@@ -1,9 +1,8 @@
-"""Annuaire public + autocomplete + liste admin des personnes (async)."""
+"""Annuaire public + autocomplete + liste admin des personnes (sync)."""
 
 from typing import Any
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection, text
 
 from infrastructure.db.queries.filters import (
     WhereClause,
@@ -17,8 +16,8 @@ from infrastructure.db.queries.filters import (
 # ── Annuaire public ──────────────────────────────────────────────
 
 
-async def persons_directory(
-    conn: AsyncConnection, *, filters: Any, page: int, per_page: int, sort: str
+def persons_directory(
+    conn: Connection, *, filters: Any, page: int, per_page: int, sort: str
 ) -> dict[str, Any]:
     """Annuaire public des personnes avec ORCID et idHAL."""
     offset = (page - 1) * per_page
@@ -50,48 +49,44 @@ async def persons_directory(
     where_sql, binds = assemble_where(clauses)
     order = persons_sort_clause(sort)
 
-    count_row = (
-        await conn.execute(
-            text(
-                f"SELECT COUNT(*) AS total FROM persons p "
-                f"LEFT JOIN persons_rh prh ON prh.person_id = p.id WHERE {where_sql}"
-            ),
-            binds,
-        )
+    count_row = conn.execute(
+        text(
+            f"SELECT COUNT(*) AS total FROM persons p "
+            f"LEFT JOIN persons_rh prh ON prh.person_id = p.id WHERE {where_sql}"
+        ),
+        binds,
     ).one()
     total = count_row.total
 
-    rows = (
-        await conn.execute(
-            text(f"""
-                SELECT
-                    p.id, p.last_name, p.first_name,
-                    prh.role_title, prh.department_name,
-                    (prh.id IS NOT NULL) AS has_rh,
-                    (SELECT COUNT(DISTINCT a.publication_id)
-                     FROM authorships a
-                     WHERE a.person_id = p.id AND a.roles && ARRAY['author']::text[]
-                    ) AS pub_count,
-                    (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
-                     FROM person_identifiers pi
-                     WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
-                    ) AS orcids,
-                    (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
-                     FROM person_identifiers pi
-                     WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
-                    ) AS idhals,
-                    (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
-                     FROM person_identifiers pi
-                     WHERE pi.person_id = p.id AND pi.id_type = 'idref' AND pi.status != 'rejected'
-                    ) AS idrefs
-                FROM persons p
-                LEFT JOIN persons_rh prh ON prh.person_id = p.id
-                WHERE {where_sql}
-                ORDER BY {order}
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
-            {**binds, "pg_limit": per_page, "pg_offset": offset},
-        )
+    rows = conn.execute(
+        text(f"""
+            SELECT
+                p.id, p.last_name, p.first_name,
+                prh.role_title, prh.department_name,
+                (prh.id IS NOT NULL) AS has_rh,
+                (SELECT COUNT(DISTINCT a.publication_id)
+                 FROM authorships a
+                 WHERE a.person_id = p.id AND a.roles && ARRAY['author']::text[]
+                ) AS pub_count,
+                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
+                 FROM person_identifiers pi
+                 WHERE pi.person_id = p.id AND pi.id_type = 'orcid' AND pi.status != 'rejected'
+                ) AS orcids,
+                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
+                 FROM person_identifiers pi
+                 WHERE pi.person_id = p.id AND pi.id_type = 'idhal' AND pi.status != 'rejected'
+                ) AS idhals,
+                (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
+                 FROM person_identifiers pi
+                 WHERE pi.person_id = p.id AND pi.id_type = 'idref' AND pi.status != 'rejected'
+                ) AS idrefs
+            FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
+            WHERE {where_sql}
+            ORDER BY {order}
+            LIMIT :pg_limit OFFSET :pg_offset
+        """),
+        {**binds, "pg_limit": per_page, "pg_offset": offset},
     ).all()
     return {
         "total": total,
@@ -105,7 +100,7 @@ async def persons_directory(
 # ── Autocomplete ─────────────────────────────────────────────────
 
 
-async def search_persons(conn: AsyncConnection, *, q: str, limit: int) -> list[dict[str, Any]]:
+def search_persons(conn: Connection, *, q: str, limit: int) -> list[dict[str, Any]]:
     """Recherche rapide (autocomplete) : chaque mot doit matcher dans last ou first name."""
     words = q.strip().split()
     if not words:
@@ -121,19 +116,17 @@ async def search_persons(conn: AsyncConnection, *, q: str, limit: int) -> list[d
             )
         )
     where_sql, binds = assemble_where(clauses)
-    rows = (
-        await conn.execute(
-            text(f"""
-                SELECT p.id, p.last_name, p.first_name, prh.department_name,
-                       (prh.id IS NOT NULL) AS has_rh
-                FROM persons p
-                LEFT JOIN persons_rh prh ON prh.person_id = p.id
-                WHERE {where_sql}
-                ORDER BY LOWER(p.last_name), LOWER(p.first_name)
-                LIMIT :pg_limit
-            """),
-            {**binds, "pg_limit": limit},
-        )
+    rows = conn.execute(
+        text(f"""
+            SELECT p.id, p.last_name, p.first_name, prh.department_name,
+                   (prh.id IS NOT NULL) AS has_rh
+            FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
+            WHERE {where_sql}
+            ORDER BY LOWER(p.last_name), LOWER(p.first_name)
+            LIMIT :pg_limit
+        """),
+        {**binds, "pg_limit": limit},
     ).all()
     return [dict(r._mapping) for r in rows]
 
@@ -151,8 +144,8 @@ _LIST_SORT_MAP = {
 }
 
 
-async def list_persons(
-    conn: AsyncConnection, *, filters: Any, page: int, per_page: int, sort: str
+def list_persons(
+    conn: Connection, *, filters: Any, page: int, per_page: int, sort: str
 ) -> dict[str, Any]:
     """Liste des personnes avec filtres (admin)."""
     offset = (page - 1) * per_page
@@ -186,78 +179,70 @@ async def list_persons(
     where_sql, binds = assemble_where(clauses)
     order = _LIST_SORT_MAP.get(sort, _LIST_SORT_MAP["name"])
 
-    count_row = (
-        await conn.execute(
-            text(
-                f"SELECT COUNT(*) AS total FROM persons p "
-                f"LEFT JOIN persons_rh prh ON prh.person_id = p.id WHERE {where_sql}"
-            ),
-            binds,
-        )
+    count_row = conn.execute(
+        text(
+            f"SELECT COUNT(*) AS total FROM persons p "
+            f"LEFT JOIN persons_rh prh ON prh.person_id = p.id WHERE {where_sql}"
+        ),
+        binds,
     ).one()
     total = count_row.total
 
-    rows = (
-        await conn.execute(
-            text(f"""
-                SELECT p.id, p.last_name, p.first_name,
-                    p.last_name_normalized, p.first_name_normalized,
-                    prh.role_title, prh.department_name, prh.start_date, prh.end_date,
-                    (prh.id IS NOT NULL) AS has_rh, p.rejected,
-                    (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS pub_count,
-                    (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id AND a.in_perimeter = TRUE) AS uca_pub_count
-                FROM persons p
-                LEFT JOIN persons_rh prh ON prh.person_id = p.id
-                WHERE {where_sql}
-                ORDER BY {order}
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
-            {**binds, "pg_limit": per_page, "pg_offset": offset},
-        )
+    rows = conn.execute(
+        text(f"""
+            SELECT p.id, p.last_name, p.first_name,
+                p.last_name_normalized, p.first_name_normalized,
+                prh.role_title, prh.department_name, prh.start_date, prh.end_date,
+                (prh.id IS NOT NULL) AS has_rh, p.rejected,
+                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id) AS pub_count,
+                (SELECT COUNT(*) FROM authorships a WHERE a.person_id = p.id AND a.in_perimeter = TRUE) AS uca_pub_count
+            FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
+            WHERE {where_sql}
+            ORDER BY {order}
+            LIMIT :pg_limit OFFSET :pg_offset
+        """),
+        {**binds, "pg_limit": per_page, "pg_offset": offset},
     ).all()
     persons_rows = [dict(r._mapping) for r in rows]
     person_ids = [p["id"] for p in persons_rows]
 
     identifiers_map: dict[int, Any] = {}
     if person_ids:
-        id_rows = (
-            await conn.execute(
-                text("""
-                    SELECT pi.person_id,
-                           json_agg(json_build_object(
-                               'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
-                               'source', pi.source, 'status', pi.status
-                           ) ORDER BY pi.id_type, pi.id_value) AS identifiers
-                    FROM person_identifiers pi
-                    WHERE pi.person_id = ANY(:ids)
-                    GROUP BY pi.person_id
-                """),
-                {"ids": person_ids},
-            )
+        id_rows = conn.execute(
+            text("""
+                SELECT pi.person_id,
+                       json_agg(json_build_object(
+                           'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
+                           'source', pi.source, 'status', pi.status
+                       ) ORDER BY pi.id_type, pi.id_value) AS identifiers
+                FROM person_identifiers pi
+                WHERE pi.person_id = ANY(:ids)
+                GROUP BY pi.person_id
+            """),
+            {"ids": person_ids},
         ).all()
         for r in id_rows:
             identifiers_map[r.person_id] = r.identifiers
 
     name_forms_map: dict[int, Any] = {}
     if person_ids:
-        nf_rows = (
-            await conn.execute(
-                text("""
-                    SELECT pid AS person_id,
-                           json_agg(json_build_object(
-                               'name_form', pnf.name_form,
-                               'sources', pnf.sources,
-                               'ambiguous', (array_length(pnf.person_ids, 1) > 1)
-                           ) ORDER BY pnf.name_form) AS name_forms
-                    FROM person_name_forms pnf,
-                         LATERAL unnest(pnf.person_ids) AS pid
-                    WHERE pid = ANY(:ids)
-                      AND pnf.sources IS NOT NULL
-                      AND NOT (pnf.sources = ARRAY['persons']::text[])
-                    GROUP BY pid
-                """),
-                {"ids": person_ids},
-            )
+        nf_rows = conn.execute(
+            text("""
+                SELECT pid AS person_id,
+                       json_agg(json_build_object(
+                           'name_form', pnf.name_form,
+                           'sources', pnf.sources,
+                           'ambiguous', (array_length(pnf.person_ids, 1) > 1)
+                       ) ORDER BY pnf.name_form) AS name_forms
+                FROM person_name_forms pnf,
+                     LATERAL unnest(pnf.person_ids) AS pid
+                WHERE pid = ANY(:ids)
+                  AND pnf.sources IS NOT NULL
+                  AND NOT (pnf.sources = ARRAY['persons']::text[])
+                GROUP BY pid
+            """),
+            {"ids": person_ids},
         ).all()
         for r in nf_rows:
             name_forms_map[r.person_id] = r.name_forms

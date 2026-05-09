@@ -1,18 +1,21 @@
-"""Tests de caractérisation pour services/persons.py.
+"""Tests de caractérisation pour application/persons.py.
 
 Couvre link/unlink_authorship (branches source invalide), add_identifier,
-detach_name_form, assign_orphan_authorship (qui couvre _ensure_truth_authorship).
-merge_person est déjà testé dans test_integration.py.
+detach_name_form, assign_orphan_authorship (qui couvre _ensure_truth_authorship),
+merge_person, etc.
 """
 
+import json
+
 import pytest
+from sqlalchemy import text
 
 from application.persons import (
     add_identifier,
     add_identifiers_from_authorships,
     assign_orphan_authorship,
-    async_create_person,
     batch_assign_orphan_authorships,
+    create_person,
     detach_authorships,
     detach_name_form,
     link_authorship,
@@ -26,28 +29,29 @@ from application.persons import (
 )
 from domain.errors import NotFoundError, ValidationError
 from infrastructure.repositories import (
-    async_authorship_repository,
-    async_person_repository,
+    authorship_repository,
     person_repository,
 )
 
 
 @pytest.fixture
 def repo(db):
+    """Repository sync via cur psycopg (pipeline-style tests)."""
     return person_repository(db)
 
 
 @pytest.fixture
-def async_authorship_repo(async_db):
-    return async_authorship_repository(async_db)
+def sa_repo(sa_sync_conn):
+    """Repository sync via Connection SA (API-style tests)."""
+    return person_repository(sa_sync_conn)
 
 
 @pytest.fixture
-def async_repo(async_db):
-    return async_person_repository(async_db)
+def authorship_repo(sa_sync_conn):
+    return authorship_repository(sa_sync_conn)
 
 
-# ── Helpers ────────────────────────────────────────────────────────
+# ── Helpers psycopg cur (pipeline-style) ─────────────────────────
 
 
 def _insert_person(db, last="Dupont", first="Jean"):
@@ -86,8 +90,6 @@ def _insert_source_publication(db, publication_id, source="hal", source_id="hal-
 def _insert_source_person(
     db, source="hal", source_id="hal-p-1", full_name="Jean Dupont", source_ids=None
 ):
-    import json
-
     db.execute(
         """
         INSERT INTO source_persons (source, source_id, full_name, source_ids)
@@ -128,57 +130,60 @@ def _insert_source_authorship(
     return db.fetchone()["id"]
 
 
-async def _a_insert_person(db, last="Dupont", first="Jean"):
-    await db.execute(
-        """
-        INSERT INTO persons (last_name, first_name,
-                             last_name_normalized, first_name_normalized)
-        VALUES (%s, %s, lower(%s), lower(%s))
-        RETURNING id
-        """,
-        (last, first, last, first),
-    )
-    return (await db.fetchone())["id"]
+# ── Helpers Connection SA (API-style) ────────────────────────────
 
 
-async def _a_insert_publication(db, title="Test"):
-    await db.execute(
-        "INSERT INTO publications (title, pub_year) VALUES (%s, 2024) RETURNING id",
-        (title,),
-    )
-    return (await db.fetchone())["id"]
+def _sa_insert_person(conn, last="Dupont", first="Jean"):
+    row = conn.execute(
+        text(
+            "INSERT INTO persons (last_name, first_name, "
+            "                     last_name_normalized, first_name_normalized) "
+            "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
+        ),
+        {"l": last, "f": first},
+    ).one()
+    return row.id
 
 
-async def _a_insert_source_publication(db, publication_id, source="hal", source_id="hal-1"):
-    await db.execute(
-        """
-        INSERT INTO source_publications (source, source_id, title, publication_id)
-        VALUES (%s, %s, 'Test', %s)
-        RETURNING id
-        """,
-        (source, source_id, publication_id),
-    )
-    return (await db.fetchone())["id"]
+def _sa_insert_publication(conn, title="Test"):
+    row = conn.execute(
+        text("INSERT INTO publications (title, pub_year) VALUES (:t, 2024) RETURNING id"),
+        {"t": title},
+    ).one()
+    return row.id
 
 
-async def _a_insert_source_person(
-    db, source="hal", source_id="hal-p-1", full_name="Jean Dupont", source_ids=None
+def _sa_insert_source_publication(conn, publication_id, source="hal", source_id="hal-1"):
+    row = conn.execute(
+        text(
+            "INSERT INTO source_publications (source, source_id, title, publication_id) "
+            "VALUES (:s, :sid, 'Test', :pid) RETURNING id"
+        ),
+        {"s": source, "sid": source_id, "pid": publication_id},
+    ).one()
+    return row.id
+
+
+def _sa_insert_source_person(
+    conn, source="hal", source_id="hal-p-1", full_name="Jean Dupont", source_ids=None
 ):
-    import json
+    row = conn.execute(
+        text(
+            "INSERT INTO source_persons (source, source_id, full_name, source_ids) "
+            "VALUES (:s, :sid, :n, CAST(:si AS jsonb)) RETURNING id"
+        ),
+        {
+            "s": source,
+            "sid": source_id,
+            "n": full_name,
+            "si": json.dumps(source_ids) if source_ids else None,
+        },
+    ).one()
+    return row.id
 
-    await db.execute(
-        """
-        INSERT INTO source_persons (source, source_id, full_name, source_ids)
-        VALUES (%s, %s, %s, %s::jsonb)
-        RETURNING id
-        """,
-        (source, source_id, full_name, json.dumps(source_ids) if source_ids else None),
-    )
-    return (await db.fetchone())["id"]
 
-
-async def _a_insert_source_authorship(
-    db,
+def _sa_insert_source_authorship(
+    conn,
     source_publication_id,
     source_person_id,
     source="hal",
@@ -186,24 +191,42 @@ async def _a_insert_source_authorship(
     author_name_normalized="jean dupont",
     excluded=False,
 ):
-    await db.execute(
-        """
-        INSERT INTO source_authorships (source, source_publication_id,
-                                        source_person_id, person_id,
-                                        author_name_normalized, excluded)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        RETURNING id
-        """,
-        (
-            source,
-            source_publication_id,
-            source_person_id,
-            person_id,
-            author_name_normalized,
-            excluded,
+    row = conn.execute(
+        text(
+            "INSERT INTO source_authorships (source, source_publication_id, "
+            "                                source_person_id, person_id, "
+            "                                author_name_normalized, excluded) "
+            "VALUES (:s, :spid, :sper, :pid, :anf, :ex) RETURNING id"
         ),
+        {
+            "s": source,
+            "spid": source_publication_id,
+            "sper": source_person_id,
+            "pid": person_id,
+            "anf": author_name_normalized,
+            "ex": excluded,
+        },
+    ).one()
+    return row.id
+
+
+def _sa_setup_uca(conn):
+    """Périmètre UCA minimal pour les tests qui dépendent de in_perimeter."""
+    uca_id = conn.execute(
+        text(
+            "INSERT INTO structures (code, name, structure_type) "
+            "VALUES ('UCA', 'UCA', CAST('universite' AS structure_type)) RETURNING id"
+        )
+    ).scalar_one()
+    conn.execute(
+        text("INSERT INTO perimeters (code, name, structure_ids) VALUES ('uca', 'UCA', :ids)"),
+        {"ids": [uca_id]},
     )
-    return (await db.fetchone())["id"]
+    conn.execute(
+        text("INSERT INTO config (key, value) VALUES ('perimeter_persons', CAST(:v AS jsonb))"),
+        {"v": json.dumps("uca")},
+    )
+    return uca_id
 
 
 # ── link_authorship / unlink_authorship ────────────────────────────
@@ -326,284 +349,283 @@ class TestAddIdentifier:
 
 
 class TestRemoveIdentifier:
-    async def test_removes_existing(self, async_db, async_repo):
-        p = await _a_insert_person(async_db)
-        await async_db.execute(
-            "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-            "VALUES (%s, 'orcid', '0000-0001', 'auto', 'pending')",
-            (p,),
+    def test_removes_existing(self, sa_sync_conn, sa_repo):
+        p = _sa_insert_person(sa_sync_conn)
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+                "VALUES (:p, 'orcid', '0000-0001', 'auto', 'pending')"
+            ),
+            {"p": p},
         )
-        await remove_identifier(async_db, p, "orcid", "0000-0001", repo=async_repo)
-        await async_db.execute("SELECT id FROM person_identifiers WHERE id_value = '0000-0001'")
-        assert await async_db.fetchone() is None
+        remove_identifier(sa_sync_conn, p, "orcid", "0000-0001", repo=sa_repo)
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM person_identifiers WHERE id_value = '0000-0001'")
+        ).first()
+        assert row is None
 
-    async def test_raises_not_found(self, async_db, async_repo):
-        p = await _a_insert_person(async_db)
+    def test_raises_not_found(self, sa_sync_conn, sa_repo):
+        p = _sa_insert_person(sa_sync_conn)
         with pytest.raises(NotFoundError):
-            await remove_identifier(async_db, p, "orcid", "unknown", repo=async_repo)
+            remove_identifier(sa_sync_conn, p, "orcid", "unknown", repo=sa_repo)
 
 
 class TestUpdateIdentifierStatus:
-    async def test_sets_status(self, async_db, async_repo):
-        p = await _a_insert_person(async_db)
-        await async_db.execute(
-            "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-            "VALUES (%s, 'orcid', '0000-0001', 'auto', 'pending') RETURNING id",
-            (p,),
-        )
-        ident_id = (await async_db.fetchone())["id"]
+    def test_sets_status(self, sa_sync_conn, sa_repo):
+        p = _sa_insert_person(sa_sync_conn)
+        ident_id = sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+                "VALUES (:p, 'orcid', '0000-0001', 'auto', 'pending') RETURNING id"
+            ),
+            {"p": p},
+        ).scalar_one()
 
-        row = await update_identifier_status(async_db, ident_id, "confirmed", repo=async_repo)
+        row = update_identifier_status(sa_sync_conn, ident_id, "confirmed", repo=sa_repo)
 
         assert row["status"] == "confirmed"
 
-    async def test_raises_not_found(self, async_db, async_repo):
+    def test_raises_not_found(self, sa_sync_conn, sa_repo):
         with pytest.raises(NotFoundError):
-            await update_identifier_status(async_db, 999999, "confirmed", repo=async_repo)
+            update_identifier_status(sa_sync_conn, 999999, "confirmed", repo=sa_repo)
 
 
 class TestReassignIdentifier:
-    async def test_reassigns(self, async_db, async_repo):
-        p1 = await _a_insert_person(async_db, "A", "A")
-        p2 = await _a_insert_person(async_db, "B", "B")
-        await async_db.execute(
-            "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-            "VALUES (%s, 'orcid', '0000-0001', 'auto', 'pending') RETURNING id",
-            (p1,),
-        )
-        ident_id = (await async_db.fetchone())["id"]
+    def test_reassigns(self, sa_sync_conn, sa_repo):
+        p1 = _sa_insert_person(sa_sync_conn, "A", "A")
+        p2 = _sa_insert_person(sa_sync_conn, "B", "B")
+        ident_id = sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+                "VALUES (:p, 'orcid', '0000-0001', 'auto', 'pending') RETURNING id"
+            ),
+            {"p": p1},
+        ).scalar_one()
 
-        await reassign_identifier(async_db, ident_id, p2, repo=async_repo)
+        reassign_identifier(sa_sync_conn, ident_id, p2, repo=sa_repo)
 
-        await async_db.execute(
-            "SELECT person_id, status::text AS status FROM person_identifiers WHERE id = %s",
-            (ident_id,),
-        )
-        row = await async_db.fetchone()
-        assert row["person_id"] == p2
-        assert row["status"] == "pending"
+        row = sa_sync_conn.execute(
+            text("SELECT person_id, status::text AS status FROM person_identifiers WHERE id = :i"),
+            {"i": ident_id},
+        ).one()
+        assert row.person_id == p2
+        assert row.status == "pending"
 
-    async def test_raises_not_found(self, async_db, async_repo):
-        p = await _a_insert_person(async_db)
+    def test_raises_not_found(self, sa_sync_conn, sa_repo):
+        p = _sa_insert_person(sa_sync_conn)
         with pytest.raises(NotFoundError):
-            await reassign_identifier(async_db, 999999, p, repo=async_repo)
+            reassign_identifier(sa_sync_conn, 999999, p, repo=sa_repo)
 
 
 class TestSetRejected:
-    async def test_marks_rejected(self, async_db, async_repo):
-        p = await _a_insert_person(async_db)
-        await set_rejected(async_db, p, True, repo=async_repo)
-        await async_db.execute("SELECT rejected FROM persons WHERE id = %s", (p,))
-        assert (await async_db.fetchone())["rejected"] is True
+    def test_marks_rejected(self, sa_sync_conn, sa_repo):
+        p = _sa_insert_person(sa_sync_conn)
+        set_rejected(sa_sync_conn, p, True, repo=sa_repo)
+        row = sa_sync_conn.execute(
+            text("SELECT rejected FROM persons WHERE id = :p"), {"p": p}
+        ).one()
+        assert row.rejected is True
 
-    async def test_unmarks(self, async_db, async_repo):
-        p = await _a_insert_person(async_db)
-        await set_rejected(async_db, p, True, repo=async_repo)
-        await set_rejected(async_db, p, False, repo=async_repo)
-        await async_db.execute("SELECT rejected FROM persons WHERE id = %s", (p,))
-        assert (await async_db.fetchone())["rejected"] is False
+    def test_unmarks(self, sa_sync_conn, sa_repo):
+        p = _sa_insert_person(sa_sync_conn)
+        set_rejected(sa_sync_conn, p, True, repo=sa_repo)
+        set_rejected(sa_sync_conn, p, False, repo=sa_repo)
+        row = sa_sync_conn.execute(
+            text("SELECT rejected FROM persons WHERE id = :p"), {"p": p}
+        ).one()
+        assert row.rejected is False
 
-    async def test_raises_not_found(self, async_db, async_repo):
+    def test_raises_not_found(self, sa_sync_conn, sa_repo):
         with pytest.raises(NotFoundError):
-            await set_rejected(async_db, 999999, True, repo=async_repo)
+            set_rejected(sa_sync_conn, 999999, True, repo=sa_repo)
 
 
 class TestUpdateName:
-    async def test_updates_name_and_refreshes_forms(self, async_db, async_repo):
-        p = await _a_insert_person(async_db, "Dupont", "Jean")
+    def test_updates_name_and_refreshes_forms(self, sa_sync_conn, sa_repo):
+        p = _sa_insert_person(sa_sync_conn, "Dupont", "Jean")
         # La forme 'dupont jean' doit exister pour vérifier le refresh
-        await async_db.execute(
-            "INSERT INTO person_name_forms (name_form, person_ids, sources) "
-            "VALUES ('dupont jean', ARRAY[%s]::integer[], ARRAY['persons']::text[])",
-            (p,),
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_name_forms (name_form, person_ids, sources) "
+                "VALUES ('dupont jean', ARRAY[:p]::integer[], ARRAY['persons']::text[])"
+            ),
+            {"p": p},
         )
-        await async_db.execute("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
-        assert await async_db.fetchone() is not None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
+        ).first()
+        assert row is not None
 
-        await update_name(async_db, p, "Martin", "Sophie", repo=async_repo)
+        update_name(sa_sync_conn, p, "Martin", "Sophie", repo=sa_repo)
 
-        await async_db.execute("SELECT last_name, first_name FROM persons WHERE id = %s", (p,))
-        row = await async_db.fetchone()
-        assert row["last_name"] == "Martin"
-        assert row["first_name"] == "Sophie"
+        row = sa_sync_conn.execute(
+            text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": p}
+        ).one()
+        assert row.last_name == "Martin"
+        assert row.first_name == "Sophie"
 
         # Nouvelle forme créée
-        await async_db.execute("SELECT id FROM person_name_forms WHERE name_form = 'martin sophie'")
-        assert await async_db.fetchone() is not None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM person_name_forms WHERE name_form = 'martin sophie'")
+        ).first()
+        assert row is not None
 
-    async def test_raises_not_found(self, async_db, async_repo):
+    def test_raises_not_found(self, sa_sync_conn, sa_repo):
         with pytest.raises(NotFoundError):
-            await update_name(async_db, 999999, "X", "X", repo=async_repo)
+            update_name(sa_sync_conn, 999999, "X", "X", repo=sa_repo)
 
 
 # ── batch_assign_orphan_authorships ─────────────────────────────────
 
 
 class TestBatchAssignOrphanAuthorships:
-    async def _setup_uca(self, db):
-        import json
+    def test_empty_list_returns_zero(self, sa_sync_conn, sa_repo):
+        _sa_setup_uca(sa_sync_conn)
+        person_id = _sa_insert_person(sa_sync_conn)
+        assert batch_assign_orphan_authorships(sa_sync_conn, person_id, [], repo=sa_repo) == 0
 
-        await db.execute(
-            """
-            INSERT INTO structures (code, name, structure_type)
-            VALUES ('UCA', 'UCA', 'universite'::structure_type)
-            RETURNING id
-            """
+    def test_assigns_and_creates_truth(self, sa_sync_conn, sa_repo):
+        _sa_setup_uca(sa_sync_conn)
+        person_id = _sa_insert_person(sa_sync_conn)
+        pub_id = _sa_insert_publication(sa_sync_conn)
+        sp_hal = _sa_insert_source_publication(sa_sync_conn, pub_id, source="hal", source_id="h-1")
+        sp_oa = _sa_insert_source_publication(
+            sa_sync_conn, pub_id, source="openalex", source_id="W1"
         )
-        uca = (await db.fetchone())["id"]
-        await db.execute(
-            "INSERT INTO perimeters (code, name, structure_ids) VALUES ('uca', 'UCA', %s)",
-            ([uca],),
+        sp_person_hal = _sa_insert_source_person(sa_sync_conn, source="hal", source_id="hal-p-1")
+        sp_person_oa = _sa_insert_source_person(sa_sync_conn, source="openalex", source_id="oa-p-1")
+        sa1 = _sa_insert_source_authorship(
+            sa_sync_conn, sp_hal, sp_person_hal, source="hal", author_name_normalized="jean dupont"
         )
-        await db.execute(
-            "INSERT INTO config (key, value) VALUES ('perimeter_persons', %s::jsonb)",
-            (json.dumps("uca"),),
-        )
-
-    async def test_empty_list_returns_zero(self, async_db, async_repo):
-        await self._setup_uca(async_db)
-        person_id = await _a_insert_person(async_db)
-        assert await batch_assign_orphan_authorships(async_db, person_id, [], repo=async_repo) == 0
-
-    async def test_assigns_and_creates_truth(self, async_db, async_repo):
-        await self._setup_uca(async_db)
-        person_id = await _a_insert_person(async_db)
-        pub_id = await _a_insert_publication(async_db)
-        sp_hal = await _a_insert_source_publication(async_db, pub_id, source="hal", source_id="h-1")
-        sp_oa = await _a_insert_source_publication(
-            async_db, pub_id, source="openalex", source_id="W1"
-        )
-        sp_person_hal = await _a_insert_source_person(async_db, source="hal", source_id="hal-p-1")
-        sp_person_oa = await _a_insert_source_person(
-            async_db, source="openalex", source_id="oa-p-1"
-        )
-        sa1 = await _a_insert_source_authorship(
-            async_db, sp_hal, sp_person_hal, source="hal", author_name_normalized="jean dupont"
-        )
-        sa2 = await _a_insert_source_authorship(
-            async_db, sp_oa, sp_person_oa, source="openalex", author_name_normalized="jean dupont"
+        sa2 = _sa_insert_source_authorship(
+            sa_sync_conn,
+            sp_oa,
+            sp_person_oa,
+            source="openalex",
+            author_name_normalized="jean dupont",
         )
 
-        assigned = await batch_assign_orphan_authorships(
-            async_db, person_id, [sa1, sa2], repo=async_repo
+        assigned = batch_assign_orphan_authorships(
+            sa_sync_conn, person_id, [sa1, sa2], repo=sa_repo
         )
 
         assert assigned == 2
         # authorship vérité créée pour la publication
-        await async_db.execute(
-            "SELECT id FROM authorships WHERE publication_id = %s AND person_id = %s",
-            (pub_id, person_id),
-        )
-        assert await async_db.fetchone() is not None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE publication_id = :pub AND person_id = :pid"),
+            {"pub": pub_id, "pid": person_id},
+        ).first()
+        assert row is not None
         # FK posée sur les 2 source_authorships
-        await async_db.execute(
-            "SELECT authorship_id FROM source_authorships WHERE id = ANY(%s)",
-            ([sa1, sa2],),
-        )
-        rows = await async_db.fetchall()
-        assert all(r["authorship_id"] is not None for r in rows)
+        rows = sa_sync_conn.execute(
+            text("SELECT authorship_id FROM source_authorships WHERE id = ANY(:ids)"),
+            {"ids": [sa1, sa2]},
+        ).all()
+        assert all(r.authorship_id is not None for r in rows)
 
-    async def test_skips_already_assigned(self, async_db, async_repo):
-        await self._setup_uca(async_db)
-        p1 = await _a_insert_person(async_db, "A", "A")
-        p2 = await _a_insert_person(async_db, "B", "B")
-        pub_id = await _a_insert_publication(async_db)
-        sp_id = await _a_insert_source_publication(async_db, pub_id)
-        sp_person = await _a_insert_source_person(async_db)
+    def test_skips_already_assigned(self, sa_sync_conn, sa_repo):
+        _sa_setup_uca(sa_sync_conn)
+        p1 = _sa_insert_person(sa_sync_conn, "A", "A")
+        p2 = _sa_insert_person(sa_sync_conn, "B", "B")
+        pub_id = _sa_insert_publication(sa_sync_conn)
+        sp_id = _sa_insert_source_publication(sa_sync_conn, pub_id)
+        sp_person = _sa_insert_source_person(sa_sync_conn)
         # sa1 déjà assignée à p1
-        sa1 = await _a_insert_source_authorship(async_db, sp_id, sp_person, person_id=p1)
+        sa1 = _sa_insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=p1)
 
-        assigned = await batch_assign_orphan_authorships(async_db, p2, [sa1], repo=async_repo)
+        assigned = batch_assign_orphan_authorships(sa_sync_conn, p2, [sa1], repo=sa_repo)
 
         assert assigned == 0  # pas d'orpheline à rattacher
-        await async_db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa1,))
-        assert (await async_db.fetchone())["person_id"] == p1  # inchangé
+        row = sa_sync_conn.execute(
+            text("SELECT person_id FROM source_authorships WHERE id = :i"), {"i": sa1}
+        ).one()
+        assert row.person_id == p1  # inchangé
 
 
 # ── detach_authorships ─────────────────────────────────────────────
 
 
 class TestDetachAuthorships:
-    async def test_detaches_and_removes_truth_if_orphan(
-        self, async_db, async_repo, async_authorship_repo
-    ):
-        person_id = await _a_insert_person(async_db)
-        pub_id = await _a_insert_publication(async_db)
-        sp_id = await _a_insert_source_publication(async_db, pub_id)
-        sp_person = await _a_insert_source_person(async_db)
-        await async_db.execute(
-            "INSERT INTO authorships (publication_id, person_id) VALUES (%s, %s) RETURNING id",
-            (pub_id, person_id),
-        )
-        auth_id = (await async_db.fetchone())["id"]
-        sa_id = await _a_insert_source_authorship(async_db, sp_id, sp_person, person_id=person_id)
+    def test_detaches_and_removes_truth_if_orphan(self, sa_sync_conn, sa_repo, authorship_repo):
+        person_id = _sa_insert_person(sa_sync_conn)
+        pub_id = _sa_insert_publication(sa_sync_conn)
+        sp_id = _sa_insert_source_publication(sa_sync_conn, pub_id)
+        sp_person = _sa_insert_source_person(sa_sync_conn)
+        auth_id = sa_sync_conn.execute(
+            text(
+                "INSERT INTO authorships (publication_id, person_id) "
+                "VALUES (:pub, :pid) RETURNING id"
+            ),
+            {"pub": pub_id, "pid": person_id},
+        ).scalar_one()
+        sa_id = _sa_insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=person_id)
 
-        result = await detach_authorships(
-            async_db,
+        result = detach_authorships(
+            sa_sync_conn,
             person_id,
             authorships=[{"source": "hal", "authorship_id": sa_id}],
-            repo=async_repo,
-            authorship_repo=async_authorship_repo,
+            repo=sa_repo,
+            authorship_repo=authorship_repo,
         )
 
         assert result["detached"] == 1
         assert result["deleted_authorships"] == 1
         # source_authorship détaché
-        await async_db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa_id,))
-        assert (await async_db.fetchone())["person_id"] is None
+        row = sa_sync_conn.execute(
+            text("SELECT person_id FROM source_authorships WHERE id = :i"), {"i": sa_id}
+        ).one()
+        assert row.person_id is None
         # authorship vérité supprimée (orpheline)
-        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (auth_id,))
-        assert await async_db.fetchone() is None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE id = :i"), {"i": auth_id}
+        ).first()
+        assert row is None
 
-    async def test_cleans_name_form_when_no_remaining(
-        self, async_db, async_repo, async_authorship_repo
-    ):
-        person_id = await async_create_person(async_db, "Dupont", "Jean", repo=async_repo)
-        # add_name_form simulé via async_create_person
+    def test_cleans_name_form_when_no_remaining(self, sa_sync_conn, sa_repo, authorship_repo):
+        person_id = create_person(sa_sync_conn, "Dupont", "Jean", repo=sa_repo)
+        # add_name_form simulé via create_person
 
         # Pas de source_authorship portant "dupont jean" → la forme est nettoyée
-        result = await detach_authorships(
-            async_db,
+        result = detach_authorships(
+            sa_sync_conn,
             person_id,
             authorships=[],
             name_form="dupont jean",
-            repo=async_repo,
-            authorship_repo=async_authorship_repo,
+            repo=sa_repo,
+            authorship_repo=authorship_repo,
         )
         assert result["cleaned_form"] is True
 
-        await async_db.execute("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
+        row = sa_sync_conn.execute(
+            text("SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'")
+        ).first()
         # La forme a été retirée ou la person_id a été enlevée
-        row = await async_db.fetchone()
         if row:
-            await async_db.execute(
-                "SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'"
-            )
-            assert person_id not in ((await async_db.fetchone())["person_ids"] or [])
+            assert person_id not in (row.person_ids or [])
 
-    async def test_keeps_name_form_if_another_authorship_uses_it(
-        self, async_db, async_repo, async_authorship_repo
+    def test_keeps_name_form_if_another_authorship_uses_it(
+        self, sa_sync_conn, sa_repo, authorship_repo
     ):
-        person_id = await async_create_person(async_db, "Dupont", "Jean", repo=async_repo)
-        pub_id = await _a_insert_publication(async_db)
-        sp_id = await _a_insert_source_publication(async_db, pub_id)
-        sp_person = await _a_insert_source_person(async_db)
+        person_id = create_person(sa_sync_conn, "Dupont", "Jean", repo=sa_repo)
+        pub_id = _sa_insert_publication(sa_sync_conn)
+        sp_id = _sa_insert_source_publication(sa_sync_conn, pub_id)
+        sp_person = _sa_insert_source_person(sa_sync_conn)
         # source_authorship portant la forme "dupont jean"
-        await _a_insert_source_authorship(
-            async_db,
+        _sa_insert_source_authorship(
+            sa_sync_conn,
             sp_id,
             sp_person,
             person_id=person_id,
             author_name_normalized="dupont jean",
         )
 
-        result = await detach_authorships(
-            async_db,
+        result = detach_authorships(
+            sa_sync_conn,
             person_id,
             authorships=[],
             name_form="dupont jean",
-            repo=async_repo,
-            authorship_repo=async_authorship_repo,
+            repo=sa_repo,
+            authorship_repo=authorship_repo,
         )
 
         assert result["cleaned_form"] is False
@@ -657,119 +679,97 @@ class TestAddIdentifiersFromAuthorships:
 
 
 class TestDetachNameForm:
-    async def test_removes_person_from_form(self, async_db, async_repo):
-        p1 = await async_create_person(async_db, "Dupont", "Jean", repo=async_repo)
-        p2 = await async_create_person(
-            async_db, "Dupont", "Jean", repo=async_repo
-        )  # même forme 'dupont jean'
+    def test_removes_person_from_form(self, sa_sync_conn, sa_repo):
+        p1 = create_person(sa_sync_conn, "Dupont", "Jean", repo=sa_repo)
+        p2 = create_person(sa_sync_conn, "Dupont", "Jean", repo=sa_repo)  # même forme 'dupont jean'
 
-        await detach_name_form(async_db, p1, "dupont jean", repo=async_repo)
+        detach_name_form(sa_sync_conn, p1, "dupont jean", repo=sa_repo)
 
-        await async_db.execute(
-            "SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'"
-        )
-        row = await async_db.fetchone()
+        row = sa_sync_conn.execute(
+            text("SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'")
+        ).first()
         assert row is not None
-        assert p1 not in row["person_ids"]
-        assert p2 in row["person_ids"]
+        assert p1 not in row.person_ids
+        assert p2 in row.person_ids
 
-    async def test_deletes_form_when_last_person_detached(self, async_db, async_repo):
-        person_id = await async_create_person(async_db, "Unique", "Name", repo=async_repo)
+    def test_deletes_form_when_last_person_detached(self, sa_sync_conn, sa_repo):
+        person_id = create_person(sa_sync_conn, "Unique", "Name", repo=sa_repo)
 
-        await detach_name_form(async_db, person_id, "name unique", repo=async_repo)
+        detach_name_form(sa_sync_conn, person_id, "name unique", repo=sa_repo)
 
-        await async_db.execute("SELECT id FROM person_name_forms WHERE name_form = 'name unique'")
-        assert await async_db.fetchone() is None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM person_name_forms WHERE name_form = 'name unique'")
+        ).first()
+        assert row is None
 
 
 # ── assign_orphan_authorship (+ _ensure_truth_authorship) ──────────
 
 
 class TestAssignOrphanAuthorship:
-    async def _setup(self, db):
-        """Monte un périmètre UCA minimal (nécessaire pour _ensure_truth_authorship)."""
-        import json
-
-        await db.execute(
-            """
-            INSERT INTO structures (code, name, structure_type)
-            VALUES ('UCA', 'UCA', 'universite'::structure_type)
-            RETURNING id
-            """
-        )
-        uca_id = (await db.fetchone())["id"]
-        await db.execute(
-            "INSERT INTO perimeters (code, name, structure_ids) VALUES ('uca', 'UCA', %s)",
-            ([uca_id],),
-        )
-        await db.execute(
-            "INSERT INTO config (key, value) VALUES ('perimeter_persons', %s::jsonb)",
-            (json.dumps("uca"),),
-        )
-        return uca_id
-
-    async def test_raises_on_invalid_source(self, async_db, async_repo):
+    def test_raises_on_invalid_source(self, sa_sync_conn, sa_repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            await assign_orphan_authorship(async_db, 1, "invalid", 1, repo=async_repo)
+            assign_orphan_authorship(sa_sync_conn, 1, "invalid", 1, repo=sa_repo)
 
-    async def test_returns_false_if_already_assigned(self, async_db, async_repo):
+    def test_returns_false_if_already_assigned(self, sa_sync_conn, sa_repo):
         """Si l'authorship a déjà un person_id, l'UPDATE ne matche pas."""
-        await self._setup(async_db)
-        person_id = await _a_insert_person(async_db)
-        other_id = await _a_insert_person(async_db, "Other", "Author")
-        pub_id = await _a_insert_publication(async_db)
-        sp_id = await _a_insert_source_publication(async_db, pub_id)
-        sp_person = await _a_insert_source_person(async_db)
-        sa_id = await _a_insert_source_authorship(async_db, sp_id, sp_person, person_id=other_id)
+        _sa_setup_uca(sa_sync_conn)
+        person_id = _sa_insert_person(sa_sync_conn)
+        other_id = _sa_insert_person(sa_sync_conn, "Other", "Author")
+        pub_id = _sa_insert_publication(sa_sync_conn)
+        sp_id = _sa_insert_source_publication(sa_sync_conn, pub_id)
+        sp_person = _sa_insert_source_person(sa_sync_conn)
+        sa_id = _sa_insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=other_id)
 
         assert (
-            await assign_orphan_authorship(async_db, person_id, "hal", sa_id, repo=async_repo)
-            is False
+            assign_orphan_authorship(sa_sync_conn, person_id, "hal", sa_id, repo=sa_repo) is False
         )
 
-    async def test_assigns_and_creates_truth_authorship(self, async_db, async_repo):
-        await self._setup(async_db)
-        person_id = await _a_insert_person(async_db)
-        pub_id = await _a_insert_publication(async_db)
-        sp_id = await _a_insert_source_publication(async_db, pub_id)
-        sp_person = await _a_insert_source_person(async_db)
-        sa_id = await _a_insert_source_authorship(async_db, sp_id, sp_person)  # orpheline
+    def test_assigns_and_creates_truth_authorship(self, sa_sync_conn, sa_repo):
+        _sa_setup_uca(sa_sync_conn)
+        person_id = _sa_insert_person(sa_sync_conn)
+        pub_id = _sa_insert_publication(sa_sync_conn)
+        sp_id = _sa_insert_source_publication(sa_sync_conn, pub_id)
+        sp_person = _sa_insert_source_person(sa_sync_conn)
+        sa_id = _sa_insert_source_authorship(sa_sync_conn, sp_id, sp_person)  # orpheline
 
-        result = await assign_orphan_authorship(async_db, person_id, "hal", sa_id, repo=async_repo)
+        result = assign_orphan_authorship(sa_sync_conn, person_id, "hal", sa_id, repo=sa_repo)
 
         assert result is True
         # person_id assigné sur source_authorship
-        await async_db.execute(
-            "SELECT person_id, authorship_id FROM source_authorships WHERE id = %s", (sa_id,)
-        )
-        row = await async_db.fetchone()
-        assert row["person_id"] == person_id
-        assert row["authorship_id"] is not None
+        row = sa_sync_conn.execute(
+            text("SELECT person_id, authorship_id FROM source_authorships WHERE id = :i"),
+            {"i": sa_id},
+        ).one()
+        assert row.person_id == person_id
+        assert row.authorship_id is not None
 
         # authorship vérité créée
-        await async_db.execute(
-            "SELECT id FROM authorships WHERE publication_id = %s AND person_id = %s",
-            (pub_id, person_id),
-        )
-        assert await async_db.fetchone() is not None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE publication_id = :pub AND person_id = :pid"),
+            {"pub": pub_id, "pid": person_id},
+        ).first()
+        assert row is not None
 
-    async def test_skips_name_form_if_excluded(self, async_db, async_repo):
+    def test_skips_name_form_if_excluded(self, sa_sync_conn, sa_repo):
         """Si la source authorship est excluded, pas d'ajout de name_form."""
-        await self._setup(async_db)
-        person_id = await _a_insert_person(async_db, "Zzz", "Zzz")  # forme 'zzz' / 'zzz zzz'
-        pub_id = await _a_insert_publication(async_db)
-        sp_id = await _a_insert_source_publication(async_db, pub_id)
-        sp_person = await _a_insert_source_person(async_db)
-        sa_id = await _a_insert_source_authorship(
-            async_db,
+        _sa_setup_uca(sa_sync_conn)
+        person_id = _sa_insert_person(sa_sync_conn, "Zzz", "Zzz")  # forme 'zzz' / 'zzz zzz'
+        pub_id = _sa_insert_publication(sa_sync_conn)
+        sp_id = _sa_insert_source_publication(sa_sync_conn, pub_id)
+        sp_person = _sa_insert_source_person(sa_sync_conn)
+        sa_id = _sa_insert_source_authorship(
+            sa_sync_conn,
             sp_id,
             sp_person,
             author_name_normalized="other name",
             excluded=True,
         )
 
-        await assign_orphan_authorship(async_db, person_id, "hal", sa_id, repo=async_repo)
+        assign_orphan_authorship(sa_sync_conn, person_id, "hal", sa_id, repo=sa_repo)
 
         # Aucune nouvelle name_form 'other name' n'a été créée
-        await async_db.execute("SELECT id FROM person_name_forms WHERE name_form = 'other name'")
-        assert await async_db.fetchone() is None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM person_name_forms WHERE name_form = 'other name'")
+        ).first()
+        assert row is None

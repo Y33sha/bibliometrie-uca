@@ -6,14 +6,13 @@ Le package est organisé par thème :
 - `detail` : `get_person`, `person_profile`, `person_theses`, `person_addresses`,
   `person_dashboard`, `person_subjects`
 - `admin` : `person_exists`, orphan authorships, name-form authorships
-- `create` : `PgPersonsCreateQueries` (adapter du port
-  `application.ports.persons_create`)
+- `create` : `PgPersonsCreateQueries` (adapter sync du port
+  `application.ports.persons_create`, consommé par le pipeline)
 
-`PgAsyncPersonsQueries` agrège l'ensemble des fonctions de lecture +
-admin sous le port
-`application.ports.persons_queries.AsyncPersonsQueries`. Les dataclasses
-`DirectoryFilters` / `ListFilters` / `FacetFilters` vivent côté port
-(source de vérité), ici on type `filters: Any`.
+`PgPersonsQueries` agrège l'ensemble des fonctions de lecture + admin
+sous le port `application.ports.persons_queries.PersonsQueries`.
+Les dataclasses `DirectoryFilters` / `ListFilters` / `FacetFilters`
+vivent côté port (source de vérité), ici on type `filters: Any`.
 """
 
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module
@@ -23,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection
 
 from infrastructure.db.queries.persons.admin import (
     list_orphan_authorships as _list_orphan_authorships,
@@ -82,73 +81,73 @@ from infrastructure.db.queries.persons.list import (
 )
 
 
-class PgAsyncPersonsQueries:
-    """Adapter SA pour `application.ports.persons_queries.AsyncPersonsQueries`."""
+class PgPersonsQueries:
+    """Adapter SA pour `application.ports.persons_queries.PersonsQueries`."""
 
-    def __init__(self, conn: AsyncConnection) -> None:
+    def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
     # ── Annuaire / recherche / liste admin ─────────────────────────
 
-    async def persons_directory(self, **kwargs: Any) -> dict[str, Any]:
-        return await _persons_directory(self._conn, **kwargs)
+    def persons_directory(self, **kwargs: Any) -> dict[str, Any]:
+        return _persons_directory(self._conn, **kwargs)
 
-    async def search_persons(self, **kwargs: Any) -> list[dict[str, Any]]:
-        return await _search_persons(self._conn, **kwargs)
+    def search_persons(self, **kwargs: Any) -> list[dict[str, Any]]:
+        return _search_persons(self._conn, **kwargs)
 
-    async def list_persons(self, **kwargs: Any) -> dict[str, Any]:
-        return await _list_persons(self._conn, **kwargs)
+    def list_persons(self, **kwargs: Any) -> dict[str, Any]:
+        return _list_persons(self._conn, **kwargs)
 
     # ── Facettes / listes de référence / stats ─────────────────────
 
-    async def persons_facets(self, **kwargs: Any) -> dict[str, Any]:
-        return await _persons_facets(self._conn, **kwargs)
+    def persons_facets(self, **kwargs: Any) -> dict[str, Any]:
+        return _persons_facets(self._conn, **kwargs)
 
-    async def list_departments(self) -> list[dict[str, Any]]:
-        return await _list_departments(self._conn)
+    def list_departments(self) -> list[dict[str, Any]]:
+        return _list_departments(self._conn)
 
-    async def list_roles(self) -> list[dict[str, Any]]:
-        return await _list_roles(self._conn)
+    def list_roles(self) -> list[dict[str, Any]]:
+        return _list_roles(self._conn)
 
-    async def persons_stats(self) -> dict[str, Any]:
-        return await _persons_stats(self._conn)
+    def persons_stats(self) -> dict[str, Any]:
+        return _persons_stats(self._conn)
 
     # ── Détail d'une personne ──────────────────────────────────────
 
-    async def get_person(self, person_id: int) -> dict[str, Any] | None:
-        return await _get_person(self._conn, person_id)
+    def get_person(self, person_id: int) -> dict[str, Any] | None:
+        return _get_person(self._conn, person_id)
 
-    async def person_profile(self, person_id: int) -> dict[str, Any] | None:
-        return await _person_profile(self._conn, person_id)
+    def person_profile(self, person_id: int) -> dict[str, Any] | None:
+        return _person_profile(self._conn, person_id)
 
-    async def person_theses(self, person_id: int) -> dict[str, Any]:
-        return await _person_theses(self._conn, person_id)
+    def person_theses(self, person_id: int) -> dict[str, Any]:
+        return _person_theses(self._conn, person_id)
 
-    async def person_addresses(self, person_id: int, *, page: int, per_page: int) -> dict[str, Any]:
-        return await _person_addresses(self._conn, person_id, page=page, per_page=per_page)
+    def person_addresses(self, person_id: int, *, page: int, per_page: int) -> dict[str, Any]:
+        return _person_addresses(self._conn, person_id, page=page, per_page=per_page)
 
-    async def person_dashboard(self, person_id: int) -> dict[str, Any]:
-        return await _person_dashboard(self._conn, person_id)
+    def person_dashboard(self, person_id: int) -> dict[str, Any]:
+        return _person_dashboard(self._conn, person_id)
 
-    async def person_subjects(self, person_id: int, *, limit: int) -> list[dict[str, Any]]:
-        return await _person_subjects(self._conn, person_id, limit=limit)
+    def person_subjects(self, person_id: int, *, limit: int) -> list[dict[str, Any]]:
+        return _person_subjects(self._conn, person_id, limit=limit)
 
     # ── Admin : existence, orphan authorships, name forms ──────────
 
-    async def person_exists(self, person_id: int) -> bool:
-        return await _person_exists(self._conn, person_id)
+    def person_exists(self, person_id: int) -> bool:
+        return _person_exists(self._conn, person_id)
 
-    async def orphan_authorships_count(self) -> dict[str, Any]:
-        return await _orphan_authorships_count(self._conn)
+    def orphan_authorships_count(self) -> dict[str, Any]:
+        return _orphan_authorships_count(self._conn)
 
-    async def list_orphan_authorships(self, **kwargs: Any) -> dict[str, Any]:
-        return await _list_orphan_authorships(self._conn, **kwargs)
+    def list_orphan_authorships(self, **kwargs: Any) -> dict[str, Any]:
+        return _list_orphan_authorships(self._conn, **kwargs)
 
-    async def name_form_authorships(self, person_id: int, name_form: str) -> dict[str, Any]:
-        return await _name_form_authorships(self._conn, person_id, name_form)
+    def name_form_authorships(self, person_id: int, name_form: str) -> dict[str, Any]:
+        return _name_form_authorships(self._conn, person_id, name_form)
 
-    async def name_form_remaining_authorships(self, person_id: int, name_form: str) -> int:
-        return await _name_form_remaining_authorships(self._conn, person_id, name_form)
+    def name_form_remaining_authorships(self, person_id: int, name_form: str) -> int:
+        return _name_form_remaining_authorships(self._conn, person_id, name_form)
 
 
-__all__ = ["PgAsyncPersonsQueries", "PgPersonsCreateQueries"]
+__all__ = ["PgPersonsCreateQueries", "PgPersonsQueries"]

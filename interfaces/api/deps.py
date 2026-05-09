@@ -29,6 +29,7 @@ from application.ports.laboratories_queries import LaboratoriesQueries
 from application.ports.perimeter import PerimeterQueries
 from application.ports.perimeters_queries import PerimetersAdminQueries
 from application.ports.person_duplicates_queries import PersonDuplicatesQueries
+from application.ports.persons_queries import PersonsQueries
 from application.ports.publication_duplicates_queries import PublicationDuplicatesQueries
 from application.ports.publications_queries import PublicationsQueries
 from application.ports.publishers_queries import PublisherQueries
@@ -53,6 +54,7 @@ from infrastructure.db.queries.journals import PgJournalQueries
 from infrastructure.db.queries.laboratories import PgLaboratoriesQueries
 from infrastructure.db.queries.perimeter import PgPerimeterQueries, PgPerimetersAdminQueries
 from infrastructure.db.queries.person_duplicates import PgPersonDuplicatesQueries
+from infrastructure.db.queries.persons import PgPersonsQueries
 from infrastructure.db.queries.publication_duplicates import PgPublicationDuplicatesQueries
 from infrastructure.db.queries.publications import PgPublicationsQueries
 from infrastructure.db.queries.publishers import PgPublisherQueries
@@ -251,6 +253,10 @@ def authorship_repo_sync(conn: Connection = Depends(db_conn_sync)) -> Authorship
 
 def address_repo_sync(conn: Connection = Depends(db_conn_sync)) -> AddressRepository:
     return address_repository(conn)
+
+
+def persons_queries_sync(conn: Connection = Depends(db_conn_sync)) -> PersonsQueries:
+    return PgPersonsQueries(conn)
 
 
 def addresses_queries_sync(conn: Connection = Depends(db_conn_sync)) -> AddressesQueries:

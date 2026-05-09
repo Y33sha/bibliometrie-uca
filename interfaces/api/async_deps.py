@@ -34,7 +34,6 @@ from application.ports.laboratories_queries import AsyncLaboratoriesQueries
 from application.ports.perimeter import AsyncPerimeterQueries
 from application.ports.perimeters_queries import AsyncPerimetersAdminQueries
 from application.ports.person_duplicates_queries import AsyncPersonDuplicatesQueries
-from application.ports.persons_queries import AsyncPersonsQueries
 from application.ports.publication_duplicates_queries import AsyncPublicationDuplicatesQueries
 from application.ports.publishers_queries import AsyncPublisherQueries
 from application.ports.stats_queries import AsyncStatsQueries
@@ -61,7 +60,6 @@ from infrastructure.db.queries.perimeter import (
     PgAsyncPerimetersAdminQueries,
 )
 from infrastructure.db.queries.person_duplicates import PgAsyncPersonDuplicatesQueries
-from infrastructure.db.queries.persons import PgAsyncPersonsQueries
 from infrastructure.db.queries.publication_duplicates import PgAsyncPublicationDuplicatesQueries
 from infrastructure.db.queries.publishers import PgAsyncPublisherQueries
 from infrastructure.db.queries.stats import PgAsyncStatsQueries
@@ -238,12 +236,6 @@ def person_duplicates_queries(
     conn: AsyncConnection = Depends(db_conn),
 ) -> AsyncPersonDuplicatesQueries:
     return PgAsyncPersonDuplicatesQueries(conn)
-
-
-def persons_queries(
-    conn: AsyncConnection = Depends(db_conn),
-) -> AsyncPersonsQueries:
-    return PgAsyncPersonsQueries(conn)
 
 
 def publication_duplicates_queries(

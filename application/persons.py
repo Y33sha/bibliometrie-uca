@@ -8,56 +8,46 @@ du lien personne.
 
 Les auteurs sources sont dans la table unifiée `source_persons`
 (UNIQUE(source, source_id)), les authorships utilisent `source_person_id`.
-
-Variantes async migrées en SQLAlchemy Core (sous-phase 2.6 du chantier
-sqlalchemy-core-adoption) : reçoivent une `AsyncConnection` SA. La face
-sync (`create_person`, `merge_person`, `add_identifier`, etc.) reste sur
-curseur psycopg jusqu'à Phase 4.
 """
 
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection
 
-from application.audit import async_emit_event, emit_event
-from application.authorships import async_delete_orphan_authorships
+from application.audit import emit_event
+from application.authorships import delete_orphan_authorships_sync
 from domain.errors import ValidationError
 from domain.names import compute_person_name_forms
 from domain.persons.merge import check_can_merge_persons
-from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
-from domain.ports.authorship_repository import AsyncAuthorshipRepository
-from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
+from domain.ports.audit_repository import AuditRepository
+from domain.ports.authorship_repository import AuthorshipRepository
+from domain.ports.person_repository import PersonRepository
 from domain.sources import ALL_SOURCES_SET
 
 __all__ = [
-    # Fonctions utilisées par le pipeline/CLI (+ variante async pour l'API)
     "create_person",
-    "async_create_person",
     "merge_person",
-    "async_merge_person",
     "add_identifier",
-    "async_add_identifier",
     "add_identifiers_from_authorships",
     "add_name_form",
     "link_authorship",
     "link_authorships",
     "refresh_person_name_forms",
     "unlink_authorship",
-    # Fonctions API-only (async uniquement)
+    "set_rejected",
+    "update_name",
+    "remove_identifier",
+    "update_identifier_status",
+    "reassign_identifier",
+    "detach_name_form",
     "assign_orphan_authorship",
     "batch_assign_orphan_authorships",
     "detach_authorships",
-    "detach_name_form",
     "mark_distinct",
-    "reassign_identifier",
-    "remove_identifier",
-    "set_rejected",
-    "update_identifier_status",
-    "update_name",
 ]
 
 
-# ── Création ──
+# ── Création / mise à jour personne ──
 
 
 def create_person(cur: Any, last_name: str, first_name: str = "", *, repo: PersonRepository) -> int:
@@ -67,47 +57,36 @@ def create_person(cur: Any, last_name: str, first_name: str = "", *, repo: Perso
     return person_id
 
 
-async def async_create_person(
-    conn: AsyncConnection, last_name: str, first_name: str = "", *, repo: AsyncPersonRepository
-) -> int:
-    """Variante async de `create_person`."""
-    person_id = await repo.create(last_name, first_name)
-    await repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
-    return person_id
-
-
-async def set_rejected(
-    conn: AsyncConnection,
+def set_rejected(
+    conn: Connection,
     person_id: int,
     rejected: bool,
     *,
-    repo: AsyncPersonRepository,
-    audit_repo: AsyncAuditRepository | None = None,
+    repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Marque ou démarque une personne comme rejetée (fausse entité).
 
     Lève NotFoundError si la personne n'existe pas.
     """
-    await repo.set_rejected(person_id, rejected)
-    await async_emit_event(
-        audit_repo, "person.rejected", "person", person_id, {"rejected": rejected}
-    )
+    repo.set_rejected(person_id, rejected)
+    emit_event(audit_repo, "person.rejected", "person", person_id, {"rejected": rejected})
 
 
-async def update_name(
-    conn: AsyncConnection,
+def update_name(
+    conn: Connection,
     person_id: int,
     last_name: str,
     first_name: str,
     *,
-    repo: AsyncPersonRepository,
+    repo: PersonRepository,
 ) -> None:
     """Met à jour le nom/prénom d'une personne et rafraîchit ses formes de nom.
 
     Lève NotFoundError si la personne n'existe pas.
     """
-    await repo.update_name(person_id, last_name, first_name)
-    await repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
+    repo.update_name(person_id, last_name, first_name)
+    repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
 
 
 # ── Rattachement / détachement authorships ──
@@ -189,35 +168,21 @@ def add_identifier(
     repo.add_identifier(person_id, id_type, id_value, source, status)
 
 
-async def async_add_identifier(
-    conn: AsyncConnection,
-    person_id: int,
-    id_type: str,
-    id_value: str,
-    source: str = "auto",
-    status: str = "pending",
-    *,
-    repo: AsyncPersonRepository,
-) -> None:
-    """Variante async de `add_identifier`."""
-    await repo.add_identifier(person_id, id_type, id_value, source, status)
-
-
-async def remove_identifier(
-    conn: AsyncConnection,
+def remove_identifier(
+    conn: Connection,
     person_id: int,
     id_type: str,
     id_value: str,
     *,
-    repo: AsyncPersonRepository,
-    audit_repo: AsyncAuditRepository | None = None,
+    repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Supprime un identifiant d'une personne.
 
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    await repo.remove_identifier(person_id, id_type, id_value)
-    await async_emit_event(
+    repo.remove_identifier(person_id, id_type, id_value)
+    emit_event(
         audit_repo,
         "person_identifier.removed",
         "person",
@@ -226,21 +191,21 @@ async def remove_identifier(
     )
 
 
-async def update_identifier_status(
-    conn: AsyncConnection,
+def update_identifier_status(
+    conn: Connection,
     ident_id: int,
     status: str,
     *,
-    repo: AsyncPersonRepository,
-    audit_repo: AsyncAuditRepository | None = None,
+    repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> dict:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
     Retourne la ligne {id, status} mise à jour.
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    row = await repo.update_identifier_status(ident_id, status)
-    await async_emit_event(
+    row = repo.update_identifier_status(ident_id, status)
+    emit_event(
         audit_repo,
         "person_identifier.status_changed",
         "person",
@@ -250,20 +215,20 @@ async def update_identifier_status(
     return {"id": row["id"], "status": row["status"]}
 
 
-async def reassign_identifier(
-    conn: AsyncConnection,
+def reassign_identifier(
+    conn: Connection,
     ident_id: int,
     target_person_id: int,
     *,
-    repo: AsyncPersonRepository,
-    audit_repo: AsyncAuditRepository | None = None,
+    repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Réattribue un identifiant à une autre personne (status → pending).
 
     Lève NotFoundError si l'identifiant n'existe pas.
     """
-    await repo.reassign_identifier(ident_id, target_person_id)
-    await async_emit_event(
+    repo.reassign_identifier(ident_id, target_person_id)
+    emit_event(
         audit_repo,
         "person_identifier.reassigned",
         "person",
@@ -324,29 +289,24 @@ def add_name_form(
     repo.add_name_form(person_id, full_name, source=source)
 
 
-async def detach_name_form(
-    conn: AsyncConnection, person_id: int, name_form: str, *, repo: AsyncPersonRepository
+def detach_name_form(
+    conn: Connection, person_id: int, name_form: str, *, repo: PersonRepository
 ) -> None:
     """Détache une personne d'une forme de nom. Supprime la forme si
     person_ids devient vide."""
-    await repo.detach_name_form(person_id, name_form)
+    repo.detach_name_form(person_id, name_form)
 
-
-# ── Rattachement / détachement par auteur source ──
-# Ces fonctions opèrent par author_id (pas authorship_id) : elles rattachent
-# ou détachent TOUTES les authorships d'un auteur source, propagent vers
-# les authorships vérité, et gèrent les identifiants.
 
 # ── Attribution d'authorships orphelines ──
 
 
-async def assign_orphan_authorship(
-    conn: AsyncConnection,
+def assign_orphan_authorship(
+    conn: Connection,
     person_id: int,
     source: str,
     authorship_id: int,
     *,
-    repo: AsyncPersonRepository,
+    repo: PersonRepository,
 ) -> bool:
     """Attribue une authorship orpheline (person_id IS NULL) à une personne.
 
@@ -360,38 +320,38 @@ async def assign_orphan_authorship(
     if source not in ALL_SOURCES_SET:
         raise ValidationError(f"Source inconnue : {source}")
 
-    row = await repo.assign_orphan_sa(person_id, source, authorship_id)
+    row = repo.assign_orphan_sa(person_id, source, authorship_id)
     if not row:
         return False
 
     # Ajouter la forme de nom (sauf si authorship exclue)
     if row["author_name_normalized"] and not row.get("excluded"):
-        await repo.add_name_form(person_id, row["author_name_normalized"], source=source)
+        repo.add_name_form(person_id, row["author_name_normalized"], source=source)
 
     # Créer/mettre à jour l'authorship vérité
-    await repo.ensure_truth_authorship(person_id, source, authorship_id)
+    repo.ensure_truth_authorship(person_id, source, authorship_id)
     return True
 
 
-async def batch_assign_orphan_authorships(
-    conn: AsyncConnection, person_id: int, sa_ids: list[int], *, repo: AsyncPersonRepository
+def batch_assign_orphan_authorships(
+    conn: Connection, person_id: int, sa_ids: list[int], *, repo: PersonRepository
 ) -> int:
     """Attribue en batch plusieurs authorships sources orphelines à une personne.
 
     Retourne le nombre de source_authorships effectivement rattachées
     (celles qui étaient orphelines).
     """
-    return await repo.batch_assign_orphans(person_id, sa_ids)
+    return repo.batch_assign_orphans(person_id, sa_ids)
 
 
-async def detach_authorships(
-    conn: AsyncConnection,
+def detach_authorships(
+    conn: Connection,
     person_id: int,
     authorships: list[dict],
     name_form: str | None = None,
     *,
-    repo: AsyncPersonRepository,
-    authorship_repo: AsyncAuthorshipRepository,
+    repo: PersonRepository,
+    authorship_repo: AuthorshipRepository,
 ) -> dict:
     """Détache un lot d'authorships sources d'une personne et nettoie les
     authorships vérité devenues orphelines.
@@ -403,13 +363,13 @@ async def detach_authorships(
     """
     for a in authorships:
         if a["source"] in ALL_SOURCES_SET:
-            await repo.unlink_authorship(person_id, a["source"], a["authorship_id"])
+            repo.unlink_authorship(person_id, a["source"], a["authorship_id"])
 
-    deleted = await async_delete_orphan_authorships(conn, person_id, repo=authorship_repo)
+    deleted = delete_orphan_authorships_sync(conn, person_id, repo=authorship_repo)
 
     cleaned_form = False
-    if name_form and await repo.count_authorships_with_name_form(person_id, name_form) == 0:
-        await repo.detach_name_form(person_id, name_form)
+    if name_form and repo.count_authorships_with_name_form(person_id, name_form) == 0:
+        repo.detach_name_form(person_id, name_form)
         cleaned_form = True
 
     return {
@@ -466,19 +426,3 @@ def merge_person(
     check_can_merge_persons(repo.has_distinct_rh(target_id, source_id), target_id, source_id)
     repo.merge_into(target_id, source_id)
     emit_event(audit_repo, "person.merged", "person", target_id, {"source_id": source_id})
-
-
-async def async_merge_person(
-    conn: AsyncConnection,
-    target_id: int,
-    source_id: int,
-    *,
-    repo: AsyncPersonRepository,
-    audit_repo: AsyncAuditRepository | None = None,
-) -> None:
-    """Variante async de `merge_person`."""
-    check_can_merge_persons(await repo.has_distinct_rh(target_id, source_id), target_id, source_id)
-    await repo.merge_into(target_id, source_id)
-    await async_emit_event(
-        audit_repo, "person.merged", "person", target_id, {"source_id": source_id}
-    )
