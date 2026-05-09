@@ -224,6 +224,27 @@ puis les CRUD admin, puis les gros (`publications`, `persons`,
   prod basculait en même temps). Helper `infrastructure/perimeter.py:get_perimeter_structure_ids`
   étendu en dispatch (cur | Connection) pour servir
   `PgConfigQueries.get_hal_collections`. 3 tests adaptés en sync.
+- [x] `admin_pipeline.py` — déjà natif sync, rien à migrer.
+- [x] `hal_problems.py` — Protocol sync `HalProblemsQueries`, classe
+  sync `PgHalProblemsQueries`, factory `hal_problems_queries_sync`,
+  6 routes `def`. Tests interfaces : 13/13 passent.
+- [x] `admin_duplicates.py` (publications) — Protocol sync
+  `PublicationDuplicatesQueries`, classe sync `PgPublicationDuplicatesQueries`,
+  factory `publication_duplicates_queries_sync`. Services
+  `application/publications.py`: `mark_distinct` migré en sync
+  (suppression async), `async_merge_publications` supprimée
+  (utilisait `merge_publications` sync existant côté CLI). 3 routes
+  `def`, factories transverses ajoutées : `audit_repo_sync`,
+  `publication_repo_sync`. 2 tests `TestMarkDistinct` migrés en sync ;
+  `TestAsyncMergePublications` supprimé (couvert par `TestMergePublications`).
+- [x] `admin_person_duplicates.py` — Protocol sync
+  `PersonDuplicatesQueries`, classe sync `PgPersonDuplicatesQueries`,
+  factory `person_duplicates_queries_sync`. Service
+  `application/persons.py:mark_distinct` migré en sync (suppression
+  async). 5 routes `def`, factories ajoutées : `person_repo_sync`,
+  `person_duplicates_queries_sync`. 2 tests `TestMarkDistinctPersons`
+  migrés en sync ; 1 test audit sync. Total Phase 2.2 : 36 tests
+  ciblés passent.
 
 ### Phase 3 — Suppression du code async devenu mort
 

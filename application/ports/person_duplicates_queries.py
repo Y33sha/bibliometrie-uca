@@ -1,7 +1,12 @@
 """Port : lectures pour /api/admin/person-duplicates/*.
 
-Implémenté par
-`infrastructure.db.queries.person_duplicates.PgAsyncPersonDuplicatesQueries`.
+Deux variantes (chantier sync-async-deduplication, option D) :
+- `AsyncPersonDuplicatesQueries` : routers async.
+- `PersonDuplicatesQueries` : routers sync.
+
+Implémentés respectivement par `PgAsyncPersonDuplicatesQueries` et
+`PgPersonDuplicatesQueries` dans
+`infrastructure.db.queries.person_duplicates`.
 """
 
 from typing import Any, Protocol
@@ -33,5 +38,21 @@ class AsyncPersonDuplicatesQueries(Protocol):
     async def count_person_conflict_pairs(self) -> int: ...
 
     async def next_person_conflict(
+        self, *, skip_pairs: set[tuple[int, int]], offset: int
+    ) -> dict[str, Any] | None: ...
+
+
+class PersonDuplicatesQueries(Protocol):
+    """Variante sync d'`AsyncPersonDuplicatesQueries`."""
+
+    def count_person_duplicates(self) -> int: ...
+
+    def next_person_duplicate(
+        self, *, skip_pairs: set[tuple[int, int]] | None, offset: int
+    ) -> dict[str, Any] | None: ...
+
+    def count_person_conflict_pairs(self) -> int: ...
+
+    def next_person_conflict(
         self, *, skip_pairs: set[tuple[int, int]], offset: int
     ) -> dict[str, Any] | None: ...

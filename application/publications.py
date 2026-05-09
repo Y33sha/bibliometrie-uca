@@ -11,14 +11,11 @@ indépendant du type de curseur (tuple ou dict_row).
 
 from typing import Any
 
-from application.audit import async_emit_event, emit_event
+from application.audit import emit_event
 from domain.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.normalize import normalize_text
-from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
-from domain.ports.publication_repository import (
-    AsyncPublicationRepository,
-    PublicationRepository,
-)
+from domain.ports.audit_repository import AuditRepository
+from domain.ports.publication_repository import PublicationRepository
 from domain.publication import (
     OA_STATUS_UNKNOWN_DEFAULT,
     PubByDoi,
@@ -386,22 +383,22 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
     repo.update_sources(pub_id)
 
 
-async def mark_distinct(
+def mark_distinct(
     conn: Any,
     pub_id_a: int,
     pub_id_b: int,
     *,
-    repo: AsyncPublicationRepository,
-    audit_repo: AsyncAuditRepository | None = None,
+    repo: PublicationRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Marque deux publications comme distinctes (non-doublon) dans
     `distinct_publications`. Idempotent.
 
     Les IDs sont triés pour garantir l'unicité de la paire.
     """
-    inserted = await repo.mark_distinct(pub_id_a, pub_id_b)
+    inserted = repo.mark_distinct(pub_id_a, pub_id_b)
     if inserted:
-        await async_emit_event(
+        emit_event(
             audit_repo,
             "publication.marked_distinct",
             "publication",
@@ -428,26 +425,6 @@ def merge_publications(
     repo.merge_into(target_id, source_id)
     repo.update_sources(target_id)
     emit_event(
-        audit_repo,
-        "publication.merged",
-        "publication",
-        target_id,
-        {"source_id": source_id},
-    )
-
-
-async def async_merge_publications(
-    conn: Any,
-    target_id: int,
-    source_id: int,
-    *,
-    repo: AsyncPublicationRepository,
-    audit_repo: AsyncAuditRepository | None = None,
-) -> None:
-    """Variante async de `merge_publications` (utilisée par l'API admin_duplicates)."""
-    await repo.merge_into(target_id, source_id)
-    await repo.update_sources(target_id)
-    await async_emit_event(
         audit_repo,
         "publication.merged",
         "publication",

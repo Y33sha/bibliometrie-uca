@@ -167,27 +167,37 @@ class TestEndToEndServiceIntegration:
         await async_db.execute("SELECT COUNT(*) AS n FROM audit_log")
         assert (await async_db.fetchone())["n"] == 0
 
-    async def test_mark_distinct_emits_only_on_actual_insert(self, async_db):
+    def test_mark_distinct_emits_only_on_actual_insert(self, db):
         """mark_distinct est idempotent : un appel sur une paire déjà
         marquée ne doit pas générer d'événement supplémentaire."""
         from application.persons import mark_distinct
+        from infrastructure.repositories import audit_repository, person_repository
 
-        p1 = await self._a_create_person(async_db, "A", "A")
-        p2 = await self._a_create_person(async_db, "B", "B")
-        repo = async_person_repository(async_db)
-        audit_repo_ = async_audit_repository(async_db)
+        def _mk(last):
+            db.execute(
+                "INSERT INTO persons (last_name, first_name, "
+                "last_name_normalized, first_name_normalized) "
+                "VALUES (%s, %s, lower(%s), lower(%s)) RETURNING id",
+                (last, last, last, last),
+            )
+            return db.fetchone()["id"]
+
+        p1 = _mk("A")
+        p2 = _mk("B")
+        repo = person_repository(db)
+        audit_repo_ = audit_repository(db)
         token = set_current_user("admin")
         try:
-            await mark_distinct(async_db, p1, p2, repo=repo, audit_repo=audit_repo_)
-            await mark_distinct(async_db, p1, p2, repo=repo, audit_repo=audit_repo_)  # doublon
-            await mark_distinct(async_db, p2, p1, repo=repo, audit_repo=audit_repo_)  # autre sens
+            mark_distinct(db, p1, p2, repo=repo, audit_repo=audit_repo_)
+            mark_distinct(db, p1, p2, repo=repo, audit_repo=audit_repo_)  # doublon
+            mark_distinct(db, p2, p1, repo=repo, audit_repo=audit_repo_)  # autre sens
         finally:
             reset_current_user(token)
 
-        await async_db.execute(
+        db.execute(
             "SELECT COUNT(*) AS n FROM audit_log WHERE event_type = 'person.marked_distinct'"
         )
-        assert (await async_db.fetchone())["n"] == 1
+        assert db.fetchone()["n"] == 1
 
 
 class TestAsyncEmitEventViaSAConnection:

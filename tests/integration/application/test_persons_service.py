@@ -610,28 +610,28 @@ class TestDetachAuthorships:
 
 
 class TestMarkDistinctPersons:
-    async def test_inserts_ordered_pair(self, async_db, async_repo):
-        p1 = await _a_insert_person(async_db, "A", "A")
-        p2 = await _a_insert_person(async_db, "B", "B")
-        await mark_distinct(async_db, p2, p1, repo=async_repo)  # ordre inverse
-        await async_db.execute(
+    def test_inserts_ordered_pair(self, db, repo):
+        p1 = _insert_person(db, "A", "A")
+        p2 = _insert_person(db, "B", "B")
+        mark_distinct(db, p2, p1, repo=repo)  # ordre inverse
+        db.execute(
             "SELECT COUNT(*) AS n FROM distinct_persons "
             "WHERE person_id_a = %s AND person_id_b = %s",
             (min(p1, p2), max(p1, p2)),
         )
-        assert (await async_db.fetchone())["n"] == 1
+        assert db.fetchone()["n"] == 1
 
-    async def test_idempotent(self, async_db, async_repo):
-        p1 = await _a_insert_person(async_db, "A", "A")
-        p2 = await _a_insert_person(async_db, "B", "B")
-        await mark_distinct(async_db, p1, p2, repo=async_repo)
-        await mark_distinct(async_db, p1, p2, repo=async_repo)  # ON CONFLICT DO NOTHING
-        await async_db.execute(
+    def test_idempotent(self, db, repo):
+        p1 = _insert_person(db, "A", "A")
+        p2 = _insert_person(db, "B", "B")
+        mark_distinct(db, p1, p2, repo=repo)
+        mark_distinct(db, p1, p2, repo=repo)  # ON CONFLICT DO NOTHING
+        db.execute(
             "SELECT COUNT(*) AS n FROM distinct_persons "
             "WHERE person_id_a = %s AND person_id_b = %s",
             (min(p1, p2), max(p1, p2)),
         )
-        assert (await async_db.fetchone())["n"] == 1
+        assert db.fetchone()["n"] == 1
 
 
 class TestAddIdentifiersFromAuthorships:
