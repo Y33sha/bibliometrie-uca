@@ -2,7 +2,7 @@
 
 Un `perimeter` (table `perimeters`) nomme un ensemble de structures
 racines (colonne `structure_ids`) ; l'ensemble effectif est résolu par
-la CTE récursive `async_get_perimeter_structure_ids` (descend
+la CTE récursive `get_perimeter_structure_ids` (descend
 est_tutelle_de et est_partenaire_de).
 """
 
@@ -10,19 +10,19 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection
 
 from application import config as config_service
-from application.ports.config import AsyncConfigStore
-from application.ports.perimeters_queries import AsyncPerimetersAdminQueries
-from domain.ports.audit_repository import AsyncAuditRepository
-from domain.ports.perimeter_repository import AsyncPerimeterRepository
-from interfaces.api.async_deps import (
-    audit_repo,
-    config_store,
-    db_conn,
-    perimeter_repo,
-    perimeters_admin_queries,
+from application.ports.config import ConfigStore
+from application.ports.perimeters_queries import PerimetersAdminQueries
+from domain.ports.audit_repository import AuditRepository
+from domain.ports.perimeter_repository import PerimeterRepository
+from interfaces.api.deps import (
+    audit_repo_sync,
+    config_store_sync,
+    db_conn_sync,
+    perimeter_repo_sync,
+    perimeters_admin_queries_sync,
 )
 from interfaces.api.models import (
     AddPerimeterStructure,
@@ -39,8 +39,8 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/perimeters", response_model=list[PerimeterOut])
-async def list_perimeters(
-    queries: AsyncPerimetersAdminQueries = Depends(perimeters_admin_queries),
+def list_perimeters(
+    queries: PerimetersAdminQueries = Depends(perimeters_admin_queries_sync),
 ) -> Any:
     """Liste tous les périmètres avec leurs structures racines résolues.
 
@@ -49,20 +49,20 @@ async def list_perimeters(
     relations (`structure_count`). Le décompte inclut donc les
     sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
     """
-    return await queries.list_perimeters_with_structures()
+    return queries.list_perimeters_with_structures()
 
 
 @router.post("/api/perimeters", response_model=CreatedIdResponse)
-async def create_perimeter(
+def create_perimeter(
     body: PerimeterCreate,
-    conn: AsyncConnection = Depends(db_conn),
-    repo: AsyncPerimeterRepository = Depends(perimeter_repo),
+    conn: Connection = Depends(db_conn_sync),
+    repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> Any:
     """Crée un nouveau périmètre."""
     code = body.code.strip()
     name = body.name.strip()
     description = (body.description or "").strip() or None
-    pid = await config_service.create_perimeter(
+    pid = config_service.create_perimeter(
         conn,
         code=code,
         name=name,
@@ -73,11 +73,11 @@ async def create_perimeter(
 
 
 @router.put("/api/perimeters/{perimeter_id}", response_model=OkResponse)
-async def update_perimeter(
+def update_perimeter(
     perimeter_id: int,
     body: PerimeterUpdate,
-    conn: AsyncConnection = Depends(db_conn),
-    repo: AsyncPerimeterRepository = Depends(perimeter_repo),
+    conn: Connection = Depends(db_conn_sync),
+    repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> Any:
     """Met à jour un périmètre (nom, description, structures)."""
     fields = body.model_dump(exclude_unset=True)
@@ -86,38 +86,38 @@ async def update_perimeter(
         fields["name"] = fields["name"].strip()
     if "description" in fields and isinstance(fields["description"], str):
         fields["description"] = fields["description"].strip() or None
-    await config_service.update_perimeter(conn, perimeter_id, fields=fields, repo=repo)
+    config_service.update_perimeter(conn, perimeter_id, fields=fields, repo=repo)
     return {"ok": True}
 
 
 @router.delete("/api/perimeters/{perimeter_id}", response_model=OkResponse)
-async def delete_perimeter(
+def delete_perimeter(
     perimeter_id: int,
-    conn: AsyncConnection = Depends(db_conn),
-    repo: AsyncPerimeterRepository = Depends(perimeter_repo),
-    config_repo: AsyncConfigStore = Depends(config_store),
-    audit: AsyncAuditRepository = Depends(audit_repo),
+    conn: Connection = Depends(db_conn_sync),
+    repo: PerimeterRepository = Depends(perimeter_repo_sync),
+    config_repo: ConfigStore = Depends(config_store_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
-    await config_service.delete_perimeter(
+    config_service.delete_perimeter(
         conn, perimeter_id, repo=repo, config=config_repo, audit_repo=audit
     )
     return {"ok": True}
 
 
 @router.post("/api/perimeters/{perimeter_id}/structures", response_model=StatusResponse)
-async def add_perimeter_structure(
+def add_perimeter_structure(
     perimeter_id: int,
     body: AddPerimeterStructure,
-    conn: AsyncConnection = Depends(db_conn),
-    repo: AsyncPerimeterRepository = Depends(perimeter_repo),
+    conn: Connection = Depends(db_conn_sync),
+    repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> Any:
     """Ajoute une structure racine au périmètre.
 
     Renvoie `{"status": "added"}` ou `"already_exists"` si la
     structure était déjà racine.
     """
-    status = await config_service.add_perimeter_structure(
+    status = config_service.add_perimeter_structure(
         conn, perimeter_id, body.structure_id, repo=repo
     )
     return {"status": status}
@@ -126,13 +126,13 @@ async def add_perimeter_structure(
 @router.delete(
     "/api/perimeters/{perimeter_id}/structures/{structure_id}", response_model=StatusResponse
 )
-async def remove_perimeter_structure(
+def remove_perimeter_structure(
     perimeter_id: int,
     structure_id: int,
-    conn: AsyncConnection = Depends(db_conn),
-    repo: AsyncPerimeterRepository = Depends(perimeter_repo),
+    conn: Connection = Depends(db_conn_sync),
+    repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> Any:
     """Retire une structure racine du périmètre. N'affecte pas ses
     sous-structures tant qu'elles sont rattachées à d'autres racines."""
-    await config_service.remove_perimeter_structure(conn, perimeter_id, structure_id, repo=repo)
+    config_service.remove_perimeter_structure(conn, perimeter_id, structure_id, repo=repo)
     return {"status": "removed"}

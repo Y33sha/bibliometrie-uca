@@ -4,10 +4,10 @@ Fournit :
 - `client` : TestClient FastAPI pointant sur bibliometrie_test (module-scoped).
 - `auth_client` : TestClient avec cookie session admin valide.
 
-Le pool psycopg ET l'AsyncEngine SQLAlchemy du lifespan FastAPI sont
-redirigés vers bibliometrie_test par monkey-patch avant l'import de
-l'app. Pendant le chantier sqlalchemy-core-adoption, les deux cohabitent
-selon que les modules sont migrés ou non.
+Le pool psycopg, l'AsyncEngine ET le sync Engine SQLAlchemy du lifespan
+FastAPI sont redirigés vers bibliometrie_test par monkey-patch avant
+l'import de l'app. Pendant le chantier sync-async-deduplication, les
+trois cohabitent selon que les routers sont migrés ou non.
 """
 
 import os
@@ -15,7 +15,7 @@ import os
 import pytest
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
-from sqlalchemy import URL
+from sqlalchemy import URL, Engine, create_engine
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 DB_USER = os.environ["DB_USER"]
@@ -62,12 +62,26 @@ def _build_test_async_engine() -> AsyncEngine:
     return create_async_engine(url, pool_size=1, max_overflow=2, pool_pre_ping=True)
 
 
+def _build_test_sync_engine() -> Engine:
+    """Engine SA sync sur bibliometrie_test (routers migrés sync-async-dedup)."""
+    url = URL.create(
+        drivername="postgresql+psycopg",
+        username=DB_USER,
+        password=DB_PASSWORD or None,
+        host=DB_HOST,
+        port=DB_PORT,
+        database="bibliometrie_test",
+    )
+    return create_engine(url, pool_size=1, max_overflow=2, pool_pre_ping=True)
+
+
 # Patcher AVANT import de l'app
 import infrastructure.db.async_connection as _async_conn  # noqa: E402
 import infrastructure.db.engine as _engine_module  # noqa: E402
 
 _async_conn.build_async_pool = _build_test_async_pool
 _engine_module.build_async_engine = _build_test_async_engine
+_engine_module.build_sync_engine = _build_test_sync_engine
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -77,6 +91,7 @@ from interfaces.api.app import app  # noqa: E402
 # Patcher la copie locale dans app.py (import-time capture du nom)
 _app_module.build_async_pool = _build_test_async_pool
 _app_module.build_async_engine = _build_test_async_engine
+_app_module.build_sync_engine = _build_test_sync_engine
 
 from infrastructure.settings import settings as _settings  # noqa: E402
 

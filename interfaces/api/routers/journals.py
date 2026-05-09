@@ -4,18 +4,18 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection
 
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
-from application.ports.journals_queries import AsyncJournalQueries
-from domain.ports.audit_repository import AsyncAuditRepository
-from domain.ports.journal_repository import AsyncJournalRepository
-from interfaces.api.async_deps import (
-    audit_repo,
-    db_conn,
-    journal_queries,
-    journal_repo,
+from application.ports.journals_queries import JournalQueries
+from domain.ports.audit_repository import AuditRepository
+from domain.ports.journal_repository import JournalRepository
+from interfaces.api.deps import (
+    audit_repo_sync,
+    db_conn_sync,
+    journal_queries_sync,
+    journal_repo_sync,
 )
 from interfaces.api.models import JournalListResponse, JournalUpdate, MergeRequest
 
@@ -24,13 +24,13 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/journals", response_model=JournalListResponse)
-async def list_journals(
+def list_journals(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     search: str | None = None,
     publisher_id: int | None = None,
     sort: str = "title",
-    queries: AsyncJournalQueries = Depends(journal_queries),
+    queries: JournalQueries = Depends(journal_queries_sync),
 ) -> Any:
     """Liste paginée des revues avec comptage des publications rattachées.
 
@@ -39,7 +39,7 @@ async def list_journals(
     `sort` : `title` / `-title` / `publisher` / `-publisher` /
     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
     """
-    return await queries.list_journals(
+    return queries.list_journals(
         search=search,
         publisher_id=publisher_id,
         sort=sort,
@@ -49,23 +49,23 @@ async def list_journals(
 
 
 @router.get("/api/journals/{journal_id}")
-async def get_journal(
+def get_journal(
     journal_id: int,
-    queries: AsyncJournalQueries = Depends(journal_queries),
+    queries: JournalQueries = Depends(journal_queries_sync),
 ) -> Any:
     """Récupère une revue par son id (titre uniquement). 404 si inconnue."""
-    row = await queries.get_journal(journal_id)
+    row = queries.get_journal(journal_id)
     if not row:
         raise HTTPException(status_code=404, detail="Revue introuvable")
     return row
 
 
 @router.put("/api/journals/{journal_id}")
-async def update_journal(
+def update_journal(
     journal_id: int,
     body: JournalUpdate,
-    conn: AsyncConnection = Depends(db_conn),
-    repo: AsyncJournalRepository = Depends(journal_repo),
+    conn: Connection = Depends(db_conn_sync),
+    repo: JournalRepository = Depends(journal_repo_sync),
 ) -> Any:
     """Met à jour une revue (modification sélective des champs fournis).
 
@@ -73,18 +73,18 @@ async def update_journal(
     (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
     """
     fields = body.model_dump(exclude_unset=True)
-    await _update_journal(conn, journal_id, fields=fields, repo=repo)
+    _update_journal(conn, journal_id, fields=fields, repo=repo)
     return {"ok": True}
 
 
 @router.post("/api/journals/{journal_id}/merge")
-async def merge(
+def merge(
     journal_id: int,
     body: MergeRequest,
-    conn: AsyncConnection = Depends(db_conn),
-    queries: AsyncJournalQueries = Depends(journal_queries),
-    repo: AsyncJournalRepository = Depends(journal_repo),
-    audit: AsyncAuditRepository = Depends(audit_repo),
+    conn: Connection = Depends(db_conn_sync),
+    queries: JournalQueries = Depends(journal_queries_sync),
+    repo: JournalRepository = Depends(journal_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
     """Fusionne la revue `source_id` dans la revue `journal_id`.
 
@@ -92,11 +92,11 @@ async def merge(
     la cible ; la source est supprimée. 404 si l'une des deux est
     introuvable.
     """
-    found = await queries.existing_journal_ids((journal_id, body.source_id))
+    found = queries.existing_journal_ids((journal_id, body.source_id))
     if journal_id not in found:
         raise HTTPException(status_code=404, detail="Revue cible introuvable")
     if body.source_id not in found:
         raise HTTPException(status_code=404, detail="Revue source introuvable")
 
-    await merge_journals(conn, journal_id, body.source_id, repo=repo, audit_repo=audit)
+    merge_journals(conn, journal_id, body.source_id, repo=repo, audit_repo=audit)
     return {"merged": True, "source_id": body.source_id, "target_id": journal_id}

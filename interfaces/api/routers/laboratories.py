@@ -1,4 +1,4 @@
-"""Router /api/laboratories/* — délègue au port `AsyncLaboratoriesQueries`."""
+"""Router /api/laboratories/* — délègue au port `LaboratoriesQueries`."""
 
 import logging
 from typing import Any
@@ -6,10 +6,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.laboratories_queries import (
-    AsyncLaboratoriesQueries,
+    LaboratoriesQueries,
     LabPersonsFilters,
 )
-from interfaces.api.async_deps import laboratories_queries
+from interfaces.api.deps import laboratories_queries_sync
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     LaboratoryAddressesResponse,
@@ -25,27 +25,27 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/laboratories", response_model=list[LaboratoryListItem])
-async def list_laboratories(
-    queries: AsyncLaboratoriesQueries = Depends(laboratories_queries),
+def list_laboratories(
+    queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
 ) -> Any:
     """Liste des labos du périmètre."""
-    return await queries.list_laboratories()
+    return queries.list_laboratories()
 
 
 @router.get("/api/laboratories/{lab_id}", response_model=LaboratoryDetailResponse)
-async def get_laboratory(
+def get_laboratory(
     lab_id: int,
-    queries: AsyncLaboratoriesQueries = Depends(laboratories_queries),
+    queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
 ) -> Any:
     """Profil public d'un laboratoire."""
-    result = await queries.get_laboratory(lab_id)
+    result = queries.get_laboratory(lab_id)
     if not result:
         raise HTTPException(404, "Laboratory not found")
     return result
 
 
 @router.get("/api/laboratories/{lab_id}/persons", response_model=LaboratoryPersonsResponse)
-async def get_laboratory_persons(
+def get_laboratory_persons(
     lab_id: int,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
@@ -57,7 +57,7 @@ async def get_laboratory_persons(
     has_orcid: str = Query(""),
     has_idhal: str = Query(""),
     has_idref: str = Query(""),
-    queries: AsyncLaboratoriesQueries = Depends(laboratories_queries),
+    queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
 ) -> Any:
     """Personnes et authorships orphelines liées à un labo."""
     filters = LabPersonsFilters(
@@ -69,36 +69,36 @@ async def get_laboratory_persons(
         has_idhal=has_idhal,
         has_idref=has_idref,
     )
-    return await queries.get_laboratory_persons(
+    return queries.get_laboratory_persons(
         lab_id, filters=filters, page=page, per_page=per_page, sort=sort
     )
 
 
 @router.get("/api/laboratories/{lab_id}/addresses", response_model=LaboratoryAddressesResponse)
-async def get_laboratory_addresses(
+def get_laboratory_addresses(
     lab_id: int,
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
-    queries: AsyncLaboratoriesQueries = Depends(laboratories_queries),
+    queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
 ) -> Any:
     """Adresses liées à un laboratoire."""
-    return await queries.get_laboratory_addresses(lab_id, page=page, per_page=per_page)
+    return queries.get_laboratory_addresses(lab_id, page=page, per_page=per_page)
 
 
 @router.get("/api/laboratories/{lab_id}/dashboard", response_model=LaboratoryDashboardResponse)
-async def get_laboratory_dashboard(
+def get_laboratory_dashboard(
     lab_id: int,
-    queries: AsyncLaboratoriesQueries = Depends(laboratories_queries),
+    queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
 ) -> Any:
     """Dashboard labo : publications par an + répartition OA."""
-    return await queries.get_laboratory_dashboard(lab_id)
+    return queries.get_laboratory_dashboard(lab_id)
 
 
 @router.get("/api/laboratories/{lab_id}/subjects", response_model=list[SubjectFrequency])
-async def get_laboratory_subjects(
+def get_laboratory_subjects(
     lab_id: int,
     limit: int = Query(30, ge=1, le=200),
-    queries: AsyncLaboratoriesQueries = Depends(laboratories_queries),
+    queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
 ) -> Any:
     """Top sujets des publications du labo (pour le nuage de mots dashboard)."""
-    return await queries.get_laboratory_subjects(lab_id, limit=limit)
+    return queries.get_laboratory_subjects(lab_id, limit=limit)

@@ -19,22 +19,42 @@ from fastapi import Cookie, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Connection
 
+from application.ports.admin_feedback_queries import AdminFeedbackQueries
 from application.ports.config import ConfigStore
 from application.ports.config_queries import ConfigQueries
 from application.ports.hal_problems_queries import HalProblemsQueries
+from application.ports.journals_queries import JournalQueries
+from application.ports.laboratories_queries import LaboratoriesQueries
+from application.ports.perimeters_queries import PerimetersAdminQueries
 from application.ports.person_duplicates_queries import PersonDuplicatesQueries
 from application.ports.publication_duplicates_queries import PublicationDuplicatesQueries
+from application.ports.publishers_queries import PublisherQueries
 from application.ports.subjects_queries import SubjectsAdminQueries
 from domain.ports.audit_repository import AuditRepository
+from domain.ports.journal_repository import JournalRepository
+from domain.ports.perimeter_repository import PerimeterRepository
 from domain.ports.person_repository import PersonRepository
 from domain.ports.publication_repository import PublicationRepository
+from domain.ports.publisher_repository import PublisherRepository
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.queries.admin_feedback import PgAdminFeedbackQueries
 from infrastructure.db.queries.config import PgConfig, PgConfigQueries
 from infrastructure.db.queries.hal_problems import PgHalProblemsQueries
+from infrastructure.db.queries.journals import PgJournalQueries
+from infrastructure.db.queries.laboratories import PgLaboratoriesQueries
+from infrastructure.db.queries.perimeter import PgPerimetersAdminQueries
 from infrastructure.db.queries.person_duplicates import PgPersonDuplicatesQueries
 from infrastructure.db.queries.publication_duplicates import PgPublicationDuplicatesQueries
+from infrastructure.db.queries.publishers import PgPublisherQueries
 from infrastructure.db.queries.subjects import PgSubjectsAdminQueries
-from infrastructure.repositories import audit_repository, person_repository, publication_repository
+from infrastructure.repositories import (
+    audit_repository,
+    journal_repository,
+    perimeter_repository,
+    person_repository,
+    publication_repository,
+    publisher_repository,
+)
 from infrastructure.settings import settings
 
 # ----- SPA Static Files -----
@@ -154,3 +174,39 @@ def person_duplicates_queries_sync(
     conn: Connection = Depends(db_conn_sync),
 ) -> PersonDuplicatesQueries:
     return PgPersonDuplicatesQueries(conn)
+
+
+def journal_queries_sync(conn: Connection = Depends(db_conn_sync)) -> JournalQueries:
+    return PgJournalQueries(conn)
+
+
+def journal_repo_sync(conn: Connection = Depends(db_conn_sync)) -> JournalRepository:
+    return journal_repository(conn)
+
+
+def publisher_queries_sync(conn: Connection = Depends(db_conn_sync)) -> PublisherQueries:
+    return PgPublisherQueries(conn)
+
+
+def publisher_repo_sync(conn: Connection = Depends(db_conn_sync)) -> PublisherRepository:
+    return publisher_repository(conn)
+
+
+def laboratories_queries_sync(conn: Connection = Depends(db_conn_sync)) -> LaboratoriesQueries:
+    return PgLaboratoriesQueries(conn)
+
+
+def perimeter_repo_sync(conn: Connection = Depends(db_conn_sync)) -> PerimeterRepository:
+    return perimeter_repository(conn)
+
+
+def perimeters_admin_queries_sync(
+    conn: Connection = Depends(db_conn_sync),
+) -> PerimetersAdminQueries:
+    return PgPerimetersAdminQueries(conn)
+
+
+def admin_feedback_queries_sync(
+    conn: Connection = Depends(db_conn_sync),
+) -> AdminFeedbackQueries:
+    return PgAdminFeedbackQueries(conn)

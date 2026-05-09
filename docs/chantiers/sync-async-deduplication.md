@@ -245,6 +245,51 @@ puis les CRUD admin, puis les gros (`publications`, `persons`,
   `person_duplicates_queries_sync`. 2 tests `TestMarkDistinctPersons`
   migrés en sync ; 1 test audit sync. Total Phase 2.2 : 36 tests
   ciblés passent.
+- [x] `journals.py` — Protocol sync `JournalQueries`, classe sync
+  `PgJournalQueries`, factory `journal_queries_sync`. Services
+  `application/journals.py:update_journal` / `merge_journals` migrés en
+  sync (suppression async). 4 routes `def`, factories ajoutées :
+  `journal_repo_sync`. Tests `TestUpdateJournal`, `TestMergeJournals`
+  migrés en sync.
+- [x] `publishers.py` — Protocol sync `PublisherQueries`, classe sync
+  `PgPublisherQueries`, factory `publisher_queries_sync`. Services
+  `application/publishers.py:update_publisher` / `merge_publishers`
+  migrés en sync (suppression async). 4 routes `def`, factories
+  ajoutées : `publisher_repo_sync`. Tests `TestUpdatePublisher`,
+  `TestMergePublishers` migrés en sync.
+- [x] `laboratories.py` — Protocol sync `LaboratoriesQueries`, classe
+  sync `PgLaboratoriesQueries` (~360 LOC, 6 méthodes incluant
+  `get_laboratory_persons` avec ses facettes). Factory
+  `laboratories_queries_sync`. 6 routes `def`. Helpers
+  `infrastructure/perimeter.py:get_persons_perimeter_root_ids` et
+  `get_persons_structure_ids_list` étendus en dispatch (cur | Connection)
+  pour servir le sync.
+- [x] `perimeters.py` — Protocol sync `PerimetersAdminQueries` ajouté
+  à côté de `AsyncPerimetersAdminQueries`, classe sync
+  `PgPerimetersAdminQueries`. Nouveau Protocol sync `PerimeterRepository`
+  + adapter `PgPerimeterRepository` (l'agrégat n'avait que la variante
+  async jusqu'ici). Services `application/config.py` (5 fonctions :
+  `add_perimeter_structure`, `remove_perimeter_structure`,
+  `create_perimeter`, `update_perimeter`, `delete_perimeter`) migrés
+  en sync (suppression nette des variantes async). 6 routes `def`,
+  factories ajoutées : `perimeter_repo_sync`,
+  `perimeters_admin_queries_sync`. Tests `test_config_service.py`
+  (20 tests) migrés en sync.
+- [x] `admin_feedback.py` — Protocol sync `AdminFeedbackQueries`,
+  classe sync `PgAdminFeedbackQueries`, factory
+  `admin_feedback_queries_sync`. 4 routes `def` ; **`feedback_rerun`
+  reste `async def`** (pilote un subprocess en streaming SSE,
+  incompatible threadpool — cohabitation supportée). Tests
+  `test_admin_feedback_api.py` (15 tests) restent inchangés.
+- [x] **Conftest tests interfaces** : `tests/integration/interfaces/conftest.py`
+  patche désormais `build_sync_engine` en plus de `build_async_engine`
+  pour rediriger l'Engine SA sync vers `bibliometrie_test`. Sans ce
+  patch, les routes sync écrivaient sur la base prod en test (cf. bug
+  rencontré au premier run de `test_admin_feedback_api.py`).
+
+Total Phase 2.3 : 5 routers migrés (journals, publishers, laboratories,
+perimeters, admin_feedback hors SSE), 54 tests application + 50 tests
+interfaces ciblés passent.
 
 ### Phase 3 — Suppression du code async devenu mort
 

@@ -8,6 +8,11 @@ faux positifs (adresses détectées mais rejetées manuellement).
 Les endpoints d'assignation manuelle
 (`/api/addresses/{addr_id}/assign-structure` POST/DELETE) sont dans
 `addresses.py` — ils partagent la surface URL `/api/addresses/*`.
+
+L'endpoint `feedback_rerun` reste `async def` : il pilote un
+sous-processus en streaming SSE (asyncio), incompatible avec un
+threadpool sync. FastAPI sait cohabiter `def` et `async def` dans le
+même router.
 """
 
 import logging
@@ -18,8 +23,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from application.ports.admin_feedback_queries import AsyncAdminFeedbackQueries
-from interfaces.api.async_deps import admin_feedback_queries
+from application.ports.admin_feedback_queries import AdminFeedbackQueries
+from interfaces.api.deps import admin_feedback_queries_sync
 from interfaces.api.models import (
     FeedbackAddressesResponse,
     FeedbackStats,
@@ -52,8 +57,8 @@ _RESOLVE_ADDRESSES_SCRIPT = os.path.join(
 
 
 @router.get("/api/admin/feedback/structures", response_model=FeedbackStructuresResponse)
-async def feedback_structures(
-    queries: AsyncAdminFeedbackQueries = Depends(admin_feedback_queries),
+def feedback_structures(
+    queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
 ) -> Any:
     """Structures éligibles au tableau de bord feedback, groupées par type.
 
@@ -63,7 +68,7 @@ async def feedback_structures(
     - la structure UCA (code = "uca") est sélectionnée par défaut si
       elle existe, sinon la première structure du premier type non vide.
     """
-    rows = await queries.feedback_structures(list(_FEEDBACK_STRUCTURE_TYPES))
+    rows = queries.feedback_structures(list(_FEEDBACK_STRUCTURE_TYPES))
 
     by_type: dict[str, list[dict[str, Any]]] = {}
     default_id: int | None = None
@@ -84,12 +89,12 @@ async def feedback_structures(
 
 
 @router.get("/api/admin/feedback/stats", response_model=FeedbackStats)
-async def feedback_stats(
+def feedback_stats(
     structure_id: int = Query(...),
-    queries: AsyncAdminFeedbackQueries = Depends(admin_feedback_queries),
+    queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
 ) -> Any:
     """Statistiques de qualité de la détection pour une structure donnée."""
-    row = await queries.feedback_stats(structure_id)
+    row = queries.feedback_stats(structure_id)
 
     reviewed = (
         (row["concordant_valid"] or 0)
@@ -110,36 +115,40 @@ async def feedback_stats(
 
 
 @router.get("/api/admin/feedback/false-negatives", response_model=FeedbackAddressesResponse)
-async def feedback_false_negatives(
+def feedback_false_negatives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-    queries: AsyncAdminFeedbackQueries = Depends(admin_feedback_queries),
+    queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
 ) -> Any:
     """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
-    return await queries.feedback_false_negatives(
+    return queries.feedback_false_negatives(
         structure_id=structure_id, page=page, per_page=per_page, search=search
     )
 
 
 @router.get("/api/admin/feedback/false-positives", response_model=FeedbackAddressesResponse)
-async def feedback_false_positives(
+def feedback_false_positives(
     structure_id: int = Query(...),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
-    queries: AsyncAdminFeedbackQueries = Depends(admin_feedback_queries),
+    queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
 ) -> Any:
     """Adresses détectées pour cette structure mais rejetées manuellement."""
-    return await queries.feedback_false_positives(
+    return queries.feedback_false_positives(
         structure_id=structure_id, page=page, per_page=per_page, search=search
     )
 
 
 @router.get("/api/admin/feedback/rerun")
 async def feedback_rerun() -> Any:
-    """Lance resolve_addresses en SSE (détection complète sur toutes les adresses)."""
+    """Lance resolve_addresses en SSE (détection complète sur toutes les adresses).
+
+    Reste `async def` : asyncio + streaming SSE incompatible avec un
+    threadpool sync. Endpoint hors scope chantier sync-async-deduplication.
+    """
     import asyncio
 
     if not os.path.exists(_RESOLVE_ADDRESSES_SCRIPT):  # noqa: ASYNC240
