@@ -21,10 +21,20 @@ from sqlalchemy import Connection
 
 from application.ports.config import ConfigStore
 from application.ports.config_queries import ConfigQueries
+from application.ports.hal_problems_queries import HalProblemsQueries
+from application.ports.person_duplicates_queries import PersonDuplicatesQueries
+from application.ports.publication_duplicates_queries import PublicationDuplicatesQueries
 from application.ports.subjects_queries import SubjectsAdminQueries
+from domain.ports.audit_repository import AuditRepository
+from domain.ports.person_repository import PersonRepository
+from domain.ports.publication_repository import PublicationRepository
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.config import PgConfig, PgConfigQueries
+from infrastructure.db.queries.hal_problems import PgHalProblemsQueries
+from infrastructure.db.queries.person_duplicates import PgPersonDuplicatesQueries
+from infrastructure.db.queries.publication_duplicates import PgPublicationDuplicatesQueries
 from infrastructure.db.queries.subjects import PgSubjectsAdminQueries
+from infrastructure.repositories import audit_repository, person_repository, publication_repository
 from infrastructure.settings import settings
 
 # ----- SPA Static Files -----
@@ -114,3 +124,33 @@ def config_queries_sync(conn: Connection = Depends(db_conn_sync)) -> ConfigQueri
 
 def config_store_sync(conn: Connection = Depends(db_conn_sync)) -> ConfigStore:
     return PgConfig(conn)
+
+
+def hal_problems_queries_sync(
+    conn: Connection = Depends(db_conn_sync),
+) -> HalProblemsQueries:
+    return PgHalProblemsQueries(conn)
+
+
+def audit_repo_sync(conn: Connection = Depends(db_conn_sync)) -> AuditRepository:
+    return audit_repository(conn)
+
+
+def publication_repo_sync(conn: Connection = Depends(db_conn_sync)) -> PublicationRepository:
+    return publication_repository(conn)
+
+
+def publication_duplicates_queries_sync(
+    conn: Connection = Depends(db_conn_sync),
+) -> PublicationDuplicatesQueries:
+    return PgPublicationDuplicatesQueries(conn)
+
+
+def person_repo_sync(conn: Connection = Depends(db_conn_sync)) -> PersonRepository:
+    return person_repository(conn)
+
+
+def person_duplicates_queries_sync(
+    conn: Connection = Depends(db_conn_sync),
+) -> PersonDuplicatesQueries:
+    return PgPersonDuplicatesQueries(conn)

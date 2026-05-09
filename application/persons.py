@@ -422,23 +422,23 @@ async def detach_authorships(
 # ── Fusion ──
 
 
-async def mark_distinct(
-    conn: AsyncConnection,
+def mark_distinct(
+    conn: Any,
     person_id_a: int,
     person_id_b: int,
     *,
-    repo: AsyncPersonRepository,
-    audit_repo: AsyncAuditRepository | None = None,
+    repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> None:
     """Marque deux personnes comme distinctes (non-doublon) dans
     `distinct_persons`. Idempotent.
 
     Les IDs sont triés pour garantir l'unicité de la paire.
     """
-    inserted = await repo.mark_distinct(person_id_a, person_id_b)
+    inserted = repo.mark_distinct(person_id_a, person_id_b)
     # Audit seulement si une ligne a été insérée (la paire n'existait pas déjà)
     if inserted:
-        await async_emit_event(
+        emit_event(
             audit_repo,
             "person.marked_distinct",
             "person",
