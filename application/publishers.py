@@ -12,9 +12,6 @@ sémantiquement c'est une opération sur l'agrégat Publisher ; elle a
 besoin du port `JournalRepository` en complément pour détecter les
 journaux à conflit entre les deux éditeurs à fusionner avant de
 déléguer les transferts SQL.
-
-Toutes les fonctions sont sync (chantier sync-async-deduplication
-option D).
 """
 
 from typing import Any

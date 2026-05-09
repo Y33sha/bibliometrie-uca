@@ -61,7 +61,7 @@ qui forment une zone neutre dont dépendent tous les autres modules.
    composition root) **ne doivent pas** importer `infrastructure/`
    directement. Ils pilotent des use-cases applicatifs et reçoivent
    leurs dépendances via `Depends(...)` (factories dans
-   `interfaces.api.async_deps`) ; ils ne les construisent pas.
+   `interfaces.api.deps`) ; ils ne les construisent pas.
    Verrouillé côté API par le contrat `import-linter` "Routers : pas
    d'import direct de infrastructure" (chantier
    `docs/chantiers/routers-di.md`). Trois exceptions documentées :
@@ -74,7 +74,7 @@ qui forment une zone neutre dont dépendent tous les autres modules.
    concrète des adapters et leur câblage aux use-cases se fait
    dans **un petit ensemble nommé de fichiers** :
 
-   - `interfaces/api/app.py` + `interfaces/api/async_deps.py` — API HTTP
+   - `interfaces/api/app.py` + `interfaces/api/deps.py` — API HTTP
    - `run_pipeline.py` — pipeline complet
    - `interfaces/cli/pipeline/*` — phases pipeline isolées
    - `interfaces/cli/*` — scripts one-shot
@@ -178,8 +178,11 @@ Contenu :
   - `queries/` — query services SQL (un par agrégat ou phase
     pipeline) ; implémentent les ports définis dans `application/
     ports/*`
-  - `connection.py` / `async_connection.py` — pools psycopg3 (sync
-    pour pipeline/CLI, async pour l'API FastAPI)
+  - `connection.py` — `psycopg.connect()` direct (pipeline/CLI bas
+    niveau, scripts one-shot)
+  - `engine.py` — Engine SQLAlchemy synchrone (driver
+    `postgresql+psycopg`). Source unique pour l'API FastAPI (via le
+    threadpool Starlette) et tous les codes qui passent par SA Core.
 - **`repositories/`** — adapters PostgreSQL implémentant les ports
   `domain/ports/*` : `person_repository.py`, `publication_repository.py`,
   `journal_repository.py`, `structure_repository.py`,
@@ -203,14 +206,34 @@ Contenu :
   - `routers/` — un module par agrégat (publications, persons,
     laboratories, addresses, …)
   - `models.py` — Pydantic pour les bodies POST/PUT/PATCH
-  - `deps.py` — dépendances (pool DB, auth)
-  - `middlewares/` — request-id, audit, timing
+  - `deps.py` — dépendances (Engine SA sync, factories de query
+    services et de repositories, auth)
+  - middlewares inline dans `app.py` (auth, strip-prefix, timing)
 - **`frontend/`** — SvelteKit (Svelte 5)
 - **`cli/`** — scripts one-shot (imports manuels, debug, corrections
   ponctuelles). Exclus de la couverture pytest
   (`[tool.coverage.run]` omit).
 
 ## Patterns d'injection
+
+### Sync partout (FastAPI + threadpool)
+
+Toutes les routes API sont déclarées `def` (pas `async def`). FastAPI
+les exécute dans le threadpool Starlette (~40 workers par défaut), ce
+qui permet de partager **les mêmes** repositories et query services
+entre l'API et le pipeline. Une seule famille de code, un seul style
+de connexion (`Connection` SQLAlchemy ou curseur psycopg).
+
+L'unique exception : `feedback_rerun` dans `admin_feedback.py` reste
+`async def` parce qu'il streame du SSE depuis un subprocess
+(`asyncio.create_subprocess_exec` + `StreamingResponse`). Aucune
+connexion DB en jeu, cohabitation supportée par FastAPI.
+
+Dimensionnement du pool DB : `db_pool_max = 30` (dans
+`infrastructure/settings.py`), pour absorber confortablement la
+concurrence threadpool × marge sur un usage admin
+(quelques utilisateurs concurrents max). Bumper si on observe des
+`TimeoutError` côté pool sous charge anormale (cf. `.env.example`).
 
 ### Services applicatifs ↔ repositories
 
@@ -311,10 +334,10 @@ Partout ailleurs, on reçoit un port en paramètre.
 Les fichiers qui jouent ce rôle :
 
 - `interfaces/api/app.py` — entry point FastAPI (startup, lifespan,
-  montage des routers)
-- `interfaces/api/async_deps.py` — factories partagées par les
-  routers (`get_async_cursor`, `get_root_structure_id`,
-  `get_perimeter_queries`, …)
+  middlewares, montage des routers)
+- `interfaces/api/deps.py` — factories partagées par les routers :
+  `db_conn_sync` (Connection SA), query services et repositories
+  câblés sur cette Connection
 - `run_pipeline.py` — orchestrateur pipeline complet
 - `interfaces/cli/pipeline/*` — entry points CLI pour chaque phase
 - `interfaces/cli/*` — scripts one-shot

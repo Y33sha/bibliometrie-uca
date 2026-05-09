@@ -260,14 +260,10 @@ Une fois tous les routers migrés :
 
 ### Phase 4 — Doc
 
-- [ ] Mettre à jour `docs/architecture.md` (section "Patterns
-  d'injection") : retirer la mention de la cohabitation sync/async,
-  expliquer que l'API utilise les mêmes repositories que le pipeline,
-  via threadpool.
-- [ ] Documenter la valeur de `db_pool_max` recommandée et le
-  raisonnement (concurrence threadpool × marge).
-- [ ] Mettre à jour `infrastructure/repositories/__init__.py`
-  docstring (plus de mention sync/async).
+- [x] Mettre à jour `docs/architecture.md` + nettoyer les docstrings
+  qui référençaient encore `async_deps`, le pool async DB, ou le
+  chantier en cours (mention `db_pool_max` + raisonnement threadpool
+  inclus dans la section "Patterns d'injection").
 
 ## Points de vigilance
 
