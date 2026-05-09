@@ -3,20 +3,31 @@
 Lit depuis la table `config` en base. Les scripts du pipeline appellent ce
 module pour les paramètres externalisés (années, collections, affiliations,
 clés API, credentials ScanR).
+
+Les fonctions acceptent indifféremment un curseur psycopg (mode legacy
+des CLI non migrés) ou une `Connection` SA (mode cible). Le dispatch
+disparaît quand tous les CLI pipeline sont migrés en SA.
 """
 
 import datetime
 import logging
 from typing import Any
 
+from sqlalchemy import Connection, text
+
 logger = logging.getLogger(__name__)
 
 
-def _get_from_db(cur: Any, key: Any) -> Any:
+def _get_from_db(conn_or_cur: Any, key: Any) -> Any:
     """Lit une valeur depuis la table config. Retourne None si absente."""
     try:
-        cur.execute("SELECT value FROM config WHERE key = %s", (key,))
-        row = cur.fetchone()
+        if isinstance(conn_or_cur, Connection):
+            row = conn_or_cur.execute(
+                text("SELECT value FROM config WHERE key = :key"), {"key": key}
+            ).one_or_none()
+            return row.value if row else None
+        conn_or_cur.execute("SELECT value FROM config WHERE key = %s", (key,))
+        row = conn_or_cur.fetchone()
         if row:
             return row[0] if isinstance(row, tuple) else row["value"]
     except Exception:
