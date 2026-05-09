@@ -383,19 +383,17 @@ Queries SELECT/INSERT/UPDATE/DELETE statiques. Gain : uniformité
 du codebase, suppression complète de `cur.execute` côté code
 applicatif (préalable à la Phase 4).
 
-**État au démarrage de la Phase 3** (grep) : ~448 `cur.execute`
-restants au total. Hors Phase 3 :
+Hors Phase 3 :
 
-- `interfaces/cli/*` (~145) : audit deprecated/one-shot/recurring
-  préalable nécessaire (cf. audit-cto Phase 3) ; chantier dédié
-  après réorganisation, ne migrer que les scripts conservés.
-- `infrastructure/perimeter.py` (~11) : CTE récursive, reste en
-  `text()`.
-- `infrastructure/sources/*` (~28) : extracteurs API, à examiner
-  au passage (probablement staging/raw, peu de logique métier).
-- Repos async en mode dispatch : la branche psycopg disparaît en
-  Phase 4 (suppression du `cur.execute` résiduel des méthodes en
-  dispatch dans `async_publication_repository.py` notamment).
+- `interfaces/cli/*` : audit deprecated/one-shot/recurring préalable
+  nécessaire (cf. audit-cto Phase 3) ; ne migrer que les scripts
+  conservés.
+- `infrastructure/perimeter.py` : CTE récursive, reste en `text()`.
+- `infrastructure/sources/*` : extracteurs API (staging/raw),
+  hors scope BDD canonique.
+- `infrastructure/db/migrate.py` : exclu explicitement.
+- Branches dispatch psycopg des repos sync (`publication_repository.py`) :
+  disparaissent en Phase 4 quand l'orchestrateur pipeline basculera.
 
 **Critère d'arrêt par fichier** : si un module reste plus lisible
 en SQL brut (CTE complexe, opérations JSON avancées type `jsonb_set`,
@@ -435,11 +433,8 @@ disparaîtra en Phase 4 quand l'orchestrateur pipeline basculera.
   docstrings — `split_bad_merges`, `fix_oa_person_conflicts` —
   disparus). `TestDeleteOrphanAuthorships` converti en async pour
   préserver la couverture du SQL utilisé via `async_delete_orphan_authorships`.
-- [ ] Tests d'intégration sync : passent en mode cur sans
-  modification ; tests SA-branche à ajouter quand un caller
-  basculera (smoke `sa_sync_conn`).
 
-#### Lot 3.B — Queries pipeline (`infrastructure/db/queries/`, ~120 occ.)
+#### Lot 3.B — Queries pipeline (`infrastructure/db/queries/`, ~117 occ.)
 
 Code appelé par le pipeline (sync). Bénéficie du même `Engine` SA
 sync que le Lot 3.A.
@@ -453,41 +448,47 @@ Sous-lots, par étape du pipeline :
 - [ ] **Pipeline persons/authorships** (`name_forms.py`, `persons/create.py`,
   `authorships_build.py`, `source_authorships.py`) — 4 fichiers, ~25 occ.
 - [ ] **Pipeline addresses/structures** (`address_resolution.py`,
-  `affiliations.py`, `countries.py`) — 3 fichiers, ~24 occ.
+  `affiliations.py`, `countries.py`) — 3 fichiers, ~23 occ.
 - [ ] **`subjects.py`** (10 occ.) — à examiner : opérations JSON
   spécifiques susceptibles de rester en `text()`.
 
-#### Lot 3.C — Reste du code applicatif
+#### Lot 3.C — Reste du code applicatif (~13 occ.)
 
-- [ ] `application/pipeline/*` (~9 occ.)
-- [ ] `application/audit.py`, `application/addresses_countries.py`,
-  etc. (~5 occ.)
-- [ ] `infrastructure/{app_config,addresses,db_helpers}.py` (~10 occ.)
-- [ ] `interfaces/api/*` (~3 occ., sans doute des endpoints
-  exotiques)
-- [ ] `run_pipeline.py:206` (`VACUUM`) — `text()` simple
+- [ ] `infrastructure/addresses.py` (4)
+- [ ] `application/pipeline/_savepoint.py` (3)
+- [ ] `infrastructure/app_config.py` (3)
+- [ ] `application/audit.py` (1), `infrastructure/db_helpers.py` (1),
+  `run_pipeline.py:VACUUM` (1) — chacun en `text()` simple
 
 #### Critère de complétion Phase 3
 
 Plus aucun `cur.execute` dans le code applicatif **hors** :
 - `interfaces/cli/` (en attente de l'audit dédié)
 - `infrastructure/perimeter.py` (CTE récursive, choix assumé)
-- `infrastructure/sources/*` (à confirmer — sans doute hors scope BDD canonique)
-- Branches dispatch des repos async (Phase 4 les nettoie)
+- `infrastructure/sources/*` (extracteurs API, hors scope)
+- Branches dispatch psycopg de `publication_repository.py`
+  (Phase 4 les nettoie)
 
-### Phase 4 — Bascule du pool psycopg vers AsyncEngine
+### Phase 4 — Finalisation : zéro `cur.execute` applicatif
 
-Une fois toutes les queries migrées, remplacer définitivement
-`AsyncConnectionPool` psycopg par AsyncEngine SQLAlchemy.
+L'essentiel de la bascule du pool a été faite par le chantier
+`docs/chantiers/sync-async-deduplication.md` :
+- Lifespan FastAPI utilise l'`Engine` SA sync (plus d'`AsyncEngine`
+  ni de pool psycopg async).
+- `infrastructure/db/async_connection.py` supprimé.
+- Côté sync : `Engine` SA sync en place (`build_sync_engine` /
+  `get_sync_engine`).
 
-- [ ] Brancher l'AsyncEngine dans le lifespan FastAPI (en
-  remplacement du pool psycopg async).
-- [ ] Côté sync (pipeline) : créer un `Engine` SA sync, en
-  remplacement de l'usage actuel de `psycopg.connect()`.
+Reste pour clore le chantier :
+
+- [ ] Migrer les `psycopg.connect()` directs côté pipeline
+  (`run_pipeline.py`, `interfaces/cli/*`) vers `engine.connect()` SA
+  — passe surtout par les CLI conservés (cf. audit-cto Phase 3).
+- [ ] Supprimer les branches dispatch psycopg dans
+  `infrastructure/repositories/publication_repository.py` (~6 occ.)
+  une fois le pipeline migré.
 - [ ] Vérifier qu'il ne reste plus aucun `cur.execute(...)` direct
-  dans le code applicatif.
-- [ ] Supprimer `infrastructure/db/async_connection.py` et toute
-  référence au pool psycopg.
+  dans le code applicatif (hors exclusions documentées).
 
 ### Phase 5 — Décision Alembic
 
