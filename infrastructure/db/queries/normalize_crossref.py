@@ -13,13 +13,16 @@ par le pipeline ``personnes`` (source-agnostique).
 
 from typing import Any
 
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
+
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )
 
 
 def upsert_crossref_source_publication(
-    cur: Any,
+    conn: Connection,
     *,
     doi: str,
     title: str,
@@ -39,16 +42,16 @@ def upsert_crossref_source_publication(
     meta: Any,
 ) -> int:
     """UPSERT d'une publication CrossRef dans ``source_publications``. Retourne l'id."""
-    cur.execute(
-        """
+    stmt = text("""
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids,
              journal_id, oa_status, language, container_title,
              abstract, keywords, cited_by_count, biblio, meta)
-        VALUES ('crossref', %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s, %s, %s)
+        VALUES ('crossref', :source_id, :doi, :title, :pub_year, :doc_type,
+                :publication_id, :staging_id, :external_ids,
+                :journal_id, :oa_status, :language, :container_title,
+                :abstract, :keywords, :cited_by_count, :biblio, :meta)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_publications.publication_id, EXCLUDED.publication_id
@@ -66,33 +69,38 @@ def upsert_crossref_source_publication(
             biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
             meta = COALESCE(EXCLUDED.meta, source_publications.meta)
         RETURNING id
-        """,
-        (
-            doi,
-            doi,
-            title,
-            pub_year,
-            doc_type,
-            publication_id,
-            staging_id,
-            external_ids,
-            journal_id,
-            oa_status,
-            language,
-            container_title,
-            abstract,
-            keywords,
-            cited_by_count,
-            biblio,
-            meta,
-        ),
+    """).bindparams(
+        bindparam("external_ids", type_=JSONB),
+        bindparam("biblio", type_=JSONB),
+        bindparam("meta", type_=JSONB),
     )
-    row = cur.fetchone()
-    return row["id"] if isinstance(row, dict) else row[0]
+    row = conn.execute(
+        stmt,
+        {
+            "source_id": doi,
+            "doi": doi,
+            "title": title,
+            "pub_year": pub_year,
+            "doc_type": doc_type,
+            "publication_id": publication_id,
+            "staging_id": staging_id,
+            "external_ids": external_ids,
+            "journal_id": journal_id,
+            "oa_status": oa_status,
+            "language": language,
+            "container_title": container_title,
+            "abstract": abstract,
+            "keywords": keywords,
+            "cited_by_count": cited_by_count,
+            "biblio": biblio,
+            "meta": meta,
+        },
+    ).one()
+    return row.id
 
 
 def upsert_crossref_source_authorship(
-    cur: Any,
+    conn: Connection,
     *,
     source_publication_id: int,
     author_position: int,
@@ -108,42 +116,47 @@ def upsert_crossref_source_authorship(
     l'authorship — sans bénéfice). L'ORCID, seul identifiant exploitable,
     vit sur `identifiers`.
     """
-    cur.execute(
-        """
+    stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              author_name_normalized, raw_author_name, source_data, identifiers)
-        VALUES ('crossref', %s, NULL, %s, normalize_name_form(%s), %s, %s, %s)
+        VALUES ('crossref', :spid, NULL, :pos, normalize_name_form(:raw_name),
+                :raw_name, :source_data, :identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,
             raw_author_name = EXCLUDED.raw_author_name,
             source_data = EXCLUDED.source_data,
             identifiers = EXCLUDED.identifiers
         RETURNING id
-        """,
-        (
-            source_publication_id,
-            author_position,
-            raw_author_name,
-            raw_author_name,
-            source_data,
-            identifiers,
-        ),
+    """).bindparams(
+        bindparam("source_data", type_=JSONB),
+        bindparam("identifiers", type_=JSONB),
     )
-    row = cur.fetchone()
-    return row[0] if isinstance(row, tuple) else row["id"]
+    row = conn.execute(
+        stmt,
+        {
+            "spid": source_publication_id,
+            "pos": author_position,
+            "raw_name": raw_author_name,
+            "source_data": source_data,
+            "identifiers": identifiers,
+        },
+    ).one()
+    return row.id
 
 
-def get_crossref_publication_id(cur: Any, doi: str) -> int | None:
+def get_crossref_publication_id(conn: Connection, doi: str) -> int | None:
     """Idempotence : retourne ``publication_id`` déjà associé au DOI CrossRef."""
-    cur.execute(
-        "SELECT publication_id FROM source_publications WHERE source = 'crossref' AND source_id = %s",
-        (doi,),
-    )
-    row = cur.fetchone()
+    row = conn.execute(
+        text(
+            "SELECT publication_id FROM source_publications "
+            "WHERE source = 'crossref' AND source_id = :doi"
+        ),
+        {"doi": doi},
+    ).one_or_none()
     if row is None:
         return None
-    return row["publication_id"] if isinstance(row, dict) else row[0]
+    return row.publication_id
 
 
 class PgCrossrefNormalizeQueries:
@@ -151,7 +164,7 @@ class PgCrossrefNormalizeQueries:
 
     def upsert_crossref_source_publication(
         self,
-        cur: Any,
+        conn: Connection,
         *,
         doi: str,
         title: str,
@@ -171,7 +184,7 @@ class PgCrossrefNormalizeQueries:
         meta: Any,
     ) -> int:
         return upsert_crossref_source_publication(
-            cur,
+            conn,
             doi=doi,
             title=title,
             pub_year=pub_year,
@@ -192,7 +205,7 @@ class PgCrossrefNormalizeQueries:
 
     def upsert_crossref_source_authorship(
         self,
-        cur: Any,
+        conn: Connection,
         *,
         source_publication_id: int,
         author_position: int,
@@ -201,7 +214,7 @@ class PgCrossrefNormalizeQueries:
         identifiers: Any,
     ) -> int:
         return upsert_crossref_source_authorship(
-            cur,
+            conn,
             source_publication_id=source_publication_id,
             author_position=author_position,
             raw_author_name=raw_author_name,
@@ -209,10 +222,10 @@ class PgCrossrefNormalizeQueries:
             identifiers=identifiers,
         )
 
-    def get_crossref_publication_id(self, cur: Any, doi: str) -> int | None:
-        return get_crossref_publication_id(cur, doi)
+    def get_crossref_publication_id(self, conn: Connection, doi: str) -> int | None:
+        return get_crossref_publication_id(conn, doi)
 
     def clear_source_authorships_for_publication(
-        self, cur: Any, source_publication_id: int
+        self, conn: Connection, source_publication_id: int
     ) -> None:
-        clear_source_authorships_for_publication(cur, source_publication_id)
+        clear_source_authorships_for_publication(conn, source_publication_id)
