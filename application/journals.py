@@ -6,9 +6,8 @@ Les opérations sur l'agrégat Publisher vivent dans `application/publishers.py`
 (FK) mais sont manipulés par des services distincts, chacun sur son
 propre port.
 
-Toutes les fonctions sont sync. Les routers FastAPI utilisent les
-mêmes repos sync que le pipeline (chantier sync-async-deduplication
-option D, FastAPI exécute les routes `def` dans un threadpool).
+Les routers FastAPI utilisent les mêmes repos que le pipeline
+(routes `def` exécutées dans le threadpool Starlette).
 """
 
 from typing import Any

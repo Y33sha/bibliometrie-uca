@@ -146,8 +146,9 @@ def feedback_false_positives(
 async def feedback_rerun() -> Any:
     """Lance resolve_addresses en SSE (détection complète sur toutes les adresses).
 
-    Reste `async def` : asyncio + streaming SSE incompatible avec un
-    threadpool sync. Endpoint hors scope chantier sync-async-deduplication.
+    `async def` parce qu'on streame stdout d'un subprocess via
+    `asyncio.create_subprocess_exec` + `StreamingResponse`. Aucune
+    connexion DB en jeu, cohabitation supportée par FastAPI.
     """
     import asyncio
 

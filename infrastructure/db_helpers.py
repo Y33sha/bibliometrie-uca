@@ -1,6 +1,6 @@
 """Helpers pour l'accès aux rows psycopg3, compatibles tuple et dict_row."""
 
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import contextmanager
 from typing import Any
 
 from psycopg.rows import class_row
@@ -51,17 +51,6 @@ def row_as(cur: Any, cls: type) -> Any:
             cur.execute("SELECT id, doc_type, title_normalized FROM ...")
             return cur.fetchone()
     """
-    old = cur.row_factory
-    cur.row_factory = class_row(cls)
-    try:
-        yield cur
-    finally:
-        cur.row_factory = old
-
-
-@asynccontextmanager
-async def async_row_as(cur: Any, cls: type) -> Any:
-    """Variante async de `row_as` pour les curseurs `psycopg.AsyncCursor`."""
     old = cur.row_factory
     cur.row_factory = class_row(cls)
     try:

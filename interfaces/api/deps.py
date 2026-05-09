@@ -1,10 +1,9 @@
-"""Shared dependencies: SPA static files, auth helpers, sync DB factories.
+"""Shared dependencies : SPA static files, auth helpers, DB factories.
 
-Les factories DB sync (`db_conn_sync`) sont utilisées par les routers
-migrés en `def` (chantier `docs/chantiers/sync-async-deduplication.md`,
-option D). Pendant la migration progressive, elles cohabitent avec les
-factories async dans `interfaces/api/async_deps.py`. Phase 3 du
-chantier supprimera la moitié async une fois tous les routers basculés.
+`db_conn_sync` ouvre une `Connection` SQLAlchemy via
+`engine.begin()` (commit/rollback auto) et la fournit aux routes via
+`Depends(...)`. Les factories câblent les query services et
+repositories sur cette Connection.
 """
 
 import hashlib
