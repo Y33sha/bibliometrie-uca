@@ -9,30 +9,27 @@ routers différents. La gestion des pays vit dans
 `application/addresses_countries.py`.
 
 Chaque opération propage automatiquement l'UCA via
-`propagate_uca_for_addresses` (recalcul `in_perimeter` sur
+`propagate_uca_for_addresses_sync` (recalcul `in_perimeter` sur
 `source_authorships`).
-
-Module migré en SQLAlchemy Core (sous-phase 2.4 du chantier
-sqlalchemy-core-adoption).
 """
 
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection
 
-from application.authorships import propagate_uca_for_addresses
-from application.ports.perimeter import AsyncPerimeterQueries
-from domain.ports.address_repository import AsyncAddressRepository
-from domain.ports.authorship_repository import AsyncAuthorshipRepository
+from application.authorships import propagate_uca_for_addresses_sync
+from application.ports.perimeter import PerimeterQueries
+from domain.ports.address_repository import AddressRepository
+from domain.ports.authorship_repository import AuthorshipRepository
 
 
-async def review_structure_link(
-    conn: AsyncConnection,
+def review_structure_link(
+    conn: Connection,
     address_id: int,
     structure_id: int,
     is_confirmed: bool | None,
     *,
-    repo: AsyncAddressRepository,
-    authorship_repo: AsyncAuthorshipRepository,
-    perimeter_queries: AsyncPerimeterQueries,
+    repo: AddressRepository,
+    authorship_repo: AuthorshipRepository,
+    perimeter_queries: PerimeterQueries,
 ) -> None:
     """Upsert le lien address ↔ structure (validation manuelle).
 
@@ -46,30 +43,30 @@ async def review_structure_link(
     manuellement une adresse UCA déjà auto-détectée, 67k+ rows inutilement
     mises à jour → 504 timeout).
     """
-    before = await repo.which_contribute_to_perimeter([address_id], structure_id)
+    before = repo.which_contribute_to_perimeter([address_id], structure_id)
 
     if is_confirmed is None:
-        await repo.reset_manual_link(address_id, structure_id)
+        repo.reset_manual_link(address_id, structure_id)
     else:
-        await repo.upsert_structure_link(address_id, structure_id, is_confirmed)
+        repo.upsert_structure_link(address_id, structure_id, is_confirmed)
 
-    after = await repo.which_contribute_to_perimeter([address_id], structure_id)
+    after = repo.which_contribute_to_perimeter([address_id], structure_id)
 
     if before != after:
-        await propagate_uca_for_addresses(
+        propagate_uca_for_addresses_sync(
             conn, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
         )
 
 
-async def batch_review_structure_link(
-    conn: AsyncConnection,
+def batch_review_structure_link(
+    conn: Connection,
     address_ids: list[int],
     structure_id: int,
     is_confirmed: bool | None,
     *,
-    repo: AsyncAddressRepository,
-    authorship_repo: AsyncAuthorshipRepository,
-    perimeter_queries: AsyncPerimeterQueries,
+    repo: AddressRepository,
+    authorship_repo: AuthorshipRepository,
+    perimeter_queries: PerimeterQueries,
 ) -> int:
     """Comme review_structure_link mais sur un lot d'adresses.
 
@@ -82,32 +79,32 @@ async def batch_review_structure_link(
     if not address_ids:
         return 0
 
-    before = await repo.which_contribute_to_perimeter(address_ids, structure_id)
+    before = repo.which_contribute_to_perimeter(address_ids, structure_id)
 
     if is_confirmed is None:
-        updated = await repo.batch_reset_manual_links(address_ids, structure_id)
+        updated = repo.batch_reset_manual_links(address_ids, structure_id)
     else:
-        await repo.batch_upsert_structure_links(address_ids, structure_id, is_confirmed)
+        repo.batch_upsert_structure_links(address_ids, structure_id, is_confirmed)
         updated = len(address_ids)
 
-    after = await repo.which_contribute_to_perimeter(address_ids, structure_id)
+    after = repo.which_contribute_to_perimeter(address_ids, structure_id)
 
     changed = list(before ^ after)
     if changed:
-        await propagate_uca_for_addresses(
+        propagate_uca_for_addresses_sync(
             conn, changed, repo=authorship_repo, perimeter_queries=perimeter_queries
         )
     return updated
 
 
-async def unassign_manual_structure(
-    conn: AsyncConnection,
+def unassign_manual_structure(
+    conn: Connection,
     address_id: int,
     structure_id: int,
     *,
-    repo: AsyncAddressRepository,
-    authorship_repo: AsyncAuthorshipRepository,
-    perimeter_queries: AsyncPerimeterQueries,
+    repo: AddressRepository,
+    authorship_repo: AuthorshipRepository,
+    perimeter_queries: PerimeterQueries,
 ) -> bool:
     """Supprime uniquement le lien manuel (matched_form_id IS NULL) entre
     une adresse et une structure. Les liens auto-détectés et leurs is_confirmed
@@ -117,12 +114,12 @@ async def unassign_manual_structure(
     in_perimeter change effectivement.
     Retourne True si un lien manuel a été supprimé, False sinon.
     """
-    before = await repo.which_contribute_to_perimeter([address_id], structure_id)
-    deleted = await repo.delete_manual_structure_link(address_id, structure_id)
-    after = await repo.which_contribute_to_perimeter([address_id], structure_id)
+    before = repo.which_contribute_to_perimeter([address_id], structure_id)
+    deleted = repo.delete_manual_structure_link(address_id, structure_id)
+    after = repo.which_contribute_to_perimeter([address_id], structure_id)
 
     if before != after:
-        await propagate_uca_for_addresses(
+        propagate_uca_for_addresses_sync(
             conn, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
         )
     return deleted

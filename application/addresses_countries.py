@@ -7,26 +7,23 @@ Séparé de `application/addresses.py` (principe SRP) : la validation
 des liens adresse↔structure vit dans
 `application/addresses_structures.py`. Les deux surfaces partagent
 l'agrégat Address mais n'interagissent pas entre elles.
-
-Module migré en SQLAlchemy Core (sous-phase 2.4 du chantier
-sqlalchemy-core-adoption) : reçoit une `AsyncConnection` SA.
 """
 
 import logging
 
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection
 
-from domain.ports.address_repository import AsyncAddressRepository
+from domain.ports.address_repository import AddressRepository
 
 logger = logging.getLogger(__name__)
 
 
-async def set_country(
-    conn: AsyncConnection,
+def set_country(
+    conn: Connection,
     address_id: int,
     countries: list[str] | None,
     *,
-    repo: AsyncAddressRepository,
+    repo: AddressRepository,
 ) -> list[int]:
     """Attribue une liste de pays à une adresse.
 
@@ -36,19 +33,19 @@ async def set_country(
     Retourne la liste des IDs affectés (y compris address_id).
     Ne valide pas les codes pays : c'est au caller de le faire.
     """
-    await repo.set_countries(address_id, countries)
+    repo.set_countries(address_id, countries)
     affected = [address_id]
     if countries:
-        affected.extend(await repo.propagate_countries_to_similar_address(address_id))
+        affected.extend(repo.propagate_countries_to_similar_address(address_id))
     return affected
 
 
-async def batch_set_country_by_ids(
-    conn: AsyncConnection,
+def batch_set_country_by_ids(
+    conn: Connection,
     country_code: str,
     address_ids: list[int],
     *,
-    repo: AsyncAddressRepository,
+    repo: AddressRepository,
 ) -> list[int]:
     """Ajoute `country_code` à `addresses.countries` pour la liste d'IDs donnée.
 
@@ -58,18 +55,18 @@ async def batch_set_country_by_ids(
 
     Retourne les IDs effectivement modifiés (= tous ceux passés en entrée).
     """
-    return await repo.batch_add_country_by_ids(country_code, address_ids)
+    return repo.batch_add_country_by_ids(country_code, address_ids)
 
 
-async def batch_set_country_by_filter(
-    conn: AsyncConnection,
+def batch_set_country_by_filter(
+    conn: Connection,
     country_code: str,
     *,
     search: str | None = None,
     has_country: str | None = None,
     country_code_filter: str | None = None,
     suggested_country: str | None = None,
-    repo: AsyncAddressRepository,
+    repo: AddressRepository,
 ) -> list[int]:
     """Ajoute `country_code` à toutes les adresses correspondant aux filtres.
 
@@ -95,27 +92,25 @@ async def batch_set_country_by_filter(
         params.append(suggested_country)
 
     where_clause = " AND ".join(conditions) if conditions else "TRUE"
-    return await repo.batch_add_country_by_where(
+    return repo.batch_add_country_by_where(
         country_code,
         where_clause,
         params,
     )
 
 
-async def propagate_countries_to_similar(
-    conn: AsyncConnection, *, repo: AsyncAddressRepository
-) -> list[int]:
+def propagate_countries_to_similar(conn: Connection, *, repo: AddressRepository) -> list[int]:
     """Propage addresses.countries vers toutes les adresses partageant le même
     normalized_text, quand l'autre adresse a des countries différents.
 
     Appelée après un batch_set_country_by_* pour propager à travers tout le
     référentiel d'adresses. Retourne les IDs propagés.
     """
-    return await repo.propagate_countries_across_similar_addresses()
+    return repo.propagate_countries_across_similar_addresses()
 
 
-async def propagate_countries_to_publications(
-    conn: AsyncConnection, address_ids: list[int], *, repo: AsyncAddressRepository
+def propagate_countries_to_publications(
+    conn: Connection, address_ids: list[int], *, repo: AddressRepository
 ) -> None:
     """Propage addresses.countries → source_publications.countries → publications.countries.
 
@@ -125,8 +120,8 @@ async def propagate_countries_to_publications(
     if not address_ids:
         return
 
-    addr_docs = await repo.refresh_source_publications_countries(address_ids)
-    pubs = await repo.refresh_publications_countries_for_addresses(address_ids)
+    addr_docs = repo.refresh_source_publications_countries(address_ids)
+    pubs = repo.refresh_publications_countries_for_addresses(address_ids)
 
     if addr_docs or pubs:
         logger.info(f"Propagation pays : {addr_docs} docs source, {pubs} publications")

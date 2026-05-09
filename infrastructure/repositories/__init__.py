@@ -24,7 +24,7 @@ Journal, Person et Publication existent dans les deux variantes
 
 from typing import Any
 
-from domain.ports.address_repository import AsyncAddressRepository
+from domain.ports.address_repository import AddressRepository, AsyncAddressRepository
 from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
 from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
@@ -35,6 +35,7 @@ from domain.ports.publisher_repository import AsyncPublisherRepository, Publishe
 from domain.ports.structure_repository import AsyncStructureRepository, StructureRepository
 from infrastructure.db.queries.config import PgAsyncConfig, PgConfig
 
+from .address_repository import PgAddressRepository
 from .async_address_repository import PgAsyncAddressRepository
 from .async_audit_repository import PgAsyncAuditRepository
 from .async_authorship_repository import PgAsyncAuthorshipRepository
@@ -52,6 +53,11 @@ from .person_repository import PgPersonRepository
 from .publication_repository import PgPublicationRepository
 from .publisher_repository import PgPublisherRepository
 from .structure_repository import PgStructureRepository
+
+
+def address_repository(conn: Any) -> AddressRepository:
+    """Retourne un AddressRepository lié à la Connection SA donnée."""
+    return PgAddressRepository(conn)
 
 
 def audit_repository(conn_or_cur: Any) -> AuditRepository:

@@ -19,12 +19,14 @@ from fastapi import Cookie, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Connection, text
 
+from application.ports.addresses_queries import AddressesQueries
 from application.ports.admin_feedback_queries import AdminFeedbackQueries
 from application.ports.config import ConfigStore
 from application.ports.config_queries import ConfigQueries
 from application.ports.hal_problems_queries import HalProblemsQueries
 from application.ports.journals_queries import JournalQueries
 from application.ports.laboratories_queries import LaboratoriesQueries
+from application.ports.perimeter import PerimeterQueries
 from application.ports.perimeters_queries import PerimetersAdminQueries
 from application.ports.person_duplicates_queries import PersonDuplicatesQueries
 from application.ports.publication_duplicates_queries import PublicationDuplicatesQueries
@@ -33,6 +35,7 @@ from application.ports.publishers_queries import PublisherQueries
 from application.ports.stats_queries import StatsQueries
 from application.ports.structures_queries import StructuresQueries
 from application.ports.subjects_queries import SubjectsAdminQueries
+from domain.ports.address_repository import AddressRepository
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.authorship_repository import AuthorshipRepository
 from domain.ports.journal_repository import JournalRepository
@@ -42,12 +45,13 @@ from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.ports.structure_repository import StructureRepository
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.db.queries.addresses import PgAddressesQueries
 from infrastructure.db.queries.admin_feedback import PgAdminFeedbackQueries
 from infrastructure.db.queries.config import PgConfig, PgConfigQueries
 from infrastructure.db.queries.hal_problems import PgHalProblemsQueries
 from infrastructure.db.queries.journals import PgJournalQueries
 from infrastructure.db.queries.laboratories import PgLaboratoriesQueries
-from infrastructure.db.queries.perimeter import PgPerimetersAdminQueries
+from infrastructure.db.queries.perimeter import PgPerimeterQueries, PgPerimetersAdminQueries
 from infrastructure.db.queries.person_duplicates import PgPersonDuplicatesQueries
 from infrastructure.db.queries.publication_duplicates import PgPublicationDuplicatesQueries
 from infrastructure.db.queries.publications import PgPublicationsQueries
@@ -56,6 +60,7 @@ from infrastructure.db.queries.stats import PgStatsQueries
 from infrastructure.db.queries.structures import PgStructuresQueries
 from infrastructure.db.queries.subjects import PgSubjectsAdminQueries
 from infrastructure.repositories import (
+    address_repository,
     audit_repository,
     authorship_repository,
     journal_repository,
@@ -242,6 +247,45 @@ def publications_queries_sync(
 
 def authorship_repo_sync(conn: Connection = Depends(db_conn_sync)) -> AuthorshipRepository:
     return authorship_repository(conn)
+
+
+def address_repo_sync(conn: Connection = Depends(db_conn_sync)) -> AddressRepository:
+    return address_repository(conn)
+
+
+def addresses_queries_sync(conn: Connection = Depends(db_conn_sync)) -> AddressesQueries:
+    return PgAddressesQueries(conn)
+
+
+# PgPerimeterQueries est sans état (la connexion est passée aux méthodes),
+# donc un singleton par processus suffit.
+_perimeter_queries_sync_singleton: PerimeterQueries = PgPerimeterQueries()
+
+
+def get_perimeter_queries_sync() -> PerimeterQueries:
+    """Retourne le singleton sync de `PerimeterQueries`."""
+    return _perimeter_queries_sync_singleton
+
+
+def bg_propagate_countries_sync(address_ids: list[int]) -> None:
+    """Tâche de fond sync : propager les pays d'adresses → publications.
+
+    Lancée hors cycle de requête (`BackgroundTasks`), donc les `Depends`
+    ne s'appliquent pas — composition manuelle ici (composition root).
+    """
+    import logging
+
+    from application import addresses_countries as countries_service
+
+    logger = logging.getLogger(__name__)
+    try:
+        engine = get_sync_engine()
+        with engine.begin() as conn:
+            countries_service.propagate_countries_to_publications(
+                conn, address_ids, repo=address_repository(conn)
+            )
+    except Exception:
+        logger.exception("Erreur propagation pays en background")
 
 
 # ----- Perimeter root (sync, lazy-cached) -----
