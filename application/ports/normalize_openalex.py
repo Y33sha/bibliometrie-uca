@@ -9,11 +9,11 @@ from typing import Any, Protocol
 class OpenalexNormalizeQueries(Protocol):
     """Opérations SQL du normaliseur OpenAlex."""
 
-    def fetch_publication_id_for_hal_source(self, cur: Any, hal_id: str) -> int | None: ...
+    def fetch_publication_id_for_hal_source(self, conn: Any, hal_id: str) -> int | None: ...
 
     def upsert_openalex_source_publication(
         self,
-        cur: Any,
+        conn: Any,
         *,
         openalex_id: str,
         doi: str | None,
@@ -36,11 +36,11 @@ class OpenalexNormalizeQueries(Protocol):
         topics_json: Any,
     ) -> int: ...
 
-    def find_openalex_source_structure(self, cur: Any, openalex_id: str) -> int | None: ...
+    def find_openalex_source_structure(self, conn: Any, openalex_id: str) -> int | None: ...
 
     def upsert_openalex_source_structure(
         self,
-        cur: Any,
+        conn: Any,
         *,
         openalex_id: str,
         name: str,
@@ -51,7 +51,7 @@ class OpenalexNormalizeQueries(Protocol):
 
     def upsert_openalex_source_authorship(
         self,
-        cur: Any,
+        conn: Any,
         *,
         source_publication_id: int,
         source_person_id: int | None,
@@ -62,12 +62,12 @@ class OpenalexNormalizeQueries(Protocol):
         identifiers: Any,
     ) -> int: ...
 
-    def staging_has_openalex_doi(self, cur: Any, doi: str) -> bool: ...
+    def staging_has_openalex_doi(self, conn: Any, doi: str) -> bool: ...
 
-    def get_openalex_publication_id(self, cur: Any, openalex_id: str) -> int | None: ...
+    def get_openalex_publication_id(self, conn: Any, openalex_id: str) -> int | None: ...
 
-    def count_openalex_table(self, cur: Any, table: str) -> int: ...
+    def count_openalex_table(self, conn: Any, table: str) -> int: ...
 
     def clear_source_authorships_for_publication(
-        self, cur: Any, source_publication_id: int
+        self, conn: Any, source_publication_id: int
     ) -> None: ...

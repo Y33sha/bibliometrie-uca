@@ -5,7 +5,7 @@ import os
 from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
 from infrastructure.addresses import PgAddressLinker
 from infrastructure.app_config import get_api_base_urls
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
 from infrastructure.db.queries.staging import PgStagingQueries
 from infrastructure.log import setup_logger
@@ -20,9 +20,10 @@ logger = setup_logger("normalize_openalex", os.path.join(os.path.dirname(__file_
 
 
 def main() -> None:
-    conn = get_connection()
-    with conn.cursor() as cur:
-        zenodo_api = get_api_base_urls(cur)["zenodo"]
+    engine = get_sync_engine()
+    with engine.connect() as bootstrap:
+        zenodo_api = get_api_base_urls(bootstrap)["zenodo"]
+    conn = engine.connect()
     OpenalexNormalizer(
         conn,
         logger,

@@ -19,8 +19,6 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 from collections.abc import Callable
 from typing import Any
 
-from psycopg.types.json import Jsonb as Json
-
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.address_linker import AddressLinker
@@ -290,7 +288,7 @@ def insert_openalex_document(
     if pub_meta and pub_meta.get("source_doi"):
         location_ids["source_doi"] = pub_meta["source_doi"]
 
-    external_ids = Json(location_ids) if location_ids else None
+    external_ids = location_ids if location_ids else None
     cited_by_count = work.get("cited_by_count")
     is_retracted = work.get("is_retracted") or False
 
@@ -301,7 +299,7 @@ def insert_openalex_document(
         for k in ("volume", "issue", "first_page", "last_page")
         if raw_biblio.get(k)
     }
-    biblio = Json(biblio_clean) if biblio_clean else None
+    biblio = biblio_clean if biblio_clean else None
 
     # Abstract, keywords, topics
     abstract = reconstruct_abstract(work.get("abstract_inverted_index"))
@@ -312,7 +310,7 @@ def insert_openalex_document(
     else:
         keywords = None
     topics = extract_topics(work)
-    topics_json = Json(topics) if topics else None
+    topics_json = topics if topics else None
 
     # Métadonnées de publication (pour création différée)
     journal_id = pub_meta.get("journal_id") if pub_meta else None
@@ -380,7 +378,7 @@ def upsert_openalex_institution(
     if not name:
         return queries.find_openalex_source_structure(cur, openalex_id)
 
-    source_data = Json({"type": inst_type}) if inst_type else None
+    source_data = {"type": inst_type} if inst_type else None
 
     return queries.upsert_openalex_source_structure(
         cur,
@@ -462,7 +460,7 @@ def process_authorships(
 
         orcid = _extract_openalex_orcid(authorship)
         ids = compact_identifiers(orcid=orcid)
-        identifiers = Json(ids) if ids else None
+        identifiers = ids if ids else None
 
         sa_id = queries.upsert_openalex_source_authorship(
             cur,

@@ -8,26 +8,30 @@ d'idempotence et les déduplications Zenodo.
 
 from typing import Any
 
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
+
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )
 
 
-def fetch_publication_id_for_hal_source(cur: Any, hal_id: str) -> int | None:
+def fetch_publication_id_for_hal_source(conn: Connection, hal_id: str) -> int | None:
     """Retourne `publication_id` du document HAL correspondant (pour cross-référence)."""
-    cur.execute(
-        "SELECT publication_id FROM source_publications WHERE source = 'hal' AND source_id = %s",
-        (hal_id,),
-    )
-    row = cur.fetchone()
+    row = conn.execute(
+        text(
+            "SELECT publication_id FROM source_publications "
+            "WHERE source = 'hal' AND source_id = :hal_id"
+        ),
+        {"hal_id": hal_id},
+    ).one_or_none()
     if row is None:
         return None
-    pid = row["publication_id"] if isinstance(row, dict) else row[0]
-    return pid if pid else None
+    return row.publication_id if row.publication_id else None
 
 
 def upsert_openalex_source_publication(
-    cur: Any,
+    conn: Connection,
     *,
     openalex_id: str,
     doi: str | None,
@@ -50,16 +54,16 @@ def upsert_openalex_source_publication(
     topics_json: Any,
 ) -> int:
     """UPSERT d'un document OpenAlex dans `source_publications`."""
-    cur.execute(
-        """
+    stmt = text("""
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids, urls, cited_by_count,
              journal_id, oa_status, language, container_title,
              is_retracted, biblio, abstract, keywords, topics)
-        VALUES ('openalex', %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s, %s, %s)
+        VALUES ('openalex', :openalex_id, :doi, :title, :pub_year, :doc_type,
+                :publication_id, :staging_id, :external_ids, :urls, :cited_by_count,
+                :journal_id, :oa_status, :language, :container_title,
+                :is_retracted, :biblio, :abstract, :keywords, :topics_json)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_publications.publication_id, EXCLUDED.publication_id
@@ -78,47 +82,49 @@ def upsert_openalex_source_publication(
             keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
             topics = COALESCE(EXCLUDED.topics, source_publications.topics)
         RETURNING id
-        """,
-        (
-            openalex_id,
-            doi,
-            title,
-            pub_year,
-            doc_type,
-            publication_id,
-            staging_id,
-            external_ids,
-            urls,
-            cited_by_count,
-            journal_id,
-            oa_status,
-            language,
-            container_title,
-            is_retracted,
-            biblio,
-            abstract,
-            keywords,
-            topics_json,
-        ),
+    """).bindparams(
+        bindparam("external_ids", type_=JSONB),
+        bindparam("biblio", type_=JSONB),
+        bindparam("topics_json", type_=JSONB),
     )
-    row = cur.fetchone()
-    return row["id"] if isinstance(row, dict) else row[0]
+    row = conn.execute(
+        stmt,
+        {
+            "openalex_id": openalex_id,
+            "doi": doi,
+            "title": title,
+            "pub_year": pub_year,
+            "doc_type": doc_type,
+            "publication_id": publication_id,
+            "staging_id": staging_id,
+            "external_ids": external_ids,
+            "urls": urls,
+            "cited_by_count": cited_by_count,
+            "journal_id": journal_id,
+            "oa_status": oa_status,
+            "language": language,
+            "container_title": container_title,
+            "is_retracted": is_retracted,
+            "biblio": biblio,
+            "abstract": abstract,
+            "keywords": keywords,
+            "topics_json": topics_json,
+        },
+    ).one()
+    return row.id
 
 
-def find_openalex_source_structure(cur: Any, openalex_id: str) -> int | None:
+def find_openalex_source_structure(conn: Connection, openalex_id: str) -> int | None:
     """Cherche une `source_structures` OpenAlex par `source_id`."""
-    cur.execute(
-        "SELECT id FROM source_structures WHERE source = 'openalex' AND source_id = %s",
-        (openalex_id,),
-    )
-    row = cur.fetchone()
-    if row is None:
-        return None
-    return row["id"] if isinstance(row, dict) else row[0]
+    row = conn.execute(
+        text("SELECT id FROM source_structures WHERE source = 'openalex' AND source_id = :oa_id"),
+        {"oa_id": openalex_id},
+    ).one_or_none()
+    return row.id if row else None
 
 
 def upsert_openalex_source_structure(
-    cur: Any,
+    conn: Connection,
     *,
     openalex_id: str,
     name: str,
@@ -127,26 +133,32 @@ def upsert_openalex_source_structure(
     source_data: Any,
 ) -> int:
     """UPSERT d'une `source_structures` OpenAlex."""
-    cur.execute(
-        """
+    stmt = text("""
         INSERT INTO source_structures
             (source, source_id, name, ror_id, country, source_data)
-        VALUES ('openalex', %s, %s, %s, %s, %s)
+        VALUES ('openalex', :openalex_id, :name, :ror_id, :country, :source_data)
         ON CONFLICT (source, source_id) DO UPDATE SET
             name = COALESCE(NULLIF(source_structures.name, ''), EXCLUDED.name),
             ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id),
             source_data = COALESCE(source_structures.source_data, '{}') ||
                           COALESCE(EXCLUDED.source_data, '{}')
         RETURNING id
-        """,
-        (openalex_id, name, ror_id, country, source_data),
-    )
-    row = cur.fetchone()
-    return row["id"] if isinstance(row, dict) else row[0]
+    """).bindparams(bindparam("source_data", type_=JSONB))
+    row = conn.execute(
+        stmt,
+        {
+            "openalex_id": openalex_id,
+            "name": name,
+            "ror_id": ror_id,
+            "country": country,
+            "source_data": source_data,
+        },
+    ).one()
+    return row.id
 
 
 def upsert_openalex_source_authorship(
-    cur: Any,
+    conn: Connection,
     *,
     source_publication_id: int,
     source_person_id: int | None,
@@ -163,13 +175,14 @@ def upsert_openalex_source_authorship(
     algorithmiques non fiables). Les identifiants normalisés (orcid)
     vivent sur `identifiers`.
     """
-    cur.execute(
-        """
+    stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              source_struct_ids,
              author_name_normalized, is_corresponding, raw_author_name, identifiers)
-        VALUES ('openalex', %s, %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
+        VALUES ('openalex', :spid, :source_person_id, :pos, :source_struct_ids,
+                normalize_name_form(:raw_author_name), :is_corresponding,
+                :raw_author_name, :identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = COALESCE(
                 EXCLUDED.author_name_normalized,
@@ -179,78 +192,48 @@ def upsert_openalex_source_authorship(
             raw_author_name = EXCLUDED.raw_author_name,
             identifiers = EXCLUDED.identifiers
         RETURNING id
-        """,
-        (
-            source_publication_id,
-            source_person_id,
-            author_position,
-            source_struct_ids,
-            raw_author_name,
-            is_corresponding,
-            raw_author_name,
-            identifiers,
-        ),
-    )
-    row = cur.fetchone()
-    return row[0] if isinstance(row, tuple) else row["id"]
+    """).bindparams(bindparam("identifiers", type_=JSONB))
+    row = conn.execute(
+        stmt,
+        {
+            "spid": source_publication_id,
+            "source_person_id": source_person_id,
+            "pos": author_position,
+            "source_struct_ids": source_struct_ids,
+            "raw_author_name": raw_author_name,
+            "is_corresponding": is_corresponding,
+            "identifiers": identifiers,
+        },
+    ).one()
+    return row.id
 
 
-def staging_has_openalex_doi(cur: Any, doi: str) -> bool:
+def staging_has_openalex_doi(conn: Connection, doi: str) -> bool:
     """Vrai si le DOI est déjà présent dans `staging` pour `source='openalex'`."""
-    cur.execute(
-        "SELECT id FROM staging WHERE source = 'openalex' AND lower(doi) = lower(%s)",
-        (doi,),
+    return (
+        conn.execute(
+            text("SELECT id FROM staging WHERE source = 'openalex' AND lower(doi) = lower(:doi)"),
+            {"doi": doi},
+        ).first()
+        is not None
     )
-    return cur.fetchone() is not None
 
 
-def get_openalex_publication_id(cur: Any, openalex_id: str) -> int | None:
+def get_openalex_publication_id(conn: Connection, openalex_id: str) -> int | None:
     """Idempotence : retourne `publication_id` déjà associé au document OpenAlex."""
-    cur.execute(
-        "SELECT publication_id FROM source_publications WHERE source = 'openalex' AND source_id = %s",
-        (openalex_id,),
-    )
-    row = cur.fetchone()
+    row = conn.execute(
+        text(
+            "SELECT publication_id FROM source_publications "
+            "WHERE source = 'openalex' AND source_id = :oa_id"
+        ),
+        {"oa_id": openalex_id},
+    ).one_or_none()
     if row is None:
         return None
-    pid = row["publication_id"] if isinstance(row, dict) else row[0]
-    return pid if pid else None
+    return row.publication_id if row.publication_id else None
 
 
-class PgOpenalexNormalizeQueries:
-    """Adapter PostgreSQL pour `application.ports.normalize_openalex.OpenalexNormalizeQueries`."""
-
-    def fetch_publication_id_for_hal_source(self, cur: Any, hal_id: str) -> int | None:
-        return fetch_publication_id_for_hal_source(cur, hal_id)
-
-    def upsert_openalex_source_publication(self, cur: Any, **kwargs: Any) -> int:
-        return upsert_openalex_source_publication(cur, **kwargs)
-
-    def find_openalex_source_structure(self, cur: Any, openalex_id: str) -> int | None:
-        return find_openalex_source_structure(cur, openalex_id)
-
-    def upsert_openalex_source_structure(self, cur: Any, **kwargs: Any) -> int:
-        return upsert_openalex_source_structure(cur, **kwargs)
-
-    def upsert_openalex_source_authorship(self, cur: Any, **kwargs: Any) -> int:
-        return upsert_openalex_source_authorship(cur, **kwargs)
-
-    def staging_has_openalex_doi(self, cur: Any, doi: str) -> bool:
-        return staging_has_openalex_doi(cur, doi)
-
-    def get_openalex_publication_id(self, cur: Any, openalex_id: str) -> int | None:
-        return get_openalex_publication_id(cur, openalex_id)
-
-    def count_openalex_table(self, cur: Any, table: str) -> int:
-        return count_openalex_table(cur, table)
-
-    def clear_source_authorships_for_publication(
-        self, cur: Any, source_publication_id: int
-    ) -> None:
-        clear_source_authorships_for_publication(cur, source_publication_id)
-
-
-def count_openalex_table(cur: Any, table: str) -> int:
+def count_openalex_table(conn: Connection, table: str) -> int:
     """Compte les lignes d'une table avec `source = 'openalex'` (liste blanche).
 
     `source_persons` reste accepté pour permettre de tracer les rows
@@ -258,6 +241,39 @@ def count_openalex_table(cur: Any, table: str) -> int:
     """
     if table not in ("source_publications", "source_persons", "source_structures"):
         raise ValueError(f"Table inattendue : {table!r}")
-    cur.execute(f"SELECT COUNT(*) AS cnt FROM {table} WHERE source = 'openalex'")
-    row = cur.fetchone()
-    return row["cnt"] if isinstance(row, dict) else row[0]
+    return conn.execute(
+        text(f"SELECT COUNT(*) AS cnt FROM {table} WHERE source = 'openalex'")
+    ).scalar_one()
+
+
+class PgOpenalexNormalizeQueries:
+    """Adapter PostgreSQL pour `application.ports.normalize_openalex.OpenalexNormalizeQueries`."""
+
+    def fetch_publication_id_for_hal_source(self, conn: Connection, hal_id: str) -> int | None:
+        return fetch_publication_id_for_hal_source(conn, hal_id)
+
+    def upsert_openalex_source_publication(self, conn: Connection, **kwargs: Any) -> int:
+        return upsert_openalex_source_publication(conn, **kwargs)
+
+    def find_openalex_source_structure(self, conn: Connection, openalex_id: str) -> int | None:
+        return find_openalex_source_structure(conn, openalex_id)
+
+    def upsert_openalex_source_structure(self, conn: Connection, **kwargs: Any) -> int:
+        return upsert_openalex_source_structure(conn, **kwargs)
+
+    def upsert_openalex_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
+        return upsert_openalex_source_authorship(conn, **kwargs)
+
+    def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool:
+        return staging_has_openalex_doi(conn, doi)
+
+    def get_openalex_publication_id(self, conn: Connection, openalex_id: str) -> int | None:
+        return get_openalex_publication_id(conn, openalex_id)
+
+    def count_openalex_table(self, conn: Connection, table: str) -> int:
+        return count_openalex_table(conn, table)
+
+    def clear_source_authorships_for_publication(
+        self, conn: Connection, source_publication_id: int
+    ) -> None:
+        clear_source_authorships_for_publication(conn, source_publication_id)
