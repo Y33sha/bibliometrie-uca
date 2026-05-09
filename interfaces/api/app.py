@@ -20,6 +20,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy import text
 
 from application import audit
 from domain.errors import (
@@ -29,15 +30,12 @@ from domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
-from infrastructure.db.async_connection import build_async_pool, get_async_pool, set_async_pool
 from infrastructure.db.engine import (
-    build_async_engine,
     build_sync_engine,
-    set_async_engine,
+    get_sync_engine,
     set_sync_engine,
 )
 from infrastructure.log import configure_root_logging
-from interfaces.api.async_deps import get_async_cursor
 from interfaces.api.deps import _verify_token
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
@@ -70,21 +68,13 @@ logger = logging.getLogger(__name__)
 
 # ----- Lifespan -----
 #
-# Ouvre/ferme le pool async psycopg3 pour toute la surface API.
+# Initialise/dispose l'Engine SA sync pour toute la surface API.
+# Les routers `def` consomment cet engine via `db_conn_sync` ; les
+# `async def` (uniquement le SSE feedback_rerun) gèrent leur propre I/O.
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Any:
-    # Pool psycopg async + AsyncEngine SA pour les routers async (encore
-    # majoritaires pendant le chantier sync-async-deduplication).
-    # Engine SA sync pour les routers déjà migrés en `def` (option D).
-    # Les trois cohabitent ; Phase 3 du chantier supprime les deux
-    # premiers une fois tous les routers basculés.
-    pool = build_async_pool()
-    await pool.open()
-    set_async_pool(pool)
-    engine = build_async_engine()
-    set_async_engine(engine)
     sync_engine = build_sync_engine()
     set_sync_engine(sync_engine)
     try:
@@ -92,10 +82,6 @@ async def lifespan(app: FastAPI) -> Any:
     finally:
         sync_engine.dispose()
         set_sync_engine(None)
-        await engine.dispose()
-        set_async_engine(None)
-        await pool.close()
-        set_async_pool(None)
 
 
 app = FastAPI(title="Bibliométrie UCA", lifespan=lifespan)
@@ -248,18 +234,21 @@ _PIPELINE_STATUS_FILE = Path(__file__).resolve().parent.parent.parent / "logs" /
 
 
 @app.get("/api/health")
-async def health() -> Any:
+def health() -> Any:
     """Vérifie que l'API est opérationnelle, la DB accessible, et la fraîcheur
     des données (date de la dernière extraction par source).
     """
     sandbox = os.environ.get("BIBLIOMETRIE_SANDBOX") == "1"
     try:
-        async with get_async_cursor() as (cur, conn):
-            await cur.execute("SELECT 1")
-            await cur.execute(
-                "SELECT source, MAX(created_at) AS last_at FROM source_publications GROUP BY source"
-            )
-            rows = await cur.fetchall()
+        engine = get_sync_engine()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+            rows = conn.execute(
+                text(
+                    "SELECT source, MAX(created_at) AS last_at "
+                    "FROM source_publications GROUP BY source"
+                )
+            ).all()
     except Exception as e:
         return JSONResponse(status_code=503, content={"status": "error", "db": str(e)})
 
@@ -268,8 +257,8 @@ async def health() -> Any:
     last_extraction: dict = {}
     stale: list[str] = []
     for r in rows:
-        source = r["source"]
-        last_at = r["last_at"]
+        source = r.source
+        last_at = r.last_at
         is_stale = bool(last_at and last_at < threshold)
         last_extraction[source] = {
             "at": last_at.isoformat() if last_at else None,
@@ -294,22 +283,23 @@ async def health() -> Any:
 
 
 @app.get("/api/metrics")
-async def metrics() -> Any:
-    """Métriques internes : état du pool de connexions DB.
+def metrics() -> Any:
+    """Métriques internes : état du pool de connexions SQLAlchemy.
 
     Le timing des requêtes est émis via le middleware `timing_middleware`
     (champs `method`, `path`, `status`, `duration_ms` en JSON structuré).
     """
-    pool = get_async_pool()
-    stats = pool.get_stats()
-    pool_size = stats.get("pool_size", 0)
-    available = stats.get("pool_available", 0)
+    engine = get_sync_engine()
+    # `engine.pool` est typé `Pool` (interface mince), mais l'instance
+    # concrète est un `QueuePool` qui expose size/checkedout/checkedin.
+    pool: Any = engine.pool
+    size = pool.size()
     return {
         "db_pool": {
-            "minconn": pool.min_size,
-            "maxconn": pool.max_size,
-            "in_use": pool_size - available,
-            "available": available,
+            "minconn": size,
+            "maxconn": size + getattr(pool, "_max_overflow", 0),
+            "in_use": pool.checkedout(),
+            "available": pool.checkedin(),
         },
     }
 
