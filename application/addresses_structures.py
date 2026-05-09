@@ -9,13 +9,13 @@ routers différents. La gestion des pays vit dans
 `application/addresses_countries.py`.
 
 Chaque opération propage automatiquement l'UCA via
-`propagate_uca_for_addresses_sync` (recalcul `in_perimeter` sur
+`propagate_uca_for_addresses` (recalcul `in_perimeter` sur
 `source_authorships`).
 """
 
 from sqlalchemy import Connection
 
-from application.authorships import propagate_uca_for_addresses_sync
+from application.authorships import propagate_uca_for_addresses
 from application.ports.perimeter import PerimeterQueries
 from domain.ports.address_repository import AddressRepository
 from domain.ports.authorship_repository import AuthorshipRepository
@@ -53,7 +53,7 @@ def review_structure_link(
     after = repo.which_contribute_to_perimeter([address_id], structure_id)
 
     if before != after:
-        propagate_uca_for_addresses_sync(
+        propagate_uca_for_addresses(
             conn, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
         )
 
@@ -91,7 +91,7 @@ def batch_review_structure_link(
 
     changed = list(before ^ after)
     if changed:
-        propagate_uca_for_addresses_sync(
+        propagate_uca_for_addresses(
             conn, changed, repo=authorship_repo, perimeter_queries=perimeter_queries
         )
     return updated
@@ -119,7 +119,7 @@ def unassign_manual_structure(
     after = repo.which_contribute_to_perimeter([address_id], structure_id)
 
     if before != after:
-        propagate_uca_for_addresses_sync(
+        propagate_uca_for_addresses(
             conn, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
         )
     return deleted

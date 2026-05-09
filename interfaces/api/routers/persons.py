@@ -12,7 +12,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection, text
 
-from application.authorships import exclude_authorship_sync
+from application.authorships import exclude_authorship
 from application.persons import (
     add_identifier as _add_identifier,
 )
@@ -405,7 +405,7 @@ def toggle_authorship_excluded(
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
     """Marque un authorship comme exclu."""
-    row = exclude_authorship_sync(conn, authorship_id, repo=repo, audit_repo=audit)
+    row = exclude_authorship(conn, authorship_id, repo=repo, audit_repo=audit)
     return {"id": row["id"], "excluded": row["excluded"]}
 
 

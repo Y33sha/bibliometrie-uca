@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy import Connection
 
 from application.audit import emit_event
-from application.authorships import delete_orphan_authorships_sync
+from application.authorships import delete_orphan_authorships
 from domain.errors import ValidationError
 from domain.names import compute_person_name_forms
 from domain.persons.merge import check_can_merge_persons
@@ -365,7 +365,7 @@ def detach_authorships(
         if a["source"] in ALL_SOURCES_SET:
             repo.unlink_authorship(person_id, a["source"], a["authorship_id"])
 
-    deleted = delete_orphan_authorships_sync(conn, person_id, repo=authorship_repo)
+    deleted = delete_orphan_authorships(conn, person_id, repo=authorship_repo)
 
     cleaned_form = False
     if name_form and repo.count_authorships_with_name_form(person_id, name_form) == 0:

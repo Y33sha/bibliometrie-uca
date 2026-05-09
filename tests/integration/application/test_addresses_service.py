@@ -589,14 +589,14 @@ class TestPropagationSkipsNoOp:
 
     @pytest.fixture
     def spy_propagate(self, monkeypatch):
-        """Remplace propagate_uca_for_addresses_sync par un spy qui compte les appels."""
+        """Remplace propagate_uca_for_addresses par un spy qui compte les appels."""
         calls: list[list[int]] = []
 
         def fake_propagate(conn, address_ids, **kw):  # noqa: ARG001
             calls.append(list(address_ids))
 
         monkeypatch.setattr(
-            addresses_structures_module, "propagate_uca_for_addresses_sync", fake_propagate
+            addresses_structures_module, "propagate_uca_for_addresses", fake_propagate
         )
         return calls
 
