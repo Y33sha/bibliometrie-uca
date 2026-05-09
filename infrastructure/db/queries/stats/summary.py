@@ -3,7 +3,6 @@
 from typing import Any
 
 from sqlalchemy import Connection, text
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from infrastructure.db.queries.filters import (
     PUB_IS_UCA,
@@ -108,16 +107,8 @@ def _by_year_sql(
     return sql, binds
 
 
-async def stats_by_year(conn: AsyncConnection, **kwargs: Any) -> list[dict[str, Any]]:
-    """Ventilation par année (async)."""
-    await conn.execute(text("SET LOCAL jit = off"))
-    sql, binds = _by_year_sql(**kwargs)
-    rows = (await conn.execute(text(sql), binds)).all()
-    return [dict(r._mapping) for r in rows]
-
-
-def stats_by_year_sync(conn: Connection, **kwargs: Any) -> list[dict[str, Any]]:
-    """Ventilation par année (sync)."""
+def stats_by_year(conn: Connection, **kwargs: Any) -> list[dict[str, Any]]:
+    """Ventilation par année."""
     conn.execute(text("SET LOCAL jit = off"))
     sql, binds = _by_year_sql(**kwargs)
     rows = conn.execute(text(sql), binds).all()
@@ -163,16 +154,8 @@ def _summary_sql(
     return sql, binds
 
 
-async def stats_summary(conn: AsyncConnection, **kwargs: Any) -> dict[str, Any]:
-    """Totaux globaux pour la page stats (async)."""
-    await conn.execute(text("SET LOCAL jit = off"))
-    sql, binds = _summary_sql(**kwargs)
-    row = (await conn.execute(text(sql), binds)).one()
-    return dict(row._mapping)
-
-
-def stats_summary_sync(conn: Connection, **kwargs: Any) -> dict[str, Any]:
-    """Totaux globaux pour la page stats (sync)."""
+def stats_summary(conn: Connection, **kwargs: Any) -> dict[str, Any]:
+    """Totaux globaux pour la page stats."""
     conn.execute(text("SET LOCAL jit = off"))
     sql, binds = _summary_sql(**kwargs)
     row = conn.execute(text(sql), binds).one()
@@ -186,15 +169,8 @@ _AVAILABLE_YEARS_SQL = f"""
 """
 
 
-async def available_years(conn: AsyncConnection) -> list[int]:
-    """Liste des années de publication disponibles (async)."""
-    await conn.execute(text("SET LOCAL jit = off"))
-    rows = (await conn.execute(text(_AVAILABLE_YEARS_SQL))).all()
-    return [r.pub_year for r in rows]
-
-
-def available_years_sync(conn: Connection) -> list[int]:
-    """Liste des années de publication disponibles (sync)."""
+def available_years(conn: Connection) -> list[int]:
+    """Liste des années de publication disponibles."""
     conn.execute(text("SET LOCAL jit = off"))
     rows = conn.execute(text(_AVAILABLE_YEARS_SQL)).all()
     return [r.pub_year for r in rows]
@@ -292,21 +268,8 @@ def _facets_sqls(
     }
 
 
-async def stats_facets(conn: AsyncConnection, **kwargs: Any) -> dict[str, list[dict[str, Any]]]:
-    """Facettes dynamiques (async)."""
-    await conn.execute(text("SET LOCAL jit = off"))
-    sqls = _facets_sqls(**kwargs)
-
-    year_rows = (await conn.execute(text(sqls["year"][0]), sqls["year"][1])).all()
-    lab_rows = (await conn.execute(text(sqls["lab"][0]), sqls["lab"][1])).all()
-    oa_rows = (await conn.execute(text(sqls["oa"][0]), sqls["oa"][1])).all()
-    apc_row = (await conn.execute(text(sqls["apc"][0]), sqls["apc"][1])).one()
-
-    return _build_facets_result(year_rows, lab_rows, oa_rows, apc_row)
-
-
-def stats_facets_sync(conn: Connection, **kwargs: Any) -> dict[str, list[dict[str, Any]]]:
-    """Facettes dynamiques (sync)."""
+def stats_facets(conn: Connection, **kwargs: Any) -> dict[str, list[dict[str, Any]]]:
+    """Facettes dynamiques."""
     conn.execute(text("SET LOCAL jit = off"))
     sqls = _facets_sqls(**kwargs)
 

@@ -3,7 +3,6 @@
 from typing import Any
 
 from sqlalchemy import Connection, text
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from infrastructure.db.queries.filters import (
     WhereClause,
@@ -125,19 +124,8 @@ def _build_stats_labs_sql(
     return count_sql, rows_sql, binds
 
 
-async def stats_labs(conn: AsyncConnection, **kwargs: Any) -> dict[str, Any]:
-    """Stats agrégées par laboratoire, paginées (async)."""
-    await conn.execute(text("SET LOCAL jit = off"))
-    count_sql, rows_sql, binds = _build_stats_labs_sql(**kwargs)
-    total = (await conn.execute(text(count_sql), binds)).one().total
-    rows = (await conn.execute(text(rows_sql), binds)).all()
-    return paginated(
-        total, kwargs["page"], kwargs["per_page"], "labs", [dict(r._mapping) for r in rows]
-    )
-
-
-def stats_labs_sync(conn: Connection, **kwargs: Any) -> dict[str, Any]:
-    """Stats agrégées par laboratoire, paginées (sync)."""
+def stats_labs(conn: Connection, **kwargs: Any) -> dict[str, Any]:
+    """Stats agrégées par laboratoire, paginées."""
     conn.execute(text("SET LOCAL jit = off"))
     count_sql, rows_sql, binds = _build_stats_labs_sql(**kwargs)
     total = conn.execute(text(count_sql), binds).one().total
