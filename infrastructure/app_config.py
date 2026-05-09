@@ -24,18 +24,6 @@ def _get_from_db(cur: Any, key: Any) -> Any:
     return None
 
 
-async def _async_get_from_db(cur: Any, key: Any) -> Any:
-    """Variante async de `_get_from_db`."""
-    try:
-        await cur.execute("SELECT value FROM config WHERE key = %s", (key,))
-        row = await cur.fetchone()
-        if row:
-            return row[0] if isinstance(row, tuple) else row["value"]
-    except Exception:
-        pass
-    return None
-
-
 def get_years(cur: Any, mode: str = "full") -> list[int]:
     """Retourne la liste des années à extraire selon le mode.
 
@@ -96,40 +84,6 @@ def get_hal_collections(cur: Any) -> dict[str, str]:
     return {}
 
 
-async def async_get_hal_collections(cur: Any) -> dict[str, str]:
-    """Variante async de get_hal_collections."""
-    try:
-        from infrastructure.perimeter import async_get_perimeter_structure_ids
-
-        perim_code = await _async_get_from_db(cur, "perimeter_extraction") or "uca_wide"
-        perimeter_ids = await async_get_perimeter_structure_ids(cur, perim_code)
-        if perimeter_ids:
-            await cur.execute(
-                """
-                SELECT hal_collection, COALESCE(acronym, name) AS label
-                FROM structures
-                WHERE id = ANY(%s) AND hal_collection IS NOT NULL AND hal_collection != ''
-            """,
-                (list(perimeter_ids),),
-            )
-            rows = await cur.fetchall()
-            if rows:
-                return {
-                    (r["hal_collection"] if isinstance(r, dict) else r[0]): (
-                        r["label"] if isinstance(r, dict) else r[1]
-                    )
-                    for r in rows
-                }
-    except Exception as e:
-        logger.warning(f"Impossible de dériver les collections HAL depuis le périmètre : {e}")
-
-    val = await _async_get_from_db(cur, "hal_collections")
-    if val and isinstance(val, dict):
-        return val
-
-    return {}
-
-
 def get_hal_extra_collections(cur: Any) -> list[str]:
     """Retourne les collections HAL supplémentaires (hors structures du périmètre)."""
     val = _get_from_db(cur, "hal_extra_collections")
@@ -171,14 +125,6 @@ def get_api_base_urls(cur: Any) -> dict[str, str]:
     nouvel endpoint ajouté en code ne force pas à re-seeder la config.
     """
     val = _get_from_db(cur, "api_base_urls")
-    if val and isinstance(val, dict):
-        return {**_API_BASE_URLS_DEFAULTS, **val}
-    return dict(_API_BASE_URLS_DEFAULTS)
-
-
-async def async_get_api_base_urls(cur: Any) -> dict[str, str]:
-    """Variante async de `get_api_base_urls` (pour les call sites API)."""
-    val = await _async_get_from_db(cur, "api_base_urls")
     if val and isinstance(val, dict):
         return {**_API_BASE_URLS_DEFAULTS, **val}
     return dict(_API_BASE_URLS_DEFAULTS)

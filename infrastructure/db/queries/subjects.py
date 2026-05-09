@@ -2,7 +2,7 @@
 `publication_subjects`.
 
 Consommé par la phase `application/pipeline/subjects/` (fonctions sync)
-et par les routes API `/api/subjects/*` (classe `PgAsyncSubjectsQueries`,
+et par les routes API `/api/subjects/*` (classe `PgSubjectsAdminQueries`,
 implémentation du port `application.ports.subjects_queries`).
 Voir docs/chantiers/sujets-mots-cles.md.
 """
@@ -11,7 +11,6 @@ from typing import Any
 
 from psycopg.types.json import Json
 from sqlalchemy import Connection, text
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from domain.subject import normalize_label
 
@@ -243,98 +242,11 @@ def recompute_cooccurrences(cur: Any, *, min_count: int = 2) -> int:
     return cur.rowcount
 
 
-# ── Lectures async (consommées par les routes API) ───────────────
-
-
-class PgAsyncSubjectsQueries:
-    """Adapter SA pour `application.ports.subjects_queries.AsyncSubjectsQueries`."""
-
-    def __init__(self, conn: AsyncConnection) -> None:
-        self._conn = conn
-
-    async def list_subjects(
-        self, *, q: str | None, limit: int, offset: int, min_count: int
-    ) -> list[dict[str, Any]]:
-        binds: dict[str, Any] = {"min_count": min_count, "lim": limit, "off": offset}
-        where = "usage_count >= :min_count"
-        if q:
-            where += " AND lower(label) LIKE :q"
-            binds["q"] = f"%{q.lower()}%"
-        rows = (
-            await self._conn.execute(
-                text(f"""
-                    SELECT id, label, language, ontologies, usage_count
-                    FROM subjects
-                    WHERE {where}
-                    ORDER BY usage_count DESC, lower(label)
-                    LIMIT :lim OFFSET :off
-                """),
-                binds,
-            )
-        ).all()
-        return [dict(r._mapping) for r in rows]
-
-    async def count_subjects(self, *, q: str | None, min_count: int) -> int:
-        binds: dict[str, Any] = {"min_count": min_count}
-        where = "usage_count >= :min_count"
-        if q:
-            where += " AND lower(label) LIKE :q"
-            binds["q"] = f"%{q.lower()}%"
-        row = (
-            await self._conn.execute(
-                text(f"SELECT COUNT(*) AS n FROM subjects WHERE {where}"),
-                binds,
-            )
-        ).one()
-        return row.n
-
-    async def get_subject(self, subject_id: int) -> dict[str, Any] | None:
-        row = (
-            await self._conn.execute(
-                text("""
-                    SELECT id, label, language, ontologies, usage_count
-                    FROM subjects
-                    WHERE id = :id
-                """),
-                {"id": subject_id},
-            )
-        ).one_or_none()
-        return dict(row._mapping) if row else None
-
-    async def get_subject_neighbors(
-        self, subject_id: int, *, limit: int, min_count: int
-    ) -> list[dict[str, Any]]:
-        rows = (
-            await self._conn.execute(
-                text("""
-                    SELECT s.id, s.label, s.ontologies, s.usage_count,
-                           c.n AS cooccurrence_count
-                    FROM (
-                        SELECT subject_b_id AS other, count AS n
-                        FROM subject_cooccurrences WHERE subject_a_id = :sid
-                        UNION ALL
-                        SELECT subject_a_id AS other, count AS n
-                        FROM subject_cooccurrences WHERE subject_b_id = :sid
-                    ) c
-                    JOIN subjects s ON s.id = c.other
-                    WHERE c.n >= :min_count
-                    ORDER BY c.n DESC, lower(s.label)
-                    LIMIT :lim
-                """),
-                {"sid": subject_id, "min_count": min_count, "lim": limit},
-            )
-        ).all()
-        return [dict(r._mapping) for r in rows]
+# ── Lectures (consommées par les routes API) ─────────────────────
 
 
 class PgSubjectsAdminQueries:
-    """Adapter SA sync pour `application.ports.subjects_queries.SubjectsAdminQueries`.
-
-    Variante sync de `PgAsyncSubjectsQueries` pour les routers migrés
-    en `def` (chantier sync-async-deduplication, option D). Mêmes
-    requêtes, juste sans `await`. Cohabite jusqu'à la suppression de
-    la classe async en Phase 3 du chantier.
-    """
+    """Adapter SA pour `application.ports.subjects_queries.SubjectsAdminQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

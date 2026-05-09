@@ -3,7 +3,6 @@
 from typing import Any
 
 from sqlalchemy import Connection, text
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from infrastructure.db.queries.filters import (
     PUB_IS_UCA,
@@ -109,19 +108,8 @@ def _build_journal_stats_sql(
     return count_sql, rows_sql, binds
 
 
-async def journal_stats(conn: AsyncConnection, **kwargs: Any) -> dict[str, Any]:
-    """Stats agrégées par revue, paginées (async)."""
-    await conn.execute(text("SET LOCAL jit = off"))
-    count_sql, rows_sql, binds = _build_journal_stats_sql(**kwargs)
-    total = (await conn.execute(text(count_sql), binds)).one().total
-    rows = (await conn.execute(text(rows_sql), binds)).all()
-    return paginated(
-        total, kwargs["page"], kwargs["per_page"], "journals", [dict(r._mapping) for r in rows]
-    )
-
-
-def journal_stats_sync(conn: Connection, **kwargs: Any) -> dict[str, Any]:
-    """Stats agrégées par revue, paginées (sync)."""
+def journal_stats(conn: Connection, **kwargs: Any) -> dict[str, Any]:
+    """Stats agrégées par revue, paginées."""
     conn.execute(text("SET LOCAL jit = off"))
     count_sql, rows_sql, binds = _build_journal_stats_sql(**kwargs)
     total = conn.execute(text(count_sql), binds).one().total

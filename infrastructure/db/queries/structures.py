@@ -1,7 +1,7 @@
-"""Query services async pour /api/structures/* et /api/name-forms/*.
+"""Query services pour /api/structures/* et /api/name-forms/*.
 
-Implémente le port `application.ports.structures_queries.AsyncStructuresQueries`
-via `PgAsyncStructuresQueries` (constructor injection de l'AsyncConnection
+Implémente le port `application.ports.structures_queries.StructuresQueries`
+via `PgStructuresQueries` (constructor injection de la `Connection`
 SA). Conformité au port assurée par duck typing : pas d'import du
 Protocol depuis `infrastructure/` (règle DDD `infrastructure ⊥
 application`).
@@ -10,7 +10,6 @@ application`).
 from typing import Any
 
 from sqlalchemy import Connection, text
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 _LIST_ORDER_BY = """
     ORDER BY CASE s.structure_type::text
@@ -47,111 +46,27 @@ def _list_structures_sql(*, type_filter: str | None, search: str) -> tuple[str, 
     return sql, binds
 
 
-class PgAsyncStructuresQueries:
-    """Adapter SA pour `application.ports.structures_queries.AsyncStructuresQueries`."""
+class PgStructuresQueries:
+    """Adapter SA pour `application.ports.structures_queries.StructuresQueries`."""
 
-    def __init__(self, conn: AsyncConnection) -> None:
+    def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    async def list_structures(
-        self, *, type_filter: str | None, search: str
-    ) -> list[dict[str, Any]]:
+    def list_structures(self, *, type_filter: str | None, search: str) -> list[dict[str, Any]]:
         """Liste des structures, filtrable par type et recherche accent-insensible.
 
         Tri canonique par type (labo > universite > onr > chu > ecole > site
         > autres) puis nom.
         """
         sql, binds = _list_structures_sql(type_filter=type_filter, search=search)
-        rows = (await self._conn.execute(text(sql), binds)).all()
-        return [dict(r._mapping) for r in rows]
-
-    async def get_structure_detail(self, structure_id: int) -> dict[str, Any] | None:
-        """Détail complet : structure + parents + enfants + formes de noms.
-
-        Retourne `None` si la structure n'existe pas (caller = 404).
-        """
-        struct_row = (
-            await self._conn.execute(
-                text("""
-                    SELECT id, code, name, acronym, structure_type::text AS type,
-                           ror_id, rnsr_id, hal_collection, api_ids
-                    FROM structures WHERE id = :id
-                """),
-                {"id": structure_id},
-            )
-        ).one_or_none()
-        if not struct_row:
-            return None
-
-        parent_rows = (
-            await self._conn.execute(
-                text("""
-                    SELECT sr.id AS relation_id, sr.relation_type::text,
-                           sp.id, sp.code, sp.name, sp.acronym, sp.structure_type::text AS type
-                    FROM structure_relations sr
-                    JOIN structures sp ON sp.id = sr.parent_id
-                    WHERE sr.child_id = :id
-                    ORDER BY sr.relation_type, sp.name
-                """),
-                {"id": structure_id},
-            )
-        ).all()
-
-        child_rows = (
-            await self._conn.execute(
-                text("""
-                    SELECT sr.id AS relation_id, sr.relation_type::text,
-                           sc.id, sc.code, sc.name, sc.acronym, sc.structure_type::text AS type
-                    FROM structure_relations sr
-                    JOIN structures sc ON sc.id = sr.child_id
-                    WHERE sr.parent_id = :id
-                    ORDER BY sr.relation_type, sc.name
-                """),
-                {"id": structure_id},
-            )
-        ).all()
-
-        form_rows = (
-            await self._conn.execute(
-                text("""
-                    SELECT * FROM structure_name_forms
-                    WHERE structure_id = :id
-                    ORDER BY form_text
-                """),
-                {"id": structure_id},
-            )
-        ).all()
-
-        return {
-            "structure": dict(struct_row._mapping),
-            "parents": [dict(r._mapping) for r in parent_rows],
-            "children": [dict(r._mapping) for r in child_rows],
-            "forms": [dict(r._mapping) for r in form_rows],
-        }
-
-    async def get_name_form(self, form_id: int) -> dict[str, Any] | None:
-        """Forme de nom par id. None si absente."""
-        row = (
-            await self._conn.execute(
-                text("SELECT * FROM structure_name_forms WHERE id = :id"),
-                {"id": form_id},
-            )
-        ).one_or_none()
-        return dict(row._mapping) if row else None
-
-
-class PgStructuresQueries:
-    """Variante sync de `PgAsyncStructuresQueries`."""
-
-    def __init__(self, conn: Connection) -> None:
-        self._conn = conn
-
-    def list_structures(self, *, type_filter: str | None, search: str) -> list[dict[str, Any]]:
-        sql, binds = _list_structures_sql(type_filter=type_filter, search=search)
         rows = self._conn.execute(text(sql), binds).all()
         return [dict(r._mapping) for r in rows]
 
     def get_structure_detail(self, structure_id: int) -> dict[str, Any] | None:
+        """Détail complet : structure + parents + enfants + formes de noms.
+
+        Retourne `None` si la structure n'existe pas (caller = 404).
+        """
         struct_row = self._conn.execute(
             text("""
                 SELECT id, code, name, acronym, structure_type::text AS type,
@@ -204,6 +119,7 @@ class PgStructuresQueries:
         }
 
     def get_name_form(self, form_id: int) -> dict[str, Any] | None:
+        """Forme de nom par id. None si absente."""
         row = self._conn.execute(
             text("SELECT * FROM structure_name_forms WHERE id = :id"),
             {"id": form_id},

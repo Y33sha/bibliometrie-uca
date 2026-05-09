@@ -1,11 +1,6 @@
 """Port : lectures sur les laboratoires (consommé par le router laboratories).
 
-Deux variantes (chantier sync-async-deduplication, option D) :
-- `AsyncLaboratoriesQueries` : routers async.
-- `LaboratoriesQueries` : routers sync.
-
-Implémentés respectivement par `PgAsyncLaboratoriesQueries` et
-`PgLaboratoriesQueries` dans `infrastructure.db.queries.laboratories`.
+Implémenté par `infrastructure.db.queries.laboratories.PgLaboratoriesQueries`.
 """
 
 from dataclasses import dataclass, field
@@ -23,34 +18,8 @@ class LabPersonsFilters:
     has_idref: str = ""
 
 
-class AsyncLaboratoriesQueries(Protocol):
-    """Lectures async sur les laboratoires."""
-
-    async def list_laboratories(self) -> list[dict[str, Any]]: ...
-
-    async def get_laboratory(self, lab_id: int) -> dict[str, Any] | None: ...
-
-    async def get_laboratory_persons(
-        self,
-        lab_id: int,
-        *,
-        filters: LabPersonsFilters,
-        page: int,
-        per_page: int,
-        sort: str,
-    ) -> dict[str, Any]: ...
-
-    async def get_laboratory_addresses(
-        self, lab_id: int, *, page: int, per_page: int
-    ) -> dict[str, Any]: ...
-
-    async def get_laboratory_subjects(self, lab_id: int, *, limit: int) -> list[dict[str, Any]]: ...
-
-    async def get_laboratory_dashboard(self, lab_id: int) -> dict[str, Any]: ...
-
-
 class LaboratoriesQueries(Protocol):
-    """Variante sync d'`AsyncLaboratoriesQueries`."""
+    """Lectures sur les laboratoires."""
 
     def list_laboratories(self) -> list[dict[str, Any]]: ...
 
