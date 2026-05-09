@@ -1,12 +1,15 @@
 """Query service : SQL du normaliseur Web of Science.
 
 Appelé par `application/pipeline/normalize/normalize_wos.py`. Regroupe les
-UPSERT batch (via `cur.executemany`) sur `source_persons`,
+UPSERT batch (via SA executemany) sur `source_persons`,
 `source_structures`, `source_authorships`, `source_authorship_addresses`,
 et les lectures/préchargements de caches.
 """
 
 from typing import Any
+
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
@@ -14,7 +17,7 @@ from infrastructure.db.queries.source_authorships import (
 
 
 def upsert_wos_source_publication(
-    cur: Any,
+    conn: Connection,
     *,
     ut: str,
     doi: str | None,
@@ -36,18 +39,18 @@ def upsert_wos_source_publication(
     external_ids: Any,
 ) -> int:
     """UPSERT d'un document WoS dans `source_publications`."""
-    cur.execute(
-        """
+    stmt = text("""
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id,
              journal_id, oa_status, language, container_title,
              abstract, cited_by_count, biblio, keywords, topics,
              urls, external_ids)
-        VALUES ('wos', %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s, %s, %s,
-                %s, %s)
+        VALUES ('wos', :ut, :doi, :title, :pub_year, :doc_type,
+                :publication_id, :staging_id,
+                :journal_id, :oa_status, :language, :container_title,
+                :abstract, :cited_by_count, :biblio, :keywords, :topics,
+                :urls, :external_ids)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_publications.publication_id, EXCLUDED.publication_id
@@ -65,73 +68,82 @@ def upsert_wos_source_publication(
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
             external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
         RETURNING id
-        """,
-        (
-            ut,
-            doi,
-            title,
-            pub_year,
-            doc_type,
-            publication_id,
-            staging_id,
-            journal_id,
-            oa_status,
-            language,
-            container_title,
-            abstract,
-            cited_by_count,
-            biblio,
-            keywords,
-            topics,
-            urls,
-            external_ids,
-        ),
+    """).bindparams(
+        bindparam("biblio", type_=JSONB),
+        bindparam("topics", type_=JSONB),
+        bindparam("external_ids", type_=JSONB),
     )
-    row = cur.fetchone()
-    return row[0] if isinstance(row, tuple) else row["id"]
+    row = conn.execute(
+        stmt,
+        {
+            "ut": ut,
+            "doi": doi,
+            "title": title,
+            "pub_year": pub_year,
+            "doc_type": doc_type,
+            "publication_id": publication_id,
+            "staging_id": staging_id,
+            "journal_id": journal_id,
+            "oa_status": oa_status,
+            "language": language,
+            "container_title": container_title,
+            "abstract": abstract,
+            "cited_by_count": cited_by_count,
+            "biblio": biblio,
+            "keywords": keywords,
+            "topics": topics,
+            "urls": urls,
+            "external_ids": external_ids,
+        },
+    ).one()
+    return row.id
 
 
-def upsert_wos_source_structure(cur: Any, *, name: str, ror_id: str | None) -> int:
+def upsert_wos_source_structure(conn: Connection, *, name: str, ror_id: str | None) -> int:
     """UPSERT d'une `source_structures` WoS (source_id = name)."""
-    cur.execute(
-        """
-        INSERT INTO source_structures (source, source_id, name, ror_id)
-        VALUES ('wos', %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id)
-        RETURNING id
-        """,
-        (name, name, ror_id),
-    )
-    row = cur.fetchone()
-    return row[0] if isinstance(row, tuple) else row["id"]
+    row = conn.execute(
+        text("""
+            INSERT INTO source_structures (source, source_id, name, ror_id)
+            VALUES ('wos', :source_id, :name, :ror_id)
+            ON CONFLICT (source, source_id) DO UPDATE SET
+                ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id)
+            RETURNING id
+        """),
+        {"source_id": name, "name": name, "ror_id": ror_id},
+    ).one()
+    return row.id
 
 
-def upsert_addresses_batch(cur: Any, values: list[tuple[str, str]]) -> None:
-    """INSERT INTO addresses ON CONFLICT DO NOTHING pour un batch `(raw_text, normalized_text)`."""
+def upsert_addresses_batch(conn: Connection, values: list[dict[str, Any]]) -> None:
+    """INSERT INTO addresses ON CONFLICT DO NOTHING pour un batch ``[{raw, norm}, ...]``."""
     if not values:
         return
-    cur.executemany(
-        """
-        INSERT INTO addresses (raw_text, normalized_text)
-        VALUES (%s, %s)
-        ON CONFLICT (md5(raw_text)) DO NOTHING
-        """,
+    conn.execute(
+        text("""
+            INSERT INTO addresses (raw_text, normalized_text)
+            VALUES (:raw, :norm)
+            ON CONFLICT (md5(raw_text)) DO NOTHING
+        """),
         values,
     )
 
 
-def fetch_address_ids_by_raw_text(cur: Any, raw_texts: list[str]) -> dict[str, int]:
+def fetch_address_ids_by_raw_text(conn: Connection, raw_texts: list[str]) -> dict[str, int]:
     """Retourne `{raw_text: id}` pour un lot d'adresses."""
-    cur.execute(
-        "SELECT raw_text, id FROM addresses WHERE raw_text = ANY(%s)",
-        (raw_texts,),
-    )
-    return {r[0]: r[1] for r in cur.fetchall()}
+    rows = conn.execute(
+        text("SELECT raw_text, id FROM addresses WHERE raw_text = ANY(:raw_texts)"),
+        {"raw_texts": raw_texts},
+    ).all()
+    return {r.raw_text: r.id for r in rows}
 
 
-def upsert_wos_source_authorships_batch(cur: Any, values: list[tuple[Any, ...]]) -> None:
+def upsert_wos_source_authorships_batch(conn: Connection, values: list[dict[str, Any]]) -> None:
     """Batch UPSERT de `source_authorships` WoS.
+
+    Chaque dict du batch a les clés : ``source_publication_id``,
+    ``source_person_id`` (toujours None), ``author_position``,
+    ``is_corresponding``, ``author_name_normalized``,
+    ``source_struct_ids``, ``roles``, ``raw_author_name``, ``identifiers``.
 
     `source_person_id` est NULL : depuis le chantier source_persons, WoS
     n'écrit plus dans `source_persons` (entité algorithmique non fiable
@@ -140,13 +152,14 @@ def upsert_wos_source_authorships_batch(cur: Any, values: list[tuple[Any, ...]])
     """
     if not values:
         return
-    cur.executemany(
-        """
+    stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              is_corresponding, author_name_normalized,
              source_struct_ids, roles, raw_author_name, identifiers)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES ('wos', :spid, :source_person_id, :author_position,
+                :is_corresponding, :author_name_normalized,
+                :source_struct_ids, :roles, :raw_author_name, :identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
             author_name_normalized = COALESCE(
@@ -160,65 +173,71 @@ def upsert_wos_source_authorships_batch(cur: Any, values: list[tuple[Any, ...]])
             roles = EXCLUDED.roles,
             raw_author_name = EXCLUDED.raw_author_name,
             identifiers = EXCLUDED.identifiers
-        """,
-        values,
+    """).bindparams(
+        bindparam("identifiers", type_=JSONB),
     )
+    conn.execute(stmt, values)
 
 
 def fetch_source_authorship_ids_by_position(
-    cur: Any, *, source_publication_id: int, positions: list[int]
+    conn: Connection, *, source_publication_id: int, positions: list[int]
 ) -> dict[int, int]:
     """Retourne `{author_position: source_authorship_id}` pour un document WoS.
 
     Pivot par `author_position` (et non plus `source_person_id`) parce que
     WoS n'alimente plus `source_persons` (cf. chantier source_persons).
     """
-    cur.execute(
-        """
-        SELECT author_position, id FROM source_authorships
-        WHERE source = 'wos'
-          AND source_publication_id = %s
-          AND author_position = ANY(%s)
-        """,
-        (source_publication_id, positions),
-    )
-    return {r[0]: r[1] for r in cur.fetchall()}
+    rows = conn.execute(
+        text("""
+            SELECT author_position, id FROM source_authorships
+            WHERE source = 'wos'
+              AND source_publication_id = :spid
+              AND author_position = ANY(:positions)
+        """),
+        {"spid": source_publication_id, "positions": positions},
+    ).all()
+    return {r.author_position: r.id for r in rows}
 
 
-def insert_source_authorship_addresses_batch(cur: Any, values: list[tuple[int, int]]) -> None:
-    """Batch INSERT de liens `source_authorship_addresses`."""
+def insert_source_authorship_addresses_batch(
+    conn: Connection, values: list[dict[str, int]]
+) -> None:
+    """Batch INSERT de liens `source_authorship_addresses`. Dicts ``{sa_id, addr_id}``."""
     if not values:
         return
-    cur.executemany(
-        """
-        INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
-        VALUES (%s, %s)
-        ON CONFLICT (source_authorship_id, address_id) DO NOTHING
-        """,
+    conn.execute(
+        text("""
+            INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
+            VALUES (:sa_id, :addr_id)
+            ON CONFLICT (source_authorship_id, address_id) DO NOTHING
+        """),
         values,
     )
 
 
-def get_wos_publication_id(cur: Any, ut: str) -> int | None:
+def get_wos_publication_id(conn: Connection, ut: str) -> int | None:
     """Idempotence : retourne le `publication_id` déjà associé au document WoS."""
-    cur.execute(
-        "SELECT publication_id FROM source_publications WHERE source = 'wos' AND source_id = %s",
-        (ut,),
-    )
-    row = cur.fetchone()
+    row = conn.execute(
+        text(
+            "SELECT publication_id FROM source_publications "
+            "WHERE source = 'wos' AND source_id = :ut"
+        ),
+        {"ut": ut},
+    ).one_or_none()
     if row is None:
         return None
-    pid = row[0] if isinstance(row, tuple) else row["publication_id"]
-    return pid if pid else None
+    return row.publication_id if row.publication_id else None
 
 
-def fetch_wos_source_structures(cur: Any) -> list[tuple[str, int]]:
+def fetch_wos_source_structures(conn: Connection) -> list[tuple[str, int]]:
     """Charge `(source_id, id)` des `source_structures` WoS (préchargement cache)."""
-    cur.execute("SELECT source_id, id FROM source_structures WHERE source = 'wos'")
-    return [(r[0], r[1]) for r in cur.fetchall()]
+    rows = conn.execute(
+        text("SELECT source_id, id FROM source_structures WHERE source = 'wos'")
+    ).all()
+    return [(r.source_id, r.id) for r in rows]
 
 
-def delete_wos_duplicate_authorships(cur: Any) -> int:
+def delete_wos_duplicate_authorships(conn: Connection) -> int:
     """Supprime les `source_authorships` WoS en doublon de position.
 
     WoS renvoie parfois 2 entrées `name` au même `seq_no` pour les publis
@@ -228,72 +247,79 @@ def delete_wos_duplicate_authorships(cur: Any) -> int:
     `if not daisng_id: continue`), mais les rows historiques subsistent.
 
     Heuristique : on garde la row dont le ``source_persons`` a un
-    ``daisng_id`` (``source_id NOT LIKE 'wos-%%'``). À égalité
+    ``daisng_id`` (``source_id NOT LIKE 'wos-%'``). À égalité
     (deux daisng_id, auteur désambiguïsé deux fois côté WoS), on garde
     la row la plus récente (``id`` max). Retourne le nombre de lignes
     supprimées.
     """
-    cur.execute("""
-        WITH ranked AS (
-            SELECT sa.id,
-                   ROW_NUMBER() OVER (
-                       PARTITION BY sa.source_publication_id, sa.author_position
-                       ORDER BY
-                           (sp.source_id LIKE 'wos-%%') ASC,
-                           sa.id DESC
-                   ) AS rn
-            FROM source_authorships sa
-            JOIN source_persons sp ON sp.id = sa.source_person_id
-            WHERE sa.source = 'wos' AND sa.author_position IS NOT NULL
-        )
-        DELETE FROM source_authorships
-        WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
-    """)
-    return cur.rowcount
+    return conn.execute(
+        text("""
+            WITH ranked AS (
+                SELECT sa.id,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY sa.source_publication_id, sa.author_position
+                           ORDER BY
+                               (sp.source_id LIKE 'wos-%') ASC,
+                               sa.id DESC
+                       ) AS rn
+                FROM source_authorships sa
+                JOIN source_persons sp ON sp.id = sa.source_person_id
+                WHERE sa.source = 'wos' AND sa.author_position IS NOT NULL
+            )
+            DELETE FROM source_authorships
+            WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+        """)
+    ).rowcount
 
 
 class PgWosNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_wos.WosNormalizeQueries`."""
 
-    def upsert_wos_source_publication(self, cur: Any, **kwargs: Any) -> int:
-        return upsert_wos_source_publication(cur, **kwargs)
+    def upsert_wos_source_publication(self, conn: Connection, **kwargs: Any) -> int:
+        return upsert_wos_source_publication(conn, **kwargs)
 
-    def upsert_wos_source_structure(self, cur: Any, *, name: str, ror_id: str | None) -> int:
-        return upsert_wos_source_structure(cur, name=name, ror_id=ror_id)
+    def upsert_wos_source_structure(
+        self, conn: Connection, *, name: str, ror_id: str | None
+    ) -> int:
+        return upsert_wos_source_structure(conn, name=name, ror_id=ror_id)
 
-    def upsert_addresses_batch(self, cur: Any, values: list[tuple[str, str]]) -> None:
-        upsert_addresses_batch(cur, values)
+    def upsert_addresses_batch(self, conn: Connection, values: list[dict[str, Any]]) -> None:
+        upsert_addresses_batch(conn, values)
 
-    def fetch_address_ids_by_raw_text(self, cur: Any, raw_texts: list[str]) -> dict[str, int]:
-        return fetch_address_ids_by_raw_text(cur, raw_texts)
+    def fetch_address_ids_by_raw_text(
+        self, conn: Connection, raw_texts: list[str]
+    ) -> dict[str, int]:
+        return fetch_address_ids_by_raw_text(conn, raw_texts)
 
-    def upsert_wos_source_authorships_batch(self, cur: Any, values: list[tuple[Any, ...]]) -> None:
-        upsert_wos_source_authorships_batch(cur, values)
+    def upsert_wos_source_authorships_batch(
+        self, conn: Connection, values: list[dict[str, Any]]
+    ) -> None:
+        upsert_wos_source_authorships_batch(conn, values)
 
     def fetch_source_authorship_ids_by_position(
-        self, cur: Any, *, source_publication_id: int, positions: list[int]
+        self, conn: Connection, *, source_publication_id: int, positions: list[int]
     ) -> dict[int, int]:
         return fetch_source_authorship_ids_by_position(
-            cur,
+            conn,
             source_publication_id=source_publication_id,
             positions=positions,
         )
 
     def insert_source_authorship_addresses_batch(
-        self, cur: Any, values: list[tuple[int, int]]
+        self, conn: Connection, values: list[dict[str, int]]
     ) -> None:
-        insert_source_authorship_addresses_batch(cur, values)
+        insert_source_authorship_addresses_batch(conn, values)
 
-    def get_wos_publication_id(self, cur: Any, ut: str) -> int | None:
-        return get_wos_publication_id(cur, ut)
+    def get_wos_publication_id(self, conn: Connection, ut: str) -> int | None:
+        return get_wos_publication_id(conn, ut)
 
-    def fetch_wos_source_structures(self, cur: Any) -> list[tuple[str, int]]:
-        return fetch_wos_source_structures(cur)
+    def fetch_wos_source_structures(self, conn: Connection) -> list[tuple[str, int]]:
+        return fetch_wos_source_structures(conn)
 
-    def delete_wos_duplicate_authorships(self, cur: Any) -> int:
-        return delete_wos_duplicate_authorships(cur)
+    def delete_wos_duplicate_authorships(self, conn: Connection) -> int:
+        return delete_wos_duplicate_authorships(conn)
 
     def clear_source_authorships_for_publication(
-        self, cur: Any, source_publication_id: int
+        self, conn: Connection, source_publication_id: int
     ) -> None:
-        clear_source_authorships_for_publication(cur, source_publication_id)
+        clear_source_authorships_for_publication(conn, source_publication_id)
