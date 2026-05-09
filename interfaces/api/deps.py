@@ -17,7 +17,7 @@ from typing import Any
 import bcrypt
 from fastapi import Cookie, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 
 from application.ports.admin_feedback_queries import AdminFeedbackQueries
 from application.ports.config import ConfigStore
@@ -28,14 +28,19 @@ from application.ports.laboratories_queries import LaboratoriesQueries
 from application.ports.perimeters_queries import PerimetersAdminQueries
 from application.ports.person_duplicates_queries import PersonDuplicatesQueries
 from application.ports.publication_duplicates_queries import PublicationDuplicatesQueries
+from application.ports.publications_queries import PublicationsQueries
 from application.ports.publishers_queries import PublisherQueries
+from application.ports.stats_queries import StatsQueries
+from application.ports.structures_queries import StructuresQueries
 from application.ports.subjects_queries import SubjectsAdminQueries
 from domain.ports.audit_repository import AuditRepository
+from domain.ports.authorship_repository import AuthorshipRepository
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.perimeter_repository import PerimeterRepository
 from domain.ports.person_repository import PersonRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
+from domain.ports.structure_repository import StructureRepository
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.admin_feedback import PgAdminFeedbackQueries
 from infrastructure.db.queries.config import PgConfig, PgConfigQueries
@@ -45,15 +50,20 @@ from infrastructure.db.queries.laboratories import PgLaboratoriesQueries
 from infrastructure.db.queries.perimeter import PgPerimetersAdminQueries
 from infrastructure.db.queries.person_duplicates import PgPersonDuplicatesQueries
 from infrastructure.db.queries.publication_duplicates import PgPublicationDuplicatesQueries
+from infrastructure.db.queries.publications import PgPublicationsQueries
 from infrastructure.db.queries.publishers import PgPublisherQueries
+from infrastructure.db.queries.stats import PgStatsQueries
+from infrastructure.db.queries.structures import PgStructuresQueries
 from infrastructure.db.queries.subjects import PgSubjectsAdminQueries
 from infrastructure.repositories import (
     audit_repository,
+    authorship_repository,
     journal_repository,
     perimeter_repository,
     person_repository,
     publication_repository,
     publisher_repository,
+    structure_repository,
 )
 from infrastructure.settings import settings
 
@@ -210,3 +220,52 @@ def admin_feedback_queries_sync(
     conn: Connection = Depends(db_conn_sync),
 ) -> AdminFeedbackQueries:
     return PgAdminFeedbackQueries(conn)
+
+
+def stats_queries_sync(conn: Connection = Depends(db_conn_sync)) -> StatsQueries:
+    return PgStatsQueries(conn)
+
+
+def structure_repo_sync(conn: Connection = Depends(db_conn_sync)) -> StructureRepository:
+    return structure_repository(conn)
+
+
+def structures_queries_sync(conn: Connection = Depends(db_conn_sync)) -> StructuresQueries:
+    return PgStructuresQueries(conn)
+
+
+def publications_queries_sync(
+    conn: Connection = Depends(db_conn_sync),
+) -> PublicationsQueries:
+    return PgPublicationsQueries(conn)
+
+
+def authorship_repo_sync(conn: Connection = Depends(db_conn_sync)) -> AuthorshipRepository:
+    return authorship_repository(conn)
+
+
+# ----- Perimeter root (sync, lazy-cached) -----
+
+_root_structure_id_sync: int | None = None
+
+
+def get_root_structure_id_sync() -> int:
+    """ID de la structure racine du périmètre principal (variante sync).
+
+    Cache process-wide (lookup unique). 0 si périmètre non configuré.
+    """
+    global _root_structure_id_sync
+    if _root_structure_id_sync is not None:
+        return _root_structure_id_sync
+    engine = get_sync_engine()
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("""
+                SELECT p.structure_ids[1] AS root_id
+                FROM config c
+                JOIN perimeters p ON p.code = c.value #>> '{}'
+                WHERE c.key = 'perimeter_persons'
+            """)
+        ).first()
+    _root_structure_id_sync = (row.root_id if row and row.root_id else 0) if row else 0
+    return _root_structure_id_sync

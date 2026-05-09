@@ -290,6 +290,38 @@ puis les CRUD admin, puis les gros (`publications`, `persons`,
 Total Phase 2.3 : 5 routers migrés (journals, publishers, laboratories,
 perimeters, admin_feedback hors SSE), 54 tests application + 50 tests
 interfaces ciblés passent.
+- [x] `stats.py` — Protocol sync `StatsQueries` ajouté à
+  `application/ports/stats_queries.py`. Classe sync `PgStatsQueries`
+  dans `infrastructure/db/queries/stats/__init__.py`. Les 4 sous-modules
+  stats (publishers, journals, labs, summary) ont chacun gagné un
+  `*_sync` à côté de l'async, factorisé via un helper `_build_*_sql`
+  partagé. Factory `stats_queries_sync`, helper `get_root_structure_id_sync`
+  (lookup process-cached, identique à la variante async). 7 routes `def`,
+  15 tests interfaces passent.
+- [x] `structures.py` — Nouveau Protocol sync `StructureRepository`
+  + adapter `PgStructureRepository`. Protocol sync `StructuresQueries`
+  + classe sync `PgStructuresQueries`. Service `application/structures.py`
+  (5 fonctions : create/update/delete structure, create/delete relation,
+  create/update/delete name_form) migré en sync (suppression nette des
+  variantes async, single caller pattern). 9 routes `def`, factories
+  ajoutées : `structure_repo_sync`, `structures_queries_sync`. Tests
+  `test_structures_service.py` (23 tests) migrés en sync. Tests interfaces
+  `test_structures_api.py` : 32 tests inchangés passent.
+- [x] `publications.py` — Migration en swap net (single API caller) :
+  les 4 modules de query async (`list.py`, `facets.py`, `detail.py`,
+  `__init__.py`) sont **convertis sur place** vers sync (suppression
+  des variantes async, plus de cohabitation sur ce port). Protocol
+  port renommé `PublicationsQueries` (sync). `facets.py` perd son
+  `asyncio.gather` parallèle au profit d'une exécution séquentielle
+  sur la même Connection (le router tourne déjà dans un thread Starlette ;
+  pas de bénéfice à paralléliser des requêtes courtes contre la même
+  base). Nouveau Protocol sync `AuthorshipRepository` + adapter
+  `PgAuthorshipRepository` (utilisé pour le seul use case applicatif
+  du router : `set_source_authorship_excluded_sync`). Tests
+  `test_publications_list.py` (7), `test_publications_detail.py` (11),
+  et `test_publications_api.py` (26) : 44 tests passent. Service
+  `application/authorships.py` cohabite sync/async pendant que le reste
+  des routers (persons, addresses) finit la migration.
 
 ### Phase 3 — Suppression du code async devenu mort
 

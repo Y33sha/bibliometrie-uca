@@ -6,16 +6,18 @@ Opérations unitaires sur les authorships consolidées. Le script batch
 `build_authorships.py` reste le constructeur principal (reconstruction
 complète), et `webapp/uca.py` gère le recalcul UCA incrémental.
 
-Le SQL vit dans `infrastructure/repositories/async_authorship_repository.py`.
+Le SQL vit dans `infrastructure/repositories/async_authorship_repository.py`
+(variante async, en cours de retrait) et `infrastructure/repositories/authorship_repository.py`
+(variante sync, chantier sync-async-deduplication).
 """
 
 from typing import Any
 
-from application.audit import async_emit_event
+from application.audit import async_emit_event, emit_event
 from application.ports.perimeter import AsyncPerimeterQueries
 from domain.errors import NotFoundError, ValidationError
-from domain.ports.audit_repository import AsyncAuditRepository
-from domain.ports.authorship_repository import AsyncAuthorshipRepository
+from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
+from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 
@@ -148,3 +150,53 @@ async def propagate_uca_for_addresses(
 
     await repo.recompute_in_perimeter_on_source_authorships(affected_sa_ids, perimeter_ids)
     await repo.propagate_in_perimeter_to_truth_authorships(affected_sa_ids)
+
+
+# ── Variantes sync (chantier sync-async-deduplication) ──────────────
+
+
+def set_source_authorship_excluded_sync(
+    conn: Any,
+    source_authorship_id: int,
+    source: str,
+    excluded: bool,
+    *,
+    repo: AuthorshipRepository,
+    audit_repo: AuditRepository | None = None,
+) -> None:
+    """Variante sync de `set_source_authorship_excluded`."""
+    if source not in VALID_SOURCES:
+        raise ValidationError(f"Source inconnue : {source}")
+
+    if not repo.set_source_authorship_excluded(source_authorship_id, source, excluded):
+        raise NotFoundError(f"Authorship source {source}:{source_authorship_id} introuvable")
+
+    if excluded:
+        detach_source_sync(conn, source_authorship_id, source, repo=repo)
+
+    emit_event(
+        audit_repo,
+        "source_authorship.excluded",
+        "source_authorship",
+        source_authorship_id,
+        {"source": source, "excluded": excluded},
+    )
+
+
+def detach_source_sync(
+    conn: Any, source_authorship_id: int, source: str, *, repo: AuthorshipRepository
+) -> bool:
+    """Variante sync de `detach_source`."""
+    if source not in VALID_SOURCES:
+        raise ValidationError(f"Source inconnue : {source}")
+
+    truth_id = repo.get_source_authorship_truth_id(source_authorship_id, source)
+    if not truth_id:
+        return False
+
+    repo.clear_source_authorship_fk(source_authorship_id, source)
+
+    if not repo.has_active_source_attestation(truth_id):
+        repo.delete_authorship(truth_id)
+        return True
+    return False

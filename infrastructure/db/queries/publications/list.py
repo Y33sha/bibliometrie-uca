@@ -1,12 +1,11 @@
-"""Liste paginée + export CSV des publications (async)."""
+"""Liste paginée + export CSV des publications."""
 
 import csv
 import io
 import json
 from typing import Any
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
@@ -78,22 +77,20 @@ def _inline_clauses(filters: Any) -> list[WhereClause | None]:
     return out
 
 
-async def _hal_status_clause_async(conn: AsyncConnection, filters: Any) -> WhereClause | None:
+def _hal_status_clause_sync(conn: Connection, filters: Any) -> WhereClause | None:
     """Charge la collection HAL du labo unique pour le filtre hal_status."""
     if filters.hal_status_values and len(filters.lab_ids) == 1:
-        row = (
-            await conn.execute(
-                text("SELECT hal_collection FROM structures WHERE id = :sid"),
-                {"sid": filters.lab_ids[0]},
-            )
+        row = conn.execute(
+            text("SELECT hal_collection FROM structures WHERE id = :sid"),
+            {"sid": filters.lab_ids[0]},
         ).one_or_none()
         lab_hal_col = row.hal_collection if row else None
         return hal_status_clause(filters.hal_status_values, lab_hal_col)
     return None
 
 
-async def _build_list_clauses(
-    conn: AsyncConnection, filters: Any, root_structure_id: int
+def _build_list_clauses(
+    conn: Connection, filters: Any, root_structure_id: int
 ) -> tuple[str, dict[str, Any]]:
     """Construit le WHERE complet pour list_publications."""
     clauses: list[WhereClause | None] = list(_initial_clauses(filters))
@@ -111,7 +108,7 @@ async def _build_list_clauses(
     if filters.person_id:
         clauses.append(corresponding_clause(filters.person_id, filters.is_corresponding))
     clauses.append(apc_clause(filters.has_apc, root_structure_id, filters.lab_ids))
-    clauses.append(await _hal_status_clause_async(conn, filters))
+    clauses.append(_hal_status_clause_sync(conn, filters))
     clauses.append(in_perimeter_person_clause(filters.in_perimeter, filters.person_id))
     return assemble_where(clauses)
 
@@ -138,8 +135,8 @@ _ORDER_MAP = {
 # ── Liste paginée ─────────────────────────────────────────────────
 
 
-async def list_publications(
-    conn: AsyncConnection,
+def list_publications(
+    conn: Connection,
     *,
     filters: Any,
     root_structure_id: int,
@@ -148,9 +145,9 @@ async def list_publications(
     sort: str,
 ) -> dict[str, Any]:
     """Liste paginée des publications avec sources, labos, journal."""
-    await conn.execute(text("SET LOCAL jit = off"))
+    conn.execute(text("SET LOCAL jit = off"))
     offset = (page - 1) * per_page
-    where_clause, binds = await _build_list_clauses(conn, filters, root_structure_id)
+    where_clause, binds = _build_list_clauses(conn, filters, root_structure_id)
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
 
     # Quand la recherche match un sujet (cf. _search_clause), on remonte
@@ -159,11 +156,9 @@ async def list_publications(
     if filters.search:
         order = "(CASE WHEN p.title_normalized ILIKE :sort_search_pat THEN 0 ELSE 1 END), " + order
 
-    count_row = (
-        await conn.execute(
-            text(f"SELECT COUNT(*) AS total FROM publications p WHERE {where_clause}"),
-            binds,
-        )
+    count_row = conn.execute(
+        text(f"SELECT COUNT(*) AS total FROM publications p WHERE {where_clause}"),
+        binds,
     ).one()
     total = count_row.total
 
@@ -176,86 +171,84 @@ async def list_publications(
         person_lab_filter_a3 = ""
         person_lab_filter_a4 = ""
 
-    rows = (
-        await conn.execute(
-            text(f"""
+    rows = conn.execute(
+        text(f"""
+            SELECT
+                p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
+                p.oa_status::text AS oa_status,
+                j.title AS journal_title,
+                pub.name AS publisher_name,
+                src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
+                src_ids.wos_id, src_ids.theses_id, src_ids.hal_collections,
+                p.meta->>'date_soutenance' AS date_soutenance,
+                p.meta->>'date_inscription' AS date_inscription,
+                (SELECT a.is_corresponding FROM authorships a
+                 WHERE a.publication_id = p.id AND a.person_id = :focus_person
+                   AND NOT a.excluded
+                 LIMIT 1) AS is_corresponding,
+                (SELECT a.id FROM authorships a
+                 WHERE a.publication_id = p.id AND a.person_id = :focus_person
+                   AND NOT a.excluded
+                 LIMIT 1) AS authorship_id,
+                (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
+                         ORDER BY COALESCE(s.acronym, s.name))
+                 FROM authorships a3
+                 CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
+                 JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
+                 WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
+                   AND a3.structure_ids IS NOT NULL
+                   {person_lab_filter_a3}
+                ) AS labs,
+                (SELECT json_agg(sub ORDER BY sub.label)
+                 FROM (
+                    SELECT DISTINCT s.id, COALESCE(s.acronym, s.name) AS label
+                    FROM authorships a4
+                    CROSS JOIN LATERAL unnest(a4.structure_ids) AS struct_id
+                    JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
+                    WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
+                      AND a4.structure_ids IS NOT NULL
+                      {person_lab_filter_a4}
+                 ) sub
+                ) AS lab_items,
+                (SELECT json_agg(json_build_object(
+                    'amount', ap.amount_eur_ht,
+                    'institution', ap.institution,
+                    'lab_id', ap.lab_structure_id,
+                    'lab_acronym', ls.acronym,
+                    'budget_structure_id', ap.budget_structure_id
+                 ))
+                 FROM apc_payments ap
+                 LEFT JOIN structures ls ON ls.id = ap.lab_structure_id
+                 WHERE ap.publication_id = p.id
+                ) AS apc_details
+            FROM publications p
+            LEFT JOIN journals j ON j.id = p.journal_id
+            LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN LATERAL (
                 SELECT
-                    p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
-                    p.oa_status::text AS oa_status,
-                    j.title AS journal_title,
-                    pub.name AS publisher_name,
-                    src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
-                    src_ids.wos_id, src_ids.theses_id, src_ids.hal_collections,
-                    p.meta->>'date_soutenance' AS date_soutenance,
-                    p.meta->>'date_inscription' AS date_inscription,
-                    (SELECT a.is_corresponding FROM authorships a
-                     WHERE a.publication_id = p.id AND a.person_id = :focus_person
-                       AND NOT a.excluded
-                     LIMIT 1) AS is_corresponding,
-                    (SELECT a.id FROM authorships a
-                     WHERE a.publication_id = p.id AND a.person_id = :focus_person
-                       AND NOT a.excluded
-                     LIMIT 1) AS authorship_id,
-                    (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
-                             ORDER BY COALESCE(s.acronym, s.name))
-                     FROM authorships a3
-                     CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
-                     JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
-                     WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                       AND a3.structure_ids IS NOT NULL
-                       {person_lab_filter_a3}
-                    ) AS labs,
-                    (SELECT json_agg(sub ORDER BY sub.label)
-                     FROM (
-                        SELECT DISTINCT s.id, COALESCE(s.acronym, s.name) AS label
-                        FROM authorships a4
-                        CROSS JOIN LATERAL unnest(a4.structure_ids) AS struct_id
-                        JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
-                        WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
-                          AND a4.structure_ids IS NOT NULL
-                          {person_lab_filter_a4}
-                     ) sub
-                    ) AS lab_items,
-                    (SELECT json_agg(json_build_object(
-                        'amount', ap.amount_eur_ht,
-                        'institution', ap.institution,
-                        'lab_id', ap.lab_structure_id,
-                        'lab_acronym', ls.acronym,
-                        'budget_structure_id', ap.budget_structure_id
-                     ))
-                     FROM apc_payments ap
-                     LEFT JOIN structures ls ON ls.id = ap.lab_structure_id
-                     WHERE ap.publication_id = p.id
-                    ) AS apc_details
-                FROM publications p
-                LEFT JOIN journals j ON j.id = p.journal_id
-                LEFT JOIN publishers pub ON pub.id = j.publisher_id
-                LEFT JOIN LATERAL (
-                    SELECT
-                        max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
-                        max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
-                        max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
-                        max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
-                        max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id,
-                        (SELECT array_agg(DISTINCT col) FROM source_publications sd2,
-                                unnest(COALESCE(sd2.hal_collections, '{{}}'::text[])) AS col
-                         WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS hal_collections
-                    FROM source_publications sd WHERE sd.publication_id = p.id
-                ) src_ids ON TRUE
-                WHERE {where_clause}
-                ORDER BY {order}
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
-            {
-                **binds,
-                "focus_person": filters.person_id,
-                "person_lab_a3": filters.person_id,
-                "person_lab_a4": filters.person_id,
-                "sort_search_pat": f"%{normalize_text(filters.search)}%" if filters.search else "",
-                "pg_limit": per_page,
-                "pg_offset": offset,
-            },
-        )
+                    max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
+                    max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
+                    max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
+                    max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
+                    max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id,
+                    (SELECT array_agg(DISTINCT col) FROM source_publications sd2,
+                            unnest(COALESCE(sd2.hal_collections, '{{}}'::text[])) AS col
+                     WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS hal_collections
+                FROM source_publications sd WHERE sd.publication_id = p.id
+            ) src_ids ON TRUE
+            WHERE {where_clause}
+            ORDER BY {order}
+            LIMIT :pg_limit OFFSET :pg_offset
+        """),
+        {
+            **binds,
+            "focus_person": filters.person_id,
+            "person_lab_a3": filters.person_id,
+            "person_lab_a4": filters.person_id,
+            "sort_search_pat": f"%{normalize_text(filters.search)}%" if filters.search else "",
+            "pg_limit": per_page,
+            "pg_offset": offset,
+        },
     ).all()
 
     publications = [
@@ -366,8 +359,8 @@ def _build_export_clauses(filters: Any) -> tuple[str, dict[str, Any]]:
     return assemble_where(clauses)
 
 
-async def export_publications_csv(
-    conn: AsyncConnection, *, filters: Any, root_structure_id: int, sort: str
+def export_publications_csv(
+    conn: Connection, *, filters: Any, root_structure_id: int, sort: str
 ) -> str:
     """Export CSV (sans pagination) avec les mêmes filtres que list_publications.
 
@@ -377,7 +370,7 @@ async def export_publications_csv(
     Simplification : les filtres hal_status / in_perimeter ne sont pas
     appliqués dans l'export historique, on reproduit ce comportement.
     """
-    await conn.execute(text("SET LOCAL jit = off"))
+    conn.execute(text("SET LOCAL jit = off"))
     where_clause, binds = _build_export_clauses(filters)
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
 
@@ -386,42 +379,40 @@ async def export_publications_csv(
     else:
         person_lab_filter_a3 = ""
 
-    rows = (
-        await conn.execute(
-            text(f"""
+    rows = conn.execute(
+        text(f"""
+            SELECT
+                p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
+                p.oa_status::text AS oa_status,
+                j.title AS journal_title,
+                pub.name AS publisher_name,
+                src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
+                src_ids.wos_id, src_ids.theses_id,
+                (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
+                         ORDER BY COALESCE(s.acronym, s.name))
+                 FROM authorships a3
+                 CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
+                 JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
+                 WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
+                   AND a3.structure_ids IS NOT NULL
+                   {person_lab_filter_a3}
+                ) AS labs
+            FROM publications p
+            LEFT JOIN journals j ON j.id = p.journal_id
+            LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN LATERAL (
                 SELECT
-                    p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
-                    p.oa_status::text AS oa_status,
-                    j.title AS journal_title,
-                    pub.name AS publisher_name,
-                    src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
-                    src_ids.wos_id, src_ids.theses_id,
-                    (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
-                             ORDER BY COALESCE(s.acronym, s.name))
-                     FROM authorships a3
-                     CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
-                     JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
-                     WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                       AND a3.structure_ids IS NOT NULL
-                       {person_lab_filter_a3}
-                    ) AS labs
-                FROM publications p
-                LEFT JOIN journals j ON j.id = p.journal_id
-                LEFT JOIN publishers pub ON pub.id = j.publisher_id
-                LEFT JOIN LATERAL (
-                    SELECT
-                        max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
-                        max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
-                        max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
-                        max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
-                        max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
-                    FROM source_publications sd WHERE sd.publication_id = p.id
-                ) src_ids ON TRUE
-                WHERE {where_clause}
-                ORDER BY {order}
-            """),
-            {**binds, "person_lab_a3": filters.person_id},
-        )
+                    max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
+                    max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
+                    max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
+                    max(CASE WHEN sd.source = 'wos' THEN sd.source_id END) AS wos_id,
+                    max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
+                FROM source_publications sd WHERE sd.publication_id = p.id
+            ) src_ids ON TRUE
+            WHERE {where_clause}
+            ORDER BY {order}
+        """),
+        {**binds, "person_lab_a3": filters.person_id},
     ).all()
 
     buf = io.StringIO()
@@ -491,50 +482,46 @@ def _build_theses_export_clauses(filters: Any) -> tuple[str, dict[str, Any]]:
     return assemble_where(clauses)
 
 
-async def export_theses_csv(
-    conn: AsyncConnection, *, filters: Any, root_structure_id: int, sort: str
-) -> str:
+def export_theses_csv(conn: Connection, *, filters: Any, root_structure_id: int, sort: str) -> str:
     """Export CSV dédié à la page thèses.
 
     Colonnes spécifiques (Inscription, Soutenance, Statut, theses.fr) au lieu
     de Revue/Éditeur/WoS pertinents pour les publications. Tri par défaut
     `soutenance_desc` (cohérent avec l'affichage).
     """
-    await conn.execute(text("SET LOCAL jit = off"))
+    conn.execute(text("SET LOCAL jit = off"))
     where_clause, binds = _build_theses_export_clauses(filters)
     order = _ORDER_MAP.get(sort, "p.meta->>'date_soutenance' DESC NULLS LAST, p.title")
 
-    rows = (
-        await conn.execute(
-            text(f"""
+    rows = conn.execute(
+        text(f"""
+            SELECT
+                p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
+                p.oa_status::text AS oa_status,
+                p.meta->>'date_soutenance' AS date_soutenance,
+                p.meta->>'date_inscription' AS date_inscription,
+                src_ids.hal_id, src_ids.openalex_id, src_ids.theses_id,
+                (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
+                         ORDER BY COALESCE(s.acronym, s.name))
+                 FROM authorships a3
+                 CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
+                 JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
+                 WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
+                   AND a3.structure_ids IS NOT NULL
+                ) AS labs
+            FROM publications p
+            LEFT JOIN LATERAL (
                 SELECT
-                    p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
-                    p.oa_status::text AS oa_status,
-                    p.meta->>'date_soutenance' AS date_soutenance,
-                    p.meta->>'date_inscription' AS date_inscription,
-                    src_ids.hal_id, src_ids.openalex_id, src_ids.theses_id,
-                    (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
-                             ORDER BY COALESCE(s.acronym, s.name))
-                     FROM authorships a3
-                     CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
-                     JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
-                     WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                       AND a3.structure_ids IS NOT NULL
-                    ) AS labs
-                FROM publications p
-                LEFT JOIN LATERAL (
-                    SELECT
-                        max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
-                        max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
-                        max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
-                        max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
-                    FROM source_publications sd WHERE sd.publication_id = p.id
-                ) src_ids ON TRUE
-                WHERE {where_clause}
-                ORDER BY {order}
-            """),
-            binds,
-        )
+                    max(CASE WHEN sd.source = 'hal' THEN sd.source_id END) AS hal_id,
+                    max(CASE WHEN sd.source = 'openalex' THEN sd.source_id END) AS openalex_id,
+                    max(CASE WHEN sd.source = 'scanr' THEN sd.source_id END) AS scanr_id,
+                    max(CASE WHEN sd.source = 'theses' THEN sd.source_id END) AS theses_id
+                FROM source_publications sd WHERE sd.publication_id = p.id
+            ) src_ids ON TRUE
+            WHERE {where_clause}
+            ORDER BY {order}
+        """),
+        binds,
     ).all()
 
     buf = io.StringIO()

@@ -1,8 +1,8 @@
-"""Stats agrégées par éditeur (async)."""
+"""Stats agrégées par éditeur."""
 
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from infrastructure.db.queries.filters import (
@@ -28,8 +28,7 @@ _PUBLISHER_SORT_MAP = {
 }
 
 
-async def publisher_stats(
-    conn: AsyncConnection,
+def _build_publisher_stats_sql(
     *,
     root_structure_id: int,
     lab_ids: list[int],
@@ -40,11 +39,9 @@ async def publisher_stats(
     page: int,
     per_page: int,
     sort: str,
-) -> dict[str, Any]:
-    """Stats agrégées par éditeur, paginées."""
+) -> tuple[str, str, dict[str, Any]]:
+    """SQL count + rows + binds, partagé sync/async."""
     offset = (page - 1) * per_page
-    await conn.execute(text("SET LOCAL jit = off"))
-
     static_clauses = " AND ".join(
         [
             PUB_IS_UCA,
@@ -65,51 +62,62 @@ async def publisher_stats(
         where += " AND unaccent(pub.name) ILIKE unaccent(:search_pat)"
         where_binds["search_pat"] = f"%{search}%"
 
-    count_row = (
-        await conn.execute(
-            text(f"""
-                SELECT COUNT(DISTINCT pub.id) AS total
-                FROM publications p
-                JOIN journals j ON j.id = p.journal_id
-                JOIN publishers pub ON pub.id = j.publisher_id
-                WHERE {where}
-            """),
-            where_binds,
-        )
-    ).one()
-    total = count_row.total
-
+    count_sql = f"""
+        SELECT COUNT(DISTINCT pub.id) AS total
+        FROM publications p
+        JOIN journals j ON j.id = p.journal_id
+        JOIN publishers pub ON pub.id = j.publisher_id
+        WHERE {where}
+    """
     order = _PUBLISHER_SORT_MAP.get(sort, "COUNT(DISTINCT p.id) DESC")
-    rows = (
-        await conn.execute(
-            text(f"""
-                SELECT
-                    pub.id AS publisher_id,
-                    pub.name AS publisher_name,
-                    COUNT(DISTINCT j.id) AS journal_count,
-                    COUNT(DISTINCT p.id) AS pub_count,
-                    SUM({APC_SUM_SA})::numeric(12,2) AS apc_uca,
-                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
-                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
-                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
-                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
-                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
-                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
-                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown
-                FROM publications p
-                JOIN journals j ON j.id = p.journal_id
-                JOIN publishers pub ON pub.id = j.publisher_id
-                WHERE {where}
-                GROUP BY pub.id, pub.name
-                ORDER BY {order}
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
-            {
-                **where_binds,
-                "apc_root": root_structure_id,
-                "pg_limit": per_page,
-                "pg_offset": offset,
-            },
-        )
-    ).all()
-    return paginated(total, page, per_page, "publishers", [dict(r._mapping) for r in rows])
+    rows_sql = f"""
+        SELECT
+            pub.id AS publisher_id,
+            pub.name AS publisher_name,
+            COUNT(DISTINCT j.id) AS journal_count,
+            COUNT(DISTINCT p.id) AS pub_count,
+            SUM({APC_SUM_SA})::numeric(12,2) AS apc_uca,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown
+        FROM publications p
+        JOIN journals j ON j.id = p.journal_id
+        JOIN publishers pub ON pub.id = j.publisher_id
+        WHERE {where}
+        GROUP BY pub.id, pub.name
+        ORDER BY {order}
+        LIMIT :pg_limit OFFSET :pg_offset
+    """
+    binds = {
+        **where_binds,
+        "apc_root": root_structure_id,
+        "pg_limit": per_page,
+        "pg_offset": offset,
+    }
+    return count_sql, rows_sql, binds
+
+
+async def publisher_stats(conn: AsyncConnection, **kwargs: Any) -> dict[str, Any]:
+    """Stats agrégées par éditeur, paginées (async)."""
+    await conn.execute(text("SET LOCAL jit = off"))
+    count_sql, rows_sql, binds = _build_publisher_stats_sql(**kwargs)
+    total = (await conn.execute(text(count_sql), binds)).one().total
+    rows = (await conn.execute(text(rows_sql), binds)).all()
+    return paginated(
+        total, kwargs["page"], kwargs["per_page"], "publishers", [dict(r._mapping) for r in rows]
+    )
+
+
+def publisher_stats_sync(conn: Connection, **kwargs: Any) -> dict[str, Any]:
+    """Stats agrégées par éditeur, paginées (sync)."""
+    conn.execute(text("SET LOCAL jit = off"))
+    count_sql, rows_sql, binds = _build_publisher_stats_sql(**kwargs)
+    total = conn.execute(text(count_sql), binds).one().total
+    rows = conn.execute(text(rows_sql), binds).all()
+    return paginated(
+        total, kwargs["page"], kwargs["per_page"], "publishers", [dict(r._mapping) for r in rows]
+    )
