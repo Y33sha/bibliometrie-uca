@@ -1,10 +1,9 @@
-"""Query services async pour /api/addresses/* et /api/countries.
+"""Query services sync pour /api/addresses/* et /api/countries.
 
-Implémente le port `application.ports.addresses_queries.AsyncAddressesQueries`
-via `PgAsyncAddressesQueries` (constructor injection de l'AsyncConnection
-SA). Conformité au port assurée par duck typing : pas d'import du
-Protocol depuis `infrastructure/` (règle DDD `infrastructure ⊥
-application`).
+Implémente le port `application.ports.addresses_queries.AddressesQueries`
+via `PgAddressesQueries` (constructor injection de la Connection SA sync).
+Conformité au port assurée par duck typing : pas d'import du Protocol
+depuis `infrastructure/` (règle DDD `infrastructure ⊥ application`).
 
 Les dataclasses de filtres (`AddressListFilters`,
 `AddressCountriesFilters`) vivent dans `application/ports/` ; côté
@@ -14,17 +13,16 @@ au runtime, mypy via le Protocol côté caller.
 
 from typing import Any
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection, text
 
 
-class PgAsyncAddressesQueries:
-    """Adapter SA pour `application.ports.addresses_queries.AsyncAddressesQueries`."""
+class PgAddressesQueries:
+    """Adapter SA sync pour `application.ports.addresses_queries.AddressesQueries`."""
 
-    def __init__(self, conn: AsyncConnection) -> None:
+    def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    async def resolve_default_structure_id(self) -> int:
+    def resolve_default_structure_id(self) -> int:
         """Résout la structure de travail par défaut (première racine du périmètre).
 
         Lit `perimeters.structure_ids[1]` pour le périmètre configuré dans
@@ -32,21 +30,19 @@ class PgAsyncAddressesQueries:
         si le périmètre n'a aucune structure (les filtres aval sont alors
         sans effet).
         """
-        row = (
-            await self._conn.execute(
-                text("""
-                    SELECT p.structure_ids[1] AS root_id
-                    FROM config c
-                    JOIN perimeters p ON p.code = c.value #>> '{}'
-                    WHERE c.key = 'perimeter_persons'
-                """)
-            )
+        row = self._conn.execute(
+            text("""
+                SELECT p.structure_ids[1] AS root_id
+                FROM config c
+                JOIN perimeters p ON p.code = c.value #>> '{}'
+                WHERE c.key = 'perimeter_persons'
+            """)
         ).one_or_none()
         if row and row.root_id:
             return row.root_id
         return 0
 
-    async def list_addresses(
+    def list_addresses(
         self,
         *,
         structure_id: int,
@@ -91,32 +87,28 @@ class PgAsyncAddressesQueries:
             WHERE TRUE {where_clause}
         """
 
-        total_row = (
-            await self._conn.execute(text(f"SELECT COUNT(*) AS total {from_clause}"), binds)
-        ).one()
+        total_row = self._conn.execute(text(f"SELECT COUNT(*) AS total {from_clause}"), binds).one()
         total = total_row.total
 
-        rows = (
-            await self._conn.execute(
-                text(f"""
-                    SELECT a.id, a.raw_text, a.pub_count,
-                           ast_filter.is_confirmed,
-                           (ast_filter.matched_form_id IS NOT NULL) AS is_detected,
-                           (SELECT json_agg(json_build_object(
-                                       'id', s.id, 'name', s.name, 'acronym', s.acronym,
-                                       'is_confirmed', ast2.is_confirmed,
-                                       'is_detected', (ast2.matched_form_id IS NOT NULL)
-                                   ) ORDER BY COALESCE(s.acronym, s.name))
-                            FROM address_structures ast2
-                            JOIN structures s ON s.id = ast2.structure_id
-                            WHERE ast2.address_id = a.id AND s.structure_type != 'site'
-                           ) AS structures
-                    {from_clause}
-                    ORDER BY a.pub_count DESC, a.id
-                    LIMIT :pg_limit OFFSET :pg_offset
-                """),
-                {**binds, "pg_limit": per_page, "pg_offset": offset},
-            )
+        rows = self._conn.execute(
+            text(f"""
+                SELECT a.id, a.raw_text, a.pub_count,
+                       ast_filter.is_confirmed,
+                       (ast_filter.matched_form_id IS NOT NULL) AS is_detected,
+                       (SELECT json_agg(json_build_object(
+                                   'id', s.id, 'name', s.name, 'acronym', s.acronym,
+                                   'is_confirmed', ast2.is_confirmed,
+                                   'is_detected', (ast2.matched_form_id IS NOT NULL)
+                               ) ORDER BY COALESCE(s.acronym, s.name))
+                        FROM address_structures ast2
+                        JOIN structures s ON s.id = ast2.structure_id
+                        WHERE ast2.address_id = a.id AND s.structure_type != 'site'
+                       ) AS structures
+                {from_clause}
+                ORDER BY a.pub_count DESC, a.id
+                LIMIT :pg_limit OFFSET :pg_offset
+            """),
+            {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
 
         addresses = [
@@ -139,100 +131,84 @@ class PgAsyncAddressesQueries:
             "addresses": addresses,
         }
 
-    async def get_address_basic(self, addr_id: int) -> dict[str, Any] | None:
-        row = (
-            await self._conn.execute(
-                text("SELECT id, raw_text FROM addresses WHERE id = :id"),
-                {"id": addr_id},
-            )
+    def get_address_basic(self, addr_id: int) -> dict[str, Any] | None:
+        row = self._conn.execute(
+            text("SELECT id, raw_text FROM addresses WHERE id = :id"),
+            {"id": addr_id},
         ).one_or_none()
         return dict(row._mapping) if row else None
 
-    async def get_address_publications(self, addr_id: int, limit: int) -> list[dict[str, Any]]:
-        rows = (
-            await self._conn.execute(
-                text("""
-                    SELECT DISTINCT ON (p.id)
-                        p.id, p.title, p.pub_year, p.doi,
-                        p.doc_type::text AS doc_type,
-                        j.title AS journal_title,
-                        sa.raw_author_name AS author_name,
-                        sd.source_id
-                    FROM source_authorship_addresses saa
-                    JOIN source_authorships sa ON sa.id = saa.source_authorship_id
-                    JOIN source_publications sd ON sd.id = sa.source_publication_id
-                    JOIN publications p ON p.id = sd.publication_id
-                    LEFT JOIN journals j ON j.id = p.journal_id
-                    WHERE saa.address_id = :id AND sd.publication_id IS NOT NULL
-                    ORDER BY p.id, p.pub_year DESC
-                    LIMIT :lim
-                """),
-                {"id": addr_id, "lim": limit},
-            )
+    def get_address_publications(self, addr_id: int, limit: int) -> list[dict[str, Any]]:
+        rows = self._conn.execute(
+            text("""
+                SELECT DISTINCT ON (p.id)
+                    p.id, p.title, p.pub_year, p.doi,
+                    p.doc_type::text AS doc_type,
+                    j.title AS journal_title,
+                    sa.raw_author_name AS author_name,
+                    sd.source_id
+                FROM source_authorship_addresses saa
+                JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
+                JOIN publications p ON p.id = sd.publication_id
+                LEFT JOIN journals j ON j.id = p.journal_id
+                WHERE saa.address_id = :id AND sd.publication_id IS NOT NULL
+                ORDER BY p.id, p.pub_year DESC
+                LIMIT :lim
+            """),
+            {"id": addr_id, "lim": limit},
         ).all()
         return [dict(r._mapping) for r in rows]
 
-    async def get_address_structures(self, addr_id: int) -> list[dict[str, Any]]:
-        row = (
-            await self._conn.execute(
-                text("""
-                    SELECT json_agg(json_build_object(
-                               'id', s.id, 'name', s.name, 'acronym', s.acronym,
-                               'is_confirmed', ast2.is_confirmed,
-                               'is_detected', (ast2.matched_form_id IS NOT NULL)
-                           ) ORDER BY COALESCE(s.acronym, s.name)) AS structures
-                    FROM address_structures ast2
-                    JOIN structures s ON s.id = ast2.structure_id
-                    WHERE ast2.address_id = :id AND s.structure_type != 'site'
-                """),
-                {"id": addr_id},
-            )
+    def get_address_structures(self, addr_id: int) -> list[dict[str, Any]]:
+        row = self._conn.execute(
+            text("""
+                SELECT json_agg(json_build_object(
+                           'id', s.id, 'name', s.name, 'acronym', s.acronym,
+                           'is_confirmed', ast2.is_confirmed,
+                           'is_detected', (ast2.matched_form_id IS NOT NULL)
+                       ) ORDER BY COALESCE(s.acronym, s.name)) AS structures
+                FROM address_structures ast2
+                JOIN structures s ON s.id = ast2.structure_id
+                WHERE ast2.address_id = :id AND s.structure_type != 'site'
+            """),
+            {"id": addr_id},
         ).one_or_none()
         return list(row.structures) if row and row.structures else []
 
-    async def get_structure_link(self, addr_id: int, structure_id: int) -> dict[str, Any] | None:
-        row = (
-            await self._conn.execute(
-                text("""
-                    SELECT is_confirmed,
-                           (matched_form_id IS NOT NULL) AS is_detected
-                    FROM address_structures
-                    WHERE address_id = :aid AND structure_id = :sid
-                """),
-                {"aid": addr_id, "sid": structure_id},
-            )
+    def get_structure_link(self, addr_id: int, structure_id: int) -> dict[str, Any] | None:
+        row = self._conn.execute(
+            text("""
+                SELECT is_confirmed,
+                       (matched_form_id IS NOT NULL) AS is_detected
+                FROM address_structures
+                WHERE address_id = :aid AND structure_id = :sid
+            """),
+            {"aid": addr_id, "sid": structure_id},
         ).one_or_none()
         return dict(row._mapping) if row else None
 
-    async def list_countries(self) -> list[dict[str, Any]]:
-        rows = (
-            await self._conn.execute(
-                text("SELECT code, name FROM countries ORDER BY (code = 'xx') DESC, name")
-            )
+    def list_countries(self) -> list[dict[str, Any]]:
+        rows = self._conn.execute(
+            text("SELECT code, name FROM countries ORDER BY (code = 'xx') DESC, name")
         ).all()
         return [dict(r._mapping) for r in rows]
 
-    async def country_exists(self, code: str) -> bool:
-        row = (
-            await self._conn.execute(
-                text("SELECT code FROM countries WHERE code = :code"),
-                {"code": code},
-            )
+    def country_exists(self, code: str) -> bool:
+        row = self._conn.execute(
+            text("SELECT code FROM countries WHERE code = :code"),
+            {"code": code},
         ).one_or_none()
         return row is not None
 
-    async def address_exists(self, addr_id: int) -> bool:
-        row = (
-            await self._conn.execute(
-                text("SELECT id FROM addresses WHERE id = :id"),
-                {"id": addr_id},
-            )
+    def address_exists(self, addr_id: int) -> bool:
+        row = self._conn.execute(
+            text("SELECT id FROM addresses WHERE id = :id"),
+            {"id": addr_id},
         ).one_or_none()
         return row is not None
 
-    async def addresses_countries(
-        self, *, filters: Any, page: int, per_page: int
-    ) -> dict[str, Any]:
+    def addresses_countries(self, *, filters: Any, page: int, per_page: int) -> dict[str, Any]:
         offset = (page - 1) * per_page
         parts: list[str] = []
         binds: dict[str, Any] = {}
@@ -253,25 +229,21 @@ class PgAsyncAddressesQueries:
 
         where = "WHERE " + " AND ".join(parts) if parts else ""
 
-        total_row = (
-            await self._conn.execute(
-                text(f"SELECT COUNT(*) AS total FROM addresses a {where}"),
-                binds,
-            )
+        total_row = self._conn.execute(
+            text(f"SELECT COUNT(*) AS total FROM addresses a {where}"),
+            binds,
         ).one()
         total = total_row.total
 
-        rows = (
-            await self._conn.execute(
-                text(f"""
-                    SELECT a.id, a.raw_text, a.countries, a.suggested_countries, a.pub_count
-                    FROM addresses a
-                    {where}
-                    ORDER BY a.pub_count DESC, a.raw_text
-                    LIMIT :pg_limit OFFSET :pg_offset
-                """),
-                {**binds, "pg_limit": per_page, "pg_offset": offset},
-            )
+        rows = self._conn.execute(
+            text(f"""
+                SELECT a.id, a.raw_text, a.countries, a.suggested_countries, a.pub_count
+                FROM addresses a
+                {where}
+                ORDER BY a.pub_count DESC, a.raw_text
+                LIMIT :pg_limit OFFSET :pg_offset
+            """),
+            {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
         addresses = [dict(r._mapping) for r in rows]
 
@@ -293,16 +265,14 @@ class PgAsyncAddressesQueries:
         if filters.suggest and not filters.suggested_country:
             extra = "a.suggested_countries IS NOT NULL"
             sug_where = f"{where} AND {extra}" if where else f"WHERE {extra}"
-            sug_rows = (
-                await self._conn.execute(
-                    text(f"""
-                        SELECT c AS code, COUNT(*) AS cnt
-                        FROM addresses a, unnest(a.suggested_countries) AS c
-                        {sug_where}
-                        GROUP BY c ORDER BY cnt DESC LIMIT 20
-                    """),
-                    binds,
-                )
+            sug_rows = self._conn.execute(
+                text(f"""
+                    SELECT c AS code, COUNT(*) AS cnt
+                    FROM addresses a, unnest(a.suggested_countries) AS c
+                    {sug_where}
+                    GROUP BY c ORDER BY cnt DESC LIMIT 20
+                """),
+                binds,
             ).all()
             result["suggestion_facets"] = [
                 {"code": r.code.strip(), "count": r.cnt} for r in sug_rows
@@ -323,22 +293,20 @@ class PgAsyncAddressesQueries:
             cf_binds["cf_suggested"] = filters.suggested_country
         cf_parts.append("a.countries IS NOT NULL")
         cf_where = "WHERE " + " AND ".join(cf_parts)
-        cf_rows = (
-            await self._conn.execute(
-                text(f"""
-                    SELECT c AS code, COUNT(*) AS cnt
-                    FROM addresses a, unnest(a.countries) AS c
-                    {cf_where}
-                    GROUP BY c ORDER BY cnt DESC
-                """),
-                cf_binds,
-            )
+        cf_rows = self._conn.execute(
+            text(f"""
+                SELECT c AS code, COUNT(*) AS cnt
+                FROM addresses a, unnest(a.countries) AS c
+                {cf_where}
+                GROUP BY c ORDER BY cnt DESC
+            """),
+            cf_binds,
         ).all()
         result["country_facets"] = [{"code": r.code.strip(), "count": r.cnt} for r in cf_rows]
 
         return result
 
-    async def suggest_countries(self, search: str) -> dict[str, Any]:
+    def suggest_countries(self, search: str) -> dict[str, Any]:
         binds: dict[str, Any] = {}
         where_clause = ""
         if search.strip():
@@ -350,16 +318,14 @@ class PgAsyncAddressesQueries:
             if where_clause
             else "WHERE a.countries IS NOT NULL"
         )
-        sug_rows = (
-            await self._conn.execute(
-                text(f"""
-                    SELECT c, COUNT(*) AS cnt
-                    FROM addresses a, unnest(a.countries) AS c
-                    {suggest_where}
-                    GROUP BY c ORDER BY cnt DESC
-                """),
-                binds,
-            )
+        sug_rows = self._conn.execute(
+            text(f"""
+                SELECT c, COUNT(*) AS cnt
+                FROM addresses a, unnest(a.countries) AS c
+                {suggest_where}
+                GROUP BY c ORDER BY cnt DESC
+            """),
+            binds,
         ).all()
         suggestions = [{"code": r.c.strip(), "count": r.cnt} for r in sug_rows]
 
@@ -368,35 +334,29 @@ class PgAsyncAddressesQueries:
             if where_clause
             else "WHERE countries IS NULL"
         )
-        nc_row = (
-            await self._conn.execute(
-                text(f"SELECT COUNT(*) AS total FROM addresses a {no_country_where}"),
-                binds,
-            )
+        nc_row = self._conn.execute(
+            text(f"SELECT COUNT(*) AS total FROM addresses a {no_country_where}"),
+            binds,
         ).one()
         without_country = nc_row.total
 
         return {"suggestions": suggestions, "without_country": without_country}
 
-    async def admin_address_stats(self, structure_id: int) -> dict[str, Any]:
-        total_row = (
-            await self._conn.execute(text("SELECT COUNT(*) AS total FROM addresses"))
-        ).one()
+    def admin_address_stats(self, structure_id: int) -> dict[str, Any]:
+        total_row = self._conn.execute(text("SELECT COUNT(*) AS total FROM addresses")).one()
         total = total_row.total
 
-        row = (
-            await self._conn.execute(
-                text("""
-                    SELECT
-                        COUNT(*) FILTER (WHERE ast.matched_form_id IS NOT NULL) AS detected,
-                        COUNT(*) FILTER (WHERE ast.is_confirmed IS NULL) AS pending,
-                        COUNT(*) FILTER (WHERE ast.is_confirmed = FALSE) AS rejected,
-                        COUNT(*) FILTER (WHERE ast.is_confirmed = TRUE) AS confirmed
-                    FROM address_structures ast
-                    WHERE ast.structure_id = :sid
-                """),
-                {"sid": structure_id},
-            )
+        row = self._conn.execute(
+            text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE ast.matched_form_id IS NOT NULL) AS detected,
+                    COUNT(*) FILTER (WHERE ast.is_confirmed IS NULL) AS pending,
+                    COUNT(*) FILTER (WHERE ast.is_confirmed = FALSE) AS rejected,
+                    COUNT(*) FILTER (WHERE ast.is_confirmed = TRUE) AS confirmed
+                FROM address_structures ast
+                WHERE ast.structure_id = :sid
+            """),
+            {"sid": structure_id},
         ).one()
 
         return {

@@ -14,7 +14,7 @@ Le SQL vit dans `infrastructure/repositories/async_authorship_repository.py`
 from typing import Any
 
 from application.audit import async_emit_event, emit_event
-from application.ports.perimeter import AsyncPerimeterQueries
+from application.ports.perimeter import AsyncPerimeterQueries, PerimeterQueries
 from domain.errors import NotFoundError, ValidationError
 from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
 from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
@@ -200,3 +200,73 @@ def detach_source_sync(
         repo.delete_authorship(truth_id)
         return True
     return False
+
+
+def propagate_uca_for_addresses_sync(
+    conn: Any,
+    address_ids: list[int],
+    *,
+    repo: AuthorshipRepository,
+    perimeter_queries: PerimeterQueries,
+) -> None:
+    """Variante sync de `propagate_uca_for_addresses`.
+
+    Recalcule in_perimeter sur source_authorships et authorships vérité
+    pour tous les authorships liés aux adresses données.
+    """
+    if not address_ids:
+        return
+
+    perimeter_ids = perimeter_queries.get_persons_structure_ids_list(conn)
+    if not perimeter_ids:
+        return
+
+    affected_sa_ids = repo.find_source_authorships_by_addresses(address_ids)
+    if not affected_sa_ids:
+        return
+
+    repo.recompute_in_perimeter_on_source_authorships(affected_sa_ids, perimeter_ids)
+    repo.propagate_in_perimeter_to_truth_authorships(affected_sa_ids)
+
+
+def exclude_authorship_sync(
+    conn: Any,
+    authorship_id: int,
+    *,
+    repo: AuthorshipRepository,
+    audit_repo: AuditRepository | None = None,
+) -> dict:
+    """Variante sync de `exclude_authorship`.
+
+    1. Marque l'authorship vérité excluded = TRUE
+    2. Met person_id = NULL sur les authorships sources liées
+       (pour que build_authorships ne recrée pas le lien)
+
+    Lève NotFoundError si l'authorship n'existe pas.
+    """
+    row = repo.get_authorship_person(authorship_id)
+    if not row:
+        raise NotFoundError(f"Authorship {authorship_id} introuvable")
+
+    person_id = row["person_id"]
+    result = repo.mark_authorship_excluded(authorship_id)
+    if person_id:
+        repo.detach_source_authorships_for_person(authorship_id, person_id)
+
+    emit_event(
+        audit_repo,
+        "authorship.excluded",
+        "authorship",
+        authorship_id,
+        {"person_id": person_id},
+    )
+    return result
+
+
+def delete_orphan_authorships_sync(conn: Any, person_id: int, *, repo: AuthorshipRepository) -> int:
+    """Variante sync d'`async_delete_orphan_authorships`.
+
+    Supprime les authorships vérité d'une personne qui ne sont plus attestées
+    par aucune authorship source. Retourne le nombre d'authorships supprimées.
+    """
+    return repo.delete_orphan_authorships_for_person(person_id)

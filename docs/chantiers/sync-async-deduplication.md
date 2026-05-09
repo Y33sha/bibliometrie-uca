@@ -322,6 +322,24 @@ interfaces ciblés passent.
   et `test_publications_api.py` (26) : 44 tests passent. Service
   `application/authorships.py` cohabite sync/async pendant que le reste
   des routers (persons, addresses) finit la migration.
+- [x] `addresses.py` (batch 2a) — Migration en swap net (single API caller) :
+  `infrastructure/db/queries/addresses.py` converti sur place vers sync
+  (suppression `PgAsyncAddressesQueries`, port renommé `AddressesQueries`).
+  Nouveau Protocol sync `AddressRepository` + adapter `PgAddressRepository`.
+  Services `application/addresses_countries.py` et
+  `application/addresses_structures.py` (8 fonctions au total) migrés en
+  sync (suppression nette, single caller). 5 fonctions sync ajoutées à
+  `application/authorships.py` à côté des async (cohabitation pour
+  `exclude_authorship`, `delete_orphan_authorships` qui restent appelés
+  depuis `application/persons.py` async, jusqu'à batch 2b) :
+  `propagate_uca_for_addresses_sync`, `set_source_authorship_excluded_sync`,
+  `detach_source_sync`, `exclude_authorship_sync`,
+  `delete_orphan_authorships_sync`. 12 routes `def`. `bg_propagate_countries_sync`
+  ajouté à `interfaces/api/deps.py` (utilise un sync engine.begin() short-lived
+  pour les BackgroundTasks). Singleton sync `_perimeter_queries_sync_singleton`
+  via `get_perimeter_queries_sync`. Tests `test_addresses_service.py` (34),
+  `test_authorships_service.py` (22), `test_addresses_queries.py` (16),
+  `test_addresses_api.py` (45) : 117 tests passent.
 
 ### Phase 3 — Suppression du code async devenu mort
 

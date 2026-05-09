@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour services/authorships.py.
+"""Tests de caractérisation pour application/authorships.py.
 
 Documentent le comportement actuel des fonctions du service pour protéger
 contre les régressions lors de refactos ultérieurs.
@@ -7,94 +7,85 @@ contre les régressions lors de refactos ultérieurs.
 import json
 
 import pytest
+from sqlalchemy import text
 
 from application.authorships import (
-    async_delete_orphan_authorships,
-    detach_source,
-    exclude_authorship,
-    propagate_uca_for_addresses,
-    set_source_authorship_excluded,
+    delete_orphan_authorships_sync,
+    detach_source_sync,
+    exclude_authorship_sync,
+    propagate_uca_for_addresses_sync,
+    set_source_authorship_excluded_sync,
 )
 from domain.errors import NotFoundError, ValidationError
-from infrastructure.db.queries.perimeter import PgAsyncPerimeterQueries
-from infrastructure.repositories import async_authorship_repository
+from infrastructure.db.queries.perimeter import PgPerimeterQueries
+from infrastructure.repositories import authorship_repository
 
 
 @pytest.fixture
-def async_perimeter_queries():
-    return PgAsyncPerimeterQueries()
+def perimeter_queries():
+    return PgPerimeterQueries()
 
 
 @pytest.fixture
-def async_repo(async_db):
-    return async_authorship_repository(async_db)
+def repo(sa_sync_conn):
+    return authorship_repository(sa_sync_conn)
 
 
-# ── Helpers async ──────────────────────────────────────────────────
+# ── Helpers (SQLAlchemy text, paramstyle nommé) ───────────────────
 
 
-async def _a_create_person(db, last="Dupont", first="Jean"):
-    await db.execute(
-        """
-        INSERT INTO persons (last_name, first_name,
-                             last_name_normalized, first_name_normalized)
-        VALUES (%s, %s, lower(%s), lower(%s))
-        RETURNING id
-        """,
-        (last, first, last, first),
-    )
-    row = await db.fetchone()
-    return row["id"]
+def _create_person(conn, last="Dupont", first="Jean"):
+    row = conn.execute(
+        text(
+            "INSERT INTO persons (last_name, first_name, "
+            "                     last_name_normalized, first_name_normalized) "
+            "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
+        ),
+        {"l": last, "f": first},
+    ).one()
+    return row.id
 
 
-async def _a_create_publication(db, title="Test Article", pub_year=2024):
-    await db.execute(
-        "INSERT INTO publications (title, pub_year) VALUES (%s, %s) RETURNING id",
-        (title, pub_year),
-    )
-    row = await db.fetchone()
-    return row["id"]
+def _create_publication(conn, title="Test Article", pub_year=2024):
+    row = conn.execute(
+        text("INSERT INTO publications (title, pub_year) VALUES (:t, :y) RETURNING id"),
+        {"t": title, "y": pub_year},
+    ).one()
+    return row.id
 
 
-async def _a_create_source_publication(
-    db, publication_id, source="hal", source_id="hal-1", title="Test"
-):
-    await db.execute(
-        """
-        INSERT INTO source_publications (source, source_id, title, publication_id)
-        VALUES (%s, %s, %s, %s)
-        RETURNING id
-        """,
-        (source, source_id, title, publication_id),
-    )
-    row = await db.fetchone()
-    return row["id"]
+def _create_source_publication(conn, publication_id, source="hal", source_id="hal-1", title="Test"):
+    row = conn.execute(
+        text(
+            "INSERT INTO source_publications (source, source_id, title, publication_id) "
+            "VALUES (:s, :sid, :t, :pid) RETURNING id"
+        ),
+        {"s": source, "sid": source_id, "t": title, "pid": publication_id},
+    ).one()
+    return row.id
 
 
-async def _a_create_source_person(db, source="hal", source_id="hal-p-1", full_name="Jean Dupont"):
-    await db.execute(
-        """
-        INSERT INTO source_persons (source, source_id, full_name)
-        VALUES (%s, %s, %s)
-        RETURNING id
-        """,
-        (source, source_id, full_name),
-    )
-    row = await db.fetchone()
-    return row["id"]
+def _create_source_person(conn, source="hal", source_id="hal-p-1", full_name="Jean Dupont"):
+    row = conn.execute(
+        text(
+            "INSERT INTO source_persons (source, source_id, full_name) "
+            "VALUES (:s, :sid, :n) RETURNING id"
+        ),
+        {"s": source, "sid": source_id, "n": full_name},
+    ).one()
+    return row.id
 
 
-async def _a_create_authorship(db, publication_id, person_id=None):
-    await db.execute(
-        "INSERT INTO authorships (publication_id, person_id) VALUES (%s, %s) RETURNING id",
-        (publication_id, person_id),
-    )
-    row = await db.fetchone()
-    return row["id"]
+def _create_authorship(conn, publication_id, person_id=None):
+    row = conn.execute(
+        text("INSERT INTO authorships (publication_id, person_id) VALUES (:p, :pid) RETURNING id"),
+        {"p": publication_id, "pid": person_id},
+    ).one()
+    return row.id
 
 
-async def _a_create_source_authorship(
-    db,
+def _create_source_authorship(
+    conn,
     source_publication_id,
     source_person_id,
     source="hal",
@@ -104,218 +95,206 @@ async def _a_create_source_authorship(
     in_perimeter=False,
     structure_ids=None,
 ):
-    await db.execute(
-        """
-        INSERT INTO source_authorships (source, source_publication_id,
-                                        source_person_id, person_id,
-                                        authorship_id, excluded,
-                                        in_perimeter, structure_ids)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-        """,
-        (
-            source,
-            source_publication_id,
-            source_person_id,
-            person_id,
-            authorship_id,
-            excluded,
-            in_perimeter,
-            structure_ids,
+    row = conn.execute(
+        text(
+            "INSERT INTO source_authorships (source, source_publication_id, "
+            "                                source_person_id, person_id, "
+            "                                authorship_id, excluded, "
+            "                                in_perimeter, structure_ids) "
+            "VALUES (:s, :spid, :sper, :pid, :aid, :ex, :ip, :sids) RETURNING id"
         ),
-    )
-    row = await db.fetchone()
-    return row["id"]
+        {
+            "s": source,
+            "spid": source_publication_id,
+            "sper": source_person_id,
+            "pid": person_id,
+            "aid": authorship_id,
+            "ex": excluded,
+            "ip": in_perimeter,
+            "sids": structure_ids,
+        },
+    ).one()
+    return row.id
 
 
-async def _a_create_structure(db, code="UCA", name="UCA", structure_type="universite"):
-    await db.execute(
-        """
-        INSERT INTO structures (code, name, structure_type)
-        VALUES (%s, %s, %s::structure_type)
-        RETURNING id
-        """,
-        (code, name, structure_type),
-    )
-    row = await db.fetchone()
-    return row["id"]
+def _create_structure(conn, code="UCA", name="UCA", structure_type="universite"):
+    row = conn.execute(
+        text(
+            "INSERT INTO structures (code, name, structure_type) "
+            "VALUES (:c, :n, CAST(:st AS structure_type)) RETURNING id"
+        ),
+        {"c": code, "n": name, "st": structure_type},
+    ).one()
+    return row.id
 
 
-async def _a_create_perimeter(db, code, name, structure_ids):
-    await db.execute(
-        """
-        INSERT INTO perimeters (code, name, structure_ids)
-        VALUES (%s, %s, %s)
-        RETURNING id
-        """,
-        (code, name, structure_ids),
-    )
-    row = await db.fetchone()
-    return row["id"]
+def _create_perimeter(conn, code, name, structure_ids):
+    row = conn.execute(
+        text(
+            "INSERT INTO perimeters (code, name, structure_ids) VALUES (:c, :n, :sids) RETURNING id"
+        ),
+        {"c": code, "n": name, "sids": structure_ids},
+    ).one()
+    return row.id
 
 
-async def _a_set_config(db, key, value):
-    await db.execute(
-        "INSERT INTO config (key, value) VALUES (%s, %s::jsonb)",
-        (key, json.dumps(value)),
-    )
-
-
-async def _a_create_address(db, raw_text="Université Clermont Auvergne"):
-    await db.execute(
-        """
-        INSERT INTO addresses (raw_text, normalized_text)
-        VALUES (%s, lower(%s))
-        RETURNING id
-        """,
-        (raw_text, raw_text),
-    )
-    row = await db.fetchone()
-    return row["id"]
-
-
-async def _a_link_address_structure(db, address_id, structure_id, is_confirmed=True):
-    await db.execute(
-        """
-        INSERT INTO address_structures (address_id, structure_id, is_confirmed)
-        VALUES (%s, %s, %s)
-        """,
-        (address_id, structure_id, is_confirmed),
+def _set_config(conn, key, value):
+    conn.execute(
+        text("INSERT INTO config (key, value) VALUES (:k, CAST(:v AS jsonb))"),
+        {"k": key, "v": json.dumps(value)},
     )
 
 
-async def _a_link_sa_address(db, source_authorship_id, address_id):
-    await db.execute(
-        """
-        INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
-        VALUES (%s, %s)
-        """,
-        (source_authorship_id, address_id),
+def _create_address(conn, raw_text="Université Clermont Auvergne"):
+    row = conn.execute(
+        text(
+            "INSERT INTO addresses (raw_text, normalized_text) VALUES (:r, lower(:r)) RETURNING id"
+        ),
+        {"r": raw_text},
+    ).one()
+    return row.id
+
+
+def _link_address_structure(conn, address_id, structure_id, is_confirmed=True):
+    conn.execute(
+        text(
+            "INSERT INTO address_structures (address_id, structure_id, is_confirmed) "
+            "VALUES (:aid, :sid, :ic)"
+        ),
+        {"aid": address_id, "sid": structure_id, "ic": is_confirmed},
     )
 
 
-# ── exclude_authorship ─────────────────────────────────────────────
+def _link_sa_address(conn, source_authorship_id, address_id):
+    conn.execute(
+        text(
+            "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
+            "VALUES (:sa, :a)"
+        ),
+        {"sa": source_authorship_id, "a": address_id},
+    )
+
+
+# ── exclude_authorship_sync ────────────────────────────────────────
 
 
 class TestExcludeAuthorship:
-    """exclude_authorship marque l'authorship vérité comme excluded et
+    """exclude_authorship_sync marque l'authorship vérité comme excluded et
     détache les source_authorships qui y référaient."""
 
-    async def test_marks_excluded_and_detaches_sources(self, async_db, async_repo):
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
-        src_person_id = await _a_create_source_person(async_db)
-        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
-        sa_id = await _a_create_source_authorship(
-            async_db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+    def test_marks_excluded_and_detaches_sources(self, sa_sync_conn, repo):
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        src_person_id = _create_source_person(sa_sync_conn)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        sa_id = _create_source_authorship(
+            sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        result = await exclude_authorship(async_db, authorship_id, repo=async_repo)
+        result = exclude_authorship_sync(sa_sync_conn, authorship_id, repo=repo)
 
         assert result is not None
         assert result["excluded"] is True
 
         # Source détachée : person_id et authorship_id remis à NULL
-        await async_db.execute(
-            "SELECT person_id, authorship_id FROM source_authorships WHERE id = %s",
-            (sa_id,),
-        )
-        row = await async_db.fetchone()
-        assert row["person_id"] is None
-        assert row["authorship_id"] is None
+        row = sa_sync_conn.execute(
+            text("SELECT person_id, authorship_id FROM source_authorships WHERE id = :id"),
+            {"id": sa_id},
+        ).one()
+        assert row.person_id is None
+        assert row.authorship_id is None
 
-    async def test_raises_not_found(self, async_db, async_repo):
+    def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            await exclude_authorship(async_db, 999999, repo=async_repo)
+            exclude_authorship_sync(sa_sync_conn, 999999, repo=repo)
 
-    async def test_does_not_detach_unrelated_sources(self, async_db, async_repo):
+    def test_does_not_detach_unrelated_sources(self, sa_sync_conn, repo):
         """Les sources d'autres personnes sur la même pub ne sont pas touchées."""
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
 
-        p1 = await _a_create_person(async_db, "Dupont", "Jean")
-        p2 = await _a_create_person(async_db, "Martin", "Sophie")
-        sp1 = await _a_create_source_person(async_db, source_id="hal-p-1")
-        sp2 = await _a_create_source_person(async_db, source_id="hal-p-2")
-        a1 = await _a_create_authorship(async_db, pub_id, p1)
-        a2 = await _a_create_authorship(async_db, pub_id, p2)
-        sa1 = await _a_create_source_authorship(
-            async_db, sp_id, sp1, person_id=p1, authorship_id=a1
-        )
-        sa2 = await _a_create_source_authorship(
-            async_db, sp_id, sp2, person_id=p2, authorship_id=a2
-        )
+        p1 = _create_person(sa_sync_conn, "Dupont", "Jean")
+        p2 = _create_person(sa_sync_conn, "Martin", "Sophie")
+        sp1 = _create_source_person(sa_sync_conn, source_id="hal-p-1")
+        sp2 = _create_source_person(sa_sync_conn, source_id="hal-p-2")
+        a1 = _create_authorship(sa_sync_conn, pub_id, p1)
+        a2 = _create_authorship(sa_sync_conn, pub_id, p2)
+        sa1 = _create_source_authorship(sa_sync_conn, sp_id, sp1, person_id=p1, authorship_id=a1)
+        sa2 = _create_source_authorship(sa_sync_conn, sp_id, sp2, person_id=p2, authorship_id=a2)
 
-        await exclude_authorship(async_db, a1, repo=async_repo)
+        exclude_authorship_sync(sa_sync_conn, a1, repo=repo)
 
         # sa1 détachée
-        await async_db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa1,))
-        assert (await async_db.fetchone())["person_id"] is None
+        row1 = sa_sync_conn.execute(
+            text("SELECT person_id FROM source_authorships WHERE id = :id"), {"id": sa1}
+        ).one()
+        assert row1.person_id is None
         # sa2 intacte
-        await async_db.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa2,))
-        assert (await async_db.fetchone())["person_id"] == p2
+        row2 = sa_sync_conn.execute(
+            text("SELECT person_id FROM source_authorships WHERE id = :id"), {"id": sa2}
+        ).one()
+        assert row2.person_id == p2
 
 
-# ── detach_source ──────────────────────────────────────────────────
+# ── detach_source_sync ─────────────────────────────────────────────
 
 
 class TestDetachSource:
-    """detach_source retire le lien FK d'une source_authorship vers l'authorship
-    vérité. Supprime l'authorship vérité si plus aucune source ne l'atteste."""
+    """detach_source_sync retire le lien FK d'une source_authorship vers
+    l'authorship vérité. Supprime l'authorship vérité si plus aucune source
+    ne l'atteste."""
 
-    async def test_raises_on_invalid_source(self, async_db, async_repo):
+    def test_raises_on_invalid_source(self, sa_sync_conn, repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            await detach_source(async_db, 1, "invalid_source", repo=async_repo)
+            detach_source_sync(sa_sync_conn, 1, "invalid_source", repo=repo)
 
-    async def test_returns_false_if_no_authorship_linked(self, async_db, async_repo):
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
-        src_person_id = await _a_create_source_person(async_db)
+    def test_returns_false_if_no_authorship_linked(self, sa_sync_conn, repo):
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        src_person_id = _create_source_person(sa_sync_conn)
         # source_authorship sans authorship_id
-        sa_id = await _a_create_source_authorship(async_db, sp_id, src_person_id)
+        sa_id = _create_source_authorship(sa_sync_conn, sp_id, src_person_id)
 
-        assert await detach_source(async_db, sa_id, "hal", repo=async_repo) is False
+        assert detach_source_sync(sa_sync_conn, sa_id, "hal", repo=repo) is False
 
-    async def test_deletes_authorship_when_last_source_removed(self, async_db, async_repo):
+    def test_deletes_authorship_when_last_source_removed(self, sa_sync_conn, repo):
         """Une seule source atteste l'authorship → le détacher supprime l'authorship."""
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
-        src_person_id = await _a_create_source_person(async_db)
-        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
-        sa_id = await _a_create_source_authorship(
-            async_db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        src_person_id = _create_source_person(sa_sync_conn)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        sa_id = _create_source_authorship(
+            sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        assert await detach_source(async_db, sa_id, "hal", repo=async_repo) is True
+        assert detach_source_sync(sa_sync_conn, sa_id, "hal", repo=repo) is True
 
-        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert await async_db.fetchone() is None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
+        ).first()
+        assert row is None
 
-    async def test_keeps_authorship_when_other_sources_remain(self, async_db, async_repo):
+    def test_keeps_authorship_when_other_sources_remain(self, sa_sync_conn, repo):
         """Deux sources attestent l'authorship → détacher une garde l'authorship."""
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_hal = await _a_create_source_publication(
-            async_db, pub_id, source="hal", source_id="hal-1"
-        )
-        sp_oa = await _a_create_source_publication(
-            async_db, pub_id, source="openalex", source_id="W1"
-        )
-        p_hal = await _a_create_source_person(async_db, source="hal", source_id="hal-p-1")
-        p_oa = await _a_create_source_person(async_db, source="openalex", source_id="oa-p-1")
-        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
-        sa_hal = await _a_create_source_authorship(
-            async_db,
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_hal = _create_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-1")
+        sp_oa = _create_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="W1")
+        p_hal = _create_source_person(sa_sync_conn, source="hal", source_id="hal-p-1")
+        p_oa = _create_source_person(sa_sync_conn, source="openalex", source_id="oa-p-1")
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        sa_hal = _create_source_authorship(
+            sa_sync_conn,
             sp_hal,
             p_hal,
             source="hal",
             person_id=person_id,
             authorship_id=authorship_id,
         )
-        await _a_create_source_authorship(
-            async_db,
+        _create_source_authorship(
+            sa_sync_conn,
             sp_oa,
             p_oa,
             source="openalex",
@@ -323,40 +302,39 @@ class TestDetachSource:
             authorship_id=authorship_id,
         )
 
-        assert await detach_source(async_db, sa_hal, "hal", repo=async_repo) is False
+        assert detach_source_sync(sa_sync_conn, sa_hal, "hal", repo=repo) is False
 
         # Authorship toujours présente
-        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert await async_db.fetchone() is not None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
+        ).first()
+        assert row is not None
         # sa_hal détachée
-        await async_db.execute(
-            "SELECT authorship_id FROM source_authorships WHERE id = %s", (sa_hal,)
-        )
-        assert (await async_db.fetchone())["authorship_id"] is None
+        row_sa = sa_sync_conn.execute(
+            text("SELECT authorship_id FROM source_authorships WHERE id = :id"),
+            {"id": sa_hal},
+        ).one()
+        assert row_sa.authorship_id is None
 
-    async def test_excluded_sources_do_not_keep_authorship_alive(self, async_db, async_repo):
+    def test_excluded_sources_do_not_keep_authorship_alive(self, sa_sync_conn, repo):
         """Si les autres sources sont marquées excluded, l'authorship doit être supprimée."""
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_hal = await _a_create_source_publication(
-            async_db, pub_id, source="hal", source_id="hal-1"
-        )
-        sp_oa = await _a_create_source_publication(
-            async_db, pub_id, source="openalex", source_id="W1"
-        )
-        p_hal = await _a_create_source_person(async_db, source="hal", source_id="hal-p-1")
-        p_oa = await _a_create_source_person(async_db, source="openalex", source_id="oa-p-1")
-        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
-        sa_hal = await _a_create_source_authorship(
-            async_db,
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_hal = _create_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-1")
+        sp_oa = _create_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="W1")
+        p_hal = _create_source_person(sa_sync_conn, source="hal", source_id="hal-p-1")
+        p_oa = _create_source_person(sa_sync_conn, source="openalex", source_id="oa-p-1")
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        sa_hal = _create_source_authorship(
+            sa_sync_conn,
             sp_hal,
             p_hal,
             source="hal",
             person_id=person_id,
             authorship_id=authorship_id,
         )
-        await _a_create_source_authorship(
-            async_db,
+        _create_source_authorship(
+            sa_sync_conn,
             sp_oa,
             p_oa,
             source="openalex",
@@ -365,55 +343,61 @@ class TestDetachSource:
             excluded=True,
         )
 
-        assert await detach_source(async_db, sa_hal, "hal", repo=async_repo) is True
+        assert detach_source_sync(sa_sync_conn, sa_hal, "hal", repo=repo) is True
 
-        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert await async_db.fetchone() is None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
+        ).first()
+        assert row is None
 
 
-# ── async_delete_orphan_authorships ────────────────────────────────
+# ── delete_orphan_authorships_sync ─────────────────────────────────
 
 
 class TestDeleteOrphanAuthorships:
-    """async_delete_orphan_authorships supprime les authorships vérité d'une
+    """delete_orphan_authorships_sync supprime les authorships vérité d'une
     personne qui ne sont attestées par aucune source_authorship active."""
 
-    async def test_deletes_authorship_without_source(self, async_db, async_repo):
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        await _a_create_authorship(async_db, pub_id, person_id)
+    def test_deletes_authorship_without_source(self, sa_sync_conn, repo):
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        _create_authorship(sa_sync_conn, pub_id, person_id)
 
-        n = await async_delete_orphan_authorships(async_db, person_id, repo=async_repo)
+        n = delete_orphan_authorships_sync(sa_sync_conn, person_id, repo=repo)
 
         assert n == 1
-        await async_db.execute("SELECT id FROM authorships WHERE person_id = %s", (person_id,))
-        assert await async_db.fetchall() == []
+        rows = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE person_id = :pid"), {"pid": person_id}
+        ).all()
+        assert rows == []
 
-    async def test_keeps_authorship_with_attesting_source(self, async_db, async_repo):
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
-        src_person_id = await _a_create_source_person(async_db)
-        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
-        await _a_create_source_authorship(
-            async_db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+    def test_keeps_authorship_with_attesting_source(self, sa_sync_conn, repo):
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        src_person_id = _create_source_person(sa_sync_conn)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        _create_source_authorship(
+            sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        n = await async_delete_orphan_authorships(async_db, person_id, repo=async_repo)
+        n = delete_orphan_authorships_sync(sa_sync_conn, person_id, repo=repo)
 
         assert n == 0
-        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert await async_db.fetchone() is not None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
+        ).first()
+        assert row is not None
 
-    async def test_ignores_excluded_sources(self, async_db, async_repo):
+    def test_ignores_excluded_sources(self, sa_sync_conn, repo):
         """Si la seule source attestante est excluded, l'authorship est orpheline."""
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
-        src_person_id = await _a_create_source_person(async_db)
-        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
-        await _a_create_source_authorship(
-            async_db,
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        src_person_id = _create_source_person(sa_sync_conn)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        _create_source_authorship(
+            sa_sync_conn,
             sp_id,
             src_person_id,
             person_id=person_id,
@@ -421,111 +405,105 @@ class TestDeleteOrphanAuthorships:
             excluded=True,
         )
 
-        n = await async_delete_orphan_authorships(async_db, person_id, repo=async_repo)
+        n = delete_orphan_authorships_sync(sa_sync_conn, person_id, repo=repo)
 
         assert n == 1
 
-    async def test_returns_zero_when_no_authorships(self, async_db, async_repo):
-        person_id = await _a_create_person(async_db)
-        assert await async_delete_orphan_authorships(async_db, person_id, repo=async_repo) == 0
+    def test_returns_zero_when_no_authorships(self, sa_sync_conn, repo):
+        person_id = _create_person(sa_sync_conn)
+        assert delete_orphan_authorships_sync(sa_sync_conn, person_id, repo=repo) == 0
 
-    async def test_scoped_to_person(self, async_db, async_repo):
+    def test_scoped_to_person(self, sa_sync_conn, repo):
         """Ne touche que les authorships de la personne demandée."""
-        p1 = await _a_create_person(async_db, "Dupont", "Jean")
-        p2 = await _a_create_person(async_db, "Martin", "Sophie")
-        pub_id = await _a_create_publication(async_db)
-        await _a_create_authorship(async_db, pub_id, p1)
-        pub2 = await _a_create_publication(async_db, title="Autre")
-        await _a_create_authorship(async_db, pub2, p2)
+        p1 = _create_person(sa_sync_conn, "Dupont", "Jean")
+        p2 = _create_person(sa_sync_conn, "Martin", "Sophie")
+        pub_id = _create_publication(sa_sync_conn)
+        _create_authorship(sa_sync_conn, pub_id, p1)
+        pub2 = _create_publication(sa_sync_conn, title="Autre")
+        _create_authorship(sa_sync_conn, pub2, p2)
 
-        n = await async_delete_orphan_authorships(async_db, p1, repo=async_repo)
+        n = delete_orphan_authorships_sync(sa_sync_conn, p1, repo=repo)
 
         assert n == 1
-        await async_db.execute("SELECT id FROM authorships WHERE person_id = %s", (p2,))
-        assert await async_db.fetchone() is not None
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE person_id = :pid"), {"pid": p2}
+        ).first()
+        assert row is not None
 
 
-# ── propagate_uca_for_addresses ────────────────────────────────────
+# ── propagate_uca_for_addresses_sync ───────────────────────────────
 
 
 class TestPropagateUcaForAddresses:
-    """propagate_uca_for_addresses recalcule in_perimeter et structure_ids
+    """propagate_uca_for_addresses_sync recalcule in_perimeter et structure_ids
     sur les source_authorships puis propage vers l'authorship vérité,
-    après une modification sur address_structures (async)."""
+    après une modification sur address_structures."""
 
-    async def _setup_uca(self, db):
+    def _setup_uca(self, conn):
         """Monte un périmètre UCA minimal + config perimeter_persons."""
-        uca_id = await _a_create_structure(db, code="UCA", name="UCA")
-        await _a_create_perimeter(db, "uca", "UCA", [uca_id])
-        await _a_set_config(db, "perimeter_persons", "uca")
+        uca_id = _create_structure(conn, code="UCA", name="UCA")
+        _create_perimeter(conn, "uca", "UCA", [uca_id])
+        _set_config(conn, "perimeter_persons", "uca")
         return uca_id
 
-    async def test_noop_on_empty_address_ids(self, async_db, async_repo, async_perimeter_queries):
-        await self._setup_uca(async_db)
-        await propagate_uca_for_addresses(
-            async_db, [], repo=async_repo, perimeter_queries=async_perimeter_queries
+    def test_noop_on_empty_address_ids(self, sa_sync_conn, repo, perimeter_queries):
+        self._setup_uca(sa_sync_conn)
+        propagate_uca_for_addresses_sync(
+            sa_sync_conn, [], repo=repo, perimeter_queries=perimeter_queries
         )
         # Pas d'assertion négative utile : on vérifie juste qu'aucune exception
 
-    async def test_noop_if_no_perimeter_configured(
-        self, async_db, async_repo, async_perimeter_queries
-    ):
+    def test_noop_if_no_perimeter_configured(self, sa_sync_conn, repo, perimeter_queries):
         """Si aucun périmètre configuré, la fonction sort sans rien faire."""
-        addr_id = await _a_create_address(async_db)
+        addr_id = _create_address(sa_sync_conn)
         # Aucun set_config perimeter_persons
-        await propagate_uca_for_addresses(
-            async_db, [addr_id], repo=async_repo, perimeter_queries=async_perimeter_queries
+        propagate_uca_for_addresses_sync(
+            sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
         )
 
-    async def test_sets_in_perimeter_when_address_confirmed(
-        self, async_db, async_repo, async_perimeter_queries
-    ):
-        uca_id = await self._setup_uca(async_db)
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
-        src_person_id = await _a_create_source_person(async_db)
-        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
-        sa_id = await _a_create_source_authorship(
-            async_db, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+    def test_sets_in_perimeter_when_address_confirmed(self, sa_sync_conn, repo, perimeter_queries):
+        uca_id = self._setup_uca(sa_sync_conn)
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        src_person_id = _create_source_person(sa_sync_conn)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        sa_id = _create_source_authorship(
+            sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
-        addr_id = await _a_create_address(async_db)
-        await _a_link_address_structure(async_db, addr_id, uca_id, is_confirmed=True)
-        await _a_link_sa_address(async_db, sa_id, addr_id)
+        addr_id = _create_address(sa_sync_conn)
+        _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=True)
+        _link_sa_address(sa_sync_conn, sa_id, addr_id)
 
-        await propagate_uca_for_addresses(
-            async_db, [addr_id], repo=async_repo, perimeter_queries=async_perimeter_queries
+        propagate_uca_for_addresses_sync(
+            sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
         )
 
-        await async_db.execute(
-            "SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = %s",
-            (sa_id,),
-        )
-        sa = await async_db.fetchone()
-        assert sa["in_perimeter"] is True
-        assert sa["structure_ids"] == [uca_id]
+        sa = sa_sync_conn.execute(
+            text("SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = :id"),
+            {"id": sa_id},
+        ).one()
+        assert sa.in_perimeter is True
+        assert sa.structure_ids == [uca_id]
 
-        await async_db.execute(
-            "SELECT in_perimeter, structure_ids FROM authorships WHERE id = %s",
-            (authorship_id,),
-        )
-        a = await async_db.fetchone()
-        assert a["in_perimeter"] is True
-        assert a["structure_ids"] == [uca_id]
+        a = sa_sync_conn.execute(
+            text("SELECT in_perimeter, structure_ids FROM authorships WHERE id = :id"),
+            {"id": authorship_id},
+        ).one()
+        assert a.in_perimeter is True
+        assert a.structure_ids == [uca_id]
 
-    async def test_unsets_in_perimeter_when_address_rejected(
-        self, async_db, async_repo, async_perimeter_queries
-    ):
+    def test_unsets_in_perimeter_when_address_rejected(self, sa_sync_conn, repo, perimeter_queries):
         """Si l'adresse est rejetée (is_confirmed=False), la structure ne compte pas."""
-        uca_id = await self._setup_uca(async_db)
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
-        src_person_id = await _a_create_source_person(async_db)
-        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
+        uca_id = self._setup_uca(sa_sync_conn)
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        src_person_id = _create_source_person(sa_sync_conn)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         # source_authorship avec un flag in_perimeter déjà TRUE (état avant review)
-        sa_id = await _a_create_source_authorship(
-            async_db,
+        sa_id = _create_source_authorship(
+            sa_sync_conn,
             sp_id,
             src_person_id,
             person_id=person_id,
@@ -533,58 +511,57 @@ class TestPropagateUcaForAddresses:
             in_perimeter=True,
             structure_ids=[uca_id],
         )
-        addr_id = await _a_create_address(async_db)
-        await _a_link_address_structure(async_db, addr_id, uca_id, is_confirmed=False)
-        await _a_link_sa_address(async_db, sa_id, addr_id)
+        addr_id = _create_address(sa_sync_conn)
+        _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=False)
+        _link_sa_address(sa_sync_conn, sa_id, addr_id)
 
-        await propagate_uca_for_addresses(
-            async_db, [addr_id], repo=async_repo, perimeter_queries=async_perimeter_queries
+        propagate_uca_for_addresses_sync(
+            sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
         )
 
-        await async_db.execute(
-            "SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = %s",
-            (sa_id,),
-        )
-        sa = await async_db.fetchone()
-        assert sa["in_perimeter"] is False
-        assert sa["structure_ids"] is None
+        sa = sa_sync_conn.execute(
+            text("SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = :id"),
+            {"id": sa_id},
+        ).one()
+        assert sa.in_perimeter is False
+        assert sa.structure_ids is None
 
 
-# ── set_source_authorship_excluded ────────────────────────────────
+# ── set_source_authorship_excluded_sync ───────────────────────────
 
 
 class TestSetSourceAuthorshipExcluded:
-    async def test_raises_on_invalid_source(self, async_db, async_repo):
+    def test_raises_on_invalid_source(self, sa_sync_conn, repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            await set_source_authorship_excluded(async_db, 1, "invalid", True, repo=async_repo)
+            set_source_authorship_excluded_sync(sa_sync_conn, 1, "invalid", True, repo=repo)
 
-    async def test_raises_not_found(self, async_db, async_repo):
+    def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            await set_source_authorship_excluded(async_db, 999999, "hal", True, repo=async_repo)
+            set_source_authorship_excluded_sync(sa_sync_conn, 999999, "hal", True, repo=repo)
 
-    async def test_marks_excluded(self, async_db, async_repo):
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
-        src_person_id = await _a_create_source_person(async_db)
-        sa_id = await _a_create_source_authorship(
-            async_db, sp_id, src_person_id, person_id=person_id
-        )
+    def test_marks_excluded(self, sa_sync_conn, repo):
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        src_person_id = _create_source_person(sa_sync_conn)
+        sa_id = _create_source_authorship(sa_sync_conn, sp_id, src_person_id, person_id=person_id)
 
-        await set_source_authorship_excluded(async_db, sa_id, "hal", True, repo=async_repo)
+        set_source_authorship_excluded_sync(sa_sync_conn, sa_id, "hal", True, repo=repo)
 
-        await async_db.execute("SELECT excluded FROM source_authorships WHERE id = %s", (sa_id,))
-        assert (await async_db.fetchone())["excluded"] is True
+        row = sa_sync_conn.execute(
+            text("SELECT excluded FROM source_authorships WHERE id = :id"), {"id": sa_id}
+        ).one()
+        assert row.excluded is True
 
-    async def test_unmark_excluded_does_not_touch_authorship(self, async_db, async_repo):
+    def test_unmark_excluded_does_not_touch_authorship(self, sa_sync_conn, repo):
         """Remettre excluded=False ne doit pas toucher à l'authorship vérité."""
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
-        src_person_id = await _a_create_source_person(async_db)
-        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
-        sa_id = await _a_create_source_authorship(
-            async_db,
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        src_person_id = _create_source_person(sa_sync_conn)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        sa_id = _create_source_authorship(
+            sa_sync_conn,
             sp_id,
             src_person_id,
             person_id=person_id,
@@ -592,27 +569,31 @@ class TestSetSourceAuthorshipExcluded:
             excluded=True,
         )
 
-        await set_source_authorship_excluded(async_db, sa_id, "hal", False, repo=async_repo)
+        set_source_authorship_excluded_sync(sa_sync_conn, sa_id, "hal", False, repo=repo)
 
-        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert await async_db.fetchone() is not None  # authorship vérité toujours là
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
+        ).first()
+        assert row is not None  # authorship vérité toujours là
 
-    async def test_exclude_triggers_detach_source(self, async_db, async_repo):
+    def test_exclude_triggers_detach_source(self, sa_sync_conn, repo):
         """Exclure la seule source attestante doit supprimer l'authorship vérité."""
-        person_id = await _a_create_person(async_db)
-        pub_id = await _a_create_publication(async_db)
-        sp_id = await _a_create_source_publication(async_db, pub_id)
-        src_person_id = await _a_create_source_person(async_db)
-        authorship_id = await _a_create_authorship(async_db, pub_id, person_id)
-        sa_id = await _a_create_source_authorship(
-            async_db,
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        src_person_id = _create_source_person(sa_sync_conn)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        sa_id = _create_source_authorship(
+            sa_sync_conn,
             sp_id,
             src_person_id,
             person_id=person_id,
             authorship_id=authorship_id,
         )
 
-        await set_source_authorship_excluded(async_db, sa_id, "hal", True, repo=async_repo)
+        set_source_authorship_excluded_sync(sa_sync_conn, sa_id, "hal", True, repo=repo)
 
-        await async_db.execute("SELECT id FROM authorships WHERE id = %s", (authorship_id,))
-        assert await async_db.fetchone() is None  # authorship vérité supprimée
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
+        ).first()
+        assert row is None  # authorship vérité supprimée
