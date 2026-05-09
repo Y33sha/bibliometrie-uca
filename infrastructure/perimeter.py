@@ -1,6 +1,6 @@
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 """Calcul des périmètres de structures.
@@ -20,14 +20,41 @@ psycopg).
 """
 
 
-def get_perimeter_structure_ids(cur: Any, perimeter_code: str) -> set[int]:
+def get_perimeter_structure_ids(conn_or_cur: Any, perimeter_code: str) -> set[int]:
     """Retourne l'ensemble des structure_ids pour un périmètre donné.
 
     Chaque structure listée dans perimeters.structure_ids est une racine.
     Ses descendants récursifs (via est_tutelle_de) sont inclus.
+
+    Accepte cur psycopg ou Connection SA (dispatch interne).
     """
-    cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perimeter_code,))
-    row = cur.fetchone()
+    if isinstance(conn_or_cur, Connection):
+        result = conn_or_cur.execute(
+            text("SELECT structure_ids FROM perimeters WHERE code = :code"),
+            {"code": perimeter_code},
+        )
+        row = result.first()
+        root_ids = list(row.structure_ids) if row and row.structure_ids else None
+        if not root_ids:
+            return set()
+        result2 = conn_or_cur.execute(
+            text("""
+                WITH RECURSIVE descendants AS (
+                    SELECT unnest(CAST(:roots AS int[])) AS id
+                    UNION
+                    SELECT sr.child_id FROM structure_relations sr
+                    JOIN descendants d ON d.id = sr.parent_id
+                    WHERE sr.relation_type = 'est_tutelle_de'
+                )
+                SELECT id FROM descendants
+            """),
+            {"roots": root_ids},
+        )
+        return {row.id for row in result2}
+
+    # Branche legacy psycopg cur.
+    conn_or_cur.execute("SELECT structure_ids FROM perimeters WHERE code = %s", (perimeter_code,))
+    row = conn_or_cur.fetchone()
 
     if not row:
         return set()
@@ -37,7 +64,7 @@ def get_perimeter_structure_ids(cur: Any, perimeter_code: str) -> set[int]:
         return set()
 
     # Résoudre les descendants récursifs en une seule requête
-    cur.execute(
+    conn_or_cur.execute(
         """
         WITH RECURSIVE descendants AS (
             SELECT unnest(%s::int[]) AS id
@@ -51,7 +78,7 @@ def get_perimeter_structure_ids(cur: Any, perimeter_code: str) -> set[int]:
         (root_ids,),
     )
 
-    return {r["id"] if isinstance(r, dict) else r[0] for r in cur.fetchall()}
+    return {r["id"] if isinstance(r, dict) else r[0] for r in conn_or_cur.fetchall()}
 
 
 # ── Fonctions par rôle (lisent la config) ──

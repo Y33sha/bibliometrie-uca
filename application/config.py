@@ -14,10 +14,11 @@ au lieu d'un curseur psycopg.
 
 from typing import Any
 
+from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from application.audit import async_emit_event
-from application.ports.config import AsyncConfigStore
+from application.ports.config import AsyncConfigStore, ConfigStore
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.ports.audit_repository import AsyncAuditRepository
 from domain.ports.perimeter_repository import AsyncPerimeterRepository
@@ -25,17 +26,15 @@ from domain.ports.perimeter_repository import AsyncPerimeterRepository
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
-async def update_config_value(
-    conn: AsyncConnection, key: str, value: Any, *, config: AsyncConfigStore
-) -> dict:
+def update_config_value(conn: Connection, key: str, value: Any, *, config: ConfigStore) -> dict:
     """Met à jour la valeur d'un paramètre de config existant.
 
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
     Lève NotFoundError si la clé n'existe pas.
     """
-    if not await config.config_key_exists(key):
+    if not config.config_key_exists(key):
         raise NotFoundError(f"Paramètre '{key}' introuvable")
-    return await config.update_config_value(key, value)
+    return config.update_config_value(key, value)
 
 
 # ── Perimeters — structures membres ──────────────────────────────

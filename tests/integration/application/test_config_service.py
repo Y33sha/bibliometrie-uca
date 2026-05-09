@@ -14,7 +14,11 @@ from application.config import (
     update_perimeter,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from infrastructure.repositories import async_config_store, async_perimeter_repository
+from infrastructure.repositories import (
+    async_config_store,
+    async_perimeter_repository,
+    config_store,
+)
 
 
 @pytest.fixture
@@ -27,11 +31,26 @@ def config(sa_conn):
     return async_config_store(sa_conn)
 
 
+@pytest.fixture
+def sync_config(sa_sync_conn):
+    return config_store(sa_sync_conn)
+
+
 # ── Helpers ────────────────────────────────────────────────────────
 
 
 async def _insert_config(conn, key, value, description="desc"):
     await conn.execute(
+        text(
+            "INSERT INTO config (key, value, description) "
+            "VALUES (:key, CAST(:value AS jsonb), :description)"
+        ),
+        {"key": key, "value": json.dumps(value), "description": description},
+    )
+
+
+def _insert_config_sync(conn, key, value, description="desc"):
+    conn.execute(
         text(
             "INSERT INTO config (key, value, description) "
             "VALUES (:key, CAST(:value AS jsonb), :description)"
@@ -66,19 +85,19 @@ async def _create_struct(conn, code="UCA"):
 
 
 class TestUpdateConfigValue:
-    async def test_raises_not_found(self, sa_conn, config):
+    def test_raises_not_found(self, sa_sync_conn, sync_config):
         with pytest.raises(NotFoundError):
-            await update_config_value(sa_conn, "nonexistent", "x", config=config)
+            update_config_value(sa_sync_conn, "nonexistent", "x", config=sync_config)
 
-    async def test_updates_existing(self, sa_conn, config):
-        await _insert_config(sa_conn, "test_key", "old")
-        row = await update_config_value(sa_conn, "test_key", "new", config=config)
+    def test_updates_existing(self, sa_sync_conn, sync_config):
+        _insert_config_sync(sa_sync_conn, "test_key", "old")
+        row = update_config_value(sa_sync_conn, "test_key", "new", config=sync_config)
         assert row is not None
         assert row["value"] == "new"
 
-    async def test_updates_with_dict_value(self, sa_conn, config):
-        await _insert_config(sa_conn, "test_key", {})
-        row = await update_config_value(sa_conn, "test_key", {"a": 1, "b": 2}, config=config)
+    def test_updates_with_dict_value(self, sa_sync_conn, sync_config):
+        _insert_config_sync(sa_sync_conn, "test_key", {})
+        row = update_config_value(sa_sync_conn, "test_key", {"a": 1, "b": 2}, config=sync_config)
         assert row["value"] == {"a": 1, "b": 2}
 
 

@@ -33,7 +33,7 @@ from domain.ports.person_repository import AsyncPersonRepository, PersonReposito
 from domain.ports.publication_repository import AsyncPublicationRepository, PublicationRepository
 from domain.ports.publisher_repository import AsyncPublisherRepository, PublisherRepository
 from domain.ports.structure_repository import AsyncStructureRepository
-from infrastructure.db.queries.config import PgAsyncConfig
+from infrastructure.db.queries.config import PgAsyncConfig, PgConfig
 
 from .async_address_repository import PgAsyncAddressRepository
 from .async_audit_repository import PgAsyncAuditRepository
@@ -54,6 +54,15 @@ from .publisher_repository import PgPublisherRepository
 def audit_repository(conn_or_cur: Any) -> AuditRepository:
     """Retourne un AuditRepository lié au cur psycopg ou Connection SA donné."""
     return PgAuditRepository(conn_or_cur)
+
+
+def config_store(conn: Any) -> PgConfig:
+    """Retourne un ConfigStore (port défini dans application/ports/config.py).
+
+    Variante sync de `async_config_store`. Cohabite jusqu'à la
+    suppression de la moitié async (Phase 3 sync-async-deduplication).
+    """
+    return PgConfig(conn)
 
 
 def journal_repository(conn_or_cur: Any) -> JournalRepository:

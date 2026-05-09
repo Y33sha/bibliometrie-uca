@@ -9,16 +9,12 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection
 
 from application import config as config_service
-from application.ports.config import AsyncConfigStore
-from application.ports.config_queries import AsyncConfigQueries
-from interfaces.api.async_deps import (
-    config_queries,
-    config_store,
-    db_conn,
-)
+from application.ports.config import ConfigStore
+from application.ports.config_queries import ConfigQueries
+from interfaces.api.deps import config_queries_sync, config_store_sync, db_conn_sync
 from interfaces.api.models import ConfigItem, ConfigValueUpdate, HalCollectionsResponse
 
 router = APIRouter()
@@ -26,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/api/config", response_model=list[ConfigItem])
-async def list_config(
-    queries: AsyncConfigQueries = Depends(config_queries),
+def list_config(
+    queries: ConfigQueries = Depends(config_queries_sync),
 ) -> Any:
     """Liste tous les paramètres applicatifs (clé, valeur JSON, description).
 
@@ -35,24 +31,24 @@ async def list_config(
     renvoyées telles quelles (jsonb) — la sémantique de chaque clé
     est documentée dans `docs/exploitation.md`.
     """
-    return await queries.list_config()
+    return queries.list_config()
 
 
 @router.get("/api/config/hal-collections", response_model=HalCollectionsResponse)
-async def get_hal_collections(
-    queries: AsyncConfigQueries = Depends(config_queries),
+def get_hal_collections(
+    queries: ConfigQueries = Depends(config_queries_sync),
 ) -> Any:
     """Retourne les collections HAL dérivées des structures du périmètre."""
-    collections = await queries.get_hal_collections()
+    collections = queries.get_hal_collections()
     return {"collections": collections, "count": len(collections)}
 
 
 @router.put("/api/config/{key}", response_model=ConfigItem)
-async def update_config(
+def update_config(
     key: str,
     body: ConfigValueUpdate,
-    conn: AsyncConnection = Depends(db_conn),
-    config_repo: AsyncConfigStore = Depends(config_store),
+    conn: Connection = Depends(db_conn_sync),
+    config_repo: ConfigStore = Depends(config_store_sync),
 ) -> Any:
     """Met à jour la valeur d'un paramètre de config.
 
@@ -60,4 +56,4 @@ async def update_config(
     clés sont déclarées dans les migrations). 404 si la clé est
     inconnue.
     """
-    return await config_service.update_config_value(conn, key, body.value, config=config_repo)
+    return config_service.update_config_value(conn, key, body.value, config=config_repo)
