@@ -7,14 +7,13 @@ des doc_types hors périmètre métier aval) est documentée dans
 silencieuse si l'une est modifiée sans l'autre.
 """
 
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection, text
 
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 
 
 class TestActivePublicationsViewMatchesDomain:
-    async def test_view_excludes_exactly_out_of_scope_doc_types(self, sa_conn: AsyncConnection):
+    def test_view_excludes_exactly_out_of_scope_doc_types(self, sa_sync_conn: Connection):
         """La définition de la vue doit lister exactement les doc_types de
         ``OUT_OF_SCOPE_DOC_TYPES`` dans son ``NOT IN`` / ``<> ALL``.
 
@@ -23,13 +22,11 @@ class TestActivePublicationsViewMatchesDomain:
         suffit d'identifier les littéraux doc_type exposés dans la
         clause de filtre.
         """
-        row = (
-            await sa_conn.execute(
-                text(
-                    "SELECT definition FROM pg_views "
-                    "WHERE schemaname = 'public' "
-                    "AND viewname = 'v_active_publications'"
-                )
+        row = sa_sync_conn.execute(
+            text(
+                "SELECT definition FROM pg_views "
+                "WHERE schemaname = 'public' "
+                "AND viewname = 'v_active_publications'"
             )
         ).one()
         definition: str = row.definition

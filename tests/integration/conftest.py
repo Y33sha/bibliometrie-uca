@@ -111,17 +111,6 @@ def db():
     conn.close()
 
 
-@pytest.fixture
-async def async_db():
-    """Variante async de `db`. Transaction rollbackée à la fin."""
-    conn = await psycopg.AsyncConnection.connect(**_db_connect_args(), row_factory=dict_row)
-    await conn.set_autocommit(False)
-    async with conn.cursor() as cur:
-        yield cur
-    await conn.rollback()
-    await conn.close()
-
-
 def _sa_url():
     from sqlalchemy import URL
 
@@ -136,32 +125,11 @@ def _sa_url():
 
 
 @pytest.fixture
-async def sa_conn():
-    """AsyncConnection SQLAlchemy sur la base test, transaction rollbackée.
-
-    Utilisée par les modules migrés en SQLAlchemy Core pendant le chantier
-    sqlalchemy-core-adoption. Cohabite avec `async_db` (cur psycopg)
-    pendant la phase de migration.
-    """
-    from sqlalchemy.ext.asyncio import create_async_engine
-
-    engine = create_async_engine(_sa_url())
-    async with engine.connect() as conn:
-        trans = await conn.begin()
-        try:
-            yield conn
-        finally:
-            await trans.rollback()
-    await engine.dispose()
-
-
-@pytest.fixture
 def sa_sync_conn():
-    """Connection SQLAlchemy synchrone sur la base test, transaction rollbackée.
+    """Connection SQLAlchemy sur la base test, transaction rollbackée.
 
-    Pendant Phase 3 (migration des repos sync et des queries pipeline),
-    cohabite avec `db` (cur psycopg). Les modules migrés en SA Core sync
-    consomment cette fixture.
+    Consommée par les tests qui passent par les query services SA Core
+    (cohabite avec le curseur psycopg `db` côté pipeline).
     """
     from sqlalchemy import create_engine
 
