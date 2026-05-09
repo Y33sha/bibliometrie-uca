@@ -21,7 +21,6 @@ from application.audit import (
 from infrastructure.db.tables import audit_log
 from infrastructure.repositories import (
     async_audit_repository,
-    async_person_repository,
     audit_repository,
 )
 
@@ -113,59 +112,67 @@ class TestEndToEndServiceIntegration:
     """Vérifie que les services destructifs émettent bien les événements
     attendus quand un utilisateur est dans le contexte."""
 
-    async def _a_create_person(self, cur, last="X", first="X"):
-        await cur.execute(
-            """
-            INSERT INTO persons (last_name, first_name,
-                                 last_name_normalized, first_name_normalized)
-            VALUES (%s, %s, lower(%s), lower(%s)) RETURNING id
-            """,
-            (last, first, last, first),
-        )
-        return (await cur.fetchone())["id"]
+    def _create_person(self, conn, last="X", first="X"):
+        from sqlalchemy import text
 
-    async def test_set_rejected_emits_event(self, async_db):
+        return conn.execute(
+            text(
+                "INSERT INTO persons (last_name, first_name, "
+                "                     last_name_normalized, first_name_normalized) "
+                "VALUES (:l, :f, lower(:l), lower(:f)) RETURNING id"
+            ),
+            {"l": last, "f": first},
+        ).scalar_one()
+
+    def test_set_rejected_emits_event(self, sa_sync_conn):
+        from sqlalchemy import text
+
         from application.persons import set_rejected
+        from infrastructure.repositories import audit_repository, person_repository
 
-        person_id = await self._a_create_person(async_db)
+        person_id = self._create_person(sa_sync_conn)
         token = set_current_user("admin")
         try:
-            await set_rejected(
-                async_db,
+            set_rejected(
+                sa_sync_conn,
                 person_id,
                 True,
-                repo=async_person_repository(async_db),
-                audit_repo=async_audit_repository(async_db),
+                repo=person_repository(sa_sync_conn),
+                audit_repo=audit_repository(sa_sync_conn),
             )
         finally:
             reset_current_user(token)
 
-        await async_db.execute(
-            "SELECT event_type, aggregate_id, payload, user_id "
-            "FROM audit_log ORDER BY id DESC LIMIT 1"
-        )
-        row = await async_db.fetchone()
-        assert row["event_type"] == "person.rejected"
-        assert row["aggregate_id"] == person_id
-        assert row["payload"] == {"rejected": True}
-        assert row["user_id"] == "admin"
+        row = sa_sync_conn.execute(
+            text(
+                "SELECT event_type, aggregate_id, payload, user_id "
+                "FROM audit_log ORDER BY id DESC LIMIT 1"
+            )
+        ).one()
+        assert row.event_type == "person.rejected"
+        assert row.aggregate_id == person_id
+        assert row.payload == {"rejected": True}
+        assert row.user_id == "admin"
 
-    async def test_set_rejected_without_context_no_event(self, async_db):
+    def test_set_rejected_without_context_no_event(self, sa_sync_conn):
         """Confirme que hors contexte (pipeline, script), rien n'est audité
         même quand un service destructif est appelé."""
-        from application.persons import set_rejected
+        from sqlalchemy import text
 
-        person_id = await self._a_create_person(async_db)
-        await set_rejected(
-            async_db,
+        from application.persons import set_rejected
+        from infrastructure.repositories import audit_repository, person_repository
+
+        person_id = self._create_person(sa_sync_conn)
+        set_rejected(
+            sa_sync_conn,
             person_id,
             True,
-            repo=async_person_repository(async_db),
-            audit_repo=async_audit_repository(async_db),
+            repo=person_repository(sa_sync_conn),
+            audit_repo=audit_repository(sa_sync_conn),
         )
 
-        await async_db.execute("SELECT COUNT(*) AS n FROM audit_log")
-        assert (await async_db.fetchone())["n"] == 0
+        row = sa_sync_conn.execute(text("SELECT COUNT(*) AS n FROM audit_log")).one()
+        assert row.n == 0
 
     def test_mark_distinct_emits_only_on_actual_insert(self, db):
         """mark_distinct est idempotent : un appel sur une paire déjà

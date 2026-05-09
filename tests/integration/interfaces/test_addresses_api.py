@@ -47,6 +47,12 @@ def _seed_addresses_api(client):
     appel à l'API purge ces connexions mortes (la pool les discard au
     retour). `client` dépendance → fixture lancée après la création du
     TestClient.
+
+    Teardown : TRUNCATE des tables touchées + suppression du périmètre
+    'uca' et de la config `perimeter_persons` pour ne pas polluer les
+    suites application qui réinsèrent ces mêmes clés via leurs propres
+    fixtures (test_addresses_service, test_authorships_service,
+    test_persons_service).
     """
     with _pool() as cur:
         cur.execute(
@@ -81,6 +87,19 @@ def _seed_addresses_api(client):
         r = client.get("/api/countries")
         if r.status_code == 200:
             break
+
+    yield
+
+    # Teardown : nettoyer ce que ce module a committé (seed + état modifié
+    # par les routes API mutantes). RESTART IDENTITY évite que les ids
+    # autoincrémentés ne soient consultés par des tests ultérieurs.
+    with _pool() as cur:
+        cur.execute(
+            "TRUNCATE TABLE address_structures, source_authorship_addresses, addresses, "
+            "structure_name_forms, structure_relations, structures, perimeters, "
+            "audit_log RESTART IDENTITY CASCADE"
+        )
+        cur.execute("DELETE FROM config WHERE key = 'perimeter_persons'")
 
 
 def _seed_address(raw_text, countries=None):
