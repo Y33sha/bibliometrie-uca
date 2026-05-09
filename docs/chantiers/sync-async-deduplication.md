@@ -340,6 +340,32 @@ interfaces ciblés passent.
   via `get_perimeter_queries_sync`. Tests `test_addresses_service.py` (34),
   `test_authorships_service.py` (22), `test_addresses_queries.py` (16),
   `test_addresses_api.py` (45) : 117 tests passent.
+- [x] `persons.py` (batch 2b) — Migration en swap net (single API caller) :
+  les 5 modules de query async dans `infrastructure/db/queries/persons/`
+  (`list.py`, `facets.py`, `detail.py`, `admin.py`, `__init__.py`) sont
+  convertis sur place vers sync (suppression `PgAsyncPersonsQueries`, port
+  renommé `PersonsQueries`). `application/persons.py` réécrit en sync : les
+  9 fonctions API-only (`set_rejected`, `update_name`, `remove_identifier`,
+  `update_identifier_status`, `reassign_identifier`, `detach_name_form`,
+  `assign_orphan_authorship`, `batch_assign_orphan_authorships`,
+  `detach_authorships`) passent de async à sync ; les 3 wrappers redondants
+  (`async_create_person`, `async_add_identifier`, `async_merge_person`)
+  sont supprimés (l'API utilise les versions sync existantes utilisées
+  par le pipeline). 28 routes `def`, factory ajoutée :
+  `persons_queries_sync`. `interfaces/api/async_deps.py` perd les imports
+  `AsyncPersonsQueries` / `PgAsyncPersonsQueries` et la factory
+  `persons_queries`. Tests : 113 ciblés passent (test_persons_service: 36,
+  test_persons_api: 77).
+
+Total Phase 2.4 : 7 routers migrés (stats, structures, publications,
+addresses, persons + admin_pipeline déjà sync). Tous les `async def` dans
+`interfaces/api/routers/` ont été convertis en `def` (sauf le SSE
+`feedback_rerun` qui reste async par nature). 202 tests application + 241
+tests interfaces passent en suite isolée (chaque suite). Reste de la
+cohabitation sync/async : `application/authorships.py` (variantes async
+non utilisées en prod, supprimées en Phase 3), `infrastructure/repositories/async_*.py`
+(16 fichiers), `interfaces/api/async_deps.py`. Phase 3 supprime tout
+ce code mort.
 
 ### Phase 3 — Suppression du code async devenu mort
 
