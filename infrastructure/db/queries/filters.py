@@ -2,7 +2,7 @@
 
 API : chaque `*_clause(...)` retourne un `WhereClause | None`,
 composable via `assemble_where(...)`. Les fragments utilisent la syntaxe
-nommée SQLAlchemy `:nom` et s'exécutent via une `AsyncConnection` SA.
+nommée SQLAlchemy `:nom` et s'exécutent via une `Connection` SA.
 
 Vit dans `infrastructure/` parce que ces fonctions génèrent du SQL
 (infrastructure technique).
@@ -45,7 +45,7 @@ class WhereClause:
     """Fragment SQL avec ses bind params nommés (syntaxe `:nom`).
 
     À assembler via `assemble_where(...)` puis exécuter via une
-    `AsyncConnection` SA. Incompatible avec un curseur psycopg.
+    `Connection` SA. Incompatible avec un curseur psycopg.
     """
 
     sql: str
