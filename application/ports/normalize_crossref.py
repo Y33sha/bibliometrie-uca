@@ -11,7 +11,7 @@ class CrossrefNormalizeQueries(Protocol):
 
     def upsert_crossref_source_publication(
         self,
-        cur: Any,
+        conn: Any,
         *,
         doi: str,
         title: str,
@@ -33,7 +33,7 @@ class CrossrefNormalizeQueries(Protocol):
 
     def upsert_crossref_source_authorship(
         self,
-        cur: Any,
+        conn: Any,
         *,
         source_publication_id: int,
         author_position: int,
@@ -42,8 +42,8 @@ class CrossrefNormalizeQueries(Protocol):
         identifiers: Any,
     ) -> int: ...
 
-    def get_crossref_publication_id(self, cur: Any, doi: str) -> int | None: ...
+    def get_crossref_publication_id(self, conn: Any, doi: str) -> int | None: ...
 
     def clear_source_authorships_for_publication(
-        self, cur: Any, source_publication_id: int
+        self, conn: Any, source_publication_id: int
     ) -> None: ...

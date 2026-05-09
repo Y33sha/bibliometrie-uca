@@ -31,8 +31,6 @@ import datetime
 from collections.abc import Callable
 from typing import Any
 
-from psycopg.types.json import Jsonb as Json
-
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.normalize_crossref import CrossrefNormalizeQueries
@@ -263,8 +261,8 @@ def process_authors(
             source_publication_id=source_publication_id,
             author_position=position,
             raw_author_name=full_name,
-            source_data=Json(sd) if sd else None,
-            identifiers=Json(ids) if ids else None,
+            source_data=sd if sd else None,
+            identifiers=ids if ids else None,
         )
 
 
@@ -325,8 +323,8 @@ def process_work(
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
 ) -> bool | None:
-    staging_id = staging_row["id"]
-    raw = staging_row["raw_data"]
+    staging_id = staging_row.id
+    raw = staging_row.raw_data
     if not isinstance(raw, dict) or not raw:
         # Stub not_found ou payload vide — devrait déjà être processed=TRUE,
         # par sécurité on marque processed et on passe.
@@ -369,7 +367,7 @@ def process_work(
         doc_type=None,  # mapping CrossRef → enum canonique appliqué plus tard (cf. docs/chantiers/crossref.md)
         publication_id=publication_id,
         staging_id=staging_id,
-        external_ids=Json(external_ids) if external_ids else None,
+        external_ids=external_ids,
         journal_id=journal_id,
         oa_status=None,
         language=get_language(msg),
@@ -377,8 +375,8 @@ def process_work(
         abstract=get_abstract(msg),
         keywords=get_keywords(msg),
         cited_by_count=get_cited_by_count(msg),
-        biblio=Json(biblio) if biblio else None,
-        meta=Json(meta) if meta else None,
+        biblio=biblio,
+        meta=meta,
     )
 
     process_authors(cur, queries, msg, doi, source_publication_id)
