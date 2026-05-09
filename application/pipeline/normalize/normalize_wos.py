@@ -22,8 +22,6 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 from collections.abc import Callable
 from typing import Any
 
-from psycopg.types.json import Jsonb as Json
-
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.normalize_wos import WosNormalizeQueries
@@ -428,11 +426,11 @@ def insert_wos_document(
 
     abstract = rec.get("abstract")
     cited_by_count = rec.get("cited_by_count")
-    biblio = Json(rec["biblio"]) if rec.get("biblio") else None
+    biblio = rec.get("biblio")
     keywords = rec.get("keywords")
-    topics = Json(rec["topics"]) if rec.get("topics") else None
+    topics = rec.get("topics")
     urls = rec.get("urls")
-    external_ids = Json(rec["external_ids"]) if rec.get("external_ids") else None
+    external_ids = rec.get("external_ids")
 
     return queries.upsert_wos_source_publication(
         cur,
@@ -473,7 +471,7 @@ def _resolve_addresses_batch(
     """Résout un ensemble d'adresses en batch. Retourne {raw_text: id}."""
     if not raw_texts:
         return {}
-    values = [(t, normalize_text(t)) for t in raw_texts]
+    values = [{"raw": t, "norm": normalize_text(t)} for t in raw_texts]
     queries.upsert_addresses_batch(cur, values)
     return queries.fetch_address_ids_by_raw_text(cur, list(raw_texts))
 
@@ -546,18 +544,17 @@ def process_authorships(
             researcher_id=author.get("researcher_id"),
         )
 
-        values[position] = (
-            "wos",
-            source_publication_id,
-            None,  # source_person_id : plus d'écriture dans source_persons
-            position,
-            author["is_corresponding"],
-            name_norm,
-            institution_ids or None,
-            author.get("roles"),
-            author["full_name"],
-            Json(ids) if ids else None,
-        )
+        values[position] = {
+            "spid": source_publication_id,
+            "source_person_id": None,
+            "author_position": position,
+            "is_corresponding": author["is_corresponding"],
+            "author_name_normalized": name_norm,
+            "source_struct_ids": institution_ids or None,
+            "roles": author.get("roles"),
+            "raw_author_name": author["full_name"],
+            "identifiers": ids if ids else None,
+        }
 
     queries.upsert_wos_source_authorships_batch(cur, list(values.values()))
 
@@ -577,7 +574,7 @@ def process_authorships(
             cur, source_publication_id=source_publication_id, positions=positions_needed
         )
 
-        addr_values = []
+        addr_values: list[dict[str, int]] = []
         for author in authors_with_addrs:
             sa_id = sa_id_map.get(author["position"])
             if not sa_id:
@@ -585,7 +582,7 @@ def process_authorships(
             for addr_text in author["addresses"]:
                 addr_id = addr_id_map.get(addr_text)
                 if addr_id:
-                    addr_values.append((sa_id, addr_id))
+                    addr_values.append({"sa_id": sa_id, "addr_id": addr_id})
 
         queries.insert_source_authorship_addresses_batch(cur, addr_values)
 

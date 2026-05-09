@@ -3,7 +3,7 @@
 import os
 
 from application.pipeline.normalize.normalize_wos import WosNormalizer
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
 from infrastructure.db.queries.staging import PgStagingQueries
 from infrastructure.log import setup_logger
@@ -17,7 +17,7 @@ logger = setup_logger("normalize_wos", os.path.join(os.path.dirname(__file__), "
 
 
 def main() -> None:
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     WosNormalizer(
         conn,
         logger,

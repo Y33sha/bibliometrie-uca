@@ -762,24 +762,24 @@ WOS_STAGING_DOCS = [
 ]
 
 
-def _insert_wos_staging(cur, docs):
+def _insert_wos_staging(conn, docs):
+    from sqlalchemy import bindparam, text
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    stmt = text("""
+        INSERT INTO staging (source, source_id, doi, raw_data, processed)
+        VALUES ('wos', :ut, :doi, :raw_data, FALSE)
+        ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
+    """).bindparams(bindparam("raw_data", type_=JSONB))
     for doc in docs:
-        cur.execute(
-            """
-            INSERT INTO staging (source, source_id, doi, raw_data, processed)
-            VALUES ('wos', %s, %s, %s, FALSE)
-            ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
-        """,
-            (doc["ut"], doc["doi"], Json(doc["raw_data"])),
-        )
+        conn.execute(stmt, {"ut": doc["ut"], "doi": doc["doi"], "raw_data": doc["raw_data"]})
 
 
-def _run_normalize_wos(cur):
+def _run_normalize_wos(conn):
     import logging
 
-    from psycopg.rows import tuple_row
+    from sqlalchemy import text
 
-    plain_cur = cur.connection.cursor(row_factory=tuple_row)
     from application.pipeline.normalize.normalize_wos import process_record
     from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
@@ -792,19 +792,20 @@ def _run_normalize_wos(cur):
     queries = PgWosNormalizeQueries()
     staging_queries = PgStagingQueries()
     logger = logging.getLogger("test")
-    journal_repo = journal_repository(plain_cur)
-    publisher_repo = publisher_repository(plain_cur)
-    pub_repo = publication_repository(plain_cur)
+    journal_repo = journal_repository(conn)
+    publisher_repo = publisher_repository(conn)
+    pub_repo = publication_repository(conn)
 
-    plain_cur.execute("""
-        SELECT id, source_id AS ut, doi, raw_data
-        FROM staging WHERE source = 'wos' AND processed = FALSE ORDER BY id
-    """)
-    rows = plain_cur.fetchall()
+    rows = conn.execute(
+        text("""
+            SELECT id, source_id AS ut, doi, raw_data
+            FROM staging WHERE source = 'wos' AND processed = FALSE ORDER BY id
+        """)
+    ).all()
     processed = 0
     for row in rows:
         if process_record(
-            plain_cur,
+            conn,
             queries,
             logger,
             row,
@@ -817,29 +818,34 @@ def _run_normalize_wos(cur):
     return processed
 
 
-def _count_wos_tables(cur) -> dict:
+def _count_wos_tables(conn) -> dict:
+    from sqlalchemy import text
+
     counts = {}
     for t in ["publications", "source_persons"]:
-        cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
-        counts[t] = cur.fetchone()["cnt"]
-    cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'wos'")
-    counts["wos_authorships"] = cur.fetchone()["cnt"]
-    cur.execute("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'wos'")
-    counts["wos_documents"] = cur.fetchone()["cnt"]
+        counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
+    counts["wos_authorships"] = conn.execute(
+        text("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'wos'")
+    ).scalar_one()
+    counts["wos_documents"] = conn.execute(
+        text("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'wos'")
+    ).scalar_one()
     return counts
 
 
 class TestNormalizeWosIdempotence:
-    def test_double_run_same_counts(self, db):
-        _insert_wos_staging(db, WOS_STAGING_DOCS)
+    def test_double_run_same_counts(self, sa_sync_conn):
+        from sqlalchemy import text
 
-        processed_1 = _run_normalize_wos(db)
-        counts_1 = _count_wos_tables(db)
+        _insert_wos_staging(sa_sync_conn, WOS_STAGING_DOCS)
+
+        processed_1 = _run_normalize_wos(sa_sync_conn)
+        counts_1 = _count_wos_tables(sa_sync_conn)
         assert processed_1 == 3
 
-        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'wos'")
-        _run_normalize_wos(db)
-        counts_2 = _count_wos_tables(db)
+        sa_sync_conn.execute(text("UPDATE staging SET processed = FALSE WHERE source = 'wos'"))
+        _run_normalize_wos(sa_sync_conn)
+        counts_2 = _count_wos_tables(sa_sync_conn)
 
         assert counts_2 == counts_1, (
             f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
