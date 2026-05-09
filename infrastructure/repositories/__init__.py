@@ -26,13 +26,13 @@ from typing import Any
 
 from domain.ports.address_repository import AsyncAddressRepository
 from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
-from domain.ports.authorship_repository import AsyncAuthorshipRepository
+from domain.ports.authorship_repository import AsyncAuthorshipRepository, AuthorshipRepository
 from domain.ports.journal_repository import AsyncJournalRepository, JournalRepository
 from domain.ports.perimeter_repository import AsyncPerimeterRepository, PerimeterRepository
 from domain.ports.person_repository import AsyncPersonRepository, PersonRepository
 from domain.ports.publication_repository import AsyncPublicationRepository, PublicationRepository
 from domain.ports.publisher_repository import AsyncPublisherRepository, PublisherRepository
-from domain.ports.structure_repository import AsyncStructureRepository
+from domain.ports.structure_repository import AsyncStructureRepository, StructureRepository
 from infrastructure.db.queries.config import PgAsyncConfig, PgConfig
 
 from .async_address_repository import PgAsyncAddressRepository
@@ -45,16 +45,23 @@ from .async_publication_repository import PgAsyncPublicationRepository
 from .async_publisher_repository import PgAsyncPublisherRepository
 from .async_structure_repository import PgAsyncStructureRepository
 from .audit_repository import PgAuditRepository
+from .authorship_repository import PgAuthorshipRepository
 from .journal_repository import PgJournalRepository
 from .perimeter_repository import PgPerimeterRepository
 from .person_repository import PgPersonRepository
 from .publication_repository import PgPublicationRepository
 from .publisher_repository import PgPublisherRepository
+from .structure_repository import PgStructureRepository
 
 
 def audit_repository(conn_or_cur: Any) -> AuditRepository:
     """Retourne un AuditRepository lié au cur psycopg ou Connection SA donné."""
     return PgAuditRepository(conn_or_cur)
+
+
+def authorship_repository(conn: Any) -> AuthorshipRepository:
+    """Retourne un AuthorshipRepository lié à la Connection SA donnée."""
+    return PgAuthorshipRepository(conn)
 
 
 def config_store(conn: Any) -> PgConfig:
@@ -89,6 +96,11 @@ def publication_repository(conn_or_cur: Any) -> PublicationRepository:
 def publisher_repository(conn_or_cur: Any) -> PublisherRepository:
     """Retourne un PublisherRepository lié au cur psycopg ou Connection SA donné."""
     return PgPublisherRepository(conn_or_cur)
+
+
+def structure_repository(conn: Any) -> StructureRepository:
+    """Retourne un StructureRepository lié à la Connection SA donnée."""
+    return PgStructureRepository(conn)
 
 
 # ── Factories async ────────────────────────────────────────────────

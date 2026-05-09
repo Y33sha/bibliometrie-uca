@@ -5,12 +5,12 @@ Le package est organisé par thème :
 - `facets` : `publications_facets`
 - `detail` : `all_years`, `get_publication_detail`
 - `create` : `PgPublicationsCreateQueries` (adapter du port
-  `application.ports.publications_create`)
+  `application.ports.publications_create`, sync, consommé par le pipeline)
 
-`PgAsyncPublicationsQueries` agrège les 6 fonctions de lecture sous le
-port `application.ports.publications_queries.AsyncPublicationsQueries`.
-Les dataclasses `FacetFilters` / `ListFilters` vivent côté port (source
-de vérité), ici on type `filters: Any`.
+`PgPublicationsQueries` agrège les 6 fonctions de lecture sous le port
+`application.ports.publications_queries.PublicationsQueries`. Les
+dataclasses `FacetFilters` / `ListFilters` vivent côté port (source de
+vérité), ici on type `filters: Any`.
 """
 
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module
@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy import Connection
 
 from infrastructure.db.queries.publications.create import PgPublicationsCreateQueries
 from infrastructure.db.queries.publications.detail import (
@@ -43,29 +43,29 @@ from infrastructure.db.queries.publications.list import (
 )
 
 
-class PgAsyncPublicationsQueries:
-    """Adapter SA pour `application.ports.publications_queries.AsyncPublicationsQueries`."""
+class PgPublicationsQueries:
+    """Adapter SA pour `application.ports.publications_queries.PublicationsQueries`."""
 
-    def __init__(self, conn: AsyncConnection) -> None:
+    def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    async def list_publications(self, **kwargs: Any) -> dict[str, Any]:
-        return await _list_publications(self._conn, **kwargs)
+    def list_publications(self, **kwargs: Any) -> dict[str, Any]:
+        return _list_publications(self._conn, **kwargs)
 
-    async def publications_facets(self, **kwargs: Any) -> dict[str, Any]:
-        return await _publications_facets(self._conn, **kwargs)
+    def publications_facets(self, **kwargs: Any) -> dict[str, Any]:
+        return _publications_facets(self._conn, **kwargs)
 
-    async def export_publications_csv(self, **kwargs: Any) -> str:
-        return await _export_publications_csv(self._conn, **kwargs)
+    def export_publications_csv(self, **kwargs: Any) -> str:
+        return _export_publications_csv(self._conn, **kwargs)
 
-    async def export_theses_csv(self, **kwargs: Any) -> str:
-        return await _export_theses_csv(self._conn, **kwargs)
+    def export_theses_csv(self, **kwargs: Any) -> str:
+        return _export_theses_csv(self._conn, **kwargs)
 
-    async def all_years(self) -> list[int]:
-        return await _all_years(self._conn)
+    def all_years(self) -> list[int]:
+        return _all_years(self._conn)
 
-    async def get_publication_detail(self, pub_id: int) -> dict[str, Any] | None:
-        return await _get_publication_detail(self._conn, pub_id)
+    def get_publication_detail(self, pub_id: int) -> dict[str, Any] | None:
+        return _get_publication_detail(self._conn, pub_id)
 
 
-__all__ = ["PgAsyncPublicationsQueries", "PgPublicationsCreateQueries"]
+__all__ = ["PgPublicationsCreateQueries", "PgPublicationsQueries"]

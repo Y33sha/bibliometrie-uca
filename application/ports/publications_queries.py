@@ -1,7 +1,6 @@
 """Port : lectures sur les publications (consommé par le router publications).
 
-Implémenté par
-`infrastructure.db.queries.publications.PgAsyncPublicationsQueries`.
+Implémenté par `infrastructure.db.queries.publications.PgPublicationsQueries`.
 
 Les dataclasses `FacetFilters` et `ListFilters` vivent ici (source de
 vérité) ; les fonctions infra acceptent `filters: Any` puis lisent ses
@@ -61,10 +60,10 @@ class FacetFilters:
     subject_id: int | None = None
 
 
-class AsyncPublicationsQueries(Protocol):
-    """Lectures pour /api/publications/*."""
+class PublicationsQueries(Protocol):
+    """Lectures sync pour /api/publications/*."""
 
-    async def list_publications(
+    def list_publications(
         self,
         *,
         filters: ListFilters,
@@ -74,18 +73,18 @@ class AsyncPublicationsQueries(Protocol):
         sort: str,
     ) -> dict[str, Any]: ...
 
-    async def publications_facets(
+    def publications_facets(
         self, *, filters: FacetFilters, root_structure_id: int
     ) -> dict[str, Any]: ...
 
-    async def export_publications_csv(
+    def export_publications_csv(
         self, *, filters: ListFilters, root_structure_id: int, sort: str
     ) -> str: ...
 
-    async def export_theses_csv(
+    def export_theses_csv(
         self, *, filters: ListFilters, root_structure_id: int, sort: str
     ) -> str: ...
 
-    async def all_years(self) -> list[int]: ...
+    def all_years(self) -> list[int]: ...
 
-    async def get_publication_detail(self, pub_id: int) -> dict[str, Any] | None: ...
+    def get_publication_detail(self, pub_id: int) -> dict[str, Any] | None: ...
