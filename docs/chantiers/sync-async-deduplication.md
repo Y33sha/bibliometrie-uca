@@ -208,10 +208,22 @@ puis les CRUD admin, puis les gros (`publications`, `persons`,
 `laboratories`).
 
 **Routers migrés** :
-- [x] `subjects.py` — pilote (commit à venir). 2 routes, 1 nouveau
+- [x] `subjects.py` — pilote (commit `6e9c8f8`). 2 routes, 1 nouveau
   Protocol `SubjectsAdminQueries`, 1 nouvelle classe
   `PgSubjectsAdminQueries`, 1 factory `subjects_admin_queries`.
   Sert de modèle pour les suivants.
+- [x] `subjects.py`, `config.py` (auth.py et docs.py étaient déjà
+  natifs sync). Pour config : ajout des Protocols sync `ConfigStore`
+  (`application/ports/config.py`) et `ConfigQueries`
+  (`application/ports/config_queries.py`), classes sync `PgConfig`
+  et `PgConfigQueries` dans `infrastructure/db/queries/config.py`,
+  factory `config_store` dans `infrastructure/repositories/__init__.py`,
+  factories `config_queries_sync` / `config_store_sync` dans
+  `interfaces/api/deps.py`. Le service `application/config.py:update_config_value`
+  est passé en sync (suppression de la version async, le seul caller
+  prod basculait en même temps). Helper `infrastructure/perimeter.py:get_perimeter_structure_ids`
+  étendu en dispatch (cur | Connection) pour servir
+  `PgConfigQueries.get_hal_collections`. 3 tests adaptés en sync.
 
 ### Phase 3 — Suppression du code async devenu mort
 

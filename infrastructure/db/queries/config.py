@@ -9,7 +9,7 @@ que l'adapter du port `application.ports.config.AsyncConfigStore`.
 import logging
 from typing import Any
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import Connection, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncConnection
 
 from infrastructure.db.tables import config
@@ -107,6 +107,89 @@ class PgAsyncConfig:
         # Le double # dans `value #>> '{}'` extrait le scalar JSON. SA Core
         # n'a pas d'opérateur direct ; on passe par text() avec bind nommé.
         result = await self._conn.execute(
+            text("SELECT key FROM config WHERE key LIKE 'perimeter_%' AND value #>> '{}' = :code"),
+            {"code": perimeter_code},
+        )
+        return [r.key for r in result]
+
+
+# ── Variantes sync (chantier sync-async-deduplication option D) ───
+
+
+class PgConfigQueries:
+    """Adapter SA sync pour `application.ports.config_queries.ConfigQueries`."""
+
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
+
+    def list_config(self) -> list[dict[str, Any]]:
+        result = self._conn.execute(
+            select(
+                config.c.key, config.c.value, config.c.description, config.c.updated_at
+            ).order_by(config.c.key)
+        )
+        return [dict(r._mapping) for r in result]
+
+    def get_hal_collections(self) -> dict[str, str]:
+        from infrastructure.perimeter import get_perimeter_structure_ids
+
+        try:
+            perim_row = self._conn.execute(
+                text("SELECT value #>> '{}' AS code FROM config WHERE key = :key"),
+                {"key": "perimeter_extraction"},
+            ).one_or_none()
+            perim_code = perim_row.code if perim_row else None
+            perim_code = perim_code or "uca_wide"
+
+            perimeter_ids = get_perimeter_structure_ids(self._conn, perim_code)
+            if perimeter_ids:
+                rows = self._conn.execute(
+                    text("""
+                        SELECT hal_collection, COALESCE(acronym, name) AS label
+                        FROM structures
+                        WHERE id = ANY(:ids)
+                          AND hal_collection IS NOT NULL
+                          AND hal_collection != ''
+                    """),
+                    {"ids": list(perimeter_ids)},
+                ).all()
+                if rows:
+                    return {r.hal_collection: r.label for r in rows}
+        except Exception as e:
+            logger.warning(f"Impossible de dériver les collections HAL depuis le périmètre : {e}")
+
+        # Fallback : config.hal_collections (manuel)
+        fallback_row = self._conn.execute(
+            text("SELECT value FROM config WHERE key = :key"),
+            {"key": "hal_collections"},
+        ).one_or_none()
+        if fallback_row and isinstance(fallback_row.value, dict):
+            return fallback_row.value
+        return {}
+
+
+class PgConfig:
+    """Adapter SA sync pour `application.ports.config.ConfigStore`."""
+
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
+
+    def config_key_exists(self, key: str) -> bool:
+        result = self._conn.execute(select(config.c.key).where(config.c.key == key))
+        return result.first() is not None
+
+    def update_config_value(self, key: str, value: Any) -> dict:
+        stmt = (
+            update(config)
+            .where(config.c.key == key)
+            .values(value=value, updated_at=func.now())
+            .returning(config.c.key, config.c.value, config.c.description, config.c.updated_at)
+        )
+        result = self._conn.execute(stmt)
+        return dict(result.one()._mapping)
+
+    def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
+        result = self._conn.execute(
             text("SELECT key FROM config WHERE key LIKE 'perimeter_%' AND value #>> '{}' = :code"),
             {"code": perimeter_code},
         )
