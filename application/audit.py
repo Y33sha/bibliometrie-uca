@@ -23,7 +23,7 @@ import contextvars
 import logging
 from typing import Any
 
-from domain.ports.audit_repository import AsyncAuditRepository, AuditRepository
+from domain.ports.audit_repository import AuditRepository
 
 logger = logging.getLogger(__name__)
 
@@ -88,17 +88,3 @@ def emit_event(
     if user_id is None or repo is None:
         return
     repo.record_event(event_type, aggregate_type, aggregate_id, payload or {}, user_id)
-
-
-async def async_emit_event(
-    repo: AsyncAuditRepository | None,
-    event_type: str,
-    aggregate_type: str,
-    aggregate_id: int | None = None,
-    payload: dict[str, Any] | None = None,
-) -> None:
-    """Variante async d'`emit_event`."""
-    user_id = get_current_user()
-    if user_id is None or repo is None:
-        return
-    await repo.record_event(event_type, aggregate_type, aggregate_id, payload or {}, user_id)

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import Connection
 
 from application.authorships import (
-    set_source_authorship_excluded_sync as _set_source_authorship_excluded,
+    set_source_authorship_excluded as _set_source_authorship_excluded,
 )
 from application.ports.publications_queries import (
     FacetFilters,
