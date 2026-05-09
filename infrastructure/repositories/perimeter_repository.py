@@ -1,8 +1,4 @@
-"""Adapter PostgreSQL sync pour l'agrégat Perimeter.
-
-Variante sync de `async_perimeter_repository.py` — utilisée par les
-routers FastAPI sync (chantier sync-async-deduplication option D).
-"""
+"""Adapter PostgreSQL sync pour l'agrégat Perimeter."""
 
 from sqlalchemy import Connection, delete, func, select, update
 

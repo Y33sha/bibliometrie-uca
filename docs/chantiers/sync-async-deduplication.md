@@ -1,10 +1,5 @@
 # Chantier — Convergence sync/async (suppression de la duplication)
-
-## État : à instruire
-
-Décision actée (option **D** ci-dessous), implémentation à dérouler
-quand le chantier sera lancé. Estimation : 2-4 jours répartis,
-migration progressive 1 router à la fois.
+Commencé le 2026-05-08
 
 ## Contexte
 
@@ -208,79 +203,18 @@ puis les CRUD admin, puis les gros (`publications`, `persons`,
 `laboratories`).
 
 **Routers migrés** :
-- [x] `subjects.py` — pilote (commit `6e9c8f8`). 2 routes, 1 nouveau
-  Protocol `SubjectsAdminQueries`, 1 nouvelle classe
-  `PgSubjectsAdminQueries`, 1 factory `subjects_admin_queries`.
-  Sert de modèle pour les suivants.
+- [x] `subjects.py` — pilote (commit `6e9c8f8`).
 - [x] `subjects.py`, `config.py` (auth.py et docs.py étaient déjà
-  natifs sync). Pour config : ajout des Protocols sync `ConfigStore`
-  (`application/ports/config.py`) et `ConfigQueries`
-  (`application/ports/config_queries.py`), classes sync `PgConfig`
-  et `PgConfigQueries` dans `infrastructure/db/queries/config.py`,
-  factory `config_store` dans `infrastructure/repositories/__init__.py`,
-  factories `config_queries_sync` / `config_store_sync` dans
-  `interfaces/api/deps.py`. Le service `application/config.py:update_config_value`
-  est passé en sync (suppression de la version async, le seul caller
-  prod basculait en même temps). Helper `infrastructure/perimeter.py:get_perimeter_structure_ids`
-  étendu en dispatch (cur | Connection) pour servir
-  `PgConfigQueries.get_hal_collections`. 3 tests adaptés en sync.
+  natifs sync).
 - [x] `admin_pipeline.py` — déjà natif sync, rien à migrer.
-- [x] `hal_problems.py` — Protocol sync `HalProblemsQueries`, classe
-  sync `PgHalProblemsQueries`, factory `hal_problems_queries_sync`,
-  6 routes `def`. Tests interfaces : 13/13 passent.
-- [x] `admin_duplicates.py` (publications) — Protocol sync
-  `PublicationDuplicatesQueries`, classe sync `PgPublicationDuplicatesQueries`,
-  factory `publication_duplicates_queries_sync`. Services
-  `application/publications.py`: `mark_distinct` migré en sync
-  (suppression async), `async_merge_publications` supprimée
-  (utilisait `merge_publications` sync existant côté CLI). 3 routes
-  `def`, factories transverses ajoutées : `audit_repo_sync`,
-  `publication_repo_sync`. 2 tests `TestMarkDistinct` migrés en sync ;
-  `TestAsyncMergePublications` supprimé (couvert par `TestMergePublications`).
-- [x] `admin_person_duplicates.py` — Protocol sync
-  `PersonDuplicatesQueries`, classe sync `PgPersonDuplicatesQueries`,
-  factory `person_duplicates_queries_sync`. Service
-  `application/persons.py:mark_distinct` migré en sync (suppression
-  async). 5 routes `def`, factories ajoutées : `person_repo_sync`,
-  `person_duplicates_queries_sync`. 2 tests `TestMarkDistinctPersons`
-  migrés en sync ; 1 test audit sync. Total Phase 2.2 : 36 tests
-  ciblés passent.
-- [x] `journals.py` — Protocol sync `JournalQueries`, classe sync
-  `PgJournalQueries`, factory `journal_queries_sync`. Services
-  `application/journals.py:update_journal` / `merge_journals` migrés en
-  sync (suppression async). 4 routes `def`, factories ajoutées :
-  `journal_repo_sync`. Tests `TestUpdateJournal`, `TestMergeJournals`
-  migrés en sync.
-- [x] `publishers.py` — Protocol sync `PublisherQueries`, classe sync
-  `PgPublisherQueries`, factory `publisher_queries_sync`. Services
-  `application/publishers.py:update_publisher` / `merge_publishers`
-  migrés en sync (suppression async). 4 routes `def`, factories
-  ajoutées : `publisher_repo_sync`. Tests `TestUpdatePublisher`,
-  `TestMergePublishers` migrés en sync.
-- [x] `laboratories.py` — Protocol sync `LaboratoriesQueries`, classe
-  sync `PgLaboratoriesQueries` (~360 LOC, 6 méthodes incluant
-  `get_laboratory_persons` avec ses facettes). Factory
-  `laboratories_queries_sync`. 6 routes `def`. Helpers
-  `infrastructure/perimeter.py:get_persons_perimeter_root_ids` et
-  `get_persons_structure_ids_list` étendus en dispatch (cur | Connection)
-  pour servir le sync.
-- [x] `perimeters.py` — Protocol sync `PerimetersAdminQueries` ajouté
-  à côté de `AsyncPerimetersAdminQueries`, classe sync
-  `PgPerimetersAdminQueries`. Nouveau Protocol sync `PerimeterRepository`
-  + adapter `PgPerimeterRepository` (l'agrégat n'avait que la variante
-  async jusqu'ici). Services `application/config.py` (5 fonctions :
-  `add_perimeter_structure`, `remove_perimeter_structure`,
-  `create_perimeter`, `update_perimeter`, `delete_perimeter`) migrés
-  en sync (suppression nette des variantes async). 6 routes `def`,
-  factories ajoutées : `perimeter_repo_sync`,
-  `perimeters_admin_queries_sync`. Tests `test_config_service.py`
-  (20 tests) migrés en sync.
-- [x] `admin_feedback.py` — Protocol sync `AdminFeedbackQueries`,
-  classe sync `PgAdminFeedbackQueries`, factory
-  `admin_feedback_queries_sync`. 4 routes `def` ; **`feedback_rerun`
-  reste `async def`** (pilote un subprocess en streaming SSE,
-  incompatible threadpool — cohabitation supportée). Tests
-  `test_admin_feedback_api.py` (15 tests) restent inchangés.
+- [x] `hal_problems.py`
+- [x] `admin_duplicates.py` (publications)
+- [x] `admin_person_duplicates.py`
+- [x] `journals.py`
+- [x] `publishers.py`
+- [x] `laboratories.py`
+- [x] `perimeters.py`
+- [x] `admin_feedback.py`
 - [x] **Conftest tests interfaces** : `tests/integration/interfaces/conftest.py`
   patche désormais `build_sync_engine` en plus de `build_async_engine`
   pour rediriger l'Engine SA sync vers `bibliometrie_test`. Sans ce
@@ -290,72 +224,11 @@ puis les CRUD admin, puis les gros (`publications`, `persons`,
 Total Phase 2.3 : 5 routers migrés (journals, publishers, laboratories,
 perimeters, admin_feedback hors SSE), 54 tests application + 50 tests
 interfaces ciblés passent.
-- [x] `stats.py` — Protocol sync `StatsQueries` ajouté à
-  `application/ports/stats_queries.py`. Classe sync `PgStatsQueries`
-  dans `infrastructure/db/queries/stats/__init__.py`. Les 4 sous-modules
-  stats (publishers, journals, labs, summary) ont chacun gagné un
-  `*_sync` à côté de l'async, factorisé via un helper `_build_*_sql`
-  partagé. Factory `stats_queries_sync`, helper `get_root_structure_id_sync`
-  (lookup process-cached, identique à la variante async). 7 routes `def`,
-  15 tests interfaces passent.
-- [x] `structures.py` — Nouveau Protocol sync `StructureRepository`
-  + adapter `PgStructureRepository`. Protocol sync `StructuresQueries`
-  + classe sync `PgStructuresQueries`. Service `application/structures.py`
-  (5 fonctions : create/update/delete structure, create/delete relation,
-  create/update/delete name_form) migré en sync (suppression nette des
-  variantes async, single caller pattern). 9 routes `def`, factories
-  ajoutées : `structure_repo_sync`, `structures_queries_sync`. Tests
-  `test_structures_service.py` (23 tests) migrés en sync. Tests interfaces
-  `test_structures_api.py` : 32 tests inchangés passent.
-- [x] `publications.py` — Migration en swap net (single API caller) :
-  les 4 modules de query async (`list.py`, `facets.py`, `detail.py`,
-  `__init__.py`) sont **convertis sur place** vers sync (suppression
-  des variantes async, plus de cohabitation sur ce port). Protocol
-  port renommé `PublicationsQueries` (sync). `facets.py` perd son
-  `asyncio.gather` parallèle au profit d'une exécution séquentielle
-  sur la même Connection (le router tourne déjà dans un thread Starlette ;
-  pas de bénéfice à paralléliser des requêtes courtes contre la même
-  base). Nouveau Protocol sync `AuthorshipRepository` + adapter
-  `PgAuthorshipRepository` (utilisé pour le seul use case applicatif
-  du router : `set_source_authorship_excluded_sync`). Tests
-  `test_publications_list.py` (7), `test_publications_detail.py` (11),
-  et `test_publications_api.py` (26) : 44 tests passent. Service
-  `application/authorships.py` cohabite sync/async pendant que le reste
-  des routers (persons, addresses) finit la migration.
-- [x] `addresses.py` (batch 2a) — Migration en swap net (single API caller) :
-  `infrastructure/db/queries/addresses.py` converti sur place vers sync
-  (suppression `PgAsyncAddressesQueries`, port renommé `AddressesQueries`).
-  Nouveau Protocol sync `AddressRepository` + adapter `PgAddressRepository`.
-  Services `application/addresses_countries.py` et
-  `application/addresses_structures.py` (8 fonctions au total) migrés en
-  sync (suppression nette, single caller). 5 fonctions sync ajoutées à
-  `application/authorships.py` à côté des async (cohabitation pour
-  `exclude_authorship`, `delete_orphan_authorships` qui restent appelés
-  depuis `application/persons.py` async, jusqu'à batch 2b) :
-  `propagate_uca_for_addresses_sync`, `set_source_authorship_excluded_sync`,
-  `detach_source_sync`, `exclude_authorship_sync`,
-  `delete_orphan_authorships_sync`. 12 routes `def`. `bg_propagate_countries_sync`
-  ajouté à `interfaces/api/deps.py` (utilise un sync engine.begin() short-lived
-  pour les BackgroundTasks). Singleton sync `_perimeter_queries_sync_singleton`
-  via `get_perimeter_queries_sync`. Tests `test_addresses_service.py` (34),
-  `test_authorships_service.py` (22), `test_addresses_queries.py` (16),
-  `test_addresses_api.py` (45) : 117 tests passent.
-- [x] `persons.py` (batch 2b) — Migration en swap net (single API caller) :
-  les 5 modules de query async dans `infrastructure/db/queries/persons/`
-  (`list.py`, `facets.py`, `detail.py`, `admin.py`, `__init__.py`) sont
-  convertis sur place vers sync (suppression `PgAsyncPersonsQueries`, port
-  renommé `PersonsQueries`). `application/persons.py` réécrit en sync : les
-  9 fonctions API-only (`set_rejected`, `update_name`, `remove_identifier`,
-  `update_identifier_status`, `reassign_identifier`, `detach_name_form`,
-  `assign_orphan_authorship`, `batch_assign_orphan_authorships`,
-  `detach_authorships`) passent de async à sync ; les 3 wrappers redondants
-  (`async_create_person`, `async_add_identifier`, `async_merge_person`)
-  sont supprimés (l'API utilise les versions sync existantes utilisées
-  par le pipeline). 28 routes `def`, factory ajoutée :
-  `persons_queries_sync`. `interfaces/api/async_deps.py` perd les imports
-  `AsyncPersonsQueries` / `PgAsyncPersonsQueries` et la factory
-  `persons_queries`. Tests : 113 ciblés passent (test_persons_service: 36,
-  test_persons_api: 77).
+- [x] `stats.py`
+- [x] `structures.py`
+- [x] `publications.py`
+- [x] `addresses.py` (batch 2a)
+- [x] `persons.py` (batch 2b)
 
 Total Phase 2.4 : 7 routers migrés (stats, structures, publications,
 addresses, persons + admin_pipeline déjà sync). Tous les `async def` dans
@@ -376,9 +249,9 @@ Une fois tous les routers migrés :
 - [ ] Supprimer les factories `async_*_repository` dans
   `infrastructure/repositories/__init__.py`
 - [ ] Supprimer les classes `Async*Repository` dans `domain/ports/*`
-- [ ] Supprimer `infrastructure/db/async_connection.py` et le
-  lifespan async de `interfaces/api/app.py`
-- [ ] Supprimer `interfaces/api/async_deps.py`
+- [x] Supprimer `infrastructure/db/async_connection.py` et le
+  lifespan async de `interfaces/api/app.py` (e10bf83)
+- [x] Supprimer `interfaces/api/async_deps.py` (287e5b2)
 - [ ] Supprimer les query services async dans
   `infrastructure/db/queries/` (renvoyer toutes les routes vers les
   variantes sync)
@@ -424,8 +297,6 @@ Forte. À tout moment, on peut :
   (ex : SSE pour les logs pipeline).
 - Recréer un repository async pour un agrégat précis si nécessaire.
 - Cohabiter sync et async dans la même API sans friction.
-
-La décision n'est pas un point de non-retour.
 
 ## Lien avec d'autres chantiers
 

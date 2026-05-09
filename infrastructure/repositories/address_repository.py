@@ -1,7 +1,9 @@
 """Adapter PostgreSQL sync pour `addresses` et ses propagations.
 
-Variante sync de `async_address_repository.py` — utilisée par les
-routers FastAPI sync (chantier sync-async-deduplication option D).
+Note : ce repo expose des méthodes de propagation cross-aggregate
+(`refresh_publications_countries_for_addresses`, etc.) qui touchent
+`publications.countries` et `source_publications.countries`. Pattern
+accepté en exception, documenté dans `docs/architecture.md`.
 """
 
 from sqlalchemy import Connection, delete, select, text, update
