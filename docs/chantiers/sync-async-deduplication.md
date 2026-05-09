@@ -233,8 +233,7 @@ interfaces ciblés passent.
 Total Phase 2.4 : 7 routers migrés (stats, structures, publications,
 addresses, persons + admin_pipeline déjà sync). Tous les `async def` dans
 `interfaces/api/routers/` ont été convertis en `def` (sauf le SSE
-`feedback_rerun` qui reste async par nature). 202 tests application + 241
-tests interfaces passent en suite isolée (chaque suite). Reste de la
+`feedback_rerun` qui reste async par nature). Reste de la
 cohabitation sync/async : `application/authorships.py` (variantes async
 non utilisées en prod, supprimées en Phase 3), `infrastructure/repositories/async_*.py`
 (16 fichiers), `interfaces/api/async_deps.py`. Phase 3 supprime tout
@@ -244,21 +243,20 @@ ce code mort.
 
 Une fois tous les routers migrés :
 
-- [ ] Supprimer les 8 fichiers `infrastructure/repositories/async_*.py`
-  (et le sous-package `async_person_repository/`)
-- [ ] Supprimer les factories `async_*_repository` dans
-  `infrastructure/repositories/__init__.py`
-- [ ] Supprimer les classes `Async*Repository` dans `domain/ports/*`
+- [x] Supprimer les 8 fichiers `infrastructure/repositories/async_*.py`
+  (et le sous-package `async_person_repository/`) (16609d0)
+- [x] Supprimer les factories `async_*_repository` dans
+  `infrastructure/repositories/__init__.py` (16609d0)
+- [x] Supprimer les classes `Async*Repository` dans `domain/ports/*` (c732dd5)
 - [x] Supprimer `infrastructure/db/async_connection.py` et le
   lifespan async de `interfaces/api/app.py` (e10bf83)
 - [x] Supprimer `interfaces/api/async_deps.py` (287e5b2)
-- [ ] Supprimer les query services async dans
-  `infrastructure/db/queries/` (renvoyer toutes les routes vers les
-  variantes sync)
-- [ ] Retirer `pytest-asyncio` de `pyproject.toml` (sauf si encore
-  utile pour des tests pipeline async ponctuels comme
-  `fetch_missing_doi`)
-- [ ] Retirer `psycopg-pool` async path s'il n'est plus utilisé
+- [x] Supprimer les query services async dans
+  `infrastructure/db/queries/` + les Protocols `Async*Queries` côté
+  ports (e7093b3)
+- [x] Convertir les fixtures async (`async_db`, `sa_conn`) et leurs
+  consommateurs (de666a7). `pytest-asyncio` reste pour
+  `test_fetch_missing_doi_async.py` (async ponctuel via `asyncio.run`).
 
 ### Phase 4 — Doc
 
