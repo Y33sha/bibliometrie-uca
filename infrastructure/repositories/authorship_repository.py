@@ -1,8 +1,4 @@
-"""Adapter PostgreSQL sync pour les authorships (vérité et sources).
-
-Variante sync de `async_authorship_repository.py` — utilisée par les
-routers FastAPI sync (chantier sync-async-deduplication option D).
-"""
+"""Adapter PostgreSQL sync pour les authorships (vérité et sources)."""
 
 from sqlalchemy import Connection, text
 
