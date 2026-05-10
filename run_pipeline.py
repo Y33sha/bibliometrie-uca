@@ -203,13 +203,13 @@ def phase_normalize(**kw: Any) -> Any:
 
 def _vacuum_staging(full: bool = False) -> Any:
     """VACUUM sur staging. FULL en mode full/monthly, simple sinon."""
-    from infrastructure.db.connection import get_connection
+    from sqlalchemy import text
 
-    conn = get_connection()
-    conn.autocommit = True
-    with conn.cursor() as cur:
-        cur.execute("VACUUM FULL staging" if full else "VACUUM staging")
-    conn.close()
+    from infrastructure.db.engine import get_sync_engine
+
+    sql = "VACUUM FULL staging" if full else "VACUUM staging"
+    with get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        conn.execute(text(sql))
 
 
 def phase_affiliations(**kw: Any) -> Any:
