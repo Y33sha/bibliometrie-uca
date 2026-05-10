@@ -11,7 +11,7 @@ class HalNormalizeQueries(Protocol):
 
     def upsert_hal_source_publication(
         self,
-        cur: Any,
+        conn: Any,
         *,
         hal_id: str,
         doi: str | None,
@@ -35,7 +35,7 @@ class HalNormalizeQueries(Protocol):
 
     def upsert_hal_source_person(
         self,
-        cur: Any,
+        conn: Any,
         *,
         source_id: str,
         full_name: str,
@@ -44,13 +44,13 @@ class HalNormalizeQueries(Protocol):
         source_ids_json: Any,
     ) -> int: ...
 
-    def upsert_hal_source_structure(self, cur: Any, *, source_id: str, name: str) -> int: ...
+    def upsert_hal_source_structure(self, conn: Any, *, source_id: str, name: str) -> int: ...
 
-    def fetch_hal_source_structure_ids(self, cur: Any, source_ids: list[str]) -> list[int]: ...
+    def fetch_hal_source_structure_ids(self, conn: Any, source_ids: list[str]) -> list[int]: ...
 
     def upsert_hal_source_authorship(
         self,
-        cur: Any,
+        conn: Any,
         *,
         source_publication_id: int,
         source_person_id: int | None,
@@ -62,16 +62,16 @@ class HalNormalizeQueries(Protocol):
         identifiers: Any,
     ) -> int: ...
 
-    def staging_has_hal_doi(self, cur: Any, doi: str) -> bool: ...
+    def staging_has_hal_doi(self, conn: Any, doi: str) -> bool: ...
 
-    def get_hal_publication_id(self, cur: Any, hal_id: str) -> int | None: ...
+    def get_hal_publication_id(self, conn: Any, hal_id: str) -> int | None: ...
 
-    def fetch_hal_source_structures_for_cache(self, cur: Any) -> list[tuple[str, int, str]]: ...
+    def fetch_hal_source_structures_for_cache(self, conn: Any) -> list[tuple[str, int, str]]: ...
 
     def clear_source_authorships_for_publication(
-        self, cur: Any, source_publication_id: int
+        self, conn: Any, source_publication_id: int
     ) -> None: ...
 
-    def delete_hal_duplicate_authorship_addresses(self, cur: Any) -> None: ...
+    def delete_hal_duplicate_authorship_addresses(self, conn: Any) -> None: ...
 
-    def delete_hal_duplicate_authorships(self, cur: Any) -> int: ...
+    def delete_hal_duplicate_authorships(self, conn: Any) -> int: ...

@@ -9,7 +9,8 @@ la mise à jour des métadonnées lors d'un re-traitement.
 
 import copy
 
-from psycopg.types.json import Jsonb as Json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import update_sources
@@ -19,16 +20,19 @@ from domain.publication import normalize_nnt
 from infrastructure.repositories import publication_repository
 
 
-def _create_all_publications(cur):
+def _create_all_publications(conn):
     """Crée les publications pour tous les source_publications orphelins."""
-    repo = publication_repository(cur)
-    cur.execute("""
-        SELECT id, source, doi, title, pub_year, doc_type, journal_id,
-               oa_status, language, container_title, external_ids
-        FROM source_publications WHERE publication_id IS NULL
-        ORDER BY id
-    """)
-    for doc in cur.fetchall():
+    repo = publication_repository(conn)
+    rows = conn.execute(
+        text("""
+            SELECT id, source, doi, title, pub_year, doc_type, journal_id,
+                   oa_status, language, container_title, external_ids
+            FROM source_publications WHERE publication_id IS NULL
+            ORDER BY id
+        """)
+    ).all()
+    for row in rows:
+        doc = dict(row._mapping)
         title = doc["title"] or ""
         pub_year = doc["pub_year"]
         if not title or not pub_year:
@@ -40,7 +44,7 @@ def _create_all_publications(cur):
         if nnt:
             nnt = normalize_nnt(nnt)
         pub_id, _ = find_or_create_publication(
-            cur,
+            conn,
             title=title,
             title_normalized=normalize_text(title),
             pub_year=pub_year,
@@ -55,11 +59,11 @@ def _create_all_publications(cur):
             repo=repo,
         )
         if pub_id:
-            cur.execute(
-                "UPDATE source_publications SET publication_id = %s WHERE id = %s",
-                (pub_id, doc["id"]),
+            conn.execute(
+                text("UPDATE source_publications SET publication_id = :pid WHERE id = :sid"),
+                {"pid": pub_id, "sid": doc["id"]},
             )
-            update_sources(cur, pub_id, repo=repo)
+            update_sources(conn, pub_id, repo=repo)
 
 
 # ── Données HAL minimales ───────────────────────────────────────
@@ -81,31 +85,31 @@ HAL_DOC_CLOSED = {
 }
 
 
-def _insert_hal_staging(cur, doc, hal_collections=None):
+def _insert_hal_staging(conn, doc, hal_collections=None):
     """Insère un document HAL dans staging."""
     if hal_collections is None:
         hal_collections = ["TEST_COLL"]
-    cur.execute(
-        """
+    stmt = text("""
         INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed)
-        VALUES ('hal', %s, %s, %s, %s, FALSE)
+        VALUES ('hal', :halid, :doi, :raw_data, :hal_collections, FALSE)
         ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = EXCLUDED.raw_data,
             processed = FALSE
-    """,
-        (doc["halId_s"], doc.get("doiId_s"), Json(doc), hal_collections),
+    """).bindparams(bindparam("raw_data", type_=JSONB))
+    conn.execute(
+        stmt,
+        {
+            "halid": doc["halId_s"],
+            "doi": doc.get("doiId_s"),
+            "raw_data": doc,
+            "hal_collections": hal_collections,
+        },
     )
 
 
-def _run_normalize_hal(dict_cur):
-    """Exécute la normalisation HAL sur les staging non traités.
-
-    Le normaliseur HAL utilise un curseur tuple (accès par index),
-    on en crée un temporaire sur la même connexion.
-    """
+def _run_normalize_hal(conn):
+    """Exécute la normalisation HAL sur les staging non traités."""
     import logging
-
-    from psycopg.rows import tuple_row
 
     from application.pipeline.normalize.normalize_hal import process_work
     from infrastructure.addresses import PgAddressLinker
@@ -118,57 +122,52 @@ def _run_normalize_hal(dict_cur):
     )
     from infrastructure.zenodo import HttpZenodoResolver
 
-    conn = dict_cur.connection
-    tuple_cur = conn.cursor(row_factory=tuple_row)  # curseur standard (tuple)
     queries = PgHalNormalizeQueries()
     staging_queries = PgStagingQueries()
     address_linker = PgAddressLinker()
     zenodo_resolver = HttpZenodoResolver(api_base="https://zenodo.org/api/records")
     logger = logging.getLogger("test")
-    journal_repo = journal_repository(tuple_cur)
-    publisher_repo = publisher_repository(tuple_cur)
-    pub_repo = publication_repository(tuple_cur)
-    try:
-        tuple_cur.execute("""
+    journal_repo = journal_repository(conn)
+    publisher_repo = publisher_repository(conn)
+    pub_repo = publication_repository(conn)
+
+    rows = conn.execute(
+        text("""
             SELECT id, source_id, doi, raw_data, hal_collections
             FROM staging
             WHERE source = 'hal' AND processed = FALSE
             ORDER BY id
         """)
-        rows = tuple_cur.fetchall()
-        processed = 0
-        for row in rows:
-            if process_work(
-                tuple_cur,
-                queries,
-                logger,
-                row,
-                journal_repo=journal_repo,
-                publisher_repo=publisher_repo,
-                pub_repo=pub_repo,
-                zenodo_resolver=zenodo_resolver,
-                staging_queries=staging_queries,
-                address_linker=address_linker,
-            ):
-                processed += 1
-        return processed
-    finally:
-        tuple_cur.close()
+    ).all()
+    processed = 0
+    for row in rows:
+        if process_work(
+            conn,
+            queries,
+            logger,
+            row,
+            journal_repo=journal_repo,
+            publisher_repo=publisher_repo,
+            pub_repo=pub_repo,
+            zenodo_resolver=zenodo_resolver,
+            staging_queries=staging_queries,
+            address_linker=address_linker,
+        ):
+            processed += 1
+    return processed
 
 
-def _get_pub_oa_status(cur, hal_id):
+def _get_pub_oa_status(conn, hal_id):
     """Retourne le oa_status de la publication liée à un source_document HAL."""
-    cur.execute(
-        """
-        SELECT p.oa_status::text
-        FROM publications p
-        JOIN source_publications sd ON sd.publication_id = p.id
-        WHERE sd.source = 'hal' AND sd.source_id = %s
-    """,
-        (hal_id,),
-    )
-    row = cur.fetchone()
-    return row["oa_status"] if row else None
+    return conn.execute(
+        text("""
+            SELECT p.oa_status::text AS oa_status
+            FROM publications p
+            JOIN source_publications sd ON sd.publication_id = p.id
+            WHERE sd.source = 'hal' AND sd.source_id = :hal_id
+        """),
+        {"hal_id": hal_id},
+    ).scalar_one_or_none()
 
 
 # ── Tests ───────────────────────────────────────────────────────
@@ -178,15 +177,15 @@ class TestHalReprocessingUpdatesOaStatus:
     """Quand openAccess_bool passe de false à true dans le staging,
     le re-traitement doit mettre à jour oa_status de closed à green."""
 
-    def test_closed_then_green(self, db):
+    def test_closed_then_green(self, sa_sync_conn):
         hal_id = HAL_DOC_CLOSED["halId_s"]
 
         # 1. Premier traitement : openAccess_bool = false → closed
-        _insert_hal_staging(db, HAL_DOC_CLOSED)
-        _run_normalize_hal(db)
-        _create_all_publications(db)
+        _insert_hal_staging(sa_sync_conn, HAL_DOC_CLOSED)
+        _run_normalize_hal(sa_sync_conn)
+        _create_all_publications(sa_sync_conn)
 
-        assert _get_pub_oa_status(db, hal_id) == "closed"
+        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "closed"
 
         # 2. Re-traitement : un fileMain_s apparaît (dépôt effectif en HAL)
         #    → green. `openAccess_bool=True` seul ne suffit plus depuis la
@@ -194,12 +193,12 @@ class TestHalReprocessingUpdatesOaStatus:
         updated_doc = copy.deepcopy(HAL_DOC_CLOSED)
         updated_doc["openAccess_bool"] = True
         updated_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
-        _insert_hal_staging(db, updated_doc)  # remet processed = FALSE
-        _run_normalize_hal(db)
+        _insert_hal_staging(sa_sync_conn, updated_doc)  # remet processed = FALSE
+        _run_normalize_hal(sa_sync_conn)
 
-        assert _get_pub_oa_status(db, hal_id) == "green"
+        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"
 
-    def test_closed_replaces_green_on_reprocessing(self, db):
+    def test_closed_replaces_green_on_reprocessing(self, sa_sync_conn):
         """Un re-traitement où le dépôt HAL disparaît met à jour le statut.
 
         Avec refresh_from_sources, le statut est recalculé depuis les
@@ -212,15 +211,15 @@ class TestHalReprocessingUpdatesOaStatus:
         open_doc = copy.deepcopy(HAL_DOC_CLOSED)
         open_doc["openAccess_bool"] = True
         open_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
-        _insert_hal_staging(db, open_doc)
-        _run_normalize_hal(db)
-        _create_all_publications(db)
+        _insert_hal_staging(sa_sync_conn, open_doc)
+        _run_normalize_hal(sa_sync_conn)
+        _create_all_publications(sa_sync_conn)
 
-        assert _get_pub_oa_status(db, hal_id) == "green"
+        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"
 
         # 2. Re-traitement : fileMain_s retiré, openAccess_bool = false
         #    → refresh_from_sources recalcule en closed.
-        _insert_hal_staging(db, HAL_DOC_CLOSED)
-        _run_normalize_hal(db)
+        _insert_hal_staging(sa_sync_conn, HAL_DOC_CLOSED)
+        _run_normalize_hal(sa_sync_conn)
 
-        assert _get_pub_oa_status(db, hal_id) == "closed"
+        assert _get_pub_oa_status(sa_sync_conn, hal_id) == "closed"
