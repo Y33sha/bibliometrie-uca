@@ -75,9 +75,9 @@ def person_repository(conn_or_cur: Any) -> PersonRepository:
     return PgPersonRepository(conn_or_cur)
 
 
-def publication_repository(conn_or_cur: Any) -> PublicationRepository:
-    """Retourne un PublicationRepository lié au cur psycopg ou Connection SA donné."""
-    return PgPublicationRepository(conn_or_cur)
+def publication_repository(conn: Any) -> PublicationRepository:
+    """Retourne un PublicationRepository lié à la Connection SA donnée."""
+    return PgPublicationRepository(conn)
 
 
 def publisher_repository(conn_or_cur: Any) -> PublisherRepository:
