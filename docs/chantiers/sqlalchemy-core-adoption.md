@@ -448,28 +448,16 @@ Sous-lots, par étape du pipeline :
   Commits : `3edb300` (CrossRef + dispatch infra), `a22623e` (WoS),
   `bdb677a` (OA), `cf4dd24` (ScanR), `951d91d` (theses), `cd149ad`
   (HAL), `05bf493` (cleanup dispatch).
-- [x] **Pipeline publications/staging/merge** (`merge.py`, `enrich.py`,
-  `publications/create.py`) migrés ; orchestrators (merge_pubs_by_*,
-  enrich_*, create_publications), CLIs et `run_pipeline.py` aussi.
-  `_savepoint.py` dispatch retiré (tous les callers SA). Commit
+- [x] **Pipeline publications/staging/merge**  Commit
   `ac06648`.
-- [x] **Pipeline persons/authorships** (`name_forms.py`,
-  `persons/create.py`, `authorships_build.py`) migrés ; orchestrators
-  (`populate_person_name_forms`, `create_persons_from_source_authorships`,
-  `build_authorships`), CLIs et `run_pipeline.py` aussi. Tests
-  intégration adaptés.
-- [x] **Pipeline addresses/structures** (`address_resolution.py`,
-  `affiliations.py`, `countries.py`) migrés ; ports + orchestrators
-  (`populate_affiliations`, `resolve_addresses`,
-  `refresh_publication_countries`), CLIs et `run_pipeline.py` aussi.
-  `TestPopulateAffiliationsIdempotence` réactivé (helpers SA).
-  Tests intégration : 887/887 verts.
+- [x] **Pipeline persons/authorships**
+- [x] **Pipeline addresses/structures**
 - [x] **`subjects.py`** migré ; port + orchestrators (`subjects/run.py`,
   `_common.py:SubjectCache`, 6 ingestors, `cooccurrences/run.py`) et
   `run_pipeline.py` (phases subjects + cooccurrences) basculés sur
   `Connection` SA. Le UPSERT JSONB merge reste en `text()` (ON CONFLICT
   imbriqué avec `jsonb_each`/`jsonb_agg` — critère « SQL brut plus
-  lisible »), bind `ontologies` typé `JSONB`. Tests : 815/815 verts.
+  lisible »), bind `ontologies` typé `JSONB`.
 
 #### Lot 3.C — Reste du code applicatif (~13 occ.)
 
@@ -477,10 +465,13 @@ Sous-lots, par étape du pipeline :
   commit `05bf493`).
 - [x] `application/pipeline/_savepoint.py` migré (suite Lot 3.B sub-lot 2,
   commit `ac06648`).
-- [ ] `infrastructure/app_config.py` (3) — dispatch encore actif pour
-  les CLI scripts non-pipeline.
-- [ ] `application/audit.py` (1), `infrastructure/db_helpers.py` (1),
-  `run_pipeline.py:VACUUM` (1) — chacun en `text()` simple
+- [x] `infrastructure/app_config.py` — dispatch ajouté aux 2 fonctions
+  qui restaient en raw `cur.execute` (`get_hal_collections`,
+  `get_extraction_api_ids`).
+- [x] `run_pipeline.py:VACUUM` — `engine.connect()` + `AUTOCOMMIT`.
+- [x] `application/audit.py` et `infrastructure/db_helpers.py` :
+  faux-positifs (mentions de `cur.execute` dans des docstrings, pas
+  d'appel réel).
 
 #### Critère de complétion Phase 3
 

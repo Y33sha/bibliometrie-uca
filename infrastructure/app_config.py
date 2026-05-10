@@ -55,7 +55,7 @@ def get_years(cur: Any, mode: str = "full") -> list[int]:
     return [current_year]
 
 
-def get_hal_collections(cur: Any) -> dict[str, str]:
+def get_hal_collections(conn_or_cur: Any) -> dict[str, str]:
     """Retourne les collections HAL {code_hal: label}.
 
     Dérivé des structures du périmètre UCA qui ont un hal_collection renseigné,
@@ -65,30 +65,43 @@ def get_hal_collections(cur: Any) -> dict[str, str]:
     try:
         from infrastructure.perimeter import get_perimeter_structure_ids
 
-        perim_code = _get_from_db(cur, "perimeter_extraction") or "uca_wide"
-        perimeter_ids = get_perimeter_structure_ids(cur, perim_code)
+        perim_code = _get_from_db(conn_or_cur, "perimeter_extraction") or "uca_wide"
+        perimeter_ids = get_perimeter_structure_ids(conn_or_cur, perim_code)
         if perimeter_ids:
-            cur.execute(
-                """
-                SELECT hal_collection, COALESCE(acronym, name) AS label
-                FROM structures
-                WHERE id = ANY(%s) AND hal_collection IS NOT NULL AND hal_collection != ''
-            """,
-                (list(perimeter_ids),),
-            )
-            rows = cur.fetchall()
-            if rows:
-                return {
-                    (r["hal_collection"] if isinstance(r, dict) else r[0]): (
-                        r["label"] if isinstance(r, dict) else r[1]
-                    )
-                    for r in rows
-                }
+            if isinstance(conn_or_cur, Connection):
+                rows = conn_or_cur.execute(
+                    text(
+                        "SELECT hal_collection, COALESCE(acronym, name) AS label "
+                        "FROM structures "
+                        "WHERE id = ANY(:ids) "
+                        "AND hal_collection IS NOT NULL AND hal_collection != ''"
+                    ),
+                    {"ids": list(perimeter_ids)},
+                ).all()
+                if rows:
+                    return {r.hal_collection: r.label for r in rows}
+            else:
+                conn_or_cur.execute(
+                    """
+                    SELECT hal_collection, COALESCE(acronym, name) AS label
+                    FROM structures
+                    WHERE id = ANY(%s) AND hal_collection IS NOT NULL AND hal_collection != ''
+                """,
+                    (list(perimeter_ids),),
+                )
+                rows = conn_or_cur.fetchall()
+                if rows:
+                    return {
+                        (r["hal_collection"] if isinstance(r, dict) else r[0]): (
+                            r["label"] if isinstance(r, dict) else r[1]
+                        )
+                        for r in rows
+                    }
     except Exception as e:
         logger.warning(f"Impossible de dériver les collections HAL depuis le périmètre : {e}")
 
     # 2. Fallback config DB
-    val = _get_from_db(cur, "hal_collections")
+    val = _get_from_db(conn_or_cur, "hal_collections")
     if val and isinstance(val, dict):
         return val
 
@@ -141,31 +154,43 @@ def get_api_base_urls(cur: Any) -> dict[str, str]:
     return dict(_API_BASE_URLS_DEFAULTS)
 
 
-def get_extraction_api_ids(cur: Any, source: str) -> list[str]:
+def get_extraction_api_ids(conn_or_cur: Any, source: str) -> list[str]:
     """Retourne les identifiants API pour une source, déduits du périmètre d'extraction.
 
     Lit perimeter_extraction → structures du périmètre → api_ids[source].
     Fallback sur les anciennes clés config (openalex_institution_ids, etc.).
     """
     # 1. Depuis les structures du périmètre
-    perim_code = _get_from_db(cur, "perimeter_extraction")
+    perim_code = _get_from_db(conn_or_cur, "perimeter_extraction")
     if perim_code and isinstance(perim_code, str):
         try:
             from infrastructure.perimeter import get_perimeter_structure_ids
 
-            struct_ids = get_perimeter_structure_ids(cur, perim_code)
+            struct_ids = get_perimeter_structure_ids(conn_or_cur, perim_code)
             if struct_ids:
-                cur.execute(
-                    """
-                    SELECT api_ids->%s AS ids
-                    FROM structures
-                    WHERE id = ANY(%s) AND api_ids ? %s
-                """,
-                    (source, list(struct_ids), source),
-                )
-                result = []
-                for row in cur.fetchall():
-                    ids = row["ids"] if isinstance(row, dict) else row[0]
+                if isinstance(conn_or_cur, Connection):
+                    sa_rows = conn_or_cur.execute(
+                        text(
+                            "SELECT api_ids->:src AS ids FROM structures "
+                            "WHERE id = ANY(:ids) AND api_ids ? :src"
+                        ),
+                        {"src": source, "ids": list(struct_ids)},
+                    ).all()
+                    raw_ids = [r.ids for r in sa_rows]
+                else:
+                    conn_or_cur.execute(
+                        """
+                        SELECT api_ids->%s AS ids
+                        FROM structures
+                        WHERE id = ANY(%s) AND api_ids ? %s
+                    """,
+                        (source, list(struct_ids), source),
+                    )
+                    raw_ids = [
+                        (r["ids"] if isinstance(r, dict) else r[0]) for r in conn_or_cur.fetchall()
+                    ]
+                result: list[str] = []
+                for ids in raw_ids:
                     if isinstance(ids, list):
                         result.extend(ids)
                     elif isinstance(ids, str):
@@ -184,7 +209,7 @@ def get_extraction_api_ids(cur: Any, source: str) -> list[str]:
     }
     fallback_key = fallback_keys.get(source)
     if fallback_key:
-        val = _get_from_db(cur, fallback_key)
+        val = _get_from_db(conn_or_cur, fallback_key)
         if val and isinstance(val, list):
             return val
 
