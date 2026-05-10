@@ -16,7 +16,7 @@ from typing import Any
 from application.ports.authorships_build import AuthorshipsBuildQueries
 
 
-def build(cur: Any, queries: AuthorshipsBuildQueries, logger: Any, sources: Any = None) -> None:
+def build(conn: Any, queries: AuthorshipsBuildQueries, logger: Any, sources: Any = None) -> None:
     all_sources = [
         ("HAL", "hal"),
         ("OpenAlex", "openalex"),
@@ -35,31 +35,31 @@ def build(cur: Any, queries: AuthorshipsBuildQueries, logger: Any, sources: Any 
     logger.info(f"Sources : {', '.join(n for n, _ in active_sources)}")
 
     logger.info("Étape 1 : insertion des authorships manquantes...")
-    inserted = queries.insert_missing_authorships(cur)
+    inserted = queries.insert_missing_authorships(conn)
     logger.info(f"  {inserted} authorships créées")
 
     logger.info("Étape 2 : peuplement des FK (source_authorships → authorships)...")
     for source_name, source_value in active_sources:
-        n = queries.link_source_authorships_to_authorship_for(cur, source_value)
+        n = queries.link_source_authorships_to_authorship_for(conn, source_value)
         logger.info(f"  {source_name} FK : {n} liens")
 
     logger.info("Étape 3 : author_position et is_corresponding...")
-    logger.info(f"  {queries.propagate_author_position(cur)} positions mises à jour")
-    logger.info(f"  {queries.propagate_is_corresponding(cur)} is_corresponding mises à jour")
-    logger.info(f"  {queries.propagate_roles(cur)} roles mises à jour")
+    logger.info(f"  {queries.propagate_author_position(conn)} positions mises à jour")
+    logger.info(f"  {queries.propagate_is_corresponding(conn)} is_corresponding mises à jour")
+    logger.info(f"  {queries.propagate_roles(conn)} roles mises à jour")
 
     logger.info("Étape 4 : propagation in_perimeter et structure_ids...")
     if full_run:
-        reset = queries.reset_authorships_perimeter_and_structures(cur)
+        reset = queries.reset_authorships_perimeter_and_structures(conn)
         logger.info(f"  Reset {reset} authorships")
     else:
         logger.info("  Pas de reset (run partiel)")
 
     for source_name, source_value in active_sources:
-        n = queries.propagate_perimeter_and_structures_from(cur, source_value)
+        n = queries.propagate_perimeter_and_structures_from(conn, source_value)
         logger.info(f"  {source_name} : {n} authorships mises à jour")
 
-    total_uca = queries.count_authorships_in_perimeter(cur)
+    total_uca = queries.count_authorships_in_perimeter(conn)
     logger.info(f"  Total authorships in_perimeter=TRUE : {total_uca}")
 
     elapsed = time.perf_counter() - t0

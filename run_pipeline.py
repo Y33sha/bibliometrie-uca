@@ -318,21 +318,19 @@ def _run_create_publications() -> None:
 
 def _run_create_persons() -> None:
     from application.pipeline.persons.create_persons_from_source_authorships import run
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
 
     log.info("▶ create_persons_from_source_authorships")
     t0 = time.time()
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
         run(
-            cur,
             conn,
             PgPersonsCreateQueries(),
             log,
-            person_repo=person_repository(cur),
+            person_repo=person_repository(conn),
         )
     finally:
         conn.close()
@@ -341,16 +339,14 @@ def _run_create_persons() -> None:
 
 def _run_build_authorships() -> None:
     from application.pipeline.authorships.build_authorships import build
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
 
     log.info("▶ build_authorships")
     t0 = time.time()
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        build(cur, PgAuthorshipsBuildQueries(), log)
+        build(conn, PgAuthorshipsBuildQueries(), log)
         conn.commit()
     finally:
         conn.close()
@@ -390,15 +386,14 @@ def _run_populate_affiliations(*, mode: str) -> None:
 
 def _run_populate_person_name_forms() -> None:
     from application.pipeline.persons.populate_person_name_forms import populate
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.name_forms import PgNameFormsQueries
 
     log.info("▶ populate_person_name_forms")
     t0 = time.time()
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        populate(cur, conn, PgNameFormsQueries(), log)
+        populate(conn, PgNameFormsQueries(), log)
     finally:
         conn.close()
     log.info("✓ populate_person_name_forms terminé en %.1fs", time.time() - t0)
