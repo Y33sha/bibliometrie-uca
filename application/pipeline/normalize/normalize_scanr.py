@@ -18,8 +18,6 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from psycopg.types.json import Jsonb as Json
-
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.address_linker import AddressLinker
@@ -170,7 +168,7 @@ def insert_scanr_document(
                 ext["pmid"] = eid["id"]
             elif etype == "hal" and not ext.get("hal"):
                 ext["hal"] = eid["id"]
-    external_ids = Json(ext) if ext else None
+    external_ids = ext if ext else None
 
     summary = doc.get("summary") or {}
     abstract = summary.get("default") or summary.get("en") or summary.get("fr")
@@ -185,11 +183,11 @@ def insert_scanr_document(
         keywords = None
 
     topics_raw = doc.get("topics")
-    topics = Json(topics_raw) if topics_raw else None
+    topics = topics_raw if topics_raw else None
     if not topics_raw:
         domains = doc.get("domains")
         if domains:
-            topics = Json(domains)
+            topics = domains
 
     cbc = doc.get("cited_by_counts_by_year") or {}
     cited_by_count = sum(cbc.values()) if cbc else None
@@ -298,7 +296,7 @@ def process_authors(
             orcid=normalize_orcid(denorm.get("orcid")),
             idref=denorm.get("idref"),
         )
-        identifiers = Json(ids) if ids else None
+        identifiers = ids if ids else None
 
         raw_role = author_data.get("role")
         roles, _ = map_role("scanr", raw_role)
@@ -346,9 +344,9 @@ def process_work(
     staging_queries: StagingQueries,
     address_linker: AddressLinker,
 ) -> bool:
-    staging_id = staging_row["id"]
-    scanr_id = staging_row["scanr_id"]
-    raw_data = staging_row["raw_data"]
+    staging_id = staging_row.id
+    scanr_id = staging_row.scanr_id
+    raw_data = staging_row.raw_data
     doc = raw_data
     timings: dict[str, float] = {}
 
