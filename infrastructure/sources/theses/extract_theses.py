@@ -27,7 +27,8 @@ import os
 import time
 from typing import Any
 
-from psycopg.types.json import Jsonb as Json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
@@ -41,6 +42,27 @@ from infrastructure.sources.base import (
 from infrastructure.sources.common import compute_hash, setup_logger
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
+
+_UPDATE_THESES_SQL = text(
+    """
+    UPDATE staging
+    SET raw_data = :raw_data, doi = :doi, raw_hash = :raw_hash, last_seen_at = now(),
+        processed = CASE
+            WHEN raw_hash IS DISTINCT FROM :raw_hash THEN FALSE
+            ELSE processed
+        END
+    WHERE source = 'theses' AND source_id = :source_id
+      AND (raw_hash IS DISTINCT FROM :raw_hash)
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
+
+_INSERT_THESES_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+    VALUES ('theses', :source_id, :doi, :raw_data, :raw_hash)
+    ON CONFLICT (source, source_id) DO NOTHING
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 def build_query(ppn: str, status: str | None = None) -> str:
@@ -119,64 +141,57 @@ def extract_ppn(
     debut = 0
     per_page = THESES_PER_PAGE
 
-    with conn.cursor() as cur:
-        while debut < total:
-            data = fetch_page(base_url, query, debut=debut, nombre=per_page)
-            theses = data.get("theses", [])
+    while debut < total:
+        data = fetch_page(base_url, query, debut=debut, nombre=per_page)
+        theses = data.get("theses", [])
 
-            if not theses:
-                break
+        if not theses:
+            break
 
-            for these in theses:
-                theses_id = extract_theses_id(these)
-                if not theses_id:
-                    continue
+        for these in theses:
+            theses_id = extract_theses_id(these)
+            if not theses_id:
+                continue
 
-                if year is not None and not theses_id.startswith(str(year)):
-                    continue
+            if year is not None and not theses_id.startswith(str(year)):
+                continue
 
-                doi = extract_doi(these)
-                raw_hash = compute_hash(these)
+            doi = extract_doi(these)
+            raw_hash = compute_hash(these)
 
-                if theses_id in existing_ids:
-                    # Mettre à jour si le hash a changé
-                    cur.execute(
-                        """
-                        UPDATE staging
-                        SET raw_data = %s, doi = %s, raw_hash = %s, last_seen_at = now(),
-                            processed = CASE
-                                WHEN raw_hash IS DISTINCT FROM %s THEN FALSE
-                                ELSE processed
-                            END
-                        WHERE source = 'theses' AND source_id = %s
-                          AND (raw_hash IS DISTINCT FROM %s)
-                    """,
-                        (Json(these), doi, raw_hash, raw_hash, theses_id, raw_hash),
-                    )
-                    if cur.rowcount:
-                        updated += 1
-                else:
-                    cur.execute(
-                        """
-                        INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-                        VALUES ('theses', %s, %s, %s, %s)
-                        ON CONFLICT (source, source_id) DO NOTHING
-                    """,
-                        (theses_id, doi, Json(these), raw_hash),
-                    )
-                    if cur.rowcount:
-                        inserted += 1
-                        existing_ids.add(theses_id)
-
-            conn.commit()
-            debut += len(theses)
-
-            if debut % 1000 == 0 or debut >= total:
-                logger.info(
-                    f"    {debut}/{total} traités ({inserted} nouveaux, {updated} mis à jour)"
+            if theses_id in existing_ids:
+                result = conn.execute(
+                    _UPDATE_THESES_SQL,
+                    {
+                        "raw_data": these,
+                        "doi": doi,
+                        "raw_hash": raw_hash,
+                        "source_id": theses_id,
+                    },
                 )
+                if result.rowcount:
+                    updated += 1
+            else:
+                result = conn.execute(
+                    _INSERT_THESES_SQL,
+                    {
+                        "source_id": theses_id,
+                        "doi": doi,
+                        "raw_data": these,
+                        "raw_hash": raw_hash,
+                    },
+                )
+                if result.rowcount:
+                    inserted += 1
+                    existing_ids.add(theses_id)
 
-            time.sleep(THESES_DELAY)
+        conn.commit()
+        debut += len(theses)
+
+        if debut % 1000 == 0 or debut >= total:
+            logger.info(f"    {debut}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
+
+        time.sleep(THESES_DELAY)
 
     return total, inserted, updated
 
@@ -211,8 +226,8 @@ class ThesesExtractor(SourceExtractor):
             help="Accepté pour cohérence CLI ; sans effet (theses.fr a un volume bas)",
         )
 
-    def load_config(self, cur: Any) -> dict[str, Any]:
-        ppns = get_extraction_api_ids(cur, "theses")
+    def load_config(self, conn: Any) -> dict[str, Any]:
+        ppns = get_extraction_api_ids(conn, "theses")
         if not ppns:
             raise ExtractionConfigError(
                 "aucun PPN d'établissement theses.fr configuré "
@@ -220,7 +235,7 @@ class ThesesExtractor(SourceExtractor):
             )
         return {
             "ppns": ppns,
-            "base_url": get_api_base_urls(cur).get(
+            "base_url": get_api_base_urls(conn).get(
                 "theses", "https://theses.fr/api/v1/theses/recherche/"
             ),
         }

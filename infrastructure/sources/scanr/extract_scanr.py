@@ -15,7 +15,8 @@ import os
 import time
 from typing import Any
 
-from psycopg.types.json import Jsonb as Json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import SCANR_DELAY, SCANR_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
@@ -34,6 +35,22 @@ from infrastructure.sources.base import (
 from infrastructure.sources.common import clean_doi, compute_hash, setup_logger
 
 logger = setup_logger("extract_scanr", os.path.join(os.path.dirname(__file__), "logs"))
+
+_UPDATE_SCANR_SQL = text(
+    """
+    UPDATE staging
+    SET raw_data = :raw_data, doi = :doi, raw_hash = :raw_hash, last_seen_at = now()
+    WHERE source = 'scanr' AND source_id = :source_id AND (raw_hash IS DISTINCT FROM :raw_hash)
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
+
+_INSERT_SCANR_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+    VALUES ('scanr', :source_id, :doi, :raw_data, :raw_hash)
+    ON CONFLICT (source, source_id) DO NOTHING
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 def build_query(year: int, affiliation_ids: list[str], search_after: list | None = None) -> dict:
@@ -103,7 +120,6 @@ def extract_year(
     if dry_run:
         return total, 0, 0
 
-    cur = conn.cursor()
     while True:
         query = build_query(year, affiliation_ids, search_after)
         data = fetch_page(url, auth, query)
@@ -122,26 +138,28 @@ def extract_year(
             seen += 1
 
             if scanr_id in existing_ids:
-                cur.execute(
-                    """
-                    UPDATE staging
-                    SET raw_data = %s, doi = %s, raw_hash = %s, last_seen_at = now()
-                    WHERE source = 'scanr' AND source_id = %s AND (raw_hash IS DISTINCT FROM %s)
-                    """,
-                    (Json(doc), doi, raw_hash, scanr_id, raw_hash),
+                result = conn.execute(
+                    _UPDATE_SCANR_SQL,
+                    {
+                        "raw_data": doc,
+                        "doi": doi,
+                        "raw_hash": raw_hash,
+                        "source_id": scanr_id,
+                    },
                 )
-                if cur.rowcount:
+                if result.rowcount:
                     updated += 1
             else:
-                cur.execute(
-                    """
-                    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-                    VALUES ('scanr', %s, %s, %s, %s)
-                    ON CONFLICT (source, source_id) DO NOTHING
-                    """,
-                    (scanr_id, doi, Json(doc), raw_hash),
+                result = conn.execute(
+                    _INSERT_SCANR_SQL,
+                    {
+                        "source_id": scanr_id,
+                        "doi": doi,
+                        "raw_data": doc,
+                        "raw_hash": raw_hash,
+                    },
                 )
-                if cur.rowcount:
+                if result.rowcount:
                     inserted += 1
                     existing_ids.add(scanr_id)
 
@@ -167,18 +185,18 @@ class ScanrExtractor(SourceExtractor):
             "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
         )
 
-    def load_config(self, cur: Any) -> dict[str, Any]:
-        affiliation_ids = get_extraction_api_ids(cur, "scanr")
+    def load_config(self, conn: Any) -> dict[str, Any]:
+        affiliation_ids = get_extraction_api_ids(conn, "scanr")
         if not affiliation_ids:
             raise ExtractionConfigError(
                 "aucun affiliation_id ScanR configuré "
                 "(structures.api_ids->'scanr' vide pour le périmètre d'extraction)"
             )
-        username, password = get_scanr_credentials(cur)
+        username, password = get_scanr_credentials(conn)
         return {
             "affiliation_ids": affiliation_ids,
             "auth": (username, password),
-            "url": get_api_base_urls(cur).get(
+            "url": get_api_base_urls(conn).get(
                 "scanr",
                 "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
             ),
@@ -190,8 +208,7 @@ class ScanrExtractor(SourceExtractor):
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
     ) -> ExtractionStats:
-        with self.conn.cursor() as cur:
-            config_years = get_years(cur, mode=args.mode)
+        config_years = get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
         self.logger.info(f"Années : {years}")
         stats = ExtractionStats()

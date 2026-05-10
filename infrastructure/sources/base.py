@@ -21,7 +21,7 @@ from typing import Any, ClassVar
 
 import requests
 
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.sources.common import get_existing_ids
 
 
@@ -55,7 +55,7 @@ class SourceExtractor(ABC):
     Points d'override obligatoires :
     - `SOURCE` : identifiant source (ex: "hal", "openalex")
     - `DESCRIPTION` : description CLI
-    - `load_config(cur) -> dict` : charge la config depuis la DB (URL, auth, affiliations, etc.)
+    - `load_config(conn) -> dict` : charge la config depuis la DB (URL, auth, affiliations, etc.)
     - `extract_all(args, config, existing_ids) -> ExtractionStats` : boucle d'extraction
 
     Points d'override optionnels :
@@ -74,7 +74,7 @@ class SourceExtractor(ABC):
     # ── Hooks métier ────────────────────────────────────────────
 
     @abstractmethod
-    def load_config(self, cur: Any) -> dict[str, Any]:
+    def load_config(self, conn: Any) -> dict[str, Any]:
         """Charge la config DB (URL, auth, affiliations, années, etc.)."""
 
     @abstractmethod
@@ -111,8 +111,7 @@ class SourceExtractor(ABC):
         args = self.parse_args(argv)
 
         try:
-            with self.conn.cursor() as cur:
-                config = self.load_config(cur)
+            config = self.load_config(self.conn)
         except ExtractionConfigError as e:
             self.logger.error(f"Extraction {self.SOURCE} interrompue : {e}")
             self.conn.close()
@@ -144,5 +143,5 @@ class SourceExtractor(ABC):
 
 def run_extractor(cls: type[SourceExtractor], logger: Any) -> None:
     """Helper pour les entry points : instancie et lance."""
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     cls(conn, logger).run()

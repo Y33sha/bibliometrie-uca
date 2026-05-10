@@ -16,7 +16,8 @@ import os
 import time
 from typing import Any
 
-from psycopg.types.json import Jsonb as Json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import HAL_DELAY, hal_per_page_for
 from infrastructure.api_retry import http_request_with_retry
@@ -29,6 +30,45 @@ from infrastructure.app_config import (
 from infrastructure.hal import HAL_FIELDS
 from infrastructure.sources.base import ExtractionStats, SourceExtractor, run_extractor
 from infrastructure.sources.common import clean_doi, compute_hash, setup_logger
+
+_TAG_COLLECTION_SQL = text(
+    """
+    UPDATE staging
+    SET hal_collections = CASE
+            WHEN hal_collections IS NULL THEN ARRAY[:code]::TEXT[]
+            WHEN :code = ANY(hal_collections) THEN hal_collections
+            ELSE hal_collections || CAST(:code AS TEXT)
+        END,
+        last_seen_at = now()
+    WHERE source = 'hal' AND source_id = ANY(:ids)
+    """
+)
+
+_UPSERT_HAL_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, raw_hash)
+    VALUES ('hal', :hal_id, :doi, :raw_data, ARRAY[:collection], :raw_hash)
+    ON CONFLICT (source, source_id) DO UPDATE SET
+        hal_collections = CASE
+            WHEN staging.hal_collections IS NULL THEN ARRAY[EXCLUDED.hal_collections[1]]
+            WHEN EXCLUDED.hal_collections[1] = ANY(staging.hal_collections)
+                THEN staging.hal_collections
+            ELSE staging.hal_collections || EXCLUDED.hal_collections[1]
+        END,
+        raw_data = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN EXCLUDED.raw_data
+            ELSE staging.raw_data
+        END,
+        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
+        processed = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN FALSE
+            ELSE staging.processed
+        END,
+        last_seen_at = now()
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
 
 # ----- Logging -----
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))
@@ -145,23 +185,9 @@ def tag_existing_with_collection(conn: Any, hal_ids: list[str], collection_code:
     """
     if not hal_ids:
         return 0
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            UPDATE staging
-            SET hal_collections = CASE
-                    WHEN hal_collections IS NULL THEN ARRAY[%s]::TEXT[]
-                    WHEN %s = ANY(hal_collections) THEN hal_collections
-                    ELSE hal_collections || %s::TEXT
-                END,
-                last_seen_at = now()
-            WHERE source = 'hal' AND source_id = ANY(%s)
-            """,
-            (collection_code, collection_code, collection_code, hal_ids),
-        )
-        updated = cur.rowcount
+    result = conn.execute(_TAG_COLLECTION_SQL, {"code": collection_code, "ids": hal_ids})
     conn.commit()
-    return updated
+    return result.rowcount
 
 
 def extract_hal_id(doc: dict) -> str:
@@ -180,34 +206,16 @@ def upsert_work(conn: Any, hal_id: str, doi: str | None, raw_data: dict, collect
     Si le halId existe déjà : ajoute la collection, et si le contenu a changé
     (hash différent), met à jour raw_data et remet processed = FALSE.
     """
-    raw_hash = compute_hash(raw_data)
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, raw_hash)
-            VALUES ('hal', %s, %s, %s::jsonb, ARRAY[%s], %s)
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                hal_collections = CASE
-                    WHEN staging.hal_collections IS NULL THEN ARRAY[EXCLUDED.hal_collections[1]]
-                    WHEN EXCLUDED.hal_collections[1] = ANY(staging.hal_collections)
-                        THEN staging.hal_collections
-                    ELSE staging.hal_collections || EXCLUDED.hal_collections[1]
-                END,
-                raw_data = CASE
-                    WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                        THEN EXCLUDED.raw_data
-                    ELSE staging.raw_data
-                END,
-                raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-                processed = CASE
-                    WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                        THEN FALSE
-                    ELSE staging.processed
-                END,
-                last_seen_at = now()
-        """,
-            (hal_id, doi, Json(raw_data), collection, raw_hash),
-        )
+    conn.execute(
+        _UPSERT_HAL_SQL,
+        {
+            "hal_id": hal_id,
+            "doi": doi,
+            "raw_data": raw_data,
+            "collection": collection,
+            "raw_hash": compute_hash(raw_data),
+        },
+    )
 
 
 def _extract_full(
@@ -360,15 +368,15 @@ class HalExtractor(SourceExtractor):
             help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents soumis depuis cette date",
         )
 
-    def load_config(self, cur: Any) -> dict[str, Any]:
-        collections = get_hal_collections(cur)
-        extra_collections = get_hal_extra_collections(cur)
+    def load_config(self, conn: Any) -> dict[str, Any]:
+        collections = get_hal_collections(conn)
+        extra_collections = get_hal_extra_collections(conn)
         all_collections = dict(collections)
         for code in extra_collections:
             if code not in all_collections:
                 all_collections[code] = code
         return {
-            "base_url": get_api_base_urls(cur).get(
+            "base_url": get_api_base_urls(conn).get(
                 "hal", "https://api.archives-ouvertes.fr/search/"
             ),
             "all_collections": all_collections,
@@ -391,8 +399,7 @@ class HalExtractor(SourceExtractor):
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
     ) -> ExtractionStats:
         # Années : from CLI ou from config
-        with self.conn.cursor() as cur:
-            config_years = get_years(cur, mode=args.mode)
+        config_years = get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
 
         stats = ExtractionStats()
