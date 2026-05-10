@@ -68,7 +68,6 @@ def fetch_oa_status(doi: str, logger: Any, *, unpaywall_base: str) -> str | None
 
 
 def run_enrich(
-    cur: Any,
     conn: Any,
     queries: EnrichQueries,
     logger: Any,
@@ -79,7 +78,7 @@ def run_enrich(
     dry_run: bool = False,
     rate_delay: float = 0.1,
 ) -> None:
-    pubs = queries.fetch_publications_with_doi(cur, limit=limit or None)
+    pubs = queries.fetch_publications_with_doi(conn, limit=limit or None)
     total = len(pubs)
     logger.info(f"{total} publications avec DOI à vérifier sur Unpaywall")
 
@@ -115,7 +114,7 @@ def run_enrich(
             if dry_run:
                 logger.info(f"  [DRY] {doi} : {current_status} → {status}")
             else:
-                update_oa_status(cur, pub_id, status, repo=pub_repo)
+                update_oa_status(conn, pub_id, status, repo=pub_repo)
             updated += 1
         elif status is None:
             not_found += 1

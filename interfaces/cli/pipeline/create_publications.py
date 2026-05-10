@@ -4,7 +4,7 @@ import argparse
 import os
 
 from application.pipeline.publications.create_publications import run
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.publications.create import PgPublicationsCreateQueries
 from infrastructure.log import setup_logger
 from infrastructure.repositories import publication_repository
@@ -19,15 +19,13 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
         run(
-            cur,
             conn,
             PgPublicationsCreateQueries(),
             logger,
-            pub_repo=publication_repository(cur),
+            pub_repo=publication_repository(conn),
             dry_run=args.dry_run,
         )
     finally:

@@ -31,7 +31,7 @@ from domain.publications.dedup import has_minimal_publication_metadata
 
 
 def process_document(
-    cur: Any,
+    conn: Any,
     queries: PublicationsCreateQueries,
     doc: Any,
     dry_run: bool,
@@ -61,7 +61,7 @@ def process_document(
         return True
 
     pub_id, _is_new = find_or_create_publication(
-        cur,
+        conn,
         title=title,
         title_normalized=normalize_text(title),
         pub_year=pub_year,
@@ -79,14 +79,13 @@ def process_document(
     if not pub_id:
         return False
 
-    queries.link_source_publication_to_publication(cur, doc["id"], pub_id)
-    refresh_from_sources(cur, pub_id, repo=pub_repo)
+    queries.link_source_publication_to_publication(conn, doc["id"], pub_id)
+    refresh_from_sources(conn, pub_id, repo=pub_repo)
 
     return True
 
 
 def run(
-    cur: Any,
     conn: Any,
     queries: PublicationsCreateQueries,
     logger: Any,
@@ -95,7 +94,7 @@ def run(
     dry_run: bool = False,
 ) -> None:
     try:
-        docs = queries.fetch_orphan_in_perimeter_source_publications(cur)
+        docs = queries.fetch_orphan_in_perimeter_source_publications(conn)
         logger.info("%d source_publications in-perimeter sans publication", len(docs))
 
         if not docs:
@@ -105,7 +104,7 @@ def run(
         created = 0
         skipped = 0
         for i, doc in enumerate(docs):
-            if process_document(cur, queries, doc, dry_run, pub_repo=pub_repo):
+            if process_document(conn, queries, doc, dry_run, pub_repo=pub_repo):
                 created += 1
             else:
                 skipped += 1

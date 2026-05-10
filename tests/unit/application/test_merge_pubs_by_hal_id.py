@@ -59,7 +59,7 @@ def test_second_source_with_same_hal_id_is_not_dropped():
     ]
     hal_rows = [_hal("hal-05508565", hal_pub_id=86628, hal_doc_id=999)]
 
-    link_only, merge_needed = find_duplicates(cur=None, queries=_FakeQueries(src_rows, hal_rows))
+    link_only, merge_needed = find_duplicates(conn=None, queries=_FakeQueries(src_rows, hal_rows))
 
     assert link_only == []
     assert len(merge_needed) == 1
@@ -78,7 +78,7 @@ def test_no_op_when_both_sources_already_merged():
     ]
     hal_rows = [_hal("hal-X", hal_pub_id=42)]
 
-    link_only, merge_needed = find_duplicates(cur=None, queries=_FakeQueries(src_rows, hal_rows))
+    link_only, merge_needed = find_duplicates(conn=None, queries=_FakeQueries(src_rows, hal_rows))
 
     assert link_only == []
     assert merge_needed == []
@@ -92,7 +92,7 @@ def test_link_only_when_hal_has_no_publication_id():
     src_rows = [_src("openalex", src_pub_id=10, hal_id="hal-Y")]
     hal_rows = [_hal("hal-Y", hal_pub_id=None, hal_doc_id=500)]
 
-    link_only, merge_needed = find_duplicates(cur=None, queries=_FakeQueries(src_rows, hal_rows))
+    link_only, merge_needed = find_duplicates(conn=None, queries=_FakeQueries(src_rows, hal_rows))
 
     assert merge_needed == []
     assert len(link_only) == 1
@@ -112,7 +112,7 @@ def test_link_only_dedup_per_hal_doc_when_multiple_sources():
     ]
     hal_rows = [_hal("hal-Z", hal_pub_id=None, hal_doc_id=700)]
 
-    link_only, _ = find_duplicates(cur=None, queries=_FakeQueries(src_rows, hal_rows))
+    link_only, _ = find_duplicates(conn=None, queries=_FakeQueries(src_rows, hal_rows))
 
     assert len(link_only) == 1
     assert link_only[0]["hal_doc_id"] == 700
@@ -129,7 +129,7 @@ def test_merge_needed_dedup_same_pair_seen_twice():
     ]
     hal_rows = [_hal("hal-W", hal_pub_id=21)]
 
-    _, merge_needed = find_duplicates(cur=None, queries=_FakeQueries(src_rows, hal_rows))
+    _, merge_needed = find_duplicates(conn=None, queries=_FakeQueries(src_rows, hal_rows))
 
     assert len(merge_needed) == 1
 
@@ -139,7 +139,7 @@ def test_no_match_when_hal_id_absent_from_hal_table():
     src_rows = [_src("scanr", src_pub_id=30, hal_id="hal-orphan")]
     hal_rows = [_hal("hal-otherid", hal_pub_id=99)]
 
-    link_only, merge_needed = find_duplicates(cur=None, queries=_FakeQueries(src_rows, hal_rows))
+    link_only, merge_needed = find_duplicates(conn=None, queries=_FakeQueries(src_rows, hal_rows))
 
     assert link_only == []
     assert merge_needed == []

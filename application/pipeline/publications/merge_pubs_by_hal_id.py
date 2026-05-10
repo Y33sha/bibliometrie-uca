@@ -24,7 +24,7 @@ from domain.ports.publication_repository import PublicationRepository
 
 
 def find_duplicates(
-    cur: Any, queries: MergeQueries
+    conn: Any, queries: MergeQueries
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Croise `source_publications` OA/ScanR (avec hal_id) et HAL.
 
@@ -36,14 +36,14 @@ def find_duplicates(
     plusieurs sources (OpenAlex + ScanR) pointant vers des publications distinctes,
     et il faut traiter chacune.
     """
-    hal_by_id = {r["halid"]: r for r in queries.fetch_hal_source_publications(cur)}
+    hal_by_id = {r["halid"]: r for r in queries.fetch_hal_source_publications(conn)}
 
     link_only: list[dict[str, Any]] = []
     merge_needed: list[dict[str, Any]] = []
     seen_link: set[int] = set()
     seen_merge: set[tuple[int, int]] = set()
 
-    for r in queries.fetch_source_publications_with_hal_external_id(cur):
+    for r in queries.fetch_source_publications_with_hal_external_id(conn):
         hid = r["hal_id"]
         if hid not in hal_by_id:
             continue
@@ -74,7 +74,7 @@ def find_duplicates(
 
 
 def link_hal_to_publication(
-    cur: Any,
+    conn: Any,
     queries: MergeQueries,
     items: Any,
     logger: Any,
@@ -92,13 +92,13 @@ def link_hal_to_publication(
             logger.info(f"  [LINK] [{item['source']}] hal_doc {halid} → pub {src_pub_id}")
             continue
 
-        queries.link_source_publication_to_publication(cur, hal_doc_id, src_pub_id)
-        update_sources(cur, src_pub_id, repo=pub_repo)
+        queries.link_source_publication_to_publication(conn, hal_doc_id, src_pub_id)
+        update_sources(conn, src_pub_id, repo=pub_repo)
     return len(items)
 
 
 def merge_publications(
-    cur: Any,
+    conn: Any,
     items: Any,
     logger: Any,
     dry_run: bool = False,
@@ -137,9 +137,9 @@ def merge_publications(
             continue
 
         try:
-            with savepoint(cur, "merge_pub"):
-                _merge_pub(cur, hal_pub_id, src_pub_id, repo=pub_repo)
-                refresh_from_sources(cur, hal_pub_id, repo=pub_repo)
+            with savepoint(conn, "merge_pub"):
+                _merge_pub(conn, hal_pub_id, src_pub_id, repo=pub_repo)
+                refresh_from_sources(conn, hal_pub_id, repo=pub_repo)
             merged_into[src_pub_id] = hal_pub_id
             merged += 1
 
@@ -151,7 +151,6 @@ def merge_publications(
 
 
 def run_merge(
-    cur: Any,
     conn: Any,
     queries: MergeQueries,
     logger: Any,
@@ -161,7 +160,7 @@ def run_merge(
 ) -> None:
     try:
         logger.info("Recherche des doublons par identifiant HAL (OpenAlex + ScanR)...")
-        link_only, merge_needed = find_duplicates(cur, queries)
+        link_only, merge_needed = find_duplicates(conn, queries)
 
         logger.info(f"  HAL sans publication (lien simple) : {len(link_only)}")
         logger.info(f"  Publications distinctes à fusionner : {len(merge_needed)}")
@@ -173,14 +172,14 @@ def run_merge(
         if link_only:
             logger.info("\n--- Liaison HAL → publication existante ---")
             n = link_hal_to_publication(
-                cur, queries, link_only, logger, dry_run=dry_run, pub_repo=pub_repo
+                conn, queries, link_only, logger, dry_run=dry_run, pub_repo=pub_repo
             )
             logger.info(f"  {n} source_publications HAL reliés")
 
         if merge_needed:
             logger.info("\n--- Fusion de publications ---")
             n, errs = merge_publications(
-                cur, merge_needed, logger, dry_run=dry_run, pub_repo=pub_repo
+                conn, merge_needed, logger, dry_run=dry_run, pub_repo=pub_repo
             )
             logger.info(f"  {n} publications fusionnées, {errs} erreurs")
 
