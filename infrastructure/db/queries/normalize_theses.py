@@ -7,13 +7,16 @@ ainsi que les lectures utiles à l'idempotence et au matching auteurs.
 
 from typing import Any
 
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
+
 from domain.names import parse_raw_author_name
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )
 
 
-def fetch_thesis_primary_author(cur: Any, publication_id: int) -> tuple[str, str] | None:
+def fetch_thesis_primary_author(conn: Connection, publication_id: int) -> tuple[str, str] | None:
     """Retourne `(last_name, first_name)` de l'auteur principal d'une thèse existante.
 
     Rôle `author`, tri par (source_publication_id, author_position), 1 ligne max.
@@ -21,42 +24,36 @@ def fetch_thesis_primary_author(cur: Any, publication_id: int) -> tuple[str, str
     `domain.names.parse_raw_author_name` (gère « Nom, Prénom » comme
     « Prénom Nom »).
     """
-    cur.execute(
-        """
-        SELECT sas.raw_author_name
-        FROM source_authorships sas
-        JOIN source_publications sd ON sd.id = sas.source_publication_id
-        WHERE sd.publication_id = %s
-          AND 'author' = ANY(sas.roles)
-        ORDER BY sd.id, sas.author_position
-        LIMIT 1
-        """,
-        (publication_id,),
-    )
-    row = cur.fetchone()
-    if row is None:
+    row = conn.execute(
+        text("""
+            SELECT sas.raw_author_name
+            FROM source_authorships sas
+            JOIN source_publications sd ON sd.id = sas.source_publication_id
+            WHERE sd.publication_id = :pid
+              AND 'author' = ANY(sas.roles)
+            ORDER BY sd.id, sas.author_position
+            LIMIT 1
+        """),
+        {"pid": publication_id},
+    ).one_or_none()
+    if row is None or not row.raw_author_name:
         return None
-    raw = row["raw_author_name"] if isinstance(row, dict) else row[0]
-    if not raw:
-        return None
-    last, first = parse_raw_author_name(raw)
+    last, first = parse_raw_author_name(row.raw_author_name)
     return (last, first) if last else None
 
 
-def merge_publication_meta(cur: Any, publication_id: int, meta_json: Any) -> None:
+def merge_publication_meta(conn: Connection, publication_id: int, meta_json: Any) -> None:
     """Fusionne `publications.meta` avec `meta_json` (concat JSONB)."""
-    cur.execute(
-        """
+    stmt = text("""
         UPDATE publications
-        SET meta = COALESCE(meta, '{}') || %s, updated_at = now()
-        WHERE id = %s
-        """,
-        (meta_json, publication_id),
-    )
+        SET meta = COALESCE(meta, '{}') || :meta_json, updated_at = now()
+        WHERE id = :pid
+    """).bindparams(bindparam("meta_json", type_=JSONB))
+    conn.execute(stmt, {"meta_json": meta_json, "pid": publication_id})
 
 
 def upsert_theses_source_publication(
-    cur: Any,
+    conn: Connection,
     *,
     theses_id: str,
     doi: str | None,
@@ -75,16 +72,16 @@ def upsert_theses_source_publication(
     source_meta_json: Any,
 ) -> int:
     """UPSERT d'un document theses.fr dans `source_publications`."""
-    cur.execute(
-        """
+    stmt = text("""
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids,
              journal_id, oa_status, language, container_title,
              keywords, topics, meta)
-        VALUES ('theses', %s, %s, %s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s)
+        VALUES ('theses', :theses_id, :doi, :title, :pub_year, :doc_type,
+                :publication_id, :staging_id, :external_ids,
+                :journal_id, :oa_status, :language, :container_title,
+                :keywords, :topics_json, :source_meta_json)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_publications.publication_id, EXCLUDED.publication_id
@@ -99,49 +96,53 @@ def upsert_theses_source_publication(
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             meta = COALESCE(EXCLUDED.meta, source_publications.meta)
         RETURNING id
-        """,
-        (
-            theses_id,
-            doi,
-            title,
-            pub_year,
-            doc_type,
-            publication_id,
-            staging_id,
-            external_ids,
-            journal_id,
-            oa_status,
-            language,
-            container_title,
-            keywords,
-            topics_json,
-            source_meta_json,
-        ),
+    """).bindparams(
+        bindparam("external_ids", type_=JSONB),
+        bindparam("topics_json", type_=JSONB),
+        bindparam("source_meta_json", type_=JSONB),
     )
-    row = cur.fetchone()
-    return row["id"] if isinstance(row, dict) else row[0]
+    row = conn.execute(
+        stmt,
+        {
+            "theses_id": theses_id,
+            "doi": doi,
+            "title": title,
+            "pub_year": pub_year,
+            "doc_type": doc_type,
+            "publication_id": publication_id,
+            "staging_id": staging_id,
+            "external_ids": external_ids,
+            "journal_id": journal_id,
+            "oa_status": oa_status,
+            "language": language,
+            "container_title": container_title,
+            "keywords": keywords,
+            "topics_json": topics_json,
+            "source_meta_json": source_meta_json,
+        },
+    ).one()
+    return row.id
 
 
-def upsert_theses_source_person_by_ppn(cur: Any, *, ppn: str, full_name: str) -> int:
+def upsert_theses_source_person_by_ppn(conn: Connection, *, ppn: str, full_name: str) -> int:
     """UPSERT d'un `source_persons` theses.fr dédupliqué sur PPN (idref)."""
-    cur.execute(
-        """
-        INSERT INTO source_persons
-            (source, source_id, full_name, idref)
-        VALUES ('theses', %s, %s, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            full_name = EXCLUDED.full_name,
-            idref = COALESCE(source_persons.idref, EXCLUDED.idref)
-        RETURNING id
-        """,
-        (ppn, full_name, ppn),
-    )
-    row = cur.fetchone()
-    return row["id"] if isinstance(row, dict) else row[0]
+    row = conn.execute(
+        text("""
+            INSERT INTO source_persons
+                (source, source_id, full_name, idref)
+            VALUES ('theses', :source_id, :full_name, :idref)
+            ON CONFLICT (source, source_id) DO UPDATE SET
+                full_name = EXCLUDED.full_name,
+                idref = COALESCE(source_persons.idref, EXCLUDED.idref)
+            RETURNING id
+        """),
+        {"source_id": ppn, "full_name": full_name, "idref": ppn},
+    ).one()
+    return row.id
 
 
 def upsert_theses_source_authorship(
-    cur: Any,
+    conn: Connection,
     *,
     source_publication_id: int,
     source_person_id: int | None,
@@ -158,143 +159,86 @@ def upsert_theses_source_authorship(
     `source_authorships` avec `identifiers` (vide en pratique pour
     theses sans PPN, puisque le PPN était l'unique identifiant).
     """
-    cur.execute(
-        """
+    stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              author_name_normalized, roles,
              raw_author_name, identifiers)
-        VALUES ('theses', %s, %s, %s, normalize_name_form(%s), %s, %s, %s)
+        VALUES ('theses', :spid, :source_person_id, :pos,
+                normalize_name_form(:raw_author_name), :roles,
+                :raw_author_name, :identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             roles = EXCLUDED.roles,
             author_name_normalized = EXCLUDED.author_name_normalized,
             raw_author_name = EXCLUDED.raw_author_name,
             identifiers = EXCLUDED.identifiers
         RETURNING id
-        """,
-        (
-            source_publication_id,
-            source_person_id,
-            author_position,
-            raw_author_name,
-            roles,
-            raw_author_name,
-            identifiers,
-        ),
-    )
-    row = cur.fetchone()
-    return row[0] if isinstance(row, tuple) else row["id"]
+    """).bindparams(bindparam("identifiers", type_=JSONB))
+    row = conn.execute(
+        stmt,
+        {
+            "spid": source_publication_id,
+            "source_person_id": source_person_id,
+            "pos": author_position,
+            "roles": roles,
+            "raw_author_name": raw_author_name,
+            "identifiers": identifiers,
+        },
+    ).one()
+    return row.id
 
 
-def get_theses_publication_id(cur: Any, theses_id: str) -> int | None:
+def get_theses_publication_id(conn: Connection, theses_id: str) -> int | None:
     """Idempotence : retourne le `publication_id` existant pour un document theses.fr."""
-    cur.execute(
-        "SELECT publication_id FROM source_publications WHERE source = 'theses' AND source_id = %s",
-        (theses_id,),
-    )
-    row = cur.fetchone()
-    if row is None:
-        return None
-    return row["publication_id"] if isinstance(row, dict) else row[0]
+    row = conn.execute(
+        text(
+            "SELECT publication_id FROM source_publications "
+            "WHERE source = 'theses' AND source_id = :theses_id"
+        ),
+        {"theses_id": theses_id},
+    ).one_or_none()
+    return row.publication_id if row else None
 
 
-class PgThesesNormalizeQueries:
-    """Adapter PostgreSQL pour `application.ports.normalize_theses.ThesesNormalizeQueries`."""
-
-    def fetch_thesis_primary_author(self, cur: Any, publication_id: int) -> tuple[str, str] | None:
-        return fetch_thesis_primary_author(cur, publication_id)
-
-    def merge_publication_meta(self, cur: Any, publication_id: int, meta_json: Any) -> None:
-        merge_publication_meta(cur, publication_id, meta_json)
-
-    def upsert_theses_source_publication(
-        self,
-        cur: Any,
-        *,
-        theses_id: str,
-        doi: str | None,
-        title: str,
-        pub_year: int | None,
-        doc_type: str,
-        publication_id: int | None,
-        staging_id: int,
-        external_ids: Any,
-        journal_id: int | None,
-        oa_status: str | None,
-        language: str | None,
-        container_title: str | None,
-        keywords: list[str] | None,
-        topics_json: Any,
-        source_meta_json: Any,
-    ) -> int:
-        return upsert_theses_source_publication(
-            cur,
-            theses_id=theses_id,
-            doi=doi,
-            title=title,
-            pub_year=pub_year,
-            doc_type=doc_type,
-            publication_id=publication_id,
-            staging_id=staging_id,
-            external_ids=external_ids,
-            journal_id=journal_id,
-            oa_status=oa_status,
-            language=language,
-            container_title=container_title,
-            keywords=keywords,
-            topics_json=topics_json,
-            source_meta_json=source_meta_json,
-        )
-
-    def upsert_theses_source_person_by_ppn(
-        self,
-        cur: Any,
-        *,
-        ppn: str,
-        full_name: str,
-    ) -> int:
-        return upsert_theses_source_person_by_ppn(cur, ppn=ppn, full_name=full_name)
-
-    def upsert_theses_source_authorship(
-        self,
-        cur: Any,
-        *,
-        source_publication_id: int,
-        source_person_id: int | None,
-        author_position: int | None,
-        roles: list[str],
-        raw_author_name: str,
-        identifiers: Any,
-    ) -> int:
-        return upsert_theses_source_authorship(
-            cur,
-            source_publication_id=source_publication_id,
-            source_person_id=source_person_id,
-            author_position=author_position,
-            roles=roles,
-            raw_author_name=raw_author_name,
-            identifiers=identifiers,
-        )
-
-    def get_theses_publication_id(self, cur: Any, theses_id: str) -> int | None:
-        return get_theses_publication_id(cur, theses_id)
-
-    def count_theses_table(self, cur: Any, table: str) -> int:
-        return count_theses_table(cur, table)
-
-    def clear_source_authorships_for_publication(
-        self, cur: Any, source_publication_id: int
-    ) -> None:
-        clear_source_authorships_for_publication(cur, source_publication_id)
-
-
-def count_theses_table(cur: Any, table: str) -> int:
+def count_theses_table(conn: Connection, table: str) -> int:
     """Compte les lignes d'une table avec `source = 'theses'`.
 
     `table` est une valeur littérale contrôlée par le code appelant (liste blanche).
     """
     if table not in ("source_publications", "source_persons", "source_authorships"):
         raise ValueError(f"Table inattendue : {table!r}")
-    cur.execute(f"SELECT COUNT(*) AS cnt FROM {table} WHERE source = 'theses'")
-    row = cur.fetchone()
-    return row["cnt"] if isinstance(row, dict) else row[0]
+    return conn.execute(
+        text(f"SELECT COUNT(*) AS cnt FROM {table} WHERE source = 'theses'")
+    ).scalar_one()
+
+
+class PgThesesNormalizeQueries:
+    """Adapter PostgreSQL pour `application.ports.normalize_theses.ThesesNormalizeQueries`."""
+
+    def fetch_thesis_primary_author(
+        self, conn: Connection, publication_id: int
+    ) -> tuple[str, str] | None:
+        return fetch_thesis_primary_author(conn, publication_id)
+
+    def merge_publication_meta(self, conn: Connection, publication_id: int, meta_json: Any) -> None:
+        merge_publication_meta(conn, publication_id, meta_json)
+
+    def upsert_theses_source_publication(self, conn: Connection, **kwargs: Any) -> int:
+        return upsert_theses_source_publication(conn, **kwargs)
+
+    def upsert_theses_source_person_by_ppn(self, conn: Connection, **kwargs: Any) -> int:
+        return upsert_theses_source_person_by_ppn(conn, **kwargs)
+
+    def upsert_theses_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
+        return upsert_theses_source_authorship(conn, **kwargs)
+
+    def get_theses_publication_id(self, conn: Connection, theses_id: str) -> int | None:
+        return get_theses_publication_id(conn, theses_id)
+
+    def count_theses_table(self, conn: Connection, table: str) -> int:
+        return count_theses_table(conn, table)
+
+    def clear_source_authorships_for_publication(
+        self, conn: Connection, source_publication_id: int
+    ) -> None:
+        clear_source_authorships_for_publication(conn, source_publication_id)
