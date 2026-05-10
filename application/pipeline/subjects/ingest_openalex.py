@@ -30,7 +30,7 @@ _LEVELS = ("domain", "field", "subfield", "topic")
 
 
 def ingest(
-    cur: Any,
+    conn: Any,
     *,
     publication_id: int,
     keywords: list[str] | None,
@@ -42,18 +42,18 @@ def ingest(
     links: list[tuple[int, int, float | None]] = []
 
     for kw in dedup_strs(keywords):
-        sid = cache.get_or_upsert(cur, label=kw)
+        sid = cache.get_or_upsert(conn, label=kw)
         links.append((publication_id, sid, None))
 
     if isinstance(topics, list):
         for entry in topics:
-            _collect_topic_chain(cur, cache, publication_id, entry, links)
+            _collect_topic_chain(conn, cache, publication_id, entry, links)
 
-    return cache.link_bulk(cur, source=SOURCE, rows=links)
+    return cache.link_bulk(conn, source=SOURCE, rows=links)
 
 
 def _collect_topic_chain(
-    cur: Any,
+    conn: Any,
     cache: SubjectCache,
     publication_id: int,
     entry: Any,
@@ -88,7 +88,7 @@ def _collect_topic_chain(
         if parent_label is not None:
             ontology_entry["parent"] = parent_label
         sid = cache.get_or_upsert(
-            cur,
+            conn,
             label=label,
             language="en",
             ontologies={ONTOLOGY_OPENALEX_TOPIC: ontology_entry},

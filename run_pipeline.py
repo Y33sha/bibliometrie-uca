@@ -684,16 +684,14 @@ def _run_refresh_publication_countries() -> None:
 
 def _run_ingest_subjects() -> None:
     from application.pipeline.subjects.run import run
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.subjects import PgSubjectsQueries
 
     log.info("▶ subjects")
     t0 = time.time()
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        run(cur, PgSubjectsQueries(), log)
+        run(conn, PgSubjectsQueries(), log)
         conn.commit()
     finally:
         conn.close()
@@ -702,16 +700,14 @@ def _run_ingest_subjects() -> None:
 
 def _run_cooccurrences() -> None:
     from application.pipeline.cooccurrences.run import run
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.subjects import PgSubjectsQueries
 
     log.info("▶ cooccurrences")
     t0 = time.time()
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        run(cur, PgSubjectsQueries(), log)
+        run(conn, PgSubjectsQueries(), log)
         conn.commit()
     finally:
         conn.close()

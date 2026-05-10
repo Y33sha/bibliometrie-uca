@@ -9,14 +9,71 @@ Voir docs/chantiers/sujets-mots-cles.md.
 
 from typing import Any
 
-from psycopg.types.json import Json
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.subject import normalize_label
 
+# Le ON CONFLICT fusionne par ontologie : pour chaque clé présente dans l'un
+# OU l'autre des dicts, on construit un objet `{codes, level, parent}` agrégé.
+# `codes` = union des listes ; `level` et `parent` = premier non-null
+# (existant prioritaire).
+_UPSERT_SUBJECT_SQL = text(
+    """
+    INSERT INTO subjects (label, language, ontologies)
+    VALUES (:label, :language, :ontologies)
+    ON CONFLICT (lower(label)) DO UPDATE SET
+        ontologies = COALESCE(
+            (
+                SELECT jsonb_object_agg(k, body)
+                FROM (
+                    SELECT
+                        k,
+                        jsonb_build_object(
+                            'codes',
+                            COALESCE(
+                                (
+                                    SELECT jsonb_agg(DISTINCT code)
+                                    FROM (
+                                        SELECT jsonb_array_elements_text(
+                                            COALESCE(subjects.ontologies->k->'codes', '[]'::jsonb)
+                                        ) AS code
+                                        UNION
+                                        SELECT jsonb_array_elements_text(
+                                            COALESCE(EXCLUDED.ontologies->k->'codes', '[]'::jsonb)
+                                        )
+                                    ) merged_codes
+                                ),
+                                '[]'::jsonb
+                            ),
+                            'level',
+                            COALESCE(
+                                subjects.ontologies->k->'level',
+                                EXCLUDED.ontologies->k->'level'
+                            ),
+                            'parent',
+                            COALESCE(
+                                subjects.ontologies->k->'parent',
+                                EXCLUDED.ontologies->k->'parent'
+                            )
+                        ) AS body
+                    FROM (
+                        SELECT key AS k FROM jsonb_each(subjects.ontologies)
+                        UNION
+                        SELECT key AS k FROM jsonb_each(EXCLUDED.ontologies)
+                    ) keys
+                ) merged
+            ),
+            '{}'::jsonb
+        ),
+        language = COALESCE(subjects.language, EXCLUDED.language)
+    RETURNING id
+    """
+).bindparams(bindparam("ontologies", type_=JSONB))
+
 
 def upsert_subject(
-    cur: Any,
+    conn: Any,
     *,
     label: str,
     language: str | None = None,
@@ -30,71 +87,14 @@ def upsert_subject(
     doublon) ; on garde la première valeur non-null vue pour `level` et
     `parent` (côté existant prioritaire).
     """
-    normalized = normalize_label(label)
-    onto = ontologies or {}
-    cur.execute(
-        """
-        INSERT INTO subjects (label, language, ontologies)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (lower(label)) DO UPDATE SET
-            -- Fusion par ontologie : pour chaque clé présente dans l'un OU
-            -- l'autre des dicts, on construit un objet `{codes, level,
-            -- parent}` agrégé. `codes` = union des listes ; `level` et
-            -- `parent` = premier non-null (existant prioritaire).
-            ontologies = COALESCE(
-                (
-                    SELECT jsonb_object_agg(k, body)
-                    FROM (
-                        SELECT
-                            k,
-                            jsonb_build_object(
-                                'codes',
-                                COALESCE(
-                                    (
-                                        SELECT jsonb_agg(DISTINCT code)
-                                        FROM (
-                                            SELECT jsonb_array_elements_text(
-                                                COALESCE(subjects.ontologies->k->'codes', '[]'::jsonb)
-                                            ) AS code
-                                            UNION
-                                            SELECT jsonb_array_elements_text(
-                                                COALESCE(EXCLUDED.ontologies->k->'codes', '[]'::jsonb)
-                                            )
-                                        ) merged_codes
-                                    ),
-                                    '[]'::jsonb
-                                ),
-                                'level',
-                                COALESCE(
-                                    subjects.ontologies->k->'level',
-                                    EXCLUDED.ontologies->k->'level'
-                                ),
-                                'parent',
-                                COALESCE(
-                                    subjects.ontologies->k->'parent',
-                                    EXCLUDED.ontologies->k->'parent'
-                                )
-                            ) AS body
-                        FROM (
-                            SELECT key AS k FROM jsonb_each(subjects.ontologies)
-                            UNION
-                            SELECT key AS k FROM jsonb_each(EXCLUDED.ontologies)
-                        ) keys
-                    ) merged
-                ),
-                '{}'::jsonb
-            ),
-            language = COALESCE(subjects.language, EXCLUDED.language)
-        RETURNING id
-        """,
-        (normalized, language, Json(onto)),
-    )
-    row = cur.fetchone()
-    return row["id"] if isinstance(row, dict) else row[0]
+    return conn.execute(
+        _UPSERT_SUBJECT_SQL,
+        {"label": normalize_label(label), "language": language, "ontologies": ontologies or {}},
+    ).scalar_one()
 
 
 def link_publication_subject(
-    cur: Any,
+    conn: Any,
     *,
     publication_id: int,
     subject_id: int,
@@ -107,19 +107,21 @@ def link_publication_subject(
     deux sources différentes donne deux lignes ; un même sujet annoté
     deux fois par la même source écrase le score précédent.
     """
-    cur.execute(
-        """
-        INSERT INTO publication_subjects (publication_id, subject_id, source, score)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (publication_id, subject_id, source)
-        DO UPDATE SET score = EXCLUDED.score
-        """,
-        (publication_id, subject_id, source, score),
+    conn.execute(
+        text(
+            """
+            INSERT INTO publication_subjects (publication_id, subject_id, source, score)
+            VALUES (:pid, :sid, :src, :score)
+            ON CONFLICT (publication_id, subject_id, source)
+            DO UPDATE SET score = EXCLUDED.score
+            """
+        ),
+        {"pid": publication_id, "sid": subject_id, "src": source, "score": score},
     )
 
 
 def link_publication_subjects_bulk(
-    cur: Any,
+    conn: Any,
     *,
     source: str,
     rows: list[tuple[int, int, float | None]],
@@ -138,108 +140,113 @@ def link_publication_subjects_bulk(
     if not rows:
         return 0
     seen: set[tuple[int, int]] = set()
-    deduped: list[tuple[int, int, str, float | None]] = []
+    deduped: list[dict[str, Any]] = []
     for pub_id, sid, score in rows:
         key = (pub_id, sid)
         if key in seen:
             continue
         seen.add(key)
-        deduped.append((pub_id, sid, source, score))
-    cur.executemany(
-        """
-        INSERT INTO publication_subjects (publication_id, subject_id, source, score)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (publication_id, subject_id, source)
-        DO UPDATE SET score = EXCLUDED.score
-        """,
+        deduped.append({"pid": pub_id, "sid": sid, "src": source, "score": score})
+    conn.execute(
+        text(
+            """
+            INSERT INTO publication_subjects (publication_id, subject_id, source, score)
+            VALUES (:pid, :sid, :src, :score)
+            ON CONFLICT (publication_id, subject_id, source)
+            DO UPDATE SET score = EXCLUDED.score
+            """
+        ),
         deduped,
     )
     return len(deduped)
 
 
 def clear_publication_subjects(
-    cur: Any,
+    conn: Any,
     *,
     publication_id: int,
     source: str,
 ) -> int:
     """Supprime tous les liens d'une publication pour une source.
     Retourne le nombre de lignes supprimées."""
-    cur.execute(
-        """
-        DELETE FROM publication_subjects
-        WHERE publication_id = %s AND source = %s
-        """,
-        (publication_id, source),
-    )
-    return cur.rowcount
+    return conn.execute(
+        text("DELETE FROM publication_subjects WHERE publication_id = :pid AND source = :src"),
+        {"pid": publication_id, "src": source},
+    ).rowcount
 
 
-def clear_links_for_source(cur: Any, *, source: str) -> int:
+def clear_links_for_source(conn: Any, *, source: str) -> int:
     """`DELETE FROM publication_subjects WHERE source = X`. Retourne le rowcount."""
-    cur.execute("DELETE FROM publication_subjects WHERE source = %s", (source,))
-    return cur.rowcount
+    return conn.execute(
+        text("DELETE FROM publication_subjects WHERE source = :src"),
+        {"src": source},
+    ).rowcount
 
 
-def select_source_publications_with_subjects(cur: Any, *, source: str) -> list[Any]:
+def select_source_publications_with_subjects(conn: Any, *, source: str) -> list[Any]:
     """Lit les `source_publications` rattachées à une publication canonique."""
-    cur.execute(
-        """
-        SELECT publication_id, keywords, topics
-        FROM source_publications
-        WHERE source = %s AND publication_id IS NOT NULL
-        """,
-        (source,),
-    )
-    return cur.fetchall()
+    return conn.execute(
+        text(
+            """
+            SELECT publication_id, keywords, topics
+            FROM source_publications
+            WHERE source = :src AND publication_id IS NOT NULL
+            """
+        ),
+        {"src": source},
+    ).all()
 
 
 # ── Co-occurrences ───────────────────────────────────────────────
 
 
-def recompute_usage_counts(cur: Any) -> int:
+def recompute_usage_counts(conn: Any) -> int:
     """Recalcule `subjects.usage_count` = nb publications distinctes par sujet."""
-    cur.execute("UPDATE subjects SET usage_count = 0 WHERE usage_count <> 0")
-    n_reset = cur.rowcount
-    cur.execute(
-        """
-        UPDATE subjects s
-        SET usage_count = c.n
-        FROM (
-            SELECT subject_id, COUNT(DISTINCT publication_id) AS n
-            FROM publication_subjects
-            GROUP BY subject_id
-        ) c
-        WHERE s.id = c.subject_id
-        """
-    )
-    return n_reset + cur.rowcount
+    n_reset = conn.execute(
+        text("UPDATE subjects SET usage_count = 0 WHERE usage_count <> 0")
+    ).rowcount
+    n_updated = conn.execute(
+        text(
+            """
+            UPDATE subjects s
+            SET usage_count = c.n
+            FROM (
+                SELECT subject_id, COUNT(DISTINCT publication_id) AS n
+                FROM publication_subjects
+                GROUP BY subject_id
+            ) c
+            WHERE s.id = c.subject_id
+            """
+        )
+    ).rowcount
+    return n_reset + n_updated
 
 
-def recompute_cooccurrences(cur: Any, *, min_count: int = 2) -> int:
+def recompute_cooccurrences(conn: Any, *, min_count: int = 2) -> int:
     """Recalcule `subject_cooccurrences` depuis `publication_subjects`.
 
     TRUNCATE puis INSERT en bloc, filtré par count >= min_count. Retourne
     le nombre de paires insérées.
     """
-    cur.execute("TRUNCATE subject_cooccurrences")
-    cur.execute(
-        """
-        INSERT INTO subject_cooccurrences (subject_a_id, subject_b_id, count)
-        SELECT
-            ps1.subject_id AS a_id,
-            ps2.subject_id AS b_id,
-            COUNT(DISTINCT ps1.publication_id) AS n
-        FROM publication_subjects ps1
-        JOIN publication_subjects ps2
-          ON ps1.publication_id = ps2.publication_id
-         AND ps1.subject_id < ps2.subject_id
-        GROUP BY ps1.subject_id, ps2.subject_id
-        HAVING COUNT(DISTINCT ps1.publication_id) >= %s
-        """,
-        (min_count,),
-    )
-    return cur.rowcount
+    conn.execute(text("TRUNCATE subject_cooccurrences"))
+    return conn.execute(
+        text(
+            """
+            INSERT INTO subject_cooccurrences (subject_a_id, subject_b_id, count)
+            SELECT
+                ps1.subject_id AS a_id,
+                ps2.subject_id AS b_id,
+                COUNT(DISTINCT ps1.publication_id) AS n
+            FROM publication_subjects ps1
+            JOIN publication_subjects ps2
+              ON ps1.publication_id = ps2.publication_id
+             AND ps1.subject_id < ps2.subject_id
+            GROUP BY ps1.subject_id, ps2.subject_id
+            HAVING COUNT(DISTINCT ps1.publication_id) >= :min_count
+            """
+        ),
+        {"min_count": min_count},
+    ).rowcount
 
 
 # ── Lectures (consommées par les routes API) ─────────────────────
@@ -323,14 +330,14 @@ class PgSubjectsQueries:
 
     def upsert_subject(
         self,
-        cur: Any,
+        conn: Any,
         *,
         label: str,
         language: str | None = None,
         ontologies: dict[str, dict[str, Any]] | None = None,
     ) -> int:
         return upsert_subject(
-            cur,
+            conn,
             label=label,
             language=language,
             ontologies=ontologies,
@@ -338,21 +345,21 @@ class PgSubjectsQueries:
 
     def link_publication_subjects_bulk(
         self,
-        cur: Any,
+        conn: Any,
         *,
         source: str,
         rows: list[tuple[int, int, float | None]],
     ) -> int:
-        return link_publication_subjects_bulk(cur, source=source, rows=rows)
+        return link_publication_subjects_bulk(conn, source=source, rows=rows)
 
-    def clear_links_for_source(self, cur: Any, *, source: str) -> int:
-        return clear_links_for_source(cur, source=source)
+    def clear_links_for_source(self, conn: Any, *, source: str) -> int:
+        return clear_links_for_source(conn, source=source)
 
-    def select_source_publications_with_subjects(self, cur: Any, *, source: str) -> list[Any]:
-        return select_source_publications_with_subjects(cur, source=source)
+    def select_source_publications_with_subjects(self, conn: Any, *, source: str) -> list[Any]:
+        return select_source_publications_with_subjects(conn, source=source)
 
-    def recompute_usage_counts(self, cur: Any) -> int:
-        return recompute_usage_counts(cur)
+    def recompute_usage_counts(self, conn: Any) -> int:
+        return recompute_usage_counts(conn)
 
-    def recompute_cooccurrences(self, cur: Any, *, min_count: int = 2) -> int:
-        return recompute_cooccurrences(cur, min_count=min_count)
+    def recompute_cooccurrences(self, conn: Any, *, min_count: int = 2) -> int:
+        return recompute_cooccurrences(conn, min_count=min_count)

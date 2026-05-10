@@ -16,7 +16,7 @@ SOURCE = "wos"
 
 
 def ingest(
-    cur: Any,
+    conn: Any,
     *,
     publication_id: int,
     keywords: list[str] | None,
@@ -26,13 +26,13 @@ def ingest(
     links: list[tuple[int, int, float | None]] = []
 
     for kw in dedup_strs(keywords):
-        sid = cache.get_or_upsert(cur, label=kw)
+        sid = cache.get_or_upsert(conn, label=kw)
         links.append((publication_id, sid, None))
 
     if isinstance(topics, dict):
         for label in dedup_strs(topics.get("subjects")):
             sid = cache.get_or_upsert(
-                cur,
+                conn,
                 label=label,
                 language="en",
                 ontologies={ONTOLOGY_WOS_SUBJECT: {"codes": [label.lower()]}},
@@ -41,11 +41,11 @@ def ingest(
 
         for label in dedup_strs(topics.get("headings")):
             sid = cache.get_or_upsert(
-                cur,
+                conn,
                 label=label,
                 language="en",
                 ontologies={ONTOLOGY_WOS_HEADING: {"codes": [label.lower()]}},
             )
             links.append((publication_id, sid, None))
 
-    return cache.link_bulk(cur, source=SOURCE, rows=links)
+    return cache.link_bulk(conn, source=SOURCE, rows=links)
