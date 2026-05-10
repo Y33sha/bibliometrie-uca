@@ -13,7 +13,7 @@ class SubjectsQueries(Protocol):
 
     def upsert_subject(
         self,
-        cur: Any,
+        conn: Any,
         *,
         label: str,
         language: str | None = None,
@@ -38,7 +38,7 @@ class SubjectsQueries(Protocol):
 
     def link_publication_subjects_bulk(
         self,
-        cur: Any,
+        conn: Any,
         *,
         source: str,
         rows: list[tuple[int, int, float | None]],
@@ -47,19 +47,19 @@ class SubjectsQueries(Protocol):
         une source. Dédoublonne `(pub_id, subject_id)` côté client."""
         ...
 
-    def clear_links_for_source(self, cur: Any, *, source: str) -> int:
+    def clear_links_for_source(self, conn: Any, *, source: str) -> int:
         """`DELETE FROM publication_subjects WHERE source = X`. Retourne le rowcount."""
         ...
 
-    def select_source_publications_with_subjects(self, cur: Any, *, source: str) -> list[Any]:
+    def select_source_publications_with_subjects(self, conn: Any, *, source: str) -> list[Any]:
         """Retourne les `source_publications` rattachées (publication_id non NULL)
         pour la source donnée, avec leurs `keywords` et `topics`."""
         ...
 
-    def recompute_usage_counts(self, cur: Any) -> int:
+    def recompute_usage_counts(self, conn: Any) -> int:
         """Recalcule `subjects.usage_count` depuis `publication_subjects`."""
         ...
 
-    def recompute_cooccurrences(self, cur: Any, *, min_count: int = 2) -> int:
+    def recompute_cooccurrences(self, conn: Any, *, min_count: int = 2) -> int:
         """Recalcule la table `subject_cooccurrences` (TRUNCATE + INSERT)."""
         ...

@@ -43,7 +43,7 @@ _LOG_EVERY = 1000
 
 
 def run(
-    cur: Any,
+    conn: Any,
     queries: SubjectsQueries,
     logger: Any,
     sources: Any = None,
@@ -62,8 +62,8 @@ def run(
             logger.warning("subjects/%s : pas d'ingestor, source ignorée", source)
             continue
 
-        n_cleared = queries.clear_links_for_source(cur, source=source)
-        rows = queries.select_source_publications_with_subjects(cur, source=source)
+        n_cleared = queries.clear_links_for_source(conn, source=source)
+        rows = queries.select_source_publications_with_subjects(conn, source=source)
         total = len(rows)
         logger.info(
             "subjects/%s : %d publications à traiter (clear: %d)",
@@ -76,14 +76,11 @@ def run(
         n_links = 0
         t0 = time.perf_counter()
         for i, r in enumerate(rows, start=1):
-            pub_id = r["publication_id"] if isinstance(r, dict) else r[0]
-            kws = r["keywords"] if isinstance(r, dict) else r[1]
-            tps = r["topics"] if isinstance(r, dict) else r[2]
             n_links += ingestor.ingest(
-                cur,
-                publication_id=pub_id,
-                keywords=kws,
-                topics=tps,
+                conn,
+                publication_id=r.publication_id,
+                keywords=r.keywords,
+                topics=r.topics,
                 cache=cache,
             )
             if i % _LOG_EVERY == 0:

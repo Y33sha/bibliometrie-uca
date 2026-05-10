@@ -276,9 +276,8 @@ maximal là).
   (id/profile/theses/addresses/dashboard/subjects).
 - [x] **Nettoyage `apply_*` legacy** : tous les apply_* supprimés
   une fois plus aucun consommateur. `apply_stats_apc_filter` aussi.
-- [ ] **subjects.py** — partiellement (queries dynamiques uniquement,
-  les opérations JSON spécifiques restent en SQL brut). À traiter
-  en Phase 3 au fil de l'eau.
+- [x] **subjects.py** — partie pipeline traitée au Lot 3.B sub-lot 5
+  (cf. ci-dessous). Les opérations JSONB merge restent en `text()`.
 
 ### Phase 2 — Migration des modules (repos d'écriture + services + routers writes)
 
@@ -465,8 +464,12 @@ Sous-lots, par étape du pipeline :
   `refresh_publication_countries`), CLIs et `run_pipeline.py` aussi.
   `TestPopulateAffiliationsIdempotence` réactivé (helpers SA).
   Tests intégration : 887/887 verts.
-- [ ] **`subjects.py`** (10 occ.) — à examiner : opérations JSON
-  spécifiques susceptibles de rester en `text()`.
+- [x] **`subjects.py`** migré ; port + orchestrators (`subjects/run.py`,
+  `_common.py:SubjectCache`, 6 ingestors, `cooccurrences/run.py`) et
+  `run_pipeline.py` (phases subjects + cooccurrences) basculés sur
+  `Connection` SA. Le UPSERT JSONB merge reste en `text()` (ON CONFLICT
+  imbriqué avec `jsonb_each`/`jsonb_agg` — critère « SQL brut plus
+  lisible »), bind `ontologies` typé `JSONB`. Tests : 815/815 verts.
 
 #### Lot 3.C — Reste du code applicatif (~13 occ.)
 

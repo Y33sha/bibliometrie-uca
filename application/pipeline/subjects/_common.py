@@ -55,7 +55,7 @@ class SubjectCache:
 
     def get_or_upsert(
         self,
-        cur: Any,
+        conn: Any,
         *,
         label: str,
         language: str | None = None,
@@ -74,7 +74,7 @@ class SubjectCache:
         if cached is not None and self._covers(cached[1], onto):
             return cached[0]
         sid = self._queries.upsert_subject(
-            cur,
+            conn,
             label=label,
             language=language,
             ontologies=ontologies,
@@ -115,12 +115,12 @@ class SubjectCache:
 
     def link_bulk(
         self,
-        cur: Any,
+        conn: Any,
         *,
         source: str,
         rows: list[tuple[int, int, float | None]],
     ) -> int:
-        return self._queries.link_publication_subjects_bulk(cur, source=source, rows=rows)
+        return self._queries.link_publication_subjects_bulk(conn, source=source, rows=rows)
 
     def stats(self) -> dict[str, int]:
         return {"subjects": len(self._cache)}

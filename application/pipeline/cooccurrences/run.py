@@ -21,7 +21,7 @@ DEFAULT_MIN_COOCCURRENCE = 2
 
 
 def run(
-    cur: Any,
+    conn: Any,
     queries: SubjectsQueries,
     logger: Any,
     *,
@@ -30,11 +30,11 @@ def run(
     """Recalcule usage_counts + cooccurrences. Retourne un dict de stats."""
     t0 = time.perf_counter()
 
-    n_updated = queries.recompute_usage_counts(cur)
+    n_updated = queries.recompute_usage_counts(conn)
     logger.info("cooccurrences : usage_count rafraîchi sur %d sujets", n_updated)
 
     t_uc = time.perf_counter()
-    n_pairs = queries.recompute_cooccurrences(cur, min_count=min_cooccurrence)
+    n_pairs = queries.recompute_cooccurrences(conn, min_count=min_cooccurrence)
     t_co = time.perf_counter()
     logger.info(
         "cooccurrences : %d paires (count >= %d) en %.1fs",

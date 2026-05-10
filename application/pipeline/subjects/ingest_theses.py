@@ -17,7 +17,7 @@ SOURCE = "theses"
 
 
 def ingest(
-    cur: Any,
+    conn: Any,
     *,
     publication_id: int,
     keywords: list[str] | None,
@@ -27,7 +27,7 @@ def ingest(
     links: list[tuple[int, int, float | None]] = []
 
     for kw in dedup_strs(keywords):
-        sid = cache.get_or_upsert(cur, label=kw)
+        sid = cache.get_or_upsert(conn, label=kw)
         links.append((publication_id, sid, None))
 
     if isinstance(topics, dict):
@@ -35,7 +35,7 @@ def ingest(
         if isinstance(discipline, str) and discipline.strip():
             label = discipline.strip()
             sid = cache.get_or_upsert(
-                cur,
+                conn,
                 label=label,
                 language="fr",
                 ontologies={ONTOLOGY_THESES_DISCIPLINE: {"codes": [label.lower()]}},
@@ -44,11 +44,11 @@ def ingest(
 
         for label in dedup_strs(topics.get("rameau")):
             sid = cache.get_or_upsert(
-                cur,
+                conn,
                 label=label,
                 language="fr",
                 ontologies={ONTOLOGY_RAMEAU: {"codes": [label.lower()]}},
             )
             links.append((publication_id, sid, None))
 
-    return cache.link_bulk(cur, source=SOURCE, rows=links)
+    return cache.link_bulk(conn, source=SOURCE, rows=links)

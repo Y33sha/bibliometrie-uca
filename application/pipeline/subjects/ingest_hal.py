@@ -34,7 +34,7 @@ def _strip_level_prefix(raw: str) -> str:
 
 
 def ingest(
-    cur: Any,
+    conn: Any,
     *,
     publication_id: int,
     keywords: list[str] | None,
@@ -51,7 +51,7 @@ def ingest(
     links: list[tuple[int, int, float | None]] = []
 
     for kw in dedup_strs(keywords):
-        sid = cache.get_or_upsert(cur, label=kw)
+        sid = cache.get_or_upsert(conn, label=kw)
         links.append((publication_id, sid, None))
 
     if isinstance(topics, dict):
@@ -62,10 +62,10 @@ def ingest(
                 continue
             seen_codes.add(code)
             sid = cache.get_or_upsert(
-                cur,
+                conn,
                 label=hal_domain_label(code),
                 ontologies={ONTOLOGY_HAL_DOMAIN: {"codes": [code]}},
             )
             links.append((publication_id, sid, None))
 
-    return cache.link_bulk(cur, source=SOURCE, rows=links)
+    return cache.link_bulk(conn, source=SOURCE, rows=links)
