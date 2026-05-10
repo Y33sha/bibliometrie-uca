@@ -3,19 +3,14 @@
 Implémente le port `domain.ports.person_repository.PersonRepository`.
 Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`,
 `_authorships`, `_name_forms` — la classe `PgPersonRepository` n'est qu'un
-point d'agrégation qui borne le curseur et délègue.
-
-Mode dispatch : accepte un curseur psycopg ou une Connection SA. Les
-sous-modules dispatchent en interne via `isinstance`. Phase 4 supprimera
-la branche psycopg.
+point d'agrégation qui borne la connexion et délègue.
 
 Usage :
-    with get_cursor() as (cur, conn):
-        repo = PgPersonRepository(cur)
-        repo.set_rejected(person_id, True)
+    repo = PgPersonRepository(conn)
+    repo.set_rejected(person_id, True)
 """
 
-from typing import Any
+from sqlalchemy import Connection
 
 from infrastructure.repositories.person_repository import (
     _authorships,
@@ -26,37 +21,34 @@ from infrastructure.repositories.person_repository import (
 
 
 class PgPersonRepository:
-    """Accès PostgreSQL à l'agrégat Person.
+    """Accès PostgreSQL à l'agrégat Person via une `Connection` SA."""
 
-    Accepte un curseur psycopg ou une Connection SQLAlchemy.
-    """
-
-    def __init__(self, conn_or_cur: Any) -> None:
-        self._cur = conn_or_cur
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
 
     # ── persons ────────────────────────────────────────────────────
 
     def create(self, last_name: str, first_name: str = "") -> int:
-        return _core.create(self._cur, last_name, first_name)
+        return _core.create(self._conn, last_name, first_name)
 
     def update_name(self, person_id: int, last_name: str, first_name: str) -> None:
-        _core.update_name(self._cur, person_id, last_name, first_name)
+        _core.update_name(self._conn, person_id, last_name, first_name)
 
     def set_rejected(self, person_id: int, rejected: bool) -> None:
-        _core.set_rejected(self._cur, person_id, rejected)
+        _core.set_rejected(self._conn, person_id, rejected)
 
     # ── Fusion ─────────────────────────────────────────────────────
 
     def has_distinct_rh(self, id_a: int, id_b: int) -> bool:
-        return _core.has_distinct_rh(self._cur, id_a, id_b)
+        return _core.has_distinct_rh(self._conn, id_a, id_b)
 
     def merge_into(self, target_id: int, source_id: int) -> None:
-        _core.merge_into(self._cur, target_id, source_id)
+        _core.merge_into(self._conn, target_id, source_id)
 
     # ── distinct_persons ───────────────────────────────────────────
 
     def mark_distinct(self, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
-        return _core.mark_distinct(self._cur, person_id_a, person_id_b)
+        return _core.mark_distinct(self._conn, person_id_a, person_id_b)
 
     # ── person_identifiers ─────────────────────────────────────────
 
@@ -68,16 +60,16 @@ class PgPersonRepository:
         source: str = "auto",
         status: str = "pending",
     ) -> None:
-        _identifiers.add_identifier(self._cur, person_id, id_type, id_value, source, status)
+        _identifiers.add_identifier(self._conn, person_id, id_type, id_value, source, status)
 
     def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None:
-        _identifiers.remove_identifier(self._cur, person_id, id_type, id_value)
+        _identifiers.remove_identifier(self._conn, person_id, id_type, id_value)
 
     def update_identifier_status(self, ident_id: int, status: str) -> dict:
-        return _identifiers.update_identifier_status(self._cur, ident_id, status)
+        return _identifiers.update_identifier_status(self._conn, ident_id, status)
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:
-        _identifiers.reassign_identifier(self._cur, ident_id, target_person_id)
+        _identifiers.reassign_identifier(self._conn, ident_id, target_person_id)
 
     # ── source_authorships (liens personne ↔ authorship source) ────
 
@@ -91,7 +83,7 @@ class PgPersonRepository:
         has_hal_person_id: bool = False,
     ) -> None:
         _authorships.link_authorship(
-            self._cur,
+            self._conn,
             person_id,
             source,
             authorship_id,
@@ -100,27 +92,27 @@ class PgPersonRepository:
         )
 
     def unlink_authorship(self, person_id: int, source: str, authorship_id: int) -> None:
-        _authorships.unlink_authorship(self._cur, person_id, source, authorship_id)
+        _authorships.unlink_authorship(self._conn, person_id, source, authorship_id)
 
     def assign_orphan_sa(self, person_id: int, source: str, authorship_id: int) -> dict | None:
-        return _authorships.assign_orphan_sa(self._cur, person_id, source, authorship_id)
+        return _authorships.assign_orphan_sa(self._conn, person_id, source, authorship_id)
 
     def batch_assign_orphans(self, person_id: int, sa_ids: list[int]) -> int:
-        return _authorships.batch_assign_orphans(self._cur, person_id, sa_ids)
+        return _authorships.batch_assign_orphans(self._conn, person_id, sa_ids)
 
     def ensure_truth_authorship(self, person_id: int, source: str, authorship_id: int) -> None:
-        _authorships.ensure_truth_authorship(self._cur, person_id, source, authorship_id)
+        _authorships.ensure_truth_authorship(self._conn, person_id, source, authorship_id)
 
     def count_authorships_with_name_form(self, person_id: int, name_form: str) -> int:
-        return _authorships.count_authorships_with_name_form(self._cur, person_id, name_form)
+        return _authorships.count_authorships_with_name_form(self._conn, person_id, name_form)
 
     # ── person_name_forms ──────────────────────────────────────────
 
     def refresh_name_forms(self, person_id: int, forms: set[str]) -> None:
-        _name_forms.refresh_name_forms(self._cur, person_id, forms)
+        _name_forms.refresh_name_forms(self._conn, person_id, forms)
 
     def add_name_form(self, person_id: int, full_name: str, source: str | None = None) -> None:
-        _name_forms.add_name_form(self._cur, person_id, full_name, source)
+        _name_forms.add_name_form(self._conn, person_id, full_name, source)
 
     def detach_name_form(self, person_id: int, name_form: str) -> None:
-        _name_forms.detach_name_form(self._cur, person_id, name_form)
+        _name_forms.detach_name_form(self._conn, person_id, name_form)

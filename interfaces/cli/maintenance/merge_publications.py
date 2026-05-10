@@ -4,8 +4,7 @@ Fusion ad hoc de deux publications doublonnées.
 
 Variante CLI de l'endpoint admin POST /api/admin/duplicates/merge — utile
 quand on n'a pas de session HTTP (terminal non auth) ou pour scripter un
-nettoyage en lot. Migration SA Core reportée au Lot 3.A du chantier
-sqlalchemy-core-adoption.
+nettoyage en lot.
 
 Usage :
     python -m interfaces.cli.maintenance.merge_publications <target_id> <source_id>           # dry-run
