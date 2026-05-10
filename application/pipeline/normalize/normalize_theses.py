@@ -25,8 +25,6 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 from collections.abc import Callable
 from typing import Any
 
-from psycopg.types.json import Jsonb as Json
-
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.address_linker import AddressLinker
 from application.ports.normalize_theses import ThesesNormalizeQueries
@@ -168,7 +166,7 @@ def _update_thesis_meta(
         meta["date_inscription"] = di
     if not meta:
         return
-    queries.merge_publication_meta(cur, pub_id, Json(meta))
+    queries.merge_publication_meta(cur, pub_id, meta)
 
 
 # =============================================================
@@ -223,7 +221,7 @@ def insert_source_document(
     écoles doctorales, partenaires, dates).
     """
     nnt = pub_meta["nnt"]
-    external_ids = Json({"nnt": nnt}) if nnt else None
+    external_ids = {"nnt": nnt} if nnt else None
 
     # Keywords : sujets (mots-cles auteur)
     sujets = these.get("sujets") or []
@@ -238,11 +236,11 @@ def insert_source_document(
     rameau_list = [r.get("libelle") for r in rameau if r.get("libelle")]
     if rameau_list:
         topics["rameau"] = rameau_list
-    topics_json = Json(topics) if topics else None
+    topics_json = topics if topics else None
 
     # Meta spécifique thèse (discipline, écoles doctorales, partenaires, dates)
     source_meta = _build_source_meta(these)
-    source_meta_json = Json(source_meta) if source_meta else None
+    source_meta_json = source_meta if source_meta else None
 
     return queries.upsert_theses_source_publication(
         cur,
@@ -325,7 +323,7 @@ def process_persons(
             author_position=a.author_position,
             roles=a.roles,
             raw_author_name=a.raw_author_name,
-            identifiers=Json(a.identifiers) if a.identifiers else None,
+            identifiers=a.identifiers if a.identifiers else None,
         )
         if addr_parts:
             address_linker.link(cur, sa_id, addr_parts)
@@ -340,16 +338,16 @@ def process_work(
     cur: Any,
     queries: ThesesNormalizeQueries,
     logger: Any,
-    row: dict,
+    row: Any,
     *,
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
     address_linker: AddressLinker,
 ) -> bool:
     """Traite une thèse du staging."""
-    staging_id = row["id"]
-    theses_id = row["source_id"]
-    these = row["raw_data"]
+    staging_id = row.id
+    theses_id = row.source_id
+    these = row.raw_data
 
     try:
         title = these.get("titrePrincipal")
