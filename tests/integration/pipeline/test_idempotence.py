@@ -211,41 +211,43 @@ SCANR_STAGING_DOCS = [
 ]
 
 
-def _insert_staging(cur, docs):
+def _insert_staging(conn, docs):
     """Insère des documents dans staging (source='scanr')."""
+    from sqlalchemy import bindparam, text
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    stmt = text("""
+        INSERT INTO staging (source, source_id, doi, raw_data, processed)
+        VALUES ('scanr', :scanr_id, :doi, :raw_data, FALSE)
+        ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
+    """).bindparams(bindparam("raw_data", type_=JSONB))
     for doc in docs:
-        cur.execute(
-            """
-            INSERT INTO staging (source, source_id, doi, raw_data, processed)
-            VALUES ('scanr', %s, %s, %s, FALSE)
-            ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
-        """,
-            (doc["scanr_id"], doc["doi"], Json(doc["raw_data"])),
+        conn.execute(
+            stmt, {"scanr_id": doc["scanr_id"], "doi": doc["doi"], "raw_data": doc["raw_data"]}
         )
 
 
-def _count_tables(cur) -> dict:
+def _count_tables(conn) -> dict:
     """Retourne les compteurs des tables normalisées."""
-    tables = [
-        "publications",
-        "journals",
-        "publishers",
-        "source_persons",
-    ]
+    from sqlalchemy import text
+
     counts = {}
-    for t in tables:
-        cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
-        counts[t] = cur.fetchone()["cnt"]
-    cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'scanr'")
-    counts["scanr_authorships"] = cur.fetchone()["cnt"]
-    cur.execute("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'scanr'")
-    counts["scanr_documents"] = cur.fetchone()["cnt"]
+    for t in ("publications", "journals", "publishers", "source_persons"):
+        counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
+    counts["scanr_authorships"] = conn.execute(
+        text("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'scanr'")
+    ).scalar_one()
+    counts["scanr_documents"] = conn.execute(
+        text("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'scanr'")
+    ).scalar_one()
     return counts
 
 
-def _run_normalize_scanr(cur):
-    """Exécute la normalisation ScanR sur le curseur de test."""
+def _run_normalize_scanr(conn):
+    """Exécute la normalisation ScanR sur la Connection SA de test."""
     import logging
+
+    from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_scanr import process_work
     from infrastructure.addresses import PgAddressLinker
@@ -261,21 +263,22 @@ def _run_normalize_scanr(cur):
     staging_queries = PgStagingQueries()
     address_linker = PgAddressLinker()
     logger = logging.getLogger("test")
-    journal_repo = journal_repository(cur)
-    publisher_repo = publisher_repository(cur)
-    pub_repo = publication_repository(cur)
+    journal_repo = journal_repository(conn)
+    publisher_repo = publisher_repository(conn)
+    pub_repo = publication_repository(conn)
 
-    cur.execute("""
-        SELECT id, source_id AS scanr_id, doi, raw_data
-        FROM staging
-        WHERE source = 'scanr' AND processed = FALSE
-        ORDER BY id
-    """)
-    rows = cur.fetchall()
+    rows = conn.execute(
+        text("""
+            SELECT id, source_id AS scanr_id, doi, raw_data
+            FROM staging
+            WHERE source = 'scanr' AND processed = FALSE
+            ORDER BY id
+        """)
+    ).all()
     processed = 0
     for row in rows:
         if process_work(
-            cur,
+            conn,
             queries,
             logger,
             row,
@@ -295,14 +298,16 @@ def _run_normalize_scanr(cur):
 class TestNormalizeScanrIdempotence:
     """La normalisation ScanR produit le même résultat si lancée deux fois."""
 
-    def test_double_run_same_counts(self, db):
+    def test_double_run_same_counts(self, sa_sync_conn):
         """Lancer la normalisation deux fois ne crée pas de doublons."""
-        _insert_staging(db, SCANR_STAGING_DOCS)
+        from sqlalchemy import text
+
+        _insert_staging(sa_sync_conn, SCANR_STAGING_DOCS)
 
         # Première passe
-        processed_1 = _run_normalize_scanr(db)
-        _create_all_publications(db)
-        counts_1 = _count_tables(db)
+        processed_1 = _run_normalize_scanr(sa_sync_conn)
+        _create_all_publications(sa_sync_conn)
+        counts_1 = _count_tables(sa_sync_conn)
 
         assert processed_1 == 3, f"Première passe : {processed_1} traités (attendu 3)"
         assert counts_1["scanr_documents"] == 3
@@ -314,31 +319,38 @@ class TestNormalizeScanrIdempotence:
         assert counts_1["publications"] >= 3
 
         # Reset processed flags
-        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'scanr'")
+        sa_sync_conn.execute(text("UPDATE staging SET processed = FALSE WHERE source = 'scanr'"))
 
         # Deuxième passe
-        _run_normalize_scanr(db)
-        _create_all_publications(db)
-        counts_2 = _count_tables(db)
+        _run_normalize_scanr(sa_sync_conn)
+        _create_all_publications(sa_sync_conn)
+        counts_2 = _count_tables(sa_sync_conn)
 
         assert counts_2 == counts_1, (
             f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
 
-    def test_author_dedup_by_idref(self, db):
+    def test_author_dedup_by_idref(self, sa_sync_conn):
         """Un même idref sur deux documents → un seul scanr_author."""
-        _insert_staging(db, SCANR_STAGING_DOCS)
-        _run_normalize_scanr(db)
+        from sqlalchemy import text
 
-        db.execute("SELECT count(*) AS cnt FROM source_persons WHERE idref = '000000001'")
-        assert db.fetchone()["cnt"] == 1, "Alice Dupont devrait être dédupliquée par idref"
+        _insert_staging(sa_sync_conn, SCANR_STAGING_DOCS)
+        _run_normalize_scanr(sa_sync_conn)
 
-        db.execute(
-            "SELECT count(*) AS cnt FROM source_authorships WHERE source = 'scanr' AND source_person_id = (SELECT id FROM source_persons WHERE idref = '000000001')"
-        )
-        assert db.fetchone()["cnt"] == 2, "Alice devrait avoir 2 authorships (article + chapitre)"
+        cnt = sa_sync_conn.execute(
+            text("SELECT count(*) AS cnt FROM source_persons WHERE idref = '000000001'")
+        ).scalar_one()
+        assert cnt == 1, "Alice Dupont devrait être dédupliquée par idref"
 
-    def test_author_without_idref(self, db):
+        cnt = sa_sync_conn.execute(
+            text(
+                "SELECT count(*) AS cnt FROM source_authorships WHERE source = 'scanr' "
+                "AND source_person_id = (SELECT id FROM source_persons WHERE idref = '000000001')"
+            )
+        ).scalar_one()
+        assert cnt == 2, "Alice devrait avoir 2 authorships (article + chapitre)"
+
+    def test_author_without_idref(self, sa_sync_conn):
         """Un auteur sans idref ScanR ne crée pas de source_persons.
 
         Depuis le chantier source_persons : ScanR ne crée plus de
@@ -346,28 +358,35 @@ class TestNormalizeScanrIdempotence:
         que dans `source_authorships` (source_person_id NULL). L'identité
         sera reconstruite au pipeline `personnes` via les name_forms.
         """
-        _insert_staging(db, SCANR_STAGING_DOCS)
-        _run_normalize_scanr(db)
+        from sqlalchemy import text
+
+        _insert_staging(sa_sync_conn, SCANR_STAGING_DOCS)
+        _run_normalize_scanr(sa_sync_conn)
 
         # Aucun source_persons sans idref côté ScanR.
-        db.execute(
-            "SELECT count(*) AS cnt FROM source_persons WHERE source = 'scanr' AND idref IS NULL"
-        )
-        assert db.fetchone()["cnt"] == 0
+        cnt = sa_sync_conn.execute(
+            text(
+                "SELECT count(*) AS cnt FROM source_persons "
+                "WHERE source = 'scanr' AND idref IS NULL"
+            )
+        ).scalar_one()
+        assert cnt == 0
 
         # Charlie Noid et Diana Durand sont bien dans source_authorships
         # avec source_person_id NULL.
-        db.execute(
-            """
-            SELECT count(*) AS cnt FROM source_authorships
-            WHERE source = 'scanr' AND source_person_id IS NULL
-              AND raw_author_name IN ('Charlie Noid', 'Diana Durand')
-            """
-        )
-        assert db.fetchone()["cnt"] == 2
+        cnt = sa_sync_conn.execute(
+            text("""
+                SELECT count(*) AS cnt FROM source_authorships
+                WHERE source = 'scanr' AND source_person_id IS NULL
+                  AND raw_author_name IN ('Charlie Noid', 'Diana Durand')
+            """)
+        ).scalar_one()
+        assert cnt == 2
 
-    def test_publication_dedup_by_doi(self, db):
+    def test_publication_dedup_by_doi(self, sa_sync_conn):
         """Deux documents ScanR avec le même DOI → une seule publication."""
+        from sqlalchemy import text
+
         dup = {
             "scanr_id": "doi10.1234/test-article-001-bis",
             "doi": "10.1234/test-article-001",
@@ -382,39 +401,50 @@ class TestNormalizeScanrIdempotence:
                 "authors": [],
             },
         }
-        _insert_staging(db, SCANR_STAGING_DOCS + [dup])
-        _run_normalize_scanr(db)
-        _create_all_publications(db)
+        _insert_staging(sa_sync_conn, SCANR_STAGING_DOCS + [dup])
+        _run_normalize_scanr(sa_sync_conn)
+        _create_all_publications(sa_sync_conn)
 
-        db.execute(
-            "SELECT count(*) AS cnt FROM publications WHERE lower(doi) = '10.1234/test-article-001'"
-        )
-        assert db.fetchone()["cnt"] == 1, "Le DOI devrait être dédupliqué"
+        cnt = sa_sync_conn.execute(
+            text(
+                "SELECT count(*) AS cnt FROM publications "
+                "WHERE lower(doi) = '10.1234/test-article-001'"
+            )
+        ).scalar_one()
+        assert cnt == 1, "Le DOI devrait être dédupliqué"
 
-        db.execute("SELECT count(*) AS cnt FROM source_publications WHERE source = 'scanr'")
-        assert db.fetchone()["cnt"] == 4, "4 scanr_documents (3 originaux + 1 bis)"
+        cnt = sa_sync_conn.execute(
+            text("SELECT count(*) AS cnt FROM source_publications WHERE source = 'scanr'")
+        ).scalar_one()
+        assert cnt == 4, "4 scanr_documents (3 originaux + 1 bis)"
 
-    def test_journal_dedup(self, db):
+    def test_journal_dedup(self, sa_sync_conn):
         """Deux documents avec le même journal → un seul journal."""
-        _insert_staging(db, SCANR_STAGING_DOCS)
-        _run_normalize_scanr(db)
+        from sqlalchemy import text
 
-        db.execute(
-            "SELECT count(*) AS cnt FROM journals WHERE title_normalized LIKE '%volcanology%'"
-        )
-        assert db.fetchone()["cnt"] == 1
+        _insert_staging(sa_sync_conn, SCANR_STAGING_DOCS)
+        _run_normalize_scanr(sa_sync_conn)
 
-    def test_publisher_dedup(self, db):
+        cnt = sa_sync_conn.execute(
+            text("SELECT count(*) AS cnt FROM journals WHERE title_normalized LIKE '%volcanology%'")
+        ).scalar_one()
+        assert cnt == 1
+
+    def test_publisher_dedup(self, sa_sync_conn):
         """Le même éditeur n'est pas créé en double."""
-        _insert_staging(db, SCANR_STAGING_DOCS)
-        _run_normalize_scanr(db)
+        from sqlalchemy import text
+
+        _insert_staging(sa_sync_conn, SCANR_STAGING_DOCS)
+        _run_normalize_scanr(sa_sync_conn)
 
         # Première passe ok, reset et relance
-        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'scanr'")
-        _run_normalize_scanr(db)
+        sa_sync_conn.execute(text("UPDATE staging SET processed = FALSE WHERE source = 'scanr'"))
+        _run_normalize_scanr(sa_sync_conn)
 
-        db.execute("SELECT count(*) AS cnt FROM publishers WHERE name_normalized LIKE '%elsevier%'")
-        assert db.fetchone()["cnt"] == 1, "Elsevier BV ne devrait exister qu'une fois"
+        cnt = sa_sync_conn.execute(
+            text("SELECT count(*) AS cnt FROM publishers WHERE name_normalized LIKE '%elsevier%'")
+        ).scalar_one()
+        assert cnt == 1, "Elsevier BV ne devrait exister qu'une fois"
 
 
 # ══════════════════════════════════════════════════════════════════

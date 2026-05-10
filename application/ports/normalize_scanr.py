@@ -11,7 +11,7 @@ class ScanrNormalizeQueries(Protocol):
 
     def upsert_scanr_source_publication(
         self,
-        cur: Any,
+        conn: Any,
         *,
         scanr_id: str,
         doi: str | None,
@@ -34,7 +34,7 @@ class ScanrNormalizeQueries(Protocol):
 
     def upsert_scanr_source_person_by_idref(
         self,
-        cur: Any,
+        conn: Any,
         *,
         idref: str,
         full_name: str,
@@ -43,7 +43,7 @@ class ScanrNormalizeQueries(Protocol):
 
     def upsert_scanr_source_authorship(
         self,
-        cur: Any,
+        conn: Any,
         *,
         source_publication_id: int,
         source_person_id: int | None,
@@ -53,8 +53,8 @@ class ScanrNormalizeQueries(Protocol):
         identifiers: Any,
     ) -> int: ...
 
-    def get_scanr_publication_id(self, cur: Any, scanr_id: str) -> int | None: ...
+    def get_scanr_publication_id(self, conn: Any, scanr_id: str) -> int | None: ...
 
     def clear_source_authorships_for_publication(
-        self, cur: Any, source_publication_id: int
+        self, conn: Any, source_publication_id: int
     ) -> None: ...
