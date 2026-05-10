@@ -1,8 +1,6 @@
 """SQL pour les liens personne ↔ `source_authorships` et les authorships vérité."""
 
-from typing import Any
-
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from domain.sources import (
     AUTHOR_SOURCES_SQL,
@@ -14,7 +12,7 @@ from infrastructure.repositories.person_repository import _name_forms
 
 
 def link_authorship(
-    conn: Any,
+    conn: Connection,
     person_id: int,
     source: str,
     authorship_id: int,
@@ -42,7 +40,7 @@ def link_authorship(
         )
 
 
-def unlink_authorship(conn: Any, person_id: int, source: str, authorship_id: int) -> None:
+def unlink_authorship(conn: Connection, person_id: int, source: str, authorship_id: int) -> None:
     conn.execute(
         text("""
             UPDATE source_authorships SET person_id = NULL
@@ -52,7 +50,9 @@ def unlink_authorship(conn: Any, person_id: int, source: str, authorship_id: int
     )
 
 
-def assign_orphan_sa(conn: Any, person_id: int, source: str, authorship_id: int) -> dict | None:
+def assign_orphan_sa(
+    conn: Connection, person_id: int, source: str, authorship_id: int
+) -> dict | None:
     """Tente de poser person_id sur une source_authorship orpheline.
 
     Retourne un dict {excluded, author_name_normalized} si l'UPDATE a
@@ -69,7 +69,7 @@ def assign_orphan_sa(conn: Any, person_id: int, source: str, authorship_id: int)
     return dict(row._mapping) if row else None
 
 
-def batch_assign_orphans(conn: Any, person_id: int, sa_ids: list[int]) -> int:
+def batch_assign_orphans(conn: Connection, person_id: int, sa_ids: list[int]) -> int:
     """Rattache en batch un lot de source_authorships orphelines, crée les
     authorships vérité manquantes, pose les FK et ajoute les formes de noms.
 
@@ -136,7 +136,9 @@ def batch_assign_orphans(conn: Any, person_id: int, sa_ids: list[int]) -> int:
     return assigned
 
 
-def ensure_truth_authorship(conn: Any, person_id: int, source: str, authorship_id: int) -> None:
+def ensure_truth_authorship(
+    conn: Connection, person_id: int, source: str, authorship_id: int
+) -> None:
     """Crée/synchronise l'authorship vérité pour une paire (pub, person).
 
     Même logique que build_authorships.py mais pour une seule paire :
@@ -231,7 +233,7 @@ def ensure_truth_authorship(conn: Any, person_id: int, source: str, authorship_i
     )
 
 
-def count_authorships_with_name_form(conn: Any, person_id: int, name_form: str) -> int:
+def count_authorships_with_name_form(conn: Connection, person_id: int, name_form: str) -> int:
     """Compte les source_authorships actives d'une personne portant une
     forme de nom donnée. Utilisé par detach_authorships pour décider
     de nettoyer la name_form ou pas."""

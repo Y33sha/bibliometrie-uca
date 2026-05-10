@@ -21,7 +21,7 @@ import time
 from typing import Any
 
 import requests
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import WOS_DELAY, WOS_PER_PAGE
@@ -131,7 +131,7 @@ def get_records_found(data: dict) -> int:
         return 0
 
 
-def get_existing_uts(conn: Any) -> set:
+def get_existing_uts(conn: Connection) -> set:
     """Récupère les UT déjà en base pour éviter les doublons."""
     from infrastructure.sources.common import get_existing_ids
 
@@ -155,7 +155,7 @@ _INSERT_WOS_BATCH_SQL = text(
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
 
-def insert_batch(conn: Any, batch: list[dict]) -> Any:
+def insert_batch(conn: Connection, batch: list[dict]) -> Any:
     """Insère un batch de records dans staging.
     Si le record existe et le hash a changé, met à jour raw_data et remet processed = FALSE.
     """
@@ -163,7 +163,7 @@ def insert_batch(conn: Any, batch: list[dict]) -> Any:
     conn.commit()
 
 
-def extract_year(year: int, conn: Any, existing_uts: set, dry_run: bool = False) -> int:
+def extract_year(year: int, conn: Connection, existing_uts: set, dry_run: bool = False) -> int:
     """Extrait toutes les publications d'une année. Retourne le nb insérés."""
     logger.info(f"Requête WoS : {build_query(year)}")
 
@@ -271,7 +271,7 @@ class WosExtractor(SourceExtractor):
             "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
         )
 
-    def load_config(self, conn: Any) -> dict[str, Any]:
+    def load_config(self, conn: Connection) -> dict[str, Any]:
         global BASE_URL, HEADERS
         affiliations = get_extraction_api_ids(conn, "wos")
         if not affiliations:

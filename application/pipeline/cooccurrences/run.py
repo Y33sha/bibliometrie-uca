@@ -12,8 +12,10 @@ Idempotent : on peut relancer autant qu'on veut, le résultat ne dépend que
 de l'état courant de `publication_subjects`.
 """
 
+import logging
 import time
-from typing import Any
+
+from sqlalchemy import Connection
 
 from application.ports.subjects import SubjectsQueries
 
@@ -21,9 +23,9 @@ DEFAULT_MIN_COOCCURRENCE = 2
 
 
 def run(
-    conn: Any,
+    conn: Connection,
     queries: SubjectsQueries,
-    logger: Any,
+    logger: logging.Logger,
     *,
     min_cooccurrence: int = DEFAULT_MIN_COOCCURRENCE,
 ) -> dict[str, int]:

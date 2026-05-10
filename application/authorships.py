@@ -9,7 +9,7 @@ complète), et `webapp/uca.py` gère le recalcul UCA incrémental.
 Le SQL vit dans `infrastructure/repositories/authorship_repository.py`.
 """
 
-from typing import Any
+from sqlalchemy import Connection
 
 from application.audit import emit_event
 from application.ports.perimeter import PerimeterQueries
@@ -20,7 +20,7 @@ from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 
 def exclude_authorship(
-    conn: Any,
+    conn: Connection,
     authorship_id: int,
     *,
     repo: AuthorshipRepository,
@@ -54,7 +54,7 @@ def exclude_authorship(
 
 
 def set_source_authorship_excluded(
-    conn: Any,
+    conn: Connection,
     source_authorship_id: int,
     source: str,
     excluded: bool,
@@ -89,7 +89,7 @@ def set_source_authorship_excluded(
 
 
 def detach_source(
-    conn: Any, source_authorship_id: int, source: str, *, repo: AuthorshipRepository
+    conn: Connection, source_authorship_id: int, source: str, *, repo: AuthorshipRepository
 ) -> bool:
     """Détache une authorship source de son authorship vérité.
     Si plus aucune source ne l'atteste, supprime l'authorship vérité.
@@ -113,7 +113,7 @@ def detach_source(
 
 
 def propagate_uca_for_addresses(
-    conn: Any,
+    conn: Connection,
     address_ids: list[int],
     *,
     repo: AuthorshipRepository,
@@ -140,7 +140,9 @@ def propagate_uca_for_addresses(
     repo.propagate_in_perimeter_to_truth_authorships(affected_sa_ids)
 
 
-def delete_orphan_authorships(conn: Any, person_id: int, *, repo: AuthorshipRepository) -> int:
+def delete_orphan_authorships(
+    conn: Connection, person_id: int, *, repo: AuthorshipRepository
+) -> int:
     """Supprime les authorships vérité d'une personne qui ne sont plus attestées
     par aucune authorship source. Retourne le nombre d'authorships supprimées.
     """

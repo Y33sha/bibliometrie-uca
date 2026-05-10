@@ -10,10 +10,11 @@ L'orchestrateur dépend du port `EnrichQueries`. Le point d'entrée CLI est dans
 `interfaces/cli/pipeline/enrich_journal_apc.py`.
 """
 
+import logging
 import time
-from typing import Any
 
 import requests
+from sqlalchemy import Connection
 
 from application.journals import reset_journal_apc, update_journal_apc
 from application.ports.enrich import EnrichQueries
@@ -39,7 +40,7 @@ def to_short_id(full_id: str) -> str:
 
 
 def fetch_sources_batch(
-    openalex_ids: list[str], mailto: str, logger: Any, *, openalex_sources_api: str
+    openalex_ids: list[str], mailto: str, logger: logging.Logger, *, openalex_sources_api: str
 ) -> dict[str, dict]:
     """Interroge l'API OpenAlex pour un lot d'IDs et retourne un dict short_id → données."""
     full_ids = [to_full_id(oid) for oid in openalex_ids]
@@ -99,9 +100,9 @@ def extract_apc(source: dict) -> tuple[float | None, str]:
 
 
 def run_enrich(
-    conn: Any,
+    conn: Connection,
     queries: EnrichQueries,
-    logger: Any,
+    logger: logging.Logger,
     *,
     journal_repo: JournalRepository,
     mailto: str,

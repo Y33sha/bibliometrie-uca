@@ -12,8 +12,6 @@ par concept métier, on promouvra en package (`domain/structure/`) le
 jour où ça dépasse ~500 lignes.
 """
 
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
@@ -42,7 +40,7 @@ class StructureApiIds(BaseModel):
 
     @field_validator("openalex", "wos", "scanr", "theses", "hal", mode="before")
     @classmethod
-    def _ensure_list(cls, v: Any) -> list[str] | None:
+    def _ensure_list(cls, v: str | list[str] | None) -> list[str] | None:
         """Tolère un string unique en entrée en le wrappant en liste.
 
         Données historiques : certaines entrées ont pu être écrites

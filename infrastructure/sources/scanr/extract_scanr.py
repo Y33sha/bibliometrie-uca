@@ -15,7 +15,7 @@ import os
 import time
 from typing import Any
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import SCANR_DELAY, SCANR_PER_PAGE
@@ -98,7 +98,7 @@ def fetch_page(url: str, auth: tuple, query: dict) -> dict:
 
 
 def extract_year(
-    conn: Any,
+    conn: Connection,
     url: str,
     auth: tuple,
     year: int,
@@ -185,7 +185,7 @@ class ScanrExtractor(SourceExtractor):
             "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
         )
 
-    def load_config(self, conn: Any) -> dict[str, Any]:
+    def load_config(self, conn: Connection) -> dict[str, Any]:
         affiliation_ids = get_extraction_api_ids(conn, "scanr")
         if not affiliation_ids:
             raise ExtractionConfigError(

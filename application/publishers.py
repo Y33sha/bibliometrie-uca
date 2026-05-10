@@ -14,8 +14,6 @@ journaux à conflit entre les deux éditeurs à fusionner avant de
 déléguer les transferts SQL.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection
 
 from application.audit import emit_event
@@ -28,7 +26,7 @@ from domain.ports.publisher_repository import PublisherRepository
 
 
 def find_or_create_publisher(
-    cur: Any,
+    cur: Connection,
     name: str | None,
     *,
     openalex_id: str | None = None,

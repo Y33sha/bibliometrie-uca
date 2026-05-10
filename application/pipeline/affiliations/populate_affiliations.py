@@ -12,17 +12,20 @@ L'orchestrateur dépend du port `AffiliationsQueries`. Le point d'entrée CLI
 est dans `interfaces/cli/pipeline/populate_affiliations.py`.
 """
 
+import logging
 import time
 from typing import Any
+
+from sqlalchemy import Connection
 
 from application.ports.affiliations import AffiliationsQueries
 from domain.sources import BIBLIO_SOURCES
 
 
 def _step_address_source(
-    conn: Any,
+    conn: Connection,
     queries: AffiliationsQueries,
-    logger: Any,
+    logger: logging.Logger,
     source: str,
     perimeter_ids: Any,
     wide_ids: Any,
@@ -47,9 +50,9 @@ def _step_address_source(
 
 
 def step3d_theses(
-    conn: Any,
+    conn: Connection,
     queries: AffiliationsQueries,
-    logger: Any,
+    logger: logging.Logger,
     wide_ids: Any,
     daily: bool = False,
 ) -> None:
@@ -61,7 +64,7 @@ def step3d_theses(
     logger.info(f"Étape 3d — theses.fr structure_ids : {n} authorships")
 
 
-def show_stats(conn: Any, queries: AffiliationsQueries, logger: Any) -> None:
+def show_stats(conn: Connection, queries: AffiliationsQueries, logger: logging.Logger) -> None:
     """Affiche les compteurs in_perimeter par source."""
     for source_name, source_value in [
         ("HAL", "hal"),
@@ -77,9 +80,9 @@ def show_stats(conn: Any, queries: AffiliationsQueries, logger: Any) -> None:
 
 
 def run_populate(
-    conn: Any,
+    conn: Connection,
     queries: AffiliationsQueries,
-    logger: Any,
+    logger: logging.Logger,
     perimeter_ids: set[int],
     wide_ids: set[int],
     *,

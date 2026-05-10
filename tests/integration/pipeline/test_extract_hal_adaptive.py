@@ -243,9 +243,7 @@ class TestTagExistingWithCollectionSql:
             _NoCommitConn(db.connection), ["hal-existing"], "GEOLAB"
         )
         assert n == 1
-        db.execute(
-            "SELECT hal_collections FROM staging WHERE source_id = 'hal-existing'"
-        )
+        db.execute("SELECT hal_collections FROM staging WHERE source_id = 'hal-existing'")
         assert db.fetchone()["hal_collections"] == ["OLD", "GEOLAB"]
 
     def test_init_collection_array_when_null(self, db):
@@ -259,9 +257,7 @@ class TestTagExistingWithCollectionSql:
             _NoCommitConn(db.connection), ["hal-null"], "GEOLAB"
         )
         assert n == 1
-        db.execute(
-            "SELECT hal_collections FROM staging WHERE source_id = 'hal-null'"
-        )
+        db.execute("SELECT hal_collections FROM staging WHERE source_id = 'hal-null'")
         assert db.fetchone()["hal_collections"] == ["GEOLAB"]
 
     def test_no_duplicate_when_collection_already_present(self, db):
@@ -275,7 +271,5 @@ class TestTagExistingWithCollectionSql:
             _NoCommitConn(db.connection), ["hal-dup"], "GEOLAB"
         )
         assert n == 1
-        db.execute(
-            "SELECT hal_collections FROM staging WHERE source_id = 'hal-dup'"
-        )
+        db.execute("SELECT hal_collections FROM staging WHERE source_id = 'hal-dup'")
         assert db.fetchone()["hal_collections"] == ["GEOLAB"]

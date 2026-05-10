@@ -7,17 +7,6 @@ Issues 1 et 2 exécutées. Issue 3 confirmée sans action (exception
 documentée dans `docs/architecture.md`). Voir l'historique git pour
 les commits de mise en œuvre.
 
-## Pour l'instance Claude qui exécute ce chantier
-
-Tu n'as pas le contexte de la session qui a produit ce chantier.
-Lis cette fiche en entier avant de commencer. Lis aussi la section
-"Règle de placement des ports" dans `docs/architecture.md` qui a été
-ajoutée dans la même session : c'est la règle que ce chantier
-applique.
-
-Tu peux faire les 3 issues dans n'importe quel ordre — elles sont
-indépendantes. Commit séparé par issue (rollback granulaire).
-
 ## Contexte
 
 Le projet suit DDD-lite avec ports/adapters. Les ports sont répartis

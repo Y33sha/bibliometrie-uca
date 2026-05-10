@@ -14,7 +14,10 @@ L'orchestrateur dépend du port `MergeQueries`. Le point d'entrée CLI est
 dans `interfaces/cli/pipeline/merge_pubs_by_hal_id.py`.
 """
 
+import logging
 from typing import Any
+
+from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
 from application.ports.merge import MergeQueries
@@ -24,7 +27,7 @@ from domain.ports.publication_repository import PublicationRepository
 
 
 def find_duplicates(
-    conn: Any, queries: MergeQueries
+    conn: Connection, queries: MergeQueries
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Croise `source_publications` OA/ScanR (avec hal_id) et HAL.
 
@@ -74,10 +77,10 @@ def find_duplicates(
 
 
 def link_hal_to_publication(
-    conn: Any,
+    conn: Connection,
     queries: MergeQueries,
     items: Any,
-    logger: Any,
+    logger: logging.Logger,
     dry_run: bool = False,
     *,
     pub_repo: PublicationRepository,
@@ -98,9 +101,9 @@ def link_hal_to_publication(
 
 
 def merge_publications(
-    conn: Any,
+    conn: Connection,
     items: Any,
-    logger: Any,
+    logger: logging.Logger,
     dry_run: bool = False,
     *,
     pub_repo: PublicationRepository,
@@ -151,9 +154,9 @@ def merge_publications(
 
 
 def run_merge(
-    conn: Any,
+    conn: Connection,
     queries: MergeQueries,
-    logger: Any,
+    logger: logging.Logger,
     *,
     pub_repo: PublicationRepository,
     dry_run: bool = False,

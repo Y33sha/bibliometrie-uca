@@ -16,7 +16,7 @@ import os
 import time
 from typing import Any
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
@@ -122,7 +122,7 @@ _INSERT_OA_BATCH_SQL = text(
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
 
-def insert_batch(conn: Any, batch: list[dict]) -> int:
+def insert_batch(conn: Connection, batch: list[dict]) -> int:
     """Insère un batch de works dans staging.
 
     Logique de mise à jour :
@@ -157,12 +157,12 @@ def insert_batch(conn: Any, batch: list[dict]) -> int:
 
 
 def extract_year(
-    year: int = None,
-    conn: Any = None,
-    existing_ids: set = None,
+    year: int | None = None,
+    conn: Connection | None = None,
+    existing_ids: set | None = None,
     base_url: str = "",
-    institution_ids: list[str] = None,
-    since: str = None,
+    institution_ids: list[str] | None = None,
+    since: str | None = None,
     dry_run: bool = False,
 ) -> tuple[int, int]:
     """
@@ -184,6 +184,7 @@ def extract_year(
     if dry_run:
         return 0, 0
 
+    assert conn is not None, "conn requis hors dry_run"
     while True:
         page_num += 1
 
@@ -263,7 +264,7 @@ class OpenalexExtractor(SourceExtractor):
             help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents modifiés depuis cette date",
         )
 
-    def load_config(self, conn: Any) -> dict[str, Any]:
+    def load_config(self, conn: Connection) -> dict[str, Any]:
         institution_ids = get_extraction_api_ids(conn, "openalex")
         if not institution_ids:
             raise ExtractionConfigError(

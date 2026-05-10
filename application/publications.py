@@ -11,6 +11,8 @@ indépendant du type de curseur (tuple ou dict_row).
 
 from typing import Any
 
+from sqlalchemy import Connection
+
 from application.audit import emit_event
 from domain.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.normalize import normalize_text
@@ -40,18 +42,18 @@ __all__ = [
 ]
 
 
-def find_by_doi(cur: Any, doi: str, *, repo: PublicationRepository) -> PubByDoi | None:
+def find_by_doi(cur: Connection, doi: str, *, repo: PublicationRepository) -> PubByDoi | None:
     """Cherche une publication par DOI (case-insensitive)."""
     return repo.find_by_doi(doi)
 
 
-def find_by_nnt(cur: Any, nnt: str, *, repo: PublicationRepository) -> PubByNnt | None:
+def find_by_nnt(cur: Connection, nnt: str, *, repo: PublicationRepository) -> PubByNnt | None:
     """Cherche une publication via NNT (source_publications.external_ids)."""
     return repo.find_by_nnt(nnt)
 
 
 def find_by_title(
-    cur: Any,
+    cur: Connection,
     title_normalized: str,
     pub_year: int,
     journal_id: int,
@@ -63,7 +65,7 @@ def find_by_title(
 
 
 def find_thesis_by_title(
-    cur: Any,
+    cur: Connection,
     title_normalized: str,
     pub_year: int,
     *,
@@ -73,7 +75,9 @@ def find_thesis_by_title(
     return repo.find_thesis_by_title(title_normalized, pub_year)
 
 
-def try_merge_by_doi(cur: Any, pub_id: int, doi: str | None, *, repo: PublicationRepository) -> int:
+def try_merge_by_doi(
+    cur: Connection, pub_id: int, doi: str | None, *, repo: PublicationRepository
+) -> int:
     """Tente de fusionner via DOI si la publication n'en a pas encore.
 
     Si pub_id n'a pas de DOI et qu'une autre publication porte ce DOI,
@@ -97,7 +101,7 @@ def try_merge_by_doi(cur: Any, pub_id: int, doi: str | None, *, repo: Publicatio
 
 
 def resolve_doi_conflict(
-    cur: Any,
+    cur: Connection,
     doi: str,
     doc_type: str,
     title_normalized: str,
@@ -126,7 +130,7 @@ def resolve_doi_conflict(
 
 
 def find_or_create(
-    cur: Any,
+    cur: Connection,
     *,
     title: str,
     title_normalized: str,
@@ -197,19 +201,21 @@ def find_or_create(
     return pub_id, True
 
 
-def update_oa_status(cur: Any, pub_id: int, oa_status: str, *, repo: PublicationRepository) -> None:
+def update_oa_status(
+    cur: Connection, pub_id: int, oa_status: str, *, repo: PublicationRepository
+) -> None:
     """Met à jour le statut OA d'une publication."""
     repo.update_oa_status(pub_id, oa_status)
 
 
 def update_countries(
-    cur: Any, pub_id: int, countries: list[str], *, repo: PublicationRepository
+    cur: Connection, pub_id: int, countries: list[str], *, repo: PublicationRepository
 ) -> None:
     """Met à jour les pays d'une publication."""
     repo.update_countries(pub_id, countries)
 
 
-def update_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) -> None:
+def update_sources(cur: Connection, pub_id: int, *, repo: PublicationRepository) -> None:
     """Recalcule publications.sources depuis source_publications."""
     repo.update_sources(pub_id)
 
@@ -294,7 +300,7 @@ def _first_doc_type(rows: list[dict[str, Any]]) -> str:
     return "other"
 
 
-def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) -> None:
+def refresh_from_sources(cur: Connection, pub_id: int, *, repo: PublicationRepository) -> None:
     """Recalcule les métadonnées d'une publication depuis ses source_publications.
 
     Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé
@@ -384,7 +390,7 @@ def refresh_from_sources(cur: Any, pub_id: int, *, repo: PublicationRepository) 
 
 
 def mark_distinct(
-    conn: Any,
+    conn: Connection,
     pub_id_a: int,
     pub_id_b: int,
     *,
@@ -408,7 +414,7 @@ def mark_distinct(
 
 
 def merge_publications(
-    cur: Any,
+    cur: Connection,
     target_id: int,
     source_id: int,
     *,

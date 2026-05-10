@@ -19,6 +19,8 @@ feuille ; les niveaux supérieurs sont liés sans score.
 
 from typing import Any
 
+from sqlalchemy import Connection
+
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
 from domain.subject import ONTOLOGY_OPENALEX_TOPIC
 
@@ -30,7 +32,7 @@ _LEVELS = ("domain", "field", "subfield", "topic")
 
 
 def ingest(
-    conn: Any,
+    conn: Connection,
     *,
     publication_id: int,
     keywords: list[str] | None,
@@ -53,7 +55,7 @@ def ingest(
 
 
 def _collect_topic_chain(
-    conn: Any,
+    conn: Connection,
     cache: SubjectCache,
     publication_id: int,
     entry: Any,

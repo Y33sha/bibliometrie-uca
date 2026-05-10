@@ -9,12 +9,12 @@ import datetime
 import logging
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 logger = logging.getLogger(__name__)
 
 
-def _get_from_db(conn: Any, key: Any) -> Any:
+def _get_from_db(conn: Connection, key: Any) -> Any:
     """Lit une valeur depuis la table config. Retourne None si absente."""
     try:
         row = conn.execute(
@@ -25,7 +25,7 @@ def _get_from_db(conn: Any, key: Any) -> Any:
         return None
 
 
-def get_years(conn: Any, mode: str = "full") -> list[int]:
+def get_years(conn: Connection, mode: str = "full") -> list[int]:
     """Retourne la liste des années à extraire selon le mode.
 
     Lit pipeline_years_full ou pipeline_years_weekly depuis la table config
@@ -45,7 +45,7 @@ def get_years(conn: Any, mode: str = "full") -> list[int]:
     return [current_year]
 
 
-def get_hal_collections(conn: Any) -> dict[str, str]:
+def get_hal_collections(conn: Connection) -> dict[str, str]:
     """Retourne les collections HAL {code_hal: label}.
 
     Dérivé des structures du périmètre UCA qui ont un hal_collection renseigné,
@@ -78,7 +78,7 @@ def get_hal_collections(conn: Any) -> dict[str, str]:
     return {}
 
 
-def get_hal_extra_collections(conn: Any) -> list[str]:
+def get_hal_extra_collections(conn: Connection) -> list[str]:
     """Retourne les collections HAL supplémentaires (hors structures du périmètre)."""
     val = _get_from_db(conn, "hal_extra_collections")
     if val and isinstance(val, list):
@@ -86,7 +86,7 @@ def get_hal_extra_collections(conn: Any) -> list[str]:
     return []
 
 
-def get_openalex_api_key(conn: Any) -> str | None:
+def get_openalex_api_key(conn: Connection) -> str | None:
     """Retourne la clé API OpenAlex (None si non configurée)."""
     val = _get_from_db(conn, "openalex_api_key")
     if val and isinstance(val, str):
@@ -111,7 +111,7 @@ _API_BASE_URLS_DEFAULTS: dict[str, str] = {
 }
 
 
-def get_api_base_urls(conn: Any) -> dict[str, str]:
+def get_api_base_urls(conn: Connection) -> dict[str, str]:
     """Retourne les URLs de base des API (extracteurs + endpoints secondaires).
 
     Les valeurs définies dans la table `config` écrasent les defaults ;
@@ -124,7 +124,7 @@ def get_api_base_urls(conn: Any) -> dict[str, str]:
     return dict(_API_BASE_URLS_DEFAULTS)
 
 
-def get_extraction_api_ids(conn: Any, source: str) -> list[str]:
+def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
     """Retourne les identifiants API pour une source, déduits du périmètre d'extraction.
 
     Lit perimeter_extraction → structures du périmètre → api_ids[source].
@@ -171,7 +171,7 @@ def get_extraction_api_ids(conn: Any, source: str) -> list[str]:
     return []
 
 
-def get_openalex_institution_ids(conn: Any) -> list[str]:
+def get_openalex_institution_ids(conn: Connection) -> list[str]:
     """Retourne les IDs institution OpenAlex."""
     val = _get_from_db(conn, "openalex_institution_ids")
     if val and isinstance(val, list):
@@ -179,7 +179,7 @@ def get_openalex_institution_ids(conn: Any) -> list[str]:
     return []
 
 
-def get_wos_affiliations(conn: Any) -> list[str]:
+def get_wos_affiliations(conn: Connection) -> list[str]:
     """Retourne les noms OG WoS."""
     val = _get_from_db(conn, "wos_affiliations")
     if val and isinstance(val, list):
@@ -187,7 +187,7 @@ def get_wos_affiliations(conn: Any) -> list[str]:
     return []
 
 
-def get_openalex_email(conn: Any) -> str:
+def get_openalex_email(conn: Connection) -> str:
     """Retourne l'email pour le polite pool OpenAlex."""
     val = _get_from_db(conn, "openalex_email")
     if val and isinstance(val, str):
@@ -195,7 +195,7 @@ def get_openalex_email(conn: Any) -> str:
     return "bibliometrie@uca.fr"
 
 
-def get_crossref_email(conn: Any) -> str:
+def get_crossref_email(conn: Connection) -> str:
     """Retourne l'email pour le polite pool CrossRef (envoyé via User-Agent)."""
     val = _get_from_db(conn, "crossref_email")
     if val and isinstance(val, str):
@@ -204,7 +204,7 @@ def get_crossref_email(conn: Any) -> str:
     return get_openalex_email(conn)
 
 
-def get_wos_api_key(conn: Any) -> str:
+def get_wos_api_key(conn: Connection) -> str:
     """Retourne la clé API WoS."""
     val = _get_from_db(conn, "wos_api_key")
     if val and isinstance(val, str):
@@ -212,7 +212,7 @@ def get_wos_api_key(conn: Any) -> str:
     return ""
 
 
-def get_scanr_affiliation_ids(conn: Any) -> list[str]:
+def get_scanr_affiliation_ids(conn: Connection) -> list[str]:
     """Retourne les IDs SIREN des structures ScanR."""
     val = _get_from_db(conn, "scanr_affiliation_ids")
     if val and isinstance(val, list):
@@ -220,7 +220,7 @@ def get_scanr_affiliation_ids(conn: Any) -> list[str]:
     return []
 
 
-def get_theses_etab_ppns(conn: Any) -> list[str]:
+def get_theses_etab_ppns(conn: Connection) -> list[str]:
     """Retourne les PPN IdRef des établissements de soutenance pour theses.fr."""
     val = _get_from_db(conn, "theses_etab_ppns")
     if val and isinstance(val, list):
@@ -228,7 +228,7 @@ def get_theses_etab_ppns(conn: Any) -> list[str]:
     return []
 
 
-def get_scanr_credentials(conn: Any) -> tuple[str, str]:
+def get_scanr_credentials(conn: Connection) -> tuple[str, str]:
     """Retourne (username, password) pour l'API ScanR."""
     user = _get_from_db(conn, "scanr_username")
     pwd = _get_from_db(conn, "scanr_password")

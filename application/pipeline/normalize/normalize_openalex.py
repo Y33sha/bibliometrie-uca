@@ -16,8 +16,11 @@ Tables peuplées :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
+import logging
 from collections.abc import Callable
 from typing import Any
+
+from sqlalchemy import Connection, Row
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
@@ -122,7 +125,9 @@ def extract_short_id(url: str, prefix: str = "https://openalex.org/") -> str:
     return url or ""
 
 
-def find_hal_publication_id(cur: Any, queries: OpenalexNormalizeQueries, work: dict) -> int | None:
+def find_hal_publication_id(
+    cur: Connection, queries: OpenalexNormalizeQueries, work: dict
+) -> int | None:
     """Si le work OpenAlex pointe vers un document HAL existant, retourne le publication_id."""
     location = work.get("primary_location") or {}
     url = location.get("landing_page_url") or ""
@@ -137,7 +142,9 @@ def find_hal_publication_id(cur: Any, queries: OpenalexNormalizeQueries, work: d
 # =============================================================
 
 
-def upsert_publisher(cur: Any, work: dict, *, publisher_repo: PublisherRepository) -> int | None:
+def upsert_publisher(
+    cur: Connection, work: dict, *, publisher_repo: PublisherRepository
+) -> int | None:
     """Extrait et trouve/crée l'éditeur depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
@@ -151,7 +158,7 @@ def upsert_publisher(cur: Any, work: dict, *, publisher_repo: PublisherRepositor
 
 
 def upsert_journal(
-    cur: Any, work: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+    cur: Connection, work: dict, publisher_id: int | None, *, journal_repo: JournalRepository
 ) -> int | None:
     """Extrait et trouve/crée la revue depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
@@ -237,7 +244,7 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
 
 
 def find_publication(
-    cur: Any,
+    cur: Connection,
     work: dict,
     journal_id: int | None,
     *,
@@ -257,7 +264,7 @@ def find_publication(
 
 
 def insert_openalex_document(
-    cur: Any,
+    cur: Connection,
     queries: OpenalexNormalizeQueries,
     work: dict,
     staging_id: int,
@@ -362,7 +369,7 @@ def _extract_openalex_orcid(authorship: dict) -> str | None:
 
 
 def upsert_openalex_institution(
-    cur: Any, queries: OpenalexNormalizeQueries, institution: dict
+    cur: Connection, queries: OpenalexNormalizeQueries, institution: dict
 ) -> int | None:
     """Insère/retrouve une institution OpenAlex. Retourne source_structures.id ou None."""
     inst_id_url = institution.get("id")
@@ -396,7 +403,7 @@ def upsert_openalex_institution(
 
 
 def process_authorships(
-    cur: Any,
+    cur: Connection,
     queries: OpenalexNormalizeQueries,
     work: dict,
     source_publication_id: int,
@@ -483,10 +490,10 @@ def process_authorships(
 
 
 def process_work(
-    cur: Any,
+    cur: Connection,
     queries: OpenalexNormalizeQueries,
-    logger: Any,
-    staging_row: tuple,
+    logger: logging.Logger,
+    staging_row: Row[Any],
     *,
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
@@ -593,8 +600,8 @@ class OpenalexNormalizer(SourceNormalizer):
 
     def __init__(
         self,
-        conn: Any,
-        logger: Any,
+        conn: Connection,
+        logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: OpenalexNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
@@ -614,12 +621,12 @@ class OpenalexNormalizer(SourceNormalizer):
         self._zenodo_resolver = zenodo_resolver
         self._address_linker = address_linker
 
-    def preload_caches(self, cur: Any) -> None:
+    def preload_caches(self, cur: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
         self._publisher_repo = self._publisher_repo_factory(cur)
         self._pub_repo = self._pub_repo_factory(cur)
 
-    def process_work(self, cur: Any, row: Any) -> bool | None:
+    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
         assert (
             self._journal_repo is not None
             and self._publisher_repo is not None
@@ -647,7 +654,7 @@ class OpenalexNormalizer(SourceNormalizer):
         # violations sur les works suivants.
         self._address_linker.clear_cache()
 
-    def summary_stats(self, cur: Any) -> list[str]:
+    def summary_stats(self, cur: Connection) -> list[str]:
         return [
             f"  {table} (openalex) : {self._queries.count_openalex_table(cur, table)} enregistrements"
             for table in ("source_structures", "source_persons", "source_publications")

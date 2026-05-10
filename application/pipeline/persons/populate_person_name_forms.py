@@ -19,7 +19,10 @@ L'orchestrateur dépend du port `NameFormsQueries`. Le point d'entrée CLI
 est dans `interfaces/cli/pipeline/populate_person_name_forms.py`.
 """
 
+import logging
 from typing import Any
+
+from sqlalchemy import Connection
 
 from application.ports.name_forms import NameFormsQueries
 from domain.names import compute_person_name_forms
@@ -27,7 +30,7 @@ from domain.names import compute_person_name_forms
 BATCH_SIZE = 5000
 
 
-def populate(conn: Any, queries: NameFormsQueries, logger: Any) -> None:
+def populate(conn: Connection, queries: NameFormsQueries, logger: logging.Logger) -> None:
     triples = []
 
     logger.info("Source 1 : persons (prénom nom + nom prénom)")

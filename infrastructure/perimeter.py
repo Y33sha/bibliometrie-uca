@@ -9,12 +9,10 @@ L'association phase→périmètre est lue depuis la table `config` :
 - perimeter_persons : périmètre pour la création des personnes
 """
 
-from typing import Any
-
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 
-def get_perimeter_structure_ids(conn: Any, perimeter_code: str) -> set[int]:
+def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[int]:
     """Retourne l'ensemble des structure_ids pour un périmètre donné.
 
     Chaque structure listée dans perimeters.structure_ids est une racine.
@@ -46,7 +44,7 @@ def get_perimeter_structure_ids(conn: Any, perimeter_code: str) -> set[int]:
 # ── Fonctions par rôle (lisent la config) ──
 
 
-def _config_perimeter_code(conn: Any, config_key: str, default: str) -> str:
+def _config_perimeter_code(conn: Connection, config_key: str, default: str) -> str:
     """Lit un code périmètre depuis la table config."""
     try:
         row = conn.execute(
@@ -61,24 +59,24 @@ def _config_perimeter_code(conn: Any, config_key: str, default: str) -> str:
     return default
 
 
-def get_affiliations_structure_ids(conn: Any) -> set[int]:
+def get_affiliations_structure_ids(conn: Connection) -> set[int]:
     """Périmètre pour la résolution des affiliations (structure_ids)."""
     code = _config_perimeter_code(conn, "perimeter_affiliations", "uca_wide")
     return get_perimeter_structure_ids(conn, code)
 
 
-def get_persons_structure_ids(conn: Any) -> set[int]:
+def get_persons_structure_ids(conn: Connection) -> set[int]:
     """Périmètre pour la création des personnes (in_perimeter)."""
     code = _config_perimeter_code(conn, "perimeter_persons", "uca")
     return get_perimeter_structure_ids(conn, code)
 
 
-def get_persons_structure_ids_list(conn: Any) -> list[int]:
+def get_persons_structure_ids_list(conn: Connection) -> list[int]:
     """Variante liste (pour usage dans les requêtes SQL ANY(:ids))."""
     return list(get_persons_structure_ids(conn))
 
 
-def get_persons_perimeter_root_ids(conn: Any) -> list[int]:
+def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
     """Racines du périmètre "persons" (sans expansion par `est_tutelle_de`).
 
     À distinguer de `get_persons_structure_ids(...)` qui retourne la

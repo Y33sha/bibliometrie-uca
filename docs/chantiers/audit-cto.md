@@ -13,9 +13,7 @@ phasés.
   (la DSI réécrira un frontend public exposé dans le SID/ENT) ;
 - l'app est mono-utilisateur de bout en bout par choix : la couche
   auth/permissions sera réécrite par la DSI, pas étendue à partir de
-  l'existant ;
-- les trois TODO en parallèle (TODO_LAURA, TODO_CLAUDE, ROADMAP)
-  seront fusionnés en un backlog unique avant transmission.
+  l'existant.
 
 Ces points sortent donc du périmètre des chantiers ci-dessous.
 
@@ -239,11 +237,6 @@ pas tranchés, toute évolution amplifie la dette.
   d'exécution. B reste compatible avec une migration future si
   un besoin émerge (testabilité poussée, debugging récurrent).
 
-  **Indépendance vis-à-vis du chantier sync/async** : oui, les
-  deux décisions sont orthogonales. A et A' sont neutres
-  vis-à-vis du sync/async. B s'intègre naturellement avec une
-  migration async, mais n'en dépend pas.
-
   **Décision attendue** : confirmer A' et lister les phases à
   migrer (1 par 1), ou rouvrir le débat. Document court à écrire
   dans `docs/chantiers/` quand le chantier sera lancé.
@@ -290,7 +283,7 @@ chacun mérite son fichier dans `docs/chantiers/`.
 
 - [ ] **Refonte pipeline** selon décision Phase 1 (subprocess vs
   imports)
-- [ ] **Convergence sync/async** selon décision Phase 1
+- [x] **Convergence sync/async** selon décision Phase 1
 - [x] **§1.6 ROADMAP — DI complète FastAPI** : chantier
   [`routers-di.md`](routers-di.md) bouclé. Tous les routers admin
   reçoivent leurs dépendances via `Depends(...)` (factories dans
@@ -298,15 +291,13 @@ chacun mérite son fichier dans `docs/chantiers/`.
   pas d'import direct de infrastructure" verrouille la règle 4 côté
   API. Exceptions documentées : `auth` (settings), `admin_pipeline`
   (status filesystem), `docs` (PROJECT_ROOT) — pas de query/repo.
-- [ ] **Migration SQLAlchemy Core** si décision = adoption
+- [x] **Migration SQLAlchemy Core** si décision = adoption
 
 ### Phase 3 — Dette technique
 
 Items hétérogènes : certains sont des quick-wins (typer un module,
 mettre à jour une doc), d'autres méritent un chantier dédié (typage
-généralisé, background tasks). Pas de catégorie « au fil de l'eau »
-— cf. règle projet : soit quick-win actionnable maintenant, soit
-chantier dédié avec fiche.
+généralisé, background tasks).
 
 - [x] **`application/audit.py` doit passer par un repository** :
   port `AuditRepository`/`AsyncAuditRepository` dans
@@ -333,7 +324,7 @@ chantier dédié avec fiche.
   `**kw: Any`, `-> Any` neutralisent mypy strict sur ~40-50 fichiers
   applicatifs. Touche : couches application + infrastructure +
   interfaces. Nécessite un alias `Cursor`/`AsyncCursor` central et
-  passage par module. Hors scope quick-win.
+  passage par module.
 - [x] **Pool DB** : `db_pool_max` passé à 30 (default `settings.py` +
   `.env.example`). Note opérationnelle ajoutée (ratio recommandé ~1:15,
   bumper à 50+ si TimeoutError côté pool, surveiller `pg_stat_activity`
@@ -364,14 +355,6 @@ chantier dédié avec fiche.
   chantiers achevés). Migration SA Core des scripts conservés
   effectuée pour ceux qui ne dépendent pas des repos sync (les autres
   reportés au Lot 3.A du chantier sqla).
-- [ ] **Référencer `processing/*` retiré dans `docs/donnees.md`** —
-  rattaché au chantier de réécriture doc final (Phase 4 ci-dessous,
-  pas un quick-win indépendant).
-- [ ] **Background tasks pour endpoints longs** — chantier dédié à
-  créer. Plan déjà cadré dans TODO_CLAUDE (« Background jobs pour
-  endpoints de propagation massive » + 2 audits associés : endpoints
-  long-running, sync I/O dans coroutines). Impl + seuil + 202 +
-  handling frontend du 202. Hors scope quick-win.
 
 ### Phase 4 — Avant transmission DSI
 

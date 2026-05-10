@@ -4,7 +4,6 @@ Fonctions partagées par les scripts d'extraction (OpenAlex, HAL, WoS, ScanR).
 
 import hashlib
 import json
-from typing import Any
 
 from sqlalchemy import Connection, text
 
@@ -19,7 +18,7 @@ def compute_hash(raw_data: dict) -> str:
     return hashlib.md5(canonical.encode("utf-8")).hexdigest()
 
 
-def get_cross_import_dois(conn: Any, target: str, all_staged: bool = False) -> list[str]:
+def get_cross_import_dois(conn: Connection, target: str, all_staged: bool = False) -> list[str]:
     """Retourne les DOI présents dans les autres sources staging mais absents de la cible.
 
     Comparaison directe sur `doi` : tous les DOIs sont stockés en minuscules
@@ -60,7 +59,7 @@ def get_cross_import_dois(conn: Any, target: str, all_staged: bool = False) -> l
         return [row["doi"] for row in cur.fetchall()]
 
 
-def get_existing_ids(conn: Any, source: str) -> set:
+def get_existing_ids(conn: Connection, source: str) -> set:
     """Récupère les source_id déjà en staging pour une source donnée."""
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")

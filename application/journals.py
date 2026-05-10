@@ -10,8 +10,6 @@ Les routers FastAPI utilisent les mêmes repos que le pipeline
 (routes `def` exécutées dans le threadpool Starlette).
 """
 
-from typing import Any
-
 from sqlalchemy import Connection
 
 from application.audit import emit_event
@@ -22,7 +20,7 @@ from domain.ports.journal_repository import JournalRepository
 
 
 def find_or_create_journal(
-    cur: Any,
+    cur: Connection,
     title: str | None,
     *,
     issn: str | None = None,
@@ -132,7 +130,7 @@ def update_journal(
 
 
 def update_journal_apc(
-    cur: Any,
+    cur: Connection,
     journal_id: int,
     *,
     apc_amount: float | None = None,
@@ -149,7 +147,7 @@ def update_journal_apc(
     )
 
 
-def reset_journal_apc(cur: Any, *, repo: JournalRepository) -> int:
+def reset_journal_apc(cur: Connection, *, repo: JournalRepository) -> int:
     """Réinitialise les APC/DOAJ de toutes les revues avec openalex_id."""
     return repo.reset_journal_apc()
 

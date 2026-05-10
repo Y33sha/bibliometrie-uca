@@ -19,7 +19,7 @@ import argparse
 import logging
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from application.persons import merge_person
 from infrastructure.db.engine import get_sync_engine
@@ -61,7 +61,7 @@ LAB_PERSONS_CTE = """
 """
 
 
-def get_labs_with_duplicates(conn: Any) -> Any:
+def get_labs_with_duplicates(conn: Connection) -> Any:
     """Retourne les labos ayant des personnes homonymes."""
     rows = conn.execute(
         text(
@@ -82,7 +82,7 @@ def get_labs_with_duplicates(conn: Any) -> Any:
     return [dict(r._mapping) for r in rows]
 
 
-def get_swapped_name_duplicates(conn: Any, lab_id: Any) -> Any:
+def get_swapped_name_duplicates(conn: Connection, lab_id: Any) -> Any:
     """Retourne les paires (personne A, personne B) dans un labo
     où nom_A = prénom_B et prénom_A = nom_B (interversion nom/prénom)."""
     rows = conn.execute(
@@ -108,7 +108,7 @@ def get_swapped_name_duplicates(conn: Any, lab_id: Any) -> Any:
     return [dict(r._mapping) for r in rows]
 
 
-def get_labs_with_swaps(conn: Any) -> Any:
+def get_labs_with_swaps(conn: Connection) -> Any:
     """Retourne les labos ayant des interversions nom/prénom."""
     rows = conn.execute(
         text(
@@ -131,7 +131,7 @@ def get_labs_with_swaps(conn: Any) -> Any:
     return {row.lab_id: row.lab_name for row in rows}
 
 
-def get_person_details(conn: Any, person_ids: Any) -> Any:
+def get_person_details(conn: Connection, person_ids: Any) -> Any:
     """Récupère les détails des personnes pour affichage."""
     rows = conn.execute(
         text(

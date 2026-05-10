@@ -9,7 +9,9 @@ L'orchestrateur dépend du port `MergeQueries`. Le point d'entrée CLI est
 dans `interfaces/cli/pipeline/merge_pubs_by_nnt.py`.
 """
 
-from typing import Any
+import logging
+
+from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
 from application.ports.merge import MergeQueries
@@ -19,9 +21,9 @@ from domain.ports.publication_repository import PublicationRepository
 
 
 def run_merge(
-    conn: Any,
+    conn: Connection,
     queries: MergeQueries,
-    logger: Any,
+    logger: logging.Logger,
     *,
     pub_repo: PublicationRepository,
     dry_run: bool = False,

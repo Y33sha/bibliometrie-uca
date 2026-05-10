@@ -19,9 +19,12 @@ via populate_affiliations.py, pas ici. Ce script ne fait que stocker les source_
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
+import logging
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from typing import Any
+
+from sqlalchemy import Connection, Row
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
@@ -80,14 +83,14 @@ def get_title(doc: dict) -> str:
 
 
 def upsert_publisher(
-    cur: Any, publisher_name: str, *, publisher_repo: PublisherRepository
+    cur: Connection, publisher_name: str, *, publisher_repo: PublisherRepository
 ) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
     return find_or_create_publisher(cur, publisher_name, repo=publisher_repo)
 
 
 def upsert_journal(
-    cur: Any, doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+    cur: Connection, doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
 ) -> int | None:
     """Extrait et trouve/crée la revue depuis les champs HAL."""
     title = as_str(doc.get("journalTitle_s"))
@@ -149,7 +152,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
 
 
 def find_publication(
-    cur: Any,
+    cur: Connection,
     doc: dict,
     journal_id: int | None,
     *,
@@ -169,7 +172,7 @@ def find_publication(
 
 
 def insert_hal_document(
-    cur: Any,
+    cur: Connection,
     queries: HalNormalizeQueries,
     doc: dict,
     staging_id: int,
@@ -325,7 +328,7 @@ _hal_author_cache: dict[str, int] = {}
 
 
 def upsert_hal_author(
-    cur: Any,
+    cur: Connection,
     queries: HalNormalizeQueries,
     full_name: str,
     hal_person_id: int | None,
@@ -379,7 +382,7 @@ def upsert_hal_author(
 
 def parse_author_structures(
     doc: dict,
-    cur: Any = None,
+    cur: Connection = None,
     queries: HalNormalizeQueries | None = None,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
@@ -451,7 +454,7 @@ def parse_author_structures(
 
 
 def process_authors(
-    cur: Any,
+    cur: Connection,
     queries: HalNormalizeQueries,
     doc: dict,
     source_publication_id: int,
@@ -618,10 +621,10 @@ def process_authors(
 
 
 def process_work(
-    cur: Any,
+    cur: Connection,
     queries: HalNormalizeQueries,
-    logger: Any,
-    staging_row: tuple,
+    logger: logging.Logger,
+    staging_row: Row[Any],
     *,
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
@@ -739,8 +742,8 @@ class HalNormalizer(SourceNormalizer):
 
     def __init__(
         self,
-        conn: Any,
-        logger: Any,
+        conn: Connection,
+        logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: HalNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
@@ -762,7 +765,7 @@ class HalNormalizer(SourceNormalizer):
         self._struct_cache: dict[str, int] = {}
         self._struct_name_cache: dict[int, str] = {}
 
-    def preload_caches(self, cur: Any) -> None:
+    def preload_caches(self, cur: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
         self._publisher_repo = self._publisher_repo_factory(cur)
         self._pub_repo = self._pub_repo_factory(cur)
@@ -771,7 +774,7 @@ class HalNormalizer(SourceNormalizer):
         self._struct_name_cache = {pid: name for _, pid, name in rows}
         self.logger.info(f"Cache source_structures : {len(self._struct_cache)} entrées")
 
-    def process_work(self, cur: Any, row: Any) -> bool | None:
+    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
         assert self._journal_repo is not None, "preload_caches doit être appelé avant"
         assert self._publisher_repo is not None, "preload_caches doit être appelé avant"
         assert self._pub_repo is not None, "preload_caches doit être appelé avant"
@@ -790,7 +793,7 @@ class HalNormalizer(SourceNormalizer):
             struct_name_cache=self._struct_name_cache,
         )
 
-    def post_process(self, cur: Any) -> None:
+    def post_process(self, cur: Connection) -> None:
         self._queries.delete_hal_duplicate_authorship_addresses(cur)
         deleted_dups = self._queries.delete_hal_duplicate_authorships(cur)
         if deleted_dups:
