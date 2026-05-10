@@ -4,7 +4,7 @@ import argparse
 import os
 
 from application.pipeline.authorships.build_authorships import build
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
 from infrastructure.log import setup_logger
 
@@ -19,11 +19,9 @@ def main() -> None:
 
     sources = set(s.strip() for s in args.sources.split(",") if s.strip()) if args.sources else None
 
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        build(cur, PgAuthorshipsBuildQueries(), logger, sources=sources)
+        build(conn, PgAuthorshipsBuildQueries(), logger, sources=sources)
 
         if args.dry_run:
             conn.rollback()

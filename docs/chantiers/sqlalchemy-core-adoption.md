@@ -441,12 +441,24 @@ sync que le Lot 3.A.
 
 Sous-lots, par étape du pipeline :
 
-- [ ] **Normalizers** (HAL/OA/WoS/ScanR/theses/Crossref) — 6 fichiers,
-  ~43 occ.
-- [ ] **Pipeline publications/staging/merge** (`merge.py`, `enrich.py`,
-  `publications/create.py`, `staging.py`) — 4 fichiers, ~16 occ.
-- [ ] **Pipeline persons/authorships** (`name_forms.py`, `persons/create.py`,
-  `authorships_build.py`, `source_authorships.py`) — 4 fichiers, ~25 occ.
+- [x] **Normalizers** (HAL/OA/WoS/ScanR/theses/Crossref) end-to-end :
+  queries + ports + orchestrators + CLI + tests intégration migrés
+  en SA Connection. Infra partagée (`staging.py`, `_savepoint.py`,
+  `base.py`, `source_authorships.py`, `addresses.py`) nettoyée du
+  dispatch transitoire. `run_pipeline.py` phases normalize migrées.
+  Commits : `3edb300` (CrossRef + dispatch infra), `a22623e` (WoS),
+  `bdb677a` (OA), `cf4dd24` (ScanR), `951d91d` (theses), `cd149ad`
+  (HAL), `05bf493` (cleanup dispatch).
+- [x] **Pipeline publications/staging/merge** (`merge.py`, `enrich.py`,
+  `publications/create.py`) migrés ; orchestrators (merge_pubs_by_*,
+  enrich_*, create_publications), CLIs et `run_pipeline.py` aussi.
+  `_savepoint.py` dispatch retiré (tous les callers SA). Commit
+  `ac06648`.
+- [x] **Pipeline persons/authorships** (`name_forms.py`,
+  `persons/create.py`, `authorships_build.py`) migrés ; orchestrators
+  (`populate_person_name_forms`, `create_persons_from_source_authorships`,
+  `build_authorships`), CLIs et `run_pipeline.py` aussi. Tests
+  intégration adaptés.
 - [ ] **Pipeline addresses/structures** (`address_resolution.py`,
   `affiliations.py`, `countries.py`) — 3 fichiers, ~23 occ.
 - [ ] **`subjects.py`** (10 occ.) — à examiner : opérations JSON
@@ -454,9 +466,12 @@ Sous-lots, par étape du pipeline :
 
 #### Lot 3.C — Reste du code applicatif (~13 occ.)
 
-- [ ] `infrastructure/addresses.py` (4)
-- [ ] `application/pipeline/_savepoint.py` (3)
-- [ ] `infrastructure/app_config.py` (3)
+- [x] `infrastructure/addresses.py` migré (suite Lot 3.B normalizers,
+  commit `05bf493`).
+- [x] `application/pipeline/_savepoint.py` migré (suite Lot 3.B sub-lot 2,
+  commit `ac06648`).
+- [ ] `infrastructure/app_config.py` (3) — dispatch encore actif pour
+  les CLI scripts non-pipeline.
 - [ ] `application/audit.py` (1), `infrastructure/db_helpers.py` (1),
   `run_pipeline.py:VACUUM` (1) — chacun en `text()` simple
 

@@ -4,7 +4,7 @@ import argparse
 import os
 
 from application.pipeline.persons.create_persons_from_source_authorships import run
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
 from infrastructure.log import setup_logger
 from infrastructure.repositories import person_repository
@@ -19,15 +19,13 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Simuler sans modifier la base")
     args = parser.parse_args()
 
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
         run(
-            cur,
             conn,
             PgPersonsCreateQueries(),
             logger,
-            person_repo=person_repository(cur),
+            person_repo=person_repository(conn),
             dry_run=args.dry_run,
         )
     finally:

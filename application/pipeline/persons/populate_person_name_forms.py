@@ -27,37 +27,37 @@ from domain.names import compute_person_name_forms
 BATCH_SIZE = 5000
 
 
-def populate(cur: Any, conn: Any, queries: NameFormsQueries, logger: Any) -> None:
+def populate(conn: Any, queries: NameFormsQueries, logger: Any) -> None:
     triples = []
 
     logger.info("Source 1 : persons (prénom nom + nom prénom)")
-    for r in queries.fetch_persons_names(cur):
+    for r in queries.fetch_persons_names(conn):
         fn = (r["first_name"] or "").strip()
         ln = r["last_name"].strip()
         for form in compute_person_name_forms(ln, fn):
             triples.append((form, r["id"], "persons"))
 
     logger.info("Source 2 : source_authorships.author_name_normalized (toutes sources)")
-    source_forms = queries.fetch_source_authorship_name_forms(cur)
+    source_forms = queries.fetch_source_authorship_name_forms(conn)
     logger.info(
         f"  {len(triples)} triplets persons + {len(source_forms)} formes source_authorships"
     )
 
     logger.info("Normalisation des formes persons...")
-    queries.create_temp_raw_forms_table(cur)
-    batch: list[tuple[str, int, str]] = []
+    queries.create_temp_raw_forms_table(conn)
+    batch: list[dict[str, Any]] = []
     for raw, pid, src in triples:
-        batch.append((raw.strip(), pid, src))
+        batch.append({"raw_text": raw.strip(), "person_id": pid, "source": src})
         if len(batch) >= BATCH_SIZE:
-            queries.insert_raw_forms_batch(cur, batch)
+            queries.insert_raw_forms_batch(conn, batch)
             batch = []
     if batch:
-        queries.insert_raw_forms_batch(cur, batch)
+        queries.insert_raw_forms_batch(conn, batch)
 
     expected_forms = {
-        r["name_form"]: r for r in queries.fetch_normalized_forms_from_temp(cur) if r["name_form"]
+        r["name_form"]: r for r in queries.fetch_normalized_forms_from_temp(conn) if r["name_form"]
     }
-    queries.drop_temp_raw_forms_table(cur)
+    queries.drop_temp_raw_forms_table(conn)
 
     for r in source_forms:
         nf = r["name_form"]
@@ -77,7 +77,7 @@ def populate(cur: Any, conn: Any, queries: NameFormsQueries, logger: Any) -> Non
 
     logger.info(f"  {len(expected_forms)} formes distinctes après fusion")
 
-    existing = {r["name_form"]: r for r in queries.fetch_existing_name_forms(cur)}
+    existing = {r["name_form"]: r for r in queries.fetch_existing_name_forms(conn)}
     logger.info(f"  {len(existing)} formes existantes en base")
 
     inserted = 0
@@ -90,15 +90,15 @@ def populate(cur: Any, conn: Any, queries: NameFormsQueries, logger: Any) -> Non
             if set(data["person_ids"]) != set(old["person_ids"]) or set(data["sources"]) != set(
                 old["sources"] or []
             ):
-                queries.update_name_form(cur, old["id"], data["person_ids"], data["sources"])
+                queries.update_name_form(conn, old["id"], data["person_ids"], data["sources"])
                 updated += 1
         else:
-            queries.insert_name_form_with_merge(cur, nf, data["person_ids"], data["sources"])
+            queries.insert_name_form_with_merge(conn, nf, data["person_ids"], data["sources"])
             inserted += 1
 
     for nf, old in existing.items():
         if nf not in expected_forms:
-            queries.delete_name_form(cur, old["id"])
+            queries.delete_name_form(conn, old["id"])
             deleted += 1
 
     conn.commit()

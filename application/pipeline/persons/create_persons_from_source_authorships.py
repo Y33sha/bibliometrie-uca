@@ -62,11 +62,11 @@ from domain.sources.openalex import keep_orcid_if_name_matches
 # ---------------------------------------------------------------------------
 
 
-def get_all_unlinked_authorships(cur: Any, queries: PersonsCreateQueries) -> list[dict[str, Any]]:
+def get_all_unlinked_authorships(conn: Any, queries: PersonsCreateQueries) -> list[dict[str, Any]]:
     """Charge les authorships UCA sans person_id (toutes sources) et les enrichit
     (parsing noms, filtrage ORCID OpenAlex, flag allow_create)."""
     all_rows = []
-    for r in queries.fetch_unlinked_authorships(cur):
+    for r in queries.fetch_unlinked_authorships(conn):
         r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
         r["last_norm"] = normalize_name(r["last_name"])
         r["first_norm"] = normalize_name(r["first_name"])
@@ -88,12 +88,12 @@ def get_all_unlinked_authorships(cur: Any, queries: PersonsCreateQueries) -> lis
 
 
 def load_linked_authorships_by_pub(
-    cur: Any, queries: PersonsCreateQueries
+    conn: Any, queries: PersonsCreateQueries
 ) -> dict[tuple[int, int], list[tuple[int, str, str, str]]]:
     """Index des authorships rattachées par (publication_id, author_position)."""
     index: dict[tuple[int, int], list[tuple[int, str, str, str]]] = defaultdict(list)
 
-    for r in queries.fetch_linked_authorships(cur):
+    for r in queries.fetch_linked_authorships(conn):
         last, first = parse_raw_author_name(r["full_name"])
         ln, fn = normalize_name(last), normalize_name(first)
         index[(r["publication_id"], r["author_position"])].append(
@@ -109,7 +109,7 @@ def load_linked_authorships_by_pub(
 
 
 def step0_hal_accounts(
-    cur: Any,
+    conn: Any,
     queries: PersonsCreateQueries,
     logger: Any,
     all_authorships: Any,
@@ -124,7 +124,7 @@ def step0_hal_accounts(
         if a["source"] == "hal" and a["has_hal_person_id"]:
             by_hal_pid[a["hal_person_id"]].append(a)
 
-    hal_person_map = queries.fetch_hal_account_to_person_map(cur)
+    hal_person_map = queries.fetch_hal_account_to_person_map(conn)
 
     linked = 0
     skipped = 0
@@ -132,8 +132,8 @@ def step0_hal_accounts(
         existing_pid = hal_person_map.get(hal_pid)
         if existing_pid:
             if not dry_run:
-                link_to_person(cur, existing_pid, group, repo=person_repo)
-                add_identifiers(cur, existing_pid, group, repo=person_repo)
+                link_to_person(conn, existing_pid, group, repo=person_repo)
+                add_identifiers(conn, existing_pid, group, repo=person_repo)
             linked += len(group)
             for a in group:
                 linked_ids.add((a["source"], a["authorship_id"]))
@@ -177,7 +177,7 @@ def _max_authors_per_pub(
 
 
 def step1_cross_source(
-    cur: Any,
+    conn: Any,
     logger: Any,
     all_authorships: Any,
     linked_ids: set,
@@ -218,9 +218,9 @@ def step1_cross_source(
 
         if matched_pid:
             if not dry_run:
-                link_to_person(cur, matched_pid, [a], repo=person_repo)
-                add_name_form(cur, matched_pid, a["full_name"], repo=person_repo)
-                add_identifiers(cur, matched_pid, [a], repo=person_repo)
+                link_to_person(conn, matched_pid, [a], repo=person_repo)
+                add_name_form(conn, matched_pid, a["full_name"], repo=person_repo)
+                add_identifiers(conn, matched_pid, [a], repo=person_repo)
             linked_ids.add((a["source"], a["authorship_id"]))
             ln, fn = a["last_norm"], a["first_norm"]
             linked_index[(pub_id, position)].append((matched_pid, ln, fn, a["source"]))
@@ -236,7 +236,7 @@ def step1_cross_source(
 
 
 def step1b_idref(
-    cur: Any,
+    conn: Any,
     queries: PersonsCreateQueries,
     logger: Any,
     all_authorships: Any,
@@ -246,7 +246,7 @@ def step1b_idref(
     person_repo: PersonRepository,
 ) -> int:
     """Si l'authorship a un IdRef déjà connu en base (non rejeté), rattacher."""
-    idref_map = queries.fetch_idref_to_person_map(cur)
+    idref_map = queries.fetch_idref_to_person_map(conn)
     linked = 0
 
     for a in all_authorships:
@@ -256,9 +256,9 @@ def step1b_idref(
         pid = decide_match_by_identifier(a.get("idref"), idref_map)
         if pid:
             if not dry_run:
-                link_to_person(cur, pid, [a], repo=person_repo)
-                add_name_form(cur, pid, a["full_name"], repo=person_repo)
-                add_identifiers(cur, pid, [a], repo=person_repo)
+                link_to_person(conn, pid, [a], repo=person_repo)
+                add_name_form(conn, pid, a["full_name"], repo=person_repo)
+                add_identifiers(conn, pid, [a], repo=person_repo)
             linked_ids.add((a["source"], a["authorship_id"]))
             linked += 1
 
@@ -272,7 +272,7 @@ def step1b_idref(
 
 
 def step2_orcid(
-    cur: Any,
+    conn: Any,
     queries: PersonsCreateQueries,
     logger: Any,
     all_authorships: Any,
@@ -282,7 +282,7 @@ def step2_orcid(
     person_repo: PersonRepository,
 ) -> int:
     """Si l'authorship a un ORCID déjà connu en base, rattacher."""
-    orcid_map = queries.fetch_orcid_to_person_map(cur)
+    orcid_map = queries.fetch_orcid_to_person_map(conn)
     linked = 0
 
     for a in all_authorships:
@@ -292,9 +292,9 @@ def step2_orcid(
         pid = decide_match_by_identifier(a.get("orcid"), orcid_map)
         if pid:
             if not dry_run:
-                link_to_person(cur, pid, [a], repo=person_repo)
-                add_name_form(cur, pid, a["full_name"], repo=person_repo)
-                add_identifiers(cur, pid, [a], repo=person_repo)
+                link_to_person(conn, pid, [a], repo=person_repo)
+                add_name_form(conn, pid, a["full_name"], repo=person_repo)
+                add_identifiers(conn, pid, [a], repo=person_repo)
             linked_ids.add((a["source"], a["authorship_id"]))
             linked += 1
 
@@ -308,7 +308,7 @@ def step2_orcid(
 
 
 def step3_name_forms(
-    cur: Any,
+    conn: Any,
     logger: Any,
     all_authorships: Any,
     linked_ids: set,
@@ -347,8 +347,8 @@ def step3_name_forms(
             pid = decision.person_id
             assert pid is not None  # narrowing : garanti par decide_name_form_outcome
             if not dry_run:
-                link_to_person(cur, pid, [a], repo=person_repo)
-                add_name_form(cur, pid, a["full_name"], repo=person_repo)
+                link_to_person(conn, pid, [a], repo=person_repo)
+                add_name_form(conn, pid, a["full_name"], repo=person_repo)
             linked_ids.add((a["source"], a["authorship_id"]))
             linked += 1
         elif decision.action == "skip":
@@ -363,10 +363,10 @@ def step3_name_forms(
             ln, fn = a["last_norm"], a["first_norm"]
             cache_forms = [f for f in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()] if f]
             if not dry_run:
-                pid = create_person(cur, last, first, repo=person_repo)
-                link_to_person(cur, pid, [a], repo=person_repo)
-                add_identifiers(cur, pid, [a], repo=person_repo)
-                add_name_form(cur, pid, a["full_name"], repo=person_repo)
+                pid = create_person(conn, last, first, repo=person_repo)
+                link_to_person(conn, pid, [a], repo=person_repo)
+                add_identifiers(conn, pid, [a], repo=person_repo)
+                add_name_form(conn, pid, a["full_name"], repo=person_repo)
                 for form in cache_forms:
                     name_form_map[form] = [pid]
             else:
@@ -388,7 +388,6 @@ def step3_name_forms(
 
 
 def run(
-    cur: Any,
     conn: Any,
     queries: PersonsCreateQueries,
     logger: Any,
@@ -396,7 +395,7 @@ def run(
     person_repo: PersonRepository,
     dry_run: bool = False,
 ) -> None:
-    all_authorships = get_all_unlinked_authorships(cur, queries)
+    all_authorships = get_all_unlinked_authorships(conn, queries)
     logger.info(f"{len(all_authorships)} authorships UCA non rattachées (toutes sources)")
 
     if not all_authorships:
@@ -407,29 +406,29 @@ def run(
 
     logger.info("\n--- Étape 0 : comptes HAL ---")
     s0 = step0_hal_accounts(
-        cur, queries, logger, all_authorships, linked_ids, dry_run, person_repo=person_repo
+        conn, queries, logger, all_authorships, linked_ids, dry_run, person_repo=person_repo
     )
 
     logger.info("\n--- Étape 1 : cross-source (même publi + position) ---")
-    linked_index = load_linked_authorships_by_pub(cur, queries)
+    linked_index = load_linked_authorships_by_pub(conn, queries)
     s1 = step1_cross_source(
-        cur, logger, all_authorships, linked_ids, linked_index, dry_run, person_repo=person_repo
+        conn, logger, all_authorships, linked_ids, linked_index, dry_run, person_repo=person_repo
     )
 
     logger.info("\n--- Étape 1b : IdRef connu ---")
     s1b = step1b_idref(
-        cur, queries, logger, all_authorships, linked_ids, dry_run, person_repo=person_repo
+        conn, queries, logger, all_authorships, linked_ids, dry_run, person_repo=person_repo
     )
 
     logger.info("\n--- Étape 2 : ORCID connu ---")
     s2 = step2_orcid(
-        cur, queries, logger, all_authorships, linked_ids, dry_run, person_repo=person_repo
+        conn, queries, logger, all_authorships, linked_ids, dry_run, person_repo=person_repo
     )
 
     logger.info("\n--- Étape 3 : person_name_forms ---")
-    name_form_map = queries.fetch_name_form_map(cur)
+    name_form_map = queries.fetch_name_form_map(conn)
     s3_created, s3_linked, s3_skipped = step3_name_forms(
-        cur,
+        conn,
         logger,
         all_authorships,
         linked_ids,
