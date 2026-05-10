@@ -9,7 +9,6 @@ La personne cible (celle qui absorbe les autres) est celle avec le plus de
 publications, ou celle qui a des données RH.
 
 Outil ad-hoc de maintenance — relancer occasionnellement après ingestion.
-Migration SA Core reportée au Lot 3.A du chantier sqlalchemy-core-adoption.
 
 Usage:
     python -m interfaces.cli.maintenance.merge_person_duplicates_by_lab              # appliquer les fusions confirmées
@@ -20,8 +19,10 @@ import argparse
 import logging
 from typing import Any
 
+from sqlalchemy import text
+
 from application.persons import merge_person
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.repositories import person_repository
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -60,104 +61,112 @@ LAB_PERSONS_CTE = """
 """
 
 
-def get_labs_with_duplicates(cur: Any) -> Any:
+def get_labs_with_duplicates(conn: Any) -> Any:
     """Retourne les labos ayant des personnes homonymes."""
-    cur.execute(
-        LAB_PERSONS_CTE
-        + """
-        SELECT lab_id, lab_name,
-               regexp_replace(last_name_normalized, '[-\\s]+', ' ', 'g') AS last_norm,
-               regexp_replace(first_name_normalized, '[-\\s]+', ' ', 'g') AS first_norm,
-               array_agg(person_id ORDER BY person_id) AS person_ids
-        FROM lab_persons
-        WHERE last_name_normalized != '' AND first_name_normalized != ''
-        GROUP BY lab_id, lab_name, last_norm, first_norm
-        HAVING COUNT(*) > 1
-        ORDER BY lab_name, last_norm, first_norm
-    """
-    )
-    return cur.fetchall()
+    rows = conn.execute(
+        text(
+            LAB_PERSONS_CTE
+            + """
+            SELECT lab_id, lab_name,
+                   regexp_replace(last_name_normalized, '[-\\s]+', ' ', 'g') AS last_norm,
+                   regexp_replace(first_name_normalized, '[-\\s]+', ' ', 'g') AS first_norm,
+                   array_agg(person_id ORDER BY person_id) AS person_ids
+            FROM lab_persons
+            WHERE last_name_normalized != '' AND first_name_normalized != ''
+            GROUP BY lab_id, lab_name, last_norm, first_norm
+            HAVING COUNT(*) > 1
+            ORDER BY lab_name, last_norm, first_norm
+            """
+        )
+    ).all()
+    return [dict(r._mapping) for r in rows]
 
 
-def get_swapped_name_duplicates(cur: Any, lab_id: Any) -> Any:
+def get_swapped_name_duplicates(conn: Any, lab_id: Any) -> Any:
     """Retourne les paires (personne A, personne B) dans un labo
     où nom_A = prénom_B et prénom_A = nom_B (interversion nom/prénom)."""
-    cur.execute(
-        LAB_PERSONS_CTE
-        + """
-        SELECT DISTINCT LEAST(a.person_id, b.person_id) AS id1,
-               GREATEST(a.person_id, b.person_id) AS id2
-        FROM lab_persons a
-        JOIN lab_persons b ON a.lab_id = b.lab_id
-            AND a.person_id < b.person_id
-            AND regexp_replace(a.last_name_normalized, '[-\\s]+', ' ', 'g')
-              = regexp_replace(b.first_name_normalized, '[-\\s]+', ' ', 'g')
-            AND regexp_replace(a.first_name_normalized, '[-\\s]+', ' ', 'g')
-              = regexp_replace(b.last_name_normalized, '[-\\s]+', ' ', 'g')
-        WHERE a.lab_id = %s
-          AND a.last_name_normalized != '' AND a.first_name_normalized != ''
-          AND b.last_name_normalized != '' AND b.first_name_normalized != ''
-    """,
-        (lab_id,),
-    )
-    return cur.fetchall()
+    rows = conn.execute(
+        text(
+            LAB_PERSONS_CTE
+            + """
+            SELECT DISTINCT LEAST(a.person_id, b.person_id) AS id1,
+                   GREATEST(a.person_id, b.person_id) AS id2
+            FROM lab_persons a
+            JOIN lab_persons b ON a.lab_id = b.lab_id
+                AND a.person_id < b.person_id
+                AND regexp_replace(a.last_name_normalized, '[-\\s]+', ' ', 'g')
+                  = regexp_replace(b.first_name_normalized, '[-\\s]+', ' ', 'g')
+                AND regexp_replace(a.first_name_normalized, '[-\\s]+', ' ', 'g')
+                  = regexp_replace(b.last_name_normalized, '[-\\s]+', ' ', 'g')
+            WHERE a.lab_id = :lab_id
+              AND a.last_name_normalized != '' AND a.first_name_normalized != ''
+              AND b.last_name_normalized != '' AND b.first_name_normalized != ''
+            """
+        ),
+        {"lab_id": lab_id},
+    ).all()
+    return [dict(r._mapping) for r in rows]
 
 
-def get_labs_with_swaps(cur: Any) -> Any:
+def get_labs_with_swaps(conn: Any) -> Any:
     """Retourne les labos ayant des interversions nom/prénom."""
-    cur.execute(
-        LAB_PERSONS_CTE
-        + """
-        SELECT DISTINCT a.lab_id, s.name AS lab_name
-        FROM lab_persons a
-        JOIN lab_persons b ON a.lab_id = b.lab_id
-            AND a.person_id < b.person_id
-            AND regexp_replace(a.last_name_normalized, '[-\\s]+', ' ', 'g')
-              = regexp_replace(b.first_name_normalized, '[-\\s]+', ' ', 'g')
-            AND regexp_replace(a.first_name_normalized, '[-\\s]+', ' ', 'g')
-              = regexp_replace(b.last_name_normalized, '[-\\s]+', ' ', 'g')
-        JOIN structures s ON s.id = a.lab_id
-        WHERE a.last_name_normalized != '' AND a.first_name_normalized != ''
-          AND b.last_name_normalized != '' AND b.first_name_normalized != ''
-    """
-    )
-    return {row["lab_id"]: row["lab_name"] for row in cur.fetchall()}
+    rows = conn.execute(
+        text(
+            LAB_PERSONS_CTE
+            + """
+            SELECT DISTINCT a.lab_id, s.name AS lab_name
+            FROM lab_persons a
+            JOIN lab_persons b ON a.lab_id = b.lab_id
+                AND a.person_id < b.person_id
+                AND regexp_replace(a.last_name_normalized, '[-\\s]+', ' ', 'g')
+                  = regexp_replace(b.first_name_normalized, '[-\\s]+', ' ', 'g')
+                AND regexp_replace(a.first_name_normalized, '[-\\s]+', ' ', 'g')
+                  = regexp_replace(b.last_name_normalized, '[-\\s]+', ' ', 'g')
+            JOIN structures s ON s.id = a.lab_id
+            WHERE a.last_name_normalized != '' AND a.first_name_normalized != ''
+              AND b.last_name_normalized != '' AND b.first_name_normalized != ''
+            """
+        )
+    ).all()
+    return {row.lab_id: row.lab_name for row in rows}
 
 
-def get_person_details(cur: Any, person_ids: Any) -> Any:
+def get_person_details(conn: Any, person_ids: Any) -> Any:
     """Récupère les détails des personnes pour affichage."""
-    cur.execute(
-        """
-        SELECT p.id, p.last_name, p.first_name,
-               prh.department_name, prh.role_title,
-               (prh.id IS NOT NULL) AS has_rh,
-               (SELECT COUNT(DISTINCT sd.publication_id)
-                FROM source_authorships sa2
-                JOIN source_publications sd ON sd.id = sa2.source_publication_id
-                WHERE sa2.person_id = p.id AND sd.publication_id IS NOT NULL
-               ) AS pub_count,
-               (SELECT array_agg(DISTINCT pi.id_type || ':' || pi.id_value)
-                FROM person_identifiers pi
-                WHERE pi.person_id = p.id AND pi.status != 'rejected') AS identifiers,
-               -- HAL : comptes HAL identifiés (source_person_id non-null = hal_person_id)
-               (SELECT COUNT(DISTINCT sa3.source_person_id) FROM source_authorships sa3 WHERE sa3.source = 'hal' AND sa3.person_id = p.id) AS hal_authors,
-               -- OA post-chantier source_persons : pas de source_persons → distinguer par raw_author_name
-               (SELECT COUNT(DISTINCT sa4.raw_author_name) FROM source_authorships sa4 WHERE sa4.source = 'openalex' AND sa4.person_id = p.id) AS oa_authors
-        FROM persons p
-        LEFT JOIN persons_rh prh ON prh.person_id = p.id
-        WHERE p.id = ANY(%s)
-        ORDER BY
-            (prh.id IS NOT NULL) DESC,
-            (SELECT COUNT(DISTINCT sd.publication_id)
-             FROM source_authorships sa2
-             JOIN source_publications sd ON sd.id = sa2.source_publication_id
-             WHERE sa2.person_id = p.id AND sd.publication_id IS NOT NULL
-            ) DESC,
-            p.id ASC
-    """,
-        (person_ids,),
-    )
-    return cur.fetchall()
+    rows = conn.execute(
+        text(
+            """
+            SELECT p.id, p.last_name, p.first_name,
+                   prh.department_name, prh.role_title,
+                   (prh.id IS NOT NULL) AS has_rh,
+                   (SELECT COUNT(DISTINCT sd.publication_id)
+                    FROM source_authorships sa2
+                    JOIN source_publications sd ON sd.id = sa2.source_publication_id
+                    WHERE sa2.person_id = p.id AND sd.publication_id IS NOT NULL
+                   ) AS pub_count,
+                   (SELECT array_agg(DISTINCT pi.id_type || ':' || pi.id_value)
+                    FROM person_identifiers pi
+                    WHERE pi.person_id = p.id AND pi.status != 'rejected') AS identifiers,
+                   -- HAL : comptes HAL identifiés (source_person_id non-null = hal_person_id)
+                   (SELECT COUNT(DISTINCT sa3.source_person_id) FROM source_authorships sa3 WHERE sa3.source = 'hal' AND sa3.person_id = p.id) AS hal_authors,
+                   -- OA post-chantier source_persons : pas de source_persons → distinguer par raw_author_name
+                   (SELECT COUNT(DISTINCT sa4.raw_author_name) FROM source_authorships sa4 WHERE sa4.source = 'openalex' AND sa4.person_id = p.id) AS oa_authors
+            FROM persons p
+            LEFT JOIN persons_rh prh ON prh.person_id = p.id
+            WHERE p.id = ANY(:ids)
+            ORDER BY
+                (prh.id IS NOT NULL) DESC,
+                (SELECT COUNT(DISTINCT sd.publication_id)
+                 FROM source_authorships sa2
+                 JOIN source_publications sd ON sd.id = sa2.source_publication_id
+                 WHERE sa2.person_id = p.id AND sd.publication_id IS NOT NULL
+                ) DESC,
+                p.id ASC
+            """
+        ),
+        {"ids": list(person_ids)},
+    ).all()
+    return [dict(r._mapping) for r in rows]
 
 
 def pick_target(persons: Any) -> Any:
@@ -188,10 +197,9 @@ def display_person(p: Any, is_target: Any = False) -> Any:
 
 
 def run(dry_run: Any = False) -> Any:
-    conn = get_connection()
-    cur = conn.cursor()
+    conn = get_sync_engine().connect()
 
-    rows = get_labs_with_duplicates(cur)
+    rows = get_labs_with_duplicates(conn)
 
     # Grouper par labo (passe 1 : homonymes)
     labs = {}
@@ -202,7 +210,7 @@ def run(dry_run: Any = False) -> Any:
         labs[lab_id]["groups"].append(row["person_ids"])
 
     # Ajouter les labos qui n'ont que des interversions (passe 2)
-    swap_labs = get_labs_with_swaps(cur)
+    swap_labs = get_labs_with_swaps(conn)
     for lab_id, lab_name in swap_labs.items():
         if lab_id not in labs:
             labs[lab_id] = {"name": lab_name, "groups": []}
@@ -229,7 +237,7 @@ def run(dry_run: Any = False) -> Any:
         merge_plan = []  # list of (target, sources)
 
         for i, person_ids in enumerate(groups):
-            persons = get_person_details(cur, person_ids)
+            persons = get_person_details(conn, person_ids)
             if len(persons) < 2:
                 continue  # déjà fusionnés entre-temps
 
@@ -320,7 +328,7 @@ def run(dry_run: Any = False) -> Any:
                 for target, sources in merge_plan:
                     for source in sources:
                         if not dry_run:
-                            do_merge(cur, target["id"], source["id"], repo=person_repository(cur))
+                            do_merge(conn, target["id"], source["id"], repo=person_repository(conn))
                             logger.info(
                                 f"  Fusionné #{source['id']} → #{target['id']} "
                                 f"({source['last_name']} {source['first_name']})"
@@ -335,7 +343,7 @@ def run(dry_run: Any = False) -> Any:
                     conn.commit()
 
         # ── Passe 2 : interversions nom/prénom ──
-        swapped = get_swapped_name_duplicates(cur, lab_id)
+        swapped = get_swapped_name_duplicates(conn, lab_id)
         if swapped:
             swap_plan = []
             print(
@@ -347,7 +355,7 @@ def run(dry_run: Any = False) -> Any:
 
             for row in swapped:
                 pair_ids = [row["id1"], row["id2"]]
-                persons = get_person_details(cur, pair_ids)
+                persons = get_person_details(conn, pair_ids)
                 if len(persons) < 2:
                     continue
 
@@ -436,7 +444,7 @@ def run(dry_run: Any = False) -> Any:
                         for source in sources:
                             if not dry_run:
                                 do_merge(
-                                    cur, target["id"], source["id"], repo=person_repository(cur)
+                                    conn, target["id"], source["id"], repo=person_repository(conn)
                                 )
                                 logger.info(
                                     f"  Fusionné (interversion) #{source['id']} → #{target['id']} "
@@ -460,7 +468,6 @@ def run(dry_run: Any = False) -> Any:
         print(c("  (dry-run — aucune modification effectuée)", "yellow"))
     print(f"{'=' * 70}\n")
 
-    cur.close()
     conn.close()
 
 

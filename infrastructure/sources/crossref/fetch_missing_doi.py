@@ -20,13 +20,30 @@ from collections.abc import Iterable
 from typing import Any
 
 import httpx
-from psycopg.types.json import Jsonb as Json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_retry_async import http_request_with_retry_async
 from infrastructure.app_config import get_api_base_urls, get_crossref_email
 from infrastructure.sources.common import compute_hash
 
 _USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
+
+_INSERT_NOT_FOUND_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, doi, raw_data, not_found, processed)
+    VALUES ('crossref', :doi, :doi, '{}'::jsonb, TRUE, TRUE)
+    ON CONFLICT (source, source_id) DO NOTHING
+    """
+)
+
+_INSERT_CROSSREF_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
+    VALUES ('crossref', :doi, :doi, :raw_data, :raw_hash, FALSE)
+    ON CONFLICT (source, source_id) DO NOTHING
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 class CrossrefFetchMissingDoiAdapter:
@@ -43,14 +60,12 @@ class CrossrefFetchMissingDoiAdapter:
     base_url: str
     headers: dict[str, str]
 
-    def configure(self, cur: Any) -> None:
-        self.base_url = get_api_base_urls(cur).get("crossref", "https://api.crossref.org")
-        email = get_crossref_email(cur)
+    def configure(self, conn: Any) -> None:
+        self.base_url = get_api_base_urls(conn).get("crossref", "https://api.crossref.org")
+        email = get_crossref_email(conn)
         self.headers = {"User-Agent": _USER_AGENT_TEMPLATE.format(email=email)}
 
-    async def fetch_async(
-        self, client: httpx.AsyncClient, dois: list[str]
-    ) -> Iterable[dict]:
+    async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         doi = dois[0]
         # CrossRef accepte le DOI tel quel dans le path (slashes inclus, qui
         # font partie d'à peu près 100 % des DOI). On ne quote que les
@@ -87,29 +102,13 @@ class CrossrefFetchMissingDoiAdapter:
         doi = doi_raw.lower()
 
         if record.get("_status") == "not_found":
-            with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO staging (source, source_id, doi, raw_data, not_found, processed)
-                    VALUES ('crossref', %s, %s, '{}'::jsonb, TRUE, TRUE)
-                    ON CONFLICT (source, source_id) DO NOTHING
-                    """,
-                    (doi, doi),
-                )
-                inserted = cur.rowcount > 0
+            result = conn.execute(_INSERT_NOT_FOUND_SQL, {"doi": doi})
             conn.commit()
-            return inserted
+            return result.rowcount > 0
 
-        raw_hash = compute_hash(record)
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
-                VALUES ('crossref', %s, %s, %s::jsonb, %s, FALSE)
-                ON CONFLICT (source, source_id) DO NOTHING
-                """,
-                (doi, doi, Json(record), raw_hash),
-            )
-            inserted = cur.rowcount > 0
+        result = conn.execute(
+            _INSERT_CROSSREF_SQL,
+            {"doi": doi, "raw_data": record, "raw_hash": compute_hash(record)},
+        )
         conn.commit()
-        return inserted
+        return result.rowcount > 0

@@ -47,7 +47,7 @@ class AsyncFetchMissingDoiAdapter(Protocol):
     max_concurrent: int  # plafond asyncio.Semaphore — respect du rate-limit API
     request_delay_s: float  # pause par worker après chaque fetch (0 = pas de pause)
 
-    def configure(self, cur: Any) -> None:
+    def configure(self, conn: Any) -> None:
         """Lit la config (URLs, credentials) depuis la base avant la boucle."""
 
     def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Awaitable[Iterable[dict]]:
@@ -74,11 +74,11 @@ async def run_async(
     Lance les fetchs HTTP en parallèle via `asyncio.gather`, bornés par
     un sémaphore `adapter.max_concurrent` pour respecter le rate-limit
     de l'API. Les inserts DB restent sync, délégués au threadpool via
-    `asyncio.to_thread` et sérialisés par un `asyncio.Lock` (la conn
-    psycopg sync n'est pas thread-safe).
+    `asyncio.to_thread` et sérialisés par un `asyncio.Lock` (la
+    `Connection` SA sync n'est pas thread-safe).
 
     Args:
-        conn: connexion psycopg ouverte.
+        conn: `Connection` SA ouverte.
         adapter: instance source-spécifique async.
         log: logger.
         cross_import_dois_reader: callable qui lit en base les DOI
@@ -91,9 +91,7 @@ async def run_async(
     Returns:
         Stats {dois, fetched, inserted}.
     """
-    cur = conn.cursor()
-    adapter.configure(cur)
-    cur.close()
+    adapter.configure(conn)
 
     dois = cross_import_dois_reader(conn, adapter.source_key, all_staged)
     log.info("%d DOI manquants pour %s", len(dois), adapter.source_key)
@@ -113,7 +111,7 @@ async def run_async(
     batches = [dois[i : i + adapter.batch_size] for i in range(0, total, adapter.batch_size)]
 
     sem = asyncio.Semaphore(adapter.max_concurrent)
-    # Sérialise les inserts : la conn psycopg sync n'est pas thread-safe,
+    # Sérialise les inserts : la `Connection` SA sync n'est pas thread-safe,
     # or `asyncio.to_thread` exécute dans un ThreadPoolExecutor partagé.
     db_lock = asyncio.Lock()
     progress = {"processed": 0, "fetched": 0, "inserted": 0}
