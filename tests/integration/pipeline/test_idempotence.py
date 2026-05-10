@@ -7,9 +7,6 @@ compter les résultats, relancer, vérifier que les compteurs n'ont pas bougé.
 Ces tests tournent sur la base bibliometrie_test (cf. conftest.py).
 """
 
-import pytest
-from psycopg.types.json import Jsonb as Json
-
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import update_sources
 from domain.doc_types import map_doc_type
@@ -495,25 +492,33 @@ HAL_STAGING_DOCS = [
 ]
 
 
-def _insert_hal_staging(cur, docs):
+def _insert_hal_staging(conn, docs):
+    from sqlalchemy import bindparam, text
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    stmt = text("""
+        INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed)
+        VALUES ('hal', :halid, :doi, :raw_data, :hal_collections, FALSE)
+        ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
+    """).bindparams(bindparam("raw_data", type_=JSONB))
     for doc in docs:
-        cur.execute(
-            """
-            INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed)
-            VALUES ('hal', %s, %s, %s, %s, FALSE)
-            ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
-        """,
-            (doc["halid"], doc["doi"], Json(doc["raw_data"]), doc["hal_collections"]),
+        conn.execute(
+            stmt,
+            {
+                "halid": doc["halid"],
+                "doi": doc["doi"],
+                "raw_data": doc["raw_data"],
+                "hal_collections": doc["hal_collections"],
+            },
         )
 
 
-def _run_normalize_hal(cur):
-    """Exécute la normalisation HAL via un curseur tuple (comme le vrai script)."""
+def _run_normalize_hal(conn):
+    """Exécute la normalisation HAL sur la Connection SA de test."""
     import logging
 
-    from psycopg.rows import tuple_row
+    from sqlalchemy import text
 
-    plain_cur = cur.connection.cursor(row_factory=tuple_row)
     from application.pipeline.normalize.normalize_hal import process_work
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
@@ -530,19 +535,20 @@ def _run_normalize_hal(cur):
     address_linker = PgAddressLinker()
     zenodo_resolver = HttpZenodoResolver(api_base="https://zenodo.org/api/records")
     logger = logging.getLogger("test")
-    journal_repo = journal_repository(plain_cur)
-    publisher_repo = publisher_repository(plain_cur)
-    pub_repo = publication_repository(plain_cur)
+    journal_repo = journal_repository(conn)
+    publisher_repo = publisher_repository(conn)
+    pub_repo = publication_repository(conn)
 
-    plain_cur.execute("""
-        Select id, source_id AS halid, doi, raw_data, hal_collections
-        FROM staging WHERE source = 'hal' AND processed = FALSE ORDER BY id
-    """)
-    rows = plain_cur.fetchall()
+    rows = conn.execute(
+        text("""
+            SELECT id, source_id, doi, raw_data, hal_collections
+            FROM staging WHERE source = 'hal' AND processed = FALSE ORDER BY id
+        """)
+    ).all()
     processed = 0
     for row in rows:
         if process_work(
-            plain_cur,
+            conn,
             queries,
             logger,
             row,
@@ -557,29 +563,34 @@ def _run_normalize_hal(cur):
     return processed
 
 
-def _count_hal_tables(cur) -> dict:
+def _count_hal_tables(conn) -> dict:
+    from sqlalchemy import text
+
     counts = {}
-    for t in ["publications", "source_persons"]:
-        cur.execute(f"SELECT COUNT(*) AS cnt FROM {t}")
-        counts[t] = cur.fetchone()["cnt"]
-    cur.execute("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'hal'")
-    counts["hal_authorships"] = cur.fetchone()["cnt"]
-    cur.execute("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'hal'")
-    counts["hal_documents"] = cur.fetchone()["cnt"]
+    for t in ("publications", "source_persons"):
+        counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
+    counts["hal_authorships"] = conn.execute(
+        text("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'hal'")
+    ).scalar_one()
+    counts["hal_documents"] = conn.execute(
+        text("SELECT COUNT(*) AS cnt FROM source_publications WHERE source = 'hal'")
+    ).scalar_one()
     return counts
 
 
 class TestNormalizeHalIdempotence:
-    def test_double_run_same_counts(self, db):
-        _insert_hal_staging(db, HAL_STAGING_DOCS)
+    def test_double_run_same_counts(self, sa_sync_conn):
+        from sqlalchemy import text
 
-        processed_1 = _run_normalize_hal(db)
-        counts_1 = _count_hal_tables(db)
+        _insert_hal_staging(sa_sync_conn, HAL_STAGING_DOCS)
+
+        processed_1 = _run_normalize_hal(sa_sync_conn)
+        counts_1 = _count_hal_tables(sa_sync_conn)
         assert processed_1 == 3
 
-        db.execute("UPDATE staging SET processed = FALSE WHERE source = 'hal'")
-        _run_normalize_hal(db)
-        counts_2 = _count_hal_tables(db)
+        sa_sync_conn.execute(text("UPDATE staging SET processed = FALSE WHERE source = 'hal'"))
+        _run_normalize_hal(sa_sync_conn)
+        counts_2 = _count_hal_tables(sa_sync_conn)
 
         assert counts_2 == counts_1, (
             f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
@@ -1020,37 +1031,35 @@ INTER_OA_DOCS = [
 ]
 
 
-@pytest.mark.skip(
-    reason=(
-        "Inter-source HAL+OA : OA migré en SA Core, HAL encore psycopg ; "
-        "les deux ne partagent pas la même connexion. À réactiver quand HAL "
-        "sera migré (chantier sqla Lot 3.B)."
-    )
-)
 class TestNormalizeInterSourceIdempotence:
     """Normaliser HAL puis OA puis relancer HAL ne crée pas de doublons."""
 
-    def test_hal_then_oa_then_hal_again(self, db):
-        _insert_hal_staging(db, INTER_HAL_DOCS)
-        _insert_oa_staging(db, INTER_OA_DOCS)
+    def test_hal_then_oa_then_hal_again(self, sa_sync_conn):
+        from sqlalchemy import text
+
+        _insert_hal_staging(sa_sync_conn, INTER_HAL_DOCS)
+        _insert_oa_staging(sa_sync_conn, INTER_OA_DOCS)
 
         # Passe 1 : HAL
-        _run_normalize_hal(db)
-        _create_all_publications(db)
-        db.execute("SELECT COUNT(*) AS cnt FROM publications")
-        pubs_after_hal = db.fetchone()["cnt"]
+        _run_normalize_hal(sa_sync_conn)
+        _create_all_publications(sa_sync_conn)
+        pubs_after_hal = sa_sync_conn.execute(
+            text("SELECT COUNT(*) AS cnt FROM publications")
+        ).scalar_one()
 
         # Passe 2 : OA
-        _run_normalize_oa(db)
-        _create_all_publications(db)
-        db.execute("SELECT COUNT(*) AS cnt FROM publications")
-        pubs_after_oa = db.fetchone()["cnt"]
+        _run_normalize_oa(sa_sync_conn)
+        _create_all_publications(sa_sync_conn)
+        pubs_after_oa = sa_sync_conn.execute(
+            text("SELECT COUNT(*) AS cnt FROM publications")
+        ).scalar_one()
 
         # L'article partagé ne doit pas être dupliqué (même DOI)
-        db.execute(
-            "SELECT COUNT(*) AS cnt FROM publications WHERE lower(doi) = lower(%s)", (SHARED_DOI,)
-        )
-        assert db.fetchone()["cnt"] == 1, "L'article partagé ne doit exister qu'une fois"
+        cnt = sa_sync_conn.execute(
+            text("SELECT COUNT(*) AS cnt FROM publications WHERE lower(doi) = lower(:doi)"),
+            {"doi": SHARED_DOI},
+        ).scalar_one()
+        assert cnt == 1, "L'article partagé ne doit exister qu'une fois"
 
         # Le rapport HAL sans DOI + l'article OA-only = 2 pubs de plus
         assert pubs_after_oa == pubs_after_hal + 1, (
@@ -1059,28 +1068,33 @@ class TestNormalizeInterSourceIdempotence:
         )
 
         # Passe 3 : relancer HAL
-        _insert_hal_staging(db, INTER_HAL_DOCS)
-        _run_normalize_hal(db)
-        db.execute("SELECT COUNT(*) AS cnt FROM publications")
-        pubs_after_hal2 = db.fetchone()["cnt"]
+        _insert_hal_staging(sa_sync_conn, INTER_HAL_DOCS)
+        _run_normalize_hal(sa_sync_conn)
+        pubs_after_hal2 = sa_sync_conn.execute(
+            text("SELECT COUNT(*) AS cnt FROM publications")
+        ).scalar_one()
 
         assert pubs_after_hal2 == pubs_after_oa, (
             f"Relancer HAL ne devrait rien créer. Avant={pubs_after_oa}, après={pubs_after_hal2}"
         )
 
-    def test_shared_doi_same_journal(self, db):
+    def test_shared_doi_same_journal(self, sa_sync_conn):
         """L'article partagé pointe vers le même journal, pas un doublon."""
-        _insert_hal_staging(db, INTER_HAL_DOCS)
-        _insert_oa_staging(db, INTER_OA_DOCS)
+        from sqlalchemy import text
 
-        _run_normalize_hal(db)
-        _run_normalize_oa(db)
+        _insert_hal_staging(sa_sync_conn, INTER_HAL_DOCS)
+        _insert_oa_staging(sa_sync_conn, INTER_OA_DOCS)
 
-        db.execute("""
-            SELECT COUNT(*) AS cnt FROM journals
-            WHERE title_normalized LIKE '%%geochemistry international%%'
-        """)
-        assert db.fetchone()["cnt"] == 1, "Le journal partagé ne doit exister qu'une fois"
+        _run_normalize_hal(sa_sync_conn)
+        _run_normalize_oa(sa_sync_conn)
+
+        cnt = sa_sync_conn.execute(
+            text("""
+                SELECT COUNT(*) AS cnt FROM journals
+                WHERE title_normalized LIKE '%geochemistry international%'
+            """)
+        ).scalar_one()
+        assert cnt == 1, "Le journal partagé ne doit exister qu'une fois"
 
 
 # ══════════════════════════════════════════════════════════════════

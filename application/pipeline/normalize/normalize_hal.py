@@ -23,8 +23,6 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from typing import Any
 
-from psycopg.types.json import Jsonb as Json
-
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.address_linker import AddressLinker
@@ -206,7 +204,7 @@ def insert_hal_document(
 
     # NNT dans external_ids (thèses HAL)
     nnt = normalize_nnt(as_str(doc.get("nntId_s")))
-    external_ids = Json({"nnt": nnt}) if nnt else None
+    external_ids = {"nnt": nnt} if nnt else None
 
     # Métadonnées de publication (pour création différée)
     journal_id = pub_meta.get("journal_id") if pub_meta else None
@@ -223,9 +221,7 @@ def insert_hal_document(
 
     # Topics (domaines HAL)
     domain_raw = doc.get("domain_s")
-    topics = (
-        Json({"hal_domains": domain_raw}) if isinstance(domain_raw, list) and domain_raw else None
-    )
+    topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
 
     # Biblio
     biblio = {}
@@ -238,7 +234,7 @@ def insert_hal_document(
     page = as_str(doc.get("page_s"))
     if page:
         biblio["pages"] = page
-    biblio_json = Json(biblio) if biblio else None
+    biblio_json = biblio if biblio else None
 
     # URLs
     uri = as_str(doc.get("uri_s"))
@@ -370,7 +366,7 @@ def upsert_hal_author(
         full_name=full_name,
         orcid=orcid,
         idref=idref,
-        source_ids_json=Json(source_ids),
+        source_ids_json=source_ids,
     )
     _hal_author_cache[src_id] = result
     return result
@@ -573,7 +569,7 @@ def process_authors(
             idhal=idhal,
             hal_person_id=hal_person_id if hal_person_id and hal_person_id > 0 else None,
         )
-        identifiers = Json(ids) if ids else None
+        identifiers = ids if ids else None
 
         # Structures affiliées à cet auteur sur ce document (par form_id)
         # Résoudre les hal_struct_id bruts → source_structures.id
