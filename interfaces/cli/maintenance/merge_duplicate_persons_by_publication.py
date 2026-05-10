@@ -11,8 +11,7 @@ Règles de choix du target :
 3. Sinon, prompter l'utilisateur
 
 Outil ad-hoc de maintenance — relancer occasionnellement après ingestion
-(une nouvelle vague de doublons peut apparaître). Migration SA Core
-reportée au Lot 3.A du chantier sqlalchemy-core-adoption.
+(une nouvelle vague de doublons peut apparaître).
 
 Usage:
     python -m interfaces.cli.maintenance.merge_duplicate_persons_by_publication              # exécuter
@@ -22,8 +21,10 @@ Usage:
 import argparse
 from typing import Any
 
+from sqlalchemy import text
+
 from application.persons import merge_person
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.repositories import person_repository
 
 PAIRS_SQL = """
@@ -77,10 +78,10 @@ def choose_target(pair: Any) -> Any:
     """Choisit le target (à garder) et le source (à absorber).
     Retourne (target_id, source_id) ou None si prompt nécessaire.
     """
-    id_a, id_b = pair["id_a"], pair["id_b"]
-    rh_a, rh_b = pair["rh_a"], pair["rh_b"]
-    lnn_a, lnn_b = pair["lnn_a"], pair["lnn_b"]
-    fnn_a, fnn_b = pair["fnn_a"], pair["fnn_b"]
+    id_a, id_b = pair.id_a, pair.id_b
+    rh_a, rh_b = pair.rh_a, pair.rh_b
+    lnn_a, lnn_b = pair.lnn_a, pair.lnn_b
+    fnn_a, fnn_b = pair.fnn_a, pair.fnn_b
 
     # Règle 1 : personne RH prioritaire
     if rh_a and not rh_b:
@@ -104,20 +105,18 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    conn = get_connection()
-    cur = conn.cursor()
+    conn = get_sync_engine().connect()
 
-    cur.execute(PAIRS_SQL)
-    pairs = cur.fetchall()
+    pairs = conn.execute(text(PAIRS_SQL)).all()
     print(f"{len(pairs)} paires candidats (nom + conflit source)")
 
     merged = 0
     prompted = 0
-    skipped_already_merged = set()
+    skipped_already_merged: set[int] = set()
 
     for pair in pairs:
         # Skip si l'une des personnes a déjà été fusionnée dans ce run
-        if pair["id_a"] in skipped_already_merged or pair["id_b"] in skipped_already_merged:
+        if pair.id_a in skipped_already_merged or pair.id_b in skipped_already_merged:
             continue
 
         choice = choose_target(pair)
@@ -125,21 +124,21 @@ def main() -> None:
         if choice is None:
             # Prompt
             print(
-                f"\n  ? {pair['ln_a']} {pair['fn_a']} (id={pair['id_a']}) vs "
-                f"{pair['ln_b']} {pair['fn_b']} (id={pair['id_b']})"
+                f"\n  ? {pair.ln_a} {pair.fn_a} (id={pair.id_a}) vs "
+                f"{pair.ln_b} {pair.fn_b} (id={pair.id_b})"
             )
             resp = input("    Garder [a/b/s(kip)] ? ").strip().lower()
             if resp == "a":
-                choice = (pair["id_a"], pair["id_b"])
+                choice = (pair.id_a, pair.id_b)
             elif resp == "b":
-                choice = (pair["id_b"], pair["id_a"])
+                choice = (pair.id_b, pair.id_a)
             else:
                 prompted += 1
                 continue
 
         target_id, source_id = choice
         if not args.dry_run:
-            do_merge(cur, target_id, source_id, repo=person_repository(cur))
+            do_merge(conn, target_id, source_id, repo=person_repository(conn))
         skipped_already_merged.add(source_id)
         merged += 1
 

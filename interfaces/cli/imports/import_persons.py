@@ -10,11 +10,6 @@ Usage:
 
 Colonnes attendues (noms flexibles, détection automatique) :
     nom, prenom, email, department-name, role-title, start-date, end-date
-
-Note : ce script utilise encore ``cur`` psycopg via
-``application.persons.refresh_person_name_forms`` + ``person_repository(cur)``.
-Migration SA Core reportée au Lot 3.A du chantier sqlalchemy-core-adoption
-(repos sync), qui rendra le repo dispatch-aware.
 """
 
 import argparse
@@ -25,9 +20,11 @@ import sys
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import text
+
 from application.persons import refresh_person_name_forms
 from domain.normalize import normalize_name
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.repositories import person_repository
 
 logging.basicConfig(
@@ -219,7 +216,6 @@ def import_persons(
     conn: Any, records: list[dict], dry_run: bool = False, export_date: str = None
 ) -> int:
     """Insère les personnes en base. Retourne le nombre d'insertions."""
-    cur = conn.cursor()
     inserted = 0
     skipped = 0
     duplicates = 0
@@ -246,43 +242,56 @@ def import_persons(
             continue
 
         # Vérifier doublon (même nom normalisé + même department + même role)
-        cur.execute(
-            """
-            SELECT p.id FROM persons p
-            LEFT JOIN persons_rh prh ON prh.person_id = p.id
-            WHERE p.last_name_normalized = %s
-              AND p.first_name_normalized = %s
-              AND prh.department_name IS NOT DISTINCT FROM %s
-              AND prh.role_title IS NOT DISTINCT FROM %s
-        """,
-            (last_norm, first_norm, department, role),
-        )
-        if cur.fetchone():
+        existing = conn.execute(
+            text(
+                """
+                SELECT p.id FROM persons p
+                LEFT JOIN persons_rh prh ON prh.person_id = p.id
+                WHERE p.last_name_normalized = :ln
+                  AND p.first_name_normalized = :fn
+                  AND prh.department_name IS NOT DISTINCT FROM :dept
+                  AND prh.role_title IS NOT DISTINCT FROM :role
+                """
+            ),
+            {"ln": last_norm, "fn": first_norm, "dept": department, "role": role},
+        ).first()
+        if existing:
             duplicates += 1
             continue
 
-        cur.execute(
-            """
-            INSERT INTO persons
-                (last_name, first_name, last_name_normalized, first_name_normalized)
-            VALUES (%s, %s, %s, %s)
-            RETURNING id
-        """,
-            (last_name, first_name, last_norm, first_norm),
-        )
-        person_id = cur.fetchone()["id"]
+        person_id = conn.execute(
+            text(
+                """
+                INSERT INTO persons
+                    (last_name, first_name, last_name_normalized, first_name_normalized)
+                VALUES (:last, :first, :ln, :fn)
+                RETURNING id
+                """
+            ),
+            {"last": last_name, "first": first_name, "ln": last_norm, "fn": first_norm},
+        ).scalar_one()
         refresh_person_name_forms(
-            cur, person_id, last_name, first_name, repo=person_repository(cur)
+            conn, person_id, last_name, first_name, repo=person_repository(conn)
         )
 
-        cur.execute(
-            """
-            INSERT INTO persons_rh
-                (person_id, email, role_title, department_name,
-                 start_date, end_date, hr_export_date)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """,
-            (person_id, email, role, department, start, end, export_dt),
+        conn.execute(
+            text(
+                """
+                INSERT INTO persons_rh
+                    (person_id, email, role_title, department_name,
+                     start_date, end_date, hr_export_date)
+                VALUES (:pid, :email, :role, :dept, :start, :end, :exp)
+                """
+            ),
+            {
+                "pid": person_id,
+                "email": email,
+                "role": role,
+                "dept": department,
+                "start": start,
+                "end": end,
+                "exp": export_dt,
+            },
         )
         inserted += 1
 
@@ -291,7 +300,6 @@ def import_persons(
             logger.info(f"  {inserted} personnes insérées…")
 
     conn.commit()
-    cur.close()
 
     if skipped:
         logger.warning(f"  {skipped} lignes ignorées (nom ou prénom manquant)")
@@ -350,22 +358,19 @@ def main() -> None:
             logger.info(f"    {d}: {count}")
         return
 
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     try:
         if args.clear:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM persons")
-                logger.info(f"  Table persons vidée ({cur.rowcount} lignes supprimées)")
+            n_deleted = conn.execute(text("DELETE FROM persons")).rowcount
+            logger.info(f"  Table persons vidée ({n_deleted} lignes supprimées)")
             conn.commit()
 
         inserted = import_persons(conn, records, export_date=args.export_date)
         logger.info(f"\n=== Terminé : {inserted} personnes insérées ===")
 
         # Compter
-        with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) AS n FROM persons")
-            total = cur.fetchone()["n"]
-            logger.info(f"  Total en base : {total} personnes")
+        total = conn.execute(text("SELECT COUNT(*) AS n FROM persons")).scalar_one()
+        logger.info(f"  Total en base : {total} personnes")
 
     finally:
         conn.close()

@@ -23,7 +23,7 @@ import os
 from typing import cast
 
 from application.pipeline.fetch_missing_doi import AsyncFetchMissingDoiAdapter, run_async
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.log import setup_logger
 from infrastructure.sources.common import get_cross_import_dois
 from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
@@ -64,7 +64,7 @@ def main() -> None:
     args = parser.parse_args()
 
     adapter = ADAPTERS[args.target]()
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     try:
         asyncio.run(
             run_async(
@@ -78,8 +78,7 @@ def main() -> None:
             )
         )
     finally:
-        if not conn.closed:
-            conn.close()
+        conn.close()
 
 
 if __name__ == "__main__":

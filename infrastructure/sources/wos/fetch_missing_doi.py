@@ -22,7 +22,8 @@ from collections.abc import Iterable
 from typing import Any
 
 import httpx
-from psycopg.types.json import Jsonb as Json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.api_retry_async import http_request_with_retry_async
@@ -30,6 +31,22 @@ from infrastructure.app_config import get_api_base_urls, get_wos_api_key
 from infrastructure.sources.common import compute_hash
 
 log = logging.getLogger(__name__)
+
+_INSERT_WOS_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+    VALUES ('wos', :source_id, :doi, :raw_data, :raw_hash)
+    ON CONFLICT (source, source_id) DO UPDATE SET
+        raw_data = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+            THEN EXCLUDED.raw_data ELSE staging.raw_data END,
+        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
+        processed = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+            THEN FALSE ELSE staging.processed END,
+        last_seen_at = now()
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 def _clean_doi_for_wos(doi: str) -> str | None:
@@ -80,9 +97,9 @@ class WosFetchMissingDoiAdapter:
     base_url: str
     headers: dict[str, str]
 
-    def configure(self, cur: Any) -> None:
-        self.base_url = get_api_base_urls(cur).get("wos", "https://api.clarivate.com/api/wos")
-        self.headers = {"X-ApiKey": get_wos_api_key(cur), "Accept": "application/json"}
+    def configure(self, conn: Any) -> None:
+        self.base_url = get_api_base_urls(conn).get("wos", "https://api.clarivate.com/api/wos")
+        self.headers = {"X-ApiKey": get_wos_api_key(conn), "Accept": "application/json"}
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         clean = [d for d in (_clean_doi_for_wos(x) for x in dois) if d]
@@ -149,27 +166,14 @@ class WosFetchMissingDoiAdapter:
         return records
 
     def insert(self, conn: Any, record: dict) -> bool:
-        ut = _extract_ut(record)
-        doi = _extract_doi(record)
-        raw_hash = compute_hash(record)
-
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-                VALUES ('wos', %s, %s, %s, %s)
-                ON CONFLICT (source, source_id) DO UPDATE SET
-                    raw_data = CASE
-                        WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                        THEN EXCLUDED.raw_data ELSE staging.raw_data END,
-                    raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-                    processed = CASE
-                        WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                        THEN FALSE ELSE staging.processed END,
-                    last_seen_at = now()
-                """,
-                (ut, doi, Json(record), raw_hash),
-            )
-            inserted = cur.rowcount > 0
+        result = conn.execute(
+            _INSERT_WOS_SQL,
+            {
+                "source_id": _extract_ut(record),
+                "doi": _extract_doi(record),
+                "raw_data": record,
+                "raw_hash": compute_hash(record),
+            },
+        )
         conn.commit()
-        return inserted
+        return result.rowcount > 0

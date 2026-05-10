@@ -15,11 +15,20 @@ from collections.abc import Iterable
 from typing import Any
 
 import httpx
-from psycopg.types.json import Jsonb as Json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_retry_async import http_request_with_retry_async
 from infrastructure.app_config import get_api_base_urls, get_scanr_credentials
 from infrastructure.sources.common import clean_doi, compute_hash
+
+_INSERT_SCANR_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+    VALUES ('scanr', :source_id, :doi, :raw_data, :raw_hash)
+    ON CONFLICT (source, source_id) DO NOTHING
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 class ScanrFetchMissingDoiAdapter:
@@ -34,12 +43,12 @@ class ScanrFetchMissingDoiAdapter:
     url: str
     auth: tuple[str, str]
 
-    def configure(self, cur: Any) -> None:
-        self.url = get_api_base_urls(cur).get(
+    def configure(self, conn: Any) -> None:
+        self.url = get_api_base_urls(conn).get(
             "scanr",
             "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
         )
-        username, password = get_scanr_credentials(cur)
+        username, password = get_scanr_credentials(conn)
         self.auth = (username, password)
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
@@ -69,17 +78,14 @@ class ScanrFetchMissingDoiAdapter:
                 doi = clean_doi(ext.get("id"))
                 break
 
-        raw_hash = compute_hash(record)
-
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-                VALUES ('scanr', %s, %s, %s, %s)
-                ON CONFLICT (source, source_id) DO NOTHING
-                """,
-                (scanr_id, doi, Json(record), raw_hash),
-            )
-            inserted = cur.rowcount > 0
+        result = conn.execute(
+            _INSERT_SCANR_SQL,
+            {
+                "source_id": scanr_id,
+                "doi": doi,
+                "raw_data": record,
+                "raw_hash": compute_hash(record),
+            },
+        )
         conn.commit()
-        return inserted
+        return result.rowcount > 0

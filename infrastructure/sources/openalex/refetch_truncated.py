@@ -16,11 +16,12 @@ import os
 import time
 
 import requests
-from psycopg.types.json import Jsonb as Json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import OPENALEX_DELAY
 from infrastructure.app_config import get_api_base_urls, get_openalex_api_key, get_openalex_email
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.sources.common import compute_hash, setup_logger
 from infrastructure.sources.openalex import (
     SELECT_FIELDS,
@@ -28,6 +29,15 @@ from infrastructure.sources.openalex import (
     compute_meta_hash,
     init_auth,
 )
+
+_UPDATE_SQL = text(
+    """
+    UPDATE staging
+    SET raw_data = :raw_data, raw_hash = :raw_hash, meta_hash = :meta_hash,
+        processed = FALSE, last_seen_at = now()
+    WHERE id = :id
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
 
 logger = setup_logger("refetch_truncated", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -57,20 +67,22 @@ def main() -> None:
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
     args = parser.parse_args()
 
-    conn = get_connection()
-    cur = conn.cursor()
-    init_auth(api_key=get_openalex_api_key(cur), email=get_openalex_email(cur))
-    base_url = get_api_base_urls(cur)["openalex"]
+    conn = get_sync_engine().connect()
+    init_auth(api_key=get_openalex_api_key(conn), email=get_openalex_email(conn))
+    base_url = get_api_base_urls(conn)["openalex"]
 
     # Détecter les works avec exactement 100 authorships dans le staging
-    cur.execute("""
-        SELECT id, source_id
-        FROM staging
-        WHERE source = 'openalex'
-          AND jsonb_array_length(raw_data->'authorships') = 100
-        ORDER BY id
-    """)
-    truncated = cur.fetchall()
+    truncated = conn.execute(
+        text(
+            """
+            SELECT id, source_id
+            FROM staging
+            WHERE source = 'openalex'
+              AND jsonb_array_length(raw_data->'authorships') = 100
+            ORDER BY id
+            """
+        )
+    ).all()
 
     if args.limit:
         truncated = truncated[: args.limit]
@@ -86,31 +98,26 @@ def main() -> None:
     errors = 0
 
     for i, row in enumerate(truncated):
-        oa_id = row["source_id"]
-        work = fetch_work(oa_id, base_url=base_url)
+        work = fetch_work(row.source_id, base_url=base_url)
         time.sleep(OPENALEX_DELAY)
 
         if not work:
             errors += 1
             continue
 
-        n_authors = len(work.get("authorships", []))
-        if n_authors <= 100:
+        if len(work.get("authorships", [])) <= 100:
             # Pas réellement tronqué (la publication a exactement 100 auteurs)
             already_complete += 1
             continue
 
-        # Mettre à jour le staging avec la version complète
-        raw_hash = compute_hash(work)
-        meta_hash = compute_meta_hash(work)
-        cur.execute(
-            """
-            UPDATE staging
-            SET raw_data = %s::jsonb, raw_hash = %s, meta_hash = %s,
-                processed = FALSE, last_seen_at = now()
-            WHERE id = %s
-        """,
-            (Json(work), raw_hash, meta_hash, row["id"]),
+        conn.execute(
+            _UPDATE_SQL,
+            {
+                "raw_data": work,
+                "raw_hash": compute_hash(work),
+                "meta_hash": compute_meta_hash(work),
+                "id": row.id,
+            },
         )
         updated += 1
 
