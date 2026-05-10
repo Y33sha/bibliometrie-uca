@@ -14,39 +14,39 @@ class TestSetInPerimeterFromAddressesDailyClause:
     que le SQL parse maintenant correctement (peu importe combien de
     lignes sont mises à jour, c'est la syntaxe qu'on teste)."""
 
-    def test_daily_true_does_not_raise(self, db):
+    def test_daily_true_does_not_raise(self, sa_sync_conn):
         # Aucune donnée requise : si le SQL parse, la fonction retourne 0.
         n = set_in_perimeter_from_addresses(
-            db, source="openalex", perimeter_ids=[1, 2, 3], daily=True
+            sa_sync_conn, source="openalex", perimeter_ids=[1, 2, 3], daily=True
         )
         assert n == 0
 
-    def test_daily_false_does_not_raise(self, db):
+    def test_daily_false_does_not_raise(self, sa_sync_conn):
         n = set_in_perimeter_from_addresses(
-            db, source="openalex", perimeter_ids=[1, 2, 3], daily=False
+            sa_sync_conn, source="openalex", perimeter_ids=[1, 2, 3], daily=False
         )
         assert n == 0
 
 
 class TestSetStructureIdsFromAddressesDailyClause:
-    def test_daily_true_does_not_raise(self, db):
+    def test_daily_true_does_not_raise(self, sa_sync_conn):
         n = set_structure_ids_from_addresses(
-            db, source="openalex", wide_ids=[1, 2, 3], daily=True
+            sa_sync_conn, source="openalex", wide_ids=[1, 2, 3], daily=True
         )
         assert n == 0
 
-    def test_daily_false_does_not_raise(self, db):
+    def test_daily_false_does_not_raise(self, sa_sync_conn):
         n = set_structure_ids_from_addresses(
-            db, source="openalex", wide_ids=[1, 2, 3], daily=False
+            sa_sync_conn, source="openalex", wide_ids=[1, 2, 3], daily=False
         )
         assert n == 0
 
 
 class TestSetThesesStructureIdsDailyClause:
-    def test_daily_true_does_not_raise(self, db):
-        n = set_theses_structure_ids(db, wide_ids=[1, 2, 3], daily=True)
+    def test_daily_true_does_not_raise(self, sa_sync_conn):
+        n = set_theses_structure_ids(sa_sync_conn, wide_ids=[1, 2, 3], daily=True)
         assert n == 0
 
-    def test_daily_false_does_not_raise(self, db):
-        n = set_theses_structure_ids(db, wide_ids=[1, 2, 3], daily=False)
+    def test_daily_false_does_not_raise(self, sa_sync_conn):
+        n = set_theses_structure_ids(sa_sync_conn, wide_ids=[1, 2, 3], daily=False)
         assert n == 0

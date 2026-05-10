@@ -13,7 +13,7 @@ import argparse
 import os
 
 from application.pipeline.countries.refresh_publication_countries import refresh
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.countries import PgCountryQueries
 from infrastructure.log import setup_logger
 
@@ -26,11 +26,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Recalcul des pays des publications")
     parser.parse_args()
 
-    conn = get_connection()
-    conn.autocommit = False
-    cur = conn.cursor()
+    conn = get_sync_engine().connect()
     try:
-        refresh(cur, PgCountryQueries(), logger)
+        refresh(conn, PgCountryQueries(), logger)
         conn.commit()
         logger.info("Terminé")
     finally:

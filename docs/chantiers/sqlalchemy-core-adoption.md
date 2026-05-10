@@ -459,8 +459,12 @@ Sous-lots, par étape du pipeline :
   (`populate_person_name_forms`, `create_persons_from_source_authorships`,
   `build_authorships`), CLIs et `run_pipeline.py` aussi. Tests
   intégration adaptés.
-- [ ] **Pipeline addresses/structures** (`address_resolution.py`,
-  `affiliations.py`, `countries.py`) — 3 fichiers, ~23 occ.
+- [x] **Pipeline addresses/structures** (`address_resolution.py`,
+  `affiliations.py`, `countries.py`) migrés ; ports + orchestrators
+  (`populate_affiliations`, `resolve_addresses`,
+  `refresh_publication_countries`), CLIs et `run_pipeline.py` aussi.
+  `TestPopulateAffiliationsIdempotence` réactivé (helpers SA).
+  Tests intégration : 887/887 verts.
 - [ ] **`subjects.py`** (10 occ.) — à examiner : opérations JSON
   spécifiques susceptibles de rester en `text()`.
 

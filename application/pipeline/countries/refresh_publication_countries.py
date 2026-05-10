@@ -17,16 +17,16 @@ from typing import Any
 from application.ports.countries import CountryQueries
 
 
-def refresh(cur: Any, queries: CountryQueries, logger: Any) -> int:
+def refresh(conn: Any, queries: CountryQueries, logger: Any) -> int:
     t0 = time.perf_counter()
 
-    hal_updated = queries.refresh_hal_source_countries(cur)
+    hal_updated = queries.refresh_hal_source_countries(conn)
     logger.info(f"HAL documents countries : {hal_updated} mis à jour")
 
-    addr_updated = queries.refresh_address_source_countries(cur)
+    addr_updated = queries.refresh_address_source_countries(conn)
     logger.info(f"OA/WoS/ScanR documents countries : {addr_updated} mis à jour")
 
-    updated = queries.refresh_publication_countries(cur)
+    updated = queries.refresh_publication_countries(conn)
     elapsed = time.perf_counter() - t0
     logger.info(f"{updated} publications mises à jour en {elapsed:.1f}s")
     return updated

@@ -4,7 +4,7 @@ import argparse
 import os
 
 from application.pipeline.affiliations.populate_affiliations import run_populate, show_stats
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.affiliations import PgAffiliationsQueries
 from infrastructure.log import setup_logger
 from infrastructure.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
@@ -23,20 +23,17 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
         queries = PgAffiliationsQueries()
 
         if args.stats:
-            show_stats(cur, queries, logger)
+            show_stats(conn, queries, logger)
             return
 
-        perimeter_ids = get_persons_structure_ids(cur)
-        wide_ids = get_affiliations_structure_ids(cur)
+        perimeter_ids = get_persons_structure_ids(conn)
+        wide_ids = get_affiliations_structure_ids(conn)
         run_populate(
-            cur,
             conn,
             queries,
             logger,
