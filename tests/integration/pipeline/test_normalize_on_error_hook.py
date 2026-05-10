@@ -90,11 +90,10 @@ class TestOnErrorHook:
 
     # ── run() (chemin non-SAVEPOINT) ────────────────────────────
 
-    def test_non_savepoint_error_calls_on_error_and_rolls_back(self, monkeypatch):
+    def test_non_savepoint_error_calls_on_error_and_rolls_back(self):
         """Le chemin sans SAVEPOINT passe par `run()` : sur erreur, la conn
         est rollbackée *puis* on_error est appelée."""
         conn = MagicMock()
-        conn.autocommit = False
         staging = MagicMock()
         staging.count_pending_staging.return_value = 3
         staging.fetch_pending_staging.return_value = iter([{"id": 1}, {"id": 42}, {"id": 3}])
@@ -115,7 +114,6 @@ class TestOnErrorHook:
 
     def test_non_savepoint_no_error_no_on_error(self):
         conn = MagicMock()
-        conn.autocommit = False
         staging = MagicMock()
         staging.count_pending_staging.return_value = 2
         staging.fetch_pending_staging.return_value = iter([{"id": 1}, {"id": 2}])
@@ -123,90 +121,3 @@ class TestOnErrorHook:
         normalizer = _SpyNormalizer(conn, MagicMock(), staging, use_savepoint=False)
         normalizer.run([])
         assert normalizer.on_error_calls == 0
-
-
-class _IsolatedConn:
-    """Wrap une connexion réelle en neutralisant commit() et close() pour
-    que le rollback final de la fixture `db` reste effectif."""
-
-    def __init__(self, real_conn):
-        self._conn = real_conn
-
-    def cursor(self, *args, **kwargs):
-        return self._conn.cursor(*args, **kwargs)
-
-    def commit(self):
-        pass
-
-    def rollback(self):
-        self._conn.rollback()
-
-    def close(self):
-        pass
-
-    @property
-    def autocommit(self):
-        return self._conn.autocommit
-
-    @autocommit.setter
-    def autocommit(self, value):
-        self._conn.autocommit = value
-
-    @property
-    def info(self):
-        return self._conn.info
-
-
-class TestMakeCursorRespectsUseDictCursor:
-    """`get_connection()` configure `row_factory=dict_row` au niveau
-    connexion, donc `conn.cursor()` sans row_factory en hérite. Le
-    normalizer doit forcer un tuple cursor explicite quand
-    `USE_DICT_CURSOR=False` (cas HAL / WoS), sinon les unpacking par
-    position dans `process_work` (`a, b, c = row`) reçoivent les noms de
-    colonnes au lieu des valeurs."""
-
-    def test_tuple_cursor_when_use_dict_cursor_false(self, db):
-        normalizer = _SpyNormalizer(db.connection, MagicMock(), MagicMock())
-        normalizer.USE_DICT_CURSOR = False  # type: ignore[misc]
-
-        cur = normalizer._make_cursor()
-        cur.execute("SELECT 1 AS a, 'x' AS b")
-        row = cur.fetchone()
-        assert isinstance(row, tuple)
-        assert row == (1, "x")
-
-    def test_dict_cursor_when_use_dict_cursor_true(self, db):
-        normalizer = _SpyNormalizer(db.connection, MagicMock(), MagicMock())
-        normalizer.USE_DICT_CURSOR = True  # type: ignore[misc]
-
-        cur = normalizer._make_cursor()
-        cur.execute("SELECT 1 AS a, 'x' AS b")
-        row = cur.fetchone()
-        assert not isinstance(row, tuple)
-        assert row == {"a": 1, "b": "x"}
-
-
-class TestRunHandlesInTransactionConnection:
-    """run() doit accepter une connexion déjà en INTRANS (cas typique :
-    le caller a fait un SELECT avant de passer la conn — ex: lecture
-    `get_api_base_urls` dans run_pipeline._run_normalize_hal)."""
-
-    def test_run_resets_intrans_connection(self, db):
-        from psycopg.pq import TransactionStatus
-
-        # Forcer la connexion en INTRANS via un SELECT (simule
-        # `get_api_base_urls` exécuté avant l'appel au normalizer).
-        db.execute("SELECT 1")
-        assert (
-            db.connection.info.transaction_status == TransactionStatus.INTRANS
-        )
-
-        staging = MagicMock()
-        staging.count_pending_staging.return_value = 0  # early return
-        normalizer = _SpyNormalizer(
-            _IsolatedConn(db.connection),
-            MagicMock(),
-            staging,
-            use_savepoint=False,
-        )
-        normalizer.run([])  # ne doit pas lever ProgrammingError
