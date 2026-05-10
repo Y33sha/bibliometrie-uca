@@ -13,7 +13,7 @@ du portail ou des collections labo.
 
 Fetch HTTP en async via httpx + `asyncio.Semaphore(HAL_MAX_CONCURRENT)` pour
 saturer le rate-limit toléré par HAL sans le dépasser. Les inserts DB restent
-sync (psycopg) et sont sérialisés via `asyncio.Lock` + `asyncio.to_thread`.
+sync (`Connection` SA) et sont sérialisés via `asyncio.Lock` + `asyncio.to_thread`.
 
 Usage:
     python fetch_missing_hal_id.py              # télécharger les manquants
@@ -27,16 +27,49 @@ import os
 from typing import Any
 
 import httpx
-from psycopg.types.json import Jsonb as Json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.publication import extract_hal_id_from_url
 from infrastructure.api_limits import HAL_DELAY
 from infrastructure.api_retry_async import http_request_with_retry_async
 from infrastructure.app_config import get_api_base_urls
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.hal import HAL_FIELDS_STR
 from infrastructure.log import setup_logger
 from infrastructure.sources.common import compute_hash
+
+_UPSERT_HAL_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed, raw_hash)
+    VALUES ('hal', :source_id, :doi, :raw_data, :hal_collections, FALSE, :raw_hash)
+    ON CONFLICT (source, source_id) DO UPDATE SET
+        raw_data = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN EXCLUDED.raw_data
+            ELSE staging.raw_data
+        END,
+        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
+        hal_collections = CASE
+            WHEN staging.hal_collections IS NULL THEN EXCLUDED.hal_collections
+            WHEN EXCLUDED.hal_collections IS NULL THEN staging.hal_collections
+            ELSE (SELECT array_agg(DISTINCT c) FROM unnest(staging.hal_collections || EXCLUDED.hal_collections) AS c)
+        END,
+        processed = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN FALSE
+            ELSE staging.processed
+        END
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
+
+_INSERT_NOT_FOUND_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, raw_data, not_found, processed)
+    VALUES ('hal', :source_id, '{}', TRUE, TRUE)
+    ON CONFLICT (source, source_id) DO UPDATE SET not_found = TRUE
+    """
+)
 
 log = setup_logger("fetch_missing_hal_id", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -47,7 +80,7 @@ log = setup_logger("fetch_missing_hal_id", os.path.join(os.path.dirname(__file__
 HAL_MAX_CONCURRENT = 5
 
 
-def find_hal_primary_locations(cur: Any) -> list[dict]:
+def find_hal_primary_locations(conn: Any) -> list[dict]:
     """
     Trouve les HAL IDs référencés par OpenAlex mais absents de staging_hal.
 
@@ -68,54 +101,62 @@ def find_hal_primary_locations(cur: Any) -> list[dict]:
     results: dict[str, dict] = {}
 
     # 1. Staging OA non normalisé : extraire l'URL via JSONB path en SQL.
-    cur.execute("""
-        SELECT source_id AS openalex_id,
-               raw_data->'primary_location'->>'landing_page_url' AS url
-        FROM staging
-        WHERE source = 'openalex'
-          AND processed = FALSE
-          AND (
-              raw_data->'primary_location'->>'landing_page_url' ILIKE '%hal.science%'
-              OR raw_data->'primary_location'->>'landing_page_url' ILIKE '%hal.archives-ouvertes.fr%'
-          )
-    """)
-    for row in cur.fetchall():
-        hal_id = extract_hal_id_from_url(row["url"])
+    rows = conn.execute(
+        text(
+            """
+            SELECT source_id AS openalex_id,
+                   raw_data->'primary_location'->>'landing_page_url' AS url
+            FROM staging
+            WHERE source = 'openalex'
+              AND processed = FALSE
+              AND (
+                  raw_data->'primary_location'->>'landing_page_url' ILIKE '%hal.science%'
+                  OR raw_data->'primary_location'->>'landing_page_url' ILIKE '%hal.archives-ouvertes.fr%'
+              )
+            """
+        )
+    ).all()
+    for row in rows:
+        hal_id = extract_hal_id_from_url(row.url)
         if hal_id:
             results[hal_id] = {
-                "openalex_id": row["openalex_id"],
+                "openalex_id": row.openalex_id,
                 "hal_id": hal_id,
-                "landing_url": row["url"],
+                "landing_url": row.url,
             }
 
     # 2. Source publications OA déjà normalisés.
-    cur.execute("""
-        SELECT source_id AS openalex_id, external_ids->>'hal' AS hal_id
-        FROM source_publications
-        WHERE source = 'openalex'
-          AND external_ids->>'hal' IS NOT NULL
-    """)
-    for row in cur.fetchall():
-        hal_id = row["hal_id"]
-        if hal_id not in results:
-            results[hal_id] = {
-                "openalex_id": row["openalex_id"],
-                "hal_id": hal_id,
+    rows = conn.execute(
+        text(
+            """
+            SELECT source_id AS openalex_id, external_ids->>'hal' AS hal_id
+            FROM source_publications
+            WHERE source = 'openalex'
+              AND external_ids->>'hal' IS NOT NULL
+            """
+        )
+    ).all()
+    for row in rows:
+        if row.hal_id not in results:
+            results[row.hal_id] = {
+                "openalex_id": row.openalex_id,
+                "hal_id": row.hal_id,
                 "landing_url": None,
             }
 
     # 3. Filtrer ceux déjà en staging_hal (batch NOT EXISTS).
     if not results:
         return []
-    cur.execute(
-        "SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(%s)",
-        (list(results.keys()),),
+    already_staged = set(
+        conn.execute(
+            text("SELECT source_id FROM staging WHERE source = 'hal' AND source_id = ANY(:ids)"),
+            {"ids": list(results.keys())},
+        ).scalars()
     )
-    already_staged = {r["source_id"] for r in cur.fetchall()}
     return [r for hal_id, r in results.items() if hal_id not in already_staged]
 
 
-def find_hal_ids_from_scanr(cur: Any) -> list[dict]:
+def find_hal_ids_from_scanr(conn: Any) -> list[dict]:
     """
     Trouve les HAL IDs référencés par ScanR mais absents de staging HAL.
 
@@ -126,67 +167,79 @@ def find_hal_ids_from_scanr(cur: Any) -> list[dict]:
     Retourne [{source: "scanr", hal_id, scanr_id}, ...]
     """
     # 1. Source documents déjà normalisés
-    cur.execute("""
-        SELECT sd.source_id AS scanr_id, sd.external_ids->>'hal' AS hal_id
-        FROM source_publications sd
-        WHERE sd.source = 'scanr'
-          AND sd.external_ids->>'hal' IS NOT NULL
-          AND NOT EXISTS (
-              SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = sd.external_ids->>'hal'
-          )
-    """)
+    rows = conn.execute(
+        text(
+            """
+            SELECT sd.source_id AS scanr_id, sd.external_ids->>'hal' AS hal_id
+            FROM source_publications sd
+            WHERE sd.source = 'scanr'
+              AND sd.external_ids->>'hal' IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = sd.external_ids->>'hal'
+              )
+            """
+        )
+    ).all()
     results = {
-        row["hal_id"]: {"source": "scanr", "hal_id": row["hal_id"], "scanr_id": row["scanr_id"]}
-        for row in cur.fetchall()
+        row.hal_id: {"source": "scanr", "hal_id": row.hal_id, "scanr_id": row.scanr_id}
+        for row in rows
     }
 
     # 2. Staging ScanR non normalisé : extraction des externalIds en SQL
     # (jsonb_array_elements côté DB) — éviter de matérialiser les raw_data
     # ScanR complets en mémoire Python, comme pour OpenAlex ci-dessus.
-    cur.execute("""
-        SELECT s.source_id AS scanr_id, ext->>'id' AS hal_id
-        FROM staging s,
-             jsonb_array_elements(s.raw_data->'externalIds') ext
-        WHERE s.source = 'scanr'
-          AND s.raw_data ? 'externalIds'
-          AND ext->>'type' = 'hal'
-          AND ext->>'id' IS NOT NULL
-          AND NOT EXISTS (
-              SELECT 1 FROM staging sh
-              WHERE sh.source = 'hal' AND sh.source_id = ext->>'id'
-          )
-    """)
-    for row in cur.fetchall():
-        hal_id = row["hal_id"]
-        if hal_id not in results:
-            results[hal_id] = {"source": "scanr", "hal_id": hal_id, "scanr_id": row["scanr_id"]}
+    rows = conn.execute(
+        text(
+            """
+            SELECT s.source_id AS scanr_id, ext->>'id' AS hal_id
+            FROM staging s,
+                 jsonb_array_elements(s.raw_data->'externalIds') ext
+            WHERE s.source = 'scanr'
+              AND s.raw_data ? 'externalIds'
+              AND ext->>'type' = 'hal'
+              AND ext->>'id' IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM staging sh
+                  WHERE sh.source = 'hal' AND sh.source_id = ext->>'id'
+              )
+            """
+        )
+    ).all()
+    for row in rows:
+        if row.hal_id not in results:
+            results[row.hal_id] = {
+                "source": "scanr",
+                "hal_id": row.hal_id,
+                "scanr_id": row.scanr_id,
+            }
 
     return list(results.values())
 
 
-def find_nnt_without_hal(cur: Any) -> list[dict]:
+def find_nnt_without_hal(conn: Any) -> list[dict]:
     """
     Trouve les NNT (thèses soutenues) qui n'ont pas de document HAL associé.
     Recherche via source_publications.external_ids->>'nnt' pour les publications
     qui n'ont pas 'hal' dans leurs sources.
     Retourne [{source: "nnt", nnt, theses_id}, ...]
     """
-    cur.execute("""
-        SELECT sd.external_ids->>'nnt' AS nnt, sd.source_id AS theses_id
-        FROM source_publications sd
-        JOIN publications p ON p.id = sd.publication_id
-        WHERE sd.source = 'theses'
-          AND sd.external_ids->>'nnt' IS NOT NULL
-          AND p.doc_type != 'ongoing_thesis'
-          AND NOT EXISTS (
-              SELECT 1 FROM source_publications sd2
-              WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
-          )
-    """)
-    return [
-        {"source": "nnt", "nnt": row["nnt"], "theses_id": row["theses_id"]}
-        for row in cur.fetchall()
-    ]
+    rows = conn.execute(
+        text(
+            """
+            SELECT sd.external_ids->>'nnt' AS nnt, sd.source_id AS theses_id
+            FROM source_publications sd
+            JOIN publications p ON p.id = sd.publication_id
+            WHERE sd.source = 'theses'
+              AND sd.external_ids->>'nnt' IS NOT NULL
+              AND p.doc_type != 'ongoing_thesis'
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_publications sd2
+                  WHERE sd2.publication_id = p.id AND sd2.source = 'hal'
+              )
+            """
+        )
+    ).all()
+    return [{"source": "nnt", "nnt": row.nnt, "theses_id": row.theses_id} for row in rows]
 
 
 async def fetch_hal_by_nnt(client: httpx.AsyncClient, nnt: str, *, base_url: str) -> dict | None:
@@ -250,82 +303,60 @@ async def fetch_hal_document(
     return docs[0]
 
 
-def insert_staging_hal(cur: Any, hal_id: str, doi: str | None, doc: dict) -> Any:
+def insert_staging_hal(conn: Any, hal_id: str, doi: str | None, doc: dict) -> Any:
     """Insere un document dans staging HAL avec ses collections.
     Si le document existe et a change (hash different), met a jour et remet processed = FALSE.
     """
-    # Extraire les collections du document
     coll_codes = doc.get("collCode_s") or []
     hal_collections = coll_codes if isinstance(coll_codes, list) and coll_codes else None
 
-    raw_hash = compute_hash(doc)
-    cur.execute(
-        """
-        INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed, raw_hash)
-        VALUES ('hal', %s, %s, %s::jsonb, %s, FALSE, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            raw_data = CASE
-                WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                    THEN EXCLUDED.raw_data
-                ELSE staging.raw_data
-            END,
-            raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-            hal_collections = CASE
-                WHEN staging.hal_collections IS NULL THEN EXCLUDED.hal_collections
-                WHEN EXCLUDED.hal_collections IS NULL THEN staging.hal_collections
-                ELSE (SELECT array_agg(DISTINCT c) FROM unnest(staging.hal_collections || EXCLUDED.hal_collections) AS c)
-            END,
-            processed = CASE
-                WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                    THEN FALSE
-                ELSE staging.processed
-            END
-    """,
-        (hal_id, doi, Json(doc), hal_collections, raw_hash),
+    conn.execute(
+        _UPSERT_HAL_SQL,
+        {
+            "source_id": hal_id,
+            "doi": doi,
+            "raw_data": doc,
+            "hal_collections": hal_collections,
+            "raw_hash": compute_hash(doc),
+        },
     )
 
 
-def _insert_halid_result(cur: Any, hal_id: str, doc: dict | None) -> bool:
+def _insert_halid_result(conn: Any, hal_id: str, doc: dict | None) -> bool:
     """Insère le résultat d'un fetch par halId. Retourne True si trouvé."""
     if doc:
         doi_str = doc.get("doiId_s")
         if isinstance(doi_str, list):
             doi_str = doi_str[0] if doi_str else None
-        insert_staging_hal(cur, hal_id, doi_str, doc)
+        insert_staging_hal(conn, hal_id, doi_str, doc)
         return True
     # Marquer comme not_found dans staging pour ne plus le re-chercher
-    cur.execute(
-        """
-        INSERT INTO staging (source, source_id, raw_data, not_found, processed)
-        VALUES ('hal', %s, '{}', TRUE, TRUE)
-        ON CONFLICT (source, source_id) DO UPDATE SET not_found = TRUE
-        """,
-        (hal_id,),
-    )
+    conn.execute(_INSERT_NOT_FOUND_SQL, {"source_id": hal_id})
     return False
 
 
-def _insert_nnt_result(cur: Any, nnt: str, doc: dict | None) -> tuple[bool, bool]:
+def _insert_nnt_result(conn: Any, nnt: str, doc: dict | None) -> tuple[bool, bool]:
     """Insère le résultat d'un fetch par NNT. Retourne (api_found, inserted)."""
     if not doc:
         return (False, False)
     hal_id = doc.get("halId_s")
     if not hal_id:
         return (True, False)
-    cur.execute("SELECT 1 FROM staging WHERE source = 'hal' AND source_id = %s", (hal_id,))
-    if cur.fetchone():
+    exists = conn.execute(
+        text("SELECT 1 FROM staging WHERE source = 'hal' AND source_id = :id"),
+        {"id": hal_id},
+    ).first()
+    if exists:
         log.debug(f"  NNT={nnt} → {hal_id} déjà en staging")
         return (True, False)
     doi_str = doc.get("doiId_s")
     if isinstance(doi_str, list):
         doi_str = doi_str[0] if doi_str else None
-    insert_staging_hal(cur, hal_id, doi_str, doc)
+    insert_staging_hal(conn, hal_id, doi_str, doc)
     return (True, True)
 
 
-async def _fetch_by_halid_async(
-    refs: list[dict], conn: Any, cur: Any, base_url: str
-) -> tuple[int, int]:
+async def _fetch_by_halid_async(refs: list[dict], conn: Any, base_url: str) -> tuple[int, int]:
     """Fetch en parallèle par halId. Retourne (fetched, not_found)."""
     sem = asyncio.Semaphore(HAL_MAX_CONCURRENT)
     db_lock = asyncio.Lock()
@@ -341,7 +372,7 @@ async def _fetch_by_halid_async(
                 await asyncio.sleep(HAL_DELAY)
 
             async with db_lock:
-                found = await asyncio.to_thread(_insert_halid_result, cur, hal_id, doc)
+                found = await asyncio.to_thread(_insert_halid_result, conn, hal_id, doc)
                 if found:
                     progress["fetched"] += 1
                 else:
@@ -358,9 +389,7 @@ async def _fetch_by_halid_async(
     return progress["fetched"], progress["not_found"]
 
 
-async def _fetch_by_nnt_async(
-    refs: list[dict], conn: Any, cur: Any, base_url: str
-) -> tuple[int, int]:
+async def _fetch_by_nnt_async(refs: list[dict], conn: Any, base_url: str) -> tuple[int, int]:
     """Fetch en parallèle par NNT. Retourne (fetched, not_found)."""
     sem = asyncio.Semaphore(HAL_MAX_CONCURRENT)
     db_lock = asyncio.Lock()
@@ -376,7 +405,7 @@ async def _fetch_by_nnt_async(
 
             async with db_lock:
                 api_found, inserted = await asyncio.to_thread(
-                    _insert_nnt_result, cur, ref["nnt"], doc
+                    _insert_nnt_result, conn, ref["nnt"], doc
                 )
                 if inserted:
                     progress["fetched"] += 1
@@ -412,22 +441,21 @@ async def main() -> Any:
     )
     args = parser.parse_args()
 
-    conn = get_connection()
-    cur = conn.cursor()
-    base_url = get_api_base_urls(cur)["hal"]
+    conn = get_sync_engine().connect()
+    base_url = get_api_base_urls(conn)["hal"]
 
     # 1. Trouver les HAL IDs manquants depuis OpenAlex et ScanR
     log.info("Recherche des works OpenAlex avec primary_location HAL...")
-    hal_refs_oa = find_hal_primary_locations(cur)
+    hal_refs_oa = find_hal_primary_locations(conn)
     log.info(f"  {len(hal_refs_oa)} halIds OpenAlex absents de staging_hal")
 
     log.info("Recherche des HAL IDs dans ScanR...")
-    hal_refs_scanr = find_hal_ids_from_scanr(cur)
+    hal_refs_scanr = find_hal_ids_from_scanr(conn)
     log.info(f"  {len(hal_refs_scanr)} halIds ScanR absents de staging_hal")
 
     if args.mode == "full":
         log.info("Recherche des NNT sans document HAL...")
-        nnt_refs = find_nnt_without_hal(cur)
+        nnt_refs = find_nnt_without_hal(conn)
         log.info(f"  {len(nnt_refs)} NNT (thèses soutenues) sans HAL")
     else:
         nnt_refs = []
@@ -481,14 +509,14 @@ async def main() -> Any:
     # 3a. Par halId (OpenAlex + ScanR)
     if missing:
         log.info(f"\n--- Fetch par halId ({len(missing)} documents) ---")
-        f1, nf1 = await _fetch_by_halid_async(missing, conn, cur, base_url)
+        f1, nf1 = await _fetch_by_halid_async(missing, conn, base_url)
         fetched += f1
         not_found += nf1
 
     # 3b. Par NNT (theses.fr)
     if nnt_refs:
         log.info(f"\n--- Fetch par NNT ({len(nnt_refs)} thèses) ---")
-        f2, nf2 = await _fetch_by_nnt_async(nnt_refs, conn, cur, base_url)
+        f2, nf2 = await _fetch_by_nnt_async(nnt_refs, conn, base_url)
         fetched += f2
         not_found += nf2
         log.info(f"  NNT : {f2} récupérés, {nf2} absents de HAL")

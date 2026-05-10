@@ -21,7 +21,8 @@ import time
 from typing import Any
 
 import requests
-from psycopg.types.json import Jsonb as Json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
@@ -137,25 +138,28 @@ def get_existing_uts(conn: Any) -> set:
     return get_existing_ids(conn, "wos")
 
 
-def insert_batch(conn: Any, batch: list[tuple]) -> Any:
+_INSERT_WOS_BATCH_SQL = text(
+    """
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+    VALUES ('wos', :source_id, :doi, :raw_data, :raw_hash)
+    ON CONFLICT (source, source_id) DO UPDATE SET
+        raw_data = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+            THEN EXCLUDED.raw_data ELSE staging.raw_data END,
+        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
+        processed = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+            THEN FALSE ELSE staging.processed END,
+        last_seen_at = now()
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
+
+
+def insert_batch(conn: Any, batch: list[dict]) -> Any:
     """Insère un batch de records dans staging.
     Si le record existe et le hash a changé, met à jour raw_data et remet processed = FALSE.
     """
-    query = """
-        INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-        VALUES (%s, %s, %s, %s::jsonb, %s)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            raw_data = CASE
-                WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN EXCLUDED.raw_data ELSE staging.raw_data END,
-            raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-            processed = CASE
-                WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN FALSE ELSE staging.processed END,
-            last_seen_at = now()
-    """
-    with conn.cursor() as cur:
-        cur.executemany(query, batch)
+    conn.execute(_INSERT_WOS_BATCH_SQL, batch)
     conn.commit()
 
 
@@ -204,12 +208,17 @@ def extract_year(year: int, conn: Any, existing_uts: set, dry_run: bool = False)
         consecutive_failures = 0
 
         # Préparer le batch
-        batch = []
+        batch: list[dict] = []
         for rec in records:
             ut = extract_ut(rec)
-            doi = extract_doi(rec)
-            h = compute_hash(rec)
-            batch.append(("wos", ut, doi, Json(rec), h))
+            batch.append(
+                {
+                    "source_id": ut,
+                    "doi": extract_doi(rec),
+                    "raw_data": rec,
+                    "raw_hash": compute_hash(rec),
+                }
+            )
             existing_uts.add(ut)
 
         # Insérer
@@ -262,16 +271,16 @@ class WosExtractor(SourceExtractor):
             "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
         )
 
-    def load_config(self, cur: Any) -> dict[str, Any]:
+    def load_config(self, conn: Any) -> dict[str, Any]:
         global BASE_URL, HEADERS
-        affiliations = get_extraction_api_ids(cur, "wos")
+        affiliations = get_extraction_api_ids(conn, "wos")
         if not affiliations:
             raise ExtractionConfigError(
                 "aucune affiliation WoS configurée "
                 "(structures.api_ids->'wos' vide pour le périmètre d'extraction)"
             )
-        api_key = get_wos_api_key(cur)
-        BASE_URL = get_api_base_urls(cur).get("wos", "https://api.clarivate.com/api/wos")
+        api_key = get_wos_api_key(conn)
+        BASE_URL = get_api_base_urls(conn).get("wos", "https://api.clarivate.com/api/wos")
         HEADERS = {"X-ApiKey": api_key, "Accept": "application/json"}
         return {
             "affiliations": affiliations,
@@ -309,8 +318,7 @@ class WosExtractor(SourceExtractor):
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
     ) -> ExtractionStats:
-        with self.conn.cursor() as cur:
-            config_years = get_years(cur, mode=args.mode)
+        config_years = get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
         self.logger.info(f"Années : {years}")
 

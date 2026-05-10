@@ -1,8 +1,20 @@
 """Tests d'intégration pour `infrastructure.sources.hal.fetch_missing_hal_id`."""
 
-import json
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.sources.hal.fetch_missing_hal_id import find_hal_ids_from_scanr
+
+_INSERT_SCANR_STAGING_SQL = text(
+    "INSERT INTO staging (source, source_id, raw_data) VALUES ('scanr', :sid, :raw_data)"
+).bindparams(bindparam("raw_data", type_=JSONB))
+
+_INSERT_SOURCE_PUB_SQL = text(
+    """
+    INSERT INTO source_publications (source, source_id, staging_id, title, external_ids)
+    VALUES ('scanr', :sid, :staging_id, 'titre test', :external_ids)
+    """
+).bindparams(bindparam("external_ids", type_=JSONB))
 
 
 class TestFindHalIdsFromScanr:
@@ -14,39 +26,39 @@ class TestFindHalIdsFromScanr:
     `jsonb_array_elements`.
     """
 
-    def _insert_scanr_staging(self, db, scanr_id, external_ids):
-        db.execute(
-            "INSERT INTO staging (source, source_id, raw_data) VALUES ('scanr', %s, %s)",
-            (scanr_id, json.dumps({"externalIds": external_ids})),
+    def _insert_scanr_staging(self, conn, scanr_id, external_ids):
+        conn.execute(
+            _INSERT_SCANR_STAGING_SQL,
+            {"sid": scanr_id, "raw_data": {"externalIds": external_ids}},
         )
 
-    def _insert_hal_staging(self, db, hal_id):
-        db.execute(
-            "INSERT INTO staging (source, source_id, raw_data) VALUES ('hal', %s, '{}'::jsonb)",
-            (hal_id,),
+    def _insert_hal_staging(self, conn, hal_id):
+        conn.execute(
+            text("INSERT INTO staging (source, source_id, raw_data) VALUES ('hal', :id, '{}')"),
+            {"id": hal_id},
         )
 
-    def test_returns_hal_id_when_scanr_staging_has_external_id(self, db):
-        self._insert_scanr_staging(db, "scanr-1", [{"type": "hal", "id": "hal-aaa"}])
-        result = find_hal_ids_from_scanr(db)
+    def test_returns_hal_id_when_scanr_staging_has_external_id(self, sa_sync_conn):
+        self._insert_scanr_staging(sa_sync_conn, "scanr-1", [{"type": "hal", "id": "hal-aaa"}])
+        result = find_hal_ids_from_scanr(sa_sync_conn)
         assert result == [{"source": "scanr", "hal_id": "hal-aaa", "scanr_id": "scanr-1"}]
 
-    def test_skips_hal_id_already_in_staging_hal(self, db):
-        self._insert_scanr_staging(db, "scanr-1", [{"type": "hal", "id": "hal-bbb"}])
-        self._insert_hal_staging(db, "hal-bbb")
-        assert find_hal_ids_from_scanr(db) == []
+    def test_skips_hal_id_already_in_staging_hal(self, sa_sync_conn):
+        self._insert_scanr_staging(sa_sync_conn, "scanr-1", [{"type": "hal", "id": "hal-bbb"}])
+        self._insert_hal_staging(sa_sync_conn, "hal-bbb")
+        assert find_hal_ids_from_scanr(sa_sync_conn) == []
 
-    def test_skips_non_hal_external_id_types(self, db):
+    def test_skips_non_hal_external_id_types(self, sa_sync_conn):
         self._insert_scanr_staging(
-            db,
+            sa_sync_conn,
             "scanr-1",
             [{"type": "doi", "id": "10.1/x"}, {"type": "pubmed", "id": "999"}],
         )
-        assert find_hal_ids_from_scanr(db) == []
+        assert find_hal_ids_from_scanr(sa_sync_conn) == []
 
-    def test_picks_hal_among_mixed_external_ids(self, db):
+    def test_picks_hal_among_mixed_external_ids(self, sa_sync_conn):
         self._insert_scanr_staging(
-            db,
+            sa_sync_conn,
             "scanr-1",
             [
                 {"type": "doi", "id": "10.1/x"},
@@ -54,42 +66,47 @@ class TestFindHalIdsFromScanr:
                 {"type": "pubmed", "id": "999"},
             ],
         )
-        result = find_hal_ids_from_scanr(db)
+        result = find_hal_ids_from_scanr(sa_sync_conn)
         assert result == [{"source": "scanr", "hal_id": "hal-ccc", "scanr_id": "scanr-1"}]
 
-    def test_handles_missing_external_ids_field(self, db):
-        db.execute(
-            "INSERT INTO staging (source, source_id, raw_data) VALUES ('scanr', 'scanr-1', '{}'::jsonb)"
+    def test_handles_missing_external_ids_field(self, sa_sync_conn):
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO staging (source, source_id, raw_data) "
+                "VALUES ('scanr', 'scanr-1', '{}'::jsonb)"
+            )
         )
-        assert find_hal_ids_from_scanr(db) == []
+        assert find_hal_ids_from_scanr(sa_sync_conn) == []
 
-    def test_dedup_when_multiple_scanr_docs_reference_same_hal_id(self, db):
-        self._insert_scanr_staging(db, "scanr-1", [{"type": "hal", "id": "hal-ddd"}])
-        self._insert_scanr_staging(db, "scanr-2", [{"type": "hal", "id": "hal-ddd"}])
-        result = find_hal_ids_from_scanr(db)
+    def test_dedup_when_multiple_scanr_docs_reference_same_hal_id(self, sa_sync_conn):
+        self._insert_scanr_staging(sa_sync_conn, "scanr-1", [{"type": "hal", "id": "hal-ddd"}])
+        self._insert_scanr_staging(sa_sync_conn, "scanr-2", [{"type": "hal", "id": "hal-ddd"}])
+        result = find_hal_ids_from_scanr(sa_sync_conn)
         hal_ids = [r["hal_id"] for r in result]
         assert hal_ids.count("hal-ddd") == 1
 
-    def test_picks_up_normalized_source_publications(self, db):
+    def test_picks_up_normalized_source_publications(self, sa_sync_conn):
         # source_publications.scanr → external_ids->>'hal' (sans staging ScanR brut)
-        db.execute(
-            "INSERT INTO staging (source, source_id, raw_data) VALUES ('scanr', 'scanr-norm', '{}'::jsonb) RETURNING id"
+        staging_id = sa_sync_conn.execute(
+            text(
+                "INSERT INTO staging (source, source_id, raw_data) "
+                "VALUES ('scanr', 'scanr-norm', '{}'::jsonb) RETURNING id"
+            )
+        ).scalar_one()
+        sa_sync_conn.execute(
+            _INSERT_SOURCE_PUB_SQL,
+            {"sid": "scanr-norm", "staging_id": staging_id, "external_ids": {"hal": "hal-eee"}},
         )
-        staging_id = db.fetchone()["id"]
-        db.execute(
-            """
-            INSERT INTO source_publications (source, source_id, staging_id, title, external_ids)
-            VALUES ('scanr', 'scanr-norm', %s, 'titre test', %s)
-            """,
-            (staging_id, json.dumps({"hal": "hal-eee"})),
-        )
-        result = find_hal_ids_from_scanr(db)
+        result = find_hal_ids_from_scanr(sa_sync_conn)
         assert {"source": "scanr", "hal_id": "hal-eee", "scanr_id": "scanr-norm"} in result
 
-    def test_ignores_other_sources(self, db):
+    def test_ignores_other_sources(self, sa_sync_conn):
         # raw_data ressemble à du ScanR (externalIds[type=hal]) mais source != 'scanr'
-        db.execute(
-            "INSERT INTO staging (source, source_id, raw_data) VALUES ('openalex', 'oa-1', %s)",
-            (json.dumps({"externalIds": [{"type": "hal", "id": "hal-fff"}]}),),
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO staging (source, source_id, raw_data) "
+                "VALUES ('openalex', 'oa-1', :raw_data)"
+            ).bindparams(bindparam("raw_data", type_=JSONB)),
+            {"raw_data": {"externalIds": [{"type": "hal", "id": "hal-fff"}]}},
         )
-        assert find_hal_ids_from_scanr(db) == []
+        assert find_hal_ids_from_scanr(sa_sync_conn) == []
