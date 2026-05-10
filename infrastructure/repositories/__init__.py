@@ -45,9 +45,9 @@ def address_repository(conn: Any) -> AddressRepository:
     return PgAddressRepository(conn)
 
 
-def audit_repository(conn_or_cur: Any) -> AuditRepository:
-    """Retourne un AuditRepository lié au cur psycopg ou Connection SA donné."""
-    return PgAuditRepository(conn_or_cur)
+def audit_repository(conn: Any) -> AuditRepository:
+    """Retourne un AuditRepository lié à la Connection SA donnée."""
+    return PgAuditRepository(conn)
 
 
 def authorship_repository(conn: Any) -> AuthorshipRepository:
@@ -60,9 +60,9 @@ def config_store(conn: Any) -> PgConfig:
     return PgConfig(conn)
 
 
-def journal_repository(conn_or_cur: Any) -> JournalRepository:
-    """Retourne un JournalRepository lié au cur psycopg ou Connection SA donné."""
-    return PgJournalRepository(conn_or_cur)
+def journal_repository(conn: Any) -> JournalRepository:
+    """Retourne un JournalRepository lié à la Connection SA donnée."""
+    return PgJournalRepository(conn)
 
 
 def perimeter_repository(conn: Any) -> PerimeterRepository:
@@ -70,9 +70,9 @@ def perimeter_repository(conn: Any) -> PerimeterRepository:
     return PgPerimeterRepository(conn)
 
 
-def person_repository(conn_or_cur: Any) -> PersonRepository:
-    """Retourne un PersonRepository lié au cur psycopg ou Connection SA donné."""
-    return PgPersonRepository(conn_or_cur)
+def person_repository(conn: Any) -> PersonRepository:
+    """Retourne un PersonRepository lié à la Connection SA donnée."""
+    return PgPersonRepository(conn)
 
 
 def publication_repository(conn: Any) -> PublicationRepository:
@@ -80,9 +80,9 @@ def publication_repository(conn: Any) -> PublicationRepository:
     return PgPublicationRepository(conn)
 
 
-def publisher_repository(conn_or_cur: Any) -> PublisherRepository:
-    """Retourne un PublisherRepository lié au cur psycopg ou Connection SA donné."""
-    return PgPublisherRepository(conn_or_cur)
+def publisher_repository(conn: Any) -> PublisherRepository:
+    """Retourne un PublisherRepository lié à la Connection SA donnée."""
+    return PgPublisherRepository(conn)
 
 
 def structure_repository(conn: Any) -> StructureRepository:

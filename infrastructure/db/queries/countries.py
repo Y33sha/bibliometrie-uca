@@ -106,8 +106,7 @@ def suggest_addresses_countries_batch(
 
     Tout est fait en une seule requête SQL bulk (CTE + UPDATE + window function)
     qui exploite l'index trigramme `idx_addresses_normalized_text_trgm`
-    (cf migration 020). CTE complexe : reste en SQL brut via ``text()`` (cf.
-    règles du chantier sqlalchemy-core-adoption).
+    (cf migration 020). CTE complexe : reste en SQL brut via ``text()``.
 
     Les cibles sans match reçoivent un array vide (et non NULL) — c'est ce
     marquage qui permet à la passe suivante de les sauter via le filtre

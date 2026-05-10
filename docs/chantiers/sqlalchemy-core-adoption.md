@@ -494,18 +494,16 @@ L'essentiel de la bascule du pool a été faite par le chantier
 
 Reste pour clore le chantier :
 
-- [ ] Migrer les `psycopg.connect()` directs côté pipeline
-  (`run_pipeline.py`, `interfaces/cli/*`) vers `engine.connect()` SA
-  — passe surtout par les CLI conservés (cf. audit-cto Phase 3).
-- [x] `publication_repository.py` purement SA. CLI maintenance
-  (`merge_publications.py`) et tests (`test_publications_service`,
-  `test_dedup_publications`, `test_scenarios`) migrés en amont.
-- [x] Plus aucun `cur.execute(...)` applicatif hors exclusions
-  (`infrastructure/sources/*`, `infrastructure/perimeter.py`,
-  `infrastructure/db/migrate.py`, `infrastructure/db_helpers.py` +
-  branches dispatch des repos sync journal/publisher/person en
-  attente de leur clean-up Lot 3.A final, `infrastructure/app_config.py`
-  en dispatch tant que les CLI extracteurs ne basculent pas).
+- [x] Tous les `psycopg.connect()` / `get_connection()` directs
+  migrés vers `engine.connect()` SA (CLI imports/maintenance/pipeline,
+  base.py des extracteurs, fetchers ad-hoc).
+- [x] `publication_repository.py` purement SA.
+- [x] Dispatch retiré de `journal_repository`, `publisher_repository`,
+  `person_repository/*`, `audit_repository`, `infrastructure/perimeter.py`,
+  `infrastructure/app_config.py`. `infrastructure/db_helpers.py` (utils
+  psycopg) supprimé.
+- [x] Plus aucun `cur.execute(...)` applicatif hors `infrastructure/db/migrate.py`
+  (exclu explicitement).
 
 ### Phase 5 — Décision Alembic
 
@@ -516,8 +514,6 @@ Reste pour clore le chantier :
 - [ ] Décider : adopter Alembic (auto-génération des diffs MetaData)
   ou conserver `migrate.py` actuel.
 - [ ] Si adoption : créer un chantier dédié (`docs/chantiers/`).
-- [ ] Si statu quo : retirer la mention « Alembic à explorer » de
-  ROADMAP.md.
 
 ## Alembic — porte ouverte
 

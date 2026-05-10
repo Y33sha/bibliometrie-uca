@@ -5,15 +5,15 @@ Vérifie deux comportements essentiels :
 2. Dans un contexte utilisateur (requête HTTP) → l'événement est persisté.
 """
 
+from sqlalchemy import text
+
 from application.audit import (
     emit_event,
     get_current_user,
     reset_current_user,
     set_current_user,
 )
-from infrastructure.repositories import (
-    audit_repository,
-)
+from infrastructure.repositories import audit_repository
 
 
 class TestCurrentUserContext:
@@ -43,60 +43,72 @@ class TestCurrentUserContext:
 
 
 class TestEmitEvent:
-    def test_no_user_no_event(self, db):
+    def test_no_user_no_event(self, sa_sync_conn):
         """Hors contexte utilisateur : emit_event ne persiste rien."""
-        emit_event(audit_repository(db), "person.merged", "person", 1, {"source_id": 2})
-        db.execute("SELECT COUNT(*) AS n FROM audit_log")
-        assert db.fetchone()["n"] == 0
+        emit_event(audit_repository(sa_sync_conn), "person.merged", "person", 1, {"source_id": 2})
+        n = sa_sync_conn.execute(text("SELECT COUNT(*) AS n FROM audit_log")).scalar_one()
+        assert n == 0
 
-    def test_with_user_persists(self, db):
+    def test_with_user_persists(self, sa_sync_conn):
         token = set_current_user("admin")
         try:
-            emit_event(audit_repository(db), "person.merged", "person", 1, {"source_id": 2})
-            db.execute(
-                "SELECT event_type, aggregate_type, aggregate_id, payload, user_id "
-                "FROM audit_log ORDER BY id DESC LIMIT 1"
+            emit_event(
+                audit_repository(sa_sync_conn), "person.merged", "person", 1, {"source_id": 2}
             )
-            row = db.fetchone()
+            row = sa_sync_conn.execute(
+                text(
+                    "SELECT event_type, aggregate_type, aggregate_id, payload, user_id "
+                    "FROM audit_log ORDER BY id DESC LIMIT 1"
+                )
+            ).one()
         finally:
             reset_current_user(token)
 
-        assert row["event_type"] == "person.merged"
-        assert row["aggregate_type"] == "person"
-        assert row["aggregate_id"] == 1
-        assert row["payload"] == {"source_id": 2}
-        assert row["user_id"] == "admin"
+        assert row.event_type == "person.merged"
+        assert row.aggregate_type == "person"
+        assert row.aggregate_id == 1
+        assert row.payload == {"source_id": 2}
+        assert row.user_id == "admin"
 
-    def test_accepts_null_aggregate_id(self, db):
+    def test_accepts_null_aggregate_id(self, sa_sync_conn):
         """Cas d'une entité supprimée sans équivalent survivant."""
         token = set_current_user("admin")
         try:
-            emit_event(audit_repository(db), "structure.deleted", "structure", None, {"name": "X"})
-            db.execute("SELECT aggregate_id FROM audit_log ORDER BY id DESC LIMIT 1")
-            assert db.fetchone()["aggregate_id"] is None
+            emit_event(
+                audit_repository(sa_sync_conn),
+                "structure.deleted",
+                "structure",
+                None,
+                {"name": "X"},
+            )
+            agg_id = sa_sync_conn.execute(
+                text("SELECT aggregate_id FROM audit_log ORDER BY id DESC LIMIT 1")
+            ).scalar_one()
+            assert agg_id is None
         finally:
             reset_current_user(token)
 
-    def test_default_payload_is_empty_object(self, db):
+    def test_default_payload_is_empty_object(self, sa_sync_conn):
         token = set_current_user("admin")
         try:
-            emit_event(audit_repository(db), "person.rejected", "person", 42)
-            db.execute("SELECT payload FROM audit_log ORDER BY id DESC LIMIT 1")
-            assert db.fetchone()["payload"] == {}
+            emit_event(audit_repository(sa_sync_conn), "person.rejected", "person", 42)
+            payload = sa_sync_conn.execute(
+                text("SELECT payload FROM audit_log ORDER BY id DESC LIMIT 1")
+            ).scalar_one()
+            assert payload == {}
         finally:
             reset_current_user(token)
 
-    def test_multiple_events_in_order(self, db):
+    def test_multiple_events_in_order(self, sa_sync_conn):
         token = set_current_user("admin")
         try:
-            repo = audit_repository(db)
+            repo = audit_repository(sa_sync_conn)
             emit_event(repo, "a.b", "person", 1)
             emit_event(repo, "c.d", "person", 2)
-            db.execute("SELECT event_type FROM audit_log ORDER BY id")
-            rows = db.fetchall()
+            rows = sa_sync_conn.execute(text("SELECT event_type FROM audit_log ORDER BY id")).all()
         finally:
             reset_current_user(token)
-        assert [r["event_type"] for r in rows] == ["a.b", "c.d"]
+        assert [r.event_type for r in rows] == ["a.b", "c.d"]
 
 
 class TestEndToEndServiceIntegration:
@@ -104,8 +116,6 @@ class TestEndToEndServiceIntegration:
     attendus quand un utilisateur est dans le contexte."""
 
     def _create_person(self, conn, last="X", first="X"):
-        from sqlalchemy import text
-
         return conn.execute(
             text(
                 "INSERT INTO persons (last_name, first_name, "
@@ -116,10 +126,8 @@ class TestEndToEndServiceIntegration:
         ).scalar_one()
 
     def test_set_rejected_emits_event(self, sa_sync_conn):
-        from sqlalchemy import text
-
         from application.persons import set_rejected
-        from infrastructure.repositories import audit_repository, person_repository
+        from infrastructure.repositories import person_repository
 
         person_id = self._create_person(sa_sync_conn)
         token = set_current_user("admin")
@@ -148,10 +156,8 @@ class TestEndToEndServiceIntegration:
     def test_set_rejected_without_context_no_event(self, sa_sync_conn):
         """Confirme que hors contexte (pipeline, script), rien n'est audité
         même quand un service destructif est appelé."""
-        from sqlalchemy import text
-
         from application.persons import set_rejected
-        from infrastructure.repositories import audit_repository, person_repository
+        from infrastructure.repositories import person_repository
 
         person_id = self._create_person(sa_sync_conn)
         set_rejected(
@@ -162,37 +168,38 @@ class TestEndToEndServiceIntegration:
             audit_repo=audit_repository(sa_sync_conn),
         )
 
-        row = sa_sync_conn.execute(text("SELECT COUNT(*) AS n FROM audit_log")).one()
-        assert row.n == 0
+        n = sa_sync_conn.execute(text("SELECT COUNT(*) AS n FROM audit_log")).scalar_one()
+        assert n == 0
 
-    def test_mark_distinct_emits_only_on_actual_insert(self, db):
+    def test_mark_distinct_emits_only_on_actual_insert(self, sa_sync_conn):
         """mark_distinct est idempotent : un appel sur une paire déjà
         marquée ne doit pas générer d'événement supplémentaire."""
         from application.persons import mark_distinct
-        from infrastructure.repositories import audit_repository, person_repository
+        from infrastructure.repositories import person_repository
 
         def _mk(last):
-            db.execute(
-                "INSERT INTO persons (last_name, first_name, "
-                "last_name_normalized, first_name_normalized) "
-                "VALUES (%s, %s, lower(%s), lower(%s)) RETURNING id",
-                (last, last, last, last),
-            )
-            return db.fetchone()["id"]
+            return sa_sync_conn.execute(
+                text(
+                    "INSERT INTO persons (last_name, first_name, "
+                    "last_name_normalized, first_name_normalized) "
+                    "VALUES (:l, :l, lower(:l), lower(:l)) RETURNING id"
+                ),
+                {"l": last},
+            ).scalar_one()
 
         p1 = _mk("A")
         p2 = _mk("B")
-        repo = person_repository(db)
-        audit_repo_ = audit_repository(db)
+        repo = person_repository(sa_sync_conn)
+        audit_repo_ = audit_repository(sa_sync_conn)
         token = set_current_user("admin")
         try:
-            mark_distinct(db, p1, p2, repo=repo, audit_repo=audit_repo_)
-            mark_distinct(db, p1, p2, repo=repo, audit_repo=audit_repo_)  # doublon
-            mark_distinct(db, p2, p1, repo=repo, audit_repo=audit_repo_)  # autre sens
+            mark_distinct(sa_sync_conn, p1, p2, repo=repo, audit_repo=audit_repo_)
+            mark_distinct(sa_sync_conn, p1, p2, repo=repo, audit_repo=audit_repo_)
+            mark_distinct(sa_sync_conn, p2, p1, repo=repo, audit_repo=audit_repo_)
         finally:
             reset_current_user(token)
 
-        db.execute(
-            "SELECT COUNT(*) AS n FROM audit_log WHERE event_type = 'person.marked_distinct'"
-        )
-        assert db.fetchone()["n"] == 1
+        n = sa_sync_conn.execute(
+            text("SELECT COUNT(*) AS n FROM audit_log WHERE event_type = 'person.marked_distinct'")
+        ).scalar_one()
+        assert n == 1
