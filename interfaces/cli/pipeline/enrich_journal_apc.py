@@ -6,7 +6,7 @@ import os
 from application.pipeline.enrich.enrich_journal_apc import run_enrich
 from infrastructure.api_limits import DOAJ_DELAY
 from infrastructure.app_config import get_api_base_urls
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.enrich import PgEnrichQueries
 from infrastructure.log import setup_logger
 from infrastructure.repositories import journal_repository
@@ -29,18 +29,15 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
         run_enrich(
-            cur,
             conn,
             PgEnrichQueries(),
             logger,
-            journal_repo=journal_repository(cur),
+            journal_repo=journal_repository(conn),
             mailto=MAILTO,
-            openalex_sources_api=get_api_base_urls(cur)["openalex_sources"],
+            openalex_sources_api=get_api_base_urls(conn)["openalex_sources"],
             limit=args.limit,
             dry_run=args.dry_run,
             reset=args.reset,

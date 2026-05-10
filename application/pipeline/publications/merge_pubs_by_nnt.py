@@ -19,7 +19,6 @@ from domain.ports.publication_repository import PublicationRepository
 
 
 def run_merge(
-    cur: Any,
     conn: Any,
     queries: MergeQueries,
     logger: Any,
@@ -28,7 +27,7 @@ def run_merge(
     dry_run: bool = False,
 ) -> None:
     try:
-        duplicates = queries.find_nnt_duplicates(cur)
+        duplicates = queries.find_nnt_duplicates(conn)
         logger.info(f"NNT avec publications multiples : {len(duplicates)}")
 
         if not duplicates:
@@ -43,7 +42,7 @@ def run_merge(
             pub_ids = dup["pub_ids"]
             sources = dup["sources"]
 
-            ranked = queries.rank_publications_by_merge_priority(cur, pub_ids)
+            ranked = queries.rank_publications_by_merge_priority(conn, pub_ids)
             target = ranked[0]
             to_merge = ranked[1:]
 
@@ -59,9 +58,9 @@ def run_merge(
                     continue
 
                 try:
-                    with savepoint(cur, "merge_nnt"):
-                        _merge_pub(cur, target["id"], source["id"], repo=pub_repo)
-                        refresh_from_sources(cur, target["id"], repo=pub_repo)
+                    with savepoint(conn, "merge_nnt"):
+                        _merge_pub(conn, target["id"], source["id"], repo=pub_repo)
+                        refresh_from_sources(conn, target["id"], repo=pub_repo)
                     logger.info(f"  [MERGE] {label}")
                     merged += 1
                 except Exception as e:

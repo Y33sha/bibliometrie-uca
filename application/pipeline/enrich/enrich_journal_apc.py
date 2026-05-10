@@ -99,7 +99,6 @@ def extract_apc(source: dict) -> tuple[float | None, str]:
 
 
 def run_enrich(
-    cur: Any,
     conn: Any,
     queries: EnrichQueries,
     logger: Any,
@@ -114,11 +113,11 @@ def run_enrich(
 ) -> None:
     try:
         if reset:
-            count = reset_journal_apc(cur, repo=journal_repo)
+            count = reset_journal_apc(conn, repo=journal_repo)
             conn.commit()
             logger.info(f"Reset : {count} revues réinitialisées.")
 
-        journals = queries.fetch_journals_needing_apc(cur, limit=limit or None)
+        journals = queries.fetch_journals_needing_apc(conn, limit=limit or None)
         total = len(journals)
         logger.info(f"{total} revues à traiter (avec openalex_id, sans APC).")
 
@@ -152,7 +151,7 @@ def run_enrich(
 
                 if not dry_run:
                     update_journal_apc(
-                        cur,
+                        conn,
                         journal_id,
                         apc_amount=apc_amount,
                         apc_currency=apc_currency,

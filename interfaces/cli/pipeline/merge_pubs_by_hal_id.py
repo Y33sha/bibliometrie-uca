@@ -4,7 +4,7 @@ import argparse
 import os
 
 from application.pipeline.publications.merge_pubs_by_hal_id import run_merge
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.merge import PgMergeQueries
 from infrastructure.log import setup_logger
 from infrastructure.repositories import publication_repository
@@ -19,16 +19,13 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Lister sans fusionner")
     args = parser.parse_args()
 
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
         run_merge(
-            cur,
             conn,
             PgMergeQueries(),
             logger,
-            pub_repo=publication_repository(cur),
+            pub_repo=publication_repository(conn),
             dry_run=args.dry_run,
         )
     finally:

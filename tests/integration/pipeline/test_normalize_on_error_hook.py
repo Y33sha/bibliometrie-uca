@@ -70,21 +70,20 @@ class TestOnErrorHook:
         assert normalizer.on_error_calls == 1
 
     def test_savepoint_error_rollback_also_fails_still_calls_on_error(self):
-        """Si ROLLBACK TO SAVEPOINT échoue, on tombe sur conn.rollback() — et
+        """Si le rollback du SAVEPOINT échoue, on tombe sur conn.rollback() — et
         dans les deux cas, on_error doit être appelé (les caches restent
         invalidés pour la sécurité)."""
         conn = MagicMock()
+        # `begin_nested()` retourne un sp dont .rollback() échoue
+        sp = MagicMock()
+        sp.rollback.side_effect = RuntimeError("savepoint rollback fails")
+        conn.begin_nested.return_value = sp
+
         normalizer = _SpyNormalizer(
             conn, MagicMock(), MagicMock(), use_savepoint=True, error_on_ids={42}
         )
-        cur = MagicMock()
-        # Fait échouer le ROLLBACK TO SAVEPOINT → on tombe sur conn.rollback()
-        cur.execute.side_effect = [
-            None,  # SAVEPOINT OK
-            RuntimeError("savepoint exec fails"),  # ROLLBACK TO échoue
-        ]
         with pytest.raises(RuntimeError):
-            normalizer._process_one(cur, {"id": 42})
+            normalizer._process_one(conn, {"id": 42})
         assert conn.rollback.called
         assert normalizer.on_error_calls == 1
 

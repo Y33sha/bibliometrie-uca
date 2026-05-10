@@ -6,7 +6,7 @@ import os
 from application.pipeline.enrich.enrich_oa_status import run_enrich
 from infrastructure.api_limits import UNPAYWALL_DELAY
 from infrastructure.app_config import get_api_base_urls
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.enrich import PgEnrichQueries
 from infrastructure.log import setup_logger
 from infrastructure.repositories import publication_repository
@@ -22,16 +22,14 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Afficher sans modifier la base")
     args = parser.parse_args()
 
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
         run_enrich(
-            cur,
             conn,
             PgEnrichQueries(),
             logger,
-            pub_repo=publication_repository(cur),
-            unpaywall_base=get_api_base_urls(cur)["unpaywall"],
+            pub_repo=publication_repository(conn),
+            unpaywall_base=get_api_base_urls(conn)["unpaywall"],
             limit=args.limit,
             dry_run=args.dry_run,
             rate_delay=UNPAYWALL_DELAY,

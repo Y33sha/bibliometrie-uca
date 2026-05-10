@@ -297,21 +297,19 @@ def phase_cooccurrences(**kw: Any) -> Any:
 
 def _run_create_publications() -> None:
     from application.pipeline.publications.create_publications import run
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.publications.create import PgPublicationsCreateQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ create_publications")
     t0 = time.time()
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
         run(
-            cur,
             conn,
             PgPublicationsCreateQueries(),
             log,
-            pub_repo=publication_repository(cur),
+            pub_repo=publication_repository(conn),
         )
     finally:
         conn.close()
@@ -408,17 +406,15 @@ def _run_populate_person_name_forms() -> None:
 
 def _run_merge_pubs_by_nnt() -> None:
     from application.pipeline.publications.merge_pubs_by_nnt import run_merge
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.merge import PgMergeQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ merge_pubs_by_nnt")
     t0 = time.time()
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        run_merge(cur, conn, PgMergeQueries(), log, pub_repo=publication_repository(cur))
+        run_merge(conn, PgMergeQueries(), log, pub_repo=publication_repository(conn))
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_nnt terminé en %.1fs", time.time() - t0)
@@ -426,17 +422,15 @@ def _run_merge_pubs_by_nnt() -> None:
 
 def _run_merge_pubs_by_hal_id() -> None:
     from application.pipeline.publications.merge_pubs_by_hal_id import run_merge
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.merge import PgMergeQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ merge_pubs_by_hal_id")
     t0 = time.time()
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        run_merge(cur, conn, PgMergeQueries(), log, pub_repo=publication_repository(cur))
+        run_merge(conn, PgMergeQueries(), log, pub_repo=publication_repository(conn))
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
@@ -616,22 +610,20 @@ def _run_enrich_oa_status() -> None:
     from application.pipeline.enrich.enrich_oa_status import run_enrich
     from infrastructure.api_limits import UNPAYWALL_DELAY
     from infrastructure.app_config import get_api_base_urls
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ enrich_oa_status")
     t0 = time.time()
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
         run_enrich(
-            cur,
             conn,
             PgEnrichQueries(),
             log,
-            pub_repo=publication_repository(cur),
-            unpaywall_base=get_api_base_urls(cur)["unpaywall"],
+            pub_repo=publication_repository(conn),
+            unpaywall_base=get_api_base_urls(conn)["unpaywall"],
             rate_delay=UNPAYWALL_DELAY,
         )
     finally:
@@ -643,24 +635,21 @@ def _run_enrich_journal_apc() -> None:
     from application.pipeline.enrich.enrich_journal_apc import run_enrich
     from infrastructure.api_limits import DOAJ_DELAY
     from infrastructure.app_config import get_api_base_urls
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
 
     log.info("▶ enrich_journal_apc")
     t0 = time.time()
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
         run_enrich(
-            cur,
             conn,
             PgEnrichQueries(),
             log,
-            journal_repo=journal_repository(cur),
+            journal_repo=journal_repository(conn),
             mailto="bibliometrie@uca.fr",
-            openalex_sources_api=get_api_base_urls(cur)["openalex_sources"],
+            openalex_sources_api=get_api_base_urls(conn)["openalex_sources"],
             rate_delay=DOAJ_DELAY,
         )
     finally:

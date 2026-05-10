@@ -4,97 +4,82 @@ Appelé par `application/pipeline/enrich/*`. Chaque fonction renvoie la liste
 des publications/revues à traiter par le script d'enrichissement.
 """
 
-from typing import Any
+from sqlalchemy import Connection, text
 
 
 def fetch_publications_with_doi(
-    cur: Any, *, limit: int | None = None
+    conn: Connection, *, limit: int | None = None
 ) -> list[tuple[int, str, str | None]]:
     """Liste `(id, doi, oa_status)` des publications avec un DOI.
 
     Utilisé par `enrich_oa_status` pour interroger Unpaywall. Tri par
     `pub_year DESC, id` pour traiter les publications récentes en premier.
-
-    Conversion explicite dict → tuple : la connexion pipeline utilise
-    `row_factory=dict_row`, donc `fetchall` retourne des dicts. L'appelant
-    unpacke `(pub_id, doi, current_status)` : sans conversion, il
-    récupérerait les clés "id"/"doi"/"oa_status" au lieu des valeurs.
     """
     if limit and limit > 0:
-        cur.execute(
-            """
-            SELECT id, doi, oa_status::text AS oa_status
-            FROM publications
-            WHERE doi IS NOT NULL
-            ORDER BY pub_year DESC, id
-            LIMIT %s
-            """,
-            (limit,),
-        )
+        rows = conn.execute(
+            text("""
+                SELECT id, doi, oa_status::text AS oa_status
+                FROM publications
+                WHERE doi IS NOT NULL
+                ORDER BY pub_year DESC, id
+                LIMIT :lim
+            """),
+            {"lim": limit},
+        ).all()
     else:
-        cur.execute(
-            """
-            SELECT id, doi, oa_status::text AS oa_status
-            FROM publications
-            WHERE doi IS NOT NULL
-            ORDER BY pub_year DESC, id
-            """
-        )
-    return [
-        (row["id"], row["doi"], row["oa_status"])
-        if isinstance(row, dict)
-        else (row[0], row[1], row[2])
-        for row in cur.fetchall()
-    ]
+        rows = conn.execute(
+            text("""
+                SELECT id, doi, oa_status::text AS oa_status
+                FROM publications
+                WHERE doi IS NOT NULL
+                ORDER BY pub_year DESC, id
+            """)
+        ).all()
+    return [(r.id, r.doi, r.oa_status) for r in rows]
 
 
-def fetch_journals_needing_apc(cur: Any, *, limit: int | None = None) -> list[tuple[int, str]]:
+def fetch_journals_needing_apc(
+    conn: Connection, *, limit: int | None = None
+) -> list[tuple[int, str]]:
     """Liste `(id, openalex_id)` des revues à enrichir côté APC/DOAJ.
 
     Utilisé par `enrich_journal_apc`. Filtre les revues avec un
     `openalex_id` et sans `apc_amount` renseigné.
-
-    Conversion explicite dict → tuple : voir `fetch_publications_with_doi`.
     """
     if limit and limit > 0:
-        cur.execute(
-            """
-            SELECT id, openalex_id
-            FROM journals
-            WHERE openalex_id IS NOT NULL
-              AND apc_amount IS NULL
-            ORDER BY id
-            LIMIT %s
-            """,
-            (limit,),
-        )
+        rows = conn.execute(
+            text("""
+                SELECT id, openalex_id
+                FROM journals
+                WHERE openalex_id IS NOT NULL
+                  AND apc_amount IS NULL
+                ORDER BY id
+                LIMIT :lim
+            """),
+            {"lim": limit},
+        ).all()
     else:
-        cur.execute(
-            """
-            SELECT id, openalex_id
-            FROM journals
-            WHERE openalex_id IS NOT NULL
-              AND apc_amount IS NULL
-            ORDER BY id
-            """
-        )
-    return [
-        (row["id"], row["openalex_id"])
-        if isinstance(row, dict)
-        else (row[0], row[1])
-        for row in cur.fetchall()
-    ]
+        rows = conn.execute(
+            text("""
+                SELECT id, openalex_id
+                FROM journals
+                WHERE openalex_id IS NOT NULL
+                  AND apc_amount IS NULL
+                ORDER BY id
+            """)
+        ).all()
+    return [(r.id, r.openalex_id) for r in rows]
 
 
 class PgEnrichQueries:
     """Adapter PostgreSQL pour `application.ports.enrich.EnrichQueries`."""
 
     def fetch_publications_with_doi(
-        self, cur: Any, *, limit: int | None = None
+        self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str, str | None]]:
-        return fetch_publications_with_doi(cur, limit=limit)
+        return fetch_publications_with_doi(conn, limit=limit)
 
     def fetch_journals_needing_apc(
-        self, cur: Any, *, limit: int | None = None
+        self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]:
-        return fetch_journals_needing_apc(cur, limit=limit)
+        return fetch_journals_needing_apc(conn, limit=limit)
