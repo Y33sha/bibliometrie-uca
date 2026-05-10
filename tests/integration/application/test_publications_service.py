@@ -6,6 +6,8 @@ merge_publications. find_or_create est déjà couvert par test_integration.py.
 """
 
 import pytest
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from application.publications import (
     find_by_doi,
@@ -23,23 +25,22 @@ from infrastructure.repositories import publication_repository
 
 
 @pytest.fixture
-def repo(db):
-    return publication_repository(db)
+def repo(sa_sync_conn):
+    return publication_repository(sa_sync_conn)
 
 
 # ── Helpers ────────────────────────────────────────────────────────
 
 
-def _insert_journal(db, title="Nature"):
-    db.execute(
-        "INSERT INTO journals (title, title_normalized) VALUES (%s, lower(%s)) RETURNING id",
-        (title, title),
-    )
-    return db.fetchone()["id"]
+def _insert_journal(conn, title="Nature"):
+    return conn.execute(
+        text("INSERT INTO journals (title, title_normalized) VALUES (:t, lower(:t)) RETURNING id"),
+        {"t": title},
+    ).scalar_one()
 
 
 def _insert_publication(
-    db,
+    conn,
     title="Test",
     pub_year=2024,
     doi=None,
@@ -47,145 +48,163 @@ def _insert_publication(
     journal_id=None,
     oa_status="unknown",
 ):
-    db.execute(
-        """
-        INSERT INTO publications (title, title_normalized, pub_year, doi,
-                                  doc_type, journal_id, oa_status)
-        VALUES (%s, lower(%s), %s, %s, %s::doc_type, %s, %s::oa_type)
-        RETURNING id
-        """,
-        (title, title, pub_year, doi, doc_type, journal_id, oa_status),
-    )
-    return db.fetchone()["id"]
+    return conn.execute(
+        text(
+            """
+            INSERT INTO publications (title, title_normalized, pub_year, doi,
+                                      doc_type, journal_id, oa_status)
+            VALUES (:title, lower(:title), :pub_year, :doi,
+                    CAST(:doc_type AS doc_type), :journal_id, CAST(:oa_status AS oa_type))
+            RETURNING id
+            """
+        ),
+        {
+            "title": title,
+            "pub_year": pub_year,
+            "doi": doi,
+            "doc_type": doc_type,
+            "journal_id": journal_id,
+            "oa_status": oa_status,
+        },
+    ).scalar_one()
+
+
+_INSERT_SOURCE_PUB_SQL = text(
+    """
+    INSERT INTO source_publications (source, source_id, title,
+                                     publication_id, external_ids)
+    VALUES (:source, :source_id, :title, :publication_id, :external_ids)
+    RETURNING id
+    """
+).bindparams(bindparam("external_ids", type_=JSONB))
 
 
 def _insert_source_publication(
-    db, publication_id, source="hal", source_id="h-1", title="Test", external_ids=None
+    conn, publication_id, source="hal", source_id="h-1", title="Test", external_ids=None
 ):
-    import json
+    return conn.execute(
+        _INSERT_SOURCE_PUB_SQL,
+        {
+            "source": source,
+            "source_id": source_id,
+            "title": title,
+            "publication_id": publication_id,
+            "external_ids": external_ids,
+        },
+    ).scalar_one()
 
-    db.execute(
-        """
-        INSERT INTO source_publications (source, source_id, title,
-                                         publication_id, external_ids)
-        VALUES (%s, %s, %s, %s, %s::jsonb)
-        RETURNING id
-        """,
-        (
-            source,
-            source_id,
-            title,
-            publication_id,
-            json.dumps(external_ids) if external_ids else None,
+
+def _insert_person(conn, last="Dupont", first="Jean"):
+    return conn.execute(
+        text(
+            """
+            INSERT INTO persons (last_name, first_name,
+                                 last_name_normalized, first_name_normalized)
+            VALUES (:last, :first, lower(:last), lower(:first)) RETURNING id
+            """
         ),
-    )
-    return db.fetchone()["id"]
+        {"last": last, "first": first},
+    ).scalar_one()
 
 
-def _insert_person(db, last="Dupont", first="Jean"):
-    db.execute(
-        """
-        INSERT INTO persons (last_name, first_name,
-                             last_name_normalized, first_name_normalized)
-        VALUES (%s, %s, lower(%s), lower(%s)) RETURNING id
-        """,
-        (last, first, last, first),
-    )
-    return db.fetchone()["id"]
+def _insert_authorship(conn, publication_id, person_id=None):
+    return conn.execute(
+        text(
+            "INSERT INTO authorships (publication_id, person_id) "
+            "VALUES (:pid, :person_id) RETURNING id"
+        ),
+        {"pid": publication_id, "person_id": person_id},
+    ).scalar_one()
 
 
-def _insert_authorship(db, publication_id, person_id=None):
-    db.execute(
-        "INSERT INTO authorships (publication_id, person_id) VALUES (%s, %s) RETURNING id",
-        (publication_id, person_id),
-    )
-    return db.fetchone()["id"]
+def _select_one(conn, sql, **binds):
+    return conn.execute(text(sql), binds).one_or_none()
 
 
 # ── find_by_* ──────────────────────────────────────────────────────
 
 
 class TestFindByDoi:
-    def test_returns_none_on_empty(self, db, repo):
-        assert find_by_doi(db, None, repo=repo) is None
-        assert find_by_doi(db, "", repo=repo) is None
+    def test_returns_none_on_empty(self, sa_sync_conn, repo):
+        assert find_by_doi(sa_sync_conn, None, repo=repo) is None
+        assert find_by_doi(sa_sync_conn, "", repo=repo) is None
 
-    def test_finds_by_doi_case_insensitive(self, db, repo):
-        pub_id = _insert_publication(db, doi="10.1234/ABC")
-        result = find_by_doi(db, "10.1234/abc", repo=repo)
+    def test_finds_by_doi_case_insensitive(self, sa_sync_conn, repo):
+        pub_id = _insert_publication(sa_sync_conn, doi="10.1234/ABC")
+        result = find_by_doi(sa_sync_conn, "10.1234/abc", repo=repo)
         assert result is not None
         assert result.id == pub_id
 
-    def test_returns_none_if_not_found(self, db, repo):
-        assert find_by_doi(db, "10.1234/unknown", repo=repo) is None
+    def test_returns_none_if_not_found(self, sa_sync_conn, repo):
+        assert find_by_doi(sa_sync_conn, "10.1234/unknown", repo=repo) is None
 
 
 class TestFindByNnt:
-    def test_returns_none_on_empty(self, db, repo):
-        assert find_by_nnt(db, None, repo=repo) is None
-        assert find_by_nnt(db, "", repo=repo) is None
+    def test_returns_none_on_empty(self, sa_sync_conn, repo):
+        assert find_by_nnt(sa_sync_conn, None, repo=repo) is None
+        assert find_by_nnt(sa_sync_conn, "", repo=repo) is None
 
-    def test_finds_by_nnt_in_external_ids(self, db, repo):
-        pub_id = _insert_publication(db, doc_type="thesis")
+    def test_finds_by_nnt_in_external_ids(self, sa_sync_conn, repo):
+        pub_id = _insert_publication(sa_sync_conn, doc_type="thesis")
         _insert_source_publication(
-            db,
+            sa_sync_conn,
             pub_id,
             source="theses",
             source_id="t-1",
             external_ids={"nnt": "2024UCAC0001"},
         )
-        result = find_by_nnt(db, "2024UCAC0001", repo=repo)
+        result = find_by_nnt(sa_sync_conn, "2024UCAC0001", repo=repo)
         assert result is not None
         assert result.id == pub_id
 
-    def test_nnt_uppercased_for_lookup(self, db, repo):
-        pub_id = _insert_publication(db, doc_type="thesis")
+    def test_nnt_uppercased_for_lookup(self, sa_sync_conn, repo):
+        pub_id = _insert_publication(sa_sync_conn, doc_type="thesis")
         _insert_source_publication(
-            db,
+            sa_sync_conn,
             pub_id,
             source="theses",
             source_id="t-1",
             external_ids={"nnt": "2024UCAC0001"},
         )
         # Même en minuscules en entrée, trouve
-        result = find_by_nnt(db, "2024ucac0001", repo=repo)
+        result = find_by_nnt(sa_sync_conn, "2024ucac0001", repo=repo)
         assert result is not None
 
 
 class TestFindByTitle:
-    def test_returns_none_on_missing_input(self, db, repo):
-        assert find_by_title(db, "", 2024, 1, repo=repo) is None
-        assert find_by_title(db, "title", 2024, None, repo=repo) is None
+    def test_returns_none_on_missing_input(self, sa_sync_conn, repo):
+        assert find_by_title(sa_sync_conn, "", 2024, 1, repo=repo) is None
+        assert find_by_title(sa_sync_conn, "title", 2024, None, repo=repo) is None
 
-    def test_finds_by_title_year_journal(self, db, repo):
-        j_id = _insert_journal(db)
-        pub_id = _insert_publication(db, title="My Paper", journal_id=j_id)
-        result = find_by_title(db, "my paper", 2024, j_id, repo=repo)
+    def test_finds_by_title_year_journal(self, sa_sync_conn, repo):
+        j_id = _insert_journal(sa_sync_conn)
+        pub_id = _insert_publication(sa_sync_conn, title="My Paper", journal_id=j_id)
+        result = find_by_title(sa_sync_conn, "my paper", 2024, j_id, repo=repo)
         assert result is not None
         assert result.id == pub_id
 
-    def test_not_found_if_year_differs(self, db, repo):
-        j_id = _insert_journal(db)
-        _insert_publication(db, title="X", pub_year=2023, journal_id=j_id)
-        assert find_by_title(db, "x", 2024, j_id, repo=repo) is None
+    def test_not_found_if_year_differs(self, sa_sync_conn, repo):
+        j_id = _insert_journal(sa_sync_conn)
+        _insert_publication(sa_sync_conn, title="X", pub_year=2023, journal_id=j_id)
+        assert find_by_title(sa_sync_conn, "x", 2024, j_id, repo=repo) is None
 
 
 class TestFindThesisByTitle:
-    def test_returns_empty_on_missing_input(self, db, repo):
-        assert find_thesis_by_title(db, "", 2024, repo=repo) == []
-        assert find_thesis_by_title(db, "t", None, repo=repo) == []
+    def test_returns_empty_on_missing_input(self, sa_sync_conn, repo):
+        assert find_thesis_by_title(sa_sync_conn, "", 2024, repo=repo) == []
+        assert find_thesis_by_title(sa_sync_conn, "t", None, repo=repo) == []
 
-    def test_finds_only_theses(self, db, repo):
+    def test_finds_only_theses(self, sa_sync_conn, repo):
         """Ne retourne que les thèses."""
-        _insert_publication(db, title="A", pub_year=2024, doc_type="article")
-        t_id = _insert_publication(db, title="A", pub_year=2024, doc_type="thesis")
-        result = find_thesis_by_title(db, "a", 2024, repo=repo)
+        _insert_publication(sa_sync_conn, title="A", pub_year=2024, doc_type="article")
+        t_id = _insert_publication(sa_sync_conn, title="A", pub_year=2024, doc_type="thesis")
+        result = find_thesis_by_title(sa_sync_conn, "a", 2024, repo=repo)
         assert [r.id for r in result] == [t_id]
 
-    def test_returns_multiple_candidates(self, db, repo):
-        t1 = _insert_publication(db, title="Dup", pub_year=2024, doc_type="thesis")
-        t2 = _insert_publication(db, title="Dup", pub_year=2024, doc_type="thesis")
-        result = find_thesis_by_title(db, "dup", 2024, repo=repo)
+    def test_returns_multiple_candidates(self, sa_sync_conn, repo):
+        t1 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
+        t2 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
+        result = find_thesis_by_title(sa_sync_conn, "dup", 2024, repo=repo)
         assert {r.id for r in result} == {t1, t2}
 
 
@@ -193,97 +212,109 @@ class TestFindThesisByTitle:
 
 
 class TestTryMergeByDoi:
-    def test_noop_if_no_doi_given(self, db, repo):
-        pub_id = _insert_publication(db)
-        assert try_merge_by_doi(db, pub_id, None, repo=repo) == pub_id
+    def test_noop_if_no_doi_given(self, sa_sync_conn, repo):
+        pub_id = _insert_publication(sa_sync_conn)
+        assert try_merge_by_doi(sa_sync_conn, pub_id, None, repo=repo) == pub_id
 
-    def test_noop_if_pub_already_has_doi(self, db, repo):
-        pub_id = _insert_publication(db, doi="10.1234/existing")
-        assert try_merge_by_doi(db, pub_id, "10.1234/other", repo=repo) == pub_id
+    def test_noop_if_pub_already_has_doi(self, sa_sync_conn, repo):
+        pub_id = _insert_publication(sa_sync_conn, doi="10.1234/existing")
+        assert try_merge_by_doi(sa_sync_conn, pub_id, "10.1234/other", repo=repo) == pub_id
 
-    def test_assigns_doi_if_pub_has_none(self, db, repo):
-        pub_id = _insert_publication(db, doi=None)
-        assert try_merge_by_doi(db, pub_id, "10.1234/new", repo=repo) == pub_id
-        db.execute("SELECT doi FROM publications WHERE id = %s", (pub_id,))
-        assert db.fetchone()["doi"] == "10.1234/new"
+    def test_assigns_doi_if_pub_has_none(self, sa_sync_conn, repo):
+        pub_id = _insert_publication(sa_sync_conn, doi=None)
+        assert try_merge_by_doi(sa_sync_conn, pub_id, "10.1234/new", repo=repo) == pub_id
+        doi = sa_sync_conn.execute(
+            text("SELECT doi FROM publications WHERE id = :id"), {"id": pub_id}
+        ).scalar_one()
+        assert doi == "10.1234/new"
 
-    def test_merges_into_existing_pub_with_same_doi(self, db, repo):
-        existing = _insert_publication(db, title="Existing", doi="10.1234/shared")
-        new_pub = _insert_publication(db, title="New", doi=None)
+    def test_merges_into_existing_pub_with_same_doi(self, sa_sync_conn, repo):
+        existing = _insert_publication(sa_sync_conn, title="Existing", doi="10.1234/shared")
+        new_pub = _insert_publication(sa_sync_conn, title="New", doi=None)
 
-        result = try_merge_by_doi(db, new_pub, "10.1234/shared", repo=repo)
+        result = try_merge_by_doi(sa_sync_conn, new_pub, "10.1234/shared", repo=repo)
 
         assert result == existing  # pub id de la cible
-        db.execute("SELECT id FROM publications WHERE id = %s", (new_pub,))
-        assert db.fetchone() is None  # new_pub supprimée (fusionnée)
+        assert (
+            _select_one(sa_sync_conn, "SELECT id FROM publications WHERE id = :id", id=new_pub)
+            is None
+        )
 
 
 # ── resolve_doi_conflict ───────────────────────────────────────────
 
 
 class TestResolveDoiConflict:
-    def test_chapter_vs_existing_book_drops_doi(self, db, repo):
+    def test_chapter_vs_existing_book_drops_doi(self, sa_sync_conn, repo):
         """Chapitre avec DOI qui pointe vers livre : DOI retiré du chapitre."""
         from application.publications import PubByDoi
 
         existing = PubByDoi(id=1, doc_type="book", title_normalized="livre")
 
         doi, merge_id = resolve_doi_conflict(
-            db, "10.x/book", "book_chapter", "chapitre", existing, repo=repo
+            sa_sync_conn, "10.x/book", "book_chapter", "chapitre", existing, repo=repo
         )
         assert doi is None
         assert merge_id is None
 
-    def test_book_vs_existing_chapter_strips_doi_from_chapter(self, db, repo):
+    def test_book_vs_existing_chapter_strips_doi_from_chapter(self, sa_sync_conn, repo):
         """Livre avec DOI existant sur un chapitre : DOI retiré du chapitre, livre garde."""
         from application.publications import PubByDoi
 
         existing_id = _insert_publication(
-            db, title="Chapitre", doc_type="book_chapter", doi="10.x/book"
+            sa_sync_conn, title="Chapitre", doc_type="book_chapter", doi="10.x/book"
         )
         existing = PubByDoi(id=existing_id, doc_type="book_chapter", title_normalized="chapitre")
 
-        doi, merge_id = resolve_doi_conflict(db, "10.x/book", "book", "livre", existing, repo=repo)
+        doi, merge_id = resolve_doi_conflict(
+            sa_sync_conn, "10.x/book", "book", "livre", existing, repo=repo
+        )
         assert doi == "10.x/book"
         assert merge_id is None
-        db.execute("SELECT doi FROM publications WHERE id = %s", (existing_id,))
-        assert db.fetchone()["doi"] is None
+        result_doi = sa_sync_conn.execute(
+            text("SELECT doi FROM publications WHERE id = :id"), {"id": existing_id}
+        ).scalar_one()
+        assert result_doi is None
 
-    def test_two_chapters_different_titles_strip_both(self, db, repo):
+    def test_two_chapters_different_titles_strip_both(self, sa_sync_conn, repo):
         """2 chapitres avec titres différents partageant un DOI : les 2 perdent le DOI."""
         from application.publications import PubByDoi
 
         existing_id = _insert_publication(
-            db, title="C1", doc_type="book_chapter", doi="10.x/shared"
+            sa_sync_conn, title="C1", doc_type="book_chapter", doi="10.x/shared"
         )
         existing = PubByDoi(id=existing_id, doc_type="book_chapter", title_normalized="c1")
 
         doi, merge_id = resolve_doi_conflict(
-            db, "10.x/shared", "book_chapter", "c2_different", existing, repo=repo
+            sa_sync_conn, "10.x/shared", "book_chapter", "c2_different", existing, repo=repo
         )
         assert doi is None
         assert merge_id is None
-        db.execute("SELECT doi FROM publications WHERE id = %s", (existing_id,))
-        assert db.fetchone()["doi"] is None
+        result_doi = sa_sync_conn.execute(
+            text("SELECT doi FROM publications WHERE id = :id"), {"id": existing_id}
+        ).scalar_one()
+        assert result_doi is None
 
-    def test_two_chapters_same_title_merges(self, db, repo):
+    def test_two_chapters_same_title_merges(self, sa_sync_conn, repo):
         """2 chapitres avec même titre + DOI → fusion."""
         from application.publications import PubByDoi
 
         existing = PubByDoi(id=42, doc_type="book_chapter", title_normalized="same")
 
         doi, merge_id = resolve_doi_conflict(
-            db, "10.x/shared", "book_chapter", "same", existing, repo=repo
+            sa_sync_conn, "10.x/shared", "book_chapter", "same", existing, repo=repo
         )
         assert doi == "10.x/shared"
         assert merge_id == 42
 
-    def test_compatible_types_merge(self, db, repo):
+    def test_compatible_types_merge(self, sa_sync_conn, repo):
         """Types compatibles (ex: 2 articles) → fusion normale."""
         from application.publications import PubByDoi
 
         existing = PubByDoi(id=42, doc_type="article", title_normalized="a")
-        doi, merge_id = resolve_doi_conflict(db, "10.x/a", "article", "a", existing, repo=repo)
+        doi, merge_id = resolve_doi_conflict(
+            sa_sync_conn, "10.x/a", "article", "a", existing, repo=repo
+        )
         assert doi == "10.x/a"
         assert merge_id == 42
 
@@ -292,154 +323,159 @@ class TestResolveDoiConflict:
 
 
 class TestUpdateOaStatus:
-    def test_updates(self, db, repo):
-        pub_id = _insert_publication(db, oa_status="unknown")
-        update_oa_status(db, pub_id, "gold", repo=repo)
-        db.execute("SELECT oa_status FROM publications WHERE id = %s", (pub_id,))
-        assert db.fetchone()["oa_status"] == "gold"
+    def test_updates(self, sa_sync_conn, repo):
+        pub_id = _insert_publication(sa_sync_conn, oa_status="unknown")
+        update_oa_status(sa_sync_conn, pub_id, "gold", repo=repo)
+        oa_status = sa_sync_conn.execute(
+            text("SELECT oa_status FROM publications WHERE id = :id"), {"id": pub_id}
+        ).scalar_one()
+        assert oa_status == "gold"
 
 
 class TestUpdateCountries:
-    def test_updates(self, db, repo):
-        pub_id = _insert_publication(db)
-        update_countries(db, pub_id, ["FR", "US"], repo=repo)
-        db.execute("SELECT countries FROM publications WHERE id = %s", (pub_id,))
-        assert db.fetchone()["countries"] == ["FR", "US"]
+    def test_updates(self, sa_sync_conn, repo):
+        pub_id = _insert_publication(sa_sync_conn)
+        update_countries(sa_sync_conn, pub_id, ["FR", "US"], repo=repo)
+        countries = sa_sync_conn.execute(
+            text("SELECT countries FROM publications WHERE id = :id"), {"id": pub_id}
+        ).scalar_one()
+        assert countries == ["FR", "US"]
 
 
 # ── merge_publications ────────────────────────────────────────────
 
 
 class TestMergePublications:
-    def test_transfers_source_publications_and_authorships(self, db, repo):
-        target = _insert_publication(db, title="Target")
-        source = _insert_publication(db, title="Source")
-        sp_id = _insert_source_publication(db, source, source="hal", source_id="h-src")
+    def test_transfers_source_publications_and_authorships(self, sa_sync_conn, repo):
+        target = _insert_publication(sa_sync_conn, title="Target")
+        source = _insert_publication(sa_sync_conn, title="Source")
+        sp_id = _insert_source_publication(sa_sync_conn, source, source="hal", source_id="h-src")
 
-        person_id = _insert_person(db)
-        auth_id = _insert_authorship(db, source, person_id=person_id)
+        person_id = _insert_person(sa_sync_conn)
+        auth_id = _insert_authorship(sa_sync_conn, source, person_id=person_id)
 
-        merge_publications(db, target, source, repo=repo)
+        merge_publications(sa_sync_conn, target, source, repo=repo)
 
         # source_publication repointée
-        db.execute("SELECT publication_id FROM source_publications WHERE id = %s", (sp_id,))
-        assert db.fetchone()["publication_id"] == target
+        sp_pub = sa_sync_conn.execute(
+            text("SELECT publication_id FROM source_publications WHERE id = :id"), {"id": sp_id}
+        ).scalar_one()
+        assert sp_pub == target
         # authorship repointée
-        db.execute("SELECT publication_id FROM authorships WHERE id = %s", (auth_id,))
-        assert db.fetchone()["publication_id"] == target
+        auth_pub = sa_sync_conn.execute(
+            text("SELECT publication_id FROM authorships WHERE id = :id"), {"id": auth_id}
+        ).scalar_one()
+        assert auth_pub == target
         # source supprimée
-        db.execute("SELECT id FROM publications WHERE id = %s", (source,))
-        assert db.fetchone() is None
-
-    def test_dedup_authorships_by_person(self, db, repo):
-        """Si target et source ont une authorship pour la même person, la source est jetée."""
-        target = _insert_publication(db, title="Target")
-        source = _insert_publication(db, title="Source")
-        person_id = _insert_person(db)
-        keep_auth = _insert_authorship(db, target, person_id=person_id)
-        drop_auth = _insert_authorship(db, source, person_id=person_id)
-
-        merge_publications(db, target, source, repo=repo)
-
-        db.execute("SELECT id FROM authorships WHERE id = %s", (keep_auth,))
-        assert db.fetchone() is not None
-        db.execute("SELECT id FROM authorships WHERE id = %s", (drop_auth,))
-        assert db.fetchone() is None
-
-    def test_enriches_journal_id(self, db, repo):
-        """Target sans journal_id → reçoit celui de la source (COALESCE)."""
-        j_id = _insert_journal(db)
-        target = _insert_publication(db, title="Target", doi=None, journal_id=None)
-        source = _insert_publication(db, title="Source", doi=None, journal_id=j_id)
-
-        merge_publications(db, target, source, repo=repo)
-
-        db.execute("SELECT journal_id FROM publications WHERE id = %s", (target,))
-        assert db.fetchone()["journal_id"] == j_id
-
-    def test_doi_transferred_when_target_has_none(self, db, repo):
-        """Target sans DOI, source avec : la cible reçoit le DOI de la source."""
-        target = _insert_publication(db, title="Target", doi=None)
-        source = _insert_publication(db, title="Source", doi="10.1234/src")
-
-        merge_publications(db, target, source, repo=repo)
-
-        db.execute("SELECT doi FROM publications WHERE id = %s", (target,))
-        assert db.fetchone()["doi"] == "10.1234/src"
-
-    def test_keeps_target_doi_when_both_set(self, db, repo):
-        """Si les deux ont un DOI, celui de la cible est conservé."""
-        target = _insert_publication(db, title="Target", doi="10.1234/target")
-        source = _insert_publication(db, title="Source", doi="10.1234/source")
-
-        merge_publications(db, target, source, repo=repo)
-
-        db.execute("SELECT doi FROM publications WHERE id = %s", (target,))
-        assert db.fetchone()["doi"] == "10.1234/target"
-
-    def test_oa_status_upgrade_diamond_wins(self, db, repo):
-        """Si source est diamond, la cible devient diamond même si elle avait gold."""
-        target = _insert_publication(db, title="Target", oa_status="gold")
-        source = _insert_publication(db, title="Source", oa_status="diamond")
-        merge_publications(db, target, source, repo=repo)
-        db.execute("SELECT oa_status FROM publications WHERE id = %s", (target,))
-        assert db.fetchone()["oa_status"] == "diamond"
-
-    def test_oa_status_upgrade_from_closed_to_gold(self, db, repo):
-        target = _insert_publication(db, title="Target", oa_status="closed")
-        source = _insert_publication(db, title="Source", oa_status="gold")
-        merge_publications(db, target, source, repo=repo)
-        db.execute("SELECT oa_status FROM publications WHERE id = %s", (target,))
-        assert db.fetchone()["oa_status"] == "gold"
-
-    def test_works_with_tuple_row_cursor(self, db):
-        """Régression : merge_into doit fonctionner avec un curseur tuple_row.
-
-        Reproduit le contexte normalize_hal/wos (USE_DICT_CURSOR=False).
-        Avant fix, plantait avec « TypeError: tuple indices must be integers
-        or slices, not str » à l'étape d'enrichissement des métadonnées src.
-        """
-        from psycopg.rows import tuple_row
-
-        target = _insert_publication(db, title="Target", doi=None, oa_status="closed")
-        source = _insert_publication(
-            db, title="Source", doi="10.9999/regression", oa_status="diamond"
+        assert (
+            _select_one(sa_sync_conn, "SELECT id FROM publications WHERE id = :id", id=source)
+            is None
         )
 
-        tuple_cur = db.connection.cursor(row_factory=tuple_row)
-        try:
-            tuple_repo = publication_repository(tuple_cur)
-            merge_publications(tuple_cur, target, source, repo=tuple_repo)
-        finally:
-            tuple_cur.close()
+    def test_dedup_authorships_by_person(self, sa_sync_conn, repo):
+        """Si target et source ont une authorship pour la même person, la source est jetée."""
+        target = _insert_publication(sa_sync_conn, title="Target")
+        source = _insert_publication(sa_sync_conn, title="Source")
+        person_id = _insert_person(sa_sync_conn)
+        keep_auth = _insert_authorship(sa_sync_conn, target, person_id=person_id)
+        drop_auth = _insert_authorship(sa_sync_conn, source, person_id=person_id)
 
-        db.execute("SELECT doi, oa_status FROM publications WHERE id = %s", (target,))
-        row = db.fetchone()
-        assert row["doi"] == "10.9999/regression"
-        assert row["oa_status"] == "diamond"
+        merge_publications(sa_sync_conn, target, source, repo=repo)
+
+        assert (
+            _select_one(sa_sync_conn, "SELECT id FROM authorships WHERE id = :id", id=keep_auth)
+            is not None
+        )
+        assert (
+            _select_one(sa_sync_conn, "SELECT id FROM authorships WHERE id = :id", id=drop_auth)
+            is None
+        )
+
+    def test_enriches_journal_id(self, sa_sync_conn, repo):
+        """Target sans journal_id → reçoit celui de la source (COALESCE)."""
+        j_id = _insert_journal(sa_sync_conn)
+        target = _insert_publication(sa_sync_conn, title="Target", doi=None, journal_id=None)
+        source = _insert_publication(sa_sync_conn, title="Source", doi=None, journal_id=j_id)
+
+        merge_publications(sa_sync_conn, target, source, repo=repo)
+
+        result = sa_sync_conn.execute(
+            text("SELECT journal_id FROM publications WHERE id = :id"), {"id": target}
+        ).scalar_one()
+        assert result == j_id
+
+    def test_doi_transferred_when_target_has_none(self, sa_sync_conn, repo):
+        """Target sans DOI, source avec : la cible reçoit le DOI de la source."""
+        target = _insert_publication(sa_sync_conn, title="Target", doi=None)
+        source = _insert_publication(sa_sync_conn, title="Source", doi="10.1234/src")
+
+        merge_publications(sa_sync_conn, target, source, repo=repo)
+
+        doi = sa_sync_conn.execute(
+            text("SELECT doi FROM publications WHERE id = :id"), {"id": target}
+        ).scalar_one()
+        assert doi == "10.1234/src"
+
+    def test_keeps_target_doi_when_both_set(self, sa_sync_conn, repo):
+        """Si les deux ont un DOI, celui de la cible est conservé."""
+        target = _insert_publication(sa_sync_conn, title="Target", doi="10.1234/target")
+        source = _insert_publication(sa_sync_conn, title="Source", doi="10.1234/source")
+
+        merge_publications(sa_sync_conn, target, source, repo=repo)
+
+        doi = sa_sync_conn.execute(
+            text("SELECT doi FROM publications WHERE id = :id"), {"id": target}
+        ).scalar_one()
+        assert doi == "10.1234/target"
+
+    def test_oa_status_upgrade_diamond_wins(self, sa_sync_conn, repo):
+        """Si source est diamond, la cible devient diamond même si elle avait gold."""
+        target = _insert_publication(sa_sync_conn, title="Target", oa_status="gold")
+        source = _insert_publication(sa_sync_conn, title="Source", oa_status="diamond")
+        merge_publications(sa_sync_conn, target, source, repo=repo)
+        oa_status = sa_sync_conn.execute(
+            text("SELECT oa_status FROM publications WHERE id = :id"), {"id": target}
+        ).scalar_one()
+        assert oa_status == "diamond"
+
+    def test_oa_status_upgrade_from_closed_to_gold(self, sa_sync_conn, repo):
+        target = _insert_publication(sa_sync_conn, title="Target", oa_status="closed")
+        source = _insert_publication(sa_sync_conn, title="Source", oa_status="gold")
+        merge_publications(sa_sync_conn, target, source, repo=repo)
+        oa_status = sa_sync_conn.execute(
+            text("SELECT oa_status FROM publications WHERE id = :id"), {"id": target}
+        ).scalar_one()
+        assert oa_status == "gold"
 
 
 class TestMarkDistinct:
-    def test_inserts_ordered_pair(self, db):
-        repo = publication_repository(db)
-        p1 = _insert_publication(db, title="A")
-        p2 = _insert_publication(db, title="B")
-        mark_distinct(db, p2, p1, repo=repo)  # ordre inverse exprès
-        db.execute(
-            "SELECT pub_id_a, pub_id_b FROM distinct_publications "
-            "WHERE pub_id_a = %s AND pub_id_b = %s",
-            (min(p1, p2), max(p1, p2)),
+    def test_inserts_ordered_pair(self, sa_sync_conn):
+        repo = publication_repository(sa_sync_conn)
+        p1 = _insert_publication(sa_sync_conn, title="A")
+        p2 = _insert_publication(sa_sync_conn, title="B")
+        mark_distinct(sa_sync_conn, p2, p1, repo=repo)  # ordre inverse exprès
+        assert (
+            _select_one(
+                sa_sync_conn,
+                "SELECT pub_id_a, pub_id_b FROM distinct_publications "
+                "WHERE pub_id_a = :a AND pub_id_b = :b",
+                a=min(p1, p2),
+                b=max(p1, p2),
+            )
+            is not None
         )
-        assert db.fetchone() is not None
 
-    def test_idempotent(self, db):
-        repo = publication_repository(db)
-        p1 = _insert_publication(db, title="A")
-        p2 = _insert_publication(db, title="B")
-        mark_distinct(db, p1, p2, repo=repo)
-        mark_distinct(db, p1, p2, repo=repo)  # ON CONFLICT DO NOTHING
-        db.execute(
-            "SELECT COUNT(*) AS n FROM distinct_publications WHERE pub_id_a = %s AND pub_id_b = %s",
-            (min(p1, p2), max(p1, p2)),
-        )
-        assert db.fetchone()["n"] == 1
+    def test_idempotent(self, sa_sync_conn):
+        repo = publication_repository(sa_sync_conn)
+        p1 = _insert_publication(sa_sync_conn, title="A")
+        p2 = _insert_publication(sa_sync_conn, title="B")
+        mark_distinct(sa_sync_conn, p1, p2, repo=repo)
+        mark_distinct(sa_sync_conn, p1, p2, repo=repo)  # ON CONFLICT DO NOTHING
+        n = sa_sync_conn.execute(
+            text(
+                "SELECT COUNT(*) AS n FROM distinct_publications "
+                "WHERE pub_id_a = :a AND pub_id_b = :b"
+            ),
+            {"a": min(p1, p2), "b": max(p1, p2)},
+        ).scalar_one()
+        assert n == 1

@@ -497,11 +497,15 @@ Reste pour clore le chantier :
 - [ ] Migrer les `psycopg.connect()` directs côté pipeline
   (`run_pipeline.py`, `interfaces/cli/*`) vers `engine.connect()` SA
   — passe surtout par les CLI conservés (cf. audit-cto Phase 3).
-- [ ] Supprimer les branches dispatch psycopg dans
-  `infrastructure/repositories/publication_repository.py` (~6 occ.)
-  une fois le pipeline migré.
-- [ ] Vérifier qu'il ne reste plus aucun `cur.execute(...)` direct
-  dans le code applicatif (hors exclusions documentées).
+- [x] `publication_repository.py` purement SA. CLI maintenance
+  (`merge_publications.py`) et tests (`test_publications_service`,
+  `test_dedup_publications`, `test_scenarios`) migrés en amont.
+- [x] Plus aucun `cur.execute(...)` applicatif hors exclusions
+  (`infrastructure/sources/*`, `infrastructure/perimeter.py`,
+  `infrastructure/db/migrate.py`, `infrastructure/db_helpers.py` +
+  branches dispatch des repos sync journal/publisher/person en
+  attente de leur clean-up Lot 3.A final, `infrastructure/app_config.py`
+  en dispatch tant que les CLI extracteurs ne basculent pas).
 
 ### Phase 5 — Décision Alembic
 

@@ -17,22 +17,25 @@ import os
 import sys
 from typing import Any
 
+from sqlalchemy import text
+
 from application.publications import merge_publications
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.log import setup_logger
 from infrastructure.repositories import publication_repository
 
 log = setup_logger("merge_publications", os.path.dirname(__file__))
 
 
-def _fetch_summary(cur: Any, pub_id: int) -> dict | None:
-    cur.execute(
-        "SELECT id, title, pub_year, doi, doc_type::text AS doc_type "
-        "FROM publications WHERE id = %s",
-        (pub_id,),
-    )
-    row = cur.fetchone()
-    return dict(row) if row else None
+def _fetch_summary(conn: Any, pub_id: int) -> dict | None:
+    row = conn.execute(
+        text(
+            "SELECT id, title, pub_year, doi, doc_type::text AS doc_type "
+            "FROM publications WHERE id = :id"
+        ),
+        {"id": pub_id},
+    ).one_or_none()
+    return dict(row._mapping) if row else None
 
 
 def main() -> int:
@@ -48,11 +51,10 @@ def main() -> int:
         log.error("target_id et source_id doivent être différents")
         return 2
 
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        target = _fetch_summary(cur, args.target_id)
-        source = _fetch_summary(cur, args.source_id)
+        target = _fetch_summary(conn, args.target_id)
+        source = _fetch_summary(conn, args.source_id)
         if not target:
             log.error("Cible %d introuvable", args.target_id)
             return 2
@@ -81,8 +83,8 @@ def main() -> int:
             log.info("[dry-run] ajouter --apply pour exécuter la fusion")
             return 0
 
-        repo = publication_repository(cur)
-        merge_publications(cur, args.target_id, args.source_id, repo=repo)
+        repo = publication_repository(conn)
+        merge_publications(conn, args.target_id, args.source_id, repo=repo)
         conn.commit()
         log.info("Fusion %d ← %d effectuée", args.target_id, args.source_id)
         return 0
