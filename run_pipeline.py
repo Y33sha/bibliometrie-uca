@@ -355,7 +355,7 @@ def _run_build_authorships() -> None:
 
 def _run_populate_affiliations(*, mode: str) -> None:
     from application.pipeline.affiliations.populate_affiliations import run_populate
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.affiliations import PgAffiliationsQueries
     from infrastructure.perimeter import (
         get_affiliations_structure_ids,
@@ -364,14 +364,11 @@ def _run_populate_affiliations(*, mode: str) -> None:
 
     log.info("▶ populate_affiliations --mode %s", mode)
     t0 = time.time()
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        perimeter_ids = get_persons_structure_ids(cur)
-        wide_ids = get_affiliations_structure_ids(cur)
+        perimeter_ids = get_persons_structure_ids(conn)
+        wide_ids = get_affiliations_structure_ids(conn)
         run_populate(
-            cur,
             conn,
             PgAffiliationsQueries(),
             log,
@@ -654,18 +651,16 @@ def _run_enrich_journal_apc() -> None:
 
 def _run_resolve_addresses(mode: str) -> None:
     from application.pipeline.affiliations.resolve_addresses import run_resolution
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.address_resolution import PgAddressResolutionQueries
     from infrastructure.perimeter import get_persons_structure_ids
 
     log.info("▶ resolve_addresses --mode %s", mode)
     t0 = time.time()
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        perimeter_ids = get_persons_structure_ids(cur)
-        run_resolution(cur, conn, PgAddressResolutionQueries(), perimeter_ids, log, mode=mode)
+        perimeter_ids = get_persons_structure_ids(conn)
+        run_resolution(conn, PgAddressResolutionQueries(), perimeter_ids, log, mode=mode)
     finally:
         conn.close()
     log.info("✓ resolve_addresses terminé en %.1fs", time.time() - t0)
@@ -673,16 +668,14 @@ def _run_resolve_addresses(mode: str) -> None:
 
 def _run_refresh_publication_countries() -> None:
     from application.pipeline.countries.refresh_publication_countries import refresh
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.countries import PgCountryQueries
 
     log.info("▶ refresh_publication_countries")
     t0 = time.time()
-    conn = get_connection()
-    conn.autocommit = False
+    conn = get_sync_engine().connect()
     try:
-        cur = conn.cursor()
-        refresh(cur, PgCountryQueries(), log)
+        refresh(conn, PgCountryQueries(), log)
         conn.commit()
     finally:
         conn.close()

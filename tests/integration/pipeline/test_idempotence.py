@@ -7,8 +7,6 @@ compter les résultats, relancer, vérifier que les compteurs n'ont pas bougé.
 Ces tests tournent sur la base bibliometrie_test (cf. conftest.py).
 """
 
-import pytest
-
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import update_sources
 from domain.doc_types import map_doc_type
@@ -1340,7 +1338,7 @@ class TestBuildAuthorshipsIdempotence:
 # ══════════════════════════════════════════════════════════════════
 
 
-def _setup_affiliations_test_data(db):
+def _setup_affiliations_test_data(conn):
     """Crée des données pour tester populate_affiliations :
     structures + périmètres + adresses + source_authorships liées.
 
@@ -1349,94 +1347,111 @@ def _setup_affiliations_test_data(db):
     cette structure via source_structures. Un authorship OpenAlex
     pointe via une adresse résolue.
     """
-    # Config périmètre
-    db.execute("""
-        INSERT INTO config (key, value) VALUES
-            ('perimeter_affiliations', '"uca_wide"'),
-            ('perimeter_persons', '"uca"')
-        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-    """)
+    from sqlalchemy import text
 
-    # Périmètres : uca = UCA seule, uca_wide = UCA + partenaires
-    db.execute("""
-        INSERT INTO perimeters (code, name, structure_ids) VALUES
-            ('uca', 'UCA restreint', ARRAY[80000]),
-            ('uca_wide', 'UCA large', ARRAY[80000])
-        ON CONFLICT (code) DO UPDATE SET structure_ids = EXCLUDED.structure_ids
-    """)
+    conn.execute(
+        text("""
+            INSERT INTO config (key, value) VALUES
+                ('perimeter_affiliations', '"uca_wide"'),
+                ('perimeter_persons', '"uca"')
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+        """)
+    )
 
-    # Structures
-    db.execute("""
-        INSERT INTO structures (id, code, name, acronym, structure_type)
-        VALUES (80000, 'UCA', 'Université Clermont Auvergne', 'UCA', 'universite'),
-               (80001, 'LABO-TEST', 'Laboratoire Test', 'LT', 'labo')
-    """)
+    conn.execute(
+        text("""
+            INSERT INTO perimeters (code, name, structure_ids) VALUES
+                ('uca', 'UCA restreint', ARRAY[80000]),
+                ('uca_wide', 'UCA large', ARRAY[80000])
+            ON CONFLICT (code) DO UPDATE SET structure_ids = EXCLUDED.structure_ids
+        """)
+    )
 
-    # Relation tutelle : UCA → LABO-TEST
-    db.execute("""
-        INSERT INTO structure_relations (parent_id, child_id, relation_type)
-        VALUES (80000, 80001, 'est_tutelle_de')
-    """)
+    conn.execute(
+        text("""
+            INSERT INTO structures (id, code, name, acronym, structure_type)
+            VALUES (80000, 'UCA', 'Université Clermont Auvergne', 'UCA', 'universite'),
+                   (80001, 'LABO-TEST', 'Laboratoire Test', 'LT', 'labo')
+        """)
+    )
 
-    # Source structures HAL → structure réelle
-    db.execute("""
-        INSERT INTO source_structures (id, source, source_id, name, structure_id)
-        VALUES (80001, 'hal', 'hal-struct-80001', 'Labo Test HAL', 80001)
-    """)
+    conn.execute(
+        text("""
+            INSERT INTO structure_relations (parent_id, child_id, relation_type)
+            VALUES (80000, 80001, 'est_tutelle_de')
+        """)
+    )
 
-    # Publications
-    db.execute("""
-        INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
-        VALUES (80001, 'Pub Affiliation Test', 'pub affiliation test', 'article', 2024)
-    """)
+    conn.execute(
+        text("""
+            INSERT INTO source_structures (id, source, source_id, name, structure_id)
+            VALUES (80001, 'hal', 'hal-struct-80001', 'Labo Test HAL', 80001)
+        """)
+    )
 
-    # Source documents
-    db.execute("""
-        INSERT INTO source_publications (id, source, source_id, title, pub_year, doc_type, publication_id)
-        VALUES (80001, 'hal', 'hal-80000001', 'Pub Affiliation Test', 2024, 'ART', 80001),
-               (80002, 'openalex', 'W80000001', 'Pub Affiliation Test', 2024, 'article', 80001)
-    """)
+    conn.execute(
+        text("""
+            INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
+            VALUES (80001, 'Pub Affiliation Test', 'pub affiliation test', 'article', 2024)
+        """)
+    )
 
-    # Source authors
-    db.execute("""
-        INSERT INTO source_persons (id, source, source_id, full_name)
-        VALUES (80001, 'hal', 'hal-author-80001', 'Alice Dupont'),
-               (80002, 'openalex', 'A80001', 'Alice Dupont')
-    """)
+    conn.execute(
+        text("""
+            INSERT INTO source_publications (id, source, source_id, title, pub_year, doc_type, publication_id)
+            VALUES (80001, 'hal', 'hal-80000001', 'Pub Affiliation Test', 2024, 'ART', 80001),
+                   (80002, 'openalex', 'W80000001', 'Pub Affiliation Test', 2024, 'article', 80001)
+        """)
+    )
 
-    # HAL authorship (avec source_struct_ids pointant vers source_structures)
-    db.execute("""
-        INSERT INTO source_authorships
-            (id, source, source_publication_id, source_person_id, author_position,
-             in_perimeter, source_struct_ids, author_name_normalized)
-        VALUES (80001, 'hal', 80001, 80001, 0, FALSE, ARRAY[80001], 'alice dupont')
-    """)
+    conn.execute(
+        text("""
+            INSERT INTO source_persons (id, source, source_id, full_name)
+            VALUES (80001, 'hal', 'hal-author-80001', 'Alice Dupont'),
+                   (80002, 'openalex', 'A80001', 'Alice Dupont')
+        """)
+    )
 
-    # OpenAlex authorship (sera résolu via adresses)
-    db.execute("""
-        INSERT INTO source_authorships
-            (id, source, source_publication_id, source_person_id, author_position,
-             in_perimeter, author_name_normalized)
-        VALUES (80002, 'openalex', 80002, 80002, 0, FALSE, 'alice dupont')
-    """)
+    conn.execute(
+        text("""
+            INSERT INTO source_authorships
+                (id, source, source_publication_id, source_person_id, author_position,
+                 in_perimeter, source_struct_ids, author_name_normalized)
+            VALUES (80001, 'hal', 80001, 80001, 0, FALSE, ARRAY[80001], 'alice dupont')
+        """)
+    )
 
-    # Adresse résolue pour l'authorship OpenAlex
-    db.execute("""
-        INSERT INTO addresses (id, raw_text, normalized_text)
-        VALUES (80001, 'Laboratoire Test, UCA, Clermont-Ferrand', 'laboratoire test uca clermont ferrand')
-    """)
-    db.execute("""
-        INSERT INTO address_structures (address_id, structure_id, is_confirmed)
-        VALUES (80001, 80001, TRUE)
-    """)
-    db.execute("""
-        INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
-        VALUES (80002, 80001)
-    """)
+    conn.execute(
+        text("""
+            INSERT INTO source_authorships
+                (id, source, source_publication_id, source_person_id, author_position,
+                 in_perimeter, author_name_normalized)
+            VALUES (80002, 'openalex', 80002, 80002, 0, FALSE, 'alice dupont')
+        """)
+    )
+
+    conn.execute(
+        text("""
+            INSERT INTO addresses (id, raw_text, normalized_text)
+            VALUES (80001, 'Laboratoire Test, UCA, Clermont-Ferrand', 'laboratoire test uca clermont ferrand')
+        """)
+    )
+    conn.execute(
+        text("""
+            INSERT INTO address_structures (address_id, structure_id, is_confirmed)
+            VALUES (80001, 80001, TRUE)
+        """)
+    )
+    conn.execute(
+        text("""
+            INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
+            VALUES (80002, 80001)
+        """)
+    )
 
 
-def _run_populate_affiliations(db):
-    """Exécute populate_affiliations sur le curseur de test."""
+def _run_populate_affiliations(conn):
+    """Exécute populate_affiliations sur la Connection SA de test."""
     import logging
 
     from application.pipeline.affiliations.populate_affiliations import (
@@ -1446,46 +1461,46 @@ def _run_populate_affiliations(db):
     from infrastructure.db.queries.affiliations import PgAffiliationsQueries
     from infrastructure.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
 
-    perimeter_ids = get_persons_structure_ids(db)
-    wide_ids = get_affiliations_structure_ids(db)
+    perimeter_ids = get_persons_structure_ids(conn)
+    wide_ids = get_affiliations_structure_ids(conn)
     queries = PgAffiliationsQueries()
     logger = logging.getLogger("test")
 
     for source in ["hal", "openalex", "wos", "scanr"]:
-        _step_address_source(db, queries, logger, source, perimeter_ids, wide_ids)
-    step3d_theses(db, queries, logger, wide_ids)
+        _step_address_source(conn, queries, logger, source, perimeter_ids, wide_ids)
+    step3d_theses(conn, queries, logger, wide_ids)
 
 
-def _count_affiliations(db) -> dict:
+def _count_affiliations(conn) -> dict:
+    from sqlalchemy import text
+
     counts = {}
     for src in ["hal", "openalex"]:
-        db.execute(
-            "SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = %s AND in_perimeter = TRUE",
-            (src,),
-        )
-        counts[f"{src}_in_perimeter"] = db.fetchone()["cnt"]
-        db.execute(
-            "SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = %s AND structure_ids IS NOT NULL",
-            (src,),
-        )
-        counts[f"{src}_with_structs"] = db.fetchone()["cnt"]
+        counts[f"{src}_in_perimeter"] = conn.execute(
+            text(
+                "SELECT COUNT(*) AS cnt FROM source_authorships "
+                "WHERE source = :src AND in_perimeter = TRUE"
+            ),
+            {"src": src},
+        ).scalar_one()
+        counts[f"{src}_with_structs"] = conn.execute(
+            text(
+                "SELECT COUNT(*) AS cnt FROM source_authorships "
+                "WHERE source = :src AND structure_ids IS NOT NULL"
+            ),
+            {"src": src},
+        ).scalar_one()
     return counts
 
 
-@pytest.mark.skip(
-    reason=(
-        "populate_affiliations encore psycopg ; à réactiver quand le sub-lot "
-        "addresses/structures du Lot 3.B SQLA sera migré."
-    )
-)
 class TestPopulateAffiliationsIdempotence:
     """populate_affiliations produit le même résultat si lancé deux fois."""
 
-    def test_double_run_same_counts(self, db):
-        _setup_affiliations_test_data(db)
+    def test_double_run_same_counts(self, sa_sync_conn):
+        _setup_affiliations_test_data(sa_sync_conn)
 
-        _run_populate_affiliations(db)
-        counts_1 = _count_affiliations(db)
+        _run_populate_affiliations(sa_sync_conn)
+        counts_1 = _count_affiliations(sa_sync_conn)
 
         # HAL utilise maintenant le circuit adresses (comme les autres sources).
         # Sans populate_addresses + resolve_addresses dans ce test, HAL n'est pas in_perimeter.
@@ -1495,14 +1510,14 @@ class TestPopulateAffiliationsIdempotence:
             "L'authorship OA doit avoir des structure_ids"
         )
 
-        _run_populate_affiliations(db)
-        counts_2 = _count_affiliations(db)
+        _run_populate_affiliations(sa_sync_conn)
+        counts_2 = _count_affiliations(sa_sync_conn)
 
         assert counts_2 == counts_1, (
             f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
 
-    def test_run_populate_is_source_agnostic(self, db):
+    def test_run_populate_is_source_agnostic(self, sa_sync_conn):
         """Régression : run_populate doit traiter toutes les sources sans filtre.
 
         Une weekly avec --sources=hal ne doit plus laisser les SAs OpenAlex
@@ -1513,6 +1528,8 @@ class TestPopulateAffiliationsIdempotence:
         """
         import logging
 
+        from sqlalchemy import text
+
         from application.pipeline.affiliations.populate_affiliations import run_populate
         from infrastructure.db.queries.affiliations import PgAffiliationsQueries
         from infrastructure.perimeter import (
@@ -1520,18 +1537,18 @@ class TestPopulateAffiliationsIdempotence:
             get_persons_structure_ids,
         )
 
-        _setup_affiliations_test_data(db)
+        _setup_affiliations_test_data(sa_sync_conn)
 
         run_populate(
-            db,
-            db.connection,
+            sa_sync_conn,
             PgAffiliationsQueries(),
             logging.getLogger("test"),
-            get_persons_structure_ids(db),
-            get_affiliations_structure_ids(db),
+            get_persons_structure_ids(sa_sync_conn),
+            get_affiliations_structure_ids(sa_sync_conn),
         )
 
-        db.execute("SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = 80002")
-        row = db.fetchone()
-        assert row["in_perimeter"] is True
-        assert row["structure_ids"] == [80001]
+        row = sa_sync_conn.execute(
+            text("SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = 80002")
+        ).one()
+        assert row.in_perimeter is True
+        assert row.structure_ids == [80001]

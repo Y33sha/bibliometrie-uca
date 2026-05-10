@@ -20,7 +20,7 @@ from domain.sources import BIBLIO_SOURCES
 
 
 def _step_address_source(
-    cur: Any,
+    conn: Any,
     queries: AffiliationsQueries,
     logger: Any,
     source: str,
@@ -32,22 +32,22 @@ def _step_address_source(
     label = source.capitalize() if source != "openalex" else "OA"
 
     if not daily:
-        n = queries.reset_source_authorships_for(cur, source)
+        n = queries.reset_source_authorships_for(conn, source)
         logger.info(f"  {label} reset : {n} authorships")
 
     n = queries.set_in_perimeter_from_addresses(
-        cur, source=source, perimeter_ids=list(perimeter_ids), daily=daily
+        conn, source=source, perimeter_ids=list(perimeter_ids), daily=daily
     )
     logger.info(f"  {label} in_perimeter = TRUE : {n} authorships")
 
     n = queries.set_structure_ids_from_addresses(
-        cur, source=source, wide_ids=list(wide_ids), daily=daily
+        conn, source=source, wide_ids=list(wide_ids), daily=daily
     )
     logger.info(f"  {label} structure_ids : {n} authorships")
 
 
 def step3d_theses(
-    cur: Any,
+    conn: Any,
     queries: AffiliationsQueries,
     logger: Any,
     wide_ids: Any,
@@ -57,11 +57,11 @@ def step3d_theses(
 
     in_perimeter est déjà à TRUE (posé par normalize_theses), on ne le reset pas.
     """
-    n = queries.set_theses_structure_ids(cur, wide_ids=list(wide_ids), daily=daily)
+    n = queries.set_theses_structure_ids(conn, wide_ids=list(wide_ids), daily=daily)
     logger.info(f"Étape 3d — theses.fr structure_ids : {n} authorships")
 
 
-def show_stats(cur: Any, queries: AffiliationsQueries, logger: Any) -> None:
+def show_stats(conn: Any, queries: AffiliationsQueries, logger: Any) -> None:
     """Affiche les compteurs in_perimeter par source."""
     for source_name, source_value in [
         ("HAL", "hal"),
@@ -70,14 +70,13 @@ def show_stats(cur: Any, queries: AffiliationsQueries, logger: Any) -> None:
         ("ScanR", "scanr"),
         ("theses.fr", "theses"),
     ]:
-        total, uca, with_structs = queries.count_source_authorships_stats(cur, source_value)
+        total, uca, with_structs = queries.count_source_authorships_stats(conn, source_value)
         logger.info(
             f"  {source_name:10s} : {total} total, {uca} in_perimeter, {with_structs} avec structure_ids"
         )
 
 
 def run_populate(
-    cur: Any,
     conn: Any,
     queries: AffiliationsQueries,
     logger: Any,
@@ -103,8 +102,8 @@ def run_populate(
         logger.info("Mode daily : traitement des authorships récentes uniquement")
 
     for source in BIBLIO_SOURCES:
-        _step_address_source(cur, queries, logger, source, perimeter_ids, wide_ids, daily=daily)
-    step3d_theses(cur, queries, logger, wide_ids, daily=daily)
+        _step_address_source(conn, queries, logger, source, perimeter_ids, wide_ids, daily=daily)
+    step3d_theses(conn, queries, logger, wide_ids, daily=daily)
 
     conn.commit()
     elapsed = time.perf_counter() - t0

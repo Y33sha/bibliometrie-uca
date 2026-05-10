@@ -111,7 +111,6 @@ def resolve_address(text_normalized: Any, forms: Any, forms_by_structure: Any) -
 
 
 def run_resolution(
-    cur: Any,
     conn: Any,
     queries: AddressResolutionQueries,
     perimeter_ids: set[int],
@@ -123,15 +122,15 @@ def run_resolution(
 ) -> None:
     """Exécute le pipeline de résolution. `conn` nécessaire pour commit batch."""
     if reset or rerun:
-        affils = queries.reset_auto_detected(cur)
-        queries.reset_all_resolved_at(cur)
+        affils = queries.reset_auto_detected(conn)
+        queries.reset_all_resolved_at(conn)
         conn.commit()
         logger.info(f"Reset : {affils} affiliations auto supprimées")
         if reset and not rerun:
             return
 
     logger.info("Chargement des structures et formes...")
-    forms = queries.load_name_forms(cur)
+    forms = queries.load_name_forms(conn)
     logger.info(f"  {len(forms)} formes chargées")
     forms_by_structure = build_forms_by_structure(forms)
     logger.info(f"  {len(perimeter_ids)} structures dans le périmètre")
@@ -139,18 +138,15 @@ def run_resolution(
     incremental = mode == "daily"
     if incremental:
         logger.info("Mode incrémental : adresses non résolues uniquement")
-    rows = queries.fetch_addresses_to_resolve(cur, incremental=incremental)
+    rows = queries.fetch_addresses_to_resolve(conn, incremental=incremental)
     total = len(rows)
     logger.info(f"  {total} adresses à résoudre")
 
     if total > 0:
-        process_addresses(
-            cur, conn, queries, rows, forms, forms_by_structure, perimeter_ids, logger
-        )
+        process_addresses(conn, queries, rows, forms, forms_by_structure, perimeter_ids, logger)
 
 
 def process_addresses(
-    cur: Any,
     conn: Any,
     queries: AddressResolutionQueries,
     rows: Any,
@@ -177,14 +173,14 @@ def process_addresses(
 
         detected_structure_ids = [sid for sid, _ in matches]
 
-        removed_count += queries.delete_obsolete_detections(cur, addr_id, detected_structure_ids)
-        queries.unflag_obsolete_detections(cur, addr_id, detected_structure_ids)
+        removed_count += queries.delete_obsolete_detections(conn, addr_id, detected_structure_ids)
+        queries.unflag_obsolete_detections(conn, addr_id, detected_structure_ids)
 
         for structure_id, form_id in matches:
             affil_count += 1
-            queries.upsert_detected_structure(cur, addr_id, structure_id, form_id)
+            queries.upsert_detected_structure(conn, addr_id, structure_id, form_id)
 
-        queries.mark_address_resolved(cur, addr_id)
+        queries.mark_address_resolved(conn, addr_id)
         processed += 1
         if processed % BATCH_SIZE == 0:
             conn.commit()

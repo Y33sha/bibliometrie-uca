@@ -14,7 +14,7 @@ import argparse
 import os
 
 from application.pipeline.affiliations.resolve_addresses import run_resolution
-from infrastructure.db.connection import get_connection
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queries.address_resolution import PgAddressResolutionQueries
 from infrastructure.log import setup_logger
 from infrastructure.perimeter import get_persons_structure_ids
@@ -36,13 +36,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    conn = get_connection()
-    conn.autocommit = False
-    cur = conn.cursor()
+    conn = get_sync_engine().connect()
     try:
-        perimeter_ids = get_persons_structure_ids(cur)
+        perimeter_ids = get_persons_structure_ids(conn)
         run_resolution(
-            cur,
             conn,
             PgAddressResolutionQueries(),
             perimeter_ids,
