@@ -10,13 +10,18 @@ L'orchestrateur dépend du port `AuthorshipsBuildQueries`. Le point d'entrée
 CLI est dans `interfaces/cli/pipeline/build_authorships.py`.
 """
 
+import logging
 import time
 from typing import Any
+
+from sqlalchemy import Connection
 
 from application.ports.authorships_build import AuthorshipsBuildQueries
 
 
-def build(conn: Any, queries: AuthorshipsBuildQueries, logger: Any, sources: Any = None) -> None:
+def build(
+    conn: Connection, queries: AuthorshipsBuildQueries, logger: logging.Logger, sources: Any = None
+) -> None:
     all_sources = [
         ("HAL", "hal"),
         ("OpenAlex", "openalex"),

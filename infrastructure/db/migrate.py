@@ -26,6 +26,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import psycopg
+
 # Forcer UTF-8 sur la sortie (Windows cp1252)
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
@@ -36,7 +38,7 @@ MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
-def ensure_migrations_table(cur: Any) -> Any:
+def ensure_migrations_table(cur: psycopg.Cursor[Any]) -> Any:
     """Crée la table schema_migrations si elle n'existe pas."""
     cur.execute("""
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -46,7 +48,7 @@ def ensure_migrations_table(cur: Any) -> Any:
     """)
 
 
-def get_applied(cur: Any) -> set[str]:
+def get_applied(cur: psycopg.Cursor[Any]) -> set[str]:
     """Retourne les versions déjà appliquées."""
     cur.execute("SELECT version FROM schema_migrations ORDER BY version")
     return {row["version"] for row in cur.fetchall()}

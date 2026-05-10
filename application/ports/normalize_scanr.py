@@ -5,13 +5,15 @@ Implémenté par `infrastructure.db.queries.normalize_scanr.PgScanrNormalizeQuer
 
 from typing import Any, Protocol
 
+from sqlalchemy import Connection
+
 
 class ScanrNormalizeQueries(Protocol):
     """Opérations SQL du normaliseur ScanR."""
 
     def upsert_scanr_source_publication(
         self,
-        conn: Any,
+        conn: Connection,
         *,
         scanr_id: str,
         doi: str | None,
@@ -34,7 +36,7 @@ class ScanrNormalizeQueries(Protocol):
 
     def upsert_scanr_source_person_by_idref(
         self,
-        conn: Any,
+        conn: Connection,
         *,
         idref: str,
         full_name: str,
@@ -43,7 +45,7 @@ class ScanrNormalizeQueries(Protocol):
 
     def upsert_scanr_source_authorship(
         self,
-        conn: Any,
+        conn: Connection,
         *,
         source_publication_id: int,
         source_person_id: int | None,
@@ -53,8 +55,8 @@ class ScanrNormalizeQueries(Protocol):
         identifiers: Any,
     ) -> int: ...
 
-    def get_scanr_publication_id(self, conn: Any, scanr_id: str) -> int | None: ...
+    def get_scanr_publication_id(self, conn: Connection, scanr_id: str) -> int | None: ...
 
     def clear_source_authorships_for_publication(
-        self, conn: Any, source_publication_id: int
+        self, conn: Connection, source_publication_id: int
     ) -> None: ...

@@ -15,9 +15,12 @@ Schéma v2 :
   - matched_form_id IS NULL + is_confirmed = assignation manuelle
 """
 
+import logging
 import re
 import time
 from typing import Any
+
+from sqlalchemy import Connection
 
 from application.ports.address_resolution import AddressResolutionQueries
 from domain.normalize import normalize_text as normalize
@@ -111,10 +114,10 @@ def resolve_address(text_normalized: Any, forms: Any, forms_by_structure: Any) -
 
 
 def run_resolution(
-    conn: Any,
+    conn: Connection,
     queries: AddressResolutionQueries,
     perimeter_ids: set[int],
-    logger: Any,
+    logger: logging.Logger,
     *,
     mode: str = "full",
     reset: bool = False,
@@ -147,13 +150,13 @@ def run_resolution(
 
 
 def process_addresses(
-    conn: Any,
+    conn: Connection,
     queries: AddressResolutionQueries,
     rows: Any,
     forms: Any,
     forms_by_structure: Any,
     perimeter: Any,
-    logger: Any,
+    logger: logging.Logger,
 ) -> tuple[int, int]:
     """Traite une liste d'adresses : détection + affiliations."""
     t_start = time.perf_counter()

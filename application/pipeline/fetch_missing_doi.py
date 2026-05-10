@@ -28,6 +28,7 @@ from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, Protocol
 
 import httpx
+from sqlalchemy import Connection
 
 CrossImportDoisReader = Callable[[Any, str, bool], list[str]]
 """Signature : ``(conn, target, all_staged) -> list[doi]``."""
@@ -47,20 +48,20 @@ class AsyncFetchMissingDoiAdapter(Protocol):
     max_concurrent: int  # plafond asyncio.Semaphore — respect du rate-limit API
     request_delay_s: float  # pause par worker après chaque fetch (0 = pas de pause)
 
-    def configure(self, conn: Any) -> None:
+    def configure(self, conn: Connection) -> None:
         """Lit la config (URLs, credentials) depuis la base avant la boucle."""
 
     def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Awaitable[Iterable[dict]]:
         """Interroge l'API pour un lot (1 à `batch_size` DOI) via le client
         async partagé. Retourne les records trouvés (vide si rien trouvé)."""
 
-    def insert(self, conn: Any, record: dict) -> bool:
+    def insert(self, conn: Connection, record: dict) -> bool:
         """Insère le record dans staging. Retourne True si nouveau, False
         si déjà présent (ON CONFLICT DO NOTHING) ou non inséré."""
 
 
 async def run_async(
-    conn: Any,
+    conn: Connection,
     adapter: AsyncFetchMissingDoiAdapter,
     log: logging.Logger,
     *,

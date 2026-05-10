@@ -14,9 +14,12 @@ Tables peuplées :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
+import logging
 import time
 from collections.abc import Callable
 from typing import Any
+
+from sqlalchemy import Connection, Row
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
@@ -67,7 +70,9 @@ def get_title(doc: dict) -> str | None:
     return title
 
 
-def upsert_publisher(cur: Any, doc: dict, *, publisher_repo: PublisherRepository) -> int | None:
+def upsert_publisher(
+    cur: Connection, doc: dict, *, publisher_repo: PublisherRepository
+) -> int | None:
     publisher_name = (doc.get("source") or {}).get("publisher")
     if not publisher_name:
         return None
@@ -75,7 +80,7 @@ def upsert_publisher(cur: Any, doc: dict, *, publisher_repo: PublisherRepository
 
 
 def upsert_journal(
-    cur: Any, doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+    cur: Connection, doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
 ) -> int | None:
     source = doc.get("source") or {}
     title = source.get("title")
@@ -118,7 +123,7 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
 
 
 def find_publication(
-    cur: Any,
+    cur: Connection,
     doc: dict,
     journal_id: int | None,
     scanr_id: str | None = None,
@@ -141,7 +146,7 @@ def find_publication(
 
 
 def insert_scanr_document(
-    cur: Any,
+    cur: Connection,
     queries: ScanrNormalizeQueries,
     doc: dict,
     staging_id: int,
@@ -238,7 +243,9 @@ def insert_scanr_document(
 # =============================================================
 
 
-def upsert_scanr_author(cur: Any, queries: ScanrNormalizeQueries, author: dict) -> int | None:
+def upsert_scanr_author(
+    cur: Connection, queries: ScanrNormalizeQueries, author: dict
+) -> int | None:
     """Crée un `source_persons` ScanR uniquement quand un idref est fourni.
 
     Sans idref, retourne None : la `source_authorships` sera insérée
@@ -270,7 +277,7 @@ def upsert_scanr_author(cur: Any, queries: ScanrNormalizeQueries, author: dict) 
 
 
 def process_authors(
-    cur: Any,
+    cur: Connection,
     queries: ScanrNormalizeQueries,
     doc: dict,
     source_publication_id: int,
@@ -333,10 +340,10 @@ def process_authors(
 
 
 def process_work(
-    cur: Any,
+    cur: Connection,
     queries: ScanrNormalizeQueries,
-    logger: Any,
-    staging_row: Any,
+    logger: logging.Logger,
+    staging_row: Row[Any],
     *,
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
@@ -412,8 +419,8 @@ class ScanrNormalizer(SourceNormalizer):
 
     def __init__(
         self,
-        conn: Any,
-        logger: Any,
+        conn: Connection,
+        logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: ScanrNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
@@ -431,12 +438,12 @@ class ScanrNormalizer(SourceNormalizer):
         self._pub_repo: PublicationRepository | None = None
         self._address_linker = address_linker
 
-    def preload_caches(self, cur: Any) -> None:
+    def preload_caches(self, cur: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
         self._publisher_repo = self._publisher_repo_factory(cur)
         self._pub_repo = self._pub_repo_factory(cur)
 
-    def process_work(self, cur: Any, row: Any) -> bool | None:
+    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
         assert (
             self._journal_repo is not None
             and self._publisher_repo is not None

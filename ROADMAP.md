@@ -21,18 +21,6 @@ API + logique métier.
   faire au fil des prochaines touches sur ces composants, pas en
   bulk.
 
-#### 2.7.5 Tests frontend
-- [x] Vitest configuré, **5 composables testés** (`useDebouncedSearch`,
-  `useColumnVisibility`, `useUrlFilters`, `useFacets`,
-  `usePaginatedFetch`) — 52 tests couvrant timers, race conditions,
-  persistance `localStorage`, sérialisation URL, mappings de facettes,
-  pagination. `happy-dom` pour les tests qui touchent `localStorage`/
-  `window`. `@testing-library/svelte` non nécessaire (composables
-  non-DOM). 24 tests utils existants sur `src/lib/utils.ts`.
-- [ ] Installer **Playwright** pour 2-3 parcours e2e critiques :
-  login admin, recherche publication, fusion de personnes.
-- [ ] Ajouter au pre-commit + CI une fois une baseline établie.
-
 ### 2.8 Observabilité et robustesse production
 - [ ] **Checks automatiques post-pipeline** : comptages, orphelins,
   anomalies (type tests de caractérisation sur les données produites)

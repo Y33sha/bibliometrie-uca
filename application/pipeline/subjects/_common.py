@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from sqlalchemy import Connection
+
 from application.ports.subjects import SubjectsQueries
 
 
@@ -55,7 +57,7 @@ class SubjectCache:
 
     def get_or_upsert(
         self,
-        conn: Any,
+        conn: Connection,
         *,
         label: str,
         language: str | None = None,
@@ -115,7 +117,7 @@ class SubjectCache:
 
     def link_bulk(
         self,
-        conn: Any,
+        conn: Connection,
         *,
         source: str,
         rows: list[tuple[int, int, float | None]],

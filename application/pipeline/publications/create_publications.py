@@ -14,7 +14,10 @@ L'orchestrateur dépend du port `PublicationsCreateQueries`. Le point
 d'entrée CLI est dans `interfaces/cli/pipeline/create_publications.py`.
 """
 
+import logging
 from typing import Any
+
+from sqlalchemy import Connection
 
 from application.ports.publications_create import PublicationsCreateQueries
 from application.publications import (
@@ -31,7 +34,7 @@ from domain.publications.dedup import has_minimal_publication_metadata
 
 
 def process_document(
-    conn: Any,
+    conn: Connection,
     queries: PublicationsCreateQueries,
     doc: Any,
     dry_run: bool,
@@ -86,9 +89,9 @@ def process_document(
 
 
 def run(
-    conn: Any,
+    conn: Connection,
     queries: PublicationsCreateQueries,
-    logger: Any,
+    logger: logging.Logger,
     *,
     pub_repo: PublicationRepository,
     dry_run: bool = False,

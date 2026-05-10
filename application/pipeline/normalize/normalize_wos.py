@@ -19,8 +19,11 @@ TI/AU/AF/SO/PU) n'est plus supporté.
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
+import logging
 from collections.abc import Callable
 from typing import Any
+
+from sqlalchemy import Connection, Row
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
@@ -339,14 +342,14 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
 
 
 def upsert_publisher(
-    cur: Any, publisher_name: str | None, *, publisher_repo: PublisherRepository
+    cur: Connection, publisher_name: str | None, *, publisher_repo: PublisherRepository
 ) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
     return find_or_create_publisher(cur, publisher_name, repo=publisher_repo)
 
 
 def upsert_journal(
-    cur: Any, rec: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+    cur: Connection, rec: dict, publisher_id: int | None, *, journal_repo: JournalRepository
 ) -> int | None:
     """Trouve ou crée une revue depuis les données WoS."""
     title = rec.get("journal_title")
@@ -389,7 +392,7 @@ def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
 
 
 def find_publication(
-    cur: Any,
+    cur: Connection,
     rec: dict,
     journal_id: int | None,
     *,
@@ -411,7 +414,7 @@ def find_publication(
 
 
 def insert_wos_document(
-    cur: Any,
+    cur: Connection,
     queries: WosNormalizeQueries,
     rec: dict,
     staging_id: int,
@@ -466,7 +469,7 @@ def insert_wos_document(
 
 
 def _resolve_addresses_batch(
-    cur: Any, queries: WosNormalizeQueries, raw_texts: set
+    cur: Connection, queries: WosNormalizeQueries, raw_texts: set
 ) -> dict[str, int]:
     """Résout un ensemble d'adresses en batch. Retourne {raw_text: id}."""
     if not raw_texts:
@@ -479,7 +482,7 @@ def _resolve_addresses_batch(
 _wos_institution_cache: dict[str, int] = {}
 
 
-def upsert_wos_institution(cur: Any, queries: WosNormalizeQueries, org: dict) -> int | None:
+def upsert_wos_institution(cur: Connection, queries: WosNormalizeQueries, org: dict) -> int | None:
     """Insère/retrouve une organisation WoS dans source_structures."""
     name = org.get("name")
     if not name:
@@ -495,7 +498,7 @@ def upsert_wos_institution(cur: Any, queries: WosNormalizeQueries, org: dict) ->
 
 
 def process_authorships(
-    cur: Any, queries: WosNormalizeQueries, rec: dict, source_publication_id: int
+    cur: Connection, queries: WosNormalizeQueries, rec: dict, source_publication_id: int
 ) -> None:
     """Traite les authorships d'un record WoS + crée les liens adresses et institutions.
 
@@ -593,10 +596,10 @@ def process_authorships(
 
 
 def process_record(
-    cur: Any,
+    cur: Connection,
     queries: WosNormalizeQueries,
-    logger: Any,
-    staging_row: tuple,
+    logger: logging.Logger,
+    staging_row: Row[Any],
     *,
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
@@ -663,8 +666,8 @@ class WosNormalizer(SourceNormalizer):
 
     def __init__(
         self,
-        conn: Any,
-        logger: Any,
+        conn: Connection,
+        logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: WosNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
@@ -680,7 +683,7 @@ class WosNormalizer(SourceNormalizer):
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
 
-    def preload_caches(self, cur: Any) -> None:
+    def preload_caches(self, cur: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
         self._publisher_repo = self._publisher_repo_factory(cur)
         self._pub_repo = self._pub_repo_factory(cur)
@@ -688,7 +691,7 @@ class WosNormalizer(SourceNormalizer):
             _wos_institution_cache[src_id] = pid
         self.logger.info(f"Cache WoS : {len(_wos_institution_cache)} institutions")
 
-    def process_work(self, cur: Any, row: Any) -> bool | None:
+    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
         assert (
             self._journal_repo is not None
             and self._publisher_repo is not None
@@ -705,7 +708,7 @@ class WosNormalizer(SourceNormalizer):
             staging_queries=self._staging,
         )
 
-    def post_process(self, cur: Any) -> None:
+    def post_process(self, cur: Connection) -> None:
         deleted_dups = self._queries.delete_wos_duplicate_authorships(cur)
         if deleted_dups:
             self.logger.info("Doublons de position supprimés : %d", deleted_dups)

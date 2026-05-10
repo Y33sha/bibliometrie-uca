@@ -14,8 +14,11 @@ peut rester orphelin si plus aucune publication ne le référence. Le coût
 mémoire est négligeable et permet de garder l'historique des labels observés.
 """
 
+import logging
 import time
 from typing import Any
+
+from sqlalchemy import Connection
 
 from application.pipeline.subjects import (
     ingest_crossref,
@@ -43,9 +46,9 @@ _LOG_EVERY = 1000
 
 
 def run(
-    conn: Any,
+    conn: Connection,
     queries: SubjectsQueries,
-    logger: Any,
+    logger: logging.Logger,
     sources: Any = None,
 ) -> int:
     """Ingère les sujets pour les sources données (toutes par défaut).

@@ -1,8 +1,9 @@
 """Résumé global, ventilation annuelle, années disponibles, facettes croisées."""
 
+from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from infrastructure.db.queries.filters import (
     PUB_IS_UCA,
@@ -282,7 +283,10 @@ def stats_facets(conn: Connection, **kwargs: Any) -> dict[str, list[dict[str, An
 
 
 def _build_facets_result(
-    year_rows: Any, lab_rows: Any, oa_rows: Any, apc_row: Any
+    year_rows: Sequence[Row[Any]],
+    lab_rows: Sequence[Row[Any]],
+    oa_rows: Sequence[Row[Any]],
+    apc_row: Row[Any],
 ) -> dict[str, list[dict[str, Any]]]:
     return {
         "years": [{"value": r.pub_year, "count": r.count} for r in year_rows],

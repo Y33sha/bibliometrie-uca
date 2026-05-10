@@ -11,10 +11,9 @@ embarrassingly parallel par DOI via `httpx.AsyncClient`.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
 
 import httpx
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_retry_async import http_request_with_retry_async
@@ -58,7 +57,7 @@ class HalFetchMissingDoiAdapter:
 
     base_url: str
 
-    def configure(self, conn: Any) -> None:
+    def configure(self, conn: Connection) -> None:
         self.base_url = get_api_base_urls(conn)["hal"]
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
@@ -82,7 +81,7 @@ class HalFetchMissingDoiAdapter:
         docs = data.get("response", {}).get("docs", [])
         return docs[:1]
 
-    def insert(self, conn: Any, record: dict) -> bool:
+    def insert(self, conn: Connection, record: dict) -> bool:
         hal_id = record.get("halId_s")
         if isinstance(hal_id, list):
             hal_id = hal_id[0] if hal_id else None

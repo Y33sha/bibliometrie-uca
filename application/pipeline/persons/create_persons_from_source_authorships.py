@@ -32,8 +32,11 @@ L'orchestrateur dépend du port `PersonsCreateQueries`. Le point d'entrée CLI
 est dans `interfaces/cli/pipeline/create_persons_from_source_authorships.py`.
 """
 
+import logging
 from collections import defaultdict
 from typing import Any
+
+from sqlalchemy import Connection
 
 from application.persons import (
     add_identifiers_from_authorships as add_identifiers,
@@ -62,7 +65,9 @@ from domain.sources.openalex import keep_orcid_if_name_matches
 # ---------------------------------------------------------------------------
 
 
-def get_all_unlinked_authorships(conn: Any, queries: PersonsCreateQueries) -> list[dict[str, Any]]:
+def get_all_unlinked_authorships(
+    conn: Connection, queries: PersonsCreateQueries
+) -> list[dict[str, Any]]:
     """Charge les authorships UCA sans person_id (toutes sources) et les enrichit
     (parsing noms, filtrage ORCID OpenAlex, flag allow_create)."""
     all_rows = []
@@ -88,7 +93,7 @@ def get_all_unlinked_authorships(conn: Any, queries: PersonsCreateQueries) -> li
 
 
 def load_linked_authorships_by_pub(
-    conn: Any, queries: PersonsCreateQueries
+    conn: Connection, queries: PersonsCreateQueries
 ) -> dict[tuple[int, int], list[tuple[int, str, str, str]]]:
     """Index des authorships rattachées par (publication_id, author_position)."""
     index: dict[tuple[int, int], list[tuple[int, str, str, str]]] = defaultdict(list)
@@ -109,9 +114,9 @@ def load_linked_authorships_by_pub(
 
 
 def step0_hal_accounts(
-    conn: Any,
+    conn: Connection,
     queries: PersonsCreateQueries,
-    logger: Any,
+    logger: logging.Logger,
     all_authorships: Any,
     linked_ids: set,
     dry_run: bool,
@@ -177,8 +182,8 @@ def _max_authors_per_pub(
 
 
 def step1_cross_source(
-    conn: Any,
-    logger: Any,
+    conn: Connection,
+    logger: logging.Logger,
     all_authorships: Any,
     linked_ids: set,
     linked_index: dict,
@@ -236,9 +241,9 @@ def step1_cross_source(
 
 
 def step1b_idref(
-    conn: Any,
+    conn: Connection,
     queries: PersonsCreateQueries,
-    logger: Any,
+    logger: logging.Logger,
     all_authorships: Any,
     linked_ids: set,
     dry_run: bool,
@@ -272,9 +277,9 @@ def step1b_idref(
 
 
 def step2_orcid(
-    conn: Any,
+    conn: Connection,
     queries: PersonsCreateQueries,
-    logger: Any,
+    logger: logging.Logger,
     all_authorships: Any,
     linked_ids: set,
     dry_run: bool,
@@ -308,8 +313,8 @@ def step2_orcid(
 
 
 def step3_name_forms(
-    conn: Any,
-    logger: Any,
+    conn: Connection,
+    logger: logging.Logger,
     all_authorships: Any,
     linked_ids: set,
     name_form_map: dict,
@@ -388,9 +393,9 @@ def step3_name_forms(
 
 
 def run(
-    conn: Any,
+    conn: Connection,
     queries: PersonsCreateQueries,
-    logger: Any,
+    logger: logging.Logger,
     *,
     person_repo: PersonRepository,
     dry_run: bool = False,

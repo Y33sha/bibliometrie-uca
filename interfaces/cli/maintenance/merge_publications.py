@@ -14,9 +14,8 @@ Usage :
 import argparse
 import os
 import sys
-from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from application.publications import merge_publications
 from infrastructure.db.engine import get_sync_engine
@@ -26,7 +25,7 @@ from infrastructure.repositories import publication_repository
 log = setup_logger("merge_publications", os.path.dirname(__file__))
 
 
-def _fetch_summary(conn: Any, pub_id: int) -> dict | None:
+def _fetch_summary(conn: Connection, pub_id: int) -> dict | None:
     row = conn.execute(
         text(
             "SELECT id, title, pub_year, doi, doc_type::text AS doc_type "

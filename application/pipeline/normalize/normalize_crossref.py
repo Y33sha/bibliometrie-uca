@@ -28,8 +28,11 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 from __future__ import annotations
 
 import datetime
+import logging
 from collections.abc import Callable
 from typing import Any
+
+from sqlalchemy import Connection, Row
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
@@ -163,7 +166,9 @@ def get_meta(msg: dict) -> dict | None:
 # =============================================================
 
 
-def upsert_publisher(cur: Any, msg: dict, *, publisher_repo: PublisherRepository) -> int | None:
+def upsert_publisher(
+    cur: Connection, msg: dict, *, publisher_repo: PublisherRepository
+) -> int | None:
     name = get_publisher_name(msg)
     if not name:
         return None
@@ -171,7 +176,7 @@ def upsert_publisher(cur: Any, msg: dict, *, publisher_repo: PublisherRepository
 
 
 def upsert_journal(
-    cur: Any,
+    cur: Connection,
     msg: dict,
     publisher_id: int | None,
     *,
@@ -218,7 +223,7 @@ def _author_affiliation_strings(author: dict) -> list[str]:
 
 
 def process_authors(
-    cur: Any,
+    cur: Connection,
     queries: CrossrefNormalizeQueries,
     msg: dict,
     doi: str,
@@ -272,7 +277,7 @@ def process_authors(
 
 
 def find_publication(
-    cur: Any,
+    cur: Connection,
     msg: dict,
     journal_id: int | None,
     *,
@@ -313,10 +318,10 @@ def find_publication(
 
 
 def process_work(
-    cur: Any,
+    cur: Connection,
     queries: CrossrefNormalizeQueries,
-    logger: Any,
-    staging_row: Any,
+    logger: logging.Logger,
+    staging_row: Row[Any],
     *,
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
@@ -395,8 +400,8 @@ class CrossrefNormalizer(SourceNormalizer):
 
     def __init__(
         self,
-        conn: Any,
-        logger: Any,
+        conn: Connection,
+        logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: CrossrefNormalizeQueries,
         journal_repo_factory: Callable[[Any], JournalRepository],
@@ -412,12 +417,12 @@ class CrossrefNormalizer(SourceNormalizer):
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
 
-    def preload_caches(self, cur: Any) -> None:
+    def preload_caches(self, cur: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(cur)
         self._publisher_repo = self._publisher_repo_factory(cur)
         self._pub_repo = self._pub_repo_factory(cur)
 
-    def process_work(self, cur: Any, row: Any) -> bool | None:
+    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
         assert (
             self._journal_repo is not None
             and self._publisher_repo is not None

@@ -73,7 +73,7 @@ _UPSERT_SUBJECT_SQL = text(
 
 
 def upsert_subject(
-    conn: Any,
+    conn: Connection,
     *,
     label: str,
     language: str | None = None,
@@ -94,7 +94,7 @@ def upsert_subject(
 
 
 def link_publication_subject(
-    conn: Any,
+    conn: Connection,
     *,
     publication_id: int,
     subject_id: int,
@@ -121,7 +121,7 @@ def link_publication_subject(
 
 
 def link_publication_subjects_bulk(
-    conn: Any,
+    conn: Connection,
     *,
     source: str,
     rows: list[tuple[int, int, float | None]],
@@ -162,7 +162,7 @@ def link_publication_subjects_bulk(
 
 
 def clear_publication_subjects(
-    conn: Any,
+    conn: Connection,
     *,
     publication_id: int,
     source: str,
@@ -175,7 +175,7 @@ def clear_publication_subjects(
     ).rowcount
 
 
-def clear_links_for_source(conn: Any, *, source: str) -> int:
+def clear_links_for_source(conn: Connection, *, source: str) -> int:
     """`DELETE FROM publication_subjects WHERE source = X`. Retourne le rowcount."""
     return conn.execute(
         text("DELETE FROM publication_subjects WHERE source = :src"),
@@ -183,24 +183,26 @@ def clear_links_for_source(conn: Any, *, source: str) -> int:
     ).rowcount
 
 
-def select_source_publications_with_subjects(conn: Any, *, source: str) -> list[Any]:
+def select_source_publications_with_subjects(conn: Connection, *, source: str) -> list[Any]:
     """Lit les `source_publications` rattachées à une publication canonique."""
-    return conn.execute(
-        text(
-            """
-            SELECT publication_id, keywords, topics
-            FROM source_publications
-            WHERE source = :src AND publication_id IS NOT NULL
-            """
-        ),
-        {"src": source},
-    ).all()
+    return list(
+        conn.execute(
+            text(
+                """
+                SELECT publication_id, keywords, topics
+                FROM source_publications
+                WHERE source = :src AND publication_id IS NOT NULL
+                """
+            ),
+            {"src": source},
+        ).all()
+    )
 
 
 # ── Co-occurrences ───────────────────────────────────────────────
 
 
-def recompute_usage_counts(conn: Any) -> int:
+def recompute_usage_counts(conn: Connection) -> int:
     """Recalcule `subjects.usage_count` = nb publications distinctes par sujet."""
     n_reset = conn.execute(
         text("UPDATE subjects SET usage_count = 0 WHERE usage_count <> 0")
@@ -222,7 +224,7 @@ def recompute_usage_counts(conn: Any) -> int:
     return n_reset + n_updated
 
 
-def recompute_cooccurrences(conn: Any, *, min_count: int = 2) -> int:
+def recompute_cooccurrences(conn: Connection, *, min_count: int = 2) -> int:
     """Recalcule `subject_cooccurrences` depuis `publication_subjects`.
 
     TRUNCATE puis INSERT en bloc, filtré par count >= min_count. Retourne
@@ -330,7 +332,7 @@ class PgSubjectsQueries:
 
     def upsert_subject(
         self,
-        conn: Any,
+        conn: Connection,
         *,
         label: str,
         language: str | None = None,
@@ -345,21 +347,23 @@ class PgSubjectsQueries:
 
     def link_publication_subjects_bulk(
         self,
-        conn: Any,
+        conn: Connection,
         *,
         source: str,
         rows: list[tuple[int, int, float | None]],
     ) -> int:
         return link_publication_subjects_bulk(conn, source=source, rows=rows)
 
-    def clear_links_for_source(self, conn: Any, *, source: str) -> int:
+    def clear_links_for_source(self, conn: Connection, *, source: str) -> int:
         return clear_links_for_source(conn, source=source)
 
-    def select_source_publications_with_subjects(self, conn: Any, *, source: str) -> list[Any]:
+    def select_source_publications_with_subjects(
+        self, conn: Connection, *, source: str
+    ) -> list[Any]:
         return select_source_publications_with_subjects(conn, source=source)
 
-    def recompute_usage_counts(self, conn: Any) -> int:
+    def recompute_usage_counts(self, conn: Connection) -> int:
         return recompute_usage_counts(conn)
 
-    def recompute_cooccurrences(self, conn: Any, *, min_count: int = 2) -> int:
+    def recompute_cooccurrences(self, conn: Connection, *, min_count: int = 2) -> int:
         return recompute_cooccurrences(conn, min_count=min_count)

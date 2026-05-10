@@ -16,7 +16,7 @@ Usage :
         person_repository(cur).set_rejected(person_id, rejected)
 """
 
-from typing import Any
+from sqlalchemy import Connection
 
 from domain.ports.address_repository import AddressRepository
 from domain.ports.audit_repository import AuditRepository
@@ -40,51 +40,51 @@ from .publisher_repository import PgPublisherRepository
 from .structure_repository import PgStructureRepository
 
 
-def address_repository(conn: Any) -> AddressRepository:
+def address_repository(conn: Connection) -> AddressRepository:
     """Retourne un AddressRepository lié à la Connection SA donnée."""
     return PgAddressRepository(conn)
 
 
-def audit_repository(conn: Any) -> AuditRepository:
+def audit_repository(conn: Connection) -> AuditRepository:
     """Retourne un AuditRepository lié à la Connection SA donnée."""
     return PgAuditRepository(conn)
 
 
-def authorship_repository(conn: Any) -> AuthorshipRepository:
+def authorship_repository(conn: Connection) -> AuthorshipRepository:
     """Retourne un AuthorshipRepository lié à la Connection SA donnée."""
     return PgAuthorshipRepository(conn)
 
 
-def config_store(conn: Any) -> PgConfig:
+def config_store(conn: Connection) -> PgConfig:
     """Retourne un ConfigStore (port défini dans application/ports/config.py)."""
     return PgConfig(conn)
 
 
-def journal_repository(conn: Any) -> JournalRepository:
+def journal_repository(conn: Connection) -> JournalRepository:
     """Retourne un JournalRepository lié à la Connection SA donnée."""
     return PgJournalRepository(conn)
 
 
-def perimeter_repository(conn: Any) -> PerimeterRepository:
+def perimeter_repository(conn: Connection) -> PerimeterRepository:
     """Retourne un PerimeterRepository lié à la Connection SA donnée."""
     return PgPerimeterRepository(conn)
 
 
-def person_repository(conn: Any) -> PersonRepository:
+def person_repository(conn: Connection) -> PersonRepository:
     """Retourne un PersonRepository lié à la Connection SA donnée."""
     return PgPersonRepository(conn)
 
 
-def publication_repository(conn: Any) -> PublicationRepository:
+def publication_repository(conn: Connection) -> PublicationRepository:
     """Retourne un PublicationRepository lié à la Connection SA donnée."""
     return PgPublicationRepository(conn)
 
 
-def publisher_repository(conn: Any) -> PublisherRepository:
+def publisher_repository(conn: Connection) -> PublisherRepository:
     """Retourne un PublisherRepository lié à la Connection SA donnée."""
     return PgPublisherRepository(conn)
 
 
-def structure_repository(conn: Any) -> StructureRepository:
+def structure_repository(conn: Connection) -> StructureRepository:
     """Retourne un StructureRepository lié à la Connection SA donnée."""
     return PgStructureRepository(conn)

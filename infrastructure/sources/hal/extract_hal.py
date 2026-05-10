@@ -16,7 +16,7 @@ import os
 import time
 from typing import Any
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import HAL_DELAY, hal_per_page_for
@@ -173,7 +173,7 @@ def fetch_single_work(url: str, hal_id: str) -> dict | None:
     return docs[0] if docs else None
 
 
-def tag_existing_with_collection(conn: Any, hal_ids: list[str], collection_code: str) -> int:
+def tag_existing_with_collection(conn: Connection, hal_ids: list[str], collection_code: str) -> int:
     """Append `collection_code` à `hal_collections` pour les halIds donnés.
 
     Utilisé quand on a pré-listé les halIds d'une collection et qu'on
@@ -200,7 +200,9 @@ def extract_doi(doc: dict) -> str | None:
     return clean_doi(doc.get("doiId_s"))
 
 
-def upsert_work(conn: Any, hal_id: str, doi: str | None, raw_data: dict, collection: str) -> Any:
+def upsert_work(
+    conn: Connection, hal_id: str, doi: str | None, raw_data: dict, collection: str
+) -> Any:
     """
     Insère ou met à jour un work dans staging.
     Si le halId existe déjà : ajoute la collection, et si le contenu a changé
@@ -222,7 +224,7 @@ def _extract_full(
     url: str,
     query: str,
     collection_code: str,
-    conn: Any,
+    conn: Connection,
     existing_ids: set,
     total_count: int,
 ) -> int:
@@ -264,7 +266,7 @@ def _extract_incremental(
     collection_code: str,
     orphans: list[str],
     known: list[str],
-    conn: Any,
+    conn: Connection,
     existing_ids: set,
 ) -> tuple[int, int]:
     """Fetch individuel des orphelins + UPDATE SQL pour tagger les connus.
@@ -300,7 +302,7 @@ def _extract_incremental(
 def extract_collection(
     collection_code: str,
     collection_label: str,
-    conn: Any,
+    conn: Connection,
     existing_ids: set,
     base_url: str,
     years: list = None,
@@ -368,7 +370,7 @@ class HalExtractor(SourceExtractor):
             help="Date ISO (YYYY-MM-DD) : ne récupérer que les documents soumis depuis cette date",
         )
 
-    def load_config(self, conn: Any) -> dict[str, Any]:
+    def load_config(self, conn: Connection) -> dict[str, Any]:
         collections = get_hal_collections(conn)
         extra_collections = get_hal_extra_collections(conn)
         all_collections = dict(collections)

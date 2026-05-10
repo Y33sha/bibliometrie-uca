@@ -13,10 +13,11 @@ API: https://api.unpaywall.org/v2/{doi}?email=...
 Rate limit: 100 000 req/jour, ~10 req/s recommandé
 """
 
+import logging
 import time
-from typing import Any
 
 import requests
+from sqlalchemy import Connection
 
 from application.ports.enrich import EnrichQueries
 from application.publications import update_oa_status
@@ -37,7 +38,7 @@ OA_MAP = {
 BATCH_SIZE = 50
 
 
-def fetch_oa_status(doi: str, logger: Any, *, unpaywall_base: str) -> str | None:
+def fetch_oa_status(doi: str, logger: logging.Logger, *, unpaywall_base: str) -> str | None:
     """Interroge Unpaywall pour un DOI. Retourne le statut OA ou None."""
     for attempt in range(3):
         try:
@@ -68,9 +69,9 @@ def fetch_oa_status(doi: str, logger: Any, *, unpaywall_base: str) -> str | None
 
 
 def run_enrich(
-    conn: Any,
+    conn: Connection,
     queries: EnrichQueries,
-    logger: Any,
+    logger: logging.Logger,
     *,
     pub_repo: PublicationRepository,
     unpaywall_base: str,

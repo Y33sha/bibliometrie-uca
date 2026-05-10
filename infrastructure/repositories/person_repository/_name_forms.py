@@ -1,13 +1,11 @@
 """SQL pour `person_name_forms`."""
 
-from typing import Any
-
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_name
 
 
-def refresh_name_forms(conn: Any, person_id: int, forms: set[str]) -> None:
+def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
     """Recalcule les formes de nom source 'persons' d'une personne.
 
     Supprime les anciennes formes 'persons' puis insère les nouvelles.
@@ -48,7 +46,9 @@ def refresh_name_forms(conn: Any, person_id: int, forms: set[str]) -> None:
         add_name_form(conn, person_id, form, source="persons")
 
 
-def add_name_form(conn: Any, person_id: int, full_name: str, source: str | None = None) -> None:
+def add_name_form(
+    conn: Connection, person_id: int, full_name: str, source: str | None = None
+) -> None:
     """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà.
 
     Si `source` est fourni (ex: 'hal', 'openalex', 'persons'), il est ajouté
@@ -96,7 +96,7 @@ def add_name_form(conn: Any, person_id: int, full_name: str, source: str | None 
         )
 
 
-def detach_name_form(conn: Any, person_id: int, name_form: str) -> None:
+def detach_name_form(conn: Connection, person_id: int, name_form: str) -> None:
     """Détache une personne d'une forme de nom. Supprime la forme si elle
     devient orpheline."""
     conn.execute(

@@ -16,10 +16,11 @@ et implémente `process_work()`.
 from __future__ import annotations
 
 import argparse
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, Row
 
 from application.pipeline._savepoint import savepoint
 from application.ports.staging import StagingQueries
@@ -47,7 +48,9 @@ class SourceNormalizer(ABC):
     FETCH_SUB_BATCH: ClassVar[int | None] = None
     FETCH_COLUMNS: ClassVar[str] = "id, source_id, doi, raw_data"
 
-    def __init__(self, conn: Connection, logger: Any, staging_queries: StagingQueries) -> None:
+    def __init__(
+        self, conn: Connection, logger: logging.Logger, staging_queries: StagingQueries
+    ) -> None:
         self.conn = conn
         self.logger = logger
         self._staging = staging_queries
@@ -55,7 +58,7 @@ class SourceNormalizer(ABC):
     # ── Hooks métier ────────────────────────────────────────────
 
     @abstractmethod
-    def process_work(self, conn: Connection, row: Any) -> bool | None:
+    def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
         """Traite une ligne staging. Retourne True (ok), None (skip), False (erreur)."""
 
     def preload_caches(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
@@ -119,7 +122,7 @@ class SourceNormalizer(ABC):
                 conn, batch_ids, columns=self.FETCH_COLUMNS
             )
 
-    def _process_one(self, conn: Connection, row: Any) -> bool | None:
+    def _process_one(self, conn: Connection, row: Row[Any]) -> bool | None:
         """Enveloppe process_work avec SAVEPOINT optionnel."""
         if not self.USE_SAVEPOINT:
             return self.process_work(conn, row)

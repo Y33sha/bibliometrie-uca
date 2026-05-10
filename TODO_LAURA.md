@@ -1,4 +1,6 @@
 # A régler avant transmission
+## Schéma
+* Supprimer source_persons et source_structures
 ## Pipeline
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
@@ -8,6 +10,8 @@
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 * [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
 * [ ] création erronée d'idhal numériques par normalize-hal
+* abstraire config (cf toutes les conditions sur le mode du pipeline)
+* Backoff `not_found_at` sur DOI: Pour limiter la croissance du pool de DOI retentés à chaque run de `fetch_missing_doi`, stocker un `not_found_at TIMESTAMP` sur les DOI qu'une source n'a pas pu résoudre, et ne les réessayer qu'après N jours (30 ?)
 ## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
 * [ ] cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
@@ -22,6 +26,7 @@
 * [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques): supprimer les requêtes vers source_authorships pouvant être remplacées par des requêtes vers les tables canoniques
 * [ ] nommage des routers pas totalement cohérent
 * is_wos_author_exploitable, authors_kept: à quoi ça sert? auditer
+* sortir les use cases des repositories; clarifier la distinction repositories / db/queries
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 ## Sujets
@@ -31,7 +36,7 @@
 * [ ] pour les jeux de données: DataCite, autres?
 * [ ] divers: ORCID, IdRef, DOAJ
 ## Types de documents: fixer l'enum et le mapping, algo de résolution de conflits
-* [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger + source theses.fr => corriger type
+* [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger
 * [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?); data papers?
 * [ ] types wos "composites": étudier, voir si ça représente des types/sous-types comme dans HAL
 ## Journals/Publishers

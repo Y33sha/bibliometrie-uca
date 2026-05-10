@@ -22,8 +22,11 @@ Particularités theses.fr :
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
+import logging
 from collections.abc import Callable
 from typing import Any
+
+from sqlalchemy import Connection, Row
 
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.address_linker import AddressLinker
@@ -63,7 +66,7 @@ def _extract_thesis_author(these: dict) -> tuple[str, str] | None:
 
 
 def _thesis_author_compatible(
-    cur: Any, queries: ThesesNormalizeQueries, pub_id: int, author: tuple[str, str]
+    cur: Connection, queries: ThesesNormalizeQueries, pub_id: int, author: tuple[str, str]
 ) -> bool:
     primary = queries.fetch_thesis_primary_author(cur, pub_id)
     return thesis_authors_compatible(primary, author)
@@ -101,7 +104,7 @@ def extract_pub_metadata(these: dict) -> dict:
 
 
 def find_publication(
-    cur: Any,
+    cur: Connection,
     queries: ThesesNormalizeQueries,
     these: dict,
     *,
@@ -154,7 +157,7 @@ def find_publication(
 
 
 def _update_thesis_meta(
-    cur: Any, queries: ThesesNormalizeQueries, pub_id: int, these: dict
+    cur: Connection, queries: ThesesNormalizeQueries, pub_id: int, these: dict
 ) -> None:
     """Met à jour publications.meta avec les dates de thèse."""
     meta = {}
@@ -204,7 +207,7 @@ def _build_source_meta(these: dict) -> dict | None:
 
 
 def insert_source_document(
-    cur: Any,
+    cur: Connection,
     queries: ThesesNormalizeQueries,
     these: dict,
     staging_id: int,
@@ -267,7 +270,9 @@ def insert_source_document(
 # =============================================================
 
 
-def upsert_source_author(cur: Any, queries: ThesesNormalizeQueries, person: dict) -> int | None:
+def upsert_source_author(
+    cur: Connection, queries: ThesesNormalizeQueries, person: dict
+) -> int | None:
     """Crée un `source_persons` theses uniquement quand un PPN (idref stable)
     est fourni. Sans PPN, retourne None : la `source_authorships` sera
     insérée avec `source_person_id=NULL` (cf. chantier source_persons).
@@ -292,7 +297,7 @@ def upsert_source_author(cur: Any, queries: ThesesNormalizeQueries, person: dict
 
 
 def process_persons(
-    cur: Any,
+    cur: Connection,
     queries: ThesesNormalizeQueries,
     these: dict,
     source_publication_id: int,
@@ -335,10 +340,10 @@ def process_persons(
 
 
 def process_work(
-    cur: Any,
+    cur: Connection,
     queries: ThesesNormalizeQueries,
-    logger: Any,
-    row: Any,
+    logger: logging.Logger,
+    row: Row[Any],
     *,
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
@@ -389,8 +394,8 @@ class ThesesNormalizer(SourceNormalizer):
 
     def __init__(
         self,
-        conn: Any,
-        logger: Any,
+        conn: Connection,
+        logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: ThesesNormalizeQueries,
         pub_repo_factory: Callable[[Any], PublicationRepository],
@@ -402,10 +407,10 @@ class ThesesNormalizer(SourceNormalizer):
         self._pub_repo: PublicationRepository | None = None
         self._address_linker = address_linker
 
-    def preload_caches(self, cur: Any) -> None:
+    def preload_caches(self, cur: Connection) -> None:
         self._pub_repo = self._pub_repo_factory(cur)
 
-    def process_work(self, cur: Any, row: Any) -> bool | None:
+    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
         assert self._pub_repo is not None
         return process_work(
             cur,
@@ -426,7 +431,7 @@ class ThesesNormalizer(SourceNormalizer):
         # violations sur les works suivants.
         self._address_linker.clear_cache()
 
-    def summary_stats(self, cur: Any) -> list[str]:
+    def summary_stats(self, cur: Connection) -> list[str]:
         return [
             f"  {table} (theses) : {self._queries.count_theses_table(cur, table)}"
             for table in ("source_publications", "source_persons", "source_authorships")

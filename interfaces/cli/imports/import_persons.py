@@ -20,7 +20,7 @@ import sys
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from application.persons import refresh_person_name_forms
 from domain.normalize import normalize_name
@@ -213,7 +213,7 @@ def read_file(filepath: str) -> list[dict]:
 
 
 def import_persons(
-    conn: Any, records: list[dict], dry_run: bool = False, export_date: str = None
+    conn: Connection, records: list[dict], dry_run: bool = False, export_date: str = None
 ) -> int:
     """Insère les personnes en base. Retourne le nombre d'insertions."""
     inserted = 0

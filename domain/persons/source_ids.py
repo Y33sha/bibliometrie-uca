@@ -7,8 +7,6 @@ d'identifiants (ORCID/IdHAL/IdRef) modélisent quant à eux les types
 canoniques de l'enregistrement consolidé côté ``person_identifiers``.
 """
 
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.persons.identifiers import IdHAL
@@ -25,7 +23,7 @@ class PersonSourceIds(BaseModel):
     Ici on a par exemple :
     - `hal_person_id` : entier interne HAL (>0 = compte confirmé)
     - `idhal` : login slug HAL (validé via VO IdHAL)
-    - `hal_form_id` : ID du formulaire HAL (structure interne)
+    - `hal_form_id` : ID de la forme de nom (chaîne de caractères)
 
     extra="allow" pour accepter d'autres clés que d'autres sources
     (ScanR, WoS, …) pourraient introduire à l'avenir.
@@ -39,7 +37,7 @@ class PersonSourceIds(BaseModel):
 
     @field_validator("idhal", mode="before")
     @classmethod
-    def _normalize_idhal(cls, v: Any) -> str | None:
+    def _normalize_idhal(cls, v: str | None) -> str | None:
         """Normalise via le VO IdHAL : trim, lowercase, validation du slug."""
         if v is None or v == "":
             return None

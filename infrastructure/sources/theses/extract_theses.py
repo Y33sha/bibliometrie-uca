@@ -27,7 +27,7 @@ import os
 import time
 from typing import Any
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import THESES_DELAY, THESES_PER_PAGE
@@ -110,7 +110,7 @@ def extract_doi(these: dict) -> str | None:
 
 def extract_ppn(
     ppn: str,
-    conn: Any,
+    conn: Connection,
     existing_ids: set,
     base_url: str,
     status: str | None = None,
@@ -226,7 +226,7 @@ class ThesesExtractor(SourceExtractor):
             help="Accepté pour cohérence CLI ; sans effet (theses.fr a un volume bas)",
         )
 
-    def load_config(self, conn: Any) -> dict[str, Any]:
+    def load_config(self, conn: Connection) -> dict[str, Any]:
         ppns = get_extraction_api_ids(conn, "theses")
         if not ppns:
             raise ExtractionConfigError(

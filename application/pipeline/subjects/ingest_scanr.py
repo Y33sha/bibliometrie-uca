@@ -9,6 +9,8 @@ Source format (cf normalize_scanr.py:176-190) :
 
 from typing import Any
 
+from sqlalchemy import Connection
+
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
 from domain.subject import ONTOLOGY_SCANR_DOMAIN
 
@@ -16,7 +18,7 @@ SOURCE = "scanr"
 
 
 def ingest(
-    conn: Any,
+    conn: Connection,
     *,
     publication_id: int,
     keywords: list[str] | None,

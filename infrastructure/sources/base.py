@@ -15,11 +15,13 @@ reste spécifique à chaque source — pas de template trop contraignant.
 from __future__ import annotations
 
 import argparse
+import logging
 import sys
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar
 
 import requests
+from sqlalchemy import Connection
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.sources.common import get_existing_ids
@@ -67,14 +69,14 @@ class SourceExtractor(ABC):
     SOURCE: ClassVar[str] = ""
     DESCRIPTION: ClassVar[str] = ""
 
-    def __init__(self, conn: Any, logger: Any) -> None:
+    def __init__(self, conn: Connection, logger: logging.Logger) -> None:
         self.conn = conn
         self.logger = logger
 
     # ── Hooks métier ────────────────────────────────────────────
 
     @abstractmethod
-    def load_config(self, conn: Any) -> dict[str, Any]:
+    def load_config(self, conn: Connection) -> dict[str, Any]:
         """Charge la config DB (URL, auth, affiliations, années, etc.)."""
 
     @abstractmethod
@@ -141,7 +143,7 @@ class SourceExtractor(ABC):
             self.conn.close()
 
 
-def run_extractor(cls: type[SourceExtractor], logger: Any) -> None:
+def run_extractor(cls: type[SourceExtractor], logger: logging.Logger) -> None:
     """Helper pour les entry points : instancie et lance."""
     conn = get_sync_engine().connect()
     cls(conn, logger).run()

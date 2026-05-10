@@ -1,5 +1,6 @@
 # Chantier — Convergence sync/async (suppression de la duplication)
 Commencé le 2026-05-08
+Terminé le 2026-05-09
 
 ## Contexte
 

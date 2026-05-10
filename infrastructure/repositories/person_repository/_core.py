@@ -1,8 +1,6 @@
 """SQL d'écriture sur `persons`, `distinct_persons`, et la fusion."""
 
-from typing import Any
-
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from domain.errors import NotFoundError
 from domain.names import compute_person_name_forms
@@ -10,7 +8,7 @@ from domain.normalize import normalize_name
 from infrastructure.repositories.person_repository import _name_forms
 
 
-def create(conn: Any, last_name: str, first_name: str = "") -> int:
+def create(conn: Connection, last_name: str, first_name: str = "") -> int:
     return conn.execute(
         text(
             "INSERT INTO persons (last_name, first_name, "
@@ -26,7 +24,7 @@ def create(conn: Any, last_name: str, first_name: str = "") -> int:
     ).scalar_one()
 
 
-def update_name(conn: Any, person_id: int, last_name: str, first_name: str) -> None:
+def update_name(conn: Connection, person_id: int, last_name: str, first_name: str) -> None:
     if (
         conn.execute(text("SELECT id FROM persons WHERE id = :id"), {"id": person_id}).first()
         is None
@@ -48,7 +46,7 @@ def update_name(conn: Any, person_id: int, last_name: str, first_name: str) -> N
     )
 
 
-def set_rejected(conn: Any, person_id: int, rejected: bool) -> None:
+def set_rejected(conn: Connection, person_id: int, rejected: bool) -> None:
     result = conn.execute(
         text("UPDATE persons SET rejected = :r, updated_at = now() WHERE id = :id"),
         {"r": rejected, "id": person_id},
@@ -57,7 +55,7 @@ def set_rejected(conn: Any, person_id: int, rejected: bool) -> None:
         raise NotFoundError(f"Personne {person_id} introuvable")
 
 
-def has_distinct_rh(conn: Any, id_a: int, id_b: int) -> bool:
+def has_distinct_rh(conn: Connection, id_a: int, id_b: int) -> bool:
     return (
         conn.execute(
             text("SELECT COUNT(*) AS n FROM persons_rh WHERE person_id IN (:a, :b)"),
@@ -67,7 +65,7 @@ def has_distinct_rh(conn: Any, id_a: int, id_b: int) -> bool:
     )
 
 
-def merge_into(conn: Any, target_id: int, source_id: int) -> None:
+def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     """Fusionne `source_id` dans `target_id`.
 
     Séquence complète en une transaction :
@@ -150,7 +148,7 @@ def merge_into(conn: Any, target_id: int, source_id: int) -> None:
     conn.execute(text("DELETE FROM persons WHERE id = :id"), {"id": source_id})
 
 
-def mark_distinct(conn: Any, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
+def mark_distinct(conn: Connection, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
     """Marque deux personnes comme distinctes (idempotent). Retourne (a, b)
     triés si la paire vient d'être insérée, None si elle existait déjà."""
     row = conn.execute(

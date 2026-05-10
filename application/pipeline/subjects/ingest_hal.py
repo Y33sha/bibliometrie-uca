@@ -13,6 +13,8 @@ Source format (cf normalize_hal.py:228-235) :
 
 from typing import Any
 
+from sqlalchemy import Connection
+
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
 from domain.hal_domains import hal_domain_label
 from domain.subject import ONTOLOGY_HAL_DOMAIN
@@ -34,7 +36,7 @@ def _strip_level_prefix(raw: str) -> str:
 
 
 def ingest(
-    conn: Any,
+    conn: Connection,
     *,
     publication_id: int,
     keywords: list[str] | None,

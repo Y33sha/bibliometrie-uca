@@ -5,15 +5,17 @@ Implémenté par `infrastructure.db.queries.normalize_openalex.PgOpenalexNormali
 
 from typing import Any, Protocol
 
+from sqlalchemy import Connection
+
 
 class OpenalexNormalizeQueries(Protocol):
     """Opérations SQL du normaliseur OpenAlex."""
 
-    def fetch_publication_id_for_hal_source(self, conn: Any, hal_id: str) -> int | None: ...
+    def fetch_publication_id_for_hal_source(self, conn: Connection, hal_id: str) -> int | None: ...
 
     def upsert_openalex_source_publication(
         self,
-        conn: Any,
+        conn: Connection,
         *,
         openalex_id: str,
         doi: str | None,
@@ -36,11 +38,11 @@ class OpenalexNormalizeQueries(Protocol):
         topics_json: Any,
     ) -> int: ...
 
-    def find_openalex_source_structure(self, conn: Any, openalex_id: str) -> int | None: ...
+    def find_openalex_source_structure(self, conn: Connection, openalex_id: str) -> int | None: ...
 
     def upsert_openalex_source_structure(
         self,
-        conn: Any,
+        conn: Connection,
         *,
         openalex_id: str,
         name: str,
@@ -51,7 +53,7 @@ class OpenalexNormalizeQueries(Protocol):
 
     def upsert_openalex_source_authorship(
         self,
-        conn: Any,
+        conn: Connection,
         *,
         source_publication_id: int,
         source_person_id: int | None,
@@ -62,12 +64,12 @@ class OpenalexNormalizeQueries(Protocol):
         identifiers: Any,
     ) -> int: ...
 
-    def staging_has_openalex_doi(self, conn: Any, doi: str) -> bool: ...
+    def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool: ...
 
-    def get_openalex_publication_id(self, conn: Any, openalex_id: str) -> int | None: ...
+    def get_openalex_publication_id(self, conn: Connection, openalex_id: str) -> int | None: ...
 
-    def count_openalex_table(self, conn: Any, table: str) -> int: ...
+    def count_openalex_table(self, conn: Connection, table: str) -> int: ...
 
     def clear_source_authorships_for_publication(
-        self, conn: Any, source_publication_id: int
+        self, conn: Connection, source_publication_id: int
     ) -> None: ...

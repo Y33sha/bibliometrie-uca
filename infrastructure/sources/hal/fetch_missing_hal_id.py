@@ -27,7 +27,7 @@ import os
 from typing import Any
 
 import httpx
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.publication import extract_hal_id_from_url
@@ -80,7 +80,7 @@ log = setup_logger("fetch_missing_hal_id", os.path.join(os.path.dirname(__file__
 HAL_MAX_CONCURRENT = 5
 
 
-def find_hal_primary_locations(conn: Any) -> list[dict]:
+def find_hal_primary_locations(conn: Connection) -> list[dict]:
     """
     Trouve les HAL IDs référencés par OpenAlex mais absents de staging_hal.
 
@@ -156,7 +156,7 @@ def find_hal_primary_locations(conn: Any) -> list[dict]:
     return [r for hal_id, r in results.items() if hal_id not in already_staged]
 
 
-def find_hal_ids_from_scanr(conn: Any) -> list[dict]:
+def find_hal_ids_from_scanr(conn: Connection) -> list[dict]:
     """
     Trouve les HAL IDs référencés par ScanR mais absents de staging HAL.
 
@@ -216,7 +216,7 @@ def find_hal_ids_from_scanr(conn: Any) -> list[dict]:
     return list(results.values())
 
 
-def find_nnt_without_hal(conn: Any) -> list[dict]:
+def find_nnt_without_hal(conn: Connection) -> list[dict]:
     """
     Trouve les NNT (thèses soutenues) qui n'ont pas de document HAL associé.
     Recherche via source_publications.external_ids->>'nnt' pour les publications
@@ -303,7 +303,7 @@ async def fetch_hal_document(
     return docs[0]
 
 
-def insert_staging_hal(conn: Any, hal_id: str, doi: str | None, doc: dict) -> Any:
+def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict) -> Any:
     """Insere un document dans staging HAL avec ses collections.
     Si le document existe et a change (hash different), met a jour et remet processed = FALSE.
     """
@@ -322,7 +322,7 @@ def insert_staging_hal(conn: Any, hal_id: str, doi: str | None, doc: dict) -> An
     )
 
 
-def _insert_halid_result(conn: Any, hal_id: str, doc: dict | None) -> bool:
+def _insert_halid_result(conn: Connection, hal_id: str, doc: dict | None) -> bool:
     """Insère le résultat d'un fetch par halId. Retourne True si trouvé."""
     if doc:
         doi_str = doc.get("doiId_s")
@@ -335,7 +335,7 @@ def _insert_halid_result(conn: Any, hal_id: str, doc: dict | None) -> bool:
     return False
 
 
-def _insert_nnt_result(conn: Any, nnt: str, doc: dict | None) -> tuple[bool, bool]:
+def _insert_nnt_result(conn: Connection, nnt: str, doc: dict | None) -> tuple[bool, bool]:
     """Insère le résultat d'un fetch par NNT. Retourne (api_found, inserted)."""
     if not doc:
         return (False, False)
@@ -356,7 +356,9 @@ def _insert_nnt_result(conn: Any, nnt: str, doc: dict | None) -> tuple[bool, boo
     return (True, True)
 
 
-async def _fetch_by_halid_async(refs: list[dict], conn: Any, base_url: str) -> tuple[int, int]:
+async def _fetch_by_halid_async(
+    refs: list[dict], conn: Connection, base_url: str
+) -> tuple[int, int]:
     """Fetch en parallèle par halId. Retourne (fetched, not_found)."""
     sem = asyncio.Semaphore(HAL_MAX_CONCURRENT)
     db_lock = asyncio.Lock()
@@ -389,7 +391,7 @@ async def _fetch_by_halid_async(refs: list[dict], conn: Any, base_url: str) -> t
     return progress["fetched"], progress["not_found"]
 
 
-async def _fetch_by_nnt_async(refs: list[dict], conn: Any, base_url: str) -> tuple[int, int]:
+async def _fetch_by_nnt_async(refs: list[dict], conn: Connection, base_url: str) -> tuple[int, int]:
     """Fetch en parallèle par NNT. Retourne (fetched, not_found)."""
     sem = asyncio.Semaphore(HAL_MAX_CONCURRENT)
     db_lock = asyncio.Lock()

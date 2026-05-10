@@ -17,10 +17,9 @@ from __future__ import annotations
 
 import urllib.parse
 from collections.abc import Iterable
-from typing import Any
 
 import httpx
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_retry_async import http_request_with_retry_async
@@ -60,7 +59,7 @@ class CrossrefFetchMissingDoiAdapter:
     base_url: str
     headers: dict[str, str]
 
-    def configure(self, conn: Any) -> None:
+    def configure(self, conn: Connection) -> None:
         self.base_url = get_api_base_urls(conn).get("crossref", "https://api.crossref.org")
         email = get_crossref_email(conn)
         self.headers = {"User-Agent": _USER_AGENT_TEMPLATE.format(email=email)}
@@ -93,7 +92,7 @@ class CrossrefFetchMissingDoiAdapter:
             return []
         return [message]
 
-    def insert(self, conn: Any, record: dict) -> bool:
+    def insert(self, conn: Connection, record: dict) -> bool:
         # DOI = identifiant CrossRef. On normalise en lowercase pour
         # rester cohérent avec les autres sources qui font de même.
         doi_raw = record.get("DOI", "")

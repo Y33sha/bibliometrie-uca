@@ -10,10 +10,9 @@ sémaphore.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
 
 import httpx
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_retry_async import http_request_with_retry_async
@@ -49,7 +48,7 @@ class OpenalexFetchMissingDoiAdapter:
 
     base_url: str
 
-    def configure(self, conn: Any) -> None:
+    def configure(self, conn: Connection) -> None:
         init_auth(api_key=get_openalex_api_key(conn), email=get_openalex_email(conn))
         self.base_url = get_api_base_urls(conn)["openalex"]
 
@@ -73,7 +72,7 @@ class OpenalexFetchMissingDoiAdapter:
             return []
         return data.get("results", [])[:1]
 
-    def insert(self, conn: Any, record: dict) -> bool:
+    def insert(self, conn: Connection, record: dict) -> bool:
         result = conn.execute(
             _INSERT_OA_SQL,
             {

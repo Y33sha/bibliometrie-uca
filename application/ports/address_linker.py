@@ -6,7 +6,9 @@ Chaque adapter porte son propre cache d'adresses (raw_text → id) pour
 éviter les lookups répétés dans un même run.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
+
+from sqlalchemy import Connection
 
 
 class AddressLinker(Protocol):
@@ -14,7 +16,7 @@ class AddressLinker(Protocol):
 
     def link(
         self,
-        cur: Any,
+        cur: Connection,
         authorship_id: int,
         addr_texts: list[str],
         countries: list[str] | None = None,

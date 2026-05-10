@@ -1,14 +1,12 @@
 """SQL pour `person_identifiers` (ORCID, idHAL, IdRef...)."""
 
-from typing import Any
-
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from domain.errors import NotFoundError
 
 
 def add_identifier(
-    conn: Any,
+    conn: Connection,
     person_id: int,
     id_type: str,
     id_value: str,
@@ -48,7 +46,7 @@ def add_identifier(
         )
 
 
-def remove_identifier(conn: Any, person_id: int, id_type: str, id_value: str) -> None:
+def remove_identifier(conn: Connection, person_id: int, id_type: str, id_value: str) -> None:
     result = conn.execute(
         text(
             "DELETE FROM person_identifiers "
@@ -60,7 +58,7 @@ def remove_identifier(conn: Any, person_id: int, id_type: str, id_value: str) ->
         raise NotFoundError("Identifiant introuvable")
 
 
-def update_identifier_status(conn: Any, ident_id: int, status: str) -> dict:
+def update_identifier_status(conn: Connection, ident_id: int, status: str) -> dict:
     """Change le statut d'un identifiant. Retourne {id, status, person_id}."""
     row = conn.execute(
         text(
@@ -74,7 +72,7 @@ def update_identifier_status(conn: Any, ident_id: int, status: str) -> dict:
     return dict(row._mapping)
 
 
-def reassign_identifier(conn: Any, ident_id: int, target_person_id: int) -> None:
+def reassign_identifier(conn: Connection, ident_id: int, target_person_id: int) -> None:
     """Réattribue un identifiant à une autre personne (statut → pending)."""
     result = conn.execute(
         text(

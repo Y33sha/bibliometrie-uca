@@ -10,8 +10,6 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 (UNIQUE(source, source_id)), les authorships utilisent `source_person_id`.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection
 
 from application.audit import emit_event
@@ -50,7 +48,9 @@ __all__ = [
 # ── Création / mise à jour personne ──
 
 
-def create_person(cur: Any, last_name: str, first_name: str = "", *, repo: PersonRepository) -> int:
+def create_person(
+    cur: Connection, last_name: str, first_name: str = "", *, repo: PersonRepository
+) -> int:
     """Crée une personne et retourne son id."""
     person_id = repo.create(last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
@@ -93,7 +93,7 @@ def update_name(
 
 
 def link_authorship(
-    cur: Any,
+    cur: Connection,
     person_id: int,
     source: str,
     authorship_id: int,
@@ -119,7 +119,7 @@ def link_authorship(
 
 
 def link_authorships(
-    cur: Any, person_id: int, authorships: list[dict], *, repo: PersonRepository
+    cur: Connection, person_id: int, authorships: list[dict], *, repo: PersonRepository
 ) -> None:
     """Rattache un groupe d'authorships à une personne (pipeline).
 
@@ -139,7 +139,7 @@ def link_authorships(
 
 
 def unlink_authorship(
-    cur: Any, person_id: int, source: str, authorship_id: int, *, repo: PersonRepository
+    cur: Connection, person_id: int, source: str, authorship_id: int, *, repo: PersonRepository
 ) -> None:
     """Détache une authorship source d'une personne (met person_id à NULL)."""
     if source in ALL_SOURCES_SET:
@@ -150,7 +150,7 @@ def unlink_authorship(
 
 
 def add_identifier(
-    cur: Any,
+    cur: Connection,
     person_id: int,
     id_type: str,
     id_value: str,
@@ -238,7 +238,7 @@ def reassign_identifier(
 
 
 def add_identifiers_from_authorships(
-    cur: Any, person_id: int, authorships: list[dict], *, repo: PersonRepository
+    cur: Connection, person_id: int, authorships: list[dict], *, repo: PersonRepository
 ) -> None:
     """Ajoute les ORCID, idHAL et IdRef trouvés dans un groupe d'authorships.
 
@@ -262,7 +262,7 @@ def add_identifiers_from_authorships(
 
 
 def refresh_person_name_forms(
-    cur: Any,
+    cur: Connection,
     person_id: int,
     last_name: str,
     first_name: str,
@@ -278,7 +278,7 @@ def refresh_person_name_forms(
 
 
 def add_name_form(
-    cur: Any,
+    cur: Connection,
     person_id: int,
     full_name: str,
     source: str | None = None,
@@ -383,7 +383,7 @@ def detach_authorships(
 
 
 def mark_distinct(
-    conn: Any,
+    conn: Connection,
     person_id_a: int,
     person_id_b: int,
     *,
@@ -408,7 +408,7 @@ def mark_distinct(
 
 
 def merge_person(
-    cur: Any,
+    cur: Connection,
     target_id: int,
     source_id: int,
     *,

@@ -513,7 +513,6 @@ Reste pour clore le chantier :
   vers Alembic.
 - [ ] Décider : adopter Alembic (auto-génération des diffs MetaData)
   ou conserver `migrate.py` actuel.
-- [ ] Si adoption : créer un chantier dédié (`docs/chantiers/`).
 
 ## Alembic — porte ouverte
 

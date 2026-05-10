@@ -10,6 +10,8 @@ Source format (cf normalize_theses.py:267-280) :
 
 from typing import Any
 
+from sqlalchemy import Connection
+
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
 from domain.subject import ONTOLOGY_RAMEAU, ONTOLOGY_THESES_DISCIPLINE
 
@@ -17,7 +19,7 @@ SOURCE = "theses"
 
 
 def ingest(
-    conn: Any,
+    conn: Connection,
     *,
     publication_id: int,
     keywords: list[str] | None,

@@ -174,17 +174,19 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
 # HAL fait la distinction via ses combinaisons type_sous-type
 # ("art_artrev" → "review", "art_bookreview" → "book_review", etc.).
 # Cette logique d'arbitrage vit dans `application.publications._first_doc_type`.
-ARTICLE_SUBTYPES: frozenset[str] = frozenset({
-    "review",
-    "book_review",
-    "data_paper",
-    "poster",
-    "conference_paper",
-    "editorial",
-    "letter",
-    "erratum",
-    "retraction",
-})
+ARTICLE_SUBTYPES: frozenset[str] = frozenset(
+    {
+        "review",
+        "book_review",
+        "data_paper",
+        "poster",
+        "conference_paper",
+        "editorial",
+        "letter",
+        "erratum",
+        "retraction",
+    }
+)
 
 # Valeurs valides de l'enum doc_type (pour le fallback identity)
 _VALID_DOC_TYPES = {

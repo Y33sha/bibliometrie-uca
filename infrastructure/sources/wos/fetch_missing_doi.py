@@ -19,10 +19,9 @@ import asyncio
 import logging
 import re
 from collections.abc import Iterable
-from typing import Any
 
 import httpx
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.api_limits import WOS_DELAY, WOS_PER_PAGE
@@ -97,7 +96,7 @@ class WosFetchMissingDoiAdapter:
     base_url: str
     headers: dict[str, str]
 
-    def configure(self, conn: Any) -> None:
+    def configure(self, conn: Connection) -> None:
         self.base_url = get_api_base_urls(conn).get("wos", "https://api.clarivate.com/api/wos")
         self.headers = {"X-ApiKey": get_wos_api_key(conn), "Accept": "application/json"}
 
@@ -165,7 +164,7 @@ class WosFetchMissingDoiAdapter:
 
         return records
 
-    def insert(self, conn: Any, record: dict) -> bool:
+    def insert(self, conn: Connection, record: dict) -> bool:
         result = conn.execute(
             _INSERT_WOS_SQL,
             {

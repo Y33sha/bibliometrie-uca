@@ -11,13 +11,15 @@ d'entrée CLI (argparse + connexion + instanciation de l'adapter) est
 dans `interfaces/cli/pipeline/refresh_publication_countries.py`.
 """
 
+import logging
 import time
-from typing import Any
+
+from sqlalchemy import Connection
 
 from application.ports.countries import CountryQueries
 
 
-def refresh(conn: Any, queries: CountryQueries, logger: Any) -> int:
+def refresh(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> int:
     t0 = time.perf_counter()
 
     hal_updated = queries.refresh_hal_source_countries(conn)

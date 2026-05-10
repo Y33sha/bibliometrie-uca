@@ -18,7 +18,7 @@ from infrastructure.perimeter import (
 class PgPerimeterQueries:
     """Adapter PostgreSQL pour `application.ports.perimeter.PerimeterQueries`."""
 
-    def get_persons_structure_ids_list(self, cur: Any) -> list[int]:
+    def get_persons_structure_ids_list(self, cur: Connection) -> list[int]:
         return get_persons_structure_ids_list(cur)
 
 
