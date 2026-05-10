@@ -1,83 +1,72 @@
 """Tests de caractérisation pour `infrastructure.addresses.PgAddressLinker`."""
 
+from sqlalchemy import text
+
 from infrastructure.addresses import PgAddressLinker
 
 
-def _create_authorship_stub(db):
+def _create_authorship_stub(conn):
     """Crée une publication + source_publication + source_authorship minimaux
     pour pouvoir rattacher une adresse. Retourne source_authorship_id."""
-    db.execute(
-        """
-        INSERT INTO publications (title, title_normalized, pub_year, doc_type)
-        VALUES ('X', 'x', 2024, 'article') RETURNING id
-        """
-    )
-    pub_id = db.fetchone()["id"]
-    db.execute(
-        """
-        INSERT INTO source_publications (source, source_id, title, pub_year, publication_id)
-        VALUES ('hal', 'hal-X', 'X', 2024, %s) RETURNING id
-        """,
-        (pub_id,),
-    )
-    sd_id = db.fetchone()["id"]
-    db.execute(
-        """
-        INSERT INTO source_persons (source, source_id, full_name)
-        VALUES ('hal', 'sp-X', 'Durand') RETURNING id
-        """
-    )
-    sp_id = db.fetchone()["id"]
-    db.execute(
-        """
-        INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position)
-        VALUES ('hal', %s, %s, 0) RETURNING id
-        """,
-        (sd_id, sp_id),
-    )
-    return db.fetchone()["id"]
+    pub_id = conn.execute(
+        text("""
+            INSERT INTO publications (title, title_normalized, pub_year, doc_type)
+            VALUES ('X', 'x', 2024, 'article') RETURNING id
+        """)
+    ).scalar_one()
+    sd_id = conn.execute(
+        text("""
+            INSERT INTO source_publications (source, source_id, title, pub_year, publication_id)
+            VALUES ('hal', 'hal-X', 'X', 2024, :pub_id) RETURNING id
+        """),
+        {"pub_id": pub_id},
+    ).scalar_one()
+    sp_id = conn.execute(
+        text("""
+            INSERT INTO source_persons (source, source_id, full_name)
+            VALUES ('hal', 'sp-X', 'Durand') RETURNING id
+        """)
+    ).scalar_one()
+    return conn.execute(
+        text("""
+            INSERT INTO source_authorships
+                (source, source_publication_id, source_person_id, author_position)
+            VALUES ('hal', :sd_id, :sp_id, 0) RETURNING id
+        """),
+        {"sd_id": sd_id, "sp_id": sp_id},
+    ).scalar_one()
 
 
-class TestLinkAddressesDictCursor:
-    """Garantit que link() fonctionne avec un curseur dict_row, y compris
-    sur le chemin fallback (SELECT après ON CONFLICT DO NOTHING).
-
-    Régression d'un bug : `row[0]` sur une row dict lève KeyError.
+class TestLinkAddresses:
+    """Garantit que link() fonctionne, y compris sur le chemin fallback
+    (SELECT après ON CONFLICT DO NOTHING).
     """
 
-    def test_reuses_existing_address_via_fallback_path(self, db):
+    def test_reuses_existing_address_via_fallback_path(self, sa_sync_conn):
         """Si l'adresse existe déjà, la branche fallback est exercée :
         ON CONFLICT DO NOTHING ne retourne rien, donc SELECT par md5
-        doit pouvoir lire l'id même sur un curseur dict_row."""
-        sa_id = _create_authorship_stub(db)
+        doit pouvoir lire l'id."""
+        sa_id = _create_authorship_stub(sa_sync_conn)
 
         # Pré-insérer l'adresse pour forcer ON CONFLICT DO NOTHING
-        db.execute(
-            """
-            INSERT INTO addresses (raw_text, normalized_text)
-            VALUES (%s, %s) RETURNING id
-            """,
-            ("Université Clermont Auvergne", "universite clermont auvergne"),
-        )
-        existing_id = db.fetchone()["id"]
+        existing_id = sa_sync_conn.execute(
+            text("""
+                INSERT INTO addresses (raw_text, normalized_text)
+                VALUES (:raw, :norm) RETURNING id
+            """),
+            {"raw": "Université Clermont Auvergne", "norm": "universite clermont auvergne"},
+        ).scalar_one()
 
-        # Utiliser un curseur dict_row comme en pipeline openalex/scanr
-        dict_cur = db.connection.cursor()
-        try:
-            linker = PgAddressLinker()
-            links = linker.link(dict_cur, sa_id, ["Université Clermont Auvergne"])
-            assert links == 1
+        linker = PgAddressLinker()
+        links = linker.link(sa_sync_conn, sa_id, ["Université Clermont Auvergne"])
+        assert links == 1
 
-            # Vérifier que le lien pointe bien sur l'adresse pré-existante
-            db.execute(
-                """
+        # Vérifier que le lien pointe bien sur l'adresse pré-existante
+        addr_id = sa_sync_conn.execute(
+            text("""
                 SELECT address_id FROM source_authorship_addresses
-                WHERE source_authorship_id = %s
-                """,
-                (sa_id,),
-            )
-            row = db.fetchone()
-            assert row["address_id"] == existing_id
-        finally:
-            dict_cur.close()
+                WHERE source_authorship_id = :sa_id
+            """),
+            {"sa_id": sa_id},
+        ).scalar_one()
+        assert addr_id == existing_id

@@ -446,7 +446,7 @@ def _run_normalize_hal() -> None:
     from application.pipeline.normalize.normalize_hal import HalNormalizer
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.app_config import get_api_base_urls
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -458,9 +458,10 @@ def _run_normalize_hal() -> None:
 
     log.info("▶ normalize_hal")
     t0 = time.time()
-    conn = get_connection()
-    with conn.cursor() as cur:
-        zenodo_api = get_api_base_urls(cur)["zenodo"]
+    engine = get_sync_engine()
+    with engine.connect() as bootstrap:
+        zenodo_api = get_api_base_urls(bootstrap)["zenodo"]
+    conn = engine.connect()
     HalNormalizer(
         conn,
         log,
@@ -477,7 +478,7 @@ def _run_normalize_hal() -> None:
 
 def _run_normalize_wos() -> None:
     from application.pipeline.normalize.normalize_wos import WosNormalizer
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -488,7 +489,7 @@ def _run_normalize_wos() -> None:
 
     log.info("▶ normalize_wos")
     t0 = time.time()
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     WosNormalizer(
         conn,
         log,
@@ -505,7 +506,7 @@ def _run_normalize_openalex() -> None:
     from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.app_config import get_api_base_urls
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -517,9 +518,10 @@ def _run_normalize_openalex() -> None:
 
     log.info("▶ normalize_openalex")
     t0 = time.time()
-    conn = get_connection()
-    with conn.cursor() as cur:
-        zenodo_api = get_api_base_urls(cur)["zenodo"]
+    engine = get_sync_engine()
+    with engine.connect() as bootstrap:
+        zenodo_api = get_api_base_urls(bootstrap)["zenodo"]
+    conn = engine.connect()
     OpenalexNormalizer(
         conn,
         log,
@@ -537,7 +539,7 @@ def _run_normalize_openalex() -> None:
 def _run_normalize_scanr() -> None:
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
     from infrastructure.addresses import PgAddressLinker
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -548,7 +550,7 @@ def _run_normalize_scanr() -> None:
 
     log.info("▶ normalize_scanr")
     t0 = time.time()
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     ScanrNormalizer(
         conn,
         log,
@@ -565,14 +567,14 @@ def _run_normalize_scanr() -> None:
 def _run_normalize_theses() -> None:
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
     from infrastructure.addresses import PgAddressLinker
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.normalize_theses import PgThesesNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ normalize_theses")
     t0 = time.time()
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     ThesesNormalizer(
         conn,
         log,
@@ -586,7 +588,7 @@ def _run_normalize_theses() -> None:
 
 def _run_normalize_crossref() -> None:
     from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
-    from infrastructure.db.connection import get_connection
+    from infrastructure.db.engine import get_sync_engine
     from infrastructure.db.queries.normalize_crossref import PgCrossrefNormalizeQueries
     from infrastructure.db.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -597,7 +599,7 @@ def _run_normalize_crossref() -> None:
 
     log.info("▶ normalize_crossref")
     t0 = time.time()
-    conn = get_connection()
+    conn = get_sync_engine().connect()
     CrossrefNormalizer(
         conn,
         log,
