@@ -34,7 +34,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def parse_date(val: Any) -> str | None:
+def parse_date(val: object) -> str | None:
     """Parse une date depuis différents formats possibles."""
     if not val or str(val).strip() == "":
         return None
@@ -119,7 +119,7 @@ def resolve_columns(headers: list[str]) -> dict[str, int]:
     return mapping
 
 
-def read_csv_tsv(filepath: str) -> list[dict]:
+def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
     """Lit un fichier CSV ou TSV et retourne une liste de dicts."""
     with open(filepath, encoding="utf-8-sig") as f:
         sample = f.read(4096)
@@ -162,7 +162,7 @@ def read_csv_tsv(filepath: str) -> list[dict]:
         return rows
 
 
-def read_excel(filepath: str) -> list[dict]:
+def read_excel(filepath: str) -> list[dict[str, Any]]:
     """Lit un fichier Excel (.xlsx/.xls)."""
     try:
         import openpyxl
@@ -198,7 +198,7 @@ def read_excel(filepath: str) -> list[dict]:
     return rows
 
 
-def read_file(filepath: str) -> list[dict]:
+def read_file(filepath: str) -> list[dict[str, Any]]:
     """Lit un fichier selon son extension."""
     ext = os.path.splitext(filepath)[1].lower()
     if ext in (".xlsx", ".xls"):
@@ -213,7 +213,10 @@ def read_file(filepath: str) -> list[dict]:
 
 
 def import_persons(
-    conn: Connection, records: list[dict], dry_run: bool = False, export_date: str = None
+    conn: Connection,
+    records: list[dict[str, Any]],
+    dry_run: bool = False,
+    export_date: str | None = None,
 ) -> int:
     """Insère les personnes en base. Retourne le nombre d'insertions."""
     inserted = 0

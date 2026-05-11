@@ -21,7 +21,7 @@ Usage:
 import argparse
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Row, text
 
 from application.persons import merge_person
 from infrastructure.db.engine import get_sync_engine
@@ -74,7 +74,7 @@ ORDER BY nc.id_a, nc.id_b
 do_merge = merge_person
 
 
-def choose_target(pair: Any) -> Any:
+def choose_target(pair: Row[Any]) -> tuple[int, int] | None:
     """Choisit le target (à garder) et le source (à absorber).
     Retourne (target_id, source_id) ou None si prompt nécessaire.
     """

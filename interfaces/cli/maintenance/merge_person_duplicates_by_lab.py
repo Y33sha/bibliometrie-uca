@@ -39,7 +39,7 @@ COLORS = {
 }
 
 
-def c(text: Any, *styles: Any) -> Any:
+def c(text: object, *styles: str) -> str:
     prefix = "".join(COLORS.get(s, "") for s in styles)
     return f"{prefix}{text}{COLORS['reset']}"
 
@@ -61,7 +61,7 @@ LAB_PERSONS_CTE = """
 """
 
 
-def get_labs_with_duplicates(conn: Connection) -> Any:
+def get_labs_with_duplicates(conn: Connection) -> list[dict[str, Any]]:
     """Retourne les labos ayant des personnes homonymes."""
     rows = conn.execute(
         text(
@@ -82,7 +82,7 @@ def get_labs_with_duplicates(conn: Connection) -> Any:
     return [dict(r._mapping) for r in rows]
 
 
-def get_swapped_name_duplicates(conn: Connection, lab_id: Any) -> Any:
+def get_swapped_name_duplicates(conn: Connection, lab_id: int) -> list[dict[str, Any]]:
     """Retourne les paires (personne A, personne B) dans un labo
     où nom_A = prénom_B et prénom_A = nom_B (interversion nom/prénom)."""
     rows = conn.execute(
@@ -108,7 +108,7 @@ def get_swapped_name_duplicates(conn: Connection, lab_id: Any) -> Any:
     return [dict(r._mapping) for r in rows]
 
 
-def get_labs_with_swaps(conn: Connection) -> Any:
+def get_labs_with_swaps(conn: Connection) -> dict[int, str]:
     """Retourne les labos ayant des interversions nom/prénom."""
     rows = conn.execute(
         text(
@@ -131,7 +131,7 @@ def get_labs_with_swaps(conn: Connection) -> Any:
     return {row.lab_id: row.lab_name for row in rows}
 
 
-def get_person_details(conn: Connection, person_ids: Any) -> Any:
+def get_person_details(conn: Connection, person_ids: list[int]) -> list[dict[str, Any]]:
     """Récupère les détails des personnes pour affichage."""
     rows = conn.execute(
         text(
@@ -169,7 +169,7 @@ def get_person_details(conn: Connection, person_ids: Any) -> Any:
     return [dict(r._mapping) for r in rows]
 
 
-def pick_target(persons: Any) -> Any:
+def pick_target(persons: list[dict[str, Any]]) -> dict[str, Any]:
     """Choisit la personne cible : RH d'abord, puis max publications."""
     # Le tri SQL met déjà la meilleure en premier
     return persons[0]
@@ -178,7 +178,7 @@ def pick_target(persons: Any) -> Any:
 do_merge = merge_person
 
 
-def display_person(p: Any, is_target: Any = False) -> Any:
+def display_person(p: dict[str, Any], is_target: bool = False) -> None:
     """Affiche une ligne pour une personne."""
     marker = c(" ← CIBLE", "green", "bold") if is_target else ""
     rh = c(" [RH]", "cyan") if p["has_rh"] else ""
@@ -196,7 +196,7 @@ def display_person(p: Any, is_target: Any = False) -> Any:
     )
 
 
-def run(dry_run: Any = False) -> Any:
+def run(dry_run: bool = False) -> None:
     conn = get_sync_engine().connect()
 
     rows = get_labs_with_duplicates(conn)
