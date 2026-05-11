@@ -57,7 +57,7 @@ docker compose exec db bash -c 'pg_restore -U "$POSTGRES_USER" -d bibliometrie -
 Ou créer une base vide (le pipeline applique toutes les migrations) :
 
 ```bash
-docker compose exec backend python -m infrastructure.db.migrate
+docker compose exec backend alembic upgrade head
 ```
 
 ### 4. Pipeline
@@ -87,14 +87,14 @@ docker compose exec backend bash   # Shell dans le conteneur backend
 
 ```bash
 createdb bibliometrie
-python -m infrastructure.db.migrate     # applique toutes les migrations
+alembic upgrade head     # applique toutes les migrations
 ```
 
 `schema.sql` est un snapshot descriptif (utile pour relire la
 structure d'un coup d'œil), pas la source de vérité — la vérité, ce
-sont les migrations dans `infrastructure/db/migrations/`. Pour
+sont les migrations Alembic dans `alembic/versions/`. Pour
 rafraîchir le snapshot après une série de migrations :
-`python -m infrastructure.db.migrate --dump-schema`.
+`python -m infrastructure.db.dump_schema`.
 
 Deux options pour initialiser les données :
 
@@ -198,7 +198,7 @@ bibliometrie-uca/
 ├── application/         Services métier, orchestrateurs
 │   └── pipeline/        Phases du pipeline (normalize, build, enrich, …)
 ├── infrastructure/      Adapters sortants (SQL, API sources, settings)
-│   ├── db/              Schéma SQL, migrations, query services
+│   ├── db/              Schéma SQL, MetaData SA, query services
 │   ├── sources/         Extracteurs API (hal, openalex, wos, scanr, theses)
 │   └── repositories/    Adapters PostgreSQL pour les ports domain/
 ├── interfaces/          Adapters entrants

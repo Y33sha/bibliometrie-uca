@@ -86,13 +86,14 @@ table `schema_migrations`) par Alembic, et bénéficier de
 
 ## Phase 6 — Documentation
 
-- [ ] `CLAUDE.md` : nouveau workflow (`alembic upgrade head`,
+- [x] `CLAUDE.md` : nouveau workflow (`alembic upgrade head`,
   `alembic revision --autogenerate -m "..."`, `dump_schema`)
-- [ ] `README.md`, `CONTRIBUTING.md`, `docs/architecture.md`,
-  `docs/exploitation.md` : remplacer les références à `migrate.py`
-- [ ] Cocher la Phase 5 de `sqlalchemy-core-adoption.md` et renvoyer
-  vers cette fiche
-- [ ] Mini-doc workflow Alembic (créer / appliquer / rollback / dump)
+- [x] `README.md`, `CONTRIBUTING.md`, `docs/architecture.md`,
+  `docs/exploitation.md` : références à `migrate.py` remplacées
+- [x] Phase 5 de `2026-05-11_sqlalchemy-core-adoption.md` déléguée
+  à cette fiche (déjà fait par l'utilisatrice lors du renommage)
+- [x] `alembic/README` : workflow Alembic (créer / relire / appliquer
+  / rollback / dump_schema, cas particulier de la baseline)
 
 ## Phase 7 — Bascule prod
 

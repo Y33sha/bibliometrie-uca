@@ -172,9 +172,12 @@ Interdiction : **`application/` ne peut pas importer
 
 Contenu :
 - **`db/`** :
-  - `schema.sql`, `seed.sql`
-  - `migrations/` — migrations numérotées, appliquées via
-    `python -m infrastructure.db.migrate`
+  - `schema.sql` (snapshot descriptif, régénéré par
+    `python -m infrastructure.db.dump_schema`), `seed.sql`
+  - `tables.py` — MetaData SQLAlchemy explicite (source pour
+    `alembic --autogenerate`). Les migrations vivent dans
+    `alembic/versions/` à la racine, appliquées via
+    `alembic upgrade head`.
   - `queries/` — query services SQL (un par agrégat ou phase
     pipeline) ; implémentent les ports définis dans `application/
     ports/*`
