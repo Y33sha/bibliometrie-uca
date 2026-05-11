@@ -22,10 +22,10 @@ class _FakeQueries:
         self._src_rows = src_rows
         self._hal_rows = hal_rows
 
-    def fetch_source_publications_with_hal_external_id(self, cur: Any) -> list[dict[str, Any]]:
+    def fetch_source_publications_with_hal_external_id(self, conn: Any) -> list[dict[str, Any]]:
         return self._src_rows
 
-    def fetch_hal_source_publications(self, cur: Any) -> list[dict[str, Any]]:
+    def fetch_hal_source_publications(self, conn: Any) -> list[dict[str, Any]]:
         return self._hal_rows
 
 

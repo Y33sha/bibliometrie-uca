@@ -37,7 +37,7 @@ class _SpyNormalizer(SourceNormalizer):
         self.on_error_calls = 0
         self.processed_ids: list[int] = []
 
-    def process_work(self, cur: Any, row: Any) -> bool | None:
+    def process_work(self, conn: Any, row: Any) -> bool | None:
         self.processed_ids.append(row["id"])
         if row["id"] in self._error_on_ids:
             raise RuntimeError(f"boom on {row['id']}")

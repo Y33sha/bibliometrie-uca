@@ -16,7 +16,7 @@ class AddressLinker(Protocol):
 
     def link(
         self,
-        cur: Connection,
+        conn: Connection,
         authorship_id: int,
         addr_texts: list[str],
         countries: list[str] | None = None,

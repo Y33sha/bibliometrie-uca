@@ -142,7 +142,7 @@ def find_publication(
 
 
 def insert_scanr_document(
-    cur: Connection,
+    conn: Connection,
     queries: ScanrNormalizeQueries,
     doc: dict,
     staging_id: int,
@@ -213,7 +213,7 @@ def insert_scanr_document(
     container_title = pub_meta.get("container_title") if pub_meta else None
 
     return queries.upsert_scanr_source_publication(
-        cur,
+        conn,
         scanr_id=scanr_id,
         doi=doi,
         title=title,
@@ -240,7 +240,7 @@ def insert_scanr_document(
 
 
 def upsert_scanr_author(
-    cur: Connection, queries: ScanrNormalizeQueries, author: dict
+    conn: Connection, queries: ScanrNormalizeQueries, author: dict
 ) -> int | None:
     """Crée un `source_persons` ScanR uniquement quand un idref est fourni.
 
@@ -260,7 +260,7 @@ def upsert_scanr_author(
 
     orcid = normalize_orcid(denorm.get("orcid"))
     return queries.upsert_scanr_source_person_by_idref(
-        cur,
+        conn,
         idref=idref,
         full_name=full_name,
         orcid=orcid,
@@ -273,7 +273,7 @@ def upsert_scanr_author(
 
 
 def process_authors(
-    cur: Connection,
+    conn: Connection,
     queries: ScanrNormalizeQueries,
     doc: dict,
     source_publication_id: int,
@@ -281,7 +281,7 @@ def process_authors(
     address_linker: AddressLinker,
 ) -> None:
     # Pré-nettoyage : re-traitement → table blanche pour cette publi.
-    queries.clear_source_authorships_for_publication(cur, source_publication_id)
+    queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
     authors = doc.get("authors") or []
 
@@ -292,7 +292,7 @@ def process_authors(
 
         # Avec idref : crée le source_persons (cas légitime conservé)
         # Sans idref : source_person_id reste NULL (ORCID éventuel sur identifiers)
-        source_person_id = upsert_scanr_author(cur, queries, author_data)
+        source_person_id = upsert_scanr_author(conn, queries, author_data)
 
         denorm = author_data.get("denormalized") or {}
         ids = compact_identifiers(
@@ -317,7 +317,7 @@ def process_authors(
             detected_countries.update(aff.get("detected_countries") or [])
 
         sa_id = queries.upsert_scanr_source_authorship(
-            cur,
+            conn,
             source_publication_id=source_publication_id,
             source_person_id=source_person_id,
             author_position=position,
@@ -327,7 +327,7 @@ def process_authors(
         )
 
         if addr_parts:
-            address_linker.link(cur, sa_id, addr_parts, countries=list(detected_countries) or None)
+            address_linker.link(conn, sa_id, addr_parts, countries=list(detected_countries) or None)
 
 
 # =============================================================
@@ -336,7 +336,7 @@ def process_authors(
 
 
 def process_work(
-    cur: Connection,
+    conn: Connection,
     queries: ScanrNormalizeQueries,
     logger: logging.Logger,
     staging_row: Row[Any],
@@ -371,7 +371,7 @@ def process_work(
         pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
 
         t0 = time.perf_counter()
-        publication_id = queries.get_scanr_publication_id(cur, scanr_id)
+        publication_id = queries.get_scanr_publication_id(conn, scanr_id)
         if not publication_id:
             publication_id = find_publication(doc, journal_id, scanr_id, pub_repo=pub_repo)
         timings["publication"] = time.perf_counter() - t0
@@ -381,18 +381,18 @@ def process_work(
 
         t0 = time.perf_counter()
         source_publication_id = insert_scanr_document(
-            cur, queries, doc, staging_id, scanr_id, publication_id, pub_meta
+            conn, queries, doc, staging_id, scanr_id, publication_id, pub_meta
         )
         timings["scanr_doc"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        process_authors(cur, queries, doc, source_publication_id, address_linker=address_linker)
+        process_authors(conn, queries, doc, source_publication_id, address_linker=address_linker)
         timings["authors"] = time.perf_counter() - t0
 
         if publication_id:
             refresh_from_sources(publication_id, repo=pub_repo)
 
-        staging_queries.mark_done(cur, staging_id)
+        staging_queries.mark_done(conn, staging_id)
 
         total = sum(timings.values())
         if total > 0.5:
@@ -434,19 +434,19 @@ class ScanrNormalizer(SourceNormalizer):
         self._pub_repo: PublicationRepository | None = None
         self._address_linker = address_linker
 
-    def preload_caches(self, cur: Connection) -> None:
-        self._journal_repo = self._journal_repo_factory(cur)
-        self._publisher_repo = self._publisher_repo_factory(cur)
-        self._pub_repo = self._pub_repo_factory(cur)
+    def preload_caches(self, conn: Connection) -> None:
+        self._journal_repo = self._journal_repo_factory(conn)
+        self._publisher_repo = self._publisher_repo_factory(conn)
+        self._pub_repo = self._pub_repo_factory(conn)
 
-    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
+    def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
         assert (
             self._journal_repo is not None
             and self._publisher_repo is not None
             and self._pub_repo is not None
         )
         return process_work(
-            cur,
+            conn,
             self._queries,
             self.logger,
             row,

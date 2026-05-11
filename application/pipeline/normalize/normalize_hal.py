@@ -168,7 +168,7 @@ def find_publication(
 
 
 def insert_hal_document(
-    cur: Connection,
+    conn: Connection,
     queries: HalNormalizeQueries,
     doc: dict,
     staging_id: int,
@@ -240,7 +240,7 @@ def insert_hal_document(
     urls = [uri] if uri else None
 
     return queries.upsert_hal_source_publication(
-        cur,
+        conn,
         hal_id=hal_id,
         doi=doi,
         title=title,
@@ -324,7 +324,7 @@ _hal_author_cache: dict[str, int] = {}
 
 
 def upsert_hal_author(
-    cur: Connection,
+    conn: Connection,
     queries: HalNormalizeQueries,
     full_name: str,
     hal_person_id: int | None,
@@ -360,7 +360,7 @@ def upsert_hal_author(
         source_ids["hal_form_id"] = hal_form_id
 
     result = queries.upsert_hal_source_person(
-        cur,
+        conn,
         source_id=src_id,
         full_name=full_name,
         orcid=orcid,
@@ -378,7 +378,7 @@ def upsert_hal_author(
 
 def parse_author_structures(
     doc: dict,
-    cur: Connection = None,
+    conn: Connection = None,
     queries: HalNormalizeQueries | None = None,
     struct_cache: dict | None = None,
     struct_name_cache: dict | None = None,
@@ -432,13 +432,13 @@ def parse_author_structures(
 
         # Créer la source_structure si pas encore en cache
         if (
-            cur
+            conn
             and queries is not None
             and struct_cache is not None
             and str(struct_id) not in struct_cache
         ):
             ss_id = queries.upsert_hal_source_structure(
-                cur,
+                conn,
                 source_id=str(struct_id),
                 name=(struct_name[:500] if struct_name else str(struct_id)),
             )
@@ -450,7 +450,7 @@ def parse_author_structures(
 
 
 def process_authors(
-    cur: Connection,
+    conn: Connection,
     queries: HalNormalizeQueries,
     doc: dict,
     source_publication_id: int,
@@ -468,7 +468,7 @@ def process_authors(
     """
     # Pré-nettoyage : un re-traitement peut changer les auteurs/positions,
     # on repart d'une table blanche pour cette publi.
-    queries.clear_source_authorships_for_publication(cur, source_publication_id)
+    queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
     names = doc.get("authFullName_s") or []
     qualities = doc.get("authQuality_s") or []
@@ -526,7 +526,7 @@ def process_authors(
     # authIdHasPrimaryStructure_fs → {form_id: set of hal_struct_id bruts}
     form_struct_map = parse_author_structures(
         doc,
-        cur=cur,
+        conn=conn,
         queries=queries,
         struct_cache=struct_cache,
         struct_name_cache=struct_name_cache,
@@ -553,7 +553,7 @@ def process_authors(
         # Sans hal_person_id : source_person_id reste NULL, identifiants
         # (orcid/idref/idhal) sur la source_authorships via identifiers.
         source_person_id = upsert_hal_author(
-            cur, queries, name, hal_person_id, idhal, form_id, orcid=orcid, idref=idref
+            conn, queries, name, hal_person_id, idhal, form_id, orcid=orcid, idref=idref
         )
 
         if not name:
@@ -581,7 +581,7 @@ def process_authors(
                 ]
             else:
                 resolved = queries.fetch_hal_source_structure_ids(
-                    cur, [str(hid) for hid in raw_hal_ids]
+                    conn, [str(hid) for hid in raw_hal_ids]
                 )
             if resolved:
                 source_struct_ids = sorted(resolved)
@@ -596,7 +596,7 @@ def process_authors(
             ]
 
         sa_id = queries.upsert_hal_source_authorship(
-            cur,
+            conn,
             source_publication_id=source_publication_id,
             source_person_id=source_person_id,
             author_position=position,
@@ -608,7 +608,7 @@ def process_authors(
         )
 
         if addr_parts:
-            address_linker.link(cur, sa_id, addr_parts)
+            address_linker.link(conn, sa_id, addr_parts)
 
 
 # =============================================================
@@ -617,7 +617,7 @@ def process_authors(
 
 
 def process_work(
-    cur: Connection,
+    conn: Connection,
     queries: HalNormalizeQueries,
     logger: logging.Logger,
     staging_row: Row[Any],
@@ -653,12 +653,12 @@ def process_work(
                 logger.warning(f"  {hal_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
                 return False
             if version_doi:
-                if queries.staging_has_hal_doi(cur, version_doi):
+                if queries.staging_has_hal_doi(conn, version_doi):
                     logger.info(
                         f"  {hal_id} concept DOI Zenodo {raw_doi} -> "
                         f"version {version_doi} deja en staging, skip"
                     )
-                    staging_queries.mark_done(cur, staging_id)
+                    staging_queries.mark_done(conn, staging_id)
                     return None
 
         publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
@@ -673,7 +673,7 @@ def process_work(
         pub_meta = extract_pub_metadata(doc, journal_id)
 
         publication_id = None
-        old_pub_id = queries.get_hal_publication_id(cur, hal_id)
+        old_pub_id = queries.get_hal_publication_id(conn, hal_id)
         if old_pub_id:
             publication_id = find_publication(doc, journal_id, pub_repo=pub_repo)
             if publication_id and publication_id != old_pub_id:
@@ -693,7 +693,7 @@ def process_work(
             )
 
         source_publication_id = insert_hal_document(
-            cur,
+            conn,
             queries,
             doc,
             staging_id,
@@ -705,7 +705,7 @@ def process_work(
         t.mark("hal_doc")
 
         process_authors(
-            cur,
+            conn,
             queries,
             doc,
             source_publication_id,
@@ -719,7 +719,7 @@ def process_work(
             refresh_from_sources(publication_id, repo=pub_repo)
         t.mark("refresh")
 
-        staging_queries.mark_done(cur, staging_id)
+        staging_queries.mark_done(conn, staging_id)
         t.log_if_slow(hal_id, logger)
 
         return True
@@ -761,21 +761,21 @@ class HalNormalizer(SourceNormalizer):
         self._struct_cache: dict[str, int] = {}
         self._struct_name_cache: dict[int, str] = {}
 
-    def preload_caches(self, cur: Connection) -> None:
-        self._journal_repo = self._journal_repo_factory(cur)
-        self._publisher_repo = self._publisher_repo_factory(cur)
-        self._pub_repo = self._pub_repo_factory(cur)
-        rows = self._queries.fetch_hal_source_structures_for_cache(cur)
+    def preload_caches(self, conn: Connection) -> None:
+        self._journal_repo = self._journal_repo_factory(conn)
+        self._publisher_repo = self._publisher_repo_factory(conn)
+        self._pub_repo = self._pub_repo_factory(conn)
+        rows = self._queries.fetch_hal_source_structures_for_cache(conn)
         self._struct_cache = {src: pid for src, pid, _ in rows}
         self._struct_name_cache = {pid: name for _, pid, name in rows}
         self.logger.info(f"Cache source_structures : {len(self._struct_cache)} entrées")
 
-    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
+    def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
         assert self._journal_repo is not None, "preload_caches doit être appelé avant"
         assert self._publisher_repo is not None, "preload_caches doit être appelé avant"
         assert self._pub_repo is not None, "preload_caches doit être appelé avant"
         return process_work(
-            cur,
+            conn,
             self._queries,
             self.logger,
             row,
@@ -789,9 +789,9 @@ class HalNormalizer(SourceNormalizer):
             struct_name_cache=self._struct_name_cache,
         )
 
-    def post_process(self, cur: Connection) -> None:
-        self._queries.delete_hal_duplicate_authorship_addresses(cur)
-        deleted_dups = self._queries.delete_hal_duplicate_authorships(cur)
+    def post_process(self, conn: Connection) -> None:
+        self._queries.delete_hal_duplicate_authorship_addresses(conn)
+        deleted_dups = self._queries.delete_hal_duplicate_authorships(conn)
         if deleted_dups:
             self.logger.info(f"Doublons de position supprimés : {deleted_dups}")
 
