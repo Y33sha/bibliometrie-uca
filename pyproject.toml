@@ -220,6 +220,10 @@ exclude = [
     "^bibliometrie_uca\\.egg-info/",
     "^\\.venv/",
     "^build/",
+    # Code Alembic : `op` et `context` sont ajoutés dynamiquement au
+    # module `alembic` à l'import, mypy ne les détecte pas. Cohérent
+    # avec l'exclusion `tests/` : code framework, pas du métier.
+    "^alembic/",
 ]
 
 # Durcissement progressif (chantier chasse-aux-any) : un module bascule
