@@ -1,5 +1,7 @@
 # Chantier — Adoption SQLAlchemy Core
-Commencé le 2026-05-06.
+
+Commencé le 2026-05-06
+Terminé le 2026-05-11
 
 ## Contexte
 
@@ -507,12 +509,7 @@ Reste pour clore le chantier :
 
 ### Phase 5 — Décision Alembic
 
-À traiter une fois Phase 4 terminée (avant, c'est prématuré).
-
-- [ ] Évaluer le coût de migration des 21+ migrations existantes
-  vers Alembic.
-- [ ] Décider : adopter Alembic (auto-génération des diffs MetaData)
-  ou conserver `migrate.py` actuel.
+Délégué au chantier `docs/chantiers/alembic-adoption.md`
 
 ## Alembic — porte ouverte
 

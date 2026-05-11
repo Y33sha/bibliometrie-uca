@@ -1,12 +1,6 @@
 # Chantier — Nettoyage des ports `domain/ports/`
 Commencé et terminé le 2026-05-06
 
-## État : terminé
-
-Issues 1 et 2 exécutées. Issue 3 confirmée sans action (exception
-documentée dans `docs/architecture.md`). Voir l'historique git pour
-les commits de mise en œuvre.
-
 ## Contexte
 
 Le projet suit DDD-lite avec ports/adapters. Les ports sont répartis

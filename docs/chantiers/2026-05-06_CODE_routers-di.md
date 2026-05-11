@@ -2,12 +2,6 @@
 
 Commencé et terminé le 2026-05-06.
 
-## État
-
-Décision actée : **on applique la règle 4 d'`architecture.md`** — les
-routers FastAPI ne doivent plus importer `infrastructure/`
-directement. Migration par lots, router par router.
-
 ## Contexte
 
 `docs/architecture.md` règle 4 dit :
