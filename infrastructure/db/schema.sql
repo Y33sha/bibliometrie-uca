@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict NzkLMhj7msMw25OQBsdpI5Nn73Ne6XWcqnN35QyP81ZBHb6nHsstNDaaGJps6DV
+\restrict M5naIIxmYKxp31hMTSfnrhOFrV9aQGTPz7xpF9P8eHYAd1hb29VtK8QOmy6liQe
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -225,6 +225,15 @@ CREATE SEQUENCE public.addresses_id_seq
 --
 
 ALTER SEQUENCE public.addresses_id_seq OWNED BY public.addresses.id;
+
+
+--
+-- Name: alembic_version; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.alembic_version (
+    version_num character varying(32) NOT NULL
+);
 
 
 --
@@ -910,16 +919,6 @@ ALTER SEQUENCE public.publishers_id_seq OWNED BY public.publishers.id;
 
 
 --
--- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.schema_migrations (
-    version text NOT NULL,
-    applied_at timestamp with time zone DEFAULT now()
-);
-
-
---
 -- Name: source_authorship_addresses; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1005,8 +1004,6 @@ CREATE TABLE public.source_persons (
     source text NOT NULL,
     source_id text NOT NULL,
     full_name text NOT NULL,
-    last_name text,
-    first_name text,
     orcid text,
     idref text,
     person_id integer,
@@ -1547,6 +1544,14 @@ ALTER TABLE ONLY public.addresses
 
 
 --
+-- Name: alembic_version alembic_version_pkc; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alembic_version
+    ADD CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num);
+
+
+--
 -- Name: apc_payments apc_payments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1792,14 +1797,6 @@ ALTER TABLE ONLY public.publishers
 
 ALTER TABLE ONLY public.publishers
     ADD CONSTRAINT publishers_pkey PRIMARY KEY (id);
-
-
---
--- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.schema_migrations
-    ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 
 
 --
@@ -2881,4 +2878,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NzkLMhj7msMw25OQBsdpI5Nn73Ne6XWcqnN35QyP81ZBHb6nHsstNDaaGJps6DV
+\unrestrict M5naIIxmYKxp31hMTSfnrhOFrV9aQGTPz7xpF9P8eHYAd1hb29VtK8QOmy6liQe

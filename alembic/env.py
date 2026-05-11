@@ -30,6 +30,12 @@ target_metadata = metadata
 
 
 def _build_url() -> str:
+    # Permet à un caller (ex. fixture pytest) d'imposer une URL via
+    # `cfg.set_main_option("sqlalchemy.url", ...)`. Sinon, on construit
+    # depuis les settings du projet, comme `infrastructure/db/connection.py`.
+    configured = config.get_main_option("sqlalchemy.url")
+    if configured:
+        return configured
     db_name = SANDBOX_DB_NAME if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1" else settings.db_name
     return (
         f"postgresql+psycopg://{settings.db_user}:{settings.db_password}"
