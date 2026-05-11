@@ -238,3 +238,7 @@ disallow_any_generics = true
 [[tool.mypy.overrides]]
 module = ["interfaces.api.app", "interfaces.api.deps"]
 disallow_any_generics = true
+
+[[tool.mypy.overrides]]
+module = "interfaces.api.routers.*"
+disallow_any_generics = true

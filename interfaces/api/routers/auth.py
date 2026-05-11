@@ -2,7 +2,6 @@
 
 import logging
 import time
-from typing import Any
 
 from fastapi import APIRouter, Cookie, Response
 
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/api/auth/login", response_model=OkResponse)
-def auth_login(data: LoginRequest, response: Response) -> Any:
+def auth_login(data: LoginRequest, response: Response) -> OkResponse:
     """Authentifie l'admin et pose un cookie de session signé.
 
     Renvoie 401 si les identifiants ne correspondent pas à ceux
@@ -43,23 +42,21 @@ def auth_login(data: LoginRequest, response: Response) -> Any:
         max_age=SESSION_MAX_AGE,
         path="/",
     )
-    return {"ok": True}
+    return OkResponse()
 
 
 @router.get("/api/auth/check", response_model=AuthCheckResponse)
-def auth_check(session: str | None = Cookie(None, alias="session")) -> Any:
+def auth_check(session: str | None = Cookie(None, alias="session")) -> AuthCheckResponse:
     """Indique si le cookie de session en cours est valide et non expiré.
 
     Ne renvoie jamais 401 — c'est un endpoint de diagnostic pour le
     frontend, qui s'en sert pour afficher le bouton login/logout.
     """
-    if session and _verify_token(session):
-        return {"authenticated": True}
-    return {"authenticated": False}
+    return AuthCheckResponse(authenticated=bool(session and _verify_token(session)))
 
 
 @router.post("/api/auth/logout", response_model=OkResponse)
-def auth_logout(response: Response) -> Any:
+def auth_logout(response: Response) -> OkResponse:
     """Supprime le cookie de session (déconnexion côté client)."""
     response.delete_cookie(key="session", path="/")
-    return {"ok": True}
+    return OkResponse()

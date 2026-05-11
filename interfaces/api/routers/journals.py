@@ -29,7 +29,7 @@ def list_journals(
     publisher_id: int | None = None,
     sort: str = "title",
     queries: JournalQueries = Depends(journal_queries_sync),
-) -> Any:
+) -> JournalListResponse:
     """Liste paginée des revues avec comptage des publications rattachées.
 
     `search` : recherche insensible à la casse sur le titre normalisé,
@@ -37,20 +37,21 @@ def list_journals(
     `sort` : `title` / `-title` / `publisher` / `-publisher` /
     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
     """
-    return queries.list_journals(
+    data = queries.list_journals(
         search=search,
         publisher_id=publisher_id,
         sort=sort,
         page=page,
         per_page=per_page,
     )
+    return JournalListResponse.model_validate(data)
 
 
 @router.get("/api/journals/{journal_id}")
 def get_journal(
     journal_id: int,
     queries: JournalQueries = Depends(journal_queries_sync),
-) -> Any:
+) -> dict[str, Any]:
     """Récupère une revue par son id (titre uniquement). 404 si inconnue."""
     row = queries.get_journal(journal_id)
     if not row:
@@ -63,7 +64,7 @@ def update_journal(
     journal_id: int,
     body: JournalUpdate,
     repo: JournalRepository = Depends(journal_repo_sync),
-) -> Any:
+) -> dict[str, bool]:
     """Met à jour une revue (modification sélective des champs fournis).
 
     Seuls les champs explicitement présents dans le body sont écrits
@@ -81,7 +82,7 @@ def merge(
     queries: JournalQueries = Depends(journal_queries_sync),
     repo: JournalRepository = Depends(journal_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> dict[str, Any]:
     """Fusionne la revue `source_id` dans la revue `journal_id`.
 
     Les publications et métadonnées de la source sont transférées à

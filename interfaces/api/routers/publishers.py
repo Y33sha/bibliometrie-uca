@@ -1,7 +1,6 @@
 """Router Éditeurs — liste, recherche, fusion."""
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -37,26 +36,27 @@ def list_publishers(
     search: str | None = None,
     sort: str = "name",
     queries: PublisherQueries = Depends(publisher_queries_sync),
-) -> Any:
+) -> PublisherListResponse:
     """Liste paginée des éditeurs avec comptage revues + publications.
 
     `search` : recherche sur le nom normalisé, ignorée si < 2
     caractères. `sort` : `name` / `-name` / `journals` / `-journals`
     / `pubs` / `-pubs` ; fallback sur `name` si inconnu.
     """
-    return queries.list_publishers(search=search, sort=sort, page=page, per_page=per_page)
+    data = queries.list_publishers(search=search, sort=sort, page=page, per_page=per_page)
+    return PublisherListResponse(**data)
 
 
 @router.get("/api/publishers/{publisher_id}", response_model=PublisherBasic)
 def get_publisher(
     publisher_id: int,
     queries: PublisherQueries = Depends(publisher_queries_sync),
-) -> Any:
+) -> PublisherBasic:
     """Récupère un éditeur par son id (nom uniquement). 404 si inconnu."""
     row = queries.get_publisher(publisher_id)
     if not row:
         raise HTTPException(status_code=404, detail="Éditeur introuvable")
-    return row
+    return PublisherBasic(**row)
 
 
 @router.put("/api/publishers/{publisher_id}", response_model=OkResponse)
@@ -64,7 +64,7 @@ def update_publisher(
     publisher_id: int,
     body: PublisherUpdate,
     repo: PublisherRepository = Depends(publisher_repo_sync),
-) -> Any:
+) -> OkResponse:
     """Met à jour un éditeur (modification sélective des champs fournis).
 
     Seuls les champs explicitement présents dans le body sont écrits
@@ -72,7 +72,7 @@ def update_publisher(
     """
     fields = body.model_dump(exclude_unset=True)
     _update_publisher(publisher_id, fields=fields, repo=repo)
-    return {"ok": True}
+    return OkResponse()
 
 
 @router.post("/api/publishers/{publisher_id}/merge", response_model=MergeResponse)
@@ -83,7 +83,7 @@ def merge(
     pub_repo: PublisherRepository = Depends(publisher_repo_sync),
     j_repo: JournalRepository = Depends(journal_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
     Les revues et publications rattachées à la source sont
@@ -103,4 +103,4 @@ def merge(
         journal_repo=j_repo,
         audit_repo=audit,
     )
-    return {"merged": True, "source_id": body.source_id, "target_id": publisher_id}
+    return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

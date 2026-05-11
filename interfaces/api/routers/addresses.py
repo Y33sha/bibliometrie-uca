@@ -6,7 +6,6 @@ Lectures : port `AddressesQueries`. Mutations : services applicatifs
 """
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import Connection
@@ -65,18 +64,18 @@ def list_addresses(
     search: str = Query(""),
     search_mode: str = Query("contains"),
     queries: AddressesQueries = Depends(addresses_queries_sync),
-) -> Any:
+) -> AddressListResponse:
     """Liste les adresses avec filtres détection/validation pour une structure."""
     # Garde-fou : mode "non détecté"/"tous" sans filtre → trop large
     if detected in ("no", "all") and not search and validation in ("all", "pending"):
-        return {
-            "total": 0,
-            "page": 1,
-            "per_page": per_page,
-            "pages": 0,
-            "addresses": [],
-            "requires_search": True,
-        }
+        return AddressListResponse(
+            total=0,
+            page=1,
+            per_page=per_page,
+            pages=0,
+            addresses=[],
+            requires_search=True,
+        )
 
     filters = AddressListFilters(
         detected=detected,
@@ -85,7 +84,9 @@ def list_addresses(
         search_mode=search_mode,
     )
     sid = structure_id if structure_id is not None else queries.resolve_default_structure_id()
-    return queries.list_addresses(structure_id=sid, filters=filters, page=page, per_page=per_page)
+    return AddressListResponse.model_validate(
+        queries.list_addresses(structure_id=sid, filters=filters, page=page, per_page=per_page)
+    )
 
 
 @router.get("/api/addresses/{addr_id}/publications", response_model=AddressPublicationsResponse)
@@ -93,17 +94,19 @@ def get_address_publications(
     addr_id: int,
     limit: int = Query(20),
     queries: AddressesQueries = Depends(addresses_queries_sync),
-) -> Any:
+) -> AddressPublicationsResponse:
     """Échantillon de publications liées à une adresse."""
     addr = queries.get_address_basic(addr_id)
     if not addr:
         raise HTTPException(status_code=404, detail="Address not found")
     publications = queries.get_address_publications(addr_id, limit)
-    return {
-        "address_id": addr_id,
-        "raw_text": addr["raw_text"],
-        "publications": publications,
-    }
+    return AddressPublicationsResponse.model_validate(
+        {
+            "address_id": addr_id,
+            "raw_text": addr["raw_text"],
+            "publications": publications,
+        }
+    )
 
 
 @router.post("/api/addresses/{addr_id}/review", response_model=AddressReviewResponse)
@@ -114,7 +117,7 @@ def review_address(
     queries: AddressesQueries = Depends(addresses_queries_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
     auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
-) -> Any:
+) -> AddressReviewResponse:
     """Confirme, rejette ou reset le lien adresse ↔ structure."""
     structures_service.review_structure_link(
         conn,
@@ -127,12 +130,14 @@ def review_address(
     )
     structures = queries.get_address_structures(addr_id)
     link = queries.get_structure_link(addr_id, action.structure_id)
-    return {
-        "id": addr_id,
-        "is_confirmed": link["is_confirmed"] if link else None,
-        "is_detected": link["is_detected"] if link else False,
-        "structures": structures,
-    }
+    return AddressReviewResponse.model_validate(
+        {
+            "id": addr_id,
+            "is_confirmed": link["is_confirmed"] if link else None,
+            "is_detected": link["is_detected"] if link else False,
+            "structures": structures,
+        }
+    )
 
 
 @router.post("/api/addresses/batch-review", response_model=BatchUpdatedResponse)
@@ -141,7 +146,7 @@ def batch_review(
     conn: Connection = Depends(db_conn_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
     auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
-) -> Any:
+) -> BatchUpdatedResponse:
     """Confirme/rejette/reset en batch."""
     updated = structures_service.batch_review_structure_link(
         conn,
@@ -152,15 +157,15 @@ def batch_review(
         authorship_repo=auth_repo,
         perimeter_queries=get_perimeter_queries_sync(),
     )
-    return {"updated": updated}
+    return BatchUpdatedResponse(updated=updated)
 
 
 @router.get("/api/countries", response_model=list[CountryOut])
 def list_countries(
     queries: AddressesQueries = Depends(addresses_queries_sync),
-) -> Any:
+) -> list[CountryOut]:
     """Liste des pays."""
-    return queries.list_countries()
+    return [CountryOut.model_validate(c) for c in queries.list_countries()]
 
 
 @router.get("/api/addresses/countries", response_model=AddressesCountriesResponse)
@@ -173,7 +178,7 @@ def list_addresses_countries(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     queries: AddressesQueries = Depends(addresses_queries_sync),
-) -> Any:
+) -> AddressesCountriesResponse:
     """Liste des adresses pour l'attribution de pays."""
     filters = AddressCountriesFilters(
         search=search,
@@ -182,17 +187,19 @@ def list_addresses_countries(
         suggested_country=suggested_country,
         suggest=suggest,
     )
-    return queries.addresses_countries(filters=filters, page=page, per_page=per_page)
+    return AddressesCountriesResponse.model_validate(
+        queries.addresses_countries(filters=filters, page=page, per_page=per_page)
+    )
 
 
 @router.get("/api/addresses/suggest-countries", response_model=CountrySuggestionsResponse)
 def suggest_countries(
     search: str = Query(""),
     queries: AddressesQueries = Depends(addresses_queries_sync),
-    _: Any = Depends(require_admin),
-) -> Any:
+    _: None = Depends(require_admin),
+) -> CountrySuggestionsResponse:
     """Distribution des pays des adresses matchantes + compte des sans-pays."""
-    return queries.suggest_countries(search)
+    return CountrySuggestionsResponse.model_validate(queries.suggest_countries(search))
 
 
 @router.post("/api/addresses/{addr_id}/country", response_model=OkResponse)
@@ -202,8 +209,8 @@ def set_address_country(
     bg: BackgroundTasks,
     queries: AddressesQueries = Depends(addresses_queries_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
-    _: Any = Depends(require_admin),
-) -> Any:
+    _: None = Depends(require_admin),
+) -> OkResponse:
     """Attribue des pays à une adresse."""
     if not queries.address_exists(addr_id):
         raise HTTPException(status_code=404, detail="Adresse introuvable")
@@ -213,7 +220,7 @@ def set_address_country(
 
     affected = countries_service.set_country(addr_id, body.countries, repo=addr_repo)
     bg.add_task(bg_propagate_countries_sync, affected)
-    return {"ok": True}
+    return OkResponse()
 
 
 @router.post("/api/addresses/batch-country", response_model=BatchCountryResponse)
@@ -222,8 +229,8 @@ def batch_set_country(
     bg: BackgroundTasks,
     queries: AddressesQueries = Depends(addresses_queries_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
-    _: Any = Depends(require_admin),
-) -> Any:
+    _: None = Depends(require_admin),
+) -> BatchCountryResponse:
     """Ajoute un pays à des adresses (par IDs ou par filtre)."""
     country_code = body.country_code
     if not country_code:
@@ -252,7 +259,7 @@ def batch_set_country(
     all_ids = modified_ids + propagated_ids
 
     bg.add_task(bg_propagate_countries_sync, all_ids)
-    return {"updated": updated, "propagated": propagated}
+    return BatchCountryResponse(updated=updated, propagated=propagated)
 
 
 @router.post("/api/addresses/{addr_id}/assign-structure", response_model=AssignStructureResponse)
@@ -264,7 +271,7 @@ def assign_structure(
     addr_repo: AddressRepository = Depends(address_repo_sync),
     auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
     struct_repo: StructureRepository = Depends(structure_repo_sync),
-) -> Any:
+) -> AssignStructureResponse:
     """Assigne manuellement une structure à une adresse."""
     if not queries.address_exists(addr_id):
         raise HTTPException(status_code=404, detail="Address not found")
@@ -280,7 +287,7 @@ def assign_structure(
         authorship_repo=auth_repo,
         perimeter_queries=get_perimeter_queries_sync(),
     )
-    return {"id": addr_id, "structure_id": action.structure_id, "status": "assigned"}
+    return AssignStructureResponse(id=addr_id, structure_id=action.structure_id, status="assigned")
 
 
 @router.delete(
@@ -292,7 +299,7 @@ def unassign_structure(
     conn: Connection = Depends(db_conn_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
     auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
-) -> Any:
+) -> UnassignStructureResponse:
     """Supprime l'assignation manuelle d'une structure."""
     deleted = structures_service.unassign_manual_structure(
         conn,
@@ -302,15 +309,15 @@ def unassign_structure(
         authorship_repo=auth_repo,
         perimeter_queries=get_perimeter_queries_sync(),
     )
-    return {"deleted": deleted}
+    return UnassignStructureResponse(deleted=deleted)
 
 
 @router.get("/api/admin/address-stats", response_model=AddressStatsResponse)
 def admin_address_stats(
     structure_id: int | None = Query(None),
     queries: AddressesQueries = Depends(addresses_queries_sync),
-) -> Any:
+) -> AddressStatsResponse:
     """Compteurs d'adresses par détection/validation pour une structure."""
     if structure_id is None:
         structure_id = queries.resolve_default_structure_id()
-    return queries.admin_address_stats(structure_id)
+    return AddressStatsResponse.model_validate(queries.admin_address_stats(structure_id))

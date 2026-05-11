@@ -18,7 +18,7 @@ même router.
 import logging
 import os
 import sys
-from typing import Any
+from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -28,6 +28,7 @@ from interfaces.api.deps import admin_feedback_queries_sync
 from interfaces.api.models import (
     FeedbackAddressesResponse,
     FeedbackStats,
+    FeedbackStructureItem,
     FeedbackStructuresResponse,
 )
 
@@ -59,7 +60,7 @@ _RESOLVE_ADDRESSES_SCRIPT = os.path.join(
 @router.get("/api/admin/feedback/structures", response_model=FeedbackStructuresResponse)
 def feedback_structures(
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
-) -> Any:
+) -> FeedbackStructuresResponse:
     """Structures éligibles au tableau de bord feedback, groupées par type.
 
     Encode deux règles métier :
@@ -70,10 +71,10 @@ def feedback_structures(
     """
     rows = queries.feedback_structures(list(_FEEDBACK_STRUCTURE_TYPES))
 
-    by_type: dict[str, list[dict[str, Any]]] = {}
+    by_type: dict[str, list[FeedbackStructureItem]] = {}
     default_id: int | None = None
     for row in rows:
-        by_type.setdefault(row["type"], []).append(row)
+        by_type.setdefault(row["type"], []).append(FeedbackStructureItem(**row))
         if row["code"] == _DEFAULT_STRUCTURE_CODE:
             default_id = row["id"]
 
@@ -82,17 +83,17 @@ def feedback_structures(
         # l'ordre `_FEEDBACK_STRUCTURE_TYPES`.
         for t in _FEEDBACK_STRUCTURE_TYPES:
             if by_type.get(t):
-                default_id = by_type[t][0]["id"]
+                default_id = by_type[t][0].id
                 break
 
-    return {"by_type": by_type, "default_structure_id": default_id}
+    return FeedbackStructuresResponse(by_type=by_type, default_structure_id=default_id)
 
 
 @router.get("/api/admin/feedback/stats", response_model=FeedbackStats)
 def feedback_stats(
     structure_id: int = Query(...),
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
-) -> Any:
+) -> FeedbackStats:
     """Statistiques de qualité de la détection pour une structure donnée."""
     row = queries.feedback_stats(structure_id)
 
@@ -104,14 +105,14 @@ def feedback_stats(
     )
     concordant = (row["concordant_valid"] or 0) + (row["concordant_rejected"] or 0)
 
-    return {
-        "total_reviewed": reviewed,
-        "detection_rate": round(concordant / reviewed * 100, 1) if reviewed else None,
-        "false_negatives": row["false_negatives"] or 0,
-        "false_positives": row["false_positives"] or 0,
-        "concordant_valid": row["concordant_valid"] or 0,
-        "pending": row["pending"] or 0,
-    }
+    return FeedbackStats(
+        total_reviewed=reviewed,
+        detection_rate=round(concordant / reviewed * 100, 1) if reviewed else None,
+        false_negatives=row["false_negatives"] or 0,
+        false_positives=row["false_positives"] or 0,
+        concordant_valid=row["concordant_valid"] or 0,
+        pending=row["pending"] or 0,
+    )
 
 
 @router.get("/api/admin/feedback/false-negatives", response_model=FeedbackAddressesResponse)
@@ -121,11 +122,12 @@ def feedback_false_negatives(
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
-) -> Any:
+) -> FeedbackAddressesResponse:
     """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
-    return queries.feedback_false_negatives(
+    data = queries.feedback_false_negatives(
         structure_id=structure_id, page=page, per_page=per_page, search=search
     )
+    return FeedbackAddressesResponse(**data)
 
 
 @router.get("/api/admin/feedback/false-positives", response_model=FeedbackAddressesResponse)
@@ -135,15 +137,16 @@ def feedback_false_positives(
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
-) -> Any:
+) -> FeedbackAddressesResponse:
     """Adresses détectées pour cette structure mais rejetées manuellement."""
-    return queries.feedback_false_positives(
+    data = queries.feedback_false_positives(
         structure_id=structure_id, page=page, per_page=per_page, search=search
     )
+    return FeedbackAddressesResponse(**data)
 
 
 @router.get("/api/admin/feedback/rerun")
-async def feedback_rerun() -> Any:
+async def feedback_rerun() -> StreamingResponse:
     """Lance resolve_addresses en SSE (détection complète sur toutes les adresses).
 
     `async def` parce qu'on streame stdout d'un subprocess via
@@ -155,7 +158,7 @@ async def feedback_rerun() -> Any:
     if not os.path.exists(_RESOLVE_ADDRESSES_SCRIPT):  # noqa: ASYNC240
         raise HTTPException(status_code=500, detail="Script resolve_addresses.py introuvable")
 
-    async def event_stream() -> Any:
+    async def event_stream() -> AsyncIterator[str]:
         proc = await asyncio.create_subprocess_exec(
             sys.executable,
             "-u",

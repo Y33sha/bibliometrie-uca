@@ -80,9 +80,17 @@ Patterns dominants :
   `_max_overflow`/`checkedout`/`checkedin`) ; `SPAStaticFiles.get_response` →
   signature parente `(str, Scope) -> Response` ; `require_admin` → `None`.
   Override mypy `disallow_any_generics` posé.
-- [ ] `interfaces/api/routers/` : modèles Pydantic en retour, pas
-  de `dict` non typé. Bloqué par la question ouverte
-  Pydantic/FastAPI ci-dessous.
+- [x] `interfaces/api/routers/` (124 occ., 17 fichiers) : tous les
+  handlers avec `response_model=` retournent désormais leur BaseModel.
+  Pattern retenu (option A de la question Pydantic ci-dessous) :
+  `Model.model_validate(dict_du_query_service)` pour les retours
+  composites ; constructeur direct `Model(...)` pour les retours
+  scalaires (`OkResponse()`, `MergeResponse(...)`). `_: Any = Depends(require_admin)`
+  → `_: None` (puisque `require_admin` retourne `None` après
+  Phase 2 sur `deps.py`). Handlers sans `response_model` (3 dans
+  `journals.py`, 3 dans `docs.py`) typés en `dict[str, Any]` ou
+  `list[dict[str, ...]]` faute de modèle adapté. Override mypy
+  `disallow_any_generics` posé sur `interfaces.api.routers.*`.
 - [x] `interfaces/cli/` : 11 `Any` explicites + 4 `dict` non
   paramétrés corrigés (records DB → `list[dict[str, Any]]`,
   helper `c(text, *styles)` → `(object, *str) -> str`,
@@ -111,11 +119,18 @@ Patterns dominants :
 
 ## Questions ouvertes
 
-- **Frontière Pydantic / FastAPI** : les `BaseModel` Pydantic
-  exposent souvent des champs `dict[str, Any]` pour des payloads
-  JSONB (`raw_data`, `meta`, `payload`). Faut-il pousser jusqu'à
-  des sous-modèles typés ou tolérer le `Any` à cette frontière ?
-  À trancher quand on attaque `interfaces/api/`.
+- **Frontière Pydantic / FastAPI — tranchée** : option A retenue,
+  les handlers instancient le `BaseModel` du `response_model` au
+  retour (`Model.model_validate(...)` ou constructeur direct).
+  Option C (les query services retournent directement des types
+  forts, plus de `dict[str, Any]` en infra) reste plus propre mais
+  c'est un chantier architectural à part — déplacement des
+  modèles hors de `interfaces/api/`, DTOs application-level. Pas
+  ouvert ici, à reprendre si l'envie revient.
+- **Payloads JSONB dans les `BaseModel`** : les 2 derniers `Any`
+  explicites dans `interfaces/api/models.py` (`ConfigItem.value`,
+  `ConfigValueUpdate.value`) restent volontairement libres
+  (frontière JSON/JSONB documentée).
 - **`Row` SA** : utiliser `Row` (générique sans paramétrage), ou
   des `NamedTuple` / `dataclass` typés par requête ? Le second est
   plus rigoureux mais double la dette si on bouge une colonne.

@@ -26,15 +26,15 @@ DOC_PAGES = [
 
 
 @router.get("/api/docs")
-def list_docs() -> Any:
+def list_docs() -> list[dict[str, str]]:
     """Liste les pages de documentation disponibles."""
     return DOC_PAGES
 
 
 @router.get("/api/docs/todos/all")
-def list_all_todos() -> Any:
+def list_all_todos() -> list[dict[str, Any]]:
     """Collecte tous les <!-- TODO: ... --> de tous les fichiers .md."""
-    todos = []
+    todos: list[dict[str, Any]] = []
     todo_re = re.compile(r"<!--\s*TODO\s*:\s*(.+?)\s*-->")
 
     for page in DOC_PAGES:
@@ -56,7 +56,7 @@ def list_all_todos() -> Any:
 
 
 @router.get("/api/docs/{slug}")
-def get_doc(slug: str) -> Any:
+def get_doc(slug: str) -> dict[str, Any]:
     """Retourne le contenu markdown d'une page de documentation."""
     # Sécurité : pas de traversal
     if "/" in slug or "\\" in slug or ".." in slug:
