@@ -1,6 +1,6 @@
 # A régler avant transmission
 ## Schéma
-* Supprimer source_persons et source_structures
+* Supprimer source_persons et source_structures? (ou identifier leurs usages légitimes)
 ## Pipeline
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
