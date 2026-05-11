@@ -1,20 +1,19 @@
-"""MetaData SQLAlchemy — description explicite des tables Postgres.
+"""MetaData SQLAlchemy — source de vérité du schéma Postgres.
 
-Source de vérité pour SQLAlchemy Core (chantier
-docs/chantiers/sqlalchemy-core-adoption.md). Conserve la structure des
-tables côté Python pour permettre l'autocomplete IDE et la
-construction de requêtes typées (`select(config.c.key)…`).
+Description complète des tables, indexes, contraintes uniques, CHECK
+constraints et comments. Sert :
+- au query-building côté SQLAlchemy Core (`select(config.c.key)…`),
+- à `alembic revision --autogenerate` (comparaison MetaData ↔ DB).
 
-La vraie source de vérité du schéma reste `infrastructure/db/schema.sql`
-(snapshot) et les migrations versionnées dans
-`infrastructure/db/migrations/`. À chaque migration affectant l'une
-de ces tables, mettre ce module à jour. Un test d'intégration
-(`tests/integration/infrastructure/db/test_metadata_consistency.py`)
-vérifie la cohérence entre cette MetaData et la DB réelle.
+Les Foreign Keys ne sont volontairement pas déclarées (pattern
+query-building, pas modélisation relationnelle complète). Le filtre
+`include_object` dans `alembic/env.py` empêche autogenerate de les
+considérer.
 
-Phase 0 du chantier : seules trois tables pilotes sont décrites
-(config, perimeters, structures). Les autres tables seront ajoutées
-au fur et à mesure des phases suivantes.
+`infrastructure/db/schema.sql` reste un snapshot descriptif lisible,
+régénéré par `python -m infrastructure.db.dump_schema`. Le test
+`tests/integration/infrastructure/db/test_sqlalchemy_smoke.py`
+vérifie la cohérence MetaData ↔ DB sur les colonnes.
 """
 
 from sqlalchemy import (
