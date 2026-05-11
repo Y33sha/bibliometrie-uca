@@ -10,8 +10,6 @@ du projet).
 
 from typing import Any
 
-from sqlalchemy import Connection
-
 from application.audit import emit_event
 from application.ports.config import ConfigStore
 from domain.errors import ConflictError, NotFoundError, ValidationError
@@ -21,7 +19,7 @@ from domain.ports.perimeter_repository import PerimeterRepository
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
-def update_config_value(conn: Connection, key: str, value: Any, *, config: ConfigStore) -> dict:
+def update_config_value(key: str, value: Any, *, config: ConfigStore) -> dict:
     """Met à jour la valeur d'un paramètre de config existant.
 
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
@@ -36,7 +34,6 @@ def update_config_value(conn: Connection, key: str, value: Any, *, config: Confi
 
 
 def add_perimeter_structure(
-    conn: Connection,
     perimeter_id: int,
     structure_id: int,
     *,
@@ -60,7 +57,6 @@ def add_perimeter_structure(
 
 
 def remove_perimeter_structure(
-    conn: Connection,
     perimeter_id: int,
     structure_id: int,
     *,
@@ -78,7 +74,6 @@ def remove_perimeter_structure(
 
 
 def create_perimeter(
-    conn: Connection,
     *,
     code: str,
     name: str,
@@ -99,7 +94,6 @@ def create_perimeter(
 
 
 def update_perimeter(
-    conn: Connection,
     perimeter_id: int,
     *,
     fields: dict,
@@ -122,7 +116,6 @@ def update_perimeter(
 
 
 def delete_perimeter(
-    conn: Connection,
     perimeter_id: int,
     *,
     repo: PerimeterRepository,

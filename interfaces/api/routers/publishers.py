@@ -74,7 +74,7 @@ def update_publisher(
     (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
     """
     fields = body.model_dump(exclude_unset=True)
-    _update_publisher(conn, publisher_id, fields=fields, repo=repo)
+    _update_publisher(publisher_id, fields=fields, repo=repo)
     return {"ok": True}
 
 
@@ -101,7 +101,6 @@ def merge(
         raise HTTPException(status_code=404, detail="Éditeur source introuvable")
 
     merge_publishers(
-        conn,
         publisher_id,
         body.source_id,
         publisher_repo=pub_repo,

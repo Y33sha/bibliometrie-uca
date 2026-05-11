@@ -153,7 +153,7 @@ def upsert_publisher(
         return None
     openalex_id = extract_short_id(source.get("host_organization") or "")
     return find_or_create_publisher(
-        cur, publisher_name, openalex_id=openalex_id or None, repo=publisher_repo
+        publisher_name, openalex_id=openalex_id or None, repo=publisher_repo
     )
 
 
@@ -187,7 +187,6 @@ def upsert_journal(
         oa_model = "repository"
 
     return find_or_create_journal(
-        cur,
         title,
         issn=issn,
         eissn=eissn,

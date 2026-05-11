@@ -212,7 +212,7 @@ def set_address_country(
         if not queries.country_exists(c):
             raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
 
-    affected = countries_service.set_country(conn, addr_id, body.countries, repo=addr_repo)
+    affected = countries_service.set_country(addr_id, body.countries, repo=addr_repo)
     bg.add_task(bg_propagate_countries_sync, affected)
     return {"ok": True}
 
@@ -236,11 +236,10 @@ def batch_set_country(
 
     if body.address_ids:
         modified_ids = countries_service.batch_set_country_by_ids(
-            conn, country_code, body.address_ids, repo=addr_repo
+            country_code, body.address_ids, repo=addr_repo
         )
     else:
         modified_ids = countries_service.batch_set_country_by_filter(
-            conn,
             country_code,
             search=body.search,
             has_country=body.has_country,
@@ -250,7 +249,7 @@ def batch_set_country(
         )
     updated = len(modified_ids)
 
-    propagated_ids = countries_service.propagate_countries_to_similar(conn, repo=addr_repo)
+    propagated_ids = countries_service.propagate_countries_to_similar(repo=addr_repo)
     propagated = len(propagated_ids)
     all_ids = modified_ids + propagated_ids
 

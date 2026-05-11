@@ -287,7 +287,7 @@ def bg_propagate_countries_sync(address_ids: list[int]) -> None:
         engine = get_sync_engine()
         with engine.begin() as conn:
             countries_service.propagate_countries_to_publications(
-                conn, address_ids, repo=address_repository(conn)
+                address_ids, repo=address_repository(conn)
             )
     except Exception:
         logger.exception("Erreur propagation pays en background")

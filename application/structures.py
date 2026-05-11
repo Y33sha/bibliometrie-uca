@@ -8,7 +8,6 @@ restent autorisées dans les routers (convention du projet).
 """
 
 from pydantic import ValidationError as PydanticValidationError
-from sqlalchemy import Connection
 
 from application.audit import emit_event
 from domain.errors import NotFoundError, ValidationError
@@ -48,7 +47,6 @@ _STRUCTURE_FIELD_MAP = {
 
 
 def create_structure(
-    conn: Connection,
     *,
     code: str,
     name: str,
@@ -73,9 +71,7 @@ def create_structure(
     )
 
 
-def update_structure(
-    conn: Connection, structure_id: int, *, fields: dict, repo: StructureRepository
-) -> dict:
+def update_structure(structure_id: int, *, fields: dict, repo: StructureRepository) -> dict:
     """Met à jour une structure. Retourne la ligne modifiée.
 
     Lève NotFoundError si la structure n'existe pas.
@@ -101,7 +97,6 @@ def update_structure(
 
 
 def delete_structure(
-    conn: Connection,
     structure_id: int,
     *,
     repo: StructureRepository,
@@ -124,7 +119,6 @@ def delete_structure(
 
 
 def create_relation(
-    conn: Connection,
     *,
     parent_id: int,
     child_id: int,
@@ -140,7 +134,6 @@ def create_relation(
 
 
 def delete_relation(
-    conn: Connection,
     relation_id: int,
     *,
     repo: StructureRepository,
@@ -168,7 +161,6 @@ def delete_relation(
 
 
 def create_name_form(
-    conn: Connection,
     *,
     structure_id: int,
     form_text: str,
@@ -187,9 +179,7 @@ def create_name_form(
     )
 
 
-def update_name_form(
-    conn: Connection, form_id: int, *, fields: dict, repo: StructureRepository
-) -> dict:
+def update_name_form(form_id: int, *, fields: dict, repo: StructureRepository) -> dict:
     """Met à jour une forme de nom. Retourne la ligne modifiée.
 
     Lève NotFoundError si la forme n'existe pas.
@@ -216,7 +206,6 @@ def update_name_form(
 
 
 def delete_name_form(
-    conn: Connection,
     form_id: int,
     *,
     repo: StructureRepository,

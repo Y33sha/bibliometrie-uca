@@ -172,7 +172,7 @@ def upsert_publisher(
     name = get_publisher_name(msg)
     if not name:
         return None
-    return find_or_create_publisher(cur, name, repo=publisher_repo)
+    return find_or_create_publisher(name, repo=publisher_repo)
 
 
 def upsert_journal(
@@ -188,7 +188,6 @@ def upsert_journal(
         return None
     issn, eissn = get_issns(msg)
     return find_or_create_journal(
-        cur,
         title,
         issn=issn,
         eissn=eissn,

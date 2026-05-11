@@ -345,7 +345,7 @@ def upsert_publisher(
     cur: Connection, publisher_name: str | None, *, publisher_repo: PublisherRepository
 ) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
-    return find_or_create_publisher(cur, publisher_name, repo=publisher_repo)
+    return find_or_create_publisher(publisher_name, repo=publisher_repo)
 
 
 def upsert_journal(
@@ -356,7 +356,6 @@ def upsert_journal(
     if not title:
         return None
     return find_or_create_journal(
-        cur,
         title,
         issn=rec.get("issn"),
         eissn=rec.get("eissn"),

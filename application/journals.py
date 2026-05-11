@@ -10,8 +10,6 @@ Les routers FastAPI utilisent les mêmes repos que le pipeline
 (routes `def` exécutées dans le threadpool Starlette).
 """
 
-from sqlalchemy import Connection
-
 from application.audit import emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
@@ -20,7 +18,6 @@ from domain.ports.journal_repository import JournalRepository
 
 
 def find_or_create_journal(
-    cur: Connection,
     title: str | None,
     *,
     issn: str | None = None,
@@ -34,7 +31,7 @@ def find_or_create_journal(
     """Trouve ou crée un journal.
 
     Cascade de recherche :
-    1. openalex_id (upsert si fourni)
+    1. openalex_id (upsert si fourni) #TODO: virer ça! Osef
     2. ISSN (cherche dans issn, eissn, issnl)
     3. eISSN (idem)
     4. ISSN-L (idem)
@@ -108,9 +105,7 @@ def find_or_create_journal(
     return journal_id
 
 
-def update_journal(
-    conn: Connection, journal_id: int, *, fields: dict, repo: JournalRepository
-) -> None:
+def update_journal(journal_id: int, *, fields: dict, repo: JournalRepository) -> None:
     """Met à jour une revue. Le `title` est automatiquement normalisé en
     `title_normalized`.
 
@@ -130,7 +125,6 @@ def update_journal(
 
 
 def update_journal_apc(
-    cur: Connection,
     journal_id: int,
     *,
     apc_amount: float | None = None,
@@ -147,13 +141,12 @@ def update_journal_apc(
     )
 
 
-def reset_journal_apc(cur: Connection, *, repo: JournalRepository) -> int:
+def reset_journal_apc(*, repo: JournalRepository) -> int:
     """Réinitialise les APC/DOAJ de toutes les revues avec openalex_id."""
     return repo.reset_journal_apc()
 
 
 def merge_journals(
-    conn: Connection,
     target_id: int,
     source_id: int,
     *,

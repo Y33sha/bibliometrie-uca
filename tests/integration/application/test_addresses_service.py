@@ -392,15 +392,15 @@ class TestSetCountry:
     def test_assigns_countries(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         addr = _create_address(sa_sync_conn)
-        affected = set_country(sa_sync_conn, addr, ["FR"], repo=repo)
+        affected = set_country(addr, ["FR"], repo=repo)
         assert affected == [addr]
         assert _get_countries(sa_sync_conn, addr) == ["FR"]
 
     def test_none_clears_countries(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         addr = _create_address(sa_sync_conn)
-        set_country(sa_sync_conn, addr, ["FR"], repo=repo)
-        set_country(sa_sync_conn, addr, None, repo=repo)
+        set_country(addr, ["FR"], repo=repo)
+        set_country(addr, None, repo=repo)
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_propagates_to_same_normalized_text(self, sa_sync_conn, repo):
@@ -416,7 +416,7 @@ class TestSetCountry:
             ),
             {"ids": [a1, a2]},
         )
-        set_country(sa_sync_conn, a1, ["FR"], repo=repo)
+        set_country(a1, ["FR"], repo=repo)
         assert _get_countries(sa_sync_conn, a1) == ["FR"]
         assert _get_countries(sa_sync_conn, a2) == ["FR"]  # propagé
 
@@ -429,7 +429,7 @@ class TestSetCountry:
             text("UPDATE addresses SET normalized_text = 'abc' WHERE id = ANY(:ids)"),
             {"ids": [a1, a2]},
         )
-        set_country(sa_sync_conn, a1, ["FR"], repo=repo)
+        set_country(a1, ["FR"], repo=repo)
         assert _get_countries(sa_sync_conn, a2) is None
 
 
@@ -440,7 +440,7 @@ class TestBatchSetCountryByIds:
     def test_adds_to_empty_countries(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         addrs = [_create_address(sa_sync_conn, raw_text=f"a{i}") for i in range(3)]
-        modified = batch_set_country_by_ids(sa_sync_conn, "FR", addrs, repo=repo)
+        modified = batch_set_country_by_ids("FR", addrs, repo=repo)
         assert set(modified) == set(addrs)
         for a in addrs:
             assert _get_countries(sa_sync_conn, a) == ["FR"]
@@ -449,16 +449,16 @@ class TestBatchSetCountryByIds:
         _ensure_country(sa_sync_conn, "FR")
         _ensure_country(sa_sync_conn, "US")
         addr = _create_address(sa_sync_conn)
-        set_country(sa_sync_conn, addr, ["FR"], repo=repo)
-        batch_set_country_by_ids(sa_sync_conn, "US", [addr], repo=repo)
+        set_country(addr, ["FR"], repo=repo)
+        batch_set_country_by_ids("US", [addr], repo=repo)
         countries = _get_countries(sa_sync_conn, addr)
         assert "FR" in countries and "US" in countries
 
     def test_idempotent_if_already_present(self, sa_sync_conn, repo):
         _ensure_country(sa_sync_conn, "FR")
         addr = _create_address(sa_sync_conn)
-        set_country(sa_sync_conn, addr, ["FR"], repo=repo)
-        batch_set_country_by_ids(sa_sync_conn, "FR", [addr], repo=repo)
+        set_country(addr, ["FR"], repo=repo)
+        batch_set_country_by_ids("FR", [addr], repo=repo)
         assert _get_countries(sa_sync_conn, addr) == ["FR"]  # pas de doublon
 
 
@@ -470,7 +470,7 @@ class TestBatchSetCountryByFilter:
         _ensure_country(sa_sync_conn, "FR")
         match = _create_address(sa_sync_conn, raw_text="Université Clermont")
         other = _create_address(sa_sync_conn, raw_text="MIT Boston")
-        modified = batch_set_country_by_filter(sa_sync_conn, "FR", search="Clermont", repo=repo)
+        modified = batch_set_country_by_filter("FR", search="Clermont", repo=repo)
         assert match in modified
         assert other not in modified
 
@@ -479,8 +479,8 @@ class TestBatchSetCountryByFilter:
         _ensure_country(sa_sync_conn, "US")
         addr_no = _create_address(sa_sync_conn, raw_text="sans pays")
         addr_yes = _create_address(sa_sync_conn, raw_text="avec pays")
-        set_country(sa_sync_conn, addr_yes, ["US"], repo=repo)
-        modified = batch_set_country_by_filter(sa_sync_conn, "FR", has_country="no", repo=repo)
+        set_country(addr_yes, ["US"], repo=repo)
+        modified = batch_set_country_by_filter("FR", has_country="no", repo=repo)
         assert addr_no in modified
         assert addr_yes not in modified
 
@@ -508,7 +508,7 @@ class TestPropagateCountriesToSimilar:
             {"c": ["FR"], "id": a1},
         )
 
-        propagated = propagate_countries_to_similar(sa_sync_conn, repo=repo)
+        propagated = propagate_countries_to_similar(repo=repo)
 
         assert a2 in propagated
         assert _get_countries(sa_sync_conn, a2) == ["FR"]
@@ -519,7 +519,7 @@ class TestPropagateCountriesToSimilar:
 
 class TestPropagateCountriesToPublications:
     def test_empty_is_noop(self, sa_sync_conn, repo):
-        propagate_countries_to_publications(sa_sync_conn, [], repo=repo)  # pas d'exception
+        propagate_countries_to_publications([], repo=repo)  # pas d'exception
 
     def test_propagates_to_source_pub_and_publication(self, sa_sync_conn, repo):
         """Test d'intégration minimal : une adresse avec countries liée à
@@ -561,7 +561,7 @@ class TestPropagateCountriesToPublications:
             {"sa": sa_id, "a": addr},
         )
 
-        propagate_countries_to_publications(sa_sync_conn, [addr], repo=repo)
+        propagate_countries_to_publications([addr], repo=repo)
 
         # source_publications.countries mis à jour
         sp_countries = sa_sync_conn.execute(
