@@ -3,10 +3,14 @@
 Interprétation des champs propres au schéma OpenAlex — prédicats et
 extracteurs qui encapsulent la connaissance de la sémantique OpenAlex
 pour le reste du pipeline.
+
+Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API OpenAlex
+(frontière dynamique avec une source externe, schéma non typé).
 """
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from domain.doc_types import map_doc_type
 from domain.names import names_compatible, parse_raw_author_name
@@ -46,7 +50,7 @@ class OpenalexLocation:
     source_homepage_url: str | None  # ex. 'https://hal.science'
 
 
-def _parse_one_location(loc: dict | None) -> OpenalexLocation | None:
+def _parse_one_location(loc: dict[str, Any] | None) -> OpenalexLocation | None:
     if not loc:
         return None
     src = loc.get("source") or {}
@@ -60,12 +64,12 @@ def _parse_one_location(loc: dict | None) -> OpenalexLocation | None:
     )
 
 
-def parse_primary_location(work: dict) -> OpenalexLocation | None:
+def parse_primary_location(work: dict[str, Any]) -> OpenalexLocation | None:
     """Vue structurée de `work.primary_location`. None si absent."""
     return _parse_one_location(work.get("primary_location"))
 
 
-def parse_locations(work: dict) -> list[OpenalexLocation]:
+def parse_locations(work: dict[str, Any]) -> list[OpenalexLocation]:
     """Vue structurée de toutes les `work.locations`. Inclut la primary."""
     return [
         parsed

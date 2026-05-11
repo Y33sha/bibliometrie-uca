@@ -4,7 +4,7 @@ Un seul port pour `authorships` et `source_authorships` car leurs
 opérations sont étroitement couplées.
 """
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class AuthorshipRepository(Protocol):
@@ -12,9 +12,9 @@ class AuthorshipRepository(Protocol):
 
     # ── authorships (vérité) ───────────────────────────────────────
 
-    def get_authorship_person(self, authorship_id: int) -> dict | None: ...
+    def get_authorship_person(self, authorship_id: int) -> dict[str, Any] | None: ...
 
-    def mark_authorship_excluded(self, authorship_id: int) -> dict: ...
+    def mark_authorship_excluded(self, authorship_id: int) -> dict[str, Any]: ...
 
     def detach_source_authorships_for_person(
         self,

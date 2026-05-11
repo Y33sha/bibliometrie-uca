@@ -6,7 +6,7 @@ concrète). Toute autre implémentation respectant cette interface
 (fake en mémoire pour tests, autre SGBD, etc.) est également acceptable.
 """
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class PersonRepository(Protocol):
@@ -49,7 +49,7 @@ class PersonRepository(Protocol):
 
     def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None: ...
 
-    def update_identifier_status(self, ident_id: int, status: str) -> dict: ...
+    def update_identifier_status(self, ident_id: int, status: str) -> dict[str, Any]: ...
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None: ...
 
@@ -77,7 +77,7 @@ class PersonRepository(Protocol):
         person_id: int,
         source: str,
         authorship_id: int,
-    ) -> dict | None: ...
+    ) -> dict[str, Any] | None: ...
 
     def batch_assign_orphans(self, person_id: int, sa_ids: list[int]) -> int: ...
 

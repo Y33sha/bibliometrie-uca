@@ -3,6 +3,11 @@
 Interprétation des champs propres au schéma CrossRef Works API —
 extracteurs et nettoyeurs qui encapsulent les conventions CrossRef
 pour le reste du pipeline.
+
+Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API
+CrossRef (frontière dynamique avec une source externe, schéma non
+typé). Idem pour le retour de `extract_crossref_meta`, qui est un
+sous-ensemble destiné à `source_publications.meta` (JSONB).
 """
 
 from __future__ import annotations
@@ -24,7 +29,7 @@ def strip_jats_tags(s: str) -> str:
     return _JATS_TAG_RE.sub("", s)
 
 
-def extract_crossref_pub_year(msg: dict, *, max_year: int) -> int | None:
+def extract_crossref_pub_year(msg: dict[str, Any], *, max_year: int) -> int | None:
     """Année de publication CrossRef, dans l'ordre :
     ``published > issued > published-online > published-print``.
 
@@ -56,7 +61,7 @@ def extract_crossref_pub_year(msg: dict, *, max_year: int) -> int | None:
     return None
 
 
-def parse_crossref_issns(msg: dict) -> tuple[str | None, str | None]:
+def parse_crossref_issns(msg: dict[str, Any]) -> tuple[str | None, str | None]:
     """Retourne ``(issn_print, eissn)``.
 
     CrossRef expose deux formats : ``issn-type`` (objets typés
@@ -88,7 +93,7 @@ def parse_crossref_issns(msg: dict) -> tuple[str | None, str | None]:
     return None, None
 
 
-def extract_crossref_meta(msg: dict) -> dict | None:
+def extract_crossref_meta(msg: dict[str, Any]) -> dict[str, Any] | None:
     """Extrait les champs CrossRef-spécifiques à conserver en JSONB.
 
     Whitelist explicite : ``license``, ``funder``, ``relation``,

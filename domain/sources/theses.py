@@ -3,6 +3,12 @@
 Interprétation des champs propres au schéma theses.fr — prédicats et
 extracteurs qui encapsulent la connaissance de la sémantique theses.fr
 pour le reste du pipeline.
+
+Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API
+theses.fr (frontière dynamique avec une source externe, schéma non
+typé). Le champ `person` du dataclass ``ThesisAuthorship`` transmet
+tel quel le sous-objet personne au caller pour upsert
+``source_persons``.
 """
 
 from dataclasses import dataclass
@@ -87,7 +93,7 @@ class ThesisAuthorship:
     is_author: bool
 
 
-def aggregate_thesis_persons(these: dict) -> list[ThesisAuthorship]:
+def aggregate_thesis_persons(these: dict[str, Any]) -> list[ThesisAuthorship]:
     """Agrège les personnes d'une thèse depuis ``these`` (API theses.fr).
 
     Itère sur les champs ``auteurs``, ``directeurs``, ``rapporteurs``,

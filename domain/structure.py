@@ -12,6 +12,8 @@ par concept métier, on promouvra en package (`domain/structure/`) le
 jour où ça dépasse ~500 lignes.
 """
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
@@ -54,7 +56,8 @@ class StructureApiIds(BaseModel):
             return [v] if v else None
         return v
 
-    def to_dict(self) -> dict:
-        """Sérialise pour écriture en base (JSONB). Omet les clés None
-        et les listes vides."""
+    def to_dict(self) -> dict[str, Any]:
+        """Sérialise pour écriture en base (JSONB, `structures.api_ids`).
+        Omet les clés None et les listes vides. `Any` justifié :
+        sérialisation pour colonne JSONB libre."""
         return {k: v for k, v in self.model_dump(exclude_none=True).items() if v}

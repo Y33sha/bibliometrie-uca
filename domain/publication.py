@@ -23,6 +23,7 @@ pour les identifiants), sérialisent en dict pour l'écriture en base.
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -267,11 +268,12 @@ class ExternalIds(BaseModel):
             raise ValueError(f"NNT invalide : {v!r}")
         return normalized.value
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Sérialise pour écriture en base (JSONB).
 
         Omet les clés None pour garder des objets compacts côté BD.
-        Préserve les clés supplémentaires (extra="allow").
+        Préserve les clés supplémentaires (extra="allow"). `Any`
+        justifié : sortie destinée à une colonne JSONB.
         """
         return self.model_dump(exclude_none=True)
 
@@ -303,7 +305,9 @@ class PublicationBiblio(BaseModel):
     first_page: str | None = None  # OpenAlex, WoS
     last_page: str | None = None  # OpenAlex, WoS
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
+        """Sérialise pour écriture en base (colonne JSONB `biblio`). `Any`
+        justifié : sortie destinée à une colonne JSONB."""
         return self.model_dump(exclude_none=True)
 
 
@@ -351,7 +355,9 @@ class PublicationMeta(BaseModel):
     ecoles_doctorales: list[EcoleDoctorale] | None = None
     partenaires: list[Partenaire] | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
+        """Sérialise pour écriture en base (colonne JSONB `meta`). `Any`
+        justifié : sortie destinée à une colonne JSONB."""
         return self.model_dump(exclude_none=True)
 
 
@@ -409,9 +415,13 @@ class PublicationTopics(BaseModel):
 
     openalex: list[OpenAlexTopic] | None = None
     theses: ThesesTopics | None = None
-    scanr: dict | None = None  # format variable, pas de sous-modèle
+    # ScanR a un format variable côté API, non figé en sous-modèle
+    # Pydantic. `Any` justifié : payload JSON brut conservé en JSONB.
+    scanr: dict[str, Any] | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
+        """Sérialise pour écriture en base (colonne JSONB `topics`). `Any`
+        justifié : sortie destinée à une colonne JSONB."""
         return self.model_dump(exclude_none=True)
 
 
