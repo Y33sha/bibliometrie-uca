@@ -124,13 +124,13 @@ def main() -> None:
             .where(addresses.c.id == bindparam("addr_id"))
             .values({column: bindparam("val")})
         )
-        with conn.begin():
-            for i in range(0, len(updates), 5000):
-                batch = updates[i : i + 5000]
-                conn.execute(
-                    stmt,
-                    [{"addr_id": addr_id, "val": [iso.lower()]} for addr_id, iso in batch],
-                )
+        for i in range(0, len(updates), 5000):
+            batch = updates[i : i + 5000]
+            conn.execute(
+                stmt,
+                [{"addr_id": addr_id, "val": [iso.lower()]} for addr_id, iso in batch],
+            )
+        conn.commit()
 
         logger.info(f"{matched} adresses mises à jour ({column.name})")
         show_stats(conn)

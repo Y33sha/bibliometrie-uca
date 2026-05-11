@@ -77,10 +77,10 @@ def main() -> None:
         found = 0
         t0 = time.time()
         while True:
-            with conn.begin():
-                n_done, n_found = suggest_addresses_countries_batch(
-                    conn, batch_size=args.batch_size, target_column=target_column
-                )
+            n_done, n_found = suggest_addresses_countries_batch(
+                conn, batch_size=args.batch_size, target_column=target_column
+            )
+            conn.commit()
             if n_done == 0:
                 break
             processed += n_done
