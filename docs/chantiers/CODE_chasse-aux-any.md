@@ -72,8 +72,17 @@ Patterns dominants :
   docstring (frontière JSONB libre — chaque caller fait son
   `isinstance(...)` avant usage). Adapters, queries, repositories :
   pas encore traités.
-- [ ] `interfaces/api/` routers : modèles Pydantic en retour, pas
-  de `dict` non typé.
+- [x] `interfaces/api/app.py` + `interfaces/api/deps.py` (18 occ.) :
+  `lifespan` → `AsyncIterator[None]` ; exception handlers → `JSONResponse` ;
+  middleware → `RequestResponseEndpoint` / `Response` (`starlette.middleware.base`) ;
+  `health`/`metrics` → `JSONResponse | dict[str, Any]` / `dict[str, Any]` ;
+  `pool: Any` → `cast(QueuePool, engine.pool)` (justifie l'accès à
+  `_max_overflow`/`checkedout`/`checkedin`) ; `SPAStaticFiles.get_response` →
+  signature parente `(str, Scope) -> Response` ; `require_admin` → `None`.
+  Override mypy `disallow_any_generics` posé.
+- [ ] `interfaces/api/routers/` : modèles Pydantic en retour, pas
+  de `dict` non typé. Bloqué par la question ouverte
+  Pydantic/FastAPI ci-dessous.
 - [x] `interfaces/cli/` : 11 `Any` explicites + 4 `dict` non
   paramétrés corrigés (records DB → `list[dict[str, Any]]`,
   helper `c(text, *styles)` → `(object, *str) -> str`,
