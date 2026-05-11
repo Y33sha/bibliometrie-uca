@@ -1,7 +1,6 @@
 """Router /api/admin/duplicates/* (doublons publications)."""
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
@@ -34,7 +33,7 @@ def next_duplicate_candidate(
     min_title_len: int = Query(30, ge=10),
     offset: int = Query(0, ge=0),
     queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries_sync),
-) -> Any:
+) -> PubDuplicateNextResponse:
     """Renvoie la paire de publications candidate au dédoublonnage à l'offset donné.
 
     Les candidats sont produits par la requête `next_pub_duplicate`
@@ -42,7 +41,9 @@ def next_duplicate_candidate(
     `min_title_len` filtre les titres trop courts pour être
     discriminants. Permet au front d'itérer pair par pair via offset.
     """
-    return queries.next_pub_duplicate(min_title_len=min_title_len, offset=offset)
+    return PubDuplicateNextResponse.model_validate(
+        queries.next_pub_duplicate(min_title_len=min_title_len, offset=offset)
+    )
 
 
 @router.post("/api/admin/duplicates/merge", response_model=PubMergeResponse)
@@ -52,7 +53,7 @@ def merge_duplicate_publications(
     queries: PublicationDuplicatesQueries = Depends(publication_duplicates_queries_sync),
     repo: PublicationRepository = Depends(publication_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> PubMergeResponse:
     """Fusionne la publication `source_id` dans `target_id`.
 
     Les authorships, sources, adresses et métadonnées de la source
@@ -78,7 +79,7 @@ def merge_duplicate_publications(
         savepoint.rollback()
         raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}") from e
 
-    return {"ok": True, "target_id": body.target_id, "source_id": body.source_id}
+    return PubMergeResponse(ok=True, target_id=body.target_id, source_id=body.source_id)
 
 
 @router.post("/api/admin/duplicates/mark-distinct", response_model=OkResponse)
@@ -86,7 +87,7 @@ def mark_publications_distinct(
     body: MarkDistinctPublications,
     repo: PublicationRepository = Depends(publication_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> OkResponse:
     """Marque deux publications comme distinctes (non-doublon confirmé).
 
     Persiste l'annotation dans `publication_distinctions` : la paire
@@ -96,4 +97,4 @@ def mark_publications_distinct(
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
     _mark_pubs_distinct(body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit)
-    return {"ok": True}
+    return OkResponse()

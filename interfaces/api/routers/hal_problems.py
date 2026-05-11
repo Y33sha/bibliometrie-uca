@@ -7,7 +7,6 @@ conflits d'affiliations inter-sources.
 """
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -31,9 +30,11 @@ def hal_duplicate_accounts(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries_sync),
-) -> Any:
+) -> HalDuplicateAccountsResponse:
     """Personnes liées à 2+ comptes HAL distincts."""
-    return queries.hal_duplicate_accounts(page=page, per_page=per_page)
+    return HalDuplicateAccountsResponse.model_validate(
+        queries.hal_duplicate_accounts(page=page, per_page=per_page)
+    )
 
 
 @router.get("/api/hal-problems/duplicate-pubs-doi", response_model=HalDoiDuplicatesResponse)
@@ -41,9 +42,11 @@ def hal_duplicate_pubs_by_doi(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries_sync),
-) -> Any:
+) -> HalDoiDuplicatesResponse:
     """Dépôts HAL avec DOI identique rattachés à la même publication."""
-    return queries.hal_duplicate_pubs_by_doi(page=page, per_page=per_page)
+    return HalDoiDuplicatesResponse.model_validate(
+        queries.hal_duplicate_pubs_by_doi(page=page, per_page=per_page)
+    )
 
 
 @router.get("/api/hal-problems/duplicate-pubs-meta", response_model=HalMetaDuplicatesResponse)
@@ -51,9 +54,11 @@ def hal_duplicate_pubs_by_metadata(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries_sync),
-) -> Any:
+) -> HalMetaDuplicatesResponse:
     """Doublons possibles : dépôts HAL avec métadonnées identiques."""
-    return queries.hal_duplicate_pubs_by_metadata(page=page, per_page=per_page)
+    return HalMetaDuplicatesResponse.model_validate(
+        queries.hal_duplicate_pubs_by_metadata(page=page, per_page=per_page)
+    )
 
 
 @router.get("/api/hal-problems/missing-collections", response_model=HalMissingCollectionsResponse)
@@ -62,20 +67,20 @@ def hal_missing_collections(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries_sync),
-) -> Any:
+) -> HalMissingCollectionsResponse:
     """Publications affiliées à un labo dans HAL mais absentes de sa collection."""
     result = queries.hal_missing_collections(lab_id=lab_id, page=page, per_page=per_page)
     if result.get("error") == "no_collection":
         raise HTTPException(status_code=400, detail="Labo sans collection HAL")
-    return result
+    return HalMissingCollectionsResponse.model_validate(result)
 
 
 @router.get("/api/hal-problems/missing-collections/labs", response_model=list[HalCollectionLab])
 def hal_missing_collections_labs(
     queries: HalProblemsQueries = Depends(hal_problems_queries_sync),
-) -> Any:
+) -> list[HalCollectionLab]:
     """Liste des labos avec collection HAL."""
-    return queries.hal_missing_collections_labs()
+    return [HalCollectionLab.model_validate(r) for r in queries.hal_missing_collections_labs()]
 
 
 @router.get(
@@ -85,6 +90,8 @@ def hal_affiliation_conflicts(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries_sync),
-) -> Any:
+) -> HalAffiliationConflictsResponse:
     """Publications affiliées UCA dans HAL mais pas dans une autre source."""
-    return queries.hal_affiliation_conflicts(page=page, per_page=per_page)
+    return HalAffiliationConflictsResponse.model_validate(
+        queries.hal_affiliation_conflicts(page=page, per_page=per_page)
+    )

@@ -5,7 +5,6 @@ du comportement applicatif (invocation d'un use case), pas une query pure.
 """
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
@@ -65,7 +64,7 @@ def publications_facets(
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
     queries: PublicationsQueries = Depends(publications_queries_sync),
-) -> Any:
+) -> PublicationsFacetsResponse:
     """Facettes dynamiques pour la page publications."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
     filters = FacetFilters(
@@ -87,15 +86,15 @@ def publications_facets(
         in_perimeter=in_perimeter,
         subject_id=subject_id,
     )
-    return queries.publications_facets(
-        filters=filters, root_structure_id=get_root_structure_id_sync()
+    return PublicationsFacetsResponse.model_validate(
+        queries.publications_facets(filters=filters, root_structure_id=get_root_structure_id_sync())
     )
 
 
 @router.get("/api/publications/years", response_model=list[int])
 def all_years(
     queries: PublicationsQueries = Depends(publications_queries_sync),
-) -> Any:
+) -> list[int]:
     """Liste de toutes les années présentes en base (validées ou non).
 
     Contrairement à `/stats/years` qui restreint aux années validées,
@@ -181,12 +180,12 @@ def export_theses_csv(
 def get_publication(
     pub_id: int,
     queries: PublicationsQueries = Depends(publications_queries_sync),
-) -> Any:
+) -> PublicationDetailResponse:
     """Détail complet d'une publication."""
     detail = queries.get_publication_detail(pub_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Publication not found")
-    return detail
+    return PublicationDetailResponse.model_validate(detail)
 
 
 @router.post(
@@ -199,7 +198,7 @@ def exclude_source_authorship(
     body: ExcludeSourceAuthorship = ExcludeSourceAuthorship(),
     repo: AuthorshipRepository = Depends(authorship_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> ExcludeSourceAuthorshipResponse:
     """Marque/démarque une authorship source comme fausse.
 
     Si aucune source non exclue n'atteste plus l'authorship consolidée,
@@ -208,7 +207,7 @@ def exclude_source_authorship(
     _set_source_authorship_excluded(
         authorship_id, source, body.excluded, repo=repo, audit_repo=audit
     )
-    return {"ok": True, "excluded": body.excluded}
+    return ExcludeSourceAuthorshipResponse(ok=True, excluded=body.excluded)
 
 
 @router.get("/api/publications", response_model=PublicationListResponse)
@@ -234,7 +233,7 @@ def list_publications(
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
     queries: PublicationsQueries = Depends(publications_queries_sync),
-) -> Any:
+) -> PublicationListResponse:
     """Liste paginée des publications avec sources, labos et journal rattachés.
 
     Filtres multiples cumulables. `lab_id` et `year` acceptent des
@@ -265,10 +264,12 @@ def list_publications(
         in_perimeter=in_perimeter,
         subject_id=subject_id,
     )
-    return queries.list_publications(
-        filters=filters,
-        root_structure_id=get_root_structure_id_sync(),
-        page=page,
-        per_page=per_page,
-        sort=sort,
+    return PublicationListResponse.model_validate(
+        queries.list_publications(
+            filters=filters,
+            root_structure_id=get_root_structure_id_sync(),
+            page=page,
+            per_page=per_page,
+            sort=sort,
+        )
     )

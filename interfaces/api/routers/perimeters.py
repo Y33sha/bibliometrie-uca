@@ -7,7 +7,6 @@ est_tutelle_de et est_partenaire_de).
 """
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends
 
@@ -39,7 +38,7 @@ logger = logging.getLogger(__name__)
 @router.get("/api/perimeters", response_model=list[PerimeterOut])
 def list_perimeters(
     queries: PerimetersAdminQueries = Depends(perimeters_admin_queries_sync),
-) -> Any:
+) -> list[PerimeterOut]:
     """Liste tous les périmètres avec leurs structures racines résolues.
 
     Pour chaque périmètre, renvoie les structures racines directes
@@ -47,14 +46,14 @@ def list_perimeters(
     relations (`structure_count`). Le décompte inclut donc les
     sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
     """
-    return queries.list_perimeters_with_structures()
+    return [PerimeterOut.model_validate(p) for p in queries.list_perimeters_with_structures()]
 
 
 @router.post("/api/perimeters", response_model=CreatedIdResponse)
 def create_perimeter(
     body: PerimeterCreate,
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
-) -> Any:
+) -> CreatedIdResponse:
     """Crée un nouveau périmètre."""
     code = body.code.strip()
     name = body.name.strip()
@@ -65,7 +64,7 @@ def create_perimeter(
         description=description,
         repo=repo,
     )
-    return {"id": pid}
+    return CreatedIdResponse(id=pid)
 
 
 @router.put("/api/perimeters/{perimeter_id}", response_model=OkResponse)
@@ -73,7 +72,7 @@ def update_perimeter(
     perimeter_id: int,
     body: PerimeterUpdate,
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
-) -> Any:
+) -> OkResponse:
     """Met à jour un périmètre (nom, description, structures)."""
     fields = body.model_dump(exclude_unset=True)
     # Nettoyer : strip des strings et description vide → None
@@ -82,7 +81,7 @@ def update_perimeter(
     if "description" in fields and isinstance(fields["description"], str):
         fields["description"] = fields["description"].strip() or None
     config_service.update_perimeter(perimeter_id, fields=fields, repo=repo)
-    return {"ok": True}
+    return OkResponse()
 
 
 @router.delete("/api/perimeters/{perimeter_id}", response_model=OkResponse)
@@ -91,10 +90,10 @@ def delete_perimeter(
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
     config_repo: ConfigStore = Depends(config_store_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> OkResponse:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
     config_service.delete_perimeter(perimeter_id, repo=repo, config=config_repo, audit_repo=audit)
-    return {"ok": True}
+    return OkResponse()
 
 
 @router.post("/api/perimeters/{perimeter_id}/structures", response_model=StatusResponse)
@@ -102,14 +101,14 @@ def add_perimeter_structure(
     perimeter_id: int,
     body: AddPerimeterStructure,
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
-) -> Any:
+) -> StatusResponse:
     """Ajoute une structure racine au périmètre.
 
     Renvoie `{"status": "added"}` ou `"already_exists"` si la
     structure était déjà racine.
     """
     status = config_service.add_perimeter_structure(perimeter_id, body.structure_id, repo=repo)
-    return {"status": status}
+    return StatusResponse(status=status)
 
 
 @router.delete(
@@ -119,8 +118,8 @@ def remove_perimeter_structure(
     perimeter_id: int,
     structure_id: int,
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
-) -> Any:
+) -> StatusResponse:
     """Retire une structure racine du périmètre. N'affecte pas ses
     sous-structures tant qu'elles sont rattachées à d'autres racines."""
     config_service.remove_perimeter_structure(perimeter_id, structure_id, repo=repo)
-    return {"status": "removed"}
+    return StatusResponse(status="removed")

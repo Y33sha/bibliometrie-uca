@@ -7,7 +7,6 @@ Lectures via le port `PersonsQueries` (toutes les queries SQL sont dans
 
 import logging
 import re
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection, text
@@ -127,7 +126,7 @@ def persons_directory(
     has_rh: str = Query(""),
     sort: str = Query("name"),
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> PersonDirectoryResponse:
     """Annuaire public des personnes UCA avec ORCID et idHAL."""
     filters = DirectoryFilters(
         search=search,
@@ -138,7 +137,9 @@ def persons_directory(
         has_idref=has_idref,
         has_rh=has_rh,
     )
-    return queries.persons_directory(filters=filters, page=page, per_page=per_page, sort=sort)
+    return PersonDirectoryResponse.model_validate(
+        queries.persons_directory(filters=filters, page=page, per_page=per_page, sort=sort)
+    )
 
 
 @router.get("/api/persons/search", response_model=list[PersonSearchResult])
@@ -146,9 +147,9 @@ def search_persons(
     q: str = Query("", min_length=2),
     limit: int = Query(10, ge=1, le=30),
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> list[PersonSearchResult]:
     """Recherche rapide de personnes (autocomplete)."""
-    return queries.search_persons(q=q, limit=limit)
+    return [PersonSearchResult.model_validate(r) for r in queries.search_persons(q=q, limit=limit)]
 
 
 @router.get("/api/persons", response_model=PersonListResponse)
@@ -164,7 +165,7 @@ def list_persons(
     has_rh: str = Query(""),
     sort: str = Query("name"),
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> PersonListResponse:
     """Liste des personnes avec filtres (admin)."""
     filters = ListFilters(
         search=search,
@@ -175,7 +176,9 @@ def list_persons(
         has_idhal=has_idhal,
         has_rh=has_rh,
     )
-    return queries.list_persons(filters=filters, page=page, per_page=per_page, sort=sort)
+    return PersonListResponse.model_validate(
+        queries.list_persons(filters=filters, page=page, per_page=per_page, sort=sort)
+    )
 
 
 @router.get("/api/persons/facets", response_model=PersonsFacetsResponse)
@@ -188,7 +191,7 @@ def persons_facets(
     has_rh: str = Query(""),
     linked: str = Query(""),
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> PersonsFacetsResponse:
     """Facettes dynamiques pour la page personnes."""
     filters = FacetFilters(
         departments=parse_str_csv(department),
@@ -199,64 +202,64 @@ def persons_facets(
         has_rh=has_rh,
         linked=linked,
     )
-    return queries.persons_facets(filters=filters)
+    return PersonsFacetsResponse.model_validate(queries.persons_facets(filters=filters))
 
 
 @router.get("/api/persons/departments", response_model=list[DepartmentCount])
 def list_departments(
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> list[DepartmentCount]:
     """Liste des départements distincts."""
-    return queries.list_departments()
+    return [DepartmentCount.model_validate(r) for r in queries.list_departments()]
 
 
 @router.get("/api/persons/roles", response_model=list[RoleCount])
 def list_roles(
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> list[RoleCount]:
     """Liste des rôles distincts."""
-    return queries.list_roles()
+    return [RoleCount.model_validate(r) for r in queries.list_roles()]
 
 
 @router.get("/api/persons/stats", response_model=PersonsStatsResponse)
 def persons_stats(
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> PersonsStatsResponse:
     """Statistiques sur les personnes et l'alignement."""
-    return queries.persons_stats()
+    return PersonsStatsResponse.model_validate(queries.persons_stats())
 
 
 @router.get("/api/persons/{person_id}", response_model=PersonDetail)
 def get_person(
     person_id: int,
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> PersonDetail:
     """Détail d'une personne avec auteurs liés."""
     person = queries.get_person(person_id)
     if not person:
         raise HTTPException(status_code=404, detail="Person not found")
-    return person
+    return PersonDetail.model_validate(person)
 
 
 @router.get("/api/persons/{person_id}/profile", response_model=PersonProfileResponse)
 def person_profile(
     person_id: int,
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> PersonProfileResponse:
     """Profil public complet d'une personne."""
     profile = queries.person_profile(person_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Person not found")
-    return profile
+    return PersonProfileResponse.model_validate(profile)
 
 
 @router.get("/api/persons/{person_id}/theses", response_model=PersonThesesResponse)
 def person_theses(
     person_id: int,
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> PersonThesesResponse:
     """Thèses liées à cette personne avec un rôle non-auteur."""
-    return queries.person_theses(person_id)
+    return PersonThesesResponse.model_validate(queries.person_theses(person_id))
 
 
 @router.get("/api/persons/{person_id}/addresses", response_model=PersonAddressesResponse)
@@ -265,18 +268,20 @@ def person_addresses(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> PersonAddressesResponse:
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
-    return queries.person_addresses(person_id, page=page, per_page=per_page)
+    return PersonAddressesResponse.model_validate(
+        queries.person_addresses(person_id, page=page, per_page=per_page)
+    )
 
 
 @router.get("/api/persons/{person_id}/dashboard", response_model=PersonDashboardResponse)
 def person_dashboard(
     person_id: int,
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> PersonDashboardResponse:
     """Dashboard personne : publis/an + Open Access."""
-    return queries.person_dashboard(person_id)
+    return PersonDashboardResponse.model_validate(queries.person_dashboard(person_id))
 
 
 @router.get("/api/persons/{person_id}/subjects", response_model=list[SubjectFrequency])
@@ -284,9 +289,11 @@ def person_subjects(
     person_id: int,
     limit: int = Query(30, ge=1, le=100),
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> list[SubjectFrequency]:
     """Top sujets des publications de cette personne (nuage de mots)."""
-    return queries.person_subjects(person_id, limit=limit)
+    return [
+        SubjectFrequency.model_validate(r) for r in queries.person_subjects(person_id, limit=limit)
+    ]
 
 
 # ── Gestion des identifiants ─────────────────────────────────────
@@ -301,7 +308,7 @@ def add_person_identifier(
     conn: Connection = Depends(db_conn_sync),
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
-) -> Any:
+) -> AddIdentifierResponse:
     """Ajoute manuellement un identifiant (ORCID ou idHAL) à une personne."""
     if data.id_type not in ("orcid", "idhal", "idref"):
         raise HTTPException(status_code=400, detail="id_type doit être 'orcid', 'idhal' ou 'idref'")
@@ -332,7 +339,7 @@ def add_person_identifier(
     was_reassigned = False
     if existing_row:
         if existing_row.person_id == person_id:
-            return {"added": False, "reason": "already_exists"}
+            return AddIdentifierResponse(added=False, reason="already_exists")
         if existing_row.status != "rejected":
             raise HTTPException(
                 status_code=409,
@@ -343,10 +350,12 @@ def add_person_identifier(
         was_reassigned = True
 
     _add_identifier(person_id, data.id_type, id_value, source="manual", repo=repo)
-    result: dict[str, Any] = {"added": True, "id_type": data.id_type, "id_value": id_value}
-    if was_reassigned:
-        result["reassigned"] = True
-    return result
+    return AddIdentifierResponse(
+        added=True,
+        id_type=data.id_type,
+        id_value=id_value,
+        reassigned=True if was_reassigned else None,
+    )
 
 
 @router.delete(
@@ -359,10 +368,10 @@ def remove_person_identifier(
     id_value: str,
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> RemovedResponse:
     """Supprime un identifiant d'une personne."""
     _remove_identifier(person_id, id_type, id_value, repo=repo, audit_repo=audit)
-    return {"removed": True}
+    return RemovedResponse()
 
 
 @router.patch("/api/person-identifiers/{ident_id}/status", response_model=IdentifierStatusResponse)
@@ -371,10 +380,10 @@ def update_identifier_status(
     body: UpdateIdentifierStatus,
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> IdentifierStatusResponse:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
     row = _update_identifier_status(ident_id, body.status, repo=repo, audit_repo=audit)
-    return {"id": row["id"], "status": row["status"]}
+    return IdentifierStatusResponse(id=row["id"], status=row["status"])
 
 
 @router.patch(
@@ -386,12 +395,12 @@ def reassign_identifier(
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> IdentifierReassignResponse:
     """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
     if not queries.person_exists(body.person_id):
         raise HTTPException(status_code=404, detail="Personne cible introuvable")
     _reassign_identifier(ident_id, body.person_id, repo=repo, audit_repo=audit)
-    return {"id": ident_id, "person_id": body.person_id, "status": "pending"}
+    return IdentifierReassignResponse(id=ident_id, person_id=body.person_id, status="pending")
 
 
 @router.patch("/api/authorships/{authorship_id}/exclude", response_model=AuthorshipExcludeResponse)
@@ -399,10 +408,10 @@ def toggle_authorship_excluded(
     authorship_id: int,
     repo: AuthorshipRepository = Depends(authorship_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> AuthorshipExcludeResponse:
     """Marque un authorship comme exclu."""
     row = exclude_authorship(authorship_id, repo=repo, audit_repo=audit)
-    return {"id": row["id"], "excluded": row["excluded"]}
+    return AuthorshipExcludeResponse(id=row["id"], excluded=row["excluded"])
 
 
 @router.patch("/api/persons/{person_id}/reject", response_model=OkResponse)
@@ -411,10 +420,10 @@ def reject_person(
     body: RejectPerson,
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> OkResponse:
     """Marque/démarque une personne comme rejetée."""
     _set_rejected(person_id, body.rejected, repo=repo, audit_repo=audit)
-    return {"ok": True}
+    return OkResponse()
 
 
 @router.patch("/api/persons/{person_id}/name", response_model=OkResponse)
@@ -422,14 +431,14 @@ def update_person_name(
     person_id: int,
     body: UpdatePersonName,
     repo: PersonRepository = Depends(person_repo_sync),
-) -> Any:
+) -> OkResponse:
     """Modifie le nom/prénom d'une personne."""
     last_name = body.last_name.strip()
     first_name = body.first_name.strip()
     if not last_name:
         raise HTTPException(status_code=400, detail="Le nom est requis")
     _update_name(person_id, last_name, first_name, repo=repo)
-    return {"ok": True}
+    return OkResponse()
 
 
 @router.post("/api/persons/{person_id}/merge", response_model=MergeResponse)
@@ -439,7 +448,7 @@ def merge_persons(
     conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> Any:
+) -> MergeResponse:
     """Fusionne une autre personne (source) dans celle-ci (target)."""
     source_id = body.source_id
     if source_id == person_id:
@@ -456,7 +465,7 @@ def merge_persons(
         raise HTTPException(status_code=404, detail="Personne source introuvable")
 
     _merge_person(person_id, source_id, repo=repo, audit_repo=audit)
-    return {"merged": True, "source_id": source_id, "target_id": person_id}
+    return MergeResponse(merged=True, source_id=source_id, target_id=person_id)
 
 
 # ── Authorships orphelines ───────────────────────────────────────
@@ -465,9 +474,9 @@ def merge_persons(
 @router.get("/api/admin/orphan-authorships/count", response_model=OrphanCountResponse)
 def orphan_authorships_count(
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> OrphanCountResponse:
     """Nombre d'authorships UCA sans person_id."""
-    return queries.orphan_authorships_count()
+    return OrphanCountResponse.model_validate(queries.orphan_authorships_count())
 
 
 @router.get("/api/admin/orphan-authorships", response_model=OrphanAuthorshipsResponse)
@@ -476,9 +485,11 @@ def list_orphan_authorships(
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> OrphanAuthorshipsResponse:
     """Liste les authorships UCA sans person_id."""
-    return queries.list_orphan_authorships(search=search, page=page, per_page=per_page)
+    return OrphanAuthorshipsResponse.model_validate(
+        queries.list_orphan_authorships(search=search, page=page, per_page=per_page)
+    )
 
 
 @router.post("/api/admin/orphan-authorships/assign", response_model=OrphanAssignResponse)
@@ -486,7 +497,7 @@ def assign_orphan_authorship_endpoint(
     body: AssignOrphanAuthorship,
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
-) -> Any:
+) -> OrphanAssignResponse:
     """Attribue une authorship orpheline à une personne."""
     if body.source not in ALL_SOURCES_SET:
         raise HTTPException(status_code=400, detail=f"Source inconnue: {body.source}")
@@ -503,7 +514,7 @@ def assign_orphan_authorship_endpoint(
     if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
     _assign_orphan(person_id, body.source, body.authorship_id, repo=repo)
-    return {"ok": True, "person_id": person_id}
+    return OrphanAssignResponse(person_id=person_id)
 
 
 @router.post("/api/admin/orphan-authorships/batch-assign", response_model=OrphanBatchAssignResponse)
@@ -511,17 +522,17 @@ def batch_assign_orphan_authorships(
     body: BatchAssignOrphanAuthorships,
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
-) -> Any:
+) -> OrphanBatchAssignResponse:
     """Attribue plusieurs authorships orphelines à une même personne."""
     person_id = body.person_id
     sa_ids = [a.authorship_id for a in body.authorships if a.source in ALL_SOURCES_SET]
     if not sa_ids:
-        return {"ok": True, "assigned": 0}
+        return OrphanBatchAssignResponse(assigned=0)
 
     if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
     assigned = _batch_assign_orphan(person_id, sa_ids, repo=repo)
-    return {"ok": True, "assigned": assigned}
+    return OrphanBatchAssignResponse(assigned=assigned)
 
 
 # ── Formes de noms / détachement authorships ─────────────────────
@@ -535,9 +546,11 @@ def name_form_authorships(
     person_id: int,
     name_form: str = Query(...),
     queries: PersonsQueries = Depends(persons_queries_sync),
-) -> Any:
+) -> NameFormAuthorshipsResponse:
     """Authorships sources + autres personnes partageant une forme de nom."""
-    return queries.name_form_authorships(person_id, name_form)
+    return NameFormAuthorshipsResponse.model_validate(
+        queries.name_form_authorships(person_id, name_form)
+    )
 
 
 @router.post(
@@ -548,16 +561,18 @@ def detach_authorships(
     body: DetachAuthorships,
     person_repo_: PersonRepository = Depends(person_repo_sync),
     auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
-) -> Any:
+) -> DetachAuthorshipsResponse:
     """Détache des authorships sources d'une personne et nettoie les formes de noms."""
-    return _detach_authorships_service(
-        person_id,
-        authorships=[
-            {"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships
-        ],
-        name_form=body.name_form,
-        repo=person_repo_,
-        authorship_repo=auth_repo,
+    return DetachAuthorshipsResponse.model_validate(
+        _detach_authorships_service(
+            person_id,
+            authorships=[
+                {"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships
+            ],
+            name_form=body.name_form,
+            repo=person_repo_,
+            authorship_repo=auth_repo,
+        )
     )
 
 
@@ -567,13 +582,13 @@ def detach_name_form(
     body: DetachNameForm,
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
-) -> Any:
+) -> DetachedResponse:
     """Détache une forme de nom d'une personne (quand aucune authorship n'y est liée)."""
     remaining = queries.name_form_remaining_authorships(person_id, body.name_form)
     if remaining > 0:
         raise HTTPException(status_code=400, detail="Cette forme a encore des authorships liées")
     _detach_name_form(person_id, body.name_form, repo=repo)
-    return {"detached": True}
+    return DetachedResponse()
 
 
 # Les endpoints `/api/hal-problems/*` ont été déplacés dans
