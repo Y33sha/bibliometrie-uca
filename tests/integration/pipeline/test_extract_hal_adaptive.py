@@ -11,6 +11,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy import text
 
 from infrastructure.sources.hal import extract_hal
 
@@ -194,35 +195,28 @@ class TestTagExistingWithCollection:
 
     def test_executes_update_with_array_append(self):
         conn = MagicMock()
-        cur = MagicMock()
-        cur.rowcount = 3
-        conn.cursor.return_value.__enter__.return_value = cur
+        conn.execute.return_value.rowcount = 3
 
         n = extract_hal.tag_existing_with_collection(conn, ["hal-1", "hal-2", "hal-3"], "PRES_UCA")
         assert n == 3
-        sql = cur.execute.call_args[0][0]
+        sql = str(conn.execute.call_args[0][0])
         assert "UPDATE staging" in sql
         assert "hal_collections" in sql
-        assert "ANY(%s)" in sql
-        params = cur.execute.call_args[0][1]
-        assert params == (
-            "PRES_UCA",
-            "PRES_UCA",
-            "PRES_UCA",
-            ["hal-1", "hal-2", "hal-3"],
-        )
+        assert "ANY(:ids)" in sql
+        params = conn.execute.call_args[0][1]
+        assert params == {"code": "PRES_UCA", "ids": ["hal-1", "hal-2", "hal-3"]}
         conn.commit.assert_called_once()
 
 
 class _NoCommitConn:
-    """Wrap une connexion réelle en neutralisant commit() pour que le
-    rollback de la fixture `db` reste effectif."""
+    """Wrap une SA Connection en neutralisant commit() pour que le
+    rollback de la fixture `sa_sync_conn` reste effectif."""
 
     def __init__(self, real_conn):
         self._conn = real_conn
 
-    def cursor(self):
-        return self._conn.cursor()
+    def execute(self, *args, **kwargs):
+        return self._conn.execute(*args, **kwargs)
 
     def commit(self):
         pass
@@ -232,44 +226,50 @@ class TestTagExistingWithCollectionSql:
     """Exécute le vrai SQL contre la base de test pour attraper les bugs
     de typage côté Postgres (ex. cast manquant sur `array || element`)."""
 
-    def test_append_collection_to_existing_array(self, db):
-        db.execute(
-            """
-            INSERT INTO staging (source, source_id, raw_data, hal_collections)
-            VALUES ('hal', 'hal-existing', '{}'::jsonb, ARRAY['OLD']::TEXT[])
-            """
+    def test_append_collection_to_existing_array(self, sa_sync_conn):
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO staging (source, source_id, raw_data, hal_collections) "
+                "VALUES ('hal', 'hal-existing', '{}'::jsonb, ARRAY['OLD']::TEXT[])"
+            )
         )
         n = extract_hal.tag_existing_with_collection(
-            _NoCommitConn(db.connection), ["hal-existing"], "GEOLAB"
+            _NoCommitConn(sa_sync_conn), ["hal-existing"], "GEOLAB"
         )
         assert n == 1
-        db.execute("SELECT hal_collections FROM staging WHERE source_id = 'hal-existing'")
-        assert db.fetchone()["hal_collections"] == ["OLD", "GEOLAB"]
+        row = sa_sync_conn.execute(
+            text("SELECT hal_collections FROM staging WHERE source_id = 'hal-existing'")
+        ).one()
+        assert row.hal_collections == ["OLD", "GEOLAB"]
 
-    def test_init_collection_array_when_null(self, db):
-        db.execute(
-            """
-            INSERT INTO staging (source, source_id, raw_data, hal_collections)
-            VALUES ('hal', 'hal-null', '{}'::jsonb, NULL)
-            """
+    def test_init_collection_array_when_null(self, sa_sync_conn):
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO staging (source, source_id, raw_data, hal_collections) "
+                "VALUES ('hal', 'hal-null', '{}'::jsonb, NULL)"
+            )
         )
         n = extract_hal.tag_existing_with_collection(
-            _NoCommitConn(db.connection), ["hal-null"], "GEOLAB"
+            _NoCommitConn(sa_sync_conn), ["hal-null"], "GEOLAB"
         )
         assert n == 1
-        db.execute("SELECT hal_collections FROM staging WHERE source_id = 'hal-null'")
-        assert db.fetchone()["hal_collections"] == ["GEOLAB"]
+        row = sa_sync_conn.execute(
+            text("SELECT hal_collections FROM staging WHERE source_id = 'hal-null'")
+        ).one()
+        assert row.hal_collections == ["GEOLAB"]
 
-    def test_no_duplicate_when_collection_already_present(self, db):
-        db.execute(
-            """
-            INSERT INTO staging (source, source_id, raw_data, hal_collections)
-            VALUES ('hal', 'hal-dup', '{}'::jsonb, ARRAY['GEOLAB']::TEXT[])
-            """
+    def test_no_duplicate_when_collection_already_present(self, sa_sync_conn):
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO staging (source, source_id, raw_data, hal_collections) "
+                "VALUES ('hal', 'hal-dup', '{}'::jsonb, ARRAY['GEOLAB']::TEXT[])"
+            )
         )
         n = extract_hal.tag_existing_with_collection(
-            _NoCommitConn(db.connection), ["hal-dup"], "GEOLAB"
+            _NoCommitConn(sa_sync_conn), ["hal-dup"], "GEOLAB"
         )
         assert n == 1
-        db.execute("SELECT hal_collections FROM staging WHERE source_id = 'hal-dup'")
-        assert db.fetchone()["hal_collections"] == ["GEOLAB"]
+        row = sa_sync_conn.execute(
+            text("SELECT hal_collections FROM staging WHERE source_id = 'hal-dup'")
+        ).one()
+        assert row.hal_collections == ["GEOLAB"]

@@ -420,8 +420,6 @@ source_persons = Table(
     Column("source", Text, nullable=False),
     Column("source_id", Text, nullable=False),
     Column("full_name", Text, nullable=False),
-    Column("last_name", Text),
-    Column("first_name", Text),
     Column("orcid", Text),
     Column("idref", Text),
     Column("person_id", Integer),

@@ -14,7 +14,7 @@
 - Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (orchestrateurs métier, incluant `application/pipeline/`), `infrastructure/` (adapters SQL, APIs sources, settings), `interfaces/` (adapters entrants : `interfaces/api/` pour FastAPI, `interfaces/frontend/` pour SvelteKit, `interfaces/cli/` pour les scripts one-shot). Entry points CLI : `run_pipeline.py` à la racine.
 - Frontend : SvelteKit (Svelte 5), routes dans `interfaces/frontend/src/routes/`
 - Pipeline : phases dans `application/pipeline/`, extracteurs dans `infrastructure/sources/`, orchestrateur `run_pipeline.py` à la racine
-- Migrations SQL dans `infrastructure/db/migrations/`, appliquées via `python -m infrastructure.db.migrate`
+- Migrations Alembic dans `alembic/versions/` (créer : `alembic revision --autogenerate -m "..."` ; appliquer : `alembic upgrade head` ; rollback : `alembic downgrade -1`). Snapshot `infrastructure/db/schema.sql` régénéré par `python -m infrastructure.db.dump_schema`.
 - Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_PASSWORD=...`)
 - Tests frontend : `cd interfaces/frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh` (uvicorn port 8003 + vite port 5176)

@@ -61,18 +61,28 @@ table `schema_migrations`) par Alembic, et bénéficier de
 
 ## Phase 4 — Bascule de la base dev locale
 
-- [ ] L'utilisatrice : `alembic stamp head` sur la base dev (marque
+- [x] L'utilisatrice : `alembic stamp head` sur la base dev (marque
   la baseline appliquée sans la rejouer)
-- [ ] L'utilisatrice : `DROP TABLE schema_migrations`
+- [x] L'utilisatrice : `DROP TABLE schema_migrations`
 
 ## Phase 5 — Décommissionnement
 
-- [ ] Supprimer `infrastructure/db/migrations/*.sql` (23 fichiers)
-- [ ] Supprimer `infrastructure/db/migrate.py`
-- [ ] Créer `infrastructure/db/dump_schema.py` (équivalent du
+- [x] Supprimer `infrastructure/db/migrations/*.sql` (23 fichiers)
+- [x] Supprimer `infrastructure/db/migrate.py`
+- [x] Créer `infrastructure/db/dump_schema.py` (équivalent du
   `--dump-schema`)
-- [ ] Adapter tout caller : `conftest.py` (fixture base de test),
-  `start.sh`, scripts éventuels
+- [x] `conftest.py` : bascule sur `alembic upgrade head` au lieu de
+  lire `schema.sql` (Alembic devient unique source de vérité ;
+  option B retenue après discussion). `env.py` étendu pour accepter
+  une URL surchargée via config.
+- [x] **Hors périmètre, fix au passage** : `tables.py.source_persons`
+  avait encore `last_name`/`first_name` (migration 022 appliquée en
+  DB mais MetaData oubliée — masqué jusqu'ici par un `schema.sql`
+  désynchronisé). Test `test_all_metadata_columns_exist_in_db` à
+  nouveau vrai.
+- [x] **Hors périmètre, fix au passage** : 4 tests dans
+  `test_extract_hal_adaptive` cassés depuis sqla Phase 4 (signature
+  cursor → SA Connection non répercutée côté tests), adaptés.
 
 ## Phase 6 — Documentation
 
