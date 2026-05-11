@@ -13,8 +13,7 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 from sqlalchemy import Connection
 
 from application.audit import emit_event
-from application.authorships import delete_orphan_authorships
-from domain.errors import ValidationError
+from application.authorships.core import delete_orphan_authorships
 from domain.names import compute_person_name_forms
 from domain.persons.merge import check_can_merge_persons
 from domain.ports.audit_repository import AuditRepository
@@ -38,8 +37,6 @@ __all__ = [
     "update_identifier_status",
     "reassign_identifier",
     "detach_name_form",
-    "assign_orphan_authorship",
-    "batch_assign_orphan_authorships",
     "detach_authorships",
     "mark_distinct",
 ]
@@ -295,53 +292,6 @@ def detach_name_form(
     """Détache une personne d'une forme de nom. Supprime la forme si
     person_ids devient vide."""
     repo.detach_name_form(person_id, name_form)
-
-
-# ── Attribution d'authorships orphelines ──
-
-
-def assign_orphan_authorship(
-    conn: Connection,
-    person_id: int,
-    source: str,
-    authorship_id: int,
-    *,
-    repo: PersonRepository,
-) -> bool:
-    """Attribue une authorship orpheline (person_id IS NULL) à une personne.
-
-    1. Valide la source
-    2. Met person_id sur l'authorship source (seulement si elle est orpheline)
-    3. Ajoute la forme de nom (si authorship non exclue)
-    4. Crée/met à jour l'authorship vérité + FK source
-
-    Retourne True si l'authorship a été attribuée, False sinon.
-    """
-    if source not in ALL_SOURCES_SET:
-        raise ValidationError(f"Source inconnue : {source}")
-
-    row = repo.assign_orphan_sa(person_id, source, authorship_id)
-    if not row:
-        return False
-
-    # Ajouter la forme de nom (sauf si authorship exclue)
-    if row["author_name_normalized"] and not row.get("excluded"):
-        repo.add_name_form(person_id, row["author_name_normalized"], source=source)
-
-    # Créer/mettre à jour l'authorship vérité
-    repo.ensure_truth_authorship(person_id, source, authorship_id)
-    return True
-
-
-def batch_assign_orphan_authorships(
-    conn: Connection, person_id: int, sa_ids: list[int], *, repo: PersonRepository
-) -> int:
-    """Attribue en batch plusieurs authorships sources orphelines à une personne.
-
-    Retourne le nombre de source_authorships effectivement rattachées
-    (celles qui étaient orphelines).
-    """
-    return repo.batch_assign_orphans(person_id, sa_ids)
 
 
 def detach_authorships(

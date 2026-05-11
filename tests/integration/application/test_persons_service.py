@@ -1,7 +1,9 @@
-"""Tests de caractérisation pour application/persons.py.
+"""Tests de caractérisation pour application/persons.py et
+application/authorships/assign_orphans.py.
 
 Couvre link/unlink_authorship (branches source invalide), add_identifier,
-detach_name_form, assign_orphan_authorship (qui couvre _ensure_truth_authorship),
+detach_name_form, assign_orphan_authorship (qui couvre la
+re-synchronisation de l'authorship canonique depuis ses sources),
 merge_person, etc.
 """
 
@@ -11,11 +13,13 @@ import pytest
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.authorships.assign_orphans import (
+    assign_orphan_authorship,
+    batch_assign_orphan_authorships,
+)
 from application.persons import (
     add_identifier,
     add_identifiers_from_authorships,
-    assign_orphan_authorship,
-    batch_assign_orphan_authorships,
     create_person,
     detach_authorships,
     detach_name_form,
@@ -407,7 +411,7 @@ class TestBatchAssignOrphanAuthorships:
         person_id = _insert_person(sa_sync_conn)
         assert batch_assign_orphan_authorships(sa_sync_conn, person_id, [], repo=repo) == 0
 
-    def test_assigns_and_creates_truth(self, sa_sync_conn, repo):
+    def test_assigns_and_creates_authorship(self, sa_sync_conn, repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
@@ -462,7 +466,7 @@ class TestBatchAssignOrphanAuthorships:
 
 
 class TestDetachAuthorships:
-    def test_detaches_and_removes_truth_if_orphan(self, sa_sync_conn, repo, authorship_repo):
+    def test_detaches_and_removes_authorship_if_orphan(self, sa_sync_conn, repo, authorship_repo):
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
@@ -618,7 +622,7 @@ class TestDetachNameForm:
         assert row is None
 
 
-# ── assign_orphan_authorship (+ _ensure_truth_authorship) ──────────
+# ── assign_orphan_authorship ───────────────────────────────────────
 
 
 class TestAssignOrphanAuthorship:
@@ -638,7 +642,7 @@ class TestAssignOrphanAuthorship:
 
         assert assign_orphan_authorship(sa_sync_conn, person_id, "hal", sa_id, repo=repo) is False
 
-    def test_assigns_and_creates_truth_authorship(self, sa_sync_conn, repo):
+    def test_assigns_and_creates_authorship(self, sa_sync_conn, repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)

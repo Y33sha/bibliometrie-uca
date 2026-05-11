@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import Connection
 
-from application.authorships import (
+from application.authorships.core import (
     set_source_authorship_excluded as _set_source_authorship_excluded,
 )
 from application.ports.publications_queries import (

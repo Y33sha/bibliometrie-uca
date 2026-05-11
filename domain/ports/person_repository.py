@@ -79,13 +79,60 @@ class PersonRepository(Protocol):
         authorship_id: int,
     ) -> dict[str, Any] | None: ...
 
-    def batch_assign_orphans(self, person_id: int, sa_ids: list[int]) -> int: ...
+    # ── Opérations atomiques pour le use case `assign_orphans` ────
+    # Orchestré dans `application/authorships/assign_orphans.py`.
 
-    def ensure_truth_authorship(
+    def assign_orphan_source_authorships_to_person(
         self,
         person_id: int,
+        sa_ids: list[int],
+    ) -> int: ...
+
+    def create_authorships_from_sources(
+        self,
+        person_id: int,
+        sa_ids: list[int],
+        source_priority: tuple[str, ...],
+    ) -> None: ...
+
+    def link_source_authorships_to_authorships(
+        self,
+        person_id: int,
+        sa_ids: list[int],
+    ) -> None: ...
+
+    def get_distinct_name_forms_from_source_authorships(
+        self,
+        sa_ids: list[int],
+    ) -> list[str]: ...
+
+    def find_publication_id_for_source_authorship(
+        self,
         source: str,
         authorship_id: int,
+    ) -> int | None: ...
+
+    def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None: ...
+
+    def link_source_authorships_to_authorship_for_pair(
+        self,
+        publication_id: int,
+        person_id: int,
+    ) -> None: ...
+
+    def recompute_authorship_author_position_and_corresponding(
+        self,
+        publication_id: int,
+        person_id: int,
+        source_priority: tuple[str, ...],
+        is_corresponding_priority: tuple[str, ...],
+    ) -> None: ...
+
+    def recompute_authorship_in_perimeter_and_structures(
+        self,
+        publication_id: int,
+        person_id: int,
+        sources: tuple[str, ...],
     ) -> None: ...
 
     def count_authorships_with_name_form(

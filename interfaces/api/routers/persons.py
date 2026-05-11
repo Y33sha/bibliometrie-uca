@@ -12,15 +12,15 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection, text
 
-from application.authorships import exclude_authorship
-from application.persons import (
-    add_identifier as _add_identifier,
-)
-from application.persons import (
+from application.authorships.assign_orphans import (
     assign_orphan_authorship as _assign_orphan,
 )
-from application.persons import (
+from application.authorships.assign_orphans import (
     batch_assign_orphan_authorships as _batch_assign_orphan,
+)
+from application.authorships.core import exclude_authorship
+from application.persons import (
+    add_identifier as _add_identifier,
 )
 from application.persons import (
     create_person as _create_person,
