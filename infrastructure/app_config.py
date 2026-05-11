@@ -14,8 +14,13 @@ from sqlalchemy import Connection, text
 logger = logging.getLogger(__name__)
 
 
-def _get_from_db(conn: Connection, key: Any) -> Any:
-    """Lit une valeur depuis la table config. Retourne None si absente."""
+def _get_from_db(conn: Connection, key: str) -> Any:
+    """Lit une valeur depuis la table config. Retourne None si absente.
+
+    Le retour est typé `Any` car les valeurs `config.value` sont stockées
+    en JSONB libre — chaque caller fait son `isinstance(...)` pour
+    contraindre le type (str, list, dict, …) avant usage.
+    """
     try:
         row = conn.execute(
             text("SELECT value FROM config WHERE key = :key"), {"key": key}

@@ -62,10 +62,16 @@ Patterns dominants :
 - [x] `domain/` (43 corrections en mode `--strict` : 4 `Any` explicites
   + 39 `dict`/`list`/`tuple` non paramétrés. Contrainte
   `disallow_any_generics` activée pour `domain.*`).
-- [ ] `application/` ports + orchestrateurs : décliner les
-  signatures abstraites (`queries: Any` → `XxxQueries` Protocol,
-  `repo: Any` → port).
-- [ ] `infrastructure/` : adapters, queries, repositories.
+- [~] `application/` services racine : `existing: Any` →
+  `PubByDoi` (résolution conflit DOI). Restent justifiés : `set[Any]`
+  / `list[Any]` dans `_merge_lists` (items hétérogènes par champ),
+  `value: Any` dans `update_config_value` (frontière JSONB).
+  Ports + orchestrateurs pipeline : pas encore traités.
+- [~] `infrastructure/` racine : `_get_from_db(key: Any)` → `key: str`
+  dans `app_config.py`. Le retour `Any` est conservé et justifié en
+  docstring (frontière JSONB libre — chaque caller fait son
+  `isinstance(...)` avant usage). Adapters, queries, repositories :
+  pas encore traités.
 - [ ] `interfaces/api/` routers : modèles Pydantic en retour, pas
   de `dict` non typé.
 - [x] `interfaces/cli/` : 11 `Any` explicites + 4 `dict` non

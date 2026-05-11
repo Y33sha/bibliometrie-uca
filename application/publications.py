@@ -98,7 +98,7 @@ def resolve_doi_conflict(
     doi: str,
     doc_type: str,
     title_normalized: str,
-    existing: Any,
+    existing: PubByDoi,
     *,
     repo: PublicationRepository,
 ) -> tuple[str | None, int | None]:
