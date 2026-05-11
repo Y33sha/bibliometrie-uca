@@ -225,7 +225,11 @@ d'import entre couches (vérifiées par import-linter en pre-commit + CI).
 - [Glossaire](docs/glossaire.md) — définitions des termes métier
 - [Guide utilisateur](docs/guide-utilisateur.md) — pages et fonctionnalités
 
-## Roadmap
+## Chantiers
 
-Voir [ROADMAP.md](ROADMAP.md) pour l'état des chantiers (architecture,
-qualité, documentation) et la liste des points d'audit périodique.
+Les chantiers en cours et terminés sont documentés dans
+[docs/chantiers/](docs/chantiers/). Chaque fiche porte un préfixe :
+`METIER_` (changement de comportement), `DATA_` (révision de schéma)
+ou `CODE_` (refactor / chantier qualité). Les fiches datées
+correspondent aux chantiers terminés ; les fiches non datées sont en
+cours.

@@ -319,6 +319,7 @@ le convertit en TypeScript via `openapi-typescript` et écrit dans
 2. Coder, tester (`pytest tests/ -v`, `svelte-check` si front touché).
 3. `ruff format .` avant de committer (évite le double-commit du
    pre-commit hook).
-4. Commits atomiques, messages en français, référence au `§X.Y`
-   de [`ROADMAP.md`](ROADMAP.md) quand applicable.
+4. Commits atomiques, messages en français, référence à la fiche
+   chantier concernée dans [`docs/chantiers/`](docs/chantiers/) quand
+   applicable.
 5. Merge en `--no-ff` pour garder la trace du chantier.

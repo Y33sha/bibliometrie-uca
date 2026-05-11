@@ -178,7 +178,7 @@ immédiat.
   commentaires Python + `pyproject.toml`. Reformulations intemporelles
   (« Variante async de X » au lieu de « Variante async de X (§2.12) »,
   « principe ISP » au lieu de « depuis §2.9.ISP », etc.).
-  Restent légitimement : `ROADMAP.md`, `docs/chantiers/audit-cto.md`,
+  Restent légitimement : `docs/chantiers/audit-cto.md`,
   `docs/architecture.md` (réécrit en Phase 4).
 - [x] **Décorréler `schema.sql` du flow de migration** : `migrate.py`
   ne régénère plus automatiquement `schema.sql` à chaque migration. Le
@@ -364,11 +364,10 @@ Dernière passe avant de remettre le dossier.
   les corrections de chemins morts (`processing/*`,
   `cross_import_<source>.py`, `harvest_hal_identifiers`,
   `monthly` → `full`, etc.)
-- [ ] **Backlog unifié** (déjà prévu par Laura) — fusionner
-  TODO_LAURA + TODO_CLAUDE + ROADMAP en un seul fichier catégorisé
-  (qualité données / dette technique / nice-to-have)
-- [ ] **Tests E2E Playwright** sur 2-3 parcours critiques (déjà dans
-  ROADMAP §2.7.5)
+- [x] **Backlog unifié** — ROADMAP dissoute en fiches chantiers
+  thématiques dans `docs/chantiers/` (préfixes METIER/DATA/CODE).
+  TODO_CLAUDE résorbé ; TODO_LAURA conservé comme TODO personnel.
+- [ ] **Tests E2E Playwright** sur 2-3 parcours critiques
 
 ---
 
