@@ -15,7 +15,7 @@ Chaque opération propage automatiquement l'UCA via
 
 from sqlalchemy import Connection
 
-from application.authorships import propagate_uca_for_addresses
+from application.authorships.core import propagate_uca_for_addresses
 from application.ports.perimeter import PerimeterQueries
 from domain.ports.address_repository import AddressRepository
 from domain.ports.authorship_repository import AuthorshipRepository

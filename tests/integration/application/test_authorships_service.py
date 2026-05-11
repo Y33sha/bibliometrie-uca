@@ -9,7 +9,7 @@ import json
 import pytest
 from sqlalchemy import text
 
-from application.authorships import (
+from application.authorships.core import (
     delete_orphan_authorships,
     detach_source,
     exclude_authorship,

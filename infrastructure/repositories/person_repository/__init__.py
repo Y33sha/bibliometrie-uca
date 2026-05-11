@@ -97,11 +97,68 @@ class PgPersonRepository:
     def assign_orphan_sa(self, person_id: int, source: str, authorship_id: int) -> dict | None:
         return _authorships.assign_orphan_sa(self._conn, person_id, source, authorship_id)
 
-    def batch_assign_orphans(self, person_id: int, sa_ids: list[int]) -> int:
-        return _authorships.batch_assign_orphans(self._conn, person_id, sa_ids)
+    # ── Opérations atomiques pour le use case `assign_orphans` ────
 
-    def ensure_truth_authorship(self, person_id: int, source: str, authorship_id: int) -> None:
-        _authorships.ensure_truth_authorship(self._conn, person_id, source, authorship_id)
+    def assign_orphan_source_authorships_to_person(self, person_id: int, sa_ids: list[int]) -> int:
+        return _authorships.assign_orphan_source_authorships_to_person(
+            self._conn, person_id, sa_ids
+        )
+
+    def create_authorships_from_sources(
+        self,
+        person_id: int,
+        sa_ids: list[int],
+        source_priority: tuple[str, ...],
+    ) -> None:
+        _authorships.create_authorships_from_sources(self._conn, person_id, sa_ids, source_priority)
+
+    def link_source_authorships_to_authorships(self, person_id: int, sa_ids: list[int]) -> None:
+        _authorships.link_source_authorships_to_authorships(self._conn, person_id, sa_ids)
+
+    def get_distinct_name_forms_from_source_authorships(self, sa_ids: list[int]) -> list[str]:
+        return _authorships.get_distinct_name_forms_from_source_authorships(self._conn, sa_ids)
+
+    def find_publication_id_for_source_authorship(
+        self, source: str, authorship_id: int
+    ) -> int | None:
+        return _authorships.find_publication_id_for_source_authorship(
+            self._conn, source, authorship_id
+        )
+
+    def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:
+        _authorships.insert_authorship_if_missing(self._conn, publication_id, person_id)
+
+    def link_source_authorships_to_authorship_for_pair(
+        self, publication_id: int, person_id: int
+    ) -> None:
+        _authorships.link_source_authorships_to_authorship_for_pair(
+            self._conn, publication_id, person_id
+        )
+
+    def recompute_authorship_author_position_and_corresponding(
+        self,
+        publication_id: int,
+        person_id: int,
+        source_priority: tuple[str, ...],
+        is_corresponding_priority: tuple[str, ...],
+    ) -> None:
+        _authorships.recompute_authorship_author_position_and_corresponding(
+            self._conn,
+            publication_id,
+            person_id,
+            source_priority,
+            is_corresponding_priority,
+        )
+
+    def recompute_authorship_in_perimeter_and_structures(
+        self,
+        publication_id: int,
+        person_id: int,
+        sources: tuple[str, ...],
+    ) -> None:
+        _authorships.recompute_authorship_in_perimeter_and_structures(
+            self._conn, publication_id, person_id, sources
+        )
 
     def count_authorships_with_name_form(self, person_id: int, name_form: str) -> int:
         return _authorships.count_authorships_with_name_form(self._conn, person_id, name_form)
