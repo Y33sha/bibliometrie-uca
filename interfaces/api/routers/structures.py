@@ -11,7 +11,6 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application import structures as structures_service
 from application.ports.structures_queries import StructuresQueries
@@ -19,7 +18,6 @@ from domain.ports.audit_repository import AuditRepository
 from domain.ports.structure_repository import StructureRepository
 from interfaces.api.deps import (
     audit_repo_sync,
-    db_conn_sync,
     structure_repo_sync,
     structures_queries_sync,
 )
@@ -79,7 +77,6 @@ def get_structure(
 @router.post("/api/structures", response_model=StructureOut)
 def create_structure(
     data: StructureCreate,
-    conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
 ) -> Any:
     """Crée une structure. Lève 409 si le `code` est déjà utilisé."""
@@ -100,7 +97,6 @@ def create_structure(
 def update_structure(
     structure_id: int,
     data: StructureUpdate,
-    conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
 ) -> Any:
     """Met à jour une structure (mise à jour sélective des champs fournis).
@@ -115,7 +111,6 @@ def update_structure(
 @router.delete("/api/structures/{structure_id}", response_model=DeletedResponse)
 def delete_structure(
     structure_id: int,
-    conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
@@ -128,7 +123,6 @@ def delete_structure(
 @router.post("/api/structure-relations", response_model=StructureRelationCreateResponse)
 def create_relation(
     data: RelationCreate,
-    conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
 ) -> Any:
     """Crée une relation parent-enfant entre deux structures.
@@ -151,7 +145,6 @@ def create_relation(
 @router.delete("/api/structure-relations/{relation_id}", response_model=DeletedResponse)
 def delete_relation(
     relation_id: int,
-    conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
@@ -175,7 +168,6 @@ def get_name_form(
 @router.post("/api/name-forms", response_model=NameFormOut)
 def create_name_form(
     data: NameFormCreate,
-    conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
 ) -> Any:
     """Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
@@ -201,7 +193,6 @@ def create_name_form(
 def update_name_form(
     form_id: int,
     data: NameFormUpdate,
-    conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
 ) -> Any:
     """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
@@ -212,7 +203,6 @@ def update_name_form(
 @router.delete("/api/name-forms/{form_id}", response_model=DeletedResponse)
 def delete_name_form(
     form_id: int,
-    conn: Connection = Depends(db_conn_sync),
     repo: StructureRepository = Depends(structure_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:

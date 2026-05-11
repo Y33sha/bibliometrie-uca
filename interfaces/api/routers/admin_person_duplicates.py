@@ -4,7 +4,6 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application.persons import mark_distinct as _mark_persons_distinct
 from application.ports.person_duplicates_queries import (
@@ -15,7 +14,6 @@ from domain.ports.audit_repository import AuditRepository
 from domain.ports.person_repository import PersonRepository
 from interfaces.api.deps import (
     audit_repo_sync,
-    db_conn_sync,
     person_duplicates_queries_sync,
     person_repo_sync,
 )
@@ -59,7 +57,6 @@ def next_person_duplicate(
 @router.post("/api/admin/person-duplicates/mark-distinct", response_model=OkResponse)
 def mark_persons_distinct(
     body: MarkPersonsDistinct,
-    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:

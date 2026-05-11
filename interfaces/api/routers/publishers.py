@@ -4,7 +4,6 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application.ports.publishers_queries import PublisherQueries
 from application.publishers import merge_publishers
@@ -14,7 +13,6 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publisher_repository import PublisherRepository
 from interfaces.api.deps import (
     audit_repo_sync,
-    db_conn_sync,
     journal_repo_sync,
     publisher_queries_sync,
     publisher_repo_sync,
@@ -65,7 +63,6 @@ def get_publisher(
 def update_publisher(
     publisher_id: int,
     body: PublisherUpdate,
-    conn: Connection = Depends(db_conn_sync),
     repo: PublisherRepository = Depends(publisher_repo_sync),
 ) -> Any:
     """Met à jour un éditeur (modification sélective des champs fournis).
@@ -82,7 +79,6 @@ def update_publisher(
 def merge(
     publisher_id: int,
     body: MergeRequest,
-    conn: Connection = Depends(db_conn_sync),
     queries: PublisherQueries = Depends(publisher_queries_sync),
     pub_repo: PublisherRepository = Depends(publisher_repo_sync),
     j_repo: JournalRepository = Depends(journal_repo_sync),

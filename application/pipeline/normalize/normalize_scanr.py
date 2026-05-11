@@ -70,9 +70,7 @@ def get_title(doc: dict) -> str | None:
     return title
 
 
-def upsert_publisher(
-    cur: Connection, doc: dict, *, publisher_repo: PublisherRepository
-) -> int | None:
+def upsert_publisher(doc: dict, *, publisher_repo: PublisherRepository) -> int | None:
     publisher_name = (doc.get("source") or {}).get("publisher")
     if not publisher_name:
         return None
@@ -80,7 +78,7 @@ def upsert_publisher(
 
 
 def upsert_journal(
-    cur: Connection, doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+    doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
 ) -> int | None:
     source = doc.get("source") or {}
     title = source.get("title")
@@ -122,7 +120,6 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
 
 
 def find_publication(
-    cur: Connection,
     doc: dict,
     journal_id: int | None,
     scanr_id: str | None = None,
@@ -364,11 +361,11 @@ def process_work(
             return False
 
         t0 = time.perf_counter()
-        publisher_id = upsert_publisher(cur, doc, publisher_repo=publisher_repo)
+        publisher_id = upsert_publisher(doc, publisher_repo=publisher_repo)
         timings["publisher"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        journal_id = upsert_journal(cur, doc, publisher_id, journal_repo=journal_repo)
+        journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
         timings["journal"] = time.perf_counter() - t0
 
         pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
@@ -376,7 +373,7 @@ def process_work(
         t0 = time.perf_counter()
         publication_id = queries.get_scanr_publication_id(cur, scanr_id)
         if not publication_id:
-            publication_id = find_publication(cur, doc, journal_id, scanr_id, pub_repo=pub_repo)
+            publication_id = find_publication(doc, journal_id, scanr_id, pub_repo=pub_repo)
         timings["publication"] = time.perf_counter() - t0
 
         if publication_id:

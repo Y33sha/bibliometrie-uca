@@ -9,12 +9,11 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import Connection
 
 from application import config as config_service
 from application.ports.config import ConfigStore
 from application.ports.config_queries import ConfigQueries
-from interfaces.api.deps import config_queries_sync, config_store_sync, db_conn_sync
+from interfaces.api.deps import config_queries_sync, config_store_sync
 from interfaces.api.models import ConfigItem, ConfigValueUpdate, HalCollectionsResponse
 
 router = APIRouter()
@@ -47,7 +46,6 @@ def get_hal_collections(
 def update_config(
     key: str,
     body: ConfigValueUpdate,
-    conn: Connection = Depends(db_conn_sync),
     config_repo: ConfigStore = Depends(config_store_sync),
 ) -> Any:
     """Met à jour la valeur d'un paramètre de config.

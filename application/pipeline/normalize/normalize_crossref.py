@@ -166,9 +166,7 @@ def get_meta(msg: dict) -> dict | None:
 # =============================================================
 
 
-def upsert_publisher(
-    cur: Connection, msg: dict, *, publisher_repo: PublisherRepository
-) -> int | None:
+def upsert_publisher(msg: dict, *, publisher_repo: PublisherRepository) -> int | None:
     name = get_publisher_name(msg)
     if not name:
         return None
@@ -176,7 +174,6 @@ def upsert_publisher(
 
 
 def upsert_journal(
-    cur: Connection,
     msg: dict,
     publisher_id: int | None,
     *,
@@ -276,7 +273,6 @@ def process_authors(
 
 
 def find_publication(
-    cur: Connection,
     msg: dict,
     journal_id: int | None,
     *,
@@ -349,12 +345,12 @@ def process_work(
         return None
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
 
-    publisher_id = upsert_publisher(cur, msg, publisher_repo=publisher_repo)
-    journal_id = upsert_journal(cur, msg, publisher_id, journal_repo=journal_repo)
+    publisher_id = upsert_publisher(msg, publisher_repo=publisher_repo)
+    journal_id = upsert_journal(msg, publisher_id, journal_repo=journal_repo)
 
     publication_id = queries.get_crossref_publication_id(cur, doi)
     if not publication_id:
-        publication_id = find_publication(cur, msg, journal_id, pub_repo=pub_repo)
+        publication_id = find_publication(msg, journal_id, pub_repo=pub_repo)
     if publication_id:
         publication_id = try_merge_by_doi(publication_id, doi, repo=pub_repo)
 

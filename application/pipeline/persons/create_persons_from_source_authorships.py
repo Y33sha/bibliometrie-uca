@@ -182,7 +182,6 @@ def _max_authors_per_pub(
 
 
 def step1_cross_source(
-    conn: Connection,
     logger: logging.Logger,
     all_authorships: Any,
     linked_ids: set,
@@ -313,7 +312,6 @@ def step2_orcid(
 
 
 def step3_name_forms(
-    conn: Connection,
     logger: logging.Logger,
     all_authorships: Any,
     linked_ids: set,
@@ -417,7 +415,7 @@ def run(
     logger.info("\n--- Étape 1 : cross-source (même publi + position) ---")
     linked_index = load_linked_authorships_by_pub(conn, queries)
     s1 = step1_cross_source(
-        conn, logger, all_authorships, linked_ids, linked_index, dry_run, person_repo=person_repo
+        logger, all_authorships, linked_ids, linked_index, dry_run, person_repo=person_repo
     )
 
     logger.info("\n--- Étape 1b : IdRef connu ---")
@@ -433,7 +431,6 @@ def run(
     logger.info("\n--- Étape 3 : person_name_forms ---")
     name_form_map = queries.fetch_name_form_map(conn)
     s3_created, s3_linked, s3_skipped = step3_name_forms(
-        conn,
         logger,
         all_authorships,
         linked_ids,

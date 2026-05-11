@@ -357,7 +357,6 @@ def remove_person_identifier(
     person_id: int,
     id_type: str,
     id_value: str,
-    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
@@ -370,7 +369,6 @@ def remove_person_identifier(
 def update_identifier_status(
     ident_id: int,
     body: UpdateIdentifierStatus,
-    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
@@ -385,7 +383,6 @@ def update_identifier_status(
 def reassign_identifier(
     ident_id: int,
     body: ReassignIdentifier,
-    conn: Connection = Depends(db_conn_sync),
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
@@ -400,7 +397,6 @@ def reassign_identifier(
 @router.patch("/api/authorships/{authorship_id}/exclude", response_model=AuthorshipExcludeResponse)
 def toggle_authorship_excluded(
     authorship_id: int,
-    conn: Connection = Depends(db_conn_sync),
     repo: AuthorshipRepository = Depends(authorship_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
@@ -413,7 +409,6 @@ def toggle_authorship_excluded(
 def reject_person(
     person_id: int,
     body: RejectPerson,
-    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
@@ -426,7 +421,6 @@ def reject_person(
 def update_person_name(
     person_id: int,
     body: UpdatePersonName,
-    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
 ) -> Any:
     """Modifie le nom/prénom d'une personne."""
@@ -490,7 +484,6 @@ def list_orphan_authorships(
 @router.post("/api/admin/orphan-authorships/assign", response_model=OrphanAssignResponse)
 def assign_orphan_authorship_endpoint(
     body: AssignOrphanAuthorship,
-    conn: Connection = Depends(db_conn_sync),
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
 ) -> Any:
@@ -516,7 +509,6 @@ def assign_orphan_authorship_endpoint(
 @router.post("/api/admin/orphan-authorships/batch-assign", response_model=OrphanBatchAssignResponse)
 def batch_assign_orphan_authorships(
     body: BatchAssignOrphanAuthorships,
-    conn: Connection = Depends(db_conn_sync),
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
 ) -> Any:
@@ -554,7 +546,6 @@ def name_form_authorships(
 def detach_authorships(
     person_id: int,
     body: DetachAuthorships,
-    conn: Connection = Depends(db_conn_sync),
     person_repo_: PersonRepository = Depends(person_repo_sync),
     auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
 ) -> Any:
@@ -574,7 +565,6 @@ def detach_authorships(
 def detach_name_form(
     person_id: int,
     body: DetachNameForm,
-    conn: Connection = Depends(db_conn_sync),
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
 ) -> Any:
