@@ -270,9 +270,7 @@ def import_persons(
             ),
             {"last": last_name, "first": first_name, "ln": last_norm, "fn": first_norm},
         ).scalar_one()
-        refresh_person_name_forms(
-            conn, person_id, last_name, first_name, repo=person_repository(conn)
-        )
+        refresh_person_name_forms(person_id, last_name, first_name, repo=person_repository(conn))
 
         conn.execute(
             text(

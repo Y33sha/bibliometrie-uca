@@ -56,7 +56,6 @@ def _create_all_publications(conn_or_cur):
         if nnt:
             nnt = normalize_nnt(nnt)
         pub_id, _ = find_or_create_publication(
-            conn_or_cur,
             title=title,
             title_normalized=normalize_text(title),
             pub_year=pub_year,
@@ -81,7 +80,7 @@ def _create_all_publications(conn_or_cur):
                     "UPDATE source_publications SET publication_id = %s WHERE id = %s",
                     (pub_id, doc["id"]),
                 )
-            update_sources(conn_or_cur, pub_id, repo=repo)
+            update_sources(pub_id, repo=repo)
 
 
 # ── Fixtures de données ScanR ────────────────────────────────────

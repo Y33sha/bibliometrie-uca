@@ -137,8 +137,8 @@ def step0_hal_accounts(
         existing_pid = hal_person_map.get(hal_pid)
         if existing_pid:
             if not dry_run:
-                link_to_person(conn, existing_pid, group, repo=person_repo)
-                add_identifiers(conn, existing_pid, group, repo=person_repo)
+                link_to_person(existing_pid, group, repo=person_repo)
+                add_identifiers(existing_pid, group, repo=person_repo)
             linked += len(group)
             for a in group:
                 linked_ids.add((a["source"], a["authorship_id"]))
@@ -223,9 +223,9 @@ def step1_cross_source(
 
         if matched_pid:
             if not dry_run:
-                link_to_person(conn, matched_pid, [a], repo=person_repo)
-                add_name_form(conn, matched_pid, a["full_name"], repo=person_repo)
-                add_identifiers(conn, matched_pid, [a], repo=person_repo)
+                link_to_person(matched_pid, [a], repo=person_repo)
+                add_name_form(matched_pid, a["full_name"], repo=person_repo)
+                add_identifiers(matched_pid, [a], repo=person_repo)
             linked_ids.add((a["source"], a["authorship_id"]))
             ln, fn = a["last_norm"], a["first_norm"]
             linked_index[(pub_id, position)].append((matched_pid, ln, fn, a["source"]))
@@ -261,9 +261,9 @@ def step1b_idref(
         pid = decide_match_by_identifier(a.get("idref"), idref_map)
         if pid:
             if not dry_run:
-                link_to_person(conn, pid, [a], repo=person_repo)
-                add_name_form(conn, pid, a["full_name"], repo=person_repo)
-                add_identifiers(conn, pid, [a], repo=person_repo)
+                link_to_person(pid, [a], repo=person_repo)
+                add_name_form(pid, a["full_name"], repo=person_repo)
+                add_identifiers(pid, [a], repo=person_repo)
             linked_ids.add((a["source"], a["authorship_id"]))
             linked += 1
 
@@ -297,9 +297,9 @@ def step2_orcid(
         pid = decide_match_by_identifier(a.get("orcid"), orcid_map)
         if pid:
             if not dry_run:
-                link_to_person(conn, pid, [a], repo=person_repo)
-                add_name_form(conn, pid, a["full_name"], repo=person_repo)
-                add_identifiers(conn, pid, [a], repo=person_repo)
+                link_to_person(pid, [a], repo=person_repo)
+                add_name_form(pid, a["full_name"], repo=person_repo)
+                add_identifiers(pid, [a], repo=person_repo)
             linked_ids.add((a["source"], a["authorship_id"]))
             linked += 1
 
@@ -352,8 +352,8 @@ def step3_name_forms(
             pid = decision.person_id
             assert pid is not None  # narrowing : garanti par decide_name_form_outcome
             if not dry_run:
-                link_to_person(conn, pid, [a], repo=person_repo)
-                add_name_form(conn, pid, a["full_name"], repo=person_repo)
+                link_to_person(pid, [a], repo=person_repo)
+                add_name_form(pid, a["full_name"], repo=person_repo)
             linked_ids.add((a["source"], a["authorship_id"]))
             linked += 1
         elif decision.action == "skip":
@@ -368,10 +368,10 @@ def step3_name_forms(
             ln, fn = a["last_norm"], a["first_norm"]
             cache_forms = [f for f in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()] if f]
             if not dry_run:
-                pid = create_person(conn, last, first, repo=person_repo)
-                link_to_person(conn, pid, [a], repo=person_repo)
-                add_identifiers(conn, pid, [a], repo=person_repo)
-                add_name_form(conn, pid, a["full_name"], repo=person_repo)
+                pid = create_person(last, first, repo=person_repo)
+                link_to_person(pid, [a], repo=person_repo)
+                add_identifiers(pid, [a], repo=person_repo)
+                add_name_form(pid, a["full_name"], repo=person_repo)
                 for form in cache_forms:
                     name_form_map[form] = [pid]
             else:

@@ -209,7 +209,7 @@ def exclude_source_authorship(
     celle-ci est supprimée.
     """
     _set_source_authorship_excluded(
-        conn, authorship_id, source, body.excluded, repo=repo, audit_repo=audit
+        authorship_id, source, body.excluded, repo=repo, audit_repo=audit
     )
     return {"ok": True, "excluded": body.excluded}
 

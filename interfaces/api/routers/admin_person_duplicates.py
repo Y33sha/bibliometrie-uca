@@ -68,7 +68,7 @@ def mark_persons_distinct(
         raise HTTPException(
             status_code=400, detail="person_id_a et person_id_b doivent être différents"
         )
-    _mark_persons_distinct(conn, body.person_id_a, body.person_id_b, repo=repo, audit_repo=audit)
+    _mark_persons_distinct(body.person_id_a, body.person_id_b, repo=repo, audit_repo=audit)
     return {"ok": True}
 
 

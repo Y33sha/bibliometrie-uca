@@ -11,8 +11,6 @@ opérations atomiques du port qui recomposent une authorship pour une
 paire (publication, person) depuis ses source_authorships.
 """
 
-from sqlalchemy import Connection
-
 from domain.errors import ValidationError
 from domain.ports.person_repository import PersonRepository
 from domain.sources import (
@@ -24,7 +22,6 @@ from domain.sources import (
 
 
 def assign_orphan_authorship(
-    conn: Connection,
     person_id: int,
     source: str,
     authorship_id: int,
@@ -59,7 +56,6 @@ def assign_orphan_authorship(
 
 
 def batch_assign_orphan_authorships(
-    conn: Connection,
     person_id: int,
     sa_ids: list[int],
     *,

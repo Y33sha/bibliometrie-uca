@@ -202,9 +202,7 @@ class TestStep0HalAccounts:
         pub2 = _insert_publication(sa_sync_conn, "Pub 2")
 
         # Personne existante + hal_author rattaché
-        person_id = create_person(
-            sa_sync_conn, "Dupont", "Jean", repo=person_repository(sa_sync_conn)
-        )
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         ha = _insert_hal_author(sa_sync_conn, "Jean Dupont", hal_person_id=12345)
         sa_sync_conn.execute(
             text("UPDATE source_persons SET person_id = :pid WHERE id = :sp_id"),
@@ -271,9 +269,7 @@ class TestStep0HalAccounts:
         pub = _insert_publication(sa_sync_conn)
 
         # Personne existante (créée par un import précédent)
-        person_id = create_person(
-            sa_sync_conn, "Bensoussan", "Népomucène", repo=person_repository(sa_sync_conn)
-        )
+        person_id = create_person("Bensoussan", "Népomucène", repo=person_repository(sa_sync_conn))
 
         # Nouveau hal_author vierge, même nom
         ha = _insert_hal_author(
@@ -326,9 +322,7 @@ class TestStep1CrossSource:
         pub = _insert_publication(sa_sync_conn, "Shared Publication")
 
         # Personne existante rattachée via HAL
-        person_id = create_person(
-            sa_sync_conn, "Dupont", "Jean", repo=person_repository(sa_sync_conn)
-        )
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         ha = _insert_hal_author(sa_sync_conn, "Jean Dupont", hal_person_id=111)
         hd = _insert_hal_document(sa_sync_conn, "hal-100", pub)
         _insert_hal_authorship(sa_sync_conn, hd, ha, position=3, person_id=person_id)
@@ -365,9 +359,7 @@ class TestStep1CrossSource:
 
         pub = _insert_publication(sa_sync_conn)
 
-        person_id = create_person(
-            sa_sync_conn, "Dupont", "Jean", repo=person_repository(sa_sync_conn)
-        )
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         ha = _insert_hal_author(sa_sync_conn, "Jean Dupont", hal_person_id=111)
         hd = _insert_hal_document(sa_sync_conn, "hal-id-test", pub)
         _insert_hal_authorship(sa_sync_conn, hd, ha, position=0, person_id=person_id)
@@ -412,9 +404,7 @@ class TestStep1CrossSource:
 
         pub = _insert_publication(sa_sync_conn)
 
-        person_id = create_person(
-            sa_sync_conn, "Dupont", "Jean", repo=person_repository(sa_sync_conn)
-        )
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         ha = _insert_hal_author(sa_sync_conn, "Jean Dupont", hal_person_id=222)
         hd = _insert_hal_document(sa_sync_conn, "hal-200", pub)
         _insert_hal_authorship(sa_sync_conn, hd, ha, position=0, person_id=person_id)
@@ -453,11 +443,8 @@ class TestStep2Orcid:
         )
 
         pub = _insert_publication(sa_sync_conn)
-        person_id = create_person(
-            sa_sync_conn, "Dupont", "Jean", repo=person_repository(sa_sync_conn)
-        )
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         add_identifier(
-            sa_sync_conn,
             person_id,
             "orcid",
             "0000-0001-2345-6789",
@@ -499,11 +486,8 @@ class TestStep2Orcid:
         )
 
         pub = _insert_publication(sa_sync_conn)
-        person_id = create_person(
-            sa_sync_conn, "Dupont", "Jean", repo=person_repository(sa_sync_conn)
-        )
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         add_identifier(
-            sa_sync_conn,
             person_id,
             "orcid",
             "0000-0001-2345-6789",
@@ -548,11 +532,8 @@ class TestStep2Orcid:
         )
 
         pub = _insert_publication(sa_sync_conn)
-        person_id = create_person(
-            sa_sync_conn, "Dupont", "Jean", repo=person_repository(sa_sync_conn)
-        )
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         add_identifier(
-            sa_sync_conn,
             person_id,
             "orcid",
             "0000-0001-9999-0000",
@@ -630,9 +611,7 @@ class TestStep3NameForms:
         )
 
         pub = _insert_publication(sa_sync_conn)
-        person_id = create_person(
-            sa_sync_conn, "Martin", "Pierre", repo=person_repository(sa_sync_conn)
-        )
+        person_id = create_person("Martin", "Pierre", repo=person_repository(sa_sync_conn))
         # create_person crée déjà les name_forms via refresh_person_name_forms
 
         oa_author = _insert_oa_author(sa_sync_conn, "Pierre Martin", "A666")
@@ -664,13 +643,11 @@ class TestStep3NameForms:
         )
 
         pub = _insert_publication(sa_sync_conn)
-        pid1 = create_person(sa_sync_conn, "Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        pid2 = create_person(
-            sa_sync_conn, "Dupont", "Jacques", repo=person_repository(sa_sync_conn)
-        )
+        pid1 = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
+        pid2 = create_person("Dupont", "Jacques", repo=person_repository(sa_sync_conn))
         # "j dupont" est une forme ambiguë (initiale J → match les deux)
-        add_name_form(sa_sync_conn, pid1, "J Dupont", repo=person_repository(sa_sync_conn))
-        add_name_form(sa_sync_conn, pid2, "J Dupont", repo=person_repository(sa_sync_conn))
+        add_name_form(pid1, "J Dupont", repo=person_repository(sa_sync_conn))
+        add_name_form(pid2, "J Dupont", repo=person_repository(sa_sync_conn))
 
         oa_author = _insert_oa_author(sa_sync_conn, "J Dupont", "A777")
         oa_doc = _insert_oa_document(sa_sync_conn, "W777", pub)

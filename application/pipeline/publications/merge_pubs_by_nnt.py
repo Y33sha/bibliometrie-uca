@@ -61,8 +61,8 @@ def run_merge(
 
                 try:
                     with savepoint(conn, "merge_nnt"):
-                        _merge_pub(conn, target["id"], source["id"], repo=pub_repo)
-                        refresh_from_sources(conn, target["id"], repo=pub_repo)
+                        _merge_pub(target["id"], source["id"], repo=pub_repo)
+                        refresh_from_sources(target["id"], repo=pub_repo)
                     logger.info(f"  [MERGE] {label}")
                     merged += 1
                 except Exception as e:

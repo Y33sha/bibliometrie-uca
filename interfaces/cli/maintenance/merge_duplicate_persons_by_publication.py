@@ -138,7 +138,7 @@ def main() -> None:
 
         target_id, source_id = choice
         if not args.dry_run:
-            do_merge(conn, target_id, source_id, repo=person_repository(conn))
+            do_merge(target_id, source_id, repo=person_repository(conn))
         skipped_already_merged.add(source_id)
         merged += 1
 

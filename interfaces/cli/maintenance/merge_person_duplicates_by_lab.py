@@ -328,7 +328,7 @@ def run(dry_run: Any = False) -> Any:
                 for target, sources in merge_plan:
                     for source in sources:
                         if not dry_run:
-                            do_merge(conn, target["id"], source["id"], repo=person_repository(conn))
+                            do_merge(target["id"], source["id"], repo=person_repository(conn))
                             logger.info(
                                 f"  Fusionné #{source['id']} → #{target['id']} "
                                 f"({source['last_name']} {source['first_name']})"
@@ -443,9 +443,7 @@ def run(dry_run: Any = False) -> Any:
                     for target, sources in swap_plan:
                         for source in sources:
                             if not dry_run:
-                                do_merge(
-                                    conn, target["id"], source["id"], repo=person_repository(conn)
-                                )
+                                do_merge(target["id"], source["id"], repo=person_repository(conn))
                                 logger.info(
                                     f"  Fusionné (interversion) #{source['id']} → #{target['id']} "
                                     f"({source['last_name']} {source['first_name']})"

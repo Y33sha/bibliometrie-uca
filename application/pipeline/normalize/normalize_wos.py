@@ -403,7 +403,7 @@ def find_publication(
         return None
     # Mapper le doc_type pour find_or_create (resolve_doi_conflict a besoin du type canonique)
     meta["doc_type"] = map_doc_type(meta["doc_type"], "wos")
-    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False, repo=pub_repo)
+    pub_id, _ = find_or_create_publication(**meta, allow_create=False, repo=pub_repo)
     return pub_id
 
 
@@ -632,7 +632,7 @@ def process_record(
         t.mark("publication")
 
         if publication_id:
-            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"], repo=pub_repo)
+            publication_id = try_merge_by_doi(publication_id, pub_meta["doi"], repo=pub_repo)
 
         source_publication_id = insert_wos_document(
             cur, queries, rec, staging_id, publication_id, pub_meta
@@ -643,7 +643,7 @@ def process_record(
         t.mark("authors")
 
         if publication_id:
-            refresh_from_sources(cur, publication_id, repo=pub_repo)
+            refresh_from_sources(publication_id, repo=pub_repo)
         t.mark("refresh")
 
         staging_queries.mark_done(cur, staging_id)

@@ -72,7 +72,7 @@ def merge_duplicate_publications(
 
     savepoint = conn.begin_nested()
     try:
-        merge_publications(conn, body.target_id, body.source_id, repo=repo, audit_repo=audit)
+        merge_publications(body.target_id, body.source_id, repo=repo, audit_repo=audit)
         savepoint.commit()
     except Exception as e:
         savepoint.rollback()
@@ -96,5 +96,5 @@ def mark_publications_distinct(
     """
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
-    _mark_pubs_distinct(conn, body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit)
+    _mark_pubs_distinct(body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit)
     return {"ok": True}

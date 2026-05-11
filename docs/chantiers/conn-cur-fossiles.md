@@ -39,7 +39,7 @@ itératif : sweep, propage, re-sweep.
 
 ## Hors scope
 
-- Renommage `cur` → `conn` quand le variable garde un usage légitime.
+- Renommage `cur` → `conn` quand la variable garde un usage légitime.
   Reporté à un chantier dédié si nécessaire.
 - Refactor de l'usage interne (continuer à passer `conn` aux repos
   qui en ont besoin par leur `__init__`).

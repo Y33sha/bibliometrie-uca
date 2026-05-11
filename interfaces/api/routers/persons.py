@@ -342,7 +342,7 @@ def add_person_identifier(
             )
         was_reassigned = True
 
-    _add_identifier(conn, person_id, data.id_type, id_value, source="manual", repo=repo)
+    _add_identifier(person_id, data.id_type, id_value, source="manual", repo=repo)
     result: dict[str, Any] = {"added": True, "id_type": data.id_type, "id_value": id_value}
     if was_reassigned:
         result["reassigned"] = True
@@ -362,7 +362,7 @@ def remove_person_identifier(
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
     """Supprime un identifiant d'une personne."""
-    _remove_identifier(conn, person_id, id_type, id_value, repo=repo, audit_repo=audit)
+    _remove_identifier(person_id, id_type, id_value, repo=repo, audit_repo=audit)
     return {"removed": True}
 
 
@@ -375,7 +375,7 @@ def update_identifier_status(
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
-    row = _update_identifier_status(conn, ident_id, body.status, repo=repo, audit_repo=audit)
+    row = _update_identifier_status(ident_id, body.status, repo=repo, audit_repo=audit)
     return {"id": row["id"], "status": row["status"]}
 
 
@@ -393,7 +393,7 @@ def reassign_identifier(
     """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
     if not queries.person_exists(body.person_id):
         raise HTTPException(status_code=404, detail="Personne cible introuvable")
-    _reassign_identifier(conn, ident_id, body.person_id, repo=repo, audit_repo=audit)
+    _reassign_identifier(ident_id, body.person_id, repo=repo, audit_repo=audit)
     return {"id": ident_id, "person_id": body.person_id, "status": "pending"}
 
 
@@ -405,7 +405,7 @@ def toggle_authorship_excluded(
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
     """Marque un authorship comme exclu."""
-    row = exclude_authorship(conn, authorship_id, repo=repo, audit_repo=audit)
+    row = exclude_authorship(authorship_id, repo=repo, audit_repo=audit)
     return {"id": row["id"], "excluded": row["excluded"]}
 
 
@@ -418,7 +418,7 @@ def reject_person(
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
     """Marque/démarque une personne comme rejetée."""
-    _set_rejected(conn, person_id, body.rejected, repo=repo, audit_repo=audit)
+    _set_rejected(person_id, body.rejected, repo=repo, audit_repo=audit)
     return {"ok": True}
 
 
@@ -434,7 +434,7 @@ def update_person_name(
     first_name = body.first_name.strip()
     if not last_name:
         raise HTTPException(status_code=400, detail="Le nom est requis")
-    _update_name(conn, person_id, last_name, first_name, repo=repo)
+    _update_name(person_id, last_name, first_name, repo=repo)
     return {"ok": True}
 
 
@@ -461,7 +461,7 @@ def merge_persons(
     if source_id not in found:
         raise HTTPException(status_code=404, detail="Personne source introuvable")
 
-    _merge_person(conn, person_id, source_id, repo=repo, audit_repo=audit)
+    _merge_person(person_id, source_id, repo=repo, audit_repo=audit)
     return {"merged": True, "source_id": source_id, "target_id": person_id}
 
 
@@ -504,12 +504,12 @@ def assign_orphan_authorship_endpoint(
         fn = body.create_person.first_name.strip()
         if not ln:
             raise HTTPException(status_code=400, detail="Nom requis")
-        person_id = _create_person(conn, ln, fn, repo=repo)
+        person_id = _create_person(ln, fn, repo=repo)
     elif not person_id:
         raise HTTPException(status_code=400, detail="person_id ou create_person requis")
     if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
-    _assign_orphan(conn, person_id, body.source, body.authorship_id, repo=repo)
+    _assign_orphan(person_id, body.source, body.authorship_id, repo=repo)
     return {"ok": True, "person_id": person_id}
 
 
@@ -528,7 +528,7 @@ def batch_assign_orphan_authorships(
 
     if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
-    assigned = _batch_assign_orphan(conn, person_id, sa_ids, repo=repo)
+    assigned = _batch_assign_orphan(person_id, sa_ids, repo=repo)
     return {"ok": True, "assigned": assigned}
 
 
@@ -560,7 +560,6 @@ def detach_authorships(
 ) -> Any:
     """Détache des authorships sources d'une personne et nettoie les formes de noms."""
     return _detach_authorships_service(
-        conn,
         person_id,
         authorships=[
             {"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships
@@ -583,7 +582,7 @@ def detach_name_form(
     remaining = queries.name_form_remaining_authorships(person_id, body.name_form)
     if remaining > 0:
         raise HTTPException(status_code=400, detail="Cette forme a encore des authorships liées")
-    _detach_name_form(conn, person_id, body.name_form, repo=repo)
+    _detach_name_form(person_id, body.name_form, repo=repo)
     return {"detached": True}
 
 

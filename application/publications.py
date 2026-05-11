@@ -11,8 +11,6 @@ indépendant du type de curseur (tuple ou dict_row).
 
 from typing import Any
 
-from sqlalchemy import Connection
-
 from application.audit import emit_event
 from domain.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.normalize import normalize_text
@@ -42,18 +40,17 @@ __all__ = [
 ]
 
 
-def find_by_doi(cur: Connection, doi: str, *, repo: PublicationRepository) -> PubByDoi | None:
+def find_by_doi(doi: str, *, repo: PublicationRepository) -> PubByDoi | None:
     """Cherche une publication par DOI (case-insensitive)."""
     return repo.find_by_doi(doi)
 
 
-def find_by_nnt(cur: Connection, nnt: str, *, repo: PublicationRepository) -> PubByNnt | None:
+def find_by_nnt(nnt: str, *, repo: PublicationRepository) -> PubByNnt | None:
     """Cherche une publication via NNT (source_publications.external_ids)."""
     return repo.find_by_nnt(nnt)
 
 
 def find_by_title(
-    cur: Connection,
     title_normalized: str,
     pub_year: int,
     journal_id: int,
@@ -65,7 +62,6 @@ def find_by_title(
 
 
 def find_thesis_by_title(
-    cur: Connection,
     title_normalized: str,
     pub_year: int,
     *,
@@ -75,9 +71,7 @@ def find_thesis_by_title(
     return repo.find_thesis_by_title(title_normalized, pub_year)
 
 
-def try_merge_by_doi(
-    cur: Connection, pub_id: int, doi: str | None, *, repo: PublicationRepository
-) -> int:
+def try_merge_by_doi(pub_id: int, doi: str | None, *, repo: PublicationRepository) -> int:
     """Tente de fusionner via DOI si la publication n'en a pas encore.
 
     Si pub_id n'a pas de DOI et qu'une autre publication porte ce DOI,
@@ -93,7 +87,7 @@ def try_merge_by_doi(
     # La pub n'a pas de DOI : vérifier si une autre l'a
     existing = repo.find_by_doi(doi)
     if existing and existing.id != pub_id:
-        merge_publications(cur, existing.id, pub_id, repo=repo)
+        merge_publications(existing.id, pub_id, repo=repo)
         return existing.id
     # Attribuer le DOI
     repo.set_doi(pub_id, doi)
@@ -101,7 +95,6 @@ def try_merge_by_doi(
 
 
 def resolve_doi_conflict(
-    cur: Connection,
     doi: str,
     doc_type: str,
     title_normalized: str,
@@ -130,9 +123,8 @@ def resolve_doi_conflict(
 
 
 def find_or_create(
-    cur: Connection,
-    *,
     title: str,
+    *,
     title_normalized: str,
     pub_year: int,
     doc_type: str = "other",
@@ -171,7 +163,7 @@ def find_or_create(
         existing = repo.find_by_doi(doi)
         if existing:
             doi, merge_id = resolve_doi_conflict(
-                cur, doi, doc_type, title_normalized, existing, repo=repo
+                doi, doc_type, title_normalized, existing, repo=repo
             )
             if merge_id:
                 return merge_id, False
@@ -180,7 +172,7 @@ def find_or_create(
     if nnt:
         existing_nnt = repo.find_by_nnt(nnt)
         if existing_nnt:
-            try_merge_by_doi(cur, existing_nnt.id, doi, repo=repo)
+            try_merge_by_doi(existing_nnt.id, doi, repo=repo)
             return existing_nnt.id, False
 
     # 2. Creer
@@ -201,21 +193,17 @@ def find_or_create(
     return pub_id, True
 
 
-def update_oa_status(
-    cur: Connection, pub_id: int, oa_status: str, *, repo: PublicationRepository
-) -> None:
+def update_oa_status(pub_id: int, oa_status: str, *, repo: PublicationRepository) -> None:
     """Met à jour le statut OA d'une publication."""
     repo.update_oa_status(pub_id, oa_status)
 
 
-def update_countries(
-    cur: Connection, pub_id: int, countries: list[str], *, repo: PublicationRepository
-) -> None:
+def update_countries(pub_id: int, countries: list[str], *, repo: PublicationRepository) -> None:
     """Met à jour les pays d'une publication."""
     repo.update_countries(pub_id, countries)
 
 
-def update_sources(cur: Connection, pub_id: int, *, repo: PublicationRepository) -> None:
+def update_sources(pub_id: int, *, repo: PublicationRepository) -> None:
     """Recalcule publications.sources depuis source_publications."""
     repo.update_sources(pub_id)
 
@@ -300,7 +288,7 @@ def _first_doc_type(rows: list[dict[str, Any]]) -> str:
     return "other"
 
 
-def refresh_from_sources(cur: Connection, pub_id: int, *, repo: PublicationRepository) -> None:
+def refresh_from_sources(pub_id: int, *, repo: PublicationRepository) -> None:
     """Recalcule les métadonnées d'une publication depuis ses source_publications.
 
     Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé
@@ -360,7 +348,7 @@ def refresh_from_sources(cur: Connection, pub_id: int, *, repo: PublicationRepos
     if new_doi:
         existing = repo.find_by_doi(new_doi)
         if existing and existing.id != pub_id:
-            merge_publications(cur, pub_id, existing.id, repo=repo)
+            merge_publications(pub_id, existing.id, repo=repo)
             rows = repo.get_source_rows(pub_id)
             rows.sort(key=lambda r: rank.get(r["source"], 99))
 
@@ -390,7 +378,6 @@ def refresh_from_sources(cur: Connection, pub_id: int, *, repo: PublicationRepos
 
 
 def mark_distinct(
-    conn: Connection,
     pub_id_a: int,
     pub_id_b: int,
     *,
@@ -414,7 +401,6 @@ def mark_distinct(
 
 
 def merge_publications(
-    cur: Connection,
     target_id: int,
     source_id: int,
     *,

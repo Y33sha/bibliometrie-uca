@@ -129,7 +129,6 @@ def find_publication(
 
     # 1. Chercher par DOI ou NNT (sans créer)
     pub_id, _ = find_or_create(
-        cur,
         title=title,
         title_normalized=title_norm,
         pub_year=pub_year,
@@ -144,13 +143,13 @@ def find_publication(
 
     # 2. Dédup spécifique thèses : titre + année + auteur compatible
     if pub_year and title_norm:
-        candidates = find_thesis_by_title(cur, title_norm, pub_year, repo=pub_repo)
+        candidates = find_thesis_by_title(title_norm, pub_year, repo=pub_repo)
         if candidates:
             author = _extract_thesis_author(these)
             for cand in candidates:
                 if not author or _thesis_author_compatible(cur, queries, cand.id, author):
                     # Match trouvé → attribuer le DOI si nécessaire
-                    try_merge_by_doi(cur, cand.id, doi, repo=pub_repo)
+                    try_merge_by_doi(cand.id, doi, repo=pub_repo)
                     return cand.id
 
     return None
@@ -367,7 +366,7 @@ def process_work(
             publication_id = find_publication(cur, queries, these, pub_repo=pub_repo)
 
         if publication_id:
-            publication_id = try_merge_by_doi(cur, publication_id, pub_meta["doi"], repo=pub_repo)
+            publication_id = try_merge_by_doi(publication_id, pub_meta["doi"], repo=pub_repo)
 
         source_publication_id = insert_source_document(
             cur, queries, these, staging_id, theses_id, publication_id, pub_meta
@@ -376,7 +375,7 @@ def process_work(
         process_persons(cur, queries, these, source_publication_id, address_linker=address_linker)
 
         if publication_id:
-            refresh_from_sources(cur, publication_id, repo=pub_repo)
+            refresh_from_sources(publication_id, repo=pub_repo)
             _update_thesis_meta(cur, queries, publication_id, these)
 
         staging_queries.mark_done(cur, staging_id)

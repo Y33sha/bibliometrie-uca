@@ -126,23 +126,23 @@ def _select_one(conn, sql, **binds):
 
 class TestFindByDoi:
     def test_returns_none_on_empty(self, sa_sync_conn, repo):
-        assert find_by_doi(sa_sync_conn, None, repo=repo) is None
-        assert find_by_doi(sa_sync_conn, "", repo=repo) is None
+        assert find_by_doi(None, repo=repo) is None
+        assert find_by_doi("", repo=repo) is None
 
     def test_finds_by_doi_case_insensitive(self, sa_sync_conn, repo):
         pub_id = _insert_publication(sa_sync_conn, doi="10.1234/ABC")
-        result = find_by_doi(sa_sync_conn, "10.1234/abc", repo=repo)
+        result = find_by_doi("10.1234/abc", repo=repo)
         assert result is not None
         assert result.id == pub_id
 
     def test_returns_none_if_not_found(self, sa_sync_conn, repo):
-        assert find_by_doi(sa_sync_conn, "10.1234/unknown", repo=repo) is None
+        assert find_by_doi("10.1234/unknown", repo=repo) is None
 
 
 class TestFindByNnt:
     def test_returns_none_on_empty(self, sa_sync_conn, repo):
-        assert find_by_nnt(sa_sync_conn, None, repo=repo) is None
-        assert find_by_nnt(sa_sync_conn, "", repo=repo) is None
+        assert find_by_nnt(None, repo=repo) is None
+        assert find_by_nnt("", repo=repo) is None
 
     def test_finds_by_nnt_in_external_ids(self, sa_sync_conn, repo):
         pub_id = _insert_publication(sa_sync_conn, doc_type="thesis")
@@ -153,7 +153,7 @@ class TestFindByNnt:
             source_id="t-1",
             external_ids={"nnt": "2024UCAC0001"},
         )
-        result = find_by_nnt(sa_sync_conn, "2024UCAC0001", repo=repo)
+        result = find_by_nnt("2024UCAC0001", repo=repo)
         assert result is not None
         assert result.id == pub_id
 
@@ -167,44 +167,44 @@ class TestFindByNnt:
             external_ids={"nnt": "2024UCAC0001"},
         )
         # Même en minuscules en entrée, trouve
-        result = find_by_nnt(sa_sync_conn, "2024ucac0001", repo=repo)
+        result = find_by_nnt("2024ucac0001", repo=repo)
         assert result is not None
 
 
 class TestFindByTitle:
     def test_returns_none_on_missing_input(self, sa_sync_conn, repo):
-        assert find_by_title(sa_sync_conn, "", 2024, 1, repo=repo) is None
-        assert find_by_title(sa_sync_conn, "title", 2024, None, repo=repo) is None
+        assert find_by_title("", 2024, 1, repo=repo) is None
+        assert find_by_title("title", 2024, None, repo=repo) is None
 
     def test_finds_by_title_year_journal(self, sa_sync_conn, repo):
         j_id = _insert_journal(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn, title="My Paper", journal_id=j_id)
-        result = find_by_title(sa_sync_conn, "my paper", 2024, j_id, repo=repo)
+        result = find_by_title("my paper", 2024, j_id, repo=repo)
         assert result is not None
         assert result.id == pub_id
 
     def test_not_found_if_year_differs(self, sa_sync_conn, repo):
         j_id = _insert_journal(sa_sync_conn)
         _insert_publication(sa_sync_conn, title="X", pub_year=2023, journal_id=j_id)
-        assert find_by_title(sa_sync_conn, "x", 2024, j_id, repo=repo) is None
+        assert find_by_title("x", 2024, j_id, repo=repo) is None
 
 
 class TestFindThesisByTitle:
     def test_returns_empty_on_missing_input(self, sa_sync_conn, repo):
-        assert find_thesis_by_title(sa_sync_conn, "", 2024, repo=repo) == []
-        assert find_thesis_by_title(sa_sync_conn, "t", None, repo=repo) == []
+        assert find_thesis_by_title("", 2024, repo=repo) == []
+        assert find_thesis_by_title("t", None, repo=repo) == []
 
     def test_finds_only_theses(self, sa_sync_conn, repo):
         """Ne retourne que les thèses."""
         _insert_publication(sa_sync_conn, title="A", pub_year=2024, doc_type="article")
         t_id = _insert_publication(sa_sync_conn, title="A", pub_year=2024, doc_type="thesis")
-        result = find_thesis_by_title(sa_sync_conn, "a", 2024, repo=repo)
+        result = find_thesis_by_title("a", 2024, repo=repo)
         assert [r.id for r in result] == [t_id]
 
     def test_returns_multiple_candidates(self, sa_sync_conn, repo):
         t1 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
         t2 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
-        result = find_thesis_by_title(sa_sync_conn, "dup", 2024, repo=repo)
+        result = find_thesis_by_title("dup", 2024, repo=repo)
         assert {r.id for r in result} == {t1, t2}
 
 
@@ -214,15 +214,15 @@ class TestFindThesisByTitle:
 class TestTryMergeByDoi:
     def test_noop_if_no_doi_given(self, sa_sync_conn, repo):
         pub_id = _insert_publication(sa_sync_conn)
-        assert try_merge_by_doi(sa_sync_conn, pub_id, None, repo=repo) == pub_id
+        assert try_merge_by_doi(pub_id, None, repo=repo) == pub_id
 
     def test_noop_if_pub_already_has_doi(self, sa_sync_conn, repo):
         pub_id = _insert_publication(sa_sync_conn, doi="10.1234/existing")
-        assert try_merge_by_doi(sa_sync_conn, pub_id, "10.1234/other", repo=repo) == pub_id
+        assert try_merge_by_doi(pub_id, "10.1234/other", repo=repo) == pub_id
 
     def test_assigns_doi_if_pub_has_none(self, sa_sync_conn, repo):
         pub_id = _insert_publication(sa_sync_conn, doi=None)
-        assert try_merge_by_doi(sa_sync_conn, pub_id, "10.1234/new", repo=repo) == pub_id
+        assert try_merge_by_doi(pub_id, "10.1234/new", repo=repo) == pub_id
         doi = sa_sync_conn.execute(
             text("SELECT doi FROM publications WHERE id = :id"), {"id": pub_id}
         ).scalar_one()
@@ -232,7 +232,7 @@ class TestTryMergeByDoi:
         existing = _insert_publication(sa_sync_conn, title="Existing", doi="10.1234/shared")
         new_pub = _insert_publication(sa_sync_conn, title="New", doi=None)
 
-        result = try_merge_by_doi(sa_sync_conn, new_pub, "10.1234/shared", repo=repo)
+        result = try_merge_by_doi(new_pub, "10.1234/shared", repo=repo)
 
         assert result == existing  # pub id de la cible
         assert (
@@ -252,7 +252,7 @@ class TestResolveDoiConflict:
         existing = PubByDoi(id=1, doc_type="book", title_normalized="livre")
 
         doi, merge_id = resolve_doi_conflict(
-            sa_sync_conn, "10.x/book", "book_chapter", "chapitre", existing, repo=repo
+            "10.x/book", "book_chapter", "chapitre", existing, repo=repo
         )
         assert doi is None
         assert merge_id is None
@@ -266,9 +266,7 @@ class TestResolveDoiConflict:
         )
         existing = PubByDoi(id=existing_id, doc_type="book_chapter", title_normalized="chapitre")
 
-        doi, merge_id = resolve_doi_conflict(
-            sa_sync_conn, "10.x/book", "book", "livre", existing, repo=repo
-        )
+        doi, merge_id = resolve_doi_conflict("10.x/book", "book", "livre", existing, repo=repo)
         assert doi == "10.x/book"
         assert merge_id is None
         result_doi = sa_sync_conn.execute(
@@ -286,7 +284,7 @@ class TestResolveDoiConflict:
         existing = PubByDoi(id=existing_id, doc_type="book_chapter", title_normalized="c1")
 
         doi, merge_id = resolve_doi_conflict(
-            sa_sync_conn, "10.x/shared", "book_chapter", "c2_different", existing, repo=repo
+            "10.x/shared", "book_chapter", "c2_different", existing, repo=repo
         )
         assert doi is None
         assert merge_id is None
@@ -302,7 +300,7 @@ class TestResolveDoiConflict:
         existing = PubByDoi(id=42, doc_type="book_chapter", title_normalized="same")
 
         doi, merge_id = resolve_doi_conflict(
-            sa_sync_conn, "10.x/shared", "book_chapter", "same", existing, repo=repo
+            "10.x/shared", "book_chapter", "same", existing, repo=repo
         )
         assert doi == "10.x/shared"
         assert merge_id == 42
@@ -312,9 +310,7 @@ class TestResolveDoiConflict:
         from application.publications import PubByDoi
 
         existing = PubByDoi(id=42, doc_type="article", title_normalized="a")
-        doi, merge_id = resolve_doi_conflict(
-            sa_sync_conn, "10.x/a", "article", "a", existing, repo=repo
-        )
+        doi, merge_id = resolve_doi_conflict("10.x/a", "article", "a", existing, repo=repo)
         assert doi == "10.x/a"
         assert merge_id == 42
 
@@ -325,7 +321,7 @@ class TestResolveDoiConflict:
 class TestUpdateOaStatus:
     def test_updates(self, sa_sync_conn, repo):
         pub_id = _insert_publication(sa_sync_conn, oa_status="unknown")
-        update_oa_status(sa_sync_conn, pub_id, "gold", repo=repo)
+        update_oa_status(pub_id, "gold", repo=repo)
         oa_status = sa_sync_conn.execute(
             text("SELECT oa_status FROM publications WHERE id = :id"), {"id": pub_id}
         ).scalar_one()
@@ -335,7 +331,7 @@ class TestUpdateOaStatus:
 class TestUpdateCountries:
     def test_updates(self, sa_sync_conn, repo):
         pub_id = _insert_publication(sa_sync_conn)
-        update_countries(sa_sync_conn, pub_id, ["FR", "US"], repo=repo)
+        update_countries(pub_id, ["FR", "US"], repo=repo)
         countries = sa_sync_conn.execute(
             text("SELECT countries FROM publications WHERE id = :id"), {"id": pub_id}
         ).scalar_one()
@@ -354,7 +350,7 @@ class TestMergePublications:
         person_id = _insert_person(sa_sync_conn)
         auth_id = _insert_authorship(sa_sync_conn, source, person_id=person_id)
 
-        merge_publications(sa_sync_conn, target, source, repo=repo)
+        merge_publications(target, source, repo=repo)
 
         # source_publication repointée
         sp_pub = sa_sync_conn.execute(
@@ -380,7 +376,7 @@ class TestMergePublications:
         keep_auth = _insert_authorship(sa_sync_conn, target, person_id=person_id)
         drop_auth = _insert_authorship(sa_sync_conn, source, person_id=person_id)
 
-        merge_publications(sa_sync_conn, target, source, repo=repo)
+        merge_publications(target, source, repo=repo)
 
         assert (
             _select_one(sa_sync_conn, "SELECT id FROM authorships WHERE id = :id", id=keep_auth)
@@ -397,7 +393,7 @@ class TestMergePublications:
         target = _insert_publication(sa_sync_conn, title="Target", doi=None, journal_id=None)
         source = _insert_publication(sa_sync_conn, title="Source", doi=None, journal_id=j_id)
 
-        merge_publications(sa_sync_conn, target, source, repo=repo)
+        merge_publications(target, source, repo=repo)
 
         result = sa_sync_conn.execute(
             text("SELECT journal_id FROM publications WHERE id = :id"), {"id": target}
@@ -409,7 +405,7 @@ class TestMergePublications:
         target = _insert_publication(sa_sync_conn, title="Target", doi=None)
         source = _insert_publication(sa_sync_conn, title="Source", doi="10.1234/src")
 
-        merge_publications(sa_sync_conn, target, source, repo=repo)
+        merge_publications(target, source, repo=repo)
 
         doi = sa_sync_conn.execute(
             text("SELECT doi FROM publications WHERE id = :id"), {"id": target}
@@ -421,7 +417,7 @@ class TestMergePublications:
         target = _insert_publication(sa_sync_conn, title="Target", doi="10.1234/target")
         source = _insert_publication(sa_sync_conn, title="Source", doi="10.1234/source")
 
-        merge_publications(sa_sync_conn, target, source, repo=repo)
+        merge_publications(target, source, repo=repo)
 
         doi = sa_sync_conn.execute(
             text("SELECT doi FROM publications WHERE id = :id"), {"id": target}
@@ -432,7 +428,7 @@ class TestMergePublications:
         """Si source est diamond, la cible devient diamond même si elle avait gold."""
         target = _insert_publication(sa_sync_conn, title="Target", oa_status="gold")
         source = _insert_publication(sa_sync_conn, title="Source", oa_status="diamond")
-        merge_publications(sa_sync_conn, target, source, repo=repo)
+        merge_publications(target, source, repo=repo)
         oa_status = sa_sync_conn.execute(
             text("SELECT oa_status FROM publications WHERE id = :id"), {"id": target}
         ).scalar_one()
@@ -441,7 +437,7 @@ class TestMergePublications:
     def test_oa_status_upgrade_from_closed_to_gold(self, sa_sync_conn, repo):
         target = _insert_publication(sa_sync_conn, title="Target", oa_status="closed")
         source = _insert_publication(sa_sync_conn, title="Source", oa_status="gold")
-        merge_publications(sa_sync_conn, target, source, repo=repo)
+        merge_publications(target, source, repo=repo)
         oa_status = sa_sync_conn.execute(
             text("SELECT oa_status FROM publications WHERE id = :id"), {"id": target}
         ).scalar_one()
@@ -453,7 +449,7 @@ class TestMarkDistinct:
         repo = publication_repository(sa_sync_conn)
         p1 = _insert_publication(sa_sync_conn, title="A")
         p2 = _insert_publication(sa_sync_conn, title="B")
-        mark_distinct(sa_sync_conn, p2, p1, repo=repo)  # ordre inverse exprès
+        mark_distinct(p2, p1, repo=repo)  # ordre inverse exprès
         assert (
             _select_one(
                 sa_sync_conn,
@@ -469,8 +465,8 @@ class TestMarkDistinct:
         repo = publication_repository(sa_sync_conn)
         p1 = _insert_publication(sa_sync_conn, title="A")
         p2 = _insert_publication(sa_sync_conn, title="B")
-        mark_distinct(sa_sync_conn, p1, p2, repo=repo)
-        mark_distinct(sa_sync_conn, p1, p2, repo=repo)  # ON CONFLICT DO NOTHING
+        mark_distinct(p1, p2, repo=repo)
+        mark_distinct(p1, p2, repo=repo)  # ON CONFLICT DO NOTHING
         n = sa_sync_conn.execute(
             text(
                 "SELECT COUNT(*) AS n FROM distinct_publications "

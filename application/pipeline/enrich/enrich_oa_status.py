@@ -115,7 +115,7 @@ def run_enrich(
             if dry_run:
                 logger.info(f"  [DRY] {doi} : {current_status} → {status}")
             else:
-                update_oa_status(conn, pub_id, status, repo=pub_repo)
+                update_oa_status(pub_id, status, repo=pub_repo)
             updated += 1
         elif status is None:
             not_found += 1
