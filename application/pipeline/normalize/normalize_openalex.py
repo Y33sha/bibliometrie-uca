@@ -126,7 +126,7 @@ def extract_short_id(url: str, prefix: str = "https://openalex.org/") -> str:
 
 
 def find_hal_publication_id(
-    cur: Connection, queries: OpenalexNormalizeQueries, work: dict
+    conn: Connection, queries: OpenalexNormalizeQueries, work: dict
 ) -> int | None:
     """Si le work OpenAlex pointe vers un document HAL existant, retourne le publication_id."""
     location = work.get("primary_location") or {}
@@ -134,7 +134,7 @@ def find_hal_publication_id(
     hal_id = extract_hal_id_from_url(url)
     if not hal_id:
         return None
-    return queries.fetch_publication_id_for_hal_source(cur, hal_id)
+    return queries.fetch_publication_id_for_hal_source(conn, hal_id)
 
 
 # =============================================================
@@ -260,7 +260,7 @@ def find_publication(
 
 
 def insert_openalex_document(
-    cur: Connection,
+    conn: Connection,
     queries: OpenalexNormalizeQueries,
     work: dict,
     staging_id: int,
@@ -322,7 +322,7 @@ def insert_openalex_document(
     container_title = pub_meta.get("container_title") if pub_meta else None
 
     return queries.upsert_openalex_source_publication(
-        cur,
+        conn,
         openalex_id=openalex_id,
         doi=doi,
         title=title,
@@ -365,7 +365,7 @@ def _extract_openalex_orcid(authorship: dict) -> str | None:
 
 
 def upsert_openalex_institution(
-    cur: Connection, queries: OpenalexNormalizeQueries, institution: dict
+    conn: Connection, queries: OpenalexNormalizeQueries, institution: dict
 ) -> int | None:
     """Insère/retrouve une institution OpenAlex. Retourne source_structures.id ou None."""
     inst_id_url = institution.get("id")
@@ -379,12 +379,12 @@ def upsert_openalex_institution(
     inst_type = institution.get("type")
 
     if not name:
-        return queries.find_openalex_source_structure(cur, openalex_id)
+        return queries.find_openalex_source_structure(conn, openalex_id)
 
     source_data = {"type": inst_type} if inst_type else None
 
     return queries.upsert_openalex_source_structure(
-        cur,
+        conn,
         openalex_id=openalex_id,
         name=name,
         ror_id=ror_id,
@@ -399,7 +399,7 @@ def upsert_openalex_institution(
 
 
 def process_authorships(
-    cur: Connection,
+    conn: Connection,
     queries: OpenalexNormalizeQueries,
     work: dict,
     source_publication_id: int,
@@ -419,7 +419,7 @@ def process_authorships(
 
     # Pré-nettoyage : un re-traitement peut changer les auteurs/positions,
     # on repart d'une table blanche pour cette publi.
-    queries.clear_source_authorships_for_publication(cur, source_publication_id)
+    queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
     for position, authorship in enumerate(authorships):
         # Nom brut de l'auteur (fiable, contrairement à author.display_name)
@@ -444,7 +444,7 @@ def process_authorships(
         # Institutions OpenAlex → source_structures.id
         source_struct_ids = []
         for inst in authorship.get("institutions") or []:
-            ss_id = upsert_openalex_institution(cur, queries, inst)
+            ss_id = upsert_openalex_institution(conn, queries, inst)
             if ss_id:
                 source_struct_ids.append(ss_id)
 
@@ -466,7 +466,7 @@ def process_authorships(
         identifiers = ids if ids else None
 
         sa_id = queries.upsert_openalex_source_authorship(
-            cur,
+            conn,
             source_publication_id=source_publication_id,
             source_person_id=None,
             author_position=position,
@@ -477,7 +477,7 @@ def process_authorships(
         )
 
         if addr_parts:
-            address_linker.link(cur, sa_id, addr_parts)
+            address_linker.link(conn, sa_id, addr_parts)
 
 
 # =============================================================
@@ -486,7 +486,7 @@ def process_authorships(
 
 
 def process_work(
-    cur: Connection,
+    conn: Connection,
     queries: OpenalexNormalizeQueries,
     logger: logging.Logger,
     staging_row: Row[Any],
@@ -516,12 +516,12 @@ def process_work(
                 logger.warning(f"  {openalex_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
                 return None
             if version_doi:
-                if queries.staging_has_openalex_doi(cur, version_doi):
+                if queries.staging_has_openalex_doi(conn, version_doi):
                     logger.info(
                         f"  {openalex_id} concept DOI Zenodo {raw_doi} -> "
                         f"version {version_doi} deja en staging, skip"
                     )
-                    staging_queries.mark_done(cur, staging_id)
+                    staging_queries.mark_done(conn, staging_id)
                     return None
 
         primary = parse_primary_location(work)
@@ -537,7 +537,7 @@ def process_work(
 
         publication_id = None
         if primary and is_hal_location(primary):
-            publication_id = find_hal_publication_id(cur, queries, work)
+            publication_id = find_hal_publication_id(conn, queries, work)
         if not publication_id and primary and is_theses_fr_location(primary):
             nnt = extract_nnt_from_location(primary)
             if nnt:
@@ -546,7 +546,7 @@ def process_work(
                     publication_id = existing.id
 
         if not publication_id:
-            publication_id = queries.get_openalex_publication_id(cur, openalex_id)
+            publication_id = queries.get_openalex_publication_id(conn, openalex_id)
 
         if not publication_id:
             publication_id = find_publication(work, journal_id, pub_repo=pub_repo)
@@ -569,17 +569,17 @@ def process_work(
             publication_id = try_merge_by_doi(publication_id, enrich_doi, repo=pub_repo)
 
         source_publication_id = insert_openalex_document(
-            cur, queries, work, staging_id, publication_id, pub_meta
+            conn, queries, work, staging_id, publication_id, pub_meta
         )
 
         process_authorships(
-            cur, queries, work, source_publication_id, address_linker=address_linker
+            conn, queries, work, source_publication_id, address_linker=address_linker
         )
 
         if publication_id:
             refresh_from_sources(publication_id, repo=pub_repo)
 
-        staging_queries.mark_done(cur, staging_id)
+        staging_queries.mark_done(conn, staging_id)
         return True
 
     except Exception as e:
@@ -616,19 +616,19 @@ class OpenalexNormalizer(SourceNormalizer):
         self._zenodo_resolver = zenodo_resolver
         self._address_linker = address_linker
 
-    def preload_caches(self, cur: Connection) -> None:
-        self._journal_repo = self._journal_repo_factory(cur)
-        self._publisher_repo = self._publisher_repo_factory(cur)
-        self._pub_repo = self._pub_repo_factory(cur)
+    def preload_caches(self, conn: Connection) -> None:
+        self._journal_repo = self._journal_repo_factory(conn)
+        self._publisher_repo = self._publisher_repo_factory(conn)
+        self._pub_repo = self._pub_repo_factory(conn)
 
-    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
+    def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
         assert (
             self._journal_repo is not None
             and self._publisher_repo is not None
             and self._pub_repo is not None
         )
         return process_work(
-            cur,
+            conn,
             self._queries,
             self.logger,
             row,
@@ -649,8 +649,8 @@ class OpenalexNormalizer(SourceNormalizer):
         # violations sur les works suivants.
         self._address_linker.clear_cache()
 
-    def summary_stats(self, cur: Connection) -> list[str]:
+    def summary_stats(self, conn: Connection) -> list[str]:
         return [
-            f"  {table} (openalex) : {self._queries.count_openalex_table(cur, table)} enregistrements"
+            f"  {table} (openalex) : {self._queries.count_openalex_table(conn, table)} enregistrements"
             for table in ("source_structures", "source_persons", "source_publications")
         ]

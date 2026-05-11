@@ -47,7 +47,7 @@ class _FakeAdapter:
         self.record_in_flight = record_in_flight if record_in_flight is not None else []
         self.inserted_records: list[dict] = []
 
-    def configure(self, cur):  # noqa: ARG002
+    def configure(self, conn):  # noqa: ARG002
         pass
 
     async def fetch_async(self, client, dois):  # noqa: ARG002

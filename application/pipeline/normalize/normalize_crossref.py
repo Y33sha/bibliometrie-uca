@@ -219,7 +219,7 @@ def _author_affiliation_strings(author: dict) -> list[str]:
 
 
 def process_authors(
-    cur: Connection,
+    conn: Connection,
     queries: CrossrefNormalizeQueries,
     msg: dict,
     doi: str,
@@ -233,7 +233,7 @@ def process_authors(
     exploitable côté CrossRef, vit sur `source_authorships.identifiers`.
     Les affiliations brutes (génériques tutelle) restent sur `source_data`.
     """
-    queries.clear_source_authorships_for_publication(cur, source_publication_id)
+    queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
     authors = msg.get("author") or []
     if not isinstance(authors, list):
@@ -258,7 +258,7 @@ def process_authors(
             sd["sequence"] = author["sequence"]
 
         queries.upsert_crossref_source_authorship(
-            cur,
+            conn,
             source_publication_id=source_publication_id,
             author_position=position,
             raw_author_name=full_name,
@@ -312,7 +312,7 @@ def find_publication(
 
 
 def process_work(
-    cur: Connection,
+    conn: Connection,
     queries: CrossrefNormalizeQueries,
     logger: logging.Logger,
     staging_row: Row[Any],
@@ -327,28 +327,28 @@ def process_work(
     if not isinstance(raw, dict) or not raw:
         # Stub not_found ou payload vide — devrait déjà être processed=TRUE,
         # par sécurité on marque processed et on passe.
-        staging_queries.mark_done(cur, staging_id)
+        staging_queries.mark_done(conn, staging_id)
         return None
 
     msg = raw  # CrossRef stocke directement le 'message'
     doi = get_doi(msg)
     if not doi:
         logger.warning(f"CrossRef staging {staging_id} sans DOI exploitable — skip")
-        staging_queries.mark_done(cur, staging_id)
+        staging_queries.mark_done(conn, staging_id)
         return None
 
     title = get_title(msg)
     pub_year = get_pub_year(msg)
     if not has_minimal_publication_metadata(title, pub_year):
         logger.warning(f"CrossRef {doi} sans titre ou année — pas de rattachement possible, skip")
-        staging_queries.mark_done(cur, staging_id)
+        staging_queries.mark_done(conn, staging_id)
         return None
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
 
     publisher_id = upsert_publisher(msg, publisher_repo=publisher_repo)
     journal_id = upsert_journal(msg, publisher_id, journal_repo=journal_repo)
 
-    publication_id = queries.get_crossref_publication_id(cur, doi)
+    publication_id = queries.get_crossref_publication_id(conn, doi)
     if not publication_id:
         publication_id = find_publication(msg, journal_id, pub_repo=pub_repo)
     if publication_id:
@@ -359,7 +359,7 @@ def process_work(
     meta = get_meta(msg)
 
     source_publication_id = queries.upsert_crossref_source_publication(
-        cur,
+        conn,
         doi=doi,
         title=title,
         pub_year=pub_year,
@@ -378,12 +378,12 @@ def process_work(
         meta=meta,
     )
 
-    process_authors(cur, queries, msg, doi, source_publication_id)
+    process_authors(conn, queries, msg, doi, source_publication_id)
 
     if publication_id:
         refresh_from_sources(publication_id, repo=pub_repo)
 
-    staging_queries.mark_done(cur, staging_id)
+    staging_queries.mark_done(conn, staging_id)
     return True
 
 
@@ -411,19 +411,19 @@ class CrossrefNormalizer(SourceNormalizer):
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
 
-    def preload_caches(self, cur: Connection) -> None:
-        self._journal_repo = self._journal_repo_factory(cur)
-        self._publisher_repo = self._publisher_repo_factory(cur)
-        self._pub_repo = self._pub_repo_factory(cur)
+    def preload_caches(self, conn: Connection) -> None:
+        self._journal_repo = self._journal_repo_factory(conn)
+        self._publisher_repo = self._publisher_repo_factory(conn)
+        self._pub_repo = self._pub_repo_factory(conn)
 
-    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
+    def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
         assert (
             self._journal_repo is not None
             and self._publisher_repo is not None
             and self._pub_repo is not None
         )
         return process_work(
-            cur,
+            conn,
             self._queries,
             self.logger,
             row,

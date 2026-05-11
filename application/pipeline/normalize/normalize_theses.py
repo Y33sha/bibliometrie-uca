@@ -66,9 +66,9 @@ def _extract_thesis_author(these: dict) -> tuple[str, str] | None:
 
 
 def _thesis_author_compatible(
-    cur: Connection, queries: ThesesNormalizeQueries, pub_id: int, author: tuple[str, str]
+    conn: Connection, queries: ThesesNormalizeQueries, pub_id: int, author: tuple[str, str]
 ) -> bool:
-    primary = queries.fetch_thesis_primary_author(cur, pub_id)
+    primary = queries.fetch_thesis_primary_author(conn, pub_id)
     return thesis_authors_compatible(primary, author)
 
 
@@ -104,7 +104,7 @@ def extract_pub_metadata(these: dict) -> dict:
 
 
 def find_publication(
-    cur: Connection,
+    conn: Connection,
     queries: ThesesNormalizeQueries,
     these: dict,
     *,
@@ -147,7 +147,7 @@ def find_publication(
         if candidates:
             author = _extract_thesis_author(these)
             for cand in candidates:
-                if not author or _thesis_author_compatible(cur, queries, cand.id, author):
+                if not author or _thesis_author_compatible(conn, queries, cand.id, author):
                     # Match trouvé → attribuer le DOI si nécessaire
                     try_merge_by_doi(cand.id, doi, repo=pub_repo)
                     return cand.id
@@ -156,7 +156,7 @@ def find_publication(
 
 
 def _update_thesis_meta(
-    cur: Connection, queries: ThesesNormalizeQueries, pub_id: int, these: dict
+    conn: Connection, queries: ThesesNormalizeQueries, pub_id: int, these: dict
 ) -> None:
     """Met à jour publications.meta avec les dates de thèse."""
     meta = {}
@@ -168,7 +168,7 @@ def _update_thesis_meta(
         meta["date_inscription"] = di
     if not meta:
         return
-    queries.merge_publication_meta(cur, pub_id, meta)
+    queries.merge_publication_meta(conn, pub_id, meta)
 
 
 # =============================================================
@@ -206,7 +206,7 @@ def _build_source_meta(these: dict) -> dict | None:
 
 
 def insert_source_document(
-    cur: Connection,
+    conn: Connection,
     queries: ThesesNormalizeQueries,
     these: dict,
     staging_id: int,
@@ -245,7 +245,7 @@ def insert_source_document(
     source_meta_json = source_meta if source_meta else None
 
     return queries.upsert_theses_source_publication(
-        cur,
+        conn,
         theses_id=theses_id,
         doi=pub_meta["doi"],
         title=pub_meta["title"] or "",
@@ -270,7 +270,7 @@ def insert_source_document(
 
 
 def upsert_source_author(
-    cur: Connection, queries: ThesesNormalizeQueries, person: dict
+    conn: Connection, queries: ThesesNormalizeQueries, person: dict
 ) -> int | None:
     """Crée un `source_persons` theses uniquement quand un PPN (idref stable)
     est fourni. Sans PPN, retourne None : la `source_authorships` sera
@@ -287,7 +287,7 @@ def upsert_source_author(
     assert isinstance(ppn, str)  # narrowing : garanti par le check ci-dessus
 
     full_name = f"{prenom} {nom}".strip() if prenom else nom
-    return queries.upsert_theses_source_person_by_ppn(cur, ppn=ppn, full_name=full_name)
+    return queries.upsert_theses_source_person_by_ppn(conn, ppn=ppn, full_name=full_name)
 
 
 # =============================================================
@@ -296,7 +296,7 @@ def upsert_source_author(
 
 
 def process_persons(
-    cur: Connection,
+    conn: Connection,
     queries: ThesesNormalizeQueries,
     these: dict,
     source_publication_id: int,
@@ -306,7 +306,7 @@ def process_persons(
     """Traite tous les rôles d'une thèse (auteurs, directeurs, rapporteurs,
     jury, président) en consommant ``aggregate_thesis_persons`` côté domain
     pour la dédup multi-rôles + fusion + assignation de position."""
-    queries.clear_source_authorships_for_publication(cur, source_publication_id)
+    queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
     authorships = aggregate_thesis_persons(these)
 
@@ -319,9 +319,9 @@ def process_persons(
         # Avec PPN : crée le source_persons (cas légitime conservé)
         # Sans PPN : source_person_id reste NULL (l'auteur sans idref est
         # déjà désigné par son raw_author_name + author_position).
-        source_person_id = upsert_source_author(cur, queries, a.person)
+        source_person_id = upsert_source_author(conn, queries, a.person)
         sa_id = queries.upsert_theses_source_authorship(
-            cur,
+            conn,
             source_publication_id=source_publication_id,
             source_person_id=source_person_id,
             author_position=a.author_position,
@@ -330,7 +330,7 @@ def process_persons(
             identifiers=a.identifiers if a.identifiers else None,
         )
         if addr_parts:
-            address_linker.link(cur, sa_id, addr_parts)
+            address_linker.link(conn, sa_id, addr_parts)
 
 
 # =============================================================
@@ -339,7 +339,7 @@ def process_persons(
 
 
 def process_work(
-    cur: Connection,
+    conn: Connection,
     queries: ThesesNormalizeQueries,
     logger: logging.Logger,
     row: Row[Any],
@@ -361,24 +361,24 @@ def process_work(
 
         pub_meta = extract_pub_metadata(these)
 
-        publication_id = queries.get_theses_publication_id(cur, theses_id)
+        publication_id = queries.get_theses_publication_id(conn, theses_id)
         if not publication_id:
-            publication_id = find_publication(cur, queries, these, pub_repo=pub_repo)
+            publication_id = find_publication(conn, queries, these, pub_repo=pub_repo)
 
         if publication_id:
             publication_id = try_merge_by_doi(publication_id, pub_meta["doi"], repo=pub_repo)
 
         source_publication_id = insert_source_document(
-            cur, queries, these, staging_id, theses_id, publication_id, pub_meta
+            conn, queries, these, staging_id, theses_id, publication_id, pub_meta
         )
 
-        process_persons(cur, queries, these, source_publication_id, address_linker=address_linker)
+        process_persons(conn, queries, these, source_publication_id, address_linker=address_linker)
 
         if publication_id:
             refresh_from_sources(publication_id, repo=pub_repo)
-            _update_thesis_meta(cur, queries, publication_id, these)
+            _update_thesis_meta(conn, queries, publication_id, these)
 
-        staging_queries.mark_done(cur, staging_id)
+        staging_queries.mark_done(conn, staging_id)
 
         return True
 
@@ -406,13 +406,13 @@ class ThesesNormalizer(SourceNormalizer):
         self._pub_repo: PublicationRepository | None = None
         self._address_linker = address_linker
 
-    def preload_caches(self, cur: Connection) -> None:
-        self._pub_repo = self._pub_repo_factory(cur)
+    def preload_caches(self, conn: Connection) -> None:
+        self._pub_repo = self._pub_repo_factory(conn)
 
-    def process_work(self, cur: Connection, row: Row[Any]) -> bool | None:
+    def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
         assert self._pub_repo is not None
         return process_work(
-            cur,
+            conn,
             self._queries,
             self.logger,
             row,
@@ -430,8 +430,8 @@ class ThesesNormalizer(SourceNormalizer):
         # violations sur les works suivants.
         self._address_linker.clear_cache()
 
-    def summary_stats(self, cur: Connection) -> list[str]:
+    def summary_stats(self, conn: Connection) -> list[str]:
         return [
-            f"  {table} (theses) : {self._queries.count_theses_table(cur, table)}"
+            f"  {table} (theses) : {self._queries.count_theses_table(conn, table)}"
             for table in ("source_publications", "source_persons", "source_authorships")
         ]
