@@ -11,15 +11,12 @@ l'agrégat Address mais n'interagissent pas entre elles.
 
 import logging
 
-from sqlalchemy import Connection
-
 from domain.ports.address_repository import AddressRepository
 
 logger = logging.getLogger(__name__)
 
 
 def set_country(
-    conn: Connection,
     address_id: int,
     countries: list[str] | None,
     *,
@@ -41,7 +38,6 @@ def set_country(
 
 
 def batch_set_country_by_ids(
-    conn: Connection,
     country_code: str,
     address_ids: list[int],
     *,
@@ -59,7 +55,6 @@ def batch_set_country_by_ids(
 
 
 def batch_set_country_by_filter(
-    conn: Connection,
     country_code: str,
     *,
     search: str | None = None,
@@ -99,7 +94,7 @@ def batch_set_country_by_filter(
     )
 
 
-def propagate_countries_to_similar(conn: Connection, *, repo: AddressRepository) -> list[int]:
+def propagate_countries_to_similar(*, repo: AddressRepository) -> list[int]:
     """Propage addresses.countries vers toutes les adresses partageant le même
     normalized_text, quand l'autre adresse a des countries différents.
 
@@ -109,9 +104,7 @@ def propagate_countries_to_similar(conn: Connection, *, repo: AddressRepository)
     return repo.propagate_countries_across_similar_addresses()
 
 
-def propagate_countries_to_publications(
-    conn: Connection, address_ids: list[int], *, repo: AddressRepository
-) -> None:
+def propagate_countries_to_publications(address_ids: list[int], *, repo: AddressRepository) -> None:
     """Propage addresses.countries → source_publications.countries → publications.countries.
 
     Appelée après une modification de pays sur les adresses (typiquement en

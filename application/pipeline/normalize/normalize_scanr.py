@@ -76,7 +76,7 @@ def upsert_publisher(
     publisher_name = (doc.get("source") or {}).get("publisher")
     if not publisher_name:
         return None
-    return find_or_create_publisher(cur, publisher_name, repo=publisher_repo)
+    return find_or_create_publisher(publisher_name, repo=publisher_repo)
 
 
 def upsert_journal(
@@ -89,7 +89,6 @@ def upsert_journal(
     issn = source.get("issn")
     eissn = source.get("eissn")
     return find_or_create_journal(
-        cur,
         title,
         issn=issn,
         eissn=eissn,

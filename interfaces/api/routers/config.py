@@ -56,4 +56,4 @@ def update_config(
     clés sont déclarées dans les migrations). 404 si la clé est
     inconnue.
     """
-    return config_service.update_config_value(conn, key, body.value, config=config_repo)
+    return config_service.update_config_value(key, body.value, config=config_repo)

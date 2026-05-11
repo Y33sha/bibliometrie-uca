@@ -114,7 +114,7 @@ def run_enrich(
 ) -> None:
     try:
         if reset:
-            count = reset_journal_apc(conn, repo=journal_repo)
+            count = reset_journal_apc(repo=journal_repo)
             conn.commit()
             logger.info(f"Reset : {count} revues réinitialisées.")
 
@@ -152,7 +152,6 @@ def run_enrich(
 
                 if not dry_run:
                     update_journal_apc(
-                        conn,
                         journal_id,
                         apc_amount=apc_amount,
                         apc_currency=apc_currency,

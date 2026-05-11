@@ -84,7 +84,6 @@ def create_structure(
 ) -> Any:
     """Crée une structure. Lève 409 si le `code` est déjà utilisé."""
     return structures_service.create_structure(
-        conn,
         code=data.code,
         name=data.name,
         acronym=data.acronym,
@@ -110,7 +109,7 @@ def update_structure(
     404 si la structure n'existe pas.
     """
     fields = data.model_dump(exclude_unset=True)
-    return structures_service.update_structure(conn, structure_id, fields=fields, repo=repo)
+    return structures_service.update_structure(structure_id, fields=fields, repo=repo)
 
 
 @router.delete("/api/structures/{structure_id}", response_model=DeletedResponse)
@@ -122,7 +121,7 @@ def delete_structure(
 ) -> Any:
     """Supprime une structure. Cascade sur les relations et formes de
     noms liées. 404 si inconnue."""
-    structures_service.delete_structure(conn, structure_id, repo=repo, audit_repo=audit)
+    structures_service.delete_structure(structure_id, repo=repo, audit_repo=audit)
     return {"deleted": True}
 
 
@@ -139,7 +138,6 @@ def create_relation(
     recréer.
     """
     row = structures_service.create_relation(
-        conn,
         parent_id=data.parent_id,
         child_id=data.child_id,
         relation_type=data.relation_type,
@@ -158,7 +156,7 @@ def delete_relation(
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
     """Supprime une relation structure. 404 si l'id n'existe pas."""
-    structures_service.delete_relation(conn, relation_id, repo=repo, audit_repo=audit)
+    structures_service.delete_relation(relation_id, repo=repo, audit_repo=audit)
     return {"deleted": True}
 
 
@@ -190,7 +188,6 @@ def create_name_form(
     elles-mêmes matcher l'adresse pour que cette forme active.
     """
     return structures_service.create_name_form(
-        conn,
         structure_id=data.structure_id,
         form_text=data.form_text,
         is_word_boundary=data.is_word_boundary,
@@ -209,7 +206,7 @@ def update_name_form(
 ) -> Any:
     """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
     fields = data.model_dump(exclude_unset=True)
-    return structures_service.update_name_form(conn, form_id, fields=fields, repo=repo)
+    return structures_service.update_name_form(form_id, fields=fields, repo=repo)
 
 
 @router.delete("/api/name-forms/{form_id}", response_model=DeletedResponse)
@@ -220,5 +217,5 @@ def delete_name_form(
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
     """Supprime une forme de nom. 404 si inconnue."""
-    structures_service.delete_name_form(conn, form_id, repo=repo, audit_repo=audit)
+    structures_service.delete_name_form(form_id, repo=repo, audit_repo=audit)
     return {"deleted": True}

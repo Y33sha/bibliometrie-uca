@@ -63,7 +63,6 @@ def create_perimeter(
     name = body.name.strip()
     description = (body.description or "").strip() or None
     pid = config_service.create_perimeter(
-        conn,
         code=code,
         name=name,
         description=description,
@@ -86,7 +85,7 @@ def update_perimeter(
         fields["name"] = fields["name"].strip()
     if "description" in fields and isinstance(fields["description"], str):
         fields["description"] = fields["description"].strip() or None
-    config_service.update_perimeter(conn, perimeter_id, fields=fields, repo=repo)
+    config_service.update_perimeter(perimeter_id, fields=fields, repo=repo)
     return {"ok": True}
 
 
@@ -99,9 +98,7 @@ def delete_perimeter(
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
-    config_service.delete_perimeter(
-        conn, perimeter_id, repo=repo, config=config_repo, audit_repo=audit
-    )
+    config_service.delete_perimeter(perimeter_id, repo=repo, config=config_repo, audit_repo=audit)
     return {"ok": True}
 
 
@@ -117,9 +114,7 @@ def add_perimeter_structure(
     Renvoie `{"status": "added"}` ou `"already_exists"` si la
     structure était déjà racine.
     """
-    status = config_service.add_perimeter_structure(
-        conn, perimeter_id, body.structure_id, repo=repo
-    )
+    status = config_service.add_perimeter_structure(perimeter_id, body.structure_id, repo=repo)
     return {"status": status}
 
 
@@ -134,5 +129,5 @@ def remove_perimeter_structure(
 ) -> Any:
     """Retire une structure racine du périmètre. N'affecte pas ses
     sous-structures tant qu'elles sont rattachées à d'autres racines."""
-    config_service.remove_perimeter_structure(conn, perimeter_id, structure_id, repo=repo)
+    config_service.remove_perimeter_structure(perimeter_id, structure_id, repo=repo)
     return {"status": "removed"}

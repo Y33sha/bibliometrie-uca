@@ -73,7 +73,7 @@ def update_journal(
     (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
     """
     fields = body.model_dump(exclude_unset=True)
-    _update_journal(conn, journal_id, fields=fields, repo=repo)
+    _update_journal(journal_id, fields=fields, repo=repo)
     return {"ok": True}
 
 
@@ -98,5 +98,5 @@ def merge(
     if body.source_id not in found:
         raise HTTPException(status_code=404, detail="Revue source introuvable")
 
-    merge_journals(conn, journal_id, body.source_id, repo=repo, audit_repo=audit)
+    merge_journals(journal_id, body.source_id, repo=repo, audit_repo=audit)
     return {"merged": True, "source_id": body.source_id, "target_id": journal_id}

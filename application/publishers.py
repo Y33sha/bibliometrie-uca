@@ -14,8 +14,6 @@ journaux à conflit entre les deux éditeurs à fusionner avant de
 déléguer les transferts SQL.
 """
 
-from sqlalchemy import Connection
-
 from application.audit import emit_event
 from application.journals import merge_journals
 from domain.errors import ConflictError, NotFoundError, ValidationError
@@ -26,7 +24,6 @@ from domain.ports.publisher_repository import PublisherRepository
 
 
 def find_or_create_publisher(
-    cur: Connection,
     name: str | None,
     *,
     openalex_id: str | None = None,
@@ -72,9 +69,7 @@ def find_or_create_publisher(
     return pub_id
 
 
-def update_publisher(
-    conn: Connection, publisher_id: int, *, fields: dict, repo: PublisherRepository
-) -> None:
+def update_publisher(publisher_id: int, *, fields: dict, repo: PublisherRepository) -> None:
     """Met à jour un éditeur. Le `name` est automatiquement normalisé en
     `name_normalized`.
 
@@ -94,7 +89,6 @@ def update_publisher(
 
 
 def merge_publishers(
-    conn: Connection,
     target_id: int,
     source_id: int,
     *,
@@ -129,7 +123,6 @@ def merge_publishers(
                     f"Fusionner les revues manuellement d'abord."
                 )
         merge_journals(
-            conn,
             pair["target_journal_id"],
             pair["source_journal_id"],
             repo=journal_repo,
