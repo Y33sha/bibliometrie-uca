@@ -12,6 +12,7 @@ dependencies = [
     "psycopg[binary]==3.3.3",
     "psycopg-pool==3.3.0",
     "sqlalchemy==2.0.43",        # query builder Core (chantier sqlalchemy-core-adoption.md)
+    "alembic==1.18.0",           # migrations DB (chantier alembic-adoption.md)
     "fastapi==0.128.2",
     "uvicorn==0.40.0",
     "bcrypt==5.0.0",
