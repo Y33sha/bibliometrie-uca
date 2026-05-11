@@ -10,7 +10,7 @@ from typing import Any, Protocol
 class AuthorshipRepository(Protocol):
     """Contrat d'accès aux tables authorships et source_authorships."""
 
-    # ── authorships (vérité) ───────────────────────────────────────
+    # ── authorships ────────────────────────────────────────────────
 
     def get_authorship_person(self, authorship_id: int) -> dict[str, Any] | None: ...
 
@@ -35,7 +35,7 @@ class AuthorshipRepository(Protocol):
         excluded: bool,
     ) -> bool: ...
 
-    def get_source_authorship_truth_id(
+    def get_authorship_id_for_source(
         self,
         source_authorship_id: int,
         source: str,
@@ -47,7 +47,7 @@ class AuthorshipRepository(Protocol):
         source: str,
     ) -> None: ...
 
-    def has_active_source_attestation(self, truth_id: int) -> bool: ...
+    def has_active_source_attestation(self, authorship_id: int) -> bool: ...
 
     # ── Propagation UCA depuis les adresses ────────────────────────
 
@@ -62,7 +62,7 @@ class AuthorshipRepository(Protocol):
         perimeter_structure_ids: list[int],
     ) -> None: ...
 
-    def propagate_in_perimeter_to_truth_authorships(
+    def propagate_in_perimeter_to_authorships(
         self,
         source_authorship_ids: list[int],
     ) -> None: ...

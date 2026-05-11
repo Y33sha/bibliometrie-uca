@@ -133,20 +133,25 @@ Exceptions à expliciter (pas à supprimer) :
   le code touché.
 - [x] Adapter port `PersonRepository`, router API admin, tests.
 
-Tests : 1403/1403 OK.
-
 ### Phase 2 — `authorship_repository.py` perimeter
 
-- Créer `application/perimeter_propagation.py` (nom à confirmer).
-- Y déplacer `recompute_in_perimeter_on_source_authorships` et
-  `propagate_in_perimeter_to_truth_authorships`. Le repo conserve les
-  méthodes SQL atomiques sous-jacentes.
-- Extraire la règle « une authorship canonique est orpheline si aucune
-  source non-exclue ne l'atteste » : soit dans le domaine (fonction
-  pure), soit dans le use case `delete_orphan_authorships`.
-
-Tests : `tests/integration/application/test_perimeter_*` +
-`tests/integration/application/test_authorships_*`.
+- [x] Vérification : l'orchestration `recompute_in_perimeter_*` +
+  `propagate_in_perimeter_*` est **déjà** côté use case
+  (`propagate_uca_for_addresses` dans `application/authorships/core.py`).
+  Les méthodes du repo sont des agrégations SQL atomiques (CTE
+  d'agrégation cross-row), pas de la logique métier déguisée.
+  Rien à extraire.
+- [x] `delete_orphan_authorships_for_person` : la « règle d'orphelinat »
+  est un simple `NOT EXISTS` SQL, formulation la plus directe. Extraire
+  vers Python = 2 round-trips au lieu d'1 pour gain marginal. Laissé
+  tel quel.
+- [x] Suppression du jargon « truth » dans `authorship_repository.py` :
+  `get_source_authorship_truth_id` → `get_authorship_id_for_source`,
+  `has_active_source_attestation(truth_id)` →
+  `has_active_source_attestation(authorship_id)`,
+  `propagate_in_perimeter_to_truth_authorships` →
+  `propagate_in_perimeter_to_authorships`. Adaptations du port et
+  des call sites dans `application/authorships/core.py`.
 
 ### Phase 3 — Règle OA dans `publication_repository.merge_into`
 
