@@ -1,6 +1,6 @@
 """
-Service Authorships vérité — orchestrateur des opérations sur
-`authorships` et `source_authorships`.
+Service Authorships — orchestrateur des opérations sur `authorships`
+et `source_authorships`.
 
 Opérations unitaires sur les authorships consolidées. Le script batch
 `build_authorships.py` reste le constructeur principal (reconstruction
@@ -26,9 +26,9 @@ def exclude_authorship(
     repo: AuthorshipRepository,
     audit_repo: AuditRepository | None = None,
 ) -> dict:
-    """Marque une authorship vérité comme exclue et détache les authorships sources.
+    """Marque une authorship comme exclue et détache les authorships sources.
 
-    1. Marque l'authorship vérité excluded = TRUE
+    1. Marque l'authorship excluded = TRUE
     2. Met person_id = NULL sur les authorships sources liées
        (pour que build_authorships ne recrée pas le lien)
 
@@ -64,7 +64,7 @@ def set_source_authorship_excluded(
 ) -> None:
     """Marque ou démarque une authorship source comme exclue.
 
-    Si `excluded=True`, détache aussi la FK vers l'authorship vérité et
+    Si `excluded=True`, détache aussi la FK vers l'authorship canonique et
     supprime cette dernière si plus aucune source non-exclue ne l'atteste.
 
     Lève ValidationError si la source n'est pas reconnue.
@@ -91,23 +91,23 @@ def set_source_authorship_excluded(
 def detach_source(
     conn: Connection, source_authorship_id: int, source: str, *, repo: AuthorshipRepository
 ) -> bool:
-    """Détache une authorship source de son authorship vérité.
-    Si plus aucune source ne l'atteste, supprime l'authorship vérité.
+    """Détache une authorship source de son authorship canonique.
+    Si plus aucune source ne l'atteste, supprime l'authorship canonique.
 
-    Retourne True si l'authorship vérité a été supprimée, False sinon.
+    Retourne True si l'authorship canonique a été supprimée, False sinon.
     Lève ValidationError si la source n'est pas reconnue.
     """
     if source not in VALID_SOURCES:
         raise ValidationError(f"Source inconnue : {source}")
 
-    truth_id = repo.get_source_authorship_truth_id(source_authorship_id, source)
-    if not truth_id:
+    authorship_id = repo.get_authorship_id_for_source(source_authorship_id, source)
+    if not authorship_id:
         return False
 
     repo.clear_source_authorship_fk(source_authorship_id, source)
 
-    if not repo.has_active_source_attestation(truth_id):
-        repo.delete_authorship(truth_id)
+    if not repo.has_active_source_attestation(authorship_id):
+        repo.delete_authorship(authorship_id)
         return True
     return False
 
@@ -119,7 +119,7 @@ def propagate_uca_for_addresses(
     repo: AuthorshipRepository,
     perimeter_queries: PerimeterQueries,
 ) -> None:
-    """Recalcule in_perimeter sur source_authorships et authorships vérité
+    """Recalcule in_perimeter sur source_authorships et authorships canoniques
     pour tous les authorships liés aux adresses données.
 
     Appelé après chaque review/assign/unassign d'adresse pour
@@ -137,13 +137,14 @@ def propagate_uca_for_addresses(
         return
 
     repo.recompute_in_perimeter_on_source_authorships(affected_sa_ids, perimeter_ids)
-    repo.propagate_in_perimeter_to_truth_authorships(affected_sa_ids)
+    repo.propagate_in_perimeter_to_authorships(affected_sa_ids)
 
 
 def delete_orphan_authorships(
     conn: Connection, person_id: int, *, repo: AuthorshipRepository
 ) -> int:
-    """Supprime les authorships vérité d'une personne qui ne sont plus attestées
-    par aucune authorship source. Retourne le nombre d'authorships supprimées.
+    """Supprime les authorships canoniques d'une personne qui ne sont plus
+    attestées par aucune authorship source. Retourne le nombre d'authorships
+    supprimées.
     """
     return repo.delete_orphan_authorships_for_person(person_id)

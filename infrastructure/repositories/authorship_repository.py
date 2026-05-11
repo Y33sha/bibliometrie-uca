@@ -1,15 +1,15 @@
-"""Adapter PostgreSQL sync pour les authorships (vérité et sources)."""
+"""Adapter PostgreSQL sync pour les authorships et source_authorships."""
 
 from sqlalchemy import Connection, text
 
 
 class PgAuthorshipRepository:
-    """Accès PostgreSQL sync aux agrégats Authorship (vérité et sources)."""
+    """Accès PostgreSQL sync aux agrégats Authorship et SourceAuthorship."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── authorships (vérité) ───────────────────────────────────────
+    # ── authorships ────────────────────────────────────────────────
 
     def get_authorship_person(self, authorship_id: int) -> dict | None:
         result = self._conn.execute(
@@ -82,7 +82,7 @@ class PgAuthorshipRepository:
         )
         return result.first() is not None
 
-    def get_source_authorship_truth_id(
+    def get_authorship_id_for_source(
         self,
         source_authorship_id: int,
         source: str,
@@ -106,13 +106,13 @@ class PgAuthorshipRepository:
             {"id": source_authorship_id, "src": source},
         )
 
-    def has_active_source_attestation(self, truth_id: int) -> bool:
+    def has_active_source_attestation(self, authorship_id: int) -> bool:
         result = self._conn.execute(
             text(
                 "SELECT 1 FROM source_authorships "
                 "WHERE authorship_id = :id AND NOT excluded LIMIT 1"
             ),
-            {"id": truth_id},
+            {"id": authorship_id},
         )
         return result.first() is not None
 
@@ -162,7 +162,7 @@ class PgAuthorshipRepository:
             {"sa_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},
         )
 
-    def propagate_in_perimeter_to_truth_authorships(
+    def propagate_in_perimeter_to_authorships(
         self,
         source_authorship_ids: list[int],
     ) -> None:
