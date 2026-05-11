@@ -285,6 +285,25 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 - **`source_authorship_addresses`** : table de liaison `source_authorships ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs authorships, et alimente la résolution structure ↔ adresse de la phase `affiliations`.
 - **`source_structures`** : structures importées depuis HAL, OpenAlex et WoS. La colonne `structure_id` (FK vers `structures` canoniques) existe mais est très peu utilisée en pratique (≈ 0,2 % des lignes mappées) — la résolution canonique passe par les adresses, pas par cette table. Utilisée principalement par `refresh_hal_source_countries` pour propager les pays HAL vers `source_publications.countries`.
 
+## Autres tables, à documenter
+
+<!--TODO: rédiger des sections dédiées pour les tables ci-dessous.-->
+
+- `audit_log` — journal des opérations admin destructives.
+- `distinct_persons` — paires de personnes marquées comme distinctes
+  (symétrique de `distinct_publications`).
+- `staging` — table d'ingestion par source ; cycle de vie particulier
+  (`raw_data` JSONB vidé après normalisation, conserve `processed`,
+  `last_seen_at`, `not_found`).
+- `subjects`, `publication_subjects`, `subject_cooccurrences` —
+  référentiel des sujets/mots-clés et leurs co-occurrences (alimenté
+  par les phases `subjects` et `cooccurrences` du pipeline).
+- `journal_name_forms`, `publisher_name_forms` — formes de noms
+  normalisées pour le matching journaux et éditeurs (parallèle à
+  `person_name_forms` et `structure_name_forms`).
+- `country_name_forms` — formes de noms pour le matching des pays
+  dans les adresses (parallèle à `countries`).
+
 ## Évolutions prévues à court terme
 
 Chantiers `DATA_*` actuellement ouverts dans
