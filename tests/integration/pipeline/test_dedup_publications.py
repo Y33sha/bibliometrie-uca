@@ -26,7 +26,7 @@ def _create(conn, **kwargs):
         "journal_id": None,
     }
     defaults.update(kwargs)
-    return find_or_create(conn, **defaults, repo=publication_repository(conn))
+    return find_or_create(**defaults, repo=publication_repository(conn))
 
 
 def _create_journal(conn, title="Test Journal"):
@@ -357,7 +357,7 @@ class TestRefreshFromSources:
             doc_type="article",
         )
         self._insert_sd(sa_sync_conn, id1, "hal", language="en", oa_status="closed")
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "en"
@@ -367,7 +367,7 @@ class TestRefreshFromSources:
         id1, _ = _create(sa_sync_conn, doi="10.1234/oa", oa_status="closed")
         self._insert_sd(sa_sync_conn, id1, "hal", oa_status="closed")
         self._insert_sd(sa_sync_conn, id1, "openalex", oa_status="green")
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "green"
@@ -377,7 +377,7 @@ class TestRefreshFromSources:
         id1, _ = _create(sa_sync_conn, doi="10.1234/dia", oa_status="gold")
         self._insert_sd(sa_sync_conn, id1, "hal", oa_status="gold")
         self._insert_sd(sa_sync_conn, id1, "openalex", oa_status="diamond")
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "diamond"
@@ -387,7 +387,7 @@ class TestRefreshFromSources:
         id1, _ = _create(sa_sync_conn, doi="10.1234/prio", pub_year=2024, doc_type="article")
         self._insert_sd(sa_sync_conn, id1, "openalex", language="en")
         self._insert_sd(sa_sync_conn, id1, "hal", language="fr")
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "fr"
@@ -397,7 +397,7 @@ class TestRefreshFromSources:
         id1, _ = _create(sa_sync_conn, doi="10.1234/thesis-prio", pub_year=2024, doc_type="thesis")
         self._insert_sd(sa_sync_conn, id1, "hal", language="en", doc_type="THESE")
         self._insert_sd(sa_sync_conn, id1, "theses", language="fr", doc_type="thesis")
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "fr"
@@ -407,7 +407,7 @@ class TestRefreshFromSources:
         id1, _ = _create(sa_sync_conn, doi="10.1234/scanr-prio", pub_year=2024, doc_type="article")
         self._insert_sd(sa_sync_conn, id1, "hal", language="en", doc_type="ART")
         self._insert_sd(sa_sync_conn, id1, "scanr", language="fr", doc_type="article")
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "fr"
@@ -416,7 +416,7 @@ class TestRefreshFromSources:
         """Les doc_types bruts sont mappés vers l'enum canonique."""
         id1, _ = _create(sa_sync_conn, pub_year=2024, doc_type="other")
         self._insert_sd(sa_sync_conn, id1, "hal", doc_type="ART")
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         dt = _scalar(sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=id1)
         assert dt == "article"
@@ -425,7 +425,7 @@ class TestRefreshFromSources:
         """Un ongoing_thesis passe à thesis quand theses.fr le dit."""
         id1, _ = _create(sa_sync_conn, pub_year=2024, doc_type="ongoing_thesis")
         self._insert_sd(sa_sync_conn, id1, "theses", doc_type="thesis")
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         dt = _scalar(sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=id1)
         assert dt == "thesis"
@@ -443,7 +443,7 @@ class TestRefreshFromSources:
             ),
             {"p": id1},
         )
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         kw = _scalar(sa_sync_conn, "SELECT keywords FROM publications WHERE id = :id", id=id1)
         # 'data' et 'Data' sont dédupliqués (case-insensitive), 3 mots-clés
@@ -470,7 +470,7 @@ class TestRefreshFromSources:
             ),
             {"p": id1},
         )
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         topics = _scalar(sa_sync_conn, "SELECT topics FROM publications WHERE id = :id", id=id1)
         # Chaque source garde sa forme sous sa propre clé
@@ -494,7 +494,7 @@ class TestRefreshFromSources:
             ),
             {"p": id1},
         )
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         topics = _scalar(sa_sync_conn, "SELECT topics FROM publications WHERE id = :id", id=id1)
         # La liste OpenAlex est préservée telle quelle
@@ -516,7 +516,7 @@ class TestRefreshFromSources:
             ),
             {"p": id1},
         )
-        refresh_from_sources(sa_sync_conn, id1, repo=publication_repository(sa_sync_conn))
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         is_ret = _scalar(
             sa_sync_conn, "SELECT is_retracted FROM publications WHERE id = :id", id=id1
@@ -526,7 +526,6 @@ class TestRefreshFromSources:
     def test_allow_create_false(self, sa_sync_conn):
         """allow_create=False → retourne None si non trouvée."""
         result, _ = find_or_create(
-            sa_sync_conn,
             title="X",
             title_normalized="x",
             pub_year=2024,
@@ -668,9 +667,7 @@ class TestDedupByNnt:
         )
         _create_source_doc_with_nnt(sa_sync_conn, id1, "theses", "2023UCFA0069", "2023UCFA0069")
 
-        result = find_by_nnt(
-            sa_sync_conn, "2023UCFA0069", repo=publication_repository(sa_sync_conn)
-        )
+        result = find_by_nnt("2023UCFA0069", repo=publication_repository(sa_sync_conn))
         assert result is not None
         assert result.id == id1
 
@@ -685,8 +682,6 @@ class TestDedupByNnt:
         )
         _create_source_doc_with_nnt(sa_sync_conn, id1, "theses", "2023UCFA0069", "2023UCFA0069")
 
-        result = find_by_nnt(
-            sa_sync_conn, "2023ucfa0069", repo=publication_repository(sa_sync_conn)
-        )
+        result = find_by_nnt("2023ucfa0069", repo=publication_repository(sa_sync_conn))
         assert result is not None
         assert result.id == id1

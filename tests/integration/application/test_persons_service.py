@@ -151,7 +151,7 @@ def _scalar(conn, sql_text: str, **params):
 class TestLinkAuthorship:
     def test_ignores_invalid_source(self, sa_sync_conn, repo):
         """Source inconnue → no-op silencieux (pas d'exception)."""
-        link_authorship(sa_sync_conn, 1, "invalid", 1, repo=repo)
+        link_authorship(1, "invalid", 1, repo=repo)
 
     def test_sets_person_id_on_source_authorship(self, sa_sync_conn, repo):
         person_id = _insert_person(sa_sync_conn)
@@ -160,7 +160,7 @@ class TestLinkAuthorship:
         sp_person = _insert_source_person(sa_sync_conn)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person)
 
-        link_authorship(sa_sync_conn, person_id, "hal", sa_id, repo=repo)
+        link_authorship(person_id, "hal", sa_id, repo=repo)
 
         assert (
             _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
@@ -176,7 +176,6 @@ class TestLinkAuthorship:
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person)
 
         link_authorship(
-            sa_sync_conn,
             person_id,
             "hal",
             sa_id,
@@ -193,7 +192,7 @@ class TestLinkAuthorship:
 
 class TestUnlinkAuthorship:
     def test_ignores_invalid_source(self, sa_sync_conn, repo):
-        unlink_authorship(sa_sync_conn, 1, "invalid", 1, repo=repo)
+        unlink_authorship(1, "invalid", 1, repo=repo)
 
     def test_unsets_person_id(self, sa_sync_conn, repo):
         person_id = _insert_person(sa_sync_conn)
@@ -202,7 +201,7 @@ class TestUnlinkAuthorship:
         sp_person = _insert_source_person(sa_sync_conn)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=person_id)
 
-        unlink_authorship(sa_sync_conn, person_id, "hal", sa_id, repo=repo)
+        unlink_authorship(person_id, "hal", sa_id, repo=repo)
 
         assert (
             _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
@@ -218,7 +217,7 @@ class TestUnlinkAuthorship:
         sp_person = _insert_source_person(sa_sync_conn)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=p1)
 
-        unlink_authorship(sa_sync_conn, p2, "hal", sa_id, repo=repo)
+        unlink_authorship(p2, "hal", sa_id, repo=repo)
 
         assert (
             _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
@@ -232,7 +231,7 @@ class TestUnlinkAuthorship:
 class TestAddIdentifier:
     def test_inserts_new(self, sa_sync_conn, repo):
         person_id = _insert_person(sa_sync_conn)
-        add_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", repo=repo)
+        add_identifier(person_id, "orcid", "0000-0001-2345-6789", repo=repo)
         status = _scalar(
             sa_sync_conn,
             "SELECT status FROM person_identifiers WHERE id_type='orcid' AND id_value=:v",
@@ -243,11 +242,11 @@ class TestAddIdentifier:
     def test_reassigns_if_rejected(self, sa_sync_conn, repo):
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")
-        add_identifier(sa_sync_conn, p1, "orcid", "0000-0001", repo=repo)
+        add_identifier(p1, "orcid", "0000-0001", repo=repo)
         sa_sync_conn.execute(
             text("UPDATE person_identifiers SET status='rejected' WHERE id_value='0000-0001'")
         )
-        add_identifier(sa_sync_conn, p2, "orcid", "0000-0001", repo=repo)
+        add_identifier(p2, "orcid", "0000-0001", repo=repo)
 
         row = sa_sync_conn.execute(
             text("SELECT person_id, status FROM person_identifiers WHERE id_value='0000-0001'")
@@ -259,8 +258,8 @@ class TestAddIdentifier:
         """Si le même identifiant existe en 'pending', on ne touche pas."""
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")
-        add_identifier(sa_sync_conn, p1, "orcid", "0000-0001", repo=repo)
-        add_identifier(sa_sync_conn, p2, "orcid", "0000-0001", repo=repo)
+        add_identifier(p1, "orcid", "0000-0001", repo=repo)
+        add_identifier(p2, "orcid", "0000-0001", repo=repo)
 
         assert (
             _scalar(
@@ -275,7 +274,7 @@ class TestAddIdentifier:
         person_id = _insert_person(sa_sync_conn)
         sp = _insert_source_person(sa_sync_conn, source_ids={"idhal": "jean-dupont"})
 
-        add_identifier(sa_sync_conn, person_id, "idhal", "jean-dupont", repo=repo)
+        add_identifier(person_id, "idhal", "jean-dupont", repo=repo)
 
         assert (
             _scalar(sa_sync_conn, "SELECT person_id FROM source_persons WHERE id = :i", i=sp)
@@ -293,7 +292,7 @@ class TestRemoveIdentifier:
             ),
             {"p": p},
         )
-        remove_identifier(sa_sync_conn, p, "orcid", "0000-0001", repo=repo)
+        remove_identifier(p, "orcid", "0000-0001", repo=repo)
         row = sa_sync_conn.execute(
             text("SELECT id FROM person_identifiers WHERE id_value = '0000-0001'")
         ).first()
@@ -302,7 +301,7 @@ class TestRemoveIdentifier:
     def test_raises_not_found(self, sa_sync_conn, repo):
         p = _insert_person(sa_sync_conn)
         with pytest.raises(NotFoundError):
-            remove_identifier(sa_sync_conn, p, "orcid", "unknown", repo=repo)
+            remove_identifier(p, "orcid", "unknown", repo=repo)
 
 
 class TestUpdateIdentifierStatus:
@@ -316,13 +315,13 @@ class TestUpdateIdentifierStatus:
             {"p": p},
         ).scalar_one()
 
-        row = update_identifier_status(sa_sync_conn, ident_id, "confirmed", repo=repo)
+        row = update_identifier_status(ident_id, "confirmed", repo=repo)
 
         assert row["status"] == "confirmed"
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            update_identifier_status(sa_sync_conn, 999999, "confirmed", repo=repo)
+            update_identifier_status(999999, "confirmed", repo=repo)
 
 
 class TestReassignIdentifier:
@@ -337,7 +336,7 @@ class TestReassignIdentifier:
             {"p": p1},
         ).scalar_one()
 
-        reassign_identifier(sa_sync_conn, ident_id, p2, repo=repo)
+        reassign_identifier(ident_id, p2, repo=repo)
 
         row = sa_sync_conn.execute(
             text("SELECT person_id, status::text AS status FROM person_identifiers WHERE id = :i"),
@@ -349,24 +348,24 @@ class TestReassignIdentifier:
     def test_raises_not_found(self, sa_sync_conn, repo):
         p = _insert_person(sa_sync_conn)
         with pytest.raises(NotFoundError):
-            reassign_identifier(sa_sync_conn, 999999, p, repo=repo)
+            reassign_identifier(999999, p, repo=repo)
 
 
 class TestSetRejected:
     def test_marks_rejected(self, sa_sync_conn, repo):
         p = _insert_person(sa_sync_conn)
-        set_rejected(sa_sync_conn, p, True, repo=repo)
+        set_rejected(p, True, repo=repo)
         assert _scalar(sa_sync_conn, "SELECT rejected FROM persons WHERE id = :p", p=p) is True
 
     def test_unmarks(self, sa_sync_conn, repo):
         p = _insert_person(sa_sync_conn)
-        set_rejected(sa_sync_conn, p, True, repo=repo)
-        set_rejected(sa_sync_conn, p, False, repo=repo)
+        set_rejected(p, True, repo=repo)
+        set_rejected(p, False, repo=repo)
         assert _scalar(sa_sync_conn, "SELECT rejected FROM persons WHERE id = :p", p=p) is False
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            set_rejected(sa_sync_conn, 999999, True, repo=repo)
+            set_rejected(999999, True, repo=repo)
 
 
 class TestUpdateName:
@@ -384,7 +383,7 @@ class TestUpdateName:
         ).first()
         assert row is not None
 
-        update_name(sa_sync_conn, p, "Martin", "Sophie", repo=repo)
+        update_name(p, "Martin", "Sophie", repo=repo)
 
         row = sa_sync_conn.execute(
             text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": p}
@@ -399,7 +398,7 @@ class TestUpdateName:
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            update_name(sa_sync_conn, 999999, "X", "X", repo=repo)
+            update_name(999999, "X", "X", repo=repo)
 
 
 # ── batch_assign_orphan_authorships ─────────────────────────────────
@@ -409,7 +408,7 @@ class TestBatchAssignOrphanAuthorships:
     def test_empty_list_returns_zero(self, sa_sync_conn, repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
-        assert batch_assign_orphan_authorships(sa_sync_conn, person_id, [], repo=repo) == 0
+        assert batch_assign_orphan_authorships(person_id, [], repo=repo) == 0
 
     def test_assigns_and_creates_authorship(self, sa_sync_conn, repo):
         _setup_uca(sa_sync_conn)
@@ -430,7 +429,7 @@ class TestBatchAssignOrphanAuthorships:
             author_name_normalized="jean dupont",
         )
 
-        assigned = batch_assign_orphan_authorships(sa_sync_conn, person_id, [sa1, sa2], repo=repo)
+        assigned = batch_assign_orphan_authorships(person_id, [sa1, sa2], repo=repo)
 
         assert assigned == 2
         row = sa_sync_conn.execute(
@@ -453,7 +452,7 @@ class TestBatchAssignOrphanAuthorships:
         sp_person = _insert_source_person(sa_sync_conn)
         sa1 = _insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=p1)
 
-        assigned = batch_assign_orphan_authorships(sa_sync_conn, p2, [sa1], repo=repo)
+        assigned = batch_assign_orphan_authorships(p2, [sa1], repo=repo)
 
         assert assigned == 0
         assert (
@@ -481,7 +480,6 @@ class TestDetachAuthorships:
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=person_id)
 
         result = detach_authorships(
-            sa_sync_conn,
             person_id,
             authorships=[{"source": "hal", "authorship_id": sa_id}],
             repo=repo,
@@ -500,10 +498,9 @@ class TestDetachAuthorships:
         assert row is None
 
     def test_cleans_name_form_when_no_remaining(self, sa_sync_conn, repo, authorship_repo):
-        person_id = create_person(sa_sync_conn, "Dupont", "Jean", repo=repo)
+        person_id = create_person("Dupont", "Jean", repo=repo)
 
         result = detach_authorships(
-            sa_sync_conn,
             person_id,
             authorships=[],
             name_form="dupont jean",
@@ -521,7 +518,7 @@ class TestDetachAuthorships:
     def test_keeps_name_form_if_another_authorship_uses_it(
         self, sa_sync_conn, repo, authorship_repo
     ):
-        person_id = create_person(sa_sync_conn, "Dupont", "Jean", repo=repo)
+        person_id = create_person("Dupont", "Jean", repo=repo)
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sp_person = _insert_source_person(sa_sync_conn)
@@ -534,7 +531,6 @@ class TestDetachAuthorships:
         )
 
         result = detach_authorships(
-            sa_sync_conn,
             person_id,
             authorships=[],
             name_form="dupont jean",
@@ -549,7 +545,7 @@ class TestMarkDistinctPersons:
     def test_inserts_ordered_pair(self, sa_sync_conn, repo):
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")
-        mark_distinct(sa_sync_conn, p2, p1, repo=repo)
+        mark_distinct(p2, p1, repo=repo)
         n = sa_sync_conn.execute(
             text(
                 "SELECT COUNT(*) AS n FROM distinct_persons "
@@ -562,8 +558,8 @@ class TestMarkDistinctPersons:
     def test_idempotent(self, sa_sync_conn, repo):
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")
-        mark_distinct(sa_sync_conn, p1, p2, repo=repo)
-        mark_distinct(sa_sync_conn, p1, p2, repo=repo)
+        mark_distinct(p1, p2, repo=repo)
+        mark_distinct(p1, p2, repo=repo)
         n = sa_sync_conn.execute(
             text(
                 "SELECT COUNT(*) AS n FROM distinct_persons "
@@ -581,7 +577,7 @@ class TestAddIdentifiersFromAuthorships:
             {"source": "hal", "orcid": "0000-0001", "idhal": "jdupont"},
             {"source": "scanr", "orcid": "0000-0001", "idref": "123456"},
         ]
-        add_identifiers_from_authorships(sa_sync_conn, person_id, authorships, repo=repo)
+        add_identifiers_from_authorships(person_id, authorships, repo=repo)
 
         rows = sa_sync_conn.execute(
             text(
@@ -599,10 +595,10 @@ class TestAddIdentifiersFromAuthorships:
 
 class TestDetachNameForm:
     def test_removes_person_from_form(self, sa_sync_conn, repo):
-        p1 = create_person(sa_sync_conn, "Dupont", "Jean", repo=repo)
-        p2 = create_person(sa_sync_conn, "Dupont", "Jean", repo=repo)
+        p1 = create_person("Dupont", "Jean", repo=repo)
+        p2 = create_person("Dupont", "Jean", repo=repo)
 
-        detach_name_form(sa_sync_conn, p1, "dupont jean", repo=repo)
+        detach_name_form(p1, "dupont jean", repo=repo)
 
         row = sa_sync_conn.execute(
             text("SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'")
@@ -612,9 +608,9 @@ class TestDetachNameForm:
         assert p2 in row.person_ids
 
     def test_deletes_form_when_last_person_detached(self, sa_sync_conn, repo):
-        person_id = create_person(sa_sync_conn, "Unique", "Name", repo=repo)
+        person_id = create_person("Unique", "Name", repo=repo)
 
-        detach_name_form(sa_sync_conn, person_id, "name unique", repo=repo)
+        detach_name_form(person_id, "name unique", repo=repo)
 
         row = sa_sync_conn.execute(
             text("SELECT id FROM person_name_forms WHERE name_form = 'name unique'")
@@ -628,7 +624,7 @@ class TestDetachNameForm:
 class TestAssignOrphanAuthorship:
     def test_raises_on_invalid_source(self, sa_sync_conn, repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            assign_orphan_authorship(sa_sync_conn, 1, "invalid", 1, repo=repo)
+            assign_orphan_authorship(1, "invalid", 1, repo=repo)
 
     def test_returns_false_if_already_assigned(self, sa_sync_conn, repo):
         """Si l'authorship a déjà un person_id, l'UPDATE ne matche pas."""
@@ -640,7 +636,7 @@ class TestAssignOrphanAuthorship:
         sp_person = _insert_source_person(sa_sync_conn)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=other_id)
 
-        assert assign_orphan_authorship(sa_sync_conn, person_id, "hal", sa_id, repo=repo) is False
+        assert assign_orphan_authorship(person_id, "hal", sa_id, repo=repo) is False
 
     def test_assigns_and_creates_authorship(self, sa_sync_conn, repo):
         _setup_uca(sa_sync_conn)
@@ -650,7 +646,7 @@ class TestAssignOrphanAuthorship:
         sp_person = _insert_source_person(sa_sync_conn)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person)
 
-        result = assign_orphan_authorship(sa_sync_conn, person_id, "hal", sa_id, repo=repo)
+        result = assign_orphan_authorship(person_id, "hal", sa_id, repo=repo)
 
         assert result is True
         row = sa_sync_conn.execute(
@@ -681,7 +677,7 @@ class TestAssignOrphanAuthorship:
             excluded=True,
         )
 
-        assign_orphan_authorship(sa_sync_conn, person_id, "hal", sa_id, repo=repo)
+        assign_orphan_authorship(person_id, "hal", sa_id, repo=repo)
 
         row = sa_sync_conn.execute(
             text("SELECT id FROM person_name_forms WHERE name_form = 'other name'")

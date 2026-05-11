@@ -133,7 +133,6 @@ class TestEndToEndServiceIntegration:
         token = set_current_user("admin")
         try:
             set_rejected(
-                sa_sync_conn,
                 person_id,
                 True,
                 repo=person_repository(sa_sync_conn),
@@ -161,7 +160,6 @@ class TestEndToEndServiceIntegration:
 
         person_id = self._create_person(sa_sync_conn)
         set_rejected(
-            sa_sync_conn,
             person_id,
             True,
             repo=person_repository(sa_sync_conn),
@@ -193,9 +191,9 @@ class TestEndToEndServiceIntegration:
         audit_repo_ = audit_repository(sa_sync_conn)
         token = set_current_user("admin")
         try:
-            mark_distinct(sa_sync_conn, p1, p2, repo=repo, audit_repo=audit_repo_)
-            mark_distinct(sa_sync_conn, p1, p2, repo=repo, audit_repo=audit_repo_)
-            mark_distinct(sa_sync_conn, p2, p1, repo=repo, audit_repo=audit_repo_)
+            mark_distinct(p1, p2, repo=repo, audit_repo=audit_repo_)
+            mark_distinct(p1, p2, repo=repo, audit_repo=audit_repo_)
+            mark_distinct(p2, p1, repo=repo, audit_repo=audit_repo_)
         finally:
             reset_current_user(token)
 

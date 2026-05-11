@@ -44,7 +44,6 @@ def _create_all_publications(conn):
         if nnt:
             nnt = normalize_nnt(nnt)
         pub_id, _ = find_or_create_publication(
-            conn,
             title=title,
             title_normalized=normalize_text(title),
             pub_year=pub_year,
@@ -63,7 +62,7 @@ def _create_all_publications(conn):
                 text("UPDATE source_publications SET publication_id = :pid WHERE id = :sid"),
                 {"pid": pub_id, "sid": doc["id"]},
             )
-            update_sources(conn, pub_id, repo=repo)
+            update_sources(pub_id, repo=repo)
 
 
 # ── Données HAL minimales ───────────────────────────────────────

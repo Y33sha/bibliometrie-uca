@@ -96,7 +96,7 @@ def link_hal_to_publication(
             continue
 
         queries.link_source_publication_to_publication(conn, hal_doc_id, src_pub_id)
-        update_sources(conn, src_pub_id, repo=pub_repo)
+        update_sources(src_pub_id, repo=pub_repo)
     return len(items)
 
 
@@ -141,8 +141,8 @@ def merge_publications(
 
         try:
             with savepoint(conn, "merge_pub"):
-                _merge_pub(conn, hal_pub_id, src_pub_id, repo=pub_repo)
-                refresh_from_sources(conn, hal_pub_id, repo=pub_repo)
+                _merge_pub(hal_pub_id, src_pub_id, repo=pub_repo)
+                refresh_from_sources(hal_pub_id, repo=pub_repo)
             merged_into[src_pub_id] = hal_pub_id
             merged += 1
 

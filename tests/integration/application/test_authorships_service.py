@@ -192,7 +192,7 @@ class TestExcludeAuthorship:
             sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        result = exclude_authorship(sa_sync_conn, authorship_id, repo=repo)
+        result = exclude_authorship(authorship_id, repo=repo)
 
         assert result is not None
         assert result["excluded"] is True
@@ -207,7 +207,7 @@ class TestExcludeAuthorship:
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            exclude_authorship(sa_sync_conn, 999999, repo=repo)
+            exclude_authorship(999999, repo=repo)
 
     def test_does_not_detach_unrelated_sources(self, sa_sync_conn, repo):
         """Les sources d'autres personnes sur la même pub ne sont pas touchées."""
@@ -223,7 +223,7 @@ class TestExcludeAuthorship:
         sa1 = _create_source_authorship(sa_sync_conn, sp_id, sp1, person_id=p1, authorship_id=a1)
         sa2 = _create_source_authorship(sa_sync_conn, sp_id, sp2, person_id=p2, authorship_id=a2)
 
-        exclude_authorship(sa_sync_conn, a1, repo=repo)
+        exclude_authorship(a1, repo=repo)
 
         # sa1 détachée
         row1 = sa_sync_conn.execute(
@@ -247,7 +247,7 @@ class TestDetachSource:
 
     def test_raises_on_invalid_source(self, sa_sync_conn, repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            detach_source(sa_sync_conn, 1, "invalid_source", repo=repo)
+            detach_source(1, "invalid_source", repo=repo)
 
     def test_returns_false_if_no_authorship_linked(self, sa_sync_conn, repo):
         pub_id = _create_publication(sa_sync_conn)
@@ -256,7 +256,7 @@ class TestDetachSource:
         # source_authorship sans authorship_id
         sa_id = _create_source_authorship(sa_sync_conn, sp_id, src_person_id)
 
-        assert detach_source(sa_sync_conn, sa_id, "hal", repo=repo) is False
+        assert detach_source(sa_id, "hal", repo=repo) is False
 
     def test_deletes_authorship_when_last_source_removed(self, sa_sync_conn, repo):
         """Une seule source atteste l'authorship → le détacher supprime l'authorship."""
@@ -269,7 +269,7 @@ class TestDetachSource:
             sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        assert detach_source(sa_sync_conn, sa_id, "hal", repo=repo) is True
+        assert detach_source(sa_id, "hal", repo=repo) is True
 
         row = sa_sync_conn.execute(
             text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
@@ -302,7 +302,7 @@ class TestDetachSource:
             authorship_id=authorship_id,
         )
 
-        assert detach_source(sa_sync_conn, sa_hal, "hal", repo=repo) is False
+        assert detach_source(sa_hal, "hal", repo=repo) is False
 
         # Authorship toujours présente
         row = sa_sync_conn.execute(
@@ -343,7 +343,7 @@ class TestDetachSource:
             excluded=True,
         )
 
-        assert detach_source(sa_sync_conn, sa_hal, "hal", repo=repo) is True
+        assert detach_source(sa_hal, "hal", repo=repo) is True
 
         row = sa_sync_conn.execute(
             text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
@@ -363,7 +363,7 @@ class TestDeleteOrphanAuthorships:
         pub_id = _create_publication(sa_sync_conn)
         _create_authorship(sa_sync_conn, pub_id, person_id)
 
-        n = delete_orphan_authorships(sa_sync_conn, person_id, repo=repo)
+        n = delete_orphan_authorships(person_id, repo=repo)
 
         assert n == 1
         rows = sa_sync_conn.execute(
@@ -381,7 +381,7 @@ class TestDeleteOrphanAuthorships:
             sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        n = delete_orphan_authorships(sa_sync_conn, person_id, repo=repo)
+        n = delete_orphan_authorships(person_id, repo=repo)
 
         assert n == 0
         row = sa_sync_conn.execute(
@@ -405,13 +405,13 @@ class TestDeleteOrphanAuthorships:
             excluded=True,
         )
 
-        n = delete_orphan_authorships(sa_sync_conn, person_id, repo=repo)
+        n = delete_orphan_authorships(person_id, repo=repo)
 
         assert n == 1
 
     def test_returns_zero_when_no_authorships(self, sa_sync_conn, repo):
         person_id = _create_person(sa_sync_conn)
-        assert delete_orphan_authorships(sa_sync_conn, person_id, repo=repo) == 0
+        assert delete_orphan_authorships(person_id, repo=repo) == 0
 
     def test_scoped_to_person(self, sa_sync_conn, repo):
         """Ne touche que les authorships de la personne demandée."""
@@ -422,7 +422,7 @@ class TestDeleteOrphanAuthorships:
         pub2 = _create_publication(sa_sync_conn, title="Autre")
         _create_authorship(sa_sync_conn, pub2, p2)
 
-        n = delete_orphan_authorships(sa_sync_conn, p1, repo=repo)
+        n = delete_orphan_authorships(p1, repo=repo)
 
         assert n == 1
         row = sa_sync_conn.execute(
@@ -533,11 +533,11 @@ class TestPropagateUcaForAddresses:
 class TestSetSourceAuthorshipExcluded:
     def test_raises_on_invalid_source(self, sa_sync_conn, repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            set_source_authorship_excluded(sa_sync_conn, 1, "invalid", True, repo=repo)
+            set_source_authorship_excluded(1, "invalid", True, repo=repo)
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            set_source_authorship_excluded(sa_sync_conn, 999999, "hal", True, repo=repo)
+            set_source_authorship_excluded(999999, "hal", True, repo=repo)
 
     def test_marks_excluded(self, sa_sync_conn, repo):
         person_id = _create_person(sa_sync_conn)
@@ -546,7 +546,7 @@ class TestSetSourceAuthorshipExcluded:
         src_person_id = _create_source_person(sa_sync_conn)
         sa_id = _create_source_authorship(sa_sync_conn, sp_id, src_person_id, person_id=person_id)
 
-        set_source_authorship_excluded(sa_sync_conn, sa_id, "hal", True, repo=repo)
+        set_source_authorship_excluded(sa_id, "hal", True, repo=repo)
 
         row = sa_sync_conn.execute(
             text("SELECT excluded FROM source_authorships WHERE id = :id"), {"id": sa_id}
@@ -569,7 +569,7 @@ class TestSetSourceAuthorshipExcluded:
             excluded=True,
         )
 
-        set_source_authorship_excluded(sa_sync_conn, sa_id, "hal", False, repo=repo)
+        set_source_authorship_excluded(sa_id, "hal", False, repo=repo)
 
         row = sa_sync_conn.execute(
             text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
@@ -591,7 +591,7 @@ class TestSetSourceAuthorshipExcluded:
             authorship_id=authorship_id,
         )
 
-        set_source_authorship_excluded(sa_sync_conn, sa_id, "hal", True, repo=repo)
+        set_source_authorship_excluded(sa_id, "hal", True, repo=repo)
 
         row = sa_sync_conn.execute(
             text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}

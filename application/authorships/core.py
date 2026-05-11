@@ -4,7 +4,7 @@ et `source_authorships`.
 
 Opérations unitaires sur les authorships consolidées. Le script batch
 `build_authorships.py` reste le constructeur principal (reconstruction
-complète), et `webapp/uca.py` gère le recalcul UCA incrémental.
+complète).
 
 Le SQL vit dans `infrastructure/repositories/authorship_repository.py`.
 """
@@ -20,7 +20,6 @@ from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
 
 
 def exclude_authorship(
-    conn: Connection,
     authorship_id: int,
     *,
     repo: AuthorshipRepository,
@@ -54,7 +53,6 @@ def exclude_authorship(
 
 
 def set_source_authorship_excluded(
-    conn: Connection,
     source_authorship_id: int,
     source: str,
     excluded: bool,
@@ -77,7 +75,7 @@ def set_source_authorship_excluded(
         raise NotFoundError(f"Authorship source {source}:{source_authorship_id} introuvable")
 
     if excluded:
-        detach_source(conn, source_authorship_id, source, repo=repo)
+        detach_source(source_authorship_id, source, repo=repo)
 
     emit_event(
         audit_repo,
@@ -88,9 +86,7 @@ def set_source_authorship_excluded(
     )
 
 
-def detach_source(
-    conn: Connection, source_authorship_id: int, source: str, *, repo: AuthorshipRepository
-) -> bool:
+def detach_source(source_authorship_id: int, source: str, *, repo: AuthorshipRepository) -> bool:
     """Détache une authorship source de son authorship canonique.
     Si plus aucune source ne l'atteste, supprime l'authorship canonique.
 
@@ -140,9 +136,7 @@ def propagate_uca_for_addresses(
     repo.propagate_in_perimeter_to_authorships(affected_sa_ids)
 
 
-def delete_orphan_authorships(
-    conn: Connection, person_id: int, *, repo: AuthorshipRepository
-) -> int:
+def delete_orphan_authorships(person_id: int, *, repo: AuthorshipRepository) -> int:
     """Supprime les authorships canoniques d'une personne qui ne sont plus
     attestées par aucune authorship source. Retourne le nombre d'authorships
     supprimées.

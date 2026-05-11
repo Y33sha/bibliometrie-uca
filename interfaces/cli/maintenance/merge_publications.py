@@ -82,7 +82,7 @@ def main() -> int:
             return 0
 
         repo = publication_repository(conn)
-        merge_publications(conn, args.target_id, args.source_id, repo=repo)
+        merge_publications(args.target_id, args.source_id, repo=repo)
         conn.commit()
         log.info("Fusion %d ← %d effectuée", args.target_id, args.source_id)
         return 0

@@ -253,7 +253,7 @@ def find_publication(
     meta = extract_pub_metadata(work, journal_id)
     if not meta["pub_year"] or not meta["title"]:
         return None
-    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False, repo=pub_repo)
+    pub_id, _ = find_or_create_publication(**meta, allow_create=False, repo=pub_repo)
     return pub_id
 
 
@@ -544,7 +544,7 @@ def process_work(
         if not publication_id and primary and is_theses_fr_location(primary):
             nnt = extract_nnt_from_location(primary)
             if nnt:
-                existing = find_by_nnt(cur, nnt, repo=pub_repo)
+                existing = find_by_nnt(nnt, repo=pub_repo)
                 if existing:
                     publication_id = existing.id
 
@@ -557,11 +557,10 @@ def process_work(
         if publication_id:
             enrich_doi = pub_meta["doi"]
             if enrich_doi:
-                existing_by_doi = find_by_doi(cur, enrich_doi, repo=pub_repo)
+                existing_by_doi = find_by_doi(enrich_doi, repo=pub_repo)
                 if existing_by_doi and existing_by_doi.id != publication_id:
                     original_doi = enrich_doi
                     enrich_doi, _ = resolve_doi_conflict(
-                        cur,
                         enrich_doi,
                         pub_meta["doc_type"],
                         pub_meta["title_normalized"],
@@ -570,7 +569,7 @@ def process_work(
                     )
                     if enrich_doi != original_doi:
                         pub_meta["source_doi"] = original_doi
-            publication_id = try_merge_by_doi(cur, publication_id, enrich_doi, repo=pub_repo)
+            publication_id = try_merge_by_doi(publication_id, enrich_doi, repo=pub_repo)
 
         source_publication_id = insert_openalex_document(
             cur, queries, work, staging_id, publication_id, pub_meta
@@ -581,7 +580,7 @@ def process_work(
         )
 
         if publication_id:
-            refresh_from_sources(cur, publication_id, repo=pub_repo)
+            refresh_from_sources(publication_id, repo=pub_repo)
 
         staging_queries.mark_done(cur, staging_id)
         return True

@@ -64,7 +64,6 @@ def process_document(
         return True
 
     pub_id, _is_new = find_or_create_publication(
-        conn,
         title=title,
         title_normalized=normalize_text(title),
         pub_year=pub_year,
@@ -83,7 +82,7 @@ def process_document(
         return False
 
     queries.link_source_publication_to_publication(conn, doc["id"], pub_id)
-    refresh_from_sources(conn, pub_id, repo=pub_repo)
+    refresh_from_sources(pub_id, repo=pub_repo)
 
     return True
 

@@ -88,7 +88,6 @@ class TestDoiCaseInsensitive:
 class TestPublicationService:
     def test_create_new(self, sa_sync_conn, pub_repo):
         pub_id, is_new = find_or_create(
-            sa_sync_conn,
             title="Test Article",
             title_normalized="test article",
             pub_year=2024,
@@ -101,7 +100,6 @@ class TestPublicationService:
 
     def test_find_by_doi_case_insensitive(self, sa_sync_conn, pub_repo):
         pub_id1, _ = find_or_create(
-            sa_sync_conn,
             title="Pub A",
             title_normalized="pub a",
             pub_year=2024,
@@ -109,7 +107,6 @@ class TestPublicationService:
             repo=pub_repo,
         )
         pub_id2, is_new = find_or_create(
-            sa_sync_conn,
             title="Pub A variant",
             title_normalized="pub a variant",
             pub_year=2024,
@@ -123,7 +120,6 @@ class TestPublicationService:
         """Sans DOI commun, meme titre+annee+journal -> pas de fusion."""
         journal_id = create_journal(sa_sync_conn, "Nature")
         pub_id1, _ = find_or_create(
-            sa_sync_conn,
             title="My Article",
             title_normalized="my article",
             pub_year=2024,
@@ -132,7 +128,6 @@ class TestPublicationService:
             repo=pub_repo,
         )
         pub_id2, is_new = find_or_create(
-            sa_sync_conn,
             title="My Article",
             title_normalized="my article",
             pub_year=2024,
@@ -146,7 +141,6 @@ class TestPublicationService:
     def test_no_title_match_without_journal(self, sa_sync_conn, pub_repo):
         """Sans journal_id, pas de dédup par titre — deux publications créées."""
         pub_id1, _ = find_or_create(
-            sa_sync_conn,
             title="My Article",
             title_normalized="my article",
             pub_year=2024,
@@ -154,7 +148,6 @@ class TestPublicationService:
             repo=pub_repo,
         )
         pub_id2, is_new = find_or_create(
-            sa_sync_conn,
             title="My Article",
             title_normalized="my article",
             pub_year=2024,
@@ -168,7 +161,6 @@ class TestPublicationService:
         """refresh_from_sources enrichit les métadonnées depuis les source_publications."""
         journal_id = create_journal(sa_sync_conn, "Science")
         pub_id, _ = find_or_create(
-            sa_sync_conn,
             title="Pub",
             title_normalized="pub",
             pub_year=2024,
@@ -187,7 +179,7 @@ class TestPublicationService:
             ),
             {"pid": pub_id, "jid": journal_id},
         )
-        refresh_from_sources(sa_sync_conn, pub_id, repo=pub_repo)
+        refresh_from_sources(pub_id, repo=pub_repo)
         row = sa_sync_conn.execute(
             text("SELECT oa_status, journal_id FROM publications WHERE id = :id"),
             {"id": pub_id},
@@ -206,7 +198,6 @@ class TestPublicationService:
         NNT sans DOI). Avant fix : crash IntegrityError.
         """
         existing, _ = find_or_create(
-            sa_sync_conn,
             title="Thèse côté OpenAlex",
             title_normalized="these cote openalex",
             pub_year=2020,
@@ -215,7 +206,6 @@ class TestPublicationService:
             repo=pub_repo,
         )
         current, _ = find_or_create(
-            sa_sync_conn,
             title="Thèse côté theses.fr",
             title_normalized="these cote theses fr",
             pub_year=2020,
@@ -233,7 +223,7 @@ class TestPublicationService:
             {"pid": current, "doi": "10.70675/regression-test"},
         )
 
-        refresh_from_sources(sa_sync_conn, current, repo=pub_repo)
+        refresh_from_sources(current, repo=pub_repo)
 
         # current est vivant et a hérité du DOI
         doi = sa_sync_conn.execute(
@@ -250,7 +240,6 @@ class TestPublicationService:
 
     def test_allow_create_false(self, sa_sync_conn, pub_repo):
         pub_id, is_new = find_or_create(
-            sa_sync_conn,
             title="Ghost",
             title_normalized="ghost",
             pub_year=2024,
@@ -300,7 +289,7 @@ class TestMergePersons:
             {"ids": [source]},
         )
 
-        merge_person(sa_sync_conn, target, source, repo=person_repo)
+        merge_person(target, source, repo=person_repo)
 
         # Source supprimée
         assert (
@@ -324,7 +313,7 @@ class TestMergePersons:
         create_persons_rh(sa_sync_conn, source, matricule="MAT-002")
 
         with pytest.raises(ConflictError, match="REFUS de fusion"):
-            merge_person(sa_sync_conn, target, source, repo=person_repo)
+            merge_person(target, source, repo=person_repo)
 
         # Les deux personnes existent toujours
         assert (
@@ -339,7 +328,7 @@ class TestMergePersons:
         source = create_person(sa_sync_conn, "Dupont", "J.")
         create_persons_rh(sa_sync_conn, target, matricule="MAT-001")
 
-        merge_person(sa_sync_conn, target, source, repo=person_repo)
+        merge_person(target, source, repo=person_repo)
 
         assert (
             sa_sync_conn.execute(

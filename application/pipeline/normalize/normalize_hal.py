@@ -161,7 +161,7 @@ def find_publication(
     meta = extract_pub_metadata(doc, journal_id)
     if not meta["pub_year"] or not meta["title"]:
         return None
-    pub_id, _ = find_or_create_publication(cur, **meta, allow_create=False, repo=pub_repo)
+    pub_id, _ = find_or_create_publication(**meta, allow_create=False, repo=pub_repo)
     return pub_id
 
 
@@ -683,7 +683,7 @@ def process_work(
                 from application.publications import merge_publications
 
                 logger.info(f"  {hal_id} : fusion pub {old_pub_id} → {publication_id} (DOI/NNT)")
-                merge_publications(cur, publication_id, old_pub_id, repo=pub_repo)
+                merge_publications(publication_id, old_pub_id, repo=pub_repo)
             elif not publication_id:
                 publication_id = old_pub_id
         else:
@@ -692,7 +692,7 @@ def process_work(
 
         if publication_id:
             publication_id = try_merge_by_doi(
-                cur, publication_id, clean_doi(as_str(doc.get("doiId_s"))), repo=pub_repo
+                publication_id, clean_doi(as_str(doc.get("doiId_s"))), repo=pub_repo
             )
 
         source_publication_id = insert_hal_document(
@@ -719,7 +719,7 @@ def process_work(
         t.mark("authors")
 
         if publication_id:
-            refresh_from_sources(cur, publication_id, repo=pub_repo)
+            refresh_from_sources(publication_id, repo=pub_repo)
         t.mark("refresh")
 
         staging_queries.mark_done(cur, staging_id)

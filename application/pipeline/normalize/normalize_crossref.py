@@ -296,7 +296,6 @@ def find_publication(
         return None
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
     pub_id, _ = find_or_create_publication(
-        cur,
         title=title,
         title_normalized=normalize_text(title),
         pub_year=pub_year,
@@ -357,7 +356,7 @@ def process_work(
     if not publication_id:
         publication_id = find_publication(cur, msg, journal_id, pub_repo=pub_repo)
     if publication_id:
-        publication_id = try_merge_by_doi(cur, publication_id, doi, repo=pub_repo)
+        publication_id = try_merge_by_doi(publication_id, doi, repo=pub_repo)
 
     external_ids = get_external_ids(msg)
     biblio = get_biblio(msg)
@@ -386,7 +385,7 @@ def process_work(
     process_authors(cur, queries, msg, doi, source_publication_id)
 
     if publication_id:
-        refresh_from_sources(cur, publication_id, repo=pub_repo)
+        refresh_from_sources(publication_id, repo=pub_repo)
 
     staging_queries.mark_done(cur, staging_id)
     return True

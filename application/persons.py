@@ -10,8 +10,6 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 (UNIQUE(source, source_id)), les authorships utilisent `source_person_id`.
 """
 
-from sqlalchemy import Connection
-
 from application.audit import emit_event
 from application.authorships.core import delete_orphan_authorships
 from domain.names import compute_person_name_forms
@@ -45,9 +43,7 @@ __all__ = [
 # ── Création / mise à jour personne ──
 
 
-def create_person(
-    cur: Connection, last_name: str, first_name: str = "", *, repo: PersonRepository
-) -> int:
+def create_person(last_name: str, first_name: str = "", *, repo: PersonRepository) -> int:
     """Crée une personne et retourne son id."""
     person_id = repo.create(last_name, first_name)
     repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
@@ -55,7 +51,6 @@ def create_person(
 
 
 def set_rejected(
-    conn: Connection,
     person_id: int,
     rejected: bool,
     *,
@@ -71,7 +66,6 @@ def set_rejected(
 
 
 def update_name(
-    conn: Connection,
     person_id: int,
     last_name: str,
     first_name: str,
@@ -90,7 +84,6 @@ def update_name(
 
 
 def link_authorship(
-    cur: Connection,
     person_id: int,
     source: str,
     authorship_id: int,
@@ -115,9 +108,7 @@ def link_authorship(
     )
 
 
-def link_authorships(
-    cur: Connection, person_id: int, authorships: list[dict], *, repo: PersonRepository
-) -> None:
+def link_authorships(person_id: int, authorships: list[dict], *, repo: PersonRepository) -> None:
     """Rattache un groupe d'authorships à une personne (pipeline).
 
     Chaque dict doit avoir 'source' et 'authorship_id',
@@ -125,7 +116,6 @@ def link_authorships(
     """
     for a in authorships:
         link_authorship(
-            cur,
             person_id,
             a["source"],
             a["authorship_id"],
@@ -136,7 +126,7 @@ def link_authorships(
 
 
 def unlink_authorship(
-    cur: Connection, person_id: int, source: str, authorship_id: int, *, repo: PersonRepository
+    person_id: int, source: str, authorship_id: int, *, repo: PersonRepository
 ) -> None:
     """Détache une authorship source d'une personne (met person_id à NULL)."""
     if source in ALL_SOURCES_SET:
@@ -147,7 +137,6 @@ def unlink_authorship(
 
 
 def add_identifier(
-    cur: Connection,
     person_id: int,
     id_type: str,
     id_value: str,
@@ -166,7 +155,6 @@ def add_identifier(
 
 
 def remove_identifier(
-    conn: Connection,
     person_id: int,
     id_type: str,
     id_value: str,
@@ -189,7 +177,6 @@ def remove_identifier(
 
 
 def update_identifier_status(
-    conn: Connection,
     ident_id: int,
     status: str,
     *,
@@ -213,7 +200,6 @@ def update_identifier_status(
 
 
 def reassign_identifier(
-    conn: Connection,
     ident_id: int,
     target_person_id: int,
     *,
@@ -235,7 +221,7 @@ def reassign_identifier(
 
 
 def add_identifiers_from_authorships(
-    cur: Connection, person_id: int, authorships: list[dict], *, repo: PersonRepository
+    person_id: int, authorships: list[dict], *, repo: PersonRepository
 ) -> None:
     """Ajoute les ORCID, idHAL et IdRef trouvés dans un groupe d'authorships.
 
@@ -251,7 +237,7 @@ def add_identifiers_from_authorships(
         for id_type in ("orcid", "idhal", "idref"):
             value = a.get(id_type)
             if value and (id_type, value) not in seen:
-                add_identifier(cur, person_id, id_type, value, repo=repo)
+                add_identifier(person_id, id_type, value, repo=repo)
                 seen.add((id_type, value))
 
 
@@ -259,7 +245,6 @@ def add_identifiers_from_authorships(
 
 
 def refresh_person_name_forms(
-    cur: Connection,
     person_id: int,
     last_name: str,
     first_name: str,
@@ -275,7 +260,6 @@ def refresh_person_name_forms(
 
 
 def add_name_form(
-    cur: Connection,
     person_id: int,
     full_name: str,
     source: str | None = None,
@@ -286,16 +270,13 @@ def add_name_form(
     repo.add_name_form(person_id, full_name, source=source)
 
 
-def detach_name_form(
-    conn: Connection, person_id: int, name_form: str, *, repo: PersonRepository
-) -> None:
+def detach_name_form(person_id: int, name_form: str, *, repo: PersonRepository) -> None:
     """Détache une personne d'une forme de nom. Supprime la forme si
     person_ids devient vide."""
     repo.detach_name_form(person_id, name_form)
 
 
 def detach_authorships(
-    conn: Connection,
     person_id: int,
     authorships: list[dict],
     name_form: str | None = None,
@@ -315,7 +296,7 @@ def detach_authorships(
         if a["source"] in ALL_SOURCES_SET:
             repo.unlink_authorship(person_id, a["source"], a["authorship_id"])
 
-    deleted = delete_orphan_authorships(conn, person_id, repo=authorship_repo)
+    deleted = delete_orphan_authorships(person_id, repo=authorship_repo)
 
     cleaned_form = False
     if name_form and repo.count_authorships_with_name_form(person_id, name_form) == 0:
@@ -333,7 +314,6 @@ def detach_authorships(
 
 
 def mark_distinct(
-    conn: Connection,
     person_id_a: int,
     person_id_b: int,
     *,
@@ -358,7 +338,6 @@ def mark_distinct(
 
 
 def merge_person(
-    cur: Connection,
     target_id: int,
     source_id: int,
     *,
