@@ -1,5 +1,7 @@
 # Architecture logicielle — Bibliométrie UCA
 
+*Document à jour au 2026-05-11.*
+
 Pour le modèle de données (tables, relations, domaines fonctionnels),
 voir [donnees.md](donnees.md).
 
@@ -116,10 +118,10 @@ remplis simultanément :
 1. **Le port représente la persistance d'un agrégat du domaine**
    (entité racine identifiable au cœur du modèle métier : `Person`,
    `Publication`, `Structure`, `Authorship`, `Journal`, `Publisher`,
-   `Address`, `Perimeter`).
+   `Address`, `Perimeter`, `Audit`).
 2. **La signature ne référence que des types `domain/`, stdlib, ou
    primitives Python** (`int`, `str`, `dict`, `list`, etc.). Aucun
-   type d'`infrastructure/`, aucun `cur: Cursor`, aucun fragment SQL.
+   type d'`infrastructure/`, aucun fragment SQL.
 3. **Les méthodes sont nommées en termes métier** (`find_by_doi`,
    `create`, `merge_into`), pas en termes techniques (`execute_query`,
    `fetch_batch`, `count_table`).
@@ -127,9 +129,9 @@ remplis simultanément :
 Sinon, le port va dans **`application/ports/`** : c'est un query
 service ou un wrapper d'opération orchestrationnelle, propre à un
 workflow applicatif (phase pipeline, etc.) plutôt qu'à un agrégat.
-Les ports `application/` peuvent légitimement avoir `cur: Any` dans
-leurs signatures — c'est un signal qu'on est dans l'orchestration
-technique, pas dans le langage du domaine.
+Les ports `application/` ont typiquement une signature qui prend
+explicitement une `Connection` SA en premier argument — signal qu'on
+est dans l'orchestration technique, pas dans le langage du domaine.
 
 **Le critère est conceptuel, pas mécanique** (« est-ce que ce port
 parle du domaine ? »), pas (« est-ce que ce port est utilisé par
@@ -149,24 +151,29 @@ ports `domain/` dans les use cases.
 
 Contenu :
 - **Services métier** : `persons.py`, `publications.py`, `journals.py`,
-  `authorships.py`, `structures.py`, `addresses.py`, `audit.py`,
-  `config.py`. Ces services reçoivent leurs dépendances par injection
-  (kwarg `repo=`, cf. §1.7b de la ROADMAP).
+  `authorships/core.py`, `authorships/assign_orphans.py`,
+  `structures.py`, `addresses_countries.py`, `addresses_structures.py`,
+  `audit.py`, `config.py`, `publishers.py`. Ces services reçoivent
+  leurs dépendances par injection (kwarg `repo=`, `audit_repo=`,
+  `queries=`).
 - **Orchestrateurs pipeline** dans `application/pipeline/` :
   - `normalize/` — staging → tables sources (un module par source)
-  - `build/` — construction authorships, affiliations, name_forms
-  - `create/` — création publications, personnes
-  - `merge/` — fusions inter-sources (DOI, HAL-ID, NNT)
+  - `affiliations/` — propagation adresses ↔ structures vers
+    `source_authorships.in_perimeter` / `structure_ids`
+  - `publications/` — création/merge publications canoniques
+  - `persons/` — création personnes + formes de noms
+  - `authorships/` — reconstruction de la table de vérité
+  - `countries/` — recalcul pays publications
+  - `subjects/` — ingestion sujets/mots-clés
+  - `cooccurrences/` — recalcul co-occurrences sujets
   - `enrich/` — Unpaywall, APC
-  - `harvest/` — identifiants HAL (ORCID, IdRef)
-  - `countries/` — détection pays, refresh
-  - `addresses/` — résolution adresses → structures
+  - `fetch_missing_doi.py` — cross-source DOI lookup
 - **Ports** (`application/ports/*`) : interfaces Protocol pour les
   query services (adapters dans `infrastructure/db/queries/*`).
 
 Interdiction : **`application/` ne peut pas importer
-`infrastructure/`**. §1.7b clôturé — zéro violation historique en
-`ignore_imports`. Toute nouvelle dépendance doit passer par un port.
+`infrastructure/`**. Toute nouvelle dépendance doit passer par un
+port. Vérifié par le contrat `layered` d'`import-linter`.
 
 ### `infrastructure/` — adapters sortants
 
@@ -175,28 +182,31 @@ Contenu :
   - `schema.sql` (snapshot descriptif, régénéré par
     `python -m infrastructure.db.dump_schema`), `seed.sql`
   - `tables.py` — MetaData SQLAlchemy explicite (source pour
-    `alembic --autogenerate`). Les migrations vivent dans
+    `alembic revision --autogenerate`). Les migrations vivent dans
     `alembic/versions/` à la racine, appliquées via
     `alembic upgrade head`.
   - `queries/` — query services SQL (un par agrégat ou phase
     pipeline) ; implémentent les ports définis dans `application/
     ports/*`
-  - `connection.py` — `psycopg.connect()` direct (pipeline/CLI bas
-    niveau, scripts one-shot)
   - `engine.py` — Engine SQLAlchemy synchrone (driver
     `postgresql+psycopg`). Source unique pour l'API FastAPI (via le
-    threadpool Starlette) et tous les codes qui passent par SA Core.
+    threadpool Starlette) et le pipeline.
+  - `connection.py` — réduit à des constantes communes
+    (`SANDBOX_DB_NAME`) ; la fonction `get_connection()` n'est plus
+    utilisée par le code applicatif depuis l'adoption SA.
 - **`repositories/`** — adapters PostgreSQL implémentant les ports
-  `domain/ports/*` : `person_repository.py`, `publication_repository.py`,
+  `domain/ports/*` : `person_repository/`, `publication_repository.py`,
   `journal_repository.py`, `structure_repository.py`,
   `authorship_repository.py`, `address_repository.py`,
-  `config_repository.py`. Factories exposées dans `__init__.py`
-  (`person_repository(cur)`, `publication_repository(cur)`, …).
+  `publisher_repository.py`, `perimeter_repository.py`,
+  `audit_repository.py`. Factories exposées dans `__init__.py`
+  (`person_repository(conn)`, `publication_repository(conn)`, …).
 - **`sources/`** — extracteurs API (HAL, OpenAlex, WoS, ScanR,
-  theses.fr). Héritent de `SourceExtractor` (`base.py`).
+  theses.fr, Crossref). Héritent de `SourceExtractor` (`base.py`).
 - **Divers** : `log.py` (JSON structuré), `settings.py`
   (pydantic-settings), `perimeter.py`, `addresses.py`, `zenodo.py`,
-  `api_retry.py`, `api_limits.py`, `pipeline_metrics.py`.
+  `api_retry.py`, `api_limits.py`, `pipeline_metrics.py`,
+  `pipeline_status.py`, `app_config.py`, `db/dump_schema.py`.
 
 Interdiction : **`infrastructure/` ne peut pas importer
 `application/`** (sauf par un port explicitement passé).
@@ -225,7 +235,7 @@ Toutes les routes API sont déclarées `def` (pas `async def`). FastAPI
 les exécute dans le threadpool Starlette (~40 workers par défaut), ce
 qui permet de partager **les mêmes** repositories et query services
 entre l'API et le pipeline. Une seule famille de code, un seul style
-de connexion (`Connection` SQLAlchemy ou curseur psycopg).
+de connexion (`Connection` SQLAlchemy).
 
 L'unique exception : `feedback_rerun` dans `admin_feedback.py` reste
 `async def` parce qu'il streame du SSE depuis un subprocess
@@ -240,12 +250,19 @@ concurrence threadpool × marge sur un usage admin
 
 ### Services applicatifs ↔ repositories
 
-Les services acceptent leur repo en kwarg :
+Les services acceptent leur repo (et autres dépendances : audit_repo,
+queries, …) en kwarg keyword-only :
 
 ```python
-def set_rejected(cur: Any, person_id: int, rejected: bool, *,
-                 repo: PersonRepository) -> None:
+def set_rejected(
+    person_id: int,
+    rejected: bool,
+    *,
+    repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
+) -> None:
     repo.set_rejected(person_id, rejected)
+    emit_event(audit_repo, "person.rejected", ...)
 ```
 
 Les callers directs (routers, tests, scripts CLI) créent l'instance
@@ -253,7 +270,7 @@ via la factory :
 
 ```python
 from infrastructure.repositories import person_repository
-set_rejected(db, person_id, True, repo=person_repository(db))
+set_rejected(person_id, True, repo=person_repository(conn))
 ```
 
 ### Orchestrateurs pipeline ↔ query services + repositories
@@ -268,8 +285,8 @@ importer `infrastructure.*` directement. Deux mécanismes :
 
 2. **Repositories** (ex. `PublicationRepository`) : quand un
    orchestrateur a besoin d'un repo, on passe un **factory callable**
-   `repo_factory: Callable[[Any], XRepository]` au constructeur.
-   L'orchestrateur appelle `self._repo = self._repo_factory(cur)` dans
+   `repo_factory: Callable[[Connection], XRepository]` au constructeur.
+   L'orchestrateur appelle `self._repo = self._repo_factory(conn)` dans
    `preload_caches()` ou au début de `run()`.
 
 Exemple depuis `run_pipeline.py` :
@@ -279,30 +296,35 @@ from infrastructure.db.queries.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 
 PgPersonsCreateQueries()        # adapter query service
-person_repository(cur)          # factory repository
+person_repository(conn)         # factory repository
 ```
 
 ## Pipeline
 
-L'orchestrateur `run_pipeline.py` à la racine enchaîne 9 phases :
+L'orchestrateur `run_pipeline.py` à la racine enchaîne 12 phases :
 
 1. **extract** — sources → staging (JSONB brut)
-2. **cross_imports** — DOIs manquants entre sources, fetch HAL par
-   hal-id / NNT
-3. **normalize** — staging → tables sources (`source_publications`,
+2. **fetch_missing_hal_id** — récupère les notices HAL manquantes
+   par hal-id / NNT pour les sources externes
+3. **fetch_missing_doi** — cross-source DOI lookup
+4. **normalize** — staging → tables sources (`source_publications`,
    `source_persons`, `source_authorships`). Rattachement aux
    publications existantes par DOI/NNT/HAL-ID, **sans création**
-4. **affiliations** — adresses → structures, propagation
+5. **affiliations** — adresses → structures, propagation
    `in_perimeter` et `structure_ids` sur `source_authorships`
-5. **publications** — création publications pour les
+6. **publications** — création publications pour les
    source_publications in-perimeter non rattachées + merges
    inter-sources (HAL-ID, NNT)
-6. **persons** — création/mapping personnes + formes de noms
-7. **authorships** — reconstruction authorships canoniques (table de
+7. **persons** — création/mapping personnes + formes de noms
+8. **authorships** — reconstruction authorships canoniques (table de
    vérité) + propagation UCA
-8. **countries** — détection pays des adresses + recalcul pays des
+9. **countries** — détection pays des adresses + recalcul pays des
    publications
-9. **enrich** — OA status via Unpaywall, APC revues
+10. **subjects** — ingestion sujets/mots-clés depuis
+    `source_publications.keywords` / `topics` vers `subjects` et
+    `publication_subjects`
+11. **cooccurrences** — recalcul de la table `subject_cooccurrences`
+12. **enrich** — OA status via Unpaywall, APC revues
 
 Chaque phase est idempotente (relançable sans risque). Reprise depuis
 une phase donnée : `python run_pipeline.py --from <phase>`.
@@ -315,17 +337,19 @@ Voir [pipeline.md](pipeline.md) pour le détail par phase.
   `application/` (services avec mocks), parsing des normalizers,
   infrastructure pure (log, pipeline_metrics).
 - **Intégration** (`tests/integration/`) — base `bibliometrie_test`
-  créée à la volée, fixture `db` avec rollback entre chaque test.
-  Couvre les routers, les orchestrateurs pipeline, et les adapters
-  repositories.
+  créée à la volée (`alembic upgrade head` sur DB vierge), fixtures
+  `db` (curseur psycopg avec rollback) et `sa_sync_conn` (Connection
+  SA avec rollback). Couvre les routers, les orchestrateurs pipeline,
+  et les adapters repositories.
 
 Conftest splitté :
 - `tests/conftest.py` — cross-cutting (mock `setup_logger` pour
   éviter la pollution disque, caches)
-- `tests/integration/conftest.py` — setup BDD, fixture `db`
+- `tests/integration/conftest.py` — setup BDD via Alembic, fixtures
+  `db` / `sa_sync_conn`
 
-Couverture actuelle ~49%, seuil `fail_under = 49`
-(`[tool.coverage.report]` dans `pyproject.toml`).
+Seuil de couverture `fail_under = 62` (`[tool.coverage.report]` dans
+`pyproject.toml`).
 
 ## Composition roots
 
@@ -345,12 +369,14 @@ Les fichiers qui jouent ce rôle :
 - `interfaces/cli/pipeline/*` — entry points CLI pour chaque phase
 - `interfaces/cli/*` — scripts one-shot
 
-Cible (ROADMAP §1.6) : **seuls** ces fichiers importent
-`infrastructure.repositories`, `infrastructure.db.queries.*` ou toute
-classe `Pg*` concrète. Les routers et CLI applicatifs reçoivent
-leurs dépendances, ne les construisent pas. En attendant, quelques
-routers instancient encore des factories directement — dette
-résiduelle listée dans la roadmap.
+**Seuls** ces fichiers importent `infrastructure.repositories`,
+`infrastructure.db.queries.*` ou toute classe `Pg*` concrète. Les
+routers et CLI applicatifs reçoivent leurs dépendances, ne les
+construisent pas. Le contrat `import-linter` "Routers : pas d'import
+direct de infrastructure" verrouille la règle côté API ; les CLI
+applicatifs (`interfaces/cli/*`) ne sont pas verrouillés par contrat
+mais suivent la même discipline (composition root = `run_pipeline.py`
+ou le script CLI lui-même).
 
 ## Pour aller plus loin
 
