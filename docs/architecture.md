@@ -58,19 +58,19 @@ qui forment une zone neutre dont dépendent tous les autres modules.
    Les deux dépendent des ports. Contrôlé par `import-linter`
    (contrat `layered` dans `pyproject.toml`).
 
-4. **Adapters entrants ⊥ adapters sortants.** Les routers FastAPI et
-   scripts CLI (`interfaces/api/routers/*`, `interfaces/cli/*` hors
-   composition root) **ne doivent pas** importer `infrastructure/`
-   directement. Ils pilotent des use-cases applicatifs et reçoivent
-   leurs dépendances via `Depends(...)` (factories dans
-   `interfaces.api.deps`) ; ils ne les construisent pas.
-   Verrouillé côté API par le contrat `import-linter` "Routers : pas
-   d'import direct de infrastructure" (chantier
-   `docs/chantiers/routers-di.md`). Trois exceptions documentées :
+4. **Routers ⊥ adapters sortants.** Les routers FastAPI
+   (`interfaces/api/routers/*`) **ne doivent pas** importer
+   `infrastructure/` directement. Ils pilotent des use-cases
+   applicatifs et reçoivent leurs dépendances via `Depends(...)`
+   (factories dans `interfaces.api.deps`) ; ils ne les construisent
+   pas. Verrouillé par le contrat `import-linter` "Routers : pas
+   d'import direct de infrastructure". Trois exceptions documentées :
    `auth.py` lit `infrastructure.settings` (config statique),
    `admin_pipeline.py` appelle `infrastructure.pipeline_status`
    (status filesystem), `docs.py` utilise `infrastructure.PROJECT_ROOT`
-   (chemin projet) — aucune ne touche à la DB.
+   (chemin projet) — aucune ne touche à la DB. Les scripts CLI ne
+   sont pas concernés par cette règle : ils sont des composition
+   roots (cf. règle 5).
 
 5. **Le composition root est un endroit précis.** L'instanciation
    concrète des adapters et leur câblage aux use-cases se fait
@@ -89,8 +89,7 @@ qui forment une zone neutre dont dépendent tous les autres modules.
 Le contrat `layers` d'`import-linter` (voir `pyproject.toml`,
 section `[tool.importlinter]`) vérifie les règles 1 à 3. Le contrat
 `forbidden` "Routers : pas d'import direct de infrastructure" applique
-la règle 4 côté API. La règle 5 reste discipline-only (les CLI
-scripts ne sont pas verrouillés).
+la règle 4. La règle 5 reste discipline-only.
 
 ## Les 4 couches en détail
 
@@ -370,18 +369,26 @@ Les fichiers qui jouent ce rôle :
 - `interfaces/cli/*` — scripts one-shot
 
 **Seuls** ces fichiers importent `infrastructure.repositories`,
-`infrastructure.db.queries.*` ou toute classe `Pg*` concrète. Les
-routers et CLI applicatifs reçoivent leurs dépendances, ne les
-construisent pas. Le contrat `import-linter` "Routers : pas d'import
-direct de infrastructure" verrouille la règle côté API ; les CLI
-applicatifs (`interfaces/cli/*`) ne sont pas verrouillés par contrat
-mais suivent la même discipline (composition root = `run_pipeline.py`
-ou le script CLI lui-même).
+`infrastructure.db.queries.*` ou toute classe `Pg*` concrète.
+
+- **Côté API** : `app.py` / `deps.py` sont les composition roots ;
+  les routers individuels (`interfaces/api/routers/*`) reçoivent
+  leurs dépendances via `Depends(...)` et **n'importent pas**
+  `infrastructure.*` directement. Verrouillé par le contrat
+  `import-linter` "Routers : pas d'import direct de infrastructure".
+- **Côté CLI** : chaque script (`interfaces/cli/*`, y compris
+  `interfaces/cli/pipeline/*`) **est** son propre composition root.
+  Il importe les adapters concrets, instancie les factories, et
+  appelle un use case applicatif en lui passant tout en kwargs.
+  Pas de séparation construct/appel comme côté API ; cohérent avec
+  la nature one-shot des scripts. Pas de contrat `import-linter`
+  côté CLI, la discipline reste manuelle : `application/` et
+  `domain/` ne doivent jamais importer `infrastructure/`, et le
+  script CLI doit rester un thin wrapper (imports + instanciations
+  + appel d'un use case ; pas de logique métier dans le script).
 
 ## Pour aller plus loin
 
-- [ROADMAP.md](../ROADMAP.md) — état des chantiers architecture,
-  points d'audit périodique
 - [donnees.md](donnees.md) — modèle de données
 - [pipeline.md](pipeline.md) — détail des phases
 - [sources.md](sources.md) — API et imports par source
