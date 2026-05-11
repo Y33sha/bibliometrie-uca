@@ -3,10 +3,15 @@
 Interprétation des champs propres au schéma WoS Expanded API —
 prédicats et extracteurs qui encapsulent la connaissance de la
 sémantique WoS pour le reste du pipeline.
+
+Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API WoS
+(frontière dynamique avec une source externe, schéma non typé).
 """
 
+from typing import Any
 
-def is_wos_author_exploitable(author: dict) -> bool:
+
+def is_wos_author_exploitable(author: dict[str, Any]) -> bool:
     """Indique si une entrée auteur WoS est utilisable côté pipeline.
 
     `daisng_id` (Distinct Author Identification System) est l'identifiant

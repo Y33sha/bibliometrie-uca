@@ -221,3 +221,12 @@ exclude = [
     "^\\.venv/",
     "^build/",
 ]
+
+# Durcissement progressif (chantier chasse-aux-any) : un module bascule
+# en mode strict quand il est nettoyé. `disallow_any_generics` bloque
+# les `dict`/`list`/`tuple` non paramétrés (= `Any` implicite). `Any`
+# explicite reste autorisé mais doit être justifié dans le code
+# (frontière JSON/JSONB).
+[[tool.mypy.overrides]]
+module = "domain.*"
+disallow_any_generics = true

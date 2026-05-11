@@ -16,7 +16,7 @@ query sur `journals`.
 Implémenté par `infrastructure/repositories/publisher_repository.py`.
 """
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class PublisherRepository(Protocol):
@@ -52,7 +52,7 @@ class PublisherRepository(Protocol):
 
     def publisher_exists(self, publisher_id: int) -> bool: ...
 
-    def update_publisher_fields(self, publisher_id: int, fields: dict) -> None: ...
+    def update_publisher_fields(self, publisher_id: int, fields: dict[str, Any]) -> None: ...
 
     # ── Fusion ─────────────────────────────────────────────────────
 

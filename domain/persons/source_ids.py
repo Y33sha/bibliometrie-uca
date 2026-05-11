@@ -7,6 +7,8 @@ d'identifiants (ORCID/IdHAL/IdRef) modélisent quant à eux les types
 canoniques de l'enregistrement consolidé côté ``person_identifiers``.
 """
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from domain.persons.identifiers import IdHAL
@@ -46,6 +48,7 @@ class PersonSourceIds(BaseModel):
             raise ValueError(f"IdHAL invalide : {v!r}")
         return normalized.value
 
-    def to_dict(self) -> dict:
-        """Sérialise pour écriture en base (JSONB). Omet les clés None."""
+    def to_dict(self) -> dict[str, Any]:
+        """Sérialise pour écriture en base (JSONB). Omet les clés None.
+        `Any` justifié : sortie destinée à une colonne JSONB."""
         return self.model_dump(exclude_none=True)

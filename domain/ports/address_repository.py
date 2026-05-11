@@ -1,6 +1,6 @@
 """Port AddressRepository — contrat d'accès à l'agrégat Address."""
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class AddressRepository(Protocol):
@@ -75,7 +75,9 @@ class AddressRepository(Protocol):
         self,
         country_code: str,
         where_clause: str,
-        where_params: list,
+        # Liste de bind-params SQL hétérogènes (str/int/bool/list[int]/...).
+        # `Any` justifié : frontière SQL, types dépendent du `where_clause`.
+        where_params: list[Any],
     ) -> list[int]: ...
 
     def propagate_countries_across_similar_addresses(self) -> list[int]: ...

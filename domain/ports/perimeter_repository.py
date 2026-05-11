@@ -3,7 +3,7 @@
 Implémenté par `infrastructure/repositories/perimeter_repository.py`.
 """
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class PerimeterRepository(Protocol):
@@ -37,7 +37,7 @@ class PerimeterRepository(Protocol):
         description: str | None,
     ) -> int: ...
 
-    def update_perimeter_fields(self, perimeter_id: int, fields: dict) -> None: ...
+    def update_perimeter_fields(self, perimeter_id: int, fields: dict[str, Any]) -> None: ...
 
     def get_perimeter_code(self, perimeter_id: int) -> str | None: ...
 

@@ -12,7 +12,7 @@ d'éditeurs pour détecter les conflits avant `merge_publisher_into`.
 Implémenté par `infrastructure/repositories/journal_repository.py`.
 """
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class JournalRepository(Protocol):
@@ -67,7 +67,7 @@ class JournalRepository(Protocol):
 
     def journal_exists(self, journal_id: int) -> bool: ...
 
-    def update_journal_fields(self, journal_id: int, fields: dict) -> None: ...
+    def update_journal_fields(self, journal_id: int, fields: dict[str, Any]) -> None: ...
 
     # ── APC / DOAJ ─────────────────────────────────────────────────
 
@@ -88,6 +88,6 @@ class JournalRepository(Protocol):
         self,
         target_publisher_id: int,
         source_publisher_id: int,
-    ) -> list[dict]: ...
+    ) -> list[dict[str, Any]]: ...
 
     def merge_journal_into(self, target_id: int, source_id: int) -> None: ...

@@ -1,11 +1,18 @@
 """Port StructureRepository — contrat d'accès à l'agrégat Structure."""
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class StructureRepository(Protocol):
     """Contrat d'accès aux 3 tables du concept Structure
-    (structures, structure_relations, structure_name_forms)."""
+    (structures, structure_relations, structure_name_forms).
+
+    Les retours `dict[str, Any]` sont des records DB (colonnes
+    hétérogènes par table) ; le paramètre `fields: dict[str, Any]`
+    porte des couples (colonne, valeur) pour un UPDATE générique
+    (les types varient selon la colonne). Ces `Any` sont des
+    frontières DB intrinsèques.
+    """
 
     # ── structures ─────────────────────────────────────────────────
 
@@ -21,16 +28,16 @@ class StructureRepository(Protocol):
         ror_id: str | None,
         rnsr_id: str | None,
         hal_collection: str | None,
-        api_ids: dict | None,
-    ) -> dict: ...
+        api_ids: dict[str, Any] | None,
+    ) -> dict[str, Any]: ...
 
     def update_structure_fields(
         self,
         structure_id: int,
-        fields: dict,
-    ) -> dict: ...
+        fields: dict[str, Any],
+    ) -> dict[str, Any]: ...
 
-    def delete_structure(self, structure_id: int) -> dict | None: ...
+    def delete_structure(self, structure_id: int) -> dict[str, Any] | None: ...
 
     # ── structure_relations ────────────────────────────────────────
 
@@ -40,9 +47,9 @@ class StructureRepository(Protocol):
         parent_id: int,
         child_id: int,
         relation_type: str,
-    ) -> dict | None: ...
+    ) -> dict[str, Any] | None: ...
 
-    def delete_relation(self, relation_id: int) -> dict | None: ...
+    def delete_relation(self, relation_id: int) -> dict[str, Any] | None: ...
 
     # ── structure_name_forms ───────────────────────────────────────
 
@@ -55,13 +62,13 @@ class StructureRepository(Protocol):
         form_text_normalized: str,
         is_word_boundary: bool,
         is_excluding: bool,
-        requires_context_of: list | None,
-    ) -> dict: ...
+        requires_context_of: list[int] | None,
+    ) -> dict[str, Any]: ...
 
     def update_name_form_fields(
         self,
         form_id: int,
-        fields: dict,
-    ) -> dict: ...
+        fields: dict[str, Any],
+    ) -> dict[str, Any]: ...
 
-    def delete_name_form(self, form_id: int) -> dict | None: ...
+    def delete_name_form(self, form_id: int) -> dict[str, Any] | None: ...

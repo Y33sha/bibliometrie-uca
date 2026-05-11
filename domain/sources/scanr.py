@@ -3,10 +3,15 @@
 Interprétation des champs propres au schéma ScanR (élasticsearch
 dataesr) — prédicats et extracteurs qui encapsulent la connaissance
 de la sémantique ScanR pour le reste du pipeline.
+
+Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API ScanR
+(frontière dynamique avec une source externe, schéma non typé).
 """
 
+from typing import Any
 
-def select_leaf_affiliations(affiliations: list[dict]) -> list[dict]:
+
+def select_leaf_affiliations(affiliations: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Filtre les affiliations ScanR aux entrées marquées labo.
 
     ScanR renvoie côte à côte l'affiliation labo (champ
@@ -39,7 +44,7 @@ def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
     return None
 
 
-def derive_scanr_oa_status(is_oa: bool | None, oa_evidence: dict | None) -> str | None:
+def derive_scanr_oa_status(is_oa: bool | None, oa_evidence: dict[str, Any] | None) -> str | None:
     """Mapping (isOa, oaEvidence) ScanR → enum oa_status canonique.
 
     ScanR n'expose pas de statut OA nuancé ; il faut l'inférer de
