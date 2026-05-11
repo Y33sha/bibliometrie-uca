@@ -8,7 +8,6 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import Connection
 
 from application.authorships.core import (
     set_source_authorship_excluded as _set_source_authorship_excluded,
@@ -23,7 +22,6 @@ from domain.ports.authorship_repository import AuthorshipRepository
 from interfaces.api.deps import (
     audit_repo_sync,
     authorship_repo_sync,
-    db_conn_sync,
     get_root_structure_id_sync,
     publications_queries_sync,
 )
@@ -199,7 +197,6 @@ def exclude_source_authorship(
     source: str,
     authorship_id: int,
     body: ExcludeSourceAuthorship = ExcludeSourceAuthorship(),
-    conn: Connection = Depends(db_conn_sync),
     repo: AuthorshipRepository = Depends(authorship_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:

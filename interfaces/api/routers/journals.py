@@ -4,7 +4,6 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
@@ -13,7 +12,6 @@ from domain.ports.audit_repository import AuditRepository
 from domain.ports.journal_repository import JournalRepository
 from interfaces.api.deps import (
     audit_repo_sync,
-    db_conn_sync,
     journal_queries_sync,
     journal_repo_sync,
 )
@@ -64,7 +62,6 @@ def get_journal(
 def update_journal(
     journal_id: int,
     body: JournalUpdate,
-    conn: Connection = Depends(db_conn_sync),
     repo: JournalRepository = Depends(journal_repo_sync),
 ) -> Any:
     """Met à jour une revue (modification sélective des champs fournis).
@@ -81,7 +78,6 @@ def update_journal(
 def merge(
     journal_id: int,
     body: MergeRequest,
-    conn: Connection = Depends(db_conn_sync),
     queries: JournalQueries = Depends(journal_queries_sync),
     repo: JournalRepository = Depends(journal_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),

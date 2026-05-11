@@ -342,14 +342,14 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
 
 
 def upsert_publisher(
-    cur: Connection, publisher_name: str | None, *, publisher_repo: PublisherRepository
+    publisher_name: str | None, *, publisher_repo: PublisherRepository
 ) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
     return find_or_create_publisher(publisher_name, repo=publisher_repo)
 
 
 def upsert_journal(
-    cur: Connection, rec: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+    rec: dict, publisher_id: int | None, *, journal_repo: JournalRepository
 ) -> int | None:
     """Trouve ou crée une revue depuis les données WoS."""
     title = rec.get("journal_title")
@@ -391,7 +391,6 @@ def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
 
 
 def find_publication(
-    cur: Connection,
     rec: dict,
     journal_id: int | None,
     *,
@@ -617,10 +616,8 @@ def process_record(
         if not rec["ut"]:
             rec["ut"] = ut
 
-        publisher_id = upsert_publisher(
-            cur, rec.get("publisher_name"), publisher_repo=publisher_repo
-        )
-        journal_id = upsert_journal(cur, rec, publisher_id, journal_repo=journal_repo)
+        publisher_id = upsert_publisher(rec.get("publisher_name"), publisher_repo=publisher_repo)
+        journal_id = upsert_journal(rec, publisher_id, journal_repo=journal_repo)
         t.mark("publisher+journal")
 
         pub_meta = extract_pub_metadata(rec, journal_id)
@@ -628,7 +625,7 @@ def process_record(
         publication_id = queries.get_wos_publication_id(cur, rec["ut"])
 
         if not publication_id:
-            publication_id = find_publication(cur, rec, journal_id, pub_repo=pub_repo)
+            publication_id = find_publication(rec, journal_id, pub_repo=pub_repo)
         t.mark("publication")
 
         if publication_id:

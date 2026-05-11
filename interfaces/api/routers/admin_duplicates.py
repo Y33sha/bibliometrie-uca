@@ -84,7 +84,6 @@ def merge_duplicate_publications(
 @router.post("/api/admin/duplicates/mark-distinct", response_model=OkResponse)
 def mark_publications_distinct(
     body: MarkDistinctPublications,
-    conn: Connection = Depends(db_conn_sync),
     repo: PublicationRepository = Depends(publication_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> Any:

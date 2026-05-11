@@ -296,7 +296,6 @@ class TestStep0HalAccounts:
         # Passe 3 : rattaché par nom
         name_form_map = _queries.fetch_name_form_map(sa_sync_conn)
         step3_name_forms(
-            sa_sync_conn,
             _logger,
             all_as,
             linked_ids,
@@ -338,7 +337,6 @@ class TestStep1CrossSource:
         linked_ids = set()
         linked_index = load_linked_authorships_by_pub(sa_sync_conn, _queries)
         step1_cross_source(
-            sa_sync_conn,
             _logger,
             all_as,
             linked_ids,
@@ -382,7 +380,6 @@ class TestStep1CrossSource:
         linked_ids = set()
         linked_index = load_linked_authorships_by_pub(sa_sync_conn, _queries)
         step1_cross_source(
-            sa_sync_conn,
             _logger,
             all_as,
             linked_ids,
@@ -419,7 +416,6 @@ class TestStep1CrossSource:
         linked_ids = set()
         linked_index = load_linked_authorships_by_pub(sa_sync_conn, _queries)
         step1_cross_source(
-            sa_sync_conn,
             _logger,
             all_as,
             linked_ids,
@@ -624,7 +620,6 @@ class TestStep3NameForms:
         linked_ids = set()
         name_form_map = _queries.fetch_name_form_map(sa_sync_conn)
         step3_name_forms(
-            sa_sync_conn,
             _logger,
             all_as,
             linked_ids,
@@ -659,7 +654,6 @@ class TestStep3NameForms:
         linked_ids = set()
         name_form_map = _queries.fetch_name_form_map(sa_sync_conn)
         step3_name_forms(
-            sa_sync_conn,
             _logger,
             all_as,
             linked_ids,
@@ -689,7 +683,6 @@ class TestStep3NameForms:
         linked_ids = set()
         name_form_map = _queries.fetch_name_form_map(sa_sync_conn)
         step3_name_forms(
-            sa_sync_conn,
             _logger,
             all_as,
             linked_ids,

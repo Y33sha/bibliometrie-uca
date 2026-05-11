@@ -82,15 +82,13 @@ def get_title(doc: dict) -> str:
 # =============================================================
 
 
-def upsert_publisher(
-    cur: Connection, publisher_name: str, *, publisher_repo: PublisherRepository
-) -> int | None:
+def upsert_publisher(publisher_name: str, *, publisher_repo: PublisherRepository) -> int | None:
     """Trouve ou crée un éditeur. Délègue au service journals."""
     return find_or_create_publisher(publisher_name, repo=publisher_repo)
 
 
 def upsert_journal(
-    cur: Connection, doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+    doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
 ) -> int | None:
     """Extrait et trouve/crée la revue depuis les champs HAL."""
     title = as_str(doc.get("journalTitle_s"))
@@ -151,7 +149,6 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
 
 
 def find_publication(
-    cur: Connection,
     doc: dict,
     journal_id: int | None,
     *,
@@ -666,11 +663,11 @@ def process_work(
 
         publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
         publisher_id = (
-            upsert_publisher(cur, publisher_name, publisher_repo=publisher_repo)
+            upsert_publisher(publisher_name, publisher_repo=publisher_repo)
             if publisher_name
             else None
         )
-        journal_id = upsert_journal(cur, doc, publisher_id, journal_repo=journal_repo)
+        journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
         t.mark("publisher+journal")
 
         pub_meta = extract_pub_metadata(doc, journal_id)
@@ -678,7 +675,7 @@ def process_work(
         publication_id = None
         old_pub_id = queries.get_hal_publication_id(cur, hal_id)
         if old_pub_id:
-            publication_id = find_publication(cur, doc, journal_id, pub_repo=pub_repo)
+            publication_id = find_publication(doc, journal_id, pub_repo=pub_repo)
             if publication_id and publication_id != old_pub_id:
                 from application.publications import merge_publications
 
@@ -687,7 +684,7 @@ def process_work(
             elif not publication_id:
                 publication_id = old_pub_id
         else:
-            publication_id = find_publication(cur, doc, journal_id, pub_repo=pub_repo)
+            publication_id = find_publication(doc, journal_id, pub_repo=pub_repo)
         t.mark("publication")
 
         if publication_id:

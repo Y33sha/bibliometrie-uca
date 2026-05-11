@@ -10,7 +10,6 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import Connection
 
 from application import config as config_service
 from application.ports.config import ConfigStore
@@ -20,7 +19,6 @@ from domain.ports.perimeter_repository import PerimeterRepository
 from interfaces.api.deps import (
     audit_repo_sync,
     config_store_sync,
-    db_conn_sync,
     perimeter_repo_sync,
     perimeters_admin_queries_sync,
 )
@@ -55,7 +53,6 @@ def list_perimeters(
 @router.post("/api/perimeters", response_model=CreatedIdResponse)
 def create_perimeter(
     body: PerimeterCreate,
-    conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> Any:
     """Crée un nouveau périmètre."""
@@ -75,7 +72,6 @@ def create_perimeter(
 def update_perimeter(
     perimeter_id: int,
     body: PerimeterUpdate,
-    conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> Any:
     """Met à jour un périmètre (nom, description, structures)."""
@@ -92,7 +88,6 @@ def update_perimeter(
 @router.delete("/api/perimeters/{perimeter_id}", response_model=OkResponse)
 def delete_perimeter(
     perimeter_id: int,
-    conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
     config_repo: ConfigStore = Depends(config_store_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
@@ -106,7 +101,6 @@ def delete_perimeter(
 def add_perimeter_structure(
     perimeter_id: int,
     body: AddPerimeterStructure,
-    conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> Any:
     """Ajoute une structure racine au périmètre.
@@ -124,7 +118,6 @@ def add_perimeter_structure(
 def remove_perimeter_structure(
     perimeter_id: int,
     structure_id: int,
-    conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> Any:
     """Retire une structure racine du périmètre. N'affecte pas ses

@@ -1176,7 +1176,6 @@ def _run_create_persons(conn):
     )
     linked_index = load_linked_authorships_by_pub(conn, queries)
     step1_cross_source(
-        conn,
         logger,
         all_authorships,
         linked_ids,
@@ -1189,7 +1188,6 @@ def _run_create_persons(conn):
     )
     name_form_map = queries.fetch_name_form_map(conn)
     step3_name_forms(
-        conn,
         logger,
         all_authorships,
         linked_ids,

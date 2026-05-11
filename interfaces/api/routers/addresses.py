@@ -200,7 +200,6 @@ def set_address_country(
     addr_id: int,
     body: SetCountry,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn_sync),
     queries: AddressesQueries = Depends(addresses_queries_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
     _: Any = Depends(require_admin),
@@ -221,7 +220,6 @@ def set_address_country(
 def batch_set_country(
     body: BatchSetCountry,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn_sync),
     queries: AddressesQueries = Depends(addresses_queries_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
     _: Any = Depends(require_admin),

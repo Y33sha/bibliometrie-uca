@@ -142,9 +142,7 @@ def find_hal_publication_id(
 # =============================================================
 
 
-def upsert_publisher(
-    cur: Connection, work: dict, *, publisher_repo: PublisherRepository
-) -> int | None:
+def upsert_publisher(work: dict, *, publisher_repo: PublisherRepository) -> int | None:
     """Extrait et trouve/crée l'éditeur depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
     source = location.get("source") or {}
@@ -158,7 +156,7 @@ def upsert_publisher(
 
 
 def upsert_journal(
-    cur: Connection, work: dict, publisher_id: int | None, *, journal_repo: JournalRepository
+    work: dict, publisher_id: int | None, *, journal_repo: JournalRepository
 ) -> int | None:
     """Extrait et trouve/crée la revue depuis le work OpenAlex."""
     location = work.get("primary_location") or {}
@@ -243,7 +241,6 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
 
 
 def find_publication(
-    cur: Connection,
     work: dict,
     journal_id: int | None,
     *,
@@ -533,8 +530,8 @@ def process_work(
             publisher_id = None
             journal_id = None
         else:
-            publisher_id = upsert_publisher(cur, work, publisher_repo=publisher_repo)
-            journal_id = upsert_journal(cur, work, publisher_id, journal_repo=journal_repo)
+            publisher_id = upsert_publisher(work, publisher_repo=publisher_repo)
+            journal_id = upsert_journal(work, publisher_id, journal_repo=journal_repo)
 
         pub_meta = extract_pub_metadata(work, journal_id)
 
@@ -552,7 +549,7 @@ def process_work(
             publication_id = queries.get_openalex_publication_id(cur, openalex_id)
 
         if not publication_id:
-            publication_id = find_publication(cur, work, journal_id, pub_repo=pub_repo)
+            publication_id = find_publication(work, journal_id, pub_repo=pub_repo)
 
         if publication_id:
             enrich_doi = pub_meta["doi"]
