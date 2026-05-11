@@ -11,12 +11,13 @@ import hmac
 import os
 import time
 from collections.abc import Iterator
-from typing import Any
 
 import bcrypt
 from fastapi import Cookie, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Connection, text
+from starlette.responses import Response
+from starlette.types import Scope
 
 from application.ports.addresses_queries import AddressesQueries
 from application.ports.admin_feedback_queries import AdminFeedbackQueries
@@ -82,7 +83,7 @@ BUILD_DIR = os.path.join(PROJECT_ROOT, "interfaces", "frontend", "build")
 class SPAStaticFiles(StaticFiles):
     """Sert les fichiers statiques avec fallback index.html pour le routage SPA."""
 
-    async def get_response(self, path: Any, scope: Any) -> Any:
+    async def get_response(self, path: str, scope: Scope) -> Response:
         try:
             return await super().get_response(path, scope)
         except Exception:
@@ -124,7 +125,7 @@ def _check_password(password: str) -> bool:
     return bcrypt.checkpw(password.encode(), settings.admin_hash.encode())
 
 
-def require_admin(session: str | None = Cookie(None, alias="session")) -> Any:
+def require_admin(session: str | None = Cookie(None, alias="session")) -> None:
     """Dépendance FastAPI : vérifie que l'utilisateur est authentifié."""
     if not session or not _verify_token(session):
         raise HTTPException(status_code=401, detail="Non authentifié")

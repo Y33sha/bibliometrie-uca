@@ -12,15 +12,19 @@ import logging
 import os
 import time
 import traceback
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import text
+from sqlalchemy.pool import QueuePool
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 from application import audit
 from domain.errors import (
@@ -74,7 +78,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> Any:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     sync_engine = build_sync_engine()
     set_sync_engine(sync_engine)
     try:
@@ -94,34 +98,34 @@ app = FastAPI(title="Bibliométrie UCA", lifespan=lifespan)
 
 
 @app.exception_handler(NotFoundError)
-async def not_found_handler(request: Request, exc: NotFoundError) -> Any:
+async def not_found_handler(request: Request, exc: NotFoundError) -> JSONResponse:
     return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 @app.exception_handler(ValidationError)
-async def validation_handler(request: Request, exc: ValidationError) -> Any:
+async def validation_handler(request: Request, exc: ValidationError) -> JSONResponse:
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.exception_handler(ConflictError)
-async def conflict_handler(request: Request, exc: ConflictError) -> Any:
+async def conflict_handler(request: Request, exc: ConflictError) -> JSONResponse:
     return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
 @app.exception_handler(UnauthorizedError)
-async def unauthorized_handler(request: Request, exc: UnauthorizedError) -> Any:
+async def unauthorized_handler(request: Request, exc: UnauthorizedError) -> JSONResponse:
     return JSONResponse(status_code=401, content={"detail": str(exc)})
 
 
 @app.exception_handler(DomainError)
-async def domain_error_handler(request: Request, exc: DomainError) -> Any:
+async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
     # Filet de sécurité pour une DomainError non spécialisée ci-dessus.
     logger.warning("DomainError non mappée : %s", exc)
     return JSONResponse(status_code=400, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception) -> Any:
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Renvoie du JSON 500 au lieu de HTML pour les erreurs non gérées."""
     logger.error(
         "Erreur non gérée sur %s %s\n%s", request.method, request.url.path, traceback.format_exc()
@@ -145,7 +149,7 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def auth_middleware(request: Request, call_next: Any) -> Any:
+async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
     """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH) sauf auth.
 
     Log aussi les actions admin réussies (status < 400) pour traçabilité —
@@ -190,7 +194,7 @@ async def auth_middleware(request: Request, call_next: Any) -> Any:
 
 
 @app.middleware("http")
-async def strip_prefix(request: Request, call_next: Any) -> Any:
+async def strip_prefix(request: Request, call_next: RequestResponseEndpoint) -> Response:
     """Strip /bibliometrie prefix pour que les routes /api/* fonctionnent en accès direct."""
     if request.url.path.startswith("/bibliometrie/api/"):
         request.scope["path"] = request.url.path[len("/bibliometrie") :]
@@ -202,7 +206,7 @@ _METRICS_SKIP_PATHS = ("/api/health", "/api/metrics")
 
 
 @app.middleware("http")
-async def timing_middleware(request: Request, call_next: Any) -> Any:
+async def timing_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
     """Mesure la durée de chaque requête, ajoute un header X-Response-Time
     et log un record `request_completed` structuré (sauf /api/health et /api/metrics).
     """
@@ -234,7 +238,7 @@ _PIPELINE_STATUS_FILE = Path(__file__).resolve().parent.parent.parent / "logs" /
 
 
 @app.get("/api/health")
-def health() -> Any:
+def health() -> JSONResponse | dict[str, Any]:
     """Vérifie que l'API est opérationnelle, la DB accessible, et la fraîcheur
     des données (date de la dernière extraction par source).
     """
@@ -254,7 +258,7 @@ def health() -> Any:
 
     now = datetime.now(timezone.utc)
     threshold = now - timedelta(days=_STALE_THRESHOLD_DAYS)
-    last_extraction: dict = {}
+    last_extraction: dict[str, dict[str, Any]] = {}
     stale: list[str] = []
     for r in rows:
         source = r.source
@@ -283,7 +287,7 @@ def health() -> Any:
 
 
 @app.get("/api/metrics")
-def metrics() -> Any:
+def metrics() -> dict[str, Any]:
     """Métriques internes : état du pool de connexions SQLAlchemy.
 
     Le timing des requêtes est émis via le middleware `timing_middleware`
@@ -292,12 +296,12 @@ def metrics() -> Any:
     engine = get_sync_engine()
     # `engine.pool` est typé `Pool` (interface mince), mais l'instance
     # concrète est un `QueuePool` qui expose size/checkedout/checkedin.
-    pool: Any = engine.pool
+    pool = cast(QueuePool, engine.pool)
     size = pool.size()
     return {
         "db_pool": {
             "minconn": size,
-            "maxconn": size + getattr(pool, "_max_overflow", 0),
+            "maxconn": size + pool._max_overflow,
             "in_use": pool.checkedout(),
             "available": pool.checkedin(),
         },
@@ -308,7 +312,7 @@ def metrics() -> Any:
 
 
 @app.get("/")
-async def root() -> Any:
+async def root() -> RedirectResponse:
     return RedirectResponse("/bibliometrie/stats")
 
 
