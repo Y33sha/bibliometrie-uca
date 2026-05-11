@@ -1,6 +1,6 @@
 # Chantier — Adoption d'Alembic
 
-Commencé le 2026-05-11.
+Commencé et terminé le 2026-05-11
 
 ## Contexte
 

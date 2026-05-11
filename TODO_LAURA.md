@@ -27,6 +27,7 @@
 * [ ] nommage des routers pas totalement cohérent
 * is_wos_author_exploitable, authors_kept: à quoi ça sert? auditer
 * sortir les use cases des repositories; clarifier la distinction repositories / db/queries
+* typage des ports?
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 ## Sujets
