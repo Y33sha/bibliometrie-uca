@@ -127,9 +127,12 @@ une source s'intègre aux phases existantes, ce n'est **pas** une phase.
 ### 6. Migration SQL éventuelle
 
 Si la source ajoute des colonnes (`source_publications.nouveau_champ`),
-écrire la migration dans [`infrastructure/db/migrations/NNN_<nom>.sql`]
-(numérotation séquentielle à 3 chiffres) et appliquer via
-`python -m infrastructure.db.migrate`.
+mettre à jour la MetaData dans
+[`infrastructure/db/tables.py`](infrastructure/db/tables.py), générer
+la migration Alembic via
+`alembic revision --autogenerate -m "<description>"`, relire le
+fichier produit dans [`alembic/versions/`](alembic/versions/) et
+appliquer via `alembic upgrade head`.
 
 ---
 

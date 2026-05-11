@@ -1,1 +1,66 @@
-Generic single-database configuration.
+# Migrations Alembic — workflow
+
+Alembic est la source de vérité du schéma DB du projet
+(`bibliometrie`). La MetaData explicite vit dans
+`infrastructure/db/tables.py` ; le snapshot lisible reste
+`infrastructure/db/schema.sql` (régénéré à la main par
+`python -m infrastructure.db.dump_schema`).
+
+## Cycle typique
+
+1. Modifier la MetaData dans `infrastructure/db/tables.py` (ajout
+   d'une colonne, d'une table, d'un index, etc.).
+2. Générer la migration :
+   ```bash
+   alembic revision --autogenerate -m "<description>"
+   ```
+   Alembic compare la MetaData à la DB courante et crée un fichier
+   dans `alembic/versions/<date>-<rev>_<slug>.py`.
+3. **Relire le fichier généré.** L'autogenerate rate ou se trompe
+   souvent sur :
+   - les enums Postgres (déclarer avec `create_type=False` dans la
+     MetaData ; côté migration, utiliser
+     `op.execute("CREATE TYPE …")`),
+   - les vues, triggers, fonctions custom (`op.execute("CREATE …")`),
+   - les colonnes JSONB avec `server_default` (faux positifs
+     classiques),
+   - les contraintes complexes (CHECK avec expression).
+4. Appliquer :
+   ```bash
+   alembic upgrade head
+   ```
+5. Régénérer le snapshot pour relecture :
+   ```bash
+   python -m infrastructure.db.dump_schema
+   ```
+
+## Commandes utiles
+
+- `alembic current` — version actuelle de la base
+- `alembic history` — chaîne des migrations
+- `alembic upgrade head` — appliquer toutes les migrations en attente
+- `alembic upgrade +1` / `downgrade -1` — un cran
+- `alembic stamp head` — marquer la base comme à jour sans rejouer
+  (utilisé une fois lors de l'adoption initiale d'Alembic)
+- `BIBLIOMETRIE_SANDBOX=1 alembic upgrade head` — appliquer sur la
+  base sandbox au lieu de la base principale
+- `DB_NAME=<autre> alembic upgrade head` — surcharger la base cible
+
+## Baseline
+
+`alembic/versions/2026_05_11_0938-0001_baseline.py` est un cas
+particulier : c'est le squash des 23 migrations SQL historiques
+(`infrastructure/db/migrations/001_*.sql` à `023_*.sql`), figé via
+`op.execute(<contenu du baseline.sql adjacent>)`. Cette migration
+n'est rejouée que sur une base vierge. Sur la prod et la dev, elle
+a été marquée appliquée via `alembic stamp head`.
+
+Le fichier `0001_baseline.sql` à côté contient le SQL exhaustif
+(tables, vues, enums, fonctions). Il n'est jamais modifié — c'est
+un snapshot immuable.
+
+## Tests
+
+Le conftest des tests d'intégration
+(`tests/integration/conftest.py`) recrée `bibliometrie_test` avant
+chaque session pytest en appliquant `alembic upgrade head`.
