@@ -39,26 +39,47 @@ itératif : sweep, propage, re-sweep.
 
 ## Hors scope
 
-- Renommage `cur` → `conn` quand la variable garde un usage légitime.
-  Reporté à un chantier dédié si nécessaire.
 - Refactor de l'usage interne (continuer à passer `conn` aux repos
   qui en ont besoin par leur `__init__`).
-- `infrastructure/sources/*` extracteurs API : à voir en queue, le
-  pattern y est probablement différent (commits batch).
+- `infrastructure/sources/*` extracteurs API : les `cur` y sont des
+  vrais curseurs psycopg (pas des Connection SA), à voir séparément.
 
 ## Phasage
 
 ### Phase 1 — Audit complet
 
-- [ ] Lister toutes les fonctions de `application/`, `interfaces/api/`,
-  `tests/integration/application/` qui déclarent `conn` ou `cur` mais
-  ne l'utilisent jamais dans leur corps.
+- [x] Lister toutes les fonctions de `application/`, `interfaces/api/`,
+  `tests/integration/` qui déclarent `conn` ou `cur` mais ne
+  l'utilisent jamais dans leur corps. Audit initial : 62 fossiles
+  effectifs (53 si on retire les ports `Protocol` et les
+  abstract methods, hors faux positifs).
 
 ### Phase 2 — Sweep itératif
 
-- [ ] Supprimer les arguments fossiles, adapter les call sites
-  (probablement plusieurs commits intermédiaires).
+- [x] Sweep modules `application/*` (commit `cfd4510`) :
+  `config.py`, `publishers.py`, `journals.py`, `structures.py`,
+  `addresses_countries.py` (28 fonctions).
+- [x] Sweep modules `application/*` partie 2 (commit `50d35ec`) :
+  `persons.py`, `publications.py`, `authorships/core.py`,
+  `authorships/assign_orphans.py` (~30 fonctions). Callers
+  patchés par AST en respectant les défs locales (helpers
+  `_create_person`, etc.) et les aliases d'imports.
+- [x] Sweep finale routers + pipeline (commit `80270ec`) : retrait de
+  `conn: Connection = Depends(db_conn_sync)` dans 33 endpoints
+  FastAPI (FastAPI résout la cascade via le repo) + 17 helpers
+  internes pipeline (`upsert_publisher`, `upsert_journal`,
+  `find_publication`, `step1_cross_source`, `step3_name_forms`).
 
-### Phase 3 — Validation finale
+### Phase 3 — Renommage `cur` → `conn`
 
-- [ ] mypy + tests + suite complète.
+- [x] (commit `41ff74d`) Renommage AST-driven : 53 paramètres
+  `cur: Connection` typés SA mais nommés `cur` par héritage psycopg,
+  renommés en `conn` avec leurs références internes. 13 fichiers
+  touchés.
+
+### Phase 4 — Validation finale
+
+- [x] mypy : aucune erreur.
+- [x] Tests : 1403/1403 OK à chaque étape.
+- [x] Restent ~6 fossiles acceptés (mocks `monkeypatch` qui doivent
+  matcher la signature de la cible, hook abstrait `summary_stats`).
