@@ -1,5 +1,7 @@
 # Schéma de données — Bibliométrie UCA
 
+*Document à jour au 2026-05-11.*
+
 ## Principes de conception
 
 Le schéma repose sur une distinction entre des tables "sources" et des tables "canoniques" (= vérité).
@@ -39,7 +41,7 @@ erDiagram
 
 ```
 
-Les tables sources sont toutes peuplées lors de la [phase 3](pipeline#normalize) du pipeline (`normalize`).
+Les tables sources sont toutes peuplées lors de la phase `normalize` du pipeline (cf. [pipeline.md](pipeline.md)).
 
 #### Tables “canoniques”
 
@@ -56,7 +58,7 @@ le service pour écrire.
 
 | Table | Propriétaire |
 |-------|-------------|
-| `staging` | extracteurs (`extraction/*/extract_*.py`, cross-imports) |
+| `staging` | extracteurs (`infrastructure/sources/*/extract_*.py`, cross-imports) |
 
 Table unique pour toutes les sources. Colonnes notables : `source` (enum), `source_id`, `raw_data` (JSONB, vidé après normalisation), `hal_collections` (text[], HAL uniquement), `not_found` (documents disparus).
 
@@ -64,56 +66,74 @@ Table unique pour toutes les sources. Colonnes notables : `source` (enum), `sour
 
 | Table | Propriétaire |
 |-------|-------------|
-| `source_publications` | `processing/normalize_*.py` |
-| `source_persons` | `processing/normalize_*.py` |
-| `source_authorships` | `processing/normalize_*.py` |
-| `source_structures` | `processing/normalize_hal.py`, `enrich_hal_structures.py` |
+| `source_publications` | `application/pipeline/normalize/normalize_*.py` |
+| `source_persons` | `application/pipeline/normalize/normalize_*.py` |
+| `source_authorships` | `application/pipeline/normalize/normalize_*.py` |
+| `source_authorship_addresses` | `application/pipeline/normalize/normalize_*.py` (via `infrastructure.addresses.PgAddressLinker`) |
+| `source_structures` | `application/pipeline/normalize/normalize_{hal,openalex,wos}.py` |
 
-Note : `person_id` sur `source_authorships` est écrit par `application/persons.py` (rattachement), pas par les normaliseurs. `in_perimeter` et `structure_ids` sont écrits par `populate_affiliations.py`.
+Note : `person_id` sur `source_authorships` est écrit par `application/persons.py` et `application/authorships/assign_orphans.py` (rattachement), pas par les normalizers. `in_perimeter` et `structure_ids` sont écrits par `application/pipeline/affiliations/populate_affiliations.py`.
 
 ### Référentiel Publications — `application/publications.py`
 
 | Table | Propriétaire | Notes |
 |-------|-------------|-------|
 | `publications` | `application/publications.py` | `refresh_from_sources()` recalcule les métadonnées depuis les source_publications |
-| `distinct_publications` | API admin | paires marquées distinctes malgré titre identique |
+| `distinct_publications` | `application/publications.py` (endpoint admin) | paires marquées distinctes malgré titre identique |
 | `apc_payments` | import APC (CSV) | — |
 | `journals` | `application/journals.py` | — |
-| `publishers` | `application/journals.py` | — |
+| `journal_name_forms` | `application/journals.py` | formes de noms normalisées pour le matching |
+| `publishers` | `application/publishers.py` | — |
+| `publisher_name_forms` | `application/publishers.py` | formes de noms normalisées pour le matching |
 
 ### Référentiel Personnes — `application/persons.py`
 
 | Table | Propriétaire | Notes |
 |-------|-------------|-------|
 | `persons` | `application/persons.py` | import RH écrit aussi (toléré) |
-| `persons_rh` | import RH (CSV) | table satellite |
+| `persons_rh` | import RH (CSV — `interfaces/cli/imports/import_persons.py`) | table satellite |
 | `person_identifiers` | `application/persons.py` | ORCID, idHAL, IdRef |
-| `person_name_forms` | `application/persons.py` | recalcul bulk par `populate_person_name_forms.py` |
+| `person_name_forms` | `application/persons.py` | recalcul bulk par `interfaces/cli/pipeline/populate_person_name_forms.py` |
+| `distinct_persons` | `application/persons.py` (endpoint admin) | paires marquées distinctes |
 
-### Authorships canoniques — `build_authorships.py`
+### Authorships canoniques — `application/authorships/`
 
 | Table | Propriétaire | Notes |
 |-------|-------------|-------|
-| `authorships` | `build_authorships.py` + `application/authorships.py` | dédupliqué (person_id, publication_id), consolide in_perimeter et structure_ids depuis les sources |
+| `authorships` | `application/pipeline/authorships/build_authorships.py` + `application/authorships/core.py` + `application/authorships/assign_orphans.py` | dédupliqué (person_id, publication_id), consolide in_perimeter et structure_ids depuis les sources |
 
-### Structures — admin (pas de service)
+### Structures et configuration — `application/structures.py`, `application/config.py`
 
 | Table | Propriétaire |
 |-------|-------------|
-| `structures` | admin / API |
-| `structure_relations` | admin / API |
-| `structure_name_forms` | admin / API |
-| `perimeters` | admin / API |
-| `countries`, `country_name_forms` | référentiel statique |
-| `config` | admin / API |
+| `structures` | `application/structures.py` (admin / API) |
+| `structure_relations` | `application/structures.py` (admin / API) |
+| `structure_name_forms` | `application/structures.py` (admin / API) |
+| `perimeters` | `application/config.py` (admin / API) |
+| `config` | `application/config.py` (admin / API) |
+| `countries`, `country_name_forms` | référentiel statique (seed) |
 
 ### Adresses — scripts du pipeline
 
 | Table | Propriétaire |
 |-------|-------------|
-| `addresses` | `populate_addresses.py` |
-| `address_structures` | `resolve_addresses.py`, admin (confirmation manuelle) |
-| `source_authorship_addresses` | `populate_addresses.py` |
+| `addresses` | `application/pipeline/affiliations/resolve_addresses.py` (création), `application/addresses_*.py` (édition admin) |
+| `address_structures` | `application/pipeline/affiliations/resolve_addresses.py` + `application/addresses_structures.py` (confirmation manuelle) |
+| `source_authorship_addresses` | écrites par les normalizers (cf. zone sources) |
+
+### Sujets — pipeline subjects
+
+| Table | Propriétaire |
+|-------|-------------|
+| `subjects` | `application/pipeline/subjects/run.py` |
+| `publication_subjects` | `application/pipeline/subjects/run.py` |
+| `subject_cooccurrences` | `application/pipeline/cooccurrences/run.py` |
+
+### Audit — événements d'admin
+
+| Table | Propriétaire |
+|-------|-------------|
+| `audit_log` | écrit par tous les services applicatifs via `application/audit.py:emit_event` |
 
 
 ## Détail des tables
@@ -162,11 +182,11 @@ Légende:
 Tables associées :
 - `perimeters` : un périmètre est un ensemble de structures, incluant récursivement les sous-structures. Actuellement deux périmètres sont définis: **UCA** et **UCA élargi** (UCA + CHU + INP). Impacte:
     - les critères d'affiliation utilisés en paramètre des requêtes API;
-    - les authorships sources dont le champ `structure_ids` sera peuplé par le pipeline ([phase 5](pipeline#affiliations) du pipeline), et qui serviront à générer des `publications` et des `personnes` dans les tables canoniques.
+    - les authorships sources dont le champ `structure_ids` sera peuplé par la phase `affiliations` du pipeline, et qui serviront à générer des `publications` et des `personnes` dans les tables canoniques.
 
 - `structure_relations` : définit les relations entre structures. Deux relations existent: **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans le [référentiel ROR](glossaire#ror)); la relation "tutelle" a une conséquence sur les **structures incluses dans un périmètre** donné.
-- `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `addresses` du [pipeline](pipeline#addresses) pour peupler la table de liaison `address_structures`.
-- `address_structures`: table de liaison. Les adresses proviennent des authorships sources (phase 4 `addresses` du pipeline). Les structures identifiées sont ensuite propagées aux authorships sources.
+- `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `affiliations` du [pipeline](pipeline.md) pour peupler la table de liaison `address_structures`.
+- `address_structures`: table de liaison. Les adresses proviennent des authorships sources (peuplées via `source_authorship_addresses` lors de la phase `normalize`, exploitées lors de la phase `affiliations`). Les structures identifiées sont ensuite propagées aux authorships sources.
 - `apc_payments`: données provenant d'un import CSV, voir [doc sources](sources#donnees-apc).
 
 La page [**admin/structures**](guide-utilisateur#admin-structures) permet de gérer le CRUD des structures ainsi que leurs relations et formes de noms.
@@ -245,19 +265,47 @@ Tables associées :
 
 #### `authorships`
 
-Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures. Construite par `build_authorships.py` à partir des *authorships* sources.
+Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures. Construite par `application/pipeline/authorships/build_authorships.py` à partir des *authorships* sources.
 
 - `person_id`
 - `structure_ids`
 - `in_perimeter` : TRUE si l'auteur est affilié UCA sur cette publication
 - `author_position` : position dans la liste d'auteurs
 - `is_corresponding` : auteur correspondant
+- `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
+- `excluded` : authorship rejetée manuellement
 
 ### Tables source
 
-Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses).
+Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses, crossref).
 
 - **`source_publications`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées (doc_type non mappé, oa_status, abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
-- **`source_persons`** : un enregistrement par auteur par source. Déduplication par `(source, source_id)`. Le `source_id` est l'identifiant interne de l'entité auteur dans la source. Porte aussi `orcid`, `idref` et `source_ids` (JSONB, identifiants propres à la source : idhal, hal_person_id, etc.).
-- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `structure_ids` (affiliation résolue), `raw_author_name`, `raw_affiliations` (affiliations textuelles brutes issues de la source), `roles` (auteur, directeur, rapporteur — theses.fr), `excluded` (authorship rejetée manuellement).
-- **`source_structures`** : structures importées depuis HAL, OpenAlex et WoS. Mapping vers `structures` canoniques via `structure_id`. Utilisée par `populate_affiliations` pour résoudre les affiliations.
+- **`source_persons`** : un enregistrement par auteur par source. Déduplication par `(source, source_id)`. Le `source_id` est l'identifiant interne de l'entité auteur dans la source. Porte aussi `orcid`, `idref` et `source_ids` (JSONB, identifiants propres à la source : idhal, hal_person_id, etc.). Aujourd'hui peuplé seulement par HAL, ScanR et theses ; CrossRef, OpenAlex et WoS n'y écrivent plus (les identifiants sont portés directement par `source_authorships.identifiers`).
+- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `structure_ids` (affiliation canonique résolue), `source_struct_ids` (références internes vers `source_structures`), `raw_author_name`, `author_name_normalized`, `identifiers` (JSONB), `roles`, `excluded`. Les affiliations textuelles brutes sont reliées via `source_authorship_addresses` → `addresses.raw_text`.
+- **`source_authorship_addresses`** : table de liaison `source_authorships ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs authorships, et alimente la résolution structure ↔ adresse de la phase `affiliations`.
+- **`source_structures`** : structures importées depuis HAL, OpenAlex et WoS. La colonne `structure_id` (FK vers `structures` canoniques) existe mais est très peu utilisée en pratique (≈ 0,2 % des lignes mappées) — la résolution canonique passe par les adresses, pas par cette table. Utilisée principalement par `refresh_hal_source_countries` pour propager les pays HAL vers `source_publications.countries`.
+
+## Évolutions prévues à court terme
+
+Chantiers `DATA_*` actuellement ouverts dans
+[`docs/chantiers/`](chantiers/) :
+
+- **[`DATA_simplify-source-tables.md`](chantiers/DATA_simplify-source-tables.md)**
+  — suppression des tables `source_persons` et `source_structures`,
+  migration des identifiants fiables vers `person_identifiers`,
+  remplacement de `source_authorships.source_struct_ids` (FK
+  internes) par `source_structures` (ARRAY[TEXT] avec les IDs
+  internes des sources) et ajout d'une colonne `countries` sur
+  `source_authorships` pour préserver le pays HAL.
+
+- **[`DATA_person-name-forms-normalisation.md`](chantiers/DATA_person-name-forms-normalisation.md)**
+  — normalisation du schéma `person_name_forms` : remplacer les
+  deux arrays parallèles `person_ids[]` + `sources[]` par une
+  vraie table de jointure pour qu'on puisse tracer `(person_id,
+  source)` sans ambiguïté.
+
+- **[`DATA_raw-data-store.md`](chantiers/DATA_raw-data-store.md)**
+  — stockage des payloads bruts API hors BDD (store externe type
+  filesystem ou S3), pour permettre la re-normalisation sans
+  re-moissonnage et alléger la BDD (notamment les
+  `source_authorships` hors périmètre).
