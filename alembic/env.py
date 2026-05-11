@@ -29,6 +29,22 @@ if config.config_file_name is not None:
 target_metadata = metadata
 
 
+def _include_object(
+    object_: object,
+    name: str | None,
+    type_: str,
+    reflected: bool,
+    compare_to: object | None,
+) -> bool:
+    # La MetaData du projet (`infrastructure/db/tables.py`) ne déclare
+    # pas les ForeignKey (pattern délibéré : la MetaData sert au query
+    # building, pas à la modélisation relationnelle complète). Sans ce
+    # filtre, autogenerate proposerait de DROP toutes les FK existantes
+    # en DB. Les éventuelles FK à ajouter ou modifier se font à la main
+    # dans la migration générée, via `op.create_foreign_key(...)`.
+    return not (type_ == "foreign_key_constraint" and reflected)
+
+
 def _build_url() -> str:
     # Permet à un caller (ex. fixture pytest) d'imposer une URL via
     # `cfg.set_main_option("sqlalchemy.url", ...)`. Sinon, on construit
@@ -49,6 +65,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=_include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -63,7 +80,11 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=_include_object,
+        )
         with context.begin_transaction():
             context.run_migrations()
 

@@ -95,14 +95,18 @@ table `schema_migrations`) par Alembic, et bénéficier de
 - [x] `alembic/README` : workflow Alembic (créer / relire / appliquer
   / rollback / dump_schema, cas particulier de la baseline)
 
-## Phase 7 — Bascule prod
+## Phase 7 — Tests finaux
 
-- [ ] L'utilisatrice : `alembic stamp head` sur prod
-- [ ] L'utilisatrice : `DROP TABLE schema_migrations` sur prod
-
-## Phase 8 — Tests finaux
-
-- [ ] Suite complète (`pytest tests/ -v`)
-- [ ] `mypy` / `lint-imports` / `ruff`
-- [ ] Smoke test : créer une migration bidon avec `--autogenerate`,
-  vérifier que le diff est cohérent, puis la supprimer
+- [x] Suite complète (`pytest tests/ -v`) — 1403/1403
+- [x] Smoke test `--autogenerate` : a révélé 7 tables manquantes dans
+  la MetaData (héritage du chantier sqla-core qui ne les avait pas
+  toutes couvertes) ainsi que tous les Index, UniqueConstraints,
+  CheckConstraints et column comments. Dette remboursée en une
+  passe : 85 indexes, 23 UC, 4 CC, ~10 comments ajoutés à
+  `tables.py`. `--autogenerate` produit maintenant un diff vide.
+  - Outil one-shot utilisé pour générer les déclarations :
+    `sqlacodegen --generator tables` (5 index sur expressions
+    `md5/lower/normalize_name_form` complétés à la main).
+- [x] `env.py` : `include_object` configuré pour skipper les
+  `foreign_key_constraint` reflétées (la MetaData ne déclare pas les
+  FK — pattern délibéré, query-building only).
