@@ -1,5 +1,7 @@
 # Sources de données — Bibliométrie UCA
 
+*Document à jour au 2026-05-11.*
+
 ## Vue d'ensemble
 
 Le système intègre 6 sources bibliographiques principales, complétées par des imports manuels et des APIs d'enrichissement.
@@ -24,18 +26,23 @@ Le système intègre 6 sources bibliographiques principales, complétées par de
 #### <span id='sources-affiliations'></span>Gestion des affiliations
 
 
-- Dans **OpenAlex** et **WoS**, les liens authorships-structures sont résolus de manière algorithmique à partir des adresses liées aux publications. Ce processus génère beaucoup d'erreurs causées par des similitudes de noms (dans OpenAlex principalement). Mais la donnée-source (*raw affiliation string*) est présente et exploitable. On ignore donc les structure_ids présents dans les sources et **on reconstruit l'affiliation à partir des adresses brutes**. ([Phase `addresses` du pipeline](pipeline#phase-4--addresses--adresses-et-affiliations).)
+- Dans **OpenAlex** et **WoS**, les liens authorships-structures sont résolus de manière algorithmique à partir des adresses liées aux publications. Ce processus génère beaucoup d'erreurs causées par des similitudes de noms (dans OpenAlex principalement). Mais la donnée-source (*raw affiliation string*) est présente et exploitable. On ignore donc les structure_ids présents dans les sources et **on reconstruit l'affiliation à partir des adresses brutes**. (Phase `affiliations` du pipeline.)
 
-##### /!\ Obsolète: à réécrire <!--TODO: Réécrire documentation Sources-->
-- Dans **HAL**, les liens authorships-structures sont basés sur les affiliations renseignées dans les comptes HAL des auteurs au moment du dépôt (Cf [doc HAL](https://doc.hal.science/depot-fonctionnement-de-l-affiliation-automatique/#)), et éventuellement complétés manuellement par le déposant. Les métadonnées de HAL ne contiennent pas les adresses brutes. La seule option est donc de récupérer les affiliations telles quelles, via un *mapping* entre `hal_structures` et `structures` canoniques. Les erreurs sont détectées *a posteriori* (pages [hal-problems](guide-utilisateur#problemes-hal)).
+- Dans **HAL**, les liens authorships-structures sont basés sur les affiliations renseignées dans les comptes HAL des auteurs au moment du dépôt (Cf [doc HAL](https://doc.hal.science/depot-fonctionnement-de-l-affiliation-automatique/#)), et éventuellement complétés manuellement par le déposant. Les métadonnées de HAL ne contiennent pas les adresses brutes. La seule option est donc de récupérer les affiliations telles quelles, via un *mapping* entre `source_structures` HAL et `structures` canoniques. Les erreurs sont détectées *a posteriori* (pages [hal-problems](guide-utilisateur#problemes-hal)).
 Le *mapping* est géré via la page [admin/structures](guide-utilisateur#gestion-des-structures-adminstructures).
-La résolution des affiliations se fait pendant la [phase `affiliations` du pipeline](pipeline#affiliations).
+La résolution des affiliations se fait pendant la phase `affiliations` du pipeline.
 
 #### <span id='entites-auteurs'></span>Nature des entités auteurs
 
-Chaque source contient ses propres identifiants internes pour les entités auteurs. Le traitement des auteurs correspond à la [phase `personnes`](pipeline#phase-7--persons--création-de-personnes) du pipeline.
+Chaque source contient ses propres identifiants internes pour les entités auteurs. Le traitement des auteurs correspond à la phase `persons` du pipeline.
 
-**`source_persons`** est restreinte aux sources avec un **identifiant auteur stable** (cf. [chantier source_persons](chantiers/2026-04-28_source-persons.md)) :
+> **Évolution prévue** — la table `source_persons` est sur le départ
+> (cf. [DATA_simplify-source-tables.md](chantiers/DATA_simplify-source-tables.md)).
+> Les identifiants stables (idhal, idref) doivent migrer vers `person_identifiers`
+> et l'identité-source est suffisamment portée par `source_authorships.identifiers`.
+> Cette section décrit l'état actuel ; elle sera révisée au terme du chantier.
+
+**`source_persons`** est restreinte aux sources avec un **identifiant auteur stable** (cf. [chantier source_persons](chantiers/2026-04-28_DATA_source-persons.md)) :
 - HAL avec `hal_person_id` (compte HAL identifié)
 - ScanR avec idref
 - Theses avec PPN
@@ -60,7 +67,7 @@ Pour les autres cas (OpenAlex, WoS, CrossRef, et les comptes HAL non identifiés
 
 **Search API** (`https://api.archives-ouvertes.fr/search`) — moissonnage des publications.
 - Requête par collection labo (27 collections UCA) + portail global `clermont-univ`
-- Champs Solr récupérés : voir `utils/hal.py` (`HAL_FIELDS`)
+- Champs Solr récupérés : voir [infrastructure/hal.py](../infrastructure/hal.py) (`HAL_FIELDS`)
 - Pagination par offset, 500 résultats/page, 0.5s de délai entre requêtes
 - Les identifiants ORCID/IdRef des auteurs sont extraits depuis le TEI `label_xml` retourné par la search API ; aucun appel séparé à `ref/author` n'est nécessaire.
 
@@ -91,7 +98,7 @@ Pour les autres cas (OpenAlex, WoS, CrossRef, et les comptes HAL non identifiés
 **Works API** (`https://api.openalex.org/works`) — moissonnage des publications.
 - Requête par institution (filtre `lineage`) + année
 - Pagination par cursor, 200 résultats/page, 0.2s de délai (polite pool via email)
-- L'API bulk tronque les authorships à 100 auteurs ; `refetch_truncated.py` re-télécharge individuellement les works concernés
+- L'API bulk tronque les authorships à 100 auteurs ; [infrastructure/sources/openalex/refetch_truncated.py](../infrastructure/sources/openalex/refetch_truncated.py) re-télécharge individuellement les works concernés
 
 **Sources API** (`https://api.openalex.org/sources`) — enrichissement APC des journaux.
 - Récupération des prix APC catalogue (DOAJ) par openalex_id
@@ -136,11 +143,71 @@ Pour les autres cas (OpenAlex, WoS, CrossRef, et les comptes HAL non identifiés
 - Pause longue toutes les 10 pages (15s) et entre chaque année (30s) pour ménager l'API
 - Les DOI de preprints (10.48550, 10.21203, etc.) sont filtrés lors du cross-import
 
+### ScanR
+
+#### API utilisée
+
+**Elasticsearch DataESR** (`https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search`) — moissonnage des publications du périmètre français de la recherche.
+
+- Authentification HTTP Basic (`scanr_username` / `scanr_password` en config)
+- Requête `bool` combinant un filtre `year` et un `should` sur `affiliations.id.keyword` (SIREN des structures déclarées dans le périmètre)
+- Pagination par `search_after` sur `id.keyword`, taille `SCANR_PER_PAGE`, délai `SCANR_DELAY` entre requêtes
+- Affiliation IDs dérivés du périmètre d'extraction (`structures.api_ids->'scanr'`)
+
+#### Données récupérées
+
+- **Publications** : id ScanR, title (dict multilingue `default`/`en`/`fr` ou string), year, type, isOa + oaEvidence, summary (multilingue), keywords (multilingue, liste ou CSV), topics/domains, cited_by_counts_by_year, URLs (landingPage, doiUrl, pdfUrl), externalIds (doi, hal, nnt, pmid)
+- **Source** (journal/éditeur) : `source.title`, `source.issn`, `source.eissn`, `source.publisher`
+- **Auteurs** : `fullName`, `role`, `affiliations`, `denormalized.orcid`, `denormalized.idref`
+- **Affiliations auteur** : arbre de structures (tutelle → laboratoire), filtré par `select_leaf_affiliations` pour ne garder que les feuilles
+
+#### Particularités
+
+- L'`id` ScanR contient le NNT pour les thèses (pattern `nnt:<ppn>`) — extrait via `extract_nnt_from_scanr_id`, ce qui permet la reconciliation avec theses.fr
+- Champs multilingues : la priorité est `default` > `en` > `fr` (même règle pour title / summary / keywords)
+- `oa_status` dérivé via `derive_scanr_oa_status(isOa, oaEvidence)` plutôt que pris brut
+- `source_persons` créé uniquement si idref présent (`should_create_source_person`) — sinon `source_authorships.source_person_id = NULL` et l'ORCID éventuel va dans `identifiers`
+- Adresses : les feuilles d'affiliation portent un `name` libre — passées à l'`AddressLinker` comme pour OpenAlex/WoS
+
+### CrossRef
+
+CrossRef n'est pas une source de périmètre : aucune requête par institution / année. La table `staging` n'est alimentée que pour les DOI absents (DOI-driven), via le mécanisme `fetch_missing_doi`. CrossRef est consultée en aval pour fiabiliser les métadonnées éditeur (journal, ISSN, license) et récupérer les ORCID article-level qui manquent ailleurs.
+
+#### API utilisée
+
+**Works API** (`https://api.crossref.org/works/{doi}`) — interrogation unitaire par DOI.
+
+- Polite pool obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (email lu via `get_crossref_email`, fallback `get_openalex_email`)
+- Limites observées par CrossRef pour le polite pool : 10 req/s + 3 concurrentes. L'adapter colle exactement à ces limites (`max_concurrent=3`, `request_delay_s=0.1`)
+- Les 404 sont matérialisés dans `staging` avec `not_found=TRUE` + `processed=TRUE` pour ne pas être réinterrogés à chaque run
+
+#### Données récupérées
+
+- **Publications** : DOI, title (liste, on prend le premier non-vide), container-title, ISSN/eISSN, publisher, type, abstract (en JATS XML inline — nettoyé via `strip_jats_tags`), subject (utilisé comme keywords), license, relation
+- **Auteurs** : `given` + `family`, `ORCID` (URL), `affiliation` (texte libre, généralement tutelle)
+
+#### Particularités
+
+- Pas de `source_persons` créés (pas d'identité d'auteur stable côté API) — l'ORCID éventuel va dans `source_authorships.identifiers`
+- Affiliations CrossRef purement textuelles et génériques (tutelles, pas de structures détaillées) → stockées dans `source_authorships.source_data` pour traçabilité, **pas** d'insertion dans `addresses` / `source_authorship_addresses`
+- `doc_type` stocké comme `NULL` à la normalisation ; le mapping taxonomie CrossRef → enum canonique est appliqué plus tard via `_SOURCE_MAPS`
+- `oa_status` non dérivé de CrossRef (pas fiable) ; laissé à NULL — les autres sources arbitrent via `refresh_from_sources`
+- Année de publication : extraite via `extract_crossref_pub_year` qui choisit entre `issued`, `published-print`, `published-online`, `created` avec un plafond `current_year + 1`
+
+### Theses.fr — à documenter
+
+Section à compléter, sur le même modèle (API utilisées, données récupérées, particularités).
+Extracteur dans [infrastructure/sources/theses/](../infrastructure/sources/theses/),
+normaliseur dans [application/pipeline/normalize/normalize_theses.py](../application/pipeline/normalize/normalize_theses.py).
+Particularité connue : couvre thèses soutenues + en cours, jurys et rapporteurs
+matérialisés comme `source_authorships` sans `source_persons` quand le PPN
+est absent.
+
 ## APIs d'enrichissement
 
 ### Unpaywall
 
-Script : `processing/enrich_oa_unpaywall.py`
+Script : [interfaces/cli/pipeline/enrich_oa_status.py](../interfaces/cli/pipeline/enrich_oa_status.py) (orchestration dans [application/pipeline/enrich/enrich_oa_status.py](../application/pipeline/enrich/enrich_oa_status.py)).
 
 Interroge l'API Unpaywall (`https://api.unpaywall.org/v2/{doi}`) pour chaque publication avec DOI. Met à jour `publications.oa_status`.
 
@@ -148,7 +215,7 @@ Règle métier : ne remplace jamais un statut `diamond` par `gold` (Unpaywall ne
 
 ### OpenAlex Sources (APC)
 
-Script : `processing/enrich_journal_apc.py`
+Script : [interfaces/cli/pipeline/enrich_journal_apc.py](../interfaces/cli/pipeline/enrich_journal_apc.py) (orchestration dans [application/pipeline/enrich/enrich_journal_apc.py](../application/pipeline/enrich/enrich_journal_apc.py)).
 
 Interroge l'API OpenAlex Sources pour les journaux avec `openalex_id`. Récupère les prix APC catalogue (DOAJ). Met à jour `journals.apc_amount`, `apc_currency`, `is_in_doaj`.
 
@@ -159,7 +226,7 @@ Note : ces données ne sont pas encore exploitées en aval dans l'application.
 
 ### <span id="donnees-rh"></span>Base RH (personnel UCA)
 
-Fichier CSV importé via `interfaces/cli/import_rh.py` → table `persons_rh`.
+Fichier CSV importé via [interfaces/cli/imports/import_persons.py](../interfaces/cli/imports/import_persons.py) → table `persons_rh`.
 - Contient : email, nom, prénom, département, rôle, dates de début/fin
 - Rattaché à une personne du référentiel via `persons_rh.person_id`
 - Sert de filtre dans l'annuaire personnes (filtre "Base RH")
