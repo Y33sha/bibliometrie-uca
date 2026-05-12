@@ -3,15 +3,14 @@ Crée des entités Personnes à partir des authorships sources UCA non rattaché
 
 Algorithme en 4 étapes + 1 étape complémentaire :
 
-  Étape 0 : Comptes HAL déjà rattachés
-    source_persons HAL avec hal_person_id ET person_id → propagation aux nouvelles
-    authorships du même compte. Les comptes non rattachés sont laissés
-    aux étapes suivantes (matching par nom, ORCID, position).
-
   Étape 1 : Cross-source
     Pour chaque authorship sans person_id, chercher sur la même publication
     (même position) une authorship d'une autre source qui a un person_id.
     Si le nom est compatible → rattacher à cette personne.
+
+  Étape 1b : IdRef connu
+    Si l'authorship a un IdRef déjà présent en base (status != rejected)
+    et mappé à une personne → rattacher à cette personne.
 
   Étape 2 : ORCID connu
     Si l'authorship a un ORCID déjà présent en base (status != rejected)
@@ -26,7 +25,11 @@ Algorithme en 4 étapes + 1 étape complémentaire :
     - Forme inconnue → créer nouvelle personne
 
   Étape 4 : Presonnes liées aux thèses (directeurs, rapporteurs, jury)
-    Les rôles non-auteur des thèses sont hors périmètre (in_perimeter=false: pas de signatures ni de structure_ids) et ne passent pas par les étapes 0-3. Si leur source_author a un IdRef correspondant à une personne connue, on rattache sans modifier in_perimeter ni créer de personne.
+    Les rôles non-auteur des thèses sont hors périmètre (in_perimeter=false: pas de signatures ni de structure_ids) et ne passent pas par les étapes 1-3. Si leur source_author a un IdRef correspondant à une personne connue, on rattache sans modifier in_perimeter ni créer de personne.
+
+Note : un matching par idhal / hal_person_id sera réintroduit dans le
+chantier `METIER_decide-person-match` (étape dédiée au côté du matching
+par identifiants forts).
 
 L'orchestrateur dépend du port `PersonsCreateQueries`. Le point d'entrée CLI
 est dans `interfaces/cli/pipeline/create_persons_from_source_authorships.py`.
@@ -106,49 +109,6 @@ def load_linked_authorships_by_pub(
         )
 
     return index
-
-
-# ---------------------------------------------------------------------------
-# Étape 0 : Comptes HAL
-# ---------------------------------------------------------------------------
-
-
-def step0_hal_accounts(
-    conn: Connection,
-    queries: PersonsCreateQueries,
-    logger: logging.Logger,
-    all_authorships: Any,
-    linked_ids: set,
-    dry_run: bool,
-    *,
-    person_repo: PersonRepository,
-) -> int:
-    """Propagation des comptes HAL déjà rattachés à une personne."""
-    by_hal_pid = defaultdict(list)
-    for a in all_authorships:
-        if a["source"] == "hal" and a["has_hal_person_id"]:
-            by_hal_pid[a["hal_person_id"]].append(a)
-
-    hal_person_map = queries.fetch_hal_account_to_person_map(conn)
-
-    linked = 0
-    skipped = 0
-    for hal_pid, group in by_hal_pid.items():
-        existing_pid = hal_person_map.get(hal_pid)
-        if existing_pid:
-            if not dry_run:
-                link_to_person(existing_pid, group, repo=person_repo)
-                add_identifiers(existing_pid, group, repo=person_repo)
-            linked += len(group)
-            for a in group:
-                linked_ids.add((a["source"], a["authorship_id"]))
-        else:
-            skipped += len(group)
-
-    logger.info(
-        f"  {linked} authorships rattachées, {skipped} ignorées (comptes HAL non rattachés)"
-    )
-    return linked
 
 
 # ---------------------------------------------------------------------------
@@ -407,11 +367,6 @@ def run(
 
     linked_ids: set[tuple[str, int]] = set()
 
-    logger.info("\n--- Étape 0 : comptes HAL ---")
-    s0 = step0_hal_accounts(
-        conn, queries, logger, all_authorships, linked_ids, dry_run, person_repo=person_repo
-    )
-
     logger.info("\n--- Étape 1 : cross-source (même publi + position) ---")
     linked_index = load_linked_authorships_by_pub(conn, queries)
     s1 = step1_cross_source(
@@ -443,7 +398,6 @@ def run(
     unlinked = len(all_authorships) - total_linked
 
     logger.info("\n=== Résumé ===")
-    logger.info(f"  Étape 0 (comptes HAL)    : {s0} rattachées")
     logger.info(f"  Étape 1 (cross-source)   : {s1} rattachées")
     logger.info(f"  Étape 1b (IdRef connu)   : {s1b} rattachées")
     logger.info(f"  Étape 2 (ORCID connu)    : {s2} rattachées")

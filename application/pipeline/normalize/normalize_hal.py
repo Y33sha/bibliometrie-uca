@@ -346,8 +346,7 @@ def upsert_hal_author(
     if not should_create_source_person(source="hal", strong_id_value=hal_person_id):
         return None
 
-    # source_persons.source_id est text (colonne partagée cross-sources) ;
-    # hal_person_id > 0 ici, garanti par should_create_source_person ci-dessus.
+    # source_persons.source_id est text (colonne partagée cross-sources).
     assert hal_person_id is not None
     src_id = str(hal_person_id)
     if src_id in _hal_author_cache:
@@ -560,13 +559,11 @@ def process_authors(
             continue
 
         # Identifiants normalisés cross-source pour cette authorship.
-        # `hal_person_id <= 0` est une sentinelle HAL "auteur non identifié"
-        # à ne pas stocker (cf. domain.persons.creation).
         ids = compact_identifiers(
             orcid=orcid,
             idref=idref,
             idhal=idhal,
-            hal_person_id=hal_person_id if hal_person_id and hal_person_id > 0 else None,
+            hal_person_id=hal_person_id,
         )
         identifiers = ids if ids else None
 

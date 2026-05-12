@@ -113,50 +113,63 @@ Audit (cf. discussion architecturale 2026-05-11) :
 
 ### Phase 3 — Refactor code
 
-- [ ] `application/pipeline/normalize/normalize_hal.py` : écrire
-  directement `source_authorships.countries` et
-  `source_authorships.source_structures` (avec les `halId_s` des
-  structures référencées) ; arrêter d'UPSERT dans `source_structures`
-  et `source_persons`.
-- [ ] `application/pipeline/normalize/normalize_openalex.py` /
-  `normalize_wos.py` / `normalize_scanr.py` / `normalize_theses.py` :
-  arrêter d'UPSERT dans `source_persons` et `source_structures`.
-  Écrire le `source_id` de la structure côté
-  `source_authorships.source_structures` (TEXT).
-- [ ] `infrastructure/db/queries/countries.py:refresh_hal_source_countries` :
-  refactor pour lire `source_authorships.countries` au lieu de la
-  jointure via `source_structures`.
+#### Lectures : passer de `source_persons` à `sa.person_identifiers` / `person_identifiers`
+
+- [x] `infrastructure/db/queries/persons/create.py:fetch_unlinked_authorships` :
+  JOIN sur `source_persons` retiré ; lecture orcid/idref/idhal/hal_person_id
+  depuis `sa.person_identifiers` JSONB directement.
+- [x] `infrastructure/db/queries/persons/create.py:fetch_hal_account_to_person_map` :
+  **supprimé** (avec la phase `step0_hal_accounts` du pipeline persons).
+  Un matching par idhal / hal_person_id sera réintroduit dans le chantier
+  `METIER_decide-person-match`.
+- [x] `infrastructure/db/queries/countries.py:refresh_hal_source_countries` :
+  **supprimé** (circuit vestige passant par `source_structures.country`,
+  devenu redondant maintenant que HAL alimente `source_authorship_addresses`
+  comme les autres sources). Remplacé par
+  `refresh_sa_countries_for_source(source)` batché par source.
+- [x] `infrastructure/db/queries/persons/detail.py` :
+  filtre `id_type = ANY(:public_id_types)` ajouté sur les 2 agrégats JSONB
+  exposés (via la constante `PUBLIC_PERSON_IDENTIFIER_TYPES` dans
+  `domain/persons/identifiers.py`).
 - [ ] `infrastructure/db/queries/hal_problems.py` : refactor des
   requêtes de doublons HAL pour grouper sur
-  `source_authorships.identifiers->>'idhal'` et/ou sur
-  `(person_id, identifiers->>'hal_person_id')` (la décision finale
-  dépendra du volume de comptes HAL sans idhal — à voir au moment
-  du refactor).
-- [ ] `infrastructure/db/queries/persons/create.py:fetch_hal_account_to_person_map` :
-  refactor pour interroger `person_identifiers` (id_type='idhal')
-  au lieu de `source_persons`.
-- [ ] `infrastructure/db/queries/persons/create.py:fetch_unlinked_authorships` :
-  retirer le JOIN sur `source_persons` ; lire orcid/idref/idhal
-  depuis `source_authorships.identifiers` JSONB directement.
+  `sa.person_identifiers->>'idhal'` et/ou
+  `(person_id, sa.person_identifiers->>'hal_person_id')`.
+- [ ] `infrastructure/db/queries/persons/detail.py:hal_rows` :
+  refactor pour reconstruire la vue « comptes HAL » depuis
+  `source_authorships` agrégés.
+- [ ] `interfaces/cli/maintenance/merge_person_duplicates_by_lab.py` :
+  remplacer `COUNT(DISTINCT source_person_id)` par
+  `COUNT(DISTINCT sa.person_identifiers->>'idhal')` ou similaire.
+
+#### Dual-writes vers `source_persons` à supprimer
+
 - [ ] `infrastructure/repositories/person_repository/_authorships.py:link_authorship` :
   supprimer le dual-write `source_persons`.
 - [ ] `infrastructure/repositories/person_repository/_identifiers.py:add_identifier` :
   supprimer le dual-write `source_persons`.
 - [ ] `infrastructure/repositories/person_repository/_core.py:merge_into` :
   supprimer la propagation `UPDATE source_persons`.
-- [ ] `infrastructure/db/queries/persons/detail.py:hal_rows` :
-  refactor pour reconstruire la vue "comptes HAL" depuis
-  `source_authorships` agrégés.
-- [ ] `interfaces/cli/maintenance/merge_person_duplicates_by_lab.py` :
-  remplacer `COUNT(DISTINCT source_person_id)` par
-  `COUNT(DISTINCT identifiers->>'idhal')` ou similaire.
-- [ ] Mettre à jour `infrastructure/db/tables.py` (MetaData SA).
+
+#### Normalizers : arrêter UPSERT `source_persons` + `source_structures`
+
+- [ ] `application/pipeline/normalize/normalize_hal.py` :
+  - Écrire le `source_id` HAL côté `sa.source_structures` (TEXT[]) avec
+    les `halId_s` des structures référencées.
+  - Arrêter d'UPSERT dans `source_structures` et `source_persons`.
+  - (Le circuit `sa.countries` HAL via structures a déjà été supprimé,
+    cf. lectures ci-dessus.)
+- [ ] `application/pipeline/normalize/normalize_openalex.py` /
+  `normalize_wos.py` / `normalize_scanr.py` / `normalize_theses.py` :
+  arrêter d'UPSERT dans `source_persons` et `source_structures`.
+  Écrire le `source_id` de la structure côté `sa.source_structures` (TEXT[]).
+
+#### Cleanup schéma (avant Phase 4 DROP)
+
+- [ ] Mettre à jour `infrastructure/db/tables.py` (retirer les références
+  `source_persons` et `source_structures` de la MetaData SA si besoin).
 - [ ] Mettre à jour les ports `domain/ports/person_repository.py`
   (méthodes éventuelles concernant `source_persons`).
-- [ ] `infrastructure/db/queries/persons/detail.py` : filtrer
-  `id_type <> 'hal_person_id'` sur les lignes 37-40 (agrégat JSONB
-  des identifiers exposé via la page détail) et 70 (sélection
-  brute pour admin) — cf. décision 1.
 
 ### Phase 4 — Tests + suppression schéma
 
