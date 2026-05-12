@@ -360,40 +360,6 @@ def _extract_openalex_orcid(authorship: dict) -> str | None:
 
 
 # =============================================================
-# OPENALEX INSTITUTIONS (source_structures, source='openalex')
-# =============================================================
-
-
-def upsert_openalex_institution(
-    conn: Connection, queries: OpenalexNormalizeQueries, institution: dict
-) -> int | None:
-    """Insère/retrouve une institution OpenAlex. Retourne source_structures.id ou None."""
-    inst_id_url = institution.get("id")
-    if not inst_id_url:
-        return None
-
-    openalex_id = extract_short_id(inst_id_url)
-    name = institution.get("display_name") or ""
-    ror_id = institution.get("ror")
-    country_code = institution.get("country_code")
-    inst_type = institution.get("type")
-
-    if not name:
-        return queries.find_openalex_source_structure(conn, openalex_id)
-
-    source_data = {"type": inst_type} if inst_type else None
-
-    return queries.upsert_openalex_source_structure(
-        conn,
-        openalex_id=openalex_id,
-        name=name,
-        ror_id=ror_id,
-        country=country_code,
-        source_data=source_data,
-    )
-
-
-# =============================================================
 # OPENALEX AUTHORSHIPS
 # =============================================================
 
@@ -409,11 +375,12 @@ def process_authorships(
     """
     Traite les authorships d'un work OpenAlex :
     - Crée les liens source_authorships (source='openalex', source_person_id=NULL)
-    - Stocke l'ORCID dans source_authorships.person_identifiers quand présent
-    - Extrait et insère les institutions dans source_structures (source='openalex')
-    - Stocke les source_struct_ids (source_structures.id) sur chaque authorship
+    - Stocke l'ORCID dans `sa.person_identifiers` quand présent
+    - Stocke les `openalex_id` natifs des institutions dans
+      `sa.source_structures` (TEXT[])
 
-    Plus d'écriture sur `source_persons` (cf. docs/chantiers/2026-04-28_source-persons.md).
+    Plus d'écriture sur `source_persons` ni `source_structures` (cf.
+    chantier `DATA_simplify-source-tables`).
     """
     authorships = work.get("authorships") or []
 
@@ -434,31 +401,18 @@ def process_authorships(
 
         # Affiliations brutes
         raw_strings = authorship.get("raw_affiliation_strings") or []
-        if raw_strings:
-            " | ".join(raw_strings)
-        else:
-            institutions = authorship.get("institutions") or []
-            inst_names = [i.get("display_name") for i in institutions if i.get("display_name")]
-            " | ".join(inst_names) if inst_names else None
+        institutions = authorship.get("institutions") or []
 
-        # Institutions OpenAlex → source_structures.id
-        source_struct_ids = []
-        for inst in authorship.get("institutions") or []:
-            ss_id = upsert_openalex_institution(conn, queries, inst)
-            if ss_id:
-                source_struct_ids.append(ss_id)
+        # Institutions OpenAlex → openalex_id natifs (TEXT[])
+        source_structures = [
+            extract_short_id(inst["id"]) for inst in institutions if inst.get("id")
+        ]
 
         # Adresses individuelles pour link_addresses
         addr_parts = (
             raw_strings
             if raw_strings
-            else (
-                [
-                    n
-                    for n in (i.get("display_name") for i in (authorship.get("institutions") or []))
-                    if n
-                ]
-            )
+            else [n for n in (i.get("display_name") for i in institutions) if n]
         )
 
         orcid = _extract_openalex_orcid(authorship)
@@ -468,9 +422,8 @@ def process_authorships(
         sa_id = queries.upsert_openalex_source_authorship(
             conn,
             source_publication_id=source_publication_id,
-            source_person_id=None,
             author_position=position,
-            source_struct_ids=source_struct_ids or None,
+            source_structures=source_structures or None,
             raw_author_name=raw_author_name,
             is_corresponding=is_corresponding,
             person_identifiers=identifiers,

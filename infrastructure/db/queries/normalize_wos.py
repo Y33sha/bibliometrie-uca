@@ -100,21 +100,6 @@ def upsert_wos_source_publication(
     return row.id
 
 
-def upsert_wos_source_structure(conn: Connection, *, name: str, ror_id: str | None) -> int:
-    """UPSERT d'une `source_structures` WoS (source_id = name)."""
-    row = conn.execute(
-        text("""
-            INSERT INTO source_structures (source, source_id, name, ror_id)
-            VALUES ('wos', :source_id, :name, :ror_id)
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id)
-            RETURNING id
-        """),
-        {"source_id": name, "name": name, "ror_id": ror_id},
-    ).one()
-    return row.id
-
-
 def upsert_addresses_batch(conn: Connection, values: list[dict[str, Any]]) -> None:
     """INSERT INTO addresses ON CONFLICT DO NOTHING pour un batch ``[{raw, norm}, ...]``."""
     if not values:
@@ -142,15 +127,14 @@ def upsert_wos_source_authorships_batch(conn: Connection, values: list[dict[str,
     """Batch UPSERT de `source_authorships` WoS.
 
     Chaque dict du batch a les clés : ``source_publication_id``,
-    ``source_person_id`` (toujours None), ``author_position``,
-    ``is_corresponding``, ``author_name_normalized``,
-    ``source_struct_ids``, ``roles``, ``raw_author_name``,
-    ``person_identifiers``.
+    ``author_position``, ``is_corresponding``, ``author_name_normalized``,
+    ``source_structures`` (TEXT[] des noms d'institutions WoS, qui sont
+    les seuls identifiants stables disponibles côté WoS), ``roles``,
+    ``raw_author_name``, ``person_identifiers``.
 
-    `source_person_id` est NULL : depuis le chantier source_persons, WoS
-    n'écrit plus dans `source_persons` (entité algorithmique non fiable
-    via `daisng_id`). Les identifiants normalisés (`orcid`, `researcher_id`)
-    vivent sur `person_identifiers`.
+    `source_person_id` toujours NULL (entités auteurs WoS algorithmiques
+    via `daisng_id` non fiables). Les identifiants normalisés (`orcid`,
+    `researcher_id`) vivent sur `person_identifiers`.
     """
     if not values:
         return
@@ -158,19 +142,19 @@ def upsert_wos_source_authorships_batch(conn: Connection, values: list[dict[str,
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              is_corresponding, author_name_normalized,
-             source_struct_ids, roles, raw_author_name, person_identifiers)
-        VALUES ('wos', :spid, :source_person_id, :author_position,
+             source_structures, roles, raw_author_name, person_identifiers)
+        VALUES ('wos', :spid, NULL, :author_position,
                 :is_corresponding, :author_name_normalized,
-                :source_struct_ids, :roles, :raw_author_name, :person_identifiers)
+                :source_structures, :roles, :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
             author_name_normalized = COALESCE(
                 EXCLUDED.author_name_normalized,
                 source_authorships.author_name_normalized
             ),
-            source_struct_ids = COALESCE(
-                EXCLUDED.source_struct_ids,
-                source_authorships.source_struct_ids
+            source_structures = COALESCE(
+                EXCLUDED.source_structures,
+                source_authorships.source_structures
             ),
             roles = EXCLUDED.roles,
             raw_author_name = EXCLUDED.raw_author_name,
@@ -231,14 +215,6 @@ def get_wos_publication_id(conn: Connection, ut: str) -> int | None:
     return row.publication_id if row.publication_id else None
 
 
-def fetch_wos_source_structures(conn: Connection) -> list[tuple[str, int]]:
-    """Charge `(source_id, id)` des `source_structures` WoS (préchargement cache)."""
-    rows = conn.execute(
-        text("SELECT source_id, id FROM source_structures WHERE source = 'wos'")
-    ).all()
-    return [(r.source_id, r.id) for r in rows]
-
-
 def delete_wos_duplicate_authorships(conn: Connection) -> int:
     """Supprime les `source_authorships` WoS en doublon de position.
 
@@ -280,11 +256,6 @@ class PgWosNormalizeQueries:
     def upsert_wos_source_publication(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_wos_source_publication(conn, **kwargs)
 
-    def upsert_wos_source_structure(
-        self, conn: Connection, *, name: str, ror_id: str | None
-    ) -> int:
-        return upsert_wos_source_structure(conn, name=name, ror_id=ror_id)
-
     def upsert_addresses_batch(self, conn: Connection, values: list[dict[str, Any]]) -> None:
         upsert_addresses_batch(conn, values)
 
@@ -314,9 +285,6 @@ class PgWosNormalizeQueries:
 
     def get_wos_publication_id(self, conn: Connection, ut: str) -> int | None:
         return get_wos_publication_id(conn, ut)
-
-    def fetch_wos_source_structures(self, conn: Connection) -> list[tuple[str, int]]:
-        return fetch_wos_source_structures(conn)
 
     def delete_wos_duplicate_authorships(self, conn: Connection) -> int:
         return delete_wos_duplicate_authorships(conn)
