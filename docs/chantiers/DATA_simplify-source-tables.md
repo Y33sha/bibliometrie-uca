@@ -172,12 +172,23 @@ Audit (cf. discussion architecturale 2026-05-11) :
 
 #### Normalizers : arrêter UPSERT `source_persons` + `source_structures`
 
-- [ ] `application/pipeline/normalize/normalize_hal.py` :
-  - Écrire le `source_id` HAL côté `sa.source_structures` (TEXT[]) avec
-    les `halId_s` des structures référencées.
-  - Arrêter d'UPSERT dans `source_structures` et `source_persons`.
-  - (Le circuit `sa.countries` HAL via structures a déjà été supprimé,
-    cf. lectures ci-dessus.)
+- [x] `application/pipeline/normalize/normalize_hal.py` :
+  - Écriture de `sa.source_structures` (TEXT[]) avec les `halId_s`
+    natifs (parsés depuis `authIdHasPrimaryStructure_fs` /
+    `authIdHasStructure_fs`).
+  - Plus d'UPSERT vers `source_structures` ni `source_persons`. Plus
+    de cache structures préchargé (les noms sont parsés localement
+    au document pour alimenter les adresses).
+  - `source_person_id` toujours NULL pour HAL (comme OA/WoS/CrossRef
+    depuis le chantier source_persons précédent). Identifiants
+    personne sur `sa.person_identifiers` JSONB via `compact_identifiers`.
+  - Fonctions supprimées côté query service : `upsert_hal_source_person`,
+    `upsert_hal_source_structure`, `fetch_hal_source_structure_ids`,
+    `fetch_hal_source_structures_for_cache`. Signature de
+    `upsert_hal_source_authorship` mise à jour (kwarg `source_structures`
+    au lieu de `source_struct_ids`, plus de `source_person_id`).
+  - Tests adaptés : unit `parse_author_structures` (set[int] →
+    set[str]), suppression test intégration sur fonction supprimée.
 - [ ] `application/pipeline/normalize/normalize_openalex.py` /
   `normalize_wos.py` / `normalize_scanr.py` / `normalize_theses.py` :
   arrêter d'UPSERT dans `source_persons` et `source_structures`.

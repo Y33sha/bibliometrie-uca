@@ -122,7 +122,7 @@ class TestHALParseAuthorStructures:
             ]
         }
         result = parse_author_structures(doc)
-        assert result == {49236: {1234}}
+        assert result == {49236: {"1234"}}
 
     def test_multiple_structures(self):
         doc = {
@@ -132,7 +132,7 @@ class TestHALParseAuthorStructures:
             ]
         }
         result = parse_author_structures(doc)
-        assert result == {100: {1, 2}}
+        assert result == {100: {"1", "2"}}
 
     def test_multiple_authors(self):
         doc = {
@@ -142,7 +142,7 @@ class TestHALParseAuthorStructures:
             ]
         }
         result = parse_author_structures(doc)
-        assert result == {100: {1}, 300: {2}}
+        assert result == {100: {"1"}, 300: {"2"}}
 
     def test_empty(self):
         assert parse_author_structures({}) == {}
@@ -152,7 +152,9 @@ class TestHALParseAuthorStructures:
         doc = {"authIdHasStructure_fs": ["garbage_data"]}
         assert parse_author_structures(doc) == {}
 
-    def test_non_numeric_ids(self):
+    def test_non_numeric_form_id(self):
+        # form_id reste numérique (clé de groupement par auteur HAL),
+        # mais struct_id est accepté tel quel (text natif HAL).
         doc = {"authIdHasStructure_fs": ["abc-def_FacetSep_Nom_JoinSep_xyz_FacetSep_Lab"]}
         assert parse_author_structures(doc) == {}
 
@@ -170,7 +172,7 @@ class TestHALParseAuthorStructures:
                 "100-200_FacetSep_Mouchet_JoinSep_441569_FacetSep_CNRS",
             ],
         }
-        assert parse_author_structures(doc) == {100: {1063691}}
+        assert parse_author_structures(doc) == {100: {"1063691"}}
 
     def test_falls_back_to_all_structures_when_primary_empty(self):
         """Si Primary est vide (ancien doc HAL), fallback sur l'arbre complet
@@ -181,7 +183,7 @@ class TestHALParseAuthorStructures:
                 "100-200_FacetSep_Nom_JoinSep_1_FacetSep_Lab",
             ],
         }
-        assert parse_author_structures(doc) == {100: {1}}
+        assert parse_author_structures(doc) == {100: {"1"}}
 
 
 class TestHALDocTypeMap:

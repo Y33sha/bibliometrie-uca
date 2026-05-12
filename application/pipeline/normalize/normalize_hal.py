@@ -37,7 +37,6 @@ from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
-from domain.persons.creation import should_create_source_person
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
@@ -320,56 +319,6 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
     return out
 
 
-_hal_author_cache: dict[str, int] = {}
-
-
-def upsert_hal_author(
-    conn: Connection,
-    queries: HalNormalizeQueries,
-    full_name: str,
-    hal_person_id: int | None,
-    idhal: str | None,
-    hal_form_id: int | None = None,
-    orcid: str | None = None,
-    idref: str | None = None,
-) -> int | None:
-    """Crée un `source_persons` HAL uniquement quand un `hal_person_id` est
-    fourni (= compte HAL identifié, cas légitime conservé par le chantier
-    source_persons). Sans `hal_person_id`, retourne None : la
-    `source_authorships` sera insérée avec `source_person_id=NULL`,
-    et les éventuels orcid/idref/idhal vivront sur `identifiers`.
-
-    Cache mémoire par `hal_person_id` pour éviter les SELECTs redondants.
-    """
-    if not full_name:
-        return None
-    if not should_create_source_person(source="hal", strong_id_value=hal_person_id):
-        return None
-
-    # source_persons.source_id est text (colonne partagée cross-sources).
-    assert hal_person_id is not None
-    src_id = str(hal_person_id)
-    if src_id in _hal_author_cache:
-        return _hal_author_cache[src_id]
-
-    source_ids: dict[str, Any] = {"hal_person_id": hal_person_id}
-    if idhal:
-        source_ids["idhal"] = idhal
-    if hal_form_id:
-        source_ids["hal_form_id"] = hal_form_id
-
-    result = queries.upsert_hal_source_person(
-        conn,
-        source_id=src_id,
-        full_name=full_name,
-        orcid=orcid,
-        idref=idref,
-        source_ids_json=source_ids,
-    )
-    _hal_author_cache[src_id] = result
-    return result
-
-
 # =============================================================
 # HAL AUTHORSHIPS
 # =============================================================
@@ -377,14 +326,11 @@ def upsert_hal_author(
 
 def parse_author_structures(
     doc: dict,
-    conn: Connection = None,
-    queries: HalNormalizeQueries | None = None,
-    struct_cache: dict | None = None,
-    struct_name_cache: dict | None = None,
-) -> dict[int, set[int]]:
+    struct_name_by_hal_id: dict[str, str] | None = None,
+) -> dict[int, set[str]]:
     """
     Parse les structures d'affiliation pour extraire le mapping
-    form_id → {hal_struct_id bruts (entiers HAL, résolus en source_struct_ids ensuite)}.
+    `form_id → {halId_s natifs (text)}`.
 
     Format : "formId-personId_FacetSep_Nom_JoinSep_structId_FacetSep_StructNom"
 
@@ -394,10 +340,12 @@ def parse_author_structures(
     avec une entrée par tutelle parente alors que la résolution
     structure→tutelle se fait déjà via `structures_parents`.
 
-    Crée les source_structures HAL à la volée si elles n'existent pas encore.
+    Si `struct_name_by_hal_id` est fourni, est rempli avec le mapping
+    `halId_s → nom_structure` parsé depuis le document (utile pour
+    construire les adresses).
     """
     entries = doc.get("authIdHasPrimaryStructure_fs") or doc.get("authIdHasStructure_fs") or []
-    form_structs: dict[int, set[int]] = {}
+    form_structs: dict[int, set[str]] = {}
 
     for entry in entries:
         parts = entry.split("_JoinSep_")
@@ -421,29 +369,14 @@ def parse_author_structures(
         right_parts = parts[1].split("_FacetSep_")
         if not right_parts:
             continue
-        try:
-            struct_id = int(right_parts[0])
-        except ValueError:
+        struct_id_str = right_parts[0].strip()
+        if not struct_id_str:
             continue
         struct_name = right_parts[1].strip() if len(right_parts) > 1 else ""
 
-        form_structs.setdefault(form_id, set()).add(struct_id)
-
-        # Créer la source_structure si pas encore en cache
-        if (
-            conn
-            and queries is not None
-            and struct_cache is not None
-            and str(struct_id) not in struct_cache
-        ):
-            ss_id = queries.upsert_hal_source_structure(
-                conn,
-                source_id=str(struct_id),
-                name=(struct_name[:500] if struct_name else str(struct_id)),
-            )
-            struct_cache[str(struct_id)] = ss_id
-            if struct_name_cache is not None:
-                struct_name_cache[ss_id] = struct_name
+        form_structs.setdefault(form_id, set()).add(struct_id_str)
+        if struct_name_by_hal_id is not None and struct_name:
+            struct_name_by_hal_id.setdefault(struct_id_str, struct_name)
 
     return form_structs
 
@@ -455,15 +388,18 @@ def process_authors(
     source_publication_id: int,
     *,
     address_linker: AddressLinker,
-    struct_cache: dict | None = None,
-    struct_name_cache: dict | None = None,
 ) -> None:
     """
     Traite les auteurs d'un document HAL :
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasPrimaryStructure_fs pour les affiliations (clé = form_id)
-    - Crée/retrouve chaque auteur dans source_persons (source='hal')
-    - Crée les source_authorships (source='hal') avec source_struct_ids (source_structures.id)
+    - Crée les source_authorships (source='hal', source_person_id=NULL) avec
+      `source_structures` (TEXT[] des halId_s natifs) et `person_identifiers`
+      (JSONB des orcid/idref/idhal/hal_person_id quand présents).
+
+    Le pipeline n'écrit plus dans `source_persons` ni `source_structures`
+    (tables en voie de suppression, cf. chantier
+    `DATA_simplify-source-tables`).
     """
     # Pré-nettoyage : un re-traitement peut changer les auteurs/positions,
     # on repart d'une table blanche pour cette publi.
@@ -522,14 +458,12 @@ def process_authors(
                 except ValueError:
                     pass
 
-    # authIdHasPrimaryStructure_fs → {form_id: set of hal_struct_id bruts}
-    form_struct_map = parse_author_structures(
-        doc,
-        conn=conn,
-        queries=queries,
-        struct_cache=struct_cache,
-        struct_name_cache=struct_name_cache,
-    )
+    # authIdHasPrimaryStructure_fs → {form_id: set of halId_s natifs (text)}
+    # + mapping {halId_s: nom} local au document (pour construire les
+    # adresses sans toucher à `source_structures`, table en voie de
+    # suppression).
+    struct_name_by_hal_id: dict[str, str] = {}
+    form_struct_map = parse_author_structures(doc, struct_name_by_hal_id=struct_name_by_hal_id)
 
     for position, name in enumerate(names):
         idhal = idhal_by_pos.get(position)
@@ -548,13 +482,6 @@ def process_authors(
         roles, is_corresponding_from_role = map_role("hal", quality)
         is_corresponding = is_corresponding_from_role
 
-        # Avec hal_person_id : crée le source_persons (cas légitime conservé)
-        # Sans hal_person_id : source_person_id reste NULL, identifiants
-        # (orcid/idref/idhal) sur la source_authorships via identifiers.
-        source_person_id = upsert_hal_author(
-            conn, queries, name, hal_person_id, idhal, form_id, orcid=orcid, idref=idref
-        )
-
         if not name:
             continue
 
@@ -567,37 +494,24 @@ def process_authors(
         )
         identifiers = ids if ids else None
 
-        # Structures affiliées à cet auteur sur ce document (par form_id)
-        # Résoudre les hal_struct_id bruts → source_structures.id
-        source_struct_ids = None
+        # Structures affiliées à cet auteur sur ce document (par form_id).
+        # On stocke directement les halId_s natifs (TEXT[]) sur la sa, plus
+        # de résolution vers `source_structures.id`.
+        source_structures = None
+        addr_parts: list[str] = []
         if form_id and form_id in form_struct_map:
-            raw_hal_ids = sorted(form_struct_map[form_id])
-            if struct_cache is not None:
-                resolved = [
-                    struct_cache[str(hid)] for hid in raw_hal_ids if str(hid) in struct_cache
-                ]
-            else:
-                resolved = queries.fetch_hal_source_structure_ids(
-                    conn, [str(hid) for hid in raw_hal_ids]
-                )
-            if resolved:
-                source_struct_ids = sorted(resolved)
-
-        # Noms des structures pour les adresses
-        addr_parts = []
-        if source_struct_ids and struct_name_cache:
+            source_structures = sorted(form_struct_map[form_id])
             addr_parts = [
-                struct_name_cache[sid]
-                for sid in source_struct_ids
-                if sid in struct_name_cache and struct_name_cache[sid].strip()
+                struct_name_by_hal_id[hid]
+                for hid in source_structures
+                if hid in struct_name_by_hal_id and struct_name_by_hal_id[hid].strip()
             ]
 
         sa_id = queries.upsert_hal_source_authorship(
             conn,
             source_publication_id=source_publication_id,
-            source_person_id=source_person_id,
             author_position=position,
-            source_struct_ids=source_struct_ids,
+            source_structures=source_structures,
             raw_author_name=name,
             is_corresponding=is_corresponding,
             roles=roles or None,
@@ -625,8 +539,6 @@ def process_work(
     zenodo_resolver: ZenodoResolver,
     staging_queries: StagingQueries,
     address_linker: AddressLinker,
-    struct_cache: dict | None = None,
-    struct_name_cache: dict | None = None,
 ) -> bool | None:
     """Traite un work du staging HAL."""
     from application.pipeline.timings import StepTimer
@@ -707,8 +619,6 @@ def process_work(
             doc,
             source_publication_id,
             address_linker=address_linker,
-            struct_cache=struct_cache,
-            struct_name_cache=struct_name_cache,
         )
         t.mark("authors")
 
@@ -755,17 +665,11 @@ class HalNormalizer(SourceNormalizer):
         self._pub_repo: PublicationRepository | None = None
         self._zenodo_resolver = zenodo_resolver
         self._address_linker = address_linker
-        self._struct_cache: dict[str, int] = {}
-        self._struct_name_cache: dict[int, str] = {}
 
     def preload_caches(self, conn: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(conn)
         self._publisher_repo = self._publisher_repo_factory(conn)
         self._pub_repo = self._pub_repo_factory(conn)
-        rows = self._queries.fetch_hal_source_structures_for_cache(conn)
-        self._struct_cache = {src: pid for src, pid, _ in rows}
-        self._struct_name_cache = {pid: name for _, pid, name in rows}
-        self.logger.info(f"Cache source_structures : {len(self._struct_cache)} entrées")
 
     def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
         assert self._journal_repo is not None, "preload_caches doit être appelé avant"
@@ -782,8 +686,6 @@ class HalNormalizer(SourceNormalizer):
             zenodo_resolver=self._zenodo_resolver,
             staging_queries=self._staging,
             address_linker=self._address_linker,
-            struct_cache=self._struct_cache,
-            struct_name_cache=self._struct_name_cache,
         )
 
     def post_process(self, conn: Connection) -> None:
@@ -793,15 +695,10 @@ class HalNormalizer(SourceNormalizer):
             self.logger.info(f"Doublons de position supprimés : {deleted_dups}")
 
     def cleanup(self) -> None:
-        self._struct_cache.clear()
-        self._struct_name_cache.clear()
         self._address_linker.clear_cache()
 
     def on_error(self) -> None:
-        # Les caches peuvent contenir des IDs (adresses, structures)
-        # insérés dans la transaction qui vient d'être rollbackée — les
-        # invalider évite les FK violations sur les works suivants.
-        self._struct_cache.clear()
-        self._struct_name_cache.clear()
+        # Le cache adresse peut contenir des IDs insérés dans la
+        # transaction qui vient d'être rollbackée — l'invalider évite
+        # les FK violations sur les works suivants.
         self._address_linker.clear_cache()
-        _hal_author_cache.clear()
