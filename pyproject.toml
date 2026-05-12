@@ -242,3 +242,23 @@ disallow_any_generics = true
 [[tool.mypy.overrides]]
 module = "interfaces.api.routers.*"
 disallow_any_generics = true
+
+# Ports normalize : frontière JSONB typée via `JsonValue` (cf. chantier
+# chasse-aux-any). `Any` interdit dans ces fichiers. Les implémentations
+# dans `infrastructure.db.queries.normalize_*` ont encore des `**kwargs: Any`
+# sur les méthodes adapter — à traiter dans une tranche suivante avant
+# d'étendre le verrou côté infra.
+#
+# `application.ports.normalize_wos` exclu du verrou : utilise encore
+# `list[dict[str, Any]]` pour les batchs (paramètres SQL hétérogènes,
+# pas du JSONB). Tranche suivante.
+[[tool.mypy.overrides]]
+module = [
+    "application.ports.normalize_hal",
+    "application.ports.normalize_openalex",
+    "application.ports.normalize_crossref",
+    "application.ports.normalize_theses",
+    "application.ports.normalize_scanr",
+]
+disallow_any_explicit = true
+disallow_any_generics = true

@@ -3,9 +3,11 @@
 Implémenté par `infrastructure.db.queries.normalize_openalex.PgOpenalexNormalizeQueries`.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
+
+from domain.json_types import JsonValue
 
 
 class OpenalexNormalizeQueries(Protocol):
@@ -24,7 +26,7 @@ class OpenalexNormalizeQueries(Protocol):
         doc_type: str | None,
         publication_id: int | None,
         staging_id: int,
-        external_ids: Any,
+        external_ids: JsonValue,
         urls: list[str] | None,
         cited_by_count: int | None,
         journal_id: int | None,
@@ -32,10 +34,10 @@ class OpenalexNormalizeQueries(Protocol):
         language: str | None,
         container_title: str | None,
         is_retracted: bool | None,
-        biblio: Any,
+        biblio: JsonValue,
         abstract: str | None,
         keywords: list[str] | None,
-        topics_json: Any,
+        topics_json: JsonValue,
     ) -> int: ...
 
     def find_openalex_source_structure(self, conn: Connection, openalex_id: str) -> int | None: ...
@@ -48,7 +50,7 @@ class OpenalexNormalizeQueries(Protocol):
         name: str,
         ror_id: str | None,
         country: str | None,
-        source_data: Any,
+        source_data: JsonValue,
     ) -> int: ...
 
     def upsert_openalex_source_authorship(
@@ -61,7 +63,7 @@ class OpenalexNormalizeQueries(Protocol):
         source_struct_ids: list[int] | None,
         raw_author_name: str | None,
         is_corresponding: bool,
-        identifiers: Any,
+        identifiers: JsonValue,
     ) -> int: ...
 
     def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool: ...

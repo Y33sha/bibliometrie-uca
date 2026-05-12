@@ -3,9 +3,11 @@
 Implémenté par ``infrastructure.db.queries.normalize_crossref.PgCrossrefNormalizeQueries``.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
+
+from domain.json_types import JsonValue
 
 
 class CrossrefNormalizeQueries(Protocol):
@@ -21,7 +23,7 @@ class CrossrefNormalizeQueries(Protocol):
         doc_type: str | None,
         publication_id: int | None,
         staging_id: int,
-        external_ids: Any,
+        external_ids: JsonValue,
         journal_id: int | None,
         oa_status: str | None,
         language: str | None,
@@ -29,8 +31,8 @@ class CrossrefNormalizeQueries(Protocol):
         abstract: str | None,
         keywords: list[str] | None,
         cited_by_count: int | None,
-        biblio: Any,
-        meta: Any,
+        biblio: JsonValue,
+        meta: JsonValue,
     ) -> int: ...
 
     def upsert_crossref_source_authorship(
@@ -40,8 +42,8 @@ class CrossrefNormalizeQueries(Protocol):
         source_publication_id: int,
         author_position: int,
         raw_author_name: str | None,
-        source_data: Any,
-        identifiers: Any,
+        source_data: JsonValue,
+        identifiers: JsonValue,
     ) -> int: ...
 
     def get_crossref_publication_id(self, conn: Connection, doi: str) -> int | None: ...

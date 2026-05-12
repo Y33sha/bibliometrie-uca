@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from domain.json_types import JsonValue
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )
@@ -32,11 +33,11 @@ def upsert_wos_source_publication(
     container_title: str | None,
     abstract: str | None,
     cited_by_count: int | None,
-    biblio: Any,
+    biblio: JsonValue,
     keywords: list[str] | None,
-    topics: Any,
+    topics: JsonValue,
     urls: list[str] | None,
-    external_ids: Any,
+    external_ids: JsonValue,
 ) -> int:
     """UPSERT d'un document WoS dans `source_publications`."""
     stmt = text("""

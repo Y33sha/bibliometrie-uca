@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from domain.json_types import JsonValue
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )
@@ -25,14 +26,14 @@ def upsert_scanr_source_publication(
     doc_type: str | None,
     publication_id: int | None,
     staging_id: int,
-    external_ids: Any,
+    external_ids: JsonValue,
     journal_id: int | None,
     oa_status: str | None,
     language: str | None,
     container_title: str | None,
     abstract: str | None,
     keywords: list[str] | None,
-    topics: Any,
+    topics: JsonValue,
     cited_by_count: int | None,
     urls: list[str] | None,
 ) -> int:
@@ -125,7 +126,7 @@ def upsert_scanr_source_authorship(
     author_position: int,
     roles: list[str] | None,
     raw_author_name: str | None,
-    identifiers: Any,
+    identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une `source_authorships` ScanR. Retourne l'id.
 

@@ -11,11 +11,10 @@ La déduplication vers les ``persons`` canoniques est faite plus tard
 par le pipeline ``personnes`` (source-agnostique).
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from domain.json_types import JsonValue
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )
@@ -30,7 +29,7 @@ def upsert_crossref_source_publication(
     doc_type: str | None,
     publication_id: int | None,
     staging_id: int,
-    external_ids: Any,
+    external_ids: JsonValue,
     journal_id: int | None,
     oa_status: str | None,
     language: str | None,
@@ -38,8 +37,8 @@ def upsert_crossref_source_publication(
     abstract: str | None,
     keywords: list[str] | None,
     cited_by_count: int | None,
-    biblio: Any,
-    meta: Any,
+    biblio: JsonValue,
+    meta: JsonValue,
 ) -> int:
     """UPSERT d'une publication CrossRef dans ``source_publications``. Retourne l'id."""
     stmt = text("""
@@ -105,8 +104,8 @@ def upsert_crossref_source_authorship(
     source_publication_id: int,
     author_position: int,
     raw_author_name: str | None,
-    source_data: Any,
-    identifiers: Any,
+    source_data: JsonValue,
+    identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une ``source_authorships`` CrossRef. Retourne l'id.
 
@@ -172,7 +171,7 @@ class PgCrossrefNormalizeQueries:
         doc_type: str | None,
         publication_id: int | None,
         staging_id: int,
-        external_ids: Any,
+        external_ids: JsonValue,
         journal_id: int | None,
         oa_status: str | None,
         language: str | None,
@@ -180,8 +179,8 @@ class PgCrossrefNormalizeQueries:
         abstract: str | None,
         keywords: list[str] | None,
         cited_by_count: int | None,
-        biblio: Any,
-        meta: Any,
+        biblio: JsonValue,
+        meta: JsonValue,
     ) -> int:
         return upsert_crossref_source_publication(
             conn,
@@ -210,8 +209,8 @@ class PgCrossrefNormalizeQueries:
         source_publication_id: int,
         author_position: int,
         raw_author_name: str | None,
-        source_data: Any,
-        identifiers: Any,
+        source_data: JsonValue,
+        identifiers: JsonValue,
     ) -> int:
         return upsert_crossref_source_authorship(
             conn,
