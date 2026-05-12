@@ -105,16 +105,20 @@ def propagate_countries_to_similar(*, repo: AddressRepository) -> list[int]:
 
 
 def propagate_countries_to_publications(address_ids: list[int], *, repo: AddressRepository) -> None:
-    """Propage addresses.countries → source_publications.countries → publications.countries.
+    """Propage addresses.countries → sa.countries → sp.countries → publications.countries.
 
     Appelée après une modification de pays sur les adresses (typiquement en
-    background task). Recalcule par agrégation, idempotent.
+    background task). Recalcule en cascade, idempotent.
     """
     if not address_ids:
         return
 
+    sa_count = repo.refresh_sa_countries_for_addresses(address_ids)
     addr_docs = repo.refresh_source_publications_countries(address_ids)
     pubs = repo.refresh_publications_countries_for_addresses(address_ids)
 
-    if addr_docs or pubs:
-        logger.info(f"Propagation pays : {addr_docs} docs source, {pubs} publications")
+    if sa_count or addr_docs or pubs:
+        logger.info(
+            f"Propagation pays : {sa_count} authorships, {addr_docs} docs source, "
+            f"{pubs} publications"
+        )

@@ -94,7 +94,7 @@ Audit (cf. discussion architecturale 2026-05-11) :
     faisant `array_agg(DISTINCT ss.country ORDER BY ss.country)` via
     la même jointure.
   - idempotent (skip si déjà rempli).
-- [ ] `interfaces/cli/maintenance/migrate_source_persons_to_authorships.py`
+- [x] `interfaces/cli/maintenance/migrate_source_persons_to_authorships.py`
   *(à écrire seulement si l'audit confirme que des
   `source_authorships` manquent l'info présente dans
   `source_persons`)* :
@@ -110,10 +110,6 @@ Audit (cf. discussion architecturale 2026-05-11) :
   - **Audit préalable obligatoire** : compter les
     `source_authorships` qui ont une `source_persons` rattachée mais
     auxquelles il manque l'info dans `person_identifiers` JSONB.
-    Si l'audit retourne 0 (le pipeline a déjà tout poussé via
-    `compact_identifiers` dans `normalize_hal.py` etc.), le script
-    n'est pas nécessaire — l'item devient « DROP TABLE source_persons »
-    direct.
 
 ### Phase 3 — Refactor code
 
@@ -180,5 +176,3 @@ Audit (cf. discussion architecturale 2026-05-11) :
 - `2026-04-28_source-persons.md` : a déjà allégé `source_persons`
   côté écritures (CrossRef/OA/WoS n'écrivent plus). Ce chantier-ci
   pousse la logique à son terme — suppression complète.
-- `2026-05-11_alembic-adoption.md` : ce chantier utilise Alembic
-  pour les migrations (ADD/DROP COLUMN, DROP TABLE).

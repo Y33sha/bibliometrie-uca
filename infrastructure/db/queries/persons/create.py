@@ -17,16 +17,21 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
     Une seule requête (un seul round-trip DB) — les différences sémantiques
     entre sources sont portées par des CASE expressions :
 
-    - `orcid` : NULL pour OpenAlex/WoS/CrossRef (l'ORCID vit sur
-      `identifiers` côté authorship pour ces sources, cf. chantier
-      source_persons).
-    - `idhal`, `source_person_id`, `has_hal_person_id`, `hal_person_id` :
-      renseignés uniquement pour HAL (dual-write sur `hal_authorships.person_id`).
-    - `idref` : renseigné pour ScanR et theses.
+    - `orcid` : NULL pour OpenAlex/WoS/CrossRef (filtré à part via
+      `oa_orcid` ci-dessous, ces sources n'étant pas fiables pour
+      l'ORCID au niveau matching).
+    - `idhal`, `has_hal_person_id`, `hal_person_id` : renseignés
+      uniquement pour HAL.
+    - `idref` : renseigné toutes sources (le pipeline `persons`
+      l'utilise comme critère de match cross-source).
     - `oa_orcid` / `oa_full_name` : exposés pour OpenAlex/WoS/CrossRef
       pour permettre au caller la vérification de compatibilité des noms.
     - `roles` : renseigné pour theses uniquement (distingue auteur vs
       directeur de thèse).
+
+    Tous les identifiants viennent désormais de
+    `source_authorships.person_identifiers` (JSONB) — `source_persons`
+    n'est plus joint (cf. chantier `DATA_simplify-source-tables`).
 
     Le nom (last/first) est parsé côté caller via
     `domain.names.parse_raw_author_name(full_name)` — uniformément pour
@@ -42,21 +47,17 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
                    sa_auth.raw_author_name AS full_name,
                    sa_auth.author_name_normalized,
                    CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref') THEN NULL::text
-                        ELSE COALESCE(sa.orcid, sa_auth.person_identifiers->>'orcid') END AS orcid,
+                        ELSE sa_auth.person_identifiers->>'orcid' END AS orcid,
                    CASE WHEN sa_auth.source = 'hal'
-                        THEN COALESCE(
-                                sa.source_ids->>'idhal',
-                                sa_auth.person_identifiers->>'idhal'
-                             )
+                        THEN sa_auth.person_identifiers->>'idhal'
                         ELSE NULL::text END AS idhal,
-                   COALESCE(sa.idref, sa_auth.person_identifiers->>'idref') AS idref,
-                   CASE WHEN sa_auth.source = 'hal' THEN sa.id
-                        ELSE NULL::int END AS source_person_id,
+                   sa_auth.person_identifiers->>'idref' AS idref,
+                   sa_auth.source_person_id,
                    CASE WHEN sa_auth.source = 'hal'
-                        THEN ((sa.source_ids->>'hal_person_id') IS NOT NULL)
+                        THEN (sa_auth.person_identifiers->>'hal_person_id') IS NOT NULL
                         ELSE FALSE END AS has_hal_person_id,
                    CASE WHEN sa_auth.source = 'hal'
-                        THEN (sa.source_ids->>'hal_person_id')::int
+                        THEN (sa_auth.person_identifiers->>'hal_person_id')::int
                         ELSE NULL::int END AS hal_person_id,
                    CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref')
                         THEN sa_auth.person_identifiers->>'orcid'
@@ -69,7 +70,6 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
                    sd.publication_id,
                    sa_auth.author_position
             FROM source_authorships sa_auth
-            LEFT JOIN source_persons sa ON sa.id = sa_auth.source_person_id
             JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
             JOIN v_active_publications vap ON vap.id = sd.publication_id
             WHERE sa_auth.person_id IS NULL
