@@ -105,16 +105,14 @@ def upsert_scanr_source_authorship(
 ) -> int:
     """UPSERT d'une `source_authorships` ScanR. Retourne l'id.
 
-    `source_person_id` toujours NULL (table `source_persons` en voie de
-    suppression, cf. chantier `DATA_simplify-source-tables`). Les
-    identifiants (`orcid`, `idref`) vivent sur `person_identifiers`
+    Les identifiants (`orcid`, `idref`) vivent sur `person_identifiers`
     (JSONB).
     """
     stmt = text("""
         INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position, roles,
+            (source, source_publication_id, author_position, roles,
              author_name_normalized, raw_author_name, person_identifiers)
-        VALUES ('scanr', :spid, NULL, :pos, :roles,
+        VALUES ('scanr', :spid, :pos, :roles,
                 normalize_name_form(:raw_author_name), :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,

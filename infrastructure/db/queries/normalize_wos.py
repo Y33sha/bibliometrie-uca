@@ -132,18 +132,18 @@ def upsert_wos_source_authorships_batch(conn: Connection, values: list[dict[str,
     les seuls identifiants stables disponibles côté WoS), ``roles``,
     ``raw_author_name``, ``person_identifiers``.
 
-    `source_person_id` toujours NULL (entités auteurs WoS algorithmiques
-    via `daisng_id` non fiables). Les identifiants normalisés (`orcid`,
-    `researcher_id`) vivent sur `person_identifiers`.
+    Les identifiants normalisés (`orcid`, `researcher_id`) vivent sur
+    `person_identifiers` (entités auteurs WoS algorithmiques via
+    `daisng_id` non fiables).
     """
     if not values:
         return
     stmt = text("""
         INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position,
+            (source, source_publication_id, author_position,
              is_corresponding, author_name_normalized,
              source_structures, roles, raw_author_name, person_identifiers)
-        VALUES ('wos', :spid, NULL, :author_position,
+        VALUES ('wos', :spid, :author_position,
                 :is_corresponding, :author_name_normalized,
                 :source_structures, :roles, :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, author_position) DO UPDATE SET

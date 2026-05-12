@@ -124,20 +124,17 @@ def upsert_hal_source_authorship(
 ) -> int:
     """UPSERT d'une `source_authorships` HAL.
 
-    `source_person_id` est toujours NULL pour HAL depuis le chantier
-    `DATA_simplify-source-tables` (table `source_persons` en voie de
-    suppression). Les identifiants personne (`orcid`/`idref`/`idhal`/
-    `hal_person_id`) vivent sur `person_identifiers` (JSONB).
+    Les identifiants personne (`orcid`/`idref`/`idhal`/`hal_person_id`)
+    vivent sur `person_identifiers` (JSONB).
 
     `source_structures` (TEXT[]) stocke les `halId_s` natifs des
-    structures référencées par cette authorship — remplace l'ancien
-    `source_struct_ids` (INTEGER[] de PK `source_structures`).
+    structures référencées par cette authorship.
     """
     stmt = text("""
         INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position, source_structures,
+            (source, source_publication_id, author_position, source_structures,
              author_name_normalized, is_corresponding, roles, raw_author_name, person_identifiers)
-        VALUES ('hal', :spid, NULL, :pos, :source_structures,
+        VALUES ('hal', :spid, :pos, :source_structures,
                 normalize_name_form(:raw_author_name), :is_corresponding, :roles,
                 :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
