@@ -89,39 +89,24 @@ def link_authorship(
     source: str,
     authorship_id: int,
     *,
-    source_person_id: int | None = None,
-    has_hal_person_id: bool = False,
     repo: PersonRepository,
 ) -> None:
-    """Rattache une authorship source à une personne (pipeline).
-
-    Pour HAL avec un compte HAL, fait aussi le dual-write sur source_persons
-    (propagation attendue par l'étape 0 du pipeline).
-    """
+    """Rattache une authorship source à une personne (pipeline)."""
     if source not in ALL_SOURCES_SET:
         return
-    repo.link_authorship(
-        person_id,
-        source,
-        authorship_id,
-        source_person_id=source_person_id,
-        has_hal_person_id=has_hal_person_id,
-    )
+    repo.link_authorship(person_id, source, authorship_id)
 
 
 def link_authorships(person_id: int, authorships: list[dict], *, repo: PersonRepository) -> None:
     """Rattache un groupe d'authorships à une personne (pipeline).
 
-    Chaque dict doit avoir 'source' et 'authorship_id',
-    et optionnellement 'source_person_id' et 'has_hal_person_id'.
+    Chaque dict doit avoir 'source' et 'authorship_id'.
     """
     for a in authorships:
         link_authorship(
             person_id,
             a["source"],
             a["authorship_id"],
-            source_person_id=a.get("source_person_id"),
-            has_hal_person_id=a.get("has_hal_person_id", False),
             repo=repo,
         )
 

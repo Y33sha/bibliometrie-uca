@@ -60,9 +60,6 @@ class PersonRepository(Protocol):
         person_id: int,
         source: str,
         authorship_id: int,
-        *,
-        source_person_id: int | None = None,
-        has_hal_person_id: bool = False,
     ) -> None: ...
 
     def unlink_authorship(

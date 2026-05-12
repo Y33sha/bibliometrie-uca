@@ -154,8 +154,12 @@ Audit (cf. discussion architecturale 2026-05-11) :
 
 #### Dual-writes vers `source_persons` à supprimer
 
-- [ ] `infrastructure/repositories/person_repository/_authorships.py:link_authorship` :
-  supprimer le dual-write `source_persons`.
+- [x] `infrastructure/repositories/person_repository/_authorships.py:link_authorship` :
+  dual-write `source_persons` supprimé. Paramètres `source_person_id`
+  et `has_hal_person_id` retirés de la signature (cascade :
+  `_authorships.py` → adapter `PgPersonRepository.link_authorship` →
+  port `domain/ports/person_repository.py:link_authorship` →
+  service `application/persons.py:link_authorship` + `link_authorships`).
 - [ ] `infrastructure/repositories/person_repository/_identifiers.py:add_identifier` :
   supprimer le dual-write `source_persons`.
 - [ ] `infrastructure/repositories/person_repository/_core.py:merge_into` :

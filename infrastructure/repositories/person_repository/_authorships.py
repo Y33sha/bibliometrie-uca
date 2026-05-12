@@ -10,28 +10,18 @@ def link_authorship(
     person_id: int,
     source: str,
     authorship_id: int,
-    *,
-    source_person_id: int | None = None,
-    has_hal_person_id: bool = False,
 ) -> None:
     """Rattache une authorship source à une personne.
 
-    Pour HAL avec un compte HAL, propage aussi le person_id vers
-    source_persons (dual-write attendu par l'étape 0 du pipeline).
+    `source_persons` n'est plus écrit côté HAL (la phase
+    `step0_hal_accounts` du pipeline persons a été supprimée — cf.
+    chantier `DATA_simplify-source-tables`). Le matching par
+    idhal/hal_person_id sera réintroduit dans `METIER_decide-person-match`.
     """
     conn.execute(
         text("UPDATE source_authorships SET person_id = :pid WHERE id = :aid AND source = :src"),
         {"pid": person_id, "aid": authorship_id, "src": source},
     )
-    if source == "hal" and source_person_id and has_hal_person_id:
-        conn.execute(
-            text("""
-                UPDATE source_persons SET person_id = :pid
-                WHERE id = :sp
-                  AND (source_ids->>'hal_person_id') IS NOT NULL
-            """),
-            {"pid": person_id, "sp": source_person_id},
-        )
 
 
 def unlink_authorship(conn: Connection, person_id: int, source: str, authorship_id: int) -> None:
