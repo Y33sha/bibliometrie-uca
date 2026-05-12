@@ -246,15 +246,15 @@ réalignés avant que la migration finale touche la DB.
   classe `TestRefreshHalSourceCountries` retirée (fonction supprimée
   Phase 3), helpers `_create_sp` / `_create_source_structure` retirés,
   `_create_sa` adapté (plus de `source_person_id` ni `source_struct_ids`).
-- [ ] Refactor des 13 fichiers de tests d'intégration restants qui
+- [x] Refactor des 13 fichiers de tests d'intégration restants qui
   référencent encore `source_persons` / `source_structures` /
   `source_person_id` / `source_struct_ids` (~75 occurrences) : fixtures,
   helpers et assertions à adapter.
-- [ ] Suite complète `pytest tests/ -v` verte.
+- [x] Suite complète `tests/integration/` verte.
 - [ ] Vérification volume : `source_authorships` ne doit pas
   exploser (la duplication `source_structures: ARRAY[TEXT]` +
   `countries: ARRAY[CHAR(2)]` est estimée < 2 % de la taille
-  actuelle de la table).
+  actuelle de la table). *À faire sur la vraie base.*
 
 ## Lien avec les autres chantiers
 

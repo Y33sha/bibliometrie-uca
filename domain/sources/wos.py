@@ -15,13 +15,12 @@ def is_wos_author_exploitable(author: dict[str, Any]) -> bool:
     """Indique si une entrée auteur WoS est utilisable côté pipeline.
 
     `daisng_id` (Distinct Author Identification System) est l'identifiant
-    interne WoS de l'auteur. Il n'est plus utilisé comme clé d'unicité
-    côté DB depuis le chantier `source_persons` (cf.
-    `docs/chantiers/2026-04-28_source-persons.md`) mais reste un signal
-    de **qualité** : son absence indique un parsing API WoS douteux
-    (typiquement les enregistrements anciens ou mal indexés). Combiné à
-    l'exigence d'un `full_name`, le filtre garde une bonne approximation
-    « auteur réel exploitable » et écarte les fragments d'erreur.
+    interne WoS de l'auteur. Pas utilisé côté DB (entité algorithmique
+    WoS, non fiable) mais c'est un signal de **qualité** : son absence
+    indique un parsing API WoS douteux (typiquement les enregistrements
+    anciens ou mal indexés). Combiné à l'exigence d'un `full_name`, le
+    filtre garde une bonne approximation « auteur réel exploitable » et
+    écarte les fragments d'erreur.
     """
     return bool(author.get("daisng_id") and author.get("full_name"))
 

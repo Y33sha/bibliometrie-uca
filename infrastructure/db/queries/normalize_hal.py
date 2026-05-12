@@ -5,11 +5,9 @@ les UPSERT sur `source_publications` et `source_authorships`, ainsi
 que les lectures d'idempotence et les cleanups de post-traitement
 (doublons de position).
 
-Plus d'UPSERT vers `source_persons` ni `source_structures` (tables en
-voie de suppression, cf. chantier `DATA_simplify-source-tables`) : les
-identifiants personne vivent désormais sur `sa.person_identifiers`
-(JSONB) et les IDs de structures HAL directement sur `sa.source_structures`
-(TEXT[] des `halId_s` natifs).
+Les identifiants personne (orcid/idhal/idref/hal_person_id) vivent sur
+`sa.person_identifiers` (JSONB) et les IDs natifs des structures HAL
+(`halId_s`) sur `sa.source_structures` (TEXT[]).
 """
 
 from typing import Any

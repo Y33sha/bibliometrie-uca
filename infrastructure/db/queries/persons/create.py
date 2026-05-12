@@ -30,9 +30,8 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
     - `roles` : renseigné pour theses uniquement (distingue auteur vs
       directeur de thèse).
 
-    Tous les identifiants viennent désormais de
-    `source_authorships.person_identifiers` (JSONB) — `source_persons`
-    n'est plus joint (cf. chantier `DATA_simplify-source-tables`).
+    Tous les identifiants sont lus depuis
+    `source_authorships.person_identifiers` (JSONB).
 
     Le nom (last/first) est parsé côté caller via
     `domain.names.parse_raw_author_name(full_name)` — uniformément pour
@@ -53,7 +52,6 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
                         THEN sa_auth.person_identifiers->>'idhal'
                         ELSE NULL::text END AS idhal,
                    sa_auth.person_identifiers->>'idref' AS idref,
-                   sa_auth.source_person_id,
                    CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref')
                         THEN sa_auth.person_identifiers->>'orcid'
                         ELSE NULL::text END AS oa_orcid,
@@ -82,8 +80,7 @@ def fetch_linked_authorships(conn: Connection) -> list[dict[str, Any]]:
 
     Ramène `raw_author_name` ; le caller parse via
     `domain.names.parse_raw_author_name` pour toutes les sources
-    uniformément. Ne touche pas à `source_persons` — pas de JOIN
-    nécessaire.
+    uniformément.
     """
     rows = conn.execute(
         text("""

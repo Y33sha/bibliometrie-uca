@@ -1,14 +1,12 @@
 """Query service : SQL du normaliseur CrossRef.
 
 Appelé par ``application/pipeline/normalize/normalize_crossref.py``.
-Regroupe les UPSERT sur ``source_publications``, ``source_persons``,
-``source_authorships`` et la lecture d'idempotence.
+Regroupe les UPSERT sur ``source_publications`` et ``source_authorships``
+ainsi que la lecture d'idempotence.
 
-Particularité CrossRef : pas d'identifiant stable côté auteur. On
-synthétise un ``source_id = "<DOI>:<position>"`` à chaque insertion,
-chaque authorship générant un ``source_persons`` qui lui est propre.
-La déduplication vers les ``persons`` canoniques est faite plus tard
-par le pipeline ``personnes`` (source-agnostique).
+Particularité CrossRef : pas d'identifiant stable côté auteur. La
+déduplication vers les ``persons`` canoniques est faite plus tard par
+le pipeline ``personnes`` (source-agnostique).
 """
 
 from sqlalchemy import Connection, bindparam, text

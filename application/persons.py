@@ -6,8 +6,8 @@ Gère aussi le rattachement/détachement des authorships sources
 (source_authorships) puisque le person_id y est la source de vérité
 du lien personne.
 
-Les auteurs sources sont dans la table unifiée `source_persons`
-(UNIQUE(source, source_id)), les authorships utilisent `source_person_id`.
+Les identifiants par observation (orcid/idhal/idref/hal_person_id) sont
+portés par `source_authorships.person_identifiers` (JSONB) côté sources.
 """
 
 from application.audit import emit_event

@@ -1,8 +1,8 @@
 """Query service : SQL du normaliseur ScanR.
 
 Appelé par `application/pipeline/normalize/normalize_scanr.py`. Regroupe
-les UPSERT sur `source_publications`, `source_persons`, `source_authorships`
-et la lecture idempotence.
+les UPSERT sur `source_publications` et `source_authorships`, ainsi que
+la lecture d'idempotence.
 """
 
 from typing import Any

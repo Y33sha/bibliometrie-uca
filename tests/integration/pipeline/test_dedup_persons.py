@@ -33,28 +33,6 @@ def _insert_publication(conn, title="Test Pub", pub_year=2024):
     ).scalar_one()
 
 
-def _insert_hal_author(conn, full_name, hal_person_id=None, orcid=None, idhal=None):
-    """Crée un source_author HAL minimal."""
-    source_ids = {}
-    if hal_person_id is not None:
-        source_ids["hal_person_id"] = hal_person_id
-    if idhal is not None:
-        source_ids["idhal"] = idhal
-    stmt = text("""
-        INSERT INTO source_persons (source, source_id, full_name, orcid, source_ids)
-        VALUES ('hal', :source_id, :full_name, :orcid, :source_ids) RETURNING id
-    """).bindparams(bindparam("source_ids", type_=JSONB))
-    return conn.execute(
-        stmt,
-        {
-            "source_id": f"hal-{full_name}",
-            "full_name": full_name,
-            "orcid": orcid,
-            "source_ids": source_ids if source_ids else None,
-        },
-    ).scalar_one()
-
-
 def _insert_hal_document(conn, halid, publication_id):
     """Crée un source_document minimal (source='hal')."""
     return conn.execute(
@@ -69,50 +47,49 @@ def _insert_hal_document(conn, halid, publication_id):
 def _insert_hal_authorship(
     conn,
     source_publication_id,
-    source_person_id,
+    raw_author_name,
+    *,
     position=0,
     in_perimeter=True,
     person_id=None,
-    raw_author_name=None,
+    hal_person_id=None,
+    orcid=None,
+    idhal=None,
+    idref=None,
 ):
     """Crée une source_authorship HAL.
 
-    `raw_author_name` est lu depuis `source_persons.full_name` par défaut
-    (parse côté caller via `parse_raw_author_name`) — c'est ce qui se
-    passe en prod aussi.
+    Les identifiants (hal_person_id, orcid, idhal, idref) sont portés par
+    `source_authorships.person_identifiers` (JSONB).
     """
-    if raw_author_name is None:
-        raw_author_name = conn.execute(
-            text("SELECT full_name FROM source_persons WHERE id = :sp_id"),
-            {"sp_id": source_person_id},
-        ).scalar_one_or_none()
+    person_identifiers: dict[str, object] = {}
+    if hal_person_id is not None:
+        person_identifiers["hal_person_id"] = hal_person_id
+    if orcid is not None:
+        person_identifiers["orcid"] = orcid
+    if idhal is not None:
+        person_identifiers["idhal"] = idhal
+    if idref is not None:
+        person_identifiers["idref"] = idref
+
+    stmt = text("""
+        INSERT INTO source_authorships
+            (source, source_publication_id, author_position,
+             in_perimeter, person_id, raw_author_name, person_identifiers,
+             author_name_normalized)
+        VALUES ('hal', :sd, :pos, :in_perim, :person_id,
+                :raw, :person_identifiers, normalize_name_form(:raw)) RETURNING id
+    """).bindparams(bindparam("person_identifiers", type_=JSONB))
     return conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (source, source_publication_id, source_person_id, author_position,
-                 in_perimeter, person_id, raw_author_name, author_name_normalized)
-            VALUES ('hal', :sd, :sp, :pos, :in_perim, :person_id,
-                    :raw, normalize_name_form(:raw)) RETURNING id
-        """),
+        stmt,
         {
             "sd": source_publication_id,
-            "sp": source_person_id,
             "pos": position,
             "in_perim": in_perimeter,
             "person_id": person_id,
             "raw": raw_author_name,
+            "person_identifiers": person_identifiers or None,
         },
-    ).scalar_one()
-
-
-def _insert_oa_author(conn, full_name, openalex_id, orcid=None):
-    """Crée un source_author OpenAlex minimal."""
-    return conn.execute(
-        text("""
-            INSERT INTO source_persons (source, source_id, full_name, orcid)
-            VALUES ('openalex', :source_id, :full_name, :orcid) RETURNING id
-        """),
-        {"source_id": openalex_id, "full_name": full_name, "orcid": orcid},
     ).scalar_one()
 
 
@@ -130,32 +107,30 @@ def _insert_oa_document(conn, openalex_id, publication_id):
 def _insert_oa_authorship(
     conn,
     oa_document_id,
-    oa_author_id,
+    raw_author_name,
+    *,
     position=0,
     in_perimeter=True,
     person_id=None,
-    raw_author_name=None,
     identifiers=None,
 ):
     """Crée une source_authorship OpenAlex.
 
-    Pour OpenAlex/WoS/CrossRef, les identifiants (orcid, idref, ...) vivent
-    sur `source_authorships.person_identifiers` (JSONB), pas sur
-    `source_persons` — le pipeline de dédup-personnes lit
-    `sa.person_identifiers->>'orcid'`.
+    Les identifiants (orcid, idref, ...) vivent sur
+    `source_authorships.person_identifiers` (JSONB).
     """
     stmt = text("""
         INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position,
-             in_perimeter, person_id, raw_author_name, person_identifiers, author_name_normalized)
-        VALUES ('openalex', :sd, :sp, :pos, :in_perim, :person_id,
+            (source, source_publication_id, author_position,
+             in_perimeter, person_id, raw_author_name, person_identifiers,
+             author_name_normalized)
+        VALUES ('openalex', :sd, :pos, :in_perim, :person_id,
                 :raw, :person_identifiers, normalize_name_form(:raw)) RETURNING id
     """).bindparams(bindparam("person_identifiers", type_=JSONB))
     return conn.execute(
         stmt,
         {
             "sd": oa_document_id,
-            "sp": oa_author_id,
             "pos": position,
             "in_perim": in_perimeter,
             "person_id": person_id,
@@ -204,16 +179,14 @@ class TestStep1CrossSource:
 
         # Personne existante rattachée via HAL
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        ha = _insert_hal_author(sa_sync_conn, "Jean Dupont", hal_person_id=111)
         hd = _insert_hal_document(sa_sync_conn, "hal-100", pub)
-        _insert_hal_authorship(sa_sync_conn, hd, ha, position=3, person_id=person_id)
+        _insert_hal_authorship(
+            sa_sync_conn, hd, "Jean Dupont", position=3, person_id=person_id, hal_person_id=111
+        )
 
         # Authorship OA non rattachée, même publi, même position
-        oa_author = _insert_oa_author(sa_sync_conn, "J Dupont", "A111")
         oa_doc = _insert_oa_document(sa_sync_conn, "W111", pub)
-        oa_as = _insert_oa_authorship(
-            sa_sync_conn, oa_doc, oa_author, position=3, raw_author_name="J Dupont"
-        )
+        oa_as = _insert_oa_authorship(sa_sync_conn, oa_doc, "J Dupont", position=3)
 
         all_as = get_all_unlinked_authorships(sa_sync_conn, _queries)
         linked_ids = set()
@@ -240,21 +213,17 @@ class TestStep1CrossSource:
         pub = _insert_publication(sa_sync_conn)
 
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        ha = _insert_hal_author(sa_sync_conn, "Jean Dupont", hal_person_id=111)
         hd = _insert_hal_document(sa_sync_conn, "hal-id-test", pub)
-        _insert_hal_authorship(sa_sync_conn, hd, ha, position=0, person_id=person_id)
+        _insert_hal_authorship(
+            sa_sync_conn, hd, "Jean Dupont", position=0, person_id=person_id, hal_person_id=111
+        )
 
-        # OA authorship avec ORCID porté par person_identifiers (cf. chantier
-        # source_persons : pour OA/WoS/CrossRef, l'ORCID vit sur
-        # source_authorships.person_identifiers, pas sur source_persons).
-        oa_author = _insert_oa_author(sa_sync_conn, "J Dupont", "A-id1")
         oa_doc = _insert_oa_document(sa_sync_conn, "W-id1", pub)
         _insert_oa_authorship(
             sa_sync_conn,
             oa_doc,
-            oa_author,
+            "J Dupont",
             position=0,
-            raw_author_name="J Dupont",
             identifiers={"orcid": "0000-0001-9999-8888"},
         )
 
@@ -284,15 +253,13 @@ class TestStep1CrossSource:
         pub = _insert_publication(sa_sync_conn)
 
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        ha = _insert_hal_author(sa_sync_conn, "Jean Dupont", hal_person_id=222)
         hd = _insert_hal_document(sa_sync_conn, "hal-200", pub)
-        _insert_hal_authorship(sa_sync_conn, hd, ha, position=0, person_id=person_id)
-
-        oa_author = _insert_oa_author(sa_sync_conn, "J Dupont", "A222")
-        oa_doc = _insert_oa_document(sa_sync_conn, "W222", pub)
-        oa_as = _insert_oa_authorship(
-            sa_sync_conn, oa_doc, oa_author, position=5, raw_author_name="J Dupont"
+        _insert_hal_authorship(
+            sa_sync_conn, hd, "Jean Dupont", position=0, person_id=person_id, hal_person_id=222
         )
+
+        oa_doc = _insert_oa_document(sa_sync_conn, "W222", pub)
+        oa_as = _insert_oa_authorship(sa_sync_conn, oa_doc, "J Dupont", position=5)
 
         all_as = get_all_unlinked_authorships(sa_sync_conn, _queries)
         linked_ids = set()
@@ -331,14 +298,12 @@ class TestStep2Orcid:
             repo=person_repository(sa_sync_conn),
         )
 
-        oa_author = _insert_oa_author(sa_sync_conn, "J Dupont", "A333")
         oa_doc = _insert_oa_document(sa_sync_conn, "W333", pub)
         oa_as = _insert_oa_authorship(
             sa_sync_conn,
             oa_doc,
-            oa_author,
+            "J Dupont",
             position=0,
-            raw_author_name="J Dupont",
             identifiers={"orcid": "0000-0001-2345-6789"},
         )
 
@@ -374,18 +339,16 @@ class TestStep2Orcid:
             repo=person_repository(sa_sync_conn),
         )
 
-        # HAL author avec même ORCID + un IdRef
-        ha = _insert_hal_author(
-            sa_sync_conn, "Jean Dupont", hal_person_id=None, orcid="0000-0001-2345-6789"
-        )
-        # Ajouter idref manuellement (helper ne le gère pas)
-        sa_sync_conn.execute(
-            text("UPDATE source_persons SET idref = :idref WHERE id = :sp_id"),
-            {"idref": "123456789", "sp_id": ha},
-        )
-
+        # HAL authorship avec ORCID + IdRef portés par person_identifiers
         hd = _insert_hal_document(sa_sync_conn, "hal-orcid-idref", pub)
-        _insert_hal_authorship(sa_sync_conn, hd, ha, position=0)
+        _insert_hal_authorship(
+            sa_sync_conn,
+            hd,
+            "Jean Dupont",
+            position=0,
+            orcid="0000-0001-2345-6789",
+            idref="123456789",
+        )
 
         all_as = get_all_unlinked_authorships(sa_sync_conn, _queries)
         linked_ids = set()
@@ -420,15 +383,8 @@ class TestStep2Orcid:
             repo=person_repository(sa_sync_conn),
         )
 
-        oa_author = _insert_oa_author(sa_sync_conn, "J Dupont", "A444")
         oa_doc = _insert_oa_document(sa_sync_conn, "W444", pub)
-        oa_as = _insert_oa_authorship(
-            sa_sync_conn,
-            oa_doc,
-            oa_author,
-            position=0,
-            raw_author_name="J Dupont",
-        )
+        oa_as = _insert_oa_authorship(sa_sync_conn, oa_doc, "J Dupont", position=0)
 
         all_as = get_all_unlinked_authorships(sa_sync_conn, _queries)
         linked_ids = set()
@@ -452,14 +408,13 @@ class TestStep2Orcid:
         )
 
         pub = _insert_publication(sa_sync_conn)
-        oa_author = _insert_oa_author(sa_sync_conn, "Nobody", "A555", orcid="0000-9999-9999-9999")
         oa_doc = _insert_oa_document(sa_sync_conn, "W555", pub)
         oa_as = _insert_oa_authorship(
             sa_sync_conn,
             oa_doc,
-            oa_author,
+            "Nobody",
             position=0,
-            raw_author_name="Nobody",
+            identifiers={"orcid": "0000-9999-9999-9999"},
         )
 
         all_as = get_all_unlinked_authorships(sa_sync_conn, _queries)
@@ -492,11 +447,8 @@ class TestStep3NameForms:
         person_id = create_person("Martin", "Pierre", repo=person_repository(sa_sync_conn))
         # create_person crée déjà les name_forms via refresh_person_name_forms
 
-        oa_author = _insert_oa_author(sa_sync_conn, "Pierre Martin", "A666")
         oa_doc = _insert_oa_document(sa_sync_conn, "W666", pub)
-        oa_as = _insert_oa_authorship(
-            sa_sync_conn, oa_doc, oa_author, position=0, raw_author_name="Pierre Martin"
-        )
+        oa_as = _insert_oa_authorship(sa_sync_conn, oa_doc, "Pierre Martin", position=0)
 
         all_as = get_all_unlinked_authorships(sa_sync_conn, _queries)
         linked_ids = set()
@@ -526,11 +478,8 @@ class TestStep3NameForms:
         add_name_form(pid1, "J Dupont", repo=person_repository(sa_sync_conn))
         add_name_form(pid2, "J Dupont", repo=person_repository(sa_sync_conn))
 
-        oa_author = _insert_oa_author(sa_sync_conn, "J Dupont", "A777")
         oa_doc = _insert_oa_document(sa_sync_conn, "W777", pub)
-        oa_as = _insert_oa_authorship(
-            sa_sync_conn, oa_doc, oa_author, position=0, raw_author_name="J Dupont"
-        )
+        oa_as = _insert_oa_authorship(sa_sync_conn, oa_doc, "J Dupont", position=0)
 
         all_as = get_all_unlinked_authorships(sa_sync_conn, _queries)
         linked_ids = set()
@@ -555,11 +504,8 @@ class TestStep3NameForms:
         )
 
         pub = _insert_publication(sa_sync_conn)
-        oa_author = _insert_oa_author(sa_sync_conn, "Inconnu Nouveau", "A888")
         oa_doc = _insert_oa_document(sa_sync_conn, "W888", pub)
-        oa_as = _insert_oa_authorship(
-            sa_sync_conn, oa_doc, oa_author, position=0, raw_author_name="Inconnu Nouveau"
-        )
+        oa_as = _insert_oa_authorship(sa_sync_conn, oa_doc, "Inconnu Nouveau", position=0)
 
         all_as = get_all_unlinked_authorships(sa_sync_conn, _queries)
         linked_ids = set()

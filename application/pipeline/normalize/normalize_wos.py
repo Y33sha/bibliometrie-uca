@@ -8,9 +8,10 @@ Usage:
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
-    source_publications                        (lien staging ↔ publication, source='wos')
-    source_persons                          (auteurs unifiés, source='wos')
-    source_authorships                      (lien document × auteur, source='wos')
+    source_publications                     (lien staging ↔ publication, source='wos')
+    source_authorships                      (lien document × auteur, source='wos',
+                                             avec `source_structures` TEXT[] = noms
+                                             d'institutions et `person_identifiers` JSONB)
 
 Format raw_data : structure WoS Expanded API (static_data, dynamic_data
 imbriqués). L'ancien format TSV (fichiers téléchargés, clés 2 lettres
@@ -457,13 +458,11 @@ def insert_wos_document(
 
 
 # =============================================================
-# WOS AUTHORSHIPS — identifiants normalisés sur source_authorships
+# WOS AUTHORSHIPS — identifiants sur source_authorships
 # =============================================================
-# Plus d'écriture dans source_persons côté WoS depuis le chantier
-# source_persons (cf. docs/chantiers/2026-04-28_source-persons.md) : le `daisng_id`
-# est une entité algorithmique non fiable, et le `researcher_id`
-# (ResearcherID Clarivate) est un identifiant cross-source qui vit mieux
-# directement sur source_authorships.person_identifiers.
+# Le `daisng_id` (entité algorithmique WoS non fiable) n'est pas
+# conservé. Le `researcher_id` (ResearcherID Clarivate) — identifiant
+# cross-source — vit sur source_authorships.person_identifiers.
 
 
 def _resolve_addresses_batch(
@@ -482,11 +481,9 @@ def process_authorships(
 ) -> None:
     """Traite les authorships d'un record WoS + crée les liens adresses.
 
-    Pas d'écriture sur `source_persons` ni `source_structures` (cf.
-    chantier `DATA_simplify-source-tables`). Chaque authorship est
-    insérée avec `source_person_id=NULL`, un dict `person_identifiers`
-    (orcid + researcher_id) et `source_structures` (TEXT[] des noms
-    d'organisations WoS — seul identifiant stable disponible côté WoS).
+    Chaque authorship porte un dict `person_identifiers` (orcid +
+    researcher_id) et `source_structures` (TEXT[] des noms d'organisations
+    WoS — seul identifiant stable disponible côté WoS).
     """
     # Pré-nettoyage : re-traitement → table blanche pour cette publi.
     queries.clear_source_authorships_for_publication(conn, source_publication_id)
@@ -497,8 +494,8 @@ def process_authorships(
     if not authors_kept:
         return
 
-    # Batch INSERT source_authorships (source_person_id=NULL,
-    # person_identifiers JSONB, source_structures TEXT[]).
+    # Batch INSERT source_authorships (person_identifiers JSONB,
+    # source_structures TEXT[]).
     from domain.normalize import normalize_name_form
 
     values = {}  # clé = author_position, dédupliqué (1 row par position)
@@ -532,8 +529,7 @@ def process_authorships(
 
     queries.upsert_wos_source_authorships_batch(conn, list(values.values()))
 
-    # Phase 3 : batch adresses — pivot par author_position (au lieu de
-    # source_person_id qui n'existe plus pour WoS).
+    # Phase 3 : batch adresses — pivot par author_position.
     authors_with_addrs = [a for a in authors_kept if a.get("addresses")]
     if authors_with_addrs:
         # Collecter toutes les adresses uniques du document

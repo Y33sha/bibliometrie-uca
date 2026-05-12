@@ -4,9 +4,7 @@ Recalcule publications.countries en cascade depuis les addresses.countries.
 Trois caches dénormalisés orchestrés via le port `CountryQueries` :
   1. addresses.countries → source_authorships.countries
   2. source_authorships.countries → source_publications.countries
-     (toutes sources unifiées, le circuit HAL particulier via
-     source_structures.country a été supprimé — toutes les sources
-     passent par les adresses)
+     (toutes sources passent par les adresses, circuit unifié)
   3. source_publications.countries → publications.countries
 
 Cet orchestrateur ne dépend que du domaine et de son port ; le point

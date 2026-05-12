@@ -8,13 +8,15 @@ Usage:
 
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
-    source_publications                        (lien staging ↔ publication, source='hal')
-    source_persons                          (auteurs unifiés, source='hal')
-    source_authorships                      (lien document × auteur, source='hal', avec source_struct_ids)
+    source_publications                     (lien staging ↔ publication, source='hal')
+    source_authorships                      (lien document × auteur, source='hal',
+                                             avec `source_structures` TEXT[] = halId_s natifs
+                                             et `person_identifiers` JSONB)
 
-La résolution UCA (source_authorships.structure_ids, in_perimeter) se fait en post-traitement
-via populate_affiliations.py, pas ici. Ce script ne fait que stocker les source_struct_ids
-(source_structures.id) extraits de authIdHasPrimaryStructure_fs.
+La résolution UCA (source_authorships.structure_ids, in_perimeter) se fait en
+post-traitement via populate_affiliations.py, pas ici. Ce script stocke les halId_s
+de structures extraits de authIdHasPrimaryStructure_fs dans
+`source_authorships.source_structures`.
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
@@ -262,7 +264,7 @@ def insert_hal_document(
 
 
 # =============================================================
-# HAL AUTHORS (source_persons, source='hal')
+# HAL AUTHORS — parsing identifiants depuis le TEI
 # =============================================================
 
 
@@ -393,13 +395,9 @@ def process_authors(
     Traite les auteurs d'un document HAL :
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasPrimaryStructure_fs pour les affiliations (clé = form_id)
-    - Crée les source_authorships (source='hal', source_person_id=NULL) avec
-      `source_structures` (TEXT[] des halId_s natifs) et `person_identifiers`
-      (JSONB des orcid/idref/idhal/hal_person_id quand présents).
-
-    Le pipeline n'écrit plus dans `source_persons` ni `source_structures`
-    (tables en voie de suppression, cf. chantier
-    `DATA_simplify-source-tables`).
+    - Crée les source_authorships (source='hal') avec `source_structures`
+      (TEXT[] des halId_s natifs) et `person_identifiers` (JSONB des
+      orcid/idref/idhal/hal_person_id quand présents).
     """
     # Pré-nettoyage : un re-traitement peut changer les auteurs/positions,
     # on repart d'une table blanche pour cette publi.
@@ -460,8 +458,7 @@ def process_authors(
 
     # authIdHasPrimaryStructure_fs → {form_id: set of halId_s natifs (text)}
     # + mapping {halId_s: nom} local au document (pour construire les
-    # adresses sans toucher à `source_structures`, table en voie de
-    # suppression).
+    # adresses).
     struct_name_by_hal_id: dict[str, str] = {}
     form_struct_map = parse_author_structures(doc, struct_name_by_hal_id=struct_name_by_hal_id)
 
@@ -495,8 +492,7 @@ def process_authors(
         identifiers = ids if ids else None
 
         # Structures affiliées à cet auteur sur ce document (par form_id).
-        # On stocke directement les halId_s natifs (TEXT[]) sur la sa, plus
-        # de résolution vers `source_structures.id`.
+        # Stockées comme halId_s natifs (TEXT[]) sur la sa.
         source_structures = None
         addr_parts: list[str] = []
         if form_id and form_id in form_struct_map:

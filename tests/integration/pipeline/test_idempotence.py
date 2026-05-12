@@ -228,7 +228,7 @@ def _count_tables(conn) -> dict:
     from sqlalchemy import text
 
     counts = {}
-    for t in ("publications", "journals", "publishers", "source_persons"):
+    for t in ("publications", "journals", "publishers"):
         counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
     counts["scanr_authorships"] = conn.execute(
         text("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'scanr'")
@@ -307,11 +307,6 @@ class TestNormalizeScanrIdempotence:
 
         assert processed_1 == 3, f"Première passe : {processed_1} traités (attendu 3)"
         assert counts_1["scanr_documents"] == 3
-        # Depuis le chantier source_persons : seuls les auteurs ScanR avec
-        # idref génèrent un source_persons (Alice + Bob = 2). Charlie et
-        # Diana, sans idref, n'apparaissent que dans source_authorships
-        # (source_person_id NULL).
-        assert counts_1["source_persons"] >= 2
         assert counts_1["publications"] >= 3
 
         # Reset processed flags
@@ -327,53 +322,37 @@ class TestNormalizeScanrIdempotence:
         )
 
     def test_author_dedup_by_idref(self, sa_sync_conn):
-        """Un même idref sur deux documents → un seul scanr_author."""
+        """Un même idref sur deux documents → idref porté sur les 2 authorships."""
         from sqlalchemy import text
 
         _insert_staging(sa_sync_conn, SCANR_STAGING_DOCS)
         _run_normalize_scanr(sa_sync_conn)
 
         cnt = sa_sync_conn.execute(
-            text("SELECT count(*) AS cnt FROM source_persons WHERE idref = '000000001'")
-        ).scalar_one()
-        assert cnt == 1, "Alice Dupont devrait être dédupliquée par idref"
-
-        cnt = sa_sync_conn.execute(
             text(
-                "SELECT count(*) AS cnt FROM source_authorships WHERE source = 'scanr' "
-                "AND source_person_id = (SELECT id FROM source_persons WHERE idref = '000000001')"
+                "SELECT count(*) AS cnt FROM source_authorships "
+                "WHERE source = 'scanr' AND person_identifiers->>'idref' = '000000001'"
             )
         ).scalar_one()
         assert cnt == 2, "Alice devrait avoir 2 authorships (article + chapitre)"
 
     def test_author_without_idref(self, sa_sync_conn):
-        """Un auteur sans idref ScanR ne crée pas de source_persons.
+        """Un auteur sans idref : authorship sans clé `idref` dans person_identifiers.
 
-        Depuis le chantier source_persons : ScanR ne crée plus de
-        `source_persons` pour les auteurs sans idref ; ils n'apparaissent
-        que dans `source_authorships` (source_person_id NULL). L'identité
-        sera reconstruite au pipeline `personnes` via les name_forms.
+        Charlie Noid et Diana Durand n'ont pas d'idref ; ils apparaissent
+        dans `source_authorships` sans `idref` dans `person_identifiers`.
+        L'identité sera reconstruite au pipeline `personnes` via les name_forms.
         """
         from sqlalchemy import text
 
         _insert_staging(sa_sync_conn, SCANR_STAGING_DOCS)
         _run_normalize_scanr(sa_sync_conn)
 
-        # Aucun source_persons sans idref côté ScanR.
-        cnt = sa_sync_conn.execute(
-            text(
-                "SELECT count(*) AS cnt FROM source_persons "
-                "WHERE source = 'scanr' AND idref IS NULL"
-            )
-        ).scalar_one()
-        assert cnt == 0
-
-        # Charlie Noid et Diana Durand sont bien dans source_authorships
-        # avec source_person_id NULL.
         cnt = sa_sync_conn.execute(
             text("""
                 SELECT count(*) AS cnt FROM source_authorships
-                WHERE source = 'scanr' AND source_person_id IS NULL
+                WHERE source = 'scanr'
+                  AND (person_identifiers->>'idref') IS NULL
                   AND raw_author_name IN ('Charlie Noid', 'Diana Durand')
             """)
         ).scalar_one()
@@ -566,7 +545,7 @@ def _count_hal_tables(conn) -> dict:
     from sqlalchemy import text
 
     counts = {}
-    for t in ("publications", "source_persons"):
+    for t in ("publications",):
         counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
     counts["hal_authorships"] = conn.execute(
         text("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'hal'")
@@ -754,7 +733,7 @@ def _count_oa_tables(conn) -> dict:
     from sqlalchemy import text
 
     counts = {}
-    for t in ["publications", "source_persons"]:
+    for t in ["publications"]:
         counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
     counts["openalex_authorships"] = conn.execute(
         text("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'openalex'")
@@ -896,7 +875,7 @@ def _count_wos_tables(conn) -> dict:
     from sqlalchemy import text
 
     counts = {}
-    for t in ["publications", "source_persons"]:
+    for t in ["publications"]:
         counts[t] = conn.execute(text(f"SELECT COUNT(*) AS cnt FROM {t}")).scalar_one()
     counts["wos_authorships"] = conn.execute(
         text("SELECT COUNT(*) AS cnt FROM source_authorships WHERE source = 'wos'")
@@ -1103,7 +1082,8 @@ class TestNormalizeInterSourceIdempotence:
 
 def _setup_persons_test_data(conn):
     """Crée une chaîne complète de données pour tester create_persons :
-    publications → source_publications (hal) → source_persons → source_authorships (in_perimeter=TRUE)
+    publications → source_publications (hal) → source_authorships (in_perimeter=TRUE,
+    `person_identifiers` JSONB peuplé directement, plus de `source_persons`).
     """
     from sqlalchemy import text
 
@@ -1125,27 +1105,23 @@ def _setup_persons_test_data(conn):
         """)
     )
 
-    # HAL authors
-    conn.execute(
-        text("""
-            INSERT INTO source_persons (id, source, source_id, full_name, orcid, source_ids)
-            VALUES (90001, 'hal', 'hal-author-90001', 'Eve Leroy', '0000-0001-9999-0001', '{"hal_person_id": 900001}'),
-                   (90002, 'hal', 'hal-author-90002', 'Frank Moreau', NULL, '{"hal_person_id": 900002}'),
-                   (90003, 'hal', 'hal-author-90003', 'Grace Petit', NULL, NULL)
-        """)
-    )
-
-    # HAL authorships
+    # HAL authorships — `person_identifiers` porte orcid + hal_person_id par
+    # observation. Eve Leroy (hal_person_id=900001, orcid renseigné) apparaît
+    # sur les 2 pubs. Frank Moreau (hal_person_id=900002) sur la pub 90001.
+    # Grace Petit (sans identifiant) sur la pub 90002.
     conn.execute(
         text("""
             INSERT INTO source_authorships
-                (id, source, source_publication_id, source_person_id, author_position, in_perimeter,
-                 person_id, author_name_normalized, raw_author_name)
+                (id, source, source_publication_id, author_position, in_perimeter,
+                 person_id, author_name_normalized, raw_author_name, person_identifiers)
             VALUES
-                (90001, 'hal', 90001, 90001, 0, TRUE, NULL, 'eve leroy', 'Eve Leroy'),
-                (90002, 'hal', 90001, 90002, 1, TRUE, NULL, 'frank moreau', 'Frank Moreau'),
-                (90003, 'hal', 90002, 90001, 0, TRUE, NULL, 'eve leroy', 'Eve Leroy'),
-                (90004, 'hal', 90002, 90003, 1, TRUE, NULL, 'grace petit', 'Grace Petit')
+                (90001, 'hal', 90001, 0, TRUE, NULL, 'eve leroy', 'Eve Leroy',
+                 '{"orcid": "0000-0001-9999-0001", "hal_person_id": 900001}'),
+                (90002, 'hal', 90001, 1, TRUE, NULL, 'frank moreau', 'Frank Moreau',
+                 '{"hal_person_id": 900002}'),
+                (90003, 'hal', 90002, 0, TRUE, NULL, 'eve leroy', 'Eve Leroy',
+                 '{"orcid": "0000-0001-9999-0001", "hal_person_id": 900001}'),
+                (90004, 'hal', 90002, 1, TRUE, NULL, 'grace petit', 'Grace Petit', NULL)
         """)
     )
 
@@ -1249,7 +1225,9 @@ class TestCreatePersonsIdempotence:
         rows = sa_sync_conn.execute(
             text("""
                 SELECT DISTINCT person_id FROM source_authorships
-                WHERE source = 'hal' AND source_person_id = 90001 AND person_id IS NOT NULL
+                WHERE source = 'hal'
+                  AND person_identifiers->>'hal_person_id' = '900001'
+                  AND person_id IS NOT NULL
             """)
         ).all()
         assert len(rows) == 1, "Eve Leroy devrait être une seule personne"
@@ -1336,9 +1314,9 @@ def _setup_affiliations_test_data(conn):
     structures + périmètres + adresses + source_authorships liées.
 
     Scénario : une structure UCA (labo, id=80001) avec une relation
-    est_tutelle_de → UCA (id=80000). Un authorship HAL pointe vers
-    cette structure via source_structures. Un authorship OpenAlex
-    pointe via une adresse résolue.
+    est_tutelle_de → UCA (id=80000). Un authorship OpenAlex est rattaché
+    au labo via une adresse résolue. Un authorship HAL coexiste sans
+    résolution d'adresse (sert pour l'idempotence des comptages).
     """
     from sqlalchemy import text
 
@@ -1377,13 +1355,6 @@ def _setup_affiliations_test_data(conn):
 
     conn.execute(
         text("""
-            INSERT INTO source_structures (id, source, source_id, name, structure_id)
-            VALUES (80001, 'hal', 'hal-struct-80001', 'Labo Test HAL', 80001)
-        """)
-    )
-
-    conn.execute(
-        text("""
             INSERT INTO publications (id, title, title_normalized, doc_type, pub_year)
             VALUES (80001, 'Pub Affiliation Test', 'pub affiliation test', 'article', 2024)
         """)
@@ -1399,27 +1370,19 @@ def _setup_affiliations_test_data(conn):
 
     conn.execute(
         text("""
-            INSERT INTO source_persons (id, source, source_id, full_name)
-            VALUES (80001, 'hal', 'hal-author-80001', 'Alice Dupont'),
-                   (80002, 'openalex', 'A80001', 'Alice Dupont')
-        """)
-    )
-
-    conn.execute(
-        text("""
             INSERT INTO source_authorships
-                (id, source, source_publication_id, source_person_id, author_position,
-                 in_perimeter, source_struct_ids, author_name_normalized)
-            VALUES (80001, 'hal', 80001, 80001, 0, FALSE, ARRAY[80001], 'alice dupont')
-        """)
-    )
-
-    conn.execute(
-        text("""
-            INSERT INTO source_authorships
-                (id, source, source_publication_id, source_person_id, author_position,
+                (id, source, source_publication_id, author_position,
                  in_perimeter, author_name_normalized)
-            VALUES (80002, 'openalex', 80002, 80002, 0, FALSE, 'alice dupont')
+            VALUES (80001, 'hal', 80001, 0, FALSE, 'alice dupont')
+        """)
+    )
+
+    conn.execute(
+        text("""
+            INSERT INTO source_authorships
+                (id, source, source_publication_id, author_position,
+                 in_perimeter, author_name_normalized)
+            VALUES (80002, 'openalex', 80002, 0, FALSE, 'alice dupont')
         """)
     )
 

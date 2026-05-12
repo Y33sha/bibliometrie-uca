@@ -120,8 +120,7 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
     ).all()
     oa_authors = [dict(r._mapping) for r in oa_rows]
 
-    # WoS post-chantier source_persons : plus de source_persons WoS,
-    # group by raw_author_name comme OpenAlex. ORCID lu depuis
+    # WoS : group by raw_author_name comme OpenAlex. ORCID lu depuis
     # source_authorships.person_identifiers.
     wos_rows = conn.execute(
         text("""

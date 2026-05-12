@@ -7,8 +7,8 @@ pour le reste du pipeline.
 Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API
 theses.fr (frontière dynamique avec une source externe, schéma non
 typé). Le champ `person` du dataclass ``ThesisAuthorship`` transmet
-tel quel le sous-objet personne au caller pour upsert
-``source_persons``.
+tel quel le sous-objet personne au caller (notamment pour extraire
+les identifiants et le `raw_author_name` portés sur la `source_authorship`).
 """
 
 from dataclasses import dataclass
@@ -82,7 +82,8 @@ class ThesisAuthorship:
 
     Produite par ``aggregate_thesis_persons`` à partir du dict ``these``
     de l'API theses.fr. ``person`` est le dict brut, transmis tel quel
-    au caller pour les effets (upsert ``source_persons`` notamment).
+    au caller pour les effets (extraction d'identifiants, écriture sur
+    ``source_authorships``).
     """
 
     person: dict[str, Any]

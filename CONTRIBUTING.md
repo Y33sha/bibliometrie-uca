@@ -108,8 +108,8 @@ S'inspirer de
 Créer [`application/pipeline/normalize/normalize_<source>.py`] héritant
 de `SourceNormalizer` (voir
 [`application/pipeline/normalize/base.py`](application/pipeline/normalize/base.py#L27)).
-Override de `process_work(cur, row)` qui insère dans `source_publications`,
-`source_authorships`, `source_persons`.
+Override de `process_work(cur, row)` qui insère dans `source_publications`
+et `source_authorships`.
 
 Point d'entrée CLI dans [`interfaces/cli/pipeline/normalize_<source>.py`] :
 charge la connexion, injecte `StagingQueries` (port défini dans

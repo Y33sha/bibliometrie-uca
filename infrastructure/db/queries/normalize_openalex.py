@@ -1,9 +1,8 @@
 """Query service : SQL du normaliseur OpenAlex.
 
 Appelé par `application/pipeline/normalize/normalize_openalex.py`.
-Regroupe les UPSERT sur `source_publications`, `source_persons`,
-`source_structures`, `source_authorships`, ainsi que les lectures
-d'idempotence et les déduplications Zenodo.
+Regroupe les UPSERT sur `source_publications` et `source_authorships`,
+ainsi que les lectures d'idempotence et les déduplications Zenodo.
 """
 
 from typing import Any
