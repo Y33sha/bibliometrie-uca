@@ -89,7 +89,7 @@ class ThesisAuthorship:
     roles: list[str]
     raw_author_name: str
     author_position: int | None
-    identifiers: dict[str, str] | None
+    person_identifiers: dict[str, str] | None
     is_author: bool
 
 
@@ -139,7 +139,7 @@ def aggregate_thesis_persons(these: dict[str, Any]) -> list[ThesisAuthorship]:
         prenom = person.get("prenom") or ""
         raw_author_name = (prenom + " " + person["nom"]).strip()
         ppn = person.get("ppn")
-        identifiers = {"idref": ppn} if ppn else None
+        person_identifiers = {"idref": ppn} if ppn else None
 
         out.append(
             ThesisAuthorship(
@@ -147,7 +147,7 @@ def aggregate_thesis_persons(these: dict[str, Any]) -> list[ThesisAuthorship]:
                 roles=merged,
                 raw_author_name=raw_author_name,
                 author_position=position if is_author else None,
-                identifiers=identifiers,
+                person_identifiers=person_identifiers,
                 is_author=is_author,
             )
         )

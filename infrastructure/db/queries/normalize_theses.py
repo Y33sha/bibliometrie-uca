@@ -150,31 +150,31 @@ def upsert_theses_source_authorship(
     author_position: int | None,
     roles: list[str],
     raw_author_name: str,
-    identifiers: JsonValue,
+    person_identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une `source_authorships` theses.fr. `author_position` NULL pour les non-auteurs.
 
     `source_person_id` peut être NULL : depuis le chantier source_persons,
     seules les personnes avec PPN (= idref stable) génèrent un row dans
     `source_persons`. Les auteurs/jury sans PPN écrivent uniquement la
-    `source_authorships` avec `identifiers` (vide en pratique pour
+    `source_authorships` avec `person_identifiers` (vide en pratique pour
     theses sans PPN, puisque le PPN était l'unique identifiant).
     """
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              author_name_normalized, roles,
-             raw_author_name, identifiers)
+             raw_author_name, person_identifiers)
         VALUES ('theses', :spid, :source_person_id, :pos,
                 normalize_name_form(:raw_author_name), :roles,
-                :raw_author_name, :identifiers)
+                :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             roles = EXCLUDED.roles,
             author_name_normalized = EXCLUDED.author_name_normalized,
             raw_author_name = EXCLUDED.raw_author_name,
-            identifiers = EXCLUDED.identifiers
+            person_identifiers = EXCLUDED.person_identifiers
         RETURNING id
-    """).bindparams(bindparam("identifiers", type_=JSONB))
+    """).bindparams(bindparam("person_identifiers", type_=JSONB))
     row = conn.execute(
         stmt,
         {
@@ -183,7 +183,7 @@ def upsert_theses_source_authorship(
             "pos": author_position,
             "roles": roles,
             "raw_author_name": raw_author_name,
-            "identifiers": identifiers,
+            "person_identifiers": person_identifiers,
         },
     ).one()
     return row.id

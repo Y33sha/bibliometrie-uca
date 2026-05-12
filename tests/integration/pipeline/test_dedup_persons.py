@@ -140,16 +140,17 @@ def _insert_oa_authorship(
     """Crée une source_authorship OpenAlex.
 
     Pour OpenAlex/WoS/CrossRef, les identifiants (orcid, idref, ...) vivent
-    sur `source_authorships.identifiers` (JSONB), pas sur `source_persons`
-    — le pipeline de dédup-personnes lit `sa.identifiers->>'orcid'`.
+    sur `source_authorships.person_identifiers` (JSONB), pas sur
+    `source_persons` — le pipeline de dédup-personnes lit
+    `sa.person_identifiers->>'orcid'`.
     """
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
-             in_perimeter, person_id, raw_author_name, identifiers, author_name_normalized)
+             in_perimeter, person_id, raw_author_name, person_identifiers, author_name_normalized)
         VALUES ('openalex', :sd, :sp, :pos, :in_perim, :person_id,
-                :raw, :identifiers, normalize_name_form(:raw)) RETURNING id
-    """).bindparams(bindparam("identifiers", type_=JSONB))
+                :raw, :person_identifiers, normalize_name_form(:raw)) RETURNING id
+    """).bindparams(bindparam("person_identifiers", type_=JSONB))
     return conn.execute(
         stmt,
         {
@@ -159,7 +160,7 @@ def _insert_oa_authorship(
             "in_perim": in_perimeter,
             "person_id": person_id,
             "raw": raw_author_name,
-            "identifiers": identifiers,
+            "person_identifiers": identifiers,
         },
     ).scalar_one()
 
@@ -362,9 +363,9 @@ class TestStep1CrossSource:
         hd = _insert_hal_document(sa_sync_conn, "hal-id-test", pub)
         _insert_hal_authorship(sa_sync_conn, hd, ha, position=0, person_id=person_id)
 
-        # OA authorship avec ORCID porté par identifiers (cf. chantier
+        # OA authorship avec ORCID porté par person_identifiers (cf. chantier
         # source_persons : pour OA/WoS/CrossRef, l'ORCID vit sur
-        # source_authorships.identifiers, pas sur source_persons).
+        # source_authorships.person_identifiers, pas sur source_persons).
         oa_author = _insert_oa_author(sa_sync_conn, "J Dupont", "A-id1")
         oa_doc = _insert_oa_document(sa_sync_conn, "W-id1", pub)
         _insert_oa_authorship(

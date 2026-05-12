@@ -327,7 +327,7 @@ def process_persons(
             author_position=a.author_position,
             roles=a.roles,
             raw_author_name=a.raw_author_name,
-            identifiers=a.identifiers if a.identifiers else None,
+            person_identifiers=a.person_identifiers if a.person_identifiers else None,
         )
         if addr_parts:
             address_linker.link(conn, sa_id, addr_parts)

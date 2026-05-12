@@ -176,23 +176,23 @@ def upsert_hal_source_authorship(
     raw_author_name: str,
     is_corresponding: bool,
     roles: list[str] | None,
-    identifiers: JsonValue,
+    person_identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une `source_authorships` HAL (inclut `source_struct_ids`).
 
     `source_person_id` peut être NULL : depuis le chantier source_persons,
     seuls les auteurs avec `hal_person_id` génèrent un row dans
     `source_persons`. Les autres (sans compte HAL, juste un form_id ou
-    rien) écrivent uniquement la `source_authorships` avec `identifiers`
-    (orcid / idref / idhal selon disponibilité).
+    rien) écrivent uniquement la `source_authorships` avec
+    `person_identifiers` (orcid / idref / idhal selon disponibilité).
     """
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position, source_struct_ids,
-             author_name_normalized, is_corresponding, roles, raw_author_name, identifiers)
+             author_name_normalized, is_corresponding, roles, raw_author_name, person_identifiers)
         VALUES ('hal', :spid, :source_person_id, :pos, :source_struct_ids,
                 normalize_name_form(:raw_author_name), :is_corresponding, :roles,
-                :raw_author_name, :identifiers)
+                :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             source_struct_ids = COALESCE(
                 EXCLUDED.source_struct_ids,
@@ -202,9 +202,9 @@ def upsert_hal_source_authorship(
             is_corresponding = EXCLUDED.is_corresponding,
             roles = EXCLUDED.roles,
             raw_author_name = EXCLUDED.raw_author_name,
-            identifiers = EXCLUDED.identifiers
+            person_identifiers = EXCLUDED.person_identifiers
         RETURNING id
-    """).bindparams(bindparam("identifiers", type_=JSONB))
+    """).bindparams(bindparam("person_identifiers", type_=JSONB))
     row = conn.execute(
         stmt,
         {
@@ -215,7 +215,7 @@ def upsert_hal_source_authorship(
             "raw_author_name": raw_author_name,
             "is_corresponding": is_corresponding,
             "roles": roles,
-            "identifiers": identifiers,
+            "person_identifiers": person_identifiers,
         },
     ).one()
     return row.id

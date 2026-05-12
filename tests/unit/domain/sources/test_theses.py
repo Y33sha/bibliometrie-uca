@@ -46,7 +46,7 @@ class TestAggregateThesisPersons:
         assert a.author_position == 0
         assert a.roles == ["author"]
         assert a.raw_author_name == "Jean Dupont"
-        assert a.identifiers == {"idref": "111111111"}
+        assert a.person_identifiers == {"idref": "111111111"}
 
     def test_two_authors_get_consecutive_positions(self):
         these = {
@@ -90,7 +90,7 @@ class TestAggregateThesisPersons:
 
     def test_no_ppn_yields_none_identifiers(self):
         these = {"auteurs": [{"nom": "Dupont", "prenom": "Jean"}]}
-        assert aggregate_thesis_persons(these)[0].identifiers is None
+        assert aggregate_thesis_persons(these)[0].person_identifiers is None
 
     def test_president_singular_field(self):
         these = {"president": {"nom": "P", "prenom": "Pierre"}}

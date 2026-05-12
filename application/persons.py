@@ -13,6 +13,7 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 from application.audit import emit_event
 from application.authorships.core import delete_orphan_authorships
 from domain.names import compute_person_name_forms
+from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from domain.persons.merge import check_can_merge_persons
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.authorship_repository import AuthorshipRepository
@@ -234,7 +235,7 @@ def add_identifiers_from_authorships(
     """
     seen = set()
     for a in authorships:
-        for id_type in ("orcid", "idhal", "idref"):
+        for id_type in PUBLIC_PERSON_IDENTIFIER_TYPES:
             value = a.get(id_type)
             if value and (id_type, value) not in seen:
                 add_identifier(person_id, id_type, value, repo=repo)

@@ -604,7 +604,7 @@ def process_authors(
             raw_author_name=name,
             is_corresponding=is_corresponding,
             roles=roles or None,
-            identifiers=identifiers,
+            person_identifiers=identifiers,
         )
 
         if addr_parts:

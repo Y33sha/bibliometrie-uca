@@ -490,6 +490,11 @@ source_authorships = Table(
     Column("excluded", Boolean, server_default="false"),
     Column("structure_ids", ARRAY(Integer)),
     Column("source_struct_ids", ARRAY(Integer)),
+    # source_structures (ARRAY[TEXT]) remplace progressivement
+    # source_struct_ids (ARRAY[INTEGER]) — cf chantier
+    # DATA_simplify-source-tables. Stocke les IDs internes des
+    # structures côté sources (numérique HAL, "I****" OpenAlex, etc.).
+    Column("source_structures", ARRAY(Text)),
     Column("countries", ARRAY(Text)),
     Column("person_id", Integer),
     Column("author_name_normalized", Text),
@@ -498,7 +503,11 @@ source_authorships = Table(
     Column("source_data", JSONB),
     Column("authorship_id", Integer),
     Column("raw_author_name", Text),
-    Column("identifiers", JSONB),
+    # Identifiants observés sur cette signature (orcid, idhal, idref,
+    # hal_person_id). Distinct de la table canonique `person_identifiers`
+    # (référentiel personne) qui est alimentée par promotion via le
+    # pipeline personnes (`add_identifiers_from_authorships`).
+    Column("person_identifiers", JSONB),
     UniqueConstraint(
         "source_publication_id",
         "source_person_id",

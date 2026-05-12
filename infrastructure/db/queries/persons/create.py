@@ -42,14 +42,14 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
                    sa_auth.raw_author_name AS full_name,
                    sa_auth.author_name_normalized,
                    CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref') THEN NULL::text
-                        ELSE COALESCE(sa.orcid, sa_auth.identifiers->>'orcid') END AS orcid,
+                        ELSE COALESCE(sa.orcid, sa_auth.person_identifiers->>'orcid') END AS orcid,
                    CASE WHEN sa_auth.source = 'hal'
                         THEN COALESCE(
                                 sa.source_ids->>'idhal',
-                                sa_auth.identifiers->>'idhal'
+                                sa_auth.person_identifiers->>'idhal'
                              )
                         ELSE NULL::text END AS idhal,
-                   COALESCE(sa.idref, sa_auth.identifiers->>'idref') AS idref,
+                   COALESCE(sa.idref, sa_auth.person_identifiers->>'idref') AS idref,
                    CASE WHEN sa_auth.source = 'hal' THEN sa.id
                         ELSE NULL::int END AS source_person_id,
                    CASE WHEN sa_auth.source = 'hal'
@@ -59,7 +59,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
                         THEN (sa.source_ids->>'hal_person_id')::int
                         ELSE NULL::int END AS hal_person_id,
                    CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref')
-                        THEN sa_auth.identifiers->>'orcid'
+                        THEN sa_auth.person_identifiers->>'orcid'
                         ELSE NULL::text END AS oa_orcid,
                    CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref')
                         THEN sa_auth.raw_author_name

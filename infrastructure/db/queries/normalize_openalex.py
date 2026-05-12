@@ -167,23 +167,23 @@ def upsert_openalex_source_authorship(
     source_struct_ids: list[int] | None,
     raw_author_name: str | None,
     is_corresponding: bool,
-    identifiers: JsonValue,
+    person_identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une `source_authorships` OpenAlex.
 
     `source_person_id` est NULL : depuis le chantier source_persons,
     OpenAlex n'écrit plus dans `source_persons` (entités auteurs
     algorithmiques non fiables). Les identifiants normalisés (orcid)
-    vivent sur `identifiers`.
+    vivent sur `person_identifiers`.
     """
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              source_struct_ids,
-             author_name_normalized, is_corresponding, raw_author_name, identifiers)
+             author_name_normalized, is_corresponding, raw_author_name, person_identifiers)
         VALUES ('openalex', :spid, :source_person_id, :pos, :source_struct_ids,
                 normalize_name_form(:raw_author_name), :is_corresponding,
-                :raw_author_name, :identifiers)
+                :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = COALESCE(
                 EXCLUDED.author_name_normalized,
@@ -191,9 +191,9 @@ def upsert_openalex_source_authorship(
             ),
             is_corresponding = EXCLUDED.is_corresponding,
             raw_author_name = EXCLUDED.raw_author_name,
-            identifiers = EXCLUDED.identifiers
+            person_identifiers = EXCLUDED.person_identifiers
         RETURNING id
-    """).bindparams(bindparam("identifiers", type_=JSONB))
+    """).bindparams(bindparam("person_identifiers", type_=JSONB))
     row = conn.execute(
         stmt,
         {
@@ -203,7 +203,7 @@ def upsert_openalex_source_authorship(
             "source_struct_ids": source_struct_ids,
             "raw_author_name": raw_author_name,
             "is_corresponding": is_corresponding,
-            "identifiers": identifiers,
+            "person_identifiers": person_identifiers,
         },
     ).one()
     return row.id

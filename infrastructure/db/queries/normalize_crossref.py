@@ -105,7 +105,7 @@ def upsert_crossref_source_authorship(
     author_position: int,
     raw_author_name: str | None,
     source_data: JsonValue,
-    identifiers: JsonValue,
+    person_identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une ``source_authorships`` CrossRef. Retourne l'id.
 
@@ -113,23 +113,23 @@ def upsert_crossref_source_authorship(
     CrossRef n'écrit plus dans `source_persons` (les entités auteurs
     CrossRef étaient des `<DOI>:<position>` synthétiques 1:1 avec
     l'authorship — sans bénéfice). L'ORCID, seul identifiant exploitable,
-    vit sur `identifiers`.
+    vit sur `person_identifiers`.
     """
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
-             author_name_normalized, raw_author_name, source_data, identifiers)
+             author_name_normalized, raw_author_name, source_data, person_identifiers)
         VALUES ('crossref', :spid, NULL, :pos, normalize_name_form(:raw_name),
-                :raw_name, :source_data, :identifiers)
+                :raw_name, :source_data, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,
             raw_author_name = EXCLUDED.raw_author_name,
             source_data = EXCLUDED.source_data,
-            identifiers = EXCLUDED.identifiers
+            person_identifiers = EXCLUDED.person_identifiers
         RETURNING id
     """).bindparams(
         bindparam("source_data", type_=JSONB),
-        bindparam("identifiers", type_=JSONB),
+        bindparam("person_identifiers", type_=JSONB),
     )
     row = conn.execute(
         stmt,
@@ -138,7 +138,7 @@ def upsert_crossref_source_authorship(
             "pos": author_position,
             "raw_name": raw_author_name,
             "source_data": source_data,
-            "identifiers": identifiers,
+            "person_identifiers": person_identifiers,
         },
     ).one()
     return row.id
@@ -210,7 +210,7 @@ class PgCrossrefNormalizeQueries:
         author_position: int,
         raw_author_name: str | None,
         source_data: JsonValue,
-        identifiers: JsonValue,
+        person_identifiers: JsonValue,
     ) -> int:
         return upsert_crossref_source_authorship(
             conn,
@@ -218,7 +218,7 @@ class PgCrossrefNormalizeQueries:
             author_position=author_position,
             raw_author_name=raw_author_name,
             source_data=source_data,
-            identifiers=identifiers,
+            person_identifiers=person_identifiers,
         )
 
     def get_crossref_publication_id(self, conn: Connection, doi: str) -> int | None:
