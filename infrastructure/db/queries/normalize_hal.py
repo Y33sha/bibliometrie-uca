@@ -140,7 +140,7 @@ def upsert_hal_source_authorship(
         VALUES ('hal', :spid, NULL, :pos, :source_structures,
                 normalize_name_form(:raw_author_name), :is_corresponding, :roles,
                 :raw_author_name, :person_identifiers)
-        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
+        ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
             source_structures = COALESCE(
                 EXCLUDED.source_structures,
                 source_authorships.source_structures

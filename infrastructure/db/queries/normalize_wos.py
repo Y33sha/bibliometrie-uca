@@ -146,7 +146,7 @@ def upsert_wos_source_authorships_batch(conn: Connection, values: list[dict[str,
         VALUES ('wos', :spid, NULL, :author_position,
                 :is_corresponding, :author_name_normalized,
                 :source_structures, :roles, :raw_author_name, :person_identifiers)
-        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
+        ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
             is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
             author_name_normalized = COALESCE(
                 EXCLUDED.author_name_normalized,

@@ -148,7 +148,7 @@ def upsert_theses_source_authorship(
         VALUES ('theses', :spid, NULL, :pos,
                 normalize_name_form(:raw_author_name), :roles,
                 :raw_author_name, :person_identifiers)
-        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
+        ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
             roles = EXCLUDED.roles,
             author_name_normalized = EXCLUDED.author_name_normalized,
             raw_author_name = EXCLUDED.raw_author_name,

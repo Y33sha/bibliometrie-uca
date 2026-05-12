@@ -116,7 +116,7 @@ def upsert_scanr_source_authorship(
              author_name_normalized, raw_author_name, person_identifiers)
         VALUES ('scanr', :spid, NULL, :pos, :roles,
                 normalize_name_form(:raw_author_name), :raw_author_name, :person_identifiers)
-        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
+        ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,
             roles = EXCLUDED.roles,
             raw_author_name = EXCLUDED.raw_author_name,

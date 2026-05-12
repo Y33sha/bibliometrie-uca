@@ -225,10 +225,10 @@ réalignés avant que la migration finale touche la DB.
   `source_authorships_pub_pos_key`). Index `idx_sa_source_person`
   et `idx_sa_orphan_perimeter` supprimés. Tables `source_persons`
   et `source_structures` retirées.
-- [ ] Normalizers SQL — bascule des `ON CONFLICT (source_publication_id,
+- [x] Normalizers SQL — bascule des `ON CONFLICT (source_publication_id,
   source_person_id, author_position)` vers `(source_publication_id,
-  author_position)` dans les 5 normalizers (HAL, OpenAlex, WoS, ScanR,
-  theses).
+  author_position)` dans les 6 normalizers (HAL, OpenAlex, WoS, ScanR,
+  theses, Crossref).
 - [ ] Normalizers SQL — retrait de `source_person_id` de la liste des
   colonnes insérées (la valeur était déjà NULL en dur).
 
