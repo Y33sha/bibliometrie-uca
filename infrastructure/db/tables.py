@@ -484,16 +484,10 @@ source_authorships = Table(
     Column("id", Integer, primary_key=True),
     Column("source", Text, nullable=False),
     Column("source_publication_id", Integer, nullable=False),
-    Column("source_person_id", Integer),
     Column("author_position", SmallInteger),
     Column("in_perimeter", Boolean, server_default="false"),
     Column("excluded", Boolean, server_default="false"),
     Column("structure_ids", ARRAY(Integer)),
-    Column("source_struct_ids", ARRAY(Integer)),
-    # source_structures (ARRAY[TEXT]) remplace progressivement
-    # source_struct_ids (ARRAY[INTEGER]) — cf chantier
-    # DATA_simplify-source-tables. Stocke les IDs internes des
-    # structures côté sources (numérique HAL, "I****" OpenAlex, etc.).
     Column("source_structures", ARRAY(Text)),
     Column("countries", ARRAY(Text)),
     Column("person_id", Integer),
@@ -510,9 +504,8 @@ source_authorships = Table(
     Column("person_identifiers", JSONB),
     UniqueConstraint(
         "source_publication_id",
-        "source_person_id",
         "author_position",
-        name="source_authorships_pub_person_pos_key",
+        name="source_authorships_pub_pos_key",
     ),
     Index(
         "idx_sa_authorship",
@@ -526,14 +519,7 @@ source_authorships = Table(
         "author_position",
         postgresql_where=text("(source <> 'hal'::text) AND (in_perimeter = false)"),
     ),
-    Index(
-        "idx_sa_orphan_perimeter",
-        "source_publication_id",
-        "source_person_id",
-        postgresql_where=text("(person_id IS NULL) AND (in_perimeter = true)"),
-    ),
     Index("idx_sa_person", "person_id", postgresql_where=text("person_id IS NOT NULL")),
-    Index("idx_sa_source_person", "source_person_id"),
 )
 
 
@@ -617,29 +603,6 @@ person_name_forms = Table(
     Column("sources", ARRAY(Text)),
     UniqueConstraint("name_form", name="person_name_forms_name_form_uq"),
     Index("idx_pnf_person_ids", "person_ids", postgresql_using="gin"),
-)
-
-
-source_persons = Table(
-    "source_persons",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("source", Text, nullable=False),
-    Column("source_id", Text, nullable=False),
-    Column("full_name", Text, nullable=False),
-    Column("orcid", Text),
-    Column("idref", Text),
-    Column("person_id", Integer),
-    Column("source_ids", JSONB),
-    Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    UniqueConstraint("source", "source_id", name="source_persons_source_source_id_key"),
-    Index("idx_source_persons_idref", "idref", postgresql_where=text("idref IS NOT NULL")),
-    Index("idx_source_persons_orcid", "orcid", postgresql_where=text("orcid IS NOT NULL")),
-    Index(
-        "idx_source_persons_person",
-        "person_id",
-        postgresql_where=text("person_id IS NOT NULL"),
-    ),
 )
 
 
@@ -855,39 +818,6 @@ countries = Table(
     metadata,
     Column("code", CHAR(2), primary_key=True),
     Column("name", Text, nullable=False),
-)
-
-
-source_structures = Table(
-    "source_structures",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("source", Text, nullable=False),
-    Column("source_id", Text, nullable=False),
-    Column("name", Text, nullable=False),
-    Column("country", Text),
-    Column("ror_id", Text),
-    Column("structure_id", Integer),
-    Column("source_data", JSONB),
-    Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    UniqueConstraint("source", "source_id", name="source_structures_source_source_id_key"),
-    Index(
-        "idx_source_structs_name",
-        "name",
-        postgresql_ops={"name": "gin_trgm_ops"},
-        postgresql_using="gin",
-    ),
-    Index(
-        "idx_source_structs_ror",
-        "ror_id",
-        postgresql_where=text("ror_id IS NOT NULL"),
-    ),
-    Index("idx_source_structs_source", "source"),
-    Index(
-        "idx_source_structs_structure",
-        "structure_id",
-        postgresql_where=text("structure_id IS NOT NULL"),
-    ),
 )
 
 
