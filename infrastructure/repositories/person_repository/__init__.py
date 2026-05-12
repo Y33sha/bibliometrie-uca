@@ -78,18 +78,8 @@ class PgPersonRepository:
         person_id: int,
         source: str,
         authorship_id: int,
-        *,
-        source_person_id: int | None = None,
-        has_hal_person_id: bool = False,
     ) -> None:
-        _authorships.link_authorship(
-            self._conn,
-            person_id,
-            source,
-            authorship_id,
-            source_person_id=source_person_id,
-            has_hal_person_id=has_hal_person_id,
-        )
+        _authorships.link_authorship(self._conn, person_id, source, authorship_id)
 
     def unlink_authorship(self, person_id: int, source: str, authorship_id: int) -> None:
         _authorships.unlink_authorship(self._conn, person_id, source, authorship_id)
