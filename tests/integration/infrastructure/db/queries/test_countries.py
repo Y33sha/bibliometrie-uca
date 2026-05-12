@@ -4,7 +4,6 @@ from sqlalchemy import text
 
 from infrastructure.db.queries.countries import (
     refresh_address_source_countries,
-    refresh_hal_source_countries,
     refresh_publication_countries,
     suggest_addresses_countries_batch,
 )
@@ -30,34 +29,14 @@ def _create_sd(conn, pub_id, source, source_id, countries=None):
     ).scalar_one()
 
 
-def _create_sp(conn, source="hal", source_id="sp-1"):
-    return conn.execute(
-        text(
-            "INSERT INTO source_persons (source, source_id, full_name) "
-            "VALUES (:source, :source_id, 'X') RETURNING id"
-        ),
-        {"source": source, "source_id": source_id},
-    ).scalar_one()
-
-
-def _create_source_structure(conn, source, source_id, country):
-    return conn.execute(
-        text("""
-            INSERT INTO source_structures (source, source_id, name, country)
-            VALUES (:source, :source_id, 'Lab', :country) RETURNING id
-        """),
-        {"source": source, "source_id": source_id, "country": country},
-    ).scalar_one()
-
-
-def _create_sa(conn, sd_id, sp_id, source, source_struct_ids=None):
+def _create_sa(conn, sd_id, source, author_position=0):
     return conn.execute(
         text("""
             INSERT INTO source_authorships
-                (source, source_publication_id, source_person_id, author_position, source_struct_ids)
-            VALUES (:source, :sd, :sp, 0, :ssi) RETURNING id
+                (source, source_publication_id, author_position)
+            VALUES (:source, :sd, :pos) RETURNING id
         """),
-        {"source": source, "sd": sd_id, "sp": sp_id, "ssi": source_struct_ids},
+        {"source": source, "sd": sd_id, "pos": author_position},
     ).scalar_one()
 
 
@@ -78,51 +57,12 @@ def _ensure_country(conn, code, name="Test"):
     )
 
 
-class TestRefreshHalSourceCountries:
-    def test_propagates_country_from_struct(self, sa_sync_conn):
-        pub_id = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub_id, "hal", "hal-1")
-        sp = _create_sp(sa_sync_conn)
-        ss = _create_source_structure(sa_sync_conn, "hal", "s1", "FR")
-        _create_sa(sa_sync_conn, sd, sp, "hal", source_struct_ids=[ss])
-
-        updated = refresh_hal_source_countries(sa_sync_conn)
-        assert updated == 1
-
-        result = sa_sync_conn.execute(
-            text("SELECT countries FROM source_publications WHERE id = :sd"),
-            {"sd": sd},
-        ).scalar_one()
-        assert result == ["FR"]
-
-    def test_noop_when_already_up_to_date(self, sa_sync_conn):
-        pub_id = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub_id, "hal", "hal-2", countries=["FR"])
-        sp = _create_sp(sa_sync_conn, source_id="sp-2")
-        ss = _create_source_structure(sa_sync_conn, "hal", "s2", "FR")
-        _create_sa(sa_sync_conn, sd, sp, "hal", source_struct_ids=[ss])
-
-        updated = refresh_hal_source_countries(sa_sync_conn)
-        assert updated == 0
-
-    def test_ignores_non_hal_sources(self, sa_sync_conn):
-        pub_id = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub_id, "openalex", "oa-1")
-        sp = _create_sp(sa_sync_conn, source="openalex", source_id="oa-p1")
-        ss = _create_source_structure(sa_sync_conn, "openalex", "oa-s1", "FR")
-        _create_sa(sa_sync_conn, sd, sp, "openalex", source_struct_ids=[ss])
-
-        updated = refresh_hal_source_countries(sa_sync_conn)
-        assert updated == 0
-
-
 class TestRefreshAddressSourceCountries:
     def test_propagates_country_from_address(self, sa_sync_conn):
         _ensure_country(sa_sync_conn, "FR")
         pub_id = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub_id, "openalex", "oa-1")
-        sp = _create_sp(sa_sync_conn, source="openalex", source_id="oa-p1")
-        sa = _create_sa(sa_sync_conn, sd, sp, "openalex")
+        sa = _create_sa(sa_sync_conn, sd, "openalex")
         addr = _create_address(sa_sync_conn, "Clermont", ["FR"])
         sa_sync_conn.execute(
             text(
@@ -144,8 +84,7 @@ class TestRefreshAddressSourceCountries:
     def test_noop_without_address_countries(self, sa_sync_conn):
         pub_id = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub_id, "openalex", "oa-2")
-        sp = _create_sp(sa_sync_conn, source="openalex", source_id="oa-p2")
-        sa = _create_sa(sa_sync_conn, sd, sp, "openalex")
+        sa = _create_sa(sa_sync_conn, sd, "openalex")
         addr = _create_address(sa_sync_conn, "X", None)
         sa_sync_conn.execute(
             text(

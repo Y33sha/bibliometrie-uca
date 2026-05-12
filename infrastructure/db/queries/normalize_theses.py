@@ -183,7 +183,7 @@ def count_theses_table(conn: Connection, table: str) -> int:
 
     `table` est une valeur littérale contrôlée par le code appelant (liste blanche).
     """
-    if table not in ("source_publications", "source_persons", "source_authorships"):
+    if table not in ("source_publications", "source_authorships"):
         raise ValueError(f"Table inattendue : {table!r}")
     return conn.execute(
         text(f"SELECT COUNT(*) AS cnt FROM {table} WHERE source = 'theses'")
