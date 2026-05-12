@@ -328,7 +328,7 @@ L'orchestrateur `run_pipeline.py` à la racine enchaîne 12 phases :
 Chaque phase est idempotente (relançable sans risque). Reprise depuis
 une phase donnée : `python run_pipeline.py --from <phase>`.
 
-Voir [pipeline.md](pipeline.md) pour le détail par phase.
+Voir [pipeline.md](pipeline) pour le détail par phase.
 
 ## Tests
 
@@ -389,6 +389,6 @@ Les fichiers qui jouent ce rôle :
 
 ## Pour aller plus loin
 
-- [donnees.md](donnees.md) — modèle de données
-- [pipeline.md](pipeline.md) — détail des phases
-- [sources.md](sources.md) — API et imports par source
+- [donnees.md](donnees) — modèle de données
+- [pipeline.md](pipeline) — détail des phases
+- [sources.md](sources) — API et imports par source
