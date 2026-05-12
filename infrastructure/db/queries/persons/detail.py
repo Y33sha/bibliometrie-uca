@@ -79,19 +79,27 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
     ).all()
     identifiers = [dict(r._mapping) for r in id_rows]
 
+    # Reconstitution de la vue « comptes HAL » depuis source_authorships
+    # agrégés par hal_person_id (1 row par compte HAL pour cette personne).
+    # MIN() arbitraire mais déterministe sur les champs descriptifs : en
+    # théorie constants pour un même hal_person_id (attachés au compte
+    # HAL, pas à la signature).
     hal_rows = conn.execute(
         text("""
-            SELECT DISTINCT sauth.id, 'hal' AS source, sauth.full_name, sauth.orcid,
-                   sauth.source_ids->>'idhal' AS idhal,
-                   (sauth.source_ids->>'hal_person_id')::int AS hal_person_id,
+            SELECT MIN(sa.id) AS id,
+                   'hal' AS source,
+                   MIN(sa.raw_author_name) AS full_name,
+                   MIN(sa.person_identifiers->>'orcid') AS orcid,
+                   MIN(sa.person_identifiers->>'idhal') AS idhal,
+                   (sa.person_identifiers->>'hal_person_id')::int AS hal_person_id,
                    NULL::text AS openalex_id,
-                   (SELECT COUNT(*) FROM source_authorships sa2
-                    WHERE sa2.source = 'hal' AND sa2.source_person_id = sauth.id
-                      AND sa2.in_perimeter = TRUE AND NOT sa2.excluded) AS uca_pub_count
-            FROM source_persons sauth
-            JOIN source_authorships sa
-              ON sa.source = 'hal' AND sa.source_person_id = sauth.id
-            WHERE sa.person_id = :pid AND NOT sa.excluded
+                   COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
+            FROM source_authorships sa
+            WHERE sa.source = 'hal'
+              AND sa.person_id = :pid
+              AND NOT sa.excluded
+              AND sa.person_identifiers->>'hal_person_id' IS NOT NULL
+            GROUP BY sa.person_identifiers->>'hal_person_id'
         """),
         {"pid": person_id},
     ).all()

@@ -139,9 +139,14 @@ Audit (cf. discussion architecturale 2026-05-11) :
   multiples). `source_persons` n'est plus interrogé. Modèle Pydantic
   `HalAccountSummary` enrichi avec `idref` ; affichage Svelte
   correspondant ajouté ; types TS régénérés via `npm run types:gen`.
-- [ ] `infrastructure/db/queries/persons/detail.py:hal_rows` :
-  refactor pour reconstruire la vue « comptes HAL » depuis
-  `source_authorships` agrégés.
+- [x] `infrastructure/db/queries/persons/detail.py:hal_rows` :
+  reconstruction de la vue « comptes HAL » depuis `source_authorships`
+  agrégés par `hal_person_id` (`MIN()` arbitraire mais déterministe
+  sur les champs descriptifs, même justification que `hal_problems`).
+  `source_persons` n'est plus joint. Champ `id` retourné devient
+  `MIN(sa.id)` (au lieu de `source_persons.id`) — sans impact UI,
+  l'onglet « Identités » qui exploitait ce champ est désactivé (cf.
+  TODO `interfaces/frontend/src/routes/persons/[id]/+page.svelte:420`).
 - [ ] `interfaces/cli/maintenance/merge_person_duplicates_by_lab.py` :
   remplacer `COUNT(DISTINCT source_person_id)` par
   `COUNT(DISTINCT sa.person_identifiers->>'idhal')` ou similaire.
