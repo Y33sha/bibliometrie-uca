@@ -673,8 +673,3 @@ class WosNormalizer(SourceNormalizer):
             pub_repo=self._pub_repo,
             staging_queries=self._staging,
         )
-
-    def post_process(self, conn: Connection) -> None:
-        deleted_dups = self._queries.delete_wos_duplicate_authorships(conn)
-        if deleted_dups:
-            self.logger.info("Doublons de position supprimés : %d", deleted_dups)

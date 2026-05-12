@@ -215,41 +215,6 @@ def get_wos_publication_id(conn: Connection, ut: str) -> int | None:
     return row.publication_id if row.publication_id else None
 
 
-def delete_wos_duplicate_authorships(conn: Connection) -> int:
-    """Supprime les `source_authorships` WoS en doublon de position.
-
-    WoS renvoie parfois 2 entrées `name` au même `seq_no` pour les publis
-    consortium (ATLAS/CERN) : typiquement 1 avec un `daisng_id` renseigné
-    et 1 héritée d'un ancien code sans `daisng_id` (source_id synthétique
-    `wos-XXXX`). Le parseur actuel n'y crée plus ce cas (cf. filter
-    `if not daisng_id: continue`), mais les rows historiques subsistent.
-
-    Heuristique : on garde la row dont le ``source_persons`` a un
-    ``daisng_id`` (``source_id NOT LIKE 'wos-%'``). À égalité
-    (deux daisng_id, auteur désambiguïsé deux fois côté WoS), on garde
-    la row la plus récente (``id`` max). Retourne le nombre de lignes
-    supprimées.
-    """
-    return conn.execute(
-        text("""
-            WITH ranked AS (
-                SELECT sa.id,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY sa.source_publication_id, sa.author_position
-                           ORDER BY
-                               (sp.source_id LIKE 'wos-%') ASC,
-                               sa.id DESC
-                       ) AS rn
-                FROM source_authorships sa
-                JOIN source_persons sp ON sp.id = sa.source_person_id
-                WHERE sa.source = 'wos' AND sa.author_position IS NOT NULL
-            )
-            DELETE FROM source_authorships
-            WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
-        """)
-    ).rowcount
-
-
 class PgWosNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_wos.WosNormalizeQueries`."""
 
@@ -285,9 +250,6 @@ class PgWosNormalizeQueries:
 
     def get_wos_publication_id(self, conn: Connection, ut: str) -> int | None:
         return get_wos_publication_id(conn, ut)
-
-    def delete_wos_duplicate_authorships(self, conn: Connection) -> int:
-        return delete_wos_duplicate_authorships(conn)
 
     def clear_source_authorships_for_publication(
         self, conn: Connection, source_publication_id: int
