@@ -13,7 +13,7 @@ Les auteurs sources sont dans la table unifiée `source_persons`
 from application.audit import emit_event
 from application.authorships.core import delete_orphan_authorships
 from domain.names import compute_person_name_forms
-from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
+from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES
 from domain.persons.merge import check_can_merge_persons
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.authorship_repository import AuthorshipRepository
@@ -224,20 +224,34 @@ def reassign_identifier(
 def add_identifiers_from_authorships(
     person_id: int, authorships: list[dict], *, repo: PersonRepository
 ) -> None:
-    """Ajoute les ORCID, idHAL et IdRef trouvés dans un groupe d'authorships.
+    """Promotion canonique : insère les identifiants observés dans
+    `source_authorships.person_identifiers` (et colonnes attenantes) vers
+    `person_identifiers` pour cette personne.
+
+    Couvre les 4 id_types acceptés en base (`PERSON_IDENTIFIER_TYPES`) :
+    `orcid`, `idhal`, `idref`, `hal_person_id`. Les 3 premiers sont
+    visibles UI ; `hal_person_id` est interne (filtré côté lecture par
+    `PUBLIC_PERSON_IDENTIFIER_TYPES`).
+
+    Spécificité `hal_person_id` : la valeur arrive en `int` depuis la
+    query (cf. `fetch_unlinked_authorships`), on convertit en str pour
+    la table `person_identifiers`.
 
     La ``source`` enregistrée sur ``person_identifiers`` reste à sa valeur
-    par défaut (``'auto'``) pour les 3 types : tracer la source d'origine
-    n'apporte rien d'exploitable (la valeur n'est pas mise à jour quand
-    une autre source confirme plus tard l'identifiant) et la priorité
-    Crossref pour les ORCID se gérera côté cascade de matching, pas via
-    ce champ.
+    par défaut (``'auto'``) : tracer la source d'origine n'apporte rien
+    d'exploitable (la valeur n'est pas mise à jour quand une autre source
+    confirme plus tard l'identifiant) et la priorité Crossref pour les
+    ORCID se gérera côté cascade de matching, pas via ce champ.
     """
-    seen = set()
+    seen: set[tuple[str, str]] = set()
     for a in authorships:
-        for id_type in PUBLIC_PERSON_IDENTIFIER_TYPES:
-            value = a.get(id_type)
-            if value and (id_type, value) not in seen:
+        for id_type in PERSON_IDENTIFIER_TYPES:
+            raw = a.get(id_type)
+            if not raw:
+                continue
+            # int en source côté hal_person_id, str en cible person_identifiers
+            value = str(raw) if id_type == "hal_person_id" else raw
+            if (id_type, value) not in seen:
                 add_identifier(person_id, id_type, value, repo=repo)
                 seen.add((id_type, value))
 

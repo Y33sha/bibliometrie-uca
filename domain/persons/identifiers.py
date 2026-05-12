@@ -17,18 +17,28 @@ from dataclasses import dataclass
 from domain.errors import ValidationError
 from domain.json_types import JsonValue
 
-# ── Types d'identifiants publics côté référentiel personnes ────────
+# ── Types d'identifiants côté référentiel personnes ───────────────
 #
-# Whitelist des `id_types` autorisés à apparaître dans l'UI et dans les
-# API publiques de `person_identifiers`. Les autres types (notamment
-# `hal_person_id`, identifiant interne HAL utilisé pour la dédup
-# cross-source) sont stockés en base mais **jamais exposés**.
+# Deux listes, à ne pas confondre :
 #
-# Convention : tous les sites qui exposent `person_identifiers` à l'UI
-# (page personne, liste persons, agrégat doublons) doivent filtrer sur
-# cette whitelist. Tous les sites d'écriture par utilisatrice (form,
-# routes POST) doivent valider l'`id_type` contre cette même whitelist.
+# - `PERSON_IDENTIFIER_TYPES` : liste **complète** des id_types
+#   admissibles dans la table `person_identifiers`. Utilisée par la
+#   promotion canonique depuis les `source_authorships`
+#   (`add_identifiers_from_authorships`). Inclut `hal_person_id` —
+#   identifiant interne HAL conservé pour la dédup cross-source mais
+#   **jamais exposé en UI**.
+#
+# - `PUBLIC_PERSON_IDENTIFIER_TYPES` : sous-ensemble **visible UI**.
+#   Utilisée par les filtres SQL côté lecture (page personne, liste
+#   persons, doublons) et par la validation des routes d'ajout par
+#   l'utilisatrice. `hal_person_id` exclu pour ne jamais le faire
+#   remonter dans l'UI.
+#
+# Tout nouvel id_type accepté en base doit être ajouté à au moins
+# `PERSON_IDENTIFIER_TYPES`, et à `PUBLIC_...` s'il doit apparaître
+# en UI.
 
+PERSON_IDENTIFIER_TYPES: tuple[str, ...] = ("orcid", "idhal", "idref", "hal_person_id")
 PUBLIC_PERSON_IDENTIFIER_TYPES: tuple[str, ...] = ("orcid", "idhal", "idref")
 
 # ── ORCID ──────────────────────────────────────────────────────────

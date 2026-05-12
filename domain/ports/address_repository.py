@@ -82,7 +82,12 @@ class AddressRepository(Protocol):
 
     def propagate_countries_across_similar_addresses(self) -> list[int]: ...
 
-    # ── Propagation vers source_publications et publications ───────
+    # ── Propagation vers source_authorships, source_publications et publications ──
+
+    def refresh_sa_countries_for_addresses(
+        self,
+        address_ids: list[int],
+    ) -> int: ...
 
     def refresh_source_publications_countries(
         self,

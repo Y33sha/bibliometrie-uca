@@ -1,11 +1,18 @@
-"""Query service : recalcul des pays des publications.
+"""Query service : recalcul des pays sur les caches dénormalisés.
 
-Trois étapes (write-only) appelées par l'orchestrateur pipeline
-`application/pipeline/countries/refresh_publication_countries.py` :
+Trois caches en cascade, alimentés à partir des `addresses.countries`
+(seule source de vérité) :
 
-1. HAL  : `source_structures.country` → `source_publications.countries`
-2. OA/WoS/ScanR : `addresses.countries` → `source_publications.countries`
-3. Union de tous les `source_publications.countries` → `publications.countries`
+1. `source_authorships.countries` ← agrégat des `addresses.countries`
+   liées via `source_authorship_addresses`
+2. `source_publications.countries` ← union des `sa.countries` du doc
+3. `publications.countries` ← union des `sp.countries` du même
+   publication_id
+
+Appelées par l'orchestrateur pipeline
+`application/pipeline/countries/refresh_publication_countries.py` pour
+le refresh global, et par `application/addresses_countries.py:propagate_countries_to_publications`
+(via le repo) pour le refresh ciblé après une modification manuelle.
 
 Fonctions module-level pour compat avec le code existant ;
 `PgCountryQueries` est l'adapter qui implémente
@@ -15,30 +22,67 @@ Fonctions module-level pour compat avec le code existant ;
 from sqlalchemy import Connection, text
 
 
-def refresh_hal_source_countries(conn: Connection) -> int:
-    """Propage `source_structures.country` vers `source_publications.countries` (HAL).
+def refresh_sa_countries_for_source(conn: Connection, source: str) -> int:
+    """Recalcule `source_authorships.countries` pour les sa d'une source donnée.
 
-    Pour chaque document HAL, collecte les pays des structures de ses auteurs
-    (via `source_authorships.source_struct_ids` → `source_structures.country`).
-    Retourne le nombre de lignes mises à jour.
+    Pass 1 du refresh global, batchée par source pour éviter le spill
+    sur disque (work_mem ~64MB ne suffit pas pour le GROUP BY + DISTINCT
+    sur 7M rows en une fois). Chaque source = max ~3M rows (WoS),
+    tient en mémoire.
+
+    CTE `expanded` qui dédoublonne `(sa_id, country)` via hash, puis
+    GROUP BY pour agréger en array. UPDATE join filtré par
+    `sa.source = :source` pour borner le volume.
+
+    Retourne le nombre de sa mises à jour. Idempotent (`IS DISTINCT FROM`).
     """
     return conn.execute(
         text("""
-            UPDATE source_publications sd
-            SET countries = sub.doc_countries
-            FROM (
-                SELECT sa.source_publication_id,
-                       array_agg(DISTINCT ss.country ORDER BY ss.country) AS doc_countries
-                FROM source_authorships sa,
-                     LATERAL unnest(sa.source_struct_ids) AS ssid(val)
-                JOIN source_structures ss ON ss.id = ssid.val
-                WHERE sa.source = 'hal'
-                  AND ss.country IS NOT NULL
-                GROUP BY sa.source_publication_id
-            ) sub
-            WHERE sd.id = sub.source_publication_id
-              AND sd.source = 'hal'
-              AND sd.countries IS DISTINCT FROM sub.doc_countries
+            WITH expanded AS (
+                SELECT DISTINCT saa.source_authorship_id AS sa_id, c::text AS country_code
+                FROM source_authorship_addresses saa
+                JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                JOIN addresses a ON a.id = saa.address_id
+                CROSS JOIN LATERAL unnest(a.countries) AS c
+                WHERE a.countries IS NOT NULL
+                  AND sa.source = :source
+            ),
+            sa_new AS (
+                SELECT sa_id, array_agg(country_code ORDER BY country_code) AS new_countries
+                FROM expanded
+                GROUP BY sa_id
+            )
+            UPDATE source_authorships sa
+            SET countries = sn.new_countries
+            FROM sa_new sn
+            WHERE sa.id = sn.sa_id
+              AND sa.countries IS DISTINCT FROM sn.new_countries
+        """),
+        {"source": source},
+    ).rowcount
+
+
+def cleanup_sa_countries_orphans(conn: Connection) -> int:
+    """Pass 2 : met à NULL les sa polluées (`countries` non-NULL mais
+    aucune adresse utile).
+
+    Cas du backfill historique via `source_structures` (circuit
+    supprimé depuis). Borne le scan aux sa avec `countries IS NOT NULL`,
+    sous-ensemble étroit — rapide même sans batching.
+
+    Retourne le nombre de sa nettoyées. Idempotent.
+    """
+    return conn.execute(
+        text("""
+            UPDATE source_authorships sa
+            SET countries = NULL
+            WHERE sa.countries IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_authorship_addresses saa
+                  JOIN addresses a ON a.id = saa.address_id
+                  WHERE saa.source_authorship_id = sa.id
+                    AND a.countries IS NOT NULL
+              )
         """)
     ).rowcount
 
@@ -172,8 +216,11 @@ def suggest_addresses_countries_batch(
 class PgCountryQueries:
     """Adapter PostgreSQL implémentant `application.ports.countries.CountryQueries`."""
 
-    def refresh_hal_source_countries(self, conn: Connection) -> int:
-        return refresh_hal_source_countries(conn)
+    def refresh_sa_countries_for_source(self, conn: Connection, source: str) -> int:
+        return refresh_sa_countries_for_source(conn, source)
+
+    def cleanup_sa_countries_orphans(self, conn: Connection) -> int:
+        return cleanup_sa_countries_orphans(conn)
 
     def refresh_address_source_countries(self, conn: Connection) -> int:
         return refresh_address_source_countries(conn)

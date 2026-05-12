@@ -29,8 +29,10 @@ def _fetch_biblio_source_authorships(
     `PublicationHeader.svelte`.
 
     `raw_affiliation` concatène les `addresses.raw_text` liées via
-    `source_authorship_addresses`. `countries` retombe sur les pays
-    extraits des adresses si `sa.countries` est NULL.
+    `source_authorship_addresses`. `countries` est lu directement depuis
+    `sa.countries` (cache dénormalisé recalculé en fin de pipeline et en
+    cascade après chaque modification manuelle d'adresse, cf.
+    `application.addresses_countries`).
     """
     rows = conn.execute(
         text("""
@@ -41,14 +43,7 @@ def _fetch_biblio_source_authorships(
                     JOIN addresses addr ON addr.id = saa2.address_id
                     WHERE saa2.source_authorship_id = sa.id) AS raw_affiliation,
                    sa.excluded,
-                   COALESCE(sa.countries,
-                       (SELECT array_agg(DISTINCT c ORDER BY c)
-                        FROM source_authorship_addresses saa
-                        JOIN addresses addr ON addr.id = saa.address_id,
-                             unnest(addr.countries) AS c
-                        WHERE saa.source_authorship_id = sa.id
-                          AND addr.countries IS NOT NULL)
-                   ) AS countries
+                   sa.countries
             FROM source_authorships sa
             WHERE sa.source_publication_id = (
                 SELECT id FROM source_publications
