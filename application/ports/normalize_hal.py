@@ -37,33 +37,13 @@ class HalNormalizeQueries(Protocol):
         urls: list[str] | None,
     ) -> int: ...
 
-    def upsert_hal_source_person(
-        self,
-        conn: Connection,
-        *,
-        source_id: str,
-        full_name: str,
-        orcid: str | None,
-        idref: str | None,
-        source_ids_json: JsonValue,
-    ) -> int: ...
-
-    def upsert_hal_source_structure(
-        self, conn: Connection, *, source_id: str, name: str
-    ) -> int: ...
-
-    def fetch_hal_source_structure_ids(
-        self, conn: Connection, source_ids: list[str]
-    ) -> list[int]: ...
-
     def upsert_hal_source_authorship(
         self,
         conn: Connection,
         *,
         source_publication_id: int,
-        source_person_id: int | None,
         author_position: int,
-        source_struct_ids: list[int] | None,
+        source_structures: list[str] | None,
         raw_author_name: str,
         is_corresponding: bool,
         roles: list[str] | None,
@@ -73,10 +53,6 @@ class HalNormalizeQueries(Protocol):
     def staging_has_hal_doi(self, conn: Connection, doi: str) -> bool: ...
 
     def get_hal_publication_id(self, conn: Connection, hal_id: str) -> int | None: ...
-
-    def fetch_hal_source_structures_for_cache(
-        self, conn: Connection
-    ) -> list[tuple[str, int, str]]: ...
 
     def clear_source_authorships_for_publication(
         self, conn: Connection, source_publication_id: int

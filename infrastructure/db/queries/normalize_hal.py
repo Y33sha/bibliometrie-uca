@@ -1,9 +1,15 @@
 """Query service : SQL du normaliseur HAL.
 
-Appelé par `application/pipeline/normalize/normalize_hal.py`. Regroupe les
-UPSERT sur `source_publications`, `source_persons`, `source_structures`,
-`source_authorships`, ainsi que les lectures d'idempotence et les
-cleanups de post-traitement (doublons de position, persons orphelins).
+Appelé par `application/pipeline/normalize/normalize_hal.py`. Regroupe
+les UPSERT sur `source_publications` et `source_authorships`, ainsi
+que les lectures d'idempotence et les cleanups de post-traitement
+(doublons de position).
+
+Plus d'UPSERT vers `source_persons` ni `source_structures` (tables en
+voie de suppression, cf. chantier `DATA_simplify-source-tables`) : les
+identifiants personne vivent désormais sur `sa.person_identifiers`
+(JSONB) et les IDs de structures HAL directement sur `sa.source_structures`
+(TEXT[] des `halId_s` natifs).
 """
 
 from typing import Any
@@ -105,98 +111,39 @@ def upsert_hal_source_publication(
     return row.id
 
 
-def upsert_hal_source_person(
-    conn: Connection,
-    *,
-    source_id: str,
-    full_name: str,
-    orcid: str | None,
-    idref: str | None,
-    source_ids_json: JsonValue,
-) -> int:
-    """UPSERT d'un `source_persons` HAL. Commune aux passes hal_person_id/form_id."""
-    stmt = text("""
-        INSERT INTO source_persons
-            (source, source_id, full_name, orcid, idref, source_ids)
-        VALUES ('hal', :source_id, :full_name, :orcid, :idref, :source_ids)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
-            idref = COALESCE(source_persons.idref, EXCLUDED.idref),
-            full_name = EXCLUDED.full_name,
-            source_ids = COALESCE(source_persons.source_ids, '{}') ||
-                         COALESCE(EXCLUDED.source_ids, '{}')
-        RETURNING id
-    """).bindparams(bindparam("source_ids", type_=JSONB))
-    row = conn.execute(
-        stmt,
-        {
-            "source_id": source_id,
-            "full_name": full_name,
-            "orcid": orcid,
-            "idref": idref,
-            "source_ids": source_ids_json,
-        },
-    ).one()
-    return row.id
-
-
-def upsert_hal_source_structure(conn: Connection, *, source_id: str, name: str) -> int:
-    """UPSERT d'une `source_structures` HAL à la volée (parse de `authIdHasStructure_fs`)."""
-    row = conn.execute(
-        text("""
-            INSERT INTO source_structures (source, source_id, name)
-            VALUES ('hal', :source_id, :name)
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                name = COALESCE(NULLIF(source_structures.name, ''), EXCLUDED.name)
-            RETURNING id
-        """),
-        {"source_id": source_id, "name": name},
-    ).one()
-    return row.id
-
-
-def fetch_hal_source_structure_ids(conn: Connection, source_ids: list[str]) -> list[int]:
-    """Retourne les `id` des `source_structures` HAL pour une liste de `source_id`."""
-    rows = conn.execute(
-        text(
-            "SELECT id FROM source_structures WHERE source = 'hal' AND source_id = ANY(:source_ids)"
-        ),
-        {"source_ids": source_ids},
-    ).all()
-    return [r.id for r in rows]
-
-
 def upsert_hal_source_authorship(
     conn: Connection,
     *,
     source_publication_id: int,
-    source_person_id: int | None,
     author_position: int,
-    source_struct_ids: list[int] | None,
+    source_structures: list[str] | None,
     raw_author_name: str,
     is_corresponding: bool,
     roles: list[str] | None,
     person_identifiers: JsonValue,
 ) -> int:
-    """UPSERT d'une `source_authorships` HAL (inclut `source_struct_ids`).
+    """UPSERT d'une `source_authorships` HAL.
 
-    `source_person_id` peut être NULL : depuis le chantier source_persons,
-    seuls les auteurs avec `hal_person_id` génèrent un row dans
-    `source_persons`. Les autres (sans compte HAL, juste un form_id ou
-    rien) écrivent uniquement la `source_authorships` avec
-    `person_identifiers` (orcid / idref / idhal selon disponibilité).
+    `source_person_id` est toujours NULL pour HAL depuis le chantier
+    `DATA_simplify-source-tables` (table `source_persons` en voie de
+    suppression). Les identifiants personne (`orcid`/`idref`/`idhal`/
+    `hal_person_id`) vivent sur `person_identifiers` (JSONB).
+
+    `source_structures` (TEXT[]) stocke les `halId_s` natifs des
+    structures référencées par cette authorship — remplace l'ancien
+    `source_struct_ids` (INTEGER[] de PK `source_structures`).
     """
     stmt = text("""
         INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position, source_struct_ids,
+            (source, source_publication_id, source_person_id, author_position, source_structures,
              author_name_normalized, is_corresponding, roles, raw_author_name, person_identifiers)
-        VALUES ('hal', :spid, :source_person_id, :pos, :source_struct_ids,
+        VALUES ('hal', :spid, NULL, :pos, :source_structures,
                 normalize_name_form(:raw_author_name), :is_corresponding, :roles,
                 :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
-            source_struct_ids = COALESCE(
-                EXCLUDED.source_struct_ids,
-                source_authorships.source_struct_ids
+            source_structures = COALESCE(
+                EXCLUDED.source_structures,
+                source_authorships.source_structures
             ),
             author_name_normalized = EXCLUDED.author_name_normalized,
             is_corresponding = EXCLUDED.is_corresponding,
@@ -209,9 +156,8 @@ def upsert_hal_source_authorship(
         stmt,
         {
             "spid": source_publication_id,
-            "source_person_id": source_person_id,
             "pos": author_position,
-            "source_struct_ids": source_struct_ids,
+            "source_structures": source_structures,
             "raw_author_name": raw_author_name,
             "is_corresponding": is_corresponding,
             "roles": roles,
@@ -244,17 +190,6 @@ def get_hal_publication_id(conn: Connection, hal_id: str) -> int | None:
     if row is None:
         return None
     return row.publication_id if row.publication_id else None
-
-
-def fetch_hal_source_structures_for_cache(conn: Connection) -> list[tuple[str, int, str]]:
-    """Charge `(source_id, id, name)` des `source_structures` HAL pour préchargement cache."""
-    rows = conn.execute(
-        text("""
-            SELECT source_id, id, COALESCE(name, '') AS name
-            FROM source_structures WHERE source = 'hal'
-        """)
-    ).all()
-    return [(r.source_id, r.id, r.name) for r in rows]
 
 
 def delete_hal_duplicate_authorship_addresses(conn: Connection) -> None:
@@ -300,15 +235,6 @@ class PgHalNormalizeQueries:
     def upsert_hal_source_publication(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_hal_source_publication(conn, **kwargs)
 
-    def upsert_hal_source_person(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_hal_source_person(conn, **kwargs)
-
-    def upsert_hal_source_structure(self, conn: Connection, *, source_id: str, name: str) -> int:
-        return upsert_hal_source_structure(conn, source_id=source_id, name=name)
-
-    def fetch_hal_source_structure_ids(self, conn: Connection, source_ids: list[str]) -> list[int]:
-        return fetch_hal_source_structure_ids(conn, source_ids)
-
     def upsert_hal_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_hal_source_authorship(conn, **kwargs)
 
@@ -317,9 +243,6 @@ class PgHalNormalizeQueries:
 
     def get_hal_publication_id(self, conn: Connection, hal_id: str) -> int | None:
         return get_hal_publication_id(conn, hal_id)
-
-    def fetch_hal_source_structures_for_cache(self, conn: Connection) -> list[tuple[str, int, str]]:
-        return fetch_hal_source_structures_for_cache(conn)
 
     def delete_hal_duplicate_authorship_addresses(self, conn: Connection) -> None:
         delete_hal_duplicate_authorship_addresses(conn)
