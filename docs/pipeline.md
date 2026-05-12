@@ -1,5 +1,7 @@
 # Pipeline de traitement — Bibliométrie UCA
 
+Ce fichier présente la logique du pipeline de traitement. Pour les modalités d'exécution, voir [Guide d'exploitation](exploitation#pipeline).
+
 ## Vue d'ensemble
 
 Le peuplement de la base s'effectue via un *pipeline* composé des étapes suivantes:
@@ -21,34 +23,6 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 ### Enrichissements divers
 - [Pays](#countries): détection automatisée des pays des adresses. Utile pour interroger les collaborations internationales.
 - [Statut open access](#enrich): interrogation de l'API Unpaywall pour obtenir le statut *open access* le plus à jour
-
-## Exécution
-
-```bash
-# Pipeline complet
-python run_pipeline.py
-
-# Reprise à partir d'une phase
-python run_pipeline.py --from persons
-
-# Une seule phase
-python run_pipeline.py --only authorships
-
-# Dry-run (affiche le plan sans exécuter)
-python run_pipeline.py --dry-run
-
-# Mode hebdomadaire (incrémental, 6 derniers mois)
-python run_pipeline.py --mode weekly
-
-# Lister les phases disponibles
-python run_pipeline.py --list
-```
-
-**Modes :**
-- `full` : pipeline complet (toutes années, fetch_missing inclus, enrichissements)
-- `weekly` : incrémental (années récentes, pas de WoS, pas de fetch_missing_doi, pas d'enrichissements)
-- `daily` : HAL uniquement, depuis le dernier run (idéal cron quotidien)
-
 
 ## Phases détaillées
 
@@ -78,7 +52,7 @@ flowchart LR
 
 **Cas particulier**:
 
-L'API OpenAlex limite les authorships à 100 par publication. Un *refetch* ciblé des publications avec 100 authorships est nécessaire.
+L'API OpenAlex limite les authorships à 100 par publication dans les requêtes *bulk*. Un *refetch* individuel des publications avec 100 authorships est nécessaire.
 
 **`refetch_truncated.py`** — re-télécharge un par un les works OpenAlex tronqués à 100 auteurs.
 Pour éviter d'écraser ces publications lors de l'import suivant, un *hash* est calculé en faisant abstraction des authorships.
@@ -99,7 +73,7 @@ Transforme les données brutes (staging) en tables structurées par source.
 ```mermaid
 flowchart LR
     A[API HAL]-->B[staging]-->|normalize_hal|G@{ shape: processes, label: "Tables sources:
-    source_publications, source_persons, source_authorships, source_structures" }
+    source_publications, source_authorships" }
     C[API OpenAlex]-->B-->|normalize_openalex|G
     E[API WOS]-->B-->|normalize_wos|G
     K[API ScanR]-->B-->|normalize_scanr|G
@@ -109,30 +83,14 @@ flowchart LR
     class G new;
 ```
 
-
-
-#### Relations internes des tables dans chaque source
-
-Les tables sources sont indépendantes les unes des autres et s'organisent selon un schéma toujours identique:
-
-```mermaid
-erDiagram
-    direction LR
-    documents ||--|{ authorships : a_pour_auteurs
-    authors ||--|{ authorships : est_auteur_de
-    authorships }o--|{ structures : est_affilie_a
-
-```
-
-<!-- TODO: Tables `publisher_name_forms` et `journal_name_forms` pour gérer les formes de noms multiples en l'absence d'identifiant unique (ISSN pour les journals): "Elsevier", "Elsevier BV"; "JHEP", "Journal of High Energy Particles" -->
-
 ### <span id="addresses"></span>Phase 4 — `addresses` : Adresses et affiliations
 
-Cette étape extrait les adresses brutes des *authorships* sources pourvues d'une adresse (OpenAlex, WoS, ScanR) et les relie aux structures. (Pour le détail des différences de gestion des affiliations d'une source à l'autre: cf [doc sources](sources#sources-affiliations))
+Cette étape extrait les adresses brutes des *authorships* sources et les relie aux structures. Pas d'adresses brutes dans HAL => on utilise la chaîne de caractères du nom de la structure, et on la traite fictivement comme une adresse.
+> **TODO:** filtrage à mettre en place côté UI pour ne pas afficher les pseudo-adresses de source HAL dans les onglets "adresses"
 
 ```mermaid
 flowchart LR
-    A["source_authorships"]-->|populate_addresses|B[addresses]
+    A[source_authorships]-->|populate_addresses|B[addresses]
     D[structures]-->E[structure_name_forms]
     E-->|resolve_addresses|F[address_structures]
     B-->|resolve_addresses|F
@@ -145,6 +103,7 @@ flowchart LR
 1. **`populate_addresses.py`** — split les `raw_affiliation` (séparateur ` | `) en adresses individuelles, déduplique dans la table `addresses`, crée les liens `*_authorship_addresses`
 2. **`resolve_addresses.py`** — matche les adresses normalisées avec les formes de nom des structures (`structure_name_forms`). Résultat dans `address_structures`
 
+> **TODO:** documenter la logique de resolve_addresses
 
 ### <span id="affiliations"></span>Phase 5 — `affiliations` : Propagation des affiliations
 
@@ -155,16 +114,13 @@ flowchart LR
     A[structures]-->B[address_structures]
     B-->C
     C[addresses]-->|populate_affiliations|D[source_authorships]
-    A-->F[hal_structures]--->|populate_affiliations|D
     classDef new  fill:#bbf
     classDef valid  fill:#af5
     class D new;
     class A valid;
 ```
 
-Calcule `in_perimeter` et `structure_ids` sur les authorships des 4 sources :
-- **HAL** : `hal_struct_ids` → mapping via `hal_structures.structure_id` → `structure_ids`, puis vérification contre le périmètre UCA restreint → `in_perimeter`
-- **OpenAlex / WoS / ScanR** : via `address_structures` (adresses résolues) → même logique
+Calcule `in_perimeter` et `structure_ids` sur les authorships des 4 sources.
 
 Deux périmètres :
 - **Restreint** (UCA + labos UCA) → détermine `in_perimeter` (bool)
@@ -175,21 +131,49 @@ Périmètre centralisé dans `utils/uca_perimeter.py`.
 
 ### <span id="publications"></span>Phase 6 — `publications` : Peuplement de la table Publications
 
-Les publications sources sont fusionnées:
-- par **identité de DOI** (même DOI = même publi, sauf cas particuliers).
-- par **référence directe** (un document OpenAlex ou ScanR qui pointe vers un document HAL)
+```mermaid
+flowchart LR
+    A[source_publications]-->B[publications]
+    classDef new  fill:#bbf
+    class B new;
+```
+
+
+Les publications sources sont mappées aux publications canoniques:
+- par **DOI** (même DOI = même publi, sauf cas particuliers).
+- par **NNT** (numéro national de thèse)
+- par **hal-id** (un document OpenAlex ou ScanR qui référence un document HAL)
 
 Les cas douteux (métadonnées identiques ou similaires) sont préservés et sont fusionnés manuellement via la page admin/duplicates.
 
+> **Evolutions envisagées**
+> - Ajouter de nouveaux identifiants pouvant servir de clé de déduplication: pmid (Pubmed)...
+> - Affiner la détection de DOI faussement distincts référençant le même document (DOI versionnés, concept DOI...)
+> - Développer un algorithme de déduplication par identité de métadonnées. Piégeux: beaucoup de cas limites ou difficiles. Logique à soigner.
 
-### <span id="persons"></span>Phase 7 — `persons` : Création de personnes
 
-**`create_persons_from_source_authorships.py`** — algorithme en 4 étapes :
+### <span id="persons"></span>Phase 7 — `persons` : Rattachement et création de personnes
 
-1. **Comptes HAL** : les authorships HAL liées à un compte HAL identifié (`source_persons` HAL avec `hal_person_id`, *déjà* lié à une `person`) sont rattachées à la même personne. Cette phase ne crée pas de nouvelle personne.
-2. **Même nom + même publication + même position auteur** : pour chaque authorship sans `person_id`, cherche sur la même publication (même position) une *authorship* d'une **autre source** déjà rattachée à une personne. Si le nom est compatible → rattacher. Approche conservatrice (requiert position identique dans la liste des auteurs. TODO: voir si cette condition peut être assouplie sans perte de qualité).
-3. **Identifiant ORCID/Idref connu** : si l'authorship est liée à un ORCID ou un IdRef déjà présent en base (table `person_identifiers`, avec `status ≠ rejected`) → rattacher. Priorité aux IdRef. Les ORCID/IdRef sont lus depuis `source_persons.orcid`/`source_persons.idref` quand un `source_persons` existe (HAL+`hal_person_id`, ScanR+idref, theses+PPN), sinon depuis `source_authorships.identifiers`.
-4. **Recherche par nom** : lookup par nom normalisé dans `person_name_forms`.
+```mermaid
+flowchart LR
+    A[source_authorships]-->B[persons]
+    classDef new  fill:#bbf
+    class B new;
+```
+
+**`create_persons_from_source_authorships.py`** — algorithme en 3 étapes :
+
+> **Etape initiale à ajouter** : matching par ORCID attesté dans les métadonnées Crossref (= source auteur garantie => meilleur critère possible)
+
+1. **Même nom + même publication + même position auteur** : pour chaque authorship sans `person_id`, cherche sur la même publication (même position) une *authorship* d'une **autre source** déjà rattachée à une personne. Si le nom est compatible → rattacher. Approche conservatrice (requiert position identique dans la liste des auteurs. TODO: voir si cette condition peut être assouplie sans perte de qualité).
+
+> **Limité aux publis de 50 auteurs max**: les méga-papers (plusieurs centaines voire milliers d'auteurs) contiennent souvent des homonymes + l'initiale au lieu du prénom + de fréquents désalignements de position auteur entre sources, pouvant conduire à de faux rattachemements.
+
+2. **Identifiant Idref/ORCID connu** : si l'authorship est liée à un ORCID ou un IdRef déjà présent en base (table `person_identifiers`, avec `status ≠ rejected`) → rattacher. Priorité aux IdRef. Les ORCID/IdRef sont lus depuis `source_authorships.identifiers`.
+
+> Les ORCID provenant de métadonnées OpenAlex ou WoS sont souvent douteux. Ils sont liés à l'entité du référentiel personnes propre à chaque base, mais ces entités sont peu fiables. L'ORCID est généralement absent de la publication: c'est donc un matching algorithmique qui a permis d'associer tel ORCID à tel auteur d'une publi. Étudier la pertinence de conserver cette étape du matching.
+
+3. **Recherche par nom** : lookup par nom normalisé dans `person_name_forms`.
    - Nom mappé à 1 personne → rattacher
    - Nom mappé à >1 personnes → laisser orphelin (pour traitement manuel via `admin/orphan-authorships`)
    - **Nom inconnu → créer nouvelle personne**
@@ -206,6 +190,19 @@ Fonctions de compatibilité de noms dans `utils/names.py`.
 
 
 ### <span id="authorships"></span>Phase 8 — `authorships` : Construction des authorships canoniques
+
+```mermaid
+flowchart LR
+    F[source_authorships]---E
+    E[source_publications]---A
+    F---C
+    F---D
+    A[publications]---B[authorships]
+    C[persons]---B
+    B---D[structures]
+    classDef new  fill:#bbf
+    class B new;
+```
 
 **`build_authorships.py`** construit la table `authorships` en 4 étapes :
 
@@ -236,7 +233,7 @@ Exécutée uniquement en mode `full` :
 | `interfaces/cli/pipeline/enrich_oa_status.py` | Statut *open access* via API [Unpaywall](glossaire#unpaywall) => souvent plus à jour que le statut renseigné dans les sources |
 | `interfaces/cli/pipeline/enrich_journal_apc.py` | Montant APC par revue via API OpenAlex Sources => **ne sert à rien pour l'instant**, voir si on garde ou pas |
 
-## <span id='tables-canoniques'></span>Peuplement des tables canoniques
+## Résumé: <span id='tables-canoniques'></span>Peuplement des tables canoniques
 
 
 1. Les **structures** préexistent au pipeline.
@@ -253,7 +250,7 @@ flowchart LR
     class F valid;
 ```
 
-2. La [phase 3](#normalize) (`normalize`) peuple la table **publications** par mapping et fusion à partir des publications sources.
+2. La [phase 3](#normalize) (`normalize`) peuple la table **publications** par mapping à partir des publications sources.
 
 ```mermaid
 flowchart LR
@@ -288,8 +285,8 @@ flowchart LR
 ```
 
 4. Les **authorships** canoniques sont déduites à partir des sources dans la [phase 8](#authorships) (`authorships`). L'information (`person_id`, `structure_ids`) présente dans les *authorships* sources est donc répliquée dans la table *authorships* canonique, pour deux raisons:
-- simplifier les requêtes dans l'interface;
-- servir de source d'autorité ultime en cas d'erreur dans une des sources (une *authorship* source peut être `excluded`).
+    - optimiser les requêtes;
+    - servir de source d'autorité ultime en cas d'erreur dans une des sources (une *authorship* source peut être `excluded`).
 
 ```mermaid
 flowchart LR
@@ -306,19 +303,3 @@ flowchart LR
     classDef valid  fill:#af5
     class F,A,C,B valid;
 ```
-
-
-## Utilitaires partagés
-
-| Module | Contenu |
-|--------|---------|
-| `utils/doi.py` | `clean_doi` — nettoyage DOI |
-| `utils/hal.py` | `extract_hal_id_from_url`, `HAL_FIELDS` — constantes et utilitaires HAL |
-| `utils/names.py` | `names_compatible`, `parse_raw_author_name` — compatibilité de noms |
-| `utils/normalize.py` | `normalize_text`, `normalize_name` — normalisation texte |
-| `utils/uca_perimeter.py` | `get_uca_structure_ids`, `get_uca_structure_ids_wide` — périmètre UCA |
-| `utils/log.py` | `setup_logger` — configuration logging avec fichier |
-| `extraction/common.py` | `compute_hash`, `get_existing_ids` — fonctions d'extraction |
-| `application/persons.py` | Création, rattachement, identifiants, formes de noms |
-| `application/publications.py` | `find_or_create`, déduplication par DOI + titre |
-| `application/journals.py` | Publishers, journals, APC |

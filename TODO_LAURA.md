@@ -28,6 +28,7 @@
 * is_wos_author_exploitable, authors_kept: à quoi ça sert? auditer
 * sortir les use cases des repositories; clarifier la distinction repositories / db/queries
 * typage des ports?
+* Unit of Work
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 ## Sujets

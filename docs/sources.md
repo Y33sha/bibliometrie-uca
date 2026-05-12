@@ -23,12 +23,14 @@ Le système intègre 6 sources bibliographiques principales, complétées par de
 
 ### Spécificités
 
-#### <span id='sources-affiliations'></span>Gestion des affiliations
+> **Section pas à jour**: à réécrire entièrement
 
+#### <span id='sources-affiliations'></span>Gestion des affiliations
 
 - Dans **OpenAlex** et **WoS**, les liens authorships-structures sont résolus de manière algorithmique à partir des adresses liées aux publications. Ce processus génère beaucoup d'erreurs causées par des similitudes de noms (dans OpenAlex principalement). Mais la donnée-source (*raw affiliation string*) est présente et exploitable. On ignore donc les structure_ids présents dans les sources et **on reconstruit l'affiliation à partir des adresses brutes**. (Phase `affiliations` du pipeline.)
 
 - Dans **HAL**, les liens authorships-structures sont basés sur les affiliations renseignées dans les comptes HAL des auteurs au moment du dépôt (Cf [doc HAL](https://doc.hal.science/depot-fonctionnement-de-l-affiliation-automatique/#)), et éventuellement complétés manuellement par le déposant. Les métadonnées de HAL ne contiennent pas les adresses brutes. La seule option est donc de récupérer les affiliations telles quelles, via un *mapping* entre `source_structures` HAL et `structures` canoniques. Les erreurs sont détectées *a posteriori* (pages [hal-problems](guide-utilisateur#problemes-hal)).
+
 Le *mapping* est géré via la page [admin/structures](guide-utilisateur#gestion-des-structures-adminstructures).
 La résolution des affiliations se fait pendant la phase `affiliations` du pipeline.
 

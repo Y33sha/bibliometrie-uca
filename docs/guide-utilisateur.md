@@ -24,11 +24,11 @@ Filtrable par:
 ### Fiche personne (`/persons/{id}`)
 
 Vue détaillée d'un chercheur. Identifiants, données RH si existent.
-3 onglets:
+3 ou 4 onglets:
+- dashboard
 - publications
-- identités (formes de noms présentes sur différentes sources, avec identifiants attachés et nombre de publications correspondantes)
+- thèses, si la personne est liée à une ou plusieurs thèses
 - adresses (adresses liées à cette personne dans les publications)
-<!-- TODO: Faire un onglet Dashboard par personne -->
 <!-- TODO: Distinguer les onglets visibles selon rôle utilisateur: les onglets "identités" et "adresses" sont des outils internes, sans intérêt pour le chercheur -->
 <!-- TODO: Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation? -->
 
@@ -78,7 +78,7 @@ Paramètres des imports:
 - clé API WOS;
 - années interrogées (modes weekly et full);
 - paramètres de requête par source;
-- définition des périmètres (`uca`, `uca_wide`); (CRUD pas encore mis en place <!--TODO: mettre en place le CRUD des périmètres dans admin/config-->)
+- définition et CRUD des périmètres (`uca`, `uca_wide`);
 - périmètres utilisés à différentes étapes du pipeline.
 
 
