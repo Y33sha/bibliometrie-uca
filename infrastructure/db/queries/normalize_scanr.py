@@ -94,35 +94,10 @@ def upsert_scanr_source_publication(
     return row.id
 
 
-def upsert_scanr_source_person_by_idref(
-    conn: Connection,
-    *,
-    idref: str,
-    full_name: str,
-    orcid: str | None,
-) -> int:
-    """UPSERT d'un `source_persons` ScanR dédupliqué sur `idref`."""
-    row = conn.execute(
-        text("""
-            INSERT INTO source_persons
-                (source, source_id, full_name, orcid, idref)
-            VALUES ('scanr', :source_id, :full_name, :orcid, :idref)
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                orcid = COALESCE(source_persons.orcid, EXCLUDED.orcid),
-                full_name = EXCLUDED.full_name,
-                idref = COALESCE(source_persons.idref, EXCLUDED.idref)
-            RETURNING id
-        """),
-        {"source_id": idref, "full_name": full_name, "orcid": orcid, "idref": idref},
-    ).one()
-    return row.id
-
-
 def upsert_scanr_source_authorship(
     conn: Connection,
     *,
     source_publication_id: int,
-    source_person_id: int | None,
     author_position: int,
     roles: list[str] | None,
     raw_author_name: str | None,
@@ -130,17 +105,16 @@ def upsert_scanr_source_authorship(
 ) -> int:
     """UPSERT d'une `source_authorships` ScanR. Retourne l'id.
 
-    `source_person_id` peut être NULL : depuis le chantier source_persons,
-    seuls les auteurs avec idref génèrent un row dans `source_persons`.
-    Les autres écrivent uniquement la `source_authorships` avec
-    `person_identifiers={"orcid": ...}` (et éventuellement `idref` si
-    présent sans qu'on ait jugé utile de créer un source_persons).
+    `source_person_id` toujours NULL (table `source_persons` en voie de
+    suppression, cf. chantier `DATA_simplify-source-tables`). Les
+    identifiants (`orcid`, `idref`) vivent sur `person_identifiers`
+    (JSONB).
     """
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position, roles,
              author_name_normalized, raw_author_name, person_identifiers)
-        VALUES ('scanr', :spid, :source_person_id, :pos, :roles,
+        VALUES ('scanr', :spid, NULL, :pos, :roles,
                 normalize_name_form(:raw_author_name), :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,
@@ -153,7 +127,6 @@ def upsert_scanr_source_authorship(
         stmt,
         {
             "spid": source_publication_id,
-            "source_person_id": source_person_id,
             "pos": author_position,
             "roles": roles,
             "raw_author_name": raw_author_name,
@@ -180,9 +153,6 @@ class PgScanrNormalizeQueries:
 
     def upsert_scanr_source_publication(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_scanr_source_publication(conn, **kwargs)
-
-    def upsert_scanr_source_person_by_idref(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_scanr_source_person_by_idref(conn, **kwargs)
 
     def upsert_scanr_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_scanr_source_authorship(conn, **kwargs)

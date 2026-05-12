@@ -31,7 +31,6 @@ from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
 from domain.normalize import normalize_text
-from domain.persons.creation import should_create_source_person
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
@@ -239,34 +238,6 @@ def insert_scanr_document(
 # =============================================================
 
 
-def upsert_scanr_author(
-    conn: Connection, queries: ScanrNormalizeQueries, author: dict
-) -> int | None:
-    """Crée un `source_persons` ScanR uniquement quand un idref est fourni.
-
-    Sans idref, retourne None : la `source_authorships` sera insérée
-    avec `source_person_id=NULL` et `identifiers={"orcid": ...}` si
-    présent (cf. chantier source_persons).
-    """
-    full_name = author.get("fullName")
-    if not full_name:
-        return None
-
-    denorm = author.get("denormalized") or {}
-    idref = denorm.get("idref")
-    if not should_create_source_person(source="scanr", strong_id_value=idref):
-        return None
-    assert isinstance(idref, str)  # narrowing : garanti par le check ci-dessus
-
-    orcid = normalize_orcid(denorm.get("orcid"))
-    return queries.upsert_scanr_source_person_by_idref(
-        conn,
-        idref=idref,
-        full_name=full_name,
-        orcid=orcid,
-    )
-
-
 # =============================================================
 # SCANR AUTHORSHIPS
 # =============================================================
@@ -289,10 +260,6 @@ def process_authors(
         author_full_name = author_data.get("fullName")
         if not author_full_name:
             continue
-
-        # Avec idref : crée le source_persons (cas légitime conservé)
-        # Sans idref : source_person_id reste NULL (ORCID éventuel sur identifiers)
-        source_person_id = upsert_scanr_author(conn, queries, author_data)
 
         denorm = author_data.get("denormalized") or {}
         ids = compact_identifiers(
@@ -319,7 +286,6 @@ def process_authors(
         sa_id = queries.upsert_scanr_source_authorship(
             conn,
             source_publication_id=source_publication_id,
-            source_person_id=source_person_id,
             author_position=position,
             roles=roles or None,
             raw_author_name=author_full_name,

@@ -9,7 +9,6 @@ Usage:
 Tables peuplées :
     publications                (table de vérité)
     source_publications            (source='theses')
-    source_persons              (source='theses')
     source_authorships          (source='theses', avec roles)
 
 Particularités theses.fr :
@@ -40,7 +39,6 @@ from application.publications import (
 )
 from domain.dates import french_date_to_iso
 from domain.normalize import normalize_name, normalize_text
-from domain.persons.creation import should_create_source_person
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from domain.sources.theses import (
@@ -265,32 +263,6 @@ def insert_source_document(
 
 
 # =============================================================
-# SOURCE AUTHORS
-# =============================================================
-
-
-def upsert_source_author(
-    conn: Connection, queries: ThesesNormalizeQueries, person: dict
-) -> int | None:
-    """Crée un `source_persons` theses uniquement quand un PPN (idref stable)
-    est fourni. Sans PPN, retourne None : la `source_authorships` sera
-    insérée avec `source_person_id=NULL` (cf. chantier source_persons).
-    """
-    nom = person.get("nom")
-    prenom = person.get("prenom")
-    if not nom:
-        return None
-
-    ppn = person.get("ppn")
-    if not should_create_source_person(source="theses", strong_id_value=ppn):
-        return None
-    assert isinstance(ppn, str)  # narrowing : garanti par le check ci-dessus
-
-    full_name = f"{prenom} {nom}".strip() if prenom else nom
-    return queries.upsert_theses_source_person_by_ppn(conn, ppn=ppn, full_name=full_name)
-
-
-# =============================================================
 # SOURCE AUTHORSHIPS
 # =============================================================
 
@@ -316,14 +288,9 @@ def process_persons(
     addr_parts = [p["nom"] for p in partenaires if p.get("nom")] or []
 
     for a in authorships:
-        # Avec PPN : crée le source_persons (cas légitime conservé)
-        # Sans PPN : source_person_id reste NULL (l'auteur sans idref est
-        # déjà désigné par son raw_author_name + author_position).
-        source_person_id = upsert_source_author(conn, queries, a.person)
         sa_id = queries.upsert_theses_source_authorship(
             conn,
             source_publication_id=source_publication_id,
-            source_person_id=source_person_id,
             author_position=a.author_position,
             roles=a.roles,
             raw_author_name=a.raw_author_name,

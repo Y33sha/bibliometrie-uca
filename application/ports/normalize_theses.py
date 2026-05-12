@@ -42,20 +42,11 @@ class ThesesNormalizeQueries(Protocol):
         source_meta_json: JsonValue,
     ) -> int: ...
 
-    def upsert_theses_source_person_by_ppn(
-        self,
-        conn: Connection,
-        *,
-        ppn: str,
-        full_name: str,
-    ) -> int: ...
-
     def upsert_theses_source_authorship(
         self,
         conn: Connection,
         *,
         source_publication_id: int,
-        source_person_id: int | None,
         author_position: int | None,
         roles: list[str],
         raw_author_name: str,

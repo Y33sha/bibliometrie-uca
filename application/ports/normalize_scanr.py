@@ -36,21 +36,11 @@ class ScanrNormalizeQueries(Protocol):
         urls: list[str] | None,
     ) -> int: ...
 
-    def upsert_scanr_source_person_by_idref(
-        self,
-        conn: Connection,
-        *,
-        idref: str,
-        full_name: str,
-        orcid: str | None,
-    ) -> int: ...
-
     def upsert_scanr_source_authorship(
         self,
         conn: Connection,
         *,
         source_publication_id: int,
-        source_person_id: int | None,
         author_position: int,
         roles: list[str] | None,
         raw_author_name: str | None,

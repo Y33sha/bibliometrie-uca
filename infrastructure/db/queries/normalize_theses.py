@@ -125,28 +125,10 @@ def upsert_theses_source_publication(
     return row.id
 
 
-def upsert_theses_source_person_by_ppn(conn: Connection, *, ppn: str, full_name: str) -> int:
-    """UPSERT d'un `source_persons` theses.fr dédupliqué sur PPN (idref)."""
-    row = conn.execute(
-        text("""
-            INSERT INTO source_persons
-                (source, source_id, full_name, idref)
-            VALUES ('theses', :source_id, :full_name, :idref)
-            ON CONFLICT (source, source_id) DO UPDATE SET
-                full_name = EXCLUDED.full_name,
-                idref = COALESCE(source_persons.idref, EXCLUDED.idref)
-            RETURNING id
-        """),
-        {"source_id": ppn, "full_name": full_name, "idref": ppn},
-    ).one()
-    return row.id
-
-
 def upsert_theses_source_authorship(
     conn: Connection,
     *,
     source_publication_id: int,
-    source_person_id: int | None,
     author_position: int | None,
     roles: list[str],
     raw_author_name: str,
@@ -154,18 +136,16 @@ def upsert_theses_source_authorship(
 ) -> int:
     """UPSERT d'une `source_authorships` theses.fr. `author_position` NULL pour les non-auteurs.
 
-    `source_person_id` peut être NULL : depuis le chantier source_persons,
-    seules les personnes avec PPN (= idref stable) génèrent un row dans
-    `source_persons`. Les auteurs/jury sans PPN écrivent uniquement la
-    `source_authorships` avec `person_identifiers` (vide en pratique pour
-    theses sans PPN, puisque le PPN était l'unique identifiant).
+    `source_person_id` toujours NULL (table `source_persons` en voie de
+    suppression, cf. chantier `DATA_simplify-source-tables`). Les
+    identifiants (PPN/idref) vivent sur `person_identifiers` (JSONB).
     """
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              author_name_normalized, roles,
              raw_author_name, person_identifiers)
-        VALUES ('theses', :spid, :source_person_id, :pos,
+        VALUES ('theses', :spid, NULL, :pos,
                 normalize_name_form(:raw_author_name), :roles,
                 :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
@@ -179,7 +159,6 @@ def upsert_theses_source_authorship(
         stmt,
         {
             "spid": source_publication_id,
-            "source_person_id": source_person_id,
             "pos": author_position,
             "roles": roles,
             "raw_author_name": raw_author_name,
@@ -228,9 +207,6 @@ class PgThesesNormalizeQueries:
 
     def upsert_theses_source_publication(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_theses_source_publication(conn, **kwargs)
-
-    def upsert_theses_source_person_by_ppn(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_theses_source_person_by_ppn(conn, **kwargs)
 
     def upsert_theses_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_theses_source_authorship(conn, **kwargs)

@@ -9,7 +9,6 @@ from infrastructure.db.queries.normalize_theses import (
     get_theses_publication_id,
     merge_publication_meta,
     upsert_theses_source_authorship,
-    upsert_theses_source_person_by_ppn,
     upsert_theses_source_publication,
 )
 
@@ -90,28 +89,6 @@ class TestUpsertThesesSourcePublication:
         assert lang == "fr"
 
 
-class TestThesesSourcePersons:
-    def test_upsert_by_ppn_inserts_new(self, sa_sync_conn):
-        sp_id = upsert_theses_source_person_by_ppn(
-            sa_sync_conn, ppn="PPN1", full_name="Dupond Jean"
-        )
-        row = sa_sync_conn.execute(
-            text("SELECT idref, source_id FROM source_persons WHERE id = :id"),
-            {"id": sp_id},
-        ).one()
-        assert row.idref == "PPN1"
-        assert row.source_id == "PPN1"
-
-    def test_upsert_by_ppn_reuses_existing(self, sa_sync_conn):
-        a = upsert_theses_source_person_by_ppn(sa_sync_conn, ppn="PPN2", full_name="Ancien")
-        b = upsert_theses_source_person_by_ppn(sa_sync_conn, ppn="PPN2", full_name="Nouveau")
-        assert a == b
-        full_name = sa_sync_conn.execute(
-            text("SELECT full_name FROM source_persons WHERE id = :id"), {"id": a}
-        ).scalar_one()
-        assert full_name == "Nouveau"
-
-
 class TestUpsertThesesSourceAuthorship:
     def test_inserts_and_upserts(self, sa_sync_conn):
         staging_id = _create_staging(sa_sync_conn)
@@ -133,24 +110,21 @@ class TestUpsertThesesSourceAuthorship:
             topics_json=None,
             source_meta_json=None,
         )
-        sp = upsert_theses_source_person_by_ppn(sa_sync_conn, ppn="PPN", full_name="A")
         sa_1 = upsert_theses_source_authorship(
             sa_sync_conn,
             source_publication_id=sd,
-            source_person_id=sp,
             author_position=0,
             roles=["author"],
             raw_author_name="A",
-            identifiers=None,
+            person_identifiers=None,
         )
         sa_2 = upsert_theses_source_authorship(
             sa_sync_conn,
             source_publication_id=sd,
-            source_person_id=sp,
             author_position=0,
             roles=["author", "thesis_director"],
             raw_author_name="A",
-            identifiers=None,
+            person_identifiers=None,
         )
         assert sa_1 == sa_2
         roles = sa_sync_conn.execute(
@@ -185,15 +159,13 @@ class TestFetchThesisPrimaryAuthor:
             topics_json=None,
             source_meta_json=None,
         )
-        sp = upsert_theses_source_person_by_ppn(sa_sync_conn, ppn="PPN-X", full_name="Jean Dupond")
         upsert_theses_source_authorship(
             sa_sync_conn,
             source_publication_id=sd,
-            source_person_id=sp,
             author_position=0,
             roles=["author"],
             raw_author_name="Jean Dupond",
-            identifiers=None,
+            person_identifiers=None,
         )
         assert fetch_thesis_primary_author(sa_sync_conn, pub) == ("Dupond", "Jean")
 
