@@ -27,11 +27,31 @@ Audit (cf. discussion architecturale 2026-05-11) :
 
 ## Décisions
 
-1. **`source_persons` supprimée**. Identifiants fiables (`idhal`,
-   `idref`) migrés vers `person_identifiers` (id_types déjà
-   existants). `hal_person_id` **non migré** : assume la perte du
-   matching par hal_person_id pour les comptes HAL sans idhal, le
-   fallback nom-match prendra le relais.
+1. **`source_persons` supprimée**. Distinction sémantique fondatrice
+   à respecter :
+   - **`source_authorships.person_identifiers`** (JSONB, à renommer
+     depuis `identifiers`) = observation par-authorship des
+     identifiants vus sur cette signature spécifique. Cible naturelle
+     du transfert depuis `source_persons` (tables à supprimer).
+   - **`person_identifiers`** (table) = référentiel canonique
+     personne, alimenté par promotion via le pipeline personnes
+     (`add_identifiers_from_authorships`). **Pas la cible du transfert
+     depuis source_persons** — ce serait court-circuiter la voie
+     canonique.
+   - Types d'identifiants côté `person_identifiers` : 4 au total
+     (`orcid`, `idhal`, `idref`, `hal_person_id`), avec
+     `hal_person_id` interne (jamais visible UI). Deux constantes
+     dans `domain/persons/identifiers.py` :
+     - `PERSON_IDENTIFIER_TYPES = ("orcid", "idhal", "idref", "hal_person_id")` :
+       liste complète, utilisée par `add_identifiers_from_authorships`
+       pour la promotion canonique.
+     - `PUBLIC_PERSON_IDENTIFIER_TYPES = ("orcid", "idhal", "idref")` :
+       sous-ensemble visible UI, utilisée par les filtres SQL côté
+       `detail.py`/`list.py` et la validation API d'ajout.
+   - Pas de risque qu'un utilisateur crée un `hal_person_id` à la
+     main : la route d'ajout (`application/persons.py:237` +
+     `interfaces/api/routers/persons.py:313`) valide contre
+     `PUBLIC_PERSON_IDENTIFIER_TYPES`.
 2. **`source_structures` supprimée**. Pour HAL, le `country` côté
    structure est migré sur `source_authorships.countries` (ARRAY de
    codes pays par sa). Pour les autres sources, l'info `country` du
@@ -60,13 +80,13 @@ Audit (cf. discussion architecturale 2026-05-11) :
 
 ### Phase 1 — Préalable schéma
 
-- [ ] Migration Alembic : `ADD COLUMN source_structures ARRAY[TEXT]`
+- [x] Migration Alembic : `ADD COLUMN source_structures ARRAY[TEXT]`
   et `ADD COLUMN countries ARRAY[CHAR(2)]` sur `source_authorships`
   (nullable, sans default).
 
 ### Phase 2 — Scripts one-shot de peuplement
 
-- [ ] `interfaces/cli/maintenance/migrate_source_structures.py` :
+- [x] `interfaces/cli/maintenance/migrate_source_structures.py` :
   - peuple `source_authorships.source_structures` en faisant
     `array_agg(ss.source_id ORDER BY ss.source_id)` via la jointure
     `source_struct_ids → source_structures.id`.
@@ -74,12 +94,26 @@ Audit (cf. discussion architecturale 2026-05-11) :
     faisant `array_agg(DISTINCT ss.country ORDER BY ss.country)` via
     la même jointure.
   - idempotent (skip si déjà rempli).
-- [ ] `interfaces/cli/maintenance/migrate_source_persons_identifiers.py` :
-  - `INSERT INTO person_identifiers (person_id, id_type, id_value, status)`
-    pour chaque `(sp.person_id, 'idhal', sp.source_ids->>'idhal')`
-    et `(sp.person_id, 'idref', sp.idref)` non-NULL.
-  - `ON CONFLICT DO NOTHING` (skip si déjà connu).
-  - Lancement via `python -m interfaces.cli.maintenance.migrate_source_persons_identifiers`.
+- [ ] `interfaces/cli/maintenance/migrate_source_persons_to_authorships.py`
+  *(à écrire seulement si l'audit confirme que des
+  `source_authorships` manquent l'info présente dans
+  `source_persons`)* :
+  - `UPDATE source_authorships sa SET person_identifiers = jsonb_strip_nulls(coalesce(sa.person_identifiers, '{}') || jsonb_build_object(...))
+     FROM source_persons sp WHERE sa.source_person_id = sp.id`
+  - Champs à merger : `idhal` (depuis `sp.source_ids->>'idhal'`),
+    `idref` (depuis `sp.idref`), `hal_person_id` (depuis
+    `sp.source_ids->>'hal_person_id'`, filtré `> 0`), `orcid`
+    (depuis `sp.orcid`).
+  - Idempotent par construction (`||` JSONB ne crée pas de doublon ;
+    `jsonb_strip_nulls` éclate les `null` introduits par
+    `jsonb_build_object` quand la valeur source est absente).
+  - **Audit préalable obligatoire** : compter les
+    `source_authorships` qui ont une `source_persons` rattachée mais
+    auxquelles il manque l'info dans `person_identifiers` JSONB.
+    Si l'audit retourne 0 (le pipeline a déjà tout poussé via
+    `compact_identifiers` dans `normalize_hal.py` etc.), le script
+    n'est pas nécessaire — l'item devient « DROP TABLE source_persons »
+    direct.
 
 ### Phase 3 — Refactor code
 
@@ -98,10 +132,10 @@ Audit (cf. discussion architecturale 2026-05-11) :
   jointure via `source_structures`.
 - [ ] `infrastructure/db/queries/hal_problems.py` : refactor des
   requêtes de doublons HAL pour grouper sur
-  `source_authorships.identifiers->>'idhal'` (ou sur
-  `(person_id, identifiers->>'hal_person_id')` si on conserve la
-  capacité de détecter les doublons par hal_person_id pour les
-  comptes sans idhal, à confirmer).
+  `source_authorships.identifiers->>'idhal'` et/ou sur
+  `(person_id, identifiers->>'hal_person_id')` (la décision finale
+  dépendra du volume de comptes HAL sans idhal — à voir au moment
+  du refactor).
 - [ ] `infrastructure/db/queries/persons/create.py:fetch_hal_account_to_person_map` :
   refactor pour interroger `person_identifiers` (id_type='idhal')
   au lieu de `source_persons`.
@@ -123,6 +157,10 @@ Audit (cf. discussion architecturale 2026-05-11) :
 - [ ] Mettre à jour `infrastructure/db/tables.py` (MetaData SA).
 - [ ] Mettre à jour les ports `domain/ports/person_repository.py`
   (méthodes éventuelles concernant `source_persons`).
+- [ ] `infrastructure/db/queries/persons/detail.py` : filtrer
+  `id_type <> 'hal_person_id'` sur les lignes 37-40 (agrégat JSONB
+  des identifiers exposé via la page détail) et 70 (sélection
+  brute pour admin) — cf. décision 1.
 
 ### Phase 4 — Tests + suppression schéma
 

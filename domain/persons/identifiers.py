@@ -17,6 +17,20 @@ from dataclasses import dataclass
 from domain.errors import ValidationError
 from domain.json_types import JsonValue
 
+# ── Types d'identifiants publics côté référentiel personnes ────────
+#
+# Whitelist des `id_types` autorisés à apparaître dans l'UI et dans les
+# API publiques de `person_identifiers`. Les autres types (notamment
+# `hal_person_id`, identifiant interne HAL utilisé pour la dédup
+# cross-source) sont stockés en base mais **jamais exposés**.
+#
+# Convention : tous les sites qui exposent `person_identifiers` à l'UI
+# (page personne, liste persons, agrégat doublons) doivent filtrer sur
+# cette whitelist. Tous les sites d'écriture par utilisatrice (form,
+# routes POST) doivent valider l'`id_type` contre cette même whitelist.
+
+PUBLIC_PERSON_IDENTIFIER_TYPES: tuple[str, ...] = ("orcid", "idhal", "idref")
+
 # ── ORCID ──────────────────────────────────────────────────────────
 
 _ORCID_URL_PREFIXES = ("https://orcid.org/", "http://orcid.org/", "orcid.org/")
@@ -173,11 +187,11 @@ class IdRef:
         return self.value
 
 
-# ── Construction du dict JSONB `source_authorships.identifiers` ────
+# ── Construction du dict JSONB `source_authorships.person_identifiers` ────
 
 
 def compact_identifiers(**ids: JsonValue) -> dict[str, JsonValue] | None:
-    """Construit le dict d'identifiants pour ``source_authorships.identifiers``.
+    """Construit le dict d'identifiants pour ``source_authorships.person_identifiers``.
 
     Convention : valeur falsy (None, 0, "", …) → clé absente du dict, dict
     vide → None. Le caller gère ses propres gardes spécifiques (ex. pour

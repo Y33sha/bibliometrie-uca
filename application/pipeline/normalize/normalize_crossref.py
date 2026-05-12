@@ -10,7 +10,7 @@ Tables peuplées :
     source_authorships                      (lien document × auteur, source='crossref')
 
 Pas d'écriture dans ``source_persons`` : les auteurs CrossRef n'ont pas
-d'identifiant stable, l'ORCID éventuel vit sur ``source_authorships.identifiers``.
+d'identifiant stable, l'ORCID éventuel vit sur ``source_authorships.person_identifiers``.
 
 Particularités CrossRef :
 - Affiliations purement textuelles et génériques (tutelles), pas de
@@ -230,7 +230,7 @@ def process_authors(
     Depuis le chantier source_persons, CrossRef n'écrit plus dans
     `source_persons` (les entités auteurs CrossRef synthétiques 1:1 avec
     l'authorship n'apportaient rien). L'ORCID, seul identifiant
-    exploitable côté CrossRef, vit sur `source_authorships.identifiers`.
+    exploitable côté CrossRef, vit sur `source_authorships.person_identifiers`.
     Les affiliations brutes (génériques tutelle) restent sur `source_data`.
     """
     queries.clear_source_authorships_for_publication(conn, source_publication_id)
@@ -263,7 +263,7 @@ def process_authors(
             author_position=position,
             raw_author_name=full_name,
             source_data=sd if sd else None,
-            identifiers=ids if ids else None,
+            person_identifiers=ids if ids else None,
         )
 
 

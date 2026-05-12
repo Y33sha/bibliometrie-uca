@@ -43,7 +43,7 @@ class CrossrefNormalizeQueries(Protocol):
         author_position: int,
         raw_author_name: str | None,
         source_data: JsonValue,
-        identifiers: JsonValue,
+        person_identifiers: JsonValue,
     ) -> int: ...
 
     def get_crossref_publication_id(self, conn: Connection, doi: str) -> int | None: ...

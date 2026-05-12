@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from infrastructure.db.queries.filters import (
     WhereClause,
     assemble_where,
@@ -218,9 +219,10 @@ def list_persons(
                        ) ORDER BY pi.id_type, pi.id_value) AS identifiers
                 FROM person_identifiers pi
                 WHERE pi.person_id = ANY(:ids)
+                  AND pi.id_type = ANY(:public_id_types)
                 GROUP BY pi.person_id
             """),
-            {"ids": person_ids},
+            {"ids": person_ids, "public_id_types": list(PUBLIC_PERSON_IDENTIFIER_TYPES)},
         ).all()
         for r in id_rows:
             identifiers_map[r.person_id] = r.identifiers

@@ -351,7 +351,7 @@ def insert_openalex_document(
 # Plus d'écriture dans source_persons côté OA depuis le chantier
 # source_persons (cf. docs/chantiers/2026-04-28_source-persons.md) : les entités
 # auteurs OA sont algorithmiques et non fiables, on garde uniquement
-# l'ORCID quand présent, directement sur source_authorships.identifiers.
+# l'ORCID quand présent, directement sur source_authorships.person_identifiers.
 
 
 def _extract_openalex_orcid(authorship: dict) -> str | None:
@@ -409,7 +409,7 @@ def process_authorships(
     """
     Traite les authorships d'un work OpenAlex :
     - Crée les liens source_authorships (source='openalex', source_person_id=NULL)
-    - Stocke l'ORCID dans source_authorships.identifiers quand présent
+    - Stocke l'ORCID dans source_authorships.person_identifiers quand présent
     - Extrait et insère les institutions dans source_structures (source='openalex')
     - Stocke les source_struct_ids (source_structures.id) sur chaque authorship
 
@@ -473,7 +473,7 @@ def process_authorships(
             source_struct_ids=source_struct_ids or None,
             raw_author_name=raw_author_name,
             is_corresponding=is_corresponding,
-            identifiers=identifiers,
+            person_identifiers=identifiers,
         )
 
         if addr_parts:

@@ -323,7 +323,7 @@ def process_authors(
             author_position=position,
             roles=roles or None,
             raw_author_name=author_full_name,
-            identifiers=identifiers,
+            person_identifiers=identifiers,
         )
 
         if addr_parts:

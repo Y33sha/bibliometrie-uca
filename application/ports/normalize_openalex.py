@@ -63,7 +63,7 @@ class OpenalexNormalizeQueries(Protocol):
         source_struct_ids: list[int] | None,
         raw_author_name: str | None,
         is_corresponding: bool,
-        identifiers: JsonValue,
+        person_identifiers: JsonValue,
     ) -> int: ...
 
     def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool: ...

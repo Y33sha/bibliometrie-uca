@@ -67,7 +67,7 @@ class HalNormalizeQueries(Protocol):
         raw_author_name: str,
         is_corresponding: bool,
         roles: list[str] | None,
-        identifiers: JsonValue,
+        person_identifiers: JsonValue,
     ) -> int: ...
 
     def staging_has_hal_doi(self, conn: Connection, doi: str) -> bool: ...

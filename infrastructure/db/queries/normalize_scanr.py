@@ -126,29 +126,29 @@ def upsert_scanr_source_authorship(
     author_position: int,
     roles: list[str] | None,
     raw_author_name: str | None,
-    identifiers: JsonValue,
+    person_identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une `source_authorships` ScanR. Retourne l'id.
 
     `source_person_id` peut être NULL : depuis le chantier source_persons,
     seuls les auteurs avec idref génèrent un row dans `source_persons`.
     Les autres écrivent uniquement la `source_authorships` avec
-    `identifiers={"orcid": ...}` (et éventuellement `idref` si présent
-    sans qu'on ait jugé utile de créer un source_persons).
+    `person_identifiers={"orcid": ...}` (et éventuellement `idref` si
+    présent sans qu'on ait jugé utile de créer un source_persons).
     """
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position, roles,
-             author_name_normalized, raw_author_name, identifiers)
+             author_name_normalized, raw_author_name, person_identifiers)
         VALUES ('scanr', :spid, :source_person_id, :pos, :roles,
-                normalize_name_form(:raw_author_name), :raw_author_name, :identifiers)
+                normalize_name_form(:raw_author_name), :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,
             roles = EXCLUDED.roles,
             raw_author_name = EXCLUDED.raw_author_name,
-            identifiers = EXCLUDED.identifiers
+            person_identifiers = EXCLUDED.person_identifiers
         RETURNING id
-    """).bindparams(bindparam("identifiers", type_=JSONB))
+    """).bindparams(bindparam("person_identifiers", type_=JSONB))
     row = conn.execute(
         stmt,
         {
@@ -157,7 +157,7 @@ def upsert_scanr_source_authorship(
             "pos": author_position,
             "roles": roles,
             "raw_author_name": raw_author_name,
-            "identifiers": identifiers,
+            "person_identifiers": person_identifiers,
         },
     ).one()
     return row.id

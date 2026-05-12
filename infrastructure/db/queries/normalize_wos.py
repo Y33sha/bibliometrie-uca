@@ -144,12 +144,13 @@ def upsert_wos_source_authorships_batch(conn: Connection, values: list[dict[str,
     Chaque dict du batch a les clés : ``source_publication_id``,
     ``source_person_id`` (toujours None), ``author_position``,
     ``is_corresponding``, ``author_name_normalized``,
-    ``source_struct_ids``, ``roles``, ``raw_author_name``, ``identifiers``.
+    ``source_struct_ids``, ``roles``, ``raw_author_name``,
+    ``person_identifiers``.
 
     `source_person_id` est NULL : depuis le chantier source_persons, WoS
     n'écrit plus dans `source_persons` (entité algorithmique non fiable
     via `daisng_id`). Les identifiants normalisés (`orcid`, `researcher_id`)
-    vivent sur `identifiers`.
+    vivent sur `person_identifiers`.
     """
     if not values:
         return
@@ -157,10 +158,10 @@ def upsert_wos_source_authorships_batch(conn: Connection, values: list[dict[str,
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
              is_corresponding, author_name_normalized,
-             source_struct_ids, roles, raw_author_name, identifiers)
+             source_struct_ids, roles, raw_author_name, person_identifiers)
         VALUES ('wos', :spid, :source_person_id, :author_position,
                 :is_corresponding, :author_name_normalized,
-                :source_struct_ids, :roles, :raw_author_name, :identifiers)
+                :source_struct_ids, :roles, :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
             is_corresponding = EXCLUDED.is_corresponding OR source_authorships.is_corresponding,
             author_name_normalized = COALESCE(
@@ -173,9 +174,9 @@ def upsert_wos_source_authorships_batch(conn: Connection, values: list[dict[str,
             ),
             roles = EXCLUDED.roles,
             raw_author_name = EXCLUDED.raw_author_name,
-            identifiers = EXCLUDED.identifiers
+            person_identifiers = EXCLUDED.person_identifiers
     """).bindparams(
-        bindparam("identifiers", type_=JSONB),
+        bindparam("person_identifiers", type_=JSONB),
     )
     conn.execute(stmt, values)
 

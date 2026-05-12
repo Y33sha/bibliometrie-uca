@@ -463,7 +463,7 @@ def insert_wos_document(
 # source_persons (cf. docs/chantiers/2026-04-28_source-persons.md) : le `daisng_id`
 # est une entité algorithmique non fiable, et le `researcher_id`
 # (ResearcherID Clarivate) est un identifiant cross-source qui vit mieux
-# directement sur source_authorships.identifiers.
+# directement sur source_authorships.person_identifiers.
 
 
 def _resolve_addresses_batch(
@@ -554,7 +554,7 @@ def process_authorships(
             "source_struct_ids": institution_ids or None,
             "roles": author.get("roles"),
             "raw_author_name": author["full_name"],
-            "identifiers": ids if ids else None,
+            "person_identifiers": ids if ids else None,
         }
 
     queries.upsert_wos_source_authorships_batch(conn, list(values.values()))

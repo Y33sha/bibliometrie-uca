@@ -54,7 +54,7 @@ class ScanrNormalizeQueries(Protocol):
         author_position: int,
         roles: list[str] | None,
         raw_author_name: str | None,
-        identifiers: JsonValue,
+        person_identifiers: JsonValue,
     ) -> int: ...
 
     def get_scanr_publication_id(self, conn: Connection, scanr_id: str) -> int | None: ...

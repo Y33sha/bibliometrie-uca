@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from infrastructure.db.queries.filters import OA_CLOSED_SQL
 
@@ -37,13 +38,15 @@ def get_person(conn: Connection, person_id: int) -> dict[str, Any] | None:
                     'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
                     'source', pi.source, 'status', pi.status
                 ) ORDER BY pi.id_type, pi.id_value)
-                 FROM person_identifiers pi WHERE pi.person_id = p.id
+                 FROM person_identifiers pi
+                 WHERE pi.person_id = p.id
+                   AND pi.id_type = ANY(:public_id_types)
                 ) AS identifiers
             FROM persons p
             LEFT JOIN persons_rh prh ON prh.person_id = p.id
             WHERE p.id = :pid
         """),
-        {"pid": person_id},
+        {"pid": person_id, "public_id_types": list(PUBLIC_PERSON_IDENTIFIER_TYPES)},
     ).one_or_none()
     return dict(row._mapping) if row else None
 
@@ -68,9 +71,11 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
     id_rows = conn.execute(
         text("""
             SELECT id, id_type, id_value, source, status
-            FROM person_identifiers WHERE person_id = :pid
+            FROM person_identifiers
+            WHERE person_id = :pid
+              AND id_type = ANY(:public_id_types)
         """),
-        {"pid": person_id},
+        {"pid": person_id, "public_id_types": list(PUBLIC_PERSON_IDENTIFIER_TYPES)},
     ).all()
     identifiers = [dict(r._mapping) for r in id_rows]
 
@@ -109,13 +114,13 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
 
     # WoS post-chantier source_persons : plus de source_persons WoS,
     # group by raw_author_name comme OpenAlex. ORCID lu depuis
-    # source_authorships.identifiers.
+    # source_authorships.person_identifiers.
     wos_rows = conn.execute(
         text("""
             SELECT MIN(sa.id) AS id,
                    sa.raw_author_name AS full_name,
                    'wos' AS source,
-                   MAX(sa.identifiers->>'orcid') AS orcid,
+                   MAX(sa.person_identifiers->>'orcid') AS orcid,
                    NULL::text AS idhal, NULL::text AS openalex_id,
                    COUNT(*) FILTER (WHERE sa.in_perimeter = TRUE) AS uca_pub_count
             FROM source_authorships sa

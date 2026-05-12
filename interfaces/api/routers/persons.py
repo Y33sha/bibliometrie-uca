@@ -54,6 +54,7 @@ from application.ports.persons_queries import (
     ListFilters,
     PersonsQueries,
 )
+from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.authorship_repository import AuthorshipRepository
 from domain.ports.person_repository import PersonRepository
@@ -310,8 +311,11 @@ def add_person_identifier(
     repo: PersonRepository = Depends(person_repo_sync),
 ) -> AddIdentifierResponse:
     """Ajoute manuellement un identifiant (ORCID ou idHAL) à une personne."""
-    if data.id_type not in ("orcid", "idhal", "idref"):
-        raise HTTPException(status_code=400, detail="id_type doit être 'orcid', 'idhal' ou 'idref'")
+    if data.id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}",
+        )
 
     id_value = data.id_value.strip()
     if data.id_type == "orcid":

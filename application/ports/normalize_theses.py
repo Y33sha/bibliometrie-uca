@@ -59,7 +59,7 @@ class ThesesNormalizeQueries(Protocol):
         author_position: int | None,
         roles: list[str],
         raw_author_name: str,
-        identifiers: JsonValue,
+        person_identifiers: JsonValue,
     ) -> int: ...
 
     def get_theses_publication_id(self, conn: Connection, theses_id: str) -> int | None: ...
