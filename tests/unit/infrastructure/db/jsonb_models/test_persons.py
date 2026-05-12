@@ -4,7 +4,7 @@
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from domain.persons.source_ids import PersonSourceIds
+from infrastructure.db.jsonb_models.persons import PersonSourceIds
 
 
 class TestPersonSourceIds:

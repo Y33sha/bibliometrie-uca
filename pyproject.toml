@@ -60,6 +60,9 @@ optional_dependencies_dev_groups = ["dev"]
 # ----------------------------------------------------------------------
 [tool.importlinter]
 root_packages = ["domain", "application", "infrastructure", "interfaces"]
+# Nécessaire pour les contrats `forbidden` qui ciblent des modules
+# externes (cf. "Domain : pas de framework externe").
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Couches DDD (layered)"
@@ -92,6 +95,16 @@ ignore_imports = [
     "interfaces.api.routers.admin_pipeline -> infrastructure.pipeline_status",
     "interfaces.api.routers.docs -> infrastructure",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Domain : pas de framework externe"
+type = "forbidden"
+source_modules = ["domain"]
+forbidden_modules = ["pydantic", "sqlalchemy", "fastapi", "starlette", "psycopg"]
+# Le domaine ne dépend de rien : pas d'ORM, pas de validation
+# Pydantic, pas de framework web, pas de driver DB. Les modèles
+# d'I/O JSONB (BaseModel) vivent dans infrastructure/db/jsonb_models/.
+# Cf. docs/chantiers/CODE_purete-domain.md.
 
 [tool.deptry.per_rule_ignores]
 # python-dotenv n'est pas importé directement, mais pydantic-settings
