@@ -164,8 +164,11 @@ Audit (cf. discussion architecturale 2026-05-11) :
   dual-write `UPDATE source_persons SET person_id = :pid WHERE
   source_ids->>'idhal' = :iv` supprimé (déclenchait quand un idHAL
   était ajouté à une personne). Docstring nettoyée du side-effect.
-- [ ] `infrastructure/repositories/person_repository/_core.py:merge_into` :
-  supprimer la propagation `UPDATE source_persons`.
+- [x] `infrastructure/repositories/person_repository/_core.py:merge_into` :
+  propagation `UPDATE source_persons SET person_id = :t WHERE
+  person_id = :s` supprimée de la séquence de fusion (étape 1 du
+  merge). Docstring mise à jour (passe de 7 à 6 tables touchées par
+  la fusion).
 
 #### Normalizers : arrêter UPSERT `source_persons` + `source_structures`
 
