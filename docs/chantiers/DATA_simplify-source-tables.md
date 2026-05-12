@@ -197,10 +197,16 @@ Audit (cf. discussion architecturale 2026-05-11) :
   `upsert_wos_source_structure`, `fetch_wos_source_structures`. Le
   cache module-level `_wos_institution_cache` n'a plus de raison
   d'exister.
-- [ ] `application/pipeline/normalize/normalize_scanr.py` /
-  `normalize_theses.py` : arrêter d'UPSERT dans `source_persons` et
-  `source_structures` (ScanR/Theses écrivent encore `source_persons`
-  via `upsert_*_source_person_by_idref/ppn`).
+- [x] `application/pipeline/normalize/normalize_scanr.py` /
+  `normalize_theses.py` : arrêt UPSERT vers `source_persons` (les deux
+  sources écrivaient via `upsert_*_source_person_by_idref/ppn`).
+  `source_authorships.source_person_id` toujours NULL — les
+  identifiants (idref, ppn, orcid) sont déjà portés par
+  `sa.person_identifiers` JSONB. Fonctions query supprimées :
+  `upsert_scanr_source_person_by_idref`,
+  `upsert_theses_source_person_by_ppn`. La règle
+  `domain/persons/creation.py:should_create_source_person` n'ayant
+  plus de caller, supprimée également (avec ses tests unitaires).
 
 #### Cleanup schéma (avant Phase 4 DROP)
 
