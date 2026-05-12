@@ -69,7 +69,7 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     """Fusionne `source_id` dans `target_id`.
 
     Séquence complète en une transaction :
-    1. Transfert auteurs sources + source_authorships
+    1. Transfert source_authorships
     2. Dédoublonnage + transfert authorships vérité
     3. Dédoublonnage + transfert identifiants
     4. Transfert conditionnel fiche RH
@@ -81,12 +81,8 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     vérifié avant par le service via `has_distinct_rh`.
 
     Tout en `text()` : la complexité du merge ne tire pas de bénéfice
-    clair de SA Core (cross-aggregate sur 7 tables).
+    clair de SA Core (cross-aggregate sur 6 tables).
     """
-    conn.execute(
-        text("UPDATE source_persons SET person_id = :t WHERE person_id = :s"),
-        {"t": target_id, "s": source_id},
-    )
     conn.execute(
         text("UPDATE source_authorships SET person_id = :t WHERE person_id = :s"),
         {"t": target_id, "s": source_id},
