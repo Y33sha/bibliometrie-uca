@@ -604,6 +604,6 @@ class OpenalexNormalizer(SourceNormalizer):
 
     def summary_stats(self, conn: Connection) -> list[str]:
         return [
-            f"  {table} (openalex) : {self._queries.count_openalex_table(conn, table)} enregistrements"
-            for table in ("source_structures", "source_persons", "source_publications")
+            f"  source_publications (openalex) : "
+            f"{self._queries.count_openalex_table(conn, 'source_publications')} enregistrements"
         ]

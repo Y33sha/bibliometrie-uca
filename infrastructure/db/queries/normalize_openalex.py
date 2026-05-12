@@ -192,12 +192,8 @@ def get_openalex_publication_id(conn: Connection, openalex_id: str) -> int | Non
 
 
 def count_openalex_table(conn: Connection, table: str) -> int:
-    """Compte les lignes d'une table avec `source = 'openalex'` (liste blanche).
-
-    `source_persons` reste accepté pour permettre de tracer les rows
-    legacy (cf. `docs/chantiers/2026-04-28_source-persons.md`).
-    """
-    if table not in ("source_publications", "source_persons", "source_structures"):
+    """Compte les lignes d'une table avec `source = 'openalex'` (liste blanche)."""
+    if table not in ("source_publications", "source_authorships"):
         raise ValueError(f"Table inattendue : {table!r}")
     return conn.execute(
         text(f"SELECT COUNT(*) AS cnt FROM {table} WHERE source = 'openalex'")

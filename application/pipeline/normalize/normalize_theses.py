@@ -400,5 +400,5 @@ class ThesesNormalizer(SourceNormalizer):
     def summary_stats(self, conn: Connection) -> list[str]:
         return [
             f"  {table} (theses) : {self._queries.count_theses_table(conn, table)}"
-            for table in ("source_publications", "source_persons", "source_authorships")
+            for table in ("source_publications", "source_authorships")
         ]
