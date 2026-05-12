@@ -18,9 +18,6 @@ def add_identifier(
     Si l'identifiant existe avec statut 'rejected', le réattribue
     (nouveau person_id, statut pending). Si 'pending' ou 'confirmed',
     ne fait rien.
-
-    Pour les idHAL, rattache aussi le compte HAL correspondant dans
-    `source_persons` (side-effect cross-table attendu par le pipeline).
     """
     conn.execute(
         text("""
@@ -34,16 +31,6 @@ def add_identifier(
         """),
         {"pid": person_id, "it": id_type, "iv": id_value, "src": source, "st": status},
     )
-    if id_type == "idhal":
-        conn.execute(
-            text("""
-                UPDATE source_persons SET person_id = :pid
-                WHERE source = 'hal'
-                  AND source_ids->>'idhal' = :iv
-                  AND (person_id IS NULL OR person_id != :pid)
-            """),
-            {"pid": person_id, "iv": id_value},
-        )
 
 
 def remove_identifier(conn: Connection, person_id: int, id_type: str, id_value: str) -> None:

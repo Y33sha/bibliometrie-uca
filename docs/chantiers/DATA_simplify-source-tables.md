@@ -160,8 +160,10 @@ Audit (cf. discussion architecturale 2026-05-11) :
   `_authorships.py` → adapter `PgPersonRepository.link_authorship` →
   port `domain/ports/person_repository.py:link_authorship` →
   service `application/persons.py:link_authorship` + `link_authorships`).
-- [ ] `infrastructure/repositories/person_repository/_identifiers.py:add_identifier` :
-  supprimer le dual-write `source_persons`.
+- [x] `infrastructure/repositories/person_repository/_identifiers.py:add_identifier` :
+  dual-write `UPDATE source_persons SET person_id = :pid WHERE
+  source_ids->>'idhal' = :iv` supprimé (déclenchait quand un idHAL
+  était ajouté à une personne). Docstring nettoyée du side-effect.
 - [ ] `infrastructure/repositories/person_repository/_core.py:merge_into` :
   supprimer la propagation `UPDATE source_persons`.
 
