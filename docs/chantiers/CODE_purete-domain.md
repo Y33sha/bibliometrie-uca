@@ -91,39 +91,65 @@ Trois principes pertinents :
 
 ### Phase 1 — Inventaire fin et règles métier latentes
 
-- [ ] Classification symbole par symbole des 3 fichiers `domain/`
-  contenant du pydantic : ce qui est vrai métier (à garder),
-  ce qui est I/O JSONB (à déplacer), ce qui mérite d'émerger en
-  enum/règle métier (à créer).
-- [ ] Identifier les règles métier perdues dans les docstrings des
-  `BaseModel` (ex. `hal_person_id ≤ 0` sentinelle, contraintes
-  cross-source sur `api_ids`, …) — à reformuler en code testable.
+- [x] Classification symbole par symbole des 3 fichiers `domain/`
+  contenant du pydantic. Résultat : les 10 `BaseModel` sont tous
+  de l'I/O JSONB sans comportement métier. Aucun ne dépasse le
+  rôle « valider la forme d'un dict + sérialiser ».
+- [x] Identification des règles latentes :
+  - `hal_person_id ≤ 0 = sentinelle` : faux problème, **déjà**
+    code testable dans `domain/persons/creation.py:should_create_source_person`.
+  - `meta.discipline` canonique vs `topics.theses.discipline` :
+    pas une règle, c'est un cleanup TODO (renvoyé à un chantier
+    dédié).
+  - Enums `SourceCode` / `PersonSourceIdentifierType` : vraies
+    absences, mais relèvent de l'émergence de domaine →
+    `richesse-domain`, pas `purete-domain`.
+- [x] Constat surprenant : les 10 `BaseModel` sont quasi-inutilisés
+  en runtime — seul caller prod = `application/structures.py`.
+  Le reste est documentaire (uniquement des tests). La validation
+  Pydantic n'a jamais lieu dans le pipeline. → simplifie le
+  déplacement.
 
-### Phase 2 — Émergence de l'enum + règles métier
+### Phase 2 — Déplacer les `BaseModel` vers `infrastructure/db/jsonb_models/`
 
-- [ ] Créer `domain/sources.py` (enum `SourceCode` + règles).
-- [ ] Enrichir `domain/persons/identifiers.py` avec
-  `SourceIdentifierType` (enum) + helpers métier
-  (`is_confirmed_hal_account` etc.).
-- [ ] Ces ajouts portent en code ce qui était implicite dans les
-  docstrings — tests dédiés à écrire.
+Décisions actées :
+- **A1** : cible = `infrastructure/db/jsonb_models/` (sous-package
+  avec 3 fichiers miroirs des 3 fichiers `domain/` d'origine).
+- **C2** : tout déplacé en un seul commit (volume mécanique).
+- **D1** : pour `application/structures.py` (seul caller prod),
+  la validation Pydantic descend dans le repository
+  (`infrastructure/repositories/structure_repository.py`). Le
+  service passe le `dict` brut au repo ; le repo valide à
+  l'entrée de `create_structure` / `update_structure_fields` et
+  traduit `pydantic.ValidationError` → `domain.errors.ValidationError`.
 
-### Phase 3 — Déplacer les `BaseModel` vers `infrastructure/db/jsonb_models/`
+- [x] `infrastructure/db/jsonb_models/__init__.py` + `structure.py`
+  + `persons.py` + `publication.py` créés (10 `BaseModel`).
+- [x] `domain/structure.py` réduit à un docstring d'amorce.
+- [x] `domain/persons/source_ids.py` supprimé.
+- [x] `domain/publication.py` allégé : 8 `BaseModel` retirés,
+  import pydantic retiré.
+- [x] Refactor structure (D1) :
+  - `application/structures.py` : `_validate_api_ids` supprimé,
+    plus d'import `pydantic`/`StructureApiIds`, dict brut passé
+    au repo.
+  - `infrastructure/repositories/structure_repository.py` : helper
+    `_normalize_api_ids` ajouté, appelé dans `create_structure` et
+    `update_structure_fields` (intercepte `fields["api_ids"]`).
+- [x] Tests déplacés :
+  - `tests/unit/domain/test_structure.py` (supprimé) → `tests/unit/infrastructure/db/jsonb_models/test_structure.py`.
+  - `tests/unit/domain/persons/test_source_ids.py` (supprimé) → `tests/unit/infrastructure/db/jsonb_models/test_persons.py`.
+  - 4 classes (`TestExternalIdsParsing`, `TestPublicationBiblio`,
+    `TestPublicationMeta`, `TestPublicationTopics`) extraites de
+    `tests/unit/domain/test_publication.py` vers
+    `tests/unit/infrastructure/db/jsonb_models/test_publication.py`.
+  - `__init__.py` ajouté dans `tests/unit/infrastructure/db/jsonb_models/`
+    pour résoudre la collision pytest de basename avec
+    `tests/unit/domain/test_publication.py`.
 
-- [ ] Créer `infrastructure/db/jsonb_models/publication.py`
-  (`ExternalIds`, `PublicationBiblio`, `PublicationMeta`,
-  `PublicationTopics` + leurs sous-modèles).
-- [ ] Créer `infrastructure/db/jsonb_models/structure.py`
-  (`StructureApiIds`).
-- [ ] Créer `infrastructure/db/jsonb_models/persons.py`
-  (`PersonSourceIds`).
-- [ ] Mettre à jour les callers : query services, normalizers,
-  `application/structures.py`, etc.
-- [ ] Retirer les imports `pydantic` de `domain/`.
+### Phase 3 — Garde-fou import-linter
 
-### Phase 4 — Garde-fou import-linter
-
-- [ ] Ajouter contrat `forbidden` dans `pyproject.toml` :
+- [x] Contrat `forbidden` ajouté dans `pyproject.toml` :
   ```toml
   [[tool.importlinter.contracts]]
   name = "Domain : pas de framework externe"
@@ -131,13 +157,18 @@ Trois principes pertinents :
   source_modules = ["domain"]
   forbidden_modules = ["pydantic", "sqlalchemy", "fastapi", "starlette", "psycopg"]
   ```
-- [ ] Vérifier que le contrat passe en vert après Phase 3.
+- [x] `include_external_packages = true` activé au niveau
+  `[tool.importlinter]` (pré-requis pour les contrats forbidden
+  ciblant des modules externes).
+- [x] Le contrat passe en vert.
 
-### Phase 5 — Validation
+### Phase 4 — Validation
 
-- [ ] mypy + lint-imports + pytest tout vert.
-- [ ] (optionnel) Test empirique de pureté : `domain/` s'importe
-  dans un venv sans pydantic.
+- [x] `uv run mypy .` : 290 fichiers, no issues.
+- [x] `uv run pytest tests/unit/` : 577 tests verts.
+- [x] `uv run lint-imports` : 3 contrats verts (Couches DDD,
+  Routers, Domain pas de framework externe).
+- [x] `uv run ruff check .` : clean.
 
 ## Hors scope (chantiers de suite)
 

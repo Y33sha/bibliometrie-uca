@@ -1,9 +1,9 @@
-"""Tests des modèles de domain/structure.py."""
+"""Tests du modèle JSONB infrastructure/db/jsonb_models/structure.py."""
 
 import pytest
 from pydantic import ValidationError as PydanticValidationError
 
-from domain.structure import StructureApiIds
+from infrastructure.db.jsonb_models.structure import StructureApiIds
 
 
 class TestStructureApiIds:

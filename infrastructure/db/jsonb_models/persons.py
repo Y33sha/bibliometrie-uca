@@ -1,10 +1,10 @@
-"""Modèle Pydantic de la colonne JSONB ``source_persons.source_ids``.
+"""Modèle Pydantic de la colonne JSONB `source_persons.source_ids`.
 
-Distinct des VOs d'identifiants (``domain.persons.identifiers``) :
-ici on modélise la *colonne JSONB* qui stocke les identifiants
-**bruts** lus depuis les API sources (principalement HAL). Les VOs
-d'identifiants (ORCID/IdHAL/IdRef) modélisent quant à eux les types
-canoniques de l'enregistrement consolidé côté ``person_identifiers``.
+Distinct des VOs d'identifiants (`domain.persons.identifiers`) : ici on
+modélise la *colonne JSONB* qui stocke les identifiants **bruts** lus
+depuis les API sources (principalement HAL). Les VOs d'identifiants
+(ORCID/IdHAL/IdRef) modélisent quant à eux les types canoniques de
+l'enregistrement consolidé côté `person_identifiers`.
 """
 
 from typing import Any

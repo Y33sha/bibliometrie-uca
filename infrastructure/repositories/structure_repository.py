@@ -1,13 +1,38 @@
 """Adapter PostgreSQL sync pour les 3 tables du concept Structure."""
 
+from typing import Any
+
+from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import Connection, Text, cast, delete, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from domain.errors import ValidationError
+from infrastructure.db.jsonb_models.structure import StructureApiIds
 from infrastructure.db.tables import (
     structure_name_forms,
     structure_relations,
     structures,
 )
+
+
+def _normalize_api_ids(raw: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Valide et normalise `api_ids` via le modèle JSONB StructureApiIds.
+
+    - Entrée : dict brut (côté API admin) ou None.
+    - Sortie : dict canonique prêt JSONB, ou None si l'entrée est
+      vide/None.
+    - Lève `domain.errors.ValidationError` si le schéma est violé.
+
+    La validation vit côté repo (frontière infra→DB) : tout chemin
+    d'écriture passe par ici, y compris les scripts CLI qui
+    court-circuitent la couche application.
+    """
+    if not raw:
+        return None
+    try:
+        return StructureApiIds(**raw).to_dict() or None
+    except PydanticValidationError as e:
+        raise ValidationError(f"api_ids invalide : {e}") from e
 
 
 def _structure_returning_columns() -> list:
@@ -59,7 +84,7 @@ class PgStructureRepository:
                 ror_id=ror_id,
                 rnsr_id=rnsr_id,
                 hal_collection=hal_collection,
-                api_ids=api_ids,
+                api_ids=_normalize_api_ids(api_ids),
             )
             .returning(*_structure_returning_columns())
         )
@@ -67,6 +92,8 @@ class PgStructureRepository:
         return dict(result.one()._mapping)
 
     def update_structure_fields(self, structure_id: int, fields: dict) -> dict:
+        if "api_ids" in fields:
+            fields = {**fields, "api_ids": _normalize_api_ids(fields["api_ids"])}
         stmt = (
             update(structures)
             .where(structures.c.id == structure_id)

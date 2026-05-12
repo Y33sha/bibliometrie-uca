@@ -3,34 +3,20 @@ Service Structures — orchestrateur des opérations sur `structures`,
 `structure_relations`, `structure_name_forms`.
 
 Le SQL vit dans `infrastructure/repositories/structure_repository.py`.
+La validation du JSONB `api_ids` se fait à la frontière infra (repo)
+plutôt qu'ici — tout chemin d'écriture (service applicatif + scripts
+CLI éventuels) passe par le repo, donc la validation y est appliquée
+uniformément.
+
 Les routers passent par ces fonctions pour toute écriture. Les lectures
 restent autorisées dans les routers (convention du projet).
 """
-
-from pydantic import ValidationError as PydanticValidationError
 
 from application.audit import emit_event
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.structure_repository import StructureRepository
-from domain.structure import StructureApiIds
-
-
-def _validate_api_ids(raw: dict | None) -> dict | None:
-    """Valide et normalise `api_ids` via le modèle domaine StructureApiIds.
-
-    - Entrée : dict brut (côté API admin) ou None.
-    - Sortie : dict canonique prêt pour JSONB, ou None si l'entrée est vide/None.
-    - Lève ValidationError métier si le schéma est violé.
-    """
-    if not raw:
-        return None
-    try:
-        return StructureApiIds(**raw).to_dict() or None
-    except PydanticValidationError as e:
-        raise ValidationError(f"api_ids invalide : {e}") from e
-
 
 # ── Mapping des champs UI → colonnes SQL pour la table structures ──
 _STRUCTURE_FIELD_MAP = {
@@ -67,7 +53,7 @@ def create_structure(
         ror_id=ror_id,
         rnsr_id=rnsr_id,
         hal_collection=hal_collection,
-        api_ids=_validate_api_ids(api_ids),
+        api_ids=api_ids,
     )
 
 
@@ -88,7 +74,8 @@ def update_structure(structure_id: int, *, fields: dict, repo: StructureReposito
 
     if "api_ids" in fields and fields["api_ids"] is not None:
         # SA sérialise auto en JSONB depuis un dict Python ; pas de Json() wrap.
-        update_fields["api_ids"] = _validate_api_ids(fields["api_ids"])
+        # Validation appliquée côté repo.
+        update_fields["api_ids"] = fields["api_ids"]
 
     if not update_fields:
         raise ValidationError("Aucun champ à mettre à jour")
