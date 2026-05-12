@@ -46,16 +46,26 @@ class PgHalProblemsQueries:
         return {**dict(pub_row._mapping), "hal_docs": hal_docs}
 
     def hal_duplicate_accounts(self, *, page: int, per_page: int) -> dict[str, Any]:
+        # Note sur les agrégats MIN() ci-dessous : pour un même `hal_person_id`,
+        # les valeurs de `raw_author_name`/`orcid`/`idhal`/`idref` observées sur
+        # les `source_authorships` HAL devraient être constantes (ces champs
+        # sont attachés au compte HAL, pas à la signature). En théorie aucune
+        # variation possible. En pratique, si des imports à des dates
+        # différentes ont posé des valeurs divergentes (avant que la
+        # comparaison de hash ne réimporte les payloads obsolètes), MIN()
+        # ramasse une valeur déterministe arbitraire. L'optimal aurait été
+        # MAX(created_at), mais `source_authorships` n'a pas de `created_at`.
         offset = (page - 1) * per_page
         total_row = self._conn.execute(
             text("""
                 SELECT COUNT(*) AS total FROM (
-                    SELECT person_id
-                    FROM source_persons
-                    WHERE source = 'hal' AND person_id IS NOT NULL
-                      AND (source_ids->>'hal_person_id') IS NOT NULL
-                    GROUP BY person_id
-                    HAVING COUNT(DISTINCT source_ids->>'hal_person_id') >= 2
+                    SELECT sa.person_id
+                    FROM source_authorships sa
+                    WHERE sa.source = 'hal'
+                      AND sa.person_id IS NOT NULL
+                      AND sa.person_identifiers->>'hal_person_id' IS NOT NULL
+                    GROUP BY sa.person_id
+                    HAVING COUNT(DISTINCT sa.person_identifiers->>'hal_person_id') >= 2
                 ) sub
             """)
         ).one()
@@ -63,31 +73,42 @@ class PgHalProblemsQueries:
 
         rows = self._conn.execute(
             text("""
+                WITH hal_accounts AS (
+                    SELECT
+                        sa.person_id,
+                        (sa.person_identifiers->>'hal_person_id')::int AS hal_person_id,
+                        MIN(sa.raw_author_name) AS full_name,
+                        MIN(sa.person_identifiers->>'orcid') AS orcid,
+                        MIN(sa.person_identifiers->>'idhal') AS idhal,
+                        MIN(sa.person_identifiers->>'idref') AS idref,
+                        COUNT(*) AS pub_count
+                    FROM source_authorships sa
+                    WHERE sa.source = 'hal'
+                      AND sa.person_id IS NOT NULL
+                      AND sa.person_identifiers->>'hal_person_id' IS NOT NULL
+                    GROUP BY sa.person_id, sa.person_identifiers->>'hal_person_id'
+                ),
+                duplicates AS (
+                    SELECT person_id
+                    FROM hal_accounts
+                    GROUP BY person_id
+                    HAVING COUNT(*) >= 2
+                )
                 SELECT p.id AS person_id, p.last_name, p.first_name,
                        (prh.id IS NOT NULL) AS has_rh,
                        (SELECT json_agg(json_build_object(
-                           'hal_person_id', (sa.source_ids->>'hal_person_id')::int,
-                           'full_name', sa.full_name,
-                           'idhal', sa.source_ids->>'idhal',
-                           'orcid', sa.orcid,
-                           'pub_count', (SELECT COUNT(*) FROM source_authorships sa2
-                                         WHERE sa2.source = 'hal'
-                                           AND sa2.source_person_id = sa.id)
-                       ) ORDER BY (sa.source_ids->>'hal_person_id')::int)
-                        FROM source_persons sa
-                        WHERE sa.source = 'hal' AND sa.person_id = p.id
-                          AND (sa.source_ids->>'hal_person_id') IS NOT NULL
+                           'hal_person_id', ha.hal_person_id,
+                           'full_name', ha.full_name,
+                           'idhal', ha.idhal,
+                           'orcid', ha.orcid,
+                           'idref', ha.idref,
+                           'pub_count', ha.pub_count
+                       ) ORDER BY ha.hal_person_id)
+                        FROM hal_accounts ha WHERE ha.person_id = p.id
                        ) AS hal_accounts
                 FROM persons p
                 LEFT JOIN persons_rh prh ON prh.person_id = p.id
-                WHERE p.id IN (
-                    SELECT person_id
-                    FROM source_persons
-                    WHERE source = 'hal' AND person_id IS NOT NULL
-                      AND (source_ids->>'hal_person_id') IS NOT NULL
-                    GROUP BY person_id
-                    HAVING COUNT(DISTINCT source_ids->>'hal_person_id') >= 2
-                )
+                WHERE p.id IN (SELECT person_id FROM duplicates)
                 ORDER BY LOWER(p.last_name), LOWER(p.first_name)
                 LIMIT :pg_limit OFFSET :pg_offset
             """),

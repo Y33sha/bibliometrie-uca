@@ -90,6 +90,9 @@
                 {#if ha.orcid}
                   <span class="hal-orcid">ORCID: {ha.orcid}</span>
                 {/if}
+                {#if ha.idref}
+                  <span class="hal-idref">IdRef: {ha.idref}</span>
+                {/if}
               </div>
             {/each}
           </td>

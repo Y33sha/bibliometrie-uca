@@ -957,6 +957,7 @@ class HalAccountSummary(BaseModel):
     full_name: str
     idhal: str | None
     orcid: str | None
+    idref: str | None
     pub_count: int
 
 
