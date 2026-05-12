@@ -29,39 +29,26 @@ Le système intègre 6 sources bibliographiques principales, complétées par de
 
 - Dans **OpenAlex** et **WoS**, les liens authorships-structures sont résolus de manière algorithmique à partir des adresses liées aux publications. Ce processus génère beaucoup d'erreurs causées par des similitudes de noms (dans OpenAlex principalement). Mais la donnée-source (*raw affiliation string*) est présente et exploitable. On ignore donc les structure_ids présents dans les sources et **on reconstruit l'affiliation à partir des adresses brutes**. (Phase `affiliations` du pipeline.)
 
-- Dans **HAL**, les liens authorships-structures sont basés sur les affiliations renseignées dans les comptes HAL des auteurs au moment du dépôt (Cf [doc HAL](https://doc.hal.science/depot-fonctionnement-de-l-affiliation-automatique/#)), et éventuellement complétés manuellement par le déposant. Les métadonnées de HAL ne contiennent pas les adresses brutes. La seule option est donc de récupérer les affiliations telles quelles, via un *mapping* entre `source_structures` HAL et `structures` canoniques. Les erreurs sont détectées *a posteriori* (pages [hal-problems](guide-utilisateur#problemes-hal)).
+- Dans **HAL**, les liens authorships-structures sont basés sur les affiliations renseignées dans les comptes HAL des auteurs au moment du dépôt (Cf [doc HAL](https://doc.hal.science/depot-fonctionnement-de-l-affiliation-automatique/#)), et éventuellement complétés manuellement par le déposant. Les métadonnées de HAL ne contiennent pas les adresses brutes. La seule option est donc de récupérer les affiliations telles quelles : les `halId_s` natifs des structures sont stockés dans `source_authorships.source_structures` (TEXT[]) et mappés vers les `structures` canoniques via la résolution d'adresses (les noms d'unités HAL servent à reconstituer des adresses textuelles). Les erreurs sont détectées *a posteriori* (pages [hal-problems](guide-utilisateur#problemes-hal)).
 
 Le *mapping* est géré via la page [admin/structures](guide-utilisateur#gestion-des-structures-adminstructures).
 La résolution des affiliations se fait pendant la phase `affiliations` du pipeline.
 
 #### <span id='entites-auteurs'></span>Nature des entités auteurs
 
-Chaque source contient ses propres identifiants internes pour les entités auteurs. Le traitement des auteurs correspond à la phase `persons` du pipeline.
+Chaque source contient ses propres identifiants internes pour les entités auteurs. Aucune table dédiée côté sources : tous les identifiants normalisés (`orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id`) sont portés par `source_authorships.person_identifiers` (JSONB) — un dict par observation (= par contribution d'un auteur à un document). La déduplication / création des personnes canoniques se fait dans la phase `persons` du pipeline, à partir de ces observations.
 
-> **Évolution prévue** — la table `source_persons` est sur le départ
-> (cf. [DATA_simplify-source-tables.md](chantiers/DATA_simplify-source-tables.md)).
-> Les identifiants stables (idhal, idref) doivent migrer vers `person_identifiers`
-> et l'identité-source est suffisamment portée par `source_authorships.identifiers`.
-> Cette section décrit l'état actuel ; elle sera révisée au terme du chantier.
-
-**`source_persons`** est restreinte aux sources avec un **identifiant auteur stable** (cf. [chantier source_persons](chantiers/2026-04-28_DATA_source-persons.md)) :
-- HAL avec `hal_person_id` (compte HAL identifié)
-- ScanR avec idref
-- Theses avec PPN
-
-Pour les autres cas (OpenAlex, WoS, CrossRef, et les comptes HAL non identifiés / ScanR sans idref / theses sans PPN), aucun `source_persons` n'est créé : `source_authorships.source_person_id` reste NULL et les identifiants normalisés (orcid, idref, idhal, hal_person_id, researcher_id) vivent dans `source_authorships.identifiers` (JSONB).
-
-- Dans **OpenAlex** et **WoS**, les entités auteurs présentes côté API sont algorithmiques et non fiables (un même auteur fréquemment divisé en entités multiples, ou plusieurs personnes confondues). On ne crée plus de `source_persons` pour ces sources : le matching personne se fait *de novo* à partir de `source_authorships.raw_author_name` et de `person_name_forms`. Les ORCIDs sont récupérés dans `source_authorships.identifiers->>'orcid'` puis remontés vers `person_identifiers` avec statut `pending` lors du matching.
+- Dans **OpenAlex** et **WoS**, les entités auteurs présentes côté API sont algorithmiques et non fiables (un même auteur fréquemment divisé en entités multiples, ou plusieurs personnes confondues). Le matching personne se fait *de novo* à partir de `source_authorships.raw_author_name` et de `person_name_forms`. Les ORCIDs éventuels sont récupérés dans `source_authorships.person_identifiers->>'orcid'` puis remontés vers `person_identifiers` (la table canonique) avec statut `pending` lors du matching.
 
 - Dans **HAL**, deux cas de figure (pouvant coexister dans la même publication) :
-    - L'auteur correspond à un compte HAL identifié (`hal_person_id` présent) : entité fiable, on crée un `source_persons` avec ce `hal_person_id`. Possibilité de récupérer d'autres identifiants (ORCID, IdRef, idHAL). Le `person_id` canonique est propagé à toutes les `source_authorships` du même compte HAL via l'Étape 0 du pipeline persons.
-    - L'auteur n'est pas relié à un compte HAL identifié (form_id seul ou rien) : pas de `source_persons` HAL. On procède comme pour OpenAlex/WoS via `raw_author_name` + `identifiers`.
+    - L'auteur correspond à un compte HAL identifié : `hal_person_id` (et selon les cas, ORCID / IdRef / idHAL) sont présents dans `person_identifiers`.
+    - L'auteur n'est pas relié à un compte HAL identifié (form_id seul ou rien) : `hal_person_id` absent. On procède comme pour OpenAlex/WoS via `raw_author_name` + `person_identifiers`.
 
-- Dans **ScanR** : `source_persons` créés uniquement avec un idref (= IdRef BNF). Sans idref, les ORCID éventuels vont dans `source_authorships.identifiers`.
+- Dans **ScanR** : `idref` éventuel dans `person_identifiers` (= IdRef BNF). Sans idref, les ORCID éventuels y figurent aussi.
 
-- Dans **theses.fr** : `source_persons` créés uniquement avec un PPN (= IdRef BNF). Les non-auteurs (jurés, rapporteurs) sans PPN vivent uniquement dans `source_authorships`.
+- Dans **theses.fr** : PPN (= IdRef BNF) dans `person_identifiers->>'idref'`. Les non-auteurs (jurés, rapporteurs) sans PPN vivent uniquement dans `source_authorships` (avec leurs `roles`).
 
-- Dans **CrossRef** : aucun `source_persons` (pas d'identité d'auteur stable côté API). L'ORCID éventuel va dans `source_authorships.identifiers`.
+- Dans **CrossRef** : pas d'identité d'auteur stable côté API. L'ORCID éventuel va dans `person_identifiers`.
 
 ### HAL
 
@@ -168,7 +155,7 @@ Pour les autres cas (OpenAlex, WoS, CrossRef, et les comptes HAL non identifiés
 - L'`id` ScanR contient le NNT pour les thèses (pattern `nnt:<ppn>`) — extrait via `extract_nnt_from_scanr_id`, ce qui permet la reconciliation avec theses.fr
 - Champs multilingues : la priorité est `default` > `en` > `fr` (même règle pour title / summary / keywords)
 - `oa_status` dérivé via `derive_scanr_oa_status(isOa, oaEvidence)` plutôt que pris brut
-- `source_persons` créé uniquement si idref présent (`should_create_source_person`) — sinon `source_authorships.source_person_id = NULL` et l'ORCID éventuel va dans `identifiers`
+- L'idref éventuel (ou l'ORCID seul) est porté par `source_authorships.person_identifiers` (JSONB)
 - Adresses : les feuilles d'affiliation portent un `name` libre — passées à l'`AddressLinker` comme pour OpenAlex/WoS
 
 ### CrossRef
@@ -190,7 +177,7 @@ CrossRef n'est pas une source de périmètre : aucune requête par institution /
 
 #### Particularités
 
-- Pas de `source_persons` créés (pas d'identité d'auteur stable côté API) — l'ORCID éventuel va dans `source_authorships.identifiers`
+- Pas d'identité d'auteur stable côté API — l'ORCID éventuel va dans `source_authorships.person_identifiers` (JSONB)
 - Affiliations CrossRef purement textuelles et génériques (tutelles, pas de structures détaillées) → stockées dans `source_authorships.source_data` pour traçabilité, **pas** d'insertion dans `addresses` / `source_authorship_addresses`
 - `doc_type` stocké comme `NULL` à la normalisation ; le mapping taxonomie CrossRef → enum canonique est appliqué plus tard via `_SOURCE_MAPS`
 - `oa_status` non dérivé de CrossRef (pas fiable) ; laissé à NULL — les autres sources arbitrent via `refresh_from_sources`
@@ -201,9 +188,9 @@ CrossRef n'est pas une source de périmètre : aucune requête par institution /
 Section à compléter, sur le même modèle (API utilisées, données récupérées, particularités).
 Extracteur dans [infrastructure/sources/theses/](../infrastructure/sources/theses/),
 normaliseur dans [application/pipeline/normalize/normalize_theses.py](../application/pipeline/normalize/normalize_theses.py).
-Particularité connue : couvre thèses soutenues + en cours, jurys et rapporteurs
-matérialisés comme `source_authorships` sans `source_persons` quand le PPN
-est absent.
+Particularité connue : couvre thèses soutenues + en cours ; jurys et
+rapporteurs matérialisés comme `source_authorships` (avec leurs `roles`)
+— PPN éventuel porté par `person_identifiers->>'idref'`.
 
 ## APIs d'enrichissement
 

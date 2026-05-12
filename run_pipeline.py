@@ -18,7 +18,7 @@ Phases (dans l'ordre d'execution):
     extract              Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
     fetch_missing_hal_id Fetch des documents HAL manquants par hal-id/NNT (auto-borné, tourne toujours)
     fetch_missing_doi    Fetch par DOI des records manquants dans chaque source (scope policy)
-    normalize      Normalisation staging -> tables sources (source_publications, source_persons,
+    normalize      Normalisation staging -> tables sources (source_publications,
                    source_authorships). Rattachement aux publications existantes par DOI/NNT/
                    HAL-ID, mais PAS de creation de publications. Inclut enrichissement
                    structures HAL et extraction des identifiants ORCID/IdRef depuis le TEI HAL.

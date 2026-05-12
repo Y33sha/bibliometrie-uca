@@ -208,7 +208,7 @@ Table de liaison recensant les contributions individuelles aux publications. Cha
 Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses, crossref).
 
 - **`source_publications`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées (doc_type non mappé, oa_status, abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
-- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `structure_ids` (affiliation canonique résolue), `source_struct_ids` (références internes vers `source_structures`), `raw_author_name`, `author_name_normalized`, `identifiers` (JSONB), `roles`, `excluded`. Les affiliations textuelles brutes sont reliées via `source_authorship_addresses` → `addresses.raw_text`.
+- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `structure_ids` (affiliation canonique résolue), `source_structures` (ARRAY[TEXT] des IDs natifs des structures côté source : numérique HAL, `I****` OpenAlex, noms d'institutions WoS, etc.), `raw_author_name`, `author_name_normalized`, `person_identifiers` (JSONB : `orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id`), `countries` (ARRAY[CHAR(2)]), `roles`, `excluded`. Les affiliations textuelles brutes sont reliées via `source_authorship_addresses` → `addresses.raw_text`.
 - **`source_authorship_addresses`** : table de liaison `source_authorships ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs authorships, et alimente la résolution structure ↔ adresse de la phase `affiliations`.
 
 ## Autres tables, à documenter
@@ -234,14 +234,6 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 
 Chantiers `DATA_*` actuellement ouverts dans
 [`docs/chantiers/`](chantiers/) :
-
-- **[`DATA_simplify-source-tables.md`](chantiers/DATA_simplify-source-tables.md)**
-  — suppression des tables `source_persons` et `source_structures`,
-  migration des identifiants fiables vers `person_identifiers`,
-  remplacement de `source_authorships.source_struct_ids` (FK
-  internes) par `source_structures` (ARRAY[TEXT] avec les IDs
-  internes des sources) et ajout d'une colonne `countries` sur
-  `source_authorships` pour préserver le pays HAL.
 
 - **[`DATA_person-name-forms-normalisation.md`](chantiers/DATA_person-name-forms-normalisation.md)**
   — normalisation du schéma `person_name_forms` : remplacer les
@@ -278,10 +270,8 @@ Table unique pour toutes les sources. Colonnes notables : `source` (enum), `sour
 | Table | Propriétaire |
 |-------|-------------|
 | `source_publications` | `application/pipeline/normalize/normalize_*.py` |
-| `source_persons` | `application/pipeline/normalize/normalize_*.py` |
 | `source_authorships` | `application/pipeline/normalize/normalize_*.py` |
 | `source_authorship_addresses` | `application/pipeline/normalize/normalize_*.py` (via `infrastructure.addresses.PgAddressLinker`) |
-| `source_structures` | `application/pipeline/normalize/normalize_{hal,openalex,wos}.py` |
 
 Note : `person_id` sur `source_authorships` est écrit par `application/persons.py` et `application/authorships/assign_orphans.py` (rattachement), pas par les normalizers. `in_perimeter` et `structure_ids` sont écrits par `application/pipeline/affiliations/populate_affiliations.py`.
 

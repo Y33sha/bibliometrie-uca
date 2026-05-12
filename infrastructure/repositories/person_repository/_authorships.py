@@ -13,10 +13,8 @@ def link_authorship(
 ) -> None:
     """Rattache une authorship source à une personne.
 
-    `source_persons` n'est plus écrit côté HAL (la phase
-    `step0_hal_accounts` du pipeline persons a été supprimée — cf.
-    chantier `DATA_simplify-source-tables`). Le matching par
-    idhal/hal_person_id sera réintroduit dans `METIER_decide-person-match`.
+    Le matching par idhal/hal_person_id agrégé sera réintroduit dans
+    le chantier `METIER_decide-person-match`.
     """
     conn.execute(
         text("UPDATE source_authorships SET person_id = :pid WHERE id = :aid AND source = :src"),

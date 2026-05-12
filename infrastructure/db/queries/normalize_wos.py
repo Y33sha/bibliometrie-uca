@@ -1,9 +1,8 @@
 """Query service : SQL du normaliseur Web of Science.
 
 Appelé par `application/pipeline/normalize/normalize_wos.py`. Regroupe les
-UPSERT batch (via SA executemany) sur `source_persons`,
-`source_structures`, `source_authorships`, `source_authorship_addresses`,
-et les lectures/préchargements de caches.
+UPSERT batch (via SA executemany) sur `source_authorships` et
+`source_authorship_addresses`, et les lectures/préchargements de caches.
 """
 
 from typing import Any
@@ -168,11 +167,7 @@ def upsert_wos_source_authorships_batch(conn: Connection, values: list[dict[str,
 def fetch_source_authorship_ids_by_position(
     conn: Connection, *, source_publication_id: int, positions: list[int]
 ) -> dict[int, int]:
-    """Retourne `{author_position: source_authorship_id}` pour un document WoS.
-
-    Pivot par `author_position` (et non plus `source_person_id`) parce que
-    WoS n'alimente plus `source_persons` (cf. chantier source_persons).
-    """
+    """Retourne `{author_position: source_authorship_id}` pour un document WoS."""
     rows = conn.execute(
         text("""
             SELECT author_position, id FROM source_authorships

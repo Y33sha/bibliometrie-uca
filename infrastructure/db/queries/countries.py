@@ -66,9 +66,8 @@ def cleanup_sa_countries_orphans(conn: Connection) -> int:
     """Pass 2 : met à NULL les sa polluées (`countries` non-NULL mais
     aucune adresse utile).
 
-    Cas du backfill historique via `source_structures` (circuit
-    supprimé depuis). Borne le scan aux sa avec `countries IS NOT NULL`,
-    sous-ensemble étroit — rapide même sans batching.
+    Borne le scan aux sa avec `countries IS NOT NULL`, sous-ensemble
+    étroit — rapide même sans batching.
 
     Retourne le nombre de sa nettoyées. Idempotent.
     """

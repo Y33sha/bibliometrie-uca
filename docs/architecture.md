@@ -307,8 +307,8 @@ L'orchestrateur `run_pipeline.py` à la racine enchaîne 12 phases :
    par hal-id / NNT pour les sources externes
 3. **fetch_missing_doi** — cross-source DOI lookup
 4. **normalize** — staging → tables sources (`source_publications`,
-   `source_persons`, `source_authorships`). Rattachement aux
-   publications existantes par DOI/NNT/HAL-ID, **sans création**
+   `source_authorships`). Rattachement aux publications existantes
+   par DOI/NNT/HAL-ID, **sans création**
 5. **affiliations** — adresses → structures, propagation
    `in_perimeter` et `structure_ids` sur `source_authorships`
 6. **publications** — création publications pour les

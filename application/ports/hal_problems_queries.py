@@ -2,10 +2,8 @@
 
 Implémenté par `infrastructure.db.queries.hal_problems.PgHalProblemsQueries`.
 
-`hal_duplicate_accounts` est inclus ici (même si la query touche
-`source_persons` plutôt que `source_publications`) parce que le
-seul caller est ce router de diagnostics HAL — placement par cas
-d'usage plutôt que par table.
+Placement par cas d'usage (le seul caller est le router de diagnostics
+HAL), pas par table.
 """
 
 from typing import Any, Protocol

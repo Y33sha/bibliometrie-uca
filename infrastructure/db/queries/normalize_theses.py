@@ -1,8 +1,8 @@
 """Query service : SQL du normaliseur theses.fr.
 
 Appelé par `application/pipeline/normalize/normalize_theses.py`. Regroupe
-les UPSERT sur `source_publications`, `source_persons`, `source_authorships`
-ainsi que les lectures utiles à l'idempotence et au matching auteurs.
+les UPSERT sur `source_publications` et `source_authorships`, ainsi
+que les lectures utiles à l'idempotence et au matching auteurs.
 """
 
 from typing import Any

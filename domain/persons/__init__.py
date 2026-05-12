@@ -1,10 +1,8 @@
-"""Concept métier Personne — value objects, modèles JSONB, et règles
-d'entité.
+"""Concept métier Personne — value objects et règles d'entité.
 
 Sous-modules :
 - ``identifiers`` : VOs ORCID/IdHAL/IdRef + helpers de normalisation
-- ``source_ids`` : modèle Pydantic de la colonne JSONB
-  ``source_persons.source_ids``
-- ``merge`` : invariants de fusion entre personnes (extensible aux
-  règles de déduplication / création quand on les rapatriera)
+- ``matching`` : règles de compatibilité de noms entre signatures
+- ``creation`` : règles de création de personne depuis les sources
+- ``merge`` : invariants de fusion entre personnes
 """

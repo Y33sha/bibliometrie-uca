@@ -8,8 +8,8 @@ dans `interfaces/cli/pipeline/normalize_scanr.py`.
 Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_publications                     (lien staging ↔ publication, source='scanr')
-    source_persons                          (auteurs unifiés, source='scanr')
-    source_authorships                      (lien document × auteur, source='scanr')
+    source_authorships                      (lien document × auteur, source='scanr',
+                                             avec `person_identifiers` JSONB pour idref/orcid)
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """

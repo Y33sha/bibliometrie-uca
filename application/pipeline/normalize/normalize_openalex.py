@@ -7,11 +7,11 @@ Usage:
     python normalize_openalex.py --reset      # remettre tous les works à processed=FALSE
 
 Tables peuplées :
-    publishers, journals, publications          (tables de vérité — partagées)
-    source_publications                            (lien staging ↔ publication, source='openalex')
-    source_persons                              (auteurs unifiés, source='openalex')
-    source_authorships                          (lien document × auteur, source='openalex', avec source_struct_ids)
-    source_structures                           (structures sources, source='openalex')
+    publishers, journals, publications      (tables de vérité — partagées)
+    source_publications                     (lien staging ↔ publication, source='openalex')
+    source_authorships                      (lien document × auteur, source='openalex',
+                                             avec `source_structures` TEXT[] = openalex_ids natifs
+                                             des institutions et `person_identifiers` JSONB)
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
@@ -346,12 +346,11 @@ def insert_openalex_document(
 
 
 # =============================================================
-# OPENALEX AUTHORS (identifiants normalisés sur source_authorships)
+# OPENALEX AUTHORS — identifiants sur source_authorships
 # =============================================================
-# Plus d'écriture dans source_persons côté OA depuis le chantier
-# source_persons (cf. docs/chantiers/2026-04-28_source-persons.md) : les entités
-# auteurs OA sont algorithmiques et non fiables, on garde uniquement
-# l'ORCID quand présent, directement sur source_authorships.person_identifiers.
+# Les entités auteurs OA sont algorithmiques et non fiables, on garde
+# uniquement l'ORCID quand présent, directement sur
+# source_authorships.person_identifiers.
 
 
 def _extract_openalex_orcid(authorship: dict) -> str | None:
@@ -374,13 +373,10 @@ def process_authorships(
 ) -> None:
     """
     Traite les authorships d'un work OpenAlex :
-    - Crée les liens source_authorships (source='openalex', source_person_id=NULL)
+    - Crée les liens source_authorships (source='openalex')
     - Stocke l'ORCID dans `sa.person_identifiers` quand présent
     - Stocke les `openalex_id` natifs des institutions dans
       `sa.source_structures` (TEXT[])
-
-    Plus d'écriture sur `source_persons` ni `source_structures` (cf.
-    chantier `DATA_simplify-source-tables`).
     """
     authorships = work.get("authorships") or []
 
