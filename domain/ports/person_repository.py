@@ -12,7 +12,7 @@ from typing import Any, Protocol
 class PersonRepository(Protocol):
     """Contrat d'accès à l'agrégat Person (tables persons,
     person_identifiers, person_name_forms, distinct_persons, et
-    certaines opérations sur source_authorships/source_persons)."""
+    certaines opérations sur source_authorships)."""
 
     # ── persons ────────────────────────────────────────────────────
 
