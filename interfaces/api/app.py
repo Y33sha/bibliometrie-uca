@@ -237,7 +237,7 @@ _STALE_THRESHOLD_DAYS = 7
 _PIPELINE_STATUS_FILE = Path(__file__).resolve().parent.parent.parent / "logs" / "status.json"
 
 
-@app.get("/api/health")
+@app.get("/api/health", response_model=None)
 def health() -> JSONResponse | dict[str, Any]:
     """Vérifie que l'API est opérationnelle, la DB accessible, et la fraîcheur
     des données (date de la dernière extraction par source).
