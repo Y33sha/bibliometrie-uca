@@ -127,20 +127,18 @@ def upsert_openalex_source_authorship(
 ) -> int:
     """UPSERT d'une `source_authorships` OpenAlex.
 
-    `source_person_id` toujours NULL pour OpenAlex (entités auteurs
-    algorithmiques non fiables). Les identifiants normalisés (orcid)
-    vivent sur `person_identifiers`.
+    Les identifiants normalisés (orcid) vivent sur `person_identifiers`
+    (entités auteurs OpenAlex algorithmiques non fiables).
 
     `source_structures` (TEXT[]) stocke les `openalex_id` natifs des
-    institutions référencées — remplace l'ancien `source_struct_ids`
-    (INTEGER[] de PK `source_structures`, table en voie de suppression).
+    institutions référencées.
     """
     stmt = text("""
         INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position,
+            (source, source_publication_id, author_position,
              source_structures,
              author_name_normalized, is_corresponding, raw_author_name, person_identifiers)
-        VALUES ('openalex', :spid, NULL, :pos, :source_structures,
+        VALUES ('openalex', :spid, :pos, :source_structures,
                 normalize_name_form(:raw_author_name), :is_corresponding,
                 :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, author_position) DO UPDATE SET

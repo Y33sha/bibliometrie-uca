@@ -229,8 +229,9 @@ réalignés avant que la migration finale touche la DB.
   source_person_id, author_position)` vers `(source_publication_id,
   author_position)` dans les 6 normalizers (HAL, OpenAlex, WoS, ScanR,
   theses, Crossref).
-- [ ] Normalizers SQL — retrait de `source_person_id` de la liste des
-  colonnes insérées (la valeur était déjà NULL en dur).
+- [x] Normalizers SQL — retrait de `source_person_id` de la liste des
+  colonnes insérées dans les 6 normalizers (la valeur était déjà NULL
+  en dur).
 
 ### Phase 4 — Migration finale + tests
 

@@ -109,17 +109,14 @@ def upsert_crossref_source_authorship(
 ) -> int:
     """UPSERT d'une ``source_authorships`` CrossRef. Retourne l'id.
 
-    `source_person_id` est NULL : depuis le chantier source_persons,
-    CrossRef n'écrit plus dans `source_persons` (les entités auteurs
-    CrossRef étaient des `<DOI>:<position>` synthétiques 1:1 avec
-    l'authorship — sans bénéfice). L'ORCID, seul identifiant exploitable,
-    vit sur `person_identifiers`.
+    L'ORCID, seul identifiant exploitable pour CrossRef, vit sur
+    `person_identifiers`.
     """
     stmt = text("""
         INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position,
+            (source, source_publication_id, author_position,
              author_name_normalized, raw_author_name, source_data, person_identifiers)
-        VALUES ('crossref', :spid, NULL, :pos, normalize_name_form(:raw_name),
+        VALUES ('crossref', :spid, :pos, normalize_name_form(:raw_name),
                 :raw_name, :source_data, :person_identifiers)
         ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,

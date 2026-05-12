@@ -136,16 +136,14 @@ def upsert_theses_source_authorship(
 ) -> int:
     """UPSERT d'une `source_authorships` theses.fr. `author_position` NULL pour les non-auteurs.
 
-    `source_person_id` toujours NULL (table `source_persons` en voie de
-    suppression, cf. chantier `DATA_simplify-source-tables`). Les
-    identifiants (PPN/idref) vivent sur `person_identifiers` (JSONB).
+    Les identifiants (PPN/idref) vivent sur `person_identifiers` (JSONB).
     """
     stmt = text("""
         INSERT INTO source_authorships
-            (source, source_publication_id, source_person_id, author_position,
+            (source, source_publication_id, author_position,
              author_name_normalized, roles,
              raw_author_name, person_identifiers)
-        VALUES ('theses', :spid, NULL, :pos,
+        VALUES ('theses', :spid, :pos,
                 normalize_name_form(:raw_author_name), :roles,
                 :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
