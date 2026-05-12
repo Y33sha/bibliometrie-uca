@@ -34,7 +34,7 @@ export interface paths {
         };
         /**
          * Metrics
-         * @description Métriques internes : état du pool de connexions DB.
+         * @description Métriques internes : état du pool de connexions SQLAlchemy.
          *
          *     Le timing des requêtes est émis via le middleware `timing_middleware`
          *     (champs `method`, `path`, `status`, `duration_ms` en JSON structuré).
@@ -209,9 +209,6 @@ export interface paths {
         /**
          * Stats Summary
          * @description Agrégats globaux (total, taux OA, total APC, etc.) pour le jeu de filtres.
-         *
-         *     Alimente la bande de cartes en haut du dashboard statistiques.
-         *     Mêmes filtres que les autres endpoints de /api/stats.
          */
         get: operations["stats_summary_api_stats_summary_get"];
         put?: never;
@@ -253,9 +250,9 @@ export interface paths {
          * Available Years
          * @description Liste des années présentes dans les publications validées (tri asc).
          *
-         *     Une année est « validée » quand elle figure dans la config
-         *     `years_validated` : les autres existent en base mais ne sont pas
-         *     publiées dans le dashboard (pipeline encore partiel).
+         *     Contrairement à `/api/publications/years` qui remonte toutes les
+         *     années, celui-ci ne remonte que les années validées (config
+         *     `years_validated`).
          */
         get: operations["available_years_api_stats_years_get"];
         put?: never;
@@ -275,8 +272,7 @@ export interface paths {
         };
         /**
          * Stats Facets
-         * @description Facettes dynamiques : années, labos, oa_status, apc (chaque facette
-         *     exclut son propre filtre mais applique tous les autres).
+         * @description Facettes dynamiques : années, labos, oa_status, apc.
          */
         get: operations["stats_facets_api_stats_facets_get"];
         put?: never;
@@ -624,10 +620,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Addresses Countries
+         * List Addresses Countries
          * @description Liste des adresses pour l'attribution de pays.
          */
-        get: operations["addresses_countries_api_addresses_countries_get"];
+        get: operations["list_addresses_countries_api_addresses_countries_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -836,6 +832,10 @@ export interface paths {
         /**
          * Feedback Rerun
          * @description Lance resolve_addresses en SSE (détection complète sur toutes les adresses).
+         *
+         *     `async def` parce qu'on streame stdout d'un subprocess via
+         *     `asyncio.create_subprocess_exec` + `StreamingResponse`. Aucune
+         *     connexion DB en jeu, cohabitation supportée par FastAPI.
          */
         get: operations["feedback_rerun_api_admin_feedback_rerun_get"];
         put?: never;
@@ -1913,7 +1913,7 @@ export interface paths {
         };
         /**
          * Hal Affiliation Conflicts
-         * @description Publications affiliées UCA dans HAL mais pas dans OA/WoS.
+         * @description Publications affiliées UCA dans HAL mais pas dans une autre source.
          */
         get: operations["hal_affiliation_conflicts_api_hal_problems_affiliation_conflicts_get"];
         put?: never;
@@ -2017,7 +2017,7 @@ export interface paths {
         };
         /**
          * Get Hal Collections
-         * @description Retourne les collections HAL dérivées des structures du périmètre UCA.
+         * @description Retourne les collections HAL dérivées des structures du périmètre.
          */
         get: operations["get_hal_collections_api_config_hal_collections_get"];
         put?: never;
@@ -3017,6 +3017,8 @@ export interface components {
             idhal: string | null;
             /** Orcid */
             orcid: string | null;
+            /** Idref */
+            idref: string | null;
             /** Pub Count */
             pub_count: number;
         };
@@ -5307,7 +5309,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -6177,7 +6181,7 @@ export interface operations {
             };
         };
     };
-    addresses_countries_api_addresses_countries_get: {
+    list_addresses_countries_api_addresses_countries_get: {
         parameters: {
             query?: {
                 search?: string;
@@ -8333,7 +8337,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: string;
+                    }[];
                 };
             };
         };
@@ -8353,7 +8359,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
                 };
             };
         };
@@ -8375,7 +8383,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -8837,7 +8847,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -8872,7 +8884,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -8907,7 +8921,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

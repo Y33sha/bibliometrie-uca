@@ -131,10 +131,14 @@ Audit (cf. discussion architecturale 2026-05-11) :
   filtre `id_type = ANY(:public_id_types)` ajouté sur les 2 agrégats JSONB
   exposés (via la constante `PUBLIC_PERSON_IDENTIFIER_TYPES` dans
   `domain/persons/identifiers.py`).
-- [ ] `infrastructure/db/queries/hal_problems.py` : refactor des
-  requêtes de doublons HAL pour grouper sur
-  `sa.person_identifiers->>'idhal'` et/ou
-  `(person_id, sa.person_identifiers->>'hal_person_id')`.
+- [x] `infrastructure/db/queries/hal_problems.py:hal_duplicate_accounts` :
+  groupe désormais par `(sa.person_id, sa.person_identifiers->>'hal_person_id')`
+  via une CTE 2-niveaux (1ʳᵉ : 1 row par compte HAL avec
+  `MIN(raw_author_name/orcid/idhal/idref)` agrégé + `pub_count` ;
+  2ᵉ : `HAVING COUNT(*) >= 2` pour filtrer les personnes à comptes
+  multiples). `source_persons` n'est plus interrogé. Modèle Pydantic
+  `HalAccountSummary` enrichi avec `idref` ; affichage Svelte
+  correspondant ajouté ; types TS régénérés via `npm run types:gen`.
 - [ ] `infrastructure/db/queries/persons/detail.py:hal_rows` :
   refactor pour reconstruire la vue « comptes HAL » depuis
   `source_authorships` agrégés.
