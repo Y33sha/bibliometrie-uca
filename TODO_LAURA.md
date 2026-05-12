@@ -29,6 +29,7 @@
 * sortir les use cases des repositories; clarifier la distinction repositories / db/queries
 * typage des ports?
 * Unit of Work
+* fetch_unlinked_authorships: relire la requête pour comprendre ce qu'elle fait
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 ## Sujets
