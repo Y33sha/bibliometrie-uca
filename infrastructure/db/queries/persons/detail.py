@@ -27,12 +27,12 @@ def get_person(conn: Connection, person_id: int) -> dict[str, Any] | None:
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh,
                 (SELECT json_agg(x) FROM (
-                    SELECT DISTINCT ON (sa.source, sa.source_person_id)
-                           sa.source_person_id AS id, sa.source,
+                    SELECT MIN(sa.id) AS id, sa.source,
                            sa.raw_author_name AS full_name
                     FROM source_authorships sa
                     WHERE sa.person_id = p.id AND NOT sa.excluded
-                    ORDER BY sa.source, sa.source_person_id
+                    GROUP BY sa.source, sa.raw_author_name
+                    ORDER BY sa.source, sa.raw_author_name
                 ) x) AS linked_authors,
                 (SELECT json_agg(json_build_object(
                     'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,

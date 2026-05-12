@@ -37,30 +37,27 @@ def _create_sd(conn):
     ).scalar_one()
 
 
-def _create_sp(conn, source_id="sp-1"):
-    return conn.execute(
-        text(
-            "INSERT INTO source_persons (source, source_id, full_name) "
-            "VALUES ('hal', :source_id, 'X') RETURNING id"
-        ),
-        {"source_id": source_id},
-    ).scalar_one()
-
-
 def _create_sa(
-    conn, sd, sp, person_id=None, author_name_normalized=None, excluded=False, source="hal"
+    conn,
+    sd,
+    *,
+    author_position=0,
+    person_id=None,
+    author_name_normalized=None,
+    excluded=False,
+    source="hal",
 ):
     return conn.execute(
         text("""
             INSERT INTO source_authorships
-                (source, source_publication_id, source_person_id, author_position,
+                (source, source_publication_id, author_position,
                  person_id, author_name_normalized, excluded)
-            VALUES (:source, :sd, :sp, 0, :person_id, :anf, :excluded) RETURNING id
+            VALUES (:source, :sd, :pos, :person_id, :anf, :excluded) RETURNING id
         """),
         {
             "source": source,
             "sd": sd,
-            "sp": sp,
+            "pos": author_position,
             "person_id": person_id,
             "anf": author_name_normalized,
             "excluded": excluded,
@@ -103,11 +100,12 @@ class TestFetchSourceAuthorshipNameForms:
     def test_returns_distinct_rows(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn)
         sd = _create_sd(sa_sync_conn)
-        sp = _create_sp(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, sp, person_id=pid, author_name_normalized="dupond j")
-
-        sp2 = _create_sp(sa_sync_conn, source_id="sp-2")
-        _create_sa(sa_sync_conn, sd, sp2, person_id=pid, author_name_normalized="dupond j")
+        _create_sa(
+            sa_sync_conn, sd, author_position=0, person_id=pid, author_name_normalized="dupond j"
+        )
+        _create_sa(
+            sa_sync_conn, sd, author_position=1, person_id=pid, author_name_normalized="dupond j"
+        )
 
         rows = fetch_source_authorship_name_forms(sa_sync_conn)
         ours = [r for r in rows if r["person_id"] == pid]
@@ -118,18 +116,14 @@ class TestFetchSourceAuthorshipNameForms:
     def test_excludes_excluded_rows(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn)
         sd = _create_sd(sa_sync_conn)
-        sp = _create_sp(sa_sync_conn)
-        _create_sa(
-            sa_sync_conn, sd, sp, person_id=pid, author_name_normalized="gone", excluded=True
-        )
+        _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="gone", excluded=True)
 
         rows = fetch_source_authorship_name_forms(sa_sync_conn)
         assert not any(r["name_form"] == "gone" for r in rows)
 
     def test_excludes_rows_without_person_id_or_name(self, sa_sync_conn):
         sd = _create_sd(sa_sync_conn)
-        sp = _create_sp(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, sp, person_id=None, author_name_normalized="no-person")
+        _create_sa(sa_sync_conn, sd, person_id=None, author_name_normalized="no-person")
         rows = fetch_source_authorship_name_forms(sa_sync_conn)
         assert not any(r["name_form"] == "no-person" for r in rows)
 
