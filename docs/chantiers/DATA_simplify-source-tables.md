@@ -147,9 +147,10 @@ Audit (cf. discussion architecturale 2026-05-11) :
   `MIN(sa.id)` (au lieu de `source_persons.id`) — sans impact UI,
   l'onglet « Identités » qui exploitait ce champ est désactivé (cf.
   TODO `interfaces/frontend/src/routes/persons/[id]/+page.svelte:420`).
-- [ ] `interfaces/cli/maintenance/merge_person_duplicates_by_lab.py` :
-  remplacer `COUNT(DISTINCT source_person_id)` par
-  `COUNT(DISTINCT sa.person_identifiers->>'idhal')` ou similaire.
+- [x] `interfaces/cli/maintenance/merge_person_duplicates_by_lab.py` :
+  comptage `hal_authors` via `COUNT(DISTINCT sa.person_identifiers->>'hal_person_id')`
+  (et plus `COUNT(DISTINCT source_person_id)`). Filtre `IS NOT NULL`
+  ajouté pour rester aligné sur les comptes HAL effectifs.
 
 #### Dual-writes vers `source_persons` à supprimer
 
