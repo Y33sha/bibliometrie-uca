@@ -143,7 +143,7 @@ def upsert_openalex_source_authorship(
         VALUES ('openalex', :spid, NULL, :pos, :source_structures,
                 normalize_name_form(:raw_author_name), :is_corresponding,
                 :raw_author_name, :person_identifiers)
-        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
+        ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
             author_name_normalized = COALESCE(
                 EXCLUDED.author_name_normalized,
                 source_authorships.author_name_normalized

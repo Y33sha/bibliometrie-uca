@@ -121,7 +121,7 @@ def upsert_crossref_source_authorship(
              author_name_normalized, raw_author_name, source_data, person_identifiers)
         VALUES ('crossref', :spid, NULL, :pos, normalize_name_form(:raw_name),
                 :raw_name, :source_data, :person_identifiers)
-        ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
+        ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
             author_name_normalized = EXCLUDED.author_name_normalized,
             raw_author_name = EXCLUDED.raw_author_name,
             source_data = EXCLUDED.source_data,
