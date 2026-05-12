@@ -84,44 +84,40 @@ class TestNextPersonDuplicate:
 
 class TestCountPersonConflictPairs:
     def test_counts_conflicts(self, sa_sync_conn):
-        """Deux personnes distinctes référencées à la même position sur la même pub."""
+        """Deux personnes distinctes référencées à la même position sur la même pub
+        canonique (une via HAL, une via OpenAlex)."""
         p1 = _create_person(sa_sync_conn, last="A")
         p2 = _create_person(sa_sync_conn, last="B")
         pub = _create_pub(sa_sync_conn)
-        sd = sa_sync_conn.execute(
+        sd_hal = sa_sync_conn.execute(
             text(
                 "INSERT INTO source_publications (source, source_id, title, publication_id) "
                 "VALUES ('hal', 'h-1', 'X', :p) RETURNING id"
             ),
             {"p": pub},
         ).scalar_one()
-        sp_a = sa_sync_conn.execute(
+        sd_oa = sa_sync_conn.execute(
             text(
-                "INSERT INTO source_persons (source, source_id, full_name) "
-                "VALUES ('hal', 'sp-a', 'A') RETURNING id"
-            )
-        ).scalar_one()
-        sp_b = sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_persons (source, source_id, full_name) "
-                "VALUES ('openalex', 'sp-b', 'B') RETURNING id"
-            )
+                "INSERT INTO source_publications (source, source_id, title, publication_id) "
+                "VALUES ('openalex', 'oa-1', 'X', :p) RETURNING id"
+            ),
+            {"p": pub},
         ).scalar_one()
         sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
-                    (source, source_publication_id, source_person_id, author_position, person_id)
-                VALUES ('hal', :sd, :sp, 0, :pid)
+                    (source, source_publication_id, author_position, person_id)
+                VALUES ('hal', :sd, 0, :pid)
             """),
-            {"sd": sd, "sp": sp_a, "pid": p1},
+            {"sd": sd_hal, "pid": p1},
         )
         sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
-                    (source, source_publication_id, source_person_id, author_position, person_id)
-                VALUES ('openalex', :sd, :sp, 0, :pid)
+                    (source, source_publication_id, author_position, person_id)
+                VALUES ('openalex', :sd, 0, :pid)
             """),
-            {"sd": sd, "sp": sp_b, "pid": p2},
+            {"sd": sd_oa, "pid": p2},
         )
 
         count = _q(sa_sync_conn).count_person_conflict_pairs()

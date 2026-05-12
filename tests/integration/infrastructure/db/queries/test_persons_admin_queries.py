@@ -1,7 +1,5 @@
 """Tests d'intégration pour `infrastructure.db.queries.persons.admin`."""
 
-import json
-
 from sqlalchemy import text
 
 from infrastructure.db.queries.persons.admin import (
@@ -47,45 +45,12 @@ def _create_sd(conn, pub_id, source="hal", source_id="h1"):
     return row.id
 
 
-def _create_sp(
-    conn,
-    source="hal",
-    source_id="sp1",
-    person_id=None,
-    full_name="X",
-    hal_person_id=None,
-    idhal=None,
-    orcid=None,
-):
-    source_ids: dict = {}
-    if hal_person_id is not None:
-        source_ids["hal_person_id"] = hal_person_id
-    if idhal:
-        source_ids["idhal"] = idhal
-    row = conn.execute(
-        text(
-            "INSERT INTO source_persons "
-            "(source, source_id, full_name, person_id, source_ids, orcid) "
-            "VALUES (:src, :sid, :fn, :pid, CAST(:ids AS jsonb), :orcid) RETURNING id"
-        ),
-        {
-            "src": source,
-            "sid": source_id,
-            "fn": full_name,
-            "pid": person_id,
-            "ids": json.dumps(source_ids) if source_ids else None,
-            "orcid": orcid,
-        },
-    ).one()
-    return row.id
-
-
 def _create_sa(
     conn,
     sd,
-    sp,
     *,
     source="hal",
+    author_position=0,
     person_id=None,
     in_perimeter=True,
     excluded=False,
@@ -95,14 +60,14 @@ def _create_sa(
     row = conn.execute(
         text("""
             INSERT INTO source_authorships
-                (source, source_publication_id, source_person_id, author_position,
+                (source, source_publication_id, author_position,
                  person_id, in_perimeter, excluded, author_name_normalized, raw_author_name)
-            VALUES (:src, :sd, :sp, 0, :pid, :inp, :excl, :anf, :raw) RETURNING id
+            VALUES (:src, :sd, :pos, :pid, :inp, :excl, :anf, :raw) RETURNING id
         """),
         {
             "src": source,
             "sd": sd,
-            "sp": sp,
+            "pos": author_position,
             "pid": person_id,
             "inp": in_perimeter,
             "excl": excluded,
@@ -117,11 +82,9 @@ class TestOrphanAuthorshipsCount:
     def test_counts_orphans(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub)
-        sp = _create_sp(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, sp, person_id=None)  # orpheline
-        sp2 = _create_sp(sa_sync_conn, source_id="sp2")
+        _create_sa(sa_sync_conn, sd, author_position=0, person_id=None)  # orpheline
         pid = _create_person(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, sp2, person_id=pid)  # attribuée
+        _create_sa(sa_sync_conn, sd, author_position=1, person_id=pid)  # attribuée
 
         count = orphan_authorships_count(sa_sync_conn)
         assert count["total"] >= 1
@@ -129,16 +92,14 @@ class TestOrphanAuthorshipsCount:
     def test_excludes_non_uca(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub)
-        sp = _create_sp(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, sp, person_id=None, in_perimeter=False)
+        _create_sa(sa_sync_conn, sd, person_id=None, in_perimeter=False)
         count = orphan_authorships_count(sa_sync_conn)
         assert count["total"] == 0
 
     def test_excludes_memoir(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn, doc_type="memoir")
         sd = _create_sd(sa_sync_conn, pub)
-        sp = _create_sp(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, sp, person_id=None)
+        _create_sa(sa_sync_conn, sd, person_id=None)
         count = orphan_authorships_count(sa_sync_conn)
         assert count["total"] == 0
 
@@ -147,8 +108,7 @@ class TestListOrphanAuthorships:
     def test_lists_orphan_authorships(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub)
-        sp = _create_sp(sa_sync_conn, full_name="Dupond Jean")
-        sa = _create_sa(sa_sync_conn, sd, sp, person_id=None, raw_author_name="Dupond Jean")
+        sa = _create_sa(sa_sync_conn, sd, person_id=None, raw_author_name="Dupond Jean")
 
         res = list_orphan_authorships(sa_sync_conn, search="", page=1, per_page=50)
         assert res["total"] >= 1
@@ -157,10 +117,10 @@ class TestListOrphanAuthorships:
     def test_filters_by_search(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub)
-        sp1 = _create_sp(sa_sync_conn, source_id="sp-m", full_name="SpecialName")
-        sp2 = _create_sp(sa_sync_conn, source_id="sp-o", full_name="Autre")
-        sa_match = _create_sa(sa_sync_conn, sd, sp1, person_id=None, raw_author_name="SpecialName")
-        _create_sa(sa_sync_conn, sd, sp2, person_id=None, raw_author_name="Autre")
+        sa_match = _create_sa(
+            sa_sync_conn, sd, author_position=0, person_id=None, raw_author_name="SpecialName"
+        )
+        _create_sa(sa_sync_conn, sd, author_position=1, person_id=None, raw_author_name="Autre")
 
         res = list_orphan_authorships(sa_sync_conn, search="Special", page=1, per_page=50)
         ids = [a["authorship_id"] for a in res["authorships"]]
@@ -182,8 +142,7 @@ class TestNameFormAuthorships:
         other = _create_person(sa_sync_conn, last="Martin")
         pub = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub)
-        sp = _create_sp(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, sp, person_id=pid, author_name_normalized="dupond j")
+        _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j")
         sa_sync_conn.execute(
             text("INSERT INTO person_name_forms (name_form, person_ids) VALUES ('dupond j', :ids)"),
             {"ids": [pid, other]},
@@ -200,8 +159,7 @@ class TestNameFormRemainingAuthorships:
         pid = _create_person(sa_sync_conn)
         pub = _create_pub(sa_sync_conn)
         sd = _create_sd(sa_sync_conn, pub)
-        sp = _create_sp(sa_sync_conn)
-        _create_sa(sa_sync_conn, sd, sp, person_id=pid, author_name_normalized="x")
+        _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="x")
         assert name_form_remaining_authorships(sa_sync_conn, pid, "x") == 1
         assert name_form_remaining_authorships(sa_sync_conn, pid, "autre") == 0
 

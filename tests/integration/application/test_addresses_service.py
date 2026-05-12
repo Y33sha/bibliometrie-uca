@@ -535,18 +535,13 @@ class TestPropagateCountriesToPublications:
             ),
             {"pid": pub_id},
         ).scalar_one()
-        sperson_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_persons (source, source_id, full_name) "
-                "VALUES ('hal', 'p-1', 'J D') RETURNING id"
-            )
-        ).scalar_one()
         sa_id = sa_sync_conn.execute(
             text(
-                "INSERT INTO source_authorships (source, source_publication_id, source_person_id) "
-                "VALUES ('hal', :sp, :sper) RETURNING id"
+                "INSERT INTO source_authorships "
+                "(source, source_publication_id, author_position) "
+                "VALUES ('hal', :sp, 0) RETURNING id"
             ),
-            {"sp": sp_id, "sper": sperson_id},
+            {"sp": sp_id},
         ).scalar_one()
         addr = _create_address(sa_sync_conn)
         sa_sync_conn.execute(

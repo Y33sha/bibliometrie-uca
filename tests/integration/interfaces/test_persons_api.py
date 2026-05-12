@@ -50,7 +50,7 @@ def _cleanup_after_module():
         cur.execute(
             "TRUNCATE TABLE authorships, source_authorships, source_publications, "
             "publications, persons, person_identifiers, person_name_forms, "
-            "source_persons, audit_log RESTART IDENTITY CASCADE"
+            "audit_log RESTART IDENTITY CASCADE"
         )
 
 
@@ -105,16 +105,6 @@ def _seed_source_publication(source: str = "hal", source_id: str | None = None) 
         return cur.fetchone()["id"]
 
 
-def _seed_source_person(source: str = "hal", full_name: str = "Test Author") -> int:
-    with _pool() as cur:
-        cur.execute(
-            "INSERT INTO source_persons (source, source_id, full_name) "
-            "VALUES (%s, %s, %s) RETURNING id",
-            (source, _uniq("srcp"), full_name),
-        )
-        return cur.fetchone()["id"]
-
-
 def _seed_source_authorship(
     source: str = "hal",
     source_pub_id: int | None = None,
@@ -122,18 +112,18 @@ def _seed_source_authorship(
     authorship_id: int | None = None,
     in_perimeter: bool = True,
     raw_author_name: str = "Test Author",
+    author_position: int = 0,
 ) -> int:
     sp = source_pub_id or _seed_source_publication(source=source)
-    src_person_id = _seed_source_person(source=source, full_name=raw_author_name)
     with _pool() as cur:
         cur.execute(
-            "INSERT INTO source_authorships (source, source_publication_id, source_person_id, "
+            "INSERT INTO source_authorships (source, source_publication_id, author_position, "
             "person_id, authorship_id, in_perimeter, raw_author_name, author_name_normalized) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, lower(%s)) RETURNING id",
             (
                 source,
                 sp,
-                src_person_id,
+                author_position,
                 person_id,
                 authorship_id,
                 in_perimeter,
@@ -529,13 +519,12 @@ def _seed_orphan_authorship(raw_author_name: str) -> int:
             (_uniq("sid"), pub_id),
         )
         sp_id = cur.fetchone()["id"]
-    src_person_id = _seed_source_person(source="hal", full_name=raw_author_name)
     with _pool() as cur:
         cur.execute(
-            "INSERT INTO source_authorships (source, source_publication_id, source_person_id, "
+            "INSERT INTO source_authorships (source, source_publication_id, author_position, "
             "person_id, in_perimeter, raw_author_name, author_name_normalized) "
-            "VALUES ('hal', %s, %s, NULL, TRUE, %s, lower(%s)) RETURNING id",
-            (sp_id, src_person_id, raw_author_name, raw_author_name),
+            "VALUES ('hal', %s, 0, NULL, TRUE, %s, lower(%s)) RETURNING id",
+            (sp_id, raw_author_name, raw_author_name),
         )
         return cur.fetchone()["id"]
 

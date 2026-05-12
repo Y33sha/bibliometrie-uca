@@ -10,8 +10,7 @@ merge_person, etc.
 import json
 
 import pytest
-from sqlalchemy import bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import text
 
 from application.authorships.assign_orphans import (
     assign_orphan_authorship,
@@ -80,26 +79,12 @@ def _insert_source_publication(conn, publication_id, source="hal", source_id="ha
     ).scalar_one()
 
 
-_INSERT_SOURCE_PERSON_SQL = text(
-    "INSERT INTO source_persons (source, source_id, full_name, source_ids) "
-    "VALUES (:s, :sid, :n, :si) RETURNING id"
-).bindparams(bindparam("si", type_=JSONB))
-
-
-def _insert_source_person(
-    conn, source="hal", source_id="hal-p-1", full_name="Jean Dupont", source_ids=None
-):
-    return conn.execute(
-        _INSERT_SOURCE_PERSON_SQL,
-        {"s": source, "sid": source_id, "n": full_name, "si": source_ids},
-    ).scalar_one()
-
-
 def _insert_source_authorship(
     conn,
     source_publication_id,
-    source_person_id,
+    *,
     source="hal",
+    author_position=0,
     person_id=None,
     author_name_normalized="jean dupont",
     excluded=False,
@@ -107,14 +92,14 @@ def _insert_source_authorship(
     return conn.execute(
         text(
             "INSERT INTO source_authorships (source, source_publication_id, "
-            "                                source_person_id, person_id, "
+            "                                author_position, person_id, "
             "                                author_name_normalized, excluded) "
-            "VALUES (:s, :spid, :sper, :pid, :anf, :ex) RETURNING id"
+            "VALUES (:s, :spid, :pos, :pid, :anf, :ex) RETURNING id"
         ),
         {
             "s": source,
             "spid": source_publication_id,
-            "sper": source_person_id,
+            "pos": author_position,
             "pid": person_id,
             "anf": author_name_normalized,
             "ex": excluded,
@@ -157,35 +142,12 @@ class TestLinkAuthorship:
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sp_person = _insert_source_person(sa_sync_conn)
-        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person)
+        sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
 
         link_authorship(person_id, "hal", sa_id, repo=repo)
 
         assert (
             _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
-            == person_id
-        )
-
-    def test_dual_write_hal_person(self, sa_sync_conn, repo):
-        """Pour HAL avec hal_person_id, propage aussi à source_persons."""
-        person_id = _insert_person(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn)
-        sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sp_person = _insert_source_person(sa_sync_conn, source_ids={"hal_person_id": 42})
-        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person)
-
-        link_authorship(
-            person_id,
-            "hal",
-            sa_id,
-            source_person_id=sp_person,
-            has_hal_person_id=True,
-            repo=repo,
-        )
-
-        assert (
-            _scalar(sa_sync_conn, "SELECT person_id FROM source_persons WHERE id = :i", i=sp_person)
             == person_id
         )
 
@@ -198,8 +160,7 @@ class TestUnlinkAuthorship:
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sp_person = _insert_source_person(sa_sync_conn)
-        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=person_id)
+        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=person_id)
 
         unlink_authorship(person_id, "hal", sa_id, repo=repo)
 
@@ -214,8 +175,7 @@ class TestUnlinkAuthorship:
         p2 = _insert_person(sa_sync_conn, "Martin", "Sophie")
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sp_person = _insert_source_person(sa_sync_conn)
-        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=p1)
+        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=p1)
 
         unlink_authorship(p2, "hal", sa_id, repo=repo)
 
@@ -267,18 +227,6 @@ class TestAddIdentifier:
                 "SELECT person_id FROM person_identifiers WHERE id_value='0000-0001'",
             )
             == p1
-        )
-
-    def test_idhal_attaches_hal_source_person(self, sa_sync_conn, repo):
-        """Ajouter un idhal à une personne rattache le compte HAL correspondant."""
-        person_id = _insert_person(sa_sync_conn)
-        sp = _insert_source_person(sa_sync_conn, source_ids={"idhal": "jean-dupont"})
-
-        add_identifier(person_id, "idhal", "jean-dupont", repo=repo)
-
-        assert (
-            _scalar(sa_sync_conn, "SELECT person_id FROM source_persons WHERE id = :i", i=sp)
-            == person_id
         )
 
 
@@ -416,15 +364,12 @@ class TestBatchAssignOrphanAuthorships:
         pub_id = _insert_publication(sa_sync_conn)
         sp_hal = _insert_source_publication(sa_sync_conn, pub_id, source="hal", source_id="h-1")
         sp_oa = _insert_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="W1")
-        sp_person_hal = _insert_source_person(sa_sync_conn, source="hal", source_id="hal-p-1")
-        sp_person_oa = _insert_source_person(sa_sync_conn, source="openalex", source_id="oa-p-1")
         sa1 = _insert_source_authorship(
-            sa_sync_conn, sp_hal, sp_person_hal, source="hal", author_name_normalized="jean dupont"
+            sa_sync_conn, sp_hal, source="hal", author_name_normalized="jean dupont"
         )
         sa2 = _insert_source_authorship(
             sa_sync_conn,
             sp_oa,
-            sp_person_oa,
             source="openalex",
             author_name_normalized="jean dupont",
         )
@@ -449,8 +394,7 @@ class TestBatchAssignOrphanAuthorships:
         p2 = _insert_person(sa_sync_conn, "B", "B")
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sp_person = _insert_source_person(sa_sync_conn)
-        sa1 = _insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=p1)
+        sa1 = _insert_source_authorship(sa_sync_conn, sp_id, person_id=p1)
 
         assigned = batch_assign_orphan_authorships(p2, [sa1], repo=repo)
 
@@ -469,7 +413,6 @@ class TestDetachAuthorships:
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sp_person = _insert_source_person(sa_sync_conn)
         auth_id = sa_sync_conn.execute(
             text(
                 "INSERT INTO authorships (publication_id, person_id) "
@@ -477,7 +420,7 @@ class TestDetachAuthorships:
             ),
             {"pub": pub_id, "pid": person_id},
         ).scalar_one()
-        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=person_id)
+        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=person_id)
 
         result = detach_authorships(
             person_id,
@@ -521,11 +464,9 @@ class TestDetachAuthorships:
         person_id = create_person("Dupont", "Jean", repo=repo)
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sp_person = _insert_source_person(sa_sync_conn)
         _insert_source_authorship(
             sa_sync_conn,
             sp_id,
-            sp_person,
             person_id=person_id,
             author_name_normalized="dupont jean",
         )
@@ -633,8 +574,7 @@ class TestAssignOrphanAuthorship:
         other_id = _insert_person(sa_sync_conn, "Other", "Author")
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sp_person = _insert_source_person(sa_sync_conn)
-        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person, person_id=other_id)
+        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=other_id)
 
         assert assign_orphan_authorship(person_id, "hal", sa_id, repo=repo) is False
 
@@ -643,8 +583,7 @@ class TestAssignOrphanAuthorship:
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sp_person = _insert_source_person(sa_sync_conn)
-        sa_id = _insert_source_authorship(sa_sync_conn, sp_id, sp_person)
+        sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
 
         result = assign_orphan_authorship(person_id, "hal", sa_id, repo=repo)
 
@@ -668,11 +607,9 @@ class TestAssignOrphanAuthorship:
         person_id = _insert_person(sa_sync_conn, "Zzz", "Zzz")
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sp_person = _insert_source_person(sa_sync_conn)
         sa_id = _insert_source_authorship(
             sa_sync_conn,
             sp_id,
-            sp_person,
             author_name_normalized="other name",
             excluded=True,
         )

@@ -33,17 +33,6 @@ def _create_sd(conn, pub_id, source="hal", source_id="h1"):
     return row.id
 
 
-def _create_sp(conn, source="hal", source_id="sp1"):
-    row = conn.execute(
-        text(
-            "INSERT INTO source_persons (source, source_id, full_name) "
-            "VALUES (:src, :sid, 'X') RETURNING id"
-        ),
-        {"src": source, "sid": source_id},
-    ).one()
-    return row.id
-
-
 def _create_person(conn):
     row = conn.execute(
         text(
@@ -75,7 +64,6 @@ class TestGetPublicationDetail:
         pid = _create_person(sa_sync_conn)
         pub = _create_pub(sa_sync_conn, title="Test Pub", doi="10.1/abc")
         sd = _create_sd(sa_sync_conn, pub, source="hal", source_id="hal-1")
-        sp = _create_sp(sa_sync_conn, source="hal", source_id="sp-hal")
         auth_row = sa_sync_conn.execute(
             text(
                 "INSERT INTO authorships (publication_id, person_id) "
@@ -87,11 +75,11 @@ class TestGetPublicationDetail:
         sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
-                    (source, source_publication_id, source_person_id, author_position,
+                    (source, source_publication_id, author_position,
                      person_id, authorship_id)
-                VALUES ('hal', :sd, :sp, 0, :pid, :auth)
+                VALUES ('hal', :sd, 0, :pid, :auth)
             """),
-            {"sd": sd, "sp": sp, "pid": pid, "auth": auth_id},
+            {"sd": sd, "pid": pid, "auth": auth_id},
         )
 
         detail = get_publication_detail(sa_sync_conn, pub)

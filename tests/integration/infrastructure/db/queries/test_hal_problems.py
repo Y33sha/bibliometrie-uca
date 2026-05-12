@@ -66,18 +66,24 @@ def _create_person(conn, last="A", first="Z"):
     return row.id
 
 
-def _create_sp_with_hal_id(conn, *, source_id, person_id, hal_person_id, full_name="X"):
-    """Crée une source_persons HAL avec hal_person_id dans source_ids."""
+def _create_hal_sa_with_hal_id(
+    conn, *, person_id, hal_person_id, source_id="h-acc", raw_author_name="X"
+):
+    """Crée un sa HAL avec `hal_person_id` dans `person_identifiers` JSONB."""
+    pub = _create_pub(conn, title=f"P-{source_id}", title_normalized=f"p-{source_id}")
+    sd = _create_hal_sd(conn, pub, source_id=source_id)
     conn.execute(
         text("""
-            INSERT INTO source_persons (source, source_id, full_name, person_id, source_ids)
-            VALUES ('hal', :sid, :fn, :pid, CAST(:src_ids AS jsonb))
+            INSERT INTO source_authorships
+                (source, source_publication_id, author_position, person_id,
+                 raw_author_name, person_identifiers)
+            VALUES ('hal', :sd, 0, :pid, :raw, CAST(:idents AS jsonb))
         """),
         {
-            "sid": source_id,
-            "fn": full_name,
+            "sd": sd,
             "pid": person_id,
-            "src_ids": json.dumps({"hal_person_id": hal_person_id}),
+            "raw": raw_author_name,
+            "idents": json.dumps({"hal_person_id": hal_person_id}),
         },
     )
 
@@ -85,11 +91,11 @@ def _create_sp_with_hal_id(conn, *, source_id, person_id, hal_person_id, full_na
 class TestHalDuplicateAccounts:
     def test_detects_person_with_two_hal_accounts(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn)
-        _create_sp_with_hal_id(
-            sa_sync_conn, source_id="hal-1", person_id=pid, hal_person_id=42, full_name="A"
+        _create_hal_sa_with_hal_id(
+            sa_sync_conn, person_id=pid, hal_person_id=42, source_id="hal-1", raw_author_name="A"
         )
-        _create_sp_with_hal_id(
-            sa_sync_conn, source_id="hal-2", person_id=pid, hal_person_id=43, full_name="B"
+        _create_hal_sa_with_hal_id(
+            sa_sync_conn, person_id=pid, hal_person_id=43, source_id="hal-2", raw_author_name="B"
         )
 
         res = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50)
@@ -100,7 +106,7 @@ class TestHalDuplicateAccounts:
 
     def test_ignores_single_account(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn)
-        _create_sp_with_hal_id(sa_sync_conn, source_id="hal-1", person_id=pid, hal_person_id=42)
+        _create_hal_sa_with_hal_id(sa_sync_conn, person_id=pid, hal_person_id=42, source_id="hal-1")
         res = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50)
         assert not any(p["person_id"] == pid for p in res["persons"])
 

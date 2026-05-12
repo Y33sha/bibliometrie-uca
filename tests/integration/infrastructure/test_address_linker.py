@@ -21,19 +21,13 @@ def _create_authorship_stub(conn):
         """),
         {"pub_id": pub_id},
     ).scalar_one()
-    sp_id = conn.execute(
-        text("""
-            INSERT INTO source_persons (source, source_id, full_name)
-            VALUES ('hal', 'sp-X', 'Durand') RETURNING id
-        """)
-    ).scalar_one()
     return conn.execute(
         text("""
             INSERT INTO source_authorships
-                (source, source_publication_id, source_person_id, author_position)
-            VALUES ('hal', :sd_id, :sp_id, 0) RETURNING id
+                (source, source_publication_id, author_position)
+            VALUES ('hal', :sd_id, 0) RETURNING id
         """),
-        {"sd_id": sd_id, "sp_id": sp_id},
+        {"sd_id": sd_id},
     ).scalar_one()
 
 

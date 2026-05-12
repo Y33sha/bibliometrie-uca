@@ -185,20 +185,13 @@ class TestGetAddressPublications:
             {"p": pub},
         ).one()
         sd = sd_row.id
-        sp_row = sa_sync_conn.execute(
-            text(
-                "INSERT INTO source_persons (source, source_id, full_name) "
-                "VALUES ('hal', 'sp-1', 'X') RETURNING id"
-            )
-        ).one()
-        sp = sp_row.id
         sa_row = sa_sync_conn.execute(
             text("""
                 INSERT INTO source_authorships
-                    (source, source_publication_id, source_person_id, author_position)
-                VALUES ('hal', :sd, :sp, 0) RETURNING id
+                    (source, source_publication_id, author_position)
+                VALUES ('hal', :sd, 0) RETURNING id
             """),
-            {"sd": sd, "sp": sp},
+            {"sd": sd},
         ).one()
         sa_id = sa_row.id
         addr = _create_address(sa_sync_conn, raw_text="rue X")

@@ -65,17 +65,6 @@ def _create_source_publication(conn, publication_id, source="hal", source_id="ha
     return row.id
 
 
-def _create_source_person(conn, source="hal", source_id="hal-p-1", full_name="Jean Dupont"):
-    row = conn.execute(
-        text(
-            "INSERT INTO source_persons (source, source_id, full_name) "
-            "VALUES (:s, :sid, :n) RETURNING id"
-        ),
-        {"s": source, "sid": source_id, "n": full_name},
-    ).one()
-    return row.id
-
-
 def _create_authorship(conn, publication_id, person_id=None):
     row = conn.execute(
         text("INSERT INTO authorships (publication_id, person_id) VALUES (:p, :pid) RETURNING id"),
@@ -87,8 +76,9 @@ def _create_authorship(conn, publication_id, person_id=None):
 def _create_source_authorship(
     conn,
     source_publication_id,
-    source_person_id,
+    *,
     source="hal",
+    author_position=0,
     person_id=None,
     authorship_id=None,
     excluded=False,
@@ -98,15 +88,15 @@ def _create_source_authorship(
     row = conn.execute(
         text(
             "INSERT INTO source_authorships (source, source_publication_id, "
-            "                                source_person_id, person_id, "
+            "                                author_position, person_id, "
             "                                authorship_id, excluded, "
             "                                in_perimeter, structure_ids) "
-            "VALUES (:s, :spid, :sper, :pid, :aid, :ex, :ip, :sids) RETURNING id"
+            "VALUES (:s, :spid, :pos, :pid, :aid, :ex, :ip, :sids) RETURNING id"
         ),
         {
             "s": source,
             "spid": source_publication_id,
-            "sper": source_person_id,
+            "pos": author_position,
             "pid": person_id,
             "aid": authorship_id,
             "ex": excluded,
@@ -186,10 +176,9 @@ class TestExcludeAuthorship:
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        src_person_id = _create_source_person(sa_sync_conn)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         sa_id = _create_source_authorship(
-            sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
 
         result = exclude_authorship(authorship_id, repo=repo)
@@ -216,12 +205,14 @@ class TestExcludeAuthorship:
 
         p1 = _create_person(sa_sync_conn, "Dupont", "Jean")
         p2 = _create_person(sa_sync_conn, "Martin", "Sophie")
-        sp1 = _create_source_person(sa_sync_conn, source_id="hal-p-1")
-        sp2 = _create_source_person(sa_sync_conn, source_id="hal-p-2")
         a1 = _create_authorship(sa_sync_conn, pub_id, p1)
         a2 = _create_authorship(sa_sync_conn, pub_id, p2)
-        sa1 = _create_source_authorship(sa_sync_conn, sp_id, sp1, person_id=p1, authorship_id=a1)
-        sa2 = _create_source_authorship(sa_sync_conn, sp_id, sp2, person_id=p2, authorship_id=a2)
+        sa1 = _create_source_authorship(
+            sa_sync_conn, sp_id, author_position=0, person_id=p1, authorship_id=a1
+        )
+        sa2 = _create_source_authorship(
+            sa_sync_conn, sp_id, author_position=1, person_id=p2, authorship_id=a2
+        )
 
         exclude_authorship(a1, repo=repo)
 
@@ -252,9 +243,8 @@ class TestDetachSource:
     def test_returns_false_if_no_authorship_linked(self, sa_sync_conn, repo):
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        src_person_id = _create_source_person(sa_sync_conn)
         # source_authorship sans authorship_id
-        sa_id = _create_source_authorship(sa_sync_conn, sp_id, src_person_id)
+        sa_id = _create_source_authorship(sa_sync_conn, sp_id)
 
         assert detach_source(sa_id, "hal", repo=repo) is False
 
@@ -263,10 +253,9 @@ class TestDetachSource:
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        src_person_id = _create_source_person(sa_sync_conn)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         sa_id = _create_source_authorship(
-            sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
 
         assert detach_source(sa_id, "hal", repo=repo) is True
@@ -282,13 +271,10 @@ class TestDetachSource:
         pub_id = _create_publication(sa_sync_conn)
         sp_hal = _create_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-1")
         sp_oa = _create_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="W1")
-        p_hal = _create_source_person(sa_sync_conn, source="hal", source_id="hal-p-1")
-        p_oa = _create_source_person(sa_sync_conn, source="openalex", source_id="oa-p-1")
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         sa_hal = _create_source_authorship(
             sa_sync_conn,
             sp_hal,
-            p_hal,
             source="hal",
             person_id=person_id,
             authorship_id=authorship_id,
@@ -296,7 +282,6 @@ class TestDetachSource:
         _create_source_authorship(
             sa_sync_conn,
             sp_oa,
-            p_oa,
             source="openalex",
             person_id=person_id,
             authorship_id=authorship_id,
@@ -322,13 +307,10 @@ class TestDetachSource:
         pub_id = _create_publication(sa_sync_conn)
         sp_hal = _create_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-1")
         sp_oa = _create_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="W1")
-        p_hal = _create_source_person(sa_sync_conn, source="hal", source_id="hal-p-1")
-        p_oa = _create_source_person(sa_sync_conn, source="openalex", source_id="oa-p-1")
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         sa_hal = _create_source_authorship(
             sa_sync_conn,
             sp_hal,
-            p_hal,
             source="hal",
             person_id=person_id,
             authorship_id=authorship_id,
@@ -336,7 +318,6 @@ class TestDetachSource:
         _create_source_authorship(
             sa_sync_conn,
             sp_oa,
-            p_oa,
             source="openalex",
             person_id=person_id,
             authorship_id=authorship_id,
@@ -375,10 +356,9 @@ class TestDeleteOrphanAuthorships:
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        src_person_id = _create_source_person(sa_sync_conn)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         _create_source_authorship(
-            sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
 
         n = delete_orphan_authorships(person_id, repo=repo)
@@ -394,12 +374,10 @@ class TestDeleteOrphanAuthorships:
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        src_person_id = _create_source_person(sa_sync_conn)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         _create_source_authorship(
             sa_sync_conn,
             sp_id,
-            src_person_id,
             person_id=person_id,
             authorship_id=authorship_id,
             excluded=True,
@@ -466,10 +444,9 @@ class TestPropagateUcaForAddresses:
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        src_person_id = _create_source_person(sa_sync_conn)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         sa_id = _create_source_authorship(
-            sa_sync_conn, sp_id, src_person_id, person_id=person_id, authorship_id=authorship_id
+            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
         addr_id = _create_address(sa_sync_conn)
         _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=True)
@@ -499,13 +476,11 @@ class TestPropagateUcaForAddresses:
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        src_person_id = _create_source_person(sa_sync_conn)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         # source_authorship avec un flag in_perimeter déjà TRUE (état avant review)
         sa_id = _create_source_authorship(
             sa_sync_conn,
             sp_id,
-            src_person_id,
             person_id=person_id,
             authorship_id=authorship_id,
             in_perimeter=True,
@@ -543,8 +518,7 @@ class TestSetSourceAuthorshipExcluded:
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        src_person_id = _create_source_person(sa_sync_conn)
-        sa_id = _create_source_authorship(sa_sync_conn, sp_id, src_person_id, person_id=person_id)
+        sa_id = _create_source_authorship(sa_sync_conn, sp_id, person_id=person_id)
 
         set_source_authorship_excluded(sa_id, "hal", True, repo=repo)
 
@@ -558,12 +532,10 @@ class TestSetSourceAuthorshipExcluded:
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        src_person_id = _create_source_person(sa_sync_conn)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         sa_id = _create_source_authorship(
             sa_sync_conn,
             sp_id,
-            src_person_id,
             person_id=person_id,
             authorship_id=authorship_id,
             excluded=True,
@@ -581,12 +553,10 @@ class TestSetSourceAuthorshipExcluded:
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        src_person_id = _create_source_person(sa_sync_conn)
         authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
         sa_id = _create_source_authorship(
             sa_sync_conn,
             sp_id,
-            src_person_id,
             person_id=person_id,
             authorship_id=authorship_id,
         )
