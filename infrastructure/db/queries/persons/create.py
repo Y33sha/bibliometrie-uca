@@ -20,8 +20,9 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
     - `orcid` : NULL pour OpenAlex/WoS/CrossRef (filtré à part via
       `oa_orcid` ci-dessous, ces sources n'étant pas fiables pour
       l'ORCID au niveau matching).
-    - `idhal`, `has_hal_person_id`, `hal_person_id` : renseignés
-      uniquement pour HAL.
+    - `idhal` : renseigné uniquement pour HAL. Pas exploité par le
+      matching actuel — le matching par idhal sera réintroduit dans le
+      chantier `METIER_decide-person-match`.
     - `idref` : renseigné toutes sources (le pipeline `persons`
       l'utilise comme critère de match cross-source).
     - `oa_orcid` / `oa_full_name` : exposés pour OpenAlex/WoS/CrossRef
@@ -53,12 +54,6 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
                         ELSE NULL::text END AS idhal,
                    sa_auth.person_identifiers->>'idref' AS idref,
                    sa_auth.source_person_id,
-                   CASE WHEN sa_auth.source = 'hal'
-                        THEN (sa_auth.person_identifiers->>'hal_person_id') IS NOT NULL
-                        ELSE FALSE END AS has_hal_person_id,
-                   CASE WHEN sa_auth.source = 'hal'
-                        THEN (sa_auth.person_identifiers->>'hal_person_id')::int
-                        ELSE NULL::int END AS hal_person_id,
                    CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref')
                         THEN sa_auth.person_identifiers->>'orcid'
                         ELSE NULL::text END AS oa_orcid,
@@ -105,20 +100,6 @@ def fetch_linked_authorships(conn: Connection) -> list[dict[str, Any]]:
     return [dict(r._mapping) for r in rows]
 
 
-def fetch_hal_account_to_person_map(conn: Connection) -> dict[int, int]:
-    """`{hal_person_id: person_id}` pour les comptes HAL déjà rattachés."""
-    rows = conn.execute(
-        text("""
-            SELECT (sa.source_ids->>'hal_person_id')::int AS hal_person_id, sa.person_id
-            FROM source_persons sa
-            WHERE sa.source = 'hal'
-              AND (sa.source_ids->>'hal_person_id') IS NOT NULL
-              AND sa.person_id IS NOT NULL
-        """)
-    ).all()
-    return {r.hal_person_id: r.person_id for r in rows}
-
-
 def fetch_idref_to_person_map(conn: Connection) -> dict[str, int]:
     """`{idref: person_id}` pour les IdRef connus non rejetés."""
     rows = conn.execute(
@@ -159,9 +140,6 @@ class PgPersonsCreateQueries:
 
     def fetch_linked_authorships(self, conn: Connection) -> list[dict[str, Any]]:
         return fetch_linked_authorships(conn)
-
-    def fetch_hal_account_to_person_map(self, conn: Connection) -> dict[int, int]:
-        return fetch_hal_account_to_person_map(conn)
 
     def fetch_idref_to_person_map(self, conn: Connection) -> dict[str, int]:
         return fetch_idref_to_person_map(conn)

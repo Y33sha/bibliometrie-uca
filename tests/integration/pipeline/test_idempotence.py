@@ -1157,7 +1157,6 @@ def _run_create_persons(conn):
     from application.pipeline.persons.create_persons_from_source_authorships import (
         get_all_unlinked_authorships,
         load_linked_authorships_by_pub,
-        step0_hal_accounts,
         step1_cross_source,
         step2_orcid,
         step3_name_forms,
@@ -1171,9 +1170,6 @@ def _run_create_persons(conn):
     all_authorships = get_all_unlinked_authorships(conn, queries)
     linked_ids: set = set()
 
-    step0_hal_accounts(
-        conn, queries, logger, all_authorships, linked_ids, dry_run=False, person_repo=person_repo
-    )
     linked_index = load_linked_authorships_by_pub(conn, queries)
     step1_cross_source(
         logger,

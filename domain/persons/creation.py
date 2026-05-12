@@ -20,11 +20,8 @@ def should_create_source_person(*, source: str, strong_id_value: object) -> bool
 
     Signaux par source (ce qu'on considère « fort ») :
 
-    - **HAL** : ``hal_person_id`` (entier > 0). Compte HAL identifié,
-      créé par l'auteur ou un curateur. Un ``hal_person_id <= 0`` est
-      une sentinelle interne ("auteur non identifié" côté HAL) qu'on
-      rejette explicitement — ces signatures sont traitées comme les
-      sources sans identifiant.
+    - **HAL** : ``hal_person_id`` (entier). Compte HAL identifié,
+      créé par l'auteur ou un curateur.
     - **ScanR** : ``idref`` (PPN SUDOC, identifiant national stable).
     - **theses** : ``ppn`` (PPN SUDOC, idem ScanR).
 
@@ -35,7 +32,7 @@ def should_create_source_person(*, source: str, strong_id_value: object) -> bool
     HAL/ScanR/theses.
     """
     if source == "hal":
-        return isinstance(strong_id_value, int) and strong_id_value > 0
+        return isinstance(strong_id_value, int)
     return bool(strong_id_value)
 
 
