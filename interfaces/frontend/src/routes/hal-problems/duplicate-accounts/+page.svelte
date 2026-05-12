@@ -85,13 +85,13 @@
                 <span class="hal-name">{ha.full_name}</span>
                 <span class="hal-pubs">{ha.pub_count} publi{ha.pub_count > 1 ? "s" : ""}</span>
                 {#if ha.idhal}
-                  <span class="hal-idhal">idHAL: {ha.idhal}</span>
+                  <span class="hal-secondary-id">idHAL: {ha.idhal}</span>
                 {/if}
                 {#if ha.orcid}
-                  <span class="hal-orcid">ORCID: {ha.orcid}</span>
+                  <span class="hal-secondary-id">ORCID: {ha.orcid}</span>
                 {/if}
                 {#if ha.idref}
-                  <span class="hal-idref">IdRef: {ha.idref}</span>
+                  <span class="hal-secondary-id">IdRef: {ha.idref}</span>
                 {/if}
               </div>
             {/each}
@@ -184,8 +184,7 @@
     padding: 1px 6px;
     border-radius: 3px;
   }
-  .hal-idhal,
-  .hal-orcid {
+  .hal-secondary-id {
     font-size: 0.8rem;
     color: var(--muted);
   }
