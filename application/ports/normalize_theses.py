@@ -3,9 +3,11 @@
 Implémenté par `infrastructure.db.queries.normalize_theses.PgThesesNormalizeQueries`.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
+
+from domain.json_types import JsonValue
 
 
 class ThesesNormalizeQueries(Protocol):
@@ -16,7 +18,7 @@ class ThesesNormalizeQueries(Protocol):
     ) -> tuple[str, str] | None: ...
 
     def merge_publication_meta(
-        self, conn: Connection, publication_id: int, meta_json: Any
+        self, conn: Connection, publication_id: int, meta_json: JsonValue
     ) -> None: ...
 
     def upsert_theses_source_publication(
@@ -30,14 +32,14 @@ class ThesesNormalizeQueries(Protocol):
         doc_type: str,
         publication_id: int | None,
         staging_id: int,
-        external_ids: Any,
+        external_ids: JsonValue,
         journal_id: int | None,
         oa_status: str | None,
         language: str | None,
         container_title: str | None,
         keywords: list[str] | None,
-        topics_json: Any,
-        source_meta_json: Any,
+        topics_json: JsonValue,
+        source_meta_json: JsonValue,
     ) -> int: ...
 
     def upsert_theses_source_person_by_ppn(
@@ -57,7 +59,7 @@ class ThesesNormalizeQueries(Protocol):
         author_position: int | None,
         roles: list[str],
         raw_author_name: str,
-        identifiers: Any,
+        identifiers: JsonValue,
     ) -> int: ...
 
     def get_theses_publication_id(self, conn: Connection, theses_id: str) -> int | None: ...

@@ -3,9 +3,11 @@
 Implémenté par `infrastructure.db.queries.normalize_scanr.PgScanrNormalizeQueries`.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
+
+from domain.json_types import JsonValue
 
 
 class ScanrNormalizeQueries(Protocol):
@@ -22,14 +24,14 @@ class ScanrNormalizeQueries(Protocol):
         doc_type: str | None,
         publication_id: int | None,
         staging_id: int,
-        external_ids: Any,
+        external_ids: JsonValue,
         journal_id: int | None,
         oa_status: str | None,
         language: str | None,
         container_title: str | None,
         abstract: str | None,
         keywords: list[str] | None,
-        topics: Any,
+        topics: JsonValue,
         cited_by_count: int | None,
         urls: list[str] | None,
     ) -> int: ...
@@ -52,7 +54,7 @@ class ScanrNormalizeQueries(Protocol):
         author_position: int,
         roles: list[str] | None,
         raw_author_name: str | None,
-        identifiers: Any,
+        identifiers: JsonValue,
     ) -> int: ...
 
     def get_scanr_publication_id(self, conn: Connection, scanr_id: str) -> int | None: ...

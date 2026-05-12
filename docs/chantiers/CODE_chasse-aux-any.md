@@ -66,7 +66,23 @@ Patterns dominants :
   `PubByDoi` (résolution conflit DOI). Restent justifiés : `set[Any]`
   / `list[Any]` dans `_merge_lists` (items hétérogènes par champ),
   `value: Any` dans `update_config_value` (frontière JSONB).
-  Ports + orchestrateurs pipeline : pas encore traités.
+  Orchestrateurs pipeline : pas encore traités.
+- [~] `application/ports/normalize_*.py` : tous les `Any` JSONB
+  (frontière vers `bindparam(type_=JSONB)`) remplacés par
+  `JsonValue` (alias récursif `str | int | float | bool | None |
+  Sequence[JsonValue] | Mapping[str, JsonValue]` dans
+  `domain/json_types.py`). 6 ports (HAL, OpenAlex, CrossRef, Theses,
+  WoS, ScanR) + leurs 6 implémentations `infrastructure/db/queries/
+  normalize_*.py` (top-level functions et signatures complètes
+  CrossRef). Override mypy `disallow_any_explicit` posé sur 5 ports
+  (`normalize_wos` exclu : utilise encore `list[dict[str, Any]]` pour
+  les batchs SQL hétérogènes — tranche suivante).
+  `compact_identifiers` (`domain/persons/identifiers.py`) typé en
+  retour `dict[str, JsonValue] | None` au passage (alimente le JSONB
+  `source_authorships.identifiers`). Restent à traiter : `**kwargs: Any`
+  sur les méthodes adapter `Pg*NormalizeQueries` (HAL/OpenAlex/Theses/
+  WoS/ScanR, ~13 méthodes) — implique d'éclater en signatures
+  explicites façon CrossRef.
 - [~] `infrastructure/` racine : `_get_from_db(key: Any)` → `key: str`
   dans `app_config.py`. Le retour `Any` est conservé et justifié en
   docstring (frontière JSONB libre — chaque caller fait son
@@ -80,6 +96,12 @@ Patterns dominants :
   `_max_overflow`/`checkedout`/`checkedin`) ; `SPAStaticFiles.get_response` →
   signature parente `(str, Scope) -> Response` ; `require_admin` → `None`.
   Override mypy `disallow_any_generics` posé.
+  Note : `health()` retourne `JSONResponse | dict[str, Any]` (Union avec
+  `Response`) → FastAPI ne peut pas inférer le `response_model`. Ajouter
+  `response_model=None` sur le décorateur (sinon `FastAPIError` à
+  l'import de l'app). Cas non détecté par les hooks pre-commit qui ne
+  lancent que `tests/unit/` ; le test smoke `tests/integration/interfaces/
+  test_api.py::TestHealth::test_health` aurait capté le crash.
 - [x] `interfaces/api/routers/` (124 occ., 17 fichiers) : tous les
   handlers avec `response_model=` retournent désormais leur BaseModel.
   Pattern retenu (option A de la question Pydantic ci-dessous) :
@@ -116,6 +138,17 @@ Patterns dominants :
   chantier dédié pour ne pas mélanger « typer » et « renommer » dans
   les mêmes commits. État intermédiaire actuel : `cur: Connection`,
   techniquement correct mais visuellement bancal.
+
+- **Généraliser `JsonValue` à toutes les frontières JSON** : maintenant
+  que l'alias existe (`domain/json_types.py`), tous les `dict[str, Any]`
+  qui représentent en réalité du JSON / JSONB devraient progressivement
+  basculer vers `JsonValue` pour cohérence. Périmètres concernés
+  identifiés : `interfaces/api/models.py` (`ConfigItem.value`,
+  `ConfigValueUpdate.value`), `interfaces/api/app.py` (handlers
+  `health`/`metrics`), `interfaces/cli/` (helpers `escape_sql`,
+  records DB), `application/` (`_merge_lists`, `update_config_value`),
+  `infrastructure/` (`app_config._get_from_db`). Pas un chantier
+  monolithique — à faire au fil des sweeps Phase 2 restants.
 
 ## Questions ouvertes
 

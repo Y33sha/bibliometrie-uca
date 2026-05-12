@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from domain.json_types import JsonValue
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )
@@ -40,7 +41,7 @@ def upsert_openalex_source_publication(
     doc_type: str | None,
     publication_id: int | None,
     staging_id: int,
-    external_ids: Any,
+    external_ids: JsonValue,
     urls: list[str] | None,
     cited_by_count: int | None,
     journal_id: int | None,
@@ -48,10 +49,10 @@ def upsert_openalex_source_publication(
     language: str | None,
     container_title: str | None,
     is_retracted: bool | None,
-    biblio: Any,
+    biblio: JsonValue,
     abstract: str | None,
     keywords: list[str] | None,
-    topics_json: Any,
+    topics_json: JsonValue,
 ) -> int:
     """UPSERT d'un document OpenAlex dans `source_publications`."""
     stmt = text("""
@@ -130,7 +131,7 @@ def upsert_openalex_source_structure(
     name: str,
     ror_id: str | None,
     country: str | None,
-    source_data: Any,
+    source_data: JsonValue,
 ) -> int:
     """UPSERT d'une `source_structures` OpenAlex."""
     stmt = text("""
@@ -166,7 +167,7 @@ def upsert_openalex_source_authorship(
     source_struct_ids: list[int] | None,
     raw_author_name: str | None,
     is_corresponding: bool,
-    identifiers: Any,
+    identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une `source_authorships` OpenAlex.
 

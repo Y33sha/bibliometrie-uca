@@ -15,6 +15,7 @@ import re
 from dataclasses import dataclass
 
 from domain.errors import ValidationError
+from domain.json_types import JsonValue
 
 # ── ORCID ──────────────────────────────────────────────────────────
 
@@ -175,7 +176,7 @@ class IdRef:
 # ── Construction du dict JSONB `source_authorships.identifiers` ────
 
 
-def compact_identifiers(**ids: object) -> dict[str, object] | None:
+def compact_identifiers(**ids: JsonValue) -> dict[str, JsonValue] | None:
     """Construit le dict d'identifiants pour ``source_authorships.identifiers``.
 
     Convention : valeur falsy (None, 0, "", …) → clé absente du dict, dict
@@ -184,5 +185,5 @@ def compact_identifiers(**ids: object) -> dict[str, object] | None:
     identifié » qu'on ne stocke pas) en passant ``None`` plutôt qu'une
     valeur sentinelle.
     """
-    out = {k: v for k, v in ids.items() if v}
+    out: dict[str, JsonValue] = {k: v for k, v in ids.items() if v}
     return out or None

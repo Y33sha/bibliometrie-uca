@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from domain.json_types import JsonValue
 from domain.names import parse_raw_author_name
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
@@ -42,7 +43,7 @@ def fetch_thesis_primary_author(conn: Connection, publication_id: int) -> tuple[
     return (last, first) if last else None
 
 
-def merge_publication_meta(conn: Connection, publication_id: int, meta_json: Any) -> None:
+def merge_publication_meta(conn: Connection, publication_id: int, meta_json: JsonValue) -> None:
     """Fusionne `publications.meta` avec `meta_json` (concat JSONB)."""
     stmt = text("""
         UPDATE publications
@@ -62,14 +63,14 @@ def upsert_theses_source_publication(
     doc_type: str,
     publication_id: int | None,
     staging_id: int,
-    external_ids: Any,
+    external_ids: JsonValue,
     journal_id: int | None,
     oa_status: str | None,
     language: str | None,
     container_title: str | None,
     keywords: list[str] | None,
-    topics_json: Any,
-    source_meta_json: Any,
+    topics_json: JsonValue,
+    source_meta_json: JsonValue,
 ) -> int:
     """UPSERT d'un document theses.fr dans `source_publications`."""
     stmt = text("""
@@ -149,7 +150,7 @@ def upsert_theses_source_authorship(
     author_position: int | None,
     roles: list[str],
     raw_author_name: str,
-    identifiers: Any,
+    identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une `source_authorships` theses.fr. `author_position` NULL pour les non-auteurs.
 
@@ -220,7 +221,9 @@ class PgThesesNormalizeQueries:
     ) -> tuple[str, str] | None:
         return fetch_thesis_primary_author(conn, publication_id)
 
-    def merge_publication_meta(self, conn: Connection, publication_id: int, meta_json: Any) -> None:
+    def merge_publication_meta(
+        self, conn: Connection, publication_id: int, meta_json: JsonValue
+    ) -> None:
         merge_publication_meta(conn, publication_id, meta_json)
 
     def upsert_theses_source_publication(self, conn: Connection, **kwargs: Any) -> int:

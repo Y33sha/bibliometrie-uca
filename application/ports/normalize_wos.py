@@ -7,6 +7,8 @@ from typing import Any, Protocol
 
 from sqlalchemy import Connection
 
+from domain.json_types import JsonValue
+
 
 class WosNormalizeQueries(Protocol):
     """Opérations SQL du normaliseur WoS (batchs executemany)."""
@@ -28,11 +30,11 @@ class WosNormalizeQueries(Protocol):
         container_title: str | None,
         abstract: str | None,
         cited_by_count: int | None,
-        biblio: Any,
+        biblio: JsonValue,
         keywords: list[str] | None,
-        topics: Any,
+        topics: JsonValue,
         urls: list[str] | None,
-        external_ids: Any,
+        external_ids: JsonValue,
     ) -> int: ...
 
     def upsert_wos_source_structure(
