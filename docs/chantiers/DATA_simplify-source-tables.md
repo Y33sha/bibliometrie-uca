@@ -189,10 +189,18 @@ Audit (cf. discussion architecturale 2026-05-11) :
     au lieu de `source_struct_ids`, plus de `source_person_id`).
   - Tests adaptés : unit `parse_author_structures` (set[int] →
     set[str]), suppression test intégration sur fonction supprimée.
-- [ ] `application/pipeline/normalize/normalize_openalex.py` /
-  `normalize_wos.py` / `normalize_scanr.py` / `normalize_theses.py` :
-  arrêter d'UPSERT dans `source_persons` et `source_structures`.
-  Écrire le `source_id` de la structure côté `sa.source_structures` (TEXT[]).
+- [x] `application/pipeline/normalize/normalize_openalex.py` et
+  `normalize_wos.py` : arrêt UPSERT `source_structures` ;
+  écriture des `openalex_id` natifs (OA) ou des noms d'institutions
+  (WoS) directement dans `sa.source_structures` (TEXT[]). Fonctions
+  query supprimées : `find/upsert_openalex_source_structure`,
+  `upsert_wos_source_structure`, `fetch_wos_source_structures`. Le
+  cache module-level `_wos_institution_cache` n'a plus de raison
+  d'exister.
+- [ ] `application/pipeline/normalize/normalize_scanr.py` /
+  `normalize_theses.py` : arrêter d'UPSERT dans `source_persons` et
+  `source_structures` (ScanR/Theses écrivent encore `source_persons`
+  via `upsert_*_source_person_by_idref/ppn`).
 
 #### Cleanup schéma (avant Phase 4 DROP)
 

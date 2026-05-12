@@ -40,27 +40,13 @@ class OpenalexNormalizeQueries(Protocol):
         topics_json: JsonValue,
     ) -> int: ...
 
-    def find_openalex_source_structure(self, conn: Connection, openalex_id: str) -> int | None: ...
-
-    def upsert_openalex_source_structure(
-        self,
-        conn: Connection,
-        *,
-        openalex_id: str,
-        name: str,
-        ror_id: str | None,
-        country: str | None,
-        source_data: JsonValue,
-    ) -> int: ...
-
     def upsert_openalex_source_authorship(
         self,
         conn: Connection,
         *,
         source_publication_id: int,
-        source_person_id: int | None,
         author_position: int,
-        source_struct_ids: list[int] | None,
+        source_structures: list[str] | None,
         raw_author_name: str | None,
         is_corresponding: bool,
         person_identifiers: JsonValue,

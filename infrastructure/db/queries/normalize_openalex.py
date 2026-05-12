@@ -115,73 +115,32 @@ def upsert_openalex_source_publication(
     return row.id
 
 
-def find_openalex_source_structure(conn: Connection, openalex_id: str) -> int | None:
-    """Cherche une `source_structures` OpenAlex par `source_id`."""
-    row = conn.execute(
-        text("SELECT id FROM source_structures WHERE source = 'openalex' AND source_id = :oa_id"),
-        {"oa_id": openalex_id},
-    ).one_or_none()
-    return row.id if row else None
-
-
-def upsert_openalex_source_structure(
-    conn: Connection,
-    *,
-    openalex_id: str,
-    name: str,
-    ror_id: str | None,
-    country: str | None,
-    source_data: JsonValue,
-) -> int:
-    """UPSERT d'une `source_structures` OpenAlex."""
-    stmt = text("""
-        INSERT INTO source_structures
-            (source, source_id, name, ror_id, country, source_data)
-        VALUES ('openalex', :openalex_id, :name, :ror_id, :country, :source_data)
-        ON CONFLICT (source, source_id) DO UPDATE SET
-            name = COALESCE(NULLIF(source_structures.name, ''), EXCLUDED.name),
-            ror_id = COALESCE(source_structures.ror_id, EXCLUDED.ror_id),
-            source_data = COALESCE(source_structures.source_data, '{}') ||
-                          COALESCE(EXCLUDED.source_data, '{}')
-        RETURNING id
-    """).bindparams(bindparam("source_data", type_=JSONB))
-    row = conn.execute(
-        stmt,
-        {
-            "openalex_id": openalex_id,
-            "name": name,
-            "ror_id": ror_id,
-            "country": country,
-            "source_data": source_data,
-        },
-    ).one()
-    return row.id
-
-
 def upsert_openalex_source_authorship(
     conn: Connection,
     *,
     source_publication_id: int,
-    source_person_id: int | None,
     author_position: int,
-    source_struct_ids: list[int] | None,
+    source_structures: list[str] | None,
     raw_author_name: str | None,
     is_corresponding: bool,
     person_identifiers: JsonValue,
 ) -> int:
     """UPSERT d'une `source_authorships` OpenAlex.
 
-    `source_person_id` est NULL : depuis le chantier source_persons,
-    OpenAlex n'écrit plus dans `source_persons` (entités auteurs
+    `source_person_id` toujours NULL pour OpenAlex (entités auteurs
     algorithmiques non fiables). Les identifiants normalisés (orcid)
     vivent sur `person_identifiers`.
+
+    `source_structures` (TEXT[]) stocke les `openalex_id` natifs des
+    institutions référencées — remplace l'ancien `source_struct_ids`
+    (INTEGER[] de PK `source_structures`, table en voie de suppression).
     """
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, source_person_id, author_position,
-             source_struct_ids,
+             source_structures,
              author_name_normalized, is_corresponding, raw_author_name, person_identifiers)
-        VALUES ('openalex', :spid, :source_person_id, :pos, :source_struct_ids,
+        VALUES ('openalex', :spid, NULL, :pos, :source_structures,
                 normalize_name_form(:raw_author_name), :is_corresponding,
                 :raw_author_name, :person_identifiers)
         ON CONFLICT (source_publication_id, source_person_id, author_position) DO UPDATE SET
@@ -191,6 +150,7 @@ def upsert_openalex_source_authorship(
             ),
             is_corresponding = EXCLUDED.is_corresponding,
             raw_author_name = EXCLUDED.raw_author_name,
+            source_structures = EXCLUDED.source_structures,
             person_identifiers = EXCLUDED.person_identifiers
         RETURNING id
     """).bindparams(bindparam("person_identifiers", type_=JSONB))
@@ -198,9 +158,8 @@ def upsert_openalex_source_authorship(
         stmt,
         {
             "spid": source_publication_id,
-            "source_person_id": source_person_id,
             "pos": author_position,
-            "source_struct_ids": source_struct_ids,
+            "source_structures": source_structures,
             "raw_author_name": raw_author_name,
             "is_corresponding": is_corresponding,
             "person_identifiers": person_identifiers,
@@ -255,12 +214,6 @@ class PgOpenalexNormalizeQueries:
 
     def upsert_openalex_source_publication(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_openalex_source_publication(conn, **kwargs)
-
-    def find_openalex_source_structure(self, conn: Connection, openalex_id: str) -> int | None:
-        return find_openalex_source_structure(conn, openalex_id)
-
-    def upsert_openalex_source_structure(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_openalex_source_structure(conn, **kwargs)
 
     def upsert_openalex_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_openalex_source_authorship(conn, **kwargs)

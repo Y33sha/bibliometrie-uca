@@ -477,46 +477,19 @@ def _resolve_addresses_batch(
     return queries.fetch_address_ids_by_raw_text(conn, list(raw_texts))
 
 
-_wos_institution_cache: dict[str, int] = {}
-
-
-def upsert_wos_institution(conn: Connection, queries: WosNormalizeQueries, org: dict) -> int | None:
-    """Insère/retrouve une organisation WoS dans source_structures."""
-    name = org.get("name")
-    if not name:
-        return None
-
-    if name in _wos_institution_cache:
-        return _wos_institution_cache[name]
-
-    ror_id = org.get("ror_id")
-    result = queries.upsert_wos_source_structure(conn, name=name, ror_id=ror_id)
-    _wos_institution_cache[name] = result
-    return result
-
-
 def process_authorships(
     conn: Connection, queries: WosNormalizeQueries, rec: dict, source_publication_id: int
 ) -> None:
-    """Traite les authorships d'un record WoS + crée les liens adresses et institutions.
+    """Traite les authorships d'un record WoS + crée les liens adresses.
 
-    Plus d'écriture sur `source_persons` (cf. docs/chantiers/2026-04-28_source-persons.md).
-    Chaque authorship est inséré avec `source_person_id=NULL` et un dict
-    `identifiers` (orcid + researcher_id) sur `source_authorships`.
+    Pas d'écriture sur `source_persons` ni `source_structures` (cf.
+    chantier `DATA_simplify-source-tables`). Chaque authorship est
+    insérée avec `source_person_id=NULL`, un dict `person_identifiers`
+    (orcid + researcher_id) et `source_structures` (TEXT[] des noms
+    d'organisations WoS — seul identifiant stable disponible côté WoS).
     """
     # Pré-nettoyage : re-traitement → table blanche pour cette publi.
     queries.clear_source_authorships_for_publication(conn, source_publication_id)
-
-    # Résoudre toutes les organisations du document en un seul pass
-    all_orgs = set()
-    for author in rec.get("authors", []):
-        for org in author.get("organizations", []):
-            name = org.get("name")
-            if name:
-                all_orgs.add(name)
-    for org_name in all_orgs:
-        if org_name not in _wos_institution_cache:
-            upsert_wos_institution(conn, queries, {"name": org_name})
 
     # Filtrer les auteurs exploitables (cf. `is_wos_author_exploitable`
     # pour la sémantique du filtre).
@@ -524,7 +497,8 @@ def process_authorships(
     if not authors_kept:
         return
 
-    # Batch INSERT source_authorships (source_person_id=NULL, identifiers JSONB)
+    # Batch INSERT source_authorships (source_person_id=NULL,
+    # person_identifiers JSONB, source_structures TEXT[]).
     from domain.normalize import normalize_name_form
 
     values = {}  # clé = author_position, dédupliqué (1 row par position)
@@ -533,11 +507,11 @@ def process_authorships(
         if position in values:
             continue  # même position déjà traitée
 
-        institution_ids = []
-        for org in author.get("organizations", []):
-            name = org.get("name")
-            if name and name in _wos_institution_cache:
-                institution_ids.append(_wos_institution_cache[name])
+        # Noms des institutions WoS comme identifiants natifs (TEXT[]).
+        # Pas d'ID stable côté WoS — le nom sert d'identifiant.
+        institution_names = [
+            org["name"] for org in author.get("organizations", []) if org.get("name")
+        ]
 
         name_norm = normalize_name_form(author["full_name"])
         ids = compact_identifiers(
@@ -547,11 +521,10 @@ def process_authorships(
 
         values[position] = {
             "spid": source_publication_id,
-            "source_person_id": None,
             "author_position": position,
             "is_corresponding": author["is_corresponding"],
             "author_name_normalized": name_norm,
-            "source_struct_ids": institution_ids or None,
+            "source_structures": institution_names or None,
             "roles": author.get("roles"),
             "raw_author_name": author["full_name"],
             "person_identifiers": ids if ids else None,
@@ -683,9 +656,6 @@ class WosNormalizer(SourceNormalizer):
         self._journal_repo = self._journal_repo_factory(conn)
         self._publisher_repo = self._publisher_repo_factory(conn)
         self._pub_repo = self._pub_repo_factory(conn)
-        for src_id, pid in self._queries.fetch_wos_source_structures(conn):
-            _wos_institution_cache[src_id] = pid
-        self.logger.info(f"Cache WoS : {len(_wos_institution_cache)} institutions")
 
     def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
         assert (
@@ -708,13 +678,3 @@ class WosNormalizer(SourceNormalizer):
         deleted_dups = self._queries.delete_wos_duplicate_authorships(conn)
         if deleted_dups:
             self.logger.info("Doublons de position supprimés : %d", deleted_dups)
-
-    def cleanup(self) -> None:
-        _wos_institution_cache.clear()
-
-    def on_error(self) -> None:
-        # Le cache module-level peut contenir des IDs insérés dans la
-        # transaction qui vient d'être rollbackée (SAVEPOINT). On le vide
-        # entièrement : les prochains works re-populeront depuis la DB.
-        # Perd la part preload mais évite les FK violations.
-        _wos_institution_cache.clear()
