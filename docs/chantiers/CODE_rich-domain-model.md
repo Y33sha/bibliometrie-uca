@@ -112,10 +112,7 @@ vides comme point d'appui.
    est un index inverse dénormalisé pour le matching — pas un
    aggregate. Le domain VO est juste la string ; la mapping
    `form → persons` est une infrastructure de query.
-7. **Approche progressive** : scaffolding minimal en Phase 1, puis
-   rapatriement de la logique mûre en Phase 2, puis enrichissement
-   délégué aux chantiers METIER_* en Phase 3, puis arbitrage sur les
-   repositories en Phase 4.
+7. **Approche progressive** : scaffolding minimal des entités (Phase 1), migration statique des règles vers leur module thématique (Phase 2), refactor des use-cases mono-aggregate (Phase 3), hydratation de Publication + orchestrations qui en dépendent (Phase 4), orchestrations Person (Phase 5), nettoyage des doublons (Phase 6), convention de transmission aux chantiers METIER_* (Phase 7), généralisation de l'hydratation aux autres entités (Phase 8, différée).
 8. **Les dataclasses de résultat de requête ne sont pas des entités.**
    `PubByDoi`, `PubByNnt`, `PubByTitle`, `PubThesisCandidate` restent
    des projections de lecture (DTOs domain), distinctes des
@@ -205,10 +202,7 @@ vides comme point d'appui.
       `check_can_merge_persons` de `domain/persons/merge.py` ; doublon
       temporaire, suppression Phase 2). Signature avec `has_distinct_rh`
       kwarg en attendant le scaffolding `PersonRH`.
-- [x] `Publication.has_minimal_metadata()` (reprend
-      `has_minimal_publication_metadata` de
-      `domain/publications/dedup.py`). Doublon temporaire en
-      `dedup.py` ; suppression Phase 2.
+- [x] `Publication.has_minimal_metadata()` (reprend `has_minimal_publication_metadata` de `domain/publications/dedup.py`). Doublon temporaire en `dedup.py` ; suppression Phase 6.
 
 **Convention + tests :**
 
@@ -220,16 +214,11 @@ vides comme point d'appui.
       `SourcePublication`, `AddressAffiliation` (confirm/reject/
       reattribute/attach + cas d'erreur).
 
-### Phase 2 — Rapatrier la logique éparpillée (~3-5j)
+### Phase 2 — Migration statique vers modules thématiques
 
-Chaque item est à examiner au moment venu. Le séquencement n'est pas
-mécanique : les doublons issus de Phase 1 ne peuvent pas être
-supprimés tant que les callers ne manipulent pas d'entité, donc ils
-finissent en 2.4. Les règles pures se font en premier (2.1, scope
-local), puis les use-cases mono-aggregate (2.2, pattern « load →
-mutate → save »), puis les orchestrations larges (2.3).
+Déplacement de règles isolées et de modules orphelins vers les subpackages d'aggregate. Pas de changement de comportement, juste l'emplacement du code.
 
-#### Phase 2.1a — Règles isolées de `domain/publication.py` vers modules thématiques
+#### Phase 2.1 — Règles isolées de `domain/publication.py` vers modules thématiques
 
 Arbitrage par règle : méthode d'instance UNIQUEMENT pour les
 comportements d'identité (entité agit sur elle-même). Les comparaisons
@@ -255,11 +244,9 @@ adéquat — pas à forcer en méthodes.
       `decide_name_form_outcome`, `decide_match_by_identifier`) →
       déféré à `METIER_decide-person-match` qui refondra la cascade.
 
-#### Phase 2.1b — Modules orphelins de `domain/` racine vers subpackages
+#### Phase 2.2 — Modules orphelins de `domain/` racine vers subpackages
 
-Quelques modules historiques restent à la racine de `domain/` alors
-qu'ils sont attachés à un aggregate. Déplacement vers la subpackage
-thématique, sur le même principe que la dispersion 2.1a.
+Quelques modules historiques restaient à la racine de `domain/` alors qu'ils sont attachés à un aggregate. Déplacement vers la subpackage thématique, sur le même principe que la dispersion 2.1.
 
 - [x] Supprimer `domain/structure.py` — placeholder vide, redondant
       avec `domain/structures/structure.py`, 0 caller.
@@ -283,11 +270,9 @@ thématique, sur le même principe que la dispersion 2.1a.
       sur le même modèle que `persons/`, `publications/`,
       `structures/`).
 
-#### Phase 2.2 — Use-cases mono-aggregate : pattern load → mutate → save
+### Phase 3 — Use-cases mono-aggregate : pattern load → mutate → save
 
-L'application charge un aggregate via le repository, appelle ses
-méthodes, sauvegarde. La logique métier vit dans l'aggregate ; le
-repository ne contient plus que la persistance.
+L'application charge un aggregate via le repository, appelle ses méthodes, sauvegarde. La logique métier vit dans l'aggregate ; le repository ne contient plus que la persistance.
 
 - [x] `application/persons.py:add_identifier` (`PersonIdentifier`
       aggregate) — pilote du pattern : `repo.find_identifier(id_type,    id_value)`, dispatche (créer / idempotent / `reattribute_to` /
@@ -298,89 +283,50 @@ repository ne contient plus que la persistance.
       via handler existant) au lieu du silent no-op précédent. — `bd6f587`
 - [x] `application/persons.py:add_identifiers_from_authorships` — itère désormais en déléguant chaque identifiant à `add_identifier` (qui charge / dispatche / sauvegarde via l'aggregate `PersonIdentifier`). Signature inchangée `(person_id, authorships: list[dict])` : le parsing dict→identifiant reste interne (path batch piloté par les dicts du pipeline). Tolérance au conflit : `CannotAttributeConflict` est loggé en warning et la promotion continue sur les autres identifiants — comportement adapté au batch pipeline, distinct du path strict de `add_identifier` utilisé par l'API admin.
 
-#### Phase 2.3 — Orchestrations larges : refactor autour d'aggregates multiples
+### Phase 4 — Hydratation Publication et orchestrations larges autour de Publication
 
-- [ ] `application/publications.py:find_or_create` (l. 125-194) →
-      refactor pour utiliser `Publication` en entrée/sortie. Coord
-      avec `METIER_dedup-fusion-publications` (cascade dédup).
-- [ ] `application/publications.py:merge_publications` (l. 403-425) →
-      réorganiser autour de `Publication.absorb(other)` ;
-      l'orchestration SQL reste côté repository.
-- [ ] `application/publications.py:refresh_from_sources` (fusion
-      implicite l. 348-353 sur collision DOI) → rendre explicite :
-      méthode `Publication.absorb(other)` OU retour
-      `RefreshResult(merged_into: int | None)` qui force le caller à
-      gérer la collision.
-- [ ] Helpers de `refresh_from_sources` (`_first_non_null`,
-      `_merge_lists`, `_merge_jsonb`, `_first_doc_type`) — coord avec
-      `METIER_dedup-fusion-publications` qui vise déjà à les exfiltrer
-      vers `domain/publications/merge.py`.
-- [ ] `application/persons.py:merge_person` (orchestrateur l. 340-358)
-      → autour de `Person.merge_with(other)`. Question à examiner :
-      que deviennent les `PersonIdentifier` de la personne absorbée
-      (`reattribute_to` pour chacun, conflits sur statuts `confirmed`
-      à cadrer).
-- [ ] `application/pipeline/persons/create_persons_from_source_authorships.py`
-      — refactor de la cascade matching porté par
-      `METIER_decide-person-match`. Ce chantier-ci s'arrête au point
-      où la cascade manipule des `Person` et `PersonIdentifier` (au
-      lieu de `int + dict`).
+Les use-cases orchestrant Publication (fusion, find_or_create, refresh_from_sources) ne peuvent pas être refactorés tant que l'entité Publication ne sait pas se charger / se sauvegarder. Le premier item débloque les suivants en étendant l'entité, en ajoutant les méthodes de chargement / persistance au repo, et en rapatriant la règle d'enrichissement métadonnées depuis le SQL vers `Publication.absorb()`. Les autres entités (Person, Structure, SourcePublication) ne sont pas hydratées ici : ce chantier ne touche que Publication parce que c'est elle qui débloque la fin des orchestrations Publication. La généralisation est différée (Phase 8).
 
-#### Phase 2.4 — Cleanup des doublons (dépend de 2.2/2.3)
+- [ ] **Hydratation de l'aggregate Publication** (préalable aux items suivants) : étendre l'entité Publication avec les attributs nécessaires aux opérations métier (`journal_id`, `language`, `container_title`, `countries` en plus du strict minimum scaffoldé en Phase 1), ajouter au repo une méthode de chargement `find_by_id(id) -> Publication | None` et une méthode de persistance `save(pub) -> None`, et déplacer la règle d'enrichissement métadonnées (pairwise OA, COALESCE des champs, union des countries) actuellement portée par le SQL de `repo.merge_into` vers une méthode `Publication.absorb(other)`.
+- [ ] `application/publications.py:merge_publications` : load target + source via repo, `target.absorb(source)`, `repo.save(target)`, puis `repo.merge_into` réduit au plumbing FK + DELETE source.
+- [ ] `application/publications.py:find_or_create` (l. 125-194) → refactor pour utiliser `Publication` en entrée/sortie. Coord avec `METIER_dedup-fusion-publications` (cascade dédup).
+- [ ] `application/publications.py:refresh_from_sources` (fusion implicite l. 348-353 sur collision DOI) → rendre explicite : soit via `Publication.absorb()` une fois l'hydratation faite, soit via un retour `RefreshResult(absorbed_publication_id: int | None)` qui force le caller à gérer la collision.
+- [ ] Helpers de `refresh_from_sources` (`_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_first_doc_type`) — coord avec `METIER_dedup-fusion-publications` qui vise déjà à les exfiltrer vers `domain/publications/merge.py`.
 
-Une fois les callers de Phase 1 migrés vers les entités, les fonctions
-libres font doublon avec les méthodes d'aggregate. Suppression.
+### Phase 5 — Orchestrations Person
 
-- [ ] `domain/publications/dedup.py:has_minimal_publication_metadata`
-      — supprimer une fois les callers passés par `Publication.has_minimal_metadata()`.
-- [ ] `domain/persons/merge.py:check_can_merge_persons` — supprimer
-      une fois `application/persons.py:merge_person` migré vers
-      `Person.can_merge_with(...)`. Le fichier `merge.py` devient vide
-      et peut être supprimé.
+- [ ] `application/persons.py:merge_person` (orchestrateur l. 340-358) → autour de `Person.merge_with(other)`. Question à examiner : que deviennent les `PersonIdentifier` de la personne absorbée (`reattribute_to` pour chacun, conflits sur statuts `confirmed` à cadrer).
+- [ ] `application/pipeline/persons/create_persons_from_source_authorships.py` — refactor de la cascade matching porté par `METIER_decide-person-match`. Ce chantier-ci s'arrête au point où la cascade manipule des `Person` et `PersonIdentifier` (au lieu de `int + dict`).
 
-#### Structure
+#### Structure (note)
 
-Aucune logique métier identifiée actuellement au-delà du CRUD de
-`application/structures.py:35-212`. L'entité `Structure` reste un
-scaffold minimal. Si des règles émergent (validation `api_ids`,
-contraintes sur `structure_relations`, cycles interdits dans la
-hiérarchie, …), elles s'y déposent.
+Aucune logique métier identifiée actuellement au-delà du CRUD de `application/structures.py:35-212`. L'entité `Structure` reste un scaffold minimal. Si des règles émergent (validation `api_ids`, contraintes sur `structure_relations`, cycles interdits dans la hiérarchie, …), elles s'y déposent.
 
-### Phase 3 — Convention pour les chantiers METIER_* (~0,5j, documentation)
+### Phase 6 — Cleanup des doublons
 
-- [ ] Documenter dans un fichier `docs/architecture.md` (ou compléter
-      `CLAUDE.md`) que la logique métier touchant une entité doit y
-      atterrir, et préciser le périmètre des aggregates.
-- [ ] Mettre à jour `METIER_decide-person-match.md` : ajouter section
-      « Cible domain » pointant `Person` + `domain/persons/matching.py`.
-- [ ] Mettre à jour `METIER_dedup-fusion-publications.md` : idem,
-      pointant `Publication` + `domain/publications/dedup.py` +
-      `domain/publications/merge.py`.
-- [ ] Mettre à jour `METIER_doc-types.md`, `METIER_crossref.md`,
-      `METIER_doi-ra-datacite.md` quand ils démarreront — même
-      principe.
+Une fois les callers de Phase 1 migrés vers les entités (Phases 3, 4, 5), les fonctions libres font doublon avec les méthodes d'aggregate. Suppression.
 
-### Phase 4 — Repositories et entités (à instruire le moment venu)
+- [ ] `domain/publications/dedup.py:has_minimal_publication_metadata` — supprimer une fois les callers passés par `Publication.has_minimal_metadata()`.
+- [ ] `domain/persons/merge.py:check_can_merge_persons` — supprimer une fois `application/persons.py:merge_person` migré vers `Person.can_merge_with(...)`. Le fichier `merge.py` devient vide et peut être supprimé.
 
-Phase à creuser quand on y arrivera. Hypothèse de travail (Laura) :
-les repositories sont majoritairement en écriture et ne renvoient
-rien ; à vérifier.
+### Phase 7 — Convention pour les chantiers METIER_*
+
+- [ ] Documenter dans un fichier `docs/architecture.md` (ou compléter `CLAUDE.md`) que la logique métier touchant une entité doit y atterrir, et préciser le périmètre des aggregates.
+- [ ] Mettre à jour `METIER_decide-person-match.md` : ajouter section « Cible domain » pointant `Person` + `domain/persons/matching.py`.
+- [ ] Mettre à jour `METIER_dedup-fusion-publications.md` : idem, pointant `Publication` + `domain/publications/dedup.py` + `domain/publications/merge.py`.
+- [ ] Mettre à jour `METIER_doc-types.md`, `METIER_crossref.md`, `METIER_doi-ra-datacite.md` quand ils démarreront — même principe.
+
+### Phase 8 — Audit général des repositories (différé)
+
+Généralisation de l'hydratation faite en Phase 4 pour Publication aux autres aggregates (Person, Structure, SourcePublication, AddressAffiliation). À instruire séparément quand on y arrivera. Hypothèse de travail (Laura) : les repositories sont majoritairement en écriture et ne renvoient rien ; à vérifier.
 
 Audit préalable :
 
-- [ ] Inventaire des méthodes de chaque repository
-      (`infrastructure/repositories/`) : signature, type de retour,
-      callers.
-- [ ] Identifier les méthodes en lecture (renvoyant `dict`,
-      dataclass, ou autre) — combien, où, vers quels callers.
-- [ ] Décider du contrat : repos renvoient des entités par défaut OU
-      ajout ciblé de méthodes `load_<entity>(id) -> Entity` en
-      complément des lectures projectives existantes.
-- [ ] Trancher la place de la conversion `row → entity` (au sein du
-      repo, via un mapper dédié, via une classmethod d'entité ?).
-- [ ] Coordonner avec les query services pour API
-      (`application/ports/`) : ces derniers restent sur des DTOs de
-      projection ; pas d'entités hydratées en lecture API.
+- [ ] Inventaire des méthodes de chaque repository (`infrastructure/repositories/`) : signature, type de retour, callers.
+- [ ] Identifier les méthodes en lecture (renvoyant `dict`, dataclass, ou autre) — combien, où, vers quels callers.
+- [ ] Décider du contrat : repos renvoient des entités par défaut OU ajout ciblé de méthodes `find_by_id(id) -> Entity` en complément des lectures projectives existantes (modèle retenu en Phase 4 pour Publication).
+- [ ] Trancher la place de la conversion `row → entity` (au sein du repo, via un mapper dédié, via une classmethod d'entité ?).
+- [ ] Coordonner avec les query services pour API (`application/ports/`) : ces derniers restent sur des DTOs de projection ; pas d'entités hydratées en lecture API.
 
 Contenu détaillé à formaliser en phase d'instruction.
 
@@ -406,14 +352,8 @@ Contenu détaillé à formaliser en phase d'instruction.
   + 2 de Rich-Domain, puis enchaîner avec un METIER_* en pilote
   (probablement `decide-person-match`), puis revenir compléter
   Rich-Domain au besoin.
-- **`PubByDoi`, `PubByNnt`, … restent-elles dans `domain/`** ?
-  Aujourd'hui oui. Si elles sont consommées par des query services
-  qui sortent vers l'API frontend, peut-être plus naturel dans
-  `application/ports/` ? À reconsidérer en Phase 4 quand on aura
-  cartographié le rôle des repositories en lecture.
-- **`clean_publication_title` et autres fonctions de canonicalisation**
-  — méthode d'entité ou règle libre ? Laissée ouverte par
-  `2026-05-12_CODE_purete-domain.md`, à trancher en Phase 2.
+- **`PubByDoi`, `PubByNnt`, … restent-elles dans `domain/`** ? Aujourd'hui oui. Si elles sont consommées par des query services qui sortent vers l'API frontend, peut-être plus naturel dans `application/ports/` ? À reconsidérer en Phase 8 quand on aura cartographié le rôle des repositories en lecture.
+- **`clean_publication_title` et autres fonctions de canonicalisation** — tranché en Phase 2.1 : free function dans `domain/publications/metadata.py`. Utility string sans état d'instance, pas de gain à forcer en méthode.
 
 ## Liens
 
