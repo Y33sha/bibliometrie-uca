@@ -14,9 +14,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import update_sources
-from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.publication import normalize_nnt
+from domain.publications.doc_types import map_doc_type
 from infrastructure.repositories import publication_repository
 
 

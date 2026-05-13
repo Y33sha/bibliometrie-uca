@@ -12,7 +12,6 @@ indépendant du type de curseur (tuple ou dict_row).
 from typing import Any
 
 from application.audit import emit_event
-from domain.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.publication_repository import PublicationRepository
@@ -26,6 +25,7 @@ from domain.publications.dedup import (
     has_minimal_publication_metadata,
 )
 from domain.publications.dedup import resolve_doi_conflict as _domain_resolve_doi_conflict
+from domain.publications.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.publications.metadata import (
     OA_STATUS_UNKNOWN_DEFAULT,
     best_oa_status,
