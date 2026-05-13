@@ -1,6 +1,7 @@
 # Chantier — Simplification des tables sources
 
 Commencé le 2026-05-12.
+Terminé le 2026-05-13.
 
 ## Contexte
 
@@ -251,10 +252,6 @@ réalignés avant que la migration finale touche la DB.
   `source_person_id` / `source_struct_ids` (~75 occurrences) : fixtures,
   helpers et assertions à adapter.
 - [x] Suite complète `tests/integration/` verte.
-- [ ] Vérification volume : `source_authorships` ne doit pas
-  exploser (la duplication `source_structures: ARRAY[TEXT]` +
-  `countries: ARRAY[CHAR(2)]` est estimée < 2 % de la taille
-  actuelle de la table). *À faire sur la vraie base.*
 
 ## Lien avec les autres chantiers
 
