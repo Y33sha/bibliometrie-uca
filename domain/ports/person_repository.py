@@ -8,6 +8,8 @@ concrète). Toute autre implémentation respectant cette interface
 
 from typing import Any, Protocol
 
+from domain.persons.person_identifier import PersonIdentifier
+
 
 class PersonRepository(Protocol):
     """Contrat d'accès à l'agrégat Person (tables persons,
@@ -38,14 +40,11 @@ class PersonRepository(Protocol):
 
     # ── person_identifiers ─────────────────────────────────────────
 
-    def add_identifier(
-        self,
-        person_id: int,
-        id_type: str,
-        id_value: str,
-        source: str = "auto",
-        status: str = "pending",
-    ) -> None: ...
+    def find_identifier(self, id_type: str, id_value: str) -> PersonIdentifier | None: ...
+
+    def insert_identifier(self, ident: PersonIdentifier) -> int: ...
+
+    def update_identifier(self, ident: PersonIdentifier) -> None: ...
 
     def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None: ...
 

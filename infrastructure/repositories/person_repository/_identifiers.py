@@ -3,33 +3,79 @@
 from sqlalchemy import Connection, text
 
 from domain.errors import NotFoundError
+from domain.persons.identifiers import AttributionStatus
+from domain.persons.person_identifier import PersonIdentifier
 
 
-def add_identifier(
-    conn: Connection,
-    person_id: int,
-    id_type: str,
-    id_value: str,
-    source: str = "auto",
-    status: str = "pending",
-) -> None:
-    """Ajoute un identifiant à une personne.
-
-    Si l'identifiant existe avec statut 'rejected', le réattribue
-    (nouveau person_id, statut pending). Si 'pending' ou 'confirmed',
-    ne fait rien.
+def find_identifier(conn: Connection, id_type: str, id_value: str) -> PersonIdentifier | None:
+    """Charge le `PersonIdentifier` pour une paire `(id_type, id_value)`
+    (contrainte d'unicité globale de la table). Retourne None si absent.
     """
-    conn.execute(
+    row = conn.execute(
+        text("""
+            SELECT id, person_id, id_type, id_value, source, CAST(status AS text) AS status
+            FROM person_identifiers
+            WHERE id_type = :it AND id_value = :iv
+        """),
+        {"it": id_type, "iv": id_value},
+    ).first()
+    if not row:
+        return None
+    m = row._mapping
+    return PersonIdentifier(
+        id=m["id"],
+        person_id=m["person_id"],
+        id_type=m["id_type"],
+        id_value=m["id_value"],
+        status=AttributionStatus(m["status"]),
+        source=m["source"],
+    )
+
+
+def insert_identifier(conn: Connection, ident: PersonIdentifier) -> int:
+    """Insère un nouveau `PersonIdentifier`. Pose `ident.id` au retour
+    et le retourne. Lève si une ligne existe déjà pour `(id_type, id_value)`
+    (la contrainte d'unicité est gérée applicativement via `find_identifier`
+    avant l'insert)."""
+    row = conn.execute(
         text("""
             INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
             VALUES (:pid, :it, :iv, :src, CAST(:st AS identifier_status))
-            ON CONFLICT (id_type, id_value) DO UPDATE SET
-                person_id = EXCLUDED.person_id,
-                source = EXCLUDED.source,
-                status = 'pending'
-            WHERE person_identifiers.status = 'rejected'
+            RETURNING id
         """),
-        {"pid": person_id, "it": id_type, "iv": id_value, "src": source, "st": status},
+        {
+            "pid": ident.person_id,
+            "it": ident.id_type,
+            "iv": ident.id_value,
+            "src": ident.source,
+            "st": ident.status.value,
+        },
+    ).first()
+    assert row is not None  # RETURNING garantit une ligne
+    ident.id = row.id
+    return row.id
+
+
+def update_identifier(conn: Connection, ident: PersonIdentifier) -> None:
+    """Persiste les mutations sur un `PersonIdentifier` existant
+    (`person_id`, `status`, `source`). `id_type` et `id_value` sont
+    immuables (identité naturelle, jamais modifiée après création)."""
+    if ident.id is None:
+        raise ValueError("update_identifier : ident.id doit être posé (utiliser insert_identifier)")
+    conn.execute(
+        text("""
+            UPDATE person_identifiers
+            SET person_id = :pid,
+                status = CAST(:st AS identifier_status),
+                source = :src
+            WHERE id = :id
+        """),
+        {
+            "id": ident.id,
+            "pid": ident.person_id,
+            "st": ident.status.value,
+            "src": ident.source,
+        },
     )
 
 

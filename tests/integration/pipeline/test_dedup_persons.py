@@ -10,7 +10,7 @@ import logging
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.persons import add_identifier, add_name_form, create_person
+from application.persons import add_name_form, create_person
 from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 
@@ -18,6 +18,22 @@ _queries = PgPersonsCreateQueries()
 _logger = logging.getLogger("test")
 
 # ── Helpers ──────────────────────────────────────────────────────
+
+
+def _seed_identifier(conn, person_id, id_type, id_value, status, source="hal"):
+    """Seed direct d'un person_identifiers avec statut arbitraire.
+
+    `application.persons.add_identifier` n'accepte plus de `status` en
+    paramètre (toujours `pending` à l'insertion). Pour préparer un état
+    `confirmed` ou `rejected` en début de test, on passe par SQL.
+    """
+    conn.execute(
+        text("""
+            INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
+            VALUES (:pid, :it, :iv, :src, CAST(:st AS identifier_status))
+        """),
+        {"pid": person_id, "it": id_type, "iv": id_value, "src": source, "st": status},
+    )
 
 
 def _insert_publication(conn, title="Test Pub", pub_year=2024):
@@ -289,14 +305,7 @@ class TestStep2Orcid:
 
         pub = _insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        add_identifier(
-            person_id,
-            "orcid",
-            "0000-0001-2345-6789",
-            source="hal",
-            status="confirmed",
-            repo=person_repository(sa_sync_conn),
-        )
+        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
 
         oa_doc = _insert_oa_document(sa_sync_conn, "W333", pub)
         oa_as = _insert_oa_authorship(
@@ -330,14 +339,7 @@ class TestStep2Orcid:
 
         pub = _insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        add_identifier(
-            person_id,
-            "orcid",
-            "0000-0001-2345-6789",
-            source="hal",
-            status="confirmed",
-            repo=person_repository(sa_sync_conn),
-        )
+        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
 
         # HAL authorship avec ORCID + IdRef portés par person_identifiers
         hd = _insert_hal_document(sa_sync_conn, "hal-orcid-idref", pub)
@@ -374,14 +376,7 @@ class TestStep2Orcid:
 
         pub = _insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
-        add_identifier(
-            person_id,
-            "orcid",
-            "0000-0001-9999-0000",
-            source="hal",
-            status="rejected",
-            repo=person_repository(sa_sync_conn),
-        )
+        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-9999-0000", "rejected")
 
         oa_doc = _insert_oa_document(sa_sync_conn, "W444", pub)
         oa_as = _insert_oa_authorship(sa_sync_conn, oa_doc, "J Dupont", position=0)
