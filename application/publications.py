@@ -12,6 +12,7 @@ indépendant du type de curseur (tuple ou dict_row).
 from typing import Any
 
 from application.audit import emit_event
+from domain.errors import NotFoundError
 from domain.normalize import normalize_text
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.publication_repository import PublicationRepository
@@ -413,12 +414,27 @@ def merge_publications(
 ) -> None:
     """Fusionne la publication `source_id` dans `target_id`.
 
-    Orchestration :
-    1. Délègue la séquence de transferts/suppressions au repository
-    2. Recalcule le tableau `sources` de la cible
-    3. Émet l'événement d'audit (silencieusement no-op hors contexte HTTP)
+    Orchestration domain-driven :
+
+    1. Charge `target` et `source` comme entités `Publication` via le repo.
+    2. `target.absorb(source)` : enrichissement métadonnées en mémoire (règle pairwise OA, COALESCE des scalaires nullable, union countries) — vit dans l'aggregate.
+    3. `repo.merge_into(target_id, source_id)` : plumbing FK (transfert des source_publications + authorships avec dédup, cleanup distinct_publications, DELETE de la ligne source).
+    4. `repo.save(target)` : persistance des métadonnées enrichies. Fait APRÈS le DELETE pour éviter la collision sur la contrainte UNIQUE lower(doi) au cas où target a inhérité le DOI de source.
+    5. Recalcule `sources` agrégé.
+    6. Émet l'événement d'audit.
+
+    Lève `NotFoundError` si target ou source n'existe pas.
     """
+    target = repo.find_by_id(target_id)
+    source = repo.find_by_id(source_id)
+    if target is None:
+        raise NotFoundError(f"Publication target #{target_id} introuvable")
+    if source is None:
+        raise NotFoundError(f"Publication source #{source_id} introuvable")
+
+    target.absorb(source)
     repo.merge_into(target_id, source_id)
+    repo.save(target)
     repo.update_sources(target_id)
     emit_event(
         audit_repo,
