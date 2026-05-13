@@ -18,7 +18,6 @@ from domain.publication import (  # noqa: F401 — re-export pour compat
 )
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
-from infrastructure.db.queries.filters import OA_CLOSED_SQL
 
 
 class PgPublicationRepository:
@@ -372,20 +371,16 @@ class PgPublicationRepository:
     # ── Fusion ─────────────────────────────────────────────────────
 
     def merge_into(self, target_id: int, source_id: int) -> None:
-        """Fusionne la publication `source_id` dans `target_id`.
+        """Plumbing FK de fusion : `source_id` est absorbée par `target_id`.
 
-        Séquence en 5 étapes, toute la logique SQL ici (une seule
-        transaction) :
-        1. Transfert des source_publications
-        2. Transfert des authorships vérité (dédup par person_id)
-        3. Enrichissement des métadonnées de la cible depuis la source
-           (en respectant les contraintes d'unicité sur doi, la règle
-           OA 'diamond gagne toujours', et la fusion de countries)
-        4. Nettoyage de distinct_publications
-        5. Suppression de la publication source
+        Séquence SQL (atomique dans la transaction du caller) :
 
-        Le caller garde la responsabilité d'appeler update_sources
-        après, et d'émettre l'événement d'audit.
+        1. Transfert des `source_publications` (FK vers target).
+        2. Transfert des `authorships` vérité (avec déduplication par `person_id` : si target a déjà une row pour ce person, on supprime celle de source au lieu de la déplacer).
+        3. Nettoyage des paires `distinct_publications` impliquant source.
+        4. Suppression de la ligne `publications` source.
+
+        L'enrichissement des métadonnées canoniques (doi, oa_status, countries, etc.) est porté par `Publication.absorb(other)` côté domaine et persisté par `repo.save(target)` côté application — pas par cette méthode. Le caller (`application.publications.merge_publications`) orchestre : absorb → save → merge_into → update_sources.
         """
         # 1. Transférer les source_publications
         self._conn.execute(
@@ -409,57 +404,7 @@ class PgPublicationRepository:
             {"t": target_id, "s": source_id},
         )
 
-        # 3. Enrichir la cible avec les métadonnées de la source.
-        # Ordre : capturer les valeurs src → NULL-er doi src (libère
-        # la contrainte UNIQUE lower(doi)) → enrichir target.
-        src = self._conn.execute(
-            text("""
-                SELECT doi, journal_id, CAST(oa_status AS text) AS oa_status,
-                       language, container_title, countries
-                FROM publications WHERE id = :id
-            """),
-            {"id": source_id},
-        ).one()
-        self._conn.execute(
-            text("UPDATE publications SET doi = NULL WHERE id = :id"), {"id": source_id}
-        )
-        self._conn.execute(
-            text(f"""
-                UPDATE publications SET
-                    doi = COALESCE(doi, LOWER(:doi)),
-                    journal_id = COALESCE(journal_id, :jid),
-                    oa_status = CASE
-                        WHEN :oa1 = 'diamond' THEN CAST('diamond' AS oa_type)
-                        WHEN oa_status IN {OA_CLOSED_SQL}
-                            AND :oa2 NOT IN {OA_CLOSED_SQL}
-                        THEN CAST(:oa3 AS oa_type) ELSE oa_status END,
-                    language = COALESCE(language, :lang),
-                    container_title = COALESCE(container_title, :ct),
-                    countries = CASE
-                        WHEN countries IS NULL THEN CAST(:c1 AS text[])
-                        WHEN CAST(:c2 AS text[]) IS NULL THEN countries
-                        ELSE (SELECT array_agg(DISTINCT c ORDER BY c)
-                              FROM unnest(countries || CAST(:c3 AS text[])) AS c)
-                        END,
-                    updated_at = now()
-                WHERE id = :tid
-            """),
-            {
-                "doi": src.doi,
-                "jid": src.journal_id,
-                "oa1": src.oa_status,
-                "oa2": src.oa_status,
-                "oa3": src.oa_status,
-                "lang": src.language,
-                "ct": src.container_title,
-                "c1": src.countries,
-                "c2": src.countries,
-                "c3": src.countries,
-                "tid": target_id,
-            },
-        )
-
-        # 4. Nettoyer distinct_publications et supprimer la source
+        # 3. Nettoyer distinct_publications et supprimer la source
         self._conn.execute(
             text("DELETE FROM distinct_publications WHERE pub_id_a = :s OR pub_id_b = :s"),
             {"s": source_id},
