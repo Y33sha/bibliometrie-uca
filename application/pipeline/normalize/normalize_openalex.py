@@ -31,6 +31,7 @@ from application.ports.pipeline.zenodo_resolver import ZenodoResolver
 from application.publications import (
     find_by_doi,
     find_by_nnt,
+    publication_from_meta,
     refresh_from_sources,
     resolve_doi_conflict,
     try_merge_by_doi,
@@ -250,8 +251,13 @@ def find_publication(
     meta = extract_pub_metadata(work, journal_id)
     if not meta["pub_year"] or not meta["title"]:
         return None
-    pub_id, _ = find_or_create_publication(**meta, allow_create=False, repo=pub_repo)
-    return pub_id
+    result, _ = find_or_create_publication(
+        publication_from_meta(meta),
+        nnt=meta["nnt"],
+        allow_create=False,
+        repo=pub_repo,
+    )
+    return result.id if result else None
 
 
 # =============================================================

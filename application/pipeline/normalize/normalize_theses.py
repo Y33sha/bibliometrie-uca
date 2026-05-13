@@ -34,6 +34,7 @@ from application.ports.pipeline.staging import StagingQueries
 from application.publications import (
     find_or_create,
     find_thesis_by_title,
+    publication_from_meta,
     refresh_from_sources,
     try_merge_by_doi,
 )
@@ -122,22 +123,17 @@ def find_publication(
     pub_year = meta["pub_year"]
     doi = meta["doi"]
     nnt_clean = meta["nnt"]
-    doc_type = meta["doc_type"]
     title_norm = meta["title_normalized"]
 
     # 1. Chercher par DOI ou NNT (sans créer)
-    pub_id, _ = find_or_create(
-        title=title,
-        title_normalized=title_norm,
-        pub_year=pub_year,
-        doc_type=doc_type,
-        doi=doi,
+    result, _ = find_or_create(
+        publication_from_meta(meta),
         nnt=nnt_clean,
         allow_create=False,
         repo=pub_repo,
     )
-    if pub_id:
-        return pub_id
+    if result is not None:
+        return result.id
 
     # 2. Dédup spécifique thèses : titre + année + auteur compatible
     if pub_year and title_norm:

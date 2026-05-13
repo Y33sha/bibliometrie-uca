@@ -31,7 +31,7 @@ from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.normalize.wos import WosNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
 from application.publications import find_or_create as find_or_create_publication
-from application.publications import refresh_from_sources, try_merge_by_doi
+from application.publications import publication_from_meta, refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
@@ -403,8 +403,13 @@ def find_publication(
         return None
     # Mapper le doc_type pour find_or_create (resolve_doi_conflict a besoin du type canonique)
     meta["doc_type"] = map_doc_type(meta["doc_type"], "wos")
-    pub_id, _ = find_or_create_publication(**meta, allow_create=False, repo=pub_repo)
-    return pub_id
+    result, _ = find_or_create_publication(
+        publication_from_meta(meta),
+        nnt=meta["nnt"],
+        allow_create=False,
+        repo=pub_repo,
+    )
+    return result.id if result else None
 
 
 # =============================================================

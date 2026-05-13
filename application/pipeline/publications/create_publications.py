@@ -31,7 +31,9 @@ from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from domain.publications.dedup import has_minimal_publication_metadata
 from domain.publications.doc_types import map_doc_type
+from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
+from domain.publications.publication import Publication
 
 
 def process_document(
@@ -64,26 +66,27 @@ def process_document(
     if dry_run:
         return True
 
-    pub_id, _is_new = find_or_create_publication(
+    candidate = Publication(
+        id=None,
         title=title,
         title_normalized=normalize_text(title),
         pub_year=pub_year,
         doc_type=doc_type,
-        doi=doi,
-        nnt=nnt,
+        doi=DOI(doi) if doi else None,
         oa_status=oa_status,
         journal_id=journal_id,
         container_title=container_title,
         language=language,
-        allow_create=True,
-        repo=pub_repo,
+    )
+    result, _is_new = find_or_create_publication(
+        candidate, nnt=nnt, allow_create=True, repo=pub_repo
     )
 
-    if not pub_id:
+    if result is None or result.id is None:
         return False
 
-    queries.link_source_publication_to_publication(conn, doc["id"], pub_id)
-    refresh_from_sources(pub_id, repo=pub_repo)
+    queries.link_source_publication_to_publication(conn, doc["id"], result.id)
+    refresh_from_sources(result.id, repo=pub_repo)
 
     return True
 

@@ -49,6 +49,8 @@ from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
 from domain.publications.dedup import has_minimal_publication_metadata
+from domain.publications.identifiers import DOI
+from domain.publications.publication import Publication
 from domain.sources.crossref import (
     extract_crossref_meta,
     extract_crossref_pub_year,
@@ -290,19 +292,19 @@ def find_publication(
     if not doi or not has_minimal_publication_metadata(title, pub_year):
         return None
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
-    pub_id, _ = find_or_create_publication(
+    candidate = Publication(
+        id=None,
         title=title,
         title_normalized=normalize_text(title),
         pub_year=pub_year,
         doc_type="other",
-        doi=doi,
+        doi=DOI(doi) if doi else None,
         journal_id=journal_id,
         container_title=get_container_title(msg) if not journal_id else None,
         language=get_language(msg),
-        allow_create=False,
-        repo=pub_repo,
     )
-    return pub_id
+    result, _ = find_or_create_publication(candidate, allow_create=False, repo=pub_repo)
+    return result.id if result else None
 
 
 # =============================================================
