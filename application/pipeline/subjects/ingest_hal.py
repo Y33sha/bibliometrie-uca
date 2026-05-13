@@ -16,7 +16,7 @@ from typing import Any
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
-from domain.hal_domains import hal_domain_label
+from domain.sources.hal_domains import hal_domain_label
 from domain.subject import ONTOLOGY_HAL_DOMAIN
 
 SOURCE = "hal"

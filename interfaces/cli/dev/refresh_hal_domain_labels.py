@@ -77,7 +77,7 @@ stockée explicitement : elle se reconstitue à partir du code lui-même
 (séparateur `.`), évitant la duplication de l'arborescence.
 
 Usage :
-    from domain.hal_domains import hal_domain_label, hal_domain_path
+    from domain.sources.hal_domains import hal_domain_label, hal_domain_path
     hal_domain_label("chim.anal")   # -> "Chimie analytique"
     hal_domain_path("chim.anal")    # -> "Chimie / Chimie analytique"
 
