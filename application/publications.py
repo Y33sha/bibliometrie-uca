@@ -25,8 +25,10 @@ from domain.publication import (
     best_oa_status,
     clean_publication_title,
 )
-from domain.publication import resolve_doi_conflict as _domain_resolve_doi_conflict
-from domain.publications.dedup import has_minimal_publication_metadata
+from domain.publications.dedup import (
+    has_minimal_publication_metadata,
+)
+from domain.publications.dedup import resolve_doi_conflict as _domain_resolve_doi_conflict
 from domain.sources import SOURCE_PRIORITY
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
