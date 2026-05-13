@@ -148,6 +148,8 @@ plusieurs scripts dédiés. Chaque étape doit être idempotente.
 
 ### Phase 4 — Refactor producteurs
 
+> Note Contexte Claude : Pour la reprise (Phase 4) : j'avais commencé à investiguer le pattern de binding JSONB (bindparam("...", type_=JSONB) est utilisé dans les normalizers SCANR/OA), et j'avais choisi de faire la fusion en Python plutôt qu'en SQL ON CONFLICT (l'orchestrateur a déjà la donnée en mémoire, plus simple). Côté repository (_name_forms.py), add_name_form aura besoin d'un ON CONFLICT/jsonb_set car appelé hors orchestrateur — pas de bypass possible.
+
 Entre la fin de la Phase 2 (backfill OK) et la fin de cette phase, les
 writers existants n'écrivent que dans `person_ids/sources` (et plus
 dans `persons`). La colonne `persons` se désynchronise donc pour toute
