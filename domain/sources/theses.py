@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from domain.authorship_roles import THESES_FIELD_ROLES, merge_roles
-from domain.names import names_compatible
 from domain.normalize import normalize_name
+from domain.persons.name_matching import names_compatible
 
 
 def thesis_authors_compatible(

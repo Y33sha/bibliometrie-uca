@@ -44,7 +44,7 @@ import sys
 
 from sqlalchemy import Connection, text
 
-from domain.names import compute_person_name_forms
+from domain.persons.name_forms import compute_person_name_forms
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.log import setup_logger
 

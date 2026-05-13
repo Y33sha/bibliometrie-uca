@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from domain.names import names_compatible
+from domain.persons.name_matching import names_compatible
 
 MAX_AUTHORS_CROSS_SOURCE = 50
 """Au-delà de ce seuil d'auteurs sur une publication, le matching

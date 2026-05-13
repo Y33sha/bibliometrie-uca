@@ -6,7 +6,7 @@ y compris pour les prénoms composés (tiret, espaces), les accents,
 et les cas limites.
 """
 
-from domain.names import compute_person_name_forms
+from domain.persons.name_forms import compute_person_name_forms
 
 
 class TestSimpleName:

@@ -12,9 +12,9 @@ portés par `source_authorships.person_identifiers` (JSONB) côté sources.
 
 from application.audit import emit_event
 from application.authorships.core import delete_orphan_authorships
-from domain.names import compute_person_name_forms
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES
 from domain.persons.merge import check_can_merge_persons
+from domain.persons.name_forms import compute_person_name_forms
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.authorship_repository import AuthorshipRepository
 from domain.ports.person_repository import PersonRepository

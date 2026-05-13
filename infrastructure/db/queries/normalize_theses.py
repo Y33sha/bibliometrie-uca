@@ -11,7 +11,7 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.json_types import JsonValue
-from domain.names import parse_raw_author_name
+from domain.persons.name_matching import parse_raw_author_name
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )

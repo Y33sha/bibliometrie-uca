@@ -4,9 +4,12 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.errors import NotFoundError
-from domain.names import compute_person_name_forms
 from domain.normalize import normalize_name
-from domain.persons.name_forms import merge, remove_person
+from domain.persons.name_forms import (
+    compute_person_name_forms,
+    merge,
+    remove_person,
+)
 from infrastructure.repositories.person_repository import _name_forms
 
 

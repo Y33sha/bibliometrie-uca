@@ -1,13 +1,13 @@
 """Tests unitaires — fonctions pures, sans base de données."""
 
-from domain.names import (
-    compute_person_name_forms,
+from domain.normalize import normalize_name
+from domain.persons.name_forms import compute_person_name_forms
+from domain.persons.name_matching import (
     first_names_compatible,
     last_names_compatible,
     names_compatible,
     parse_raw_author_name,
 )
-from domain.normalize import normalize_name
 from domain.publication import clean_doi
 
 # ── normalize_name ──
