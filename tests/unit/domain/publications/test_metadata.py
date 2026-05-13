@@ -1,13 +1,7 @@
-"""Tests des règles métier hébergées par domain/publication.py
-(best_oa_status, clean_publication_title).
+"""Tests des règles métier sur les métadonnées de publication
+(best_oa_status, clean_publication_title)."""
 
-Les tests de `resolve_doi_conflict` vivent dans
-``tests/unit/domain/publications/test_dedup.py``.
-Les tests des VOs DOI/HALId/NNT vivent dans
-``tests/unit/domain/publications/test_identifiers.py``.
-"""
-
-from domain.publication import (
+from domain.publications.metadata import (
     OA_RANK,
     best_oa_status,
     clean_publication_title,
