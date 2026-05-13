@@ -506,7 +506,7 @@ def _run_normalize_hal(conn):
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.zenodo import HttpZenodoResolver
+    from infrastructure.sources.zenodo import HttpZenodoResolver
 
     queries = PgHalNormalizeQueries()
     staging_queries = PgStagingQueries()
@@ -694,7 +694,7 @@ def _run_normalize_oa(conn):
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.zenodo import HttpZenodoResolver
+    from infrastructure.sources.zenodo import HttpZenodoResolver
 
     queries = PgOpenalexNormalizeQueries()
     staging_queries = PgStagingQueries()

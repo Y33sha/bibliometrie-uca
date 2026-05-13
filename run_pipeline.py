@@ -440,7 +440,7 @@ def _run_normalize_hal() -> None:
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.zenodo import HttpZenodoResolver
+    from infrastructure.sources.zenodo import HttpZenodoResolver
 
     log.info("▶ normalize_hal")
     t0 = time.time()
@@ -500,7 +500,7 @@ def _run_normalize_openalex() -> None:
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.zenodo import HttpZenodoResolver
+    from infrastructure.sources.zenodo import HttpZenodoResolver
 
     log.info("▶ normalize_openalex")
     t0 = time.time()

@@ -1,17 +1,18 @@
 """Adapter HTTP pour `application.ports.zenodo_resolver.ZenodoResolver`.
 
-Le format des DOI Zenodo et l'erreur du contrat sont dans `domain.zenodo`.
+Le format des DOI Zenodo et l'erreur du contrat sont dans `domain.sources.zenodo`.
 """
 
+import os
 import time
 
 import requests
 
-from domain.zenodo import ZENODO_DOI_RE, ZenodoResolutionError
+from domain.sources.zenodo import ZENODO_DOI_RE, ZenodoResolutionError
 from infrastructure.api_limits import ZENODO_DELAY
 from infrastructure.log import setup_logger
 
-logger = setup_logger("zenodo", "processing/logs")
+logger = setup_logger("zenodo", os.path.join(os.path.dirname(__file__), "logs"))
 
 _MAX_RETRIES = 3
 _INITIAL_BACKOFF = 2  # secondes

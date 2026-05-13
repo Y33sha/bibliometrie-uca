@@ -14,7 +14,7 @@ from infrastructure.repositories import (
     publication_repository,
     publisher_repository,
 )
-from infrastructure.zenodo import HttpZenodoResolver
+from infrastructure.sources.zenodo import HttpZenodoResolver
 
 logger = setup_logger("normalize_openalex", os.path.join(os.path.dirname(__file__), "logs"))
 
