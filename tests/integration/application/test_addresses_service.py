@@ -6,15 +6,15 @@ import json
 import pytest
 from sqlalchemy import text
 
-from application import addresses_structures as addresses_structures_module
-from application.addresses_countries import (
+from application.addresses import structures as addresses_structures_module
+from application.addresses.countries import (
     batch_set_country_by_filter,
     batch_set_country_by_ids,
     propagate_countries_to_publications,
     propagate_countries_to_similar,
     set_country,
 )
-from application.addresses_structures import (
+from application.addresses.structures import (
     batch_review_structure_link,
     review_structure_link,
     unassign_manual_structure,

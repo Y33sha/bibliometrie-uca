@@ -10,8 +10,8 @@ import logging
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application import addresses_countries as countries_service
-from application import addresses_structures as structures_service
+from application.addresses import countries as countries_service
+from application.addresses import structures as structures_service
 from application.ports.addresses_queries import (
     AddressCountriesFilters,
     AddressesQueries,
