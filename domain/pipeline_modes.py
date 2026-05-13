@@ -47,8 +47,8 @@ MODES: dict[str, ModePolicy] = {
         run_enrich=False,
     ),
     "weekly": ModePolicy(
-        # Pas de WoS (cf. note crédit API ci-dessus). Pas de theses :
-        # source mensuelle, couverte par le mode full.
+        # Pas de WoS (cf. note crédit API ci-dessus).
+        # Pas de theses : renouvellement pas assez fréquent pour justifier l'import hebdomadaire
         extract_sources=frozenset({"hal", "openalex", "scanr"}),
         year_selection="weekly",
         refetch_truncated_oa=True,
