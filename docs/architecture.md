@@ -3,7 +3,7 @@
 *Document à jour au 2026-05-11.*
 
 Pour le modèle de données (tables, relations, domaines fonctionnels),
-voir [donnees.md](donnees.md).
+voir [donnees](donnees).
 
 ## Vue d'ensemble
 
@@ -202,8 +202,10 @@ Contenu :
   (`person_repository(conn)`, `publication_repository(conn)`, …).
 - **`sources/`** — extracteurs API (HAL, OpenAlex, WoS, ScanR,
   theses.fr, Crossref). Héritent de `SourceExtractor` (`base.py`).
+  Inclut aussi `zenodo/` (adapter HTTP de résolution concept DOI →
+  version DOI, utilisé pendant la normalisation HAL et OpenAlex).
 - **Divers** : `log.py` (JSON structuré), `settings.py`
-  (pydantic-settings), `perimeter.py`, `addresses.py`, `zenodo.py`,
+  (pydantic-settings), `perimeter.py`, `addresses.py`,
   `api_retry.py`, `api_limits.py`, `pipeline_metrics.py`,
   `pipeline_status.py`, `app_config.py`, `db/dump_schema.py`.
 
@@ -300,35 +302,13 @@ person_repository(conn)         # factory repository
 
 ## Pipeline
 
-L'orchestrateur `run_pipeline.py` à la racine enchaîne 12 phases :
+L'orchestrateur `run_pipeline.py` à la racine enchaîne les phases du
+pipeline de peuplement. Chaque phase est idempotente (relançable sans
+risque) ; reprise depuis une phase donnée :
+`python run_pipeline.py --from <phase>`.
 
-1. **extract** — sources → staging (JSONB brut)
-2. **fetch_missing_hal_id** — récupère les notices HAL manquantes
-   par hal-id / NNT pour les sources externes
-3. **fetch_missing_doi** — cross-source DOI lookup
-4. **normalize** — staging → tables sources (`source_publications`,
-   `source_authorships`). Rattachement aux publications existantes
-   par DOI/NNT/HAL-ID, **sans création**
-5. **affiliations** — adresses → structures, propagation
-   `in_perimeter` et `structure_ids` sur `source_authorships`
-6. **publications** — création publications pour les
-   source_publications in-perimeter non rattachées + merges
-   inter-sources (HAL-ID, NNT)
-7. **persons** — création/mapping personnes + formes de noms
-8. **authorships** — reconstruction authorships canoniques (table de
-   vérité) + propagation UCA
-9. **countries** — détection pays des adresses + recalcul pays des
-   publications
-10. **subjects** — ingestion sujets/mots-clés depuis
-    `source_publications.keywords` / `topics` vers `subjects` et
-    `publication_subjects`
-11. **cooccurrences** — recalcul de la table `subject_cooccurrences`
-12. **enrich** — OA status via Unpaywall, APC revues
-
-Chaque phase est idempotente (relançable sans risque). Reprise depuis
-une phase donnée : `python run_pipeline.py --from <phase>`.
-
-Voir [pipeline.md](pipeline) pour le détail par phase.
+Voir [pipeline](pipeline) pour la liste des phases et le détail de
+chacune.
 
 ## Tests
 
@@ -389,6 +369,6 @@ Les fichiers qui jouent ce rôle :
 
 ## Pour aller plus loin
 
-- [donnees.md](donnees) — modèle de données
-- [pipeline.md](pipeline) — détail des phases
-- [sources.md](sources) — API et imports par source
+- [donnees](donnees) — modèle de données
+- [pipeline](pipeline) — détail des phases
+- [sources](sources) — API et imports par source
