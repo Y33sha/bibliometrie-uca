@@ -93,7 +93,7 @@ pour 53 381 formes (97.6 %), le couplage est trivial (1 seul person_id).
 
 ### Phase 1 — Préalable schéma
 
-- [ ] Migration Alembic 1 : `ADD COLUMN persons jsonb` sur
+- [x] Migration Alembic 1 : `ADD COLUMN persons jsonb` sur
   `person_name_forms` (nullable, sans default).
 
 ### Phase 2 — Backfill (oneshots additifs)
@@ -109,32 +109,32 @@ Implémentation possible : un script unique
 sous-commandes (`--step keys|persons|authorships|cleanup`), ou
 plusieurs scripts dédiés. Chaque étape doit être idempotente.
 
-- [ ] **Étape `keys`** : pour chaque row existante de `person_name_forms`,
+- [x] **Étape `keys`** : pour chaque row existante de `person_name_forms`,
   initialiser `persons` à `{ "<pid>": [] }` pour chaque `pid` du tableau
   `person_ids`. Aucune source posée à ce stade — c'est juste l'armature
   des clés.
-- [ ] **Étape `persons`** : pour chaque personne (table `persons`,
+- [x] **Étape `persons`** : pour chaque personne (table `persons`,
   inclut `rejected = TRUE` — cf. justification dans
   `fetch_persons_names`), calculer les `compute_person_name_forms(ln, fn)`
   et ajouter `"persons"` au tableau `sources` de chaque entrée
   `(name_form, person_id)` correspondante dans `persons`. Si la clé
   `person_id` n'existe pas encore dans `persons` pour cette form,
   l'ajouter avec `sources = ["persons"]`.
-- [ ] **Étape `authorships`** : pour chaque `source_authorships` non
+- [x] **Étape `authorships`** : pour chaque `source_authorships` non
   exclus avec `person_id IS NOT NULL` et `author_name_normalized
   IS NOT NULL`, ajouter `sa.source` au tableau `sources` de l'entrée
   `(author_name_normalized, sa.person_id)` dans `persons`. Même règle
   que l'étape précédente pour les clés inexistantes.
-- [ ] **Étape `cleanup`** : pour chaque row, retirer les clés
+- [x] **Étape `cleanup`** : pour chaque row, retirer les clés
   `person_id` dont le tableau `sources` est resté vide après les
   étapes précédentes (orphelins du modèle ancien — ces person_ids
   étaient dans `person_ids[]` mais n'ont aucune justification dans les
   sources actuelles). Si après ce nettoyage `persons = '{}'`, supprimer
-  la row.
+  la row. *Run sur la base : 0 clé retirée, 0 row supprimée.*
 
 ### Phase 3 — Helpers domaine
 
-- [ ] `domain/persons/name_forms.py` : fonctions pures sur le dict
+- [x] `domain/persons/name_forms.py` : fonctions pures sur le dict
   `dict[str, list[str]]` représentant `persons`.
   - `add_person_source(persons, person_id, source) -> dict`
   - `remove_person_source(persons, person_id, source) -> dict`
@@ -143,7 +143,7 @@ plusieurs scripts dédiés. Chaque étape doit être idempotente.
     triées et dédupliquées)
   - `is_ambiguous(persons) -> bool` (>1 clé)
   - `person_ids(persons) -> list[int]`, `all_sources(persons) -> list[str]`
-- [ ] Tests unit pour ces helpers (cas singleton, multi-person,
+- [x] Tests unit pour ces helpers (cas singleton, multi-person,
   conflit de sources, ordre).
 
 ### Phase 4 — Refactor producteurs
