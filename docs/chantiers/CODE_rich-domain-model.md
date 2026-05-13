@@ -292,12 +292,14 @@ L'application charge un aggregate via le repository, appelle ses
 méthodes, sauvegarde. La logique métier vit dans l'aggregate ; le
 repository ne contient plus que la persistance.
 
-- [ ] `application/persons.py:add_identifier` (`PersonIdentifier`
-      aggregate) — le plus circonscrit, sert de pilote du pattern :
-      charge `PersonIdentifier` existant via
-      `PersonIdentifierRepository.find(identifier)`, dispatche
-      (créer/idempotent/`reattribute_to`/`CannotReattributeError`),
-      sauvegarde.
+- [x] `application/persons.py:add_identifier` (`PersonIdentifier`
+      aggregate) — pilote du pattern : `repo.find_identifier(id_type,
+      id_value)`, dispatche (créer / idempotent / `reattribute_to` /
+      `CannotAttributeConflict`), sauve. Ancien upsert SQL
+      `repo.add_identifier` retiré du port + impl. Changement de
+      comportement : cas pending/confirmed sur autre personne lève
+      `CannotAttributeConflict` (sous-classe `ConflictError`, HTTP 409
+      via handler existant) au lieu du silent no-op précédent. — `bd6f587`
 - [ ] `application/persons.py:add_identifiers_from_authorships`
       (l. 209-241) — itération sur `PersonIdentifier` (création /
       réattribution) au lieu de `(int, list[dict])`.
