@@ -189,7 +189,7 @@ flowchart LR
 Tables associées :
 - `persons_rh`: Table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](sources#donnees-rh).
 - `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hal`, `openalex`, `scanr`, `theses`, `manual`, `auto`). La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources.
-- `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes. Chaque forme pointe vers un tableau de `person_ids`. Lorsqu'une authorship source est reliée à une personne, la forme de nom est ajoutée (si absente) aux name_forms de cette personne.
+- `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes. Une colonne JSONB `persons` au format `{ "<person_id>": ["<source1>", ...], ... }` couple chaque personne aux sources où la forme a été observée. Lorsqu'une authorship source est reliée à une personne, la forme de nom est ajoutée (si absente) aux name_forms de cette personne avec la source correspondante.
 
 #### `authorships`
 
@@ -234,12 +234,6 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 
 Chantiers `DATA_*` actuellement ouverts dans
 [`docs/chantiers/`](chantiers/) :
-
-- **[`DATA_person-name-forms-normalisation.md`](chantiers/DATA_person-name-forms-normalisation.md)**
-  — normalisation du schéma `person_name_forms` : remplacer les
-  deux arrays parallèles `person_ids[]` + `sources[]` par une
-  vraie table de jointure pour qu'on puisse tracer `(person_id,
-  source)` sans ambiguïté.
 
 - **[`DATA_raw-data-store.md`](chantiers/DATA_raw-data-store.md)**
   — stockage des payloads bruts API hors BDD (store externe type

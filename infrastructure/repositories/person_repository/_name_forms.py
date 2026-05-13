@@ -116,16 +116,26 @@ def add_name_form(
 
 
 def detach_name_form(conn: Connection, person_id: int, name_form: str) -> None:
-    """Détache une personne d'une forme de nom. Supprime la forme si orpheline."""
+    """Détache une personne d'une forme de nom. Supprime la forme si orpheline.
+
+    DELETE puis UPDATE (et pas l'inverse) : la CHECK `persons_not_empty`
+    rejette l'état intermédiaire `{}` si on UPDATE d'abord sur une row
+    qui n'a que cette clé.
+    """
     pid_text = str(person_id)
     conn.execute(
-        text(
-            "UPDATE person_name_forms SET persons = persons - :pid, updated_at = now() "
-            "WHERE name_form = :nf"
-        ),
+        text("""
+            DELETE FROM person_name_forms
+            WHERE name_form = :nf
+              AND persons ? :pid
+              AND (SELECT COUNT(*) FROM jsonb_object_keys(persons)) = 1
+        """),
         {"pid": pid_text, "nf": name_form},
     )
     conn.execute(
-        text("DELETE FROM person_name_forms WHERE name_form = :nf AND persons = '{}'::jsonb"),
-        {"nf": name_form},
+        text(
+            "UPDATE person_name_forms SET persons = persons - :pid, updated_at = now() "
+            "WHERE name_form = :nf AND persons ? :pid"
+        ),
+        {"pid": pid_text, "nf": name_form},
     )

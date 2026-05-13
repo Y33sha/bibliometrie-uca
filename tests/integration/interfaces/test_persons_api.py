@@ -7,6 +7,7 @@ Identique à test_addresses_api.py : seed minimal via un pool dédié
 collisions entre cas.
 """
 
+import json
 import os
 import uuid
 from contextlib import contextmanager
@@ -137,9 +138,9 @@ def _seed_source_authorship(
 def _seed_name_form(person_id: int, name_form: str, source: str = "persons") -> int:
     with _pool() as cur:
         cur.execute(
-            "INSERT INTO person_name_forms (name_form, person_ids, sources) "
-            "VALUES (%s, %s, %s) RETURNING id",
-            (name_form, [person_id], [source]),
+            "INSERT INTO person_name_forms (name_form, persons) "
+            "VALUES (%s, CAST(%s AS jsonb)) RETURNING id",
+            (name_form, json.dumps({str(person_id): [source]})),
         )
         return cur.fetchone()["id"]
 

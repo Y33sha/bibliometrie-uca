@@ -206,21 +206,20 @@ dans le même commit : sans Phase 5, les readers anciens verraient
 readers lisent `persons` (Phase 5). On peut verrouiller la colonne et
 supprimer les anciennes.
 
-- [ ] Migration Alembic 2 :
-  - `ALTER COLUMN persons SET NOT NULL`
-  - `ADD CONSTRAINT persons_not_empty CHECK (persons <> '{}'::jsonb)`
-  - `CREATE INDEX idx_pnf_persons_gin ON person_name_forms
-    USING gin (persons jsonb_path_ops)`
-  - `DROP COLUMN person_ids`
-  - `DROP COLUMN sources`
-- [ ] `alembic upgrade head` (par l'utilisatrice).
-- [ ] `python -m infrastructure.db.dump_schema` pour rafraîchir
-  `schema.sql`.
-- [ ] Adaptation des tests d'intégration qui assertent sur `person_ids`
-  ou `sources` (helpers de fixture + assertions). Recenser via grep
-  avant refactor.
-- [ ] Suite complète `tests/integration/` verte.
-- [ ] Mise à jour de la documentation (`donnees.md`).
+- [x] Migration Alembic 0007 : NOT NULL + CHECK persons_not_empty +
+  GIN `idx_pnf_persons_gin` (`jsonb_path_ops`) + DROP `person_ids` +
+  DROP `sources`.
+- [x] `alembic upgrade head` (par l'utilisatrice).
+- [x] `python -m infrastructure.db.dump_schema` — `schema.sql`
+  rafraîchi.
+- [x] `tests/integration/interfaces/test_persons_api.py:_seed_name_form`
+  passé sur `INSERT INTO person_name_forms (name_form, persons)`.
+- [x] Fix `detach_name_form` : DELETE-puis-UPDATE (et pas l'inverse)
+  pour ne pas violer le CHECK `persons_not_empty` sur l'état
+  intermédiaire `{}`.
+- [x] Suite complète `tests/integration/` verte (813 tests).
+- [x] `docs/donnees.md` : description de `person_name_forms` mise à
+  jour, lien chantier retiré de la section « Évolutions prévues ».
 
 ## Lien avec les autres chantiers
 

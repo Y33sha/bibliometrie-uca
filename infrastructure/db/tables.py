@@ -597,13 +597,17 @@ person_name_forms = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("name_form", Text, nullable=False),
-    Column("person_ids", ARRAY(Integer)),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
-    Column("sources", ARRAY(Text)),
-    Column("persons", JSONB, nullable=True),
+    Column("persons", JSONB, nullable=False),
+    CheckConstraint("persons <> '{}'::jsonb", name="persons_not_empty"),
     UniqueConstraint("name_form", name="person_name_forms_name_form_uq"),
-    Index("idx_pnf_person_ids", "person_ids", postgresql_using="gin"),
+    Index(
+        "idx_pnf_persons_gin",
+        "persons",
+        postgresql_using="gin",
+        postgresql_ops={"persons": "jsonb_path_ops"},
+    ),
 )
 
 
