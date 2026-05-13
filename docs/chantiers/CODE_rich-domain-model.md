@@ -151,11 +151,12 @@ vides comme point d'appui.
 
 **Aggregates roots :**
 
-- [ ] `domain/publications/publication.py` — classe `Publication`
-      (identité `id`, identifiants naturels DOI/HALId/NNT, métadonnées
-      title/pub_year/doc_type/oa_status/…, composition d'`Authorship`
-      en entités filles).
-- [ ] `domain/publications/authorship.py` — entité fille `Authorship`
+- [x] `domain/publications/publication.py` — classe `Publication`
+      (identité `id`, identifiant naturel `doi` ; HALId/NNT vivent côté
+      `source_publications.external_ids`, non portés par l'aggregate
+      canonique. Métadonnées title/pub_year/doc_type/oa_status/…,
+      composition d'`Authorship` en entités filles).
+- [x] `domain/publications/authorship.py` — entité fille `Authorship`
       d'aggregate Publication. Identité `id`. Attributs : `person_id`,
       `author_position`, `in_perimeter`, `source_manual`, `excluded`,
       `is_corresponding`, `roles`, `structure_ids`, `notes`.
@@ -196,9 +197,10 @@ vides comme point d'appui.
 
 - [ ] `Person.can_merge_with(other)` (reprend `check_can_merge_persons`
       de `domain/persons/merge.py`).
-- [ ] `Publication.has_minimal_metadata()` (reprend
+- [x] `Publication.has_minimal_metadata()` (reprend
       `has_minimal_publication_metadata` de
-      `domain/publications/dedup.py`).
+      `domain/publications/dedup.py`). Doublon temporaire en
+      `dedup.py` ; suppression Phase 2.
 
 **Convention + tests :**
 
