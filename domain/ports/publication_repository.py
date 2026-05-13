@@ -11,13 +11,20 @@ from domain.publication import (
     PubByTitle,
     PubThesisCandidate,
 )
+from domain.publications.publication import Publication
 
 
 class PublicationRepository(Protocol):
     """Contrat d'accès à l'agrégat Publication (tables publications,
     source_publications et distinct_publications)."""
 
-    # ── Recherches ─────────────────────────────────────────────────
+    # ── Chargement / persistance de l'aggregate ────────────────────
+
+    def find_by_id(self, pub_id: int) -> Publication | None: ...
+
+    def save(self, pub: Publication) -> None: ...
+
+    # ── Recherches (projections de lecture) ────────────────────────
 
     def find_by_doi(self, doi: str) -> PubByDoi | None: ...
 

@@ -16,6 +16,8 @@ from domain.publication import (  # noqa: F401 — re-export pour compat
     PubByTitle,
     PubThesisCandidate,
 )
+from domain.publications.identifiers import DOI
+from domain.publications.publication import Publication
 from infrastructure.db.queries.filters import OA_CLOSED_SQL
 
 
@@ -104,6 +106,84 @@ class PgPublicationRepository:
             {"tn": title_normalized, "py": pub_year},
         )
         return [PubThesisCandidate(id=row.id, doi=row.doi) for row in result]
+
+    # ── Chargement / persistance de l'aggregate Publication ────────
+
+    def find_by_id(self, pub_id: int) -> Publication | None:
+        """Hydrate l'aggregate Publication depuis la ligne `publications`.
+
+        Charge les attributs métier (title, pub_year, doc_type, doi,
+        oa_status, journal_id, container_title, language, countries).
+        Les authorships ne sont pas chargées par défaut (projection
+        lecture séparée si nécessaire).
+        """
+        row = self._conn.execute(
+            text("""
+                SELECT id, title, title_normalized,
+                       CAST(doc_type AS text) AS doc_type,
+                       pub_year, doi,
+                       CAST(oa_status AS text) AS oa_status,
+                       journal_id, container_title, language, countries
+                FROM publications
+                WHERE id = :id
+            """),
+            {"id": pub_id},
+        ).first()
+        if not row:
+            return None
+        m = row._mapping
+        return Publication(
+            id=m["id"],
+            title=m["title"],
+            pub_year=m["pub_year"],
+            title_normalized=m["title_normalized"],
+            doc_type=m["doc_type"],
+            doi=DOI(m["doi"]) if m["doi"] else None,
+            oa_status=m["oa_status"],
+            journal_id=m["journal_id"],
+            container_title=m["container_title"],
+            language=m["language"],
+            countries=tuple(m["countries"]) if m["countries"] else (),
+        )
+
+    def save(self, pub: Publication) -> None:
+        """Persiste l'état mutable de l'aggregate Publication.
+
+        Met à jour les champs éditables (title, title_normalized, doc_type,
+        doi, oa_status, journal_id, container_title, language, countries).
+        Le champ `pub_year` n'est pas mis à jour ici (immuable côté métier
+        après création). `pub.id` doit être posé (entité persistée).
+        """
+        if pub.id is None:
+            raise ValueError("save(pub) : pub.id doit être posé (utiliser create pour insérer)")
+        self._conn.execute(
+            text("""
+                UPDATE publications SET
+                    title = :title,
+                    title_normalized = :tn,
+                    doc_type = CAST(:dt AS doc_type),
+                    doi = :doi,
+                    oa_status = CAST(:oa AS oa_type),
+                    journal_id = :jid,
+                    container_title = :ct,
+                    language = :lang,
+                    countries = CAST(:c AS text[]),
+                    updated_at = now()
+                WHERE id = :id
+            """),
+            {
+                "id": pub.id,
+                "title": pub.title,
+                "tn": pub.title_normalized,
+                "dt": pub.doc_type,
+                "doi": str(pub.doi) if pub.doi else None,
+                "oa": pub.oa_status,
+                "jid": pub.journal_id,
+                "ct": pub.container_title,
+                "lang": pub.language,
+                "c": list(pub.countries) if pub.countries else None,
+            },
+        )
 
     # ── Écritures simples ──────────────────────────────────────────
 
