@@ -12,7 +12,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application import structures as structures_service
-from application.ports.structures_queries import StructuresQueries
+from application.ports.api.structures_queries import StructuresQueries
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.structure_repository import StructureRepository
 from interfaces.api.deps import (

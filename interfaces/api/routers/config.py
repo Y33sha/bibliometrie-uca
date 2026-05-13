@@ -10,8 +10,8 @@ import logging
 from fastapi import APIRouter, Depends
 
 from application import config as config_service
+from application.ports.api.config_queries import ConfigQueries
 from application.ports.config import ConfigStore
-from application.ports.config_queries import ConfigQueries
 from interfaces.api.deps import config_queries_sync, config_store_sync
 from interfaces.api.models import ConfigItem, ConfigValueUpdate, HalCollectionsResponse
 

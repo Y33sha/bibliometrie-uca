@@ -29,7 +29,7 @@ from application.pipeline.subjects import (
     ingest_wos,
 )
 from application.pipeline.subjects._common import SubjectCache
-from application.ports.subjects import SubjectsQueries
+from application.ports.pipeline.subjects import SubjectsQueries
 from domain.sources import ALL_SOURCES
 
 INGESTORS: dict[str, Any] = {

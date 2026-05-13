@@ -4,7 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.subjects import SubjectsQueries
+from application.ports.pipeline.subjects import SubjectsQueries
 
 
 def dedup_strs(values: Any) -> list[str]:

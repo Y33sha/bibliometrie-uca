@@ -28,9 +28,9 @@ from typing import Any
 from sqlalchemy import Connection, Row
 
 from application.pipeline.normalize.base import SourceNormalizer
-from application.ports.address_linker import AddressLinker
-from application.ports.normalize_theses import ThesesNormalizeQueries
-from application.ports.staging import StagingQueries
+from application.ports.pipeline.address_linker import AddressLinker
+from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
+from application.ports.pipeline.staging import StagingQueries
 from application.publications import (
     find_or_create,
     find_thesis_by_title,

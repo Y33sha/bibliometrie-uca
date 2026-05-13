@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from application.ports.person_duplicates_queries import parse_skip_pairs
+from application.ports.api.person_duplicates_queries import parse_skip_pairs
 from infrastructure.db.queries.person_duplicates import PgPersonDuplicatesQueries
 
 

@@ -17,7 +17,7 @@ import time
 
 from sqlalchemy import Connection
 
-from application.ports.subjects import SubjectsQueries
+from application.ports.pipeline.subjects import SubjectsQueries
 
 DEFAULT_MIN_COOCCURRENCE = 2
 

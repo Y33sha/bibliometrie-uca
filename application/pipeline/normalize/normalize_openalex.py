@@ -24,10 +24,10 @@ from sqlalchemy import Connection, Row
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
-from application.ports.address_linker import AddressLinker
-from application.ports.normalize_openalex import OpenalexNormalizeQueries
-from application.ports.staging import StagingQueries
-from application.ports.zenodo_resolver import ZenodoResolver
+from application.ports.pipeline.address_linker import AddressLinker
+from application.ports.pipeline.normalize.openalex import OpenalexNormalizeQueries
+from application.ports.pipeline.staging import StagingQueries
+from application.ports.pipeline.zenodo_resolver import ZenodoResolver
 from application.publications import (
     find_by_doi,
     find_by_nnt,

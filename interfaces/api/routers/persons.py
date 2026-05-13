@@ -48,7 +48,7 @@ from application.persons import (
 from application.persons import (
     update_name as _update_name,
 )
-from application.ports.persons_queries import (
+from application.ports.api.persons_queries import (
     DirectoryFilters,
     FacetFilters,
     ListFilters,

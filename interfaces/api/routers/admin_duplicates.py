@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.ports.publication_duplicates_queries import PublicationDuplicatesQueries
+from application.ports.api.publication_duplicates_queries import PublicationDuplicatesQueries
 from application.publications import mark_distinct as _mark_pubs_distinct
 from application.publications import merge_publications
 from domain.ports.audit_repository import AuditRepository

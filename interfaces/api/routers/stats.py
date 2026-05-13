@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.stats_queries import StatsQueries
+from application.ports.api.stats_queries import StatsQueries
 from interfaces.api.deps import (
     get_root_structure_id_sync,
     stats_queries_sync,

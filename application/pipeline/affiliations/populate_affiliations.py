@@ -18,7 +18,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.affiliations import AffiliationsQueries
+from application.ports.pipeline.affiliations import AffiliationsQueries
 from domain.sources import BIBLIO_SOURCES
 
 

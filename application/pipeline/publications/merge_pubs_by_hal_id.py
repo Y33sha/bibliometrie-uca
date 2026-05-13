@@ -20,7 +20,7 @@ from typing import Any
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
-from application.ports.merge import MergeQueries
+from application.ports.pipeline.merge import MergeQueries
 from application.publications import merge_publications as _merge_pub
 from application.publications import refresh_from_sources, update_sources
 from domain.ports.publication_repository import PublicationRepository

@@ -23,9 +23,9 @@ from sqlalchemy import Connection, Row
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
-from application.ports.address_linker import AddressLinker
-from application.ports.normalize_scanr import ScanrNormalizeQueries
-from application.ports.staging import StagingQueries
+from application.ports.pipeline.address_linker import AddressLinker
+from application.ports.pipeline.normalize.scanr import ScanrNormalizeQueries
+from application.ports.pipeline.staging import StagingQueries
 from application.publications import find_or_create as find_or_create_publication
 from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher

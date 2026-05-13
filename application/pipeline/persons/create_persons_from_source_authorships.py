@@ -51,7 +51,7 @@ from application.persons import (
 from application.persons import (
     link_authorships as link_to_person,
 )
-from application.ports.persons_create import PersonsCreateQueries
+from application.ports.pipeline.persons_create import PersonsCreateQueries
 from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
 from domain.persons.matching import (

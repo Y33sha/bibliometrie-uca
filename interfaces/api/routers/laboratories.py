@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.laboratories_queries import (
+from application.ports.api.laboratories_queries import (
     LaboratoriesQueries,
     LabPersonsFilters,
 )
