@@ -35,7 +35,7 @@ from application.ports.pipeline.normalize.hal import HalNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
 from application.ports.pipeline.zenodo_resolver import ZenodoResolver
 from application.publications import find_or_create as find_or_create_publication
-from application.publications import refresh_from_sources, try_merge_by_doi
+from application.publications import publication_from_meta, refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
@@ -159,8 +159,13 @@ def find_publication(
     meta = extract_pub_metadata(doc, journal_id)
     if not meta["pub_year"] or not meta["title"]:
         return None
-    pub_id, _ = find_or_create_publication(**meta, allow_create=False, repo=pub_repo)
-    return pub_id
+    result, _ = find_or_create_publication(
+        publication_from_meta(meta),
+        nnt=meta["nnt"],
+        allow_create=False,
+        repo=pub_repo,
+    )
+    return result.id if result else None
 
 
 # =============================================================

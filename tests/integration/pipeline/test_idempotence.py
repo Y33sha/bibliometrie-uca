@@ -12,6 +12,8 @@ from application.publications import update_sources
 from domain.normalize import normalize_text
 from domain.publication import normalize_nnt
 from domain.publications.doc_types import map_doc_type
+from domain.publications.identifiers import DOI
+from domain.publications.publication import Publication
 from infrastructure.repositories import publication_repository
 
 
@@ -55,32 +57,31 @@ def _create_all_publications(conn_or_cur):
         nnt = ext_ids.get("nnt")
         if nnt:
             nnt = normalize_nnt(nnt)
-        pub_id, _ = find_or_create_publication(
+        candidate = Publication(
+            id=None,
             title=title,
             title_normalized=normalize_text(title),
             pub_year=pub_year,
             doc_type=doc_type,
-            doi=doc["doi"],
-            nnt=nnt,
+            doi=DOI(doc["doi"]) if doc["doi"] else None,
             oa_status=doc["oa_status"] or "unknown",
             journal_id=doc["journal_id"],
             container_title=doc["container_title"],
             language=doc["language"],
-            allow_create=True,
-            repo=repo,
         )
-        if pub_id:
+        result, _ = find_or_create_publication(candidate, nnt=nnt, allow_create=True, repo=repo)
+        if result and result.id is not None:
             if isinstance(conn_or_cur, Connection):
                 conn_or_cur.execute(
                     text("UPDATE source_publications SET publication_id = :pid WHERE id = :sid"),
-                    {"pid": pub_id, "sid": doc["id"]},
+                    {"pid": result.id, "sid": doc["id"]},
                 )
             else:
                 conn_or_cur.execute(
                     "UPDATE source_publications SET publication_id = %s WHERE id = %s",
-                    (pub_id, doc["id"]),
+                    (result.id, doc["id"]),
                 )
-            update_sources(pub_id, repo=repo)
+            update_sources(result.id, repo=repo)
 
 
 # ── Fixtures de données ScanR ────────────────────────────────────

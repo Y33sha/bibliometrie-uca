@@ -9,13 +9,19 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from application.publications import find_by_nnt, find_or_create, refresh_from_sources
+from domain.publications.identifiers import DOI
+from domain.publications.publication import Publication
 from infrastructure.repositories import publication_repository
 
 # ── Helpers ──────────────────────────────────────────────────────
 
 
 def _create(conn, **kwargs):
-    """Crée une publication via find_or_create et retourne (id, is_new)."""
+    """Crée une publication via find_or_create et retourne (pub_id, is_new).
+
+    Extrait `nnt` des kwargs (pas un attribut de Publication, passé séparément).
+    """
+    nnt = kwargs.pop("nnt", None)
     defaults = {
         "title": "Test Publication",
         "title_normalized": "test publication",
@@ -26,7 +32,21 @@ def _create(conn, **kwargs):
         "journal_id": None,
     }
     defaults.update(kwargs)
-    return find_or_create(**defaults, repo=publication_repository(conn))
+    doi_str = defaults.pop("doi")
+    pub = Publication(
+        id=None,
+        title=defaults["title"],
+        title_normalized=defaults["title_normalized"],
+        pub_year=defaults["pub_year"],
+        doc_type=defaults["doc_type"],
+        doi=DOI(doi_str) if doi_str else None,
+        oa_status=defaults["oa_status"],
+        journal_id=defaults["journal_id"],
+        container_title=defaults.get("container_title"),
+        language=defaults.get("language"),
+    )
+    result, is_new = find_or_create(pub, nnt=nnt, repo=publication_repository(conn))
+    return (result.id if result else None), is_new
 
 
 def _create_journal(conn, title="Test Journal"):
@@ -526,9 +546,7 @@ class TestRefreshFromSources:
     def test_allow_create_false(self, sa_sync_conn):
         """allow_create=False → retourne None si non trouvée."""
         result, _ = find_or_create(
-            title="X",
-            title_normalized="x",
-            pub_year=2024,
+            Publication(id=None, title="X", pub_year=2024, title_normalized="x"),
             allow_create=False,
             repo=publication_repository(sa_sync_conn),
         )

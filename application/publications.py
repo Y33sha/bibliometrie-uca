@@ -22,16 +22,15 @@ from domain.publication import (
     PubByTitle,
     PubThesisCandidate,
 )
-from domain.publications.dedup import (
-    has_minimal_publication_metadata,
-)
 from domain.publications.dedup import resolve_doi_conflict as _domain_resolve_doi_conflict
 from domain.publications.doc_types import ARTICLE_SUBTYPES, map_doc_type
+from domain.publications.identifiers import DOI
 from domain.publications.metadata import (
     OA_STATUS_UNKNOWN_DEFAULT,
     best_oa_status,
     clean_publication_title,
 )
+from domain.publications.publication import Publication
 from domain.sources import SOURCE_PRIORITY
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
@@ -127,75 +126,104 @@ def resolve_doi_conflict(
     return decision.accepted_doi, decision.merge_with_id
 
 
+def publication_from_meta(meta: dict) -> Publication:
+    """Adapter dict→Publication pour les call sites de `find_or_create`.
+
+    Les normalizers (`normalize_hal`, `normalize_openalex`, etc.) construisent leur métadonnée en dict via `extract_pub_metadata`, et le dict contient à la fois les attributs d'une `Publication` ET d'autres données (`nnt`, parfois `source_doi`…) consommées par d'autres traitements en aval (`insert_*_document`, tracking de DOI rejeté). Plutôt que de fragmenter le dict côté normalizer, on convertit à l'entrée de `find_or_create`.
+
+    Le `nnt` n'est PAS lu ici (il vit dans `source_publications.external_ids`, pas sur l'aggregate Publication). Le caller le passe séparément à `find_or_create(..., nnt=meta["nnt"])`.
+    """
+    return Publication(
+        id=None,
+        title=meta["title"],
+        title_normalized=meta.get("title_normalized"),
+        pub_year=meta["pub_year"],
+        doc_type=meta.get("doc_type"),
+        doi=DOI(meta["doi"]) if meta.get("doi") else None,
+        oa_status=meta.get("oa_status"),
+        journal_id=meta.get("journal_id"),
+        container_title=meta.get("container_title"),
+        language=meta.get("language"),
+    )
+
+
 def find_or_create(
-    title: str,
+    pub: Publication,
     *,
-    title_normalized: str,
-    pub_year: int,
-    doc_type: str = "other",
-    doi: str | None = None,
     nnt: str | None = None,
-    oa_status: str = "unknown",
-    journal_id: int | None = None,
-    container_title: str | None = None,
-    language: str | None = None,
     allow_create: bool = True,
     repo: PublicationRepository,
-) -> tuple[int | None, bool]:
-    """Trouve ou cree une publication.
+) -> tuple[Publication | None, bool]:
+    """Trouve ou crée une publication à partir d'une `Publication` candidate.
 
-    Logique de deduplication par identifiant unique :
-    1. Par DOI (case-insensitive)
-    1b. Par NNT (via source_publications.external_ids, theses uniquement)
-    2. Creation
+    Cascade de déduplication par identifiant unique :
 
-    Retourne (publication_id, is_new).
-    Si allow_create=False et aucune publication trouvee, retourne (None, False).
+    1. Par DOI (case-insensitive). En cas de collision incompatible (chapter vs book), `resolve_doi_conflict` peut décider de retirer le DOI ou de fusionner.
+    2. Par NNT (via `source_publications.external_ids`, thèses uniquement). Tentative de merge tardif via DOI si la thèse trouvée n'a pas de DOI alors que `pub` en propose un.
+    3. Création si `allow_create=True`.
+
+    `pub.title` est nettoyé (décodage double-encodage HTML) avant toute comparaison ou écriture, et `pub.title_normalized` est recalculé si le titre change. La mutation a lieu sur l'instance `pub` passée.
+
+    Le `nnt` est passé séparément car il ne vit pas sur l'aggregate `Publication` (il est stocké dans `source_publications.external_ids`).
+
+    Retourne `(publication, is_new)` :
+    - **publication trouvée** : entité hydratée depuis le repo (état canonique en base), `is_new=False`.
+    - **publication créée** : la `pub` passée en entrée, mutée avec `pub.id` posé, `is_new=True`.
+    - **rien trouvé et `allow_create=False`** : `(None, False)`.
+    - **conflit chapter/book qui retire le DOI sans match** : `(None, False)` (le DOI est retiré, aucune match exploitable).
     """
-    if not has_minimal_publication_metadata(title, pub_year):
+    if not pub.has_minimal_metadata():
         return None, False
 
-    # Décode un éventuel titre double-encodé (OpenAlex / ScanR remontent
-    # parfois "&amp;lt;i&amp;gt;...") avant toute comparaison ou écriture,
-    # pour que `publications.title` reste propre côté couche canonique.
-    cleaned_title = clean_publication_title(title) or ""
-    if cleaned_title != title:
-        title = cleaned_title
-        title_normalized = normalize_text(title)
+    # Décodage HTML double-encodage du titre (OpenAlex / ScanR), avant toute comparaison ou écriture.
+    cleaned_title = clean_publication_title(pub.title) or ""
+    if cleaned_title != pub.title:
+        pub.title = cleaned_title
+        pub.title_normalized = normalize_text(cleaned_title)
 
     # 1. Chercher par DOI
-    if doi:
-        existing = repo.find_by_doi(doi)
+    if pub.doi is not None:
+        existing = repo.find_by_doi(str(pub.doi))
         if existing:
-            doi, merge_id = resolve_doi_conflict(
-                doi, doc_type, title_normalized, existing, repo=repo
+            new_doi_str, merge_id = resolve_doi_conflict(
+                str(pub.doi),
+                pub.doc_type or "",
+                pub.title_normalized or "",
+                existing,
+                repo=repo,
             )
-            if merge_id:
-                return merge_id, False
+            if merge_id is not None:
+                return repo.find_by_id(merge_id), False
+            # Le DOI peut avoir été invalidé par la résolution (chapter vs chapter avec titres différents).
+            pub.doi = DOI(new_doi_str) if new_doi_str else None
 
-    # 1b. Chercher par NNT (theses uniquement)
+    # 1b. Chercher par NNT (thèses uniquement)
     if nnt:
         existing_nnt = repo.find_by_nnt(nnt)
         if existing_nnt:
-            try_merge_by_doi(existing_nnt.id, doi, repo=repo)
-            return existing_nnt.id, False
+            try_merge_by_doi(
+                existing_nnt.id,
+                str(pub.doi) if pub.doi else None,
+                repo=repo,
+            )
+            return repo.find_by_id(existing_nnt.id), False
 
-    # 2. Creer
+    # 2. Créer
     if not allow_create:
         return None, False
 
-    pub_id = repo.create(
-        title=title,
-        title_normalized=title_normalized,
-        doc_type=doc_type,
-        pub_year=pub_year,
-        doi=doi,
-        oa_status=oa_status,
-        journal_id=journal_id,
-        container_title=container_title,
-        language=language,
+    pub.id = repo.create(
+        title=pub.title,
+        title_normalized=pub.title_normalized or normalize_text(pub.title),
+        doc_type=pub.doc_type or "other",
+        pub_year=pub.pub_year,
+        doi=str(pub.doi) if pub.doi else None,
+        oa_status=pub.oa_status or OA_STATUS_UNKNOWN_DEFAULT,
+        journal_id=pub.journal_id,
+        container_title=pub.container_title,
+        language=pub.language,
     )
-    return pub_id, True
+    return pub, True
 
 
 def update_oa_status(pub_id: int, oa_status: str, *, repo: PublicationRepository) -> None:
