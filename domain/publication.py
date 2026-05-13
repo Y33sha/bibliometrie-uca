@@ -6,8 +6,6 @@ Contenu :
   formes de résultat renvoyées par `PublicationRepository`.
 - Règle d'agrégation OA multi-sources (`best_oa_status`, `OA_RANK`,
   `OA_STATUS_UNKNOWN_DEFAULT`).
-- Règle de résolution de conflit DOI (`resolve_doi_conflict`,
-  `DoiConflictResolution`).
 - Décodage des titres double-encodés HTML (`clean_publication_title`).
 - Façade ré-exportant `DOI`, `HALId`, `NNT`, `clean_doi`,
   `normalize_nnt`, `extract_hal_id_from_url` depuis
@@ -18,6 +16,9 @@ Les modèles des colonnes JSONB (`external_ids`, `biblio`, `meta`,
 `topics`) vivent côté infrastructure
 (`infrastructure/db/jsonb_models/publication.py`) — c'est un détail
 d'adapter de persistance, pas du métier.
+
+Résolution de conflit DOI (`resolve_doi_conflict`,
+`DoiConflictResolution`) : voir `domain/publications/dedup.py`.
 """
 
 import re
@@ -48,8 +49,6 @@ __all__ = [
     "OA_RANK",
     "OA_STATUS_UNKNOWN_DEFAULT",
     "best_oa_status",
-    "DoiConflictResolution",
-    "resolve_doi_conflict",
     "clean_publication_title",
 ]
 
@@ -174,71 +173,3 @@ def best_oa_status(statuses: Iterable[str | None]) -> str | None:
         if r > best_rank:
             best, best_rank = s, r
     return best
-
-
-# ── Règle de résolution de conflit sur DOI ──────────────────────────
-
-_CHAPTER_DOC_TYPES: frozenset[str] = frozenset({"book_chapter", "book-chapter", "chapter"})
-_BOOK_DOC_TYPES: frozenset[str] = frozenset({"book"})
-
-
-@dataclass(frozen=True, slots=True)
-class DoiConflictResolution:
-    """Décision pure pour un conflit DOI entre deux documents.
-
-    - `accepted_doi` : DOI à utiliser pour le nouveau document (None =
-      ne pas lui attribuer ce DOI).
-    - `merge_with_id` : id de la publication existante à fusionner avec
-      (None = pas de fusion).
-    - `clear_existing_doi` : True si le DOI doit être retiré de la
-      publication existante (effet de bord à appliquer par l'appelant).
-    """
-
-    accepted_doi: str | None
-    merge_with_id: int | None
-    clear_existing_doi: bool
-
-
-def resolve_doi_conflict(
-    new_doi: str,
-    new_doc_type: str,
-    new_title_normalized: str,
-    existing_doc_type: str | None,
-    existing_title_normalized: str | None,
-    existing_id: int,
-) -> DoiConflictResolution:
-    """Règle pure : gère les conflits de DOI entre chapitres et ouvrages.
-
-    Quand un DOI existe déjà sur une publication d'un type incompatible
-    (chapitre vs ouvrage), le DOI est retiré de l'un ou des deux côtés
-    au lieu de fusionner. Dans tous les autres cas, les types sont
-    considérés compatibles et on fusionne.
-    """
-    ex_type = existing_doc_type or ""
-
-    # Chapitre vs ouvrage : le DOI est celui de l'ouvrage, pas du chapitre
-    if new_doc_type in _CHAPTER_DOC_TYPES and ex_type in _BOOK_DOC_TYPES:
-        return DoiConflictResolution(
-            accepted_doi=None, merge_with_id=None, clear_existing_doi=False
-        )
-
-    if new_doc_type in _BOOK_DOC_TYPES and ex_type in _CHAPTER_DOC_TYPES:
-        return DoiConflictResolution(
-            accepted_doi=new_doi, merge_with_id=None, clear_existing_doi=True
-        )
-
-    # Deux chapitres avec titres différents : DOI erroné des deux côtés
-    if new_doc_type in _CHAPTER_DOC_TYPES and ex_type in _CHAPTER_DOC_TYPES:
-        ex_title = existing_title_normalized or ""
-        if new_title_normalized != ex_title:
-            return DoiConflictResolution(
-                accepted_doi=None, merge_with_id=None, clear_existing_doi=True
-            )
-        return DoiConflictResolution(
-            accepted_doi=new_doi, merge_with_id=existing_id, clear_existing_doi=False
-        )
-
-    # Cas normal : même DOI, types compatibles → fusion
-    return DoiConflictResolution(
-        accepted_doi=new_doi, merge_with_id=existing_id, clear_existing_doi=False
-    )

@@ -222,101 +222,110 @@ vides comme point d'appui.
 
 ### Phase 2 — Rapatrier la logique éparpillée (~3-5j)
 
-Chaque item est à examiner le moment venu : certains seront retenus,
-d'autres déférés ou supprimés du scope. La liste est exhaustive sur
-ce que l'audit a identifié comme candidat.
+Chaque item est à examiner au moment venu. Le séquencement n'est pas
+mécanique : les doublons issus de Phase 1 ne peuvent pas être
+supprimés tant que les callers ne manipulent pas d'entité, donc ils
+finissent en 2.4. Les règles pures se font en premier (2.1, scope
+local), puis les use-cases mono-aggregate (2.2, pattern « load →
+mutate → save »), puis les orchestrations larges (2.3).
 
-**Publication :**
+#### Phase 2.1 — Règles pures : placement thématique dans `domain/publications/` et `domain/persons/`
 
-- [ ] `domain/publications/dedup.py:has_minimal_publication_metadata`
-      → méthode `Publication.has_minimal_metadata()` (déjà en Phase 1).
-- [ ] `domain/publication.py:resolve_doi_conflict` → méthode
-      `Publication.resolve_doi_conflict_with(other) -> DoiConflictResolution`.
-- [ ] `domain/publication.py:best_oa_status` → méthode
-      `Publication.compute_best_oa_status(source_statuses)` OU reste
-      fonction pure (à arbitrer : agrégation de valeurs, pas
-      comportement d'identité).
-- [ ] `application/publications.py:refresh_from_sources` (fusion
-      implicite l. 348-353 sur collision DOI) → rendre explicite : soit
-      méthode `Publication.absorb(other)` qui retourne l'absorbé, soit
-      retour `RefreshResult(merged_into: int | None)` qui force le
-      caller à gérer la collision.
-- [ ] Helpers de `refresh_from_sources` (`_first_non_null` l. 220-225,
-      `_merge_lists` l. 228-237, `_merge_jsonb` l. 240-249,
-      `_first_doc_type` l. 262-294) → à arbitrer : helpers neutres
-      conservés OU regroupés dans `Publication.merge_source_rows(rows)`.
-      **Coordination avec `METIER_dedup-fusion-publications`** : ce
-      chantier vise déjà à exfiltrer ces helpers vers
-      `domain/publications/merge.py`.
-- [ ] `domain/publication.py:clean_publication_title` et helpers de
-      décodage HTML (`_decode_html_entities_once`) → méthode
-      `Publication.canonical_title()` OU règle libre maintenue.
-      Question laissée ouverte par `2026-05-12_CODE_purete-domain.md`.
+Arbitrage par règle : méthode d'instance UNIQUEMENT pour les
+comportements d'identité (entité agit sur elle-même). Les comparaisons
+entre entités et les agrégations de valeurs sont des **domain
+services** (free functions), à placer dans le module thématique
+adéquat — pas à forcer en méthodes.
+
+- [ ] `domain/publication.py:resolve_doi_conflict` (+ `DoiConflictResolution`,
+      `_CHAPTER_DOC_TYPES`, `_BOOK_DOC_TYPES`) → free function dans
+      `domain/publications/dedup.py`. Justification : c'est une
+      comparaison entre deux publications, pas une action d'identité ;
+      les callers actuels passent des projections et des strings, pas
+      des `Publication` (forcer en méthode obligerait à affaiblir les
+      invariants de l'entité).
+- [ ] `domain/publication.py:best_oa_status` (+ `OA_RANK`,
+      `OA_STATUS_UNKNOWN_DEFAULT`) → nouveau module
+      `domain/publications/metadata.py`. Justification : agrégation
+      de valeurs sans état d'instance.
+- [ ] `domain/publication.py:clean_publication_title` (+ helpers
+      `_decode_html_entities_once`, regex internes) →
+      `domain/publications/metadata.py`. Justification : utility
+      string sans état d'instance.
+- [ ] `domain/persons/creation.py:allow_person_creation` → reste free
+      function à son emplacement actuel (décision liée à un contexte
+      d'authorship, pas à une `Person` existante). Pas de déplacement.
+- [ ] `domain/persons/matching.py` (`decide_cross_source_match`,
+      `decide_name_form_outcome`, `decide_match_by_identifier`) →
+      déféré à `METIER_decide-person-match` qui refondra la cascade.
+- [ ] `domain/names.py` — arbitrage item par item : certaines
+      fonctions pourraient devenir `classmethod` de `PersonNameForm`
+      (ex. `is_compatible_with`). Déféré à un sous-chantier dédié si
+      nécessaire — pas critique pour Phase 2.
+
+#### Phase 2.2 — Use-cases mono-aggregate : pattern load → mutate → save
+
+L'application charge un aggregate via le repository, appelle ses
+méthodes, sauvegarde. La logique métier vit dans l'aggregate ; le
+repository ne contient plus que la persistance.
+
+- [ ] `application/persons.py:add_identifier` (`PersonIdentifier`
+      aggregate) — le plus circonscrit, sert de pilote du pattern :
+      charge `PersonIdentifier` existant via
+      `PersonIdentifierRepository.find(identifier)`, dispatche
+      (créer/idempotent/`reattribute_to`/`CannotReattributeError`),
+      sauvegarde.
+- [ ] `application/persons.py:add_identifiers_from_authorships`
+      (l. 209-241) — itération sur `PersonIdentifier` (création /
+      réattribution) au lieu de `(int, list[dict])`.
+
+#### Phase 2.3 — Orchestrations larges : refactor autour d'aggregates multiples
+
 - [ ] `application/publications.py:find_or_create` (l. 125-194) →
-      refactor pour utiliser `Publication` en entrée/sortie. NB :
-      cascade de dédup elle-même visée par
-      `METIER_dedup-fusion-publications` — coordonner.
+      refactor pour utiliser `Publication` en entrée/sortie. Coord
+      avec `METIER_dedup-fusion-publications` (cascade dédup).
 - [ ] `application/publications.py:merge_publications` (l. 403-425) →
       réorganiser autour de `Publication.absorb(other)` ;
       l'orchestration SQL reste côté repository.
-
-**Person :**
-
-- [ ] `domain/persons/merge.py:check_can_merge_persons` → méthode
-      `Person.can_merge_with(other)` (déjà en Phase 1).
-- [ ] `application/persons.py:add_identifier` (l. 125-141, doublon
-      silencieux selon le statut pending/confirmed/rejected) →
-      orchestration applicative qui charge le `PersonIdentifier`
-      existant via `PersonIdentifierRepository.find(identifier)` et
-      dispatche : créer si absent, idempotent si déjà sur cette
-      personne, `reattribute_to()` si rejected, lever
-      `CannotAttributeConflict` sinon. La logique métier (transitions,
-      invariants) est entièrement portée par l'aggregate
-      `PersonIdentifier`.
+- [ ] `application/publications.py:refresh_from_sources` (fusion
+      implicite l. 348-353 sur collision DOI) → rendre explicite :
+      méthode `Publication.absorb(other)` OU retour
+      `RefreshResult(merged_into: int | None)` qui force le caller à
+      gérer la collision.
+- [ ] Helpers de `refresh_from_sources` (`_first_non_null`,
+      `_merge_lists`, `_merge_jsonb`, `_first_doc_type`) — coord avec
+      `METIER_dedup-fusion-publications` qui vise déjà à les exfiltrer
+      vers `domain/publications/merge.py`.
 - [ ] `application/persons.py:merge_person` (orchestrateur l. 340-358)
-      → réorganiser autour de `Person.merge_with(other)` ;
-      l'orchestration SQL des 7 étapes (cf.
-      `infrastructure/repositories/person_repository/_core.py:68-144`)
-      reste côté repository. À examiner : que deviennent les
-      `PersonIdentifier` de la personne absorbée ? Probablement
-      `reattribute_to(target_person_id)` pour chacun, mais les statuts
-      `confirmed` posent question (conflit potentiel avec un identifier
-      déjà sur la cible).
-- [ ] `domain/persons/creation.py:allow_person_creation` → méthode
-      d'entité ? Plutôt une décision liée à un contexte d'authorship
-      qu'à une `Person` existante. À arbitrer : reste règle libre OU
-      `Person.is_creatable_from(authorship_context)` classmethod.
-- [ ] `domain/persons/matching.py` (`decide_cross_source_match`,
-      `decide_name_form_outcome`, `decide_match_by_identifier`) → la
-      cascade complète est portée par `METIER_decide-person-match` qui
-      créera `decide_person_match`. La question ici : ces sous-décisions
-      appartiennent-elles à `Person` ou restent-elles pures à côté ? À
-      coordonner avec ce chantier.
-- [ ] `domain/names.py` (`names_compatible`, `first_names_compatible`,
-      `last_names_compatible`, `compute_person_name_forms`,
-      `parse_raw_author_name`) → fonctions de comparaison/normalisation
-      de noms. Restent libres (pas liées à l'identité d'une personne
-      donnée) ; éventuellement, certaines deviennent des méthodes ou
-      `classmethod` de `PersonNameForm` (ex.
-      `PersonNameForm.is_compatible_with(other)`). À arbitrer item par
-      item.
-- [ ] `application/persons.py:add_identifiers_from_authorships`
-      (l. 209-241) → refactor pour itérer sur des `PersonIdentifier`
-      (création / réattribution via le repository d'aggregate) au lieu
-      de `(int, list[dict])`.
+      → autour de `Person.merge_with(other)`. Question à examiner :
+      que deviennent les `PersonIdentifier` de la personne absorbée
+      (`reattribute_to` pour chacun, conflits sur statuts `confirmed`
+      à cadrer).
 - [ ] `application/pipeline/persons/create_persons_from_source_authorships.py`
-      → le refactor de la cascade matching elle-même est porté par
-      `METIER_decide-person-match`. Ce chantier-ci s'arrête au point où
-      la cascade manipule des `Person` et `PersonIdentifier` (au lieu
-      de `int + dict`).
+      — refactor de la cascade matching porté par
+      `METIER_decide-person-match`. Ce chantier-ci s'arrête au point
+      où la cascade manipule des `Person` et `PersonIdentifier` (au
+      lieu de `int + dict`).
 
-**Structure :**
+#### Phase 2.4 — Cleanup des doublons (dépend de 2.2/2.3)
 
-- [ ] Aucune logique métier identifiée actuellement au-delà du CRUD
-      de `application/structures.py:35-212`. L'entité `Structure`
-      reste un scaffold minimal. Si des règles émergent (validation
-      `api_ids`, contraintes sur `structure_relations`,
-      cycles interdits dans la hiérarchie, …), elles s'y déposent.
+Une fois les callers de Phase 1 migrés vers les entités, les fonctions
+libres font doublon avec les méthodes d'aggregate. Suppression.
+
+- [ ] `domain/publications/dedup.py:has_minimal_publication_metadata`
+      — supprimer une fois les callers passés par `Publication.has_minimal_metadata()`.
+- [ ] `domain/persons/merge.py:check_can_merge_persons` — supprimer
+      une fois `application/persons.py:merge_person` migré vers
+      `Person.can_merge_with(...)`. Le fichier `merge.py` devient vide
+      et peut être supprimé.
+
+#### Structure
+
+Aucune logique métier identifiée actuellement au-delà du CRUD de
+`application/structures.py:35-212`. L'entité `Structure` reste un
+scaffold minimal. Si des règles émergent (validation `api_ids`,
+contraintes sur `structure_relations`, cycles interdits dans la
+hiérarchie, …), elles s'y déposent.
 
 ### Phase 3 — Convention pour les chantiers METIER_* (~0,5j, documentation)
 

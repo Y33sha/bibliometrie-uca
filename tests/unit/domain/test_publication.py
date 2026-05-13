@@ -1,16 +1,16 @@
-"""Tests des règles métier de domain/publication.py
-(best_oa_status, resolve_doi_conflict, clean_publication_title).
+"""Tests des règles métier hébergées par domain/publication.py
+(best_oa_status, clean_publication_title).
 
+Les tests de `resolve_doi_conflict` vivent dans
+``tests/unit/domain/publications/test_dedup.py``.
 Les tests des VOs DOI/HALId/NNT vivent dans
 ``tests/unit/domain/publications/test_identifiers.py``.
 """
 
 from domain.publication import (
     OA_RANK,
-    DoiConflictResolution,
     best_oa_status,
     clean_publication_title,
-    resolve_doi_conflict,
 )
 
 # ── Règles d'agrégation multi-sources ──────────────────────────────
@@ -43,105 +43,6 @@ class TestBestOAStatus:
         assert OA_RANK["diamond"] > OA_RANK["gold"] > OA_RANK["hybrid"]
         assert OA_RANK["hybrid"] > OA_RANK["bronze"] > OA_RANK["green"]
         assert OA_RANK["green"] > OA_RANK["closed"] > OA_RANK["unknown"]
-
-
-# ── resolve_doi_conflict (règle pure) ──────────────────────────────
-
-
-class TestResolveDoiConflictPure:
-    def test_chapter_vs_book_drops_doi(self):
-        """Chapitre avec DOI qui pointe vers livre : DOI retiré du chapitre."""
-        res = resolve_doi_conflict(
-            new_doi="10.x/book",
-            new_doc_type="book_chapter",
-            new_title_normalized="chapitre",
-            existing_doc_type="book",
-            existing_title_normalized="livre",
-            existing_id=1,
-        )
-        assert res == DoiConflictResolution(
-            accepted_doi=None, merge_with_id=None, clear_existing_doi=False
-        )
-
-    def test_book_vs_chapter_strips_doi_from_chapter(self):
-        """Livre avec DOI existant sur un chapitre : chapitre perd son DOI, livre garde."""
-        res = resolve_doi_conflict(
-            new_doi="10.x/book",
-            new_doc_type="book",
-            new_title_normalized="livre",
-            existing_doc_type="book_chapter",
-            existing_title_normalized="chapitre",
-            existing_id=42,
-        )
-        assert res == DoiConflictResolution(
-            accepted_doi="10.x/book", merge_with_id=None, clear_existing_doi=True
-        )
-
-    def test_two_chapters_different_titles_strip_both(self):
-        res = resolve_doi_conflict(
-            new_doi="10.x/shared",
-            new_doc_type="book_chapter",
-            new_title_normalized="c2",
-            existing_doc_type="book_chapter",
-            existing_title_normalized="c1",
-            existing_id=7,
-        )
-        assert res == DoiConflictResolution(
-            accepted_doi=None, merge_with_id=None, clear_existing_doi=True
-        )
-
-    def test_two_chapters_same_title_merges(self):
-        res = resolve_doi_conflict(
-            new_doi="10.x/shared",
-            new_doc_type="book_chapter",
-            new_title_normalized="same",
-            existing_doc_type="book_chapter",
-            existing_title_normalized="same",
-            existing_id=42,
-        )
-        assert res == DoiConflictResolution(
-            accepted_doi="10.x/shared", merge_with_id=42, clear_existing_doi=False
-        )
-
-    def test_compatible_types_merge(self):
-        res = resolve_doi_conflict(
-            new_doi="10.x/a",
-            new_doc_type="article",
-            new_title_normalized="a",
-            existing_doc_type="article",
-            existing_title_normalized="a",
-            existing_id=42,
-        )
-        assert res == DoiConflictResolution(
-            accepted_doi="10.x/a", merge_with_id=42, clear_existing_doi=False
-        )
-
-    def test_existing_doc_type_none_is_compatible(self):
-        """Pas de doc_type existant → pas de cas spécial, on fusionne."""
-        res = resolve_doi_conflict(
-            new_doi="10.x/a",
-            new_doc_type="article",
-            new_title_normalized="a",
-            existing_doc_type=None,
-            existing_title_normalized="a",
-            existing_id=1,
-        )
-        assert res.accepted_doi == "10.x/a"
-        assert res.merge_with_id == 1
-        assert res.clear_existing_doi is False
-
-    def test_chapter_variants_recognized(self):
-        """Les alias book-chapter et chapter sont traités comme book_chapter."""
-        for alias in ("book-chapter", "chapter"):
-            res = resolve_doi_conflict(
-                new_doi="10.x/b",
-                new_doc_type=alias,
-                new_title_normalized="c",
-                existing_doc_type="book",
-                existing_title_normalized="livre",
-                existing_id=1,
-            )
-            assert res.accepted_doi is None, f"alias {alias} non reconnu"
 
 
 # ── clean_publication_title (décodage double-encodage HTML) ────────
