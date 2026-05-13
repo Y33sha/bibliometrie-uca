@@ -29,5 +29,11 @@ class CannotReattributeError(ConflictError):
     autre que `rejected`. Levée par `PersonIdentifier.reattribute_to`."""
 
 
+class CannotAttributeConflict(ConflictError):
+    """Tentative d'attribution d'un identifiant déjà attribué à une autre
+    personne avec un statut `pending` ou `confirmed`. Pour réattribuer,
+    le statut existant doit d'abord être passé à `rejected`."""
+
+
 class UnauthorizedError(DomainError):
     """Accès refusé : session invalide ou permissions insuffisantes (→ HTTP 401)."""

@@ -12,9 +12,11 @@ portés par `source_authorships.person_identifiers` (JSONB) côté sources.
 
 from application.audit import emit_event
 from application.authorships.core import delete_orphan_authorships
-from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES
+from domain.errors import CannotAttributeConflict
+from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
 from domain.persons.merge import check_can_merge_persons
 from domain.persons.name_forms import compute_person_name_forms
+from domain.persons.person_identifier import PersonIdentifier
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.authorship_repository import AuthorshipRepository
 from domain.ports.person_repository import PersonRepository
@@ -126,18 +128,50 @@ def add_identifier(
     person_id: int,
     id_type: str,
     id_value: str,
-    source: str = "auto",
-    status: str = "pending",
     *,
+    source: str = "auto",
     repo: PersonRepository,
 ) -> None:
     """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
 
-    Si l'identifiant existe avec statut 'rejected', le réattribue
-    (nouveau person_id, statut pending). Si 'pending' ou 'confirmed',
-    ne fait rien.
+    Charge l'éventuel `PersonIdentifier` existant pour `(id_type, id_value)`
+    et dispatche :
+
+    - **absent** → insertion en `pending`
+    - **existant sur cette personne** → idempotent (no-op)
+    - **existant sur autre personne en `rejected`** → réattribution
+      (statut → `pending`, via `PersonIdentifier.reattribute_to`)
+    - **existant sur autre personne en `pending` ou `confirmed`** →
+      lève `CannotAttributeConflict`. Pour réattribuer, le statut
+      existant doit d'abord être passé à `rejected` (via
+      `update_identifier_status` ou `reassign_identifier`).
     """
-    repo.add_identifier(person_id, id_type, id_value, source, status)
+    existing = repo.find_identifier(id_type, id_value)
+
+    if existing is None:
+        ident = PersonIdentifier(
+            id=None,
+            person_id=person_id,
+            id_type=id_type,
+            id_value=id_value,
+            status=AttributionStatus.PENDING,
+            source=source,
+        )
+        repo.insert_identifier(ident)
+        return
+
+    if existing.person_id == person_id:
+        return  # idempotent
+
+    if existing.status is AttributionStatus.REJECTED:
+        existing.reattribute_to(person_id, source=source)
+        repo.update_identifier(existing)
+        return
+
+    raise CannotAttributeConflict(
+        f"Identifiant {id_type}={id_value!r} déjà attribué à person_id={existing.person_id} "
+        f"avec statut {existing.status.value!r} ; impossible d'attribuer à person_id={person_id}.",
+    )
 
 
 def remove_identifier(

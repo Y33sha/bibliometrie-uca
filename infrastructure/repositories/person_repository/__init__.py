@@ -10,6 +10,8 @@ Usage :
     repo.set_rejected(person_id, True)
 """
 
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Connection
 
 from infrastructure.repositories.person_repository import (
@@ -18,6 +20,9 @@ from infrastructure.repositories.person_repository import (
     _identifiers,
     _name_forms,
 )
+
+if TYPE_CHECKING:
+    from domain.persons.person_identifier import PersonIdentifier
 
 
 class PgPersonRepository:
@@ -52,15 +57,14 @@ class PgPersonRepository:
 
     # ── person_identifiers ─────────────────────────────────────────
 
-    def add_identifier(
-        self,
-        person_id: int,
-        id_type: str,
-        id_value: str,
-        source: str = "auto",
-        status: str = "pending",
-    ) -> None:
-        _identifiers.add_identifier(self._conn, person_id, id_type, id_value, source, status)
+    def find_identifier(self, id_type: str, id_value: str) -> "PersonIdentifier | None":
+        return _identifiers.find_identifier(self._conn, id_type, id_value)
+
+    def insert_identifier(self, ident: "PersonIdentifier") -> int:
+        return _identifiers.insert_identifier(self._conn, ident)
+
+    def update_identifier(self, ident: "PersonIdentifier") -> None:
+        _identifiers.update_identifier(self._conn, ident)
 
     def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None:
         _identifiers.remove_identifier(self._conn, person_id, id_type, id_value)

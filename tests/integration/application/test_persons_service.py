@@ -214,13 +214,22 @@ class TestAddIdentifier:
         assert row.person_id == p2
         assert row.status == "pending"
 
-    def test_does_not_override_pending(self, sa_sync_conn, repo):
-        """Si le même identifiant existe en 'pending', on ne touche pas."""
+    def test_raises_when_pending_on_other_person(self, sa_sync_conn, repo):
+        """Si le même identifiant existe en 'pending' sur une autre personne,
+        on lève `CannotAttributeConflict` (pour réattribuer, il faut d'abord
+        passer le statut à 'rejected')."""
+        import pytest
+
+        from domain.errors import CannotAttributeConflict
+
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")
         add_identifier(p1, "orcid", "0000-0001", repo=repo)
-        add_identifier(p2, "orcid", "0000-0001", repo=repo)
 
+        with pytest.raises(CannotAttributeConflict):
+            add_identifier(p2, "orcid", "0000-0001", repo=repo)
+
+        # L'identifiant reste rattaché à p1.
         assert (
             _scalar(
                 sa_sync_conn,
@@ -228,6 +237,18 @@ class TestAddIdentifier:
             )
             == p1
         )
+
+    def test_idempotent_on_same_person(self, sa_sync_conn, repo):
+        """Réappliquer add_identifier sur la même personne ne change rien."""
+        p = _insert_person(sa_sync_conn)
+        add_identifier(p, "orcid", "0000-0001", repo=repo)
+        add_identifier(p, "orcid", "0000-0001", repo=repo)  # no-op
+
+        row = sa_sync_conn.execute(
+            text("SELECT person_id, status FROM person_identifiers WHERE id_value='0000-0001'")
+        ).one()
+        assert row.person_id == p
+        assert row.status == "pending"
 
 
 class TestRemoveIdentifier:
