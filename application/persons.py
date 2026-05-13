@@ -1,14 +1,11 @@
-"""
-Service Référentiel Personnes — accès exclusif en écriture aux tables
-`persons`, `person_identifiers`, `person_name_forms`.
+"""Service Référentiel Personnes — accès exclusif en écriture aux tables `persons`, `person_identifiers`, `person_name_forms`.
 
-Gère aussi le rattachement/détachement des authorships sources
-(source_authorships) puisque le person_id y est la source de vérité
-du lien personne.
+Gère aussi le rattachement/détachement des authorships sources (`source_authorships`) puisque le `person_id` y est la source de vérité du lien personne.
 
-Les identifiants par observation (orcid/idhal/idref/hal_person_id) sont
-portés par `source_authorships.person_identifiers` (JSONB) côté sources.
+Les identifiants par observation (orcid/idhal/idref/hal_person_id) sont portés par `source_authorships.person_identifiers` (JSONB) côté sources.
 """
+
+import logging
 
 from application.audit import emit_event
 from application.authorships.core import delete_orphan_authorships
@@ -21,6 +18,8 @@ from domain.ports.audit_repository import AuditRepository
 from domain.ports.authorship_repository import AuthorshipRepository
 from domain.ports.person_repository import PersonRepository
 from domain.sources import ALL_SOURCES_SET
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "create_person",
@@ -243,24 +242,15 @@ def reassign_identifier(
 def add_identifiers_from_authorships(
     person_id: int, authorships: list[dict], *, repo: PersonRepository
 ) -> None:
-    """Promotion canonique : insère les identifiants observés dans
-    `source_authorships.person_identifiers` (et colonnes attenantes) vers
-    `person_identifiers` pour cette personne.
+    """Promotion canonique en batch : pour chaque authorship source, extrait les identifiants observés (orcid/idhal/idref/hal_person_id) et délègue à `add_identifier` qui dispatche selon l'état existant en base.
 
-    Couvre les 4 id_types acceptés en base (`PERSON_IDENTIFIER_TYPES`) :
-    `orcid`, `idhal`, `idref`, `hal_person_id`. Les 3 premiers sont
-    visibles UI ; `hal_person_id` est interne (filtré côté lecture par
-    `PUBLIC_PERSON_IDENTIFIER_TYPES`).
+    Path batch tolérant : un `CannotAttributeConflict` sur un identifiant donné (ORCID déjà attribué en pending/confirmed à une autre personne) est loggé en warning et la promotion continue pour les autres identifiants. Le path strict reste `add_identifier` (singulier) que l'API admin utilise directement.
 
-    Spécificité `hal_person_id` : la valeur arrive en `int` depuis la
-    query (cf. `fetch_unlinked_authorships`), on convertit en str pour
-    la table `person_identifiers`.
+    Couvre les 4 id_types acceptés en base (`PERSON_IDENTIFIER_TYPES`) : `orcid`, `idhal`, `idref`, `hal_person_id`. Les 3 premiers sont visibles UI ; `hal_person_id` est interne (filtré côté lecture par `PUBLIC_PERSON_IDENTIFIER_TYPES`).
 
-    La ``source`` enregistrée sur ``person_identifiers`` reste à sa valeur
-    par défaut (``'auto'``) : tracer la source d'origine n'apporte rien
-    d'exploitable (la valeur n'est pas mise à jour quand une autre source
-    confirme plus tard l'identifiant) et la priorité Crossref pour les
-    ORCID se gérera côté cascade de matching, pas via ce champ.
+    Spécificité `hal_person_id` : la valeur arrive en `int` depuis la query (cf. `fetch_unlinked_authorships`), on convertit en str pour la table `person_identifiers`.
+
+    La ``source`` enregistrée sur ``person_identifiers`` reste à sa valeur par défaut (``'auto'``) : tracer la source d'origine n'apporte rien d'exploitable (la valeur n'est pas mise à jour quand une autre source confirme plus tard l'identifiant) et la priorité Crossref pour les ORCID se gérera côté cascade de matching, pas via ce champ.
     """
     seen: set[tuple[str, str]] = set()
     for a in authorships:
@@ -270,9 +260,19 @@ def add_identifiers_from_authorships(
                 continue
             # int en source côté hal_person_id, str en cible person_identifiers
             value = str(raw) if id_type == "hal_person_id" else raw
-            if (id_type, value) not in seen:
+            if (id_type, value) in seen:
+                continue
+            seen.add((id_type, value))
+            try:
                 add_identifier(person_id, id_type, value, repo=repo)
-                seen.add((id_type, value))
+            except CannotAttributeConflict as exc:
+                logger.warning(
+                    "Promotion ignorée pour person_id=%s, %s=%r : %s",
+                    person_id,
+                    id_type,
+                    value,
+                    exc,
+                )
 
 
 # ── Formes de noms ──

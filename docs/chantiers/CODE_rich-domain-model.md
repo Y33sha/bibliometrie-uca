@@ -251,9 +251,6 @@ adéquat — pas à forcer en méthodes.
       pour les règles de métadonnées de publication sans meilleure
       cible). Justifications : agrégation de valeurs / utility string,
       sans état d'instance.
-- [ ] `domain/persons/creation.py:allow_person_creation` → reste free
-      function à son emplacement actuel (décision liée à un contexte
-      d'authorship, pas à une `Person` existante). Pas de déplacement.
 - [ ] `domain/persons/matching.py` (`decide_cross_source_match`,
       `decide_name_form_outcome`, `decide_match_by_identifier`) →
       déféré à `METIER_decide-person-match` qui refondra la cascade.
@@ -293,16 +290,13 @@ méthodes, sauvegarde. La logique métier vit dans l'aggregate ; le
 repository ne contient plus que la persistance.
 
 - [x] `application/persons.py:add_identifier` (`PersonIdentifier`
-      aggregate) — pilote du pattern : `repo.find_identifier(id_type,
-      id_value)`, dispatche (créer / idempotent / `reattribute_to` /
+      aggregate) — pilote du pattern : `repo.find_identifier(id_type,    id_value)`, dispatche (créer / idempotent / `reattribute_to` /
       `CannotAttributeConflict`), sauve. Ancien upsert SQL
       `repo.add_identifier` retiré du port + impl. Changement de
       comportement : cas pending/confirmed sur autre personne lève
       `CannotAttributeConflict` (sous-classe `ConflictError`, HTTP 409
       via handler existant) au lieu du silent no-op précédent. — `bd6f587`
-- [ ] `application/persons.py:add_identifiers_from_authorships`
-      (l. 209-241) — itération sur `PersonIdentifier` (création /
-      réattribution) au lieu de `(int, list[dict])`.
+- [x] `application/persons.py:add_identifiers_from_authorships` — itère désormais en déléguant chaque identifiant à `add_identifier` (qui charge / dispatche / sauvegarde via l'aggregate `PersonIdentifier`). Signature inchangée `(person_id, authorships: list[dict])` : le parsing dict→identifiant reste interne (path batch piloté par les dicts du pipeline). Tolérance au conflit : `CannotAttributeConflict` est loggé en warning et la promotion continue sur les autres identifiants — comportement adapté au batch pipeline, distinct du path strict de `add_identifier` utilisé par l'API admin.
 
 #### Phase 2.3 — Orchestrations larges : refactor autour d'aggregates multiples
 
@@ -397,14 +391,6 @@ Contenu détaillé à formaliser en phase d'instruction.
   end_date évoluent quand de nouvelles données SIHR arrivent. Non
   scaffoldée en Phase 1 (pas de logique métier identifiée) ; à ajouter
   quand `Person.can_merge_with` devient un self-check.
-- **Conflits de `PersonIdentifier` à la fusion de Persons.** Quand on
-  fusionne A → B, les `PersonIdentifier` de A doivent être déplacés.
-  Cas simples : confirmed sur A, absent sur B → réattribuer à B. Cas
-  conflictuels : confirmed sur A ET sur B pour la même valeur
-  (devrait être impossible par contrainte SQL, mais en théorie) ;
-  rejected sur A et confirmed sur B (l'historique de rejet de A
-  disparaît) ; etc. À cadrer en Phase 2 lors du refacto de
-  `merge_person`.
 - **`authorships.person_id` nullable.** Aucune mutation prod ne pose
   cette colonne à NULL (cf. audit du `2026-05-12` : le build pipeline
   filtre `WHERE sa.person_id IS NOT NULL`, et les « orphan
