@@ -53,7 +53,7 @@ from domain.sources.openalex import (
     parse_primary_location,
     should_skip_publisher_journal,
 )
-from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
+from domain.sources.zenodo import ZenodoResolutionError, is_zenodo_doi
 
 # =============================================================
 # MAPPINGS

@@ -46,7 +46,7 @@ from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi, normalize_nnt
 from domain.publications.dedup import has_minimal_publication_metadata
 from domain.sources.hal import derive_hal_doc_type, derive_hal_oa_status
-from domain.zenodo import ZenodoResolutionError, is_zenodo_doi
+from domain.sources.zenodo import ZenodoResolutionError, is_zenodo_doi
 
 # =============================================================
 # MAPPINGS
