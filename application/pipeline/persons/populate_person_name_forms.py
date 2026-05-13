@@ -11,6 +11,12 @@ Sources :
    des entités douteuses.
 2. source_authorships.author_name_normalized (toutes sources biblio).
 
+La colonne de vérité est `persons jsonb` au format ``{ "<pid>":
+["src1", ...], ... }`` — l'orchestrateur agrège les triplets
+``(name_form, person_id, source)`` en dict via
+`domain.persons.name_forms.add_person_source`, puis compare au dict
+stocké en base (égalité de dict) pour décider insert/update/delete.
+
 Une forme dans la table mais absente de la recalculation est
 supprimée — par construction, plus aucune source actuelle ne la
 soutient.
@@ -26,12 +32,13 @@ from sqlalchemy import Connection
 
 from application.ports.name_forms import NameFormsQueries
 from domain.names import compute_person_name_forms
+from domain.persons.name_forms import PersonsDict, add_person_source
 
 BATCH_SIZE = 5000
 
 
 def populate(conn: Connection, queries: NameFormsQueries, logger: logging.Logger) -> None:
-    triples = []
+    triples: list[tuple[str, int, str]] = []
 
     logger.info("Source 1 : persons (prénom nom + nom prénom)")
     for r in queries.fetch_persons_names(conn):
@@ -57,26 +64,22 @@ def populate(conn: Connection, queries: NameFormsQueries, logger: logging.Logger
     if batch:
         queries.insert_raw_forms_batch(conn, batch)
 
-    expected_forms = {
-        r["name_form"]: r for r in queries.fetch_normalized_forms_from_temp(conn) if r["name_form"]
-    }
+    normalized_persons_triples = queries.fetch_normalized_forms_from_temp(conn)
     queries.drop_temp_raw_forms_table(conn)
 
+    expected_forms: dict[str, PersonsDict] = {}
+    for r in normalized_persons_triples:
+        nf = r["name_form"]
+        if not nf:
+            continue
+        expected_forms[nf] = add_person_source(
+            expected_forms.get(nf, {}), r["person_id"], r["source"]
+        )
     for r in source_forms:
         nf = r["name_form"]
-        if nf in expected_forms:
-            pids = set(expected_forms[nf]["person_ids"])
-            pids.add(r["person_id"])
-            expected_forms[nf]["person_ids"] = sorted(pids)
-            srcs = set(expected_forms[nf]["sources"])
-            srcs.add(r["source"])
-            expected_forms[nf]["sources"] = sorted(srcs)
-        else:
-            expected_forms[nf] = {
-                "name_form": nf,
-                "person_ids": [r["person_id"]],
-                "sources": [r["source"]],
-            }
+        expected_forms[nf] = add_person_source(
+            expected_forms.get(nf, {}), r["person_id"], r["source"]
+        )
 
     logger.info(f"  {len(expected_forms)} formes distinctes après fusion")
 
@@ -87,16 +90,14 @@ def populate(conn: Connection, queries: NameFormsQueries, logger: logging.Logger
     updated = 0
     deleted = 0
 
-    for nf, data in expected_forms.items():
+    for nf, persons in expected_forms.items():
         if nf in existing:
             old = existing[nf]
-            if set(data["person_ids"]) != set(old["person_ids"]) or set(data["sources"]) != set(
-                old["sources"] or []
-            ):
-                queries.update_name_form(conn, old["id"], data["person_ids"], data["sources"])
+            if persons != (old["persons"] or {}):
+                queries.update_name_form(conn, old["id"], persons)
                 updated += 1
         else:
-            queries.insert_name_form_with_merge(conn, nf, data["person_ids"], data["sources"])
+            queries.insert_name_form(conn, nf, persons)
             inserted += 1
 
     for nf, old in existing.items():

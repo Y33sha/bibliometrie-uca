@@ -1,5 +1,7 @@
 """Tests d'intégration — nécessitent la base bibliometrie_test."""
 
+import json
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -280,13 +282,17 @@ class TestMergePersons:
 
         sa_sync_conn.execute(
             text(
-                "INSERT INTO person_name_forms (name_form, person_ids) VALUES ('jean dupont', :ids)"
+                "INSERT INTO person_name_forms (name_form, persons) "
+                "VALUES ('jean dupont', CAST(:p AS jsonb))"
             ),
-            {"ids": [target]},
+            {"p": json.dumps({str(target): ["persons"]})},
         )
         sa_sync_conn.execute(
-            text("INSERT INTO person_name_forms (name_form, person_ids) VALUES ('j dupont', :ids)"),
-            {"ids": [source]},
+            text(
+                "INSERT INTO person_name_forms (name_form, persons) "
+                "VALUES ('j dupont', CAST(:p AS jsonb))"
+            ),
+            {"p": json.dumps({str(source): ["hal"]})},
         )
 
         merge_person(target, source, repo=person_repo)
@@ -299,12 +305,14 @@ class TestMergePersons:
             is None
         )
 
-        # Name forms transférées
-        person_ids = sa_sync_conn.execute(
-            text("SELECT person_ids FROM person_name_forms WHERE name_form = 'j dupont'")
+        # Name forms transférées : la source 'hal' attachée à `source` est
+        # remontée sous la clé `target` après merge.
+        persons = sa_sync_conn.execute(
+            text("SELECT persons FROM person_name_forms WHERE name_form = 'j dupont'")
         ).scalar_one()
-        assert target in person_ids
-        assert source not in person_ids
+        assert str(target) in persons
+        assert "hal" in persons[str(target)]
+        assert str(source) not in persons
 
     def test_merge_blocked_if_both_rh(self, sa_sync_conn, person_repo):
         target = create_person(sa_sync_conn, "Dupont", "Jean")

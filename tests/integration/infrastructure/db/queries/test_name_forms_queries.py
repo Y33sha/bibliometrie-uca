@@ -1,5 +1,7 @@
 """Tests d'intégration pour `infrastructure.db.queries.name_forms`."""
 
+import json
+
 from sqlalchemy import text
 
 from infrastructure.db.queries.name_forms import (
@@ -10,7 +12,7 @@ from infrastructure.db.queries.name_forms import (
     fetch_normalized_forms_from_temp,
     fetch_persons_names,
     fetch_source_authorship_name_forms,
-    insert_name_form_with_merge,
+    insert_name_form,
     insert_raw_forms_batch,
     update_name_form,
 )
@@ -65,13 +67,17 @@ def _create_sa(
     ).scalar_one()
 
 
-def _insert_name_form(conn, name_form, person_ids, sources=None):
+def _insert_name_form(conn, name_form, persons):
+    """Pose une row `person_name_forms` avec le `persons jsonb` donné.
+
+    `persons` : ``dict[str, list[str]]`` au format de la colonne.
+    """
     return conn.execute(
         text("""
-            INSERT INTO person_name_forms (name_form, person_ids, sources)
-            VALUES (:name_form, :person_ids, :sources) RETURNING id
+            INSERT INTO person_name_forms (name_form, persons)
+            VALUES (:name_form, CAST(:persons AS jsonb)) RETURNING id
         """),
-        {"name_form": name_form, "person_ids": person_ids, "sources": sources},
+        {"name_form": name_form, "persons": json.dumps(persons)},
     ).scalar_one()
 
 
@@ -129,26 +135,29 @@ class TestFetchSourceAuthorshipNameForms:
 
 
 class TestTempRawFormsRoundtrip:
-    def test_create_insert_fetch_drop(self, sa_sync_conn):
+    def test_returns_normalized_triples(self, sa_sync_conn):
+        """`fetch_normalized_forms_from_temp` retourne des triplets
+        ``(name_form, person_id, source)`` distincts ; l'agrégation par
+        forme se fait côté orchestrateur via les helpers domaine."""
         pid = _create_person(sa_sync_conn)
 
         create_temp_raw_forms_table(sa_sync_conn)
         insert_raw_forms_batch(
             sa_sync_conn,
             [
-                {"raw_text": "  DUPOND J  ", "person_id": pid, "source": "hal"},
-                {"raw_text": "Dupond Jean", "person_id": pid, "source": "persons"},
+                {"raw_text": "  DUPOND J  ", "person_id": pid, "source": "persons"},
+                {"raw_text": "Dupond J", "person_id": pid, "source": "persons"},
             ],
         )
         rows = fetch_normalized_forms_from_temp(sa_sync_conn)
 
-        assert len(rows) >= 1
-        # normalize_name_form abaisse la casse et déroule les accents
-        normalized = {r["name_form"] for r in rows}
-        assert any("dupond" in n for n in normalized)
+        # Les deux raw_text se normalisent vers la même forme → un seul triplet
+        ours = [r for r in rows if r["person_id"] == pid]
+        assert len(ours) == 1
+        assert ours[0]["source"] == "persons"
+        assert "dupond" in ours[0]["name_form"]
 
         drop_temp_raw_forms_table(sa_sync_conn)
-        # La table a bien disparu
         result = sa_sync_conn.execute(
             text("SELECT to_regclass('pg_temp._raw_forms') AS t")
         ).scalar_one()
@@ -158,51 +167,46 @@ class TestTempRawFormsRoundtrip:
 class TestExistingNameFormsCrud:
     def test_fetch_existing(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn)
-        form_id = _insert_name_form(sa_sync_conn, "dupond j", [pid], ["hal"])
+        form_id = _insert_name_form(sa_sync_conn, "dupond j", {str(pid): ["hal"]})
 
         rows = fetch_existing_name_forms(sa_sync_conn)
         ours = [r for r in rows if r["id"] == form_id]
         assert len(ours) == 1
-        assert ours[0]["person_ids"] == [pid]
+        assert ours[0]["persons"] == {str(pid): ["hal"]}
 
     def test_update_name_form(self, sa_sync_conn):
         pid1 = _create_person(sa_sync_conn, last="A")
         pid2 = _create_person(sa_sync_conn, last="B")
-        form_id = _insert_name_form(sa_sync_conn, "ab", [pid1], ["hal"])
+        form_id = _insert_name_form(sa_sync_conn, "ab", {str(pid1): ["hal"]})
 
-        update_name_form(sa_sync_conn, form_id, [pid1, pid2], ["hal", "persons"])
+        update_name_form(
+            sa_sync_conn,
+            form_id,
+            {str(pid1): ["hal", "persons"], str(pid2): ["openalex"]},
+        )
 
         row = sa_sync_conn.execute(
-            text("SELECT person_ids, sources FROM person_name_forms WHERE id = :id"),
+            text("SELECT persons FROM person_name_forms WHERE id = :id"),
             {"id": form_id},
         ).one()
-        assert sorted(row.person_ids) == sorted([pid1, pid2])
-        assert set(row.sources) == {"hal", "persons"}
+        assert row.persons == {
+            str(pid1): ["hal", "persons"],
+            str(pid2): ["openalex"],
+        }
 
-    def test_insert_name_form_with_merge_conflict_unions(self, sa_sync_conn):
-        pid1 = _create_person(sa_sync_conn, last="A")
-        pid2 = _create_person(sa_sync_conn, last="B")
-        _insert_name_form(sa_sync_conn, "nom-x", [pid1], ["hal"])
-
-        insert_name_form_with_merge(sa_sync_conn, "nom-x", [pid2], ["openalex"])
-
-        row = sa_sync_conn.execute(
-            text("SELECT person_ids, sources FROM person_name_forms WHERE name_form = 'nom-x'")
-        ).one()
-        assert sorted(row.person_ids) == sorted([pid1, pid2])
-        assert set(row.sources) == {"hal", "openalex"}
-
-    def test_insert_name_form_with_merge_new(self, sa_sync_conn):
+    def test_insert_name_form(self, sa_sync_conn):
+        """Pas de ON CONFLICT : l'orchestrateur calcule le diff et n'appelle
+        ce point que pour les formes absentes."""
         pid = _create_person(sa_sync_conn)
-        insert_name_form_with_merge(sa_sync_conn, "nouveau", [pid], ["hal"])
-        result = sa_sync_conn.execute(
-            text("SELECT person_ids FROM person_name_forms WHERE name_form = 'nouveau'")
-        ).scalar_one()
-        assert result == [pid]
+        insert_name_form(sa_sync_conn, "nouveau", {str(pid): ["hal"]})
+        row = sa_sync_conn.execute(
+            text("SELECT persons FROM person_name_forms WHERE name_form = 'nouveau'")
+        ).one()
+        assert row.persons == {str(pid): ["hal"]}
 
     def test_delete_name_form(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn)
-        form_id = _insert_name_form(sa_sync_conn, "tmp", [pid], ["hal"])
+        form_id = _insert_name_form(sa_sync_conn, "tmp", {str(pid): ["hal"]})
         delete_name_form(sa_sync_conn, form_id)
         result = sa_sync_conn.execute(
             text("SELECT 1 FROM person_name_forms WHERE id = :id"), {"id": form_id}

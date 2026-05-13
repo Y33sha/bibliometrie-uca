@@ -124,8 +124,24 @@ def fetch_orcid_to_person_map(conn: Connection) -> dict[str, int]:
 
 
 def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
-    """Charge `person_name_forms` sous forme `{name_form: [person_id, ...]}`."""
-    rows = conn.execute(text("SELECT name_form, person_ids FROM person_name_forms")).all()
+    """Charge `person_name_forms` sous forme `{name_form: [person_id, ...]}`.
+
+    Les person_id sont extraits des clés de la colonne `persons jsonb`
+    (`jsonb_object_keys`) et castés en int côté SQL.
+    """
+    rows = conn.execute(
+        text("""
+            SELECT name_form,
+                   COALESCE(
+                       ARRAY(
+                           SELECT k::int
+                           FROM jsonb_object_keys(persons) AS k
+                       ),
+                       '{}'::int[]
+                   ) AS person_ids
+            FROM person_name_forms
+        """)
+    ).all()
     return {r.name_form: r.person_ids for r in rows}
 
 

@@ -597,7 +597,7 @@ person_name_forms = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column("name_form", Text, nullable=False),
-    Column("person_ids", ARRAY(Integer), nullable=False),
+    Column("person_ids", ARRAY(Integer)),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     Column("sources", ARRAY(Text)),
