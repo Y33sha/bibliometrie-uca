@@ -13,9 +13,28 @@ les normalizers de pipeline qui stockent la forme texte en base).
 
 import re
 from dataclasses import dataclass
+from enum import Enum
 
 from domain.errors import ValidationError
 from domain.json_types import JsonValue
+
+
+class AttributionStatus(str, Enum):
+    """Statut d'une attribution `PersonIdentifier ↔ Person`.
+
+    Mappe sur l'enum Postgres `identifier_status`. Mixin `str` pour
+    garder la valeur sérialisable telle quelle vers SQL et API.
+
+    Transitions valides (cf. `domain/persons/person_identifier.py`) :
+    - `PENDING → CONFIRMED` (validation) ou `→ REJECTED` (rejet)
+    - `CONFIRMED → REJECTED` (rejet d'une attribution validée)
+    - `REJECTED → PENDING` lors d'une réattribution à une autre personne
+    """
+
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+
 
 # ── Types d'identifiants côté référentiel personnes ───────────────
 #

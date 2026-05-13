@@ -6,13 +6,7 @@ root, accès via le root). La FK `authorships.publication_id NOT NULL`
 verrouille ce lien côté schéma.
 
 La logique métier touchant aux authorships canoniques (assignation
-person↔publication, scope de périmètre, exclusion, rôles) vit ici. Les
-chantiers METIER_* qui produisent de la logique sur les authorships y
-déposent leurs méthodes dans leurs phases dédiées.
-
-Scaffolding Phase 1 (`CODE_rich-domain-model`) : juste l'identité et les
-attributs. Les méthodes de comportement seront ajoutées au fur et à mesure
-des chantiers METIER_*.
+person↔publication, scope de périmètre, exclusion, rôles) vit ici.
 """
 
 from dataclasses import dataclass
