@@ -482,7 +482,7 @@ class TestThesesBuildSourceMeta:
 
 # ── authorship_roles ─────────────────────────────────────────────
 
-from domain.authorship_roles import map_role, merge_roles
+from domain.publications.authorship_roles import map_role, merge_roles
 
 
 class TestMapRole:
