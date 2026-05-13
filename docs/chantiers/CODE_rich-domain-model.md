@@ -160,12 +160,12 @@ vides comme point d'appui.
       d'aggregate Publication. Identité `id`. Attributs : `person_id`,
       `author_position`, `in_perimeter`, `source_manual`, `excluded`,
       `is_corresponding`, `roles`, `structure_ids`, `notes`.
-- [ ] `domain/source_publications/source_publication.py` — aggregate
+- [x] `domain/source_publications/source_publication.py` — aggregate
       root `SourcePublication`. Identité naturelle = `(source,
       source_id)`. Attribut mutable `publication_id: int | None`.
       Méthodes `attach_to(pub_id)`, `reattach_to(new_pub_id)`.
       Composition de `SourceAuthorship` en entités filles.
-- [ ] `domain/source_publications/source_authorship.py` — entité
+- [x] `domain/source_publications/source_authorship.py` — entité
       fille `SourceAuthorship`. Identité `id`. Attributs : `source`,
       `author_position`, `person_id`, `authorship_id`,
       `raw_author_name`, `author_name_normalized`,
