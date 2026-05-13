@@ -5,7 +5,7 @@ extracteurs qui encapsulent la connaissance de la sémantique HAL
 pour le reste du pipeline.
 """
 
-from domain.doc_types import map_doc_type
+from domain.publications.doc_types import map_doc_type
 
 
 def derive_hal_doc_type(doc_type: str | None, sub_type: str | None) -> str:

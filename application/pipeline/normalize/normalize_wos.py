@@ -34,13 +34,13 @@ from application.publications import find_or_create as find_or_create_publicatio
 from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.authorship_roles import map_role
-from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
+from domain.publications.doc_types import map_doc_type
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
 
 # =============================================================

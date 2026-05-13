@@ -125,7 +125,7 @@ def find_publication(
     *,
     pub_repo: PublicationRepository,
 ) -> int | None:
-    from domain.doc_types import map_doc_type
+    from domain.publications.doc_types import map_doc_type
 
     meta = extract_pub_metadata(doc, journal_id, scanr_id)
     if not meta["pub_year"] or not meta["title"]:

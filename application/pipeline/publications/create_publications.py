@@ -26,11 +26,11 @@ from application.publications import (
 from application.publications import (
     refresh_from_sources,
 )
-from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from domain.publications.dedup import has_minimal_publication_metadata
+from domain.publications.doc_types import map_doc_type
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 
 
