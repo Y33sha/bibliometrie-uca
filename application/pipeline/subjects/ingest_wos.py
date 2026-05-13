@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
-from domain.subject import ONTOLOGY_WOS_HEADING, ONTOLOGY_WOS_SUBJECT
+from domain.subjects.subject import ONTOLOGY_WOS_HEADING, ONTOLOGY_WOS_SUBJECT
 
 SOURCE = "wos"
 

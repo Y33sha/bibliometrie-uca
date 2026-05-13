@@ -12,7 +12,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from domain.subject import normalize_label
+from domain.subjects.subject import normalize_label
 
 # Le ON CONFLICT fusionne par ontologie : pour chaque clé présente dans l'un
 # OU l'autre des dicts, on construit un objet `{codes, level, parent}` agrégé.

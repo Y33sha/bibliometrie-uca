@@ -264,9 +264,9 @@ Quelques modules historiques restent à la racine de `domain/` alors
 qu'ils sont attachés à un aggregate. Déplacement vers la subpackage
 thématique, sur le même principe que la dispersion 2.1a.
 
-- [ ] Supprimer `domain/structure.py` — placeholder vide, redondant
+- [x] Supprimer `domain/structure.py` — placeholder vide, redondant
       avec `domain/structures/structure.py`, 0 caller.
-- [ ] `domain/names.py` → split :
+- [x] `domain/names.py` → split :
   - `parse_raw_author_name`, `names_compatible`, `first_names_compatible`,
     `last_names_compatible` → `domain/persons/name_matching.py`
     (règles de comparaison de signatures).
@@ -274,14 +274,14 @@ thématique, sur le même principe que la dispersion 2.1a.
     `domain/persons/name_forms.py` existant (factory de la VO
     `PersonNameForm` : les strings qu'elle produit sont les valeurs
     canoniques du VO).
-- [ ] `domain/doc_types.py` → `domain/publications/doc_types.py`
+- [x] `domain/doc_types.py` → `domain/publications/doc_types.py`
       (mapping des types de documents, attribut de Publication).
-- [ ] `domain/authorship_roles.py` → `domain/publications/authorship_roles.py`
+- [x] `domain/authorship_roles.py` → `domain/publications/authorship_roles.py`
       (rôles canoniques d'authorship, entité fille de Publication).
-- [ ] `domain/hal_domains.py` → `domain/sources/hal_domains.py`
+- [x] `domain/hal_domains.py` → `domain/sources/hal_domains.py`
       (référentiel HAL CCSD pour les sujets ; HAL est la seule source
       avec un référentiel en dur parce que ses codes sont opaques).
-- [ ] `domain/subject.py` → nouveau subpackage `domain/subjects/`
+- [x] `domain/subject.py` → nouveau subpackage `domain/subjects/`
       (sujets sont un concept métier à part, méritent leur dossier
       sur le même modèle que `persons/`, `publications/`,
       `structures/`).

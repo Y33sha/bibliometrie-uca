@@ -1,6 +1,6 @@
-"""Tests des constantes et helpers de `domain/subject.py`."""
+"""Tests des constantes et helpers de `domain/subjects/subject.py`."""
 
-from domain.subject import (
+from domain.subjects.subject import (
     ONTOLOGIES,
     ONTOLOGY_HAL_DOMAIN,
     ONTOLOGY_OPENALEX_TOPIC,
@@ -16,7 +16,7 @@ class TestOntologies:
         assert ONTOLOGY_RAMEAU in ONTOLOGIES
 
     def test_all_ontology_constants_in_set(self):
-        from domain import subject as m
+        from domain.subjects import subject as m
 
         constants = {v for k, v in vars(m).items() if k.startswith("ONTOLOGY_")}
         assert constants == set(ONTOLOGIES)
