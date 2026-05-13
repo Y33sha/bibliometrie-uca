@@ -1,10 +1,10 @@
-"""Value object `PersonNameForm` + helpers pour la colonne `persons` JSONB.
+"""Value object `PersonNameForm` + factory `compute_person_name_forms`
++ helpers pour la colonne `persons` JSONB.
 
 Une forme de nom est une représentation normalisée d'une combinaison
-(last_name, first_name) destinée au matching. Voir
-`domain/names.py:compute_person_name_forms` pour la règle de génération
-(plusieurs formes par personne : « prenom nom », « nom prenom »,
-formes initialisées, etc.).
+(last_name, first_name) destinée au matching. Plusieurs formes par
+personne : « prenom nom », « nom prenom », formes initialisées, etc.
+(cf. `compute_person_name_forms` ci-dessous).
 
 Du point de vue domain, une forme de nom est entièrement définie par
 sa string normalisée — VO immuable, égalité par valeur.
@@ -22,6 +22,7 @@ inline.
 from dataclasses import dataclass
 
 from domain.errors import ValidationError
+from domain.normalize import normalize_name
 
 
 @dataclass(frozen=True)
@@ -29,8 +30,8 @@ class PersonNameForm:
     """Forme normalisée du nom d'une personne (VO).
 
     Identité = la string normalisée. La normalisation préalable est
-    portée par `domain/names.py:compute_person_name_forms` ; le VO se
-    contente de garantir la non-vacuité.
+    portée par `compute_person_name_forms` ; le VO se contente de
+    garantir la non-vacuité.
     """
 
     value: str
@@ -41,6 +42,48 @@ class PersonNameForm:
 
     def __str__(self) -> str:
         return self.value
+
+
+# ── Factory de formes ──────────────────────────────────────────────
+
+
+def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
+    """Calcule les variantes normalisées de formes de nom pour une personne.
+
+    Règle de composition du domaine (ne dépend d'aucune BD). Les
+    strings retournées sont les valeurs canoniques d'instances de
+    `PersonNameForm`.
+
+    Retourne un ensemble de formes normalisées :
+      - "prenom nom", "nom prenom"
+      - "initiale(s) nom", "nom initiale(s)"
+        Si le prénom a plusieurs mots (ex: "jean michel"), produit :
+        - initiales séparées : "j m nom", "nom j m"
+        - initiales collées  : "jm nom", "nom jm"
+    """
+    ln = normalize_name(last_name)
+    fn = normalize_name(first_name)
+    if not ln:
+        return set()
+
+    forms: set[str] = set()
+    if fn:
+        forms.add(f"{fn} {ln}")
+        forms.add(f"{ln} {fn}")
+
+        parts = fn.split()
+        if parts:
+            initials_spaced = " ".join(p[0] for p in parts)
+            initials_joined = "".join(p[0] for p in parts)
+            forms.add(f"{initials_spaced} {ln}")
+            forms.add(f"{ln} {initials_spaced}")
+            if initials_joined != initials_spaced:
+                forms.add(f"{initials_joined} {ln}")
+                forms.add(f"{ln} {initials_joined}")
+    else:
+        forms.add(ln)
+
+    return forms
 
 
 # ── Helpers pour la colonne `persons` JSONB ────────────────────────

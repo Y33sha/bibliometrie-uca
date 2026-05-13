@@ -1,4 +1,4 @@
-"""Fonctions de compatibilité de noms pour le matching de personnes.
+"""Fonctions de comparaison et de parsing des signatures de personnes.
 
 Utilisées par le pipeline (matching cross-source dans
 `domain/persons/matching.py`, création de personnes dans
@@ -14,45 +14,6 @@ manuellement — recall important, faux positifs filtrés à l'œil.
 Conserver les deux ensembles de règles séparés ; toute évolution de
 l'un doit considérer si l'autre doit suivre.
 """
-
-from domain.normalize import normalize_name
-
-
-def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
-    """Calcule les variantes normalisées de formes de nom pour une personne.
-
-    Règle de composition du domaine (ne dépend d'aucune BD).
-
-    Retourne un ensemble de formes normalisées :
-      - "prenom nom", "nom prenom"
-      - "initiale(s) nom", "nom initiale(s)"
-        Si le prénom a plusieurs mots (ex: "jean michel"), produit :
-        - initiales séparées : "j m nom", "nom j m"
-        - initiales collées  : "jm nom", "nom jm"
-    """
-    ln = normalize_name(last_name)
-    fn = normalize_name(first_name)
-    if not ln:
-        return set()
-
-    forms: set[str] = set()
-    if fn:
-        forms.add(f"{fn} {ln}")
-        forms.add(f"{ln} {fn}")
-
-        parts = fn.split()
-        if parts:
-            initials_spaced = " ".join(p[0] for p in parts)
-            initials_joined = "".join(p[0] for p in parts)
-            forms.add(f"{initials_spaced} {ln}")
-            forms.add(f"{ln} {initials_spaced}")
-            if initials_joined != initials_spaced:
-                forms.add(f"{initials_joined} {ln}")
-                forms.add(f"{ln} {initials_joined}")
-    else:
-        forms.add(ln)
-
-    return forms
 
 
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:

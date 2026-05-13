@@ -52,7 +52,6 @@ from application.persons import (
     link_authorships as link_to_person,
 )
 from application.ports.persons_create import PersonsCreateQueries
-from domain.names import parse_raw_author_name
 from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
 from domain.persons.matching import (
@@ -60,6 +59,7 @@ from domain.persons.matching import (
     decide_match_by_identifier,
     decide_name_form_outcome,
 )
+from domain.persons.name_matching import parse_raw_author_name
 from domain.ports.person_repository import PersonRepository
 from domain.sources.openalex import keep_orcid_if_name_matches
 

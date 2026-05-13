@@ -31,8 +31,11 @@ from typing import Any
 from sqlalchemy import Connection
 
 from application.ports.name_forms import NameFormsQueries
-from domain.names import compute_person_name_forms
-from domain.persons.name_forms import PersonsDict, add_person_source
+from domain.persons.name_forms import (
+    PersonsDict,
+    add_person_source,
+    compute_person_name_forms,
+)
 
 BATCH_SIZE = 5000
 
