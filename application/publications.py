@@ -9,6 +9,7 @@ Les fonctions find_by_* retournent des namedtuples pour un accès par nom
 indépendant du type de curseur (tuple ou dict_row).
 """
 
+from dataclasses import dataclass
 from typing import Any
 
 from application.audit import emit_event
@@ -321,66 +322,53 @@ def _first_doc_type(rows: list[dict[str, Any]]) -> str:
     return "other"
 
 
-def refresh_from_sources(pub_id: int, *, repo: PublicationRepository) -> None:
+@dataclass(frozen=True, slots=True)
+class RefreshResult:
+    """Résultat de `refresh_from_sources`.
+
+    `absorbed_publication_id` non-None signale qu'une fusion a eu lieu pendant le refresh : une autre publication portait le DOI promu par l'agrégation cross-source, et a été absorbée dans la publication rafraîchie pour éviter une violation de la contrainte unique `publications_doi_lower_key`. L'id absorbé est mort en base ; le caller doit considérer toute référence externe à cette id comme dangling.
+    """
+
+    absorbed_publication_id: int | None = None
+
+
+def refresh_from_sources(pub_id: int, *, repo: PublicationRepository) -> RefreshResult:
     """Recalcule les métadonnées d'une publication depuis ses source_publications.
 
-    Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé
-    gagne, jamais de downgrade), cette fonction fait un recalcul complet :
-    elle lit TOUS les source_publications attachés et réapplique les règles de
-    priorité depuis zéro. Elle peut donc corriger des métadonnées obsolètes
-    (ex: ongoing_thesis → thesis après soutenance).
+    Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé gagne, jamais de downgrade), cette fonction fait un recalcul complet : elle lit TOUS les source_publications attachés et réapplique les règles de priorité depuis zéro. Elle peut donc corriger des métadonnées obsolètes (ex: ongoing_thesis → thesis après soutenance).
 
     Règles de priorité entre sources :
-    ─────────────────────────────────
-    Ordre unique : theses.fr > ScanR > HAL > OpenAlex > WoS.
-    Pour les documents hors thèse, la clé `theses` n'apparaît pas dans
-    les rows, l'ordre se réduit donc à ScanR > HAL > OpenAlex > WoS.
+    Ordre unique : theses.fr > ScanR > HAL > OpenAlex > WoS. Pour les documents hors thèse, la clé `theses` n'apparaît pas dans les rows, l'ordre se réduit donc à ScanR > HAL > OpenAlex > WoS.
 
     Règles de fusion par type de champ :
-    ────────────────────────────────────
-    • Scalaires (doi, doc_type, pub_year, journal_id, container_title, language) :
-      premier non-null dans l'ordre de priorité.
+    • Scalaires (doi, doc_type, pub_year, journal_id, container_title, language) : premier non-null dans l'ordre de priorité.
     • Texte (abstract) : idem, premier non-null.
-    • oa_status : le statut le plus ouvert parmi toutes les sources
-      (diamond > gold > hybrid > bronze > green > closed > unknown).
+    • oa_status : le statut le plus ouvert parmi toutes les sources (diamond > gold > hybrid > bronze > green > closed > unknown).
     • Booléen (is_retracted) : True si au moins une source le dit.
     • Listes (keywords, countries) : union de toutes les sources, dédupliquée.
-    • JSONB biblio, meta : fusion shallow par clé (clés généralement
-      orthogonales entre sources) ; en cas de conflit sur une clé, la
-      source prioritaire l'emporte.
-    • JSONB topics : composite par source — {"openalex": [...], "theses":
-      {...}, "scanr": ...}. Chaque source garde sa forme native (liste
-      hiérarchique ou dict selon la source) pour ne rien perdre.
+    • JSONB biblio, meta : fusion shallow par clé (clés généralement orthogonales entre sources) ; en cas de conflit sur une clé, la source prioritaire l'emporte.
+    • JSONB topics : composite par source — {"openalex": [...], "theses": {...}, "scanr": ...}. Chaque source garde sa forme native (liste hiérarchique ou dict selon la source) pour ne rien perdre.
 
-    Ne touche PAS à : title, title_normalized, notes, sources (utiliser
-    update_sources() séparément).
+    Ne touche PAS à : title, title_normalized, notes, sources (utiliser update_sources() séparément).
 
     Auto-fusion sur conflit DOI :
-    Si la promotion du DOI agrégé entre en collision avec une autre
-    publication qui occupe déjà ce DOI, cette dernière est absorbée dans
-    `pub_id` avant l'UPDATE — au lieu de laisser remonter une violation
-    de contrainte unique. `pub_id` reste vivant pour le caller.
+    Si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant l'UPDATE — au lieu de laisser remonter une violation de contrainte unique. `pub_id` reste vivant pour le caller, et l'id absorbée est exposée dans `RefreshResult.absorbed_publication_id` pour que le caller puisse en tenir compte (logs, audit, nettoyage de références).
     """
+    absorbed: int | None = None
+
     rows = repo.get_source_rows(pub_id)
     if not rows:
-        return
+        return RefreshResult()
 
     rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
     rows.sort(key=lambda r: rank.get(r["source"], 99))
 
-    # Si le DOI à promouvoir est déjà occupé par une autre publication,
-    # fusionner d'abord pour éviter une violation de la contrainte unique
-    # `publications_doi_lower_key` au moment de l'UPDATE. Cas typique :
-    # une thèse avec un DOI ABES (10.70675/...) créée en double — une fois
-    # via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL
-    # (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître
-    # dans une source_publication, sa promotion vers publications.doi
-    # collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans
-    # `pub_id` (qui reste vivant pour le caller).
+    # Si le DOI à promouvoir est déjà occupé par une autre publication, fusionner d'abord pour éviter une violation de la contrainte unique `publications_doi_lower_key` au moment de l'UPDATE. Cas typique : une thèse avec un DOI ABES (10.70675/...) créée en double — une fois via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître dans une source_publication, sa promotion vers publications.doi collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans `pub_id` (qui reste vivant pour le caller).
     new_doi = _first_non_null(rows, "doi")
     if new_doi:
         existing = repo.find_by_doi(new_doi)
         if existing and existing.id != pub_id:
+            absorbed = existing.id
             merge_publications(pub_id, existing.id, repo=repo)
             rows = repo.get_source_rows(pub_id)
             rows.sort(key=lambda r: rank.get(r["source"], 99))
@@ -391,11 +379,7 @@ def refresh_from_sources(pub_id: int, *, repo: PublicationRepository) -> None:
         doc_type=_first_doc_type(rows),
         pub_year=_first_non_null(rows, "pub_year"),
         journal_id=_first_non_null(rows, "journal_id"),
-        # Fallback à 'unknown' (DEFAULT côté schema) si toutes les sources
-        # sont silencieuses : best_oa_status renvoie None quand aucune
-        # valeur exploitable, et on ne veut pas écrire NULL sur la
-        # colonne canonique (le modèle Pydantic /api/publications attend
-        # un string non-null).
+        # Fallback à 'unknown' (DEFAULT côté schema) si toutes les sources sont silencieuses : best_oa_status renvoie None quand aucune valeur exploitable, et on ne veut pas écrire NULL sur la colonne canonique (le modèle Pydantic /api/publications attend un string non-null).
         oa_status=best_oa_status(r["oa_status"] for r in rows) or OA_STATUS_UNKNOWN_DEFAULT,
         container_title=_first_non_null(rows, "container_title"),
         language=_first_non_null(rows, "language"),
@@ -408,6 +392,7 @@ def refresh_from_sources(pub_id: int, *, repo: PublicationRepository) -> None:
         is_retracted=any(r["is_retracted"] for r in rows if r["is_retracted"]),
     )
     repo.update_sources(pub_id)
+    return RefreshResult(absorbed_publication_id=absorbed)
 
 
 def mark_distinct(
