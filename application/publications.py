@@ -17,18 +17,20 @@ from domain.normalize import normalize_text
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import (
-    OA_STATUS_UNKNOWN_DEFAULT,
     PubByDoi,
     PubByNnt,
     PubByTitle,
     PubThesisCandidate,
-    best_oa_status,
-    clean_publication_title,
 )
 from domain.publications.dedup import (
     has_minimal_publication_metadata,
 )
 from domain.publications.dedup import resolve_doi_conflict as _domain_resolve_doi_conflict
+from domain.publications.metadata import (
+    OA_STATUS_UNKNOWN_DEFAULT,
+    best_oa_status,
+    clean_publication_title,
+)
 from domain.sources import SOURCE_PRIORITY
 
 # Re-export des namedtuples pour les call sites historiques (scripts,

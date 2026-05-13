@@ -229,7 +229,7 @@ finissent en 2.4. Les règles pures se font en premier (2.1, scope
 local), puis les use-cases mono-aggregate (2.2, pattern « load →
 mutate → save »), puis les orchestrations larges (2.3).
 
-#### Phase 2.1 — Règles pures : placement thématique dans `domain/publications/` et `domain/persons/`
+#### Phase 2.1a — Règles isolées de `domain/publication.py` vers modules thématiques
 
 Arbitrage par règle : méthode d'instance UNIQUEMENT pour les
 comportements d'identité (entité agit sur elle-même). Les comparaisons
@@ -237,31 +237,54 @@ entre entités et les agrégations de valeurs sont des **domain
 services** (free functions), à placer dans le module thématique
 adéquat — pas à forcer en méthodes.
 
-- [ ] `domain/publication.py:resolve_doi_conflict` (+ `DoiConflictResolution`,
+- [x] `domain/publication.py:resolve_doi_conflict` (+ `DoiConflictResolution`,
       `_CHAPTER_DOC_TYPES`, `_BOOK_DOC_TYPES`) → free function dans
       `domain/publications/dedup.py`. Justification : c'est une
       comparaison entre deux publications, pas une action d'identité ;
       les callers actuels passent des projections et des strings, pas
       des `Publication` (forcer en méthode obligerait à affaiblir les
-      invariants de l'entité).
-- [ ] `domain/publication.py:best_oa_status` (+ `OA_RANK`,
-      `OA_STATUS_UNKNOWN_DEFAULT`) → nouveau module
-      `domain/publications/metadata.py`. Justification : agrégation
-      de valeurs sans état d'instance.
-- [ ] `domain/publication.py:clean_publication_title` (+ helpers
-      `_decode_html_entities_once`, regex internes) →
-      `domain/publications/metadata.py`. Justification : utility
-      string sans état d'instance.
+      invariants de l'entité). — `6f231f5`
+- [x] `domain/publication.py:best_oa_status` (+ `OA_RANK`,
+      `OA_STATUS_UNKNOWN_DEFAULT`) + `domain/publication.py:clean_publication_title`
+      (+ helpers `_decode_html_entities_once`, regex internes) →
+      nouveau module `domain/publications/metadata.py` (catch-all
+      pour les règles de métadonnées de publication sans meilleure
+      cible). Justifications : agrégation de valeurs / utility string,
+      sans état d'instance.
 - [ ] `domain/persons/creation.py:allow_person_creation` → reste free
       function à son emplacement actuel (décision liée à un contexte
       d'authorship, pas à une `Person` existante). Pas de déplacement.
 - [ ] `domain/persons/matching.py` (`decide_cross_source_match`,
       `decide_name_form_outcome`, `decide_match_by_identifier`) →
       déféré à `METIER_decide-person-match` qui refondra la cascade.
-- [ ] `domain/names.py` — arbitrage item par item : certaines
-      fonctions pourraient devenir `classmethod` de `PersonNameForm`
-      (ex. `is_compatible_with`). Déféré à un sous-chantier dédié si
-      nécessaire — pas critique pour Phase 2.
+
+#### Phase 2.1b — Modules orphelins de `domain/` racine vers subpackages
+
+Quelques modules historiques restent à la racine de `domain/` alors
+qu'ils sont attachés à un aggregate. Déplacement vers la subpackage
+thématique, sur le même principe que la dispersion 2.1a.
+
+- [ ] Supprimer `domain/structure.py` — placeholder vide, redondant
+      avec `domain/structures/structure.py`, 0 caller.
+- [ ] `domain/names.py` → split :
+  - `parse_raw_author_name`, `names_compatible`, `first_names_compatible`,
+    `last_names_compatible` → `domain/persons/name_matching.py`
+    (règles de comparaison de signatures).
+  - `compute_person_name_forms` → ajout dans
+    `domain/persons/name_forms.py` existant (factory de la VO
+    `PersonNameForm` : les strings qu'elle produit sont les valeurs
+    canoniques du VO).
+- [ ] `domain/doc_types.py` → `domain/publications/doc_types.py`
+      (mapping des types de documents, attribut de Publication).
+- [ ] `domain/authorship_roles.py` → `domain/publications/authorship_roles.py`
+      (rôles canoniques d'authorship, entité fille de Publication).
+- [ ] `domain/hal_domains.py` → `domain/sources/hal_domains.py`
+      (référentiel HAL CCSD pour les sujets ; HAL est la seule source
+      avec un référentiel en dur parce que ses codes sont opaques).
+- [ ] `domain/subject.py` → nouveau subpackage `domain/subjects/`
+      (sujets sont un concept métier à part, méritent leur dossier
+      sur le même modèle que `persons/`, `publications/`,
+      `structures/`).
 
 #### Phase 2.2 — Use-cases mono-aggregate : pattern load → mutate → save
 

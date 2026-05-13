@@ -29,8 +29,9 @@ from application.publications import (
 from domain.doc_types import map_doc_type
 from domain.normalize import normalize_text
 from domain.ports.publication_repository import PublicationRepository
-from domain.publication import OA_STATUS_UNKNOWN_DEFAULT, normalize_nnt
+from domain.publication import normalize_nnt
 from domain.publications.dedup import has_minimal_publication_metadata
+from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 
 
 def process_document(
