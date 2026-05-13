@@ -12,7 +12,7 @@ from sqlalchemy import Connection
 
 from application.addresses import countries as countries_service
 from application.addresses import structures as structures_service
-from application.ports.addresses_queries import (
+from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
     AddressesQueries,
     AddressListFilters,

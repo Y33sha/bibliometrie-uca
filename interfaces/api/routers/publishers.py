@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.publishers_queries import PublisherQueries
+from application.ports.api.publishers_queries import PublisherQueries
 from application.publishers import merge_publishers
 from application.publishers import update_publisher as _update_publisher
 from domain.ports.audit_repository import AuditRepository

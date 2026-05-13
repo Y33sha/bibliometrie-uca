@@ -19,7 +19,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.publications_create import PublicationsCreateQueries
+from application.ports.pipeline.publications_create import PublicationsCreateQueries
 from application.publications import (
     find_or_create as find_or_create_publication,
 )

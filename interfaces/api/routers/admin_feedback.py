@@ -23,7 +23,7 @@ from collections.abc import AsyncIterator
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from application.ports.admin_feedback_queries import AdminFeedbackQueries
+from application.ports.api.admin_feedback_queries import AdminFeedbackQueries
 from interfaces.api.deps import admin_feedback_queries_sync
 from interfaces.api.models import (
     FeedbackAddressesResponse,

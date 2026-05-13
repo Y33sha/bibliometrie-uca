@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from application.ports.addresses_queries import (
+from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
     AddressListFilters,
 )

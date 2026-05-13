@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.subjects_queries import SubjectsAdminQueries
+from application.ports.api.subjects_queries import SubjectsAdminQueries
 from interfaces.api.deps import subjects_admin_queries
 from interfaces.api.models import SubjectDetailResponse, SubjectListResponse
 

@@ -10,7 +10,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.hal_problems_queries import HalProblemsQueries
+from application.ports.api.hal_problems_queries import HalProblemsQueries
 from interfaces.api.deps import hal_problems_queries_sync
 from interfaces.api.models import (
     HalAffiliationConflictsResponse,

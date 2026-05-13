@@ -12,7 +12,7 @@ Le SQL vit dans `infrastructure/repositories/authorship_repository.py`.
 from sqlalchemy import Connection
 
 from application.audit import emit_event
-from application.ports.perimeter import PerimeterQueries
+from application.ports.pipeline.perimeter import PerimeterQueries
 from domain.errors import NotFoundError, ValidationError
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.authorship_repository import AuthorshipRepository

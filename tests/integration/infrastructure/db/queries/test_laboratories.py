@@ -4,7 +4,7 @@ import json
 
 from sqlalchemy import text
 
-from application.ports.laboratories_queries import LabPersonsFilters
+from application.ports.api.laboratories_queries import LabPersonsFilters
 from infrastructure.db.queries.laboratories import PgLaboratoriesQueries
 
 

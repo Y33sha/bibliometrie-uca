@@ -30,7 +30,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.name_forms import NameFormsQueries
+from application.ports.pipeline.name_forms import NameFormsQueries
 from domain.persons.name_forms import (
     PersonsDict,
     add_person_source,

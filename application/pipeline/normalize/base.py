@@ -23,7 +23,7 @@ from typing import Any, ClassVar
 from sqlalchemy import Connection, Row
 
 from application.pipeline._savepoint import savepoint
-from application.ports.staging import StagingQueries
+from application.ports.pipeline.staging import StagingQueries
 
 
 class SourceNormalizer(ABC):

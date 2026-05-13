@@ -22,7 +22,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.address_resolution import AddressResolutionQueries
+from application.ports.pipeline.address_resolution import AddressResolutionQueries
 from domain.normalize import normalize_text as normalize
 
 BATCH_SIZE = 1000

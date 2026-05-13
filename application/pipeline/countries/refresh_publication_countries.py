@@ -17,7 +17,7 @@ import time
 
 from sqlalchemy import Connection
 
-from application.ports.countries import CountryQueries
+from application.ports.pipeline.countries import CountryQueries
 from domain.sources import ALL_SOURCES
 
 

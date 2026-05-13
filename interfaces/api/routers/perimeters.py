@@ -11,8 +11,8 @@ import logging
 from fastapi import APIRouter, Depends
 
 from application import config as config_service
+from application.ports.api.perimeters_queries import PerimetersAdminQueries
 from application.ports.config import ConfigStore
-from application.ports.perimeters_queries import PerimetersAdminQueries
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.perimeter_repository import PerimeterRepository
 from interfaces.api.deps import (

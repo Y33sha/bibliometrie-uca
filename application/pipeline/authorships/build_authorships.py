@@ -16,7 +16,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.authorships_build import AuthorshipsBuildQueries
+from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
 
 
 def build(

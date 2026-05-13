@@ -19,7 +19,7 @@ import time
 import requests
 from sqlalchemy import Connection
 
-from application.ports.enrich import EnrichQueries
+from application.ports.pipeline.enrich import EnrichQueries
 from application.publications import update_oa_status
 from domain.ports.publication_repository import PublicationRepository
 

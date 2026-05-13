@@ -17,7 +17,7 @@ import requests
 from sqlalchemy import Connection
 
 from application.journals import reset_journal_apc, update_journal_apc
-from application.ports.enrich import EnrichQueries
+from application.ports.pipeline.enrich import EnrichQueries
 from domain.ports.journal_repository import JournalRepository
 
 OPENALEX_PREFIX = "https://openalex.org/"

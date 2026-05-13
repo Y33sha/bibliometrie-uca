@@ -4,7 +4,7 @@ import json
 
 from sqlalchemy import text
 
-from application.ports.publications_queries import ListFilters
+from application.ports.api.publications_queries import ListFilters
 from infrastructure.db.queries.publications.list import list_publications
 
 

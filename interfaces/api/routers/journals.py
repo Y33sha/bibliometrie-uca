@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
-from application.ports.journals_queries import JournalQueries
+from application.ports.api.journals_queries import JournalQueries
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.journal_repository import JournalRepository
 from interfaces.api.deps import (
