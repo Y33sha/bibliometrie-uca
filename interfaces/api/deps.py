@@ -281,7 +281,7 @@ def bg_propagate_countries_sync(address_ids: list[int]) -> None:
     """
     import logging
 
-    from application import addresses_countries as countries_service
+    from application.addresses import countries as countries_service
 
     logger = logging.getLogger(__name__)
     try:
