@@ -183,17 +183,21 @@ vides comme point d'appui.
       None`. Méthodes `confirm()`, `reject()`, `reattribute_to(new_person_id,
       *, source)`. Exception `CannotReattributeError` (sous-classe
       `ConflictError`) si tentative depuis statut non-rejected.
-- [ ] `domain/structures/structure.py` — classe `Structure` (identité
-      + `name_forms: tuple[StructureNameForm, ...]` + api_ids +
-      relations).
-- [ ] `domain/addresses/affiliation.py` — aggregate root
+- [x] `domain/structures/structure.py` — classe `Structure` (identité
+      + `name_forms: tuple[StructureNameForm, ...]` + api_ids). Les
+      relations hiérarchiques (`structure_relations`) ne sont pas
+      portées par l'aggregate en Phase 1 (à scaffolder quand de la
+      logique métier émergera dessus).
+- [x] `domain/addresses/affiliation.py` — aggregate root
       `AddressAffiliation` + VO interne `StructureLink`. Attributs :
-      `id`, `address: Address`, `suggested_countries`, `countries`,
-      `resolved_at`, `pub_count`, `structure_links: tuple[StructureLink,
-      ...]`. Méthodes : `confirm_structure(structure_id)`,
+      `id`, `address: Address`, `raw_text`, `suggested_countries`,
+      `countries`, `resolved_at`, `pub_count`, `structure_links:
+      tuple[StructureLink, ...]`. Méthodes :
+      `confirm_structure(structure_id)`,
       `reject_structure(structure_id)`,
       `suggest_structure(structure_id, matched_form_id)`,
-      `mark_resolved()`.
+      `mark_resolved(at: datetime)`. Le caller fournit le timestamp
+      pour préserver la pureté.
 
 **Invariants rapatriés :**
 
@@ -208,10 +212,10 @@ vides comme point d'appui.
 
 **Convention + tests :**
 
-- [ ] En-tête de chaque fichier d'entité : phrase intemporelle du type
+- [x] En-tête de chaque fichier d'entité : phrase intemporelle du type
       « La logique métier touchant à <X> vit ici » (sans référence à
       des chantiers ou phases — règle générale docstrings).
-- [ ] Tests unitaires sur les constructeurs, les 2-3 invariants
+- [x] Tests unitaires sur les constructeurs, les 2-3 invariants
       rapatriés, et les transitions de `PersonIdentifier`,
       `SourcePublication`, `AddressAffiliation` (confirm/reject/
       reattribute/attach + cas d'erreur).
