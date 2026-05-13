@@ -271,8 +271,8 @@ def add_name_form(
 
 
 def detach_name_form(person_id: int, name_form: str, *, repo: PersonRepository) -> None:
-    """Détache une personne d'une forme de nom. Supprime la forme si
-    person_ids devient vide."""
+    """Détache une personne d'une forme de nom. Supprime la forme si elle
+    n'est plus rattachée à aucune personne."""
     repo.detach_name_form(person_id, name_form)
 
 

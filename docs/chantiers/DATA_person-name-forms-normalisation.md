@@ -148,61 +148,57 @@ plusieurs scripts dédiés. Chaque étape doit être idempotente.
 
 ### Phase 4 — Refactor producteurs
 
-> Note Contexte Claude : Pour la reprise (Phase 4) : j'avais commencé à investiguer le pattern de binding JSONB (bindparam("...", type_=JSONB) est utilisé dans les normalizers SCANR/OA), et j'avais choisi de faire la fusion en Python plutôt qu'en SQL ON CONFLICT (l'orchestrateur a déjà la donnée en mémoire, plus simple). Côté repository (_name_forms.py), add_name_form aura besoin d'un ON CONFLICT/jsonb_set car appelé hors orchestrateur — pas de bypass possible.
+NOT NULL sur `person_ids` levé par migration 0006 (pour que les
+nouveaux writers puissent ne pas la renseigner). Phases 4 et 5 faites
+dans le même commit : sans Phase 5, les readers anciens verraient
+`person_ids` NULL sur les rows écrites par les nouveaux writers.
 
-Entre la fin de la Phase 2 (backfill OK) et la fin de cette phase, les
-writers existants n'écrivent que dans `person_ids/sources` (et plus
-dans `persons`). La colonne `persons` se désynchronise donc pour toute
-row touchée par un admin (rename, add/detach manuel) ou par un run
-pipeline (recompute). Comme les oneshots de la Phase 2 sont idempotents
-et additifs, le plus simple est : minimiser cette fenêtre en
-enchaînant Phase 4 dans la foulée de Phase 2, et re-lancer les
-oneshots `persons` / `authorships` après Phase 4 pour converger sur
-les rows ayant pu drifter.
-
-- [ ] `infrastructure/db/queries/name_forms.py` :
-  - `fetch_existing_name_forms` retourne `persons jsonb` (au lieu de
-    `person_ids, sources`).
-  - `update_name_form` et `insert_name_form_with_merge` prennent
-    `persons: dict[str, list[str]]` en paramètre (et plus deux arrays).
-    L'INSERT ON CONFLICT fait `persons = pnf.persons || EXCLUDED.persons`
-    avec une CTE qui merge par clé (ou délégué au helper côté Python
-    si plus lisible).
+- [x] Migration Alembic 0006 : `ALTER COLUMN person_ids DROP NOT NULL`.
+- [x] `infrastructure/db/queries/name_forms.py` :
+  - `fetch_existing_name_forms` retourne `persons jsonb`.
+  - `update_name_form(form_id, persons)` et `insert_name_form(name_form,
+    persons)` (renommé depuis `_with_merge`) prennent un
+    `dict[str, list[str]]` ; la fusion est faite côté Python par
+    l'orchestrateur (qui a déjà la donnée en mémoire), pas en SQL.
+  - `fetch_normalized_forms_from_temp` retourne des triplets
+    `(name_form, person_id, source)` distincts (au lieu d'agréger en
+    arrays parallèles) ; l'agrégation par forme en dict `persons` se
+    fait en Python via les helpers domaine.
   - `delete_name_form` inchangé.
-- [ ] `application/ports/name_forms.py` : signatures alignées sur les
-  changements de l'adapter.
-- [ ] `application/pipeline/persons/populate_person_name_forms.py` :
-  reconstruction du dict `persons` au lieu des deux arrays parallèles
-  (étape de fusion `for r in source_forms: ...`). Le reste de
-  l'orchestrateur (collecte triples, normalisation SQL via table temp,
-  diff insert/update/delete) reste structurellement identique.
-- [ ] `infrastructure/repositories/person_repository/_name_forms.py` :
-  réécriture des 3 fonctions (`refresh_name_forms`, `add_name_form`,
-  `detach_name_form`) pour manipuler `persons jsonb` au lieu des deux
-  arrays. Logique de cleanup (suppression de la row si `persons` devient
-  vide) à conserver.
+- [x] `application/ports/name_forms.py` : signatures alignées.
+- [x] `application/pipeline/persons/populate_person_name_forms.py` :
+  agrégation des triplets via `add_person_source` en dict `persons`,
+  diff insert/update/delete inchangé structurellement.
+- [x] `infrastructure/repositories/person_repository/_name_forms.py` :
+  - `refresh_name_forms` : retire la source `'persons'` du couple
+    `(pid, "persons")` dans chaque row où elle apparaît (drop de clé
+    si plus aucune source, drop de row si plus aucune clé), puis pose
+    les nouvelles formes via `add_name_form`.
+  - `add_name_form` : INSERT … ON CONFLICT DO UPDATE avec `jsonb_set`
+    qui unionne les sources de la clé `pid` côté SQL (caller hors
+    orchestrateur, pas de pré-chargement en mémoire).
+  - `detach_name_form` : `persons - pid` puis DELETE si vide.
+- [x] `infrastructure/repositories/person_repository/_core.py:merge_into`
+  : remplacement de l'UPDATE sur `person_ids` par un select-update
+  Python qui transfère les sources de `source_id` vers `target_id` via
+  le helper domaine `merge`.
 
 ### Phase 5 — Refactor consommateurs
 
-- [ ] `infrastructure/db/queries/persons/create.py:fetch_name_form_map` :
-  retourne désormais `dict[name_form, list[person_id]]` extrait de la
-  colonne `persons` via `jsonb_object_keys`. Le code appelant
-  (cascade matching dans `create_persons_from_source_authorships.py`)
-  n'a pas à connaître `sources` — interface inchangée pour le caller.
-- [ ] `infrastructure/db/queries/persons/admin.py` (lookup "autres
-  personnes attachées à cette forme") : remplacer `LATERAL
-  unnest(pnf.person_ids) AS pid` par `LATERAL jsonb_object_keys(pnf.persons)
-  AS pid_text` + cast `pid_text::int = pid`.
-- [ ] `infrastructure/db/queries/persons/list.py` (agrégat `name_forms`
-  par personne, avec flag `ambiguous`) :
-  - `array_length(pnf.person_ids, 1) > 1` → `jsonb_typeof(pnf.persons)
-    = 'object' AND (SELECT count(*) FROM jsonb_object_keys(pnf.persons))
-    > 1`.
-  - `LATERAL unnest(pnf.person_ids)` → `LATERAL jsonb_object_keys(pnf.persons)`.
-  - Filtre `pnf.sources <> ARRAY['persons']` → équivalent jsonb : ne
-    pas exposer les formes dont *aucune* clé n'a de source autre que
-    `'persons'`. À vérifier au moment du refactor — peut nécessiter une
-    sous-requête `jsonb_each(persons)`.
+- [x] `infrastructure/db/queries/persons/create.py:fetch_name_form_map` :
+  person_id extraits via `jsonb_object_keys(persons)::int`.
+- [x] `infrastructure/db/queries/persons/admin.py:name_form_authorships`
+  (lookup "autres personnes attachées à cette forme") : `LATERAL
+  jsonb_object_keys(pnf.persons) AS pid_text` + cast `pid_text::int`.
+- [x] `infrastructure/db/queries/persons/list.py` (agrégat `name_forms`
+  par personne) :
+  - `ambiguous` = `COUNT(*) > 1` sur `jsonb_object_keys(pnf.persons)`.
+  - Source des person_id : `LATERAL jsonb_object_keys(pnf.persons)`.
+  - `sources` exposé au frontend = union triée des sources de toutes
+    les clés (form-level, compat avec `NameFormSummaryOut`).
+  - Filtre d'exposition : forme exposée ssi au moins une clé a une
+    source ≠ 'persons' (sous-requête `jsonb_each` +
+    `jsonb_array_elements_text`).
 
 ### Phase 6 — Migration finale + tests
 
@@ -224,6 +220,7 @@ supprimer les anciennes.
   ou `sources` (helpers de fixture + assertions). Recenser via grep
   avant refactor.
 - [ ] Suite complète `tests/integration/` verte.
+- [ ] Mise à jour de la documentation (`donnees.md`).
 
 ## Lien avec les autres chantiers
 

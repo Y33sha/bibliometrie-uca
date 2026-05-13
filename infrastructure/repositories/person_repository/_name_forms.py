@@ -1,47 +1,60 @@
-"""SQL pour `person_name_forms`."""
+"""SQL pour `person_name_forms` — colonne de vérité `persons jsonb`.
 
-from sqlalchemy import Connection, text
+Format : ``{ "<person_id>": ["<source1>", ...], ... }`` (cf.
+`domain/persons/name_forms.py`). Les anciennes colonnes `person_ids` /
+`sources` ne sont plus écrites ni lues depuis ce module — elles
+seront DROP en Phase 6 du chantier
+`DATA_person-name-forms-normalisation`.
+
+Différence d'approche avec l'orchestrateur batch
+(`application/pipeline/persons/populate_person_name_forms.py`) : ici le
+caller (admin, assign_orphans, etc.) n'a pas pré-chargé l'état en
+mémoire, donc la fusion doit se faire côté SQL — d'où le ON CONFLICT
++ `jsonb_set` dans `add_name_form`.
+"""
+
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.normalize import normalize_name
+from domain.persons.name_forms import remove_person_source
 
 
 def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
     """Recalcule les formes de nom source 'persons' d'une personne.
 
-    Supprime les anciennes formes 'persons' puis insère les nouvelles.
-    Les formes partagées avec d'autres personnes ou d'autres sources
-    sont préservées.
+    Retire ``'persons'`` du couple ``(person_id, "persons")`` dans toutes
+    les formes où il apparaît (key droppée si plus aucune source ; row
+    supprimée si plus aucun person_id). Puis pose les nouvelles formes
+    via `add_name_form` (qui gère le ON CONFLICT JSONB).
 
     `forms` : l'ensemble des formes normalisées calculées par le domaine
     (voir `compute_person_name_forms`).
     """
-    # 1a. Formes dont 'persons' est la seule source : retirer le person_id
-    conn.execute(
+    pid_text = str(person_id)
+    rows = conn.execute(
         text("""
-            UPDATE person_name_forms
-            SET person_ids = array_remove(person_ids, :pid)
-            WHERE :pid = ANY(person_ids)
-              AND sources = ARRAY['persons']
+            SELECT id, persons FROM person_name_forms
+            WHERE persons ? :pid AND persons->:pid ? 'persons'
         """),
-        {"pid": person_id},
-    )
-    # 1b. Formes multi-sources : retirer 'persons' de sources, garder person_id
-    conn.execute(
-        text("""
-            UPDATE person_name_forms
-            SET sources = array_remove(sources, 'persons'),
-                updated_at = now()
-            WHERE :pid = ANY(person_ids)
-              AND 'persons' = ANY(sources)
-              AND array_length(sources, 1) > 1
-        """),
-        {"pid": person_id},
-    )
-    # 1c. Nettoyer les formes devenues vides
-    conn.execute(
-        text("DELETE FROM person_name_forms WHERE person_ids = '{}' OR person_ids IS NULL")
-    )
-    # 2. Ajouter les nouvelles formes
+        {"pid": pid_text},
+    ).all()
+
+    for row in rows:
+        new_persons = remove_person_source(row.persons, person_id, "persons")
+        if not new_persons:
+            conn.execute(
+                text("DELETE FROM person_name_forms WHERE id = :id"),
+                {"id": row.id},
+            )
+        else:
+            conn.execute(
+                text(
+                    "UPDATE person_name_forms SET persons = :p, updated_at = now() WHERE id = :id"
+                ).bindparams(bindparam("p", type_=JSONB)),
+                {"id": row.id, "p": new_persons},
+            )
+
     for form in forms:
         add_name_form(conn, person_id, form, source="persons")
 
@@ -49,64 +62,70 @@ def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> Non
 def add_name_form(
     conn: Connection, person_id: int, full_name: str, source: str | None = None
 ) -> None:
-    """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà.
+    """Ajoute une forme de nom à person_name_forms (idempotent).
 
-    Si `source` est fourni (ex: 'hal', 'openalex', 'persons'), il est ajouté
-    au tableau sources de la forme de nom.
+    Pose la clé ``str(person_id)`` dans `persons jsonb` et, si `source`
+    est fourni, l'ajoute aux sources de cette clé. Si la forme existe
+    déjà, fusionne au niveau SQL via ON CONFLICT + `jsonb_set` (la
+    valeur finale est l'union triée des sources existantes et de la
+    nouvelle).
     """
     if not full_name or not full_name.strip():
         return
     norm = normalize_name(full_name)
     if not norm:
         return
-    if source:
-        conn.execute(
-            text("""
-                INSERT INTO person_name_forms (name_form, person_ids, sources)
-                VALUES (:nf, ARRAY[:pid], ARRAY[:src])
-                ON CONFLICT (name_form) DO UPDATE
-                SET person_ids = (
-                        SELECT array_agg(DISTINCT x)
-                        FROM unnest(person_name_forms.person_ids || ARRAY[:pid]) AS x
-                    ),
-                    sources = (
-                        SELECT array_agg(DISTINCT x ORDER BY x)
-                        FROM unnest(
-                            COALESCE(person_name_forms.sources, '{}') || ARRAY[:src]
-                        ) AS x
-                    ),
-                    updated_at = now()
-            """),
-            {"nf": norm, "pid": person_id, "src": source},
-        )
-    else:
-        conn.execute(
-            text("""
-                INSERT INTO person_name_forms (name_form, person_ids)
-                VALUES (:nf, ARRAY[:pid])
-                ON CONFLICT (name_form) DO UPDATE
-                SET person_ids = (
-                    SELECT array_agg(DISTINCT x)
-                    FROM unnest(
-                        person_name_forms.person_ids || ARRAY[:pid]
-                    ) AS x
-                )
-            """),
-            {"nf": norm, "pid": person_id},
-        )
+
+    pid_text = str(person_id)
+    new_persons = {pid_text: [source] if source else []}
+
+    # Union des sources existantes (table) et nouvelles (EXCLUDED.persons)
+    # pour la clé `pid` via deux jsonb_array_elements_text + UNION ALL.
+    # On évite un `:bind::text[]` qui casse le parseur de bind de SA
+    # (lookahead `(?!:)` qui refuse `:name::`).
+    stmt = text("""
+        INSERT INTO person_name_forms (name_form, persons)
+        VALUES (:nf, :new_persons)
+        ON CONFLICT (name_form) DO UPDATE SET
+            persons = jsonb_set(
+                person_name_forms.persons,
+                ARRAY[:pid],
+                (
+                    SELECT COALESCE(
+                        to_jsonb(array_agg(DISTINCT s ORDER BY s)),
+                        '[]'::jsonb
+                    )
+                    FROM (
+                        SELECT jsonb_array_elements_text(
+                            person_name_forms.persons->:pid
+                        ) AS s
+                        UNION ALL
+                        SELECT jsonb_array_elements_text(
+                            EXCLUDED.persons->:pid
+                        )
+                    ) merged
+                ),
+                true
+            ),
+            updated_at = now()
+    """).bindparams(bindparam("new_persons", type_=JSONB))
+    conn.execute(
+        stmt,
+        {"nf": norm, "pid": pid_text, "new_persons": new_persons},
+    )
 
 
 def detach_name_form(conn: Connection, person_id: int, name_form: str) -> None:
-    """Détache une personne d'une forme de nom. Supprime la forme si elle
-    devient orpheline."""
+    """Détache une personne d'une forme de nom. Supprime la forme si orpheline."""
+    pid_text = str(person_id)
     conn.execute(
         text(
-            "UPDATE person_name_forms SET person_ids = array_remove(person_ids, :pid) "
+            "UPDATE person_name_forms SET persons = persons - :pid, updated_at = now() "
             "WHERE name_form = :nf"
         ),
-        {"pid": person_id, "nf": name_form},
+        {"pid": pid_text, "nf": name_form},
     )
     conn.execute(
-        text("DELETE FROM person_name_forms WHERE name_form = :nf AND person_ids = '{}'"),
+        text("DELETE FROM person_name_forms WHERE name_form = :nf AND persons = '{}'::jsonb"),
         {"nf": name_form},
     )

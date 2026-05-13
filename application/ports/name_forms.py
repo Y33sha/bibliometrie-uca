@@ -7,6 +7,8 @@ from typing import Any, Protocol
 
 from sqlalchemy import Connection
 
+from domain.persons.name_forms import PersonsDict
+
 
 class NameFormsQueries(Protocol):
     """Opérations SQL pour synchroniser `person_name_forms` depuis les sources."""
@@ -25,12 +27,8 @@ class NameFormsQueries(Protocol):
 
     def fetch_existing_name_forms(self, conn: Connection) -> list[dict[str, Any]]: ...
 
-    def update_name_form(
-        self, conn: Connection, form_id: int, person_ids: list[int], sources: list[str]
-    ) -> None: ...
+    def update_name_form(self, conn: Connection, form_id: int, persons: PersonsDict) -> None: ...
 
-    def insert_name_form_with_merge(
-        self, conn: Connection, name_form: str, person_ids: list[int], sources: list[str]
-    ) -> None: ...
+    def insert_name_form(self, conn: Connection, name_form: str, persons: PersonsDict) -> None: ...
 
     def delete_name_form(self, conn: Connection, form_id: int) -> None: ...

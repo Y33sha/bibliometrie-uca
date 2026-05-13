@@ -1,5 +1,7 @@
 """Tests d'intégration pour `infrastructure.db.queries.persons.admin`."""
 
+import json
+
 from sqlalchemy import text
 
 from infrastructure.db.queries.persons.admin import (
@@ -144,8 +146,11 @@ class TestNameFormAuthorships:
         sd = _create_sd(sa_sync_conn, pub)
         _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="dupond j")
         sa_sync_conn.execute(
-            text("INSERT INTO person_name_forms (name_form, person_ids) VALUES ('dupond j', :ids)"),
-            {"ids": [pid, other]},
+            text(
+                "INSERT INTO person_name_forms (name_form, persons) "
+                "VALUES ('dupond j', CAST(:p AS jsonb))"
+            ),
+            {"p": json.dumps({str(pid): ["hal"], str(other): ["hal"]})},
         )
 
         res = name_form_authorships(sa_sync_conn, pid, "dupond j")

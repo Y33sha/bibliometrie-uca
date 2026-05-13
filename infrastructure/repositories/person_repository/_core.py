@@ -1,10 +1,12 @@
 """SQL d'écriture sur `persons`, `distinct_persons`, et la fusion."""
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.errors import NotFoundError
 from domain.names import compute_person_name_forms
 from domain.normalize import normalize_name
+from domain.persons.name_forms import merge, remove_person
 from infrastructure.repositories.person_repository import _name_forms
 
 
@@ -123,18 +125,22 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
         """),
         {"t": target_id, "s": source_id},
     )
-    conn.execute(
-        text("""
-            UPDATE person_name_forms
-            SET person_ids = (
-                    SELECT array_agg(DISTINCT v ORDER BY v)
-                    FROM unnest(array_replace(person_ids, :s, :t)) AS v
-                ),
-                updated_at = now()
-            WHERE :s = ANY(person_ids)
-        """),
-        {"s": source_id, "t": target_id},
-    )
+    s_text = str(source_id)
+    t_text = str(target_id)
+    rows = conn.execute(
+        text("SELECT id, persons FROM person_name_forms WHERE persons ? :s"),
+        {"s": s_text},
+    ).all()
+    for row in rows:
+        without_source = remove_person(row.persons, source_id)
+        source_contribution = {t_text: list(row.persons.get(s_text, []))}
+        new_persons = merge(without_source, source_contribution)
+        conn.execute(
+            text(
+                "UPDATE person_name_forms SET persons = :p, updated_at = now() WHERE id = :id"
+            ).bindparams(bindparam("p", type_=JSONB)),
+            {"id": row.id, "p": new_persons},
+        )
     target = conn.execute(
         text("SELECT last_name, first_name FROM persons WHERE id = :id"),
         {"id": target_id},

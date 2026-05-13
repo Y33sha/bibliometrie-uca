@@ -321,15 +321,11 @@ class TestUpdateName:
         p = _insert_person(sa_sync_conn, "Dupont", "Jean")
         sa_sync_conn.execute(
             text(
-                "INSERT INTO person_name_forms (name_form, person_ids, sources) "
-                "VALUES ('dupont jean', ARRAY[:p]::integer[], ARRAY['persons']::text[])"
+                "INSERT INTO person_name_forms (name_form, persons) "
+                "VALUES ('dupont jean', CAST(:persons AS jsonb))"
             ),
-            {"p": p},
+            {"persons": json.dumps({str(p): ["persons"]})},
         )
-        row = sa_sync_conn.execute(
-            text("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
-        ).first()
-        assert row is not None
 
         update_name(p, "Martin", "Sophie", repo=repo)
 
@@ -340,9 +336,16 @@ class TestUpdateName:
         assert row.first_name == "Sophie"
 
         row = sa_sync_conn.execute(
-            text("SELECT id FROM person_name_forms WHERE name_form = 'martin sophie'")
+            text("SELECT persons FROM person_name_forms WHERE name_form = 'martin sophie'")
+        ).one()
+        assert row.persons == {str(p): ["persons"]}
+
+        # L'ancienne forme 'dupont jean' n'avait que la source 'persons'
+        # pour ce pid : refresh_name_forms a dû la supprimer entièrement.
+        row = sa_sync_conn.execute(
+            text("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
         ).first()
-        assert row is not None
+        assert row is None
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
@@ -453,10 +456,10 @@ class TestDetachAuthorships:
         assert result["cleaned_form"] is True
 
         row = sa_sync_conn.execute(
-            text("SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'")
+            text("SELECT persons FROM person_name_forms WHERE name_form = 'dupont jean'")
         ).first()
         if row:
-            assert person_id not in (row.person_ids or [])
+            assert str(person_id) not in (row.persons or {})
 
     def test_keeps_name_form_if_another_authorship_uses_it(
         self, sa_sync_conn, repo, authorship_repo
@@ -542,11 +545,11 @@ class TestDetachNameForm:
         detach_name_form(p1, "dupont jean", repo=repo)
 
         row = sa_sync_conn.execute(
-            text("SELECT person_ids FROM person_name_forms WHERE name_form = 'dupont jean'")
+            text("SELECT persons FROM person_name_forms WHERE name_form = 'dupont jean'")
         ).first()
         assert row is not None
-        assert p1 not in row.person_ids
-        assert p2 in row.person_ids
+        assert str(p1) not in row.persons
+        assert str(p2) in row.persons
 
     def test_deletes_form_when_last_person_detached(self, sa_sync_conn, repo):
         person_id = create_person("Unique", "Name", repo=repo)
