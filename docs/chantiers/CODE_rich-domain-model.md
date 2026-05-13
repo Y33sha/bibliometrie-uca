@@ -136,14 +136,14 @@ vides comme point d'appui.
 
 **VOs (commencer par ici — plus simples, autonomes) :**
 
-- [ ] `domain/persons/name_forms.py` — VO `PersonNameForm` (frozen,
-      identité = string normalisée).
-- [ ] `domain/structures/name_forms.py` — VO `StructureNameForm`
+- [x] `domain/persons/name_forms.py` — VO `PersonNameForm` (frozen,
+      identité = string normalisée). — `8675e10`
+- [x] `domain/structures/name_forms.py` — VO `StructureNameForm`
       (frozen ; attributs : `form_text`, `is_word_boundary`,
-      `is_excluding`, `requires_context_of: tuple[int, ...]`).
-- [ ] `domain/addresses/address.py` — VO `Address` (frozen, identité
-      = `normalized_text`).
-- [ ] `domain/publications/identifiers.py` — migrer `DOI`, `HALId`,
+      `is_excluding`, `requires_context_of: tuple[int, ...]`). — `8675e10`
+- [x] `domain/addresses/address.py` — VO `Address` (frozen, identité
+      = `normalized_text`). — `8675e10`
+- [x] `domain/publications/identifiers.py` — migrer `DOI`, `HALId`,
       `NNT` depuis `domain/publication.py` (miroir de
       `domain/persons/identifiers.py`). `domain/publication.py` reste
       en place transitoirement comme façade ré-exportant ; suppression
