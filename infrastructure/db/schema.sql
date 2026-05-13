@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cPlcIA3dBUhIM5vsOpxk2Ta7D1bQesnlIG0oI92tKl93pe7EGnrHCpsTESRgtZ4
+\restrict eBlMA7dlGv0oFqLDMvKP0uqqhZ2T41jeuI73XgbpBk2SjhjQRshK701lr6QCzeh
 
 -- Dumped from database version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.3 (Ubuntu 18.3-1.pgdg22.04+1)
@@ -687,7 +687,8 @@ CREATE TABLE public.person_name_forms (
     person_ids integer[] NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    sources text[]
+    sources text[],
+    persons jsonb
 );
 
 
@@ -2670,4 +2671,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cPlcIA3dBUhIM5vsOpxk2Ta7D1bQesnlIG0oI92tKl93pe7EGnrHCpsTESRgtZ4
+\unrestrict eBlMA7dlGv0oFqLDMvKP0uqqhZ2T41jeuI73XgbpBk2SjhjQRshK701lr6QCzeh

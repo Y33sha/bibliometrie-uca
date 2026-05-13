@@ -601,6 +601,7 @@ person_name_forms = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     Column("sources", ARRAY(Text)),
+    Column("persons", JSONB, nullable=True),
     UniqueConstraint("name_form", name="person_name_forms_name_form_uq"),
     Index("idx_pnf_person_ids", "person_ids", postgresql_using="gin"),
 )
