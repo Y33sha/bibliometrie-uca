@@ -1,5 +1,7 @@
 # Glossaire métier — Bibliométrie UCA
 
+*A mettre à jour.*
+
 Termes métier utilisés dans le projet. Pour la documentation technique (pipeline, architecture, sources de données), voir les pages dédiées.
 
 ## Sources de données

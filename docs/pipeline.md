@@ -1,5 +1,7 @@
 # Pipeline de traitement — Bibliométrie UCA
 
+*Document à jour au 2026-05-13.*
+
 Ce fichier présente la logique du pipeline de traitement. Pour les modalités d'exécution, voir [Guide d'exploitation](exploitation#pipeline).
 
 ## Vue d'ensemble

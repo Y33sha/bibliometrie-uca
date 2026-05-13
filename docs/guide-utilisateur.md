@@ -1,5 +1,7 @@
 # Guide utilisateur — Bibliométrie UCA
 
+*A mettre à jour.*
+
 ## Présentation
 
 L'application fournit un suivi de la production scientifique de l'Université
