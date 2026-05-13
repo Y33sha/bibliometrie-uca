@@ -34,6 +34,11 @@ OA_RANK: dict[str, int] = {
 # `source_publications.oa_status` orphelin.
 OA_STATUS_UNKNOWN_DEFAULT = "unknown"
 
+# Statuts considérés comme « non-ouverts » par les règles d'absorption
+# pairwise (cf. `absorb_oa_status` ci-dessous et règle SQL historique de
+# `repo.merge_into` qu'elle remplace).
+OA_CLOSED_STATUSES: frozenset[str] = frozenset({"closed", "unknown"})
+
 
 def best_oa_status(statuses: Iterable[str | None]) -> str | None:
     """Retourne le statut OA le plus ouvert parmi `statuses`.
@@ -51,6 +56,27 @@ def best_oa_status(statuses: Iterable[str | None]) -> str | None:
         if r > best_rank:
             best, best_rank = s, r
     return best
+
+
+def absorb_oa_status(target: str | None, source: str | None) -> str | None:
+    """Règle pairwise pour l'absorption d'une publication dans une autre.
+
+    Distincte de `best_oa_status` (agrégation multi-sources). Quand une publication target absorbe une publication source (cas typique : fusion sur collision DOI), target conserve son statut canonique sauf dans deux cas :
+
+    - `source == 'diamond'` : `diamond` est un trump qui gagne toujours, car peu de sources le déclarent à tort.
+    - `target` est non-ouvert (`closed` ou `unknown`) ET `source` est ouvert : on s'autorise à upgrader target depuis sa zone non-informative.
+
+    Dans tous les autres cas, target conserve son statut — y compris quand source a un statut "meilleur" au sens de `OA_RANK` (ex. target=hybrid, source=gold). Hypothèse : target.oa_status est le résultat d'un calcul canonique antérieur qu'on ne reflippe pas sur la base d'un seul signal source.
+
+    `target` à None est traité comme une zone non-informative équivalente à `OA_CLOSED_STATUSES` (cohérent avec le défaut d'enum `'unknown'` côté schéma).
+    """
+    if source == "diamond":
+        return "diamond"
+    target_is_closed = target is None or target in OA_CLOSED_STATUSES
+    source_is_open = source is not None and source not in OA_CLOSED_STATUSES
+    if target_is_closed and source_is_open:
+        return source
+    return target
 
 
 # ── Canonicalisation des titres double-encodés HTML ─────────────────
