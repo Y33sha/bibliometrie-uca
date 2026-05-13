@@ -1,7 +1,7 @@
-"""Tests des helpers de `domain/hal_domains.py` et du parser
+"""Tests des helpers de `domain/sources/hal_domains.py` et du parser
 `interfaces/cli/dev/refresh_hal_domain_labels.parse_label_s`."""
 
-from domain.hal_domains import HAL_DOMAINS, hal_domain_label, hal_domain_path
+from domain.sources.hal_domains import HAL_DOMAINS, hal_domain_label, hal_domain_path
 from interfaces.cli.dev.refresh_hal_domain_labels import parse_label_s
 
 
