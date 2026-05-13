@@ -5,7 +5,7 @@ Une `SourcePublication` est l'image d'un document dans une source
 externe (HAL, OpenAlex, WoS, theses.fr, ScanR, …). Identité naturelle
 = `(source, source_id)`. Identité surrogate = `id`.
 
-Lifecycle autonome (décision 3 du chantier `CODE_rich-domain-model`) :
+Lifecycle autonome :
 - naissance à l'extraction (`publication_id is None`)
 - vie non-attachée pendant la dédup
 - attachement à une publication canonique (`attach_to(pub_id)`)
@@ -16,10 +16,7 @@ Composition : `source_authorships: tuple[SourceAuthorship, ...]`
 
 La logique métier touchant aux publications sources (extraction,
 normalisation cross-sources, attachement à la publication canonique)
-vit ici. Les chantiers METIER_* y déposent leurs méthodes dans leurs
-phases dédiées.
-
-Scaffolding Phase 1 : attributs + méthodes `attach_to` / `reattach_to`.
+vit ici.
 """
 
 from dataclasses import dataclass, field

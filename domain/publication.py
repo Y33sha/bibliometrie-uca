@@ -1,7 +1,7 @@
-"""Règles métier publication, projections de lecture, façade transitoire
-sur les identifiants.
+"""Règles métier publication, projections de lecture, façade sur les
+identifiants.
 
-Contenu actuel :
+Contenu :
 - Projections (`PubByDoi`, `PubByNnt`, `PubByTitle`, `PubThesisCandidate`) :
   formes de résultat renvoyées par `PublicationRepository`.
 - Règle d'agrégation OA multi-sources (`best_oa_status`, `OA_RANK`,
@@ -9,11 +9,10 @@ Contenu actuel :
 - Règle de résolution de conflit DOI (`resolve_doi_conflict`,
   `DoiConflictResolution`).
 - Décodage des titres double-encodés HTML (`clean_publication_title`).
-
-Façade transitoire : `DOI`, `HALId`, `NNT`, `clean_doi`, `normalize_nnt`,
-`extract_hal_id_from_url` sont ré-exportés depuis
-`domain/publications/identifiers.py` (chantier ``CODE_rich-domain-model``).
-Les nouveaux call sites importent directement depuis le module spécialisé.
+- Façade ré-exportant `DOI`, `HALId`, `NNT`, `clean_doi`,
+  `normalize_nnt`, `extract_hal_id_from_url` depuis
+  `domain/publications/identifiers.py` — les nouveaux call sites
+  importent directement depuis le module spécialisé.
 
 Les modèles des colonnes JSONB (`external_ids`, `biblio`, `meta`,
 `topics`) vivent côté infrastructure

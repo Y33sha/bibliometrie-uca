@@ -172,15 +172,17 @@ vides comme point d'appui.
       `person_identifiers` (jsonb), `source_structures`,
       `structure_ids`, `countries`, `in_perimeter`, `excluded`,
       `is_corresponding`, `roles`, `source_data`.
-- [ ] `domain/persons/person.py` — classe `Person` (identité `id`,
-      `hal_person_id`, `identifiers: tuple[PersonIdentifier, ...]` en
-      projection lecture, `name_forms: tuple[PersonNameForm, ...]`).
-- [ ] `domain/persons/person_identifier.py` — aggregate root
-      `PersonIdentifier` avec `identifier: ORCID | IdHAL | IdRef`,
-      `person_id: int`, `status: AttributionStatus`, `source: str`.
-      Méthodes `confirm()`, `reject()`, `reattribute_to(new_person_id,
-      *, source)`. Exception `CannotReattributeError` si tentative
-      depuis statut non-rejected.
+- [x] `domain/persons/person.py` — classe `Person` (identité `id`,
+      `identifiers: tuple[PersonIdentifier, ...]` en projection lecture,
+      `name_forms: tuple[PersonNameForm, ...]`). `hal_person_id` n'est
+      pas attribut nu : c'est un `PersonIdentifier` d'`id_type` =
+      `"hal_person_id"`.
+- [x] `domain/persons/person_identifier.py` — aggregate root
+      `PersonIdentifier` avec `id_type: str`, `id_value: str`,
+      `person_id: int`, `status: AttributionStatus`, `source: str |
+      None`. Méthodes `confirm()`, `reject()`, `reattribute_to(new_person_id,
+      *, source)`. Exception `CannotReattributeError` (sous-classe
+      `ConflictError`) si tentative depuis statut non-rejected.
 - [ ] `domain/structures/structure.py` — classe `Structure` (identité
       + `name_forms: tuple[StructureNameForm, ...]` + api_ids +
       relations).
@@ -195,8 +197,10 @@ vides comme point d'appui.
 
 **Invariants rapatriés :**
 
-- [ ] `Person.can_merge_with(other)` (reprend `check_can_merge_persons`
-      de `domain/persons/merge.py`).
+- [x] `Person.can_merge_with(other, *, has_distinct_rh)` (reprend
+      `check_can_merge_persons` de `domain/persons/merge.py` ; doublon
+      temporaire, suppression Phase 2). Signature avec `has_distinct_rh`
+      kwarg en attendant le scaffolding `PersonRH`.
 - [x] `Publication.has_minimal_metadata()` (reprend
       `has_minimal_publication_metadata` de
       `domain/publications/dedup.py`). Doublon temporaire en
@@ -204,9 +208,9 @@ vides comme point d'appui.
 
 **Convention + tests :**
 
-- [ ] Documenter en en-tête de chaque fichier d'entité la convention
-      « la logique métier touchant à <X> atterrit ici ; les chantiers
-      METIER_* la déposent au fil de l'eau ».
+- [ ] En-tête de chaque fichier d'entité : phrase intemporelle du type
+      « La logique métier touchant à <X> vit ici » (sans référence à
+      des chantiers ou phases — règle générale docstrings).
 - [ ] Tests unitaires sur les constructeurs, les 2-3 invariants
       rapatriés, et les transitions de `PersonIdentifier`,
       `SourcePublication`, `AddressAffiliation` (confirm/reject/
@@ -350,10 +354,11 @@ Contenu détaillé à formaliser en phase d'instruction.
 
 ## Questions ouvertes
 
-- **`PersonRH` : entité fille ou aggregate séparé ?** 1:1 avec Person,
-  données SIHR sans lifecycle propre apparent — penche pour entité
-  fille (sens DDD strict). À confirmer en lisant le schéma précis et
-  les usages au démarrage de Phase 1.
+- **`PersonRH` : entité fille ou aggregate séparé ?** Tranché : 1:1
+  avec Person, entité fille au sens DDD strict. Les dates start_date/
+  end_date évoluent quand de nouvelles données SIHR arrivent. Non
+  scaffoldée en Phase 1 (pas de logique métier identifiée) ; à ajouter
+  quand `Person.can_merge_with` devient un self-check.
 - **Conflits de `PersonIdentifier` à la fusion de Persons.** Quand on
   fusionne A → B, les `PersonIdentifier` de A doivent être déplacés.
   Cas simples : confirmed sur A, absent sur B → réattribuer à B. Cas

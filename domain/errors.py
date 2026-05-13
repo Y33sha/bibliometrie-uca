@@ -24,5 +24,10 @@ class ConflictError(DomainError):
     création d'un doublon interdit, etc. (→ HTTP 409)."""
 
 
+class CannotReattributeError(ConflictError):
+    """Tentative de réattribution d'un `PersonIdentifier` depuis un statut
+    autre que `rejected`. Levée par `PersonIdentifier.reattribute_to`."""
+
+
 class UnauthorizedError(DomainError):
     """Accès refusé : session invalide ou permissions insuffisantes (→ HTTP 401)."""

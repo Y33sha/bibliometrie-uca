@@ -11,11 +11,7 @@ agrégeant cette signature après dédup. `person_id` (nullable) est
 résolu par la cascade de matching.
 
 La logique métier touchant aux authorships sources (matching personne,
-résolution de structures, scope de périmètre côté source) vit ici. Les
-chantiers METIER_decide-person-match et autres y déposent leurs
-méthodes dans leurs phases dédiées.
-
-Scaffolding Phase 1 : juste l'identité et les attributs.
+résolution de structures, scope de périmètre côté source) vit ici.
 """
 
 from dataclasses import dataclass
