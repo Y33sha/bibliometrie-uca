@@ -61,6 +61,28 @@ class PgPublicationRepository:
             return None
         return PubByNnt(id=row.id, doc_type=row.doc_type, title_normalized=row.title_normalized)
 
+    def find_by_hal_id(self, hal_id: str) -> int | None:
+        """Cherche une publication rattachée à un HAL ID donné.
+
+        Couvre les deux paths : `source_publication` HAL natif (`source='hal' AND source_id=hal_id`) ET `external_ids->>'hal_id'=hal_id` posé par les normalizers cross-source (OpenAlex, ScanR).
+        """
+        if not hal_id:
+            return None
+        row = self._conn.execute(
+            text("""
+                SELECT publication_id
+                FROM source_publications
+                WHERE publication_id IS NOT NULL
+                  AND (
+                      (source = 'hal' AND source_id = :hal_id)
+                      OR external_ids->>'hal_id' = :hal_id
+                  )
+                LIMIT 1
+            """),
+            {"hal_id": hal_id},
+        ).first()
+        return row.publication_id if row else None
+
     def find_by_title(
         self,
         title_normalized: str,

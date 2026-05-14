@@ -171,6 +171,38 @@ class TestFindByNnt:
         assert result is not None
 
 
+class TestFindByHalId:
+    def test_returns_none_on_empty(self, sa_sync_conn, repo):
+        assert repo.find_by_hal_id("") is None
+        assert repo.find_by_hal_id(None) is None  # type: ignore[arg-type]
+
+    def test_finds_via_hal_native_source(self, sa_sync_conn, repo):
+        """Path natif : `source='hal' AND source_id=hal_id`."""
+        pub_id = _insert_publication(sa_sync_conn)
+        _insert_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-12345")
+        assert repo.find_by_hal_id("hal-12345") == pub_id
+
+    def test_finds_via_external_ids_cross_source(self, sa_sync_conn, repo):
+        """Path cross-source : `external_ids->>'hal_id'=hal_id` (OpenAlex/ScanR)."""
+        pub_id = _insert_publication(sa_sync_conn)
+        _insert_source_publication(
+            sa_sync_conn,
+            pub_id,
+            source="openalex",
+            source_id="W123",
+            external_ids={"hal_id": "hal-67890"},
+        )
+        assert repo.find_by_hal_id("hal-67890") == pub_id
+
+    def test_returns_none_if_not_found(self, sa_sync_conn, repo):
+        assert repo.find_by_hal_id("hal-unknown") is None
+
+    def test_ignores_orphan_source_publications(self, sa_sync_conn, repo):
+        """Un `source_publication` HAL sans `publication_id` ne doit pas être retourné."""
+        _insert_source_publication(sa_sync_conn, None, source="hal", source_id="hal-orphan")
+        assert repo.find_by_hal_id("hal-orphan") is None
+
+
 class TestFindByTitle:
     def test_returns_none_on_missing_input(self, sa_sync_conn, repo):
         assert find_by_title("", 2024, 1, repo=repo) is None

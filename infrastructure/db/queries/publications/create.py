@@ -10,6 +10,7 @@ avec le script de fusion (voir `queries.merge.link_source_publication_to_publica
 
 from typing import Any
 
+from domain.names import parse_raw_author_name
 from sqlalchemy import Connection, text
 
 
@@ -38,6 +39,53 @@ def fetch_orphan_in_perimeter_source_publications(conn: Connection) -> list[dict
     return [dict(r._mapping) for r in rows]
 
 
+def fetch_thesis_primary_author(conn: Connection, publication_id: int) -> tuple[str, str] | None:
+    """Retourne `(last_name, first_name)` de l'auteur principal d'une publication thèse existante.
+
+    Rôle `author`, tri par (source_publication_id, author_position), 1 ligne max. Parse via `domain.names.parse_raw_author_name`.
+    """
+    row = conn.execute(
+        text("""
+            SELECT sas.raw_author_name
+            FROM source_authorships sas
+            JOIN source_publications sd ON sd.id = sas.source_publication_id
+            WHERE sd.publication_id = :pid
+              AND 'author' = ANY(sas.roles)
+            ORDER BY sd.id, sas.author_position
+            LIMIT 1
+        """),
+        {"pid": publication_id},
+    ).one_or_none()
+    if row is None or not row.raw_author_name:
+        return None
+    last, first = parse_raw_author_name(row.raw_author_name)
+    return (last, first) if last else None
+
+
+def fetch_thesis_primary_author_from_source_publication(
+    conn: Connection, source_publication_id: int
+) -> tuple[str, str] | None:
+    """Retourne `(last_name, first_name)` de l'auteur principal d'un `source_publication` courant (avant rattachement canonique).
+
+    Rôle `author`, tri par `author_position`, 1 ligne max. Parse via `domain.names.parse_raw_author_name`.
+    """
+    row = conn.execute(
+        text("""
+            SELECT raw_author_name
+            FROM source_authorships
+            WHERE source_publication_id = :spid
+              AND 'author' = ANY(roles)
+            ORDER BY author_position
+            LIMIT 1
+        """),
+        {"spid": source_publication_id},
+    ).one_or_none()
+    if row is None or not row.raw_author_name:
+        return None
+    last, first = parse_raw_author_name(row.raw_author_name)
+    return (last, first) if last else None
+
+
 class PgPublicationsCreateQueries:
     """Adapter PostgreSQL pour `application.ports.publications_create.PublicationsCreateQueries`.
 
@@ -56,3 +104,13 @@ class PgPublicationsCreateQueries:
         from infrastructure.db.queries.merge import link_source_publication_to_publication
 
         link_source_publication_to_publication(conn, source_publication_id, publication_id)
+
+    def fetch_thesis_primary_author(
+        self, conn: Connection, publication_id: int
+    ) -> tuple[str, str] | None:
+        return fetch_thesis_primary_author(conn, publication_id)
+
+    def fetch_thesis_primary_author_from_source_publication(
+        self, conn: Connection, source_publication_id: int
+    ) -> tuple[str, str] | None:
+        return fetch_thesis_primary_author_from_source_publication(conn, source_publication_id)

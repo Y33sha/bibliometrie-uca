@@ -18,3 +18,11 @@ class PublicationsCreateQueries(Protocol):
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int
     ) -> None: ...
+
+    def fetch_thesis_primary_author(
+        self, conn: Connection, publication_id: int
+    ) -> tuple[str, str] | None: ...
+
+    def fetch_thesis_primary_author_from_source_publication(
+        self, conn: Connection, source_publication_id: int
+    ) -> tuple[str, str] | None: ...
