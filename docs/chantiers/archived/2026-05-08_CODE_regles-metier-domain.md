@@ -1,4 +1,5 @@
 # Chantier — Formalisation des règles métier dans `domain/`
+
 Commencé le 2026-05-05
 Terminé le 2026-05-08
 

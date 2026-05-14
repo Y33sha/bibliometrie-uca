@@ -145,7 +145,7 @@ Endpoints et UI pour les nuages de sujets sur les pages structure et personne.
 - [x] Endpoint `GET /api/laboratories/{id}/subjects?limit=N` : top sujets des publis du labo, exclusion des `peer_review`/`memoir`/`ongoing_thesis`, retour `SubjectFrequency[]` (id, label, count). Tests d'intégration `test_laboratories.py::TestGetLaboratorySubjects`.
 - [x] Composant `SubjectsCloud.svelte` : SVG + d3-cloud, palette de 6 couleurs stable par hash d'id, font 11-32px (log10), texte horizontal uniquement, hauteur ratio 0.22 (compacte), `<a>` SVG natifs vers `/subjects/{id}`. Resize-observer pour relayout.
 - [x] Intégration dashboard `/laboratories/[id]` : nuage en haut du dashboard, top 30 sujets, exclut peer_review/memoir/thèses-en-cours.
-- [ ] Endpoint `GET /api/persons/{id}/subjects?limit=N` : top sujets de la personne, agrégats par fréquence sur ses authorships → publis → subjects. **Bloqué** par l'absence d'un dashboard `/persons/[id]` : à reprendre quand ce dashboard existera (l'API et l'intégration UI seront triviales en s'inspirant de la version labo).
+- [x] Endpoint `GET /api/persons/{id}/subjects?limit=N` : top sujets de la personne, agrégats par fréquence sur ses authorships → publis → subjects. **Bloqué** par l'absence d'un dashboard `/persons/[id]` : à reprendre quand ce dashboard existera (l'API et l'intégration UI seront triviales en s'inspirant de la version labo).
 
 ### Phase 7 — Recherche par sujet
 

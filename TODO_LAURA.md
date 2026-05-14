@@ -1,42 +1,49 @@
 # A régler avant transmission
 ## Pipeline
-* [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
-* [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
-* [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications".
-* [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
+### Extraction
+* [ ] possible de paralléliser les extracteurs *entre eux*?
+* [ ] vérif http2 pour extracteurs
+* [ ] Backoff `not_found_at` sur DOI: Pour limiter la croissance du pool de DOI retentés à chaque run de `fetch_missing_doi`, stocker un `not_found_at TIMESTAMP` sur les DOI qu'une source n'a pas pu résoudre, et ne les réessayer qu'après N jours (30 ?)
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour
-* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
-* [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
-* [ ] création erronée d'idhal numériques par normalize-hal
-* abstraire config (cf toutes les conditions sur le mode du pipeline)
-* Backoff `not_found_at` sur DOI: Pour limiter la croissance du pool de DOI retentés à chaque run de `fetch_missing_doi`, stocker un `not_found_at TIMESTAMP` sur les DOI qu'une source n'a pas pu résoudre, et ne les réessayer qu'après N jours (30 ?)
-## Trucs où je me tâte: explorer différents scénarios, évaluer +/-
+* [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
+* [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
+### Normalisation
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
-* [ ] cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
+* [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
+* [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
+* [ ] création erronée d'idhal numériques par normalize-hal
+### Suite du traitement
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
-* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
+* [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications". / DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
+* [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
+* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
+* refresh_publication_countries: peut-on éviter de tout reset à chaque run?
+### Logging
+* [ ] logs pas clairs dans l'extracteur hal: mode incrémental (0 orphelins vs 1 pages full-fetch); + le mode full-fetch pour PRES_CLERMONT est catastrophiquement lent. Ajouter une condition nb individual vs nb total?
+* autre log pas clair: pipeline:   → Lancer build_authorships.py pour propager in_perimeter/structure_ids ; avant 2026-05-14 10:42:26,829 [INFO] pipeline: ✓ create_persons_from_source_authorships terminé en 103.6s
+* [ ] extracteur hal : manque indication sur documents réimportés et mis à jour: harmoniser le logging entre sources (et les tailles de batch)
 ## Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
 * [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
-* [ ] DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
 ## Code
-* [ ] auditer le code pour voir où l'interface continue de requêter les sources (sauf trucs source-spécifiques): supprimer les requêtes vers source_authorships pouvant être remplacées par des requêtes vers les tables canoniques
-* [ ] nommage des routers pas totalement cohérent
-* is_wos_author_exploitable, authors_kept: à quoi ça sert? auditer
-* sortir les use cases des repositories; clarifier la distinction repositories / db/queries
-* typage des ports?
-* Unit of Work
-* fetch_unlinked_authorships: relire la requête pour comprendre ce qu'elle fait
+* [ ] auditer le code pour voir où l'interface continue de requêter source_authorships (sauf trucs source-spécifiques): supprimer les requêtes pouvant être remplacées par des requêtes vers les tables canoniques
+* [ ] nommage et arborescence des routers pas totalement cohérents
+* [ ] is_wos_author_exploitable, authors_kept: à quoi ça sert? auditer
+* [ ] sortir les use cases des repositories; clarifier la distinction repositories / db/queries: dichotomie écriture-lecture? Si oui, documenter
+* [ ] typage des ports?
+* [ ] Unit of Work: pertinent? voir transactions multi-repos
+* [ ] fetch_unlinked_authorships: relire la requête pour comprendre ce qu'elle fait
+* [ ] organiser le dossier queries
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 ## Sujets
-* [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation des sujets? / ajouter seuil de score de pertinence?
+* [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation manuelle des sujets? / ajouter seuil de score de pertinence? / algos pour évaluer pertinence (co-occurrences suspectes, NLP...)
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); récupérer pmid dans api HAL
-* [ ] pour les jeux de données: DataCite, autres?
+* [ ] pour les jeux de données: DataCite, Zenodo, autres?
 * [ ] divers: ORCID, IdRef, DOAJ
-## Types de documents: fixer l'enum et le mapping, algo de résolution de conflits
+## Types de documents: algo de résolution de conflits
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger
 * [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?); data papers?
 * [ ] types wos "composites": étudier, voir si ça représente des types/sous-types comme dans HAL
@@ -46,9 +53,8 @@
 * [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
 * [ ] contrôler données journal/doc_type via DOI? + DOI peut permettre de dédoublonner journals
 ## Méga-authorships et alignement inter-sources
-* [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap)
-* [ ] en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
-* [ ] vérifier pourquoi Openalex contient parfois beaucoup plus d'auteurs : ex. 21105 (OpenAlex semble résoudre les noms d'équipes en listes de noms de personnes, mais je ne sais pas comment)
+* [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap); en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
+* [ ] élucider pourquoi Openalex contient parfois beaucoup plus d'auteurs : ex. 21105 (OpenAlex semble résoudre les noms d'équipes en listes de noms de personnes, mais je ne sais pas comment)
 ## Chantier des signatures institutionnelles
 ### Côté backend
 * [ ] pays des adresses: aller plus loin dans l'automatisation de la détection (GeoNames? index n-gram des adresses avec pays associés et degré de certitude?)
@@ -79,6 +85,7 @@
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
 * [ ] afficher mémoires master et thèses en cours sur liste publications de la page personnes/id
+* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
 ## Général (interface)
 * [ ] Toujours mémoriser filtres et les rétablir au rechargement
 * [ ] Rendre tous les filtres sticky
@@ -100,6 +107,7 @@
 * 2020CLFAC007 thèse du CROC, pas récupérée via theses.fr! (158960) => aurait dû être récupéré par API theses.fr ET par cross-import de scanR via le NNT
 * Eric Beyssac pas reconnu par nom dans les authorships de thèses: voir où est le problème
 * Daniel Roux: 1 authorship hal, zéro publication sur sa page (ce n'est pas le seul)
+* bizarrerie dans l'import crossref: fetch_missing_doi: 10325 DOI manquants pour crossref 2026-05-14 09:15:18,898 [INFO] fetch_missing_doi:   100/10325 — 101 trouvés, 100 insérés 2026-05-14 09:15:27,004 [INFO] fetch_missing_doi:   200/10325 — 202 trouvés, 200 insérés / + 800/10325 — 800 trouvés, 732 inséré : pourquoi tout n'est pas inséré?
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
