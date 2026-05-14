@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.persons_queries import DirectoryFilters, ListFilters
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from infrastructure.db.queries.filters import (
     WhereClause,
@@ -18,7 +19,7 @@ from infrastructure.db.queries.filters import (
 
 
 def persons_directory(
-    conn: Connection, *, filters: Any, page: int, per_page: int, sort: str
+    conn: Connection, *, filters: DirectoryFilters, page: int, per_page: int, sort: str
 ) -> dict[str, Any]:
     """Annuaire public des personnes avec ORCID et idHAL."""
     offset = (page - 1) * per_page
@@ -146,7 +147,7 @@ _LIST_SORT_MAP = {
 
 
 def list_persons(
-    conn: Connection, *, filters: Any, page: int, per_page: int, sort: str
+    conn: Connection, *, filters: ListFilters, page: int, per_page: int, sort: str
 ) -> dict[str, Any]:
     """Liste des personnes avec filtres (admin)."""
     offset = (page - 1) * per_page

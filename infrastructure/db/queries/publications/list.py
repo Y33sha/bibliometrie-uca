@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.publications_queries import ListFilters
 from domain.normalize import normalize_text
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.db.queries.filters import (
@@ -37,7 +38,7 @@ from infrastructure.db.queries.filters import (
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
 
 
-def _initial_clauses(filters: Any) -> list[WhereClause]:
+def _initial_clauses(filters: ListFilters) -> list[WhereClause]:
     """Initialise les conditions de base selon le scope (person, labs, UCA)."""
     if filters.person_id:
         return [person_clause(filters.person_id)]
@@ -61,7 +62,7 @@ def _search_clause(search: str) -> WhereClause | None:
     )
 
 
-def _inline_clauses(filters: Any) -> list[WhereClause | None]:
+def _inline_clauses(filters: ListFilters) -> list[WhereClause | None]:
     """Filtres simples partagés entre list/export."""
     out: list[WhereClause | None] = [
         WhereClause(f"p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}", {}),
@@ -77,7 +78,7 @@ def _inline_clauses(filters: Any) -> list[WhereClause | None]:
     return out
 
 
-def _hal_status_clause_sync(conn: Connection, filters: Any) -> WhereClause | None:
+def _hal_status_clause_sync(conn: Connection, filters: ListFilters) -> WhereClause | None:
     """Charge la collection HAL du labo unique pour le filtre hal_status."""
     if filters.hal_status_values and len(filters.lab_ids) == 1:
         row = conn.execute(
@@ -90,7 +91,7 @@ def _hal_status_clause_sync(conn: Connection, filters: Any) -> WhereClause | Non
 
 
 def _build_list_clauses(
-    conn: Connection, filters: Any, root_structure_id: int
+    conn: Connection, filters: ListFilters, root_structure_id: int
 ) -> tuple[str, dict[str, Any]]:
     """Construit le WHERE complet pour list_publications."""
     clauses: list[WhereClause | None] = list(_initial_clauses(filters))
@@ -138,7 +139,7 @@ _ORDER_MAP = {
 def list_publications(
     conn: Connection,
     *,
-    filters: Any,
+    filters: ListFilters,
     root_structure_id: int,
     page: int,
     per_page: int,
@@ -289,7 +290,7 @@ def list_publications(
 # ── Export CSV ────────────────────────────────────────────────────
 
 
-def _initial_clauses_for_export(filters: Any) -> list[WhereClause]:
+def _initial_clauses_for_export(filters: ListFilters) -> list[WhereClause]:
     """Variante export : le filtre person passe par `source_authorships`
     directement (comportement historique différent de list_publications).
     """
@@ -345,7 +346,7 @@ def _export_oa_clause(oa_status: str) -> WhereClause | None:
     )
 
 
-def _build_export_clauses(filters: Any) -> tuple[str, dict[str, Any]]:
+def _build_export_clauses(filters: ListFilters) -> tuple[str, dict[str, Any]]:
     """Conditions WHERE pour l'export CSV publications (pas de hal_status,
     pas d'in_perimeter — comportement historique)."""
     clauses: list[WhereClause | None] = list(_initial_clauses_for_export(filters))
@@ -360,7 +361,7 @@ def _build_export_clauses(filters: Any) -> tuple[str, dict[str, Any]]:
 
 
 def export_publications_csv(
-    conn: Connection, *, filters: Any, root_structure_id: int, sort: str
+    conn: Connection, *, filters: ListFilters, root_structure_id: int, sort: str
 ) -> str:
     """Export CSV (sans pagination) avec les mêmes filtres que list_publications.
 
@@ -463,7 +464,7 @@ def export_publications_csv(
     return "﻿" + buf.getvalue()
 
 
-def _build_theses_export_clauses(filters: Any) -> tuple[str, dict[str, Any]]:
+def _build_theses_export_clauses(filters: ListFilters) -> tuple[str, dict[str, Any]]:
     """Conditions WHERE pour l'export CSV des thèses.
 
     Diffère de `_build_export_clauses` :
@@ -482,7 +483,9 @@ def _build_theses_export_clauses(filters: Any) -> tuple[str, dict[str, Any]]:
     return assemble_where(clauses)
 
 
-def export_theses_csv(conn: Connection, *, filters: Any, root_structure_id: int, sort: str) -> str:
+def export_theses_csv(
+    conn: Connection, *, filters: ListFilters, root_structure_id: int, sort: str
+) -> str:
     """Export CSV dédié à la page thèses.
 
     Colonnes spécifiques (Inscription, Soutenance, Statut, theses.fr) au lieu

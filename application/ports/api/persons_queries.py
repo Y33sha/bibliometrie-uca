@@ -3,9 +3,9 @@
 Implémenté par `infrastructure.db.queries.persons.PgPersonsQueries`.
 
 Les dataclasses `DirectoryFilters` / `ListFilters` / `FacetFilters`
-vivent ici (source de vérité) ; les fonctions infra acceptent
-`filters: Any` puis lisent ses attributs (cohérent avec
-`addresses_queries`, `laboratories_queries`, `publications_queries`).
+vivent ici (source de vérité) ; les fonctions infra les importent
+depuis ce module pour typer leurs signatures (cf. règle 3
+d'`architecture.md`).
 """
 
 from dataclasses import dataclass, field

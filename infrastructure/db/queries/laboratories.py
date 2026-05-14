@@ -2,18 +2,20 @@
 
 Implémente le port `application.ports.laboratories_queries.LaboratoriesQueries`
 via `PgLaboratoriesQueries` (constructor injection de la `Connection`
-SA). Conformité au port assurée par duck typing : pas d'import du
-Protocol depuis `infrastructure/` (règle DDD `infrastructure ⊥
-application`). La dataclass `LabPersonsFilters` vit dans
-`application/ports/` ; ici on type `filters: Any` puis on lit ses
-attributs.
+SA). Conformité au port assurée par duck typing : l'adapter ne fait pas
+`class PgX(LaboratoriesQueries):` ; la vérification structurale par mypy
+a lieu au point de composition root.
+
+La dataclass `LabPersonsFilters` est importée depuis le port pour typer
+les signatures (cf. règle 3 d'`architecture.md`).
 """
 
 import datetime
 from typing import Any
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
+from application.ports.api.laboratories_queries import LabPersonsFilters
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from infrastructure.db.queries.filters import (
     OA_CLOSED_SQL,
@@ -135,7 +137,7 @@ class PgLaboratoriesQueries:
         self,
         lab_id: int,
         *,
-        filters: Any,
+        filters: LabPersonsFilters,
         page: int,
         per_page: int,
         sort: str,
@@ -267,7 +269,7 @@ class PgLaboratoriesQueries:
                 full += " AND " + " AND ".join(parts)
             return full, binds
 
-        def run_yesno_facet(skip: str) -> Any:
+        def run_yesno_facet(skip: str) -> Row[Any]:
             w, p = facet_clauses(skip=skip)
             return self._conn.execute(
                 text(f"""
@@ -520,7 +522,7 @@ class PgLaboratoriesQueries:
         }
 
 
-def _lab_persons_extra_clauses(filters: Any) -> list[WhereClause | None]:
+def _lab_persons_extra_clauses(filters: LabPersonsFilters) -> list[WhereClause | None]:
     """Filtres optionnels en plus de la base (lab_id + roles author)."""
     out: list[WhereClause | None] = []
     if filters.search:

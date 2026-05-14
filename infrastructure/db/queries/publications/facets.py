@@ -10,6 +10,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.publications_queries import FacetFilters
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.db.queries.filters import (
     OA_CLOSED_SQL,
@@ -44,11 +45,11 @@ class _PublicationFacetsBuilder:
     Décomposition : une méthode privée par facette + un orchestrateur `build()`.
     """
 
-    def __init__(self, conn: Connection, filters: Any, root_structure_id: int) -> None:
+    def __init__(self, conn: Connection, filters: FacetFilters, root_structure_id: int) -> None:
         self.conn = conn
         self.filters = filters
         self.root_structure_id = root_structure_id
-        self.lab_hal_col: Any = None
+        self.lab_hal_col: str | None = None
 
     # ── Utilitaires internes ────────────────────────────────────
 
@@ -464,7 +465,7 @@ class _PublicationFacetsBuilder:
 
 
 def publications_facets(
-    conn: Connection, *, filters: Any, root_structure_id: int
+    conn: Connection, *, filters: FacetFilters, root_structure_id: int
 ) -> dict[str, Any]:
     """Facettes dynamiques : chaque facette exclut son propre filtre mais
     applique tous les autres.
