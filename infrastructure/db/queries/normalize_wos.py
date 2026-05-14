@@ -66,7 +66,8 @@ def upsert_wos_source_publication(
             keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
-            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}')
+            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
         bindparam("biblio", type_=JSONB),

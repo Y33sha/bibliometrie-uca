@@ -76,7 +76,8 @@ def upsert_hal_source_publication(
             keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
-            urls = COALESCE(EXCLUDED.urls, source_publications.urls)
+            urls = COALESCE(EXCLUDED.urls, source_publications.urls),
+            updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
         bindparam("external_ids", type_=JSONB),

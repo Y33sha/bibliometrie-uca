@@ -63,7 +63,8 @@ def upsert_scanr_source_publication(
             keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
-            urls = COALESCE(EXCLUDED.urls, source_publications.urls)
+            urls = COALESCE(EXCLUDED.urls, source_publications.urls),
+            updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
         bindparam("external_ids", type_=JSONB),

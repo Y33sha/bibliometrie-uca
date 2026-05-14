@@ -216,10 +216,6 @@ def run(
         docs = queries.fetch_orphan_in_perimeter_source_publications(conn)
         logger.info("%d source_publications in-perimeter sans publication", len(docs))
 
-        if not docs:
-            logger.info("Rien a faire.")
-            return
-
         created = 0
         skipped = 0
         for i, doc in enumerate(docs):
@@ -233,13 +229,33 @@ def run(
                     conn.commit()
                 logger.info("  %d/%d traités...", i + 1, len(docs))
 
+        # Passe 2 : refresh des publications stale (au moins un source_publication modifié depuis le dernier refresh canonique). Couvre les re-traitements des normalizers qui mettent à jour des méta sans toucher au rattachement.
+        stale_ids = queries.fetch_stale_publication_ids(conn)
+        logger.info("%d publications stale à rafraîchir", len(stale_ids))
+        refreshed = 0
+        for i, pub_id in enumerate(stale_ids):
+            refresh_from_sources(pub_id, repo=pub_repo)
+            refreshed += 1
+            if (i + 1) % 500 == 0:
+                if not dry_run:
+                    conn.commit()
+                logger.info("  %d/%d rafraîchis...", i + 1, len(stale_ids))
+
         if dry_run:
-            logger.info("DRY-RUN : %d publications à creer, %d ignorées", created, skipped)
+            logger.info(
+                "DRY-RUN : %d publications à créer, %d ignorées, %d à rafraîchir",
+                created,
+                skipped,
+                refreshed,
+            )
             conn.rollback()
         else:
             conn.commit()
             logger.info(
-                "Terminé : %d publications créées/rattachées, %d ignorées", created, skipped
+                "Terminé : %d publications créées/rattachées, %d ignorées, %d rafraîchies",
+                created,
+                skipped,
+                refreshed,
             )
 
     except Exception:

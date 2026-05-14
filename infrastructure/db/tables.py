@@ -684,6 +684,12 @@ source_publications = Table(
     Column("publication_id", Integer),
     Column("staging_id", Integer),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=text("clock_timestamp()"),
+    ),
     Column("countries", ARRAY(Text)),
     Column("hal_collections", ARRAY(Text)),
     Column("external_ids", JSONB),
