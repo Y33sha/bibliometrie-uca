@@ -218,10 +218,10 @@ def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]:
     """
     external_ids: dict[str, str] = {}
     for url in urls:
-        if not external_ids.get("hal"):
+        if not external_ids.get("hal_id"):
             hal_id = extract_hal_id_from_url(url)
             if hal_id:
-                external_ids["hal"] = hal_id
+                external_ids["hal_id"] = hal_id
         if not external_ids.get("nnt"):
             m = _THESES_FR_URL_RE.search(url)
             if m:

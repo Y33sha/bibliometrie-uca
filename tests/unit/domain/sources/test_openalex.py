@@ -61,7 +61,7 @@ class TestKeepOrcidIfNameMatches:
 class TestExtractExternalIdsFromUrls:
     def test_hal(self):
         urls = ["https://hal.science/hal-04123456v2"]
-        assert extract_external_ids_from_urls(urls) == {"hal": "hal-04123456"}
+        assert extract_external_ids_from_urls(urls) == {"hal_id": "hal-04123456"}
 
     def test_nnt(self):
         urls = ["https://www.theses.fr/2021CLFAC030"]
@@ -86,7 +86,7 @@ class TestExtractExternalIdsFromUrls:
             "https://hal.science/hal-04111111",
             "https://hal.science/hal-04222222",
         ]
-        assert extract_external_ids_from_urls(urls) == {"hal": "hal-04111111"}
+        assert extract_external_ids_from_urls(urls) == {"hal_id": "hal-04111111"}
 
     def test_multiple_types_combined(self):
         urls = [
@@ -95,7 +95,7 @@ class TestExtractExternalIdsFromUrls:
             "https://pubmed.ncbi.nlm.nih.gov/12345678",
         ]
         assert extract_external_ids_from_urls(urls) == {
-            "hal": "hal-04123456",
+            "hal_id": "hal-04123456",
             "nnt": "2021CLFAC030",
             "pmid": "12345678",
         }

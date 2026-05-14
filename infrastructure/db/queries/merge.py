@@ -35,7 +35,7 @@ def find_nnt_duplicates(conn: Connection) -> list[dict[str, Any]]:
 def fetch_source_publications_with_hal_external_id(
     conn: Connection,
 ) -> list[dict[str, Any]]:
-    """`source_publications` OpenAlex/ScanR qui référencent un `external_ids.hal`.
+    """`source_publications` OpenAlex/ScanR qui référencent un `external_ids.hal_id`.
 
     Retourne `{src_doc_id, source, src_id, src_pub_id, hal_id}` pour chaque ligne.
     """
@@ -43,10 +43,10 @@ def fetch_source_publications_with_hal_external_id(
         text("""
             SELECT sd.id AS src_doc_id, sd.source::text AS source,
                    sd.source_id AS src_id, sd.publication_id AS src_pub_id,
-                   sd.external_ids->>'hal' AS hal_id
+                   sd.external_ids->>'hal_id' AS hal_id
             FROM source_publications sd
             WHERE sd.source IN ('openalex', 'scanr')
-              AND sd.external_ids->>'hal' IS NOT NULL
+              AND sd.external_ids->>'hal_id' IS NOT NULL
         """)
     ).all()
     return [dict(r._mapping) for r in rows]

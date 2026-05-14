@@ -162,7 +162,7 @@ def insert_scanr_document(
 
     ext: dict[str, Any] = {}
     if hal_id:
-        ext["hal"] = hal_id
+        ext["hal_id"] = hal_id
     nnt = extract_nnt_from_scanr_id(scanr_id)
     if nnt:
         ext["nnt"] = nnt
@@ -171,8 +171,8 @@ def insert_scanr_document(
             etype = eid["type"].lower()
             if etype == "pmid":
                 ext["pmid"] = eid["id"]
-            elif etype == "hal" and not ext.get("hal"):
-                ext["hal"] = eid["id"]
+            elif etype == "hal" and not ext.get("hal_id"):
+                ext["hal_id"] = eid["id"]
     external_ids = ext if ext else None
 
     summary = doc.get("summary") or {}

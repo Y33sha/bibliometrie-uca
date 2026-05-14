@@ -86,7 +86,7 @@ def find_hal_primary_locations(conn: Connection) -> list[dict]:
 
     Deux sources :
     - staging non normalisé (raw_data.primary_location) — nouveaux docs du run en cours
-    - source_publications déjà normalisés (external_ids->>'hal') — docs des runs précédents
+    - source_publications déjà normalisés (external_ids->>'hal_id') — docs des runs précédents
 
     Filtrage en SQL :
     - extraction de l'URL via JSONB path (évite de remonter les raw_data
@@ -129,10 +129,10 @@ def find_hal_primary_locations(conn: Connection) -> list[dict]:
     rows = conn.execute(
         text(
             """
-            SELECT source_id AS openalex_id, external_ids->>'hal' AS hal_id
+            SELECT source_id AS openalex_id, external_ids->>'hal_id' AS hal_id
             FROM source_publications
             WHERE source = 'openalex'
-              AND external_ids->>'hal' IS NOT NULL
+              AND external_ids->>'hal_id' IS NOT NULL
             """
         )
     ).all()
@@ -161,7 +161,7 @@ def find_hal_ids_from_scanr(conn: Connection) -> list[dict]:
     Trouve les HAL IDs référencés par ScanR mais absents de staging HAL.
 
     Deux sources :
-    - source_publications ScanR déjà normalisés (external_ids->>'hal')
+    - source_publications ScanR déjà normalisés (external_ids->>'hal_id')
     - staging ScanR non encore normalisé (raw_data.externalIds type='hal')
 
     Retourne [{source: "scanr", hal_id, scanr_id}, ...]
@@ -170,12 +170,12 @@ def find_hal_ids_from_scanr(conn: Connection) -> list[dict]:
     rows = conn.execute(
         text(
             """
-            SELECT sd.source_id AS scanr_id, sd.external_ids->>'hal' AS hal_id
+            SELECT sd.source_id AS scanr_id, sd.external_ids->>'hal_id' AS hal_id
             FROM source_publications sd
             WHERE sd.source = 'scanr'
-              AND sd.external_ids->>'hal' IS NOT NULL
+              AND sd.external_ids->>'hal_id' IS NOT NULL
               AND NOT EXISTS (
-                  SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = sd.external_ids->>'hal'
+                  SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = sd.external_ids->>'hal_id'
               )
             """
         )

@@ -1,8 +1,8 @@
 """Fusionne les publications qui pointent vers le même document HAL.
 
 Sources de hal_id :
-- OpenAlex : `source_publications.external_ids->>'hal'` (extrait des URLs à la normalisation)
-- ScanR : `source_publications.external_ids->>'hal'` (extrait des externalIds)
+- OpenAlex : `source_publications.external_ids->>'hal_id'` (extrait des URLs à la normalisation)
+- ScanR : `source_publications.external_ids->>'hal_id'` (extrait des externalIds)
 
 Deux cas :
 1. HAL doc a `publication_id = NULL` → on le relie à la publication source.
