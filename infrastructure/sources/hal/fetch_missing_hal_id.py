@@ -24,7 +24,6 @@ Usage:
 import argparse
 import asyncio
 import os
-from typing import Any
 
 import httpx
 from sqlalchemy import Connection, bindparam, text
@@ -303,7 +302,7 @@ async def fetch_hal_document(
     return docs[0]
 
 
-def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict) -> Any:
+def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict) -> None:
     """Insere un document dans staging HAL avec ses collections.
     Si le document existe et a change (hash different), met a jour et remet processed = FALSE.
     """
@@ -429,7 +428,7 @@ async def _fetch_by_nnt_async(refs: list[dict], conn: Connection, base_url: str)
     return progress["fetched"], progress["not_found"]
 
 
-async def main() -> Any:
+async def main() -> None:
     parser = argparse.ArgumentParser(
         description="Récupère les entrées HAL manquantes découvertes via OpenAlex"
     )

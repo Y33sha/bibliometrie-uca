@@ -13,7 +13,7 @@ from infrastructure.settings import settings
 SANDBOX_DB_NAME = "bibliometrie_sandbox"
 
 
-def get_connection() -> Any:
+def get_connection() -> psycopg.Connection[Any]:
     """Retourne une connexion psycopg3 (rows en dict par défaut).
 
     Si la variable d'environnement BIBLIOMETRIE_SANDBOX=1 est définie,
