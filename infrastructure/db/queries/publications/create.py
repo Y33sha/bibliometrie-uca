@@ -10,8 +10,9 @@ avec le script de fusion (voir `queries.merge.link_source_publication_to_publica
 
 from typing import Any
 
-from domain.names import parse_raw_author_name
 from sqlalchemy import Connection, text
+
+from domain.persons.name_matching import parse_raw_author_name
 
 
 def fetch_orphan_in_perimeter_source_publications(conn: Connection) -> list[dict[str, Any]]:
