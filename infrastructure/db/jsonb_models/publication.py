@@ -29,14 +29,14 @@ class ExternalIds(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    hal: str | None = None  # HAL ID document (ex. "hal-04123456")
+    hal_id: str | None = None  # HAL ID document (ex. "hal-04123456")
     nnt: str | None = None  # Numéro National de Thèse
     pmid: str | None = None  # PubMed ID
     pmc: str | None = None  # PubMed Central ID
 
-    @field_validator("hal", mode="before")
+    @field_validator("hal_id", mode="before")
     @classmethod
-    def _normalize_hal(cls, v: str | None) -> str | None:
+    def _normalize_hal_id(cls, v: str | None) -> str | None:
         """Normalise via HALId : URL → ID canonique, strip version."""
         if v is None or v == "":
             return None

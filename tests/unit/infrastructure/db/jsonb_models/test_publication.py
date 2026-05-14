@@ -20,30 +20,30 @@ from infrastructure.db.jsonb_models.publication import (
 class TestExternalIdsParsing:
     def test_empty(self):
         ids = ExternalIds()
-        assert ids.hal is None
+        assert ids.hal_id is None
         assert ids.nnt is None
         assert ids.pmid is None
         assert ids.pmc is None
 
     def test_from_dict_basic(self):
-        ids = ExternalIds(hal="hal-04123456", nnt="2021clfa0030", pmid="12345")
-        assert ids.hal == "hal-04123456"
+        ids = ExternalIds(hal_id="hal-04123456", nnt="2021clfa0030", pmid="12345")
+        assert ids.hal_id == "hal-04123456"
         assert ids.nnt == "2021CLFA0030"  # normalisé en majuscules
         assert ids.pmid == "12345"
 
     def test_normalize_hal_url(self):
         """Une URL HAL en entrée est normalisée en ID canonique."""
-        ids = ExternalIds(hal="https://hal.science/hal-04123456v2")
-        assert ids.hal == "hal-04123456"
+        ids = ExternalIds(hal_id="https://hal.science/hal-04123456v2")
+        assert ids.hal_id == "hal-04123456"
 
     def test_empty_string_treated_as_none(self):
-        ids = ExternalIds(hal="", nnt="")
-        assert ids.hal is None
+        ids = ExternalIds(hal_id="", nnt="")
+        assert ids.hal_id is None
         assert ids.nnt is None
 
     def test_invalid_hal_raises(self):
         with pytest.raises(PydanticValidationError):
-            ExternalIds(hal="garbage-not-hal")
+            ExternalIds(hal_id="garbage-not-hal")
 
     def test_invalid_nnt_raises(self):
         with pytest.raises(PydanticValidationError):
@@ -51,20 +51,20 @@ class TestExternalIdsParsing:
 
     def test_accepts_extra_keys(self):
         """Les clés non déclarées (futures évolutions) sont conservées telles quelles."""
-        ids = ExternalIds(hal="hal-1234", arxiv="2401.00123", issn="0028-0836")
+        ids = ExternalIds(hal_id="hal-1234", arxiv="2401.00123", issn="0028-0836")
         # Les extras sont accessibles via model_extra
         dumped = ids.to_dict()
         assert dumped["arxiv"] == "2401.00123"
         assert dumped["issn"] == "0028-0836"
 
     def test_to_dict_omits_none(self):
-        ids = ExternalIds(hal="hal-1234")
+        ids = ExternalIds(hal_id="hal-1234")
         dumped = ids.to_dict()
-        assert dumped == {"hal": "hal-1234"}  # nnt/pmid/pmc omis car None
+        assert dumped == {"hal_id": "hal-1234"}  # nnt/pmid/pmc omis car None
 
     def test_roundtrip_from_db(self):
         """Simule un aller-retour : lecture depuis BD (dict) → model → retour dict."""
-        from_db = {"hal": "hal-04123456", "nnt": "2021CLFA0030", "pmid": "12345678"}
+        from_db = {"hal_id": "hal-04123456", "nnt": "2021CLFA0030", "pmid": "12345678"}
         ids = ExternalIds(**from_db)
         back = ids.to_dict()
         assert back == from_db

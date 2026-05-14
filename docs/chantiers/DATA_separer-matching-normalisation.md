@@ -46,13 +46,27 @@ Plus tard dans le pipeline, la phase `create_publications` (`application/pipelin
 
 ## Phasage
 
-### Phase 0 — Audit des extractions cross-source dans `external_ids`
+### Phase 0 — Audit + harmonisation des clés de `external_ids`
 
-Vérifier exhaustivement que chaque normalizer pose dans `source_publications.external_ids` tous les identifiants nécessaires à la cascade unifiée, et identifier les gaps.
+Audit fait. Bilan :
 
-- [ ] Inventaire par source : ce qui est posé dans `external_ids` aujourd'hui (lecture du code normalize_* + du JSONB en base sur un échantillon).
-- [ ] Identifier les extractions actuellement faites *pendant* le matching mais pas conservées dans `external_ids` (ex. NNT extrait de la primary_location OpenAlex et utilisé en cascade mais peut-être pas tracé). À reporter dans `external_ids` si manquantes.
-- [ ] Documenter le contrat : « après phase normalize, `source_publications.external_ids` contient tous les identifiants cross-source extraits, et c'est suffisant pour la cascade ». Ajouter au modèle JSONB côté `infrastructure/db/jsonb_models/publication.py`.
+- **Convention retenue (option B)** : `source_publications.source_id` reste l'identifiant natif (interprété selon `source_publications.source`) ; `external_ids` ne contient que les identifiants cross-source détectés en plus (pas l'identifiant natif). Le matching aval combine les deux via un helper Python `extract_known_identifiers(sp) -> dict[str, str]` qui aplatit `{native_kind_by_source[sp.source]: sp.source_id, **sp.external_ids}`.
+- **Couverture aujourd'hui** : `hal_id` (OpenAlex via URL, ScanR via `externalIds`), `nnt` (HAL/OpenAlex/ScanR/Theses), `pmid` (OpenAlex via URL, ScanR via `externalIds`), `pmc` (OpenAlex via URL), `issn`/`isbn` (Crossref — pour matching journal, hors matching pub), `source_doi` (OpenAlex post-invalidation chapter/book).
+- **WoS** : aucun cross-source aujourd'hui (`external_ids = None`). Extraction PMID + autres reportée à un chantier ultérieur quand on généralisera l'extraction PMID à toutes les sources.
+
+Décisions :
+
+- **Harmoniser `external_ids.hal` → `external_ids.hal_id`** (cohérence avec `nnt`, `pmid`, `pmc` qui sont des acronymes courts ; `hal` était une abréviation ambiguë du HAL ID). `nnt`/`pmid`/`pmc` restent : déjà des acronymes standard. `pmid` et `pmc` sont deux identifiants distincts (PubMed vs PubMed Central), coexistent sur un même document.
+- **Migration Alembic** pour renommer les clés sur les `source_publications` existants.
+- **`source_doi`** : conservé dans `external_ids` (trace historique, n'intervient pas dans la cascade). Sa pose sera centralisée en phase publications (avec le `resolve_doi_conflict`) et donc systématiquement appliquée à toutes les sources, plus seulement OpenAlex.
+
+Tâches :
+
+- [x] Migration Alembic : `external_ids.hal` → `external_ids.hal_id` sur tous les `source_publications` existants.
+- [x] Renommer dans le code écriture : `domain/sources/openalex.py`, `application/pipeline/normalize/normalize_scanr.py`. Tests associés.
+- [x] Renommer dans le code lecture SQL : `infrastructure/sources/hal/fetch_missing_hal_id.py`, `infrastructure/db/queries/merge.py`. Tests associés.
+- [x] Mettre à jour le modèle Pydantic `infrastructure/db/jsonb_models/publication.py:ExternalIds` (champ `hal` → `hal_id` + validator) et la doc.
+- [x] Mettre à jour les commentaires/docstrings résiduels (`application/pipeline/publications/merge_pubs_by_hal_id.py`).
 
 ### Phase 1 — Cascade unifiée dans la phase publications
 

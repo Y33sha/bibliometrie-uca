@@ -86,7 +86,7 @@ class TestFindHalIdsFromScanr:
         assert hal_ids.count("hal-ddd") == 1
 
     def test_picks_up_normalized_source_publications(self, sa_sync_conn):
-        # source_publications.scanr → external_ids->>'hal' (sans staging ScanR brut)
+        # source_publications.scanr → external_ids->>'hal_id' (sans staging ScanR brut)
         staging_id = sa_sync_conn.execute(
             text(
                 "INSERT INTO staging (source, source_id, raw_data) "
@@ -95,7 +95,7 @@ class TestFindHalIdsFromScanr:
         ).scalar_one()
         sa_sync_conn.execute(
             _INSERT_SOURCE_PUB_SQL,
-            {"sid": "scanr-norm", "staging_id": staging_id, "external_ids": {"hal": "hal-eee"}},
+            {"sid": "scanr-norm", "staging_id": staging_id, "external_ids": {"hal_id": "hal-eee"}},
         )
         result = find_hal_ids_from_scanr(sa_sync_conn)
         assert {"source": "scanr", "hal_id": "hal-eee", "scanr_id": "scanr-norm"} in result
