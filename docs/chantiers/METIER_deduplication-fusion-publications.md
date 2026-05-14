@@ -78,11 +78,11 @@ Ferme le dernier item ouvert de Phase 4 du chantier `CODE_rich-domain-model`.
 
 ### Phase 3 — Helper unifié de fusion par clé
 
-- [ ] Définir `merge_publications_by_key(pub_ids_by_key, *, repo, audit_repo)` dans `application/publications.py` (ou un sous-module si nécessaire).
-- [ ] Inclure le résolveur de chaîne (porté depuis `merge_pubs_by_hal_id`).
-- [ ] Le helper applique `min(pub_ids)`, résout les chaînes, appelle `merge_publications` puis `refresh_from_sources`.
-- [ ] Migrer `application/pipeline/publications/merge_pubs_by_hal_id.py` vers le helper.
-- [ ] Migrer `application/pipeline/publications/merge_pubs_by_nnt.py` vers le helper.
+- [x] `merge_publications_by_key(conn, groups, *, logger, pub_repo, dry_run)` dans `application/pipeline/publications/merge_by_key.py`.
+- [x] Résolveur de chaîne porté depuis `merge_pubs_by_hal_id` : `redirects: dict[int, int]` + fonction `resolve()` qui suit `pub_A → pub_B` puis `pub_X → pub_A` ⇒ `pub_X → pub_B`.
+- [x] Le helper applique `min(resolved_ids)`, résout les chaînes, appelle `merge_publications` puis `refresh_from_sources` sous savepoint individuel par fusion.
+- [x] `merge_pubs_by_hal_id` migré : la fonction locale `merge_publications` (qui faisait le résolveur) est supprimée, le `run_merge` construit les `groups` `(label, [src_pub_id, hal_pub_id])` et appelle le helper.
+- [x] `merge_pubs_by_nnt` migré : `run_merge` construit les `groups` `(label, dup["pub_ids"])` et appelle le helper.
 
 ### Phase 4 — Factorisation des cascades de matching
 

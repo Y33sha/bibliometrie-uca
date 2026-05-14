@@ -1,17 +1,14 @@
-"""
-Fusionne les publications qui pointent vers le même document HAL.
+"""Fusionne les publications qui pointent vers le même document HAL.
 
 Sources de hal_id :
-- OpenAlex : source_publications.external_ids->>'hal' (extrait des URLs à la normalisation)
-- ScanR : source_publications.external_ids->>'hal' (extrait des externalIds)
+- OpenAlex : `source_publications.external_ids->>'hal'` (extrait des URLs à la normalisation)
+- ScanR : `source_publications.external_ids->>'hal'` (extrait des externalIds)
 
 Deux cas :
-1. HAL doc a publication_id = NULL → on le relie à la publication source
-2. Les deux pointent vers des publications différentes → on garde celle du HAL,
-   on fusionne l'autre dedans
+1. HAL doc a `publication_id = NULL` → on le relie à la publication source.
+2. Les deux pointent vers des publications différentes → fusion via `merge_publications_by_key` (choix de cible trivial `min(pub_ids)`, résolution des chaînes de redirection dans le batch).
 
-L'orchestrateur dépend du port `MergeQueries`. Le point d'entrée CLI est
-dans `interfaces/cli/pipeline/merge_pubs_by_hal_id.py`.
+L'orchestrateur dépend du port `MergeQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/merge_pubs_by_hal_id.py`.
 """
 
 import logging
@@ -19,10 +16,9 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.pipeline._savepoint import savepoint
+from application.pipeline.publications.merge_by_key import merge_publications_by_key
 from application.ports.pipeline.merge import MergeQueries
-from application.publications import merge_publications as _merge_pub
-from application.publications import refresh_from_sources, update_sources
+from application.publications import update_sources
 from domain.ports.publication_repository import PublicationRepository
 
 
@@ -32,12 +28,10 @@ def find_duplicates(
     """Croise `source_publications` OA/ScanR (avec hal_id) et HAL.
 
     Retourne deux listes :
-      - `link_only` : HAL sans publication_id → lier à la publication source
-      - `merge_needed` : publications distinctes à fusionner
+      - `link_only` : HAL sans publication_id → lier à la publication source.
+      - `merge_needed` : publications distinctes à fusionner.
 
-    Itère sur **toutes** les lignes non-HAL : un même hal_id peut être porté par
-    plusieurs sources (OpenAlex + ScanR) pointant vers des publications distinctes,
-    et il faut traiter chacune.
+    Itère sur **toutes** les lignes non-HAL : un même hal_id peut être porté par plusieurs sources (OpenAlex + ScanR) pointant vers des publications distinctes, et il faut traiter chacune.
     """
     hal_by_id = {r["halid"]: r for r in queries.fetch_hal_source_publications(conn)}
 
@@ -85,7 +79,7 @@ def link_hal_to_publication(
     *,
     pub_repo: PublicationRepository,
 ) -> int:
-    """Case 1: HAL doc has no publication_id → link to source's publication."""
+    """Cas 1 : le document HAL n'a pas de `publication_id` → lien vers la publication de la source."""
     for item in items:
         hal_doc_id = item["hal_doc_id"]
         src_pub_id = item["src_pub_id"]
@@ -98,59 +92,6 @@ def link_hal_to_publication(
         queries.link_source_publication_to_publication(conn, hal_doc_id, src_pub_id)
         update_sources(src_pub_id, repo=pub_repo)
     return len(items)
-
-
-def merge_publications(
-    conn: Connection,
-    items: Any,
-    logger: logging.Logger,
-    dry_run: bool = False,
-    *,
-    pub_repo: PublicationRepository,
-) -> tuple[int, int]:
-    """
-    Case 2: Both have different publication_id.
-    Keep the HAL publication, merge the other into it.
-    """
-    merged = 0
-    errors = 0
-    merged_into: dict[int, int] = {}
-
-    def resolve(pub_id: Any) -> Any:
-        visited = set()
-        while pub_id in merged_into:
-            if pub_id in visited:
-                break
-            visited.add(pub_id)
-            pub_id = merged_into[pub_id]
-        return pub_id
-
-    for item in items:
-        src_pub_id = resolve(item["src_pub_id"])
-        hal_pub_id = resolve(item["hal_pub_id"])
-
-        if src_pub_id == hal_pub_id:
-            continue
-
-        if dry_run:
-            logger.info(
-                f"  [MERGE] [{item['source']}] {item['src_id']} pub={src_pub_id}"
-                f" → {item['halid']} pub={hal_pub_id}"
-            )
-            continue
-
-        try:
-            with savepoint(conn, "merge_pub"):
-                _merge_pub(hal_pub_id, src_pub_id, repo=pub_repo)
-                refresh_from_sources(hal_pub_id, repo=pub_repo)
-            merged_into[src_pub_id] = hal_pub_id
-            merged += 1
-
-        except Exception as e:
-            logger.warning(f"  Échec fusion {item['src_id']}: {e}")
-            errors += 1
-
-    return merged, errors
 
 
 def run_merge(
@@ -181,8 +122,15 @@ def run_merge(
 
         if merge_needed:
             logger.info("\n--- Fusion de publications ---")
-            n, errs = merge_publications(
-                conn, merge_needed, logger, dry_run=dry_run, pub_repo=pub_repo
+            groups = [
+                (
+                    f"[{item['source']}] {item['src_id']} ↔ {item['halid']}",
+                    [item["src_pub_id"], item["hal_pub_id"]],
+                )
+                for item in merge_needed
+            ]
+            n, errs = merge_publications_by_key(
+                conn, groups, logger=logger, pub_repo=pub_repo, dry_run=dry_run
             )
             logger.info(f"  {n} publications fusionnées, {errs} erreurs")
 
