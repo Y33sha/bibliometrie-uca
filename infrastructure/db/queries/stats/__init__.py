@@ -38,26 +38,156 @@ class PgStatsQueries:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def publisher_stats(self, **kwargs: Any) -> dict[str, Any]:
-        return _publisher_stats(self._conn, **kwargs)
+    def publisher_stats(
+        self,
+        *,
+        root_structure_id: int,
+        lab_ids: list[int],
+        years: list[int],
+        oa_status: str,
+        has_apc: str,
+        search: str,
+        page: int,
+        per_page: int,
+        sort: str,
+    ) -> dict[str, Any]:
+        return _publisher_stats(
+            self._conn,
+            root_structure_id=root_structure_id,
+            lab_ids=lab_ids,
+            years=years,
+            oa_status=oa_status,
+            has_apc=has_apc,
+            search=search,
+            page=page,
+            per_page=per_page,
+            sort=sort,
+        )
 
-    def journal_stats(self, **kwargs: Any) -> dict[str, Any]:
-        return _journal_stats(self._conn, **kwargs)
+    def journal_stats(
+        self,
+        *,
+        root_structure_id: int,
+        lab_ids: list[int],
+        years: list[int],
+        publisher_id: int | None,
+        oa_status: str,
+        has_apc: str,
+        search: str,
+        page: int,
+        per_page: int,
+        sort: str,
+    ) -> dict[str, Any]:
+        return _journal_stats(
+            self._conn,
+            root_structure_id=root_structure_id,
+            lab_ids=lab_ids,
+            years=years,
+            publisher_id=publisher_id,
+            oa_status=oa_status,
+            has_apc=has_apc,
+            search=search,
+            page=page,
+            per_page=per_page,
+            sort=sort,
+        )
 
-    def stats_labs(self, **kwargs: Any) -> dict[str, Any]:
-        return _stats_labs(self._conn, **kwargs)
+    def stats_labs(
+        self,
+        *,
+        root_structure_id: int,
+        lab_ids: list[int],
+        years: list[int],
+        publisher_id: int | None,
+        journal_id: int | None,
+        oa_status: str,
+        has_apc: str,
+        page: int,
+        per_page: int,
+        sort: str,
+    ) -> dict[str, Any]:
+        return _stats_labs(
+            self._conn,
+            root_structure_id=root_structure_id,
+            lab_ids=lab_ids,
+            years=years,
+            publisher_id=publisher_id,
+            journal_id=journal_id,
+            oa_status=oa_status,
+            has_apc=has_apc,
+            page=page,
+            per_page=per_page,
+            sort=sort,
+        )
 
-    def stats_by_year(self, **kwargs: Any) -> list[dict[str, Any]]:
-        return _stats_by_year(self._conn, **kwargs)
+    def stats_by_year(
+        self,
+        *,
+        root_structure_id: int,
+        lab_ids: list[int],
+        years: list[int],
+        publisher_id: int | None,
+        journal_id: int | None,
+        oa_status: str,
+        has_apc: str,
+    ) -> list[dict[str, Any]]:
+        return _stats_by_year(
+            self._conn,
+            root_structure_id=root_structure_id,
+            lab_ids=lab_ids,
+            years=years,
+            publisher_id=publisher_id,
+            journal_id=journal_id,
+            oa_status=oa_status,
+            has_apc=has_apc,
+        )
 
-    def stats_summary(self, **kwargs: Any) -> dict[str, Any]:
-        return _stats_summary(self._conn, **kwargs)
+    def stats_summary(
+        self,
+        *,
+        root_structure_id: int,
+        lab_ids: list[int],
+        years: list[int],
+        publisher_id: int | None,
+        journal_id: int | None,
+        oa_status: str,
+        has_apc: str,
+    ) -> dict[str, Any]:
+        return _stats_summary(
+            self._conn,
+            root_structure_id=root_structure_id,
+            lab_ids=lab_ids,
+            years=years,
+            publisher_id=publisher_id,
+            journal_id=journal_id,
+            oa_status=oa_status,
+            has_apc=has_apc,
+        )
 
     def available_years(self) -> list[int]:
         return _available_years(self._conn)
 
-    def stats_facets(self, **kwargs: Any) -> dict[str, list[dict[str, Any]]]:
-        return _stats_facets(self._conn, **kwargs)
+    def stats_facets(
+        self,
+        *,
+        root_structure_id: int,
+        lab_ids: list[int],
+        years: list[int],
+        publisher_id: int | None,
+        journal_id: int | None,
+        oa_status: str,
+        has_apc: str,
+    ) -> dict[str, list[dict[str, Any]]]:
+        return _stats_facets(
+            self._conn,
+            root_structure_id=root_structure_id,
+            lab_ids=lab_ids,
+            years=years,
+            publisher_id=publisher_id,
+            journal_id=journal_id,
+            oa_status=oa_status,
+            has_apc=has_apc,
+        )
 
 
 __all__ = ["PgStatsQueries"]

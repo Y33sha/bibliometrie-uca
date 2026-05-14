@@ -108,10 +108,28 @@ def _by_year_sql(
     return sql, binds
 
 
-def stats_by_year(conn: Connection, **kwargs: Any) -> list[dict[str, Any]]:
+def stats_by_year(
+    conn: Connection,
+    *,
+    root_structure_id: int,
+    lab_ids: list[int],
+    years: list[int],
+    publisher_id: int | None,
+    journal_id: int | None,
+    oa_status: str,
+    has_apc: str,
+) -> list[dict[str, Any]]:
     """Ventilation par année."""
     conn.execute(text("SET LOCAL jit = off"))
-    sql, binds = _by_year_sql(**kwargs)
+    sql, binds = _by_year_sql(
+        root_structure_id=root_structure_id,
+        lab_ids=lab_ids,
+        years=years,
+        publisher_id=publisher_id,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        has_apc=has_apc,
+    )
     rows = conn.execute(text(sql), binds).all()
     return [dict(r._mapping) for r in rows]
 
@@ -155,10 +173,28 @@ def _summary_sql(
     return sql, binds
 
 
-def stats_summary(conn: Connection, **kwargs: Any) -> dict[str, Any]:
+def stats_summary(
+    conn: Connection,
+    *,
+    root_structure_id: int,
+    lab_ids: list[int],
+    years: list[int],
+    publisher_id: int | None,
+    journal_id: int | None,
+    oa_status: str,
+    has_apc: str,
+) -> dict[str, Any]:
     """Totaux globaux pour la page stats."""
     conn.execute(text("SET LOCAL jit = off"))
-    sql, binds = _summary_sql(**kwargs)
+    sql, binds = _summary_sql(
+        root_structure_id=root_structure_id,
+        lab_ids=lab_ids,
+        years=years,
+        publisher_id=publisher_id,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        has_apc=has_apc,
+    )
     row = conn.execute(text(sql), binds).one()
     return dict(row._mapping)
 
@@ -269,10 +305,28 @@ def _facets_sqls(
     }
 
 
-def stats_facets(conn: Connection, **kwargs: Any) -> dict[str, list[dict[str, Any]]]:
+def stats_facets(
+    conn: Connection,
+    *,
+    root_structure_id: int,
+    lab_ids: list[int],
+    years: list[int],
+    publisher_id: int | None,
+    journal_id: int | None,
+    oa_status: str,
+    has_apc: str,
+) -> dict[str, list[dict[str, Any]]]:
     """Facettes dynamiques."""
     conn.execute(text("SET LOCAL jit = off"))
-    sqls = _facets_sqls(**kwargs)
+    sqls = _facets_sqls(
+        root_structure_id=root_structure_id,
+        lab_ids=lab_ids,
+        years=years,
+        publisher_id=publisher_id,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        has_apc=has_apc,
+    )
 
     year_rows = conn.execute(text(sqls["year"][0]), sqls["year"][1]).all()
     lab_rows = conn.execute(text(sqls["lab"][0]), sqls["lab"][1]).all()

@@ -108,12 +108,34 @@ def _build_journal_stats_sql(
     return count_sql, rows_sql, binds
 
 
-def journal_stats(conn: Connection, **kwargs: Any) -> dict[str, Any]:
+def journal_stats(
+    conn: Connection,
+    *,
+    root_structure_id: int,
+    lab_ids: list[int],
+    years: list[int],
+    publisher_id: int | None,
+    oa_status: str,
+    has_apc: str,
+    search: str,
+    page: int,
+    per_page: int,
+    sort: str,
+) -> dict[str, Any]:
     """Stats agrégées par revue, paginées."""
     conn.execute(text("SET LOCAL jit = off"))
-    count_sql, rows_sql, binds = _build_journal_stats_sql(**kwargs)
+    count_sql, rows_sql, binds = _build_journal_stats_sql(
+        root_structure_id=root_structure_id,
+        lab_ids=lab_ids,
+        years=years,
+        publisher_id=publisher_id,
+        oa_status=oa_status,
+        has_apc=has_apc,
+        search=search,
+        page=page,
+        per_page=per_page,
+        sort=sort,
+    )
     total = conn.execute(text(count_sql), binds).one().total
     rows = conn.execute(text(rows_sql), binds).all()
-    return paginated(
-        total, kwargs["page"], kwargs["per_page"], "journals", [dict(r._mapping) for r in rows]
-    )
+    return paginated(total, page, per_page, "journals", [dict(r._mapping) for r in rows])
