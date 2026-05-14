@@ -28,27 +28,17 @@ from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.openalex import OpenalexNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
 from application.ports.pipeline.zenodo_resolver import ZenodoResolver
-from application.publications import (
-    find_by_doi,
-    find_by_nnt,
-    publication_from_meta,
-    refresh_from_sources,
-    resolve_doi_conflict,
-    try_merge_by_doi,
-)
-from application.publications import find_or_create as find_or_create_publication
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
-from domain.publication import clean_doi, extract_hal_id_from_url
+from domain.publication import clean_doi
 from domain.sources.openalex import (
     correct_openalex_doc_type,
     extract_external_ids_from_urls,
     extract_nnt_from_location,
-    is_hal_location,
     is_theses_fr_location,
     map_openalex_oa_status,
     parse_primary_location,
@@ -124,18 +114,6 @@ def extract_short_id(url: str, prefix: str = "https://openalex.org/") -> str:
     if url and url.startswith(prefix):
         return url.replace(prefix, "")
     return url or ""
-
-
-def find_hal_publication_id(
-    conn: Connection, queries: OpenalexNormalizeQueries, work: dict
-) -> int | None:
-    """Si le work OpenAlex pointe vers un document HAL existant, retourne le publication_id."""
-    location = work.get("primary_location") or {}
-    url = location.get("landing_page_url") or ""
-    hal_id = extract_hal_id_from_url(url)
-    if not hal_id:
-        return None
-    return queries.fetch_publication_id_for_hal_source(conn, hal_id)
 
 
 # =============================================================
@@ -239,25 +217,6 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
         container_title=container_title,
         language=language,
     )
-
-
-def find_publication(
-    work: dict,
-    journal_id: int | None,
-    *,
-    pub_repo: PublicationRepository,
-) -> int | None:
-    """Cherche une publication existante sans en créer. Retourne l'id ou None."""
-    meta = extract_pub_metadata(work, journal_id)
-    if not meta["pub_year"] or not meta["title"]:
-        return None
-    result, _ = find_or_create_publication(
-        publication_from_meta(meta),
-        nnt=meta["nnt"],
-        allow_create=False,
-        repo=pub_repo,
-    )
-    return result.id if result else None
 
 
 # =============================================================
@@ -490,49 +449,13 @@ def process_work(
 
         pub_meta = extract_pub_metadata(work, journal_id)
 
-        publication_id = None
-        if primary and is_hal_location(primary):
-            publication_id = find_hal_publication_id(conn, queries, work)
-        if not publication_id and primary and is_theses_fr_location(primary):
-            nnt = extract_nnt_from_location(primary)
-            if nnt:
-                existing = find_by_nnt(nnt, repo=pub_repo)
-                if existing:
-                    publication_id = existing.id
-
-        if not publication_id:
-            publication_id = queries.get_openalex_publication_id(conn, openalex_id)
-
-        if not publication_id:
-            publication_id = find_publication(work, journal_id, pub_repo=pub_repo)
-
-        if publication_id:
-            enrich_doi = pub_meta["doi"]
-            if enrich_doi:
-                existing_by_doi = find_by_doi(enrich_doi, repo=pub_repo)
-                if existing_by_doi and existing_by_doi.id != publication_id:
-                    original_doi = enrich_doi
-                    enrich_doi, _ = resolve_doi_conflict(
-                        enrich_doi,
-                        pub_meta["doc_type"],
-                        pub_meta["title_normalized"],
-                        existing_by_doi,
-                        repo=pub_repo,
-                    )
-                    if enrich_doi != original_doi:
-                        pub_meta["source_doi"] = original_doi
-            publication_id = try_merge_by_doi(publication_id, enrich_doi, repo=pub_repo)
-
         source_publication_id = insert_openalex_document(
-            conn, queries, work, staging_id, publication_id, pub_meta
+            conn, queries, work, staging_id, None, pub_meta
         )
 
         process_authorships(
             conn, queries, work, source_publication_id, address_linker=address_linker
         )
-
-        if publication_id:
-            refresh_from_sources(publication_id, repo=pub_repo)
 
         staging_queries.mark_done(conn, staging_id)
         return True
