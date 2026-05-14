@@ -1,7 +1,7 @@
 """Tests de caractérisation pour services/publications.py.
 
 Couvre les find_by_* (guards + happy path), resolve_doi_conflict (chapter/book),
-update_oa_status/countries, merge_publications.
+merge_publications.
 """
 
 import pytest
@@ -16,7 +16,6 @@ from application.publications import (
     mark_distinct,
     merge_publications,
     resolve_doi_conflict,
-    update_oa_status,
 )
 from infrastructure.repositories import publication_repository
 
@@ -309,19 +308,6 @@ class TestResolveDoiConflict:
         doi, merge_id = resolve_doi_conflict("10.x/a", "article", "a", existing, repo=repo)
         assert doi == "10.x/a"
         assert merge_id == 42
-
-
-# ── update_oa_status ───────────────────────────────────────────────
-
-
-class TestUpdateOaStatus:
-    def test_updates(self, sa_sync_conn, repo):
-        pub_id = _insert_publication(sa_sync_conn, oa_status="unknown")
-        update_oa_status(pub_id, "gold", repo=repo)
-        oa_status = sa_sync_conn.execute(
-            text("SELECT oa_status FROM publications WHERE id = :id"), {"id": pub_id}
-        ).scalar_one()
-        assert oa_status == "gold"
 
 
 # ── merge_publications ────────────────────────────────────────────

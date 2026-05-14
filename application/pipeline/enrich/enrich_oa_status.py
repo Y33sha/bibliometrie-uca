@@ -20,7 +20,6 @@ import requests
 from sqlalchemy import Connection
 
 from application.ports.pipeline.enrich import EnrichQueries
-from application.publications import update_oa_status
 from domain.ports.publication_repository import PublicationRepository
 
 # Email requis par Unpaywall (politesse, pas d'auth)
@@ -115,7 +114,7 @@ def run_enrich(
             if dry_run:
                 logger.info(f"  [DRY] {doi} : {current_status} → {status}")
             else:
-                update_oa_status(pub_id, status, repo=pub_repo)
+                pub_repo.update_oa_status(pub_id, status)
             updated += 1
         elif status is None:
             not_found += 1

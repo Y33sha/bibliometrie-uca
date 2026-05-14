@@ -7,7 +7,6 @@ compter les résultats, relancer, vérifier que les compteurs n'ont pas bougé.
 Ces tests tournent sur la base bibliometrie_test (cf. conftest.py).
 """
 
-from application.publications import update_sources
 from domain.normalize import normalize_text
 from domain.publication import normalize_nnt
 from domain.publications.doc_types import map_doc_type
@@ -83,7 +82,7 @@ def _create_all_publications(conn_or_cur):
                     "UPDATE source_publications SET publication_id = %s WHERE id = %s",
                     (result.id, doc["id"]),
                 )
-            update_sources(result.id, repo=repo)
+            repo.update_sources(result.id)
 
 
 # ── Fixtures de données ScanR ────────────────────────────────────

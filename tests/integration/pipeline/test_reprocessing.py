@@ -12,7 +12,6 @@ import copy
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.publications import update_sources
 from domain.normalize import normalize_text
 from domain.publication import normalize_nnt
 from domain.publications.doc_types import map_doc_type
@@ -65,7 +64,7 @@ def _create_all_publications(conn):
                 text("UPDATE source_publications SET publication_id = :pid WHERE id = :sid"),
                 {"pid": result.id, "sid": doc["id"]},
             )
-            update_sources(result.id, repo=repo)
+            repo.update_sources(result.id)
 
 
 # ── Données HAL minimales ───────────────────────────────────────

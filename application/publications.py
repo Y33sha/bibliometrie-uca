@@ -103,16 +103,6 @@ def resolve_doi_conflict(
     return decision.accepted_doi, decision.merge_with_id
 
 
-def update_oa_status(pub_id: int, oa_status: str, *, repo: PublicationRepository) -> None:
-    """Met à jour le statut OA d'une publication."""
-    repo.update_oa_status(pub_id, oa_status)
-
-
-def update_sources(pub_id: int, *, repo: PublicationRepository) -> None:
-    """Recalcule publications.sources depuis source_publications."""
-    repo.update_sources(pub_id)
-
-
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
 
