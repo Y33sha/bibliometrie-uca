@@ -68,7 +68,7 @@ Patterns dominants :
 - [~] Services racine : `existing: Any` → `PubByDoi` (résolution conflit DOI). Restent justifiés : `set[Any]` / `list[Any]` dans `_merge_lists` (items hétérogènes par champ), `value: Any` dans `update_config_value` (frontière JSONB).
 - [ ] `application/pipeline/` (82 occ. recensées) — découpage par patterns :
   - [x] Sweep A : `Callable[[Any], …Repository]` → `Callable[[Connection], …Repository]` sur les 6 normalizers (16 occ.) ; `_iter_rows -> Any` → `Iterator[Row[Any]]` dans `base.py` ; `list[Any]` → `list[Row[Any]]` dans `application/ports/pipeline/staging.py` + `infrastructure/db/queries/staging.py` (extension révélée par le sweep).
-  - [ ] Sweep B : `topics: Any` dans les 6 `subjects/ingest_*.py` → `JsonValue`.
+  - [x] Sweep B : `topics: Any` → `JsonValue` dans les 6 `subjects/ingest_*.py` (+ `entry`, `_extract_domain_labels`, `ontology_entry` au passage dans `ingest_openalex.py` et `ingest_scanr.py`).
   - [ ] Sweep C : `dict[str, Any]` JSONB locaux dans les normalizers (`ext`, `biblio`, `meta`, `sd`, ~12 occ.) → `dict[str, JsonValue]`.
   - [ ] Sweep D : `affiliations/resolve_addresses.py` (9 `Any` sur 5 fonctions, lecture dédiée nécessaire).
   - Hors scope : `persons/create_persons_from_source_authorships.py` (6 `Any` dans la cascade matching — refonte attendue via `METIER_decide-person-match`). Cas résiduels (~10 occ.) : helpers `as_str` / `_safe_list` / `dedup_strs` (frontières dynamiques à documenter), `sp: Any` (savepoint SA), `INGESTORS: dict[str, Any]` (registry).
