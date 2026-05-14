@@ -9,7 +9,7 @@ avec un flag `processed` que les normalizers positionnent à TRUE.
 
 from typing import Any
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 
 def reset_processed_flag(conn: Connection, source: str) -> int:
@@ -29,7 +29,9 @@ def count_pending_staging(conn: Connection, source: str) -> int:
     return row.cnt if row else 0
 
 
-def fetch_pending_staging(conn: Connection, source: str, *, columns: str, limit: int) -> list[Any]:
+def fetch_pending_staging(
+    conn: Connection, source: str, *, columns: str, limit: int
+) -> list[Row[Any]]:
     """Charge les `limit` premiers `staging` non traités avec les colonnes demandées.
 
     `columns` est injecté via f-string pour supporter le select-list sur mesure
@@ -67,7 +69,9 @@ def fetch_pending_staging_ids(conn: Connection, source: str, *, limit: int) -> l
     return [r.id for r in rows]
 
 
-def fetch_staging_by_ids(conn: Connection, staging_ids: list[int], *, columns: str) -> list[Any]:
+def fetch_staging_by_ids(
+    conn: Connection, staging_ids: list[int], *, columns: str
+) -> list[Row[Any]]:
     """Charge les `staging` dont l'id est dans la liste donnée."""
     return list(
         conn.execute(
@@ -100,7 +104,7 @@ class PgStagingQueries:
 
     def fetch_pending_staging(
         self, conn: Connection, source: str, *, columns: str, limit: int
-    ) -> list[Any]:
+    ) -> list[Row[Any]]:
         return fetch_pending_staging(conn, source, columns=columns, limit=limit)
 
     def fetch_pending_staging_ids(self, conn: Connection, source: str, *, limit: int) -> list[int]:
@@ -108,7 +112,7 @@ class PgStagingQueries:
 
     def fetch_staging_by_ids(
         self, conn: Connection, staging_ids: list[int], *, columns: str
-    ) -> list[Any]:
+    ) -> list[Row[Any]]:
         return fetch_staging_by_ids(conn, staging_ids, columns=columns)
 
     def mark_done(self, conn: Connection, staging_id: int) -> None:

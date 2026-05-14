@@ -6,7 +6,7 @@ Partagé par tous les normalizers via `SourceNormalizer`.
 
 from typing import Any, Protocol
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, Row
 
 
 class StagingQueries(Protocol):
@@ -18,7 +18,7 @@ class StagingQueries(Protocol):
 
     def fetch_pending_staging(
         self, conn: Connection, source: str, *, columns: str, limit: int
-    ) -> list[Any]: ...
+    ) -> list[Row[Any]]: ...
 
     def fetch_pending_staging_ids(
         self, conn: Connection, source: str, *, limit: int
@@ -26,6 +26,6 @@ class StagingQueries(Protocol):
 
     def fetch_staging_by_ids(
         self, conn: Connection, staging_ids: list[int], *, columns: str
-    ) -> list[Any]: ...
+    ) -> list[Row[Any]]: ...
 
     def mark_done(self, conn: Connection, staging_id: int) -> None: ...

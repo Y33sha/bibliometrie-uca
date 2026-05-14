@@ -260,7 +260,7 @@ class ThesesNormalizer(SourceNormalizer):
         logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: ThesesNormalizeQueries,
-        pub_repo_factory: Callable[[Any], PublicationRepository],
+        pub_repo_factory: Callable[[Connection], PublicationRepository],
         address_linker: AddressLinker,
     ) -> None:
         super().__init__(conn, logger, staging_queries)

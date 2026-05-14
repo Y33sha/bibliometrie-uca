@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from typing import Any, ClassVar
 
 from sqlalchemy import Connection, Row
@@ -107,7 +108,7 @@ class SourceNormalizer(ABC):
     def _count_pending(self, conn: Connection) -> int:
         return self._staging.count_pending_staging(conn, self.SOURCE)
 
-    def _iter_rows(self, conn: Connection, limit: int) -> Any:
+    def _iter_rows(self, conn: Connection, limit: int) -> Iterator[Row[Any]]:
         """Itère les lignes à traiter. Peut faire un fetch en un coup ou par sous-lots."""
         if self.FETCH_SUB_BATCH is None:
             yield from self._staging.fetch_pending_staging(
