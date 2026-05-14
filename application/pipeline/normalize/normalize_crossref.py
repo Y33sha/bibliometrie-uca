@@ -48,7 +48,7 @@ from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
-from domain.publications.dedup import has_minimal_publication_metadata
+from domain.publications.deduplication import has_minimal_publication_metadata
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.sources.crossref import (

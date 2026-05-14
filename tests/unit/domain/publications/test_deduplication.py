@@ -1,6 +1,6 @@
 """Tests des règles de déduplication / création des publications."""
 
-from domain.publications.dedup import (
+from domain.publications.deduplication import (
     DoiConflictResolution,
     has_minimal_publication_metadata,
     resolve_doi_conflict,

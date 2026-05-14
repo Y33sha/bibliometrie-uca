@@ -1,7 +1,6 @@
 """Règles de déduplication / création des publications.
 
-Domain services purs autour de la dédup : invariants de métadonnées
-minimales, résolution de conflit DOI entre deux documents.
+Domain services purs autour de la déduplication : invariants de métadonnées minimales, résolution de conflit DOI entre deux documents.
 """
 
 from dataclasses import dataclass

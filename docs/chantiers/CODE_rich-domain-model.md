@@ -20,7 +20,7 @@ Inventaire actuel :
   `decide_match_by_identifier` (`domain/persons/matching.py`) ;
   `allow_person_creation` (`domain/persons/creation.py`) ;
   `names_compatible`, `compute_person_name_forms` (`domain/names.py`) ;
-  `has_minimal_publication_metadata` (`domain/publications/dedup.py`).
+  `has_minimal_publication_metadata` (`domain/publications/deduplication.py`).
 - **Dataclasses de résultat de requête** : `PubByDoi`, `PubByNnt`,
   `PubByTitle`, `PubThesisCandidate` (`domain/publication.py`).
 - **Zéro entité avec identité + comportement.** `domain/structure.py`
@@ -202,7 +202,7 @@ vides comme point d'appui.
       `check_can_merge_persons` de `domain/persons/merge.py` ; doublon
       temporaire, suppression Phase 2). Signature avec `has_distinct_rh`
       kwarg en attendant le scaffolding `PersonRH`.
-- [x] `Publication.has_minimal_metadata()` (reprend `has_minimal_publication_metadata` de `domain/publications/dedup.py`). Doublon temporaire en `dedup.py` ; suppression Phase 6.
+- [x] `Publication.has_minimal_metadata()` (reprend `has_minimal_publication_metadata` de `domain/publications/deduplication.py`). Doublon temporaire en `deduplication.py` ; suppression Phase 6.
 
 **Convention + tests :**
 
@@ -228,7 +228,7 @@ adéquat — pas à forcer en méthodes.
 
 - [x] `domain/publication.py:resolve_doi_conflict` (+ `DoiConflictResolution`,
       `_CHAPTER_DOC_TYPES`, `_BOOK_DOC_TYPES`) → free function dans
-      `domain/publications/dedup.py`. Justification : c'est une
+      `domain/publications/deduplication.py`. Justification : c'est une
       comparaison entre deux publications, pas une action d'identité ;
       les callers actuels passent des projections et des strings, pas
       des `Publication` (forcer en méthode obligerait à affaiblir les
@@ -289,9 +289,9 @@ Les use-cases orchestrant Publication (fusion, find_or_create, refresh_from_sour
 
 - [x] **Hydratation de l'aggregate Publication** : entité enrichie (`journal_id`, `language`, `container_title`, `countries`) ; helper pairwise `absorb_oa_status` dans `domain/publications/metadata.py` ; méthode `Publication.absorb(other)` (cf. `d55810a`). Ajout au repo de `find_by_id(id) -> Publication | None` et `save(pub) -> None` (cf. `4e57f38`). Simplification de `repo.merge_into` en plumbing FK pur (cf. `5924e06`).
 - [x] `application/publications.py:merge_publications` : load target + source via repo, `target.absorb(source)`, `repo.merge_into` (plumbing + DELETE), `repo.save(target)`. Order rationale : save APRÈS DELETE source pour éviter collision UNIQUE lower(doi). — `5924e06`
-- [x] `application/publications.py:find_or_create` — nouvelle signature `find_or_create(pub: Publication, *, nnt: str | None, allow_create, repo) -> tuple[Publication | None, bool]`. Helper `publication_from_meta(meta: dict) -> Publication` pour adapter les dicts des normalizers. Cascade interne (DOI → NNT → création) inchangée — son extraction vers `decide_publication_match` reste portée par `METIER_dedup-fusion-publications`. — `7def852`
+- [x] `application/publications.py:find_or_create` — nouvelle signature `find_or_create(pub: Publication, *, nnt: str | None, allow_create, repo) -> tuple[Publication | None, bool]`. Helper `publication_from_meta(meta: dict) -> Publication` pour adapter les dicts des normalizers. Cascade interne (DOI → NNT → création) inchangée — son extraction vers `decide_publication_match` reste portée par `METIER_deduplication-fusion-publications`. — `7def852`
 - [x] `application/publications.py:refresh_from_sources` — retourne désormais `RefreshResult(absorbed_publication_id: int | None)`. Le signal `absorbed_publication_id` non-None expose la fusion implicite sur collision DOI (jusque-là invisible au caller). Callers existants conservent leur comportement (ils ignorent le retour, comportement de fallback inchangé).
-- [ ] Helpers de `refresh_from_sources` (`_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_first_doc_type`) — coord avec `METIER_dedup-fusion-publications` qui vise déjà à les exfiltrer vers `domain/publications/merge.py`.
+- [ ] Helpers de `refresh_from_sources` (`_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_first_doc_type`) — coord avec `METIER_deduplication-fusion-publications` qui vise déjà à les exfiltrer vers `domain/publications/merge.py`.
 
 ### Phase 5 — Orchestrations Person
 
@@ -306,14 +306,14 @@ Aucune logique métier identifiée actuellement au-delà du CRUD de `application
 
 Une fois les callers de Phase 1 migrés vers les entités (Phases 3, 4, 5), les fonctions libres font doublon avec les méthodes d'aggregate. Suppression.
 
-- [ ] `domain/publications/dedup.py:has_minimal_publication_metadata` — supprimer une fois les callers passés par `Publication.has_minimal_metadata()`.
+- [ ] `domain/publications/deduplication.py:has_minimal_publication_metadata` — supprimer une fois les callers passés par `Publication.has_minimal_metadata()`.
 - [ ] `domain/persons/merge.py:check_can_merge_persons` — supprimer une fois `application/persons.py:merge_person` migré vers `Person.can_merge_with(...)`. Le fichier `merge.py` devient vide et peut être supprimé.
 
 ### Phase 7 — Convention pour les chantiers METIER_*
 
 - [ ] Documenter dans un fichier `docs/architecture.md` (ou compléter `CLAUDE.md`) que la logique métier touchant une entité doit y atterrir, et préciser le périmètre des aggregates.
 - [ ] Mettre à jour `METIER_decide-person-match.md` : ajouter section « Cible domain » pointant `Person` + `domain/persons/matching.py`.
-- [ ] Mettre à jour `METIER_dedup-fusion-publications.md` : idem, pointant `Publication` + `domain/publications/dedup.py` + `domain/publications/merge.py`.
+- [ ] Mettre à jour `METIER_deduplication-fusion-publications.md` : idem, pointant `Publication` + `domain/publications/deduplication.py` + `domain/publications/merge.py`.
 - [ ] Mettre à jour `METIER_doc-types.md`, `METIER_crossref.md`, `METIER_doi-ra-datacite.md` quand ils démarreront — même principe.
 
 ### Phase 8 — Audit général des repositories (différé)
@@ -362,7 +362,7 @@ Contenu détaillé à formaliser en phase d'instruction.
 - Chantier producteur de logique métier sur `Person` :
   `METIER_decide-person-match.md`.
 - Chantier producteur de logique métier sur `Publication` :
-  `METIER_dedup-fusion-publications.md`.
+  `METIER_deduplication-fusion-publications.md`.
 - Autres chantiers METIER_* qui enrichiront les entités :
   `METIER_doc-types.md`, `METIER_crossref.md`,
   `METIER_doi-ra-datacite.md`, `METIER_sujets-mots-cles.md`.

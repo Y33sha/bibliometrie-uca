@@ -23,7 +23,7 @@ from domain.publication import (
     PubByTitle,
     PubThesisCandidate,
 )
-from domain.publications.dedup import resolve_doi_conflict as _domain_resolve_doi_conflict
+from domain.publications.deduplication import resolve_doi_conflict as _domain_resolve_doi_conflict
 from domain.publications.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import (
