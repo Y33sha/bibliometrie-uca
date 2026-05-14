@@ -40,6 +40,7 @@ from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.normalize.crossref import CrossrefNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
 from application.publishers import find_or_create_publisher
+from domain.json_types import JsonValue
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
@@ -130,7 +131,7 @@ def get_language(msg: dict) -> str | None:
 
 def get_external_ids(msg: dict) -> dict | None:
     """Identifiants secondaires (ISSN, ISBN). DOI vit dans la colonne dédiée."""
-    ext: dict[str, Any] = {}
+    ext: dict[str, JsonValue] = {}
     issns = msg.get("ISSN") or []
     if isinstance(issns, list) and issns:
         ext["issn"] = [s for s in issns if isinstance(s, str)]
@@ -142,7 +143,7 @@ def get_external_ids(msg: dict) -> dict | None:
 
 def get_biblio(msg: dict) -> dict | None:
     """Volume, issue, page, article-number — repris du CrossRef brut."""
-    biblio: dict[str, Any] = {}
+    biblio: dict[str, JsonValue] = {}
     for src_key, dest_key in (
         ("volume", "volume"),
         ("issue", "issue"),
@@ -247,7 +248,7 @@ def process_authors(
         ids = compact_identifiers(orcid=orcid)
 
         affiliations = _author_affiliation_strings(author)
-        sd: dict[str, Any] = {}
+        sd: dict[str, JsonValue] = {}
         if affiliations:
             sd["affiliations"] = affiliations
         if author.get("sequence"):

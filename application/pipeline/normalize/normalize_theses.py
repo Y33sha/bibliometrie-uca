@@ -32,6 +32,7 @@ from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
 from domain.dates import french_date_to_iso
+from domain.json_types import JsonValue
 from domain.normalize import normalize_text
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
@@ -83,7 +84,7 @@ def extract_pub_metadata(these: dict) -> dict:
 
 def _build_source_meta(these: dict) -> dict | None:
     """Construit le meta jsonb pour source_publications à partir des données brutes."""
-    meta: dict[str, Any] = {}
+    meta: dict[str, JsonValue] = {}
     ds = french_date_to_iso(these.get("dateSoutenance"))
     di = french_date_to_iso(these.get("datePremiereInscriptionDoctorat"))
     if ds:
