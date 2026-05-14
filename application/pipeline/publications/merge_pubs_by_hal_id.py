@@ -18,7 +18,6 @@ from sqlalchemy import Connection
 
 from application.pipeline.publications.merge_by_key import merge_publications_by_key
 from application.ports.pipeline.merge import MergeQueries
-from application.publications import update_sources
 from domain.ports.publication_repository import PublicationRepository
 
 
@@ -90,7 +89,7 @@ def link_hal_to_publication(
             continue
 
         queries.link_source_publication_to_publication(conn, hal_doc_id, src_pub_id)
-        update_sources(src_pub_id, repo=pub_repo)
+        pub_repo.update_sources(src_pub_id)
     return len(items)
 
 
