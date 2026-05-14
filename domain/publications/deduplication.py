@@ -1,6 +1,8 @@
 """Règles pures de déduplication des publications.
 
-Cascade de matching par identifiants (`decide_publication_match`), attribution tardive de DOI sur une pub existante (`decide_doi_attribution`), résolution de conflit DOI chapter/book (`resolve_doi_conflict`). Tous les décideurs sont purs — le caller prefetch les lookups via le repo et applique les effets (création, fusion, set_doi, clear_doi).
+Cascade de matching par identifiants (`decide_publication_match`) et résolution de conflit DOI chapter/book (`resolve_doi_conflict`). Tous les décideurs sont purs — le caller prefetch les lookups via le repo et applique les effets (création, fusion, clear_doi).
+
+Asymétrie volontaire DOI vs autres clés (NNT, HAL_ID) : `resolve_doi_conflict` est DOI-spécifique parce que DOI est l'unique identifiant **canonique attribuable** à une publication (colonne propre `publications.doi` avec contrainte UNIQUE `lower(doi)`, règle chapter/book métier). Pour NNT/HAL_ID, le matching passe par `decide_publication_match` (cascade) et la résolution des conflits cross-source par les phases pipeline dédiées `merge_pubs_by_nnt` / `merge_pubs_by_hal_id`. L'attribution post-match d'un DOI à une pub matchée par autre clé se fait désormais via `refresh_from_sources` (premier non-null par `SOURCE_PRIORITY`).
 """
 
 from dataclasses import dataclass
@@ -152,42 +154,3 @@ def resolve_doi_conflict(
     return DoiConflictResolution(
         accepted_doi=new_doi, merge_with_id=existing_id, clear_existing_doi=False
     )
-
-
-@dataclass(frozen=True, slots=True)
-class DoiAttributionDecision:
-    """Décision pure pour l'attribution tardive d'un DOI à une publication existante.
-
-    - `action='noop'` : ne rien faire. Soit aucun DOI proposé, soit la pub porte déjà un DOI (qu'il soit identique ou différent du proposé — politique conservative : on ne remplace pas un DOI existant). `merge_with_id` est None.
-    - `action='merge'` : un autre publication porte déjà ce DOI ; fusionner. `merge_with_id` est l'id de la pub cible (= celle qui porte le DOI).
-    - `action='attribute'` : DOI libre, l'attribuer à la pub courante. `merge_with_id` est None.
-    """
-
-    action: Literal["noop", "merge", "attribute"]
-    merge_with_id: int | None = None
-
-
-def decide_doi_attribution(
-    *,
-    current_doi: str | None,
-    proposed_doi: str | None,
-    current_pub_id: int,
-    existing_doi_match_id: int | None,
-) -> DoiAttributionDecision:
-    """Règle pure pour la mini-cascade d'attribution tardive de DOI.
-
-    Modélise la logique historique de `try_merge_by_doi` : on a une publication courante (typiquement trouvée par NNT) et une source fournit un DOI candidat. Trois sorties exclusives :
-
-    - pas de DOI proposé OU pub courante a déjà un DOI → `noop` (politique conservative : on n'écrase pas un DOI existant, même s'il diffère du proposé).
-    - DOI proposé porté par une autre pub → `merge` vers cette autre pub.
-    - DOI libre → `attribute` à la pub courante.
-
-    Le caller doit avoir prefetch `existing_doi_match_id` via le repo (= `find_by_doi(proposed_doi).id` ou None). Le `current_pub_id` sert à distinguer le cas idempotent où le DOI proposé est déjà sur la pub courante (`existing_doi_match_id == current_pub_id`), traité comme `attribute` (= no-op effectif côté DB, set_doi idempotent).
-    """
-    if not proposed_doi:
-        return DoiAttributionDecision(action="noop")
-    if current_doi:
-        return DoiAttributionDecision(action="noop")
-    if existing_doi_match_id is not None and existing_doi_match_id != current_pub_id:
-        return DoiAttributionDecision(action="merge", merge_with_id=existing_doi_match_id)
-    return DoiAttributionDecision(action="attribute")

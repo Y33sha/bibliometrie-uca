@@ -301,7 +301,7 @@ def _run_match_or_create_publications() -> None:
     from infrastructure.db.queries.publications.match_or_create import (
         PgPublicationsMatchOrCreateQueries,
     )
-    from infrastructure.repositories import publication_repository
+    from infrastructure.repositories import audit_repository, publication_repository
 
     log.info("▶ match_or_create_publications")
     t0 = time.time()
@@ -312,6 +312,7 @@ def _run_match_or_create_publications() -> None:
             PgPublicationsMatchOrCreateQueries(),
             log,
             pub_repo=publication_repository(conn),
+            audit_repo=audit_repository(conn),
         )
     finally:
         conn.close()

@@ -9,7 +9,7 @@ from infrastructure.db.queries.publications.match_or_create import (
     PgPublicationsMatchOrCreateQueries,
 )
 from infrastructure.log import setup_logger
-from infrastructure.repositories import publication_repository
+from infrastructure.repositories import audit_repository, publication_repository
 
 logger = setup_logger(
     "match_or_create_publications", os.path.join(os.path.dirname(__file__), "logs")
@@ -30,6 +30,7 @@ def main() -> None:
             PgPublicationsMatchOrCreateQueries(),
             logger,
             pub_repo=publication_repository(conn),
+            audit_repo=audit_repository(conn),
             dry_run=args.dry_run,
         )
     finally:

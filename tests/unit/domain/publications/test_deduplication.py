@@ -2,11 +2,9 @@
 
 from domain.publications.deduplication import (
     DeduplicationKey,
-    DoiAttributionDecision,
     DoiConflictResolution,
     MetadataDeduplicationCase,
     PublicationMatchDecision,
-    decide_doi_attribution,
     decide_publication_match,
     resolve_doi_conflict,
 )
@@ -159,77 +157,3 @@ class TestDecidePublicationMatch:
             publication_id=40,
             matched_by=MetadataDeduplicationCase.THESIS_TITLE_YEAR,
         )
-
-
-# ── decide_doi_attribution (règle pure) ────────────────────────────
-
-
-class TestDecideDoiAttribution:
-    def test_no_proposed_doi_is_noop(self):
-        decision = decide_doi_attribution(
-            current_doi=None,
-            proposed_doi=None,
-            current_pub_id=1,
-            existing_doi_match_id=None,
-        )
-        assert decision == DoiAttributionDecision(action="noop")
-
-    def test_empty_proposed_doi_is_noop(self):
-        decision = decide_doi_attribution(
-            current_doi=None,
-            proposed_doi="",
-            current_pub_id=1,
-            existing_doi_match_id=None,
-        )
-        assert decision == DoiAttributionDecision(action="noop")
-
-    def test_current_doi_present_is_noop_even_when_proposed_is_free(self):
-        """Politique conservative : on n'écrase jamais un DOI existant."""
-        decision = decide_doi_attribution(
-            current_doi="10.x/already",
-            proposed_doi="10.x/proposed",
-            current_pub_id=1,
-            existing_doi_match_id=None,
-        )
-        assert decision == DoiAttributionDecision(action="noop")
-
-    def test_current_doi_same_as_proposed_is_noop(self):
-        """Même DOI déjà en place : noop, pas attribute (effet identique mais label honnête)."""
-        decision = decide_doi_attribution(
-            current_doi="10.x/same",
-            proposed_doi="10.x/same",
-            current_pub_id=1,
-            existing_doi_match_id=1,
-        )
-        assert decision == DoiAttributionDecision(action="noop")
-
-    def test_doi_held_by_other_pub_merges(self):
-        decision = decide_doi_attribution(
-            current_doi=None,
-            proposed_doi="10.x/held",
-            current_pub_id=1,
-            existing_doi_match_id=42,
-        )
-        assert decision == DoiAttributionDecision(action="merge", merge_with_id=42)
-
-    def test_doi_free_attributes(self):
-        decision = decide_doi_attribution(
-            current_doi=None,
-            proposed_doi="10.x/free",
-            current_pub_id=1,
-            existing_doi_match_id=None,
-        )
-        assert decision == DoiAttributionDecision(action="attribute")
-
-    def test_doi_already_on_current_pub_attributes(self):
-        """Cas idempotent : le DOI proposé est déjà sur la pub courante (current_doi serait alors non-None, donc en réalité ce cas tombe sur le noop).
-
-        Ce test garde le cas de figure où current_doi serait None mais existing_doi_match_id == current_pub_id (incohérence théorique : signifie que find_by_doi a retourné la pub courante alors que sa colonne doi est nulle — ne devrait pas arriver, mais la règle décide quand même = attribute).
-        """
-        decision = decide_doi_attribution(
-            current_doi=None,
-            proposed_doi="10.x/x",
-            current_pub_id=1,
-            existing_doi_match_id=1,
-        )
-        assert decision == DoiAttributionDecision(action="attribute")
