@@ -54,9 +54,9 @@ Le pipeline contient aujourd'hui **5 cascades de matching/fusion disséminées**
 
 ### Phase 0 — Préliminaire de vocabulaire
 
-- [ ] `git mv domain/publications/dedup.py domain/publications/deduplication.py` + idem pour `tests/unit/domain/publications/test_dedup.py` → `test_deduplication.py`.
-- [ ] Mettre à jour les sites d'import (~3-4 fichiers : `application/publications.py`, `application/pipeline/publications/create_publications.py`, `domain/publications/publication.py` si nécessaire, tests).
-- [ ] Mettre à jour la fiche `CODE_rich-domain-model.md` qui référence `dedup.py`.
+- [x] `git mv domain/publications/dedup.py domain/publications/deduplication.py` + idem pour `tests/unit/domain/publications/test_dedup.py` → `test_deduplication.py`. Renommage analogue du fichier de fiche : `METIER_dedup-fusion-publications.md` → `METIER_deduplication-fusion-publications.md`.
+- [x] Sites d'import mis à jour : `application/publications.py`, `application/pipeline/publications/create_publications.py`, `application/pipeline/normalize/normalize_{hal,scanr,crossref}.py`, `tests/unit/domain/publications/test_deduplication.py`.
+- [x] Docstrings (`domain/publications/__init__.py`, `domain/publications/deduplication.py`, `domain/publication.py`) et fiche `CODE_rich-domain-model.md` mises à jour (toutes les références `dedup.py` → `deduplication.py`, chemins vers la fiche METIER renommée).
 
 ### Phase 1 — Exfiltration de l'algorithme de fusion vers `merge.py`
 
