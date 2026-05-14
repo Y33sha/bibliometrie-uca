@@ -276,16 +276,16 @@ class TestCrossRefDocTypeMap:
             assert v in VALID_DOC_TYPES_SET, f"Type inconnu : {v}"
 
 
-# ── _first_doc_type : arbitrage type vs sous-type ───────────────
+# ── arbitrate_doc_type_with_article_subtype : arbitrage type vs sous-type ──
 
 
 class TestFirstDocTypeArbitration:
     """Arbitrage CrossRef (`journal-article`) vs sous-type plus précis."""
 
     def _setup(self):
-        from application.publications import _first_doc_type
+        from domain.publications.merge import arbitrate_doc_type_with_article_subtype
 
-        return _first_doc_type
+        return arbitrate_doc_type_with_article_subtype
 
     def test_crossref_article_yields_to_hal_review(self):
         """CrossRef `journal-article` ne doit pas écraser un sous-type
