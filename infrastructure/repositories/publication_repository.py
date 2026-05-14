@@ -380,6 +380,15 @@ class PgPublicationRepository:
         )
         self._conn.execute(text("DELETE FROM publications WHERE id = :s"), {"s": source_id})
 
+    # ── Suppression ────────────────────────────────────────────────
+
+    def delete(self, pub_id: int) -> None:
+        """Supprime une publication. Le cascade DB nettoie `authorships`, `distinct_publications`, `publication_subjects` (ON DELETE CASCADE) ; `apc_payments` et `source_publications.publication_id` passent à NULL (ON DELETE SET NULL)."""
+        self._conn.execute(
+            text("DELETE FROM publications WHERE id = :id"),
+            {"id": pub_id},
+        )
+
     # ── distinct_publications ──────────────────────────────────────
 
     def mark_distinct(self, pub_id_a: int, pub_id_b: int) -> tuple[int, int] | None:
