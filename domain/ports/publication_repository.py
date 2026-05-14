@@ -30,6 +30,8 @@ class PublicationRepository(Protocol):
 
     def find_by_nnt(self, nnt: str) -> PubByNnt | None: ...
 
+    def find_by_hal_id(self, hal_id: str) -> int | None: ...
+
     def find_by_title(
         self,
         title_normalized: str,
