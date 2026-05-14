@@ -155,7 +155,7 @@ _INSERT_WOS_BATCH_SQL = text(
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
 
-def insert_batch(conn: Connection, batch: list[dict]) -> Any:
+def insert_batch(conn: Connection, batch: list[dict]) -> None:
     """Insère un batch de records dans staging.
     Si le record existe et le hash a changé, met à jour raw_data et remet processed = FALSE.
     """
@@ -254,7 +254,7 @@ def extract_year(year: int, conn: Connection, existing_uts: set, dry_run: bool =
     return total_inserted
 
 
-def log_remaining_quota(resp_headers: dict) -> Any:
+def log_remaining_quota(resp_headers: dict) -> None:
     """Log les quotas restants si disponibles dans les headers."""
     remaining = resp_headers.get("X-REC-AmtPerYear-Remaining")
     if remaining:

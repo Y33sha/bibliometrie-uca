@@ -10,7 +10,7 @@ array pour gagner à passer par MetaData.
 
 from typing import Any
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from domain.publication import (  # noqa: F401 — re-export pour compat
     PubByDoi,
@@ -23,7 +23,7 @@ from domain.publications.publication import Publication
 from domain.source_publications.source_publication import SourcePublication
 
 
-def _source_publication_from_row(row: Any) -> SourcePublication:
+def _source_publication_from_row(row: Row[Any]) -> SourcePublication:
     """Mapping d'une row `source_publications` SQL vers le VO `SourcePublication`. Convertit les colonnes `text[]` Postgres en tuples immutables."""
     return SourcePublication(
         id=row.id,

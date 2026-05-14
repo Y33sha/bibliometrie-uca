@@ -202,7 +202,7 @@ def extract_doi(doc: dict) -> str | None:
 
 def upsert_work(
     conn: Connection, hal_id: str, doi: str | None, raw_data: dict, collection: str
-) -> Any:
+) -> None:
     """
     Insère ou met à jour un work dans staging.
     Si le halId existe déjà : ajoute la collection, et si le contenu a changé
