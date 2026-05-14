@@ -31,21 +31,13 @@ from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
-from application.publications import (
-    find_or_create,
-    find_thesis_by_title,
-    publication_from_meta,
-    refresh_from_sources,
-    try_merge_by_doi,
-)
 from domain.dates import french_date_to_iso
-from domain.normalize import normalize_name, normalize_text
+from domain.normalize import normalize_text
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from domain.sources.theses import (
     aggregate_thesis_persons,
     derive_theses_doc_type,
-    thesis_authors_compatible,
 )
 
 # =============================================================
@@ -53,28 +45,10 @@ from domain.sources.theses import (
 # =============================================================
 
 
-def _extract_thesis_author(these: dict) -> tuple[str, str] | None:
-    """Extrait (last_name, first_name) normalisés de l'auteur de la thèse."""
-    auteurs = these.get("auteurs") or []
-    if not auteurs:
-        return None
-    auteur = auteurs[0]
-    ln = normalize_name(auteur.get("nom") or "")
-    fn = normalize_name(auteur.get("prenom") or "")
-    return (ln, fn) if ln else None
-
-
-def _thesis_author_compatible(
-    conn: Connection, queries: ThesesNormalizeQueries, pub_id: int, author: tuple[str, str]
-) -> bool:
-    primary = queries.fetch_thesis_primary_author(conn, pub_id)
-    return thesis_authors_compatible(primary, author)
-
-
 def extract_pub_metadata(these: dict) -> dict:
     """Extrait les métadonnées de publication d'une thèse.
 
-    Retourne un dict utilisable par find_or_create et par insert_source_document.
+    Retourne un dict utilisable par `insert_source_document`.
     """
     title = these.get("titrePrincipal")
     date_soutenance = french_date_to_iso(these.get("dateSoutenance"))
@@ -100,69 +74,6 @@ def extract_pub_metadata(these: dict) -> dict:
         container_title=None,
         language=None,
     )
-
-
-def find_publication(
-    conn: Connection,
-    queries: ThesesNormalizeQueries,
-    these: dict,
-    *,
-    pub_repo: PublicationRepository,
-) -> int | None:
-    """Cherche une publication existante sans en créer. Retourne l'id ou None.
-
-    Déduplication en 2 étapes :
-    1. Par DOI ou NNT (via find_or_create avec allow_create=False)
-    2. Par titre normalisé + année + compatibilité auteur (spécifique thèses)
-    """
-    meta = extract_pub_metadata(these)
-    title = meta["title"]
-    if not title:
-        return None
-
-    pub_year = meta["pub_year"]
-    doi = meta["doi"]
-    nnt_clean = meta["nnt"]
-    title_norm = meta["title_normalized"]
-
-    # 1. Chercher par DOI ou NNT (sans créer)
-    result, _ = find_or_create(
-        publication_from_meta(meta),
-        nnt=nnt_clean,
-        allow_create=False,
-        repo=pub_repo,
-    )
-    if result is not None:
-        return result.id
-
-    # 2. Dédup spécifique thèses : titre + année + auteur compatible
-    if pub_year and title_norm:
-        candidates = find_thesis_by_title(title_norm, pub_year, repo=pub_repo)
-        if candidates:
-            author = _extract_thesis_author(these)
-            for cand in candidates:
-                if not author or _thesis_author_compatible(conn, queries, cand.id, author):
-                    # Match trouvé → attribuer le DOI si nécessaire
-                    try_merge_by_doi(cand.id, doi, repo=pub_repo)
-                    return cand.id
-
-    return None
-
-
-def _update_thesis_meta(
-    conn: Connection, queries: ThesesNormalizeQueries, pub_id: int, these: dict
-) -> None:
-    """Met à jour publications.meta avec les dates de thèse."""
-    meta = {}
-    ds = french_date_to_iso(these.get("dateSoutenance"))
-    di = french_date_to_iso(these.get("datePremiereInscriptionDoctorat"))
-    if ds:
-        meta["date_soutenance"] = ds
-    if di:
-        meta["date_inscription"] = di
-    if not meta:
-        return
-    queries.merge_publication_meta(conn, pub_id, meta)
 
 
 # =============================================================
@@ -324,22 +235,11 @@ def process_work(
 
         pub_meta = extract_pub_metadata(these)
 
-        publication_id = queries.get_theses_publication_id(conn, theses_id)
-        if not publication_id:
-            publication_id = find_publication(conn, queries, these, pub_repo=pub_repo)
-
-        if publication_id:
-            publication_id = try_merge_by_doi(publication_id, pub_meta["doi"], repo=pub_repo)
-
         source_publication_id = insert_source_document(
-            conn, queries, these, staging_id, theses_id, publication_id, pub_meta
+            conn, queries, these, staging_id, theses_id, None, pub_meta
         )
 
         process_persons(conn, queries, these, source_publication_id, address_linker=address_linker)
-
-        if publication_id:
-            refresh_from_sources(publication_id, repo=pub_repo)
-            _update_thesis_meta(conn, queries, publication_id, these)
 
         staging_queries.mark_done(conn, staging_id)
 

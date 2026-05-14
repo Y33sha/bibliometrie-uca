@@ -367,32 +367,8 @@ class TestNormalizeNnt:
 
 from application.pipeline.normalize.normalize_theses import (
     _build_source_meta,
-    _extract_thesis_author,
     extract_pub_metadata,
 )
-
-
-class TestThesesExtractAuthor:
-    def test_standard(self):
-        these = {"auteurs": [{"nom": "Dupont", "prenom": "Jean"}]}
-        assert _extract_thesis_author(these) == ("dupont", "jean")
-
-    def test_uppercase_and_accents(self):
-        these = {"auteurs": [{"nom": "LÉCOZ", "prenom": "Héloïse"}]}
-        assert _extract_thesis_author(these) == ("lecoz", "heloise")
-
-    def test_no_auteurs(self):
-        assert _extract_thesis_author({}) is None
-        assert _extract_thesis_author({"auteurs": []}) is None
-
-    def test_only_firstname(self):
-        """Pas de nom → None (ln vide)."""
-        these = {"auteurs": [{"nom": "", "prenom": "Jean"}]}
-        assert _extract_thesis_author(these) is None
-
-    def test_missing_first_name(self):
-        these = {"auteurs": [{"nom": "Dupont"}]}
-        assert _extract_thesis_author(these) == ("dupont", "")
 
 
 class TestThesesExtractPubMetadata:
