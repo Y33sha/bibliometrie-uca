@@ -76,13 +76,10 @@ Réécrire `create_publications.py` pour intégrer la cascade complète.
 - [x] `find_by_hal_id` sur le port `PublicationRepository` + adapter Postgres. Couvre le path natif HAL (`source='hal' AND source_id=hal_id`) ET le path cross-source (`external_ids->>'hal_id'=hal_id` posé par OpenAlex/ScanR). Tests d'intégration.
 - [x] Queries thèse côté `PublicationsCreateQueries` : `fetch_thesis_primary_author(publication_id)` (auteur primary d'une pub canonique candidate) et `fetch_thesis_primary_author_from_source_publication(source_publication_id)` (auteur primary d'un source_publication courant, avant rattachement).
 - [x] Cascade dans `process_document` : prefetch DOI (avec `resolve_doi_conflict`) → NNT → HAL_ID → THESIS_TITLE_YEAR (si `doc_type='thesis'`) → `decide_publication_match` → match/create → `try_merge_by_doi` post-match si non-DOI → `link_source_publication_to_publication` → `refresh_from_sources`.
-- [ ] Renommage `create_publications.py` → `match_or_create_publications.py` : reporté à Phase 2 (le nom reste cohérent tant que la phase ne traite que les orphelins).
-- [ ] Repointing HAL via résolveur de chaîne : reporté à Phase 2 (n'apparaît qu'une fois les normalizers cessant de rattacher).
-- [ ] Filtrage `publication_id IS NULL` vs `matched_at` : à trancher en Phase 2 (re-runs après suppression du matching côté normalizers).
 
-### Phase 2 — Retrait du matching des normalizers
+### Phase 2 — Retrait du matching des normalizers + élargissement de la phase publications
 
-Pour chaque normalizer, supprimer la cascade et les imports associés. Chaque `source_publication` est créé avec `publication_id = NULL`.
+**Retrait par normalizer**. Chaque `source_publication` est créé avec `publication_id = NULL`.
 
 - [ ] `normalize_hal.py` : retrait du `find_publication` + `try_merge_by_doi` + `refresh_from_sources` + cas repointing dans `process_work`. Le `get_hal_publication_id` mono-source disparaît (porté en phase publications via `external_ids.hal_id`).
 - [ ] `normalize_openalex.py` : retrait du `find_publication` + cascade HAL/NNT primary_location + `find_hal_publication_id` + `get_openalex_publication_id` + `resolve_doi_conflict` + `try_merge_by_doi` + `refresh_from_sources`. Conservation de l'extraction NNT/HAL_ID depuis primary_location → mémorisée dans `external_ids` (Phase 0).
@@ -90,6 +87,12 @@ Pour chaque normalizer, supprimer la cascade et les imports associés. Chaque `s
 - [ ] `normalize_scanr.py` : retrait du `find_publication` + `try_merge_by_doi` + `refresh_from_sources`.
 - [ ] `normalize_crossref.py` : retrait du `find_publication` + `try_merge_by_doi` + `refresh_from_sources`.
 - [ ] `normalize_wos.py` : retrait analogue.
+
+**Élargissement de la phase publications**. Une fois que les normalizers ne rattachent plus, la phase devient le seul site de rattachement et doit gérer les cas qui apparaissent alors.
+
+- [ ] Renommer `create_publications.py` → `match_or_create_publications.py` (phase + entry point CLI). Renommer le port `PublicationsCreateQueries` → `PublicationsMatchOrCreateQueries`.
+- [ ] Repointing HAL via résolveur de chaîne (`merge_publications_by_key` style) : si la cascade trouve une autre pub que celle déjà rattachée à un `source_publication` partageant le `hal_id`, fusion + résolution.
+- [ ] Trancher `publication_id IS NULL` vs `matched_at` pour le filtrage du SELECT : nouveau critère nécessaire si on veut pouvoir re-matcher à la demande sans casser l'idempotence par défaut.
 
 ### Phase 3 — Cleanup
 
