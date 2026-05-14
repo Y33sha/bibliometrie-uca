@@ -8,6 +8,8 @@ intriquées en casts enum (oa_type, doc_type, source_type) et opérations
 array pour gagner à passer par MetaData.
 """
 
+from typing import Any
+
 from sqlalchemy import Connection, text
 
 from domain.publication import (  # noqa: F401 — re-export pour compat
@@ -18,6 +20,37 @@ from domain.publication import (  # noqa: F401 — re-export pour compat
 )
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
+from domain.source_publications.source_publication import SourcePublication
+
+
+def _source_publication_from_row(row: Any) -> SourcePublication:
+    """Mapping d'une row `source_publications` SQL vers le VO `SourcePublication`. Convertit les colonnes `text[]` Postgres en tuples immutables."""
+    return SourcePublication(
+        id=row.id,
+        source=row.source,
+        source_id=row.source_id,
+        title=row.title,
+        pub_year=row.pub_year,
+        doc_type=row.doc_type,
+        doi=row.doi,
+        publication_id=row.publication_id,
+        staging_id=row.staging_id,
+        journal_id=row.journal_id,
+        container_title=row.container_title,
+        language=row.language,
+        oa_status=row.oa_status,
+        cited_by_count=row.cited_by_count,
+        is_retracted=row.is_retracted,
+        abstract=row.abstract,
+        countries=tuple(row.countries or ()),
+        hal_collections=tuple(row.hal_collections or ()),
+        urls=tuple(row.urls or ()),
+        keywords=tuple(row.keywords or ()),
+        external_ids=row.external_ids,
+        topics=row.topics,
+        biblio=row.biblio,
+        meta=row.meta,
+    )
 
 
 class PgPublicationRepository:
@@ -281,19 +314,21 @@ class PgPublicationRepository:
 
     # ── Agrégation depuis source_publications ──────────────────────
 
-    def get_source_rows(self, pub_id: int) -> list[dict]:
-        """Retourne toutes les lignes source_publications attachées à une publication, avec les champs nécessaires au recalcul d'agrégation (`refresh_from_sources`)."""
+    def get_source_publications(self, pub_id: int) -> list[SourcePublication]:
+        """Retourne les `SourcePublication` attachées à une publication canonique, hydratées pour l'agrégation (`refresh_from_sources` côté domain)."""
         result = self._conn.execute(
             text("""
-                SELECT source, title, doi, doc_type, pub_year, journal_id, oa_status,
-                       container_title, language, abstract, keywords, countries,
-                       topics, biblio, meta, is_retracted, external_ids
+                SELECT id, source, source_id, title, pub_year, doc_type, doi,
+                       publication_id, staging_id, journal_id, container_title,
+                       language, oa_status, cited_by_count, is_retracted, abstract,
+                       countries, hal_collections, urls, keywords,
+                       external_ids, topics, biblio, meta
                 FROM source_publications
                 WHERE publication_id = :id
             """),
             {"id": pub_id},
         )
-        return [dict(row._mapping) for row in result]
+        return [_source_publication_from_row(row) for row in result]
 
     # ── Création ───────────────────────────────────────────────────
 

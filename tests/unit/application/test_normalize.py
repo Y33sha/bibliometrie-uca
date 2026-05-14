@@ -282,61 +282,66 @@ class TestCrossRefDocTypeMap:
 class TestFirstDocTypeArbitration:
     """Arbitrage CrossRef (`journal-article`) vs sous-type plus précis."""
 
-    def _setup(self):
-        from domain.publications.merge import arbitrate_doc_type_with_article_subtype
+    @staticmethod
+    def _src(source: str, doc_type: str | None) -> "SourcePublication":  # noqa: F821
+        from domain.source_publications.source_publication import SourcePublication
+
+        return SourcePublication(
+            id=None, source=source, source_id="x", title="x", doc_type=doc_type
+        )
+
+    def _arbitrate(self):
+        from domain.publications.aggregation import arbitrate_doc_type_with_article_subtype
 
         return arbitrate_doc_type_with_article_subtype
 
     def test_crossref_article_yields_to_hal_review(self):
-        """CrossRef `journal-article` ne doit pas écraser un sous-type
-        review fourni par HAL (priorité moindre)."""
-        first = self._setup()
-        rows = [
-            {"source": "crossref", "doc_type": "journal-article"},  # priorité 2
-            {"source": "hal", "doc_type": "art_artrev"},  # priorité 4 → review
+        """CrossRef `journal-article` ne doit pas écraser un sous-type review fourni par HAL (priorité moindre)."""
+        arbitrate = self._arbitrate()
+        sources = [
+            self._src("crossref", "journal-article"),  # priorité 2
+            self._src("hal", "art_artrev"),  # priorité 4 → review
         ]
-        assert first(rows) == "review"
+        assert arbitrate(sources) == "review"
 
     def test_crossref_book_chapter_kept(self):
-        """CrossRef `book-chapter` est mappé directement, pas un sous-type
-        d'article : la règle d'arbitrage ne s'applique pas."""
-        first = self._setup()
-        rows = [
-            {"source": "crossref", "doc_type": "book-chapter"},
-            {"source": "hal", "doc_type": "art_artrev"},
+        """CrossRef `book-chapter` est mappé directement, pas un sous-type d'article : la règle d'arbitrage ne s'applique pas."""
+        arbitrate = self._arbitrate()
+        sources = [
+            self._src("crossref", "book-chapter"),
+            self._src("hal", "art_artrev"),
         ]
-        assert first(rows) == "book_chapter"
+        assert arbitrate(sources) == "book_chapter"
 
     def test_crossref_article_no_subtype_falls_back(self):
         """CrossRef `journal-article` sans sous-type ailleurs → article."""
-        first = self._setup()
-        rows = [
-            {"source": "crossref", "doc_type": "journal-article"},
-            {"source": "hal", "doc_type": "art"},
+        arbitrate = self._arbitrate()
+        sources = [
+            self._src("crossref", "journal-article"),
+            self._src("hal", "art"),
         ]
-        assert first(rows) == "article"
+        assert arbitrate(sources) == "article"
 
     def test_subtype_in_priority_source_kept(self):
-        """Si la source prioritaire (theses) donne un type spécifique,
-        l'arbitrage n'intervient pas."""
-        first = self._setup()
-        rows = [
-            {"source": "theses", "doc_type": "thesis"},
-            {"source": "crossref", "doc_type": "journal-article"},
+        """Si la source prioritaire (theses) donne un type spécifique, l'arbitrage n'intervient pas."""
+        arbitrate = self._arbitrate()
+        sources = [
+            self._src("theses", "thesis"),
+            self._src("crossref", "journal-article"),
         ]
-        assert first(rows) == "thesis"
+        assert arbitrate(sources) == "thesis"
 
     def test_empty_rows_returns_other(self):
-        first = self._setup()
-        assert first([]) == "other"
+        arbitrate = self._arbitrate()
+        assert arbitrate([]) == "other"
 
     def test_all_null_doc_type_returns_other(self):
-        first = self._setup()
-        rows = [
-            {"source": "crossref", "doc_type": None},
-            {"source": "hal", "doc_type": None},
+        arbitrate = self._arbitrate()
+        sources = [
+            self._src("crossref", None),
+            self._src("hal", None),
         ]
-        assert first(rows) == "other"
+        assert arbitrate(sources) == "other"
 
 
 # ── NNT ─────────────────────────────────────────────────────────

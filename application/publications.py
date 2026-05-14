@@ -21,11 +21,16 @@ from domain.publication import (
     PubByTitle,
     PubThesisCandidate,
 )
+from domain.publications.aggregation import (
+    first_non_null,
+)
+from domain.publications.aggregation import (
+    refresh_from_sources as _refresh_aggregate,
+)
 from domain.publications.deduplication import (
     resolve_doi_conflict as _domain_resolve_doi_conflict,
 )
 from domain.publications.identifiers import DOI
-from domain.publications.merge import first_non_null, merge_source_rows
 from domain.sources import SOURCE_PRIORITY
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
@@ -129,9 +134,9 @@ def refresh_from_sources(
 ) -> RefreshResult:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_publications`.
 
-    Recalcul complet (pas de COALESCE incrémental qui figerait les valeurs au premier arrivé) : lit TOUS les `source_publications` attachés, applique l'algorithme d'agrégation `merge_source_rows` (domain) qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées obsolètes (ex: `ongoing_thesis` → `thesis` après soutenance).
+    Recalcul complet (pas de COALESCE incrémental qui figerait les valeurs au premier arrivé) : lit TOUS les `SourcePublication` attachés, applique l'algorithme d'agrégation `refresh_from_sources` (domain) qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées obsolètes (ex: `ongoing_thesis` → `thesis` après soutenance).
 
-    **Cas orphelin** : si la publication n'a aucune source rattachée, la règle métier dicte qu'elle ne doit pas exister. `merge_source_rows` retourne `RefreshOutcome(is_orphan=True)` ; le caller (cette fonction) supprime la publication via `repo.delete` et émet un événement `publication.deleted_orphan`.
+    **Cas orphelin** : si la publication n'a aucune source rattachée, la règle métier dicte qu'elle ne doit pas exister. Court-circuit : suppression via `repo.delete` + audit event `publication.deleted_orphan`, sans appel à l'agrégation.
 
     Auto-fusion sur conflit DOI : si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant le save — au lieu de laisser remonter une violation de la contrainte unique. `pub_id` reste vivant pour le caller, et l'id absorbée est exposée dans `RefreshResult.absorbed_publication_id`.
 
@@ -143,34 +148,34 @@ def refresh_from_sources(
     if pub is None:
         return RefreshResult()
 
-    rows = repo.get_source_rows(pub_id)
-    if not rows:
-        # Pub orpheline : suppression côté caller (la règle métier est signalée par merge_source_rows quand on l'appellera ; ici on court-circuite parce qu'on n'a pas besoin d'agréger pour décider).
+    sources = repo.get_source_publications(pub_id)
+    if not sources:
+        # Pub orpheline : suppression côté caller (la règle métier est signalée par `aggregation.refresh_from_sources` ; ici on court-circuite parce qu'on n'a pas besoin d'agréger pour décider).
         repo.delete(pub_id)
         emit_event(audit_repo, "publication.deleted_orphan", "publication", pub_id, {})
         return RefreshResult()
 
     # Si le DOI à promouvoir est déjà occupé par une autre publication, fusionner d'abord pour éviter une violation de la contrainte unique `publications_doi_lower_key`. Cas typique : une thèse avec un DOI ABES (10.70675/…) créée en double — une fois via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître dans une `source_publication`, sa promotion collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans `pub_id` (qui reste vivant pour le caller).
     #
-    # Le DOI brut est normalisé via le VO `DOI` avant le lookup : c'est cette forme normalisée (suffixe `.vN` strippé, lowercased) qui sera posée par `merge_source_rows`. Le pré-merge doit chercher la même forme, sinon des collisions échappent au mécanisme.
+    # Le DOI brut est normalisé via le VO `DOI` avant le lookup : c'est cette forme normalisée (suffixe `.vN` strippé, lowercased) qui sera posée par l'agrégation. Le pré-merge doit chercher la même forme, sinon des collisions échappent au mécanisme.
     absorbed: int | None = None
     rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
-    rows_sorted = sorted(rows, key=lambda r: rank.get(r["source"], 99))
-    new_doi_raw = first_non_null(rows_sorted, "doi")
+    sorted_sources = sorted(sources, key=lambda s: rank.get(s.source, 99))
+    new_doi_raw = first_non_null(sorted_sources, "doi")
     new_doi_vo = DOI.try_parse(new_doi_raw) if new_doi_raw else None
     if new_doi_vo:
         existing = repo.find_by_doi(str(new_doi_vo))
         if existing and existing.id != pub_id:
             absorbed = existing.id
             merge_publications(pub_id, existing.id, repo=repo, audit_repo=audit_repo)
-            rows = repo.get_source_rows(pub_id)
+            sources = repo.get_source_publications(pub_id)
             # Recharger pub : ses attributs ont pu être enrichis via Publication.absorb pendant merge_publications.
             pub = repo.find_by_id(pub_id)
             if pub is None:
                 return RefreshResult(absorbed_publication_id=absorbed)
 
     previous_doi = pub.doi
-    merge_source_rows(pub, rows, source_priority=SOURCE_PRIORITY)
+    _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY)
     repo.save(pub)
     repo.update_sources(pub_id)
 
