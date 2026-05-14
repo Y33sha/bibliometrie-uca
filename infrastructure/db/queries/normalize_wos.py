@@ -197,20 +197,6 @@ def insert_source_authorship_addresses_batch(
     )
 
 
-def get_wos_publication_id(conn: Connection, ut: str) -> int | None:
-    """Idempotence : retourne le `publication_id` déjà associé au document WoS."""
-    row = conn.execute(
-        text(
-            "SELECT publication_id FROM source_publications "
-            "WHERE source = 'wos' AND source_id = :ut"
-        ),
-        {"ut": ut},
-    ).one_or_none()
-    if row is None:
-        return None
-    return row.publication_id if row.publication_id else None
-
-
 class PgWosNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_wos.WosNormalizeQueries`."""
 
@@ -243,9 +229,6 @@ class PgWosNormalizeQueries:
         self, conn: Connection, values: list[dict[str, int]]
     ) -> None:
         insert_source_authorship_addresses_batch(conn, values)
-
-    def get_wos_publication_id(self, conn: Connection, ut: str) -> int | None:
-        return get_wos_publication_id(conn, ut)
 
     def clear_source_authorships_for_publication(
         self, conn: Connection, source_publication_id: int

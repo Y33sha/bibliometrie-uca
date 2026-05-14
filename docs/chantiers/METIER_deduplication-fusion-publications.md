@@ -98,18 +98,15 @@ Ferme le dernier item ouvert de Phase 4 du chantier `CODE_rich-domain-model`.
 
 ### Phase 5 — Cleanup
 
-- [ ] Selon arbitrage de Q3 : `try_merge_by_doi` absorbé dans `decide_doi_attribution` ou laissé.
-- [ ] Selon arbitrage de Q4 : wrapper `application/publications.py:resolve_doi_conflict` simplifié ou supprimé.
-
-## Questions ouvertes
-
-- **Q4 — wrapper `application/publications.py:resolve_doi_conflict`** : devient-il redondant après la factorisation ? Pourrait disparaître si `decide_publication_match` retourne aussi les effets de bord à appliquer (style `RefreshResult`). À trancher en fin de Phase 4.
+Phase caduque. La migration des 4 cascades restantes (`find_or_create`, `normalize_openalex`, `normalize_theses`, `normalize_hal:process_work`) et le cleanup associé sont absorbés par le chantier `DATA_separer-matching-normalisation.md` qui centralise tout le matching en aval du pipeline. Les primitives livrées en Phases 0-3 + 4 partielle (décideurs purs, helper de fusion par clé, ranking SQL retiré, algo merge exfiltré, find_or_create migré) sont consommées telles quelles par la phase publications unifiée.
 
 ## Décisions tranchées
 
 - **Q2 — shape de la fusion multi-sources** : pas de `MergedPubFields` séparé ; `Publication` étendue porte toutes les colonnes canoniques, et `merge_source_rows(pub, rows, *)` mute l'entité en place (Phase 1).
 
 - **Q3 — `try_merge_by_doi` absorbé par `decide_doi_attribution`** : OUI. Mini-règle pure en domain (3 branches : `noop` / `merge` / `attribute`), wrapper application qui prefetch les données et applique l'effet. Politique conservative préservée : si la pub a déjà un DOI quelconque, `noop` (pas de remplacement). Label `noop` unique (pas de distinction « même DOI » vs « DOI différent » — effet identique en base, label honnête côté audit).
+
+- **Q4 — wrapper `application/publications.py:resolve_doi_conflict`** : GARDÉ. Pattern « règle pure en domain + wrapper application qui applique l'effet `clear_doi` » aligné sur les autres décideurs du chantier (`decide_doi_attribution` + `try_merge_by_doi`, `decide_publication_match` + son caller). Pas de remontée des effets de bord dans `decide_publication_match` qui alourdirait l'API du décideur pour un effet d'un seul cas. Utilisé par `match_or_create_publications.process_document` (Phase 1 du chantier DATA).
 
 ## Liens
 

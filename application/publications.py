@@ -142,27 +142,6 @@ def resolve_doi_conflict(
     return decision.accepted_doi, decision.merge_with_id
 
 
-def publication_from_meta(meta: dict) -> Publication:
-    """Adapter dict→Publication pour les call sites de `find_or_create`.
-
-    Les normalizers (`normalize_hal`, `normalize_openalex`, etc.) construisent leur métadonnée en dict via `extract_pub_metadata`, et le dict contient à la fois les attributs d'une `Publication` ET d'autres données (`nnt`, parfois `source_doi`…) consommées par d'autres traitements en aval (`insert_*_document`, tracking de DOI rejeté). Plutôt que de fragmenter le dict côté normalizer, on convertit à l'entrée de `find_or_create`.
-
-    Le `nnt` n'est PAS lu ici (il vit dans `source_publications.external_ids`, pas sur l'aggregate Publication). Le caller le passe séparément à `find_or_create(..., nnt=meta["nnt"])`.
-    """
-    return Publication(
-        id=None,
-        title=meta["title"],
-        title_normalized=meta.get("title_normalized"),
-        pub_year=meta["pub_year"],
-        doc_type=meta.get("doc_type"),
-        doi=DOI(meta["doi"]) if meta.get("doi") else None,
-        oa_status=meta.get("oa_status"),
-        journal_id=meta.get("journal_id"),
-        container_title=meta.get("container_title"),
-        language=meta.get("language"),
-    )
-
-
 def find_or_create(
     pub: Publication,
     *,

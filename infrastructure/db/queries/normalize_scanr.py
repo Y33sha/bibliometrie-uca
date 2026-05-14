@@ -135,18 +135,6 @@ def upsert_scanr_source_authorship(
     return row.id
 
 
-def get_scanr_publication_id(conn: Connection, scanr_id: str) -> int | None:
-    """Idempotence : retourne `publication_id` déjà associé au document ScanR."""
-    row = conn.execute(
-        text(
-            "SELECT publication_id FROM source_publications "
-            "WHERE source = 'scanr' AND source_id = :scanr_id"
-        ),
-        {"scanr_id": scanr_id},
-    ).one_or_none()
-    return row.publication_id if row else None
-
-
 class PgScanrNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_scanr.ScanrNormalizeQueries`."""
 
@@ -155,9 +143,6 @@ class PgScanrNormalizeQueries:
 
     def upsert_scanr_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_scanr_source_authorship(conn, **kwargs)
-
-    def get_scanr_publication_id(self, conn: Connection, scanr_id: str) -> int | None:
-        return get_scanr_publication_id(conn, scanr_id)
 
     def clear_source_authorships_for_publication(
         self, conn: Connection, source_publication_id: int

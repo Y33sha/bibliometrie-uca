@@ -97,25 +97,33 @@ Réécrire `create_publications.py` pour intégrer la cascade complète.
 
 ### Phase 3 — Cleanup
 
-- [ ] Suppression des helpers source-spécifiques devenus inutilisés : `find_hal_publication_id` (openalex), `get_openalex_publication_id`, `get_hal_publication_id`, `find_hal_publication_id` (theses si applicable).
-- [ ] Audit de l'API `application/publications.py` : `find_or_create` n'est plus appelé que depuis la phase publications. Voir si son interface peut être simplifiée (peut-être devenu redondant avec la cascade explicite de `match_or_create_publications`).
-- [ ] Q4 du chantier METIER : `resolve_doi_conflict` wrapper côté application — utilisé ? simplifiable ? supprimable ?
-- [ ] Mise à jour de `docs/pipeline.md` et `CLAUDE.md` si nécessaire (description des phases).
+- [x] Suppression des helpers source-spécifiques devenus inutilisés : `get_hal_publication_id`, `get_openalex_publication_id`, `get_scanr_publication_id`, `get_wos_publication_id`, `get_crossref_publication_id`, `get_theses_publication_id`, `fetch_publication_id_for_hal_source` (côté queries + ports normalize + tests obsolètes).
+- [x] Suppression de `fetch_thesis_primary_author` et `merge_publication_meta` côté `normalize_theses` queries (dupliquées / inutilisées depuis Phase 2).
+- [x] Suppression de `publication_from_meta` dans `application/publications.py` (n'avait plus de caller depuis le retrait du matching dans les normalizers).
+- [x] Audit de l'API `application/publications.py:find_or_create` : conservée pour les tests d'intégration (API ergonomique). Plus utilisée en prod.
+- [x] `docs/pipeline.md` et `CLAUDE.md` ne mentionnent ni `create_publications` ni les helpers supprimés. Pas de mise à jour nécessaire.
 
 ### Phase 4 — Validation pipeline complet
 
-- [ ] Run complet du pipeline sur une base test, vérifier les tableaux résultants (counts publications, source_publications, distribution des matchings).
-- [ ] Comparer aux runs précédents (avant chantier) sur les mêmes données — un certain delta est attendu (logique de matching DOI > NNT > HAL_ID alignée partout, plus de comportements divergents par source), mais il doit être interprétable.
+- [ ] Extraire un baseline (counts par source, distribution des matchings, distribution oa_status, etc.) avant le run.
+- [ ] Run complet du pipeline sur la base.
+- [ ] Comparer baseline vs après-run. Un certain delta est attendu (cascade DOI > NNT > HAL_ID alignée partout, plus de comportements divergents par source), mais il doit être interprétable.
+
+## Décisions tranchées
+
+- **Cascade unifiée DOI > NNT > HAL_ID > metadata (thèse)** : implémentée en Phase 1 dans `decide_publication_match`. Alignée sur le chantier METIER.
+
+- **Filtrage par `publication_id IS NULL` pour la passe matchorcreate** : pas de colonne `matched_at`. Le rattachement est figé une fois fait — on accepte qu'un identifiant fort qui apparaît au re-traitement crée temporairement un doublon (fusionné en aval par les phases `merge_pubs_by_*`). Casser et re-matcher au re-normalize créerait des risques de doublons quand la publi n'a pas de clé forte.
+
+- **Idempotence par source_id côté normalize** : conservée par les UPSERTs `ON CONFLICT (source, source_id) DO UPDATE` existants. C'est de l'idempotence d'écriture, distincte du matching cross-source qui est déplacé en phase publications.
+
+- **Refresh sélectif via `source_publications.updated_at` (clock_timestamp)** : 2e passe de la phase publications. Évite à la fois le refresh global coûteux et le casser/recréer du rattachement. Choix `clock_timestamp()` plutôt que `now()` justifié dans la migration 0009.
+
+- **Repointing HAL** : pas dans la phase publications. La fusion cross-source par hal_id est gérée par la phase dédiée `merge_pubs_by_hal_id` qui tourne en aval (déjà en place avant ce chantier).
 
 ## Questions ouvertes
 
-- **Q1 — `matched_at` vs filtrage sur `publication_id IS NULL`** : à quel critère sélectionner les `source_publications` à passer dans la cascade en phase publications ? Si on filtre sur `publication_id IS NULL`, un re-run de la phase ne re-matche pas ceux déjà rattachés (acceptable si on assume que le rattachement ne bouge pas hors fusion explicite). Si on veut pouvoir re-matcher à la demande, il faut un mécanisme additionnel.
-
-- **Q2 — Idempotence par source_id (« re-attach mono-source »)** : aujourd'hui, certains normalizers font un lookup `source_publications WHERE source='X' AND source_id=<id>` pour reprendre le `publication_id` d'un passage précédent. Avec la séparation, ce lookup disparaît côté normalize, mais la phase normalize doit toujours faire l'upsert (UPDATE si déjà vu, INSERT sinon) — c'est de l'idempotence d'écriture, pas de matching. À vérifier que c'est bien le cas dans tous les normalizers (déjà fait pour la plupart, présumément).
-
-- **Q3 — Ordre dans la cascade unifiée** : DOI > NNT > HAL_ID > metadata (thèse). À confirmer en début de Phase 1. Alignement avec ce qui sort des décisions du chantier METIER.
-
-- **Q4 — Performance de la phase publications** : aujourd'hui elle ne traite que les orphelins ; demain, tous les `source_publications` in-perimeter. Volume × cascade SQL × refresh. À surveiller, possiblement à batcher.
+- **Performance de la phase publications** : la passe matchorcreate ne traite que les orphelins (`publication_id IS NULL`), et la passe refresh ne traite que les pubs stale. Volume effectif à mesurer en Phase 4 (run réel). Si nécessaire, batcher les refresh.
 
 ## Liens
 

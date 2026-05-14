@@ -13,8 +13,6 @@ from domain.json_types import JsonValue
 class OpenalexNormalizeQueries(Protocol):
     """Opérations SQL du normaliseur OpenAlex."""
 
-    def fetch_publication_id_for_hal_source(self, conn: Connection, hal_id: str) -> int | None: ...
-
     def upsert_openalex_source_publication(
         self,
         conn: Connection,
@@ -53,8 +51,6 @@ class OpenalexNormalizeQueries(Protocol):
     ) -> int: ...
 
     def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool: ...
-
-    def get_openalex_publication_id(self, conn: Connection, openalex_id: str) -> int | None: ...
 
     def count_openalex_table(self, conn: Connection, table: str) -> int: ...
 

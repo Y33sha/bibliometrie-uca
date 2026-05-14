@@ -16,20 +16,6 @@ from infrastructure.db.queries.source_authorships import (
 )
 
 
-def fetch_publication_id_for_hal_source(conn: Connection, hal_id: str) -> int | None:
-    """Retourne `publication_id` du document HAL correspondant (pour cross-référence)."""
-    row = conn.execute(
-        text(
-            "SELECT publication_id FROM source_publications "
-            "WHERE source = 'hal' AND source_id = :hal_id"
-        ),
-        {"hal_id": hal_id},
-    ).one_or_none()
-    if row is None:
-        return None
-    return row.publication_id if row.publication_id else None
-
-
 def upsert_openalex_source_publication(
     conn: Connection,
     *,
@@ -177,20 +163,6 @@ def staging_has_openalex_doi(conn: Connection, doi: str) -> bool:
     )
 
 
-def get_openalex_publication_id(conn: Connection, openalex_id: str) -> int | None:
-    """Idempotence : retourne `publication_id` déjà associé au document OpenAlex."""
-    row = conn.execute(
-        text(
-            "SELECT publication_id FROM source_publications "
-            "WHERE source = 'openalex' AND source_id = :oa_id"
-        ),
-        {"oa_id": openalex_id},
-    ).one_or_none()
-    if row is None:
-        return None
-    return row.publication_id if row.publication_id else None
-
-
 def count_openalex_table(conn: Connection, table: str) -> int:
     """Compte les lignes d'une table avec `source = 'openalex'` (liste blanche)."""
     if table not in ("source_publications", "source_authorships"):
@@ -203,9 +175,6 @@ def count_openalex_table(conn: Connection, table: str) -> int:
 class PgOpenalexNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_openalex.OpenalexNormalizeQueries`."""
 
-    def fetch_publication_id_for_hal_source(self, conn: Connection, hal_id: str) -> int | None:
-        return fetch_publication_id_for_hal_source(conn, hal_id)
-
     def upsert_openalex_source_publication(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_openalex_source_publication(conn, **kwargs)
 
@@ -214,9 +183,6 @@ class PgOpenalexNormalizeQueries:
 
     def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool:
         return staging_has_openalex_doi(conn, doi)
-
-    def get_openalex_publication_id(self, conn: Connection, openalex_id: str) -> int | None:
-        return get_openalex_publication_id(conn, openalex_id)
 
     def count_openalex_table(self, conn: Connection, table: str) -> int:
         return count_openalex_table(conn, table)
