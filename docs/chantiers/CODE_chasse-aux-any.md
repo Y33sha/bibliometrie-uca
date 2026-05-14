@@ -70,7 +70,7 @@ Patterns dominants :
   - [x] Sweep A : `Callable[[Any], …Repository]` → `Callable[[Connection], …Repository]` sur les 6 normalizers (16 occ.) ; `_iter_rows -> Any` → `Iterator[Row[Any]]` dans `base.py` ; `list[Any]` → `list[Row[Any]]` dans `application/ports/pipeline/staging.py` + `infrastructure/db/queries/staging.py` (extension révélée par le sweep).
   - [x] Sweep B : `topics: Any` → `JsonValue` dans les 6 `subjects/ingest_*.py` (+ `entry`, `_extract_domain_labels`, `ontology_entry` au passage dans `ingest_openalex.py` et `ingest_scanr.py`).
   - [x] Sweep C : `dict[str, Any]` JSONB locaux dans les normalizers (`ext`, `biblio`, `meta`, `sd` : 5 occ. — réel < estimé) → `dict[str, JsonValue]`. Touchés : `normalize_crossref.py`, `normalize_scanr.py`, `normalize_theses.py`.
-  - [ ] Sweep D : `affiliations/resolve_addresses.py` (9 `Any` sur 5 fonctions, lecture dédiée nécessaire).
+  - [x] Sweep D : `affiliations/resolve_addresses.py` — 9 `Any` sur 5 fonctions (`match_form_in_text`, `build_forms_by_structure`, `has_form_match_for_structure`, `resolve_address`, `process_addresses`) typés depuis les contrats du port `AddressResolutionQueries` : `form: dict[str, Any]` (row SA hydraté), `text_normalized: str`, `forms_by_structure: dict[int, list[dict[str, Any]]]`, retours `bool` / `list[tuple[int, int]]`.
   - Hors scope : `persons/create_persons_from_source_authorships.py` (6 `Any` dans la cascade matching — refonte attendue via `METIER_decide-person-match`). Cas résiduels (~10 occ.) : helpers `as_str` / `_safe_list` / `dedup_strs` (frontières dynamiques à documenter), `sp: Any` (savepoint SA), `INGESTORS: dict[str, Any]` (registry).
 - [~] `application/ports/normalize_*.py` : tous les `Any` JSONB (frontière vers `bindparam(type_=JSONB)`) remplacés par `JsonValue` (alias récursif `str | int | float | bool | None | Sequence[JsonValue] | Mapping[str, JsonValue]` dans `domain/json_types.py`). 6 ports (HAL, OpenAlex, CrossRef, Theses, WoS, ScanR) + leurs 6 implémentations `infrastructure/db/queries/normalize_*.py` (top-level functions et signatures complètes CrossRef). Override mypy `disallow_any_explicit` posé sur 5 ports (`normalize_wos` exclu : utilise encore `list[dict[str, Any]]` pour les batchs SQL hétérogènes — tranche suivante). `compact_identifiers` (`domain/persons/identifiers.py`) typé en retour `dict[str, JsonValue] | None` au passage (alimente le JSONB `source_authorships.identifiers`). Restent à traiter : `**kwargs: Any` sur les méthodes adapter `Pg*NormalizeQueries` (HAL/OpenAlex/Theses/WoS/ScanR, ~13 méthodes) — implique d'éclater en signatures explicites façon CrossRef.
 
@@ -87,6 +87,18 @@ Patterns dominants :
 #### Phase 2.5 — `tests/`
 
 - [ ] Signatures alignées sur les fonctions testées.
+
+#### Phase 2.6 — Généraliser `JsonValue` aux frontières JSON
+
+Maintenant que l'alias existe (`domain/json_types.py`), tous les `dict[str, Any]` qui représentent en réalité du JSON / JSONB doivent basculer vers `JsonValue` pour cohérence. Action transverse — peut se faire au fil des sweeps Phase 2.1-2.5 ou en passe finale dédiée.
+
+Périmètres identifiés :
+
+- [ ] `interfaces/api/models.py` : `ConfigItem.value`, `ConfigValueUpdate.value`.
+- [ ] `interfaces/api/app.py` : handlers `health`/`metrics`.
+- [ ] `interfaces/cli/` : helpers `escape_sql`, records DB.
+- [ ] `application/` : `_merge_lists` (devenu `merge_lists_dedup_ci` dans `domain/publications/aggregation.py`), `update_config_value`.
+- [ ] `infrastructure/` : `app_config._get_from_db`.
 
 ### Phase 3 — Verrouillage
 
@@ -105,17 +117,6 @@ Patterns dominants :
   chantier dédié pour ne pas mélanger « typer » et « renommer » dans
   les mêmes commits. État intermédiaire actuel : `cur: Connection`,
   techniquement correct mais visuellement bancal.
-
-- **Généraliser `JsonValue` à toutes les frontières JSON** : maintenant
-  que l'alias existe (`domain/json_types.py`), tous les `dict[str, Any]`
-  qui représentent en réalité du JSON / JSONB devraient progressivement
-  basculer vers `JsonValue` pour cohérence. Périmètres concernés
-  identifiés : `interfaces/api/models.py` (`ConfigItem.value`,
-  `ConfigValueUpdate.value`), `interfaces/api/app.py` (handlers
-  `health`/`metrics`), `interfaces/cli/` (helpers `escape_sql`,
-  records DB), `application/` (`_merge_lists`, `update_config_value`),
-  `infrastructure/` (`app_config._get_from_db`). Pas un chantier
-  monolithique — à faire au fil des sweeps Phase 2 restants.
 
 ## Questions ouvertes
 

@@ -31,7 +31,7 @@ BATCH_SIZE = 1000
 # ─── Matching ────────────────────────────────────────────────────
 
 
-def match_form_in_text(form: Any, text_normalized: Any) -> Any:
+def match_form_in_text(form: dict[str, Any], text_normalized: str) -> bool:
     """Vérifie si une forme matche dans le texte normalisé.
 
     Si is_word_boundary ou forme <= 6 chars : mot entier (word boundary).
@@ -48,17 +48,21 @@ def match_form_in_text(form: Any, text_normalized: Any) -> Any:
         return form_text in text_normalized
 
 
-def build_forms_by_structure(forms: Any) -> Any:
+def build_forms_by_structure(
+    forms: list[dict[str, Any]],
+) -> dict[int, list[dict[str, Any]]]:
     """Index : structure_id → [forms]."""
-    idx: dict[int, list] = {}
+    idx: dict[int, list[dict[str, Any]]] = {}
     for f in forms:
         idx.setdefault(f["structure_id"], []).append(f)
     return idx
 
 
 def has_form_match_for_structure(
-    struct_id: Any, text_normalized: Any, forms_by_structure: Any
-) -> Any:
+    struct_id: int,
+    text_normalized: str,
+    forms_by_structure: dict[int, list[dict[str, Any]]],
+) -> bool:
     """Vérifie si au moins une forme de la structure donnée matche."""
     for f in forms_by_structure.get(struct_id, []):
         if match_form_in_text(f, text_normalized):
@@ -66,7 +70,11 @@ def has_form_match_for_structure(
     return False
 
 
-def resolve_address(text_normalized: Any, forms: Any, forms_by_structure: Any) -> Any:
+def resolve_address(
+    text_normalized: str,
+    forms: list[dict[str, Any]],
+    forms_by_structure: dict[int, list[dict[str, Any]]],
+) -> list[tuple[int, int]]:
     """Résout une adresse : trouve toutes les structures identifiées.
 
     Les formes excluantes (is_excluding=True) retirent la structure
@@ -74,9 +82,9 @@ def resolve_address(text_normalized: Any, forms: Any, forms_by_structure: Any) -
 
     Retourne une liste de (structure_id, form_id).
     """
-    matches = []
-    seen_structures = set()
-    excluded_structures = set()
+    matches: list[tuple[int, int]] = []
+    seen_structures: set[int] = set()
+    excluded_structures: set[int] = set()
 
     # Passe 1 : détecter les exclusions
     for f in forms:
@@ -152,10 +160,10 @@ def run_resolution(
 def process_addresses(
     conn: Connection,
     queries: AddressResolutionQueries,
-    rows: Any,
-    forms: Any,
-    forms_by_structure: Any,
-    perimeter: Any,
+    rows: list[tuple[int, str]],
+    forms: list[dict[str, Any]],
+    forms_by_structure: dict[int, list[dict[str, Any]]],
+    perimeter: set[int],
     logger: logging.Logger,
 ) -> tuple[int, int]:
     """Traite une liste d'adresses : détection + affiliations."""
