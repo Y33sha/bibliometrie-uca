@@ -201,9 +201,7 @@ Contenu :
   - `engine.py` — Engine SQLAlchemy synchrone (driver
     `postgresql+psycopg`). Source unique pour l'API FastAPI (via le
     threadpool Starlette) et le pipeline.
-  - `connection.py` — réduit à des constantes communes
-    (`SANDBOX_DB_NAME`) ; la fonction `get_connection()` n'est plus
-    utilisée par le code applicatif depuis l'adoption SA.
+  - `connection.py` — constantes communes (`SANDBOX_DB_NAME`).
 - **`repositories/`** — adapters PostgreSQL implémentant les ports
   `domain/ports/*` : `person_repository/`, `publication_repository.py`,
   `journal_repository.py`, `structure_repository.py`,
