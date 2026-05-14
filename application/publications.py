@@ -10,11 +10,9 @@ indépendant du type de curseur (tuple ou dict_row).
 """
 
 from dataclasses import dataclass
-from typing import Any
 
 from application.audit import emit_event
 from domain.errors import NotFoundError
-from domain.normalize import normalize_text
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import (
@@ -24,18 +22,10 @@ from domain.publication import (
     PubThesisCandidate,
 )
 from domain.publications.deduplication import (
-    decide_publication_match,
-)
-from domain.publications.deduplication import (
     resolve_doi_conflict as _domain_resolve_doi_conflict,
 )
 from domain.publications.identifiers import DOI
-from domain.publications.merge import merge_source_rows
-from domain.publications.metadata import (
-    OA_STATUS_UNKNOWN_DEFAULT,
-    clean_publication_title,
-)
-from domain.publications.publication import Publication
+from domain.publications.merge import first_non_null, merge_source_rows
 from domain.sources import SOURCE_PRIORITY
 
 # Re-export des namedtuples pour les call sites historiques (scripts,
@@ -108,95 +98,9 @@ def resolve_doi_conflict(
     return decision.accepted_doi, decision.merge_with_id
 
 
-def find_or_create(
-    pub: Publication,
-    *,
-    nnt: str | None = None,
-    allow_create: bool = True,
-    repo: PublicationRepository,
-) -> tuple[Publication | None, bool]:
-    """Trouve ou crée une publication à partir d'une `Publication` candidate.
-
-    Cascade de déduplication par identifiant unique :
-
-    1. Par DOI (case-insensitive). En cas de collision incompatible (chapter vs book), `resolve_doi_conflict` peut décider de retirer le DOI ou de fusionner.
-    2. Par NNT (via `source_publications.external_ids`, thèses uniquement).
-    3. Création si `allow_create=True`.
-
-    `pub.title` est nettoyé (décodage double-encodage HTML) avant toute comparaison ou écriture, et `pub.title_normalized` est recalculé si le titre change. La mutation a lieu sur l'instance `pub` passée.
-
-    Le `nnt` est passé séparément car il ne vit pas sur l'aggregate `Publication` (il est stocké dans `source_publications.external_ids`).
-
-    Retourne `(publication, is_new)` :
-    - **publication trouvée** : entité hydratée depuis le repo (état canonique en base), `is_new=False`.
-    - **publication créée** : la `pub` passée en entrée, mutée avec `pub.id` posé, `is_new=True`.
-    - **rien trouvé et `allow_create=False`** : `(None, False)`.
-    - **conflit chapter/book qui retire le DOI sans match** : `(None, False)` (le DOI est retiré, aucune match exploitable).
-    """
-    if not pub.has_minimal_metadata():
-        return None, False
-
-    # Décodage HTML double-encodage du titre (OpenAlex / ScanR), avant toute comparaison ou écriture.
-    cleaned_title = clean_publication_title(pub.title) or ""
-    if cleaned_title != pub.title:
-        pub.title = cleaned_title
-        pub.title_normalized = normalize_text(cleaned_title)
-
-    # Prefetch DOI : résolution du conflit éventuel (chapter/book) qui peut invalider le DOI ou poser un id de fusion. La mutation `pub.doi = None` reflète le cas où la règle pure a rejeté le DOI.
-    doi_merge_with_id: int | None = None
-    if pub.doi is not None:
-        existing_by_doi = repo.find_by_doi(str(pub.doi))
-        if existing_by_doi:
-            new_doi_str, doi_merge_with_id = resolve_doi_conflict(
-                str(pub.doi),
-                pub.doc_type or "",
-                pub.title_normalized or "",
-                existing_by_doi,
-                repo=repo,
-            )
-            pub.doi = DOI(new_doi_str) if new_doi_str else None
-
-    # Prefetch NNT (thèses uniquement).
-    nnt_match_id: int | None = None
-    if nnt:
-        existing_by_nnt = repo.find_by_nnt(nnt)
-        if existing_by_nnt:
-            nnt_match_id = existing_by_nnt.id
-
-    decision = decide_publication_match(
-        doi_merge_with_id=doi_merge_with_id,
-        nnt_match_id=nnt_match_id,
-    )
-
-    if decision.action == "match":
-        assert decision.publication_id is not None
-        return repo.find_by_id(decision.publication_id), False
-
-    if not allow_create:
-        return None, False
-
-    pub.id = repo.create(
-        title=pub.title,
-        title_normalized=pub.title_normalized or normalize_text(pub.title),
-        doc_type=pub.doc_type or "other",
-        pub_year=pub.pub_year,
-        doi=str(pub.doi) if pub.doi else None,
-        oa_status=pub.oa_status or OA_STATUS_UNKNOWN_DEFAULT,
-        journal_id=pub.journal_id,
-        container_title=pub.container_title,
-        language=pub.language,
-    )
-    return pub, True
-
-
 def update_oa_status(pub_id: int, oa_status: str, *, repo: PublicationRepository) -> None:
     """Met à jour le statut OA d'une publication."""
     repo.update_oa_status(pub_id, oa_status)
-
-
-def update_countries(pub_id: int, countries: list[str], *, repo: PublicationRepository) -> None:
-    """Met à jour les pays d'une publication."""
-    repo.update_countries(pub_id, countries)
 
 
 def update_sources(pub_id: int, *, repo: PublicationRepository) -> None:
@@ -247,7 +151,7 @@ def refresh_from_sources(
     absorbed: int | None = None
     rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
     rows_sorted = sorted(rows, key=lambda r: rank.get(r["source"], 99))
-    new_doi_raw = _first_non_null_doi(rows_sorted)
+    new_doi_raw = first_non_null(rows_sorted, "doi")
     new_doi_vo = DOI.try_parse(new_doi_raw) if new_doi_raw else None
     if new_doi_vo:
         existing = repo.find_by_doi(str(new_doi_vo))
@@ -278,14 +182,6 @@ def refresh_from_sources(
         )
 
     return RefreshResult(absorbed_publication_id=absorbed)
-
-
-def _first_non_null_doi(rows: list[dict[str, Any]]) -> str | None:
-    """Premier `doi` non-null dans `rows` (déjà triées par priorité)."""
-    for r in rows:
-        if r["doi"]:
-            return r["doi"]
-    return None
 
 
 def mark_distinct(

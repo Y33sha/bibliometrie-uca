@@ -1,17 +1,16 @@
 """Tests d'intégration — déduplication des publications.
 
-Teste la logique de find_or_create dans services/publications.py
-avec une vraie base PostgreSQL (bibliometrie_test).
-Chaque test tourne dans une transaction rollbackée (isolation complète).
+Teste la cascade matching-création via `find_or_create_for_tests` (helper de tests qui reproduit la logique de la cascade `decide_publication_match` + `resolve_doi_conflict` depuis une `Publication` candidate). Vraie base PostgreSQL (bibliometrie_test). Chaque test tourne dans une transaction rollbackée (isolation complète).
 """
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.publications import find_by_nnt, find_or_create, refresh_from_sources
+from application.publications import find_by_nnt, refresh_from_sources
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from infrastructure.repositories import publication_repository
+from tests.integration.helpers.publications import find_or_create_for_tests
 
 # ── Helpers ──────────────────────────────────────────────────────
 
@@ -45,7 +44,7 @@ def _create(conn, **kwargs):
         container_title=defaults.get("container_title"),
         language=defaults.get("language"),
     )
-    result, is_new = find_or_create(pub, nnt=nnt, repo=publication_repository(conn))
+    result, is_new = find_or_create_for_tests(pub, nnt=nnt, repo=publication_repository(conn))
     return (result.id if result else None), is_new
 
 
@@ -545,7 +544,7 @@ class TestRefreshFromSources:
 
     def test_allow_create_false(self, sa_sync_conn):
         """allow_create=False → retourne None si non trouvée."""
-        result, _ = find_or_create(
+        result, _ = find_or_create_for_tests(
             Publication(id=None, title="X", pub_year=2024, title_normalized="x"),
             allow_create=False,
             repo=publication_repository(sa_sync_conn),

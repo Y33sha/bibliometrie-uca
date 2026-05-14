@@ -7,7 +7,6 @@ compter les résultats, relancer, vérifier que les compteurs n'ont pas bougé.
 Ces tests tournent sur la base bibliometrie_test (cf. conftest.py).
 """
 
-from application.publications import find_or_create as find_or_create_publication
 from application.publications import update_sources
 from domain.normalize import normalize_text
 from domain.publication import normalize_nnt
@@ -15,6 +14,9 @@ from domain.publications.doc_types import map_doc_type
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from infrastructure.repositories import publication_repository
+from tests.integration.helpers.publications import (
+    find_or_create_for_tests as find_or_create_publication,
+)
 
 
 def _create_all_publications(conn_or_cur):
