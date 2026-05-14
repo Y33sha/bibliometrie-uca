@@ -1,8 +1,7 @@
 """Tests de caractérisation pour services/publications.py.
 
-Couvre les find_by_* (guards + happy path), try_merge_by_doi,
-resolve_doi_conflict (chapter/book), update_oa_status/countries,
-merge_publications. find_or_create est déjà couvert par test_integration.py.
+Couvre les find_by_* (guards + happy path), resolve_doi_conflict (chapter/book),
+update_oa_status/countries, merge_publications.
 """
 
 import pytest
@@ -17,7 +16,6 @@ from application.publications import (
     mark_distinct,
     merge_publications,
     resolve_doi_conflict,
-    try_merge_by_doi,
     update_countries,
     update_oa_status,
 )
@@ -238,39 +236,6 @@ class TestFindThesisByTitle:
         t2 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
         result = find_thesis_by_title("dup", 2024, repo=repo)
         assert {r.id for r in result} == {t1, t2}
-
-
-# ── try_merge_by_doi ───────────────────────────────────────────────
-
-
-class TestTryMergeByDoi:
-    def test_noop_if_no_doi_given(self, sa_sync_conn, repo):
-        pub_id = _insert_publication(sa_sync_conn)
-        assert try_merge_by_doi(pub_id, None, repo=repo) == pub_id
-
-    def test_noop_if_pub_already_has_doi(self, sa_sync_conn, repo):
-        pub_id = _insert_publication(sa_sync_conn, doi="10.1234/existing")
-        assert try_merge_by_doi(pub_id, "10.1234/other", repo=repo) == pub_id
-
-    def test_assigns_doi_if_pub_has_none(self, sa_sync_conn, repo):
-        pub_id = _insert_publication(sa_sync_conn, doi=None)
-        assert try_merge_by_doi(pub_id, "10.1234/new", repo=repo) == pub_id
-        doi = sa_sync_conn.execute(
-            text("SELECT doi FROM publications WHERE id = :id"), {"id": pub_id}
-        ).scalar_one()
-        assert doi == "10.1234/new"
-
-    def test_merges_into_existing_pub_with_same_doi(self, sa_sync_conn, repo):
-        existing = _insert_publication(sa_sync_conn, title="Existing", doi="10.1234/shared")
-        new_pub = _insert_publication(sa_sync_conn, title="New", doi=None)
-
-        result = try_merge_by_doi(new_pub, "10.1234/shared", repo=repo)
-
-        assert result == existing  # pub id de la cible
-        assert (
-            _select_one(sa_sync_conn, "SELECT id FROM publications WHERE id = :id", id=new_pub)
-            is None
-        )
 
 
 # ── resolve_doi_conflict ───────────────────────────────────────────

@@ -24,8 +24,6 @@ from domain.publication import (
     PubThesisCandidate,
 )
 from domain.publications.deduplication import (
-    DeduplicationKey,
-    decide_doi_attribution,
     decide_publication_match,
 )
 from domain.publications.deduplication import (
@@ -82,38 +80,6 @@ def find_thesis_by_title(
     return repo.find_thesis_by_title(title_normalized, pub_year)
 
 
-def try_merge_by_doi(pub_id: int, doi: str | None, *, repo: PublicationRepository) -> int:
-    """Tente de fusionner via DOI si la publication n'en a pas encore.
-
-    Wrapper qui prefetch les données et délègue la décision à `decide_doi_attribution` (règle pure en domain). Trois sorties exclusives :
-
-    - pas de DOI proposé OU la pub porte déjà un DOI → noop, retourne `pub_id` inchangé (politique conservative : on n'écrase pas un DOI existant).
-    - DOI proposé déjà porté par une autre publication → fusion, retourne l'id de cette autre publication.
-    - DOI libre → attribution à la pub courante, retourne `pub_id`.
-    """
-    current_doi = repo.get_doi(pub_id)
-    existing_doi_match_id: int | None = None
-    if not current_doi and doi:
-        existing = repo.find_by_doi(doi)
-        existing_doi_match_id = existing.id if existing else None
-
-    decision = decide_doi_attribution(
-        current_doi=current_doi,
-        proposed_doi=doi,
-        current_pub_id=pub_id,
-        existing_doi_match_id=existing_doi_match_id,
-    )
-
-    if decision.action == "merge":
-        assert decision.merge_with_id is not None  # garanti par la règle
-        merge_publications(decision.merge_with_id, pub_id, repo=repo)
-        return decision.merge_with_id
-    if decision.action == "attribute":
-        assert doi is not None  # garanti par la règle (proposed_doi truthy)
-        repo.set_doi(pub_id, doi)
-    return pub_id
-
-
 def resolve_doi_conflict(
     doi: str,
     doc_type: str,
@@ -154,7 +120,7 @@ def find_or_create(
     Cascade de déduplication par identifiant unique :
 
     1. Par DOI (case-insensitive). En cas de collision incompatible (chapter vs book), `resolve_doi_conflict` peut décider de retirer le DOI ou de fusionner.
-    2. Par NNT (via `source_publications.external_ids`, thèses uniquement). Tentative de merge tardif via DOI si la thèse trouvée n'a pas de DOI alors que `pub` en propose un.
+    2. Par NNT (via `source_publications.external_ids`, thèses uniquement).
     3. Création si `allow_create=True`.
 
     `pub.title` est nettoyé (décodage double-encodage HTML) avant toute comparaison ou écriture, et `pub.title_normalized` est recalculé si le titre change. La mutation a lieu sur l'instance `pub` passée.
@@ -204,13 +170,6 @@ def find_or_create(
 
     if decision.action == "match":
         assert decision.publication_id is not None
-        # Enrichissement post-match : si la pub trouvée par NNT n'a pas encore le DOI proposé, on tente l'attribution tardive (ou fusion si le DOI est porté par une autre pub).
-        if decision.matched_by == DeduplicationKey.NNT:
-            try_merge_by_doi(
-                decision.publication_id,
-                str(pub.doi) if pub.doi else None,
-                repo=repo,
-            )
         return repo.find_by_id(decision.publication_id), False
 
     if not allow_create:
@@ -258,12 +217,19 @@ class RefreshResult:
     absorbed_publication_id: int | None = None
 
 
-def refresh_from_sources(pub_id: int, *, repo: PublicationRepository) -> RefreshResult:
+def refresh_from_sources(
+    pub_id: int,
+    *,
+    repo: PublicationRepository,
+    audit_repo: AuditRepository | None = None,
+) -> RefreshResult:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_publications`.
 
     Recalcul complet (pas de COALESCE incrémental qui figerait les valeurs au premier arrivé) : lit TOUS les `source_publications` attachés, applique l'algorithme de fusion `merge_source_rows` qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées obsolètes (ex: `ongoing_thesis` → `thesis` après soutenance), et inclut désormais `title` / `title_normalized` dans l'agrégation cross-sources (ce qui n'était pas le cas auparavant).
 
     Auto-fusion sur conflit DOI : si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant le save — au lieu de laisser remonter une violation de la contrainte unique. `pub_id` reste vivant pour le caller, et l'id absorbée est exposée dans `RefreshResult.absorbed_publication_id`.
+
+    Si `audit_repo` est fourni et que le DOI canonique change effectivement (passage d'une valeur à une autre, ou perte du DOI), un événement `publication.doi_changed` est émis avec l'ancienne et la nouvelle valeur. Pas d'event sur l'attribution initiale (passage de None à une valeur) ni quand la valeur reste identique.
 
     Ne touche PAS à `notes` ni à `sources` (utiliser `update_sources` séparément).
     """
@@ -287,16 +253,30 @@ def refresh_from_sources(pub_id: int, *, repo: PublicationRepository) -> Refresh
         existing = repo.find_by_doi(str(new_doi_vo))
         if existing and existing.id != pub_id:
             absorbed = existing.id
-            merge_publications(pub_id, existing.id, repo=repo)
+            merge_publications(pub_id, existing.id, repo=repo, audit_repo=audit_repo)
             rows = repo.get_source_rows(pub_id)
             # Recharger pub : ses attributs ont pu être enrichis via Publication.absorb pendant merge_publications.
             pub = repo.find_by_id(pub_id)
             if pub is None:
                 return RefreshResult(absorbed_publication_id=absorbed)
 
+    previous_doi = pub.doi
     merge_source_rows(pub, rows, source_priority=SOURCE_PRIORITY)
     repo.save(pub)
     repo.update_sources(pub_id)
+
+    if previous_doi is not None and pub.doi != previous_doi:
+        emit_event(
+            audit_repo,
+            "publication.doi_changed",
+            "publication",
+            pub_id,
+            {
+                "previous_doi": str(previous_doi),
+                "new_doi": str(pub.doi) if pub.doi else None,
+            },
+        )
+
     return RefreshResult(absorbed_publication_id=absorbed)
 
 

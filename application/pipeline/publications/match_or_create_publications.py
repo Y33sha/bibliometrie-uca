@@ -4,8 +4,8 @@ Matche ou crée les publications canoniques pour les `source_publications` in-pe
 Phase du pipeline qui s'exécute APRÈS affiliations (quand in_perimeter est déterminé sur les source_authorships) et AVANT persons/authorships.
 
 Deux passes :
-1. Pour chaque `source_publication` sans `publication_id` ayant au moins un `source_authorship` in_perimeter : cascade de matching cross-source (`decide_publication_match` sur DOI, NNT, HAL_ID, THESIS_TITLE_YEAR). Si match : rattache + `try_merge_by_doi` tardif pour les matches non-DOI. Sinon : crée la publication.
-2. Pour chaque publication stale (au moins un `source_publication.updated_at > publications.updated_at`) : `refresh_from_sources` pour ré-agréger les méta canoniques.
+1. Pour chaque `source_publication` sans `publication_id` ayant au moins un `source_authorship` in_perimeter : cascade de matching cross-source (`decide_publication_match` sur DOI, NNT, HAL_ID, THESIS_TITLE_YEAR). Si match : rattache. Sinon : crée la publication.
+2. Pour chaque publication stale (au moins un `source_publication.updated_at > publications.updated_at`) : `refresh_from_sources` pour ré-agréger les méta canoniques (dont DOI promu par priorité de source).
 
 L'orchestrateur dépend du port `PublicationsMatchOrCreateQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/match_or_create_publications.py`.
 """
@@ -21,13 +21,12 @@ from application.ports.pipeline.publications_match_or_create import (
 from application.publications import (
     refresh_from_sources,
     resolve_doi_conflict,
-    try_merge_by_doi,
 )
 from domain.normalize import normalize_text
+from domain.ports.audit_repository import AuditRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from domain.publications.deduplication import (
-    DeduplicationKey,
     MetadataDeduplicationCase,
     decide_publication_match,
 )
@@ -74,6 +73,7 @@ def process_document(
     dry_run: bool,
     *,
     pub_repo: PublicationRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> bool:
     """Crée ou rattache une publication pour un `source_publication` orphelin.
 
@@ -155,9 +155,6 @@ def process_document(
     if decision.action == "match":
         assert decision.publication_id is not None
         publication_id = decision.publication_id
-        # Enrichissement DOI tardif si match par autre clé que DOI : la pub trouvée peut ne pas porter le DOI proposé.
-        if decision.matched_by != DeduplicationKey.DOI and doi:
-            publication_id = try_merge_by_doi(publication_id, doi, repo=pub_repo)
     else:
         publication_id = pub_repo.create(
             title=title,
@@ -172,7 +169,7 @@ def process_document(
         )
 
     queries.link_source_publication_to_publication(conn, doc["id"], publication_id)
-    refresh_from_sources(publication_id, repo=pub_repo)
+    refresh_from_sources(publication_id, repo=pub_repo, audit_repo=audit_repo)
 
     return True
 
@@ -211,6 +208,7 @@ def run(
     logger: logging.Logger,
     *,
     pub_repo: PublicationRepository,
+    audit_repo: AuditRepository | None = None,
     dry_run: bool = False,
 ) -> None:
     try:
@@ -220,7 +218,9 @@ def run(
         created = 0
         skipped = 0
         for i, doc in enumerate(docs):
-            if process_document(conn, queries, doc, dry_run, pub_repo=pub_repo):
+            if process_document(
+                conn, queries, doc, dry_run, pub_repo=pub_repo, audit_repo=audit_repo
+            ):
                 created += 1
             else:
                 skipped += 1
@@ -236,7 +236,7 @@ def run(
         refreshed = 0
         for i, pub_id in enumerate(stale_ids):
             try:
-                refresh_from_sources(pub_id, repo=pub_repo)
+                refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
             except Exception:
                 logger.exception("  refresh_from_sources crash sur pub_id=%d", pub_id)
                 raise
