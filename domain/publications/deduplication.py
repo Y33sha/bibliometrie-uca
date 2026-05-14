@@ -1,31 +1,95 @@
-"""Règles de déduplication / création des publications.
+"""Règles pures de déduplication des publications.
 
-Domain services purs autour de la déduplication : invariants de métadonnées minimales, résolution de conflit DOI entre deux documents.
+Cascade de matching par identifiants (`decide_publication_match`), attribution tardive de DOI sur une pub existante (`decide_doi_attribution`), résolution de conflit DOI chapter/book (`resolve_doi_conflict`). Tous les décideurs sont purs — le caller prefetch les lookups via le repo et applique les effets (création, fusion, set_doi, clear_doi).
 """
 
 from dataclasses import dataclass
+from enum import Enum
+from typing import Literal
 
 _CHAPTER_DOC_TYPES: frozenset[str] = frozenset({"book_chapter", "book-chapter", "chapter"})
 _BOOK_DOC_TYPES: frozenset[str] = frozenset({"book"})
 
 
-def has_minimal_publication_metadata(title: str | None, pub_year: int | None) -> bool:
-    """Indique si la publication candidate a les métadonnées minimales
-    nécessaires à sa création/déduplication.
+class DeduplicationKey(str, Enum):
+    """Identifiants cross-source par lesquels une publication peut être dédupliquée.
 
-    Invariant : titre non vide ET année renseignée. Sans ces deux
-    champs :
-
-    - le pivot de matching/déduplication par cascade
-      ``DOI > NNT > title+year+journal`` est trop faible (pas de
-      fallback titre+année possible) ;
-    - la valeur métier est nulle (pas de référence biblio
-      consultable, pas d'année pour les statistiques).
-
-    Une `pub_year` à 0 est considérée comme absente (cas pathologique
-    qui ne devrait pas remonter en BDD : `bool(0) is False`).
+    Conventionnellement ordre de priorité par défaut (DOI > NNT > HAL_ID), mais chaque cascade caller décide quelles clés elle consulte et dans quel ordre. Mixin `str` pour la sérialisation transparente.
     """
-    return bool(title) and bool(pub_year)
+
+    DOI = "doi"
+    NNT = "nnt"
+    HAL_ID = "hal_id"
+
+
+class MetadataDeduplicationCase(str, Enum):
+    """Cas de déduplication par métadonnées (algorithme de décision, pas identifiant unique).
+
+    Chaque cas correspond à une combinaison de critères qui rendent deux publications considérées comme la même. Un futur algorithme de dédup pourra ajouter de nouveaux cas (ex. `ARTICLE_TITLE_JOURNAL_YEAR`).
+    """
+
+    THESIS_TITLE_YEAR = "thesis_title_year"
+
+
+@dataclass(frozen=True, slots=True)
+class PublicationMatchDecision:
+    """Décision rendue par `decide_publication_match`.
+
+    `action='match'` : une publication existante a été identifiée. `publication_id` est posé, `matched_by` indique sur quelle clé.
+
+    `action='create'` : aucun match, le caller doit créer. `publication_id` et `matched_by` sont None.
+    """
+
+    action: Literal["match", "create"]
+    publication_id: int | None
+    matched_by: DeduplicationKey | MetadataDeduplicationCase | None
+
+
+def decide_publication_match(
+    *,
+    doi_merge_with_id: int | None = None,
+    nnt_match_id: int | None = None,
+    hal_id_match_id: int | None = None,
+    metadata_match: tuple[int, MetadataDeduplicationCase] | None = None,
+) -> PublicationMatchDecision:
+    """Sélecteur de cascade pur : premier match non-None dans l'ordre de priorité gagne.
+
+    Priorité par défaut : DOI > NNT > HAL_ID > metadata. Tous les paramètres sont optionnels (None par défaut) ; le caller passe ceux qu'il a pré-fetchés.
+
+    Pour le DOI, le caller doit avoir préalablement appelé `resolve_doi_conflict` et passé `merge_with_id` (None si le conflit chapter/book a invalidé le match). `decide_publication_match` ne re-vérifie pas les invariants du DOI ; il fait confiance au merge_with_id pré-calculé.
+
+    Le `metadata_match` est un tuple `(pub_id, case)` : l'id matché et le cas méta qui l'a produit.
+    """
+    if doi_merge_with_id is not None:
+        return PublicationMatchDecision(
+            action="match",
+            publication_id=doi_merge_with_id,
+            matched_by=DeduplicationKey.DOI,
+        )
+    if nnt_match_id is not None:
+        return PublicationMatchDecision(
+            action="match",
+            publication_id=nnt_match_id,
+            matched_by=DeduplicationKey.NNT,
+        )
+    if hal_id_match_id is not None:
+        return PublicationMatchDecision(
+            action="match",
+            publication_id=hal_id_match_id,
+            matched_by=DeduplicationKey.HAL_ID,
+        )
+    if metadata_match is not None:
+        pub_id, case = metadata_match
+        return PublicationMatchDecision(
+            action="match",
+            publication_id=pub_id,
+            matched_by=case,
+        )
+    return PublicationMatchDecision(
+        action="create",
+        publication_id=None,
+        matched_by=None,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,3 +152,42 @@ def resolve_doi_conflict(
     return DoiConflictResolution(
         accepted_doi=new_doi, merge_with_id=existing_id, clear_existing_doi=False
     )
+
+
+@dataclass(frozen=True, slots=True)
+class DoiAttributionDecision:
+    """Décision pure pour l'attribution tardive d'un DOI à une publication existante.
+
+    - `action='noop'` : ne rien faire. Soit aucun DOI proposé, soit la pub porte déjà un DOI (qu'il soit identique ou différent du proposé — politique conservative : on ne remplace pas un DOI existant). `merge_with_id` est None.
+    - `action='merge'` : un autre publication porte déjà ce DOI ; fusionner. `merge_with_id` est l'id de la pub cible (= celle qui porte le DOI).
+    - `action='attribute'` : DOI libre, l'attribuer à la pub courante. `merge_with_id` est None.
+    """
+
+    action: Literal["noop", "merge", "attribute"]
+    merge_with_id: int | None = None
+
+
+def decide_doi_attribution(
+    *,
+    current_doi: str | None,
+    proposed_doi: str | None,
+    current_pub_id: int,
+    existing_doi_match_id: int | None,
+) -> DoiAttributionDecision:
+    """Règle pure pour la mini-cascade d'attribution tardive de DOI.
+
+    Modélise la logique historique de `try_merge_by_doi` : on a une publication courante (typiquement trouvée par NNT) et une source fournit un DOI candidat. Trois sorties exclusives :
+
+    - pas de DOI proposé OU pub courante a déjà un DOI → `noop` (politique conservative : on n'écrase pas un DOI existant, même s'il diffère du proposé).
+    - DOI proposé porté par une autre pub → `merge` vers cette autre pub.
+    - DOI libre → `attribute` à la pub courante.
+
+    Le caller doit avoir prefetch `existing_doi_match_id` via le repo (= `find_by_doi(proposed_doi).id` ou None). Le `current_pub_id` sert à distinguer le cas idempotent où le DOI proposé est déjà sur la pub courante (`existing_doi_match_id == current_pub_id`), traité comme `attribute` (= no-op effectif côté DB, set_doi idempotent).
+    """
+    if not proposed_doi:
+        return DoiAttributionDecision(action="noop")
+    if current_doi:
+        return DoiAttributionDecision(action="noop")
+    if existing_doi_match_id is not None and existing_doi_match_id != current_pub_id:
+        return DoiAttributionDecision(action="merge", merge_with_id=existing_doi_match_id)
+    return DoiAttributionDecision(action="attribute")

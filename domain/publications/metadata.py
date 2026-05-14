@@ -106,6 +106,16 @@ def _decode_html_entities_once(s: str) -> str:
     return _HTML_ENTITY_RE.sub(repl, s)
 
 
+def has_minimal_publication_metadata(title: str | None, pub_year: int | None) -> bool:
+    """Indique si une publication candidate a les métadonnées minimales nécessaires à sa création.
+
+    Invariant posé à l'insertion : titre non vide ET année renseignée. Une publication sans ces deux champs n'a pas de valeur métier (pas de référence biblio consultable, pas d'année pour les statistiques) et est filtrée par les normalizers en amont de `find_or_create`.
+
+    Une `pub_year` à 0 est considérée comme absente (cas pathologique : `bool(0) is False`).
+    """
+    return bool(title) and bool(pub_year)
+
+
 def clean_publication_title(title: str | None) -> str | None:
     """Décode un titre double-encodé HTML, sinon le retourne tel quel.
 
