@@ -14,7 +14,6 @@ Règles d'agrégation par type de champ :
 `title_normalized` est recalculé à partir du `title` agrégé, pas pris d'une source (les sources ne fournissent pas ce champ).
 """
 
-from dataclasses import dataclass
 from typing import Any
 
 from domain.json_types import JsonValue
@@ -26,30 +25,22 @@ from domain.publications.publication import Publication
 from domain.source_publications.source_publication import SourcePublication
 
 
-@dataclass(frozen=True, slots=True)
-class RefreshOutcome:
-    """Résultat de l'agrégation cross-sources d'une publication.
-
-    `is_orphan=True` : la publication n'a aucune source rattachée. Règle métier : une publication non attestée par aucune source n'a pas de raison d'exister. Le caller doit la supprimer.
-    """
-
-    is_orphan: bool = False
-
-
 def refresh_from_sources(
     pub: Publication,
     sources: list[SourcePublication],
     *,
     source_priority: tuple[str, ...],
-) -> RefreshOutcome:
+) -> None:
     """Recalcule l'état canonique de `pub` (DOI, oa_status, méta, etc.) par agrégation de ses `sources`. Mute `pub` en place ; persistance via `repo.save(pub)` côté caller.
 
     Règles d'agrégation : premier non-null par `source_priority` pour les scalaires nullable, statut OA le plus ouvert toutes sources confondues, union dédupliquée des listes, fusion shallow par clé des JSONB, `topics` indexés par source.
 
-    Retourne `RefreshOutcome(is_orphan=True)` si `sources` est vide — `pub` n'est pas muté ; la règle métier dicte que le caller supprime la publication.
+    Précondition : `sources` non vide. Le cas orphelin (aucune source) est une décision métier qui doit être traitée par le caller avant d'appeler cette fonction (suppression de la publication via `repo.delete`).
     """
     if not sources:
-        return RefreshOutcome(is_orphan=True)
+        raise ValueError(
+            "refresh_from_sources requiert au moins une source ; le cas orphelin est à traiter côté caller (suppression de la publication)"
+        )
 
     rank = {s: i for i, s in enumerate(source_priority)}
     sorted_sources = sorted(sources, key=lambda s: rank.get(s.source, 99))
@@ -74,8 +65,6 @@ def refresh_from_sources(
     pub.biblio = shallow_merge_jsonb(sorted_sources, "biblio")
     pub.meta = shallow_merge_jsonb(sorted_sources, "meta")
     pub.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
-
-    return RefreshOutcome()
 
 
 # ── Helpers publics ────────────────────────────────────────────────

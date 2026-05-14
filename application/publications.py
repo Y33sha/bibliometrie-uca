@@ -9,8 +9,6 @@ Les fonctions find_by_* retournent des namedtuples pour un accès par nom
 indépendant du type de curseur (tuple ou dict_row).
 """
 
-from dataclasses import dataclass
-
 from application.audit import emit_event
 from domain.errors import NotFoundError
 from domain.ports.audit_repository import AuditRepository
@@ -106,29 +104,19 @@ def resolve_doi_conflict(
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
 
-@dataclass(frozen=True, slots=True)
-class RefreshResult:
-    """Résultat de `refresh_from_sources`.
-
-    `absorbed_publication_id` non-None signale qu'une fusion a eu lieu pendant le refresh : une autre publication portait le DOI promu par l'agrégation cross-source, et a été absorbée dans la publication rafraîchie pour éviter une violation de la contrainte unique `publications_doi_lower_key`. L'id absorbée est morte en base ; le caller doit considérer toute référence externe à cette id comme dangling.
-    """
-
-    absorbed_publication_id: int | None = None
-
-
 def refresh_from_sources(
     pub_id: int,
     *,
     repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
-) -> RefreshResult:
+) -> None:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_publications`.
 
     Recalcul complet (pas de COALESCE incrémental qui figerait les valeurs au premier arrivé) : lit TOUS les `SourcePublication` attachés, applique l'algorithme d'agrégation `refresh_from_sources` (domain) qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées obsolètes (ex: `ongoing_thesis` → `thesis` après soutenance).
 
     **Cas orphelin** : si la publication n'a aucune source rattachée, la règle métier dicte qu'elle ne doit pas exister. Court-circuit : suppression via `repo.delete` + audit event `publication.deleted_orphan`, sans appel à l'agrégation.
 
-    Auto-fusion sur conflit DOI : si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant le save — au lieu de laisser remonter une violation de la contrainte unique. `pub_id` reste vivant pour le caller, et l'id absorbée est exposée dans `RefreshResult.absorbed_publication_id`.
+    Auto-fusion sur conflit DOI : si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant le save — au lieu de laisser remonter une violation de la contrainte unique. `pub_id` reste vivant pour le caller. La fusion est tracée via l'audit event `publication.merged`.
 
     Si `audit_repo` est fourni et que le DOI canonique change effectivement (passage d'une valeur à une autre, ou perte du DOI), un événement `publication.doi_changed` est émis avec l'ancienne et la nouvelle valeur. Pas d'event sur l'attribution initiale (passage de None à une valeur) ni quand la valeur reste identique.
 
@@ -136,19 +124,18 @@ def refresh_from_sources(
     """
     pub = repo.find_by_id(pub_id)
     if pub is None:
-        return RefreshResult()
+        return
 
     sources = repo.get_source_publications(pub_id)
     if not sources:
-        # Pub orpheline : suppression côté caller (la règle métier est signalée par `aggregation.refresh_from_sources` ; ici on court-circuite parce qu'on n'a pas besoin d'agréger pour décider).
+        # Pub orpheline : la règle métier dicte qu'une publication non attestée par aucune source n'a pas de raison d'exister.
         repo.delete(pub_id)
         emit_event(audit_repo, "publication.deleted_orphan", "publication", pub_id, {})
-        return RefreshResult()
+        return
 
     # Si le DOI à promouvoir est déjà occupé par une autre publication, fusionner d'abord pour éviter une violation de la contrainte unique `publications_doi_lower_key`. Cas typique : une thèse avec un DOI ABES (10.70675/…) créée en double — une fois via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître dans une `source_publication`, sa promotion collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans `pub_id` (qui reste vivant pour le caller).
     #
     # Le DOI brut est normalisé via le VO `DOI` avant le lookup : c'est cette forme normalisée (suffixe `.vN` strippé, lowercased) qui sera posée par l'agrégation. Le pré-merge doit chercher la même forme, sinon des collisions échappent au mécanisme.
-    absorbed: int | None = None
     rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
     sorted_sources = sorted(sources, key=lambda s: rank.get(s.source, 99))
     new_doi_raw = first_non_null(sorted_sources, "doi")
@@ -156,13 +143,12 @@ def refresh_from_sources(
     if new_doi_vo:
         existing = repo.find_by_doi(str(new_doi_vo))
         if existing and existing.id != pub_id:
-            absorbed = existing.id
             merge_publications(pub_id, existing.id, repo=repo, audit_repo=audit_repo)
             sources = repo.get_source_publications(pub_id)
             # Recharger pub : ses attributs ont pu être enrichis via Publication.absorb pendant merge_publications.
             pub = repo.find_by_id(pub_id)
             if pub is None:
-                return RefreshResult(absorbed_publication_id=absorbed)
+                return
 
     previous_doi = pub.doi
     _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY)
@@ -180,8 +166,6 @@ def refresh_from_sources(
                 "new_doi": str(pub.doi) if pub.doi else None,
             },
         )
-
-    return RefreshResult(absorbed_publication_id=absorbed)
 
 
 def mark_distinct(
