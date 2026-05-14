@@ -39,18 +39,13 @@ from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.normalize.crossref import CrossrefNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
-from application.publications import find_or_create as find_or_create_publication
-from application.publications import refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
-from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
 from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
-from domain.publications.identifiers import DOI
 from domain.publications.metadata import has_minimal_publication_metadata
-from domain.publications.publication import Publication
 from domain.sources.crossref import (
     extract_crossref_meta,
     extract_crossref_pub_year,
@@ -269,45 +264,6 @@ def process_authors(
 
 
 # =============================================================
-# PUBLICATION (rattachement à la table de vérité)
-# =============================================================
-
-
-def find_publication(
-    msg: dict,
-    journal_id: int | None,
-    *,
-    pub_repo: PublicationRepository,
-) -> int | None:
-    """Cherche la publi canonique pour un record CrossRef, sans la créer.
-
-    Le matching est en pratique presque toujours par DOI (CrossRef = DOI-driven).
-    On passe ``doc_type='other'`` à ``find_or_create`` (le mapping
-    CrossRef → enum canonique est appliqué plus tard) : c'est suffisant
-    pour le matching DOI.
-    """
-    title = get_title(msg)
-    pub_year = get_pub_year(msg)
-    doi = get_doi(msg)
-    if not doi or not has_minimal_publication_metadata(title, pub_year):
-        return None
-    assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
-    candidate = Publication(
-        id=None,
-        title=title,
-        title_normalized=normalize_text(title),
-        pub_year=pub_year,
-        doc_type="other",
-        doi=DOI(doi) if doi else None,
-        journal_id=journal_id,
-        container_title=get_container_title(msg) if not journal_id else None,
-        language=get_language(msg),
-    )
-    result, _ = find_or_create_publication(candidate, allow_create=False, repo=pub_repo)
-    return result.id if result else None
-
-
-# =============================================================
 # BOUCLE PRINCIPALE
 # =============================================================
 
@@ -349,12 +305,6 @@ def process_work(
     publisher_id = upsert_publisher(msg, publisher_repo=publisher_repo)
     journal_id = upsert_journal(msg, publisher_id, journal_repo=journal_repo)
 
-    publication_id = queries.get_crossref_publication_id(conn, doi)
-    if not publication_id:
-        publication_id = find_publication(msg, journal_id, pub_repo=pub_repo)
-    if publication_id:
-        publication_id = try_merge_by_doi(publication_id, doi, repo=pub_repo)
-
     external_ids = get_external_ids(msg)
     biblio = get_biblio(msg)
     meta = get_meta(msg)
@@ -365,7 +315,7 @@ def process_work(
         title=title,
         pub_year=pub_year,
         doc_type=None,  # mapping CrossRef → enum canonique appliqué plus tard (cf. docs/chantiers/crossref.md)
-        publication_id=publication_id,
+        publication_id=None,
         staging_id=staging_id,
         external_ids=external_ids,
         journal_id=journal_id,
@@ -380,9 +330,6 @@ def process_work(
     )
 
     process_authors(conn, queries, msg, doi, source_publication_id)
-
-    if publication_id:
-        refresh_from_sources(publication_id, repo=pub_repo)
 
     staging_queries.mark_done(conn, staging_id)
     return True

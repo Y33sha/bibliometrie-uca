@@ -26,8 +26,6 @@ from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.scanr import ScanrNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
-from application.publications import find_or_create as find_or_create_publication
-from application.publications import publication_from_meta, refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
@@ -116,28 +114,6 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
         journal_id=journal_id,
         container_title=container_title,
     )
-
-
-def find_publication(
-    doc: dict,
-    journal_id: int | None,
-    scanr_id: str | None = None,
-    *,
-    pub_repo: PublicationRepository,
-) -> int | None:
-    from domain.publications.doc_types import map_doc_type
-
-    meta = extract_pub_metadata(doc, journal_id, scanr_id)
-    if not meta["pub_year"] or not meta["title"]:
-        return None
-    meta["doc_type"] = map_doc_type(meta["doc_type"], "scanr")
-    result, _ = find_or_create_publication(
-        publication_from_meta(meta),
-        nnt=meta["nnt"],
-        allow_create=False,
-        repo=pub_repo,
-    )
-    return result.id if result else None
 
 
 # =============================================================
@@ -342,26 +318,14 @@ def process_work(
         pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
 
         t0 = time.perf_counter()
-        publication_id = queries.get_scanr_publication_id(conn, scanr_id)
-        if not publication_id:
-            publication_id = find_publication(doc, journal_id, scanr_id, pub_repo=pub_repo)
-        timings["publication"] = time.perf_counter() - t0
-
-        if publication_id:
-            publication_id = try_merge_by_doi(publication_id, pub_meta["doi"], repo=pub_repo)
-
-        t0 = time.perf_counter()
         source_publication_id = insert_scanr_document(
-            conn, queries, doc, staging_id, scanr_id, publication_id, pub_meta
+            conn, queries, doc, staging_id, scanr_id, None, pub_meta
         )
         timings["scanr_doc"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
         process_authors(conn, queries, doc, source_publication_id, address_linker=address_linker)
         timings["authors"] = time.perf_counter() - t0
-
-        if publication_id:
-            refresh_from_sources(publication_id, repo=pub_repo)
 
         staging_queries.mark_done(conn, staging_id)
 

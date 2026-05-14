@@ -30,8 +30,6 @@ from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.normalize.wos import WosNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
-from application.publications import find_or_create as find_or_create_publication
-from application.publications import publication_from_meta, refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
@@ -40,7 +38,6 @@ from domain.ports.publication_repository import PublicationRepository
 from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
 from domain.publications.authorship_roles import map_role
-from domain.publications.doc_types import map_doc_type
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
 
 # =============================================================
@@ -391,27 +388,6 @@ def extract_pub_metadata(rec: dict, journal_id: int | None) -> dict:
     )
 
 
-def find_publication(
-    rec: dict,
-    journal_id: int | None,
-    *,
-    pub_repo: PublicationRepository,
-) -> int | None:
-    """Cherche une publication existante sans en créer. Retourne l'id ou None."""
-    meta = extract_pub_metadata(rec, journal_id)
-    if not meta["pub_year"] or not meta["title"] or meta["title"] == "(sans titre)":
-        return None
-    # Mapper le doc_type pour find_or_create (resolve_doi_conflict a besoin du type canonique)
-    meta["doc_type"] = map_doc_type(meta["doc_type"], "wos")
-    result, _ = find_or_create_publication(
-        publication_from_meta(meta),
-        nnt=meta["nnt"],
-        allow_create=False,
-        repo=pub_repo,
-    )
-    return result.id if result else None
-
-
 # =============================================================
 # SOURCE DOCUMENTS (WOS)
 # =============================================================
@@ -596,26 +572,11 @@ def process_record(
 
         pub_meta = extract_pub_metadata(rec, journal_id)
 
-        publication_id = queries.get_wos_publication_id(conn, rec["ut"])
-
-        if not publication_id:
-            publication_id = find_publication(rec, journal_id, pub_repo=pub_repo)
-        t.mark("publication")
-
-        if publication_id:
-            publication_id = try_merge_by_doi(publication_id, pub_meta["doi"], repo=pub_repo)
-
-        source_publication_id = insert_wos_document(
-            conn, queries, rec, staging_id, publication_id, pub_meta
-        )
+        source_publication_id = insert_wos_document(conn, queries, rec, staging_id, None, pub_meta)
         t.mark("wos_doc")
 
         process_authorships(conn, queries, rec, source_publication_id)
         t.mark("authors")
-
-        if publication_id:
-            refresh_from_sources(publication_id, repo=pub_repo)
-        t.mark("refresh")
 
         staging_queries.mark_done(conn, staging_id)
         t.log_if_slow(ut, logger)
