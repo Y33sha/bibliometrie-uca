@@ -164,9 +164,9 @@ Si la phase fait du SQL non trivial :
 
 ### 3. Entry-point CLI
 
-`interfaces/cli/pipeline/<nouvelle_phase>.py` : charge la connexion via
-`get_connection()`, instancie l'adapter SQL, appelle la fonction
-d'orchestration, commit, close.
+`interfaces/cli/pipeline/<nouvelle_phase>.py` : ouvre une `Connection`
+SA via `get_sync_engine().connect()`, instancie l'adapter SQL, appelle
+la fonction d'orchestration, commit, close.
 
 Utile pour rejouer la phase à la main sans relancer tout le pipeline.
 

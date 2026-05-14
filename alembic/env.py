@@ -3,12 +3,12 @@
 `target_metadata` pointe vers `infrastructure.db.tables.metadata` pour
 permettre `alembic revision --autogenerate`.
 
-L'URL de connexion est construite depuis `infrastructure.settings`
-(mêmes vars d'env que `infrastructure/db/connection.py`). Le driver
-est `postgresql+psycopg` (psycopg3), aligné avec `infrastructure/db/engine.py`.
+L'URL de connexion est construite depuis `infrastructure.settings`,
+avec driver `postgresql+psycopg` (psycopg3) aligné sur
+`infrastructure/db/engine.py`.
 
 Si `BIBLIOMETRIE_SANDBOX=1` est défini, bascule sur la base sandbox
-(cohérent avec `get_connection`).
+(`SANDBOX_DB_NAME` depuis `infrastructure/db/connection.py`).
 """
 
 import os
@@ -48,7 +48,7 @@ def _include_object(
 def _build_url() -> str:
     # Permet à un caller (ex. fixture pytest) d'imposer une URL via
     # `cfg.set_main_option("sqlalchemy.url", ...)`. Sinon, on construit
-    # depuis les settings du projet, comme `infrastructure/db/connection.py`.
+    # depuis les settings du projet.
     configured = config.get_main_option("sqlalchemy.url")
     if configured:
         return configured
