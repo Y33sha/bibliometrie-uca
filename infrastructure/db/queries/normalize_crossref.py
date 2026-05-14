@@ -64,7 +64,8 @@ def upsert_crossref_source_publication(
             keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
             cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
             biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
-            meta = COALESCE(EXCLUDED.meta, source_publications.meta)
+            meta = COALESCE(EXCLUDED.meta, source_publications.meta),
+            updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
         bindparam("external_ids", type_=JSONB),

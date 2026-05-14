@@ -1018,6 +1018,7 @@ CREATE TABLE public.source_publications (
     publication_id integer,
     staging_id integer,
     created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     countries text[],
     hal_collections text[],
     external_ids jsonb,

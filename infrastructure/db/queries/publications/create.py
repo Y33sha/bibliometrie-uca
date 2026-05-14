@@ -63,6 +63,26 @@ def fetch_thesis_primary_author(conn: Connection, publication_id: int) -> tuple[
     return (last, first) if last else None
 
 
+def fetch_stale_publication_ids(conn: Connection) -> list[int]:
+    """Publications dont au moins un `source_publication` a été modifié depuis le dernier refresh canonique.
+
+    Comparaison `source_publications.updated_at > publications.updated_at` : indique qu'une normalisation récente a apporté des changements de méta (oa_status, abstract, biblio, …) que le canonique ne reflète pas encore. `refresh_from_sources` recalcule les méta agrégées et met `publications.updated_at = now()` au passage, ce qui ferme la fenêtre.
+    """
+    rows = conn.execute(
+        text("""
+            SELECT p.id
+            FROM publications p
+            WHERE EXISTS (
+                SELECT 1 FROM source_publications sp
+                WHERE sp.publication_id = p.id
+                  AND sp.updated_at > p.updated_at
+            )
+            ORDER BY p.id
+        """)
+    ).all()
+    return [row.id for row in rows]
+
+
 def fetch_thesis_primary_author_from_source_publication(
     conn: Connection, source_publication_id: int
 ) -> tuple[str, str] | None:
@@ -115,3 +135,6 @@ class PgPublicationsCreateQueries:
         self, conn: Connection, source_publication_id: int
     ) -> tuple[str, str] | None:
         return fetch_thesis_primary_author_from_source_publication(conn, source_publication_id)
+
+    def fetch_stale_publication_ids(self, conn: Connection) -> list[int]:
+        return fetch_stale_publication_ids(conn)

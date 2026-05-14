@@ -170,23 +170,18 @@ def _get_pub_oa_status(conn, hal_id):
     ).scalar_one_or_none()
 
 
-def _refresh_pub_for_hal_source(conn, hal_id):
-    """Re-applique `refresh_from_sources` à la publication liée à un source HAL.
+def _refresh_stale_publications(conn):
+    """Rafraîchit les publications dont au moins un source_publication a été modifié depuis le dernier refresh.
 
-    Depuis la séparation du matching et de la normalisation (chantier `DATA_separer-matching-normalisation`), la phase normalize ne déclenche plus de refresh canonique. Pour les scénarios de re-traitement, le test simule ce que fera (à terme) la phase publications en re-touchant les `source_publications` mis à jour.
+    Reproduit la 2e passe de la phase publications (`create_publications.run`) : SELECT des pubs stale via comparaison `source_publications.updated_at > publications.updated_at` et `refresh_from_sources` sur chacune.
     """
     from application.publications import refresh_from_sources
+    from infrastructure.db.queries.publications.create import fetch_stale_publication_ids
     from infrastructure.repositories import publication_repository
 
-    pub_id = conn.execute(
-        text(
-            "SELECT publication_id FROM source_publications "
-            "WHERE source = 'hal' AND source_id = :hal_id"
-        ),
-        {"hal_id": hal_id},
-    ).scalar_one_or_none()
-    if pub_id:
-        refresh_from_sources(pub_id, repo=publication_repository(conn))
+    repo = publication_repository(conn)
+    for pub_id in fetch_stale_publication_ids(conn):
+        refresh_from_sources(pub_id, repo=repo)
 
 
 # ── Tests ───────────────────────────────────────────────────────
@@ -214,7 +209,7 @@ class TestHalReprocessingUpdatesOaStatus:
         updated_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
         _insert_hal_staging(sa_sync_conn, updated_doc)  # remet processed = FALSE
         _run_normalize_hal(sa_sync_conn)
-        _refresh_pub_for_hal_source(sa_sync_conn, hal_id)
+        _refresh_stale_publications(sa_sync_conn)
 
         assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"
 
@@ -241,6 +236,6 @@ class TestHalReprocessingUpdatesOaStatus:
         #    → refresh_from_sources recalcule en closed.
         _insert_hal_staging(sa_sync_conn, HAL_DOC_CLOSED)
         _run_normalize_hal(sa_sync_conn)
-        _refresh_pub_for_hal_source(sa_sync_conn, hal_id)
+        _refresh_stale_publications(sa_sync_conn)
 
         assert _get_pub_oa_status(sa_sync_conn, hal_id) == "closed"

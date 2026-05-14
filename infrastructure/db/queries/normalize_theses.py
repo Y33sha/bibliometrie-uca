@@ -95,7 +95,8 @@ def upsert_theses_source_publication(
             container_title = COALESCE(EXCLUDED.container_title, source_publications.container_title),
             keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
-            meta = COALESCE(EXCLUDED.meta, source_publications.meta)
+            meta = COALESCE(EXCLUDED.meta, source_publications.meta),
+            updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
         bindparam("external_ids", type_=JSONB),
