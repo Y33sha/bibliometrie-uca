@@ -62,12 +62,12 @@ Le pipeline contient aujourd'hui **5 cascades de matching/fusion disséminées**
 
 Ferme le dernier item ouvert de Phase 4 du chantier `CODE_rich-domain-model`.
 
-- [ ] Créer `domain/publications/merge.py`.
-- [ ] Y déplacer (en les publicisant) `_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_topics_by_source`, `_first_doc_type` depuis `application/publications.py`.
-- [ ] Créer `merge_source_rows(rows, *, source_priority) -> MergedPubFields` qui encapsule l'algorithme complet d'agrégation cross-sources de `refresh_from_sources`. **Inclut title et title_normalized** comme scalaires fusionnés au même titre que les autres champs.
-- [ ] Étendre `repo.update_aggregated` pour accepter `title` et `title_normalized`.
-- [ ] Adapter `application/publications.py:refresh_from_sources` pour appeler `merge_source_rows` puis persister. Le pré-merge sur collision DOI (qui produit `RefreshResult.absorbed_publication_id`) reste côté `refresh_from_sources`.
-- [ ] Tests : couverture sur title fusionné (cas non testé jusqu'ici).
+- [x] Création de `domain/publications/merge.py`.
+- [x] Helpers publicisés (`first_non_null`, `merge_lists_dedup_ci`, `shallow_merge_jsonb`, `topics_by_source`, `arbitrate_doc_type_with_article_subtype`) et `merge_source_rows(pub, rows, *, source_priority) -> None` qui mute l'entité `Publication` en place (pas de `MergedPubFields` séparé : `Publication` étendue porte toutes les colonnes canoniques).
+- [x] Extension de `Publication` avec les 6 champs manquants : `abstract`, `is_retracted`, `keywords`, `topics`, `biblio`, `meta`.
+- [x] Extension de `repo.find_by_id` / `repo.save` pour charger/persister ces 6 champs ; retrait de `repo.update_aggregated` (redondant). — `8e30bcd`
+- [x] Title et title_normalized inclus dans l'agrégation cross-sources. title_normalized recalculé via `normalize_text(pub.title)` après agrégation.
+- [x] `refresh_from_sources` orchestre désormais : load → pré-merge sur collision DOI → `merge_source_rows` → `save`. `RefreshResult.absorbed_publication_id` conservé.
 
 ### Phase 2 — Choix de cible trivial + suppression du ranking SQL
 
