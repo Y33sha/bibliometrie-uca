@@ -10,6 +10,8 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.pipeline.merge import MergeQueries
+
 
 def find_nnt_duplicates(conn: Connection) -> list[dict[str, Any]]:
     """Liste les NNT dont les `source_publications` pointent vers plusieurs publications.
@@ -74,7 +76,7 @@ def link_source_publication_to_publication(
     )
 
 
-class PgMergeQueries:
+class PgMergeQueries(MergeQueries):
     """Adapter PostgreSQL pour `application.ports.merge.MergeQueries`."""
 
     def find_nnt_duplicates(self, conn: Connection) -> list[dict[str, Any]]:

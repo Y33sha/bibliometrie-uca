@@ -9,6 +9,8 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.pipeline.persons_create import PersonsCreateQueries
+
 
 def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
     """Liste tous les `source_authorships` in-perimeter non rattachés à une
@@ -145,7 +147,7 @@ def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
     return {r.name_form: r.person_ids for r in rows}
 
 
-class PgPersonsCreateQueries:
+class PgPersonsCreateQueries(PersonsCreateQueries):
     """Adapter PostgreSQL pour `application.ports.persons_create.PersonsCreateQueries`."""
 
     def fetch_unlinked_authorships(self, conn: Connection) -> list[dict[str, Any]]:

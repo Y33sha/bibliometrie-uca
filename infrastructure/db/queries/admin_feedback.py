@@ -1,16 +1,18 @@
 """Query services pour le tableau de bord admin de feedback détection d'adresses.
 
-Implémente le port `application.ports.admin_feedback_queries.AdminFeedbackQueries`
-via `PgAdminFeedbackQueries`. Conformité au Protocol par duck typing —
-pas d'import depuis `application/` (règle DDD).
+`PgAdminFeedbackQueries` hérite explicitement du Protocol
+`application.ports.admin_feedback_queries.AdminFeedbackQueries` (mypy
+vérifie la conformité à la définition de classe).
 """
 
 from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.admin_feedback_queries import AdminFeedbackQueries
 
-class PgAdminFeedbackQueries:
+
+class PgAdminFeedbackQueries(AdminFeedbackQueries):
     """Adapter SA pour `AdminFeedbackQueries`."""
 
     def __init__(self, conn: Connection) -> None:

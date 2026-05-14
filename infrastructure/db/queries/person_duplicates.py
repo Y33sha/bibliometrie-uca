@@ -1,8 +1,7 @@
 """Query services pour /api/admin/person-duplicates/*.
 
-Implémente le port `application.ports.person_duplicates_queries.
-PersonDuplicatesQueries` via `PgPersonDuplicatesQueries`
-(duck typing — pas d'import depuis `application/`).
+`PgPersonDuplicatesQueries` hérite explicitement du Protocol
+`application.ports.person_duplicates_queries.PersonDuplicatesQueries`.
 
 **Divergence assumée** avec `domain/names.py:names_compatible`
 (matching pipeline). Les 4 `PERSON_DUP_QUERIES` + `_tokens_match`
@@ -18,6 +17,8 @@ ont des exigences opposées sur le compromis precision/recall.
 from typing import Any
 
 from sqlalchemy import Connection, text
+
+from application.ports.api.person_duplicates_queries import PersonDuplicatesQueries
 
 
 def _person_name_tokens(ln_norm: str, fn_norm: str) -> set[str]:
@@ -161,7 +162,7 @@ ORDER BY COUNT(*) DESC, LEAST(a1.person_id, a2.person_id)
 """
 
 
-class PgPersonDuplicatesQueries:
+class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
     """Adapter SA pour `PersonDuplicatesQueries`."""
 
     def __init__(self, conn: Connection) -> None:

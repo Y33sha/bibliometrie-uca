@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection, select, text
 
+from application.ports.api.publishers_queries import PublisherQueries
 from infrastructure.db.tables import publishers as t_publishers
 
 _SORT_MAP = {
@@ -16,7 +17,7 @@ _SORT_MAP = {
 }
 
 
-class PgPublisherQueries:
+class PgPublisherQueries(PublisherQueries):
     """Adapter SA pour `application.ports.publishers_queries.PublisherQueries`."""
 
     def __init__(self, conn: Connection) -> None:

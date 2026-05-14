@@ -15,6 +15,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
+from application.ports.api.stats_queries import StatsQueries
 from infrastructure.db.queries.stats.journals import journal_stats as _journal_stats
 from infrastructure.db.queries.stats.labs import stats_labs as _stats_labs
 from infrastructure.db.queries.stats.publishers import publisher_stats as _publisher_stats
@@ -32,7 +33,7 @@ from infrastructure.db.queries.stats.summary import (
 )
 
 
-class PgStatsQueries:
+class PgStatsQueries(StatsQueries):
     """Adapter SA pour `application.ports.stats_queries.StatsQueries`."""
 
     def __init__(self, conn: Connection) -> None:

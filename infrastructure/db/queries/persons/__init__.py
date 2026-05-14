@@ -28,6 +28,7 @@ from application.ports.api.persons_queries import (
     DirectoryFilters,
     FacetFilters,
     ListFilters,
+    PersonsQueries,
 )
 from infrastructure.db.queries.persons.admin import (
     list_orphan_authorships as _list_orphan_authorships,
@@ -86,7 +87,7 @@ from infrastructure.db.queries.persons.list import (
 )
 
 
-class PgPersonsQueries:
+class PgPersonsQueries(PersonsQueries):
     """Adapter SA pour `application.ports.persons_queries.PersonsQueries`."""
 
     def __init__(self, conn: Connection) -> None:

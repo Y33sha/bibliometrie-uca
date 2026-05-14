@@ -82,7 +82,7 @@ Patterns dominants :
   - [x] Adapters API : `PgPublicationsQueries` (4 méthodes), `PgPersonsQueries` (5 méthodes), `PgStatsQueries` (6 méthodes) + top-level functions `stats/{publishers,journals,labs,summary}.py` (6 fonctions).
   - [x] Adapters pipeline `Pg*NormalizeQueries` : HAL (2 méthodes), OpenAlex (2), ScanR (2), Theses (2), WoS (1). Éclatement façon `normalize_crossref` (déjà fait).
 - [ ] Sweep G : retours `Any` isolés (`db/connection.py:get_connection`, `repositories/publication_repository.py:_source_publication_from_row`, `sources/wos/extract_wos.py:insert_batch / log_remaining_quota`, `sources/hal/extract_hal.py`, `sources/hal/fetch_missing_hal_id.py:main`).
-- [ ] Sweep H : héritage explicite `class Pg*Queries(*Queries):` pour les ~33 adapters. Documente l'implémentation, fait vérifier la conformité par mypy à la définition de classe (en complément du check au composition root). Dépend du Sweep F pour bénéficier pleinement de la vérification statique (sinon les `**kwargs: Any` masquent les divergences de signature).
+- [x] Sweep H : héritage explicite `class Pg*Queries(*Queries):` pour les 33 adapters (5 API + 6 normalize + 22 autres). Maintenant que les `**kwargs: Any` sont éclatés (Sweep F), mypy vérifie la conformité à la définition de classe. Docstrings des 4 fichiers (addresses, laboratories, admin_feedback, hal_problems, person_duplicates, publication_duplicates, structures, publications/__init__, persons/__init__) et règle 3 d'`architecture.md` mises à jour pour acter l'héritage explicite (à la place du duck typing).
 
 #### Phase 2.4 — `interfaces/`
 

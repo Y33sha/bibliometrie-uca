@@ -12,6 +12,8 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.api.subjects_queries import SubjectsAdminQueries
+from application.ports.pipeline.subjects import SubjectsQueries
 from domain.subjects.subject import normalize_label
 
 # Le ON CONFLICT fusionne par ontologie : pour chaque clé présente dans l'un
@@ -254,7 +256,7 @@ def recompute_cooccurrences(conn: Connection, *, min_count: int = 2) -> int:
 # ── Lectures (consommées par les routes API) ─────────────────────
 
 
-class PgSubjectsAdminQueries:
+class PgSubjectsAdminQueries(SubjectsAdminQueries):
     """Adapter SA pour `application.ports.subjects_queries.SubjectsAdminQueries`."""
 
     def __init__(self, conn: Connection) -> None:
@@ -327,7 +329,7 @@ class PgSubjectsAdminQueries:
         return [dict(r._mapping) for r in rows]
 
 
-class PgSubjectsQueries:
+class PgSubjectsQueries(SubjectsQueries):
     """Adapter PostgreSQL implémentant `application.ports.subjects.SubjectsQueries`."""
 
     def upsert_subject(

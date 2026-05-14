@@ -22,7 +22,11 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.api.publications_queries import FacetFilters, ListFilters
+from application.ports.api.publications_queries import (
+    FacetFilters,
+    ListFilters,
+    PublicationsQueries,
+)
 from infrastructure.db.queries.publications.detail import (
     all_years as _all_years,
 )
@@ -46,7 +50,7 @@ from infrastructure.db.queries.publications.match_or_create import (
 )
 
 
-class PgPublicationsQueries:
+class PgPublicationsQueries(PublicationsQueries):
     """Adapter SA pour `application.ports.publications_queries.PublicationsQueries`."""
 
     def __init__(self, conn: Connection) -> None:

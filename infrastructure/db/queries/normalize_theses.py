@@ -8,6 +8,7 @@ que les lectures utiles à l'idempotence et au matching auteurs.
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
 from domain.json_types import JsonValue
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
@@ -140,7 +141,7 @@ def count_theses_table(conn: Connection, table: str) -> int:
     ).scalar_one()
 
 
-class PgThesesNormalizeQueries:
+class PgThesesNormalizeQueries(ThesesNormalizeQueries):
     """Adapter PostgreSQL pour `application.ports.normalize_theses.ThesesNormalizeQueries`."""
 
     def upsert_theses_source_publication(

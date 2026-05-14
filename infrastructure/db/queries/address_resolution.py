@@ -12,6 +12,8 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.pipeline.address_resolution import AddressResolutionQueries
+
 
 def load_name_forms(conn: Connection) -> list[dict[str, Any]]:
     """Charge toutes les formes depuis `structure_name_forms` + infos structure."""
@@ -146,7 +148,7 @@ def mark_address_resolved(conn: Connection, addr_id: int) -> None:
     )
 
 
-class PgAddressResolutionQueries:
+class PgAddressResolutionQueries(AddressResolutionQueries):
     """Adapter PostgreSQL pour `application.ports.address_resolution.AddressResolutionQueries`."""
 
     def load_name_forms(self, conn: Connection) -> list[dict[str, Any]]:

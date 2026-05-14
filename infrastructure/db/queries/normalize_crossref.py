@@ -12,6 +12,7 @@ le pipeline ``personnes`` (source-agnostique).
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.normalize.crossref import CrossrefNormalizeQueries
 from domain.json_types import JsonValue
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
@@ -140,7 +141,7 @@ def upsert_crossref_source_authorship(
     return row.id
 
 
-class PgCrossrefNormalizeQueries:
+class PgCrossrefNormalizeQueries(CrossrefNormalizeQueries):
     """Adapter PostgreSQL pour ``application.ports.normalize_crossref.CrossrefNormalizeQueries``."""
 
     def upsert_crossref_source_publication(

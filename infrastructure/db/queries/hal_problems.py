@@ -2,17 +2,18 @@
 
 Contrôles qualité HAL au niveau des publications (doublons de dépôts,
 manques dans les collections, conflits d'affiliation) + comptes HAL
-multiples par personne. Implémente le port
-`application.ports.hal_problems_queries.HalProblemsQueries` via
-`PgHalProblemsQueries` (duck typing).
+multiples par personne. `PgHalProblemsQueries` hérite explicitement du
+Protocol `application.ports.hal_problems_queries.HalProblemsQueries`.
 """
 
 from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.hal_problems_queries import HalProblemsQueries
 
-class PgHalProblemsQueries:
+
+class PgHalProblemsQueries(HalProblemsQueries):
     """Adapter SA pour `HalProblemsQueries`."""
 
     def __init__(self, conn: Connection) -> None:

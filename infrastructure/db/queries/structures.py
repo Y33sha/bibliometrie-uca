@@ -1,15 +1,14 @@
 """Query services pour /api/structures/* et /api/name-forms/*.
 
-Implémente le port `application.ports.structures_queries.StructuresQueries`
-via `PgStructuresQueries` (constructor injection de la `Connection`
-SA). Conformité au port assurée par duck typing : pas d'import du
-Protocol depuis `infrastructure/` (règle DDD `infrastructure ⊥
-application`).
+`PgStructuresQueries` hérite explicitement du Protocol
+`application.ports.structures_queries.StructuresQueries`.
 """
 
 from typing import Any
 
 from sqlalchemy import Connection, text
+
+from application.ports.api.structures_queries import StructuresQueries
 
 _LIST_ORDER_BY = """
     ORDER BY CASE s.structure_type::text
@@ -46,7 +45,7 @@ def _list_structures_sql(*, type_filter: str | None, search: str) -> tuple[str, 
     return sql, binds
 
 
-class PgStructuresQueries:
+class PgStructuresQueries(StructuresQueries):
     """Adapter SA pour `application.ports.structures_queries.StructuresQueries`."""
 
     def __init__(self, conn: Connection) -> None:

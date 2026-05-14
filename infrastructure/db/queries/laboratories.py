@@ -1,13 +1,10 @@
 """Query services pour /api/laboratories/*.
 
-Implémente le port `application.ports.laboratories_queries.LaboratoriesQueries`
-via `PgLaboratoriesQueries` (constructor injection de la `Connection`
-SA). Conformité au port assurée par duck typing : l'adapter ne fait pas
-`class PgX(LaboratoriesQueries):` ; la vérification structurale par mypy
-a lieu au point de composition root.
-
-La dataclass `LabPersonsFilters` est importée depuis le port pour typer
-les signatures (cf. règle 3 d'`architecture.md`).
+`PgLaboratoriesQueries` hérite explicitement du Protocol
+`application.ports.laboratories_queries.LaboratoriesQueries` : mypy
+vérifie la conformité à la définition de classe. La dataclass
+`LabPersonsFilters` est importée du port pour typer les signatures
+(cf. règle 3 d'`architecture.md`).
 """
 
 import datetime
@@ -15,7 +12,7 @@ from typing import Any
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.api.laboratories_queries import LabPersonsFilters
+from application.ports.api.laboratories_queries import LaboratoriesQueries, LabPersonsFilters
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from infrastructure.db.queries.filters import (
     OA_CLOSED_SQL,
@@ -39,7 +36,7 @@ _DOC_TYPES_EXCLUDED_FROM_LAB_CONTRIBUTIONS_SQL = (
 )
 
 
-class PgLaboratoriesQueries:
+class PgLaboratoriesQueries(LaboratoriesQueries):
     """Adapter SA pour `application.ports.laboratories_queries.LaboratoriesQueries`."""
 
     def __init__(self, conn: Connection) -> None:
