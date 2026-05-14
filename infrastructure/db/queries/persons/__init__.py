@@ -24,6 +24,11 @@ from typing import Any
 
 from sqlalchemy import Connection
 
+from application.ports.api.persons_queries import (
+    DirectoryFilters,
+    FacetFilters,
+    ListFilters,
+)
 from infrastructure.db.queries.persons.admin import (
     list_orphan_authorships as _list_orphan_authorships,
 )
@@ -89,19 +94,25 @@ class PgPersonsQueries:
 
     # ── Annuaire / recherche / liste admin ─────────────────────────
 
-    def persons_directory(self, **kwargs: Any) -> dict[str, Any]:
-        return _persons_directory(self._conn, **kwargs)
+    def persons_directory(
+        self, *, filters: DirectoryFilters, page: int, per_page: int, sort: str
+    ) -> dict[str, Any]:
+        return _persons_directory(
+            self._conn, filters=filters, page=page, per_page=per_page, sort=sort
+        )
 
-    def search_persons(self, **kwargs: Any) -> list[dict[str, Any]]:
-        return _search_persons(self._conn, **kwargs)
+    def search_persons(self, *, q: str, limit: int) -> list[dict[str, Any]]:
+        return _search_persons(self._conn, q=q, limit=limit)
 
-    def list_persons(self, **kwargs: Any) -> dict[str, Any]:
-        return _list_persons(self._conn, **kwargs)
+    def list_persons(
+        self, *, filters: ListFilters, page: int, per_page: int, sort: str
+    ) -> dict[str, Any]:
+        return _list_persons(self._conn, filters=filters, page=page, per_page=per_page, sort=sort)
 
     # ── Facettes / listes de référence / stats ─────────────────────
 
-    def persons_facets(self, **kwargs: Any) -> dict[str, Any]:
-        return _persons_facets(self._conn, **kwargs)
+    def persons_facets(self, *, filters: FacetFilters) -> dict[str, Any]:
+        return _persons_facets(self._conn, filters=filters)
 
     def list_departments(self) -> list[dict[str, Any]]:
         return _list_departments(self._conn)
@@ -140,8 +151,8 @@ class PgPersonsQueries:
     def orphan_authorships_count(self) -> dict[str, Any]:
         return _orphan_authorships_count(self._conn)
 
-    def list_orphan_authorships(self, **kwargs: Any) -> dict[str, Any]:
-        return _list_orphan_authorships(self._conn, **kwargs)
+    def list_orphan_authorships(self, *, search: str, page: int, per_page: int) -> dict[str, Any]:
+        return _list_orphan_authorships(self._conn, search=search, page=page, per_page=per_page)
 
     def name_form_authorships(self, person_id: int, name_form: str) -> dict[str, Any]:
         return _name_form_authorships(self._conn, person_id, name_form)

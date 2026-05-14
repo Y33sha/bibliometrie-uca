@@ -100,12 +100,32 @@ def _build_publisher_stats_sql(
     return count_sql, rows_sql, binds
 
 
-def publisher_stats(conn: Connection, **kwargs: Any) -> dict[str, Any]:
+def publisher_stats(
+    conn: Connection,
+    *,
+    root_structure_id: int,
+    lab_ids: list[int],
+    years: list[int],
+    oa_status: str,
+    has_apc: str,
+    search: str,
+    page: int,
+    per_page: int,
+    sort: str,
+) -> dict[str, Any]:
     """Stats agrégées par éditeur, paginées."""
     conn.execute(text("SET LOCAL jit = off"))
-    count_sql, rows_sql, binds = _build_publisher_stats_sql(**kwargs)
+    count_sql, rows_sql, binds = _build_publisher_stats_sql(
+        root_structure_id=root_structure_id,
+        lab_ids=lab_ids,
+        years=years,
+        oa_status=oa_status,
+        has_apc=has_apc,
+        search=search,
+        page=page,
+        per_page=per_page,
+        sort=sort,
+    )
     total = conn.execute(text(count_sql), binds).one().total
     rows = conn.execute(text(rows_sql), binds).all()
-    return paginated(
-        total, kwargs["page"], kwargs["per_page"], "publishers", [dict(r._mapping) for r in rows]
-    )
+    return paginated(total, page, per_page, "publishers", [dict(r._mapping) for r in rows])

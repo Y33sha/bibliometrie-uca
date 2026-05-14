@@ -22,6 +22,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
+from application.ports.api.publications_queries import FacetFilters, ListFilters
 from infrastructure.db.queries.publications.detail import (
     all_years as _all_years,
 )
@@ -51,17 +52,42 @@ class PgPublicationsQueries:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def list_publications(self, **kwargs: Any) -> dict[str, Any]:
-        return _list_publications(self._conn, **kwargs)
+    def list_publications(
+        self,
+        *,
+        filters: ListFilters,
+        root_structure_id: int,
+        page: int,
+        per_page: int,
+        sort: str,
+    ) -> dict[str, Any]:
+        return _list_publications(
+            self._conn,
+            filters=filters,
+            root_structure_id=root_structure_id,
+            page=page,
+            per_page=per_page,
+            sort=sort,
+        )
 
-    def publications_facets(self, **kwargs: Any) -> dict[str, Any]:
-        return _publications_facets(self._conn, **kwargs)
+    def publications_facets(
+        self, *, filters: FacetFilters, root_structure_id: int
+    ) -> dict[str, Any]:
+        return _publications_facets(
+            self._conn, filters=filters, root_structure_id=root_structure_id
+        )
 
-    def export_publications_csv(self, **kwargs: Any) -> str:
-        return _export_publications_csv(self._conn, **kwargs)
+    def export_publications_csv(
+        self, *, filters: ListFilters, root_structure_id: int, sort: str
+    ) -> str:
+        return _export_publications_csv(
+            self._conn, filters=filters, root_structure_id=root_structure_id, sort=sort
+        )
 
-    def export_theses_csv(self, **kwargs: Any) -> str:
-        return _export_theses_csv(self._conn, **kwargs)
+    def export_theses_csv(self, *, filters: ListFilters, root_structure_id: int, sort: str) -> str:
+        return _export_theses_csv(
+            self._conn, filters=filters, root_structure_id=root_structure_id, sort=sort
+        )
 
     def all_years(self) -> list[int]:
         return _all_years(self._conn)
