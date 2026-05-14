@@ -20,7 +20,7 @@ Inventaire actuel :
   `decide_match_by_identifier` (`domain/persons/matching.py`) ;
   `allow_person_creation` (`domain/persons/creation.py`) ;
   `names_compatible`, `compute_person_name_forms` (`domain/names.py`) ;
-  `has_minimal_publication_metadata` (`domain/publications/deduplication.py`).
+  `has_minimal_publication_metadata` (`domain/publications/metadata.py`).
 - **Dataclasses de résultat de requête** : `PubByDoi`, `PubByNnt`,
   `PubByTitle`, `PubThesisCandidate` (`domain/publication.py`).
 - **Zéro entité avec identité + comportement.** `domain/structure.py`
@@ -202,7 +202,7 @@ vides comme point d'appui.
       `check_can_merge_persons` de `domain/persons/merge.py` ; doublon
       temporaire, suppression Phase 2). Signature avec `has_distinct_rh`
       kwarg en attendant le scaffolding `PersonRH`.
-- [x] `Publication.has_minimal_metadata()` (reprend `has_minimal_publication_metadata` de `domain/publications/deduplication.py`). Doublon temporaire en `deduplication.py` ; suppression Phase 6.
+- [x] `Publication.has_minimal_metadata()` (reprend `has_minimal_publication_metadata` de `domain/publications/metadata.py`). Pas un doublon à supprimer : la méthode sert les callers qui manipulent une `Publication` (typiquement `find_or_create`), la fonction libre sert les normalizers qui n'ont que `title + pub_year` à filtrer en amont.
 
 **Convention + tests :**
 
@@ -306,7 +306,6 @@ Aucune logique métier identifiée actuellement au-delà du CRUD de `application
 
 Une fois les callers de Phase 1 migrés vers les entités (Phases 3, 4, 5), les fonctions libres font doublon avec les méthodes d'aggregate. Suppression.
 
-- [ ] `domain/publications/deduplication.py:has_minimal_publication_metadata` — supprimer une fois les callers passés par `Publication.has_minimal_metadata()`.
 - [ ] `domain/persons/merge.py:check_can_merge_persons` — supprimer une fois `application/persons.py:merge_person` migré vers `Person.can_merge_with(...)`. Le fichier `merge.py` devient vide et peut être supprimé.
 
 ### Phase 7 — Convention pour les chantiers METIER_*
