@@ -1,6 +1,6 @@
-"""Algorithme de fusion multi-sources des publications.
+"""Agrégation cross-sources de l'aggregate Publication.
 
-Encapsule les règles d'agrégation cross-sources : à partir des lignes `source_publications` attachées à une publication, calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de `SourcePublication` (lecture multi-sources) → `Publication` (vue canonique).
+Encapsule les règles d'agrégation : à partir des `SourcePublication` attachées à une publication canonique, calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de `SourcePublication` (lecture multi-sources) → `Publication` (vue canonique).
 
 Règles d'agrégation par type de champ :
 - **Scalaires nullable** (`title`, `doi`, `doc_type`, `pub_year`, `journal_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`.
@@ -23,6 +23,7 @@ from domain.publications.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT, best_oa_status
 from domain.publications.publication import Publication
+from domain.source_publications.source_publication import SourcePublication
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,44 +36,44 @@ class RefreshOutcome:
     is_orphan: bool = False
 
 
-def merge_source_rows(
+def refresh_from_sources(
     pub: Publication,
-    rows: list[dict[str, Any]],
+    sources: list[SourcePublication],
     *,
     source_priority: tuple[str, ...],
 ) -> RefreshOutcome:
-    """Recalcule l'état canonique de `pub` (DOI, oa_status, méta, etc.) par agrégation de ses sources `rows`. Mute `pub` en place ; persistance via `repo.save(pub)` côté caller.
+    """Recalcule l'état canonique de `pub` (DOI, oa_status, méta, etc.) par agrégation de ses `sources`. Mute `pub` en place ; persistance via `repo.save(pub)` côté caller.
 
     Règles d'agrégation : premier non-null par `source_priority` pour les scalaires nullable, statut OA le plus ouvert toutes sources confondues, union dédupliquée des listes, fusion shallow par clé des JSONB, `topics` indexés par source.
 
-    Retourne `RefreshOutcome(is_orphan=True)` si `rows` est vide — `pub` n'est pas muté ; la règle métier dicte que le caller supprime la publication.
+    Retourne `RefreshOutcome(is_orphan=True)` si `sources` est vide — `pub` n'est pas muté ; la règle métier dicte que le caller supprime la publication.
     """
-    if not rows:
+    if not sources:
         return RefreshOutcome(is_orphan=True)
 
     rank = {s: i for i, s in enumerate(source_priority)}
-    rows_sorted = sorted(rows, key=lambda r: rank.get(r["source"], 99))
+    sorted_sources = sorted(sources, key=lambda s: rank.get(s.source, 99))
 
-    new_title = first_non_null(rows_sorted, "title")
+    new_title = first_non_null(sorted_sources, "title")
     pub.title = new_title if new_title is not None else pub.title
     pub.title_normalized = normalize_text(pub.title) if pub.title else None
-    pub.doc_type = arbitrate_doc_type_with_article_subtype(rows_sorted)
-    pub.pub_year = first_non_null(rows_sorted, "pub_year") or pub.pub_year
+    pub.doc_type = arbitrate_doc_type_with_article_subtype(sorted_sources)
+    pub.pub_year = first_non_null(sorted_sources, "pub_year") or pub.pub_year
 
-    new_doi_str = first_non_null(rows_sorted, "doi")
+    new_doi_str = first_non_null(sorted_sources, "doi")
     pub.doi = DOI(new_doi_str) if new_doi_str else None
 
-    pub.journal_id = first_non_null(rows_sorted, "journal_id")
-    pub.oa_status = best_oa_status(r["oa_status"] for r in rows_sorted) or OA_STATUS_UNKNOWN_DEFAULT
-    pub.container_title = first_non_null(rows_sorted, "container_title")
-    pub.language = first_non_null(rows_sorted, "language")
-    pub.abstract = first_non_null(rows_sorted, "abstract")
-    pub.keywords = tuple(merge_lists_dedup_ci(rows_sorted, "keywords") or ())
-    pub.countries = tuple(merge_lists_dedup_ci(rows_sorted, "countries") or ())
-    pub.topics = topics_by_source(rows_sorted)
-    pub.biblio = shallow_merge_jsonb(rows_sorted, "biblio")
-    pub.meta = shallow_merge_jsonb(rows_sorted, "meta")
-    pub.is_retracted = any(r["is_retracted"] for r in rows_sorted if r["is_retracted"])
+    pub.journal_id = first_non_null(sorted_sources, "journal_id")
+    pub.oa_status = best_oa_status(s.oa_status for s in sorted_sources) or OA_STATUS_UNKNOWN_DEFAULT
+    pub.container_title = first_non_null(sorted_sources, "container_title")
+    pub.language = first_non_null(sorted_sources, "language")
+    pub.abstract = first_non_null(sorted_sources, "abstract")
+    pub.keywords = tuple(merge_lists_dedup_ci(sorted_sources, "keywords") or ())
+    pub.countries = tuple(merge_lists_dedup_ci(sorted_sources, "countries") or ())
+    pub.topics = topics_by_source(sorted_sources)
+    pub.biblio = shallow_merge_jsonb(sorted_sources, "biblio")
+    pub.meta = shallow_merge_jsonb(sorted_sources, "meta")
+    pub.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
 
     return RefreshOutcome()
 
@@ -80,21 +81,21 @@ def merge_source_rows(
 # ── Helpers publics ────────────────────────────────────────────────
 
 
-def first_non_null(rows: list[dict[str, Any]], field: str) -> Any:
-    """Premier `row[field]` non-null dans l'ordre des `rows`. None si tous absents."""
-    for r in rows:
-        v = r[field]
+def first_non_null(sources: list[SourcePublication], attr: str) -> Any:
+    """Premier `getattr(source, attr)` non-null dans l'ordre des `sources`. None si tous absents."""
+    for s in sources:
+        v = getattr(s, attr)
         if v is not None:
             return v
     return None
 
 
-def merge_lists_dedup_ci(rows: list[dict[str, Any]], field: str) -> list[Any] | None:
-    """Union dédupliquée des listes `row[field]`. Déduplication case-insensitive pour les strings, sinon par valeur. Préserve l'ordre d'apparition. None si toutes vides/null."""
+def merge_lists_dedup_ci(sources: list[SourcePublication], attr: str) -> list[Any] | None:
+    """Union dédupliquée des listes `source.<attr>`. Déduplication case-insensitive pour les strings, sinon par valeur. Préserve l'ordre d'apparition. None si toutes vides/null."""
     seen: set[Any] = set()
     result: list[Any] = []
-    for r in rows:
-        for item in r[field] or []:
+    for s in sources:
+        for item in getattr(s, attr) or ():
             key = item.lower() if isinstance(item, str) else item
             if key not in seen:
                 seen.add(key)
@@ -102,11 +103,11 @@ def merge_lists_dedup_ci(rows: list[dict[str, Any]], field: str) -> list[Any] | 
     return result or None
 
 
-def shallow_merge_jsonb(rows: list[dict[str, Any]], field: str) -> dict[str, JsonValue] | None:
+def shallow_merge_jsonb(sources: list[SourcePublication], attr: str) -> dict[str, JsonValue] | None:
     """Fusion shallow par clé pour `meta` / `biblio`. La première source à fournir une clé l'emporte (cohérent avec « premier non-null ») ; les clés sont généralement orthogonales entre sources."""
     merged: dict[str, JsonValue] = {}
-    for r in rows:
-        d = r[field]
+    for s in sources:
+        d = getattr(s, attr)
         if isinstance(d, dict):
             for k, v in d.items():
                 if k not in merged:
@@ -114,34 +115,33 @@ def shallow_merge_jsonb(rows: list[dict[str, Any]], field: str) -> dict[str, Jso
     return merged or None
 
 
-def topics_by_source(rows: list[dict[str, Any]]) -> dict[str, JsonValue] | None:
+def topics_by_source(sources: list[SourcePublication]) -> dict[str, JsonValue] | None:
     """Indexe les `topics` par source. Schémas radicalement différents par source — chacun reste sous sa propre clé pour préserver la forme native (liste hiérarchique OpenAlex, dict ScanR, etc.)."""
     out: dict[str, JsonValue] = {}
-    for r in rows:
-        topics = r["topics"]
-        if topics:
-            out[r["source"]] = topics
+    for s in sources:
+        if s.topics:
+            out[s.source] = s.topics
     return out or None
 
 
-def arbitrate_doc_type_with_article_subtype(rows: list[dict[str, Any]]) -> str:
+def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublication]) -> str:
     """Choix du `doc_type` canonique : premier non-null dans l'ordre de priorité, avec exception pour les sous-types d'article.
 
     CrossRef (priorité 2) renvoie `journal-article` indistinctement pour tous les sous-types (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction). Si une source moins prioritaire propose un de ces sous-types plus précis, on le préfère pour ne pas perdre l'information.
     """
     article_subtype_present: str | None = None
-    for r in rows:
-        if not r["doc_type"]:
+    for s in sources:
+        if not s.doc_type:
             continue
-        mapped = map_doc_type(r["doc_type"], r["source"])
+        mapped = map_doc_type(s.doc_type, s.source)
         if mapped in ARTICLE_SUBTYPES:
             article_subtype_present = mapped
             break
 
-    for r in rows:
-        if not r["doc_type"]:
+    for s in sources:
+        if not s.doc_type:
             continue
-        mapped = map_doc_type(r["doc_type"], r["source"])
+        mapped = map_doc_type(s.doc_type, s.source)
         if mapped == "article" and article_subtype_present:
             return article_subtype_present
         return mapped

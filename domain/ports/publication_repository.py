@@ -3,7 +3,7 @@
 Implémenté par infrastructure/repositories/publication_repository.py.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
 
 from domain.publication import (
     PubByDoi,
@@ -12,6 +12,7 @@ from domain.publication import (
     PubThesisCandidate,
 )
 from domain.publications.publication import Publication
+from domain.source_publications.source_publication import SourcePublication
 
 
 class PublicationRepository(Protocol):
@@ -61,7 +62,7 @@ class PublicationRepository(Protocol):
 
     # ── Agrégation depuis source_publications ──────────────────────
 
-    def get_source_rows(self, pub_id: int) -> list[dict[str, Any]]: ...
+    def get_source_publications(self, pub_id: int) -> list[SourcePublication]: ...
 
     # ── Création ───────────────────────────────────────────────────
 
