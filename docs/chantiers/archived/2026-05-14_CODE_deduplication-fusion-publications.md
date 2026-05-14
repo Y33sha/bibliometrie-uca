@@ -1,6 +1,6 @@
-# Chantier — Déduplication & fusion de publications
+# Chantier — Rationalisation du matching/fusion de publications.
 
-Commencé le 2026-05-14.
+Commencé et terminé le 2026-05-14.
 
 ## Contexte
 
@@ -9,7 +9,7 @@ Le pipeline contient aujourd'hui **5 cascades de matching/fusion disséminées**
 **Deux dimensions imbriquées** :
 
 - **Refactorisation** : extraire les décisions pures vers `domain/publications/deduplication.py` (cascades) et nouveau `domain/publications/merge.py` (algorithme de fusion multi-sources), unifier les sites qui font la même chose.
-- **Changement de logique** : la règle « choix de la publication cible de fusion » est arbitraire (les métadonnées canoniques sont triangulées par `refresh_from_sources` après fusion) — simplifier cette règle partout, supprimer le ranking SQL, gérer correctement les redirections en chaîne. Et inclure `title` dans l'agrégation cross-sources, ce que `refresh_from_sources` oublie actuellement.
+- **Harmonisation** : la règle « choix de la publication cible de fusion » est arbitraire (les métadonnées canoniques sont triangulées par `refresh_from_sources` après fusion) — simplifier cette règle partout, supprimer le ranking SQL, gérer correctement les redirections en chaîne. Et inclure `title` dans l'agrégation cross-sources, ce que `refresh_from_sources` oublie actuellement.
 
 ### Sites concernés (inventaire)
 

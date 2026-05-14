@@ -54,7 +54,7 @@ docker cp bibliometrie.dump bibliometrie-uca-db-1:/tmp/
 docker compose exec db bash -c 'pg_restore -U "$POSTGRES_USER" -d bibliometrie --no-owner -j 4 /tmp/bibliometrie.dump'
 ```
 
-Ou créer une base vide (le pipeline applique toutes les migrations) :
+Ou créer une base vide (le pipeline applique toutes les migrations<!--TODO: what?-->) :
 
 ```bash
 docker compose exec backend alembic upgrade head
@@ -160,13 +160,13 @@ cd interfaces/frontend && npm run build
 # Backend via pm2
 pm2 start interfaces/api/app.py --name bibliometrie --interpreter python3
 ```
-
+<!--TODO: vraiment utile d'imposer pm2 en prod? je serais plus pour donner la commade uvicorn et laisser les gens décider de leur environnement de prod; ça vaut pour exploitation.md par ricochet-->
 Voir [docs/exploitation.md](docs/exploitation.md) pour nginx et pm2.
 
 ## Pipeline de données
 
 ```bash
-python run_pipeline.py                    # Complet (9 phases)
+python run_pipeline.py                    # Complet
 python run_pipeline.py --from persons     # Reprise depuis une phase
 python run_pipeline.py --only authorships # Une seule phase
 python run_pipeline.py --list             # Liste des phases
@@ -175,7 +175,7 @@ python run_pipeline.py --mode weekly      # Import hebdomadaire (WoS exclu)
 python run_pipeline.py --sources hal,openalex  # Sources spécifiques
 ```
 
-Voir [docs/pipeline.md](docs/pipeline.md) pour le détail des 9 phases.
+Voir [docs/pipeline.md](docs/pipeline.md) pour le détail des phases.
 
 ## Tests
 
@@ -219,11 +219,11 @@ d'import entre couches (vérifiées par import-linter en pre-commit + CI).
 
 - [Architecture logicielle](docs/architecture.md) — couches DDD, ports/adapters, règles d'import
 - [Modèle de données](docs/donnees.md) — schéma, domaines fonctionnels, relations
-- [Pipeline](docs/pipeline.md) — les 9 phases de traitement
 - [Sources de données](docs/sources.md) — API, imports manuels, particularités par source
+- [Pipeline](docs/pipeline.md) — les 9 phases de traitement
 - [Guide d'exploitation](docs/exploitation.md) — lancement, reprise, supervision, déploiement
-- [Glossaire](docs/glossaire.md) — définitions des termes métier
 - [Guide utilisateur](docs/guide-utilisateur.md) — pages et fonctionnalités
+- [Glossaire](docs/glossaire.md) — définitions des termes métier
 
 ## Chantiers
 
