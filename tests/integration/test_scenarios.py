@@ -7,9 +7,12 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
 from application.persons import merge_person
-from application.publications import find_or_create, refresh_from_sources
+from application.publications import refresh_from_sources
 from domain.errors import ConflictError
+from domain.publications.identifiers import DOI
+from domain.publications.publication import Publication
 from infrastructure.repositories import person_repository, publication_repository
+from tests.integration.helpers.publications import find_or_create_for_tests
 
 
 @pytest.fixture
@@ -87,90 +90,74 @@ class TestDoiCaseInsensitive:
 # ── Service publications ──
 
 
+def _make_pub(
+    title: str,
+    *,
+    pub_year: int = 2024,
+    doi: str | None = None,
+    doc_type: str = "article",
+    journal_id: int | None = None,
+    oa_status: str = "unknown",
+) -> Publication:
+    return Publication(
+        id=None,
+        title=title,
+        title_normalized=title.lower(),
+        pub_year=pub_year,
+        doc_type=doc_type,
+        doi=DOI(doi) if doi else None,
+        oa_status=oa_status,
+        journal_id=journal_id,
+    )
+
+
 class TestPublicationService:
     def test_create_new(self, sa_sync_conn, pub_repo):
-        pub_id, is_new = find_or_create(
-            title="Test Article",
-            title_normalized="test article",
-            pub_year=2024,
-            doc_type="article",
-            doi="10.1234/test",
-            repo=pub_repo,
+        pub, is_new = find_or_create_for_tests(
+            _make_pub("Test Article", doi="10.1234/test"), repo=pub_repo
         )
-        assert pub_id is not None
+        assert pub is not None and pub.id is not None
         assert is_new is True
 
     def test_find_by_doi_case_insensitive(self, sa_sync_conn, pub_repo):
-        pub_id1, _ = find_or_create(
-            title="Pub A",
-            title_normalized="pub a",
-            pub_year=2024,
-            doi="10.1103/PhysRevC.111.024905",
-            repo=pub_repo,
+        pub1, _ = find_or_create_for_tests(
+            _make_pub("Pub A", doi="10.1103/PhysRevC.111.024905"), repo=pub_repo
         )
-        pub_id2, is_new = find_or_create(
-            title="Pub A variant",
-            title_normalized="pub a variant",
-            pub_year=2024,
-            doi="10.1103/physrevc.111.024905",
-            repo=pub_repo,
+        pub2, is_new = find_or_create_for_tests(
+            _make_pub("Pub A variant", doi="10.1103/physrevc.111.024905"), repo=pub_repo
         )
-        assert pub_id2 == pub_id1
+        assert pub2 is not None and pub1 is not None
+        assert pub2.id == pub1.id
         assert is_new is False
 
     def test_same_title_year_journal_no_merge_without_doi(self, sa_sync_conn, pub_repo):
-        """Sans DOI commun, meme titre+annee+journal -> pas de fusion."""
+        """Sans DOI commun, même titre+année+journal → pas de fusion (la cascade ne dédup pas par titre)."""
         journal_id = create_journal(sa_sync_conn, "Nature")
-        pub_id1, _ = find_or_create(
-            title="My Article",
-            title_normalized="my article",
-            pub_year=2024,
-            doc_type="article",
-            journal_id=journal_id,
-            repo=pub_repo,
+        pub1, _ = find_or_create_for_tests(
+            _make_pub("My Article", journal_id=journal_id), repo=pub_repo
         )
-        pub_id2, is_new = find_or_create(
-            title="My Article",
-            title_normalized="my article",
-            pub_year=2024,
-            doc_type="article",
-            journal_id=journal_id,
-            repo=pub_repo,
+        pub2, is_new = find_or_create_for_tests(
+            _make_pub("My Article", journal_id=journal_id), repo=pub_repo
         )
-        assert pub_id2 != pub_id1
+        assert pub1 is not None and pub2 is not None
+        assert pub2.id != pub1.id
         assert is_new is True
 
     def test_no_title_match_without_journal(self, sa_sync_conn, pub_repo):
         """Sans journal_id, pas de dédup par titre — deux publications créées."""
-        pub_id1, _ = find_or_create(
-            title="My Article",
-            title_normalized="my article",
-            pub_year=2024,
-            doc_type="article",
-            repo=pub_repo,
-        )
-        pub_id2, is_new = find_or_create(
-            title="My Article",
-            title_normalized="my article",
-            pub_year=2024,
-            doc_type="article",
-            repo=pub_repo,
-        )
-        assert pub_id2 != pub_id1
+        pub1, _ = find_or_create_for_tests(_make_pub("My Article"), repo=pub_repo)
+        pub2, is_new = find_or_create_for_tests(_make_pub("My Article"), repo=pub_repo)
+        assert pub1 is not None and pub2 is not None
+        assert pub2.id != pub1.id
         assert is_new is True
 
     def test_enrich_via_refresh(self, sa_sync_conn, pub_repo):
         """refresh_from_sources enrichit les métadonnées depuis les source_publications."""
         journal_id = create_journal(sa_sync_conn, "Science")
-        pub_id, _ = find_or_create(
-            title="Pub",
-            title_normalized="pub",
-            pub_year=2024,
-            doi="10.5555/enrich-test",
-            oa_status="unknown",
-            repo=pub_repo,
+        pub, _ = find_or_create_for_tests(
+            _make_pub("Pub", doi="10.5555/enrich-test", oa_status="unknown"), repo=pub_repo
         )
-        # Créer un source_document avec plus d'info
+        assert pub is not None and pub.id is not None
         sa_sync_conn.execute(
             text(
                 """
@@ -179,41 +166,33 @@ class TestPublicationService:
                 VALUES ('openalex', 'W999enrich', 'Pub', 2024, :pid, 'gold', :jid)
                 """
             ),
-            {"pid": pub_id, "jid": journal_id},
+            {"pid": pub.id, "jid": journal_id},
         )
-        refresh_from_sources(pub_id, repo=pub_repo)
+        refresh_from_sources(pub.id, repo=pub_repo)
         row = sa_sync_conn.execute(
             text("SELECT oa_status, journal_id FROM publications WHERE id = :id"),
-            {"id": pub_id},
+            {"id": pub.id},
         ).one()
         assert row.journal_id == journal_id
         assert row.oa_status == "gold"
 
     def test_refresh_auto_merges_when_doi_already_taken(self, sa_sync_conn, pub_repo):
-        """Régression : la promotion d'un DOI déjà occupé par une autre
-        publication doit déclencher une fusion automatique au lieu de
-        violer publications_doi_lower_key.
-
-        Cas réel : thèse 2020CLFAC037 dont le DOI ABES (10.70675/...)
-        a été créé par OpenAlex (sans NNT) sur une pub A, puis promu
-        depuis la source_publication theses.fr d'une pub B (créée par
-        NNT sans DOI). Avant fix : crash IntegrityError.
-        """
-        existing, _ = find_or_create(
-            title="Thèse côté OpenAlex",
-            title_normalized="these cote openalex",
-            pub_year=2020,
-            doc_type="thesis",
-            doi="10.70675/regression-test",
+        """Régression : la promotion d'un DOI déjà occupé par une autre publication doit déclencher une fusion automatique au lieu de violer publications_doi_lower_key."""
+        existing, _ = find_or_create_for_tests(
+            _make_pub(
+                "Thèse côté OpenAlex",
+                pub_year=2020,
+                doc_type="thesis",
+                doi="10.70675/regression-test",
+            ),
             repo=pub_repo,
         )
-        current, _ = find_or_create(
-            title="Thèse côté theses.fr",
-            title_normalized="these cote theses fr",
-            pub_year=2020,
-            doc_type="thesis",
+        current, _ = find_or_create_for_tests(
+            _make_pub("Thèse côté theses.fr", pub_year=2020, doc_type="thesis"),
             repo=pub_repo,
         )
+        assert existing is not None and existing.id is not None
+        assert current is not None and current.id is not None
         sa_sync_conn.execute(
             text(
                 """
@@ -222,33 +201,29 @@ class TestPublicationService:
                 VALUES ('theses', '2020REGRESS', 'Thèse', 2020, :pid, :doi)
                 """
             ),
-            {"pid": current, "doi": "10.70675/regression-test"},
+            {"pid": current.id, "doi": "10.70675/regression-test"},
         )
 
-        refresh_from_sources(current, repo=pub_repo)
+        refresh_from_sources(current.id, repo=pub_repo)
 
         # current est vivant et a hérité du DOI
         doi = sa_sync_conn.execute(
-            text("SELECT doi FROM publications WHERE id = :id"), {"id": current}
+            text("SELECT doi FROM publications WHERE id = :id"), {"id": current.id}
         ).scalar_one_or_none()
         assert doi == "10.70675/regression-test"
         # existing a été absorbée
         assert (
             sa_sync_conn.execute(
-                text("SELECT id FROM publications WHERE id = :id"), {"id": existing}
+                text("SELECT id FROM publications WHERE id = :id"), {"id": existing.id}
             ).first()
             is None
         )
 
     def test_allow_create_false(self, sa_sync_conn, pub_repo):
-        pub_id, is_new = find_or_create(
-            title="Ghost",
-            title_normalized="ghost",
-            pub_year=2024,
-            allow_create=False,
-            repo=pub_repo,
+        pub, is_new = find_or_create_for_tests(
+            _make_pub("Ghost"), allow_create=False, repo=pub_repo
         )
-        assert pub_id is None
+        assert pub is None
         assert is_new is False
 
 

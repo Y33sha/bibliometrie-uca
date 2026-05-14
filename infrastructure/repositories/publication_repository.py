@@ -233,13 +233,6 @@ class PgPublicationRepository:
             {"os": oa_status, "id": pub_id},
         )
 
-    def update_countries(self, pub_id: int, countries: list[str]) -> None:
-        """Met à jour les pays d'une publication."""
-        self._conn.execute(
-            text("UPDATE publications SET countries = :c, updated_at = now() WHERE id = :id"),
-            {"c": countries, "id": pub_id},
-        )
-
     def update_sources(self, pub_id: int) -> None:
         """Recalcule publications.sources depuis source_publications.
 

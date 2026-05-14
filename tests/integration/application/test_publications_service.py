@@ -16,7 +16,6 @@ from application.publications import (
     mark_distinct,
     merge_publications,
     resolve_doi_conflict,
-    update_countries,
     update_oa_status,
 )
 from infrastructure.repositories import publication_repository
@@ -312,7 +311,7 @@ class TestResolveDoiConflict:
         assert merge_id == 42
 
 
-# ── update_oa_status / update_countries ────────────────────────────
+# ── update_oa_status ───────────────────────────────────────────────
 
 
 class TestUpdateOaStatus:
@@ -323,16 +322,6 @@ class TestUpdateOaStatus:
             text("SELECT oa_status FROM publications WHERE id = :id"), {"id": pub_id}
         ).scalar_one()
         assert oa_status == "gold"
-
-
-class TestUpdateCountries:
-    def test_updates(self, sa_sync_conn, repo):
-        pub_id = _insert_publication(sa_sync_conn)
-        update_countries(pub_id, ["FR", "US"], repo=repo)
-        countries = sa_sync_conn.execute(
-            text("SELECT countries FROM publications WHERE id = :id"), {"id": pub_id}
-        ).scalar_one()
-        assert countries == ["FR", "US"]
 
 
 # ── merge_publications ────────────────────────────────────────────
