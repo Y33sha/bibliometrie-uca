@@ -34,8 +34,6 @@ from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.hal import HalNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
 from application.ports.pipeline.zenodo_resolver import ZenodoResolver
-from application.publications import find_or_create as find_or_create_publication
-from application.publications import publication_from_meta, refresh_from_sources, try_merge_by_doi
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
@@ -147,25 +145,6 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
         container_title=container_title,
         language=language,
     )
-
-
-def find_publication(
-    doc: dict,
-    journal_id: int | None,
-    *,
-    pub_repo: PublicationRepository,
-) -> int | None:
-    """Cherche une publication existante sans en créer. Retourne l'id ou None."""
-    meta = extract_pub_metadata(doc, journal_id)
-    if not meta["pub_year"] or not meta["title"]:
-        return None
-    result, _ = find_or_create_publication(
-        publication_from_meta(meta),
-        nnt=meta["nnt"],
-        allow_create=False,
-        repo=pub_repo,
-    )
-    return result.id if result else None
 
 
 # =============================================================
@@ -582,26 +561,6 @@ def process_work(
 
         pub_meta = extract_pub_metadata(doc, journal_id)
 
-        publication_id = None
-        old_pub_id = queries.get_hal_publication_id(conn, hal_id)
-        if old_pub_id:
-            publication_id = find_publication(doc, journal_id, pub_repo=pub_repo)
-            if publication_id and publication_id != old_pub_id:
-                from application.publications import merge_publications
-
-                logger.info(f"  {hal_id} : fusion pub {old_pub_id} → {publication_id} (DOI/NNT)")
-                merge_publications(publication_id, old_pub_id, repo=pub_repo)
-            elif not publication_id:
-                publication_id = old_pub_id
-        else:
-            publication_id = find_publication(doc, journal_id, pub_repo=pub_repo)
-        t.mark("publication")
-
-        if publication_id:
-            publication_id = try_merge_by_doi(
-                publication_id, clean_doi(as_str(doc.get("doiId_s"))), repo=pub_repo
-            )
-
         source_publication_id = insert_hal_document(
             conn,
             queries,
@@ -609,7 +568,7 @@ def process_work(
             staging_id,
             hal_id,
             hal_collections_staging,
-            publication_id,
+            None,
             pub_meta,
         )
         t.mark("hal_doc")
@@ -622,10 +581,6 @@ def process_work(
             address_linker=address_linker,
         )
         t.mark("authors")
-
-        if publication_id:
-            refresh_from_sources(publication_id, repo=pub_repo)
-        t.mark("refresh")
 
         staging_queries.mark_done(conn, staging_id)
         t.log_if_slow(hal_id, logger)
