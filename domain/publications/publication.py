@@ -10,6 +10,7 @@ La logique métier touchant à une publication canonique (déduplication, fusion
 from dataclasses import dataclass, field
 
 from domain.errors import ConflictError
+from domain.json_types import JsonValue
 from domain.publications.authorship import Authorship
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import absorb_oa_status
@@ -32,7 +33,13 @@ class Publication:
     journal_id: int | None = None
     container_title: str | None = None
     language: str | None = None
+    abstract: str | None = None
+    is_retracted: bool = False
     countries: tuple[str, ...] = field(default=())
+    keywords: tuple[str, ...] = field(default=())
+    topics: dict[str, JsonValue] | None = None
+    biblio: dict[str, JsonValue] | None = None
+    meta: dict[str, JsonValue] | None = None
     authorships: tuple[Authorship, ...] = field(default=())
 
     def has_minimal_metadata(self) -> bool:

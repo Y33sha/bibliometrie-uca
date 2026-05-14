@@ -24,11 +24,10 @@ from domain.publication import (
     PubThesisCandidate,
 )
 from domain.publications.deduplication import resolve_doi_conflict as _domain_resolve_doi_conflict
-from domain.publications.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.publications.identifiers import DOI
+from domain.publications.merge import merge_source_rows
 from domain.publications.metadata import (
     OA_STATUS_UNKNOWN_DEFAULT,
-    best_oa_status,
     clean_publication_title,
 )
 from domain.publications.publication import Publication
@@ -245,154 +244,61 @@ def update_sources(pub_id: int, *, repo: PublicationRepository) -> None:
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
 
-def _first_non_null(rows: list[dict[str, Any]], field: str) -> Any:
-    for r in rows:
-        v = r[field]
-        if v is not None:
-            return v
-    return None
-
-
-def _merge_lists(rows: list[dict[str, Any]], field: str) -> list[Any] | None:
-    seen: set[Any] = set()
-    result: list[Any] = []
-    for r in rows:
-        for item in r[field] or []:
-            key = item.lower() if isinstance(item, str) else item
-            if key not in seen:
-                seen.add(key)
-                result.append(item)
-    return result or None
-
-
-def _merge_jsonb(rows: list[dict[str, Any]], field: str) -> dict | None:
-    """Fusion shallow par clé pour meta/biblio (source prioritaire gagne par clé)."""
-    merged: dict[str, Any] = {}
-    for r in rows:
-        d = r[field]
-        if isinstance(d, dict):
-            for k, v in d.items():
-                if k not in merged:
-                    merged[k] = v
-    return merged or None
-
-
-def _topics_by_source(rows: list[dict[str, Any]]) -> dict | None:
-    """Indexe les topics par source (schémas radicalement différents par source)."""
-    out: dict[str, Any] = {}
-    for r in rows:
-        topics = r["topics"]
-        if topics:
-            out[r["source"]] = topics
-    return out or None
-
-
-def _first_doc_type(rows: list[dict[str, Any]]) -> str:
-    """Choisit le `doc_type` canonique parmi les rows ordonnées par
-    `SOURCE_PRIORITY`.
-
-    Règle générale : on prend la valeur de la source la plus prioritaire
-    (premier row avec `doc_type` non-null).
-
-    Exception « sous-types d'article » : CrossRef (priorité 2) renvoie
-    `journal-article` indistinctement pour tous les types d'article (review,
-    book_review, data_paper, poster, conference_paper, editorial, letter,
-    erratum, retraction). Si une source moins prioritaire propose un de
-    ces sous-types plus précis, on le préfère pour ne pas perdre
-    l'information.
-    """
-    # Précalcul : sous-type d'article présent dans une row, peu importe la
-    # priorité de sa source.
-    article_subtype_present: str | None = None
-    for r in rows:
-        if not r["doc_type"]:
-            continue
-        mapped = map_doc_type(r["doc_type"], r["source"])
-        if mapped in ARTICLE_SUBTYPES:
-            article_subtype_present = mapped
-            break
-
-    for r in rows:
-        if not r["doc_type"]:
-            continue
-        mapped = map_doc_type(r["doc_type"], r["source"])
-        if mapped == "article" and article_subtype_present:
-            return article_subtype_present
-        return mapped
-    return "other"
-
-
 @dataclass(frozen=True, slots=True)
 class RefreshResult:
     """Résultat de `refresh_from_sources`.
 
-    `absorbed_publication_id` non-None signale qu'une fusion a eu lieu pendant le refresh : une autre publication portait le DOI promu par l'agrégation cross-source, et a été absorbée dans la publication rafraîchie pour éviter une violation de la contrainte unique `publications_doi_lower_key`. L'id absorbé est mort en base ; le caller doit considérer toute référence externe à cette id comme dangling.
+    `absorbed_publication_id` non-None signale qu'une fusion a eu lieu pendant le refresh : une autre publication portait le DOI promu par l'agrégation cross-source, et a été absorbée dans la publication rafraîchie pour éviter une violation de la contrainte unique `publications_doi_lower_key`. L'id absorbée est morte en base ; le caller doit considérer toute référence externe à cette id comme dangling.
     """
 
     absorbed_publication_id: int | None = None
 
 
 def refresh_from_sources(pub_id: int, *, repo: PublicationRepository) -> RefreshResult:
-    """Recalcule les métadonnées d'une publication depuis ses source_publications.
+    """Recalcule les métadonnées canoniques d'une publication depuis ses `source_publications`.
 
-    Contrairement à l'ancien _enrich() qui faisait du COALESCE incrémental (premier arrivé gagne, jamais de downgrade), cette fonction fait un recalcul complet : elle lit TOUS les source_publications attachés et réapplique les règles de priorité depuis zéro. Elle peut donc corriger des métadonnées obsolètes (ex: ongoing_thesis → thesis après soutenance).
+    Recalcul complet (pas de COALESCE incrémental qui figerait les valeurs au premier arrivé) : lit TOUS les `source_publications` attachés, applique l'algorithme de fusion `merge_source_rows` qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées obsolètes (ex: `ongoing_thesis` → `thesis` après soutenance), et inclut désormais `title` / `title_normalized` dans l'agrégation cross-sources (ce qui n'était pas le cas auparavant).
 
-    Règles de priorité entre sources :
-    Ordre unique : theses.fr > ScanR > HAL > OpenAlex > WoS. Pour les documents hors thèse, la clé `theses` n'apparaît pas dans les rows, l'ordre se réduit donc à ScanR > HAL > OpenAlex > WoS.
+    Auto-fusion sur conflit DOI : si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant le save — au lieu de laisser remonter une violation de la contrainte unique. `pub_id` reste vivant pour le caller, et l'id absorbée est exposée dans `RefreshResult.absorbed_publication_id`.
 
-    Règles de fusion par type de champ :
-    • Scalaires (doi, doc_type, pub_year, journal_id, container_title, language) : premier non-null dans l'ordre de priorité.
-    • Texte (abstract) : idem, premier non-null.
-    • oa_status : le statut le plus ouvert parmi toutes les sources (diamond > gold > hybrid > bronze > green > closed > unknown).
-    • Booléen (is_retracted) : True si au moins une source le dit.
-    • Listes (keywords, countries) : union de toutes les sources, dédupliquée.
-    • JSONB biblio, meta : fusion shallow par clé (clés généralement orthogonales entre sources) ; en cas de conflit sur une clé, la source prioritaire l'emporte.
-    • JSONB topics : composite par source — {"openalex": [...], "theses": {...}, "scanr": ...}. Chaque source garde sa forme native (liste hiérarchique ou dict selon la source) pour ne rien perdre.
-
-    Ne touche PAS à : title, title_normalized, notes, sources (utiliser update_sources() séparément).
-
-    Auto-fusion sur conflit DOI :
-    Si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant l'UPDATE — au lieu de laisser remonter une violation de contrainte unique. `pub_id` reste vivant pour le caller, et l'id absorbée est exposée dans `RefreshResult.absorbed_publication_id` pour que le caller puisse en tenir compte (logs, audit, nettoyage de références).
+    Ne touche PAS à `notes` ni à `sources` (utiliser `update_sources` séparément).
     """
-    absorbed: int | None = None
-
     rows = repo.get_source_rows(pub_id)
     if not rows:
         return RefreshResult()
 
-    rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
-    rows.sort(key=lambda r: rank.get(r["source"], 99))
+    pub = repo.find_by_id(pub_id)
+    if pub is None:
+        return RefreshResult()
 
-    # Si le DOI à promouvoir est déjà occupé par une autre publication, fusionner d'abord pour éviter une violation de la contrainte unique `publications_doi_lower_key` au moment de l'UPDATE. Cas typique : une thèse avec un DOI ABES (10.70675/...) créée en double — une fois via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître dans une source_publication, sa promotion vers publications.doi collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans `pub_id` (qui reste vivant pour le caller).
-    new_doi = _first_non_null(rows, "doi")
+    # Si le DOI à promouvoir est déjà occupé par une autre publication, fusionner d'abord pour éviter une violation de la contrainte unique `publications_doi_lower_key`. Cas typique : une thèse avec un DOI ABES (10.70675/…) créée en double — une fois via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître dans une `source_publication`, sa promotion collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans `pub_id` (qui reste vivant pour le caller).
+    absorbed: int | None = None
+    rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
+    rows_sorted = sorted(rows, key=lambda r: rank.get(r["source"], 99))
+    new_doi = _first_non_null_doi(rows_sorted)
     if new_doi:
         existing = repo.find_by_doi(new_doi)
         if existing and existing.id != pub_id:
             absorbed = existing.id
             merge_publications(pub_id, existing.id, repo=repo)
             rows = repo.get_source_rows(pub_id)
-            rows.sort(key=lambda r: rank.get(r["source"], 99))
+            # Recharger pub : ses attributs ont pu être enrichis via Publication.absorb pendant merge_publications.
+            pub = repo.find_by_id(pub_id)
+            if pub is None:
+                return RefreshResult(absorbed_publication_id=absorbed)
 
-    repo.update_aggregated(
-        pub_id,
-        doi=_first_non_null(rows, "doi"),
-        doc_type=_first_doc_type(rows),
-        pub_year=_first_non_null(rows, "pub_year"),
-        journal_id=_first_non_null(rows, "journal_id"),
-        # Fallback à 'unknown' (DEFAULT côté schema) si toutes les sources sont silencieuses : best_oa_status renvoie None quand aucune valeur exploitable, et on ne veut pas écrire NULL sur la colonne canonique (le modèle Pydantic /api/publications attend un string non-null).
-        oa_status=best_oa_status(r["oa_status"] for r in rows) or OA_STATUS_UNKNOWN_DEFAULT,
-        container_title=_first_non_null(rows, "container_title"),
-        language=_first_non_null(rows, "language"),
-        abstract=_first_non_null(rows, "abstract"),
-        keywords=_merge_lists(rows, "keywords"),
-        countries=_merge_lists(rows, "countries"),
-        topics=_topics_by_source(rows),
-        biblio=_merge_jsonb(rows, "biblio"),
-        meta=_merge_jsonb(rows, "meta"),
-        is_retracted=any(r["is_retracted"] for r in rows if r["is_retracted"]),
-    )
+    merge_source_rows(pub, rows, source_priority=SOURCE_PRIORITY)
+    repo.save(pub)
     repo.update_sources(pub_id)
     return RefreshResult(absorbed_publication_id=absorbed)
+
+
+def _first_non_null_doi(rows: list[dict[str, Any]]) -> str | None:
+    """Premier `doi` non-null dans `rows` (déjà triées par priorité)."""
+    for r in rows:
+        if r["doi"]:
+            return r["doi"]
+    return None
 
 
 def mark_distinct(

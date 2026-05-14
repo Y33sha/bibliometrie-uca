@@ -111,10 +111,7 @@ class PgPublicationRepository:
     def find_by_id(self, pub_id: int) -> Publication | None:
         """Hydrate l'aggregate Publication depuis la ligne `publications`.
 
-        Charge les attributs métier (title, pub_year, doc_type, doi,
-        oa_status, journal_id, container_title, language, countries).
-        Les authorships ne sont pas chargées par défaut (projection
-        lecture séparée si nécessaire).
+        Charge tous les attributs canoniques de la publication (title, pub_year, doc_type, doi, oa_status, journal_id, container_title, language, abstract, is_retracted, countries, keywords, topics, biblio, meta). Les authorships ne sont pas chargées par défaut (projection lecture séparée si nécessaire).
         """
         row = self._conn.execute(
             text("""
@@ -122,7 +119,9 @@ class PgPublicationRepository:
                        CAST(doc_type AS text) AS doc_type,
                        pub_year, doi,
                        CAST(oa_status AS text) AS oa_status,
-                       journal_id, container_title, language, countries
+                       journal_id, container_title, language,
+                       abstract, is_retracted, countries, keywords,
+                       topics, biblio, meta
                 FROM publications
                 WHERE id = :id
             """),
@@ -142,16 +141,19 @@ class PgPublicationRepository:
             journal_id=m["journal_id"],
             container_title=m["container_title"],
             language=m["language"],
+            abstract=m["abstract"],
+            is_retracted=m["is_retracted"],
             countries=tuple(m["countries"]) if m["countries"] else (),
+            keywords=tuple(m["keywords"]) if m["keywords"] else (),
+            topics=m["topics"],
+            biblio=m["biblio"],
+            meta=m["meta"],
         )
 
     def save(self, pub: Publication) -> None:
         """Persiste l'état mutable de l'aggregate Publication.
 
-        Met à jour les champs éditables (title, title_normalized, doc_type,
-        doi, oa_status, journal_id, container_title, language, countries).
-        Le champ `pub_year` n'est pas mis à jour ici (immuable côté métier
-        après création). `pub.id` doit être posé (entité persistée).
+        Met à jour tous les champs éditables (title, title_normalized, doc_type, doi, oa_status, journal_id, container_title, language, abstract, is_retracted, countries, keywords, topics, biblio, meta). Le champ `pub_year` n'est pas mis à jour ici (immuable côté métier après création). `pub.id` doit être posé (entité persistée).
         """
         if pub.id is None:
             raise ValueError("save(pub) : pub.id doit être posé (utiliser create pour insérer)")
@@ -166,7 +168,13 @@ class PgPublicationRepository:
                     journal_id = :jid,
                     container_title = :ct,
                     language = :lang,
-                    countries = CAST(:c AS text[]),
+                    abstract = :abstract,
+                    is_retracted = :is_retracted,
+                    countries = CAST(:countries AS text[]),
+                    keywords = CAST(:keywords AS text[]),
+                    topics = CAST(:topics AS jsonb),
+                    biblio = CAST(:biblio AS jsonb),
+                    meta = CAST(:meta AS jsonb),
                     updated_at = now()
                 WHERE id = :id
             """),
@@ -180,7 +188,13 @@ class PgPublicationRepository:
                 "jid": pub.journal_id,
                 "ct": pub.container_title,
                 "lang": pub.language,
-                "c": list(pub.countries) if pub.countries else None,
+                "abstract": pub.abstract,
+                "is_retracted": pub.is_retracted,
+                "countries": list(pub.countries) if pub.countries else None,
+                "keywords": list(pub.keywords) if pub.keywords else None,
+                "topics": _json_dumps_or_none(pub.topics),
+                "biblio": _json_dumps_or_none(pub.biblio),
+                "meta": _json_dumps_or_none(pub.meta),
             },
         )
 
@@ -253,13 +267,10 @@ class PgPublicationRepository:
     # ── Agrégation depuis source_publications ──────────────────────
 
     def get_source_rows(self, pub_id: int) -> list[dict]:
-        """Retourne toutes les lignes source_publications attachées à
-        une publication, avec les champs nécessaires au recalcul
-        d'agrégation (refresh_from_sources).
-        """
+        """Retourne toutes les lignes source_publications attachées à une publication, avec les champs nécessaires au recalcul d'agrégation (`refresh_from_sources`)."""
         result = self._conn.execute(
             text("""
-                SELECT source, doi, doc_type, pub_year, journal_id, oa_status,
+                SELECT source, title, doi, doc_type, pub_year, journal_id, oa_status,
                        container_title, language, abstract, keywords, countries,
                        topics, biblio, meta, is_retracted, external_ids
                 FROM source_publications
@@ -268,63 +279,6 @@ class PgPublicationRepository:
             {"id": pub_id},
         )
         return [dict(row._mapping) for row in result]
-
-    def update_aggregated(
-        self,
-        pub_id: int,
-        *,
-        doi: str | None,
-        doc_type: str,
-        pub_year: int | None,
-        journal_id: int | None,
-        oa_status: str | None,
-        container_title: str | None,
-        language: str | None,
-        abstract: str | None,
-        keywords: list[str] | None,
-        countries: list[str] | None,
-        topics: dict | None,
-        biblio: dict | None,
-        meta: dict | None,
-        is_retracted: bool,
-    ) -> None:
-        """Écrit les valeurs agrégées sur une publication.
-
-        Appelé par refresh_from_sources après calcul des valeurs
-        fusionnées. Le caller garde la responsabilité d'appeler
-        ensuite `update_sources` pour le tableau `sources`.
-        """
-        self._conn.execute(
-            text("""
-                UPDATE publications SET
-                    doi = :doi, doc_type = CAST(:doc_type AS doc_type),
-                    pub_year = :pub_year, journal_id = :journal_id,
-                    oa_status = CAST(:oa_status AS oa_type),
-                    container_title = :container_title, language = :language,
-                    abstract = :abstract, keywords = :keywords,
-                    countries = :countries, topics = CAST(:topics AS jsonb),
-                    biblio = CAST(:biblio AS jsonb), meta = CAST(:meta AS jsonb),
-                    is_retracted = :is_retracted, updated_at = now()
-                WHERE id = :pub_id
-            """),
-            {
-                "doi": doi,
-                "doc_type": doc_type,
-                "pub_year": pub_year,
-                "journal_id": journal_id,
-                "oa_status": oa_status,
-                "container_title": container_title,
-                "language": language,
-                "abstract": abstract,
-                "keywords": keywords,
-                "countries": countries,
-                "topics": _json_dumps_or_none(topics),
-                "biblio": _json_dumps_or_none(biblio),
-                "meta": _json_dumps_or_none(meta),
-                "is_retracted": is_retracted,
-                "pub_id": pub_id,
-            },
-        )
 
     # ── Création ───────────────────────────────────────────────────
 

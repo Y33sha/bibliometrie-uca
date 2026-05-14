@@ -63,26 +63,6 @@ class PublicationRepository(Protocol):
 
     def get_source_rows(self, pub_id: int) -> list[dict[str, Any]]: ...
 
-    def update_aggregated(
-        self,
-        pub_id: int,
-        *,
-        doi: str | None,
-        doc_type: str,
-        pub_year: int | None,
-        journal_id: int | None,
-        oa_status: str | None,
-        container_title: str | None,
-        language: str | None,
-        abstract: str | None,
-        keywords: list[str] | None,
-        countries: list[str] | None,
-        topics: dict[str, Any] | None,
-        biblio: dict[str, Any] | None,
-        meta: dict[str, Any] | None,
-        is_retracted: bool,
-    ) -> None: ...
-
     # ── Création ───────────────────────────────────────────────────
 
     def create(
