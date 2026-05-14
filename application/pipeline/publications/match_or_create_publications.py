@@ -235,7 +235,11 @@ def run(
         logger.info("%d publications stale à rafraîchir", len(stale_ids))
         refreshed = 0
         for i, pub_id in enumerate(stale_ids):
-            refresh_from_sources(pub_id, repo=pub_repo)
+            try:
+                refresh_from_sources(pub_id, repo=pub_repo)
+            except Exception:
+                logger.exception("  refresh_from_sources crash sur pub_id=%d", pub_id)
+                raise
             refreshed += 1
             if (i + 1) % 500 == 0:
                 if not dry_run:

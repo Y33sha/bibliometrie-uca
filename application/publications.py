@@ -276,12 +276,15 @@ def refresh_from_sources(pub_id: int, *, repo: PublicationRepository) -> Refresh
         return RefreshResult()
 
     # Si le DOI à promouvoir est déjà occupé par une autre publication, fusionner d'abord pour éviter une violation de la contrainte unique `publications_doi_lower_key`. Cas typique : une thèse avec un DOI ABES (10.70675/…) créée en double — une fois via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître dans une `source_publication`, sa promotion collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans `pub_id` (qui reste vivant pour le caller).
+    #
+    # Le DOI brut est normalisé via le VO `DOI` avant le lookup : c'est cette forme normalisée (suffixe `.vN` strippé, lowercased) qui sera posée par `merge_source_rows`. Le pré-merge doit chercher la même forme, sinon des collisions échappent au mécanisme.
     absorbed: int | None = None
     rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
     rows_sorted = sorted(rows, key=lambda r: rank.get(r["source"], 99))
-    new_doi = _first_non_null_doi(rows_sorted)
-    if new_doi:
-        existing = repo.find_by_doi(new_doi)
+    new_doi_raw = _first_non_null_doi(rows_sorted)
+    new_doi_vo = DOI.try_parse(new_doi_raw) if new_doi_raw else None
+    if new_doi_vo:
+        existing = repo.find_by_doi(str(new_doi_vo))
         if existing and existing.id != pub_id:
             absorbed = existing.id
             merge_publications(pub_id, existing.id, repo=repo)
