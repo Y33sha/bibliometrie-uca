@@ -81,12 +81,12 @@ Réécrire `create_publications.py` pour intégrer la cascade complète.
 
 **Retrait par normalizer**. Chaque `source_publication` est créé avec `publication_id = NULL`.
 
-- [ ] `normalize_hal.py` : retrait du `find_publication` + `try_merge_by_doi` + `refresh_from_sources` + cas repointing dans `process_work`. Le `get_hal_publication_id` mono-source disparaît (porté en phase publications via `external_ids.hal_id`).
-- [ ] `normalize_openalex.py` : retrait du `find_publication` + cascade HAL/NNT primary_location + `find_hal_publication_id` + `get_openalex_publication_id` + `resolve_doi_conflict` + `try_merge_by_doi` + `refresh_from_sources`. Conservation de l'extraction NNT/HAL_ID depuis primary_location → mémorisée dans `external_ids` (Phase 0).
-- [ ] `normalize_theses.py` : retrait du `find_publication` + dédup spéciale title+year+author + `try_merge_by_doi` + `refresh_from_sources`. La dédup thèse devient le cas `THESIS_TITLE_YEAR` de la cascade unifiée.
-- [ ] `normalize_scanr.py` : retrait du `find_publication` + `try_merge_by_doi` + `refresh_from_sources`.
-- [ ] `normalize_crossref.py` : retrait du `find_publication` + `try_merge_by_doi` + `refresh_from_sources`.
-- [ ] `normalize_wos.py` : retrait analogue.
+- [x] `normalize_hal.py` : retrait du `find_publication` + `try_merge_by_doi` + `refresh_from_sources` + cas repointing dans `process_work`.
+- [x] `normalize_openalex.py` : retrait du `find_publication` + cascade HAL/NNT primary_location + `find_hal_publication_id` + `resolve_doi_conflict` + `try_merge_by_doi` + `refresh_from_sources`. Conservation de l'extraction NNT/HAL_ID depuis primary_location → mémorisée dans `external_ids`.
+- [x] `normalize_theses.py` : retrait du `find_publication` + dédup spéciale title+year+author + `try_merge_by_doi` + `refresh_from_sources` + `_update_thesis_meta`.
+- [x] `normalize_scanr.py` : retrait du `find_publication` + `try_merge_by_doi` + `refresh_from_sources`.
+- [x] `normalize_crossref.py` : retrait du `find_publication` + `try_merge_by_doi` + `refresh_from_sources`.
+- [x] `normalize_wos.py` : retrait analogue.
 
 **Élargissement de la phase publications**. Une fois que les normalizers ne rattachent plus, la phase devient le seul site de rattachement et doit gérer les cas qui apparaissent alors.
 
