@@ -27,6 +27,7 @@ from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.scanr import ScanrNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
 from application.publishers import find_or_create_publisher
+from domain.json_types import JsonValue
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.ports.journal_repository import JournalRepository
@@ -136,7 +137,7 @@ def insert_scanr_document(
     pub_year = doc.get("year")
     doc_type = doc.get("type")
 
-    ext: dict[str, Any] = {}
+    ext: dict[str, JsonValue] = {}
     if hal_id:
         ext["hal_id"] = hal_id
     nnt = extract_nnt_from_scanr_id(scanr_id)
