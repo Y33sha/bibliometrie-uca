@@ -13,10 +13,6 @@ class MergeQueries(Protocol):
 
     def find_nnt_duplicates(self, conn: Connection) -> list[dict[str, Any]]: ...
 
-    def rank_publications_by_merge_priority(
-        self, conn: Connection, publication_ids: list[int]
-    ) -> list[dict[str, Any]]: ...
-
     def fetch_source_publications_with_hal_external_id(
         self, conn: Connection
     ) -> list[dict[str, Any]]: ...

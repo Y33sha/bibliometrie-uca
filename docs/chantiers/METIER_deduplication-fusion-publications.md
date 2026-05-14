@@ -71,10 +71,10 @@ Ferme le dernier item ouvert de Phase 4 du chantier `CODE_rich-domain-model`.
 
 ### Phase 2 — Choix de cible trivial + suppression du ranking SQL
 
-- [ ] Remplacer `rank_publications_by_merge_priority` par `min(pub_ids)` dans `merge_pubs_by_nnt`.
-- [ ] Supprimer la query SQL `rank_publications_by_merge_priority`.
-- [ ] Supprimer le port `MergeQueries.rank_publications_by_merge_priority` et son implémentation.
-- [ ] Supprimer les tests dédiés du ranking.
+- [x] `merge_pubs_by_nnt` utilise désormais `min(pub_ids)` (via `sorted(...)[0]`) au lieu du ranking SQL.
+- [x] Query SQL `rank_publications_by_merge_priority` supprimée.
+- [x] Port `MergeQueries.rank_publications_by_merge_priority` + implémentation `PgMergeQueries.rank_publications_by_merge_priority` retirés.
+- [x] Tests dédiés `TestRankPublicationsByMergePriority` supprimés.
 
 ### Phase 3 — Helper unifié de fusion par clé
 

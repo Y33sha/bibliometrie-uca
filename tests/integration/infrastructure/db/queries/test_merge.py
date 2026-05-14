@@ -8,7 +8,6 @@ from infrastructure.db.queries.merge import (
     fetch_source_publications_with_hal_external_id,
     find_nnt_duplicates,
     link_source_publication_to_publication,
-    rank_publications_by_merge_priority,
 )
 
 
@@ -57,33 +56,6 @@ class TestFindNntDuplicates:
 
         dups = find_nnt_duplicates(sa_sync_conn)
         assert not any(d["nnt"] == "UNIQUE_NNT" for d in dups)
-
-
-class TestRankPublicationsByMergePriority:
-    def test_prefers_publication_with_real_doi(self, sa_sync_conn):
-        p_no_doi = _create_pub(sa_sync_conn)
-        p_bad_doi = _create_pub(sa_sync_conn, doi="not-a-doi")
-        p_good = _create_pub(sa_sync_conn, doi="10.1/abc")
-
-        rows = rank_publications_by_merge_priority(sa_sync_conn, [p_no_doi, p_bad_doi, p_good])
-        assert rows[0]["id"] == p_good
-
-    def test_tiebreaks_by_source_publication_count(self, sa_sync_conn):
-        p_a = _create_pub(sa_sync_conn, doi="10.1/a")
-        p_b = _create_pub(sa_sync_conn, doi="10.1/b")
-        _create_sd(sa_sync_conn, "hal", "s-a-1", p_a)
-        _create_sd(sa_sync_conn, "openalex", "s-a-2", p_a)
-        _create_sd(sa_sync_conn, "hal", "s-b-1", p_b)
-
-        rows = rank_publications_by_merge_priority(sa_sync_conn, [p_a, p_b])
-        assert rows[0]["id"] == p_a  # 2 source_publications
-        assert rows[1]["id"] == p_b
-
-    def test_tiebreaks_by_lowest_id(self, sa_sync_conn):
-        p1 = _create_pub(sa_sync_conn)
-        p2 = _create_pub(sa_sync_conn)
-        rows = rank_publications_by_merge_priority(sa_sync_conn, [p2, p1])
-        assert rows[0]["id"] == p1
 
 
 class TestFetchSourcePublicationsWithHalExternalId:

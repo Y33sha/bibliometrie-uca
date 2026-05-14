@@ -32,33 +32,6 @@ def find_nnt_duplicates(conn: Connection) -> list[dict[str, Any]]:
     return [dict(r._mapping) for r in rows]
 
 
-def rank_publications_by_merge_priority(
-    conn: Connection, publication_ids: list[int]
-) -> list[dict[str, Any]]:
-    """Classe des publications par ordre de préférence pour la fusion.
-
-    Priorité : DOI (shape `10.*`) > nombre de `source_publications` > id le plus bas.
-    La première de la liste retournée doit être conservée ; les suivantes sont
-    à fusionner dedans.
-    """
-    rows = conn.execute(
-        text("""
-            SELECT p.id, p.doi,
-                   (SELECT COUNT(*) FROM source_publications sd
-                    WHERE sd.publication_id = p.id) AS sd_count
-            FROM publications p
-            WHERE p.id = ANY(:pub_ids)
-            ORDER BY
-                (p.doi IS NOT NULL AND p.doi ~ '^10\\.') DESC,
-                (SELECT COUNT(*) FROM source_publications sd
-                 WHERE sd.publication_id = p.id) DESC,
-                p.id ASC
-        """),
-        {"pub_ids": publication_ids},
-    ).all()
-    return [dict(r._mapping) for r in rows]
-
-
 def fetch_source_publications_with_hal_external_id(
     conn: Connection,
 ) -> list[dict[str, Any]]:
@@ -106,11 +79,6 @@ class PgMergeQueries:
 
     def find_nnt_duplicates(self, conn: Connection) -> list[dict[str, Any]]:
         return find_nnt_duplicates(conn)
-
-    def rank_publications_by_merge_priority(
-        self, conn: Connection, publication_ids: list[int]
-    ) -> list[dict[str, Any]]:
-        return rank_publications_by_merge_priority(conn, publication_ids)
 
     def fetch_source_publications_with_hal_external_id(
         self, conn: Connection
