@@ -5,8 +5,6 @@ les UPSERT sur `source_publications` et `source_authorships`, ainsi
 que les lectures utiles à l'idempotence et au matching auteurs.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -145,11 +143,63 @@ def count_theses_table(conn: Connection, table: str) -> int:
 class PgThesesNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_theses.ThesesNormalizeQueries`."""
 
-    def upsert_theses_source_publication(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_theses_source_publication(conn, **kwargs)
+    def upsert_theses_source_publication(
+        self,
+        conn: Connection,
+        *,
+        theses_id: str,
+        doi: str | None,
+        title: str,
+        pub_year: int | None,
+        doc_type: str,
+        publication_id: int | None,
+        staging_id: int,
+        external_ids: JsonValue,
+        journal_id: int | None,
+        oa_status: str | None,
+        language: str | None,
+        container_title: str | None,
+        keywords: list[str] | None,
+        topics_json: JsonValue,
+        source_meta_json: JsonValue,
+    ) -> int:
+        return upsert_theses_source_publication(
+            conn,
+            theses_id=theses_id,
+            doi=doi,
+            title=title,
+            pub_year=pub_year,
+            doc_type=doc_type,
+            publication_id=publication_id,
+            staging_id=staging_id,
+            external_ids=external_ids,
+            journal_id=journal_id,
+            oa_status=oa_status,
+            language=language,
+            container_title=container_title,
+            keywords=keywords,
+            topics_json=topics_json,
+            source_meta_json=source_meta_json,
+        )
 
-    def upsert_theses_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_theses_source_authorship(conn, **kwargs)
+    def upsert_theses_source_authorship(
+        self,
+        conn: Connection,
+        *,
+        source_publication_id: int,
+        author_position: int | None,
+        roles: list[str],
+        raw_author_name: str,
+        person_identifiers: JsonValue,
+    ) -> int:
+        return upsert_theses_source_authorship(
+            conn,
+            source_publication_id=source_publication_id,
+            author_position=author_position,
+            roles=roles,
+            raw_author_name=raw_author_name,
+            person_identifiers=person_identifiers,
+        )
 
     def count_theses_table(self, conn: Connection, table: str) -> int:
         return count_theses_table(conn, table)

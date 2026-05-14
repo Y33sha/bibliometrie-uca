@@ -200,8 +200,50 @@ def insert_source_authorship_addresses_batch(
 class PgWosNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_wos.WosNormalizeQueries`."""
 
-    def upsert_wos_source_publication(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_wos_source_publication(conn, **kwargs)
+    def upsert_wos_source_publication(
+        self,
+        conn: Connection,
+        *,
+        ut: str,
+        doi: str | None,
+        title: str,
+        pub_year: int | None,
+        doc_type: str | None,
+        publication_id: int | None,
+        staging_id: int,
+        journal_id: int | None,
+        oa_status: str | None,
+        language: str | None,
+        container_title: str | None,
+        abstract: str | None,
+        cited_by_count: int | None,
+        biblio: JsonValue,
+        keywords: list[str] | None,
+        topics: JsonValue,
+        urls: list[str] | None,
+        external_ids: JsonValue,
+    ) -> int:
+        return upsert_wos_source_publication(
+            conn,
+            ut=ut,
+            doi=doi,
+            title=title,
+            pub_year=pub_year,
+            doc_type=doc_type,
+            publication_id=publication_id,
+            staging_id=staging_id,
+            journal_id=journal_id,
+            oa_status=oa_status,
+            language=language,
+            container_title=container_title,
+            abstract=abstract,
+            cited_by_count=cited_by_count,
+            biblio=biblio,
+            keywords=keywords,
+            topics=topics,
+            urls=urls,
+            external_ids=external_ids,
+        )
 
     def upsert_addresses_batch(self, conn: Connection, values: list[dict[str, Any]]) -> None:
         upsert_addresses_batch(conn, values)

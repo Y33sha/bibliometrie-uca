@@ -5,8 +5,6 @@ Regroupe les UPSERT sur `source_publications` et `source_authorships`,
 ainsi que les lectures d'idempotence et les déduplications Zenodo.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -175,11 +173,73 @@ def count_openalex_table(conn: Connection, table: str) -> int:
 class PgOpenalexNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_openalex.OpenalexNormalizeQueries`."""
 
-    def upsert_openalex_source_publication(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_openalex_source_publication(conn, **kwargs)
+    def upsert_openalex_source_publication(
+        self,
+        conn: Connection,
+        *,
+        openalex_id: str,
+        doi: str | None,
+        title: str,
+        pub_year: int | None,
+        doc_type: str | None,
+        publication_id: int | None,
+        staging_id: int,
+        external_ids: JsonValue,
+        urls: list[str] | None,
+        cited_by_count: int | None,
+        journal_id: int | None,
+        oa_status: str | None,
+        language: str | None,
+        container_title: str | None,
+        is_retracted: bool | None,
+        biblio: JsonValue,
+        abstract: str | None,
+        keywords: list[str] | None,
+        topics_json: JsonValue,
+    ) -> int:
+        return upsert_openalex_source_publication(
+            conn,
+            openalex_id=openalex_id,
+            doi=doi,
+            title=title,
+            pub_year=pub_year,
+            doc_type=doc_type,
+            publication_id=publication_id,
+            staging_id=staging_id,
+            external_ids=external_ids,
+            urls=urls,
+            cited_by_count=cited_by_count,
+            journal_id=journal_id,
+            oa_status=oa_status,
+            language=language,
+            container_title=container_title,
+            is_retracted=is_retracted,
+            biblio=biblio,
+            abstract=abstract,
+            keywords=keywords,
+            topics_json=topics_json,
+        )
 
-    def upsert_openalex_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_openalex_source_authorship(conn, **kwargs)
+    def upsert_openalex_source_authorship(
+        self,
+        conn: Connection,
+        *,
+        source_publication_id: int,
+        author_position: int,
+        source_structures: list[str] | None,
+        raw_author_name: str | None,
+        is_corresponding: bool,
+        person_identifiers: JsonValue,
+    ) -> int:
+        return upsert_openalex_source_authorship(
+            conn,
+            source_publication_id=source_publication_id,
+            author_position=author_position,
+            source_structures=source_structures,
+            raw_author_name=raw_author_name,
+            is_corresponding=is_corresponding,
+            person_identifiers=person_identifiers,
+        )
 
     def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool:
         return staging_has_openalex_doi(conn, doi)

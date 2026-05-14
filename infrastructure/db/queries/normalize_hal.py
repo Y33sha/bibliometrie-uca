@@ -10,8 +10,6 @@ Les identifiants personne (orcid/idhal/idref/hal_person_id) vivent sur
 (`halId_s`) sur `sa.source_structures` (TEXT[]).
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -214,11 +212,73 @@ def delete_hal_duplicate_authorships(conn: Connection) -> int:
 class PgHalNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_hal.HalNormalizeQueries`."""
 
-    def upsert_hal_source_publication(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_hal_source_publication(conn, **kwargs)
+    def upsert_hal_source_publication(
+        self,
+        conn: Connection,
+        *,
+        hal_id: str,
+        doi: str | None,
+        title: str,
+        pub_year: int | None,
+        doc_type: str | None,
+        hal_collections: list[str] | None,
+        publication_id: int | None,
+        staging_id: int,
+        external_ids: JsonValue,
+        journal_id: int | None,
+        oa_status: str | None,
+        language: str | None,
+        container_title: str | None,
+        abstract: str | None,
+        keywords: list[str] | None,
+        topics: JsonValue,
+        biblio: JsonValue,
+        urls: list[str] | None,
+    ) -> int:
+        return upsert_hal_source_publication(
+            conn,
+            hal_id=hal_id,
+            doi=doi,
+            title=title,
+            pub_year=pub_year,
+            doc_type=doc_type,
+            hal_collections=hal_collections,
+            publication_id=publication_id,
+            staging_id=staging_id,
+            external_ids=external_ids,
+            journal_id=journal_id,
+            oa_status=oa_status,
+            language=language,
+            container_title=container_title,
+            abstract=abstract,
+            keywords=keywords,
+            topics=topics,
+            biblio=biblio,
+            urls=urls,
+        )
 
-    def upsert_hal_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
-        return upsert_hal_source_authorship(conn, **kwargs)
+    def upsert_hal_source_authorship(
+        self,
+        conn: Connection,
+        *,
+        source_publication_id: int,
+        author_position: int,
+        source_structures: list[str] | None,
+        raw_author_name: str,
+        is_corresponding: bool,
+        roles: list[str] | None,
+        person_identifiers: JsonValue,
+    ) -> int:
+        return upsert_hal_source_authorship(
+            conn,
+            source_publication_id=source_publication_id,
+            author_position=author_position,
+            source_structures=source_structures,
+            raw_author_name=raw_author_name,
+            is_corresponding=is_corresponding,
+            roles=roles,
+            person_identifiers=person_identifiers,
+        )
 
     def staging_has_hal_doi(self, conn: Connection, doi: str) -> bool:
         return staging_has_hal_doi(conn, doi)
