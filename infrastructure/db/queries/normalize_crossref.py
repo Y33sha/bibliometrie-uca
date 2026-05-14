@@ -140,20 +140,6 @@ def upsert_crossref_source_authorship(
     return row.id
 
 
-def get_crossref_publication_id(conn: Connection, doi: str) -> int | None:
-    """Idempotence : retourne ``publication_id`` déjà associé au DOI CrossRef."""
-    row = conn.execute(
-        text(
-            "SELECT publication_id FROM source_publications "
-            "WHERE source = 'crossref' AND source_id = :doi"
-        ),
-        {"doi": doi},
-    ).one_or_none()
-    if row is None:
-        return None
-    return row.publication_id
-
-
 class PgCrossrefNormalizeQueries:
     """Adapter PostgreSQL pour ``application.ports.normalize_crossref.CrossrefNormalizeQueries``."""
 
@@ -216,9 +202,6 @@ class PgCrossrefNormalizeQueries:
             source_data=source_data,
             person_identifiers=person_identifiers,
         )
-
-    def get_crossref_publication_id(self, conn: Connection, doi: str) -> int | None:
-        return get_crossref_publication_id(conn, doi)
 
     def clear_source_authorships_for_publication(
         self, conn: Connection, source_publication_id: int

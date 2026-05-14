@@ -13,14 +13,6 @@ from domain.json_types import JsonValue
 class ThesesNormalizeQueries(Protocol):
     """Opérations SQL du normaliseur theses.fr."""
 
-    def fetch_thesis_primary_author(
-        self, conn: Connection, publication_id: int
-    ) -> tuple[str, str] | None: ...
-
-    def merge_publication_meta(
-        self, conn: Connection, publication_id: int, meta_json: JsonValue
-    ) -> None: ...
-
     def upsert_theses_source_publication(
         self,
         conn: Connection,
@@ -52,8 +44,6 @@ class ThesesNormalizeQueries(Protocol):
         raw_author_name: str,
         person_identifiers: JsonValue,
     ) -> int: ...
-
-    def get_theses_publication_id(self, conn: Connection, theses_id: str) -> int | None: ...
 
     def count_theses_table(self, conn: Connection, table: str) -> int: ...
 

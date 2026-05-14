@@ -11,46 +11,9 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.json_types import JsonValue
-from domain.persons.name_matching import parse_raw_author_name
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )
-
-
-def fetch_thesis_primary_author(conn: Connection, publication_id: int) -> tuple[str, str] | None:
-    """Retourne `(last_name, first_name)` de l'auteur principal d'une thèse existante.
-
-    Rôle `author`, tri par (source_publication_id, author_position), 1 ligne max.
-    Lit `source_authorships.raw_author_name` et le parse via
-    `domain.names.parse_raw_author_name` (gère « Nom, Prénom » comme
-    « Prénom Nom »).
-    """
-    row = conn.execute(
-        text("""
-            SELECT sas.raw_author_name
-            FROM source_authorships sas
-            JOIN source_publications sd ON sd.id = sas.source_publication_id
-            WHERE sd.publication_id = :pid
-              AND 'author' = ANY(sas.roles)
-            ORDER BY sd.id, sas.author_position
-            LIMIT 1
-        """),
-        {"pid": publication_id},
-    ).one_or_none()
-    if row is None or not row.raw_author_name:
-        return None
-    last, first = parse_raw_author_name(row.raw_author_name)
-    return (last, first) if last else None
-
-
-def merge_publication_meta(conn: Connection, publication_id: int, meta_json: JsonValue) -> None:
-    """Fusionne `publications.meta` avec `meta_json` (concat JSONB)."""
-    stmt = text("""
-        UPDATE publications
-        SET meta = COALESCE(meta, '{}') || :meta_json, updated_at = now()
-        WHERE id = :pid
-    """).bindparams(bindparam("meta_json", type_=JSONB))
-    conn.execute(stmt, {"meta_json": meta_json, "pid": publication_id})
 
 
 def upsert_theses_source_publication(
@@ -167,18 +130,6 @@ def upsert_theses_source_authorship(
     return row.id
 
 
-def get_theses_publication_id(conn: Connection, theses_id: str) -> int | None:
-    """Idempotence : retourne le `publication_id` existant pour un document theses.fr."""
-    row = conn.execute(
-        text(
-            "SELECT publication_id FROM source_publications "
-            "WHERE source = 'theses' AND source_id = :theses_id"
-        ),
-        {"theses_id": theses_id},
-    ).one_or_none()
-    return row.publication_id if row else None
-
-
 def count_theses_table(conn: Connection, table: str) -> int:
     """Compte les lignes d'une table avec `source = 'theses'`.
 
@@ -194,24 +145,11 @@ def count_theses_table(conn: Connection, table: str) -> int:
 class PgThesesNormalizeQueries:
     """Adapter PostgreSQL pour `application.ports.normalize_theses.ThesesNormalizeQueries`."""
 
-    def fetch_thesis_primary_author(
-        self, conn: Connection, publication_id: int
-    ) -> tuple[str, str] | None:
-        return fetch_thesis_primary_author(conn, publication_id)
-
-    def merge_publication_meta(
-        self, conn: Connection, publication_id: int, meta_json: JsonValue
-    ) -> None:
-        merge_publication_meta(conn, publication_id, meta_json)
-
     def upsert_theses_source_publication(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_theses_source_publication(conn, **kwargs)
 
     def upsert_theses_source_authorship(self, conn: Connection, **kwargs: Any) -> int:
         return upsert_theses_source_authorship(conn, **kwargs)
-
-    def get_theses_publication_id(self, conn: Connection, theses_id: str) -> int | None:
-        return get_theses_publication_id(conn, theses_id)
 
     def count_theses_table(self, conn: Connection, table: str) -> int:
         return count_theses_table(conn, table)

@@ -5,9 +5,6 @@ from sqlalchemy import Connection, text
 
 from infrastructure.db.queries.normalize_theses import (
     count_theses_table,
-    fetch_thesis_primary_author,
-    get_theses_publication_id,
-    merge_publication_meta,
     upsert_theses_source_authorship,
     upsert_theses_source_publication,
 )
@@ -131,81 +128,6 @@ class TestUpsertThesesSourceAuthorship:
             text("SELECT roles FROM source_authorships WHERE id = :id"), {"id": sa_1}
         ).scalar_one()
         assert "thesis_director" in roles
-
-
-class TestFetchThesisPrimaryAuthor:
-    def test_returns_none_when_absent(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
-        assert fetch_thesis_primary_author(sa_sync_conn, pub) is None
-
-    def test_returns_last_and_first(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
-        staging_id = _create_staging(sa_sync_conn)
-        sd = upsert_theses_source_publication(
-            sa_sync_conn,
-            theses_id="T-AUTH",
-            doi=None,
-            title="T",
-            pub_year=2024,
-            doc_type="thesis",
-            publication_id=pub,
-            staging_id=staging_id,
-            external_ids=None,
-            journal_id=None,
-            oa_status=None,
-            language=None,
-            container_title=None,
-            keywords=None,
-            topics_json=None,
-            source_meta_json=None,
-        )
-        upsert_theses_source_authorship(
-            sa_sync_conn,
-            source_publication_id=sd,
-            author_position=0,
-            roles=["author"],
-            raw_author_name="Jean Dupond",
-            person_identifiers=None,
-        )
-        assert fetch_thesis_primary_author(sa_sync_conn, pub) == ("Dupond", "Jean")
-
-
-class TestMergePublicationMeta:
-    def test_concats_meta(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
-        merge_publication_meta(sa_sync_conn, pub, {"date_soutenance": "2023-05-10"})
-        meta = sa_sync_conn.execute(
-            text("SELECT meta FROM publications WHERE id = :id"), {"id": pub}
-        ).scalar_one()
-        assert meta["date_soutenance"] == "2023-05-10"
-
-
-class TestGetThesesPublicationId:
-    def test_returns_none_when_absent(self, sa_sync_conn):
-        assert get_theses_publication_id(sa_sync_conn, "UNKNOWN") is None
-
-    def test_returns_publication_id(self, sa_sync_conn):
-        pub = _create_pub(sa_sync_conn)
-        staging_id = _create_staging(sa_sync_conn)
-        upsert_theses_source_publication(
-            sa_sync_conn,
-            theses_id="T-EXISTS",
-            doi=None,
-            title="T",
-            pub_year=2024,
-            doc_type="thesis",
-            publication_id=pub,
-            staging_id=staging_id,
-            external_ids=None,
-            journal_id=None,
-            oa_status=None,
-            language=None,
-            container_title=None,
-            keywords=None,
-            topics_json=None,
-            source_meta_json=None,
-        )
-        assert get_theses_publication_id(sa_sync_conn, "T-EXISTS") == pub
 
 
 class TestCountThesesTable:

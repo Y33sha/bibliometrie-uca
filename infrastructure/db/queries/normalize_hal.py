@@ -174,20 +174,6 @@ def staging_has_hal_doi(conn: Connection, doi: str) -> bool:
     )
 
 
-def get_hal_publication_id(conn: Connection, hal_id: str) -> int | None:
-    """Idempotence : retourne `publication_id` déjà associé au document HAL."""
-    row = conn.execute(
-        text(
-            "SELECT publication_id FROM source_publications "
-            "WHERE source = 'hal' AND source_id = :hal_id"
-        ),
-        {"hal_id": hal_id},
-    ).one_or_none()
-    if row is None:
-        return None
-    return row.publication_id if row.publication_id else None
-
-
 def delete_hal_duplicate_authorship_addresses(conn: Connection) -> None:
     """Post-traitement : supprime les `source_authorship_addresses` des doublons de position."""
     conn.execute(
@@ -236,9 +222,6 @@ class PgHalNormalizeQueries:
 
     def staging_has_hal_doi(self, conn: Connection, doi: str) -> bool:
         return staging_has_hal_doi(conn, doi)
-
-    def get_hal_publication_id(self, conn: Connection, hal_id: str) -> int | None:
-        return get_hal_publication_id(conn, hal_id)
 
     def delete_hal_duplicate_authorship_addresses(self, conn: Connection) -> None:
         delete_hal_duplicate_authorship_addresses(conn)
