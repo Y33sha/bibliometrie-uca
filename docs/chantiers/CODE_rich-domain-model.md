@@ -291,7 +291,7 @@ Les use-cases orchestrant Publication (fusion, find_or_create, refresh_from_sour
 - [x] `application/publications.py:merge_publications` : load target + source via repo, `target.absorb(source)`, `repo.merge_into` (plumbing + DELETE), `repo.save(target)`. Order rationale : save APRÈS DELETE source pour éviter collision UNIQUE lower(doi). — `5924e06`
 - [x] `application/publications.py:find_or_create` — nouvelle signature `find_or_create(pub: Publication, *, nnt: str | None, allow_create, repo) -> tuple[Publication | None, bool]`. Helper `publication_from_meta(meta: dict) -> Publication` pour adapter les dicts des normalizers. Cascade interne (DOI → NNT → création) inchangée — son extraction vers `decide_publication_match` reste portée par `METIER_deduplication-fusion-publications`. — `7def852`
 - [x] `application/publications.py:refresh_from_sources` — retourne désormais `RefreshResult(absorbed_publication_id: int | None)`. Le signal `absorbed_publication_id` non-None expose la fusion implicite sur collision DOI (jusque-là invisible au caller). Callers existants conservent leur comportement (ils ignorent le retour, comportement de fallback inchangé).
-- [ ] Helpers de `refresh_from_sources` (`_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_first_doc_type`) — coord avec `METIER_deduplication-fusion-publications` qui vise déjà à les exfiltrer vers `domain/publications/merge.py`.
+- [x] Helpers de `refresh_from_sources` (`_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_first_doc_type`) — exfiltrés vers `domain/publications/merge.py` lors de Phase 1 du chantier `METIER_deduplication-fusion-publications`. — `8e30bcd`
 
 ### Phase 5 — Orchestrations Person
 
