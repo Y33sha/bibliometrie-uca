@@ -1,11 +1,10 @@
-"""Query service : SQL du script `create_publications`.
+"""Query service : SQL de la phase `match_or_create_publications`.
 
-Appelé par `application/pipeline/create/create_publications.py`. Sélectionne
-les `source_publications` in-perimeter orphelins (sans `publication_id`)
-pour la création de l'entité consolidée `publications`.
+Appelé par `application/pipeline/publications/match_or_create_publications.py`. Deux passes :
+1. SELECT des `source_publications` in-perimeter orphelins (sans `publication_id`) pour rattachement (match) ou création.
+2. SELECT des `publications` stale (au moins un `source_publication` modifié depuis le dernier refresh canonique) pour ré-agrégation des méta.
 
-L'attachement d'un `source_publications` à un `publications` est mutualisé
-avec le script de fusion (voir `queries.merge.link_source_publication_to_publication`).
+L'attachement d'un `source_publications` à un `publications` est mutualisé avec le script de fusion (voir `queries.merge.link_source_publication_to_publication`).
 """
 
 from typing import Any
@@ -107,8 +106,8 @@ def fetch_thesis_primary_author_from_source_publication(
     return (last, first) if last else None
 
 
-class PgPublicationsCreateQueries:
-    """Adapter PostgreSQL pour `application.ports.publications_create.PublicationsCreateQueries`.
+class PgPublicationsMatchOrCreateQueries:
+    """Adapter PostgreSQL pour `application.ports.pipeline.publications_match_or_create.PublicationsMatchOrCreateQueries`.
 
     Délègue `link_source_publication_to_publication` à
     `infrastructure.db.queries.merge` (même SQL).

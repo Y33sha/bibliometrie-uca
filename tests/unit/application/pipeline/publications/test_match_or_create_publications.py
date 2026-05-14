@@ -1,6 +1,8 @@
-"""Tests purs des helpers de `application.pipeline.publications.create_publications`."""
+"""Tests purs des helpers de `application.pipeline.publications.match_or_create_publications`."""
 
-from application.pipeline.publications.create_publications import extract_known_identifiers
+from application.pipeline.publications.match_or_create_publications import (
+    extract_known_identifiers,
+)
 
 
 class TestExtractKnownIdentifiers:

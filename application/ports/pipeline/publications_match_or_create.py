@@ -1,6 +1,6 @@
-"""Port : SQL du script `create_publications`.
+"""Port : SQL de la phase publications (`match_or_create_publications`).
 
-Implémenté par `infrastructure.db.queries.publications.create.PgPublicationsCreateQueries`.
+Implémenté par `infrastructure.db.queries.publications.match_or_create.PgPublicationsMatchOrCreateQueries`.
 """
 
 from typing import Any, Protocol
@@ -8,8 +8,8 @@ from typing import Any, Protocol
 from sqlalchemy import Connection
 
 
-class PublicationsCreateQueries(Protocol):
-    """Opérations SQL pour la création de publications depuis les source_publications."""
+class PublicationsMatchOrCreateQueries(Protocol):
+    """Opérations SQL pour le rattachement (match ou création) des `source_publications` aux `publications` canoniques."""
 
     def fetch_orphan_in_perimeter_source_publications(
         self, conn: Connection

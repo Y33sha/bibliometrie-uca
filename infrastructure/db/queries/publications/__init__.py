@@ -4,8 +4,8 @@ Le package est organisé par thème :
 - `list` : `list_publications`, `export_publications_csv`, `export_theses_csv`
 - `facets` : `publications_facets`
 - `detail` : `all_years`, `get_publication_detail`
-- `create` : `PgPublicationsCreateQueries` (adapter du port
-  `application.ports.publications_create`, sync, consommé par le pipeline)
+- `match_or_create` : `PgPublicationsMatchOrCreateQueries` (adapter du port
+  `application.ports.pipeline.publications_match_or_create`, sync, consommé par le pipeline)
 
 `PgPublicationsQueries` agrège les 6 fonctions de lecture sous le port
 `application.ports.publications_queries.PublicationsQueries`. Les
@@ -22,7 +22,6 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from infrastructure.db.queries.publications.create import PgPublicationsCreateQueries
 from infrastructure.db.queries.publications.detail import (
     all_years as _all_years,
 )
@@ -40,6 +39,9 @@ from infrastructure.db.queries.publications.list import (
 )
 from infrastructure.db.queries.publications.list import (
     list_publications as _list_publications,
+)
+from infrastructure.db.queries.publications.match_or_create import (
+    PgPublicationsMatchOrCreateQueries,
 )
 
 
@@ -68,4 +70,4 @@ class PgPublicationsQueries:
         return _get_publication_detail(self._conn, pub_id)
 
 
-__all__ = ["PgPublicationsCreateQueries", "PgPublicationsQueries"]
+__all__ = ["PgPublicationsMatchOrCreateQueries", "PgPublicationsQueries"]

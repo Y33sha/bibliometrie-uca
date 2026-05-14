@@ -173,10 +173,12 @@ def _get_pub_oa_status(conn, hal_id):
 def _refresh_stale_publications(conn):
     """Rafraîchit les publications dont au moins un source_publication a été modifié depuis le dernier refresh.
 
-    Reproduit la 2e passe de la phase publications (`create_publications.run`) : SELECT des pubs stale via comparaison `source_publications.updated_at > publications.updated_at` et `refresh_from_sources` sur chacune.
+    Reproduit la 2e passe de la phase publications (`match_or_create_publications.run`) : SELECT des pubs stale via comparaison `source_publications.updated_at > publications.updated_at` et `refresh_from_sources` sur chacune.
     """
     from application.publications import refresh_from_sources
-    from infrastructure.db.queries.publications.create import fetch_stale_publication_ids
+    from infrastructure.db.queries.publications.match_or_create import (
+        fetch_stale_publication_ids,
+    )
     from infrastructure.repositories import publication_repository
 
     repo = publication_repository(conn)
