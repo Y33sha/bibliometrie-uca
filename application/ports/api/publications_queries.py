@@ -3,8 +3,8 @@
 Implémenté par `infrastructure.db.queries.publications.PgPublicationsQueries`.
 
 Les dataclasses `FacetFilters` et `ListFilters` vivent ici (source de
-vérité) ; les fonctions infra acceptent `filters: Any` puis lisent ses
-attributs (cohérent avec `addresses_queries`, `laboratories_queries`).
+vérité) ; les fonctions infra les importent depuis ce module pour typer
+leurs signatures (cf. règle 3 d'`architecture.md`).
 """
 
 from dataclasses import dataclass, field

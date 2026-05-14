@@ -58,6 +58,19 @@ qui forment une zone neutre dont dépendent tous les autres modules.
    Les deux dépendent des ports. Contrôlé par `import-linter`
    (contrat `layered` dans `pyproject.toml`).
 
+   **Précision sur `application/ports/`** : zone neutre (cf. règle 2),
+   donc importable depuis `infrastructure/`. La règle interdit le
+   couplage *comportemental* (un adapter qui dépendrait d'un use-case
+   applicatif), pas le partage de *types de transport*. En pratique :
+   - Les dataclasses de filtres (`ListFilters`, `FacetFilters`, …)
+     définies dans `application/ports/api/*` sont importées par les
+     adapters `infrastructure/db/queries/*` pour typer leurs signatures.
+   - Les Protocols (`PublicationsQueries`, `PersonsQueries`, …) sont
+     implémentés via duck typing — l'adapter ne fait pas
+     `class PgX(XQueries):`, l'import du Protocol côté infra est inutile
+     en Python (la conformité est vérifiée structuralement par mypy
+     au point de composition root).
+
 4. **Routers ⊥ adapters sortants.** Les routers FastAPI
    (`interfaces/api/routers/*`) **ne doivent pas** importer
    `infrastructure/` directement. Ils pilotent des use-cases

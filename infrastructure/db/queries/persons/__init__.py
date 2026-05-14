@@ -12,7 +12,7 @@ Le package est organisé par thème :
 `PgPersonsQueries` agrège l'ensemble des fonctions de lecture + admin
 sous le port `application.ports.persons_queries.PersonsQueries`.
 Les dataclasses `DirectoryFilters` / `ListFilters` / `FacetFilters`
-vivent côté port (source de vérité), ici on type `filters: Any`.
+(importées du port) typent les signatures internes.
 """
 
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module

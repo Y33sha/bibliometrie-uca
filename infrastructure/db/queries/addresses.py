@@ -2,18 +2,23 @@
 
 Implémente le port `application.ports.addresses_queries.AddressesQueries`
 via `PgAddressesQueries` (constructor injection de la Connection SA sync).
-Conformité au port assurée par duck typing : pas d'import du Protocol
-depuis `infrastructure/` (règle DDD `infrastructure ⊥ application`).
+Conformité au port assurée par duck typing : l'adapter ne fait pas
+`class PgX(AddressesQueries):` ; la vérification structurale par mypy a
+lieu au point de composition root.
 
-Les dataclasses de filtres (`AddressListFilters`,
-`AddressCountriesFilters`) vivent dans `application/ports/` ; côté
-impl on type `filters: Any` puis on lit ses attributs — Python valide
-au runtime, mypy via le Protocol côté caller.
+Les dataclasses de filtres (`AddressListFilters`, `AddressCountriesFilters`)
+sont importées depuis le port pour typer les signatures (cf. règle 3
+d'`architecture.md`).
 """
 
 from typing import Any
 
 from sqlalchemy import Connection, text
+
+from application.ports.api.addresses_queries import (
+    AddressCountriesFilters,
+    AddressListFilters,
+)
 
 
 class PgAddressesQueries:
@@ -46,7 +51,7 @@ class PgAddressesQueries:
         self,
         *,
         structure_id: int,
-        filters: Any,
+        filters: AddressListFilters,
         page: int,
         per_page: int,
     ) -> dict[str, Any]:
@@ -208,7 +213,9 @@ class PgAddressesQueries:
         ).one_or_none()
         return row is not None
 
-    def addresses_countries(self, *, filters: Any, page: int, per_page: int) -> dict[str, Any]:
+    def addresses_countries(
+        self, *, filters: AddressCountriesFilters, page: int, per_page: int
+    ) -> dict[str, Any]:
         offset = (page - 1) * per_page
         parts: list[str] = []
         binds: dict[str, Any] = {}

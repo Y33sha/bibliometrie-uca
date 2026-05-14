@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.persons_queries import FacetFilters
 from infrastructure.db.queries.filters import (
     WhereClause,
     assemble_where,
@@ -15,7 +16,7 @@ from infrastructure.db.queries.filters import (
 _BASE_FROM = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
 
 
-def persons_facets(conn: Connection, *, filters: Any) -> dict[str, Any]:
+def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]:
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_clauses(*, skip: str) -> list[WhereClause | None]:

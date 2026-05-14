@@ -9,8 +9,8 @@ Le package est organisé par thème :
 
 `PgPublicationsQueries` agrège les 6 fonctions de lecture sous le port
 `application.ports.publications_queries.PublicationsQueries`. Les
-dataclasses `FacetFilters` / `ListFilters` vivent côté port (source de
-vérité), ici on type `filters: Any`.
+dataclasses `FacetFilters` / `ListFilters` (importées du port) typent
+les signatures internes.
 """
 
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module

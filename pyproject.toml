@@ -70,6 +70,14 @@ type = "layers"
 layers = ["interfaces", "infrastructure | application", "domain"]
 # `application` n'importe pas `infrastructure` : toute nouvelle
 # dépendance doit passer par un port.
+#
+# Exception : `application.ports.*` est zone neutre (cf. règle 2
+# d'architecture.md). `infrastructure` peut en importer les
+# dataclasses de transport pour typer ses signatures (cf. règle 3).
+# Les Protocols restent implémentés via duck typing.
+ignore_imports = [
+    "infrastructure.** -> application.ports.**",
+]
 
 [[tool.importlinter.contracts]]
 name = "Routers : pas d'import direct de infrastructure"
