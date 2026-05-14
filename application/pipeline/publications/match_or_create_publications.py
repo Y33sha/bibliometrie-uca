@@ -1,14 +1,13 @@
 """
-Matche ou crée les publications canoniques pour les `source_publications` in-perimeter non rattachés.
+Matche ou crée les publications canoniques pour les `source_publications` in-perimeter non rattachés, puis rafraîchit les publications dont au moins un source a été modifié.
 
 Phase du pipeline qui s'exécute APRÈS affiliations (quand in_perimeter est déterminé sur les source_authorships) et AVANT persons/authorships.
 
-Pour chaque `source_publication` sans `publication_id` ayant au moins un `source_authorship` in_perimeter :
-  1. Cascade de matching cross-source (`decide_publication_match`) sur DOI, NNT, HAL_ID.
-  2. Si match : rattache et enrichit (`try_merge_by_doi` tardif pour les matches non-DOI).
-  3. Si pas de match : crée la publication.
+Deux passes :
+1. Pour chaque `source_publication` sans `publication_id` ayant au moins un `source_authorship` in_perimeter : cascade de matching cross-source (`decide_publication_match` sur DOI, NNT, HAL_ID, THESIS_TITLE_YEAR). Si match : rattache + `try_merge_by_doi` tardif pour les matches non-DOI. Sinon : crée la publication.
+2. Pour chaque publication stale (au moins un `source_publication.updated_at > publications.updated_at`) : `refresh_from_sources` pour ré-agréger les méta canoniques.
 
-L'orchestrateur dépend du port `PublicationsCreateQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/create_publications.py`.
+L'orchestrateur dépend du port `PublicationsMatchOrCreateQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/match_or_create_publications.py`.
 """
 
 import logging
@@ -16,7 +15,9 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.publications_create import PublicationsCreateQueries
+from application.ports.pipeline.publications_match_or_create import (
+    PublicationsMatchOrCreateQueries,
+)
 from application.publications import (
     refresh_from_sources,
     resolve_doi_conflict,
@@ -68,7 +69,7 @@ def extract_known_identifiers(
 
 def process_document(
     conn: Connection,
-    queries: PublicationsCreateQueries,
+    queries: PublicationsMatchOrCreateQueries,
     doc: Any,
     dry_run: bool,
     *,
@@ -179,7 +180,7 @@ def process_document(
 def _match_thesis_by_title_year(
     conn: Connection,
     *,
-    queries: PublicationsCreateQueries,
+    queries: PublicationsMatchOrCreateQueries,
     source_publication_id: int,
     title_normalized: str,
     pub_year: int,
@@ -206,7 +207,7 @@ def _match_thesis_by_title_year(
 
 def run(
     conn: Connection,
-    queries: PublicationsCreateQueries,
+    queries: PublicationsMatchOrCreateQueries,
     logger: logging.Logger,
     *,
     pub_repo: PublicationRepository,

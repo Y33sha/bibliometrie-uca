@@ -234,7 +234,7 @@ def phase_publications(**kw: Any) -> Any:
     une source_authorship in_perimeter (evite de creer des publications
     hors perimetre). Applique ensuite les merges inter-sources (HAL-ID, NNT).
     """
-    _run_create_publications()
+    _run_match_or_create_publications()
     _run_merge_pubs_by_hal_id()
     _run_merge_pubs_by_nnt()
 
@@ -295,25 +295,27 @@ def phase_cooccurrences(**kw: Any) -> Any:
     _run_cooccurrences()
 
 
-def _run_create_publications() -> None:
-    from application.pipeline.publications.create_publications import run
+def _run_match_or_create_publications() -> None:
+    from application.pipeline.publications.match_or_create_publications import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.publications.create import PgPublicationsCreateQueries
+    from infrastructure.db.queries.publications.match_or_create import (
+        PgPublicationsMatchOrCreateQueries,
+    )
     from infrastructure.repositories import publication_repository
 
-    log.info("▶ create_publications")
+    log.info("▶ match_or_create_publications")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
         run(
             conn,
-            PgPublicationsCreateQueries(),
+            PgPublicationsMatchOrCreateQueries(),
             log,
             pub_repo=publication_repository(conn),
         )
     finally:
         conn.close()
-    log.info("✓ create_publications terminé en %.1fs", time.time() - t0)
+    log.info("✓ match_or_create_publications terminé en %.1fs", time.time() - t0)
 
 
 def _run_create_persons() -> None:

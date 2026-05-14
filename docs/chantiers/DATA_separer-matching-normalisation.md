@@ -90,9 +90,10 @@ Réécrire `create_publications.py` pour intégrer la cascade complète.
 
 **Élargissement de la phase publications**. Une fois que les normalizers ne rattachent plus, la phase devient le seul site de rattachement et doit gérer les cas qui apparaissent alors.
 
-- [ ] Renommer `create_publications.py` → `match_or_create_publications.py` (phase + entry point CLI). Renommer le port `PublicationsCreateQueries` → `PublicationsMatchOrCreateQueries`.
-- [ ] Repointing HAL via résolveur de chaîne (`merge_publications_by_key` style) : si la cascade trouve une autre pub que celle déjà rattachée à un `source_publication` partageant le `hal_id`, fusion + résolution.
-- [ ] Trancher `publication_id IS NULL` vs `matched_at` pour le filtrage du SELECT : nouveau critère nécessaire si on veut pouvoir re-matcher à la demande sans casser l'idempotence par défaut.
+- [x] Renommer `create_publications.py` → `match_or_create_publications.py` (phase, port, adapter, entry point CLI, `run_pipeline.py`). `PublicationsCreateQueries` → `PublicationsMatchOrCreateQueries`.
+- [x] Refresh sélectif des pubs stale : colonne `source_publications.updated_at` (clock_timestamp), comparaison `sp.updated_at > p.updated_at`, 2e passe dans la phase `match_or_create_publications.run`.
+- [x] Repointing HAL : pas besoin d'un mécanisme spécifique. On ne re-matche pas au re-normalize (risque de doublons). Le cas « hal_id pointait vers pub_A, le DOI émerge plus tard et désigne pub_B » est traité par la phase dédiée `merge_pubs_by_hal_id` en aval.
+- [x] Filtrage `publication_id IS NULL` conservé pour la passe matchorcreate. Pas de `matched_at` nécessaire : le rattachement est figé une fois fait, les méta sont propagées via la 2e passe de refresh (sp.updated_at vs p.updated_at).
 
 ### Phase 3 — Cleanup
 
