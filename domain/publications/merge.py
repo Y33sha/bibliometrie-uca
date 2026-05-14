@@ -14,6 +14,7 @@ Règles d'agrégation par type de champ :
 `title_normalized` est recalculé à partir du `title` agrégé, pas pris d'une source (les sources ne fournissent pas ce champ).
 """
 
+from dataclasses import dataclass
 from typing import Any
 
 from domain.json_types import JsonValue
@@ -24,22 +25,30 @@ from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT, best_oa_stat
 from domain.publications.publication import Publication
 
 
+@dataclass(frozen=True, slots=True)
+class RefreshOutcome:
+    """Résultat de l'agrégation cross-sources d'une publication.
+
+    `is_orphan=True` : la publication n'a aucune source rattachée. Règle métier : une publication non attestée par aucune source n'a pas de raison d'exister. Le caller doit la supprimer.
+    """
+
+    is_orphan: bool = False
+
+
 def merge_source_rows(
     pub: Publication,
     rows: list[dict[str, Any]],
     *,
     source_priority: tuple[str, ...],
-) -> None:
-    """Mute `pub` avec l'agrégation cross-sources de `rows`.
+) -> RefreshOutcome:
+    """Recalcule l'état canonique de `pub` (DOI, oa_status, méta, etc.) par agrégation de ses sources `rows`. Mute `pub` en place ; persistance via `repo.save(pub)` côté caller.
 
-    `rows` est la liste des `source_publications` attachées à `pub`, telle que renvoyée par `repo.get_source_rows(pub.id)`. `source_priority` donne l'ordre de prééminence des sources pour les règles « premier non-null gagne ».
+    Règles d'agrégation : premier non-null par `source_priority` pour les scalaires nullable, statut OA le plus ouvert toutes sources confondues, union dédupliquée des listes, fusion shallow par clé des JSONB, `topics` indexés par source.
 
-    Mutation sur les attributs canoniques de `pub`. Le `pub.id` n'est pas touché, ni les `authorships`. Persistance via `repo.save(pub)` côté caller.
-
-    Si `rows` est vide (aucune source attachée), la fonction est un no-op.
+    Retourne `RefreshOutcome(is_orphan=True)` si `rows` est vide — `pub` n'est pas muté ; la règle métier dicte que le caller supprime la publication.
     """
     if not rows:
-        return
+        return RefreshOutcome(is_orphan=True)
 
     rank = {s: i for i, s in enumerate(source_priority)}
     rows_sorted = sorted(rows, key=lambda r: rank.get(r["source"], 99))
@@ -64,6 +73,8 @@ def merge_source_rows(
     pub.biblio = shallow_merge_jsonb(rows_sorted, "biblio")
     pub.meta = shallow_merge_jsonb(rows_sorted, "meta")
     pub.is_retracted = any(r["is_retracted"] for r in rows_sorted if r["is_retracted"])
+
+    return RefreshOutcome()
 
 
 # ── Helpers publics ────────────────────────────────────────────────

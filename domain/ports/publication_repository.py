@@ -83,6 +83,10 @@ class PublicationRepository(Protocol):
 
     def merge_into(self, target_id: int, source_id: int) -> None: ...
 
+    # ── Suppression ────────────────────────────────────────────────
+
+    def delete(self, pub_id: int) -> None: ...
+
     # ── distinct_publications ──────────────────────────────────────
 
     def mark_distinct(

@@ -129,7 +129,9 @@ def refresh_from_sources(
 ) -> RefreshResult:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_publications`.
 
-    Recalcul complet (pas de COALESCE incrémental qui figerait les valeurs au premier arrivé) : lit TOUS les `source_publications` attachés, applique l'algorithme de fusion `merge_source_rows` qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées obsolètes (ex: `ongoing_thesis` → `thesis` après soutenance), et inclut désormais `title` / `title_normalized` dans l'agrégation cross-sources (ce qui n'était pas le cas auparavant).
+    Recalcul complet (pas de COALESCE incrémental qui figerait les valeurs au premier arrivé) : lit TOUS les `source_publications` attachés, applique l'algorithme d'agrégation `merge_source_rows` (domain) qui mute l'entité Publication en place, et persiste via `repo.save`. Peut corriger des métadonnées obsolètes (ex: `ongoing_thesis` → `thesis` après soutenance).
+
+    **Cas orphelin** : si la publication n'a aucune source rattachée, la règle métier dicte qu'elle ne doit pas exister. `merge_source_rows` retourne `RefreshOutcome(is_orphan=True)` ; le caller (cette fonction) supprime la publication via `repo.delete` et émet un événement `publication.deleted_orphan`.
 
     Auto-fusion sur conflit DOI : si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant le save — au lieu de laisser remonter une violation de la contrainte unique. `pub_id` reste vivant pour le caller, et l'id absorbée est exposée dans `RefreshResult.absorbed_publication_id`.
 
@@ -137,12 +139,15 @@ def refresh_from_sources(
 
     Ne touche PAS à `notes` ni à `sources` (utiliser `update_sources` séparément).
     """
-    rows = repo.get_source_rows(pub_id)
-    if not rows:
-        return RefreshResult()
-
     pub = repo.find_by_id(pub_id)
     if pub is None:
+        return RefreshResult()
+
+    rows = repo.get_source_rows(pub_id)
+    if not rows:
+        # Pub orpheline : suppression côté caller (la règle métier est signalée par merge_source_rows quand on l'appellera ; ici on court-circuite parce qu'on n'a pas besoin d'agréger pour décider).
+        repo.delete(pub_id)
+        emit_event(audit_repo, "publication.deleted_orphan", "publication", pub_id, {})
         return RefreshResult()
 
     # Si le DOI à promouvoir est déjà occupé par une autre publication, fusionner d'abord pour éviter une violation de la contrainte unique `publications_doi_lower_key`. Cas typique : une thèse avec un DOI ABES (10.70675/…) créée en double — une fois via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître dans une `source_publication`, sa promotion collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans `pub_id` (qui reste vivant pour le caller).
