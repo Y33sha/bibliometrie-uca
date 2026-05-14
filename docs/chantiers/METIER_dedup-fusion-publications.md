@@ -1,225 +1,114 @@
 # Chantier — Déduplication & fusion de publications
 
-Rassemblement préalable des éléments. Structure (contexte, décisions,
-phasage) à formaliser au démarrage du chantier.
+Commencé le 2026-05-14.
 
-## Périmètre
+## Contexte
 
-Le pipeline contient aujourd'hui **6 cascades de matching/fusion**
-disséminées qui font la même chose à chaque source ou presque, plus
-des règles de fusion multi-source dupliquées entre `refresh_from_sources`
-et les phases dédiées de fusion. Chantier coordonné nécessaire — toucher
-l'un sans les autres laisse un état incohérent.
+Le pipeline contient aujourd'hui **5 cascades de matching/fusion disséminées** qui font la même chose à chaque source ou presque, plus des règles de fusion multi-sources dupliquées entre `refresh_from_sources` et les phases dédiées de fusion. Chantier coordonné nécessaire — toucher l'un sans les autres laisse un état incohérent.
 
-Deux dimensions imbriquées :
+**Deux dimensions imbriquées** :
 
-- **Refactorisation** : extraire les décisions pures vers
-  `domain/publications/dedup.py` et `domain/publications/merge.py`,
-  unifier les sites qui font la même chose.
-- **Changement de logique** : la règle « choix de la publication cible
-  de fusion » est arbitraire (les métadonnées canoniques sont triangulées
-  par `refresh_from_sources` après fusion) — simplifier cette règle
-  partout, supprimer le ranking SQL, gérer correctement les redirections
-  en chaîne.
+- **Refactorisation** : extraire les décisions pures vers `domain/publications/deduplication.py` (cascades) et nouveau `domain/publications/merge.py` (algorithme de fusion multi-sources), unifier les sites qui font la même chose.
+- **Changement de logique** : la règle « choix de la publication cible de fusion » est arbitraire (les métadonnées canoniques sont triangulées par `refresh_from_sources` après fusion) — simplifier cette règle partout, supprimer le ranking SQL, gérer correctement les redirections en chaîne. Et inclure `title` dans l'agrégation cross-sources, ce que `refresh_from_sources` oublie actuellement.
 
-## Items concernés
+### Sites concernés (inventaire)
 
-### Cascades de matching dispersées (5 sites, 5 variantes)
+**Cascades de matching** (5 sites, 5 variantes) :
 
-#### `find_or_create — cascade de déduplication`
-- **localisation** : `application/publications.py:128-197`
-- **description** : Cascade DOI → NNT → création (avec gestion de
-  conflit DOI déléguée à `resolve_doi_conflict`). Enchaîne aussi le
-  `try_merge_by_doi` quand une thèse trouvée par NNT n'a pas de DOI
-  alors qu'on en propose un.
-- **prefetch** : `doi_match`, `nnt_match`.
-- **destination** : `domain/publications/dedup.py` →
-  `decide_publication_match(*, doi_match, nnt_match) -> PublicationMatchDecision`.
+- `application/publications.py:find_or_create` — cascade DOI → NNT → création, avec gestion de conflit DOI déléguée à `resolve_doi_conflict`. Enchaîne `try_merge_by_doi` quand une thèse trouvée par NNT n'a pas de DOI alors qu'on en propose un.
+- `application/publications.py:try_merge_by_doi` — mini-règle de dédup tardive : si la pub courante n'a pas de DOI mais qu'un DOI candidat est fourni et qu'une autre pub porte ce DOI → fusion ; sinon attribution.
+- `application/pipeline/normalize/normalize_openalex.py:find_publication` — cascade priorisée HAL > NNT > openalex_id > title.
+- `application/pipeline/normalize/normalize_theses.py:find_publication` — cascade DOI/NNT puis dédup spéciale par titre+année + compatibilité auteur.
+- `application/pipeline/normalize/normalize_hal.py:process_work` — fusion HAL deux pubs (si `hal_id` pointait sur `old_pub_id` mais `find_publication` DOI/NNT trouve `publication_id` différent).
 
-#### `try_merge_by_doi`
-- **localisation** : `application/publications.py:76-96`
-- **description** : Si la pub courante n'a pas de DOI mais qu'un DOI
-  candidat est fourni, et qu'une autre pub porte ce DOI → fusion ;
-  sinon attribution. Mini-règle de dédup tardive.
-- **destination** : `domain/publications/dedup.py` →
-  `decide_doi_attribution(current_doi, proposed_doi, existing_match) -> DoiAttributionDecision`.
+**Algorithme de fusion multi-sources** : `application/publications.py:refresh_from_sources` + helpers inlinés `_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_topics_by_source`, `_first_doc_type`. Inclut une auto-fusion sur collision DOI (la pub qui occupe déjà le DOI agrégé est absorbée — déjà exposée via `RefreshResult.absorbed_publication_id` depuis le chantier `CODE_rich-domain-model`).
 
-#### `find_publication — cascade priorisée HAL > NNT > openalex_id > title` (OpenAlex)
-- **localisation** : `application/pipeline/normalize/normalize_openalex.py:604-618`
-- **description** : (1) HAL location → `find_hal_publication_id`,
-  (2) theses.fr → `find_by_nnt`, (3) `openalex_id`, (4) DOI/title via
-  `find_or_create(allow_create=False)`.
-- **destination** : `domain/publications/dedup.py` →
-  `decide_openalex_pub_match(*, hal_match, nnt_match, openalex_id_match, title_doi_match) -> PublicationMatchDecision`.
+**Choix de la publication cible de fusion** (4 sites, 4 règles ad hoc) :
 
-#### `find_publication theses — cascade DOI/NNT puis title+author`
-- **localisation** : `application/pipeline/normalize/normalize_theses.py:122-172`
-- **description** : Cascade DOI/NNT (via `find_or_create`), puis dédup
-  spéciale par titre+année + compatibilité auteur (`thesis_authors_compatible`
-  déjà en domain). Plus `try_merge_by_doi` quand match par titre + DOI
-  candidat.
-- **destination** : `domain/publications/dedup.py` →
-  `decide_thesis_match(*, doi_nnt_match, title_year_candidates, claimed_author) -> PublicationMatchDecision`.
+- `merge_pubs_by_hal_id` : « HAL gagne » (ordre des arguments fixé dans `_merge_pub(cur, hal_pub_id, src_pub_id, ...)`).
+- `merge_pubs_by_nnt` : ranking SQL `rank_publications_by_merge_priority` (DOI shape + complétude + id ASC).
+- `try_merge_by_doi` : sa propre cascade.
+- `process_work` HAL : fusion `old → new` (la nouvelle survit).
 
-#### `process_work — fusion HAL deux pubs (DOI/NNT)`
-- **localisation** : `application/pipeline/normalize/normalize_hal.py:681-693`
-- **description** : Si le `hal_id` pointait sur `old_pub_id` mais
-  `find_publication` (DOI/NNT) trouve `publication_id` différent →
-  fusion auto. Invariant « un hal_id ne pointe qu'une publication ».
-- **destination** : `domain/publications/dedup.py` →
-  `decide_hal_id_repointing(old_pub_id, new_pub_id) -> RepointDecision`.
+**Préalable déjà fait** (commit `ce5cf4f`) : `refresh_from_sources(target)` est désormais appelé après chaque fusion dans les phases dédiées (`merge_pubs_by_hal_id`, `merge_pubs_by_nnt`) — auparavant les métadonnées canoniques de la cible restaient figées après absorption.
 
-### Règles de fusion multi-source
+## Décisions
 
-#### `refresh_from_sources — règles de fusion`
-- **localisation** : `application/publications.py:297-383` (orchestration),
-  avec règles inlinées dans `_first_non_null` (220-225), `_merge_lists`
-  (228-237), `_merge_jsonb` (240-249), `_topics_by_source` (252-259),
-  `_first_doc_type` (262-294).
-- **description** : Algo complet de canonicalisation multi-source : tri
-  `SOURCE_PRIORITY`, scalaire = premier non-null prioritaire, OA =
-  `best_oa_status` (déjà domain), retracted = OR logique, listes =
-  union, JSONB shallow merge, topics composite par source, doc_type
-  avec arbitrage sous-type. Plus auto-fusion DOI si collision (lookup
-  + merge).
-- **destination** : `domain/publications/merge.py` →
-  `merge_source_rows(rows, *, source_priority) -> MergedPubFields` ;
-  `decide_premerge_for_doi(new_doi, existing_match, current_pub_id) -> PreMergeDecision` ;
-  helpers internes `first_non_null`, `merge_lists_dedup_ci`,
-  `shallow_merge_jsonb`, `topics_by_source`,
-  `arbitrate_doc_type_with_article_subtype`.
+1. **Vocabulaire** : « déduplication » partout dans le code, les fichiers et la doc. Jamais « dedup ». Renommage de `domain/publications/dedup.py` en `domain/publications/deduplication.py` inclus comme préliminaire.
 
-### Choix de la publication cible de fusion (4 sites, 4 règles ad hoc)
+2. **Architecture domaine** : règles pures dans `domain/publications/deduplication.py` (cascades de matching) et nouveau `domain/publications/merge.py` (algorithme de fusion multi-sources + résolveur de chaîne). Pattern aligné sur l'hydratation de `Publication` faite en Phase 4 du chantier `CODE_rich-domain-model`.
 
-**Constat métier** : le choix de la cible **n'a aucun impact métier**
-— les métadonnées canoniques sont triangulées par
-`refresh_from_sources` selon `SOURCE_PRIORITY` après chaque fusion.
-N'importe quelle publi peut survivre, du moment que le refresh est
-appelé ensuite. Vaut pour les fusions par DOI, NNT, hal_id, etc.
+3. **Choix de la cible de fusion** : règle triviale `min(pub_ids)` appliquée partout. Suppression du ranking SQL `rank_publications_by_merge_priority`, de son port `MergeQueries.rank_publications_by_merge_priority`, et de ses tests dédiés. Justification : les métadonnées sont triangulées par `refresh_from_sources` selon `SOURCE_PRIORITY` après chaque fusion, donc le choix n'a aucun impact métier.
 
-État actuel — 4 règles ad hoc pour rien :
+4. **Helper unifié `merge_publications_by_key(...)`** consolidant les sites de fusion par clé (HAL, NNT, repointing). Applique le choix trivial de cible, **porte le résolveur de chaîne** (présent dans `merge_pubs_by_hal_id`, absent dans `merge_pubs_by_nnt`) pour suivre `pub_A → pub_B` puis `pub_X → pub_A` accumulés dans un batch, lance `merge_publications` + `refresh_from_sources`.
 
-- `merge_pubs_by_hal_id` : « HAL gagne » (ordre des arguments fixé
-  dans `_merge_pub(cur, hal_pub_id, src_pub_id, ...)`).
-- `merge_pubs_by_nnt` : ranking SQL `rank_publications_by_merge_priority`
-  (DOI shape + complétude + id ASC).
-- `try_merge_by_doi` (`application/publications.py`) : sa propre
-  cascade.
-- `process_work` HAL (`normalize_hal.py:681-693`) : si `old_pub_id`
-  rattaché au `hal_id` diffère de la publi trouvée par DOI/NNT,
-  fusion `old → new` (la nouvelle DOI/NNT survit).
+5. **Cascade de matching unifiée** : `decide_publication_match(*, doi_match, nnt_match, ...)` paramétrée par les lookups disponibles, pas une fonction par source. Les normalizers prefetchent les lookups pertinents (un seul appel par identifiant), passent au décideur, la décision retournée est pure.
 
-### Préalable [fait] : `refresh_from_sources(target)` après chaque fusion
+6. **Algorithme de fusion** exfiltré vers `merge.py` : helpers `_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_topics_by_source`, `_first_doc_type` deviennent publics (`first_non_null`, etc.), et une fonction `merge_source_rows(rows, *, source_priority) -> MergedPubFields` encapsule l'algo complet de `refresh_from_sources`. **Inclut `title` et `title_normalized`** comme scalaires fusionnés au même titre que les autres (premier non-null prioritaire) — corrige la limitation actuelle où la cible canonique gardait son titre même si une source l'avait amélioré. Ferme l'item ouvert de Phase 4 de `CODE_rich-domain-model`.
 
-Les 3 sites batch sont désormais homogènes côté refresh post-fusion :
+7. **`DEDUPLICATION_KEYS` enum** (`str, Enum`) portant les noms d'identifiants et l'ordre de priorité (par ordre de définition). Évite la dispersion de constantes string + permet d'itérer la cascade dans l'ordre standardisé. Inclut au moins `DOI`, `NNT`, `HAL_ID` au démarrage.
 
-- `try_merge_by_doi` : ✅ refresh implicite via `process_work` du
-  normalizer en fin de traitement.
-- `merge_pubs_by_hal_id` : ✅ refresh ajouté dans le savepoint après
-  `_merge_pub` (commit `ce5cf4f`).
-- `merge_pubs_by_nnt` : ✅ idem.
+8. **Hors-scope** : DOI dataset vs article (trigger figshare déjà en place côté DB).
 
-Bug latent fixé : avant ce changement, après une fusion via les phases
-dédiées, les métadonnées canoniques de la cible restaient figées sur
-ce qu'elles étaient avant absorption. L'existence de
-`interfaces/cli/refresh_publications_year_mismatch.py` témoignait du
-symptôme.
+## Phasage
 
-### Sous-point connexe : `refresh_from_sources` ignore `title`
+### Phase 0 — Préliminaire de vocabulaire
 
-`refresh_from_sources` ne touche pas à `title` / `title_normalized`
-(cf. docstring l. 330). Si la cible a un mauvais titre et la publi
-absorbée avait un meilleur titre, le titre canonique reste celui de
-la cible. Limitation orthogonale à la fusion mais à signaler.
+- [ ] `git mv domain/publications/dedup.py domain/publications/deduplication.py` + idem pour `tests/unit/domain/publications/test_dedup.py` → `test_deduplication.py`.
+- [ ] Mettre à jour les sites d'import (~3-4 fichiers : `application/publications.py`, `application/pipeline/publications/create_publications.py`, `domain/publications/publication.py` si nécessaire, tests).
+- [ ] Mettre à jour la fiche `CODE_rich-domain-model.md` qui référence `dedup.py`.
 
-## Plan de chantier (résumé)
+### Phase 1 — Exfiltration de l'algorithme de fusion vers `merge.py`
 
-1. ✅ Ajouter `refresh_from_sources(target)` à la fin de chaque
-   fusion dans les phases dédiées (`merge_pubs_by_hal_id`,
-   `merge_pubs_by_nnt`).
-2. ⏳ Remplacer `rank_publications_by_merge_priority` par un choix
-   trivial (`min(pub_ids)` par exemple) appelé partout — suppression
-   de la query SQL, du port, des tests dédiés.
-3. ⏳ Conserver le **résolveur de chaîne** (présent dans
-   `merge_pubs_by_hal_id`, absent dans `merge_pubs_by_nnt`) pour
-   suivre les redirections accumulées dans le batch
-   (`pub_A → pub_B` puis `pub_X → pub_A`). Le porter dans le helper
-   unifié.
-4. ⏳ Unifier les 4 sites en un seul appel à un helper commun
-   `merge_publications_by_key(...)`.
-5. ⏳ Migrer les 5 cascades de matching vers `domain/publications/dedup.py`
-   en factorisant — `decide_publication_match` paramétré par les
-   lookups disponibles plutôt qu'une fonction par source.
+Ferme le dernier item ouvert de Phase 4 du chantier `CODE_rich-domain-model`.
 
-## Identifiants de déduplication (à formaliser comme donnée métier)
+- [ ] Créer `domain/publications/merge.py`.
+- [ ] Y déplacer (en les publicisant) `_first_non_null`, `_merge_lists`, `_merge_jsonb`, `_topics_by_source`, `_first_doc_type` depuis `application/publications.py`.
+- [ ] Créer `merge_source_rows(rows, *, source_priority) -> MergedPubFields` qui encapsule l'algorithme complet d'agrégation cross-sources de `refresh_from_sources`. **Inclut title et title_normalized** comme scalaires fusionnés au même titre que les autres champs.
+- [ ] Étendre `repo.update_aggregated` pour accepter `title` et `title_normalized`.
+- [ ] Adapter `application/publications.py:refresh_from_sources` pour appeler `merge_source_rows` puis persister. Le pré-merge sur collision DOI (qui produit `RefreshResult.absorbed_publication_id`) reste côté `refresh_from_sources`.
+- [ ] Tests : couverture sur title fusionné (cas non testé jusqu'ici).
 
-```python
-@dataclass(frozen=True)
-class DedupIdentifier:
-    name: str                        # 'doi', 'hal_id', 'nnt', 'pmid', …
-    priority: int                    # ordre de la cascade
-    blocks_merge_when: tuple[str, ...] = ()  # ex. ('doc_type_mismatch_chapter_book',)
+### Phase 2 — Choix de cible trivial + suppression du ranking SQL
 
-DEDUP_IDENTIFIERS = (
-    DedupIdentifier("doi",    priority=1, blocks_merge_when=("chapter_vs_book",)),
-    DedupIdentifier("nnt",    priority=2),
-    DedupIdentifier("hal_id", priority=3),
-    # DedupIdentifier("pmid", priority=4),  # le jour où on en aura
-)
-```
+- [ ] Remplacer `rank_publications_by_merge_priority` par `min(pub_ids)` dans `merge_pubs_by_nnt`.
+- [ ] Supprimer la query SQL `rank_publications_by_merge_priority`.
+- [ ] Supprimer le port `MergeQueries.rank_publications_by_merge_priority` et son implémentation.
+- [ ] Supprimer les tests dédiés du ranking.
 
-Exceptions concrètes à formaliser :
+### Phase 3 — Helper unifié de fusion par clé
 
-- **DOI chapitre vs ouvrage** : un même DOI peut identifier un
-  chapitre (`book_chapter`) ET l'ouvrage entier (`book`) chez certains
-  éditeurs. Pas de fusion automatique entre les deux.
-- **DOI dataset vs article** (cf. trigger figshare) : un DOI Zenodo/
-  figshare peut être lié à un article par `relatedIdentifier` mais
-  n'EST pas l'article. Pas de match par DOI dans ce sens.
-- **NNT vs DOI** : la priorité actuelle (DOI > NNT) suppose que quand
-  deux thèses partagent un NNT mais ont des DOI différents, elles
-  sont distinctes. À documenter explicitement.
+- [ ] Définir `merge_publications_by_key(pub_ids_by_key, *, repo, audit_repo)` dans `application/publications.py` (ou un sous-module si nécessaire).
+- [ ] Inclure le résolveur de chaîne (porté depuis `merge_pubs_by_hal_id`).
+- [ ] Le helper applique `min(pub_ids)`, résout les chaînes, appelle `merge_publications` puis `refresh_from_sources`.
+- [ ] Migrer `application/pipeline/publications/merge_pubs_by_hal_id.py` vers le helper.
+- [ ] Migrer `application/pipeline/publications/merge_pubs_by_nnt.py` vers le helper.
 
-## Signatures principales suggérées
+### Phase 4 — Factorisation des cascades de matching
 
-```python
-# domain/publications/dedup.py
-@dataclass(frozen=True)
-class PublicationMatchDecision:
-    action: Literal["match", "create"]
-    publication_id: int | None = None
-    reason: str = ""  # 'doi' | 'nnt' | 'title_year' | …
+- [ ] Définir `DEDUPLICATION_KEYS` enum dans `domain/publications/deduplication.py`.
+- [ ] Définir `PublicationMatchDecision` (dataclass frozen) + `decide_publication_match(*, doi_match, nnt_match, ...)` dans `domain/publications/deduplication.py`.
+- [ ] Migrer `application/publications.py:find_or_create` vers le décideur.
+- [ ] Migrer `application/pipeline/normalize/normalize_openalex.py:find_publication` (cascade HAL > NNT > openalex_id > title).
+- [ ] Migrer `application/pipeline/normalize/normalize_theses.py:find_publication` (cascade DOI/NNT puis title+author).
+- [ ] Migrer `application/pipeline/normalize/normalize_hal.py:process_work` (repointing). Décision dédiée `decide_hal_id_repointing(old_pub_id, new_pub_id)`.
+- [ ] Trancher Q3 sur `try_merge_by_doi`.
 
-def decide_publication_match(
-    *, doi_match: PubByDoi | None,
-    nnt_match: PubByNnt | None,
-    source_id_match: int | None = None,
-    title_year_match: PubByTitle | None = None,
-) -> PublicationMatchDecision: ...
+### Phase 5 — Cleanup
 
-def decide_doi_attribution(
-    current_doi: str | None,
-    proposed_doi: str | None,
-    existing_match: PubByDoi | None,
-) -> DoiAttributionDecision: ...
+- [ ] Selon arbitrage de Q3 : `try_merge_by_doi` absorbé dans `decide_doi_attribution` ou laissé.
+- [ ] Selon arbitrage de Q4 : wrapper `application/publications.py:resolve_doi_conflict` simplifié ou supprimé.
 
-def decide_hal_id_repointing(
-    old_pub_id: int | None, new_pub_id: int | None,
-) -> RepointDecision: ...
+## Questions ouvertes
 
-# domain/publications/merge.py
-def merge_source_rows(
-    rows: list[SourcePubRow], *, source_priority: tuple[str, ...],
-) -> MergedPubFields: ...
+- **Q2 — `MergedPubFields` shape** : dataclass typé (frozen, slots) vs kwargs match du contrat actuel de `repo.update_aggregated`. Trade-off : typé/explicite vs minimal/zero-boilerplate. À trancher avant Phase 1.
 
-def resolve_merge_redirect(pub_id: int, redirects: Mapping[int, int]) -> int: ...
-# Helpers internes : first_non_null, merge_lists_dedup_ci,
-# shallow_merge_jsonb, topics_by_source,
-# arbitrate_doc_type_with_article_subtype
-```
+- **Q3 — `try_merge_by_doi` absorbé par `decide_doi_attribution` ?** Ou laissé comme is (mini-règle distincte du flow normal de cascade) ? À trancher avant la fin de Phase 4.
+
+- **Q4 — wrapper `application/publications.py:resolve_doi_conflict`** : devient-il redondant après la factorisation ? Pourrait disparaître si `decide_publication_match` retourne aussi les effets de bord à appliquer (style `RefreshResult`). À trancher en fin de Phase 4.
 
 ## Liens
 
-- Fix préalable étape 1 : commit `ce5cf4f`
-- Pattern de référence (décision pure déjà en domain) :
-  [`resolve_doi_conflict`](../../domain/publication.py#L562)
+- Chantier prérequis : `CODE_rich-domain-model.md` (Phase 4 — hydratation Publication, déjà faite).
+- Fix préalable du refresh post-fusion : commit `ce5cf4f`.
+- Pattern de référence (règle pure déjà en domain) : `resolve_doi_conflict` dans `domain/publications/deduplication.py` (après rename).
