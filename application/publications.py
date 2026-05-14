@@ -24,7 +24,9 @@ from domain.publication import (
     PubThesisCandidate,
 )
 from domain.publications.deduplication import (
+    DeduplicationKey,
     decide_doi_attribution,
+    decide_publication_match,
 )
 from domain.publications.deduplication import (
     resolve_doi_conflict as _domain_resolve_doi_conflict,
@@ -195,34 +197,43 @@ def find_or_create(
         pub.title = cleaned_title
         pub.title_normalized = normalize_text(cleaned_title)
 
-    # 1. Chercher par DOI
+    # Prefetch DOI : résolution du conflit éventuel (chapter/book) qui peut invalider le DOI ou poser un id de fusion. La mutation `pub.doi = None` reflète le cas où la règle pure a rejeté le DOI.
+    doi_merge_with_id: int | None = None
     if pub.doi is not None:
-        existing = repo.find_by_doi(str(pub.doi))
-        if existing:
-            new_doi_str, merge_id = resolve_doi_conflict(
+        existing_by_doi = repo.find_by_doi(str(pub.doi))
+        if existing_by_doi:
+            new_doi_str, doi_merge_with_id = resolve_doi_conflict(
                 str(pub.doi),
                 pub.doc_type or "",
                 pub.title_normalized or "",
-                existing,
+                existing_by_doi,
                 repo=repo,
             )
-            if merge_id is not None:
-                return repo.find_by_id(merge_id), False
-            # Le DOI peut avoir été invalidé par la résolution (chapter vs chapter avec titres différents).
             pub.doi = DOI(new_doi_str) if new_doi_str else None
 
-    # 1b. Chercher par NNT (thèses uniquement)
+    # Prefetch NNT (thèses uniquement).
+    nnt_match_id: int | None = None
     if nnt:
-        existing_nnt = repo.find_by_nnt(nnt)
-        if existing_nnt:
+        existing_by_nnt = repo.find_by_nnt(nnt)
+        if existing_by_nnt:
+            nnt_match_id = existing_by_nnt.id
+
+    decision = decide_publication_match(
+        doi_merge_with_id=doi_merge_with_id,
+        nnt_match_id=nnt_match_id,
+    )
+
+    if decision.action == "match":
+        assert decision.publication_id is not None
+        # Enrichissement post-match : si la pub trouvée par NNT n'a pas encore le DOI proposé, on tente l'attribution tardive (ou fusion si le DOI est porté par une autre pub).
+        if decision.matched_by == DeduplicationKey.NNT:
             try_merge_by_doi(
-                existing_nnt.id,
+                decision.publication_id,
                 str(pub.doi) if pub.doi else None,
                 repo=repo,
             )
-            return repo.find_by_id(existing_nnt.id), False
+        return repo.find_by_id(decision.publication_id), False
 
-    # 2. Créer
     if not allow_create:
         return None, False
 

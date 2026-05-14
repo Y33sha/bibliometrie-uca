@@ -91,7 +91,7 @@ Ferme le dernier item ouvert de Phase 4 du chantier `CODE_rich-domain-model`.
 - [x] Définir `DoiAttributionDecision` + `decide_doi_attribution(*, current_doi, proposed_doi, current_pub_id, existing_doi_match_id)` (tranche Q3 — voir « Décisions tranchées »).
 - [x] `try_merge_by_doi` migré en wrapper consommant `decide_doi_attribution`.
 - [x] Fonction `has_minimal_publication_metadata` déplacée de `deduplication.py` vers `metadata.py` (son rôle effectif est création, pas dédup ; héritage historique d'une cascade `DOI > NNT > title+year+journal` aujourd'hui retirée).
-- [ ] Migrer `application/publications.py:find_or_create` vers le décideur.
+- [x] Migrer `application/publications.py:find_or_create` vers le décideur. `try_merge_by_doi` tardif conservé comme étape post-match (enrichissement de la pub trouvée par NNT), pas absorbé dans la cascade.
 - [ ] Migrer `application/pipeline/normalize/normalize_openalex.py:find_publication` (cascade HAL > NNT > openalex_id > title).
 - [ ] Migrer `application/pipeline/normalize/normalize_theses.py:find_publication` (cascade DOI/NNT puis title+author).
 - [ ] Migrer `application/pipeline/normalize/normalize_hal.py:process_work` (repointing). Décision dédiée `decide_hal_id_repointing(old_pub_id, new_pub_id)`.
