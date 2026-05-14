@@ -346,9 +346,9 @@ class CrossrefNormalizer(SourceNormalizer):
         logger: logging.Logger,
         staging_queries: StagingQueries,
         queries: CrossrefNormalizeQueries,
-        journal_repo_factory: Callable[[Any], JournalRepository],
-        publisher_repo_factory: Callable[[Any], PublisherRepository],
-        pub_repo_factory: Callable[[Any], PublicationRepository],
+        journal_repo_factory: Callable[[Connection], JournalRepository],
+        publisher_repo_factory: Callable[[Connection], PublisherRepository],
+        pub_repo_factory: Callable[[Connection], PublicationRepository],
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries

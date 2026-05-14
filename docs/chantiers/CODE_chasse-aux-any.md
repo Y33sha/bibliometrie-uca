@@ -59,67 +59,34 @@ Patterns dominants :
 
 ### Phase 2 — Sweep par couche
 
-- [x] `domain/` (43 corrections en mode `--strict` : 4 `Any` explicites
-  + 39 `dict`/`list`/`tuple` non paramétrés. Contrainte
-  `disallow_any_generics` activée pour `domain.*`).
-- [~] `application/` services racine : `existing: Any` →
-  `PubByDoi` (résolution conflit DOI). Restent justifiés : `set[Any]`
-  / `list[Any]` dans `_merge_lists` (items hétérogènes par champ),
-  `value: Any` dans `update_config_value` (frontière JSONB).
-  Orchestrateurs pipeline : pas encore traités.
-- [~] `application/ports/normalize_*.py` : tous les `Any` JSONB
-  (frontière vers `bindparam(type_=JSONB)`) remplacés par
-  `JsonValue` (alias récursif `str | int | float | bool | None |
-  Sequence[JsonValue] | Mapping[str, JsonValue]` dans
-  `domain/json_types.py`). 6 ports (HAL, OpenAlex, CrossRef, Theses,
-  WoS, ScanR) + leurs 6 implémentations `infrastructure/db/queries/
-  normalize_*.py` (top-level functions et signatures complètes
-  CrossRef). Override mypy `disallow_any_explicit` posé sur 5 ports
-  (`normalize_wos` exclu : utilise encore `list[dict[str, Any]]` pour
-  les batchs SQL hétérogènes — tranche suivante).
-  `compact_identifiers` (`domain/persons/identifiers.py`) typé en
-  retour `dict[str, JsonValue] | None` au passage (alimente le JSONB
-  `source_authorships.identifiers`). Restent à traiter : `**kwargs: Any`
-  sur les méthodes adapter `Pg*NormalizeQueries` (HAL/OpenAlex/Theses/
-  WoS/ScanR, ~13 méthodes) — implique d'éclater en signatures
-  explicites façon CrossRef.
-- [~] `infrastructure/` racine : `_get_from_db(key: Any)` → `key: str`
-  dans `app_config.py`. Le retour `Any` est conservé et justifié en
-  docstring (frontière JSONB libre — chaque caller fait son
-  `isinstance(...)` avant usage). Adapters, queries, repositories :
-  pas encore traités.
-- [x] `interfaces/api/app.py` + `interfaces/api/deps.py` (18 occ.) :
-  `lifespan` → `AsyncIterator[None]` ; exception handlers → `JSONResponse` ;
-  middleware → `RequestResponseEndpoint` / `Response` (`starlette.middleware.base`) ;
-  `health`/`metrics` → `JSONResponse | dict[str, Any]` / `dict[str, Any]` ;
-  `pool: Any` → `cast(QueuePool, engine.pool)` (justifie l'accès à
-  `_max_overflow`/`checkedout`/`checkedin`) ; `SPAStaticFiles.get_response` →
-  signature parente `(str, Scope) -> Response` ; `require_admin` → `None`.
-  Override mypy `disallow_any_generics` posé.
-  Note : `health()` retourne `JSONResponse | dict[str, Any]` (Union avec
-  `Response`) → FastAPI ne peut pas inférer le `response_model`. Ajouter
-  `response_model=None` sur le décorateur (sinon `FastAPIError` à
-  l'import de l'app). Cas non détecté par les hooks pre-commit qui ne
-  lancent que `tests/unit/` ; le test smoke `tests/integration/interfaces/
-  test_api.py::TestHealth::test_health` aurait capté le crash.
-- [x] `interfaces/api/routers/` (124 occ., 17 fichiers) : tous les
-  handlers avec `response_model=` retournent désormais leur BaseModel.
-  Pattern retenu (option A de la question Pydantic ci-dessous) :
-  `Model.model_validate(dict_du_query_service)` pour les retours
-  composites ; constructeur direct `Model(...)` pour les retours
-  scalaires (`OkResponse()`, `MergeResponse(...)`). `_: Any = Depends(require_admin)`
-  → `_: None` (puisque `require_admin` retourne `None` après
-  Phase 2 sur `deps.py`). Handlers sans `response_model` (3 dans
-  `journals.py`, 3 dans `docs.py`) typés en `dict[str, Any]` ou
-  `list[dict[str, ...]]` faute de modèle adapté. Override mypy
-  `disallow_any_generics` posé sur `interfaces.api.routers.*`.
-- [x] `interfaces/cli/` : 11 `Any` explicites + 4 `dict` non
-  paramétrés corrigés (records DB → `list[dict[str, Any]]`,
-  helper `c(text, *styles)` → `(object, *str) -> str`,
-  `parse_date(val)` → `object`, `escape_sql(value)` →
-  union `str | int | float | bool | list[Any] | dict[str, Any] | None`).
-  mypy strict 0 erreur sur la couche.
-- [ ] `tests/` : signatures alignées sur les fonctions testées.
+#### Phase 2.1 — `domain/`
+
+- [x] 43 corrections en mode `--strict` : 4 `Any` explicites + 39 `dict`/`list`/`tuple` non paramétrés. Contrainte `disallow_any_generics` activée pour `domain.*`.
+
+#### Phase 2.2 — `application/`
+
+- [~] Services racine : `existing: Any` → `PubByDoi` (résolution conflit DOI). Restent justifiés : `set[Any]` / `list[Any]` dans `_merge_lists` (items hétérogènes par champ), `value: Any` dans `update_config_value` (frontière JSONB).
+- [ ] `application/pipeline/` (82 occ. recensées) — découpage par patterns :
+  - [x] Sweep A : `Callable[[Any], …Repository]` → `Callable[[Connection], …Repository]` sur les 6 normalizers (16 occ.) ; `_iter_rows -> Any` → `Iterator[Row[Any]]` dans `base.py` ; `list[Any]` → `list[Row[Any]]` dans `application/ports/pipeline/staging.py` + `infrastructure/db/queries/staging.py` (extension révélée par le sweep).
+  - [ ] Sweep B : `topics: Any` dans les 6 `subjects/ingest_*.py` → `JsonValue`.
+  - [ ] Sweep C : `dict[str, Any]` JSONB locaux dans les normalizers (`ext`, `biblio`, `meta`, `sd`, ~12 occ.) → `dict[str, JsonValue]`.
+  - [ ] Sweep D : `affiliations/resolve_addresses.py` (9 `Any` sur 5 fonctions, lecture dédiée nécessaire).
+  - Hors scope : `persons/create_persons_from_source_authorships.py` (6 `Any` dans la cascade matching — refonte attendue via `METIER_decide-person-match`). Cas résiduels (~10 occ.) : helpers `as_str` / `_safe_list` / `dedup_strs` (frontières dynamiques à documenter), `sp: Any` (savepoint SA), `INGESTORS: dict[str, Any]` (registry).
+- [~] `application/ports/normalize_*.py` : tous les `Any` JSONB (frontière vers `bindparam(type_=JSONB)`) remplacés par `JsonValue` (alias récursif `str | int | float | bool | None | Sequence[JsonValue] | Mapping[str, JsonValue]` dans `domain/json_types.py`). 6 ports (HAL, OpenAlex, CrossRef, Theses, WoS, ScanR) + leurs 6 implémentations `infrastructure/db/queries/normalize_*.py` (top-level functions et signatures complètes CrossRef). Override mypy `disallow_any_explicit` posé sur 5 ports (`normalize_wos` exclu : utilise encore `list[dict[str, Any]]` pour les batchs SQL hétérogènes — tranche suivante). `compact_identifiers` (`domain/persons/identifiers.py`) typé en retour `dict[str, JsonValue] | None` au passage (alimente le JSONB `source_authorships.identifiers`). Restent à traiter : `**kwargs: Any` sur les méthodes adapter `Pg*NormalizeQueries` (HAL/OpenAlex/Theses/WoS/ScanR, ~13 méthodes) — implique d'éclater en signatures explicites façon CrossRef.
+
+#### Phase 2.3 — `infrastructure/`
+
+- [~] Racine : `_get_from_db(key: Any)` → `key: str` dans `app_config.py`. Le retour `Any` est conservé et justifié en docstring (frontière JSONB libre — chaque caller fait son `isinstance(...)` avant usage). Adapters, queries, repositories : pas encore traités.
+
+#### Phase 2.4 — `interfaces/`
+
+- [x] `interfaces/api/app.py` + `interfaces/api/deps.py` (18 occ.) : `lifespan` → `AsyncIterator[None]` ; exception handlers → `JSONResponse` ; middleware → `RequestResponseEndpoint` / `Response` (`starlette.middleware.base`) ; `health`/`metrics` → `JSONResponse | dict[str, Any]` / `dict[str, Any]` ; `pool: Any` → `cast(QueuePool, engine.pool)` (justifie l'accès à `_max_overflow`/`checkedout`/`checkedin`) ; `SPAStaticFiles.get_response` → signature parente `(str, Scope) -> Response` ; `require_admin` → `None`. Override mypy `disallow_any_generics` posé. Note : `health()` retourne `JSONResponse | dict[str, Any]` (Union avec `Response`) → FastAPI ne peut pas inférer le `response_model`. Ajouter `response_model=None` sur le décorateur (sinon `FastAPIError` à l'import de l'app). Cas non détecté par les hooks pre-commit qui ne lancent que `tests/unit/` ; le test smoke `tests/integration/interfaces/test_api.py::TestHealth::test_health` aurait capté le crash.
+- [x] `interfaces/api/routers/` (124 occ., 17 fichiers) : tous les handlers avec `response_model=` retournent désormais leur BaseModel. Pattern retenu (option A de la question Pydantic ci-dessous) : `Model.model_validate(dict_du_query_service)` pour les retours composites ; constructeur direct `Model(...)` pour les retours scalaires (`OkResponse()`, `MergeResponse(...)`). `_: Any = Depends(require_admin)` → `_: None` (puisque `require_admin` retourne `None` après Phase 2 sur `deps.py`). Handlers sans `response_model` (3 dans `journals.py`, 3 dans `docs.py`) typés en `dict[str, Any]` ou `list[dict[str, ...]]` faute de modèle adapté. Override mypy `disallow_any_generics` posé sur `interfaces.api.routers.*`.
+- [x] `interfaces/cli/` : 11 `Any` explicites + 4 `dict` non paramétrés corrigés (records DB → `list[dict[str, Any]]`, helper `c(text, *styles)` → `(object, *str) -> str`, `parse_date(val)` → `object`, `escape_sql(value)` → union `str | int | float | bool | list[Any] | dict[str, Any] | None`). mypy strict 0 erreur sur la couche.
+
+#### Phase 2.5 — `tests/`
+
+- [ ] Signatures alignées sur les fonctions testées.
 
 ### Phase 3 — Verrouillage
 
@@ -167,6 +134,3 @@ Patterns dominants :
 - **`Row` SA** : utiliser `Row` (générique sans paramétrage), ou
   des `NamedTuple` / `dataclass` typés par requête ? Le second est
   plus rigoureux mais double la dette si on bouge une colonne.
-- **Tests psycopg restants** : si Phase 5 SQLA (Alembic) n'est pas
-  faite, le `cur` psycopg subsiste dans `migrate.py`. Cohérent
-  avec le périmètre, mais à reconfirmer si Phase 5 dérape.
