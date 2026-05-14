@@ -92,13 +92,11 @@ Ferme le dernier item ouvert de Phase 4 du chantier `CODE_rich-domain-model`.
 - [x] `try_merge_by_doi` migré en wrapper consommant `decide_doi_attribution`.
 - [x] Fonction `has_minimal_publication_metadata` déplacée de `deduplication.py` vers `metadata.py` (son rôle effectif est création, pas dédup ; héritage historique d'une cascade `DOI > NNT > title+year+journal` aujourd'hui retirée).
 - [x] Migrer `application/publications.py:find_or_create` vers le décideur. `try_merge_by_doi` tardif conservé comme étape post-match (enrichissement de la pub trouvée par NNT), pas absorbé dans la cascade.
-- [ ] Migrer `application/pipeline/normalize/normalize_openalex.py:find_publication` (cascade HAL > NNT > openalex_id > title).
-- [ ] Migrer `application/pipeline/normalize/normalize_theses.py:find_publication` (cascade DOI/NNT puis title+author).
-- [ ] Migrer `application/pipeline/normalize/normalize_hal.py:process_work` (repointing). Décision dédiée `decide_hal_id_repointing(old_pub_id, new_pub_id)`.
+- [x] Cascades dans `normalize_openalex`, `normalize_theses`, `normalize_hal:process_work` : **supprimées** (pas migrées) par le chantier `DATA_separer-matching-normalisation.md`. Tout le matching est centralisé en aval dans la phase `match_or_create_publications`, qui consomme `decide_publication_match`, `decide_doi_attribution` et `resolve_doi_conflict` livrés par ce chantier METIER.
 
 ### Phase 5 — Cleanup
 
-Phase caduque. La migration des 4 cascades restantes (`find_or_create`, `normalize_openalex`, `normalize_theses`, `normalize_hal:process_work`) et le cleanup associé sont absorbés par le chantier `DATA_separer-matching-normalisation.md` qui centralise tout le matching en aval du pipeline. Les primitives livrées en Phases 0-3 + 4 partielle (décideurs purs, helper de fusion par clé, ranking SQL retiré, algo merge exfiltré, find_or_create migré) sont consommées telles quelles par la phase publications unifiée.
+Phase caduque. Le cleanup associé (suppression des helpers source-spécifiques côté queries + ports, retrait de `publication_from_meta`) est absorbé par la Phase 3 du chantier `DATA_separer-matching-normalisation.md`.
 
 ## Décisions tranchées
 

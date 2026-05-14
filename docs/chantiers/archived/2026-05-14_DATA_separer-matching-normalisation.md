@@ -105,9 +105,9 @@ Réécrire `create_publications.py` pour intégrer la cascade complète.
 
 ### Phase 4 — Validation pipeline complet
 
-- [ ] Extraire un baseline (counts par source, distribution des matchings, distribution oa_status, etc.) avant le run.
-- [ ] Run complet du pipeline sur la base.
-- [ ] Comparer baseline vs après-run. Un certain delta est attendu (cascade DOI > NNT > HAL_ID alignée partout, plus de comportements divergents par source), mais il doit être interprétable.
+- [x] Baseline avant-run extrait (counts publications/source_publications/source_authorships + distribution par source + oa_status + doc_type + in_perimeter).
+- [x] Run complet du pipeline. Un crash a révélé un bug d'alignement du pré-merge DOI dans `refresh_from_sources` (le pré-merge cherchait le DOI brut, `merge_source_rows` posait le DOI normalisé via VO `DOI` qui strip les suffixes `.vN`). Corrigé en commit `b22f277`. Run redémarré et complété sans crash.
+- [x] Comparaison avant/après : pas de surprise majeure. +8 publications, +12 in-perimeter, +221 pubs avec DOI. Reclassifications massives de doc_type et oa_status sur les 36 386 publications stale rafraîchies — propagation en masse des règles métier courantes (`arbitrate_doc_type_with_article_subtype`, `best_oa_status`, `derive_hal_oa_status` refondu) sur des publications dont le refresh canonique n'avait jamais été déclenché depuis ces refontes. Comportement attendu de la passe stale du premier run après migration 0009.
 
 ## Décisions tranchées
 
