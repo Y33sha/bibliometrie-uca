@@ -23,7 +23,12 @@ from domain.publication import (
     PubByTitle,
     PubThesisCandidate,
 )
-from domain.publications.deduplication import resolve_doi_conflict as _domain_resolve_doi_conflict
+from domain.publications.deduplication import (
+    decide_doi_attribution,
+)
+from domain.publications.deduplication import (
+    resolve_doi_conflict as _domain_resolve_doi_conflict,
+)
 from domain.publications.identifiers import DOI
 from domain.publications.merge import merge_source_rows
 from domain.publications.metadata import (
@@ -78,23 +83,32 @@ def find_thesis_by_title(
 def try_merge_by_doi(pub_id: int, doi: str | None, *, repo: PublicationRepository) -> int:
     """Tente de fusionner via DOI si la publication n'en a pas encore.
 
-    Si pub_id n'a pas de DOI et qu'une autre publication porte ce DOI,
-    les deux sont fusionnées (l'autre absorbe pub_id).
-    Attribue le DOI à la publication si elle n'en a pas.
+    Wrapper qui prefetch les données et délègue la décision à `decide_doi_attribution` (règle pure en domain). Trois sorties exclusives :
 
-    Retourne le pub_id effectif (peut changer en cas de fusion).
+    - pas de DOI proposé OU la pub porte déjà un DOI → noop, retourne `pub_id` inchangé (politique conservative : on n'écrase pas un DOI existant).
+    - DOI proposé déjà porté par une autre publication → fusion, retourne l'id de cette autre publication.
+    - DOI libre → attribution à la pub courante, retourne `pub_id`.
     """
-    if not doi:
-        return pub_id
-    if repo.get_doi(pub_id):
-        return pub_id
-    # La pub n'a pas de DOI : vérifier si une autre l'a
-    existing = repo.find_by_doi(doi)
-    if existing and existing.id != pub_id:
-        merge_publications(existing.id, pub_id, repo=repo)
-        return existing.id
-    # Attribuer le DOI
-    repo.set_doi(pub_id, doi)
+    current_doi = repo.get_doi(pub_id)
+    existing_doi_match_id: int | None = None
+    if not current_doi and doi:
+        existing = repo.find_by_doi(doi)
+        existing_doi_match_id = existing.id if existing else None
+
+    decision = decide_doi_attribution(
+        current_doi=current_doi,
+        proposed_doi=doi,
+        current_pub_id=pub_id,
+        existing_doi_match_id=existing_doi_match_id,
+    )
+
+    if decision.action == "merge":
+        assert decision.merge_with_id is not None  # garanti par la règle
+        merge_publications(decision.merge_with_id, pub_id, repo=repo)
+        return decision.merge_with_id
+    if decision.action == "attribute":
+        assert doi is not None  # garanti par la règle (proposed_doi truthy)
+        repo.set_doi(pub_id, doi)
     return pub_id
 
 

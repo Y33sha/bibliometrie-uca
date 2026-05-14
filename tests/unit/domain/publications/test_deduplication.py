@@ -1,30 +1,15 @@
 """Tests des règles de déduplication / création des publications."""
 
 from domain.publications.deduplication import (
+    DeduplicationKey,
+    DoiAttributionDecision,
     DoiConflictResolution,
-    has_minimal_publication_metadata,
+    MetadataDeduplicationCase,
+    PublicationMatchDecision,
+    decide_doi_attribution,
+    decide_publication_match,
     resolve_doi_conflict,
 )
-
-
-class TestHasMinimalPublicationMetadata:
-    def test_title_and_year_present(self):
-        assert has_minimal_publication_metadata("Some title", 2024) is True
-
-    def test_missing_title(self):
-        assert has_minimal_publication_metadata(None, 2024) is False
-        assert has_minimal_publication_metadata("", 2024) is False
-
-    def test_missing_year(self):
-        assert has_minimal_publication_metadata("Some title", None) is False
-
-    def test_year_zero_treated_as_missing(self):
-        """Année 0 : cas pathologique, on traite comme absente."""
-        assert has_minimal_publication_metadata("Some title", 0) is False
-
-    def test_both_missing(self):
-        assert has_minimal_publication_metadata(None, None) is False
-
 
 # ── resolve_doi_conflict (règle pure) ──────────────────────────────
 
@@ -123,3 +108,128 @@ class TestResolveDoiConflictPure:
                 existing_id=1,
             )
             assert res.accepted_doi is None, f"alias {alias} non reconnu"
+
+
+# ── decide_publication_match (cascade pure) ────────────────────────
+
+
+class TestDecidePublicationMatch:
+    def test_no_match_returns_create(self):
+        decision = decide_publication_match()
+        assert decision == PublicationMatchDecision(
+            action="create", publication_id=None, matched_by=None
+        )
+
+    def test_doi_wins_over_all(self):
+        decision = decide_publication_match(
+            doi_merge_with_id=10,
+            nnt_match_id=20,
+            hal_id_match_id=30,
+            metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
+        )
+        assert decision == PublicationMatchDecision(
+            action="match", publication_id=10, matched_by=DeduplicationKey.DOI
+        )
+
+    def test_nnt_wins_over_hal_and_metadata(self):
+        decision = decide_publication_match(
+            nnt_match_id=20,
+            hal_id_match_id=30,
+            metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
+        )
+        assert decision == PublicationMatchDecision(
+            action="match", publication_id=20, matched_by=DeduplicationKey.NNT
+        )
+
+    def test_hal_wins_over_metadata(self):
+        decision = decide_publication_match(
+            hal_id_match_id=30,
+            metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
+        )
+        assert decision == PublicationMatchDecision(
+            action="match", publication_id=30, matched_by=DeduplicationKey.HAL_ID
+        )
+
+    def test_metadata_only(self):
+        decision = decide_publication_match(
+            metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
+        )
+        assert decision == PublicationMatchDecision(
+            action="match",
+            publication_id=40,
+            matched_by=MetadataDeduplicationCase.THESIS_TITLE_YEAR,
+        )
+
+
+# ── decide_doi_attribution (règle pure) ────────────────────────────
+
+
+class TestDecideDoiAttribution:
+    def test_no_proposed_doi_is_noop(self):
+        decision = decide_doi_attribution(
+            current_doi=None,
+            proposed_doi=None,
+            current_pub_id=1,
+            existing_doi_match_id=None,
+        )
+        assert decision == DoiAttributionDecision(action="noop")
+
+    def test_empty_proposed_doi_is_noop(self):
+        decision = decide_doi_attribution(
+            current_doi=None,
+            proposed_doi="",
+            current_pub_id=1,
+            existing_doi_match_id=None,
+        )
+        assert decision == DoiAttributionDecision(action="noop")
+
+    def test_current_doi_present_is_noop_even_when_proposed_is_free(self):
+        """Politique conservative : on n'écrase jamais un DOI existant."""
+        decision = decide_doi_attribution(
+            current_doi="10.x/already",
+            proposed_doi="10.x/proposed",
+            current_pub_id=1,
+            existing_doi_match_id=None,
+        )
+        assert decision == DoiAttributionDecision(action="noop")
+
+    def test_current_doi_same_as_proposed_is_noop(self):
+        """Même DOI déjà en place : noop, pas attribute (effet identique mais label honnête)."""
+        decision = decide_doi_attribution(
+            current_doi="10.x/same",
+            proposed_doi="10.x/same",
+            current_pub_id=1,
+            existing_doi_match_id=1,
+        )
+        assert decision == DoiAttributionDecision(action="noop")
+
+    def test_doi_held_by_other_pub_merges(self):
+        decision = decide_doi_attribution(
+            current_doi=None,
+            proposed_doi="10.x/held",
+            current_pub_id=1,
+            existing_doi_match_id=42,
+        )
+        assert decision == DoiAttributionDecision(action="merge", merge_with_id=42)
+
+    def test_doi_free_attributes(self):
+        decision = decide_doi_attribution(
+            current_doi=None,
+            proposed_doi="10.x/free",
+            current_pub_id=1,
+            existing_doi_match_id=None,
+        )
+        assert decision == DoiAttributionDecision(action="attribute")
+
+    def test_doi_already_on_current_pub_attributes(self):
+        """Cas idempotent : le DOI proposé est déjà sur la pub courante (current_doi serait alors non-None, donc en réalité ce cas tombe sur le noop).
+
+        Ce test garde le cas de figure où current_doi serait None mais existing_doi_match_id == current_pub_id (incohérence théorique : signifie que find_by_doi a retourné la pub courante alors que sa colonne doi est nulle — ne devrait pas arriver, mais la règle décide quand même = attribute).
+        """
+        decision = decide_doi_attribution(
+            current_doi=None,
+            proposed_doi="10.x/x",
+            current_pub_id=1,
+            existing_doi_match_id=1,
+        )
+        assert decision == DoiAttributionDecision(action="attribute")

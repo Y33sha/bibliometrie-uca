@@ -16,9 +16,9 @@ d'adapter de persistance, pas du métier.
 
 Règles métier réparties :
 - Identifiants : `domain/publications/identifiers.py`
-- Déduplication (`has_minimal_publication_metadata`, `resolve_doi_conflict`,
-  `DoiConflictResolution`) : `domain/publications/deduplication.py`
-- Métadonnées (`best_oa_status`, `clean_publication_title`,
+- Déduplication (`decide_publication_match`, `resolve_doi_conflict`, `decide_doi_attribution`,
+  ...) : `domain/publications/deduplication.py`
+- Métadonnées (`best_oa_status`, `clean_publication_title`, `has_minimal_publication_metadata`,
   `OA_RANK`, `OA_STATUS_UNKNOWN_DEFAULT`) : `domain/publications/metadata.py`
 """
 

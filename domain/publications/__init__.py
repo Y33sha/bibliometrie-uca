@@ -7,7 +7,7 @@ Sous-modules :
   ``Authorship``
 - ``scope`` : doc_types hors périmètre métier aval (matching, table de
   vérité authorships, listings).
-- ``deduplication`` : invariants de déduplication (metadata minimales) et règles de résolution de conflit DOI.
+- ``deduplication`` : règles pures de matching et de résolution de conflit DOI (cascade `decide_publication_match`, attribution tardive `decide_doi_attribution`, conflit chapter/book `resolve_doi_conflict`).
 
 Note : ``domain/publication.py`` (singulier, à la racine de domain/)
 reste en place comme façade ré-exportant les VOs d'identifiants, et

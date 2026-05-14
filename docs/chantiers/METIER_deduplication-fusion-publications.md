@@ -86,13 +86,15 @@ Ferme le dernier item ouvert de Phase 4 du chantier `CODE_rich-domain-model`.
 
 ### Phase 4 — Factorisation des cascades de matching
 
-- [ ] Définir `DEDUPLICATION_KEYS` enum dans `domain/publications/deduplication.py`.
-- [ ] Définir `PublicationMatchDecision` (dataclass frozen) + `decide_publication_match(*, doi_match, nnt_match, ...)` dans `domain/publications/deduplication.py`.
+- [x] Définir `DeduplicationKey` enum dans `domain/publications/deduplication.py` (initialement `DOI`, `NNT`, `HAL_ID`). `MetadataDeduplicationCase` enum séparée pour les cas de dédup par métadonnées (initialement `THESIS_TITLE_YEAR`).
+- [x] Définir `PublicationMatchDecision` (dataclass frozen) + `decide_publication_match(*, doi_merge_with_id, nnt_match_id, hal_id_match_id, metadata_match)` dans `domain/publications/deduplication.py`. Cascade par défaut DOI > NNT > HAL_ID > metadata.
+- [x] Définir `DoiAttributionDecision` + `decide_doi_attribution(*, current_doi, proposed_doi, current_pub_id, existing_doi_match_id)` (tranche Q3 — voir « Décisions tranchées »).
+- [x] `try_merge_by_doi` migré en wrapper consommant `decide_doi_attribution`.
+- [x] Fonction `has_minimal_publication_metadata` déplacée de `deduplication.py` vers `metadata.py` (son rôle effectif est création, pas dédup ; héritage historique d'une cascade `DOI > NNT > title+year+journal` aujourd'hui retirée).
 - [ ] Migrer `application/publications.py:find_or_create` vers le décideur.
 - [ ] Migrer `application/pipeline/normalize/normalize_openalex.py:find_publication` (cascade HAL > NNT > openalex_id > title).
 - [ ] Migrer `application/pipeline/normalize/normalize_theses.py:find_publication` (cascade DOI/NNT puis title+author).
 - [ ] Migrer `application/pipeline/normalize/normalize_hal.py:process_work` (repointing). Décision dédiée `decide_hal_id_repointing(old_pub_id, new_pub_id)`.
-- [ ] Trancher Q3 sur `try_merge_by_doi`.
 
 ### Phase 5 — Cleanup
 
@@ -101,11 +103,13 @@ Ferme le dernier item ouvert de Phase 4 du chantier `CODE_rich-domain-model`.
 
 ## Questions ouvertes
 
-- **Q2 — `MergedPubFields` shape** : dataclass typé (frozen, slots) vs kwargs match du contrat actuel de `repo.update_aggregated`. Trade-off : typé/explicite vs minimal/zero-boilerplate. À trancher avant Phase 1.
-
-- **Q3 — `try_merge_by_doi` absorbé par `decide_doi_attribution` ?** Ou laissé comme is (mini-règle distincte du flow normal de cascade) ? À trancher avant la fin de Phase 4.
-
 - **Q4 — wrapper `application/publications.py:resolve_doi_conflict`** : devient-il redondant après la factorisation ? Pourrait disparaître si `decide_publication_match` retourne aussi les effets de bord à appliquer (style `RefreshResult`). À trancher en fin de Phase 4.
+
+## Décisions tranchées
+
+- **Q2 — shape de la fusion multi-sources** : pas de `MergedPubFields` séparé ; `Publication` étendue porte toutes les colonnes canoniques, et `merge_source_rows(pub, rows, *)` mute l'entité en place (Phase 1).
+
+- **Q3 — `try_merge_by_doi` absorbé par `decide_doi_attribution`** : OUI. Mini-règle pure en domain (3 branches : `noop` / `merge` / `attribute`), wrapper application qui prefetch les données et applique l'effet. Politique conservative préservée : si la pub a déjà un DOI quelconque, `noop` (pas de remplacement). Label `noop` unique (pas de distinction « même DOI » vs « DOI différent » — effet identique en base, label honnête côté audit).
 
 ## Liens
 

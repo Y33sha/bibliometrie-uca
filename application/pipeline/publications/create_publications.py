@@ -29,10 +29,9 @@ from application.publications import (
 from domain.normalize import normalize_text
 from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
-from domain.publications.deduplication import has_minimal_publication_metadata
 from domain.publications.doc_types import map_doc_type
 from domain.publications.identifiers import DOI
-from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
+from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT, has_minimal_publication_metadata
 from domain.publications.publication import Publication
 
 
