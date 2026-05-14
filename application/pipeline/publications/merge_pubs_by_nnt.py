@@ -41,18 +41,15 @@ def run_merge(
 
         for dup in duplicates:
             nnt = dup["nnt"]
-            pub_ids = dup["pub_ids"]
+            pub_ids = sorted(dup["pub_ids"])
             sources = dup["sources"]
 
-            ranked = queries.rank_publications_by_merge_priority(conn, pub_ids)
-            target = ranked[0]
-            to_merge = ranked[1:]
+            # Choix de cible trivial : l'id le plus bas survit. Les métadonnées canoniques sont triangulées par refresh_from_sources après chaque fusion (cf. SOURCE_PRIORITY), donc le choix de la cible n'a pas d'impact métier.
+            target_id = pub_ids[0]
+            to_merge = pub_ids[1:]
 
-            for source in to_merge:
-                label = (
-                    f"NNT={nnt} : pub {source['id']} → {target['id']}"
-                    f" (sources: {', '.join(sources)})"
-                )
+            for source_id in to_merge:
+                label = f"NNT={nnt} : pub {source_id} → {target_id} (sources: {', '.join(sources)})"
 
                 if dry_run:
                     logger.info(f"  [DRY] {label}")
@@ -61,8 +58,8 @@ def run_merge(
 
                 try:
                     with savepoint(conn, "merge_nnt"):
-                        _merge_pub(target["id"], source["id"], repo=pub_repo)
-                        refresh_from_sources(target["id"], repo=pub_repo)
+                        _merge_pub(target_id, source_id, repo=pub_repo)
+                        refresh_from_sources(target_id, repo=pub_repo)
                     logger.info(f"  [MERGE] {label}")
                     merged += 1
                 except Exception as e:
