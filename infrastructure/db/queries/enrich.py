@@ -6,6 +6,8 @@ des publications/revues à traiter par le script d'enrichissement.
 
 from sqlalchemy import Connection, text
 
+from application.ports.pipeline.enrich import EnrichQueries
+
 
 def fetch_publications_with_doi(
     conn: Connection, *, limit: int | None = None
@@ -71,7 +73,7 @@ def fetch_journals_needing_apc(
     return [(r.id, r.openalex_id) for r in rows]
 
 
-class PgEnrichQueries:
+class PgEnrichQueries(EnrichQueries):
     """Adapter PostgreSQL pour `application.ports.enrich.EnrichQueries`."""
 
     def fetch_publications_with_doi(

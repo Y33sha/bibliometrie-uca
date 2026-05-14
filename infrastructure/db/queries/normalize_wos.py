@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.normalize.wos import WosNormalizeQueries
 from domain.json_types import JsonValue
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
@@ -197,7 +198,7 @@ def insert_source_authorship_addresses_batch(
     )
 
 
-class PgWosNormalizeQueries:
+class PgWosNormalizeQueries(WosNormalizeQueries):
     """Adapter PostgreSQL pour `application.ports.normalize_wos.WosNormalizeQueries`."""
 
     def upsert_wos_source_publication(

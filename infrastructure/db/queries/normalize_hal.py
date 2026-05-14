@@ -13,6 +13,7 @@ Les identifiants personne (orcid/idhal/idref/hal_person_id) vivent sur
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.normalize.hal import HalNormalizeQueries
 from domain.json_types import JsonValue
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
@@ -209,7 +210,7 @@ def delete_hal_duplicate_authorships(conn: Connection) -> int:
     ).rowcount
 
 
-class PgHalNormalizeQueries:
+class PgHalNormalizeQueries(HalNormalizeQueries):
     """Adapter PostgreSQL pour `application.ports.normalize_hal.HalNormalizeQueries`."""
 
     def upsert_hal_source_publication(

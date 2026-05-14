@@ -11,12 +11,14 @@ from typing import Any
 
 from sqlalchemy import Connection, func, select, text, update
 
+from application.ports.api.config_queries import ConfigQueries
+from application.ports.config import ConfigStore
 from infrastructure.db.tables import config
 
 logger = logging.getLogger(__name__)
 
 
-class PgConfigQueries:
+class PgConfigQueries(ConfigQueries):
     """Adapter SA pour `application.ports.config_queries.ConfigQueries`."""
 
     def __init__(self, conn: Connection) -> None:
@@ -76,7 +78,7 @@ class PgConfigQueries:
         return {}
 
 
-class PgConfig:
+class PgConfig(ConfigStore):
     """Adapter SA pour `application.ports.config.ConfigStore`."""
 
     def __init__(self, conn: Connection) -> None:

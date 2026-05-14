@@ -9,20 +9,22 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.api.perimeters_queries import PerimetersAdminQueries
+from application.ports.pipeline.perimeter import PerimeterQueries
 from infrastructure.perimeter import (
     get_perimeter_structure_ids,
     get_persons_structure_ids_list,
 )
 
 
-class PgPerimeterQueries:
+class PgPerimeterQueries(PerimeterQueries):
     """Adapter PostgreSQL pour `application.ports.perimeter.PerimeterQueries`."""
 
     def get_persons_structure_ids_list(self, conn: Connection) -> list[int]:
         return get_persons_structure_ids_list(conn)
 
 
-class PgPerimetersAdminQueries:
+class PgPerimetersAdminQueries(PerimetersAdminQueries):
     """Adapter SA pour `application.ports.perimeters_queries.PerimetersAdminQueries`."""
 
     def __init__(self, conn: Connection) -> None:

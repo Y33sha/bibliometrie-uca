@@ -11,6 +11,8 @@ from typing import Any
 
 from sqlalchemy import Connection, Row, text
 
+from application.ports.pipeline.staging import StagingQueries
+
 
 def reset_processed_flag(conn: Connection, source: str) -> int:
     """Remet tous les `staging` de la source à `processed=FALSE`. Retourne rowcount."""
@@ -93,7 +95,7 @@ def mark_done(conn: Connection, staging_id: int) -> None:
     )
 
 
-class PgStagingQueries:
+class PgStagingQueries(StagingQueries):
     """Adapter PostgreSQL pour `application.ports.staging.StagingQueries`."""
 
     def reset_processed_flag(self, conn: Connection, source: str) -> int:

@@ -8,6 +8,7 @@ la lecture d'idempotence.
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.normalize.scanr import ScanrNormalizeQueries
 from domain.json_types import JsonValue
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
@@ -133,7 +134,7 @@ def upsert_scanr_source_authorship(
     return row.id
 
 
-class PgScanrNormalizeQueries:
+class PgScanrNormalizeQueries(ScanrNormalizeQueries):
     """Adapter PostgreSQL pour `application.ports.normalize_scanr.ScanrNormalizeQueries`."""
 
     def upsert_scanr_source_publication(

@@ -11,6 +11,9 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from application.ports.pipeline.publications_match_or_create import (
+    PublicationsMatchOrCreateQueries,
+)
 from domain.persons.name_matching import parse_raw_author_name
 
 
@@ -106,7 +109,7 @@ def fetch_thesis_primary_author_from_source_publication(
     return (last, first) if last else None
 
 
-class PgPublicationsMatchOrCreateQueries:
+class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.publications_match_or_create.PublicationsMatchOrCreateQueries`.
 
     Délègue `link_source_publication_to_publication` à

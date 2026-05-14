@@ -7,6 +7,8 @@ adresses résolues (`address_structures`) et les périmètres configurés.
 
 from sqlalchemy import Connection, text
 
+from application.ports.pipeline.affiliations import AffiliationsQueries
+
 # Filtre temporel daily : source_documents créés dans les dernières 24h.
 # Variante CTE (alias `sa2`) : utilisée dans les SELECT internes des CTE,
 # où le JOIN est syntaxiquement valide. Le pendant pour UPDATE direct
@@ -185,7 +187,7 @@ def count_source_authorships_stats(conn: Connection, source: str) -> tuple[int, 
     return total, uca, with_structs
 
 
-class PgAffiliationsQueries:
+class PgAffiliationsQueries(AffiliationsQueries):
     """Adapter PostgreSQL pour `application.ports.affiliations.AffiliationsQueries`."""
 
     def reset_source_authorships_for(self, conn: Connection, source: str) -> int:

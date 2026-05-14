@@ -18,6 +18,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.name_forms import NameFormsQueries
 from domain.persons.name_forms import PersonsDict
 
 
@@ -141,7 +142,7 @@ def delete_name_form(conn: Connection, form_id: int) -> None:
     )
 
 
-class PgNameFormsQueries:
+class PgNameFormsQueries(NameFormsQueries):
     """Adapter PostgreSQL pour `application.ports.name_forms.NameFormsQueries`."""
 
     def fetch_persons_names(self, conn: Connection) -> list[dict[str, Any]]:

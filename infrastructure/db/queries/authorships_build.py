@@ -7,6 +7,7 @@ Appelé par `application/pipeline/build/build_authorships.py`. Regroupe les
 
 from sqlalchemy import Connection, text
 
+from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
 from domain.sources import (
     SOURCE_PRIORITY,
     SOURCE_PRIORITY_IS_CORRESPONDING,
@@ -185,7 +186,7 @@ def count_authorships_in_perimeter(conn: Connection) -> int:
     ).scalar_one()
 
 
-class PgAuthorshipsBuildQueries:
+class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
     """Adapter PostgreSQL pour `application.ports.authorships_build.AuthorshipsBuildQueries`."""
 
     def insert_missing_authorships(self, conn: Connection) -> int:

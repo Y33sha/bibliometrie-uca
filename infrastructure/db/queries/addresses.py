@@ -1,14 +1,10 @@
 """Query services sync pour /api/addresses/* et /api/countries.
 
-Implémente le port `application.ports.addresses_queries.AddressesQueries`
-via `PgAddressesQueries` (constructor injection de la Connection SA sync).
-Conformité au port assurée par duck typing : l'adapter ne fait pas
-`class PgX(AddressesQueries):` ; la vérification structurale par mypy a
-lieu au point de composition root.
-
-Les dataclasses de filtres (`AddressListFilters`, `AddressCountriesFilters`)
-sont importées depuis le port pour typer les signatures (cf. règle 3
-d'`architecture.md`).
+`PgAddressesQueries` hérite explicitement du Protocol
+`application.ports.addresses_queries.AddressesQueries` : mypy vérifie
+la conformité à la définition de classe. Les dataclasses de filtres
+(`AddressListFilters`, `AddressCountriesFilters`) sont importées du
+port pour typer les signatures (cf. règle 3 d'`architecture.md`).
 """
 
 from typing import Any
@@ -17,11 +13,12 @@ from sqlalchemy import Connection, text
 
 from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
+    AddressesQueries,
     AddressListFilters,
 )
 
 
-class PgAddressesQueries:
+class PgAddressesQueries(AddressesQueries):
     """Adapter SA sync pour `application.ports.addresses_queries.AddressesQueries`."""
 
     def __init__(self, conn: Connection) -> None:

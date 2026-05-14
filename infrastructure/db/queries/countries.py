@@ -21,6 +21,8 @@ Fonctions module-level pour compat avec le code existant ;
 
 from sqlalchemy import Connection, text
 
+from application.ports.pipeline.countries import CountryQueries
+
 
 def refresh_sa_countries_for_source(conn: Connection, source: str) -> int:
     """Recalcule `source_authorships.countries` pour les sa d'une source donnée.
@@ -212,7 +214,7 @@ def suggest_addresses_countries_batch(
     return n_processed, n_with_suggestion
 
 
-class PgCountryQueries:
+class PgCountryQueries(CountryQueries):
     """Adapter PostgreSQL implémentant `application.ports.countries.CountryQueries`."""
 
     def refresh_sa_countries_for_source(self, conn: Connection, source: str) -> int:

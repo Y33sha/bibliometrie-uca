@@ -8,6 +8,7 @@ ainsi que les lectures d'idempotence et les déduplications Zenodo.
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.normalize.openalex import OpenalexNormalizeQueries
 from domain.json_types import JsonValue
 from infrastructure.db.queries.source_authorships import (
     clear_source_authorships_for_publication,
@@ -170,7 +171,7 @@ def count_openalex_table(conn: Connection, table: str) -> int:
     ).scalar_one()
 
 
-class PgOpenalexNormalizeQueries:
+class PgOpenalexNormalizeQueries(OpenalexNormalizeQueries):
     """Adapter PostgreSQL pour `application.ports.normalize_openalex.OpenalexNormalizeQueries`."""
 
     def upsert_openalex_source_publication(

@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection, select, text
 
+from application.ports.api.journals_queries import JournalQueries
 from infrastructure.db.tables import journals as t_journals
 
 _SORT_MAP = {
@@ -16,7 +17,7 @@ _SORT_MAP = {
 }
 
 
-class PgJournalQueries:
+class PgJournalQueries(JournalQueries):
     """Adapter SA pour `application.ports.journals_queries.JournalQueries`."""
 
     def __init__(self, conn: Connection) -> None:

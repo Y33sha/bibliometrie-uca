@@ -1,13 +1,14 @@
 """Query services pour /api/admin/duplicates/*.
 
-Implémente le port `application.ports.publication_duplicates_queries.
-PublicationDuplicatesQueries` via `PgPublicationDuplicatesQueries`
-(duck typing — pas d'import depuis `application/`).
+`PgPublicationDuplicatesQueries` hérite explicitement du Protocol
+`application.ports.publication_duplicates_queries.PublicationDuplicatesQueries`.
 """
 
 from typing import Any
 
 from sqlalchemy import Connection, text
+
+from application.ports.api.publication_duplicates_queries import PublicationDuplicatesQueries
 
 # `:min_title_len` apparaît une seule fois dans la sous-requête SELECT
 # qui est utilisée 2× : une fois pour COUNT, une fois pour LIMIT/OFFSET.
@@ -34,7 +35,7 @@ _PUB_CANDIDATE_WHERE = """
 """
 
 
-class PgPublicationDuplicatesQueries:
+class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
     """Adapter SA pour `PublicationDuplicatesQueries`."""
 
     def __init__(self, conn: Connection) -> None:
