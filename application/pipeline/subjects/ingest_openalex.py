@@ -17,11 +17,10 @@ topic) en parent_id chaîné. Le score du topic est appliqué uniquement au topi
 feuille ; les niveaux supérieurs sont liés sans score.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
+from domain.json_types import JsonValue
 from domain.subjects.subject import ONTOLOGY_OPENALEX_TOPIC
 
 SOURCE = "openalex"
@@ -36,7 +35,7 @@ def ingest(
     *,
     publication_id: int,
     keywords: list[str] | None,
-    topics: Any,
+    topics: JsonValue,
     cache: SubjectCache,
 ) -> int:
     """Ingère keywords (libres EN) et topics hiérarchiques.
@@ -58,7 +57,7 @@ def _collect_topic_chain(
     conn: Connection,
     cache: SubjectCache,
     publication_id: int,
-    entry: Any,
+    entry: JsonValue,
     links: list[tuple[int, int, float | None]],
 ) -> None:
     """Construit/upsert chaque niveau et collecte les liens à insérer.
@@ -83,7 +82,7 @@ def _collect_topic_chain(
     parent_label: str | None = None
     deepest_idx = levels_present[-1][2]
     for _name, label, idx in levels_present:
-        ontology_entry: dict[str, Any] = {
+        ontology_entry: dict[str, JsonValue] = {
             "codes": [label.lower()],
             "level": idx,
         }

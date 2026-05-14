@@ -7,11 +7,10 @@ Source format (cf normalize_crossref.py:140-146) :
 - `topics`   : pas extrait par CrossRef en l'état (cf. docs/chantiers/sujets-mots-cles.md).
 """
 
-from typing import Any
-
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
+from domain.json_types import JsonValue
 
 SOURCE = "crossref"
 
@@ -21,7 +20,7 @@ def ingest(
     *,
     publication_id: int,
     keywords: list[str] | None,
-    topics: Any,  # noqa: ARG001 — non exploité côté CrossRef (cf. docs/chantiers/sujets-mots-cles.md)
+    topics: JsonValue,  # noqa: ARG001 — non exploité côté CrossRef (cf. docs/chantiers/sujets-mots-cles.md)
     cache: SubjectCache,
 ) -> int:
     links: list[tuple[int, int, float | None]] = []

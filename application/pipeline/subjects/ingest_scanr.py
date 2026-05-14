@@ -7,11 +7,10 @@ Source format (cf normalize_scanr.py:176-190) :
   structure dict avec clés `domains` / `topics`. On ignore le reste.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
+from domain.json_types import JsonValue
 from domain.subjects.subject import ONTOLOGY_SCANR_DOMAIN
 
 SOURCE = "scanr"
@@ -22,7 +21,7 @@ def ingest(
     *,
     publication_id: int,
     keywords: list[str] | None,
-    topics: Any,
+    topics: JsonValue,
     cache: SubjectCache,
 ) -> int:
     links: list[tuple[int, int, float | None]] = []
@@ -42,7 +41,7 @@ def ingest(
     return cache.link_bulk(conn, source=SOURCE, rows=links)
 
 
-def _extract_domain_labels(topics: Any) -> list[str]:
+def _extract_domain_labels(topics: JsonValue) -> list[str]:
     """Extrait des libellés de domaine depuis la structure libre `topics`."""
     if isinstance(topics, list):
         return dedup_strs(topics)

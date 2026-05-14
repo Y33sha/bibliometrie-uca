@@ -7,11 +7,10 @@ Source format (cf normalize_wos.py:317-339) :
   `lower(label)` comme `ontology_id`.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
+from domain.json_types import JsonValue
 from domain.subjects.subject import ONTOLOGY_WOS_HEADING, ONTOLOGY_WOS_SUBJECT
 
 SOURCE = "wos"
@@ -22,7 +21,7 @@ def ingest(
     *,
     publication_id: int,
     keywords: list[str] | None,
-    topics: Any,
+    topics: JsonValue,
     cache: SubjectCache,
 ) -> int:
     links: list[tuple[int, int, float | None]] = []
