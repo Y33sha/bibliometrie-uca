@@ -60,3 +60,9 @@ class TestCanMergeWith:
         b = _make_person(id=2)
         with pytest.raises(ConflictError, match="fiche RH"):
             a.can_merge_with(b, has_distinct_rh=True)
+
+    def test_error_message_contains_both_ids(self):
+        a = _make_person(id=42)
+        b = _make_person(id=17)
+        with pytest.raises(ConflictError, match="#42.*#17"):
+            a.can_merge_with(b, has_distinct_rh=True)
