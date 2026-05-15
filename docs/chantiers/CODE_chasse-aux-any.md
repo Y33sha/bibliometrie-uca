@@ -1,6 +1,7 @@
 # Chantier — Chasse aux `Any`
 
-Commencé le 2026-05-10.
+Commencé le 2026-05-10
+Terminé le 2026-05-15
 
 ## Contexte
 
@@ -125,18 +126,13 @@ Périmètres identifiés :
 
 ## Hors scope (chantiers de suite)
 
-- **Renommage de variables historiques** : `cur` → `conn` partout
-  (notamment dans les `process_work` des normalizers, les helpers
-  qui ont gardé le nommage psycopg). Volontairement reporté à un
-  chantier dédié pour ne pas mélanger « typer » et « renommer » dans
-  les mêmes commits. État intermédiaire actuel : `cur: Connection`,
-  techniquement correct mais visuellement bancal.
 - **DTOs application-level pour les query services** : alternative
   plus stricte à l'option A retenue (les handlers instancient le
   `BaseModel` du `response_model` au retour). Les query services
   retourneraient directement des types forts, supprimant les
-  `dict[str, Any]` côté infra. Demande un déplacement des modèles
-  hors `interfaces/api/`. Pas instruit ici.
+  `dict[str, Any]` côté infra. Principalement architectural
+  (déplacement des modèles Pydantic hors `interfaces/api/`),
+  pas vraiment du typage — chantier dédié si on veut le faire.
 - **Typage strict des projections** (`Row[Any]`, batchs SQL
   hétérogènes, records DB hydratés) : voir
   `CODE_typage-projections-strict.md`.
