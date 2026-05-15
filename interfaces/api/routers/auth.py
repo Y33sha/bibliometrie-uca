@@ -3,14 +3,14 @@
 import logging
 import time
 
-from fastapi import APIRouter, Cookie, Response
+from fastapi import APIRouter, Cookie, Depends, Response
 
-from infrastructure.settings import settings
 from interfaces.api.deps import (
     SESSION_MAX_AGE,
     _check_password,
     _sign_token,
     _verify_token,
+    get_admin_user,
 )
 from interfaces.api.models import AuthCheckResponse, LoginRequest, OkResponse
 
@@ -19,7 +19,11 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/api/auth/login", response_model=OkResponse)
-def auth_login(data: LoginRequest, response: Response) -> OkResponse:
+def auth_login(
+    data: LoginRequest,
+    response: Response,
+    admin_user: str = Depends(get_admin_user),
+) -> OkResponse:
     """Authentifie l'admin et pose un cookie de session signé.
 
     Renvoie 401 si les identifiants ne correspondent pas à ceux
@@ -30,9 +34,9 @@ def auth_login(data: LoginRequest, response: Response) -> OkResponse:
     """
     from fastapi import HTTPException
 
-    if data.username != settings.admin_user or not _check_password(data.password):
+    if data.username != admin_user or not _check_password(data.password):
         raise HTTPException(status_code=401, detail="Identifiants incorrects")
-    payload = f"{settings.admin_user}|{int(time.time())}"
+    payload = f"{admin_user}|{int(time.time())}"
     token = _sign_token(payload)
     response.set_cookie(
         key="session",

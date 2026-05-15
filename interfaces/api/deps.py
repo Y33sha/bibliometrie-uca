@@ -125,6 +125,16 @@ def _check_password(password: str) -> bool:
     return bcrypt.checkpw(password.encode(), settings.admin_hash.encode())
 
 
+def get_admin_user() -> str:
+    """Username admin attendu (depuis `infrastructure.settings`).
+
+    Exposé en `Depends(...)` pour que les routers n'importent pas
+    `infrastructure.settings` directement (cf. règle 4 de
+    `docs/architecture.md`).
+    """
+    return settings.admin_user
+
+
 def require_admin(session: str | None = Cookie(None, alias="session")) -> None:
     """Dépendance FastAPI : vérifie que l'utilisateur est authentifié."""
     if not session or not _verify_token(session):
