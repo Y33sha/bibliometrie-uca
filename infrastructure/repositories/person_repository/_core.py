@@ -5,12 +5,71 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.errors import NotFoundError
 from domain.normalize import normalize_name
+from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import (
+    PersonNameForm,
     compute_person_name_forms,
     merge,
     remove_person,
 )
+from domain.persons.person import Person
+from domain.persons.person_identifier import PersonIdentifier
 from infrastructure.repositories.person_repository import _name_forms
+
+
+def find_by_id(conn: Connection, person_id: int) -> Person | None:
+    """Charge l'aggregate `Person` complet (avec `identifiers` et `name_forms`) ou `None` si la personne n'existe pas.
+
+    Les `identifiers` (`PersonIdentifier`) et `name_forms` (`PersonNameForm`) sont hydratés en projection lecture : ils accompagnent l'aggregate mais leurs mutations passent par leurs propres méthodes / repos respectifs (cf. docstring de `domain/persons/person.py`).
+    """
+    row = conn.execute(
+        text("""
+            SELECT id, last_name, first_name,
+                   last_name_normalized, first_name_normalized, rejected
+            FROM persons WHERE id = :id
+        """),
+        {"id": person_id},
+    ).first()
+    if row is None:
+        return None
+
+    id_rows = conn.execute(
+        text("""
+            SELECT id, person_id, id_type, id_value, source,
+                   CAST(status AS text) AS status
+            FROM person_identifiers
+            WHERE person_id = :pid
+        """),
+        {"pid": person_id},
+    ).all()
+    identifiers = tuple(
+        PersonIdentifier(
+            id=r.id,
+            person_id=r.person_id,
+            id_type=r.id_type,
+            id_value=r.id_value,
+            status=AttributionStatus(r.status),
+            source=r.source,
+        )
+        for r in id_rows
+    )
+
+    nf_rows = conn.execute(
+        text("SELECT name_form FROM person_name_forms WHERE persons ? :pid"),
+        {"pid": str(person_id)},
+    ).all()
+    name_forms = tuple(PersonNameForm(value=r.name_form) for r in nf_rows)
+
+    return Person(
+        id=row.id,
+        last_name=row.last_name,
+        first_name=row.first_name,
+        last_name_normalized=row.last_name_normalized,
+        first_name_normalized=row.first_name_normalized,
+        rejected=row.rejected,
+        identifiers=identifiers,
+        name_forms=name_forms,
+    )
 
 
 def create(conn: Connection, last_name: str, first_name: str = "") -> int:
