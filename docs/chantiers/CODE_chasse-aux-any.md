@@ -92,7 +92,9 @@ Patterns dominants :
 
 #### Phase 2.5 — `tests/`
 
-- [ ] Signatures alignées sur les fonctions testées.
+- [x] Signatures alignées sur les fonctions testées. Périmètre minimal — la majorité des `Any` testés viennent de `MagicMock()` (tolérés par décision 4) ou de fakes manuels (`_FakeQueries`, `_SpyNormalizer`). Modifications :
+  - `tests/unit/application/test_merge_pubs_by_hal_id.py` : `_FakeQueries.fetch_*(conn: object)` (argument non utilisé, convention « marqueur sans contrat » alignée sur `interfaces/cli/`).
+  - `tests/integration/pipeline/test_normalize_on_error_hook.py` : `_SpyNormalizer.__init__` garde `Any` pour `conn/logger/staging_queries` (MagicMock tolérés, justification posée en commentaire) ; `process_work` annoté `# type: ignore[override]` au lieu de typer strict via `MagicMock(spec=...)` au call site.
 
 #### Phase 2.6 — Généraliser `JsonValue` aux frontières JSON
 
@@ -108,6 +110,11 @@ Périmètres identifiés :
 
 ### Phase 3 — Verrouillage
 
+- [ ] **Revue pré-verrouillage** : re-passer tous les modules pour
+  réexaminer les `Any` subsistants (vraiment justifiés ?) et inclure
+  les `dict[str, Any]` / `list[Any]` (hors du pattern strict
+  `: Any | -> Any` mais comptent quand même). Action manuelle module
+  par module avant d'activer les overrides.
 - [ ] `[[tool.mypy.overrides]]` par module au fil du nettoyage :
   `disallow_any_explicit = true` activé module par module dans
   `pyproject.toml` (un commit par bascule).

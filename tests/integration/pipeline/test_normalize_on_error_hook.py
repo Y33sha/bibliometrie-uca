@@ -21,6 +21,9 @@ class _SpyNormalizer(SourceNormalizer):
 
     SOURCE = "spy"
 
+    # `Any` toléré ici (cf. décision 4 du chantier `CODE_chasse-aux-any`) :
+    # les tests passent `MagicMock()` pour conn / logger / staging_queries
+    # — typer strictement obligerait à `MagicMock(spec=Connection)` partout.
     def __init__(
         self,
         conn: Any,
@@ -37,7 +40,7 @@ class _SpyNormalizer(SourceNormalizer):
         self.on_error_calls = 0
         self.processed_ids: list[int] = []
 
-    def process_work(self, conn: Any, row: Any) -> bool | None:
+    def process_work(self, conn: Any, row: Any) -> bool | None:  # type: ignore[override]
         self.processed_ids.append(row["id"])
         if row["id"] in self._error_on_ids:
             raise RuntimeError(f"boom on {row['id']}")
