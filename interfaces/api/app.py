@@ -16,7 +16,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,6 +34,7 @@ from domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
+from domain.json_types import JsonValue
 from infrastructure.db.engine import (
     build_sync_engine,
     get_sync_engine,
@@ -238,7 +239,7 @@ _PIPELINE_STATUS_FILE = Path(__file__).resolve().parent.parent.parent / "logs" /
 
 
 @app.get("/api/health", response_model=None)
-def health() -> JSONResponse | dict[str, Any]:
+def health() -> JSONResponse | dict[str, JsonValue]:
     """Vérifie que l'API est opérationnelle, la DB accessible, et la fraîcheur
     des données (date de la dernière extraction par source).
     """
@@ -258,7 +259,7 @@ def health() -> JSONResponse | dict[str, Any]:
 
     now = datetime.now(timezone.utc)
     threshold = now - timedelta(days=_STALE_THRESHOLD_DAYS)
-    last_extraction: dict[str, dict[str, Any]] = {}
+    last_extraction: dict[str, dict[str, JsonValue]] = {}
     stale: list[str] = []
     for r in rows:
         source = r.source
@@ -287,7 +288,7 @@ def health() -> JSONResponse | dict[str, Any]:
 
 
 @app.get("/api/metrics")
-def metrics() -> dict[str, Any]:
+def metrics() -> dict[str, JsonValue]:
     """Métriques internes : état du pool de connexions SQLAlchemy.
 
     Le timing des requêtes est émis via le middleware `timing_middleware`
