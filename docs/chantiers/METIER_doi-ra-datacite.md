@@ -55,7 +55,6 @@ Ce chantier traite les deux faces du problème : **savoir** d'où vient chaque D
   - **`publisher_id` nullable** : peut rester NULL pour les préfixes DataCite (pas d'équivalent éditeur académique pour Zenodo, figshare, etc.) ou les Crossref dont le `name` ne matche pas une row `publishers` existante.
 - **`publishers.doi_prefix` (à supprimer)** : colonne devenue redondante avec `doi_prefixes`. Retrait après migration des données existantes.
 - **`source_type` enum (modif)** : ajout de `'datacite'`.
-- **Pas de nouvelle table pour DataCite** : `source_publications` / `source_authorships` / `source_persons` accueillent les rows avec `source='datacite'`, sur le modèle CrossRef (cf. chantier crossref.md).
 
 ### Code
 
@@ -115,7 +114,7 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
 - [ ] Client API DataCite + adapter `fetch_missing_doi` (extends `AsyncFetchMissingDoiAdapter`), rate limits prudents.
 - [ ] Filtre `get_cross_import_dois("datacite")` : `ra = 'DataCite'` via JOIN sur `doi_prefixes`.
 - [ ] Wiring dans `run_pipeline.py` (cible datacite dans `fetch_missing_doi`).
-- [ ] Normalizer DataCite (ports + queries + orchestrator + CLI), alimente `source_publications` / `source_authorships` / `source_persons`.
+- [ ] Normalizer DataCite (ports + queries + orchestrator + CLI), alimente `source_publications` / `source_authorships`.
 - [ ] Tests d'intégration.
 - **Livrable** : `source_publications` peuplée pour les DOIs DataCite, accessible via le pipeline normal.
 
@@ -154,7 +153,6 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
 - **Couverture DataCite UCA inconnue avant spike**. Si l'apport métadonnées s'avère négligeable (la plupart des DOIs DataCite sont déjà dans HAL avec métadonnées équivalentes), la phase 2 peut être abandonnée et seul le filtre CrossRef sera retenu — gain immédiat sans coût.
 - **Rate limits doi.org/ra** non documentés explicitement. À mesurer en phase 0. Volume négligeable de toute façon (un appel par nouveau préfixe).
 - **Évolutivité du mapping doc_types DataCite** : `resourceTypeGeneral` est une enum officielle stable, mais `resourceType` libre (texte) côté éditeur. Privilégier le general, fallback sur le libre.
-- **Compatibilité avec le chantier `source-persons` (en cours)** : DataCite n'a pas d'identifiant auteur stable côté creator → cas équivalent à OpenAlex/WoS, source synthétisée non écrite dans `source_persons` (cf. décision 2026-04-28).
 - **Préfixe nouveau pendant un run** : si un nouveau préfixe DOI apparaît entre la phase `resolve_doi_prefixes` et `fetch_missing_doi`, il sera traité avec `ra IS NULL` (best-effort, on tente CrossRef). Une seconde passe le résoudra. Acceptable.
 - **Migration `publishers.doi_prefix` → `doi_prefixes`** : couverture des données existantes incomplète si la colonne n'a pas été remplie systématiquement (la user indique qu'elle n'avait pas commencé). Migration ne portera que sur les rows non-NULL.
 
@@ -165,4 +163,3 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
 - DataCite REST API : <https://support.datacite.org/docs/api>
 - DataCite metadata schema : <https://schema.datacite.org/>
 - chantier crossref : `docs/chantiers/crossref.md` (architecture jumelle)
-- chantier source-persons : `docs/chantiers/2026-04-28_source-persons.md` (impact sur DataCite côté `source_persons`)
