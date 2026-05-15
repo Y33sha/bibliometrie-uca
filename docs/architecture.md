@@ -47,12 +47,10 @@ neutre dont dépendent tous les autres modules.
    millisecondes.
 
 2. **Les ports sont une zone neutre.** `application/ports/*` ne
-   contient que des Protocol, pas d'implémentation. Tous les autres
-   modules dépendent d'eux ; eux ne dépendent de personne (sauf de
-   `domain/` pour les types métier). L'arborescence interne sert à
-   grouper visuellement (`repositories/` pour les agrégats, `api/` /
-   `pipeline/` pour les query services), pas à porter des règles
-   d'import distinctes.
+   contient que des `Protocol`, pas d'implémentation. L'arborescence
+   interne (`repositories/` pour les agrégats, `api/` / `pipeline/`
+   pour les query services) sert à grouper visuellement, pas à porter
+   des règles d'import distinctes.
 
 3. **Use-cases indépendants des adapters sortants.** `application/`
    ne peut pas importer `infrastructure/`. Les services applicatifs
@@ -62,19 +60,13 @@ neutre dont dépendent tous les autres modules.
    par `import-linter` (contrat `layered` dans `pyproject.toml`).
 
 4. **Routers ⊥ adapters sortants.** Les routers FastAPI
-   (`interfaces/api/routers/*`) **ne doivent pas** importer
-   `infrastructure/` directement. Ils pilotent des use-cases
-   applicatifs et reçoivent leurs dépendances via `Depends(...)`
-   (factories dans `interfaces.api.deps`) ; ils ne les construisent
-   pas. Verrouillé par le contrat `import-linter` "Routers : pas
-   d'import direct de infrastructure". Deux exceptions documentées :
-   `admin_pipeline.py` appelle `infrastructure.pipeline_status`
-   (status filesystem ; sera revu dans le chantier observabilité
-   pipeline), `docs.py` utilise `infrastructure.PROJECT_ROOT`
-   (chemin projet ; sera revu lors de la refonte de l'affichage
-   doc) — aucune ne touche à la DB. Les scripts CLI ne sont pas
-   concernés par cette règle : ils sont des composition roots
-   (cf. règle 5).
+   (`interfaces/api/routers/*`) reçoivent leurs dépendances via
+   `Depends(...)` (factories dans `interfaces.api.deps`) ; ils
+   n'instancient pas eux-mêmes les `Pg*` concrets. Verrouillé par un
+   contrat `import-linter`. Les exceptions assumées (deux modules qui
+   importent un utilitaire non-DB) sont déclarées dans le
+   `pyproject.toml`, pas ici. Les scripts CLI ne sont pas concernés :
+   ils sont leur propre composition root (cf. règle 5).
 
 5. **Le composition root est un endroit précis.** L'instanciation
    concrète des adapters et leur câblage aux use-cases se fait
