@@ -23,7 +23,7 @@ Le chantier vise à exploiter CrossRef sur **trois axes complémentaires**, sans
 
 ### Inclus
 
-- Ingestion CrossRef DOI-driven dans les tables `source_*` existantes (`source_publications` / `source_authorships` / `source_persons`) avec `source='crossref'`, à partir des DOI déjà connus dans les autres sources.
+- Ingestion CrossRef DOI-driven dans les tables `source_*` existantes (`source_publications` / `source_authorships`) avec `source='crossref'`, à partir des DOI déjà connus dans les autres sources.
 - Discovery secondaire driven-by-ORCID : interrogation par ORCID confirmé pour identifier d'éventuelles publis ratées par les autres sources. **Conditionnée à un travail exploratoire** (cf. phase 4) : abandonnée si le gain s'avère nul.
 - Insertion de `crossref` dans `SOURCE_PRIORITY` (2ᵉ position) → arbitrage automatique de toutes les métadonnées canoniques via `refresh_from_sources` existant.
 - Mapping de la taxonomie `doc_type` CrossRef vers l'enum canonique dans `domain/doc_types.py`.
@@ -45,7 +45,6 @@ CrossRef s'intègre dans l'architecture source-agnostique existante en tant que 
 
 - **`source_publications`** (existante) : insertion avec `source = 'crossref'`, `source_id = doi`. Les champs canoniques sont mappés directement (`doi`, `title`, `pub_year`, `doc_type`, `language`, `container_title`, `cited_by_count`, `oa_status`, `is_retracted`, `keywords`, `journal_id`, `external_ids`). Les spécificités CrossRef (license, funders, dates multiples issued/online/print, indexed-date pour l'idempotence) vont dans `meta jsonb`. La référence ISSN va dans `external_ids` ou `biblio` selon la convention en vigueur (à vérifier sur les autres extracteurs).
 - **`source_authorships`** (existante) : un row par auteur de la publi CrossRef, `source = 'crossref'`. Les chaînes d'affiliation brutes (déjà connues comme génériques/tronquées côté CrossRef) vont dans `source_data jsonb`. **À noter** : pas de `source_authorship_addresses` à alimenter pour CrossRef puisque les affiliations sont des chaînes plates sans adresse exploitable.
-- **`source_persons`** : pas d'écriture CrossRef (pas d'identifiant auteur stable côté CrossRef). L'ORCID éventuel vit sur `source_authorships.identifiers`.
 - **`publication_relations`** (**à créer**) : `from_publication_id`, `to_publication_id` (ou DOI si la publi cible n'est pas connue), `relation_type` (preprint, version, translation, has-dataset…), `source` (crossref pour l'instant, extensible). C'est le seul vrai ajout de table — cross-source dès le départ pour ne pas refaire la migration plus tard.
 
 ### Code

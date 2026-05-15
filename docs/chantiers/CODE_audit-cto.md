@@ -320,7 +320,7 @@ généralisé, background tasks).
   `merge_pubs_by_nnt.py`. Les 7 `cur.execute("SAVEPOINT ...")` /
   RELEASE / ROLLBACK inline ont disparu. Helper côté application
   (pas infrastructure) pour respecter `application ⊥ infrastructure`.
-- [ ] **Chasser les `Any`** — chantier dédié à créer. `cur: Any`,
+- [x] **Chasser les `Any`** — chantier dédié à créer. `cur: Any`,
   `**kw: Any`, `-> Any` neutralisent mypy strict sur ~40-50 fichiers
   applicatifs. Touche : couches application + infrastructure +
   interfaces. Nécessite un alias `Cursor`/`AsyncCursor` central et

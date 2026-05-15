@@ -7,6 +7,7 @@
 Le système intègre 6 sources bibliographiques principales, complétées par des imports manuels et des APIs d'enrichissement.
 
 > TODO: Documenter les credentials necessaires pour l'interrogation des API et comment se les procurer
+
 > TODO: Documenter les modes d'interrogation possibles pour chaque source, celles qui sont utilisées ou non et pourquoi (par affiliation, par identifiant personne, par identifiant document)
 
 | Source | Type | Couverture | API | Credentials |
@@ -39,9 +40,9 @@ La résolution des affiliations se fait pendant la phase `affiliations` du pipel
 
 #### <span id='entites-auteurs'></span>Nature des entités auteurs
 
-Certaines sources (OpenAlex, WOS, HAL) possèdent leurs propres référentiels de personnes avec leurs propres identifiants internes, parfois associés à d'autres identifiants (ORCID sur la plupart des sources; IdRef et idHAL sur HAL). Les sources liées au MESRE (ScanR, theses.fr) s'appuient sur le référentiel personnes de l'ESR (IdRef).
+Certaines sources (OpenAlex, WOS, HAL) possèdent leurs propres référentiels de personnes avec leurs propres identifiants internes, parfois reliés à d'autres identifiants (ORCID sur la plupart des sources; IdRef et idHAL sur HAL). Les sources liées au MESRE (ScanR, theses.fr) s'appuient sur le référentiel personnes de l'ESR (IdRef).
 
-Vu l'hétérogénéité des sources, il a été décidé de ne pas maintenir de table `source_persons`. Les informations récupérées depuis les sources (forme de nom, identifiants éventuels) sont portées par `source_authorships` (`source_identifiers` JSONB, `raw_author_name` pour traçabilité, `author_name_normalized` pour matching par nom). La déduplication / création des personnes canoniques se fait dans la phase `persons` du pipeline, à partir de ces éléments.
+Vu l'hétérogénéité des entités personnes selon les sources, il a été décidé de ne pas maintenir de table `source_persons`. Les informations récupérées depuis les sources (forme de nom, identifiants éventuels) sont portées par `source_authorships` (`raw_author_name` pour traçabilité, `author_name_normalized` pour matching par nom, `source_identifiers` JSONB pour les identifiants persistants associés (ORCID, IdRef, idHAL)). La déduplication / création des personnes canoniques se fait dans la phase `persons` du pipeline, à partir de ces éléments.
 
 | Source | Identifiant auteur | Entité stable ? | Identifiants récupérés si présents |
 |---|---|---|---|

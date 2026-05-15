@@ -102,7 +102,7 @@ flowchart LR
     F-->|populate_affiliations|A
     classDef new  fill:#bbf
     classDef valid  fill:#af5
-    class A,F new;
+    class F new;
     class D,E valid;
 ```
 
@@ -117,7 +117,7 @@ Deux périmètres :
 
 Périmètre centralisé dans `infrastructure/perimeter.py` (port : `application/ports/perimeter.py`).
 
-> **TODO :** documenter la logique de `resolve_addresses`.
+> **TODO :** documenter plus précisément la logique de `resolve_addresses`.
 
 
 ### <span id="publications"></span>`publications` : Peuplement de la table Publications
@@ -258,7 +258,7 @@ flowchart LR
     class F valid;
 ```
 
-2. La phase [`publications`](#publications) peuple la table **publications** à partir des publications sources, en s'appuyant sur les rattachements DOI/NNT/HAL-ID déjà posés par la phase [`normalize`](#normalize).
+2. La phase [`publications`](#publications) peuple la table **publications** à partir des publications sources.
 
 ```mermaid
 flowchart LR
