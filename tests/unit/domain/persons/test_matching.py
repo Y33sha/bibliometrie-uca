@@ -2,9 +2,11 @@
 
 from domain.persons.matching import (
     NameFormDecision,
+    PersonMatchDecision,
     decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
+    decide_person_match,
 )
 
 
@@ -170,3 +172,85 @@ class TestDecideMatchByIdentifier:
         """La fonction est générique : même contrat pour IdRef et ORCID."""
         orcid_map = {"0000-0001-2345-6789": 7}
         assert decide_match_by_identifier("0000-0001-2345-6789", orcid_map) == 7
+
+
+class TestDecidePersonMatch:
+    """Cascade unifiée : ordre cross_source > idref > orcid > name_form."""
+
+    def _skip(self) -> NameFormDecision:
+        return NameFormDecision(action="skip", reason="ambiguous_name_form")
+
+    def test_cross_source_wins_over_everything(self):
+        decision = decide_person_match(
+            cross_source_match=42,
+            idref_match=17,
+            orcid_match=99,
+            name_form_outcome=NameFormDecision(action="match", person_id=7),
+        )
+        assert decision == PersonMatchDecision(action="match", person_id=42, reason="cross_source")
+
+    def test_idref_wins_when_no_cross_source(self):
+        decision = decide_person_match(
+            cross_source_match=None,
+            idref_match=17,
+            orcid_match=99,
+            name_form_outcome=NameFormDecision(action="match", person_id=7),
+        )
+        assert decision == PersonMatchDecision(action="match", person_id=17, reason="idref")
+
+    def test_orcid_wins_when_no_cross_source_no_idref(self):
+        decision = decide_person_match(
+            cross_source_match=None,
+            idref_match=None,
+            orcid_match=99,
+            name_form_outcome=NameFormDecision(action="match", person_id=7),
+        )
+        assert decision == PersonMatchDecision(action="match", person_id=99, reason="orcid")
+
+    def test_name_form_match_when_no_identifier_match(self):
+        decision = decide_person_match(
+            cross_source_match=None,
+            idref_match=None,
+            orcid_match=None,
+            name_form_outcome=NameFormDecision(action="match", person_id=7),
+        )
+        assert decision == PersonMatchDecision(action="match", person_id=7, reason="single_name")
+
+    def test_name_form_create_when_no_match(self):
+        decision = decide_person_match(
+            cross_source_match=None,
+            idref_match=None,
+            orcid_match=None,
+            name_form_outcome=NameFormDecision(action="create"),
+        )
+        assert decision == PersonMatchDecision(action="create", reason="new")
+
+    def test_name_form_skip_ambiguous_propagates(self):
+        decision = decide_person_match(
+            cross_source_match=None,
+            idref_match=None,
+            orcid_match=None,
+            name_form_outcome=self._skip(),
+        )
+        assert decision == PersonMatchDecision(action="skip", reason="ambiguous_name_form")
+
+    def test_name_form_skip_creation_not_allowed_propagates(self):
+        """Rôle non-auteur d'une thèse : pas de création, pas de match."""
+        decision = decide_person_match(
+            cross_source_match=None,
+            idref_match=None,
+            orcid_match=None,
+            name_form_outcome=NameFormDecision(action="skip", reason="creation_not_allowed"),
+        )
+        assert decision == PersonMatchDecision(action="skip", reason="creation_not_allowed")
+
+    def test_identifier_match_short_circuits_name_form_skip(self):
+        """Un identifier match prend le pas sur un skip name_form
+        (ambiguïté ou create interdit) — l'identifier est plus fiable."""
+        decision = decide_person_match(
+            cross_source_match=None,
+            idref_match=17,
+            orcid_match=None,
+            name_form_outcome=NameFormDecision(action="skip", reason="creation_not_allowed"),
+        )
+        assert decision == PersonMatchDecision(action="match", person_id=17, reason="idref")
