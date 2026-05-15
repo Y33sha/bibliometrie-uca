@@ -1,6 +1,6 @@
 # Architecture logicielle — Bibliométrie UCA
 
-*Document à jour au 2026-05-11.*
+*Document à jour au 2026-05-15.*
 
 Pour le modèle de données (tables, relations, domaines fonctionnels),
 voir [donnees](donnees).
@@ -53,21 +53,13 @@ qui forment une zone neutre dont dépendent tous les autres modules.
    eux ne dépendent de personne (sauf `domain/` pour les types
    métier).
 
-3. **Use-cases ⊥ adapters sortants.** `application/*.py` (hors
-   `ports/`) et `infrastructure/` sont frères : aucun import mutuel.
-   Les deux dépendent des ports. Contrôlé par `import-linter`
-   (contrat `layered` dans `pyproject.toml`).
-
-   **Précision sur `application/ports/`** : zone neutre (cf. règle 2),
-   donc importable depuis `infrastructure/`. La règle interdit le
-   couplage *comportemental* (un adapter qui dépendrait d'un use-case
-   applicatif), pas le partage de *types de transport*. En pratique
-   les adapters `infrastructure/db/queries/Pg*Queries` :
-   - importent les dataclasses de filtres (`ListFilters`,
-     `FacetFilters`, …) du port pour typer leurs signatures ;
-   - héritent explicitement du Protocol (`class PgPublicationsQueries(PublicationsQueries):`)
-     pour que mypy vérifie la conformité directement à la définition
-     de classe — pas seulement au point de composition root.
+3. **Use-cases indépendants des adapters sortants.** `application/`
+   ne peut pas importer `infrastructure/`. Les services applicatifs
+   reçoivent leurs dépendances (repositories, query services) via les
+   **ports** (`Protocol`) définis dans `application/ports/` ou
+   `domain/ports/` — c'est `infrastructure/` qui implémente les ports,
+   pas l'inverse. Contrôlé par `import-linter` (contrat `layered` dans
+   `pyproject.toml`).
 
 4. **Routers ⊥ adapters sortants.** Les routers FastAPI
    (`interfaces/api/routers/*`) **ne doivent pas** importer
@@ -106,19 +98,65 @@ la règle 4. La règle 5 reste discipline-only.
 
 ### `domain/` — noyau métier pur
 
-Contenu :
-- **Value objects** : `DOI`, `ORCID`, `IdRef`, normalisation de noms
-  (`names.py`, `normalize.py`), identité ORCID/idHAL
-- **Modèles métier** : représentations immutables (dataclasses) avec
-  invariants (`publication.py`, `person.py`, `structure.py`)
-- **Règles métier pures** : `doc_types`, `authorship_roles`, `sources`
-  (enum des 5 sources)
-- **Ports repositories** (`domain/ports/*`) : interfaces Protocol pour
-  `PersonRepository`, `PublicationRepository`, `JournalRepository`,
-  `StructureRepository`, `AuthorshipRepository`, `AddressRepository`,
-  `ConfigRepository`, `PublisherRepository`
+Contenu, organisé par concept métier :
+
+- **Aggregates roots** (entités avec identité + comportement, racines
+  d'invariants métier) :
+  - `Publication` (+ entité fille `Authorship`) — `domain/publications/`
+  - `SourcePublication` (+ entité fille `SourceAuthorship`) —
+    `domain/source_publications/`
+  - `Person` — `domain/persons/`
+  - `PersonIdentifier` (aggregate séparé, identité naturelle
+    `(id_type, id_value)`) — `domain/persons/`
+  - `Structure` — `domain/structures/`
+  - `Journal` — `domain/journals/`
+  - `Publisher` — `domain/publishers/`
+  - `Perimeter` — `domain/perimeters/`
+  - `AddressAffiliation` (+ VO interne `StructureLink`) —
+    `domain/addresses/`
+- **Value objects** (immuables, identité par contenu) :
+  - Identifiants publication : `DOI`, `HALId`, `NNT`
+    (`domain/publications/identifiers.py`)
+  - Identifiants personne : `ORCID`, `IdHAL`, `IdRef`
+    (`domain/persons/identifiers.py`)
+  - Identifiants structure : `RorId`, `HalCollection`
+    (`domain/structures/identifiers.py`)
+  - Formes de nom : `PersonNameForm`, `StructureNameForm`
+  - Adresse : `Address` (défini par `normalized_text`)
+  - Enums : `StructureType`, `AttributionStatus` (statut d'un
+    `PersonIdentifier`)
+- **Règles métier pures** : matching de personnes
+  (`domain/persons/matching.py`), fusion de publications
+  (`domain/publications/merge.py`, `deduplication.py`), validation
+  des relations structure (`domain/structures/relations.py`),
+  `doc_types`, `authorship_roles`, `sources` (référentiel des 6
+  sources).
+- **Ports repositories** (`domain/ports/*`) : interfaces Protocol
+  par aggregate (`PersonRepository`, `PublicationRepository`,
+  `JournalRepository`, `StructureRepository`, `AuthorshipRepository`,
+  `AddressRepository`, `PublisherRepository`, `PerimeterRepository`,
+  `AuditRepository`).
 
 Le domaine est testé en unit sans DB.
+
+**Conventions de hydratation des aggregates** :
+
+- Chaque repository d'aggregate expose `find_by_id(id) -> Entity | None`
+  qui charge l'aggregate root. Pour les aggregates riches
+  (`Publication`, `Person`, `Structure`), les VOs internes (name forms,
+  identifiers) sont chargés avec le root quand ils sont peu coûteux ;
+  les entités filles (ex. `Authorship` de `Publication`) ne sont pas
+  chargées par défaut (composition lazy — méthode dédiée
+  `find_by_publication_id` sur `AuthorshipRepository`).
+- Les références entre aggregates sont **par id** (pattern Cosmic
+  Python ch. 7), pas par objet : `Authorship.person_id`,
+  `Journal.publisher_id`, `Perimeter.structure_ids` — pas d'hydratation
+  transitive.
+- Le mapping `row SQL → entité` vit côté infra dans une **fonction libre
+  `_<entity>_from_row(row) → Entity`** au sein du module repo
+  (`infrastructure/repositories/*.py`). Pas de classmethod sur l'entité
+  (le domain ne dépend pas de SQLAlchemy) ; pas de classe mapper
+  dédiée (overkill).
 
 #### Règle de placement des ports : `domain/ports/` vs `application/ports/`
 
@@ -218,8 +256,9 @@ Contenu :
   `api_retry.py`, `api_limits.py`, `pipeline_metrics.py`,
   `pipeline_status.py`, `app_config.py`, `db/dump_schema.py`.
 
-Interdiction : **`infrastructure/` ne peut pas importer
-`application/`** (sauf par un port explicitement passé).
+`infrastructure/` n'importe que les ports (`application/ports/*`,
+`domain/ports/*`) et le domaine — jamais les use-cases applicatifs
+(`application/*.py` hors `ports/`).
 
 ### `interfaces/` — adapters entrants
 

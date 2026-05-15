@@ -339,12 +339,12 @@ Généralisation de l'hydratation faite en Phase 4 (Publication) et Phase 5 (Per
 
 **Inventaire (cf. audit) — par ordre de migration** :
 
-- [x] **`StructureRepository`** : 9 méthodes CRUD retournent `dict[str, Any]`. Aggregate scaffoldé + VOs en Phase 7. Mapper trivial. `find_by_id(id) -> Structure | None` ajouté (charge champs scalaires + VOs `name_forms`).
-- [ ] **`JournalRepository`** : scaffolder l'aggregate `Journal` a minima (entité avec attributs `issn`, `eissn`, `issnl`, `publisher_id`, `openalex_id`, `oa_model`, `is_in_doaj`, `is_predatory`) et ajouter `find_by_id`. Pas d'invariants métier rapatriés en Phase 8 — émergeront ultérieurement.
-- [ ] **`PublisherRepository`** : scaffolder l'aggregate `Publisher` a minima (attributs `name`, `country`, `is_predatory`, `openalex_id`) et ajouter `find_by_id`.
-- [ ] **`AuthorshipRepository`** : entité fille de Publication (déjà scaffoldée). Méthode `find_by_publication_id(pub_id) -> tuple[Authorship, ...]` pertinente pour les use-cases qui auront besoin des filles chargées.
-- [ ] **`PerimeterRepository`** : petit aggregate, peu utilisé en lecture. Ajouter `find_by_id` par cohérence.
-- [ ] **`AddressAffiliation`** : à instruire après les autres. Identité opaque (pas de `code` naturel), méthodes actuelles retournent surtout des listes d'IDs affectés (`refresh_sa_countries_for_addresses`, etc.) — le contrat "find_by_id en aggregate complet" n'est pas évident.
+- [x] **`StructureRepository`** : aggregate scaffoldé + VOs en Phase 7. `find_by_id(id) -> Structure | None` ajouté (charge champs scalaires + VOs `name_forms`).
+- [x] **`JournalRepository`** : aggregate `Journal` scaffoldé a minima (`domain/journals/journal.py`) ; `find_by_id` ajouté. Pas d'invariants métier rapatriés — émergeront ultérieurement.
+- [x] **`PublisherRepository`** : aggregate `Publisher` scaffoldé a minima (`domain/publishers/publisher.py`) ; `find_by_id` ajouté.
+- [x] **`AuthorshipRepository`** : `find_by_publication_id(pub_id) -> tuple[Authorship, ...]` ajouté (ordonné par `author_position`). Coerce des bool nullables vers leur default DB dans le mapper.
+- [x] **`PerimeterRepository`** : aggregate `Perimeter` scaffoldé a minima (`domain/perimeters/perimeter.py`) ; `find_by_id` ajouté.
+- [ ] **`AddressAffiliation`** : laissé non coché — audit du port n'a fait apparaître aucun use-case actuel qui aurait besoin d'un `find_by_id` hydraté (15 méthodes, toutes par id ou batch d'ids, retours `list[int]` / compteurs ; aucune projection avec `StructureLink` hydraté). À reprendre quand un vrai use-case émergera.
 
 Repos non concernés Phase 8 (déjà fait ou par nature) :
 
