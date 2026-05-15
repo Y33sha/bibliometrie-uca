@@ -45,7 +45,7 @@ from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitab
 # =============================================================
 
 
-def _safe_list(obj: Any) -> list:
+def _safe_list(obj: object) -> list:
     """WoS API retourne parfois un dict au lieu d'une liste."""
     if obj is None:
         return []

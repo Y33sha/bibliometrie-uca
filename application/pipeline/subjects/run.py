@@ -16,6 +16,7 @@ mémoire est négligeable et permet de garder l'historique des labels observés.
 
 import logging
 import time
+from collections.abc import Iterable
 from typing import Any
 
 from sqlalchemy import Connection
@@ -49,7 +50,7 @@ def run(
     conn: Connection,
     queries: SubjectsQueries,
     logger: logging.Logger,
-    sources: Any = None,
+    sources: Iterable[str] | None = None,
 ) -> int:
     """Ingère les sujets pour les sources données (toutes par défaut).
 

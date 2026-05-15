@@ -14,7 +14,6 @@ est dans `interfaces/cli/pipeline/populate_affiliations.py`.
 
 import logging
 import time
-from typing import Any
 
 from sqlalchemy import Connection
 
@@ -27,8 +26,8 @@ def _step_address_source(
     queries: AffiliationsQueries,
     logger: logging.Logger,
     source: str,
-    perimeter_ids: Any,
-    wide_ids: Any,
+    perimeter_ids: set[int],
+    wide_ids: set[int],
     daily: bool = False,
 ) -> None:
     """Étape : source avec adresses — calculer in_perimeter + structure_ids."""
@@ -53,7 +52,7 @@ def step3d_theses(
     conn: Connection,
     queries: AffiliationsQueries,
     logger: logging.Logger,
-    wide_ids: Any,
+    wide_ids: set[int],
     daily: bool = False,
 ) -> None:
     """Étape 3d : theses.fr — résoudre structure_ids via adresses.

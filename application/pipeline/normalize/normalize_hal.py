@@ -51,7 +51,7 @@ from domain.sources.zenodo import ZenodoResolutionError, is_zenodo_doi
 # =============================================================
 
 
-def as_str(value: Any) -> str | None:
+def as_str(value: object) -> str | None:
     """Extrait une chaîne depuis un champ HAL qui peut être str, list ou None."""
     if value is None:
         return None
