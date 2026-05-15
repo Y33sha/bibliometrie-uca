@@ -34,7 +34,7 @@ Manque un décideur d'orchestration unique (`decide_person_match`) qui agrège l
 
 ### Phase 1 — Refactor structurel pur (logique préservée)
 
-- [ ] **Implémenter `decide_person_match`** dans `domain/persons/matching.py`. Signature :
+- [x] **Implémenter `decide_person_match`** dans `domain/persons/matching.py`. Signature :
 
    ```python
    @dataclass(frozen=True)
@@ -54,15 +54,10 @@ Manque un décideur d'orchestration unique (`decide_person_match`) qui agrège l
 
    Pur, testable sans BDD. Reproduit l'ordre actuel.
 
-- [ ] **Tests unitaires sur toutes les branches** de la cascade : match cross-source, match idref, match orcid, name_form single match, name_form ambiguous, name_form create, name_form skip (create interdit).
-- [ ] **Refactor `create_persons_from_source_authorships.py`** : passer de 4 boucles à 1 boucle.
-  - Prefetch des 4 lookups en début de `run` (déjà partiellement présent : `linked_index`, `idref_map`, `orcid_map`, `name_form_map`).
-  - Une seule boucle sur `all_authorships`. Pour chaque authorship : calculer les 4 candidats, appeler `decide_person_match`, appliquer l'effet (`link_to_person` / `create_person` / `add_identifiers` / `add_name_form`).
-  - Suppression des fonctions `step1_cross_source`, `step1b_idref`, `step2_orcid`, `step3_name_forms`.
-- [ ] **Nettoyage** :
-  - Docstring du module : retirer l'« Étape 4 : Personnes liées aux thèses » fantôme (jamais appelée par `run()`, cf. trou de couverture).
-  - Lever au passage les 5 `Any` résiduels signalés par `CODE_chasse-aux-any` (les `all_authorships: Any` deviennent typés).
-- [ ] **Tests d'intégration** adaptés à la nouvelle structure (1 boucle au lieu de 4 steps). Vérifier que les compteurs de fin de run restent comparables.
+- [x] **Tests unitaires sur toutes les branches** de la cascade : match cross-source, match idref, match orcid, name_form single match, name_form ambiguous, name_form create, name_form skip (create interdit).
+- [x] **Refactor `create_persons_from_source_authorships.py`** : passer de 4 boucles à 1 boucle. Prefetch des 4 lookups en début de `run` + boucle unique avec appel `decide_person_match`. Suppression des fonctions `step1_cross_source`, `step1b_idref`, `step2_orcid`, `step3_name_forms`.
+- [x] **Nettoyage** : docstring du module remplacé par la nouvelle architecture (cascade unifiée + 4 sous-décisions). Les 5 `Any` résiduels signalés par `CODE_chasse-aux-any` sont levés (`all_authorships: list[dict[str, Any]]`). Bonus : commit/rollback sortis de `run()` vers le CLI (pattern plus testable).
+- [x] **Tests d'intégration** : `test_dedup_persons.py` refondu en 6 scénarios `run()` (vs 10 sur les steps supprimés). `test_idempotence.py:_run_create_persons` adapté pour appeler `run()`. La logique pure des sous-décisions reste couverte par `test_matching.py` (26 unit tests).
 
 ### Phase 2 — Peaufinage hiérarchie (post-refactor)
 

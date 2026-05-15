@@ -1129,48 +1129,25 @@ def _setup_persons_test_data(conn):
 
 
 def _run_create_persons(conn):
-    """Exécute create_persons sur la Connection SA de test."""
+    """Exécute create_persons sur la Connection SA de test, retourne le
+    nombre d'authorships HAL rattachées à l'issue du run."""
     import logging
 
-    from application.pipeline.persons.create_persons_from_source_authorships import (
-        get_all_unlinked_authorships,
-        load_linked_authorships_by_pub,
-        step1_cross_source,
-        step2_orcid,
-        step3_name_forms,
-    )
+    from sqlalchemy import text
+
+    from application.pipeline.persons.create_persons_from_source_authorships import run
     from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
 
     queries = PgPersonsCreateQueries()
     logger = logging.getLogger("test")
-    person_repo = person_repository(conn)
-    all_authorships = get_all_unlinked_authorships(conn, queries)
-    linked_ids: set = set()
+    run(conn, queries, logger, person_repo=person_repository(conn))
 
-    linked_index = load_linked_authorships_by_pub(conn, queries)
-    step1_cross_source(
-        logger,
-        all_authorships,
-        linked_ids,
-        linked_index,
-        dry_run=False,
-        person_repo=person_repo,
-    )
-    step2_orcid(
-        conn, queries, logger, all_authorships, linked_ids, dry_run=False, person_repo=person_repo
-    )
-    name_form_map = queries.fetch_name_form_map(conn)
-    step3_name_forms(
-        logger,
-        all_authorships,
-        linked_ids,
-        name_form_map,
-        dry_run=False,
-        person_repo=person_repo,
-    )
-
-    return len(linked_ids)
+    return conn.execute(
+        text(
+            "SELECT COUNT(*) FROM source_authorships WHERE source = 'hal' AND person_id IS NOT NULL"
+        )
+    ).scalar_one()
 
 
 def _count_persons_tables(conn) -> dict:

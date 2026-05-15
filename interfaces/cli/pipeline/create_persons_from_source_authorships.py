@@ -28,6 +28,14 @@ def main() -> None:
             person_repo=person_repository(conn),
             dry_run=args.dry_run,
         )
+        if args.dry_run:
+            conn.rollback()
+            logger.info("(dry-run — rien n'a été modifié)")
+        else:
+            conn.commit()
+            logger.info(
+                "✓ Appliqué. → Lancer build_authorships.py pour propager in_perimeter/structure_ids"
+            )
     finally:
         conn.close()
 
