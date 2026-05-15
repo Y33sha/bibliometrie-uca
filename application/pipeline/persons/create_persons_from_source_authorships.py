@@ -1,35 +1,25 @@
 """
 Crée des entités Personnes à partir des authorships sources UCA non rattachées.
 
-Algorithme en 4 étapes + 1 étape complémentaire :
+Cascade unifiée — une seule boucle qui interroge 4 signaux en parallèle puis
+délègue la décision à `domain.persons.matching.decide_person_match` :
 
-  Étape 1 : Cross-source
-    Pour chaque authorship sans person_id, chercher sur la même publication
-    (même position) une authorship d'une autre source qui a un person_id.
-    Si le nom est compatible → rattacher à cette personne.
+1. **Cross-source** par `(publication_id, author_position)` avec nom compatible.
+2. **IdRef** présent en base (status != rejected).
+3. **ORCID** présent en base (status != rejected).
+4. **Lookup `person_name_forms`** : match unique / ambigu (skip) /
+   inconnu (création si `allow_create`, skip sinon).
 
-  Étape 1b : IdRef connu
-    Si l'authorship a un IdRef déjà présent en base (status != rejected)
-    et mappé à une personne → rattacher à cette personne.
-
-  Étape 2 : ORCID connu
-    Si l'authorship a un ORCID déjà présent en base (status != rejected)
-    et mappé à une personne → rattacher à cette personne.
-    L'ORCID ne prime pas sur le cross-source (risque d'ORCID erroné
-    dans OpenAlex/WoS supérieur au risque d'homonymie en cross-source).
-
-  Étape 3 : Lookup person_name_forms
-    Normaliser le nom de l'auteur et chercher dans person_name_forms.
-    - Mappé à 1 personne → rattacher
-    - Mappé à >1 personnes → orphelin (traitement manuel)
-    - Forme inconnue → créer nouvelle personne
-
-  Étape 4 : Presonnes liées aux thèses (directeurs, rapporteurs, jury)
-    Les rôles non-auteur des thèses sont hors périmètre (in_perimeter=false: pas de signatures ni de structure_ids) et ne passent pas par les étapes 1-3. Si leur source_author a un IdRef correspondant à une personne connue, on rattache sans modifier in_perimeter ni créer de personne.
-
-Note : un matching par idhal / hal_person_id sera réintroduit dans le
-chantier `METIER_decide-person-match` (étape dédiée au côté du matching
-par identifiants forts).
+L'effet est appliqué selon l'action de la décision :
+- Match (cross-source / idref / orcid / name_form) → `link + add_name_form
+  + add_identifiers`. Les identifiants sont ajoutés en statut `pending`
+  (cf. `application.persons.add_identifier`), vérifiables manuellement
+  via l'admin si le matching par nom s'avère faux. Cohérent avec le
+  bootstrap d'une base vide : sans cet ajout, aucun identifier ne
+  serait jamais inséré quand la même personne arrive depuis plusieurs
+  sources successivement.
+- Création → `create + link + add_identifiers + add_name_form`.
+- Skip → rien (ambiguïté ou création interdite, cf. `allow_person_creation`).
 
 L'orchestrateur dépend du port `PersonsCreateQueries`. Le point d'entrée CLI
 est dans `interfaces/cli/pipeline/create_persons_from_source_authorships.py`.
@@ -58,6 +48,7 @@ from domain.persons.matching import (
     decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
+    decide_person_match,
 )
 from domain.persons.name_matching import parse_raw_author_name
 from domain.ports.person_repository import PersonRepository
@@ -111,14 +102,9 @@ def load_linked_authorships_by_pub(
     return index
 
 
-# ---------------------------------------------------------------------------
-# Étape 1 : Cross-source
-# ---------------------------------------------------------------------------
-
-
 def _max_authors_per_pub(
-    all_authorships: Any,
-    linked_index: dict,
+    all_authorships: list[dict[str, Any]],
+    linked_index: dict[tuple[int, int], list[tuple[int, str, str, str]]],
 ) -> dict[int, int]:
     """Max d'auteurs sur une publication par source (linked + unlinked).
 
@@ -141,210 +127,6 @@ def _max_authors_per_pub(
     return {pub_id: max(per_source.values()) for pub_id, per_source in counts.items()}
 
 
-def step1_cross_source(
-    logger: logging.Logger,
-    all_authorships: Any,
-    linked_ids: set,
-    linked_index: dict,
-    dry_run: bool,
-    *,
-    person_repo: PersonRepository,
-) -> int:
-    """Match par (publication, position) avec nom compatible d'une autre source.
-
-    Court-circuit sur les méga-papers (cf. `MAX_AUTHORS_CROSS_SOURCE`)
-    où les positions divergent trop entre sources pour qu'un match par
-    position soit fiable.
-    """
-    pub_max_authors = _max_authors_per_pub(all_authorships, linked_index)
-
-    linked = 0
-    for a in all_authorships:
-        if (a["source"], a["authorship_id"]) in linked_ids:
-            continue
-
-        pub_id = a["publication_id"]
-        position = a["author_position"]
-        if pub_id is None or position is None:
-            continue
-
-        candidates = linked_index.get((pub_id, position), [])
-        if not candidates:
-            continue
-
-        matched_pid = decide_cross_source_match(
-            authorship_source=a["source"],
-            last_norm=a["last_norm"],
-            first_norm=a["first_norm"],
-            candidates=candidates,
-            total_author_count=pub_max_authors.get(pub_id),
-        )
-
-        if matched_pid:
-            if not dry_run:
-                link_to_person(matched_pid, [a], repo=person_repo)
-                add_name_form(matched_pid, a["full_name"], repo=person_repo)
-                add_identifiers(matched_pid, [a], repo=person_repo)
-            linked_ids.add((a["source"], a["authorship_id"]))
-            ln, fn = a["last_norm"], a["first_norm"]
-            linked_index[(pub_id, position)].append((matched_pid, ln, fn, a["source"]))
-            linked += 1
-
-    logger.info(f"  {linked} authorships rattachées par cross-source")
-    return linked
-
-
-# ---------------------------------------------------------------------------
-# Étape 1b : IdRef connu
-# ---------------------------------------------------------------------------
-
-
-def step1b_idref(
-    conn: Connection,
-    queries: PersonsCreateQueries,
-    logger: logging.Logger,
-    all_authorships: Any,
-    linked_ids: set,
-    dry_run: bool,
-    *,
-    person_repo: PersonRepository,
-) -> int:
-    """Si l'authorship a un IdRef déjà connu en base (non rejeté), rattacher."""
-    idref_map = queries.fetch_idref_to_person_map(conn)
-    linked = 0
-
-    for a in all_authorships:
-        if (a["source"], a["authorship_id"]) in linked_ids:
-            continue
-
-        pid = decide_match_by_identifier(a.get("idref"), idref_map)
-        if pid:
-            if not dry_run:
-                link_to_person(pid, [a], repo=person_repo)
-                add_name_form(pid, a["full_name"], repo=person_repo)
-                add_identifiers(pid, [a], repo=person_repo)
-            linked_ids.add((a["source"], a["authorship_id"]))
-            linked += 1
-
-    logger.info(f"  {linked} authorships rattachées par IdRef connu")
-    return linked
-
-
-# ---------------------------------------------------------------------------
-# Étape 2 : ORCID connu
-# ---------------------------------------------------------------------------
-
-
-def step2_orcid(
-    conn: Connection,
-    queries: PersonsCreateQueries,
-    logger: logging.Logger,
-    all_authorships: Any,
-    linked_ids: set,
-    dry_run: bool,
-    *,
-    person_repo: PersonRepository,
-) -> int:
-    """Si l'authorship a un ORCID déjà connu en base, rattacher."""
-    orcid_map = queries.fetch_orcid_to_person_map(conn)
-    linked = 0
-
-    for a in all_authorships:
-        if (a["source"], a["authorship_id"]) in linked_ids:
-            continue
-
-        pid = decide_match_by_identifier(a.get("orcid"), orcid_map)
-        if pid:
-            if not dry_run:
-                link_to_person(pid, [a], repo=person_repo)
-                add_name_form(pid, a["full_name"], repo=person_repo)
-                add_identifiers(pid, [a], repo=person_repo)
-            linked_ids.add((a["source"], a["authorship_id"]))
-            linked += 1
-
-    logger.info(f"  {linked} authorships rattachées par ORCID connu")
-    return linked
-
-
-# ---------------------------------------------------------------------------
-# Étape 3 : Lookup person_name_forms
-# ---------------------------------------------------------------------------
-
-
-def step3_name_forms(
-    logger: logging.Logger,
-    all_authorships: Any,
-    linked_ids: set,
-    name_form_map: dict,
-    dry_run: bool,
-    *,
-    person_repo: PersonRepository,
-) -> tuple[int, int, int]:
-    """Lookup direct par `source_authorships.author_name_normalized` dans
-    `person_name_forms`.
-
-    Sémantique : la forme normalisée stockée à l'ingestion (via la fonction
-    SQL `normalize_name_form`) est utilisée directement comme clé de
-    lookup. La table `person_name_forms` contient déjà toutes les
-    variantes (ordres prénom/nom, initiales) générées par
-    `domain.names.compute_person_name_forms` à la création des personnes
-    et alimentées par `populate_person_name_forms` pour les authorships
-    rattachées — donc une seule clé de lookup suffit, n'importe laquelle
-    des variantes matchera.
-    """
-    linked = 0
-    created = 0
-    skipped = 0
-
-    for a in all_authorships:
-        if (a["source"], a["authorship_id"]) in linked_ids:
-            continue
-
-        norm = a.get("author_name_normalized")
-        if not norm:
-            continue
-
-        decision = decide_name_form_outcome(name_form_map.get(norm), a.get("allow_create", True))
-
-        if decision.action == "match":
-            pid = decision.person_id
-            assert pid is not None  # narrowing : garanti par decide_name_form_outcome
-            if not dry_run:
-                link_to_person(pid, [a], repo=person_repo)
-                add_name_form(pid, a["full_name"], repo=person_repo)
-            linked_ids.add((a["source"], a["authorship_id"]))
-            linked += 1
-        elif decision.action == "skip":
-            skipped += 1
-        else:  # create
-            last = a["last_name"] or a["full_name"] or "?"
-            first = a["first_name"] or ""
-            # On pré-popule la map en mémoire avec les deux ordres normalisés
-            # pour qu'une autre authorship du même run avec l'ordre inverse
-            # match cette personne nouvellement créée. La forme déjà
-            # cherchée (norm) est forcément l'un des deux ordres.
-            ln, fn = a["last_norm"], a["first_norm"]
-            cache_forms = [f for f in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()] if f]
-            if not dry_run:
-                pid = create_person(last, first, repo=person_repo)
-                link_to_person(pid, [a], repo=person_repo)
-                add_identifiers(pid, [a], repo=person_repo)
-                add_name_form(pid, a["full_name"], repo=person_repo)
-                for form in cache_forms:
-                    name_form_map[form] = [pid]
-            else:
-                for form in cache_forms:
-                    name_form_map[form] = [-1]
-
-            linked_ids.add((a["source"], a["authorship_id"]))
-            created += 1
-
-    logger.info(
-        f"  {created} personnes créées, {linked} rattachées, {skipped} skippées (ambiguës ou création interdite)"
-    )
-    return created, linked, skipped
-
-
 # ---------------------------------------------------------------------------
 # Orchestrateur
 # ---------------------------------------------------------------------------
@@ -365,52 +147,110 @@ def run(
         logger.info("Rien à faire.")
         return
 
-    linked_ids: set[tuple[str, int]] = set()
-
-    logger.info("\n--- Étape 1 : cross-source (même publi + position) ---")
+    # Prefetch global des 4 lookups (1 round-trip chacun, partagés sur toute la boucle).
+    logger.info("Prefetch des lookups...")
     linked_index = load_linked_authorships_by_pub(conn, queries)
-    s1 = step1_cross_source(
-        logger, all_authorships, linked_ids, linked_index, dry_run, person_repo=person_repo
-    )
-
-    logger.info("\n--- Étape 1b : IdRef connu ---")
-    s1b = step1b_idref(
-        conn, queries, logger, all_authorships, linked_ids, dry_run, person_repo=person_repo
-    )
-
-    logger.info("\n--- Étape 2 : ORCID connu ---")
-    s2 = step2_orcid(
-        conn, queries, logger, all_authorships, linked_ids, dry_run, person_repo=person_repo
-    )
-
-    logger.info("\n--- Étape 3 : person_name_forms ---")
+    idref_map = queries.fetch_idref_to_person_map(conn)
+    orcid_map = queries.fetch_orcid_to_person_map(conn)
     name_form_map = queries.fetch_name_form_map(conn)
-    s3_created, s3_linked, s3_skipped = step3_name_forms(
-        logger,
-        all_authorships,
-        linked_ids,
-        name_form_map,
-        dry_run,
-        person_repo=person_repo,
-    )
+    pub_max_authors = _max_authors_per_pub(all_authorships, linked_index)
 
-    total_linked = len(linked_ids)
-    unlinked = len(all_authorships) - total_linked
+    matched_counts: dict[str, int] = defaultdict(int)
+    skipped_counts: dict[str, int] = defaultdict(int)
+    created = 0
+
+    for a in all_authorships:
+        # ── Sous-décisions ─────────────────────────────────────────
+        cross_source_match: int | None = None
+        pub_id = a["publication_id"]
+        position = a["author_position"]
+        if pub_id is not None and position is not None:
+            candidates = linked_index.get((pub_id, position), [])
+            if candidates:
+                cross_source_match = decide_cross_source_match(
+                    authorship_source=a["source"],
+                    last_norm=a["last_norm"],
+                    first_norm=a["first_norm"],
+                    candidates=candidates,
+                    total_author_count=pub_max_authors.get(pub_id),
+                )
+
+        idref_match = decide_match_by_identifier(a.get("idref"), idref_map)
+        orcid_match = decide_match_by_identifier(a.get("orcid"), orcid_map)
+
+        norm = a.get("author_name_normalized")
+        name_form_outcome = decide_name_form_outcome(
+            name_form_map.get(norm) if norm else None,
+            a.get("allow_create", True),
+        )
+
+        # ── Décision unifiée ────────────────────────────────────────
+        decision = decide_person_match(
+            cross_source_match=cross_source_match,
+            idref_match=idref_match,
+            orcid_match=orcid_match,
+            name_form_outcome=name_form_outcome,
+        )
+
+        # ── Effets ─────────────────────────────────────────────────
+        if decision.action == "match":
+            pid = decision.person_id
+            assert pid is not None  # garanti par decide_person_match action=match
+            if not dry_run:
+                link_to_person(pid, [a], repo=person_repo)
+                add_name_form(pid, a["full_name"], repo=person_repo)
+                # Identifiants ajoutés en statut `pending` quelle que soit la
+                # source du match (cross-source/idref/orcid/name_form) —
+                # vérifiables manuellement via l'admin si erronés.
+                add_identifiers(pid, [a], repo=person_repo)
+            matched_counts[decision.reason] += 1
+            # Mettre à jour linked_index pour que les authorships suivantes
+            # sur la même (pub_id, position) puissent matcher en cross-source.
+            if pub_id is not None and position is not None:
+                ln, fn = a["last_norm"], a["first_norm"]
+                linked_index[(pub_id, position)].append((pid, ln, fn, a["source"]))
+
+        elif decision.action == "create":
+            last = a["last_name"] or a["full_name"] or "?"
+            first = a["first_name"] or ""
+            # On pré-popule la map en mémoire avec les deux ordres normalisés
+            # pour qu'une autre authorship du même run avec l'ordre inverse
+            # match cette personne nouvellement créée. La forme déjà
+            # cherchée (norm) est forcément l'un des deux ordres.
+            ln, fn = a["last_norm"], a["first_norm"]
+            cache_forms = [f for f in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()] if f]
+            if not dry_run:
+                pid = create_person(last, first, repo=person_repo)
+                link_to_person(pid, [a], repo=person_repo)
+                add_identifiers(pid, [a], repo=person_repo)
+                add_name_form(pid, a["full_name"], repo=person_repo)
+                for form in cache_forms:
+                    name_form_map[form] = [pid]
+            else:
+                for form in cache_forms:
+                    name_form_map[form] = [-1]
+            created += 1
+
+        else:  # skip
+            skipped_counts[decision.reason] += 1
+
+    # ── Résumé ─────────────────────────────────────────────────────
+    linked_total = sum(matched_counts.values())
+    skipped_total = sum(skipped_counts.values())
+    unlinked = len(all_authorships) - linked_total - created
 
     logger.info("\n=== Résumé ===")
-    logger.info(f"  Étape 1 (cross-source)   : {s1} rattachées")
-    logger.info(f"  Étape 1b (IdRef connu)   : {s1b} rattachées")
-    logger.info(f"  Étape 2 (ORCID connu)    : {s2} rattachées")
+    logger.info(f"  Cross-source             : {matched_counts['cross_source']} rattachées")
+    logger.info(f"  IdRef                    : {matched_counts['idref']} rattachées")
+    logger.info(f"  ORCID                    : {matched_counts['orcid']} rattachées")
+    logger.info(f"  Name form (single match) : {matched_counts['single_name']} rattachées")
+    logger.info(f"  Créées                   : {created}")
     logger.info(
-        f"  Étape 3 (name_forms)     : {s3_created} créées, {s3_linked} rattachées, "
-        f"{s3_skipped} skippées"
+        f"  Skippées                 : {skipped_total} "
+        f"(ambiguës={skipped_counts['ambiguous_name_form']}, "
+        f"create interdit={skipped_counts['creation_not_allowed']})"
     )
     logger.info(f"  Non résolues             : {unlinked}")
-
-    if dry_run:
-        conn.rollback()
-        logger.info("\n  (dry-run — rien n'a été modifié)")
-    else:
-        conn.commit()
-        logger.info("\n  ✓ Appliqué.")
-        logger.info("  → Lancer build_authorships.py pour propager in_perimeter/structure_ids")
+    # Commit/rollback laissés au caller (le CLI commit / rollback selon
+    # `--dry-run`, les tests d'intégration restent dans leur transaction
+    # rollbackée).
