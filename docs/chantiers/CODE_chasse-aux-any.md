@@ -131,26 +131,15 @@ Périmètres identifiés :
   chantier dédié pour ne pas mélanger « typer » et « renommer » dans
   les mêmes commits. État intermédiaire actuel : `cur: Connection`,
   techniquement correct mais visuellement bancal.
-
-## Questions ouvertes
-
-- **Frontière Pydantic / FastAPI — tranchée** (Phase 2.4) : option A
-  retenue, les handlers instancient le `BaseModel` du `response_model`
-  au retour (`Model.model_validate(...)` ou constructeur direct).
-  Option C (query services retournant des types forts, suppression
-  des `dict[str, Any]` côté query) reste plus propre mais demande
-  un chantier architectural à part (déplacement des modèles hors
-  `interfaces/api/`, DTOs application-level). Pas ouverte ici.
-- **Payloads JSONB dans les `BaseModel` — tranchée** (Phase 2.6) :
-  les 2 `Any` dans `interfaces/api/models.py` (`ConfigItem.value`,
-  `ConfigValueUpdate.value`) restent volontairement libres. La
-  bascule vers l'alias récursif `JsonValue` a été tentée mais
-  pydantic en py310 lève une `RecursionError` à la génération de
-  schéma. PEP 695 type aliases (3.12+) résoudraient ; à revoir au
-  passage py312.
-- **`Row` SA — déférée** au chantier `CODE_typage-projections-strict`.
-  Question reformulée : `Row[Any]` vs `Row[tuple[...]]` paramétré vs
-  `NamedTuple`/`dataclass` par requête. Coût/bénéfice à arbitrer au
-  cas par cas (la version `tuple[...]` est précise mais fragile sur
-  changement de SELECT). Décision pragmatique probable : `NamedTuple`
-  quand la row a > 2 colonnes ou est propagée hors de la fonction.
+- **DTOs application-level pour les query services** : alternative
+  plus stricte à l'option A retenue (les handlers instancient le
+  `BaseModel` du `response_model` au retour). Les query services
+  retourneraient directement des types forts, supprimant les
+  `dict[str, Any]` côté infra. Demande un déplacement des modèles
+  hors `interfaces/api/`. Pas instruit ici.
+- **Typage strict des projections** (`Row[Any]`, batchs SQL
+  hétérogènes, records DB hydratés) : voir
+  `CODE_typage-projections-strict.md`.
+- **Records DB hydratés en `dict[str, Any]` et partial updates
+  `fields: dict[str, Any]`** sur les ports repository : voir
+  `CODE_rich-domain-model.md` Phase 8.
