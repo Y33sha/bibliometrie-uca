@@ -96,12 +96,58 @@ forbidden_modules = ["infrastructure"]
 # imports directs.
 allow_indirect_imports = "true"
 ignore_imports = [
-    # Hors périmètre du chantier routers-di : settings statique,
-    # status filesystem, chemin projet. Ces 3 cas ne sont pas des
-    # queries / repos et ne dépendent pas d'une connexion DB.
-    "interfaces.api.routers.auth -> infrastructure.settings",
+    # Hors périmètre du chantier routers-di : status filesystem
+    # (relu dans le futur chantier observabilité pipeline) et chemin
+    # projet (en attendant la refonte du mode d'affichage de la doc).
+    # Ces 2 cas ne sont pas des queries / repos et ne dépendent pas
+    # d'une connexion DB.
     "interfaces.api.routers.admin_pipeline -> infrastructure.pipeline_status",
     "interfaces.api.routers.docs -> infrastructure",
+]
+
+[[tool.importlinter.contracts]]
+name = "Composition root : Pg* concrets uniquement dans app et deps"
+type = "forbidden"
+source_modules = ["interfaces.api"]
+forbidden_modules = [
+    "infrastructure.repositories",
+    "infrastructure.db.queries",
+]
+# Verrouillage de la règle 5 de docs/architecture.md : seul
+# `interfaces/api/deps.py` instancie les `Pg*` concrets et les
+# repositories ; les routers et autre utilitaire éventuel sous
+# `interfaces.api/` doivent passer par un port via `Depends(...)`.
+# (`interfaces/api/app.py` n'importe ni `repositories` ni
+# `db.queries` — pas besoin de l'ignorer.)
+#
+# `ignore_imports` exige le matching exact (pas les descendants),
+# d'où l'énumération des sub-modules `infrastructure.db.queries.*`
+# consommés par `deps.py`.
+ignore_imports = [
+    "interfaces.api.deps -> infrastructure.repositories.address_repository",
+    "interfaces.api.deps -> infrastructure.repositories.audit_repository",
+    "interfaces.api.deps -> infrastructure.repositories.authorship_repository",
+    "interfaces.api.deps -> infrastructure.repositories.journal_repository",
+    "interfaces.api.deps -> infrastructure.repositories.perimeter_repository",
+    "interfaces.api.deps -> infrastructure.repositories.person_repository",
+    "interfaces.api.deps -> infrastructure.repositories.publication_repository",
+    "interfaces.api.deps -> infrastructure.repositories.publisher_repository",
+    "interfaces.api.deps -> infrastructure.repositories.structure_repository",
+    "interfaces.api.deps -> infrastructure.db.queries.addresses",
+    "interfaces.api.deps -> infrastructure.db.queries.admin_feedback",
+    "interfaces.api.deps -> infrastructure.db.queries.config",
+    "interfaces.api.deps -> infrastructure.db.queries.hal_problems",
+    "interfaces.api.deps -> infrastructure.db.queries.journals",
+    "interfaces.api.deps -> infrastructure.db.queries.laboratories",
+    "interfaces.api.deps -> infrastructure.db.queries.perimeter",
+    "interfaces.api.deps -> infrastructure.db.queries.person_duplicates",
+    "interfaces.api.deps -> infrastructure.db.queries.persons",
+    "interfaces.api.deps -> infrastructure.db.queries.publication_duplicates",
+    "interfaces.api.deps -> infrastructure.db.queries.publications",
+    "interfaces.api.deps -> infrastructure.db.queries.publishers",
+    "interfaces.api.deps -> infrastructure.db.queries.stats",
+    "interfaces.api.deps -> infrastructure.db.queries.structures",
+    "interfaces.api.deps -> infrastructure.db.queries.subjects",
 ]
 
 [[tool.importlinter.contracts]]

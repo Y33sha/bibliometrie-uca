@@ -67,13 +67,14 @@ qui forment une zone neutre dont dépendent tous les autres modules.
    applicatifs et reçoivent leurs dépendances via `Depends(...)`
    (factories dans `interfaces.api.deps`) ; ils ne les construisent
    pas. Verrouillé par le contrat `import-linter` "Routers : pas
-   d'import direct de infrastructure". Trois exceptions documentées :
-   `auth.py` lit `infrastructure.settings` (config statique),
+   d'import direct de infrastructure". Deux exceptions documentées :
    `admin_pipeline.py` appelle `infrastructure.pipeline_status`
-   (status filesystem), `docs.py` utilise `infrastructure.PROJECT_ROOT`
-   (chemin projet) — aucune ne touche à la DB. Les scripts CLI ne
-   sont pas concernés par cette règle : ils sont des composition
-   roots (cf. règle 5).
+   (status filesystem ; sera revu dans le chantier observabilité
+   pipeline), `docs.py` utilise `infrastructure.PROJECT_ROOT`
+   (chemin projet ; sera revu lors de la refonte de l'affichage
+   doc) — aucune ne touche à la DB. Les scripts CLI ne sont pas
+   concernés par cette règle : ils sont des composition roots
+   (cf. règle 5).
 
 5. **Le composition root est un endroit précis.** L'instanciation
    concrète des adapters et leur câblage aux use-cases se fait
@@ -91,8 +92,11 @@ qui forment une zone neutre dont dépendent tous les autres modules.
 
 Le contrat `layers` d'`import-linter` (voir `pyproject.toml`,
 section `[tool.importlinter]`) vérifie les règles 1 à 3. Le contrat
-`forbidden` "Routers : pas d'import direct de infrastructure" applique
-la règle 4. La règle 5 reste discipline-only.
+`forbidden` "Routers : pas d'import direct de infrastructure"
+applique la règle 4. Le contrat `forbidden` "Composition root : Pg*
+concrets uniquement dans app et deps" applique la règle 5 pour
+`interfaces/api/` (les CLIs restent discipline-only — ils sont leur
+propre composition root par nature, cf. règle 5).
 
 ## Les 4 couches en détail
 
@@ -100,13 +104,13 @@ la règle 4. La règle 5 reste discipline-only.
 
 Contenu, organisé par concept métier :
 
-- **Aggregates roots** (entités avec identité + comportement, racines
-  d'invariants métier) :
+- **Agrégats** (entités avec identité + comportement, racines
+  d'invariants métier — *aggregate roots* en terminologie DDD) :
   - `Publication` (+ entité fille `Authorship`) — `domain/publications/`
   - `SourcePublication` (+ entité fille `SourceAuthorship`) —
     `domain/source_publications/`
   - `Person` — `domain/persons/`
-  - `PersonIdentifier` (aggregate séparé, identité naturelle
+  - `PersonIdentifier` (agrégat séparé, identité naturelle
     `(id_type, id_value)`) — `domain/persons/`
   - `Structure` — `domain/structures/`
   - `Journal` — `domain/journals/`
@@ -132,23 +136,23 @@ Contenu, organisé par concept métier :
   `doc_types`, `authorship_roles`, `sources` (référentiel des 6
   sources).
 - **Ports repositories** (`domain/ports/*`) : interfaces Protocol
-  par aggregate (`PersonRepository`, `PublicationRepository`,
+  par agrégat (`PersonRepository`, `PublicationRepository`,
   `JournalRepository`, `StructureRepository`, `AuthorshipRepository`,
   `AddressRepository`, `PublisherRepository`, `PerimeterRepository`,
   `AuditRepository`).
 
 Le domaine est testé en unit sans DB.
 
-**Conventions de hydratation des aggregates** :
+**Conventions d’hydratation des agrégats** :
 
-- Chaque repository d'aggregate expose `find_by_id(id) -> Entity | None`
-  qui charge l'aggregate root. Pour les aggregates riches
+- Chaque repository d'agrégat expose `find_by_id(id) -> Entity | None`
+  qui charge l'*aggregate root*. Pour les agrégats riches
   (`Publication`, `Person`, `Structure`), les VOs internes (name forms,
   identifiers) sont chargés avec le root quand ils sont peu coûteux ;
   les entités filles (ex. `Authorship` de `Publication`) ne sont pas
   chargées par défaut (composition lazy — méthode dédiée
   `find_by_publication_id` sur `AuthorshipRepository`).
-- Les références entre aggregates sont **par id** (pattern Cosmic
+- Les références entre agrégats sont **par id** (pattern Cosmic
   Python ch. 7), pas par objet : `Authorship.person_id`,
   `Journal.publisher_id`, `Perimeter.structure_ids` — pas d'hydratation
   transitive.
