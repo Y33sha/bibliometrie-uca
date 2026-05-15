@@ -28,7 +28,10 @@ class StructureRepository(Protocol):
         ror_id: str | None,
         rnsr_id: str | None,
         hal_collection: str | None,
-        api_ids: dict[str, Any] | None,
+        # Pré-coercion : `str` toléré, normalisé en `list[str]` par le repo
+        # via `StructureApiIds`. Le post-coercion (DB / aggregate) est
+        # `dict[str, list[str]]`.
+        api_ids: dict[str, str | list[str]] | None,
     ) -> dict[str, Any]: ...
 
     def update_structure_fields(

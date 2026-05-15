@@ -13,7 +13,6 @@ règles sur la hiérarchie `structure_relations`) vit ici.
 
 from dataclasses import dataclass, field
 
-from domain.json_types import JsonValue
 from domain.structures.name_forms import StructureNameForm
 
 
@@ -29,5 +28,5 @@ class Structure:
     ror_id: str | None = None
     rnsr_id: str | None = None
     hal_collection: str | None = None
-    api_ids: dict[str, JsonValue] | None = None
+    api_ids: dict[str, list[str]] | None = None
     name_forms: tuple[StructureNameForm, ...] = field(default=())

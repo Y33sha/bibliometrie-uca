@@ -21,8 +21,8 @@ règle DDD `application ⊥ infrastructure`.
 
 import contextvars
 import logging
-from typing import Any
 
+from domain.json_types import JsonValue
 from domain.ports.audit_repository import AuditRepository
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ def emit_event(
     event_type: str,
     aggregate_type: str,
     aggregate_id: int | None = None,
-    payload: dict[str, Any] | None = None,
+    payload: dict[str, JsonValue] | None = None,
 ) -> None:
     """Enregistre un événement d'audit dans audit_log.
 
