@@ -24,11 +24,6 @@ class ConflictError(DomainError):
     création d'un doublon interdit, etc. (→ HTTP 409)."""
 
 
-class CannotReattributeError(ConflictError):
-    """Tentative de réattribution d'un `PersonIdentifier` depuis un statut
-    autre que `rejected`. Levée par `PersonIdentifier.reattribute_to`."""
-
-
 class CannotAttributeConflict(ConflictError):
     """Tentative d'attribution d'un identifiant déjà attribué à une autre
     personne avec un statut `pending` ou `confirmed`. Pour réattribuer,
