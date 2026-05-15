@@ -121,12 +121,7 @@ Périmètres identifiés :
   - `application/pipeline/affiliations/populate_affiliations.py` : `perimeter_ids/wide_ids: set[int]`. `application/pipeline/publications/merge_pubs_by_hal_id.py:items: list[dict[str, Any]]`. `application/pipeline/publications/match_or_create_publications.py:doc: dict[str, Any]`. `application/pipeline/subjects/run.py` + `authorships/build_authorships.py` : `sources: Iterable[str] | None`.
   - `interfaces/api/models.py:ConfigItem.value` et `ConfigValueUpdate.value` : `Any` (pydantic ne supporte pas l'alias récursif `JsonValue` en py310).
   - `tests/` : `Any` tolérés pour `MagicMock` (cf. décision 4) ; `object` quand l'argument n'est pas utilisé.
-- [ ] `[[tool.mypy.overrides]]` par module au fil du nettoyage :
-  `disallow_any_explicit = true` activé module par module dans
-  `pyproject.toml` (un commit par bascule).
-- [ ] Une fois tous les modules nettoyés, promotion en règle
-  globale (retrait des overrides individuels, activation au niveau
-  `[tool.mypy]`).
+- [x] **Promotion en règle globale** : `disallow_any_explicit = true` et `disallow_any_generics = true` activés au niveau `[tool.mypy]`. Toute occurrence de `Any` ou de `dict`/`list`/`tuple` non paramétré est désormais rejetée par défaut. Les overrides individuels précédents (`domain.*`, `interfaces.api.{app,deps,routers.*}`, 5 ports normalize) sont retirés (redondants avec le global). Un seul override de désactivation explicite couvre les modules dont les `Any` sont délibérés et documentés (frontières JSON externes, records DB / `fields` partial updates délégués à `rich-domain-model` Phase 8, helpers polymorphiques, Pydantic récursivité, code hors scope du chantier — CLIs maintenance/imports, infra fetch/extract). La liste à désactiver rétrécit au fil des nettoyages futurs.
 
 ## Hors scope (chantiers de suite)
 

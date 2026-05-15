@@ -36,7 +36,7 @@ _current_user: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 )
 
 
-def set_current_user(user_id: str | None) -> contextvars.Token:
+def set_current_user(user_id: str | None) -> contextvars.Token[str | None]:
     """Définit l'utilisateur courant pour la requête en cours.
 
     Retourne un Token à passer à `reset_current_user()` pour restaurer
@@ -45,7 +45,7 @@ def set_current_user(user_id: str | None) -> contextvars.Token:
     return _current_user.set(user_id)
 
 
-def reset_current_user(token: contextvars.Token) -> None:
+def reset_current_user(token: contextvars.Token[str | None]) -> None:
     """Restaure l'état précédent du contexte utilisateur."""
     _current_user.reset(token)
 

@@ -224,11 +224,16 @@ python_version = "3.10"
 # Imports : ignorer les libs tierces non typées plutôt que de polluer
 ignore_missing_imports = true
 # Mode strict : toutes les fonctions doivent être annotées, et leur corps
-# est vérifié. `warn_return_any` reste off car `-> Any` est utilisé
-# pragmatiquement sur les fonctions CLI/helpers où le type de retour
-# n'apporte pas d'information.
+# est vérifié.
 check_untyped_defs = true
 disallow_untyped_defs = true
+# `Any` explicite interdit globalement — aboutissement du chantier
+# `CODE_chasse-aux-any`. Exceptions explicites via overrides ci-dessous,
+# toutes documentées (frontières JSON/JSONB en lecture, records DB
+# hydratés, helpers polymorphiques, partial updates DB).
+disallow_any_explicit = true
+disallow_any_generics = true
+# `-> Any` propagé toléré pragmatiquement.
 warn_return_any = false
 # Afficher les codes d'erreur pour pouvoir ignorer précisément au besoin
 show_error_codes = true
@@ -247,39 +252,82 @@ exclude = [
     "^alembic/",
 ]
 
-# Durcissement progressif (chantier chasse-aux-any) : un module bascule
-# en mode strict quand il est nettoyé. `disallow_any_generics` bloque
-# les `dict`/`list`/`tuple` non paramétrés (= `Any` implicite). `Any`
-# explicite reste autorisé mais doit être justifié dans le code
-# (frontière JSON/JSONB).
-[[tool.mypy.overrides]]
-module = "domain.*"
-disallow_any_generics = true
-
-[[tool.mypy.overrides]]
-module = ["interfaces.api.app", "interfaces.api.deps"]
-disallow_any_generics = true
-
-[[tool.mypy.overrides]]
-module = "interfaces.api.routers.*"
-disallow_any_generics = true
-
-# Ports normalize : frontière JSONB typée via `JsonValue` (cf. chantier
-# chasse-aux-any). `Any` interdit dans ces fichiers. Les implémentations
-# dans `infrastructure.db.queries.normalize_*` ont encore des `**kwargs: Any`
-# sur les méthodes adapter — à traiter dans une tranche suivante avant
-# d'étendre le verrou côté infra.
-#
-# `application.ports.normalize_wos` exclu du verrou : utilise encore
-# `list[dict[str, Any]]` pour les batchs (paramètres SQL hétérogènes,
-# pas du JSONB). Tranche suivante.
+# Désactivation explicite pour les modules dont les `Any` sont
+# délibérés. Documentés au cas par cas :
+# - `domain.sources.*` : payloads JSON bruts d'APIs externes (lecture
+#   dynamique, forcer `JsonValue` exigerait des isinstance partout).
+# - `domain.ports.*` (sauf audit, déjà strict) : records DB hydratés et
+#   partial updates `fields: dict[str, Any]` — délégués au chantier
+#   `CODE_rich-domain-model` Phase 8.
+# - `domain.publications.aggregation` : `first_non_null` /
+#   `merge_lists_dedup_ci` polymorphiques sur `getattr(source, attr)`.
+# - `application.ports.api.*` et `application.ports.pipeline.*` (hors
+#   normalize ciblés) : Protocols qui retournent `dict[str, Any]`
+#   records DB.
+# - `application.pipeline.normalize.*` : consomment des `dict[str, Any]`
+#   payloads venant des APIs (cf. `domain.sources.*`).
+# - `application.pipeline.persons.create_persons_from_source_authorships` :
+#   cascade matching bloquée par `METIER_decide-person-match`.
+# - Services racine `application.{config,persons,journals,publishers,
+#   structures,addresses.countries,authorships.core}` : retournent ou
+#   reçoivent des records / partial updates DB (Phase 8).
+# - `infrastructure.repositories.*` et `infrastructure.db.queries.*` :
+#   couche SQL — Row, records DB, batchs hétérogènes. Phase 8.
+# - `infrastructure.sources.*` : extracteurs API, payloads JSON.
+# - `infrastructure.{api_retry,api_retry_async,settings,pipeline_status}`
+#   et `interfaces.cli.{imports,maintenance}.*` : hors scope du
+#   chantier (CLIs / framework).
+# - `interfaces.api.models:ConfigItem.value` / `ConfigValueUpdate.value` :
+#   pydantic ne supporte pas l'alias récursif `JsonValue` (py310).
+# - `interfaces.cli.dev.generate_seed.TABLES` : schéma de seed,
+#   `list[dict[str, Any]]` délibéré.
 [[tool.mypy.overrides]]
 module = [
-    "application.ports.normalize_hal",
-    "application.ports.normalize_openalex",
-    "application.ports.normalize_crossref",
-    "application.ports.normalize_theses",
-    "application.ports.normalize_scanr",
+    "application.addresses.countries",
+    "application.authorships.core",
+    "application.config",
+    "application.journals",
+    "application.persons",
+    "application.publishers",
+    "application.structures",
+    "application.pipeline.affiliations.resolve_addresses",
+    "application.pipeline.enrich.*",
+    "application.pipeline.fetch_missing_doi",
+    "application.pipeline.normalize.*",
+    "application.pipeline.persons.create_persons_from_source_authorships",
+    "application.pipeline.persons.populate_person_name_forms",
+    "application.pipeline.publications.match_or_create_publications",
+    "application.pipeline.publications.merge_pubs_by_hal_id",
+    "application.pipeline.subjects._common",
+    "application.pipeline.subjects.run",
+    "application.ports.api.*",
+    "application.ports.config",
+    "application.ports.pipeline.address_resolution",
+    "application.ports.pipeline.merge",
+    "application.ports.pipeline.name_forms",
+    "application.ports.pipeline.normalize.wos",
+    "application.ports.pipeline.persons_create",
+    "application.ports.pipeline.publications_match_or_create",
+    "application.ports.pipeline.staging",
+    "application.ports.pipeline.subjects",
+    "domain.ports.*",
+    "domain.publications.aggregation",
+    "domain.sources.*",
+    "infrastructure.api_retry",
+    "infrastructure.api_retry_async",
+    "infrastructure.db.jsonb_models.*",
+    "infrastructure.db.queries.*",
+    "infrastructure.pipeline_status",
+    "infrastructure.repositories.*",
+    "infrastructure.settings",
+    "infrastructure.sources.*",
+    "interfaces.api.models",
+    "interfaces.api.routers.docs",
+    "interfaces.api.routers.journals",
+    "interfaces.cli.dev.generate_seed",
+    "interfaces.cli.imports.*",
+    "interfaces.cli.maintenance.*",
+    "run_pipeline",
 ]
-disallow_any_explicit = true
-disallow_any_generics = true
+disallow_any_explicit = false
+disallow_any_generics = false
