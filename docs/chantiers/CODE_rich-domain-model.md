@@ -306,7 +306,7 @@ Aucune logique métier identifiée actuellement au-delà du CRUD de `application
 
 Une fois les callers de Phase 1 migrés vers les entités (Phases 3, 4, 5), les fonctions libres font doublon avec les méthodes d'aggregate. Suppression.
 
-- [ ] `domain/persons/merge.py:check_can_merge_persons` — supprimer une fois `application/persons.py:merge_person` migré vers `Person.can_merge_with(...)`. Le fichier `merge.py` devient vide et peut être supprimé.
+- [x] `domain/persons/merge.py:check_can_merge_persons` supprimée — remplacée partout par `Person.can_merge_with` après Phase 5.1. Fichier `domain/persons/merge.py` supprimé (devenu vide). Test correspondant `tests/unit/domain/persons/test_merge.py` supprimé ; le seul cas non déjà couvert par `tests/unit/domain/persons/test_person.py:TestCanMergeWith` (présence des deux ids dans le message d'erreur) migré au passage.
 
 ### Phase 7 — Convention pour les chantiers METIER_*
 
