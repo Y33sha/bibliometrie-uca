@@ -11,10 +11,26 @@ d'éditeurs ; la détection préalable des journaux à titre partagé
 deux.
 """
 
-from sqlalchemy import Connection, delete, func, select, text, update
+from typing import Any
+
+from sqlalchemy import Connection, Row, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from domain.publishers.publisher import Publisher
 from infrastructure.db.tables import publisher_name_forms, publishers
+
+
+def _publisher_from_row(row: Row[Any]) -> Publisher:
+    """Mapping d'une row `publishers` SQL vers l'aggregate `Publisher`."""
+    return Publisher(
+        id=row.id,
+        name=row.name,
+        country=row.country,
+        openalex_id=row.openalex_id,
+        is_predatory=row.is_predatory,
+        notes=row.notes,
+        doi_prefix=row.doi_prefix,
+    )
 
 
 class PgPublisherRepository:
@@ -22,6 +38,24 @@ class PgPublisherRepository:
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    # ── Chargement de l'aggregate ──────────────────────────────────
+
+    def find_by_id(self, publisher_id: int) -> Publisher | None:
+        row = self._conn.execute(
+            select(
+                publishers.c.id,
+                publishers.c.name,
+                publishers.c.country,
+                publishers.c.openalex_id,
+                publishers.c.is_predatory,
+                publishers.c.notes,
+                publishers.c.doi_prefix,
+            ).where(publishers.c.id == publisher_id)
+        ).first()
+        if row is None:
+            return None
+        return _publisher_from_row(row)
 
     # ── publisher_name_forms ───────────────────────────────────────
 

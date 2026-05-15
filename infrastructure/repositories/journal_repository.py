@@ -6,10 +6,35 @@ Même contrat que les autres PgXxxRepository : exceptions du domaine,
 pas d'orchestration métier (qui reste dans `application/journals.py`).
 """
 
-from sqlalchemy import Connection, case, delete, func, or_, select, text, update
+from typing import Any
+
+from sqlalchemy import Connection, Row, case, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from domain.journals.journal import Journal
 from infrastructure.db.tables import journal_name_forms, journals
+
+
+def _journal_from_row(row: Row[Any]) -> Journal:
+    """Mapping d'une row `journals` SQL vers l'aggregate `Journal`."""
+    return Journal(
+        id=row.id,
+        title=row.title,
+        issn=row.issn,
+        eissn=row.eissn,
+        issnl=row.issnl,
+        publisher_id=row.publisher_id,
+        openalex_id=row.openalex_id,
+        is_in_doaj=row.is_in_doaj,
+        is_predatory=row.is_predatory,
+        apc_amount=row.apc_amount,
+        apc_currency=row.apc_currency,
+        oa_model=row.oa_model,
+        notes=row.notes,
+        journal_type=row.journal_type,
+        is_academic=row.is_academic,
+        doi_prefix=row.doi_prefix,
+    )
 
 
 class PgJournalRepository:
@@ -17,6 +42,33 @@ class PgJournalRepository:
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    # ── Chargement de l'aggregate ──────────────────────────────────
+
+    def find_by_id(self, journal_id: int) -> Journal | None:
+        row = self._conn.execute(
+            select(
+                journals.c.id,
+                journals.c.title,
+                journals.c.issn,
+                journals.c.eissn,
+                journals.c.issnl,
+                journals.c.publisher_id,
+                journals.c.openalex_id,
+                journals.c.is_in_doaj,
+                journals.c.is_predatory,
+                journals.c.apc_amount,
+                journals.c.apc_currency,
+                journals.c.oa_model,
+                journals.c.notes,
+                journals.c.journal_type,
+                journals.c.is_academic,
+                journals.c.doi_prefix,
+            ).where(journals.c.id == journal_id)
+        ).first()
+        if row is None:
+            return None
+        return _journal_from_row(row)
 
     # ── journal_name_forms ─────────────────────────────────────────
 

@@ -18,9 +18,20 @@ Implémenté par `infrastructure/repositories/publisher_repository.py`.
 
 from typing import Any, Protocol
 
+from domain.publishers.publisher import Publisher
+
 
 class PublisherRepository(Protocol):
     """Contrat d'accès à l'agrégat Publisher."""
+
+    # ── Chargement de l'aggregate ──────────────────────────────────
+
+    def find_by_id(self, publisher_id: int) -> Publisher | None:
+        """Hydrate l'aggregate `Publisher` complet. Retourne None si
+        l'éditeur n'existe pas. Les `publisher_name_forms` ne sont pas
+        chargées par l'aggregate (projection séparée — voir
+        `find_publisher_by_name_form` pour les lookups par forme)."""
+        ...
 
     # ── publisher_name_forms ───────────────────────────────────────
 
