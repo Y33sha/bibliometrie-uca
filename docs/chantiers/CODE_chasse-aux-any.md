@@ -126,13 +126,8 @@ Périmètres identifiés :
 
 ## Hors scope (chantiers de suite)
 
-- **DTOs application-level pour les query services** : alternative
-  plus stricte à l'option A retenue (les handlers instancient le
-  `BaseModel` du `response_model` au retour). Les query services
-  retourneraient directement des types forts, supprimant les
-  `dict[str, Any]` côté infra. Principalement architectural
-  (déplacement des modèles Pydantic hors `interfaces/api/`),
-  pas vraiment du typage — chantier dédié si on veut le faire.
+- **DTOs application-level pour les query services** : voir
+  `CODE_dtos-application-level.md` (stub).
 - **Typage strict des projections** (`Row[Any]`, batchs SQL
   hétérogènes, records DB hydratés) : voir
   `CODE_typage-projections-strict.md`.
