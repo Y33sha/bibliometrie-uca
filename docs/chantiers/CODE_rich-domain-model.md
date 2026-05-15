@@ -325,25 +325,32 @@ Hors scope domain (mentions pour mémoire) :
 
 - **Validation cross-aggregate sur `StructureNameForm.requires_context_of`** : les ids référencés doivent pointer vers des structures existantes. Plutôt côté service / infra (FK constraint) que dans le domain pur.
 
-### Phase 8 — Audit général des repositories
+### Phase 8 — Hydratation des aggregates restants
 
-Généralisation de l'hydratation faite en Phase 4 pour Publication aux autres aggregates (Person, Structure, SourcePublication, AddressAffiliation). À instruire séparément quand on y arrivera. Hypothèse de travail (Laura) : les repositories sont majoritairement en écriture et ne renvoient rien ; à vérifier.
+Généralisation de l'hydratation faite en Phase 4 (Publication) et Phase 5 (Person partiellement) aux autres aggregates. Audit réalisé au démarrage : voir tableau ci-dessous.
 
-Inclut aussi le **typage des projections de lecture et des partial updates** (déféré depuis `CODE_chasse-aux-any` Phase 3) : les `dict[str, Any]` qui apparaissent comme retour ou comme `fields: dict[str, Any]` dans les ports `domain/ports/*_repository.py` sont délibérément non typés tant que ce sweep architectural n'a pas tranché entre les options ci-dessous.
+**Décisions cadrantes** :
 
-Audit préalable :
+- **Composition lazy** : `find_by_id` charge l'aggregate root sans ses entités filles (modèle Phase 4 pour Publication : authorships non chargées par défaut). Si un caller a besoin des filles, méthode dédiée `find_by_id_with_<fille>` au cas par cas.
+- **Mapper `row → entity`** : fonction libre `_<entity>_from_row(row) → Entity` dans le module repo. Pas de classmethod sur l'entité (pour ne pas mêler SQL et domain) ; pas de classe mapper dédiée (overkill).
+- **Query services API hors scope par découpage de chantier** : les query services (`infrastructure/db/queries/**` consommés par les routers FastAPI via `application/ports/api/*_queries.py`) projettent vers des formes ciblées UI (souvent dénormalisées) ; les charger en aggregate complet pour re-projeter est du double travail. Le typage de leurs retours `dict[str, Any]` → DTOs Pydantic est dans le scope de `CODE_typage-projections-strict`.
+- **Typage des projections de lecture, des partial updates et des DTOs API** : absorbé par `CODE_typage-projections-strict` (`Row[Any]`, `list[dict[str, Any]]`, `fields: dict[str, Any]`, Pydantic `BaseModel` de `interfaces/api/models.py`). Ce chantier-ci se concentre sur les aggregates roots, pas sur le typage fin des records minimaux et batchs SQL.
 
-- [ ] Inventaire des méthodes de chaque repository (`infrastructure/repositories/`) : signature, type de retour, callers.
-- [ ] Identifier les méthodes en lecture (renvoyant `dict`, dataclass, ou autre) — combien, où, vers quels callers.
-- [ ] Décider du contrat : repos renvoient des entités par défaut OU ajout ciblé de méthodes `find_by_id(id) -> Entity` en complément des lectures projectives existantes (modèle retenu en Phase 4 pour Publication).
-- [ ] Trancher la place de la conversion `row → entity` (au sein du repo, via un mapper dédié, via une classmethod d'entité ?).
-- [ ] Coordonner avec les query services pour API (`application/ports/`) : ces derniers restent sur des DTOs de projection ; pas d'entités hydratées en lecture API.
-- [ ] **Projections de lecture `dict[str, Any]`** : décider du remplaçant (entité riche / `TypedDict` / `dataclass(frozen=True)` / `NamedTuple`). Le choix peut varier par méthode selon ce qu'elle retourne (record minimal vs aggregate complet).
-- [ ] **Partial updates `fields: dict[str, Any]`** : remplacer par `TypedDict(total=False)` un par port (`JournalUpdateFields`, `PerimeterUpdateFields`, `PublisherUpdateFields`, `StructureUpdateFields`, `StructureNameFormUpdateFields`). Contraint statiquement les callers aux colonnes valides.
+**Inventaire (cf. audit) — par ordre de migration** :
 
-Contenu détaillé à formaliser en phase d'instruction.
+- [ ] **`StructureRepository`** : 9 méthodes CRUD retournent `dict[str, Any]`. Aggregate scaffoldé + VOs en Phase 7. Mapper trivial. Ajouter `find_by_id(id) -> Structure | None`.
+- [ ] **`JournalRepository` + `PublisherRepository`** : entités simples, peu de logique métier. Aggregate à scaffolder en passant. Ajouter `find_by_id`.
+- [ ] **`AuthorshipRepository`** : entité fille de Publication (déjà scaffoldée). Méthode `find_by_publication_id(pub_id) -> tuple[Authorship, ...]` pertinente pour les use-cases qui auront besoin des filles chargées.
+- [ ] **`PerimeterRepository`** : petit aggregate, peu utilisé en lecture. Ajouter `find_by_id` par cohérence.
+- [ ] **`AddressAffiliation`** : à instruire après les autres. Identité opaque (pas de `code` naturel), méthodes actuelles retournent surtout des listes d'IDs affectés (`refresh_sa_countries_for_addresses`, etc.) — le contrat "find_by_id en aggregate complet" n'est pas évident.
 
-En clôture du chantier (dernière étape de cette phase) : mettre à jour `docs/architecture.md` pour refléter le modèle DDD final (aggregates, VOs, périmètre de chaque entité, conventions de hydratation/projection).
+Hors scope Phase 8 (write-only ou déjà fait) :
+
+- `AuditRepository` (write-only par nature).
+- `PersonRepository` (`find_by_id` déjà ajouté en Phase 5 ; les 19 méthodes d'orchestration `link_authorship` / `assign_orphan_*` / etc. ne sont pas des charges pures et restent en l'état).
+- `PublicationRepository` (hydraté en Phase 4).
+
+**Clôture** : mettre à jour `docs/architecture.md` pour refléter le modèle DDD final (aggregates, VOs, périmètre de chaque entité, conventions hydratation/projection/composition lazy).
 
 ## Questions ouvertes
 
