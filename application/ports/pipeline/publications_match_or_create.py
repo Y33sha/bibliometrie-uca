@@ -3,7 +3,7 @@
 Implémenté par `infrastructure.db.queries.publications.match_or_create.PgPublicationsMatchOrCreateQueries`.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
 
@@ -13,7 +13,7 @@ class PublicationsMatchOrCreateQueries(Protocol):
 
     def fetch_orphan_in_perimeter_source_publications(
         self, conn: Connection
-    ) -> list[dict[str, Any]]: ...
+    ) -> list[dict[str, object]]: ...
 
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int

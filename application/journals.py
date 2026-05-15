@@ -12,6 +12,7 @@ Les routers FastAPI utilisent les mêmes repos que le pipeline
 
 from application.audit import emit_event
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from domain.json_types import JsonValue
 from domain.normalize import normalize_text
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.journal_repository import JournalRepository
@@ -105,7 +106,9 @@ def find_or_create_journal(
     return journal_id
 
 
-def update_journal(journal_id: int, *, fields: dict, repo: JournalRepository) -> None:
+def update_journal(
+    journal_id: int, *, fields: dict[str, JsonValue], repo: JournalRepository
+) -> None:
     """Met à jour une revue. Le `title` est automatiquement normalisé en
     `title_normalized`.
 
@@ -120,7 +123,9 @@ def update_journal(journal_id: int, *, fields: dict, repo: JournalRepository) ->
 
     fields = dict(fields)
     if "title" in fields:
-        fields["title_normalized"] = normalize_text(fields["title"])
+        title = fields["title"]
+        assert isinstance(title, str), "fields['title'] doit être un str (validé par Pydantic)"
+        fields["title_normalized"] = normalize_text(title)
     repo.update_journal_fields(journal_id, fields)
 
 

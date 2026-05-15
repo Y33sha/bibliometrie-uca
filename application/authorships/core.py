@@ -14,6 +14,7 @@ from sqlalchemy import Connection
 from application.audit import emit_event
 from application.ports.pipeline.perimeter import PerimeterQueries
 from domain.errors import NotFoundError, ValidationError
+from domain.json_types import JsonValue
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.authorship_repository import AuthorshipRepository
 from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
@@ -24,7 +25,7 @@ def exclude_authorship(
     *,
     repo: AuthorshipRepository,
     audit_repo: AuditRepository | None = None,
-) -> dict:
+) -> dict[str, JsonValue]:
     """Marque une authorship comme exclue et détache les authorships sources.
 
     1. Marque l'authorship excluded = TRUE

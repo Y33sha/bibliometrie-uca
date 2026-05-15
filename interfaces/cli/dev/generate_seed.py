@@ -29,7 +29,8 @@ from sqlalchemy import Connection, text
 from domain.json_types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 
-# Tables à exporter, dans l'ordre d'insertion (respect des FK)
+# Tables à exporter, dans l'ordre d'insertion (respect des FK).
+# Valeurs hétérogènes (str, list, dict) — TypedDict ferait sens à terme.
 TABLES: list[dict[str, Any]] = [
     {
         "table": "config",

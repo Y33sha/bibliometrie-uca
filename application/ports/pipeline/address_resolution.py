@@ -3,7 +3,7 @@
 Implémenté par `infrastructure.db.queries.address_resolution.PgAddressResolutionQueries`.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
 
@@ -11,7 +11,7 @@ from sqlalchemy import Connection
 class AddressResolutionQueries(Protocol):
     """Opérations SQL pour résoudre les adresses → structures."""
 
-    def load_name_forms(self, conn: Connection) -> list[dict[str, Any]]: ...
+    def load_name_forms(self, conn: Connection) -> list[dict[str, object]]: ...
 
     def reset_auto_detected(self, conn: Connection) -> int: ...
 

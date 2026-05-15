@@ -2,10 +2,10 @@
 
 import logging
 import re
-from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from domain.json_types import JsonValue
 from infrastructure import PROJECT_ROOT
 
 router = APIRouter()
@@ -32,9 +32,9 @@ def list_docs() -> list[dict[str, str]]:
 
 
 @router.get("/api/docs/todos/all")
-def list_all_todos() -> list[dict[str, Any]]:
+def list_all_todos() -> list[dict[str, JsonValue]]:
     """Collecte tous les <!-- TODO: ... --> de tous les fichiers .md."""
-    todos: list[dict[str, Any]] = []
+    todos: list[dict[str, JsonValue]] = []
     todo_re = re.compile(r"<!--\s*TODO\s*:\s*(.+?)\s*-->")
 
     for page in DOC_PAGES:
@@ -56,7 +56,7 @@ def list_all_todos() -> list[dict[str, Any]]:
 
 
 @router.get("/api/docs/{slug}")
-def get_doc(slug: str) -> dict[str, Any]:
+def get_doc(slug: str) -> dict[str, JsonValue]:
     """Retourne le contenu markdown d'une page de documentation."""
     # Sécurité : pas de traversal
     if "/" in slug or "\\" in slug or ".." in slug:

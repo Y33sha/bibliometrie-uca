@@ -415,7 +415,10 @@ def toggle_authorship_excluded(
 ) -> AuthorshipExcludeResponse:
     """Marque un authorship comme exclu."""
     row = exclude_authorship(authorship_id, repo=repo, audit_repo=audit)
-    return AuthorshipExcludeResponse(id=row["id"], excluded=row["excluded"])
+    row_id = row["id"]
+    row_excluded = row["excluded"]
+    assert isinstance(row_id, int) and isinstance(row_excluded, bool)
+    return AuthorshipExcludeResponse(id=row_id, excluded=row_excluded)
 
 
 @router.patch("/api/persons/{person_id}/reject", response_model=OkResponse)
