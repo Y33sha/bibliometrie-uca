@@ -6,9 +6,20 @@ opérations sont étroitement couplées.
 
 from typing import Any, Protocol
 
+from domain.publications.authorship import Authorship
+
 
 class AuthorshipRepository(Protocol):
     """Contrat d'accès aux tables authorships et source_authorships."""
+
+    # ── Chargement des entités filles ──────────────────────────────
+
+    def find_by_publication_id(self, publication_id: int) -> tuple[Authorship, ...]:
+        """Charge toutes les `Authorship` d'une publication (ordonnées
+        par `author_position`). Retourne un tuple vide si aucune.
+        Entrée principale pour les use-cases qui manipulent les
+        authorships comme entités plutôt que comme records DB."""
+        ...
 
     # ── authorships ────────────────────────────────────────────────
 

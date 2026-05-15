@@ -5,9 +5,20 @@ Implémenté par `infrastructure/repositories/perimeter_repository.py`.
 
 from typing import Any, Protocol
 
+from domain.perimeters.perimeter import Perimeter
+
 
 class PerimeterRepository(Protocol):
     """Contrat d'accès à la table `perimeters`."""
+
+    # ── Chargement de l'aggregate ──────────────────────────────────
+
+    def find_by_id(self, perimeter_id: int) -> Perimeter | None:
+        """Hydrate l'aggregate `Perimeter` complet (code, name,
+        description, `structure_ids`). Retourne None si le perimeter
+        n'existe pas. `structure_ids` reste sous forme d'ids (références
+        par id à l'aggregate Structure)."""
+        ...
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
 

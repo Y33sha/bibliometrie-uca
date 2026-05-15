@@ -165,6 +165,80 @@ def _link_sa_address(conn, source_authorship_id, address_id):
     )
 
 
+# ── find_by_publication_id (hydratation Authorship) ──────────────
+
+
+class TestFindByPublicationId:
+    def test_returns_empty_tuple_if_no_authorship(self, sa_sync_conn, repo):
+        pub_id = _create_publication(sa_sync_conn)
+        assert repo.find_by_publication_id(pub_id) == ()
+
+    def test_returns_empty_if_pub_does_not_exist(self, sa_sync_conn, repo):
+        assert repo.find_by_publication_id(999999) == ()
+
+    def test_hydrates_authorships_ordered_by_position(self, sa_sync_conn, repo):
+        pub_id = _create_publication(sa_sync_conn)
+        p1 = _create_person(sa_sync_conn, "Alpha", "A")
+        p2 = _create_person(sa_sync_conn, "Beta", "B")
+        # Insert dans l'ordre inverse pour vérifier le tri par author_position.
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO authorships (publication_id, person_id, author_position) "
+                "VALUES (:p, :pid, 2)"
+            ),
+            {"p": pub_id, "pid": p2},
+        )
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO authorships (publication_id, person_id, author_position) "
+                "VALUES (:p, :pid, 1)"
+            ),
+            {"p": pub_id, "pid": p1},
+        )
+        auths = repo.find_by_publication_id(pub_id)
+        assert len(auths) == 2
+        assert auths[0].person_id == p1
+        assert auths[0].author_position == 1
+        assert auths[1].person_id == p2
+        assert auths[1].author_position == 2
+        # Vérification des defaults bool.
+        assert auths[0].in_perimeter is False
+        assert auths[0].excluded is False
+
+    def test_hydrates_full_authorship(self, sa_sync_conn, repo):
+        pub_id = _create_publication(sa_sync_conn)
+        person_id = _create_person(sa_sync_conn)
+        sa_sync_conn.execute(
+            text("""
+                INSERT INTO authorships
+                    (publication_id, person_id, author_position, in_perimeter,
+                     source_manual, excluded, is_corresponding, roles, structure_ids,
+                     notes)
+                VALUES (:p, :pid, 3, TRUE, TRUE, FALSE, TRUE,
+                        CAST(:roles AS text[]), CAST(:sids AS integer[]),
+                        'note')
+            """),
+            {
+                "p": pub_id,
+                "pid": person_id,
+                "roles": ["author"],
+                "sids": [42, 43],
+            },
+        )
+        auths = repo.find_by_publication_id(pub_id)
+        assert len(auths) == 1
+        a = auths[0]
+        assert a.publication_id == pub_id
+        assert a.person_id == person_id
+        assert a.author_position == 3
+        assert a.in_perimeter is True
+        assert a.source_manual is True
+        assert a.is_corresponding is True
+        assert a.roles == ("author",)
+        assert a.structure_ids == (42, 43)
+        assert a.notes == "note"
+
+
 # ── exclude_authorship ────────────────────────────────────────
 
 

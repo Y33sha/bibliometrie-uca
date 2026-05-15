@@ -1,8 +1,22 @@
 """Adapter PostgreSQL sync pour l'agrégat Perimeter."""
 
-from sqlalchemy import Connection, delete, func, select, update
+from typing import Any
 
+from sqlalchemy import Connection, Row, delete, func, select, update
+
+from domain.perimeters.perimeter import Perimeter
 from infrastructure.db.tables import perimeters
+
+
+def _perimeter_from_row(row: Row[Any]) -> Perimeter:
+    """Mapping d'une row `perimeters` SQL vers l'aggregate `Perimeter`."""
+    return Perimeter(
+        id=row.id,
+        code=row.code,
+        name=row.name,
+        description=row.description,
+        structure_ids=tuple(row.structure_ids or ()),
+    )
 
 
 class PgPerimeterRepository:
@@ -10,6 +24,22 @@ class PgPerimeterRepository:
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    # ── Chargement de l'aggregate ──────────────────────────────────
+
+    def find_by_id(self, perimeter_id: int) -> Perimeter | None:
+        row = self._conn.execute(
+            select(
+                perimeters.c.id,
+                perimeters.c.code,
+                perimeters.c.name,
+                perimeters.c.description,
+                perimeters.c.structure_ids,
+            ).where(perimeters.c.id == perimeter_id)
+        ).first()
+        if row is None:
+            return None
+        return _perimeter_from_row(row)
 
     # ── Liens structure ↔ perimeter ────────────────────────────────
 
