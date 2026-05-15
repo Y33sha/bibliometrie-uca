@@ -83,7 +83,7 @@ Découpage proposé (chaque phase = chantier autonome mergeable indépendamment)
 - [x] Ajout de `"crossref"` à `ALL_SOURCES`, `BIBLIO_SOURCES` et `SOURCE_PRIORITY` (2ᵉ position) dans `domain/sources.py`
 - [x] Client API `infrastructure/sources/crossref/fetch_missing_doi.py` (polite pool via mailto, retry, gestion 404 → `not_found=TRUE`)
 - [x] Wiring dans `run_pipeline.py` + dispatcher CLI `interfaces/cli/pipeline/fetch_missing_doi.py`
-- [x] Normalizer CrossRef : ports (`application/ports/normalize_crossref.py`) + queries (`infrastructure/db/queries/normalize_crossref.py`) + orchestrator (`application/pipeline/normalize/normalize_crossref.py`) + CLI (`interfaces/cli/pipeline/normalize_crossref.py`) — alimentation de `source_publications` / `source_authorships` (colonnes canoniques + `meta`/`source_data`/`biblio` pour le reste). `doc_type` stocké NULL en attendant la phase 2.
+- [x] Normalizer CrossRef : ports (`application/ports/normalize_crossref.py`) + queries (`infrastructure/queries/normalize_crossref.py`) + orchestrator (`application/pipeline/normalize/normalize_crossref.py`) + CLI (`interfaces/cli/pipeline/normalize_crossref.py`) — alimentation de `source_publications` / `source_authorships` (colonnes canoniques + `meta`/`source_data`/`biblio` pour le reste). `doc_type` stocké NULL en attendant la phase 2.
 - [x] Wiring du normalizer dans `run_pipeline.phase_normalize` (avant scanr/hal/oa/wos, après theses)
 - [ ] Tests d'intégration sur un petit lot
 - **Livrable** : `source_publications` / `source_authorships` alimentées avec `source='crossref'` pour les DOI déjà présents dans `publications`, idempotent

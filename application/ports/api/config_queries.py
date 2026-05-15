@@ -5,7 +5,7 @@ lecture/écriture par clé de la table `config`. Ce port-ci agrège les
 lectures qui dérivent des paramètres (ex: collections HAL des
 structures du périmètre) ou qui listent l'ensemble des paramètres.
 
-Implémenté par `infrastructure.db.queries.config.PgConfigQueries`.
+Implémenté par `infrastructure.queries.config.PgConfigQueries`.
 """
 
 from typing import Any, Protocol

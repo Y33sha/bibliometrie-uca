@@ -17,7 +17,7 @@ from application.pipeline.subjects import (
 )
 from application.pipeline.subjects._common import SubjectCache
 from application.pipeline.subjects.run import run
-from infrastructure.db.queries.subjects import PgSubjectsQueries
+from infrastructure.queries.subjects import PgSubjectsQueries
 
 
 @pytest.fixture

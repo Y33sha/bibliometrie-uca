@@ -1,6 +1,6 @@
 """Port : SQL du normaliseur CrossRef.
 
-Implémenté par ``infrastructure.db.queries.normalize_crossref.PgCrossrefNormalizeQueries``.
+Implémenté par ``infrastructure.queries.normalize_crossref.PgCrossrefNormalizeQueries``.
 """
 
 from typing import Protocol

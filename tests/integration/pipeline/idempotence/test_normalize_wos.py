@@ -66,8 +66,8 @@ def run_normalize_wos(conn):
     from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_wos import process_record
-    from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
-    from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.queries.normalize_wos import PgWosNormalizeQueries
+    from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,

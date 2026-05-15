@@ -17,7 +17,7 @@ from application.authorships.core import (
     set_source_authorship_excluded,
 )
 from domain.errors import NotFoundError, ValidationError
-from infrastructure.db.queries.perimeter import PgPerimeterQueries
+from infrastructure.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import authorship_repository
 
 

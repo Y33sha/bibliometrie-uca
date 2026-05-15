@@ -5,9 +5,9 @@ import os
 from application.pipeline.normalize.normalize_theses import ThesesNormalizer
 from infrastructure.addresses import PgAddressLinker
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queries.normalize_theses import PgThesesNormalizeQueries
-from infrastructure.db.queries.staging import PgStagingQueries
 from infrastructure.log import setup_logger
+from infrastructure.queries.normalize_theses import PgThesesNormalizeQueries
+from infrastructure.queries.staging import PgStagingQueries
 from infrastructure.repositories import publication_repository
 
 logger = setup_logger("normalize_theses", os.path.join(os.path.dirname(__file__), "logs"))

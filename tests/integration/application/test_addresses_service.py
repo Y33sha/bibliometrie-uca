@@ -19,7 +19,7 @@ from application.addresses.structures import (
     review_structure_link,
     unassign_manual_structure,
 )
-from infrastructure.db.queries.perimeter import PgPerimeterQueries
+from infrastructure.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import address_repository, authorship_repository
 
 

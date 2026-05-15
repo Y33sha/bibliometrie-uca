@@ -1,6 +1,6 @@
 """Port : lectures sur les personnes (consommé par le router persons).
 
-Implémenté par `infrastructure.db.queries.persons.PgPersonsQueries`.
+Implémenté par `infrastructure.queries.persons.PgPersonsQueries`.
 
 Les dataclasses `DirectoryFilters` / `ListFilters` / `FacetFilters`
 vivent ici (source de vérité) ; les fonctions infra les importent

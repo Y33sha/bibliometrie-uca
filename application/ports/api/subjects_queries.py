@@ -1,7 +1,7 @@
 """Port : lectures sur les sujets (consommé par le router subjects).
 
 Implémenté par
-`infrastructure.db.queries.subjects.PgSubjectsAdminQueries`.
+`infrastructure.queries.subjects.PgSubjectsAdminQueries`.
 
 Note : `application.ports.subjects.SubjectsQueries` couvre la variante
 utilisée par le pipeline de normalisation (upsert/link/cleanup).

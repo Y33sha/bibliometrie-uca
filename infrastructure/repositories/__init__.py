@@ -27,7 +27,7 @@ from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.ports.repositories.structure_repository import StructureRepository
-from infrastructure.db.queries.config import PgConfig
+from infrastructure.queries.config import PgConfig
 
 from .address_repository import PgAddressRepository
 from .audit_repository import PgAuditRepository

@@ -1,6 +1,6 @@
 """Port : lectures/écritures pour les scripts de fusion cross-source.
 
-Implémenté par `infrastructure.db.queries.merge.PgMergeQueries`.
+Implémenté par `infrastructure.queries.merge.PgMergeQueries`.
 """
 
 from typing import Any, Protocol

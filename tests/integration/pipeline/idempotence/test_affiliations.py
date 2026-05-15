@@ -106,8 +106,8 @@ def _run_populate_affiliations(conn):
         _step_address_source,
         step3d_theses,
     )
-    from infrastructure.db.queries.affiliations import PgAffiliationsQueries
     from infrastructure.perimeter import get_affiliations_structure_ids, get_persons_structure_ids
+    from infrastructure.queries.affiliations import PgAffiliationsQueries
 
     perimeter_ids = get_persons_structure_ids(conn)
     wide_ids = get_affiliations_structure_ids(conn)
@@ -179,11 +179,11 @@ class TestPopulateAffiliationsIdempotence:
         from sqlalchemy import text
 
         from application.pipeline.affiliations.populate_affiliations import run_populate
-        from infrastructure.db.queries.affiliations import PgAffiliationsQueries
         from infrastructure.perimeter import (
             get_affiliations_structure_ids,
             get_persons_structure_ids,
         )
+        from infrastructure.queries.affiliations import PgAffiliationsQueries
 
         _setup_affiliations_test_data(sa_sync_conn)
 

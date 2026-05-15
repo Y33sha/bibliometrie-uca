@@ -5,7 +5,7 @@ la résolution du périmètre `persons` consommée par d'autres modules.
 Ce port-ci sert le listing complet pour la page admin périmètres.
 
 Implémenté par
-`infrastructure.db.queries.perimeter.PgPerimetersAdminQueries`.
+`infrastructure.queries.perimeter.PgPerimetersAdminQueries`.
 """
 
 from typing import Any, Protocol

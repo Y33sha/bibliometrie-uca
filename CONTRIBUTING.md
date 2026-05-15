@@ -158,7 +158,7 @@ découper comme `application/pipeline/publications/`, `persons/`, etc.
 Si la phase fait du SQL non trivial :
 
 - Protocol `application/ports/<phase>.py` définissant l'interface.
-- Adapter `infrastructure/db/queries/<phase>.py` qui l'implémente.
+- Adapter `infrastructure/queries/<phase>.py` qui l'implémente.
 - Le port est injecté par le composition root (le CLI one-shot ou
   `run_pipeline.py`), jamais instancié dans la couche application.
 

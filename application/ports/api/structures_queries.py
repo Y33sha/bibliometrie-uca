@@ -1,6 +1,6 @@
 """Port : lectures sur les structures (consommé par le router structures).
 
-Implémenté par `infrastructure.db.queries.structures.PgStructuresQueries`.
+Implémenté par `infrastructure.queries.structures.PgStructuresQueries`.
 """
 
 from typing import Any, Protocol

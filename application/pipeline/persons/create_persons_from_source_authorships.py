@@ -113,7 +113,7 @@ def _max_authors_per_pub(
     positions divergent trop entre sources. Pour appliquer ce seuil,
     on calcule pour chaque publi le max d'auteurs trouvés sur une
     même source — cohérent avec le filtre `MAX_AUTHORS_CONFLICT`
-    côté admin (`infrastructure/db/queries/person_duplicates.py`).
+    côté admin (`infrastructure/queries/person_duplicates.py`).
     """
     counts: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for a in all_authorships:

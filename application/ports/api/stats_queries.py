@@ -1,6 +1,6 @@
 """Port : lectures stats (consommé par le router stats).
 
-Implémenté par `infrastructure.db.queries.stats.PgStatsQueries`.
+Implémenté par `infrastructure.queries.stats.PgStatsQueries`.
 """
 
 from typing import Any, Protocol

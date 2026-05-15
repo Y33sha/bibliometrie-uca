@@ -111,7 +111,7 @@ type = "forbidden"
 source_modules = ["interfaces.api"]
 forbidden_modules = [
     "infrastructure.repositories",
-    "infrastructure.db.queries",
+    "infrastructure.queries",
 ]
 # Verrouillage de la règle 5 de docs/architecture.md : seul
 # `interfaces/api/deps.py` instancie les `Pg*` concrets et les
@@ -121,7 +121,7 @@ forbidden_modules = [
 # `db.queries` — pas besoin de l'ignorer.)
 #
 # `ignore_imports` exige le matching exact (pas les descendants),
-# d'où l'énumération des sub-modules `infrastructure.db.queries.*`
+# d'où l'énumération des sub-modules `infrastructure.queries.*`
 # consommés par `deps.py`.
 ignore_imports = [
     "interfaces.api.deps -> infrastructure.repositories.address_repository",
@@ -133,21 +133,21 @@ ignore_imports = [
     "interfaces.api.deps -> infrastructure.repositories.publication_repository",
     "interfaces.api.deps -> infrastructure.repositories.publisher_repository",
     "interfaces.api.deps -> infrastructure.repositories.structure_repository",
-    "interfaces.api.deps -> infrastructure.db.queries.addresses",
-    "interfaces.api.deps -> infrastructure.db.queries.admin_feedback",
-    "interfaces.api.deps -> infrastructure.db.queries.config",
-    "interfaces.api.deps -> infrastructure.db.queries.hal_problems",
-    "interfaces.api.deps -> infrastructure.db.queries.journals",
-    "interfaces.api.deps -> infrastructure.db.queries.laboratories",
-    "interfaces.api.deps -> infrastructure.db.queries.perimeter",
-    "interfaces.api.deps -> infrastructure.db.queries.person_duplicates",
-    "interfaces.api.deps -> infrastructure.db.queries.persons",
-    "interfaces.api.deps -> infrastructure.db.queries.publication_duplicates",
-    "interfaces.api.deps -> infrastructure.db.queries.publications",
-    "interfaces.api.deps -> infrastructure.db.queries.publishers",
-    "interfaces.api.deps -> infrastructure.db.queries.stats",
-    "interfaces.api.deps -> infrastructure.db.queries.structures",
-    "interfaces.api.deps -> infrastructure.db.queries.subjects",
+    "interfaces.api.deps -> infrastructure.queries.addresses",
+    "interfaces.api.deps -> infrastructure.queries.admin_feedback",
+    "interfaces.api.deps -> infrastructure.queries.config",
+    "interfaces.api.deps -> infrastructure.queries.hal_problems",
+    "interfaces.api.deps -> infrastructure.queries.journals",
+    "interfaces.api.deps -> infrastructure.queries.laboratories",
+    "interfaces.api.deps -> infrastructure.queries.perimeter",
+    "interfaces.api.deps -> infrastructure.queries.person_duplicates",
+    "interfaces.api.deps -> infrastructure.queries.persons",
+    "interfaces.api.deps -> infrastructure.queries.publication_duplicates",
+    "interfaces.api.deps -> infrastructure.queries.publications",
+    "interfaces.api.deps -> infrastructure.queries.publishers",
+    "interfaces.api.deps -> infrastructure.queries.stats",
+    "interfaces.api.deps -> infrastructure.queries.structures",
+    "interfaces.api.deps -> infrastructure.queries.subjects",
 ]
 
 [[tool.importlinter.contracts]]
@@ -157,7 +157,7 @@ source_modules = ["domain"]
 forbidden_modules = ["pydantic", "sqlalchemy", "fastapi", "starlette", "psycopg"]
 # Le domaine ne dépend de rien : pas d'ORM, pas de validation
 # Pydantic, pas de framework web, pas de driver DB. Les modèles
-# d'I/O JSONB (BaseModel) vivent dans infrastructure/db/jsonb_models/.
+# d'I/O JSONB (BaseModel) vivent dans infrastructure/jsonb_models/.
 # Cf. docs/chantiers/CODE_purete-domain.md.
 
 [tool.deptry.per_rule_ignores]
@@ -317,7 +317,7 @@ exclude = [
 # - Services racine `application.{config,persons,journals,publishers,
 #   structures,addresses.countries,authorships.core}` : retournent ou
 #   reçoivent des records / partial updates DB (Phase 8).
-# - `infrastructure.repositories.*` et `infrastructure.db.queries.*` :
+# - `infrastructure.repositories.*` et `infrastructure.queries.*` :
 #   couche SQL — Row, records DB, batchs hétérogènes. Phase 8.
 # - `infrastructure.sources.*` : extracteurs API, payloads JSON.
 # - `infrastructure.{api_retry,api_retry_async,settings,pipeline_status}`
@@ -351,8 +351,8 @@ module = [
     "domain.sources.*",
     "infrastructure.api_retry",
     "infrastructure.api_retry_async",
-    "infrastructure.db.jsonb_models.*",
-    "infrastructure.db.queries.*",
+    "infrastructure.jsonb_models.*",
+    "infrastructure.queries.*",
     "infrastructure.repositories.*",
     "infrastructure.settings",
     "infrastructure.sources.*",

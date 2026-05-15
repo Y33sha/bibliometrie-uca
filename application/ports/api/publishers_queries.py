@@ -1,6 +1,6 @@
 """Port : lectures sur les éditeurs (consommé par le router publishers).
 
-Implémenté par `infrastructure.db.queries.publishers.PgPublisherQueries`.
+Implémenté par `infrastructure.queries.publishers.PgPublisherQueries`.
 """
 
 from typing import Any, Protocol

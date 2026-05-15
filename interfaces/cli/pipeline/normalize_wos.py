@@ -4,9 +4,9 @@ import os
 
 from application.pipeline.normalize.normalize_wos import WosNormalizer
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
-from infrastructure.db.queries.staging import PgStagingQueries
 from infrastructure.log import setup_logger
+from infrastructure.queries.normalize_wos import PgWosNormalizeQueries
+from infrastructure.queries.staging import PgStagingQueries
 from infrastructure.repositories import (
     journal_repository,
     publication_repository,

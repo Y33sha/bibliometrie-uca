@@ -1,6 +1,6 @@
 """Port : SQL du peuplement de `person_name_forms`.
 
-Implémenté par `infrastructure.db.queries.name_forms.PgNameFormsQueries`.
+Implémenté par `infrastructure.queries.name_forms.PgNameFormsQueries`.
 """
 
 from typing import Any, Protocol

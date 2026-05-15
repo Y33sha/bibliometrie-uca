@@ -1,7 +1,7 @@
 """Port : opérations SQL pour la phase d'ingestion des sujets / mots-clés
 et le recalcul des co-occurrences.
 
-Implémenté par `infrastructure.db.queries.subjects.PgSubjectsQueries`.
+Implémenté par `infrastructure.queries.subjects.PgSubjectsQueries`.
 """
 
 from typing import Any, Protocol

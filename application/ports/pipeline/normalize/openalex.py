@@ -1,6 +1,6 @@
 """Port : SQL du normaliseur OpenAlex.
 
-Implémenté par `infrastructure.db.queries.normalize_openalex.PgOpenalexNormalizeQueries`.
+Implémenté par `infrastructure.queries.normalize_openalex.PgOpenalexNormalizeQueries`.
 """
 
 from typing import Protocol

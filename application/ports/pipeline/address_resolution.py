@@ -1,6 +1,6 @@
 """Port : SQL du pipeline de résolution d'adresses.
 
-Implémenté par `infrastructure.db.queries.address_resolution.PgAddressResolutionQueries`.
+Implémenté par `infrastructure.queries.address_resolution.PgAddressResolutionQueries`.
 """
 
 from typing import Protocol
