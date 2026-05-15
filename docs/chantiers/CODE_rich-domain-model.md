@@ -112,7 +112,7 @@ vides comme point d'appui.
    est un index inverse dénormalisé pour le matching — pas un
    aggregate. Le domain VO est juste la string ; la mapping
    `form → persons` est une infrastructure de query.
-7. **Approche progressive** : scaffolding minimal des entités (Phase 1), migration statique des règles vers leur module thématique (Phase 2), refactor des use-cases mono-aggregate (Phase 3), hydratation de Publication + orchestrations qui en dépendent (Phase 4), orchestrations Person (Phase 5), nettoyage des doublons (Phase 6), convention de transmission aux chantiers METIER_* (Phase 7), généralisation de l'hydratation aux autres entités (Phase 8, différée).
+7. **Approche progressive** : scaffolding minimal des entités (Phase 1), migration statique des règles vers leur module thématique (Phase 2), refactor des use-cases mono-aggregate (Phase 3), hydratation de Publication + orchestrations qui en dépendent (Phase 4), orchestrations Person (Phase 5), nettoyage des doublons (Phase 6), aggregate Structure (Phase 7), généralisation de l'hydratation aux autres entités (Phase 8, différée). Mise à jour de `docs/architecture.md` en clôture du chantier (Phase 8).
 8. **Les dataclasses de résultat de requête ne sont pas des entités.**
    `PubByDoi`, `PubByNnt`, `PubByTitle`, `PubThesisCandidate` restent
    des projections de lecture (DTOs domain), distinctes des
@@ -178,7 +178,7 @@ vides comme point d'appui.
       `PersonIdentifier` avec `id_type: str`, `id_value: str`,
       `person_id: int`, `status: AttributionStatus`, `source: str |
       None`. Méthodes `confirm()`, `reject()`, `reattribute_to(new_person_id,
-      *, source)`. Exception `CannotReattributeError` (sous-classe
+      *, source)`. Exception `CannotAttributeConflict` (sous-classe
       `ConflictError`) si tentative depuis statut non-rejected.
 - [x] `domain/structures/structure.py` — classe `Structure` (identité
       + `name_forms: tuple[StructureNameForm, ...]` + api_ids). Les
@@ -298,24 +298,34 @@ Les use-cases orchestrant Publication (fusion, find_or_create, refresh_from_sour
 - [x] `application/persons.py:merge_person` refactoré autour de `Person.can_merge_with`. Pattern Phase 4 strict : `repo.find_by_id` ajouté au `PersonRepository` (hydratation complète : `identifiers` + `name_forms`), load target + source, délégation de l'invariant RH à la méthode d'aggregate, puis `repo.merge_into` (plumbing SQL inchangé). La free function `check_can_merge_persons` reste en place transitoirement, à supprimer en Phase 6. Pas de conflit possible sur les `PersonIdentifier` lors de la fusion : la contrainte `UNIQUE (id_type, id_value)` est globale (pas par personne), donc un identifier appartient à exactement une personne — `repo.merge_into` fait un UPDATE bulk sans gestion d'exception.
 - [ ] `application/pipeline/persons/create_persons_from_source_authorships.py` — refactor de la cascade matching porté par `METIER_decide-person-match`. Ce chantier-ci s'arrête au point où la cascade manipule des `Person` et `PersonIdentifier` (au lieu de `int + dict`).
 
-#### Structure (note)
-
-Aucune logique métier identifiée actuellement au-delà du CRUD de `application/structures.py:35-212`. L'entité `Structure` reste un scaffold minimal. Si des règles émergent (validation `api_ids`, contraintes sur `structure_relations`, cycles interdits dans la hiérarchie, …), elles s'y déposent.
-
 ### Phase 6 — Cleanup des doublons
 
 Une fois les callers de Phase 1 migrés vers les entités (Phases 3, 4, 5), les fonctions libres font doublon avec les méthodes d'aggregate. Suppression.
 
 - [x] `domain/persons/merge.py:check_can_merge_persons` supprimée — remplacée partout par `Person.can_merge_with` après Phase 5.1. Fichier `domain/persons/merge.py` supprimé (devenu vide). Test correspondant `tests/unit/domain/persons/test_merge.py` supprimé ; le seul cas non déjà couvert par `tests/unit/domain/persons/test_person.py:TestCanMergeWith` (présence des deux ids dans le message d'erreur) migré au passage.
 
-### Phase 7 — Convention pour les chantiers METIER_*
+### Phase 7 — Aggregate Structure
 
-- [ ] Documenter dans un fichier `docs/architecture.md` (ou compléter `CLAUDE.md`) que la logique métier touchant une entité doit y atterrir, et préciser le périmètre des aggregates.
-- [ ] Mettre à jour `METIER_decide-person-match.md` : ajouter section « Cible domain » pointant `Person` + `domain/persons/matching.py`.
-- [ ] Mettre à jour `METIER_deduplication-fusion-publications.md` : idem, pointant `Publication` + `domain/publications/deduplication.py` + `domain/publications/merge.py`.
-- [ ] Mettre à jour `METIER_doc-types.md`, `METIER_crossref.md`, `METIER_doi-ra-datacite.md` quand ils démarreront — même principe.
+Au-delà du CRUD de `application/structures.py:35-212`, plusieurs règles métier doivent descendre dans l'aggregate `Structure` (ou ses VOs). Conditionne Phase 8 (audit repositories) : l'hydratation complète de `Structure` via `repo.find_by_id` doit pouvoir utiliser les VOs.
 
-### Phase 8 — Audit général des repositories (différé)
+Pistes :
+
+- [ ] **VO `RorId`** (Research Organization Registry, `structures.ror_id`). Forme canonique = 9-char nu (même principe qu'`ORCID`) ; l'URL `https://ror.org/<9-char>` reste possible à l'affichage. Migration des valeurs existantes (URLs → 9-char) à prévoir.
+- [ ] **VO `HalCollection`** (`structures.hal_collection`). Code de collection HAL — format à confirmer.
+- [ ] **Interdiction des cycles** dans `structure_relations` : un parent ne peut pas avoir un de ses descendants comme parent. Le caller (service) prefetche les descendants via le repo et délègue la validation au domain (méthode `Structure.add_parent` ou similaire). Pré-check via `WITH RECURSIVE` côté service envisageable.
+- [ ] **Interdiction d'auto-référence** dans `structure_relations` (cas dégénéré : `parent_id == child_id`). Trivial à poser (CHECK SQL + règle domain).
+- [ ] **Enum Python `StructureType`** côté domain en miroir de l'enum SQL `structure_type`. Renforce le typage et évite les typos par rapport à un `str` libre.
+- [ ] **Clés `api_ids` métier** : les noms de sources (`openalex`, `wos`, `scanr`, `theses`, `hal`) sont une connaissance métier ; faire remonter cette liste blanche au domain (cf. `domain.sources.ALL_SOURCES` ou équivalent dédié `api_ids`). Les valeurs restent JSONB libre — pas de validation de format (pas de moyen de vérifier la validité d'un id externe en tant que tel).
+
+Pas inscrit comme item, mais signalé :
+
+- **Fusion de structures** (`merge_structure(target, source)`) — analogue à `merge_publications` / `merge_person`. Cas exceptionnel (les structures de l'ESR français fusionnent occasionnellement, ex. deux labos UCA à venir), toujours effectué manuellement par un admin. Réaffectation des `structure_name_forms`, `apc_payments`, `authorships`, `address_structures` ; pour les `structure_relations`, fusion sauf incompatibilité (changer manuellement les relations avant la fusion sinon). Suffisamment rare pour rester un **script one-shot** plutôt qu'un point de l'aggregate ; à reconsidérer si la fréquence augmente.
+
+Hors scope domain (mentions pour mémoire) :
+
+- **Validation cross-aggregate sur `StructureNameForm.requires_context_of`** : les ids référencés doivent pointer vers des structures existantes. Plutôt côté service / infra (FK constraint) que dans le domain pur.
+
+### Phase 8 — Audit général des repositories
 
 Généralisation de l'hydratation faite en Phase 4 pour Publication aux autres aggregates (Person, Structure, SourcePublication, AddressAffiliation). À instruire séparément quand on y arrivera. Hypothèse de travail (Laura) : les repositories sont majoritairement en écriture et ne renvoient rien ; à vérifier.
 
@@ -332,6 +342,8 @@ Audit préalable :
 - [ ] **Partial updates `fields: dict[str, Any]`** : remplacer par `TypedDict(total=False)` un par port (`JournalUpdateFields`, `PerimeterUpdateFields`, `PublisherUpdateFields`, `StructureUpdateFields`, `StructureNameFormUpdateFields`). Contraint statiquement les callers aux colonnes valides.
 
 Contenu détaillé à formaliser en phase d'instruction.
+
+En clôture du chantier (dernière étape de cette phase) : mettre à jour `docs/architecture.md` pour refléter le modèle DDD final (aggregates, VOs, périmètre de chaque entité, conventions de hydratation/projection).
 
 ## Questions ouvertes
 
