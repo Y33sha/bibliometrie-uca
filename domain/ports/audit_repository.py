@@ -6,7 +6,9 @@ logique de filtrage par `user_id` (no-op hors contexte HTTP) reste dans
 d'insertion.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
+
+from domain.json_types import JsonValue
 
 
 class AuditRepository(Protocol):
@@ -17,6 +19,6 @@ class AuditRepository(Protocol):
         event_type: str,
         aggregate_type: str,
         aggregate_id: int | None,
-        payload: dict[str, Any],
+        payload: dict[str, JsonValue],
         user_id: str,
     ) -> None: ...

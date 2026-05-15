@@ -68,7 +68,9 @@ class StructureCreate(BaseModel):
     ror_id: str | None = None
     rnsr_id: str | None = None
     hal_collection: str | None = None
-    api_ids: dict | None = None
+    # Pré-coercion : `str` toléré et wrappé en list par `StructureApiIds`
+    # côté repo. Output (`StructureOut.api_ids`) est `dict[str, list[str]]`.
+    api_ids: dict[str, str | list[str]] | None = None
 
 
 class StructureUpdate(BaseModel):
@@ -78,7 +80,7 @@ class StructureUpdate(BaseModel):
     ror_id: str | None = None
     rnsr_id: str | None = None
     hal_collection: str | None = None
-    api_ids: dict | None = None
+    api_ids: dict[str, str | list[str]] | None = None
 
 
 class RelationCreate(BaseModel):

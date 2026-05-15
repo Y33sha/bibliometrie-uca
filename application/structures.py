@@ -41,7 +41,7 @@ def create_structure(
     ror_id: str | None = None,
     rnsr_id: str | None = None,
     hal_collection: str | None = None,
-    api_ids: dict | None = None,
+    api_ids: dict[str, str | list[str]] | None = None,
     repo: StructureRepository,
 ) -> dict:
     """Crée une structure. Retourne la ligne insérée (dict)."""
