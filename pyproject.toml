@@ -114,40 +114,12 @@ forbidden_modules = [
     "infrastructure.queries",
 ]
 # Verrouillage de la règle 5 de docs/architecture.md : seul
-# `interfaces/api/deps.py` instancie les `Pg*` concrets et les
-# repositories ; les routers et autre utilitaire éventuel sous
-# `interfaces.api/` doivent passer par un port via `Depends(...)`.
-# (`interfaces/api/app.py` n'importe ni `repositories` ni
-# `db.queries` — pas besoin de l'ignorer.)
-#
-# `ignore_imports` exige le matching exact (pas les descendants),
-# d'où l'énumération des sub-modules `infrastructure.queries.*`
-# consommés par `deps.py`.
+# `interfaces/api/deps.py` instancie les `Pg*` concrets ; les routers
+# et autres modules sous `interfaces.api/` passent par un port via
+# `Depends(...)`.
 ignore_imports = [
-    "interfaces.api.deps -> infrastructure.repositories.address_repository",
-    "interfaces.api.deps -> infrastructure.repositories.audit_repository",
-    "interfaces.api.deps -> infrastructure.repositories.authorship_repository",
-    "interfaces.api.deps -> infrastructure.repositories.journal_repository",
-    "interfaces.api.deps -> infrastructure.repositories.perimeter_repository",
-    "interfaces.api.deps -> infrastructure.repositories.person_repository",
-    "interfaces.api.deps -> infrastructure.repositories.publication_repository",
-    "interfaces.api.deps -> infrastructure.repositories.publisher_repository",
-    "interfaces.api.deps -> infrastructure.repositories.structure_repository",
-    "interfaces.api.deps -> infrastructure.queries.addresses",
-    "interfaces.api.deps -> infrastructure.queries.admin_feedback",
-    "interfaces.api.deps -> infrastructure.queries.config",
-    "interfaces.api.deps -> infrastructure.queries.hal_problems",
-    "interfaces.api.deps -> infrastructure.queries.journals",
-    "interfaces.api.deps -> infrastructure.queries.laboratories",
-    "interfaces.api.deps -> infrastructure.queries.perimeter",
-    "interfaces.api.deps -> infrastructure.queries.person_duplicates",
-    "interfaces.api.deps -> infrastructure.queries.persons",
-    "interfaces.api.deps -> infrastructure.queries.publication_duplicates",
-    "interfaces.api.deps -> infrastructure.queries.publications",
-    "interfaces.api.deps -> infrastructure.queries.publishers",
-    "interfaces.api.deps -> infrastructure.queries.stats",
-    "interfaces.api.deps -> infrastructure.queries.structures",
-    "interfaces.api.deps -> infrastructure.queries.subjects",
+    "interfaces.api.deps -> infrastructure.repositories.**",
+    "interfaces.api.deps -> infrastructure.queries.**",
 ]
 
 [[tool.importlinter.contracts]]
