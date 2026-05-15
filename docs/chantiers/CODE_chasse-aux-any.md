@@ -134,18 +134,23 @@ Périmètres identifiés :
 
 ## Questions ouvertes
 
-- **Frontière Pydantic / FastAPI — tranchée** : option A retenue,
-  les handlers instancient le `BaseModel` du `response_model` au
-  retour (`Model.model_validate(...)` ou constructeur direct).
-  Option C (les query services retournent directement des types
-  forts, plus de `dict[str, Any]` en infra) reste plus propre mais
-  c'est un chantier architectural à part — déplacement des
-  modèles hors de `interfaces/api/`, DTOs application-level. Pas
-  ouvert ici, à reprendre si l'envie revient.
-- **Payloads JSONB dans les `BaseModel`** : les 2 derniers `Any`
-  explicites dans `interfaces/api/models.py` (`ConfigItem.value`,
-  `ConfigValueUpdate.value`) restent volontairement libres
-  (frontière JSON/JSONB documentée).
-- **`Row` SA** : utiliser `Row` (générique sans paramétrage), ou
-  des `NamedTuple` / `dataclass` typés par requête ? Le second est
-  plus rigoureux mais double la dette si on bouge une colonne.
+- **Frontière Pydantic / FastAPI — tranchée** (Phase 2.4) : option A
+  retenue, les handlers instancient le `BaseModel` du `response_model`
+  au retour (`Model.model_validate(...)` ou constructeur direct).
+  Option C (query services retournant des types forts, suppression
+  des `dict[str, Any]` côté query) reste plus propre mais demande
+  un chantier architectural à part (déplacement des modèles hors
+  `interfaces/api/`, DTOs application-level). Pas ouverte ici.
+- **Payloads JSONB dans les `BaseModel` — tranchée** (Phase 2.6) :
+  les 2 `Any` dans `interfaces/api/models.py` (`ConfigItem.value`,
+  `ConfigValueUpdate.value`) restent volontairement libres. La
+  bascule vers l'alias récursif `JsonValue` a été tentée mais
+  pydantic en py310 lève une `RecursionError` à la génération de
+  schéma. PEP 695 type aliases (3.12+) résoudraient ; à revoir au
+  passage py312.
+- **`Row` SA — déférée** au chantier `CODE_typage-projections-strict`.
+  Question reformulée : `Row[Any]` vs `Row[tuple[...]]` paramétré vs
+  `NamedTuple`/`dataclass` par requête. Coût/bénéfice à arbitrer au
+  cas par cas (la version `tuple[...]` est précise mais fragile sur
+  changement de SELECT). Décision pragmatique probable : `NamedTuple`
+  quand la row a > 2 colonnes ou est propagée hors de la fonction.
