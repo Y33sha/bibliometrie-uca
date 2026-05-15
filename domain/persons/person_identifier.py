@@ -24,7 +24,7 @@ de statut, réattribution) vit ici.
 
 from dataclasses import dataclass
 
-from domain.errors import CannotReattributeError
+from domain.errors import CannotAttributeConflict
 from domain.persons.identifiers import AttributionStatus
 
 
@@ -58,13 +58,13 @@ class PersonIdentifier:
 
         Autorisée uniquement depuis le statut `REJECTED` : un identifiant
         rejeté pour une personne A peut être réattribué à une personne B
-        avec statut `PENDING`. Lève `CannotReattributeError` sinon.
+        avec statut `PENDING`. Lève `CannotAttributeConflict` sinon.
 
         `source` trace l'origine de la réattribution (ex. "manual",
         "matching_cascade").
         """
         if self.status is not AttributionStatus.REJECTED:
-            raise CannotReattributeError(
+            raise CannotAttributeConflict(
                 f"Impossible de réattribuer l'identifiant {self.id_type}={self.id_value!r} "
                 f"depuis le statut {self.status.value!r} ; seuls les identifiants rejected "
                 "peuvent être réattribués.",

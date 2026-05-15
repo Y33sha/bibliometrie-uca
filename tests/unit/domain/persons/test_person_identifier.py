@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.errors import CannotReattributeError
+from domain.errors import CannotAttributeConflict
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person_identifier import PersonIdentifier
 
@@ -56,14 +56,14 @@ class TestReattributeTo:
 
     def test_raises_on_pending(self):
         ident = _make(status=AttributionStatus.PENDING)
-        with pytest.raises(CannotReattributeError):
+        with pytest.raises(CannotAttributeConflict):
             ident.reattribute_to(99, source="manual")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.PENDING
 
     def test_raises_on_confirmed(self):
         ident = _make(status=AttributionStatus.CONFIRMED)
-        with pytest.raises(CannotReattributeError):
+        with pytest.raises(CannotAttributeConflict):
             ident.reattribute_to(99, source="manual")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.CONFIRMED
