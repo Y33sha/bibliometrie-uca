@@ -14,9 +14,20 @@ Implémenté par `infrastructure/repositories/journal_repository.py`.
 
 from typing import Any, Protocol
 
+from domain.journals.journal import Journal
+
 
 class JournalRepository(Protocol):
     """Contrat d'accès à l'agrégat Journal."""
+
+    # ── Chargement de l'aggregate ──────────────────────────────────
+
+    def find_by_id(self, journal_id: int) -> Journal | None:
+        """Hydrate l'aggregate `Journal` complet. Retourne None si le
+        journal n'existe pas. Les `journal_name_forms` ne sont pas
+        chargées par l'aggregate (projection séparée — voir
+        `find_journal_by_name_form` pour les lookups par forme)."""
+        ...
 
     # ── journal_name_forms ─────────────────────────────────────────
 

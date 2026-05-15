@@ -122,10 +122,11 @@ vides comme point d'appui.
 9. **Convention de transmission aux chantiers METIER_*** : ces
    chantiers documentent dans leur fiche la cible domain (méthode
    d'entité, VO, règle libre) avant de commencer à coder.
-10. **Aggregates futurs hors scope** : `Publisher`, `Journal`,
-    `Subject` (tables existantes mais peu de logique métier
-    aujourd'hui — deviendront probablement des aggregates lors d'un
-    chantier ultérieur dédié).
+10. **Aggregates simples scaffoldés a minima en Phase 8** : `Publisher`,
+    `Journal`. Peu de logique métier identifiée aujourd'hui — scaffolding
+    minimal (entité + `find_by_id`) en Phase 8 ; les invariants et règles
+    spécifiques émergeront lors de chantiers ultérieurs si besoin.
+    `Subject` reste en projection (a déjà son subpackage `domain/subjects/`).
 
 ## Phasage
 
@@ -338,13 +339,14 @@ Généralisation de l'hydratation faite en Phase 4 (Publication) et Phase 5 (Per
 
 **Inventaire (cf. audit) — par ordre de migration** :
 
-- [ ] **`StructureRepository`** : 9 méthodes CRUD retournent `dict[str, Any]`. Aggregate scaffoldé + VOs en Phase 7. Mapper trivial. Ajouter `find_by_id(id) -> Structure | None`.
-- [ ] **`JournalRepository` + `PublisherRepository`** : entités simples, peu de logique métier. Aggregate à scaffolder en passant. Ajouter `find_by_id`.
+- [x] **`StructureRepository`** : 9 méthodes CRUD retournent `dict[str, Any]`. Aggregate scaffoldé + VOs en Phase 7. Mapper trivial. `find_by_id(id) -> Structure | None` ajouté (charge champs scalaires + VOs `name_forms`).
+- [ ] **`JournalRepository`** : scaffolder l'aggregate `Journal` a minima (entité avec attributs `issn`, `eissn`, `issnl`, `publisher_id`, `openalex_id`, `oa_model`, `is_in_doaj`, `is_predatory`) et ajouter `find_by_id`. Pas d'invariants métier rapatriés en Phase 8 — émergeront ultérieurement.
+- [ ] **`PublisherRepository`** : scaffolder l'aggregate `Publisher` a minima (attributs `name`, `country`, `is_predatory`, `openalex_id`) et ajouter `find_by_id`.
 - [ ] **`AuthorshipRepository`** : entité fille de Publication (déjà scaffoldée). Méthode `find_by_publication_id(pub_id) -> tuple[Authorship, ...]` pertinente pour les use-cases qui auront besoin des filles chargées.
 - [ ] **`PerimeterRepository`** : petit aggregate, peu utilisé en lecture. Ajouter `find_by_id` par cohérence.
 - [ ] **`AddressAffiliation`** : à instruire après les autres. Identité opaque (pas de `code` naturel), méthodes actuelles retournent surtout des listes d'IDs affectés (`refresh_sa_countries_for_addresses`, etc.) — le contrat "find_by_id en aggregate complet" n'est pas évident.
 
-Hors scope Phase 8 (write-only ou déjà fait) :
+Repos non concernés Phase 8 (déjà fait ou par nature) :
 
 - `AuditRepository` (write-only par nature).
 - `PersonRepository` (`find_by_id` déjà ajouté en Phase 5 ; les 19 méthodes d'orchestration `link_authorship` / `assign_orphan_*` / etc. ne sont pas des charges pures et restent en l'état).
