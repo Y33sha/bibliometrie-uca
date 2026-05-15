@@ -302,8 +302,8 @@ exclude = [
 # délibérés. Documentés au cas par cas :
 # - `domain.sources.*` : payloads JSON bruts d'APIs externes (lecture
 #   dynamique, forcer `JsonValue` exigerait des isinstance partout).
-# - `domain.ports.*` (sauf audit, déjà strict) : records DB hydratés et
-#   partial updates `fields: dict[str, Any]` — délégués au chantier
+# - `application.ports.repositories.*` (sauf audit, déjà strict) : records DB
+#   hydratés et partial updates `fields: dict[str, Any]` — délégués au chantier
 #   `CODE_rich-domain-model` Phase 8.
 # - `domain.publications.aggregation` : `first_non_null` /
 #   `merge_lists_dedup_ci` polymorphiques sur `getattr(source, attr)`.
@@ -346,7 +346,7 @@ module = [
     "application.ports.pipeline.persons_create",
     "application.ports.pipeline.staging",
     "application.ports.pipeline.subjects",
-    "domain.ports.*",
+    "application.ports.repositories.*",
     "domain.publications.aggregation",
     "domain.sources.*",
     "infrastructure.api_retry",

@@ -18,13 +18,13 @@ from sqlalchemy import Connection
 from application.ports.pipeline.publications_match_or_create import (
     PublicationsMatchOrCreateQueries,
 )
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.publication_repository import PublicationRepository
 from application.publications import (
     refresh_from_sources,
     resolve_doi_conflict,
 )
 from domain.normalize import normalize_text
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from domain.publications.deduplication import (
     MetadataDeduplicationCase,

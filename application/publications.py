@@ -10,9 +10,9 @@ indépendant du type de curseur (tuple ou dict_row).
 """
 
 from application.audit import emit_event
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.publication_repository import PublicationRepository
 from domain.errors import NotFoundError
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.publication_repository import PublicationRepository
 from domain.publication import (
     PubByDoi,
     PubByNnt,

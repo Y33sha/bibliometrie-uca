@@ -9,8 +9,8 @@ from application.ports.api.person_duplicates_queries import (
     PersonDuplicatesQueries,
     parse_skip_pairs,
 )
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.person_repository import PersonRepository
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.person_repository import PersonRepository
 from interfaces.api.deps import (
     audit_repo_sync,
     person_duplicates_queries_sync,

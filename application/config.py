@@ -10,10 +10,10 @@ du projet).
 
 from application.audit import emit_event
 from application.ports.config import ConfigStore
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.perimeter_repository import PerimeterRepository
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.json_types import JsonValue
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.perimeter_repository import PerimeterRepository
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 

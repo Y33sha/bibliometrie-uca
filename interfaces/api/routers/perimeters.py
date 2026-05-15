@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends
 from application import config as config_service
 from application.ports.api.perimeters_queries import PerimetersAdminQueries
 from application.ports.config import ConfigStore
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.perimeter_repository import PerimeterRepository
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.perimeter_repository import PerimeterRepository
 from interfaces.api.deps import (
     audit_repo_sync,
     config_store_sync,

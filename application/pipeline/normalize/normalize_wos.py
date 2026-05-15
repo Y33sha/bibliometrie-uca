@@ -30,12 +30,12 @@ from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.normalize.wos import WosNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
+from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.publication_repository import PublicationRepository
+from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
-from domain.ports.journal_repository import JournalRepository
-from domain.ports.publication_repository import PublicationRepository
-from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
 from domain.publications.authorship_roles import map_role
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable

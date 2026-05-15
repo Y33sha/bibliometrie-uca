@@ -1,7 +1,7 @@
 """Adapter PostgreSQL pour la persistance des publications.
 
 Isole le SQL de la couche application. Implémente le port
-`PublicationRepository` défini dans domain/ports/.
+`PublicationRepository` défini dans application/ports/repositories/.
 
 Toutes les queries publications utilisent `text()` paramétré : trop
 intriquées en casts enum (oa_type, doc_type, source_type) et opérations

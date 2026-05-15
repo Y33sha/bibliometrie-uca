@@ -11,8 +11,8 @@ opérations atomiques du port qui recomposent une authorship pour une
 paire (publication, person) depuis ses source_authorships.
 """
 
+from application.ports.repositories.person_repository import PersonRepository
 from domain.errors import ValidationError
-from domain.ports.person_repository import PersonRepository
 from domain.sources import (
     ALL_SOURCES_SET,
     AUTHOR_SOURCES,

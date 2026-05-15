@@ -34,12 +34,12 @@ from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.hal import HalNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
 from application.ports.pipeline.zenodo_resolver import ZenodoResolver
+from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.publication_repository import PublicationRepository
+from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
-from domain.ports.journal_repository import JournalRepository
-from domain.ports.publication_repository import PublicationRepository
-from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi, normalize_nnt
 from domain.publications.authorship_roles import map_role
 from domain.publications.metadata import has_minimal_publication_metadata

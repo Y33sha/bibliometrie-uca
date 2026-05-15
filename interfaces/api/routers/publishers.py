@@ -5,11 +5,11 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.api.publishers_queries import PublisherQueries
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import merge_publishers
 from application.publishers import update_publisher as _update_publisher
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.journal_repository import JournalRepository
-from domain.ports.publisher_repository import PublisherRepository
 from interfaces.api.deps import (
     audit_repo_sync,
     journal_repo_sync,

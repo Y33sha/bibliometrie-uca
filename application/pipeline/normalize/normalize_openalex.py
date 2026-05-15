@@ -28,12 +28,12 @@ from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.openalex import OpenalexNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
 from application.ports.pipeline.zenodo_resolver import ZenodoResolver
+from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.publication_repository import PublicationRepository
+from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
-from domain.ports.journal_repository import JournalRepository
-from domain.ports.publication_repository import PublicationRepository
-from domain.ports.publisher_repository import PublisherRepository
 from domain.publication import clean_doi
 from domain.sources.openalex import (
     correct_openalex_doc_type,

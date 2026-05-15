@@ -17,8 +17,8 @@ from sqlalchemy import Connection
 
 from application.authorships.core import propagate_uca_for_addresses
 from application.ports.pipeline.perimeter import PerimeterQueries
-from domain.ports.address_repository import AddressRepository
-from domain.ports.authorship_repository import AuthorshipRepository
+from application.ports.repositories.address_repository import AddressRepository
+from application.ports.repositories.authorship_repository import AuthorshipRepository
 
 
 def review_structure_link(

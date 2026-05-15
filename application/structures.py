@@ -13,10 +13,10 @@ restent autorisées dans les routers (convention du projet).
 """
 
 from application.audit import emit_event
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.structure_repository import StructureRepository
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.structure_repository import StructureRepository
 from domain.structures.relations import check_can_create_relation
 
 # ── Mapping des champs UI → colonnes SQL pour la table structures ──

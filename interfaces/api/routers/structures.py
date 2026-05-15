@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application import structures as structures_service
 from application.ports.api.structures_queries import StructuresQueries
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.structure_repository import StructureRepository
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.structure_repository import StructureRepository
 from interfaces.api.deps import (
     audit_repo_sync,
     structure_repo_sync,

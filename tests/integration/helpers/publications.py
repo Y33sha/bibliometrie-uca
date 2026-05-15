@@ -3,9 +3,9 @@
 `find_or_create_for_tests` reproduit la cascade équivalente à ce qu'appliquait l'ancien `application.publications.find_or_create` (retiré du code prod) : prefetch DOI avec `resolve_doi_conflict`, prefetch NNT, décision via `decide_publication_match`, création si pas de match. Conservé ici parce que la cascade est testée à l'unité (decideurs purs) et en intégration via `match_or_create_publications.process_document` (qui consomme des rows SQL), mais aucune des deux ne couvre la cascade depuis une `Publication` candidate construite à la main — ce que les tests legacy de dédup font systématiquement.
 """
 
+from application.ports.repositories.publication_repository import PublicationRepository
 from application.publications import resolve_doi_conflict
 from domain.normalize import normalize_text
-from domain.ports.publication_repository import PublicationRepository
 from domain.publications.deduplication import decide_publication_match
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT, clean_publication_title

@@ -256,7 +256,7 @@ pas tranchés, toute évolution amplifie la dette.
   Chantier `docs/chantiers/ports-cleanup.md` terminé :
   `structure_repository` ne fuite plus de fragments SQL dans son
   contrat (refactor `update_*_fields` → `fields: dict`), et
-  `config_repository` a été scindé en `domain/ports/perimeter_repository`
+  `config_repository` a été scindé en `application/ports/repositories/perimeter_repository`
   (agrégat) + `application/ports/config` (port AsyncConfigStore pour
   la table clé/valeur).
 
@@ -301,7 +301,7 @@ généralisé, background tasks).
 
 - [x] **`application/audit.py` doit passer par un repository** :
   port `AuditRepository`/`AsyncAuditRepository` dans
-  `domain/ports/audit_repository.py` (méthode `record_event`),
+  `application/ports/repositories/audit_repository.py` (méthode `record_event`),
   adapters `infrastructure/repositories/audit_repository.py` et
   `async_audit_repository.py` (dispatch cur | Connection / AsyncConnection),
   factories dans `infrastructure/repositories/__init__.py`. Les 7

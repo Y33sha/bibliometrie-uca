@@ -16,8 +16,8 @@ from application.ports.api.publications_queries import (
     ListFilters,
     PublicationsQueries,
 )
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.authorship_repository import AuthorshipRepository
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.authorship_repository import AuthorshipRepository
 from interfaces.api.deps import (
     audit_repo_sync,
     authorship_repo_sync,

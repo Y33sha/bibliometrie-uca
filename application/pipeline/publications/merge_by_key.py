@@ -11,8 +11,8 @@ from collections.abc import Iterable
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
+from application.ports.repositories.publication_repository import PublicationRepository
 from application.publications import merge_publications, refresh_from_sources
-from domain.ports.publication_repository import PublicationRepository
 
 
 def merge_publications_by_key(
