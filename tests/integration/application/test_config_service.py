@@ -85,6 +85,35 @@ class TestUpdateConfigValue:
         assert row["value"] == {"a": 1, "b": 2}
 
 
+# ── find_by_id (hydratation Perimeter) ─────────────────────────────
+
+
+class TestPerimeterFindById:
+    def test_returns_none_if_missing(self, repo):
+        assert repo.find_by_id(999999) is None
+
+    def test_hydrates_minimal(self, sa_sync_conn, repo):
+        pid = _insert_perimeter_sync(sa_sync_conn, code="P1", name="Périmètre 1")
+        p = repo.find_by_id(pid)
+        assert p is not None
+        assert p.id == pid
+        assert p.code == "P1"
+        assert p.name == "Périmètre 1"
+        assert p.description is None
+        assert p.structure_ids == ()
+
+    def test_hydrates_with_structure_ids(self, sa_sync_conn, repo):
+        pid = _insert_perimeter_sync(
+            sa_sync_conn,
+            code="P2",
+            name="P2",
+            structure_ids=[10, 20, 30],
+        )
+        p = repo.find_by_id(pid)
+        assert p is not None
+        assert p.structure_ids == (10, 20, 30)
+
+
 # ── add_perimeter_structure ────────────────────────────────────────
 
 

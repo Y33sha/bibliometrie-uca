@@ -1,6 +1,32 @@
 """Adapter PostgreSQL sync pour les authorships et source_authorships."""
 
-from sqlalchemy import Connection, text
+from typing import Any
+
+from sqlalchemy import Connection, Row, text
+
+from domain.publications.authorship import Authorship
+
+
+def _authorship_from_row(row: Row[Any]) -> Authorship:
+    """Mapping d'une row `authorships` SQL vers l'entité fille `Authorship`.
+
+    Les colonnes nullable avec DEFAULT côté DB (`in_perimeter`,
+    `source_manual`, `excluded`) sont coerces vers leur default si NULL,
+    pour préserver la sémantique de l'aggregate.
+    """
+    return Authorship(
+        id=row.id,
+        publication_id=row.publication_id,
+        person_id=row.person_id,
+        author_position=row.author_position,
+        in_perimeter=row.in_perimeter if row.in_perimeter is not None else False,
+        source_manual=row.source_manual if row.source_manual is not None else False,
+        excluded=row.excluded if row.excluded is not None else False,
+        is_corresponding=row.is_corresponding,
+        roles=tuple(row.roles or ()),
+        structure_ids=tuple(row.structure_ids or ()),
+        notes=row.notes,
+    )
 
 
 class PgAuthorshipRepository:
@@ -8,6 +34,24 @@ class PgAuthorshipRepository:
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    # ── Chargement des entités filles ──────────────────────────────
+
+    def find_by_publication_id(self, publication_id: int) -> tuple[Authorship, ...]:
+        """Charge toutes les `Authorship` d'une publication (ordonnées
+        par `author_position`). Retourne un tuple vide si aucune."""
+        result = self._conn.execute(
+            text("""
+                SELECT id, publication_id, person_id, author_position,
+                       in_perimeter, source_manual, excluded,
+                       is_corresponding, roles, structure_ids, notes
+                FROM authorships
+                WHERE publication_id = :pub_id
+                ORDER BY author_position NULLS LAST, id
+            """),
+            {"pub_id": publication_id},
+        )
+        return tuple(_authorship_from_row(row) for row in result)
 
     # ── authorships ────────────────────────────────────────────────
 
