@@ -9,9 +9,8 @@ import logging
 
 from application.audit import emit_event
 from application.authorships.core import delete_orphan_authorships
-from domain.errors import CannotAttributeConflict
+from domain.errors import CannotAttributeConflict, NotFoundError
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
-from domain.persons.merge import check_can_merge_persons
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person_identifier import PersonIdentifier
 from domain.ports.audit_repository import AuditRepository
@@ -380,12 +379,21 @@ def merge_person(
 ) -> None:
     """Fusionne la personne `source_id` dans `target_id`.
 
-    Invariant métier : refus si les deux personnes ont chacune une
-    fiche RH distincte (risque de perdre de l'information humaine).
+    Orchestration domain-driven : load target + source via le repo,
+    délègue l'invariant métier à `Person.can_merge_with` (refus si les
+    deux personnes ont chacune une fiche RH distincte), puis applique
+    le plumbing FK via `repo.merge_into`.
 
-    Lève ConflictError si l'invariant est violé. Émet un événement
-    d'audit `person.merged` si l'utilisateur est dans le contexte.
+    Lève `NotFoundError` si target ou source n'existe pas. Lève
+    `ConflictError` si l'invariant RH est violé. Émet un événement
+    d'audit `person.merged` si un utilisateur est dans le contexte.
     """
-    check_can_merge_persons(repo.has_distinct_rh(target_id, source_id), target_id, source_id)
+    target = repo.find_by_id(target_id)
+    source = repo.find_by_id(source_id)
+    if target is None:
+        raise NotFoundError(f"Personne #{target_id} introuvable")
+    if source is None:
+        raise NotFoundError(f"Personne #{source_id} introuvable")
+    target.can_merge_with(source, has_distinct_rh=repo.has_distinct_rh(target_id, source_id))
     repo.merge_into(target_id, source_id)
     emit_event(audit_repo, "person.merged", "person", target_id, {"source_id": source_id})

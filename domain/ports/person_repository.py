@@ -8,6 +8,7 @@ concrète). Toute autre implémentation respectant cette interface
 
 from typing import Any, Protocol
 
+from domain.persons.person import Person
 from domain.persons.person_identifier import PersonIdentifier
 
 
@@ -17,6 +18,8 @@ class PersonRepository(Protocol):
     certaines opérations sur source_authorships)."""
 
     # ── persons ────────────────────────────────────────────────────
+
+    def find_by_id(self, person_id: int) -> Person | None: ...
 
     def create(self, last_name: str, first_name: str = "") -> int: ...
 

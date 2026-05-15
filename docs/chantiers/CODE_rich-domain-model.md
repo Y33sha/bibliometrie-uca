@@ -295,7 +295,7 @@ Les use-cases orchestrant Publication (fusion, find_or_create, refresh_from_sour
 
 ### Phase 5 — Orchestrations Person
 
-- [ ] `application/persons.py:merge_person` (orchestrateur l. 340-358) → autour de `Person.merge_with(other)`. Question à examiner : que deviennent les `PersonIdentifier` de la personne absorbée (`reattribute_to` pour chacun, conflits sur statuts `confirmed` à cadrer).
+- [x] `application/persons.py:merge_person` refactoré autour de `Person.can_merge_with`. Pattern Phase 4 strict : `repo.find_by_id` ajouté au `PersonRepository` (hydratation complète : `identifiers` + `name_forms`), load target + source, délégation de l'invariant RH à la méthode d'aggregate, puis `repo.merge_into` (plumbing SQL inchangé). La free function `check_can_merge_persons` reste en place transitoirement, à supprimer en Phase 6. Pas de conflit possible sur les `PersonIdentifier` lors de la fusion : la contrainte `UNIQUE (id_type, id_value)` est globale (pas par personne), donc un identifier appartient à exactement une personne — `repo.merge_into` fait un UPDATE bulk sans gestion d'exception.
 - [ ] `application/pipeline/persons/create_persons_from_source_authorships.py` — refactor de la cascade matching porté par `METIER_decide-person-match`. Ce chantier-ci s'arrête au point où la cascade manipule des `Person` et `PersonIdentifier` (au lieu de `int + dict`).
 
 #### Structure (note)

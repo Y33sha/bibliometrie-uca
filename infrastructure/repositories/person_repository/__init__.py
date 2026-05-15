@@ -22,6 +22,7 @@ from infrastructure.repositories.person_repository import (
 )
 
 if TYPE_CHECKING:
+    from domain.persons.person import Person
     from domain.persons.person_identifier import PersonIdentifier
 
 
@@ -32,6 +33,9 @@ class PgPersonRepository:
         self._conn = conn
 
     # ── persons ────────────────────────────────────────────────────
+
+    def find_by_id(self, person_id: int) -> "Person | None":
+        return _core.find_by_id(self._conn, person_id)
 
     def create(self, last_name: str, first_name: str = "") -> int:
         return _core.create(self._conn, last_name, first_name)
