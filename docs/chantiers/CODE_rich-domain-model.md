@@ -310,12 +310,12 @@ Au-delà du CRUD de `application/structures.py:35-212`, plusieurs règles métie
 
 Pistes :
 
-- [ ] **VO `RorId`** (Research Organization Registry, `structures.ror_id`). Forme canonique = 9-char nu (même principe qu'`ORCID`) ; l'URL `https://ror.org/<9-char>` reste possible à l'affichage. Migration des valeurs existantes (URLs → 9-char) à prévoir.
-- [ ] **VO `HalCollection`** (`structures.hal_collection`). Code de collection HAL — format à confirmer.
-- [ ] **Interdiction des cycles** dans `structure_relations` : un parent ne peut pas avoir un de ses descendants comme parent. Le caller (service) prefetche les descendants via le repo et délègue la validation au domain (méthode `Structure.add_parent` ou similaire). Pré-check via `WITH RECURSIVE` côté service envisageable.
-- [ ] **Interdiction d'auto-référence** dans `structure_relations` (cas dégénéré : `parent_id == child_id`). Trivial à poser (CHECK SQL + règle domain).
-- [ ] **Enum Python `StructureType`** côté domain en miroir de l'enum SQL `structure_type`. Renforce le typage et évite les typos par rapport à un `str` libre.
-- [ ] **Clés `api_ids` métier** : les noms de sources (`openalex`, `wos`, `scanr`, `theses`, `hal`) sont une connaissance métier ; faire remonter cette liste blanche au domain (cf. `domain.sources.ALL_SOURCES` ou équivalent dédié `api_ids`). Les valeurs restent JSONB libre — pas de validation de format (pas de moyen de vérifier la validité d'un id externe en tant que tel).
+- [x] **VO `RorId`** (Research Organization Registry, `structures.ror_id`). Forme canonique = 9-char nu (même principe qu'`ORCID`) ; l'URL `https://ror.org/<9-char>` reste possible à l'affichage. Migration alembic 0010 (URLs existantes → 9-char nu).
+- [x] **VO `HalCollection`** (`structures.hal_collection`). Code de collection HAL ; format observé `[A-Z0-9][A-Z0-9_-]*` (pas de spec HAL formelle).
+- [x] **Interdiction des cycles** dans `structure_relations` : `check_can_create_relation(parent_id, child_id, ancestors_of_parent)` (domain service pur). Le service applicatif prefetche les ancêtres via `repo.get_ancestor_ids` (WITH RECURSIVE) et délègue la validation au domain. Aucune validation cycle côté DB (Postgres ne sait pas en CHECK).
+- [x] **Interdiction d'auto-référence** dans `structure_relations` : même point d'entrée que les cycles côté domain ; CHECK SQL `parent_id <> child_id` côté DB (migration alembic 0011) en défense en profondeur.
+- [x] **Enum Python `StructureType`** côté domain en miroir de l'enum SQL `structure_type`.
+- [x] **Clés `api_ids` métier** : constante `domain.sources.STRUCTURE_API_SOURCES` (`openalex`, `wos`, `scanr`, `theses`, `hal`). `StructureApiIds` passe en `extra="forbid"` — toute clé hors whitelist est rejetée en écriture. Test de synchronisation entre les champs du modèle Pydantic et la constante domain.
 
 Pas inscrit comme item, mais signalé :
 

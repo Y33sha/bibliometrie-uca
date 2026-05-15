@@ -44,10 +44,19 @@ class TestStructureApiIds:
         assert "openalex" in d
         assert "wos" not in d
 
-    def test_accepts_extra_source(self):
-        """Nouvelle source introduite plus tard → acceptée telle quelle."""
-        s = StructureApiIds(openalex=["I123"], crossref=["10.5281/..."])
-        assert s.to_dict()["crossref"] == ["10.5281/..."]
+    def test_rejects_unknown_source(self):
+        """Clés strictes : une source hors whitelist est rejetée
+        (la liste des sources `api_ids` est connaissance métier centralisée
+        dans `domain.sources.STRUCTURE_API_SOURCES`)."""
+        with pytest.raises(PydanticValidationError):
+            StructureApiIds(openalex=["I123"], crossref=["10.5281/..."])
+
+    def test_fields_match_domain_whitelist(self):
+        """Les champs déclarés du modèle doivent correspondre exactement
+        à la whitelist `domain.sources.STRUCTURE_API_SOURCES_SET`."""
+        from domain.sources import STRUCTURE_API_SOURCES_SET
+
+        assert set(StructureApiIds.model_fields.keys()) == STRUCTURE_API_SOURCES_SET
 
     def test_rejects_non_string_in_list(self):
         """Les valeurs d'une liste doivent être des strings."""

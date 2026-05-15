@@ -163,6 +163,44 @@ class TestCreateRelation:
         )
         assert again is None
 
+    def test_rejects_self_reference(self, sa_sync_conn, repo):
+        s = create_structure(code="S", name="S", type="universite", repo=repo)
+        with pytest.raises(ValidationError, match="Auto-référence"):
+            create_relation(
+                parent_id=s["id"],
+                child_id=s["id"],
+                relation_type="est_tutelle_de",
+                repo=repo,
+            )
+
+    def test_rejects_cycle(self, sa_sync_conn, repo):
+        """A → B existe ; tenter B → A doit échouer (cycle)."""
+        a = create_structure(code="A", name="A", type="universite", repo=repo)
+        b = create_structure(code="B", name="B", type="labo", repo=repo)
+        create_relation(
+            parent_id=a["id"],
+            child_id=b["id"],
+            relation_type="est_tutelle_de",
+            repo=repo,
+        )
+        with pytest.raises(ValidationError, match="Cycle"):
+            create_relation(
+                parent_id=b["id"],
+                child_id=a["id"],
+                relation_type="est_tutelle_de",
+                repo=repo,
+            )
+
+    def test_rejects_indirect_cycle(self, sa_sync_conn, repo):
+        """A → B → C ; tenter C → A doit échouer."""
+        a = create_structure(code="A", name="A", type="universite", repo=repo)
+        b = create_structure(code="B", name="B", type="labo", repo=repo)
+        c = create_structure(code="C", name="C", type="equipe", repo=repo)
+        create_relation(parent_id=a["id"], child_id=b["id"], relation_type="x", repo=repo)
+        create_relation(parent_id=b["id"], child_id=c["id"], relation_type="x", repo=repo)
+        with pytest.raises(ValidationError, match="Cycle"):
+            create_relation(parent_id=c["id"], child_id=a["id"], relation_type="x", repo=repo)
+
 
 class TestDeleteRelation:
     def test_raises_not_found(self, sa_sync_conn, repo):
