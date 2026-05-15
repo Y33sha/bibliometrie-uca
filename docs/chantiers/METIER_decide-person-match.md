@@ -1,180 +1,87 @@
 # Chantier — Cascade unifiée de matching personnes (`decide_person_match`)
 
-Rassemblement préalable des éléments. Structure (contexte, décisions,
-phasage) à formaliser au démarrage du chantier.
+## Contexte
 
-## Périmètre
-
-Le pipeline persons (`create_persons_from_source_authorships.py`)
-exécute la cascade de matching personne en **5 boucles séquentielles
-indépendantes** sur `all_authorships` — chaque étape skip ce qui est
-déjà rattaché par les étapes précédentes. La hiérarchie de fiabilité
-n'est pas exprimée comme une décision pure unique mais résulte
-implicitement de l'ordre des appels.
-
-Deux dimensions imbriquées :
-
-- **Refactorisation** : passer de 5 boucles à 1 boucle qui prefetch
-  les lookups + appelle `decide_person_match`. La cascade devient
-  testable hors BDD avec des fixtures simples.
-- **Changement de logique** : interroger l'ordre actuel (compte HAL
-  avant ORCID Crossref ?), gérer les méga-papers, formaliser les
-  invariants (statuts `pending`/`confirmed`/`rejected` côté
-  `person_identifiers`).
-
-## Item concerné
-
-### `contrat de la cascade globale`
-- **localisation** :
-  `application/pipeline/persons/create_persons_from_source_authorships.py:1-33`
-  (docstring) + `:389-420` (orchestrateur)
-- **description** : Hiérarchie de fiabilité (compte HAL > cross-source
-  > IdRef > ORCID > nom), aujourd'hui dispersée dans 5 fonctions
-  `step0_hal_accounts`, `step1_cross_source`, `step1b_idref`,
-  `step2_orcid`, `step3_name_forms`.
-- **destination** : `domain/persons/matching.py` →
-  `decide_person_match(*, hal_account_match, cross_source_match,
-  idref_match, orcid_match, name_form_outcome) -> PersonMatchDecision`.
-
-## État réel du code (5 boucles séquentielles)
-
-```python
-# orchestrateur l. 389-420
-s0 = step0_hal_accounts(...)
-s1 = step1_cross_source(..., linked_index, ...)
-s1b = step1b_idref(...)
-s2 = step2_orcid(...)
-s3 = step3_name_forms(...)
-```
-
-Chaque step itère sur `all_authorships`, skip ce qui est dans
-`linked_ids`, fait son lookup spécifique, ajoute à `linked_ids` si
-match.
-
-## Briques déjà en place côté domain
-
-Les 3 sous-décisions partielles existent déjà dans
-[`domain/persons/matching.py`](../../domain/persons/matching.py) :
-
-- `decide_cross_source_match(authorship_source, last_norm, first_norm, candidates)`
-  — étape 1
-- `decide_match_by_identifier(value, identifier_map)`
-  — étapes 1b (IdRef) et 2 (ORCID)
-- `decide_name_form_outcome(person_ids, allow_create)`
-  — étape 3
-
-Manque uniquement `decide_person_match` qui orchestre les 4 lookups
-(hal_account + cross_source + idref/orcid via decide_match_by_identifier
-+ name_form_outcome) en une décision unique.
-
-## Hiérarchie de fiabilité — à formaliser et discuter
+Le pipeline persons (`application/pipeline/persons/create_persons_from_source_authorships.py`) exécute la cascade de matching personne en **4 boucles séquentielles indépendantes** sur `all_authorships`. Chaque étape skip ce qui est déjà rattaché par les précédentes ; la hiérarchie de fiabilité n'est pas exprimée comme une décision pure unique mais résulte implicitement de l'ordre des appels.
 
 Hiérarchie actuelle (de la plus fiable à la moins) :
 
-1. **Compte HAL** (`hal_person_id`) : compte créé par l'auteur ou un
-   curateur ; quelques erreurs possibles mais globalement fiable.
-2. **Cross-source par publication × position auteur** : on relie une
-   signature à la `person_id` connue d'une autre source à la même
-   `(publication_id, author_position)`. Garde-fou `names_compatible`.
-3. **IdRef** : PPN SUDOC (`person_identifiers`).
-4. **ORCID** issu de `person_identifiers`.
-5. **Lookup `person_name_forms`** : matching par nom normalisé.
-6. **Création** si rien ne matche.
+1. **Cross-source par publication × position auteur** (`step1_cross_source`) — on relie une signature à la `person_id` connue d'une autre source à la même `(publication_id, author_position)`. Garde-fou `names_compatible`. Court-circuit méga-paper (≤ 50 auteurs, `MAX_AUTHORS_CROSS_SOURCE` dans `domain/persons/matching.py`).
+2. **IdRef** (`step1b_idref`) — PPN SUDOC via `person_identifiers`, filtre `status != 'rejected'`.
+3. **ORCID** (`step2_orcid`) — toutes sources confondues (filtré pour OpenAlex/WoS via `keep_orcid_if_name_matches` pré-cascade).
+4. **`person_name_forms`** (`step3_name_forms`) — matching par nom normalisé, avec création si forme inconnue et `allow_create=True`.
 
-**Hiérarchie proposée (regles-metier-domain.md) — à arbitrer** :
+**Briques déjà en place côté domain** ([domain/persons/matching.py](../../domain/persons/matching.py)) :
 
-1. **ORCID Crossref** : un ORCID dans Crossref vient de l'éditeur,
-   directement de l'auteur lors de la soumission. Le plus fiable. (À
-   ajouter en tête, pas encore implémenté).
-2. **Compte HAL** (`hal_person_id`).
-3. **IdRef / ORCID provenant d'autres sources** (HAL hors compte, OA,
-   WoS) : les ORCID OA/WoS viennent souvent d'un matching par nom
-   côté éditeur de la source, donc régulièrement fautifs. À surveiller
-   — voire à retirer si ratio bruit/signal défavorable.
-4. **Matching par nom**.
+- `decide_cross_source_match(authorship_source, last_norm, first_norm, candidates, total_author_count)` — étape 1.
+- `decide_match_by_identifier(value, identifier_map)` — étapes 1b (IdRef) et 2 (ORCID).
+- `decide_name_form_outcome(person_ids, allow_create)` — étape 3.
 
-## Question ouverte — matching par publication cross-source
+Manque un décideur d'orchestration unique (`decide_person_match`) qui agrège les sous-décisions et trie selon la hiérarchie de fiabilité. Permettrait de tester toute la cascade hors BDD et de modifier l'ordre sans toucher 4 boucles.
 
-Actuellement utilisé en complément du matching par nom pour
-désambiguïser : « on relie cette signature à la person X parce qu'elle
-est déjà reliée à la même publication, en même position auteur, dans
-une autre source ». Pose problème sur les méga-papers (consortiums,
-papers à 100+ auteurs) avec des désalignements + homonymes
-"initiale+nom" fréquents.
+## Décisions
 
-À réexaminer pendant ce chantier : maintien tel quel, restriction à
-un seuil max d'auteurs (ex. ≤ 30 auteurs), ou suppression. Décision à
-prendre après mesure du ratio matchings utiles / faux positifs sur
-les cas méga-paper.
+1. **Refactor pur avant peaufinage logique**. Phase 1 reproduit la logique actuelle (cross-source → IdRef → ORCID toute source → name_forms) en restructurant la cascade en un décideur pur + 1 boucle d'application. Phase 2 modifie la logique (hiérarchie cible).
+2. **Hiérarchie cible** (Phase 2) :
+   1. **ORCID dans authorship Crossref** (un ORCID Crossref vient de l'éditeur, directement de l'auteur lors de la soumission ; le plus fiable). À ajouter en tête.
+   2. **Cross-source par publication × position auteur** (avec garde-fou méga-paper, état actuel).
+   3. **Identifiants : IdRef, hal_person_id**. ORCID hors Crossref retiré (les ORCID OA/WoS viennent souvent d'un matching par nom côté éditeur, régulièrement fautifs).
+   4. **Name matching**.
+3. **Seuil méga-paper conservé**. `MAX_AUTHORS_CROSS_SOURCE = 50` déjà implémenté dans `decide_cross_source_match`, cohérent avec `MAX_AUTHORS_CONFLICT = 50` côté admin.
+4. **Statuts `pending`/`confirmed`/`rejected` inchangés**. Un identifier `rejected` n'est jamais utilisé pour le matching (`fetch_*_to_person_map` filtre déjà `status != 'rejected'`). `pending` et `confirmed` restent utilisés indistinctement ; restreindre aux `confirmed` est différé.
 
-### Sous-point : seuil méga-paper
+## Phasage
 
-Court-circuit à ajouter sur `decide_cross_source_match` si le
-`source_publication` a plus de N auteurs (constante
-`MAX_AUTHORS_CROSS_SOURCE`, à harmoniser avec `MAX_AUTHORS_CONFLICT`
-côté `TODO_LAURA.md`). Renvoie `None` direct (pas de cross-source)
-au-delà du seuil.
+### Phase 1 — Refactor structurel pur (logique préservée)
 
-Coût : ajout d'un argument `total_author_count` à
-`decide_cross_source_match` + compute du count côté caller (depuis le
-prefetch ou une query supplémentaire).
+- [ ] **Implémenter `decide_person_match`** dans `domain/persons/matching.py`. Signature :
 
-## À rapatrier de l'application
+   ```python
+   @dataclass(frozen=True)
+   class PersonMatchDecision:
+       action: Literal["match", "create", "skip"]
+       person_id: int | None = None
+       reason: str = ""  # 'cross_source' | 'idref' | 'orcid' | 'single_name' | 'name_ambiguous' | …
 
-Au-delà du `decide_person_match` lui-même :
+   def decide_person_match(
+       *,
+       cross_source_match: int | None,
+       idref_match: int | None,
+       orcid_match: int | None,
+       name_form_outcome: NameFormDecision,
+   ) -> PersonMatchDecision: ...
+   ```
 
-- Règles d'arbitrage (ordre des sources d'identité, comportement en
-  cas d'ambiguïté).
-- Gestion des statuts `pending` / `confirmed` / `rejected` côté
-  `person_identifiers`.
-- Invariants métier (ex. « jamais de fusion automatique entre deux
-  persons ayant chacune un `persons_rh` distinct » — déjà appliqué
-  côté API et scripts via `check_can_merge_persons`, à formaliser
-  comme partie de la cascade si pertinent).
+   Pur, testable sans BDD. Reproduit l'ordre actuel.
 
-## Signature suggérée
+- [ ] **Tests unitaires sur toutes les branches** de la cascade : match cross-source, match idref, match orcid, name_form single match, name_form ambiguous, name_form create, name_form skip (create interdit).
+- [ ] **Refactor `create_persons_from_source_authorships.py`** : passer de 4 boucles à 1 boucle.
+  - Prefetch des 4 lookups en début de `run` (déjà partiellement présent : `linked_index`, `idref_map`, `orcid_map`, `name_form_map`).
+  - Une seule boucle sur `all_authorships`. Pour chaque authorship : calculer les 4 candidats, appeler `decide_person_match`, appliquer l'effet (`link_to_person` / `create_person` / `add_identifiers` / `add_name_form`).
+  - Suppression des fonctions `step1_cross_source`, `step1b_idref`, `step2_orcid`, `step3_name_forms`.
+- [ ] **Nettoyage** :
+  - Docstring du module : retirer l'« Étape 4 : Personnes liées aux thèses » fantôme (jamais appelée par `run()`, cf. trou de couverture).
+  - Lever au passage les 5 `Any` résiduels signalés par `CODE_chasse-aux-any` (les `all_authorships: Any` deviennent typés).
+- [ ] **Tests d'intégration** adaptés à la nouvelle structure (1 boucle au lieu de 4 steps). Vérifier que les compteurs de fin de run restent comparables.
 
-```python
-@dataclass(frozen=True)
-class PersonMatchDecision:
-    action: Literal["match", "create", "skip"]
-    person_id: int | None = None
-    reason: str = ""
-    # 'orcid_crossref' | 'hal_account' | 'cross_source' |
-    # 'idref' | 'orcid' | 'single_name' | 'name_ambiguous' | …
+### Phase 2 — Peaufinage hiérarchie (post-refactor)
 
-def decide_person_match(
-    *,
-    hal_account_match: int | None,
-    cross_source_match: int | None,
-    idref_match: int | None,
-    orcid_match: int | None,
-    name_form_outcome: NameFormDecision,
-) -> PersonMatchDecision:
-    """Cascade de matching personne, du signal le plus fiable au moins
-    fiable. Pure, testable sans BDD."""
-```
+- [ ] **Ajout source dédiée ORCID Crossref** en tête. Soit nouveau paramètre dédié dans `decide_person_match` (`orcid_crossref_match`), soit map ORCID restreinte à `source = 'crossref'`.
+- [ ] **Ajout `hal_person_id`** au niveau des identifiants (à côté d'IdRef). Sous-décision `decide_match_by_identifier(value, hal_account_map)` existe déjà — il suffit d'ajouter une map prefetch + un argument au décideur.
+- [ ] **Retirer le matching ORCID hors Crossref**. Filtre côté `fetch_orcid_to_person_map` ou côté décideur.
 
-Côté application : 1 boucle qui prefetch les 4 maps de lookup, calcule
-chaque match par authorship, appelle `decide_person_match`, applique
-l'effet selon la décision (INSERT person + identifiers, ou attache
-person_id existant, ou skip).
+## Questions ouvertes
 
-## Plan de chantier (résumé)
+- **Trou de couverture theses** : `BIBLIO_SOURCES = ("hal", "openalex", "wos", "scanr", "crossref")` exclut délibérément theses. Conséquence : aucune `source_authorship` theses n'a `in_perimeter = TRUE` (le mécanisme `set_in_perimeter_from_addresses` n'est appelé que pour `BIBLIO_SOURCES` dans `populate_affiliations.run_populate`). `fetch_unlinked_authorships` filtre `WHERE in_perimeter = TRUE`, donc les authorships theses ne passent jamais dans la cascade. Les rattachements visibles aujourd'hui (ex. personne 2557 liée à 8 thèses comme non-auteur) sont vestiges d'un état antérieur du code (commentaire trompeur `populate_affiliations.py:60` « in_perimeter est déjà à TRUE (posé par normalize_theses) »). À réexaminer après refactor : (a) pourquoi `BIBLIO_SOURCES` exclut-il theses initialement ? (b) conséquences d'inclure theses dans le périmètre standard sur les autres consommateurs (`application/authorships/core.py:VALID_SOURCES`, `domain/pipeline_modes.py`) ? (c) ajout à `BIBLIO_SOURCES` ou solution alternative (boucle dédiée theses dans `populate_affiliations`) ?
 
-1. Implémenter `decide_person_match` en domain en s'appuyant sur les
-   3 sous-décisions déjà en place.
-2. Restructurer `create_persons_from_source_authorships` : passer de
-   5 boucles à 1 boucle avec prefetch des 4 maps + appel
-   `decide_person_match`.
-3. Décider du sort du matching cross-source (seuil, suppression…).
-4. Surveiller la perf — un seul prefetch global vs lookups par étape.
-5. Tests unitaires sur la cascade (toutes les branches), tests
-   d'intégration adaptés.
+- **Matching cross-source sur méga-papers** : le seuil `MAX_AUTHORS_CROSS_SOURCE = 50` court-circuite le cross-source au-delà. Suffit-il, ou faut-il restreindre davantage ? Mesure préalable du ratio matchings utiles / faux positifs sur les papers à 30-50 auteurs encore couverts par le matching. À examiner après Phase 1.
+
+- **Statuts `pending` vs `confirmed`** : aujourd'hui les deux sont utilisés indistinctement pour le matching. Restreindre aux `confirmed` réduirait le bruit mais fragiliserait la cascade sur des identifiers récents non encore validés. À reconsidérer plus tard.
+
+- **Invariants métier dans la cascade** : faut-il intégrer `check_can_merge_persons` (jamais de fusion auto entre deux persons avec `persons_rh` distincts) comme partie de la cascade, ou le garder en pré-check côté admin/scripts seulement ? À trancher si Phase 2 produit des cas où la cascade rattacherait deux personnes RH-distinctes par identifier.
 
 ## Liens
 
-- Pattern de référence (décision pure déjà en domain) :
-  [`resolve_doi_conflict`](../../domain/publication.py#L562)
-- Briques sous-décisions déjà migrées :
-  [`domain/persons/matching.py`](../../domain/persons/matching.py)
+- Pattern de référence (décision pure déjà en domain) : [`resolve_doi_conflict`](../../domain/publication.py)
+- Briques sous-décisions déjà migrées : [`domain/persons/matching.py`](../../domain/persons/matching.py)
+- Phase 5 de `CODE_rich-domain-model.md` (refactor `create_persons_from_source_authorships` côté entités) — débloquée après Phase 1 de ce chantier.

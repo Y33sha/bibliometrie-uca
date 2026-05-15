@@ -149,3 +149,62 @@ def decide_match_by_identifier(
     if not value:
         return None
     return identifier_map.get(value)
+
+
+@dataclass(frozen=True)
+class PersonMatchDecision:
+    """Décision de la cascade de matching unifiée.
+
+    ``reason`` identifie le signal qui a tranché (``"cross_source"`` /
+    ``"idref"`` / ``"orcid"`` / ``"single_name"`` pour les ``match`` ;
+    ``"new"`` pour ``create`` ; ``"ambiguous_name_form"`` /
+    ``"creation_not_allowed"`` pour ``skip``). Utilisable côté logs et
+    stats par le caller.
+    """
+
+    action: Literal["match", "create", "skip"]
+    person_id: int | None = None
+    reason: str = ""
+
+
+def decide_person_match(
+    *,
+    cross_source_match: int | None,
+    idref_match: int | None,
+    orcid_match: int | None,
+    name_form_outcome: NameFormDecision,
+) -> PersonMatchDecision:
+    """Cascade unifiée de matching personne, du signal le plus fiable au moins fiable.
+
+    Reproduit la hiérarchie actuelle de
+    ``application/pipeline/persons/create_persons_from_source_authorships.py`` :
+
+    1. **Cross-source** (``cross_source_match``) — match par
+       ``(publication_id, author_position)`` avec une authorship d'une
+       autre source et nom compatible.
+    2. **IdRef** (``idref_match``).
+    3. **ORCID** (``orcid_match``).
+    4. **`person_name_forms`** (``name_form_outcome``) — délègue au
+       résultat de ``decide_name_form_outcome`` (match / create / skip
+       selon ambiguïté et politique de création).
+
+    Pure, testable sans BDD : les 4 paramètres sont précalculés par le
+    caller via prefetch.
+    """
+    if cross_source_match is not None:
+        return PersonMatchDecision(
+            action="match", person_id=cross_source_match, reason="cross_source"
+        )
+    if idref_match is not None:
+        return PersonMatchDecision(action="match", person_id=idref_match, reason="idref")
+    if orcid_match is not None:
+        return PersonMatchDecision(action="match", person_id=orcid_match, reason="orcid")
+    if name_form_outcome.action == "match":
+        return PersonMatchDecision(
+            action="match",
+            person_id=name_form_outcome.person_id,
+            reason="single_name",
+        )
+    if name_form_outcome.action == "create":
+        return PersonMatchDecision(action="create", reason="new")
+    return PersonMatchDecision(action="skip", reason=name_form_outcome.reason)
