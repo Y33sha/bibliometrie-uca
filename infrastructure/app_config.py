@@ -136,64 +136,37 @@ def get_api_base_urls(conn: Connection) -> dict[str, str]:
 def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
     """Retourne les identifiants API pour une source, déduits du périmètre d'extraction.
 
-    Lit perimeter_extraction → structures du périmètre → api_ids[source].
-    Fallback sur les anciennes clés config (openalex_institution_ids, etc.).
+    Lit `perimeter_extraction` → structures du périmètre → `structures.api_ids[source]`.
+    Seul circuit autorisé : pas de fallback vers d'anciennes clés `config.*` plates.
     """
     perim_code = _get_from_db(conn, "perimeter_extraction")
-    if perim_code and isinstance(perim_code, str):
-        try:
-            from infrastructure.perimeter import get_perimeter_structure_ids
+    if not (perim_code and isinstance(perim_code, str)):
+        return []
+    try:
+        from infrastructure.perimeter import get_perimeter_structure_ids
 
-            struct_ids = get_perimeter_structure_ids(conn, perim_code)
-            if struct_ids:
-                rows = conn.execute(
-                    text(
-                        "SELECT api_ids->:src AS ids FROM structures "
-                        "WHERE id = ANY(:ids) AND api_ids ? :src"
-                    ),
-                    {"src": source, "ids": list(struct_ids)},
-                ).all()
-                result: list[str] = []
-                for row in rows:
-                    ids = row.ids
-                    if isinstance(ids, list):
-                        result.extend(ids)
-                    elif isinstance(ids, str):
-                        result.append(ids)
-                if result:
-                    return list(dict.fromkeys(result))  # dédupliqué, ordre préservé
-        except Exception as e:
-            logger.warning(f"Impossible de dériver api_ids depuis le périmètre : {e}")
-
-    fallback_keys = {
-        "openalex": "openalex_institution_ids",
-        "wos": "wos_affiliations",
-        "scanr": "scanr_affiliation_ids",
-        "theses": "theses_etab_ppns",
-    }
-    fallback_key = fallback_keys.get(source)
-    if fallback_key:
-        val = _get_from_db(conn, fallback_key)
-        if val and isinstance(val, list):
-            return val
-
-    return []
-
-
-def get_openalex_institution_ids(conn: Connection) -> list[str]:
-    """Retourne les IDs institution OpenAlex."""
-    val = _get_from_db(conn, "openalex_institution_ids")
-    if val and isinstance(val, list):
-        return val
-    return []
-
-
-def get_wos_affiliations(conn: Connection) -> list[str]:
-    """Retourne les noms OG WoS."""
-    val = _get_from_db(conn, "wos_affiliations")
-    if val and isinstance(val, list):
-        return val
-    return []
+        struct_ids = get_perimeter_structure_ids(conn, perim_code)
+        if not struct_ids:
+            return []
+        rows = conn.execute(
+            text(
+                "SELECT api_ids->:src AS ids FROM structures "
+                "WHERE id = ANY(:ids) AND api_ids ? :src"
+            ),
+            {"src": source, "ids": list(struct_ids)},
+        ).all()
+        result: list[str] = []
+        for row in rows:
+            ids = row.ids
+            if isinstance(ids, list):
+                result.extend(ids)
+            elif isinstance(ids, str):
+                # Tolérance scalaire historique (cf. `StructureApiIds._ensure_list`).
+                result.append(ids)
+        return list(dict.fromkeys(result))  # dédupliqué, ordre préservé
+    except Exception as e:
+        logger.warning(f"Impossible de dériver api_ids depuis le périmètre : {e}")
+        return []
 
 
 def get_openalex_email(conn: Connection) -> str:
@@ -219,22 +192,6 @@ def get_wos_api_key(conn: Connection) -> str:
     if val and isinstance(val, str):
         return val
     return ""
-
-
-def get_scanr_affiliation_ids(conn: Connection) -> list[str]:
-    """Retourne les IDs SIREN des structures ScanR."""
-    val = _get_from_db(conn, "scanr_affiliation_ids")
-    if val and isinstance(val, list):
-        return val
-    return []
-
-
-def get_theses_etab_ppns(conn: Connection) -> list[str]:
-    """Retourne les PPN IdRef des établissements de soutenance pour theses.fr."""
-    val = _get_from_db(conn, "theses_etab_ppns")
-    if val and isinstance(val, list):
-        return val
-    return []
 
 
 def get_scanr_credentials(conn: Connection) -> tuple[str, str]:
