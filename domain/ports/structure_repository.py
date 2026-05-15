@@ -2,6 +2,8 @@
 
 from typing import Any, Protocol
 
+from domain.structures.structure import Structure
+
 
 class StructureRepository(Protocol):
     """Contrat d'accès aux 3 tables du concept Structure
@@ -13,6 +15,16 @@ class StructureRepository(Protocol):
     (les types varient selon la colonne). Ces `Any` sont des
     frontières DB intrinsèques.
     """
+
+    # ── Chargement de l'aggregate ──────────────────────────────────
+
+    def find_by_id(self, structure_id: int) -> Structure | None:
+        """Hydrate l'aggregate `Structure` complet (champs scalaires +
+        VOs `name_forms`). Retourne None si la structure n'existe pas.
+        Les `structure_relations` ne sont pas chargées (graphe externe
+        à l'aggregate ; voir `get_ancestor_ids` pour les remontées
+        ciblées)."""
+        ...
 
     # ── structures ─────────────────────────────────────────────────
 

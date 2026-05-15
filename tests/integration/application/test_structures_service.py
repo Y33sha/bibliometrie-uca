@@ -18,6 +18,8 @@ from application.structures import (
     update_structure,
 )
 from domain.errors import NotFoundError, ValidationError
+from domain.structures.identifiers import HalCollection, RorId
+from domain.structures.structure import StructureType
 from infrastructure.repositories import structure_repository
 
 
@@ -27,6 +29,57 @@ def repo(sa_sync_conn):
 
 
 # ── structures ────────────────────────────────────────────────────
+
+
+class TestFindById:
+    def test_returns_none_if_missing(self, sa_sync_conn, repo):
+        assert repo.find_by_id(999999) is None
+
+    def test_hydrates_minimal_structure(self, sa_sync_conn, repo):
+        row = create_structure(code="MIN", name="Min", type="labo", repo=repo)
+        s = repo.find_by_id(row["id"])
+        assert s is not None
+        assert s.id == row["id"]
+        assert s.code == "MIN"
+        assert s.name == "Min"
+        assert s.structure_type is StructureType.LABO
+        assert s.acronym is None
+        assert s.ror_id is None
+        assert s.hal_collection is None
+        assert s.api_ids is None
+        assert s.name_forms == ()
+
+    def test_hydrates_full_structure_with_vos(self, sa_sync_conn, repo):
+        row = create_structure(
+            code="UMR-LIMOS",
+            name="LIMOS",
+            type="labo",
+            acronym="LIMOS",
+            ror_id="02feahw73",
+            hal_collection="LIMOS",
+            api_ids={"openalex": ["I1"], "wos": ["W1"]},
+            repo=repo,
+        )
+        s = repo.find_by_id(row["id"])
+        assert s is not None
+        assert s.ror_id == RorId("02feahw73")
+        assert s.hal_collection == HalCollection("LIMOS")
+        assert s.api_ids == {"openalex": ["I1"], "wos": ["W1"]}
+
+    def test_hydrates_name_forms(self, sa_sync_conn, repo):
+        row = create_structure(code="S", name="S", type="labo", repo=repo)
+        create_name_form(structure_id=row["id"], form_text="lab x", repo=repo)
+        create_name_form(
+            structure_id=row["id"],
+            form_text="autre forme",
+            is_word_boundary=True,
+            repo=repo,
+        )
+        s = repo.find_by_id(row["id"])
+        assert s is not None
+        assert len(s.name_forms) == 2
+        forms = {nf.form_text for nf in s.name_forms}
+        assert forms == {"lab x", "autre forme"}
 
 
 class TestCreateStructure:

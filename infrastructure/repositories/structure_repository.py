@@ -3,16 +3,53 @@
 from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
-from sqlalchemy import Connection, Text, bindparam, cast, delete, select, text, update
+from sqlalchemy import Connection, Row, Text, bindparam, cast, delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from domain.errors import ValidationError
+from domain.structures.identifiers import HalCollection, RorId
+from domain.structures.name_forms import StructureNameForm
+from domain.structures.structure import Structure, StructureType
 from infrastructure.db.jsonb_models.structure import StructureApiIds
 from infrastructure.db.tables import (
     structure_name_forms,
     structure_relations,
     structures,
 )
+
+
+def _structure_name_form_from_row(row: Row[Any]) -> StructureNameForm:
+    """Mapping d'une row `structure_name_forms` SQL vers le VO."""
+    return StructureNameForm(
+        form_text=row.form_text,
+        is_word_boundary=row.is_word_boundary,
+        is_excluding=row.is_excluding,
+        requires_context_of=tuple(row.requires_context_of or ()),
+    )
+
+
+def _structure_from_row(row: Row[Any], name_forms: tuple[StructureNameForm, ...]) -> Structure:
+    """Mapping d'une row `structures` SQL vers l'aggregate `Structure`.
+
+    Reçoit en paramètre la liste hydratée des `name_forms` (chargée à
+    part par `find_by_id`). Les VOs `ror_id` et `hal_collection` sont
+    parsés en strict (`RorId(...)` / `HalCollection(...)`) — toute donnée
+    en base qui ne respecte pas le format canonique des VOs fera lever
+    `ValidationError` à l'hydratation. C'est délibéré : la base est
+    censée être normalisée (migration 0010 pour ror_id) ; un échec ici
+    signale une corruption à investiguer plutôt qu'à masquer.
+    """
+    return Structure(
+        id=row.id,
+        code=row.code,
+        name=row.name,
+        structure_type=StructureType(row.structure_type),
+        acronym=row.acronym,
+        ror_id=RorId(row.ror_id) if row.ror_id else None,
+        hal_collection=HalCollection(row.hal_collection) if row.hal_collection else None,
+        api_ids=row.api_ids,
+        name_forms=name_forms,
+    )
 
 
 def _normalize_api_ids(raw: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -55,6 +92,34 @@ class PgStructureRepository:
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    # ── Chargement de l'aggregate ──────────────────────────────────
+
+    def find_by_id(self, structure_id: int) -> Structure | None:
+        row = self._conn.execute(
+            select(
+                structures.c.id,
+                structures.c.code,
+                structures.c.name,
+                structures.c.acronym,
+                cast(structures.c.structure_type, Text).label("structure_type"),
+                structures.c.ror_id,
+                structures.c.hal_collection,
+                structures.c.api_ids,
+            ).where(structures.c.id == structure_id)
+        ).first()
+        if row is None:
+            return None
+        nf_result = self._conn.execute(
+            select(
+                structure_name_forms.c.form_text,
+                structure_name_forms.c.is_word_boundary,
+                structure_name_forms.c.is_excluding,
+                structure_name_forms.c.requires_context_of,
+            ).where(structure_name_forms.c.structure_id == structure_id)
+        )
+        name_forms = tuple(_structure_name_form_from_row(r) for r in nf_result)
+        return _structure_from_row(row, name_forms)
 
     # ── structures ─────────────────────────────────────────────────
 
