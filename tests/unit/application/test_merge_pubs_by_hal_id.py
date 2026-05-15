@@ -22,10 +22,12 @@ class _FakeQueries:
         self._src_rows = src_rows
         self._hal_rows = hal_rows
 
-    def fetch_source_publications_with_hal_external_id(self, conn: Any) -> list[dict[str, Any]]:
+    # `conn: object` car l'argument n'est pas utilisé dans le fake (les tests
+    # passent `conn=None` ; le fake retourne directement les rows pré-fournies).
+    def fetch_source_publications_with_hal_external_id(self, conn: object) -> list[dict[str, Any]]:
         return self._src_rows
 
-    def fetch_hal_source_publications(self, conn: Any) -> list[dict[str, Any]]:
+    def fetch_hal_source_publications(self, conn: object) -> list[dict[str, Any]]:
         return self._hal_rows
 
 
