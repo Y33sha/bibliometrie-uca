@@ -17,10 +17,14 @@ class StructureApiIds(BaseModel):
     Utilisé pour configurer les filtres d'affiliation lors des
     extractions (via `utils/app_config.get_extraction_api_ids`).
 
-    extra="allow" pour accepter les sources futures sans migration.
+    Clés strictes (whitelist `domain.sources.STRUCTURE_API_SOURCES`) :
+    `extra="forbid"` rejette toute clé inconnue, par cohérence avec
+    le fait que la liste des sources est une connaissance métier
+    centralisée côté domain. Un test de synchronisation vérifie
+    que les champs du modèle correspondent exactement à la whitelist.
     """
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
 
     openalex: list[str] | None = None
     wos: list[str] | None = None

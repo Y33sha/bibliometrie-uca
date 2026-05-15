@@ -3,7 +3,7 @@
 from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
-from sqlalchemy import Connection, Text, cast, delete, select, update
+from sqlalchemy import Connection, Text, bindparam, cast, delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from domain.errors import ValidationError
@@ -114,6 +114,25 @@ class PgStructureRepository:
         return dict(row._mapping) if row else None
 
     # ── structure_relations ────────────────────────────────────────
+
+    def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:
+        # Remontée récursive `child → parent` à travers `structure_relations`,
+        # toutes `relation_type` confondues (un cycle est un cycle quel que
+        # soit le type d'arête). `structure_id` lui-même est exclu du résultat.
+        stmt = text(
+            """
+            WITH RECURSIVE ancestors(id) AS (
+                SELECT parent_id FROM structure_relations
+                WHERE child_id = :sid
+                UNION
+                SELECT sr.parent_id FROM structure_relations sr
+                JOIN ancestors a ON a.id = sr.child_id
+            )
+            SELECT id FROM ancestors
+            """
+        ).bindparams(bindparam("sid", structure_id))
+        result = self._conn.execute(stmt)
+        return frozenset(row[0] for row in result)
 
     def create_relation(
         self,

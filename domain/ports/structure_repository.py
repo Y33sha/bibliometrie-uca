@@ -44,6 +44,13 @@ class StructureRepository(Protocol):
 
     # ── structure_relations ────────────────────────────────────────
 
+    def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:
+        """Ancêtres stricts de `structure_id` dans le graphe
+        `structure_relations` (toutes `relation_type` confondues).
+        N'inclut pas `structure_id` lui-même. Sert au service pour
+        valider l'absence de cycle avant insertion d'une relation."""
+        ...
+
     def create_relation(
         self,
         *,

@@ -51,6 +51,14 @@ AUTHOR_SOURCES_SQL = _to_sql(AUTHOR_SOURCES)
 # réduit aux sources restantes.
 SOURCE_PRIORITY: tuple[str, ...] = ("theses", "crossref", "scanr", "hal", "openalex", "wos")
 
+
+# Sources qui peuvent apparaître comme clés du JSONB `structures.api_ids`
+# (identifiants d'organisation côté sources externes). Crossref absent :
+# pas de notion d'identifiant structure côté Crossref. Sert de whitelist
+# stricte au modèle JSONB `StructureApiIds` côté infra.
+STRUCTURE_API_SOURCES: tuple[str, ...] = ("openalex", "wos", "scanr", "theses", "hal")
+STRUCTURE_API_SOURCES_SET: frozenset[str] = frozenset(STRUCTURE_API_SOURCES)
+
 # Ordre spécifique pour le marqueur `is_corresponding`. Inversé par
 # rapport à `SOURCE_PRIORITY` : WoS marque explicitement le
 # "reprint_author" dans ses métadonnées, OpenAlex l'infère, HAL
