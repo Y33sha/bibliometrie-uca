@@ -72,7 +72,7 @@ def find_duplicates(
 def link_hal_to_publication(
     conn: Connection,
     queries: MergeQueries,
-    items: Any,
+    items: list[dict[str, Any]],
     logger: logging.Logger,
     dry_run: bool = False,
     *,

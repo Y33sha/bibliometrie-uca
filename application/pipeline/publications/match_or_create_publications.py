@@ -69,7 +69,7 @@ def extract_known_identifiers(
 def process_document(
     conn: Connection,
     queries: PublicationsMatchOrCreateQueries,
-    doc: Any,
+    doc: dict[str, Any],
     dry_run: bool,
     *,
     pub_repo: PublicationRepository,

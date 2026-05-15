@@ -7,7 +7,7 @@ from sqlalchemy import Connection
 from application.ports.pipeline.subjects import SubjectsQueries
 
 
-def dedup_strs(values: Any) -> list[str]:
+def dedup_strs(values: object) -> list[str]:
     """Filtre les non-str et chaînes vides, déduplique sur `lower(s)` en
     préservant l'ordre et la casse du premier insert."""
     if not isinstance(values, list):

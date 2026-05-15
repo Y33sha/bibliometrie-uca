@@ -11,9 +11,8 @@ l'import inverse — et seuls les pipelines en ont l'usage.
 
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, NestedTransaction
 
 
 @contextmanager
@@ -37,7 +36,7 @@ def savepoint(
         with savepoint(conn, "merge_pub"):
             do_work(conn)
     """
-    sp: Any = conn.begin_nested()
+    sp: NestedTransaction = conn.begin_nested()
     try:
         yield
     except Exception:

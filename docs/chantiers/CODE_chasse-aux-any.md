@@ -110,11 +110,17 @@ Périmètres identifiés :
 
 ### Phase 3 — Verrouillage
 
-- [ ] **Revue pré-verrouillage** : re-passer tous les modules pour
-  réexaminer les `Any` subsistants (vraiment justifiés ?) et inclure
-  les `dict[str, Any]` / `list[Any]` (hors du pattern strict
-  `: Any | -> Any` mais comptent quand même). Action manuelle module
-  par module avant d'activer les overrides.
+- [x] **Revue pré-verrouillage** : tous les modules re-passés (`: Any | -> Any` strict + `dict[str, Any]` / `list[Any]` élargis). Bilan des `Any` subsistants après revue :
+  - `domain/publications/aggregation.py:first_non_null -> Any` + `merge_lists_dedup_ci -> list[Any]` : polymorphique selon `getattr(s, attr)`. Justification documentée en docstring.
+  - `domain/sources/*.py` (5 fichiers) : `dict[str, Any]` = payloads JSON bruts d'APIs externes en lecture. Forcer `JsonValue` exigerait des `isinstance` partout sur le dict-walking interne (50+ checks pour zéro gain métier). Justification documentée en docstring de module.
+  - `domain/ports/*_repository.py` : `dict[str, Any]` records DB hydratés + `fields: dict[str, Any]` partial updates. **Déférés à `CODE_rich-domain-model` Phase 8** qui décidera entre vraie entité / `TypedDict` / `dataclass(frozen)` selon le cas, et appliquera `TypedDict(total=False)` pour les `fields`.
+  - `domain/ports/address_repository.py:where_params: list[Any]` : bindings SQL paramétrés, types dépendent du `where_clause`. Commentaire inline déjà posé.
+  - `application/pipeline/persons/create_persons_from_source_authorships.py:all_authorships: Any` (5 occ.) : cascade matching refondue par `METIER_decide-person-match` — `Any` levés à ce moment-là.
+  - `application/pipeline/normalize/normalize_hal.py:as_str(value: object)`, `normalize_wos.py:_safe_list(obj: object)`, `subjects/_common.py:dedup_strs(values: object)` : helpers de coercion, basculés en `object` (convention « marqueur sans contrat »).
+  - `application/pipeline/_savepoint.py` : `sp: NestedTransaction` (typé depuis SA).
+  - `application/pipeline/affiliations/populate_affiliations.py` : `perimeter_ids/wide_ids: set[int]`. `application/pipeline/publications/merge_pubs_by_hal_id.py:items: list[dict[str, Any]]`. `application/pipeline/publications/match_or_create_publications.py:doc: dict[str, Any]`. `application/pipeline/subjects/run.py` + `authorships/build_authorships.py` : `sources: Iterable[str] | None`.
+  - `interfaces/api/models.py:ConfigItem.value` et `ConfigValueUpdate.value` : `Any` (pydantic ne supporte pas l'alias récursif `JsonValue` en py310).
+  - `tests/` : `Any` tolérés pour `MagicMock` (cf. décision 4) ; `object` quand l'argument n'est pas utilisé.
 - [ ] `[[tool.mypy.overrides]]` par module au fil du nettoyage :
   `disallow_any_explicit = true` activé module par module dans
   `pyproject.toml` (un commit par bascule).

@@ -319,6 +319,8 @@ Une fois les callers de Phase 1 migrés vers les entités (Phases 3, 4, 5), les 
 
 Généralisation de l'hydratation faite en Phase 4 pour Publication aux autres aggregates (Person, Structure, SourcePublication, AddressAffiliation). À instruire séparément quand on y arrivera. Hypothèse de travail (Laura) : les repositories sont majoritairement en écriture et ne renvoient rien ; à vérifier.
 
+Inclut aussi le **typage des projections de lecture et des partial updates** (déféré depuis `CODE_chasse-aux-any` Phase 3) : les `dict[str, Any]` qui apparaissent comme retour ou comme `fields: dict[str, Any]` dans les ports `domain/ports/*_repository.py` sont délibérément non typés tant que ce sweep architectural n'a pas tranché entre les options ci-dessous.
+
 Audit préalable :
 
 - [ ] Inventaire des méthodes de chaque repository (`infrastructure/repositories/`) : signature, type de retour, callers.
@@ -326,6 +328,8 @@ Audit préalable :
 - [ ] Décider du contrat : repos renvoient des entités par défaut OU ajout ciblé de méthodes `find_by_id(id) -> Entity` en complément des lectures projectives existantes (modèle retenu en Phase 4 pour Publication).
 - [ ] Trancher la place de la conversion `row → entity` (au sein du repo, via un mapper dédié, via une classmethod d'entité ?).
 - [ ] Coordonner avec les query services pour API (`application/ports/`) : ces derniers restent sur des DTOs de projection ; pas d'entités hydratées en lecture API.
+- [ ] **Projections de lecture `dict[str, Any]`** : décider du remplaçant (entité riche / `TypedDict` / `dataclass(frozen=True)` / `NamedTuple`). Le choix peut varier par méthode selon ce qu'elle retourne (record minimal vs aggregate complet).
+- [ ] **Partial updates `fields: dict[str, Any]`** : remplacer par `TypedDict(total=False)` un par port (`JournalUpdateFields`, `PerimeterUpdateFields`, `PublisherUpdateFields`, `StructureUpdateFields`, `StructureNameFormUpdateFields`). Contraint statiquement les callers aux colonnes valides.
 
 Contenu détaillé à formaliser en phase d'instruction.
 

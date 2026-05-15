@@ -12,7 +12,7 @@ CLI est dans `interfaces/cli/pipeline/build_authorships.py`.
 
 import logging
 import time
-from typing import Any
+from collections.abc import Iterable
 
 from sqlalchemy import Connection
 
@@ -20,7 +20,10 @@ from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
 
 
 def build(
-    conn: Connection, queries: AuthorshipsBuildQueries, logger: logging.Logger, sources: Any = None
+    conn: Connection,
+    queries: AuthorshipsBuildQueries,
+    logger: logging.Logger,
+    sources: Iterable[str] | None = None,
 ) -> None:
     all_sources = [
         ("HAL", "hal"),
