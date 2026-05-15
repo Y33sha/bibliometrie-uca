@@ -7,7 +7,9 @@ Le port vit donc dans `application/ports/` plutôt que dans `domain/ports/`.
 Implémenté par `infrastructure.db.queries.config.PgConfig`.
 """
 
-from typing import Any, Protocol
+from typing import Protocol
+
+from domain.json_types import JsonValue
 
 
 class ConfigStore(Protocol):
@@ -15,6 +17,6 @@ class ConfigStore(Protocol):
 
     def config_key_exists(self, key: str) -> bool: ...
 
-    def update_config_value(self, key: str, value: Any) -> dict: ...
+    def update_config_value(self, key: str, value: JsonValue) -> dict: ...
 
     def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]: ...

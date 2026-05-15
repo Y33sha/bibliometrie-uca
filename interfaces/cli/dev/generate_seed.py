@@ -26,6 +26,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from domain.json_types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 
 # Tables à exporter, dans l'ordre d'insertion (respect des FK)
@@ -93,10 +94,7 @@ TABLES: list[dict[str, Any]] = [
 ]
 
 
-def escape_sql(
-    value: str | int | float | bool | list[Any] | dict[str, Any] | None,
-    is_jsonb: bool = False,
-) -> str:
+def escape_sql(value: JsonValue, is_jsonb: bool = False) -> str:
     """Échappe une valeur pour insertion SQL.
 
     Si is_jsonb=True, la valeur est sérialisée en JSON valide

@@ -8,18 +8,17 @@ Le SQL vit dans `infrastructure/repositories/perimeter_repository.py`
 du projet).
 """
 
-from typing import Any
-
 from application.audit import emit_event
 from application.ports.config import ConfigStore
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from domain.json_types import JsonValue
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.perimeter_repository import PerimeterRepository
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
-def update_config_value(key: str, value: Any, *, config: ConfigStore) -> dict:
+def update_config_value(key: str, value: JsonValue, *, config: ConfigStore) -> dict:
     """Met à jour la valeur d'un paramètre de config existant.
 
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.

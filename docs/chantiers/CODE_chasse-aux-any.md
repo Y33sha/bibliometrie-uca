@@ -100,11 +100,11 @@ Maintenant que l'alias existe (`domain/json_types.py`), tous les `dict[str, Any]
 
 Périmètres identifiés :
 
-- [ ] `interfaces/api/models.py` : `ConfigItem.value`, `ConfigValueUpdate.value`.
-- [ ] `interfaces/api/app.py` : handlers `health`/`metrics`.
-- [ ] `interfaces/cli/` : helpers `escape_sql`, records DB.
-- [ ] `application/` : `_merge_lists` (devenu `merge_lists_dedup_ci` dans `domain/publications/aggregation.py`), `update_config_value`.
-- [ ] `infrastructure/` : `app_config._get_from_db`.
+- [~] `interfaces/api/models.py` : `ConfigItem.value`, `ConfigValueUpdate.value` — **restent `Any`** (pydantic ne supporte pas l'alias récursif `JsonValue` en py310 : `RecursionError` à la génération de schéma). Commentaire de justification posé sur les deux champs. PEP 695 type aliases (3.12+) résoudraient le problème ; à revoir au passage py312.
+- [x] `interfaces/api/app.py` : `health() -> JSONResponse | dict[str, JsonValue]` ; `metrics() -> dict[str, JsonValue]` ; `last_extraction: dict[str, dict[str, JsonValue]]`.
+- [x] `interfaces/cli/dev/generate_seed.py:escape_sql(value: JsonValue, is_jsonb: bool)` — l'union manuelle `str | int | float | bool | list[Any] | dict[str, Any] | None` était l'équivalent verbeux de `JsonValue`.
+- [x] `application/` : `update_config_value(key, value: JsonValue, *, config)` (`application/config.py`) + port `ConfigStore.update_config_value` (`application/ports/config.py`). `_merge_lists` n'existe plus (renommé `merge_lists_dedup_ci` côté domain, signature `list[Any] | None` non liée à JSONB — type de retour polymorphique sur `getattr(source, attr)`).
+- [x] `infrastructure/` : `app_config._get_from_db -> JsonValue` + 3 isinstance checks ajoutés sur les callers internes (`get_years`, `get_hal_collections`, `get_scanr_credentials`) pour narrower correctement le type. `infrastructure/db/queries/config.py:PgConfig.update_config_value` aligné sur le port.
 
 ### Phase 3 — Verrouillage
 

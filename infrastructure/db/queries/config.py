@@ -13,6 +13,7 @@ from sqlalchemy import Connection, func, select, text, update
 
 from application.ports.api.config_queries import ConfigQueries
 from application.ports.config import ConfigStore
+from domain.json_types import JsonValue
 from infrastructure.db.tables import config
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ class PgConfig(ConfigStore):
         result = self._conn.execute(select(config.c.key).where(config.c.key == key))
         return result.first() is not None
 
-    def update_config_value(self, key: str, value: Any) -> dict:
+    def update_config_value(self, key: str, value: JsonValue) -> dict:
         stmt = (
             update(config)
             .where(config.c.key == key)

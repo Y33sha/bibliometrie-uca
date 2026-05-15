@@ -7,19 +7,20 @@ clés API, credentials ScanR).
 
 import datetime
 import logging
-from typing import Any
 
 from sqlalchemy import Connection, text
+
+from domain.json_types import JsonValue
 
 logger = logging.getLogger(__name__)
 
 
-def _get_from_db(conn: Connection, key: str) -> Any:
+def _get_from_db(conn: Connection, key: str) -> JsonValue:
     """Lit une valeur depuis la table config. Retourne None si absente.
 
-    Le retour est typé `Any` car les valeurs `config.value` sont stockées
-    en JSONB libre — chaque caller fait son `isinstance(...)` pour
-    contraindre le type (str, list, dict, …) avant usage.
+    Le retour est typé `JsonValue` (frontière JSONB libre) — chaque caller
+    fait son `isinstance(...)` pour contraindre le type (str, list, dict, …)
+    avant usage.
     """
     try:
         row = conn.execute(
@@ -40,12 +41,14 @@ def get_years(conn: Connection, mode: str = "full") -> list[int]:
     offset = _get_from_db(conn, key)
     current_year = datetime.date.today().year
 
-    if offset is not None:
+    if isinstance(offset, (int, str, float)) and not isinstance(offset, bool):
         try:
-            n = int(offset) if not isinstance(offset, int) else offset
+            n = int(offset)
             return list(range(current_year - n, current_year + 1))
         except (ValueError, TypeError):
             logger.warning(f"Valeur invalide pour {key}: {offset}")
+    elif offset is not None:
+        logger.warning(f"Valeur invalide pour {key}: {offset}")
 
     return [current_year]
 
@@ -59,7 +62,8 @@ def get_hal_collections(conn: Connection) -> dict[str, str]:
     try:
         from infrastructure.perimeter import get_perimeter_structure_ids
 
-        perim_code = _get_from_db(conn, "perimeter_extraction") or "uca_wide"
+        raw_perim = _get_from_db(conn, "perimeter_extraction")
+        perim_code = raw_perim if isinstance(raw_perim, str) and raw_perim else "uca_wide"
         perimeter_ids = get_perimeter_structure_ids(conn, perim_code)
         if perimeter_ids:
             rows = conn.execute(
@@ -237,6 +241,6 @@ def get_scanr_credentials(conn: Connection) -> tuple[str, str]:
     """Retourne (username, password) pour l'API ScanR."""
     user = _get_from_db(conn, "scanr_username")
     pwd = _get_from_db(conn, "scanr_password")
-    if user and pwd:
+    if isinstance(user, str) and isinstance(pwd, str) and user and pwd:
         return user, pwd
     return "", ""
