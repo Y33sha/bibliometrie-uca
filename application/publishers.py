@@ -16,12 +16,12 @@ déléguer les transferts SQL.
 
 from application.audit import emit_event
 from application.journals import merge_journals
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.publisher_repository import PublisherRepository
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.json_types import JsonValue
 from domain.normalize import normalize_text
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.journal_repository import JournalRepository
-from domain.ports.publisher_repository import PublisherRepository
 
 
 def find_or_create_publisher(

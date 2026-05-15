@@ -9,13 +9,13 @@ import logging
 
 from application.audit import emit_event
 from application.authorships.core import delete_orphan_authorships
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.authorship_repository import AuthorshipRepository
+from application.ports.repositories.person_repository import PersonRepository
 from domain.errors import CannotAttributeConflict, NotFoundError
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person_identifier import PersonIdentifier
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.authorship_repository import AuthorshipRepository
-from domain.ports.person_repository import PersonRepository
 from domain.sources import ALL_SOURCES_SET
 
 logger = logging.getLogger(__name__)

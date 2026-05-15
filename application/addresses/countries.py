@@ -11,7 +11,7 @@ l'agrégat Address mais n'interagissent pas entre elles.
 
 import logging
 
-from domain.ports.address_repository import AddressRepository
+from application.ports.repositories.address_repository import AddressRepository
 
 logger = logging.getLogger(__name__)
 

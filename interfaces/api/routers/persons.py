@@ -54,10 +54,10 @@ from application.ports.api.persons_queries import (
     ListFilters,
     PersonsQueries,
 )
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.authorship_repository import AuthorshipRepository
+from application.ports.repositories.person_repository import PersonRepository
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.authorship_repository import AuthorshipRepository
-from domain.ports.person_repository import PersonRepository
 from domain.sources import ALL_SOURCES_SET
 from interfaces.api.deps import (
     audit_repo_sync,

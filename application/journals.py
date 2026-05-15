@@ -11,11 +11,11 @@ Les routers FastAPI utilisent les mêmes repos que le pipeline
 """
 
 from application.audit import emit_event
+from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.journal_repository import JournalRepository
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.json_types import JsonValue
 from domain.normalize import normalize_text
-from domain.ports.audit_repository import AuditRepository
-from domain.ports.journal_repository import JournalRepository
 
 
 def find_or_create_journal(

@@ -18,7 +18,7 @@ from sqlalchemy import Connection
 
 from application.pipeline.publications.merge_by_key import merge_publications_by_key
 from application.ports.pipeline.merge import MergeQueries
-from domain.ports.publication_repository import PublicationRepository
+from application.ports.repositories.publication_repository import PublicationRepository
 
 
 def find_duplicates(

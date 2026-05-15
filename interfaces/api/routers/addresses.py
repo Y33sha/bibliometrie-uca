@@ -17,9 +17,9 @@ from application.ports.api.addresses_queries import (
     AddressesQueries,
     AddressListFilters,
 )
-from domain.ports.address_repository import AddressRepository
-from domain.ports.authorship_repository import AuthorshipRepository
-from domain.ports.structure_repository import StructureRepository
+from application.ports.repositories.address_repository import AddressRepository
+from application.ports.repositories.authorship_repository import AuthorshipRepository
+from application.ports.repositories.structure_repository import StructureRepository
 from interfaces.api.deps import (
     address_repo_sync,
     addresses_queries_sync,

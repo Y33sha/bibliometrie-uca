@@ -14,8 +14,8 @@ périphériques d'**adapters frères** qui ne se connaissent pas :
 `interfaces/` (adapters entrants — HTTP, CLI) et `infrastructure/`
 (adapters sortants — DB, APIs externes, logs, settings). La
 neutralité entre ces deux bandes repose sur les **ports**
-(`Protocol`) définis dans `application/ports/` ou `domain/ports/`,
-qui forment une zone neutre dont dépendent tous les autres modules.
+(`Protocol`) définis dans `application/ports/`, qui forment une zone
+neutre dont dépendent tous les autres modules.
 
 ```
                   ┌─────────────────────────────┐
@@ -46,20 +46,20 @@ qui forment une zone neutre dont dépendent tous les autres modules.
    hormis `stdlib`. Testable sans DB, sans HTTP, sans mock, en
    millisecondes.
 
-2. **Les ports sont une zone neutre.** `application/ports/*` (ports
-   des query services et adapters spécifiques) et `domain/ports/*`
-   (ports repositories d'agrégats) ne contiennent que des Protocol,
-   pas d'implémentation. Tous les autres modules dépendent d'eux ;
-   eux ne dépendent de personne (sauf `domain/` pour les types
-   métier).
+2. **Les ports sont une zone neutre.** `application/ports/*` ne
+   contient que des Protocol, pas d'implémentation. Tous les autres
+   modules dépendent d'eux ; eux ne dépendent de personne (sauf de
+   `domain/` pour les types métier). L'arborescence interne sert à
+   grouper visuellement (`repositories/` pour les agrégats, `api/` /
+   `pipeline/` pour les query services), pas à porter des règles
+   d'import distinctes.
 
 3. **Use-cases indépendants des adapters sortants.** `application/`
    ne peut pas importer `infrastructure/`. Les services applicatifs
    reçoivent leurs dépendances (repositories, query services) via les
-   **ports** (`Protocol`) définis dans `application/ports/` ou
-   `domain/ports/` — c'est `infrastructure/` qui implémente les ports,
-   pas l'inverse. Contrôlé par `import-linter` (contrat `layered` dans
-   `pyproject.toml`).
+   **ports** (`Protocol`) définis dans `application/ports/` — c'est
+   `infrastructure/` qui implémente les ports, pas l'inverse. Contrôlé
+   par `import-linter` (contrat `layered` dans `pyproject.toml`).
 
 4. **Routers ⊥ adapters sortants.** Les routers FastAPI
    (`interfaces/api/routers/*`) **ne doivent pas** importer
@@ -135,13 +135,10 @@ Contenu, organisé par concept métier :
   des relations structure (`domain/structures/relations.py`),
   `doc_types`, `authorship_roles`, `sources` (référentiel des 6
   sources).
-- **Ports repositories** (`domain/ports/*`) : interfaces Protocol
-  par agrégat (`PersonRepository`, `PublicationRepository`,
-  `JournalRepository`, `StructureRepository`, `AuthorshipRepository`,
-  `AddressRepository`, `PublisherRepository`, `PerimeterRepository`,
-  `AuditRepository`).
 
-Le domaine est testé en unit sans DB.
+Le domaine est testé en unit sans DB. Il ne contient aucun port — les
+Protocols de persistance vivent dans `application/ports/repositories/`
+(cf. section `application/` ci-dessous).
 
 **Conventions d’hydratation des agrégats** :
 
@@ -162,37 +159,31 @@ Le domaine est testé en unit sans DB.
   (le domain ne dépend pas de SQLAlchemy) ; pas de classe mapper
   dédiée (overkill).
 
-#### Règle de placement des ports : `domain/ports/` vs `application/ports/`
+#### Où ranger un nouveau port ?
 
-Un port va dans **`domain/ports/`** ssi les **trois critères** sont
-remplis simultanément :
+Tous les ports vivent dans `application/ports/`. L'arborescence
+interne reflète la nature du contrat, mais ne porte aucune règle
+d'import :
 
-1. **Le port représente la persistance d'un agrégat du domaine**
-   (entité racine identifiable au cœur du modèle métier : `Person`,
-   `Publication`, `Structure`, `Authorship`, `Journal`, `Publisher`,
-   `Address`, `Perimeter`, `Audit`).
-2. **La signature ne référence que des types `domain/`, stdlib, ou
-   primitives Python** (`int`, `str`, `dict`, `list`, etc.). Aucun
-   type d'`infrastructure/`, aucun fragment SQL.
-3. **Les méthodes sont nommées en termes métier** (`find_by_doi`,
-   `create`, `merge_into`), pas en termes techniques (`execute_query`,
-   `fetch_batch`, `count_table`).
+- **`application/ports/repositories/`** — Protocols de persistance
+  d'un agrégat (`PersonRepository`, `PublicationRepository`,
+  `JournalRepository`, `StructureRepository`, `AuthorshipRepository`,
+  `AddressRepository`, `PublisherRepository`, `PerimeterRepository`,
+  `AuditRepository`). Signatures en termes métier (`find_by_doi`,
+  `create`, `merge_into`), types `domain/` + primitives Python.
+- **`application/ports/api/`** — query services lectures pour les
+  routers (facets, listings, projections plates).
+- **`application/ports/pipeline/`** — query services et opérations
+  spécifiques à une phase pipeline. Signature typique : `Connection`
+  SA en premier argument.
+- **`application/ports/<nom>.py`** (racine) — autres ports
+  applicatifs sans famille (ex. `config.py`).
 
-Sinon, le port va dans **`application/ports/`** : c'est un query
-service ou un wrapper d'opération orchestrationnelle, propre à un
-workflow applicatif (phase pipeline, etc.) plutôt qu'à un agrégat.
-Les ports `application/` ont typiquement une signature qui prend
-explicitement une `Connection` SA en premier argument — signal qu'on
-est dans l'orchestration technique, pas dans le langage du domaine.
+Si un même port pourrait raisonnablement aller dans deux
+emplacements, choisir au feeling : c'est cosmétique, on peut le
+déplacer plus tard sans casse.
 
-**Le critère est conceptuel, pas mécanique** (« est-ce que ce port
-parle du domaine ? »), pas (« est-ce que ce port est utilisé par
-`domain/` ? ») : ce dernier critère, appliqué strictement, viderait
-`domain/ports/` puisque le domaine ne fait pas d'I/O et n'utilise donc
-jamais directement un port. C'est `application/` qui consomme les
-ports `domain/` dans les use cases.
-
-**Exceptions assumées** :
+**Exception assumée pour les repositories** :
 - `address_repository` expose des méthodes de propagation
   cross-aggregate (ex. `refresh_publications_countries_for_addresses`)
   qui touchent `publications.countries`. Pattern accepté en DDD quand
@@ -221,7 +212,9 @@ Contenu :
   - `enrich/` — Unpaywall, APC
   - `fetch_missing_doi.py` — cross-source DOI lookup
 - **Ports** (`application/ports/*`) : interfaces Protocol pour les
-  query services (adapters dans `infrastructure/db/queries/*`).
+  query services (adapters dans `infrastructure/db/queries/*`) et
+  pour les repositories d'agrégats (`application/ports/repositories/*`,
+  implémentés dans `infrastructure/repositories/*`).
 
 Interdiction : **`application/` ne peut pas importer
 `infrastructure/`**. Toute nouvelle dépendance doit passer par un
@@ -245,7 +238,7 @@ Contenu :
     threadpool Starlette) et le pipeline.
   - `connection.py` — constantes communes (`SANDBOX_DB_NAME`).
 - **`repositories/`** — adapters PostgreSQL implémentant les ports
-  `domain/ports/*` : `person_repository/`, `publication_repository.py`,
+  `application/ports/repositories/*` : `person_repository/`, `publication_repository.py`,
   `journal_repository.py`, `structure_repository.py`,
   `authorship_repository.py`, `address_repository.py`,
   `publisher_repository.py`, `perimeter_repository.py`,
@@ -260,9 +253,9 @@ Contenu :
   `api_retry.py`, `api_limits.py`, `pipeline_metrics.py`,
   `pipeline_status.py`, `app_config.py`, `db/dump_schema.py`.
 
-`infrastructure/` n'importe que les ports (`application/ports/*`,
-`domain/ports/*`) et le domaine — jamais les use-cases applicatifs
-(`application/*.py` hors `ports/`).
+`infrastructure/` n'importe que les ports (`application/ports/*`)
+et le domaine — jamais les use-cases applicatifs (`application/*.py`
+hors `ports/`).
 
 ### `interfaces/` — adapters entrants
 

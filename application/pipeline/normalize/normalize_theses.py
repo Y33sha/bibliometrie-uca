@@ -31,10 +31,10 @@ from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries
+from application.ports.repositories.publication_repository import PublicationRepository
 from domain.dates import french_date_to_iso
 from domain.json_types import JsonValue
 from domain.normalize import normalize_text
-from domain.ports.publication_repository import PublicationRepository
 from domain.publication import normalize_nnt
 from domain.sources.theses import (
     aggregate_thesis_persons,

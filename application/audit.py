@@ -15,15 +15,15 @@ Les ContextVar sont async-local — chaque requête HTTP a son propre contexte,
 pas de fuite entre requêtes.
 
 L'écriture SQL elle-même passe par le port `AuditRepository` (cf.
-`domain/ports/audit_repository.py`), pas par un `cur.execute` inline :
+`application/ports/repositories/audit_repository.py`), pas par un `cur.execute` inline :
 règle DDD `application ⊥ infrastructure`.
 """
 
 import contextvars
 import logging
 
+from application.ports.repositories.audit_repository import AuditRepository
 from domain.json_types import JsonValue
-from domain.ports.audit_repository import AuditRepository
 
 logger = logging.getLogger(__name__)
 

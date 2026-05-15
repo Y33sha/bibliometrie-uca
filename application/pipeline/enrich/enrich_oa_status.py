@@ -20,7 +20,7 @@ import requests
 from sqlalchemy import Connection
 
 from application.ports.pipeline.enrich import EnrichQueries
-from domain.ports.publication_repository import PublicationRepository
+from application.ports.repositories.publication_repository import PublicationRepository
 
 # Email requis par Unpaywall (politesse, pas d'auth)
 UNPAYWALL_EMAIL = "bibliometrie@uca.fr"

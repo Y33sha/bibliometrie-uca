@@ -2,7 +2,8 @@
 
 `config` n'est pas un agrégat métier — c'est un store clé/valeur utilisé
 par l'orchestration (paramètres pipeline, identifiants sources, etc.).
-Le port vit donc dans `application/ports/` plutôt que dans `domain/ports/`.
+Le port vit donc à la racine de `application/ports/` plutôt que dans
+`application/ports/repositories/` (réservé aux agrégats du domaine).
 
 Implémenté par `infrastructure.db.queries.config.PgConfig`.
 """
