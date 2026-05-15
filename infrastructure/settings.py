@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     db_pool_max: int = 30
 
     @property
-    def db_args(self) -> dict:
+    def db_args(self) -> dict[str, str | int]:
         """Arguments pour psycopg.connect() / psycopg_pool.ConnectionPool."""
         return {
             "dbname": self.db_name,

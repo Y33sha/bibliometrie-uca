@@ -18,7 +18,7 @@ from domain.ports.perimeter_repository import PerimeterRepository
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 
 
-def update_config_value(key: str, value: JsonValue, *, config: ConfigStore) -> dict:
+def update_config_value(key: str, value: JsonValue, *, config: ConfigStore) -> dict[str, JsonValue]:
     """Met à jour la valeur d'un paramètre de config existant.
 
     `value` est sérialisé en JSON. Retourne la ligne mise à jour.
@@ -95,7 +95,7 @@ def create_perimeter(
 def update_perimeter(
     perimeter_id: int,
     *,
-    fields: dict,
+    fields: dict[str, JsonValue],
     repo: PerimeterRepository,
 ) -> None:
     """Met à jour un périmètre (name, description, structure_ids).

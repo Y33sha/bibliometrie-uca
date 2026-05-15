@@ -12,8 +12,8 @@ import json
 import logging
 import os
 import sys
-from typing import Any
 
+from domain.json_types import JsonValue
 from infrastructure import PROJECT_ROOT
 
 log = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ def clear_status() -> None:
     STATUS_FILE.unlink(missing_ok=True)
 
 
-def read_status() -> dict[str, Any] | None:
+def read_status() -> dict[str, JsonValue] | None:
     """Lit le statut, ou ``None`` si aucun pipeline n'est actif.
 
     Un statut dont le PID est mort est traité comme "pas de pipeline

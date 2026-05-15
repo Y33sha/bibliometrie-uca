@@ -71,7 +71,7 @@ def batch_set_country_by_filter(
     Retourne les IDs modifiés.
     """
     conditions: list[str] = []
-    params: list = []
+    params: list[object] = []
     if search:
         conditions.append("unaccent(raw_text) ILIKE unaccent(%s)")
         params.append(f"%{search}%")

@@ -26,7 +26,6 @@ est dans `interfaces/cli/pipeline/populate_person_name_forms.py`.
 """
 
 import logging
-from typing import Any
 
 from sqlalchemy import Connection
 
@@ -58,7 +57,7 @@ def populate(conn: Connection, queries: NameFormsQueries, logger: logging.Logger
 
     logger.info("Normalisation des formes persons...")
     queries.create_temp_raw_forms_table(conn)
-    batch: list[dict[str, Any]] = []
+    batch: list[dict[str, object]] = []
     for raw, pid, src in triples:
         batch.append({"raw_text": raw.strip(), "person_id": pid, "source": src})
         if len(batch) >= BATCH_SIZE:

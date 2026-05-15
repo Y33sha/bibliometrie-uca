@@ -1084,8 +1084,7 @@ class TestNormalizeInterSourceIdempotence:
 
 def _setup_persons_test_data(conn):
     """Crée une chaîne complète de données pour tester create_persons :
-    publications → source_publications (hal) → source_authorships (in_perimeter=TRUE,
-    `person_identifiers` JSONB peuplé directement, plus de `source_persons`).
+    publications → source_publications (hal) → source_authorships (in_perimeter=TRUE).
     """
     from sqlalchemy import text
 

@@ -17,6 +17,7 @@ déléguer les transferts SQL.
 from application.audit import emit_event
 from application.journals import merge_journals
 from domain.errors import ConflictError, NotFoundError, ValidationError
+from domain.json_types import JsonValue
 from domain.normalize import normalize_text
 from domain.ports.audit_repository import AuditRepository
 from domain.ports.journal_repository import JournalRepository
@@ -69,7 +70,9 @@ def find_or_create_publisher(
     return pub_id
 
 
-def update_publisher(publisher_id: int, *, fields: dict, repo: PublisherRepository) -> None:
+def update_publisher(
+    publisher_id: int, *, fields: dict[str, JsonValue], repo: PublisherRepository
+) -> None:
     """Met à jour un éditeur. Le `name` est automatiquement normalisé en
     `name_normalized`.
 
@@ -84,7 +87,9 @@ def update_publisher(publisher_id: int, *, fields: dict, repo: PublisherReposito
 
     fields = dict(fields)
     if "name" in fields:
-        fields["name_normalized"] = normalize_text(fields["name"])
+        name = fields["name"]
+        assert isinstance(name, str), "fields['name'] doit être un str (validé par Pydantic)"
+        fields["name_normalized"] = normalize_text(name)
     repo.update_publisher_fields(publisher_id, fields)
 
 

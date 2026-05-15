@@ -17,7 +17,7 @@ mémoire est négligeable et permet de garder l'historique des labels observés.
 import logging
 import time
 from collections.abc import Iterable
-from typing import Any
+from typing import Protocol
 
 from sqlalchemy import Connection
 
@@ -31,15 +31,29 @@ from application.pipeline.subjects import (
 )
 from application.pipeline.subjects._common import SubjectCache
 from application.ports.pipeline.subjects import SubjectsQueries
+from domain.json_types import JsonValue
 from domain.sources import ALL_SOURCES
 
-INGESTORS: dict[str, Any] = {
-    "hal": ingest_hal,
-    "openalex": ingest_openalex,
-    "wos": ingest_wos,
-    "crossref": ingest_crossref,
-    "theses": ingest_theses,
-    "scanr": ingest_scanr,
+
+class SubjectIngestor(Protocol):
+    def __call__(
+        self,
+        conn: Connection,
+        *,
+        publication_id: int,
+        keywords: list[str] | None,
+        topics: JsonValue,
+        cache: SubjectCache,
+    ) -> int: ...
+
+
+INGESTORS: dict[str, SubjectIngestor] = {
+    "hal": ingest_hal.ingest,
+    "openalex": ingest_openalex.ingest,
+    "wos": ingest_wos.ingest,
+    "crossref": ingest_crossref.ingest,
+    "theses": ingest_theses.ingest,
+    "scanr": ingest_scanr.ingest,
 }
 
 # Fréquence des logs de progression (par source).
@@ -80,7 +94,7 @@ def run(
         n_links = 0
         t0 = time.perf_counter()
         for i, r in enumerate(rows, start=1):
-            n_links += ingestor.ingest(
+            n_links += ingestor(
                 conn,
                 publication_id=r.publication_id,
                 keywords=r.keywords,
