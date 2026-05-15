@@ -1,7 +1,7 @@
 """Port : lectures pour /api/admin/person-duplicates/*.
 
 Implémenté par
-`infrastructure.db.queries.person_duplicates.PgPersonDuplicatesQueries`.
+`infrastructure.queries.person_duplicates.PgPersonDuplicatesQueries`.
 """
 
 from typing import Any, Protocol

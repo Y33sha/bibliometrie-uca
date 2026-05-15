@@ -1,6 +1,6 @@
 """Port : lectures sur les publications (consommé par le router publications).
 
-Implémenté par `infrastructure.db.queries.publications.PgPublicationsQueries`.
+Implémenté par `infrastructure.queries.publications.PgPublicationsQueries`.
 
 Les dataclasses `FacetFilters` et `ListFilters` vivent ici (source de
 vérité) ; les fonctions infra les importent depuis ce module pour typer

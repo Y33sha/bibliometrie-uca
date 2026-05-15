@@ -11,7 +11,7 @@ Contenu :
 
 Les modèles des colonnes JSONB (`external_ids`, `biblio`, `meta`,
 `topics`) vivent côté infrastructure
-(`infrastructure/db/jsonb_models/publication.py`) — c'est un détail
+(`infrastructure/jsonb_models/publication.py`) — c'est un détail
 d'adapter de persistance, pas du métier.
 
 Règles métier réparties :

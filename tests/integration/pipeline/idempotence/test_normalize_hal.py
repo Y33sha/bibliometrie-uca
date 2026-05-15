@@ -73,8 +73,8 @@ def run_normalize_hal(conn):
 
     from application.pipeline.normalize.normalize_hal import process_work
     from infrastructure.addresses import PgAddressLinker
-    from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
-    from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.queries.normalize_hal import PgHalNormalizeQueries
+    from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,

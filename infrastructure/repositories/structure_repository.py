@@ -10,12 +10,12 @@ from domain.errors import ValidationError
 from domain.structures.identifiers import HalCollection, RorId
 from domain.structures.name_forms import StructureNameForm
 from domain.structures.structure import Structure, StructureType
-from infrastructure.db.jsonb_models.structure import StructureApiIds
 from infrastructure.db.tables import (
     structure_name_forms,
     structure_relations,
     structures,
 )
+from infrastructure.jsonb_models.structure import StructureApiIds
 
 
 def _structure_name_form_from_row(row: Row[Any]) -> StructureNameForm:

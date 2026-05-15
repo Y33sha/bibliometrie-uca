@@ -1,6 +1,6 @@
 """Port : lectures pour `create_persons_from_source_authorships`.
 
-Implémenté par `infrastructure.db.queries.persons.create.PgPersonsCreateQueries`.
+Implémenté par `infrastructure.queries.persons.create.PgPersonsCreateQueries`.
 """
 
 from typing import Any, Protocol

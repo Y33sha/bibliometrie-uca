@@ -22,7 +22,7 @@ divergent fréquemment entre HAL/OpenAlex/WoS — on récolterait
 surtout des faux conflits ou des faux matchings.
 
 À garder cohérent avec ``MAX_AUTHORS_CONFLICT`` côté admin
-(``infrastructure/db/queries/person_duplicates.py``) qui filtre les
+(``infrastructure/queries/person_duplicates.py``) qui filtre les
 mêmes méga-papers à l'autre bout du flux (présentation des paires
 en conflit pour validation manuelle)."""
 

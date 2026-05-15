@@ -1,7 +1,7 @@
 """Persons router : directory, search, list, profile, merge, identifiers, admin.
 
 Lectures via le port `PersonsQueries` (toutes les queries SQL sont dans
-`infrastructure/db/queries/persons/`). Les mutations délèguent à
+`infrastructure/queries/persons/`). Les mutations délèguent à
 `application.persons` et `application.authorships`.
 """
 

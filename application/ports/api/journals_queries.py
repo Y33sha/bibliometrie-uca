@@ -1,6 +1,6 @@
 """Port : lectures sur les revues (consommé par le router journals).
 
-Implémenté par `infrastructure.db.queries.journals.PgJournalQueries`.
+Implémenté par `infrastructure.queries.journals.PgJournalQueries`.
 """
 
 from typing import Any, Protocol

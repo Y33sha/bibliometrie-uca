@@ -1,6 +1,6 @@
 """Port : lectures pour les scripts d'enrichissement.
 
-Implémenté par `infrastructure.db.queries.enrich.PgEnrichQueries`.
+Implémenté par `infrastructure.queries.enrich.PgEnrichQueries`.
 """
 
 from typing import Protocol

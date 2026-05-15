@@ -1,6 +1,6 @@
 """Port : SQL du normaliseur HAL.
 
-Implémenté par `infrastructure.db.queries.normalize_hal.PgHalNormalizeQueries`.
+Implémenté par `infrastructure.queries.normalize_hal.PgHalNormalizeQueries`.
 """
 
 from typing import Protocol

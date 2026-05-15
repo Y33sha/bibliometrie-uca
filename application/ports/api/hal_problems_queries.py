@@ -1,6 +1,6 @@
 """Port : lectures pour /api/hal-problems/*.
 
-Implémenté par `infrastructure.db.queries.hal_problems.PgHalProblemsQueries`.
+Implémenté par `infrastructure.queries.hal_problems.PgHalProblemsQueries`.
 
 Placement par cas d'usage (le seul caller est le router de diagnostics
 HAL), pas par table.

@@ -26,8 +26,8 @@ import time
 from sqlalchemy import text
 
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queries.countries import suggest_addresses_countries_batch
 from infrastructure.log import setup_logger
+from infrastructure.queries.countries import suggest_addresses_countries_batch
 
 logger = setup_logger("suggest_countries", "processing/logs")
 

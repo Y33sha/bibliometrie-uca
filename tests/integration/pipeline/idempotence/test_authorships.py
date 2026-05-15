@@ -11,7 +11,7 @@ def _run_build_authorships(conn):
     import logging
 
     from application.pipeline.authorships.build_authorships import build
-    from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
+    from infrastructure.queries.authorships_build import PgAuthorshipsBuildQueries
 
     build(conn, PgAuthorshipsBuildQueries(), logging.getLogger("test"))
 

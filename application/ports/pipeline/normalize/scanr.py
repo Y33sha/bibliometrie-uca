@@ -1,6 +1,6 @@
 """Port : SQL du normaliseur ScanR.
 
-Implémenté par `infrastructure.db.queries.normalize_scanr.PgScanrNormalizeQueries`.
+Implémenté par `infrastructure.queries.normalize_scanr.PgScanrNormalizeQueries`.
 """
 
 from typing import Protocol

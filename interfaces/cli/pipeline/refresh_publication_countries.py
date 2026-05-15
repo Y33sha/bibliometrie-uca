@@ -14,8 +14,8 @@ import os
 
 from application.pipeline.countries.refresh_publication_countries import refresh
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queries.countries import PgCountryQueries
 from infrastructure.log import setup_logger
+from infrastructure.queries.countries import PgCountryQueries
 
 logger = setup_logger(
     "refresh_publication_countries", os.path.join(os.path.dirname(__file__), "logs")

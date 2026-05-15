@@ -110,8 +110,8 @@ def run_normalize_oa(conn):
 
     from application.pipeline.normalize.normalize_openalex import process_work
     from infrastructure.addresses import PgAddressLinker
-    from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
-    from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.queries.normalize_openalex import PgOpenalexNormalizeQueries
+    from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,

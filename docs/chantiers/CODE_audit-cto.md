@@ -32,7 +32,7 @@ Ces points sortent donc du périmètre des chantiers ci-dessous.
 - **Architecture aspirationnelle** : `docs/architecture.md` énonce la
   règle 4 (« les routers ne doivent pas importer `infrastructure/`
   directement »), puis admet aussitôt que c'est non atteint. Tous les
-  18 routers importent `infrastructure.db.queries.*` et
+  18 routers importent `infrastructure.queries.*` et
   `infrastructure.repositories.*`. Lecteur trompé. Soit on l'applique,
   soit on l'enlève — l'entre-deux est pire que pas de règle.
 - **Mode `weekly` exclut WoS** (`run_pipeline.py`) sans qu'aucun
@@ -69,7 +69,7 @@ Ces points sortent donc du périmètre des chantiers ci-dessous.
 - **Fuite du curseur partout** : toutes les fonctions de
   `application/` ont `cur: Any` en premier paramètre. Le DDD
   documenté est cosmétique — on a déplacé le SQL dans
-  `infrastructure/db/queries/` mais le couplage à un cursor psycopg3
+  `infrastructure/queries/` mais le couplage à un cursor psycopg3
   persiste partout dans la couche métier. Vraie isolation =
   `repo.find_by_doi(doi)`, pas `repo.find_by_doi(cur, doi)`.
 

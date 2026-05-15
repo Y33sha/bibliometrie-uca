@@ -1,6 +1,6 @@
 """Port : SQL de la phase publications (`match_or_create_publications`).
 
-Implémenté par `infrastructure.db.queries.publications.match_or_create.PgPublicationsMatchOrCreateQueries`.
+Implémenté par `infrastructure.queries.publications.match_or_create.PgPublicationsMatchOrCreateQueries`.
 """
 
 from typing import Protocol

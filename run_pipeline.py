@@ -298,7 +298,7 @@ def phase_cooccurrences(**kw: Any) -> Any:
 def _run_match_or_create_publications() -> None:
     from application.pipeline.publications.match_or_create_publications import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.publications.match_or_create import (
+    from infrastructure.queries.publications.match_or_create import (
         PgPublicationsMatchOrCreateQueries,
     )
     from infrastructure.repositories import audit_repository, publication_repository
@@ -322,7 +322,7 @@ def _run_match_or_create_publications() -> None:
 def _run_create_persons() -> None:
     from application.pipeline.persons.create_persons_from_source_authorships import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
+    from infrastructure.queries.persons.create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
 
     log.info("▶ create_persons_from_source_authorships")
@@ -343,7 +343,7 @@ def _run_create_persons() -> None:
 def _run_build_authorships() -> None:
     from application.pipeline.authorships.build_authorships import build
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.authorships_build import PgAuthorshipsBuildQueries
+    from infrastructure.queries.authorships_build import PgAuthorshipsBuildQueries
 
     log.info("▶ build_authorships")
     t0 = time.time()
@@ -359,11 +359,11 @@ def _run_build_authorships() -> None:
 def _run_populate_affiliations(*, mode: str) -> None:
     from application.pipeline.affiliations.populate_affiliations import run_populate
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.affiliations import PgAffiliationsQueries
     from infrastructure.perimeter import (
         get_affiliations_structure_ids,
         get_persons_structure_ids,
     )
+    from infrastructure.queries.affiliations import PgAffiliationsQueries
 
     log.info("▶ populate_affiliations --mode %s", mode)
     t0 = time.time()
@@ -387,7 +387,7 @@ def _run_populate_affiliations(*, mode: str) -> None:
 def _run_populate_person_name_forms() -> None:
     from application.pipeline.persons.populate_person_name_forms import populate
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.name_forms import PgNameFormsQueries
+    from infrastructure.queries.name_forms import PgNameFormsQueries
 
     log.info("▶ populate_person_name_forms")
     t0 = time.time()
@@ -402,7 +402,7 @@ def _run_populate_person_name_forms() -> None:
 def _run_merge_pubs_by_nnt() -> None:
     from application.pipeline.publications.merge_pubs_by_nnt import run_merge
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.merge import PgMergeQueries
+    from infrastructure.queries.merge import PgMergeQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ merge_pubs_by_nnt")
@@ -418,7 +418,7 @@ def _run_merge_pubs_by_nnt() -> None:
 def _run_merge_pubs_by_hal_id() -> None:
     from application.pipeline.publications.merge_pubs_by_hal_id import run_merge
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.merge import PgMergeQueries
+    from infrastructure.queries.merge import PgMergeQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ merge_pubs_by_hal_id")
@@ -436,8 +436,8 @@ def _run_normalize_hal() -> None:
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.app_config import get_api_base_urls
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.normalize_hal import PgHalNormalizeQueries
-    from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.queries.normalize_hal import PgHalNormalizeQueries
+    from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -468,8 +468,8 @@ def _run_normalize_hal() -> None:
 def _run_normalize_wos() -> None:
     from application.pipeline.normalize.normalize_wos import WosNormalizer
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.normalize_wos import PgWosNormalizeQueries
-    from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.queries.normalize_wos import PgWosNormalizeQueries
+    from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -496,8 +496,8 @@ def _run_normalize_openalex() -> None:
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.app_config import get_api_base_urls
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.normalize_openalex import PgOpenalexNormalizeQueries
-    from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.queries.normalize_openalex import PgOpenalexNormalizeQueries
+    from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -529,8 +529,8 @@ def _run_normalize_scanr() -> None:
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.normalize_scanr import PgScanrNormalizeQueries
-    from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.queries.normalize_scanr import PgScanrNormalizeQueries
+    from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -557,8 +557,8 @@ def _run_normalize_theses() -> None:
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
     from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.normalize_theses import PgThesesNormalizeQueries
-    from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.queries.normalize_theses import PgThesesNormalizeQueries
+    from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ normalize_theses")
@@ -578,8 +578,8 @@ def _run_normalize_theses() -> None:
 def _run_normalize_crossref() -> None:
     from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.normalize_crossref import PgCrossrefNormalizeQueries
-    from infrastructure.db.queries.staging import PgStagingQueries
+    from infrastructure.queries.normalize_crossref import PgCrossrefNormalizeQueries
+    from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -606,7 +606,7 @@ def _run_enrich_oa_status() -> None:
     from infrastructure.api_limits import UNPAYWALL_DELAY
     from infrastructure.app_config import get_api_base_urls
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.enrich import PgEnrichQueries
+    from infrastructure.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ enrich_oa_status")
@@ -631,7 +631,7 @@ def _run_enrich_journal_apc() -> None:
     from infrastructure.api_limits import DOAJ_DELAY
     from infrastructure.app_config import get_api_base_urls
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.enrich import PgEnrichQueries
+    from infrastructure.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
 
     log.info("▶ enrich_journal_apc")
@@ -655,8 +655,8 @@ def _run_enrich_journal_apc() -> None:
 def _run_resolve_addresses(mode: str) -> None:
     from application.pipeline.affiliations.resolve_addresses import run_resolution
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.address_resolution import PgAddressResolutionQueries
     from infrastructure.perimeter import get_persons_structure_ids
+    from infrastructure.queries.address_resolution import PgAddressResolutionQueries
 
     log.info("▶ resolve_addresses --mode %s", mode)
     t0 = time.time()
@@ -672,7 +672,7 @@ def _run_resolve_addresses(mode: str) -> None:
 def _run_refresh_publication_countries() -> None:
     from application.pipeline.countries.refresh_publication_countries import refresh
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.countries import PgCountryQueries
+    from infrastructure.queries.countries import PgCountryQueries
 
     log.info("▶ refresh_publication_countries")
     t0 = time.time()
@@ -688,7 +688,7 @@ def _run_refresh_publication_countries() -> None:
 def _run_ingest_subjects() -> None:
     from application.pipeline.subjects.run import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.subjects import PgSubjectsQueries
+    from infrastructure.queries.subjects import PgSubjectsQueries
 
     log.info("▶ subjects")
     t0 = time.time()
@@ -704,7 +704,7 @@ def _run_ingest_subjects() -> None:
 def _run_cooccurrences() -> None:
     from application.pipeline.cooccurrences.run import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.db.queries.subjects import PgSubjectsQueries
+    from infrastructure.queries.subjects import PgSubjectsQueries
 
     log.info("▶ cooccurrences")
     t0 = time.time()

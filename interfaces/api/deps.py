@@ -46,21 +46,21 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.ports.repositories.structure_repository import StructureRepository
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queries.addresses import PgAddressesQueries
-from infrastructure.db.queries.admin_feedback import PgAdminFeedbackQueries
-from infrastructure.db.queries.config import PgConfig, PgConfigQueries
-from infrastructure.db.queries.hal_problems import PgHalProblemsQueries
-from infrastructure.db.queries.journals import PgJournalQueries
-from infrastructure.db.queries.laboratories import PgLaboratoriesQueries
-from infrastructure.db.queries.perimeter import PgPerimeterQueries, PgPerimetersAdminQueries
-from infrastructure.db.queries.person_duplicates import PgPersonDuplicatesQueries
-from infrastructure.db.queries.persons import PgPersonsQueries
-from infrastructure.db.queries.publication_duplicates import PgPublicationDuplicatesQueries
-from infrastructure.db.queries.publications import PgPublicationsQueries
-from infrastructure.db.queries.publishers import PgPublisherQueries
-from infrastructure.db.queries.stats import PgStatsQueries
-from infrastructure.db.queries.structures import PgStructuresQueries
-from infrastructure.db.queries.subjects import PgSubjectsAdminQueries
+from infrastructure.queries.addresses import PgAddressesQueries
+from infrastructure.queries.admin_feedback import PgAdminFeedbackQueries
+from infrastructure.queries.config import PgConfig, PgConfigQueries
+from infrastructure.queries.hal_problems import PgHalProblemsQueries
+from infrastructure.queries.journals import PgJournalQueries
+from infrastructure.queries.laboratories import PgLaboratoriesQueries
+from infrastructure.queries.perimeter import PgPerimeterQueries, PgPerimetersAdminQueries
+from infrastructure.queries.person_duplicates import PgPersonDuplicatesQueries
+from infrastructure.queries.persons import PgPersonsQueries
+from infrastructure.queries.publication_duplicates import PgPublicationDuplicatesQueries
+from infrastructure.queries.publications import PgPublicationsQueries
+from infrastructure.queries.publishers import PgPublisherQueries
+from infrastructure.queries.stats import PgStatsQueries
+from infrastructure.queries.structures import PgStructuresQueries
+from infrastructure.queries.subjects import PgSubjectsAdminQueries
 from infrastructure.repositories import (
     address_repository,
     audit_repository,

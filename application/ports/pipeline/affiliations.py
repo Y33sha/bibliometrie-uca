@@ -1,6 +1,6 @@
 """Port : résolution des affiliations sur `source_authorships`.
 
-Implémenté par `infrastructure.db.queries.affiliations.PgAffiliationsQueries`.
+Implémenté par `infrastructure.queries.affiliations.PgAffiliationsQueries`.
 """
 
 from typing import Protocol

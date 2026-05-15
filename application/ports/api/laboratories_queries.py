@@ -1,6 +1,6 @@
 """Port : lectures sur les laboratoires (consommé par le router laboratories).
 
-Implémenté par `infrastructure.db.queries.laboratories.PgLaboratoriesQueries`.
+Implémenté par `infrastructure.queries.laboratories.PgLaboratoriesQueries`.
 """
 
 from dataclasses import dataclass, field

@@ -6,7 +6,7 @@ Utilisées par le pipeline (matching cross-source dans
 positif coûte cher (rattachement définitif sans validation).
 
 **Divergence assumée** avec les règles de pré-sélection des paires
-candidates côté admin (`infrastructure/db/queries/person_duplicates.py`,
+candidates côté admin (`infrastructure/queries/person_duplicates.py`,
 `PERSON_DUP_QUERIES` + `_tokens_match`) : ces dernières sont plus
 larges (gèrent par exemple « Jean Michel » vs « JM » via
 tokenization) parce qu'elles présentent une liste à valider

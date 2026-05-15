@@ -2,7 +2,7 @@
 Service Config — orchestrateur des opérations sur `config` et `perimeters`.
 
 Le SQL vit dans `infrastructure/repositories/perimeter_repository.py`
-(agrégat Perimeter) et `infrastructure/db/queries/config.py` (table
+(agrégat Perimeter) et `infrastructure/queries/config.py` (table
 `config` clé/valeur). Les routers passent par ces fonctions pour toute
 écriture. Les lectures restent autorisées dans les routers (convention
 du projet).

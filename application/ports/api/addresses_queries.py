@@ -1,6 +1,6 @@
 """Port : lectures sur les adresses (consommé par le router addresses).
 
-Implémenté par `infrastructure.db.queries.addresses.PgAddressesQueries`.
+Implémenté par `infrastructure.queries.addresses.PgAddressesQueries`.
 """
 
 from dataclasses import dataclass

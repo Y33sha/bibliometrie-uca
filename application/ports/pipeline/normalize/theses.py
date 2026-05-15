@@ -1,6 +1,6 @@
 """Port : SQL du normaliseur theses.fr.
 
-Implémenté par `infrastructure.db.queries.normalize_theses.PgThesesNormalizeQueries`.
+Implémenté par `infrastructure.queries.normalize_theses.PgThesesNormalizeQueries`.
 """
 
 from typing import Protocol

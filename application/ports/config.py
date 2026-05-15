@@ -5,7 +5,7 @@ par l'orchestration (paramètres pipeline, identifiants sources, etc.).
 Le port vit donc à la racine de `application/ports/` plutôt que dans
 `application/ports/repositories/` (réservé aux agrégats du domaine).
 
-Implémenté par `infrastructure.db.queries.config.PgConfig`.
+Implémenté par `infrastructure.queries.config.PgConfig`.
 """
 
 from typing import Protocol

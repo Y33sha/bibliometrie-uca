@@ -5,8 +5,8 @@ import os
 
 from application.pipeline.persons.create_persons_from_source_authorships import run
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.queries.persons.create import PgPersonsCreateQueries
 from infrastructure.log import setup_logger
+from infrastructure.queries.persons.create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 
 logger = setup_logger("create_persons", os.path.join(os.path.dirname(__file__), "logs"))
