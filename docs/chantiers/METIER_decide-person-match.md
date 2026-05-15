@@ -1,5 +1,7 @@
 # Chantier — Cascade unifiée de matching personnes (`decide_person_match`)
 
+Commencé le 2026-05-15
+
 ## Contexte
 
 Le pipeline persons (`application/pipeline/persons/create_persons_from_source_authorships.py`) exécute la cascade de matching personne en **4 boucles séquentielles indépendantes** sur `all_authorships`. Chaque étape skip ce qui est déjà rattaché par les précédentes ; la hiérarchie de fiabilité n'est pas exprimée comme une décision pure unique mais résulte implicitement de l'ordre des appels.
@@ -61,8 +63,21 @@ Manque un décideur d'orchestration unique (`decide_person_match`) qui agrège l
 
 ### Phase 2 — Peaufinage hiérarchie (post-refactor)
 
-- [ ] **Ajout source dédiée ORCID Crossref** en tête. Soit nouveau paramètre dédié dans `decide_person_match` (`orcid_crossref_match`), soit map ORCID restreinte à `source = 'crossref'`.
-- [ ] **Ajout `hal_person_id`** au niveau des identifiants (à côté d'IdRef). Sous-décision `decide_match_by_identifier(value, hal_account_map)` existe déjà — il suffit d'ajouter une map prefetch + un argument au décideur.
+**Repenser la cascade par fiabilité de la source, pas par type d'identifiant.** Cf. `docs/sources.md` section « Nature des entités auteurs » : un ORCID dans Crossref est excellent (fourni par l'auteur à l'éditeur), un ORCID dans OpenAlex/WoS est peu fiable (matching algorithmique côté source) — même type d'identifiant, fiabilités opposées. L'agrégation actuelle (`fetch_orcid_to_person_map` mélange toutes les sources) propage le bruit OA/WoS. Et le cross-source en tête est inopérant au bootstrap (n=0) puisqu'il suppose des matchings préexistants ; il devrait venir **après** les identifiers fiables, pas avant.
+
+Hiérarchie cible par fiabilité de source :
+
+1. **ORCID dans une authorship Crossref**.
+2. **Identifiers HAL** (hal_person_id, idhal, orcid, idref — extraits de `label_xml`).
+3. **IdRef ESR** (ScanR, theses.fr).
+4. **Cross-source** par publication × position (avec garde-fou méga-paper).
+5. **Name matching**.
+
+Conséquence implémentation : les maps précalculées doivent être restreintes par source de l'authorship qui les peuple (`orcid_crossref_map` ≠ `orcid_oa_map`), et le décideur dispatche selon la source de l'authorship en cours. La sous-décision `decide_match_by_identifier` reste générique, ses maps deviennent source-restreintes.
+
+- [ ] **Ajout source dédiée ORCID Crossref** en tête. Map ORCID restreinte à `source = 'crossref'`.
+- [ ] **Reculer le cross-source** après les identifiers fiables (sinon inopérant au bootstrap).
+- [ ] **Ajout `hal_person_id`** au niveau des identifiants HAL. Sous-décision `decide_match_by_identifier(value, hal_account_map)` existe déjà — ajouter la map prefetch + l'argument au décideur.
 - [ ] **Retirer le matching ORCID hors Crossref**. Filtre côté `fetch_orcid_to_person_map` ou côté décideur.
 
 ## Questions ouvertes

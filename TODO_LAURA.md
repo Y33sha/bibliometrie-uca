@@ -1,12 +1,13 @@
 # A régler avant transmission
 ## Pipeline
 ### Extraction
-* [ ] possible de paralléliser les extracteurs *entre eux*?
-* [ ] vérif http2 pour extracteurs
+* [ ] possible de paralléliser les extracteurs *entre eux*? ->> **CODE_async-extractions-http.md**
+* [ ] vérif http2 pour extracteurs ->> **CODE_async-extractions-http.md**
 * [ ] Backoff `not_found_at` sur DOI: Pour limiter la croissance du pool de DOI retentés à chaque run de `fetch_missing_doi`, stocker un `not_found_at TIMESTAMP` sur les DOI qu'une source n'a pas pu résoudre, et ne les réessayer qu'après N jours (30 ?)
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour
-* [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
+* [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
+* [ ] extraction par ORCID: vérifier faisabilité (quelles sources?)
 ### Normalisation
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
@@ -14,20 +15,20 @@
 * [ ] création erronée d'idhal numériques par normalize-hal
 ### Suite du traitement
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
-* [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications". / DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint?
+* [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications". / DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint? ->> **METIER_metadata-deduplication.md**
 * [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 * refresh_publication_countries: peut-on éviter de tout reset à chaque run?
 ### Logging
-* [ ] logs pas clairs dans l'extracteur hal: mode incrémental (0 orphelins vs 1 pages full-fetch); + le mode full-fetch pour PRES_CLERMONT est catastrophiquement lent. Ajouter une condition nb individual vs nb total?
-* autre log pas clair: pipeline:   → Lancer build_authorships.py pour propager in_perimeter/structure_ids ; avant 2026-05-14 10:42:26,829 [INFO] pipeline: ✓ create_persons_from_source_authorships terminé en 103.6s
+* [ ] logs pas clairs dans l'extracteur hal: "mode incrémental (0 orphelins vs 1 pages full-fetch)" => quézaco?; + le mode full-fetch pour PRES_CLERMONT est catastrophiquement lent. Ajouter une condition nb individual vs nb total?
+* autre log pas clair: pipeline:   → "Lancer build_authorships.py pour propager in_perimeter/structure_ids" (?) (juste avant [INFO] pipeline: ✓ create_persons_from_source_authorships terminé en 103.6s)
 * [ ] extracteur hal : manque indication sur documents réimportés et mis à jour: harmoniser le logging entre sources (et les tailles de batch)
 ## Problèmes spécifiques HAL
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
-* [ ] embargos (HAL, theses.fr): afficher dates (existent-elles dans le retour api)?
+* [ ] embargos (HAL, theses.fr): afficher dates dans l'UI (existent-elles dans le retour api? creuser)
 * [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 ## Code
-* [ ] auditer le code pour voir où l'interface continue de requêter source_authorships (sauf trucs source-spécifiques): supprimer les requêtes pouvant être remplacées par des requêtes vers les tables canoniques
+* [ ] auditer le code pour voir où l'interface continue de requêter source_authorships (sauf trucs vraiment source-spécifiques): supprimer les requêtes pouvant être remplacées par des requêtes vers les tables canoniques
 * [ ] nommage et arborescence des routers pas totalement cohérents
 * [ ] is_wos_author_exploitable, authors_kept: à quoi ça sert? auditer
 * [ ] sortir les use cases des repositories; clarifier la distinction repositories / db/queries: dichotomie écriture-lecture? Si oui, documenter

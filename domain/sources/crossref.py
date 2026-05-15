@@ -6,7 +6,9 @@ pour le reste du pipeline.
 
 Les `dict[str, Any]` ici sont des payloads JSON bruts de l'API
 CrossRef (frontière dynamique avec une source externe, schéma non
-typé). Idem pour le retour de `extract_crossref_meta`, qui est un
+typé). Le `Any` est délibéré : forcer `JsonValue` exigerait des
+`isinstance` partout sur le dict-walking interne, sans gain métier.
+Idem pour le retour de `extract_crossref_meta`, qui est un
 sous-ensemble destiné à `source_publications.meta` (JSONB).
 """
 
