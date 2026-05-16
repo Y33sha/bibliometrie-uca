@@ -12,7 +12,7 @@ class StatsQueries(Protocol):
     def publisher_stats(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         oa_status: str,
@@ -26,7 +26,7 @@ class StatsQueries(Protocol):
     def journal_stats(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_id: int | None,
@@ -41,7 +41,7 @@ class StatsQueries(Protocol):
     def stats_labs(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_id: int | None,
@@ -56,7 +56,7 @@ class StatsQueries(Protocol):
     def stats_by_year(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_id: int | None,
@@ -68,7 +68,7 @@ class StatsQueries(Protocol):
     def stats_summary(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_id: int | None,
@@ -82,7 +82,7 @@ class StatsQueries(Protocol):
     def stats_facets(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_id: int | None,

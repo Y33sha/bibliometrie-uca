@@ -8,24 +8,29 @@ from infrastructure.queries.filters import WhereClause
 # (distincts de `apc_clause` de filters.py qui filtre sur l'existence).
 APC_SUM_SA = """COALESCE((SELECT SUM(ap.amount_eur_ht)
      FROM apc_payments ap
-     WHERE ap.publication_id = p.id AND ap.budget_structure_id = :apc_root
+     WHERE ap.publication_id = p.id
+       AND ap.budget_structure_id = ANY(CAST(:apc_root_ids AS int[]))
     ), 0)"""
 
 _APC_EXISTS_SA = (
     "EXISTS (SELECT 1 FROM apc_payments ap "
-    "WHERE ap.publication_id = p.id AND ap.budget_structure_id = :apc_root)"
+    "WHERE ap.publication_id = p.id "
+    "AND ap.budget_structure_id = ANY(CAST(:apc_root_ids AS int[])))"
 )
 _APC_NOT_EXISTS_SA = (
     "NOT EXISTS (SELECT 1 FROM apc_payments ap "
-    "WHERE ap.publication_id = p.id AND ap.budget_structure_id = :apc_root)"
+    "WHERE ap.publication_id = p.id "
+    "AND ap.budget_structure_id = ANY(CAST(:apc_root_ids AS int[])))"
 )
 
 
-def stats_apc_clause(has_apc: str, root_structure_id: int) -> WhereClause | None:
+def stats_apc_clause(has_apc: str, apc_structure_ids: list[int]) -> WhereClause | None:
     """Filtre APC pour les endpoints stats (supporte multi-sélection).
 
-    Toutes les valeurs APC qui référencent `root_structure_id` partagent
-    le même bind `:apc_root` ; la valeur est constante par requête.
+    `apc_structure_ids` = structures considérées comme "internes" pour la
+    catégorisation APC (typiquement le périmètre `perimeter_persons`).
+    Toutes les valeurs APC partagent le bind `:apc_root_ids` ; la valeur
+    est constante par requête.
     """
     if not has_apc:
         return None
@@ -48,7 +53,7 @@ def stats_apc_clause(has_apc: str, root_structure_id: int) -> WhereClause | None
             )
     if not parts:
         return None
-    binds: dict[str, Any] = {"apc_root": root_structure_id} if needs_root else {}
+    binds: dict[str, Any] = {"apc_root_ids": apc_structure_ids} if needs_root else {}
     if len(parts) == 1:
         return WhereClause(parts[0], binds)
     return WhereClause("(" + " OR ".join(parts) + ")", binds)

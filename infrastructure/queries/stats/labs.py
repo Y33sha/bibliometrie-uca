@@ -37,7 +37,7 @@ _STRUCTS_CTE = """
 
 def _build_stats_labs_sql(
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_id: int | None,
@@ -69,7 +69,7 @@ def _build_stats_labs_sql(
         lab_struct_clause,
         year_clause(years),
         oa_clause(oa_status),
-        stats_apc_clause(has_apc, root_structure_id),
+        stats_apc_clause(has_apc, apc_structure_ids),
     ]
     if publisher_id:
         extra_clauses.append(
@@ -127,7 +127,7 @@ def _build_stats_labs_sql(
 def stats_labs(
     conn: Connection,
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_id: int | None,
@@ -141,7 +141,7 @@ def stats_labs(
     """Stats agrégées par laboratoire, paginées."""
     conn.execute(text("SET LOCAL jit = off"))
     count_sql, rows_sql, binds = _build_stats_labs_sql(
-        root_structure_id=root_structure_id,
+        apc_structure_ids=apc_structure_ids,
         lab_ids=lab_ids,
         years=years,
         publisher_id=publisher_id,

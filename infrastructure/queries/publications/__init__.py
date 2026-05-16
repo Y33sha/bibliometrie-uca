@@ -60,7 +60,7 @@ class PgPublicationsQueries(PublicationsQueries):
         self,
         *,
         filters: ListFilters,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         page: int,
         per_page: int,
         sort: str,
@@ -68,29 +68,31 @@ class PgPublicationsQueries(PublicationsQueries):
         return _list_publications(
             self._conn,
             filters=filters,
-            root_structure_id=root_structure_id,
+            apc_structure_ids=apc_structure_ids,
             page=page,
             per_page=per_page,
             sort=sort,
         )
 
     def publications_facets(
-        self, *, filters: FacetFilters, root_structure_id: int
+        self, *, filters: FacetFilters, apc_structure_ids: list[int]
     ) -> dict[str, Any]:
         return _publications_facets(
-            self._conn, filters=filters, root_structure_id=root_structure_id
+            self._conn, filters=filters, apc_structure_ids=apc_structure_ids
         )
 
     def export_publications_csv(
-        self, *, filters: ListFilters, root_structure_id: int, sort: str
+        self, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
     ) -> str:
         return _export_publications_csv(
-            self._conn, filters=filters, root_structure_id=root_structure_id, sort=sort
+            self._conn, filters=filters, apc_structure_ids=apc_structure_ids, sort=sort
         )
 
-    def export_theses_csv(self, *, filters: ListFilters, root_structure_id: int, sort: str) -> str:
+    def export_theses_csv(
+        self, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
+    ) -> str:
         return _export_theses_csv(
-            self._conn, filters=filters, root_structure_id=root_structure_id, sort=sort
+            self._conn, filters=filters, apc_structure_ids=apc_structure_ids, sort=sort
         )
 
     def all_years(self) -> list[int]:

@@ -67,22 +67,22 @@ class PublicationsQueries(Protocol):
         self,
         *,
         filters: ListFilters,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         page: int,
         per_page: int,
         sort: str,
     ) -> dict[str, Any]: ...
 
     def publications_facets(
-        self, *, filters: FacetFilters, root_structure_id: int
+        self, *, filters: FacetFilters, apc_structure_ids: list[int]
     ) -> dict[str, Any]: ...
 
     def export_publications_csv(
-        self, *, filters: ListFilters, root_structure_id: int, sort: str
+        self, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
     ) -> str: ...
 
     def export_theses_csv(
-        self, *, filters: ListFilters, root_structure_id: int, sort: str
+        self, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
     ) -> str: ...
 
     def all_years(self) -> list[int]: ...

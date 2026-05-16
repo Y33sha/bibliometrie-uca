@@ -15,7 +15,7 @@ from collections.abc import Iterator
 import bcrypt
 from fastapi import Cookie, Depends, HTTPException
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 from starlette.responses import Response
 from starlette.types import Scope
 
@@ -304,28 +304,23 @@ def bg_propagate_countries_sync(address_ids: list[int]) -> None:
         logger.exception("Erreur propagation pays en background")
 
 
-# ----- Perimeter root (sync, lazy-cached) -----
-
-_root_structure_id_sync: int | None = None
+# ----- Périmètre APC : structures considérées comme "internes" -----
 
 
-def get_root_structure_id_sync() -> int:
-    """ID de la structure racine du périmètre principal (variante sync).
+def get_apc_structure_ids_sync() -> list[int]:
+    """Structures considérées comme "internes" pour la catégorisation APC.
 
-    Cache process-wide (lookup unique). 0 si périmètre non configuré.
+    Réutilise le périmètre `perimeter_persons` (avec expansion
+    `est_tutelle_de`) : UCA + tous ses labos UCA. Une publication APC
+    est classée "uca" si au moins un de ses `apc_payments.budget_structure_id`
+    est dans cet ensemble.
+
+    Pas de cache : un lookup PK par requête API (~µs), invalidation
+    transparente si le périmètre change via `/admin/config` ou si les
+    structures du périmètre évoluent.
     """
-    global _root_structure_id_sync
-    if _root_structure_id_sync is not None:
-        return _root_structure_id_sync
+    from infrastructure.perimeter import get_persons_structure_ids_list
+
     engine = get_sync_engine()
     with engine.connect() as conn:
-        row = conn.execute(
-            text("""
-                SELECT p.structure_ids[1] AS root_id
-                FROM config c
-                JOIN perimeters p ON p.code = c.value #>> '{}'
-                WHERE c.key = 'perimeter_persons'
-            """)
-        ).first()
-    _root_structure_id_sync = (row.root_id if row and row.root_id else 0) if row else 0
-    return _root_structure_id_sync
+        return get_persons_structure_ids_list(conn)

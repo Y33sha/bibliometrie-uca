@@ -246,11 +246,19 @@ def hal_status_clause(values: list[str], lab_hal_col: str | None) -> WhereClause
 
 
 def apc_clause(
-    has_apc: str, root_structure_id: int, lab_ids: list[int] | None = None
+    has_apc: str, apc_structure_ids: list[int], lab_ids: list[int] | None = None
 ) -> WhereClause | None:
-    """Variante SA de `apply_apc_filter`. Tous les usages de root_structure_id
-    partagent le bind `:flt_apc_root` ; ceux de lab_ids partagent
-    `:flt_apc_lab_ids`."""
+    """Filtre des publications par origine du paiement APC.
+
+    `apc_structure_ids` = structures considérées comme "internes" pour la
+    catégorisation APC (typiquement le périmètre `perimeter_persons` :
+    UCA + ses labos + tutelles). Une publication APC est classée "uca"
+    si au moins un de ses `apc_payments.budget_structure_id` est dans
+    cet ensemble.
+
+    Tous les usages partagent le bind `:flt_apc_root_ids` ; ceux de
+    `lab_ids` partagent `:flt_apc_lab_ids`.
+    """
     if not has_apc:
         return None
     lab_ids = lab_ids or []
@@ -261,14 +269,16 @@ def apc_clause(
         if v == "uca":
             parts.append(
                 "EXISTS (SELECT 1 FROM apc_payments ap "
-                "WHERE ap.publication_id = p.id AND ap.budget_structure_id = :flt_apc_root)"
+                "WHERE ap.publication_id = p.id "
+                "AND ap.budget_structure_id = ANY(CAST(:flt_apc_root_ids AS int[])))"
             )
             needs_root = True
         elif v in ("other", "non_uca"):
             parts.append(
                 "(EXISTS (SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id) "
                 "AND NOT EXISTS (SELECT 1 FROM apc_payments ap "
-                "WHERE ap.publication_id = p.id AND ap.budget_structure_id = :flt_apc_root))"
+                "WHERE ap.publication_id = p.id "
+                "AND ap.budget_structure_id = ANY(CAST(:flt_apc_root_ids AS int[]))))"
             )
             needs_root = True
         elif v == "none":
@@ -285,7 +295,8 @@ def apc_clause(
         elif v == "other_uca" and lab_ids:
             parts.append(
                 "(EXISTS (SELECT 1 FROM apc_payments ap "
-                "WHERE ap.publication_id = p.id AND ap.budget_structure_id = :flt_apc_root) "
+                "WHERE ap.publication_id = p.id "
+                "AND ap.budget_structure_id = ANY(CAST(:flt_apc_root_ids AS int[]))) "
                 "AND NOT EXISTS (SELECT 1 FROM apc_payments ap "
                 "WHERE ap.publication_id = p.id "
                 "AND ap.lab_structure_id = ANY(CAST(:flt_apc_lab_ids AS int[]))))"
@@ -296,7 +307,7 @@ def apc_clause(
         return None
     binds: dict[str, Any] = {}
     if needs_root:
-        binds["flt_apc_root"] = root_structure_id
+        binds["flt_apc_root_ids"] = apc_structure_ids
     if needs_lab:
         binds["flt_apc_lab_ids"] = lab_ids
     if len(parts) == 1:

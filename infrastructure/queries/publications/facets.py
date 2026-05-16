@@ -45,10 +45,12 @@ class _PublicationFacetsBuilder:
     Décomposition : une méthode privée par facette + un orchestrateur `build()`.
     """
 
-    def __init__(self, conn: Connection, filters: FacetFilters, root_structure_id: int) -> None:
+    def __init__(
+        self, conn: Connection, filters: FacetFilters, apc_structure_ids: list[int]
+    ) -> None:
         self.conn = conn
         self.filters = filters
-        self.root_structure_id = root_structure_id
+        self.apc_structure_ids = apc_structure_ids
         self.lab_hal_col: str | None = None
 
     # ── Utilitaires internes ────────────────────────────────────
@@ -96,7 +98,7 @@ class _PublicationFacetsBuilder:
         if skip != "source":
             clauses.append(source_clause(f.source_values))
         if skip != "apc":
-            clauses.append(apc_clause(f.has_apc, self.root_structure_id, f.lab_ids))
+            clauses.append(apc_clause(f.has_apc, self.apc_structure_ids, f.lab_ids))
         clauses.append(publisher_id_clause(f.publisher_id))
         clauses.append(journal_id_clause(f.journal_id))
         if skip != "country":
@@ -281,7 +283,7 @@ class _PublicationFacetsBuilder:
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM apc_payments ap
                         WHERE ap.publication_id = p.id
-                          AND ap.budget_structure_id = :apc_facet_root
+                          AND ap.budget_structure_id = ANY(CAST(:apc_facet_root_ids AS int[]))
                     ) AND NOT EXISTS (
                         SELECT 1 FROM apc_payments ap
                         WHERE ap.publication_id = p.id
@@ -292,7 +294,7 @@ class _PublicationFacetsBuilder:
                     ) AND NOT EXISTS (
                         SELECT 1 FROM apc_payments ap
                         WHERE ap.publication_id = p.id
-                          AND ap.budget_structure_id = :apc_facet_root
+                          AND ap.budget_structure_id = ANY(CAST(:apc_facet_root_ids AS int[]))
                     )) AS apc_non_uca,
                     COUNT(*) FILTER (WHERE NOT EXISTS (
                         SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
@@ -303,7 +305,7 @@ class _PublicationFacetsBuilder:
             {
                 **binds,
                 "apc_facet_lab_ids": lab_ids,
-                "apc_facet_root": self.root_structure_id,
+                "apc_facet_root_ids": self.apc_structure_ids,
             },
         ).one()
         label_row = self.conn.execute(
@@ -325,14 +327,14 @@ class _PublicationFacetsBuilder:
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM apc_payments ap
                         WHERE ap.publication_id = p.id
-                          AND ap.budget_structure_id = :apc_facet_root
+                          AND ap.budget_structure_id = ANY(CAST(:apc_facet_root_ids AS int[]))
                     )) AS apc_uca,
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
                     ) AND NOT EXISTS (
                         SELECT 1 FROM apc_payments ap
                         WHERE ap.publication_id = p.id
-                          AND ap.budget_structure_id = :apc_facet_root
+                          AND ap.budget_structure_id = ANY(CAST(:apc_facet_root_ids AS int[]))
                     )) AS apc_other,
                     COUNT(*) FILTER (WHERE NOT EXISTS (
                         SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
@@ -340,7 +342,7 @@ class _PublicationFacetsBuilder:
                 FROM publications p
                 WHERE {where}
             """),
-            {**binds, "apc_facet_root": self.root_structure_id},
+            {**binds, "apc_facet_root_ids": self.apc_structure_ids},
         ).one()
         return [
             {"value": "uca", "text": "APC — UCA", "count": r.apc_uca},
@@ -465,7 +467,7 @@ class _PublicationFacetsBuilder:
 
 
 def publications_facets(
-    conn: Connection, *, filters: FacetFilters, root_structure_id: int
+    conn: Connection, *, filters: FacetFilters, apc_structure_ids: list[int]
 ) -> dict[str, Any]:
     """Facettes dynamiques : chaque facette exclut son propre filtre mais
     applique tous les autres.
@@ -475,7 +477,7 @@ def publications_facets(
     courtes contre une seule base PG locale).
     """
     conn.execute(text("SET LOCAL jit = off"))
-    b = _PublicationFacetsBuilder(conn, filters, root_structure_id)
+    b = _PublicationFacetsBuilder(conn, filters, apc_structure_ids)
     b._preload_lab_hal_col()
 
     labs, no_lab_count = b._facet_labs()

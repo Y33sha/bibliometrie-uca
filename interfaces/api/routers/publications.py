@@ -21,7 +21,7 @@ from application.ports.repositories.authorship_repository import AuthorshipRepos
 from interfaces.api.deps import (
     audit_repo_sync,
     authorship_repo_sync,
-    get_root_structure_id_sync,
+    get_apc_structure_ids_sync,
     publications_queries_sync,
 )
 from interfaces.api.filters import parse_int_csv, parse_str_csv
@@ -87,7 +87,7 @@ def publications_facets(
         subject_id=subject_id,
     )
     return PublicationsFacetsResponse.model_validate(
-        queries.publications_facets(filters=filters, root_structure_id=get_root_structure_id_sync())
+        queries.publications_facets(filters=filters, apc_structure_ids=get_apc_structure_ids_sync())
     )
 
 
@@ -135,7 +135,7 @@ def export_publications_csv(
         person_id=person_id,
     )
     csv_content = queries.export_publications_csv(
-        filters=filters, root_structure_id=get_root_structure_id_sync(), sort=sort
+        filters=filters, apc_structure_ids=get_apc_structure_ids_sync(), sort=sort
     )
     return Response(
         content=csv_content,
@@ -167,7 +167,7 @@ def export_theses_csv(
         doc_types=parse_str_csv(doc_type) or ["thesis", "ongoing_thesis"],
     )
     csv_content = queries.export_theses_csv(
-        filters=filters, root_structure_id=get_root_structure_id_sync(), sort=sort
+        filters=filters, apc_structure_ids=get_apc_structure_ids_sync(), sort=sort
     )
     return Response(
         content=csv_content,
@@ -267,7 +267,7 @@ def list_publications(
     return PublicationListResponse.model_validate(
         queries.list_publications(
             filters=filters,
-            root_structure_id=get_root_structure_id_sync(),
+            apc_structure_ids=get_apc_structure_ids_sync(),
             page=page,
             per_page=per_page,
             sort=sort,

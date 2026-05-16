@@ -39,7 +39,7 @@ def _publisher_journal_clauses(
 
 def _common_clauses(
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_id: int | None,
@@ -63,13 +63,13 @@ def _common_clauses(
     if skip != "oa":
         out.append(oa_clause(oa_status))
     if skip != "apc":
-        out.append(stats_apc_clause(has_apc, root_structure_id))
+        out.append(stats_apc_clause(has_apc, apc_structure_ids))
     return out
 
 
 def _by_year_sql(
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_id: int | None,
@@ -79,7 +79,7 @@ def _by_year_sql(
 ) -> tuple[str, dict[str, Any]]:
     dyn_where, binds = assemble_where(
         _common_clauses(
-            root_structure_id=root_structure_id,
+            apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_id=publisher_id,
@@ -111,7 +111,7 @@ def _by_year_sql(
 def stats_by_year(
     conn: Connection,
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_id: int | None,
@@ -122,7 +122,7 @@ def stats_by_year(
     """Ventilation par année."""
     conn.execute(text("SET LOCAL jit = off"))
     sql, binds = _by_year_sql(
-        root_structure_id=root_structure_id,
+        apc_structure_ids=apc_structure_ids,
         lab_ids=lab_ids,
         years=years,
         publisher_id=publisher_id,
@@ -136,7 +136,7 @@ def stats_by_year(
 
 def _summary_sql(
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_id: int | None,
@@ -146,7 +146,7 @@ def _summary_sql(
 ) -> tuple[str, dict[str, Any]]:
     dyn_where, binds = assemble_where(
         _common_clauses(
-            root_structure_id=root_structure_id,
+            apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_id=publisher_id,
@@ -176,7 +176,7 @@ def _summary_sql(
 def stats_summary(
     conn: Connection,
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_id: int | None,
@@ -187,7 +187,7 @@ def stats_summary(
     """Totaux globaux pour la page stats."""
     conn.execute(text("SET LOCAL jit = off"))
     sql, binds = _summary_sql(
-        root_structure_id=root_structure_id,
+        apc_structure_ids=apc_structure_ids,
         lab_ids=lab_ids,
         years=years,
         publisher_id=publisher_id,
@@ -215,7 +215,7 @@ def available_years(conn: Connection) -> list[int]:
 
 def _facets_sqls(
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_id: int | None,
@@ -227,7 +227,7 @@ def _facets_sqls(
 
     def _clauses(skip: str) -> list[WhereClause | None]:
         return _common_clauses(
-            root_structure_id=root_structure_id,
+            apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_id=publisher_id,
@@ -280,14 +280,14 @@ def _facets_sqls(
             COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
                 SELECT 1 FROM apc_payments ap
                 WHERE ap.publication_id = p.id
-                  AND ap.budget_structure_id = :apc_root
+                  AND ap.budget_structure_id = ANY(CAST(:apc_root_ids AS int[]))
             )) AS apc_uca,
             COUNT(DISTINCT p.id) FILTER (WHERE EXISTS (
                 SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
             ) AND NOT EXISTS (
                 SELECT 1 FROM apc_payments ap
                 WHERE ap.publication_id = p.id
-                  AND ap.budget_structure_id = :apc_root
+                  AND ap.budget_structure_id = ANY(CAST(:apc_root_ids AS int[]))
             )) AS apc_non_uca,
             COUNT(DISTINCT p.id) FILTER (WHERE NOT EXISTS (
                 SELECT 1 FROM apc_payments ap WHERE ap.publication_id = p.id
@@ -301,14 +301,14 @@ def _facets_sqls(
         "year": (year_sql, year_binds),
         "lab": (lab_sql, lab_binds),
         "oa": (oa_sql, oa_binds),
-        "apc": (apc_sql, {**apc_binds, "apc_root": root_structure_id}),
+        "apc": (apc_sql, {**apc_binds, "apc_root_ids": apc_structure_ids}),
     }
 
 
 def stats_facets(
     conn: Connection,
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     publisher_id: int | None,
@@ -319,7 +319,7 @@ def stats_facets(
     """Facettes dynamiques."""
     conn.execute(text("SET LOCAL jit = off"))
     sqls = _facets_sqls(
-        root_structure_id=root_structure_id,
+        apc_structure_ids=apc_structure_ids,
         lab_ids=lab_ids,
         years=years,
         publisher_id=publisher_id,
