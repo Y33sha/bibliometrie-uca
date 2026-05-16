@@ -72,6 +72,8 @@ docker compose exec backend python run_pipeline.py
 docker compose -f docker-compose.prod.yml up -d
 ```
 
+Différences avec le compose de dev : un seul conteneur applicatif (backend + frontend buildé en SPA statique, plus de vite dev server), pas de volume code, port DB non exposé. Voir [docs/exploitation.md](docs/exploitation.md) pour les détails et les options de déploiement hors Docker.
+
 ### Commandes utiles
 
 ```bash
@@ -153,15 +155,10 @@ cd interfaces/frontend && npm run dev -- --port 5176
 
 ### Production
 
-```bash
-# Build frontend
-cd interfaces/frontend && npm run build
+Deux voies au choix :
 
-# Backend via pm2
-pm2 start interfaces/api/app.py --name bibliometrie --interpreter python3
-```
-<!--TODO: vraiment utile d'imposer pm2 en prod? je serais plus pour donner la commade uvicorn et laisser les gens décider de leur environnement de prod; ça vaut pour exploitation.md par ricochet-->
-Voir [docs/exploitation.md](docs/exploitation.md) pour nginx et pm2.
+- **Docker** (recommandé pour la prod) : `docker compose -f docker-compose.prod.yml up -d` — un conteneur applicatif autoportant (backend + frontend buildé en SPA statique) + un conteneur Postgres. Voir [docs/exploitation.md](docs/exploitation.md).
+- **Sans Docker** : build du frontend (`cd interfaces/frontend && npm run build` — la SPA est ensuite servie par l'API), puis lancement d'uvicorn avec le gestionnaire de process de votre choix (systemd, supervisor, pm2…). Exemple uvicorn nu : `uvicorn interfaces.api.app:app --host 0.0.0.0 --port 8003`.
 
 ## Pipeline de données
 
