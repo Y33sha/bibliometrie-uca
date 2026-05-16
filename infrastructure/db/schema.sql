@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict o1rT4ARyPmrFhA85yAmVI0UQdiAQK20pGGmdMV4McgkgjK3YRUYu21eDyOdsd02
+\restrict JM7y3DII1NeteqdIlNrm4ySvBBtRrAhCjy9qz9WvkdggtVdTLmQpmxAyafSaCk8
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -197,7 +197,7 @@ ALTER SEQUENCE public.address_structures_id_seq OWNED BY public.address_structur
 CREATE TABLE public.addresses (
     id integer NOT NULL,
     raw_text text NOT NULL,
-    normalized_text text CONSTRAINT addresses_raw_text_normalized_not_null NOT NULL,
+    normalized_text text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     pub_count integer DEFAULT 0,
     countries character(2)[],
@@ -965,7 +965,7 @@ ALTER SEQUENCE public.source_authorship_addresses_id_seq OWNED BY public.source_
 CREATE TABLE public.source_authorships (
     id integer NOT NULL,
     source text NOT NULL,
-    source_publication_id integer CONSTRAINT source_authorships_source_document_id_not_null NOT NULL,
+    source_publication_id integer NOT NULL,
     author_position smallint,
     in_perimeter boolean DEFAULT false,
     excluded boolean DEFAULT false,
@@ -1008,17 +1008,16 @@ ALTER SEQUENCE public.source_authorships_id_seq OWNED BY public.source_authorshi
 --
 
 CREATE TABLE public.source_publications (
-    id integer CONSTRAINT source_documents_id_not_null NOT NULL,
-    source text CONSTRAINT source_documents_source_not_null NOT NULL,
-    source_id text CONSTRAINT source_documents_source_id_not_null NOT NULL,
+    id integer NOT NULL,
+    source text NOT NULL,
+    source_id text NOT NULL,
     doi text,
-    title text CONSTRAINT source_documents_title_not_null NOT NULL,
+    title text NOT NULL,
     pub_year smallint,
     doc_type text,
     publication_id integer,
     staging_id integer,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     countries text[],
     hal_collections text[],
     external_ids jsonb,
@@ -1033,7 +1032,8 @@ CREATE TABLE public.source_publications (
     keywords text[],
     topics jsonb,
     biblio jsonb,
-    meta jsonb
+    meta jsonb,
+    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL
 );
 
 
@@ -1102,9 +1102,9 @@ ALTER SEQUENCE public.staging_id_seq OWNED BY public.staging.id;
 --
 
 CREATE TABLE public.structure_name_forms (
-    id integer CONSTRAINT name_forms_id_not_null NOT NULL,
-    structure_id integer CONSTRAINT name_forms_structure_id_not_null NOT NULL,
-    form_text text CONSTRAINT name_forms_form_text_not_null NOT NULL,
+    id integer NOT NULL,
+    structure_id integer NOT NULL,
+    form_text text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     is_word_boundary boolean DEFAULT false NOT NULL,
     requires_context_of integer[],
@@ -1140,7 +1140,8 @@ CREATE TABLE public.structure_relations (
     id integer NOT NULL,
     parent_id integer NOT NULL,
     child_id integer NOT NULL,
-    relation_type text NOT NULL
+    relation_type text NOT NULL,
+    CONSTRAINT structure_relations_no_self_reference CHECK ((parent_id <> child_id))
 );
 
 
@@ -1593,14 +1594,6 @@ ALTER TABLE ONLY public.journals
 
 
 --
--- Name: structure_name_forms name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.structure_name_forms
-    ADD CONSTRAINT name_forms_pkey PRIMARY KEY (id);
-
-
---
 -- Name: perimeters perimeters_code_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1790,6 +1783,14 @@ ALTER TABLE ONLY public.staging
 
 ALTER TABLE ONLY public.staging
     ADD CONSTRAINT staging_source_source_id_key UNIQUE (source, source_id);
+
+
+--
+-- Name: structure_name_forms structure_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.structure_name_forms
+    ADD CONSTRAINT structure_name_forms_pkey PRIMARY KEY (id);
 
 
 --
@@ -2525,14 +2526,6 @@ ALTER TABLE ONLY public.journals
 
 
 --
--- Name: structure_name_forms name_forms_structure_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.structure_name_forms
-    ADD CONSTRAINT name_forms_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES public.structures(id) ON DELETE CASCADE;
-
-
---
 -- Name: person_identifiers person_identifiers_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2629,27 +2622,35 @@ ALTER TABLE ONLY public.source_authorships
 
 
 --
--- Name: source_publications source_documents_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: source_publications source_publications_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_publications
-    ADD CONSTRAINT source_documents_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES public.journals(id);
+    ADD CONSTRAINT source_publications_journal_id_fkey FOREIGN KEY (journal_id) REFERENCES public.journals(id);
 
 
 --
--- Name: source_publications source_documents_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_publications
-    ADD CONSTRAINT source_documents_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE SET NULL;
-
-
---
--- Name: source_publications source_documents_staging_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: source_publications source_publications_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.source_publications
-    ADD CONSTRAINT source_documents_staging_id_fkey FOREIGN KEY (staging_id) REFERENCES public.staging(id);
+    ADD CONSTRAINT source_publications_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE SET NULL;
+
+
+--
+-- Name: source_publications source_publications_staging_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_publications
+    ADD CONSTRAINT source_publications_staging_id_fkey FOREIGN KEY (staging_id) REFERENCES public.staging(id);
+
+
+--
+-- Name: structure_name_forms structure_name_forms_structure_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.structure_name_forms
+    ADD CONSTRAINT structure_name_forms_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES public.structures(id) ON DELETE CASCADE;
 
 
 --
@@ -2688,4 +2689,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict o1rT4ARyPmrFhA85yAmVI0UQdiAQK20pGGmdMV4McgkgjK3YRUYu21eDyOdsd02
+\unrestrict JM7y3DII1NeteqdIlNrm4ySvBBtRrAhCjy9qz9WvkdggtVdTLmQpmxAyafSaCk8
