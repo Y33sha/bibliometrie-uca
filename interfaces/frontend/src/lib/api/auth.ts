@@ -1,7 +1,7 @@
 import { api, post } from './client';
 
 export type AuthCheck = { authenticated: boolean; user?: string };
-export type HealthResponse = { status: string; sandbox?: boolean; [k: string]: unknown };
+export type HealthResponse = { status: string; [k: string]: unknown };
 
 export function check(): Promise<AuthCheck> {
 	return api<AuthCheck>('/api/auth/check');

@@ -9,17 +9,14 @@ relecture et pour le bootstrap rapide des tests d'intégration
 vérité — ce sont les migrations Alembic dans `alembic/versions/`.
 
 À regénérer après une série de migrations significatives, pour que
-`schema.sql` reflète l'état courant. Honore `BIBLIOMETRIE_SANDBOX=1`
-si défini, cohérent avec `infrastructure/db/connection.py`.
+`schema.sql` reflète l'état courant.
 """
 
 import io
-import os
 import subprocess
 import sys
 from pathlib import Path
 
-from infrastructure.db.connection import SANDBOX_DB_NAME
 from infrastructure.settings import settings
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -29,7 +26,6 @@ SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
 def main() -> None:
-    db_name = SANDBOX_DB_NAME if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1" else settings.db_name
     result = subprocess.run(
         [
             "pg_dump",
@@ -37,7 +33,7 @@ def main() -> None:
             "--no-owner",
             "--no-privileges",
             "-d",
-            db_name,
+            settings.db_name,
             "-U",
             settings.db_user,
         ],

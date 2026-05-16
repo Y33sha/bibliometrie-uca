@@ -4,19 +4,10 @@
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { base } from "$app/paths";
-  import { onMount } from "svelte";
   import type { Snippet } from "svelte";
   import { auth } from "$lib/api";
 
   let { children }: { children: Snippet } = $props();
-  let isSandbox = $state(false);
-
-  onMount(async () => {
-    try {
-      const data = await auth.health();
-      isSandbox = !!data.sandbox;
-    } catch {}
-  });
 
   const isAdmin = $derived($page.url.pathname.startsWith(base + "/admin"));
   const isPipeline = $derived($page.url.pathname === base + "/admin/pipeline" || $page.url.pathname === base + "/admin/config");
@@ -50,18 +41,12 @@
   }
 </script>
 
-<svelte:head>
-  {#if isSandbox}
-    <link rel="icon" href="{base}/favicon-sandbox.png" />
-  {/if}
-</svelte:head>
-
-<div class="site-header" class:admin={isAdmin} class:sandbox={isSandbox}>
+<div class="site-header" class:admin={isAdmin}>
   {#if isAdmin}
     <div class="site-brand">
-      <img src="{base}/{isSandbox ? 'sandbox.png' : 'connectome.png'}" alt="" class="site-icon" />
+      <img src="{base}/connectome.png" alt="" class="site-icon" />
       <h1 class="site-title">
-        {isSandbox ? "Bac à sable" : "Bibliométrie UCA"} <span class="site-title-admin">Admin</span>
+        Bibliométrie UCA <span class="site-title-admin">Admin</span>
       </h1>
     </div>
     <nav class="site-nav">
@@ -114,8 +99,8 @@
     </nav>
   {:else}
     <div class="site-brand">
-      <img src="{base}/{isSandbox ? 'sandbox.png' : 'favicon.png'}" alt="" class="site-icon" />
-      <h1 class="site-title">{isSandbox ? "Bac à sable" : "Bibliométrie UCA"}</h1>
+      <img src="{base}/favicon.png" alt="" class="site-icon" />
+      <h1 class="site-title">Bibliométrie UCA</h1>
     </div>
     <nav class="site-nav">
       <a href="{base}/stats" class="nav-link" class:active={isActive("/stats")}>Statistiques</a>
@@ -205,18 +190,6 @@
   }
   .site-header.admin .nav-dropdown-menu {
     background: #4d8a8c;
-  }
-  .site-header.sandbox {
-    background: #c2a05a;
-  }
-  .site-header.sandbox.admin {
-    background: #8b7340;
-  }
-  .site-header.sandbox .nav-dropdown-menu {
-    background: #d4b06a;
-  }
-  .site-header.sandbox.admin .nav-dropdown-menu {
-    background: #9b8350;
   }
   .site-title {
     font-family: "Ubuntu", sans-serif;
