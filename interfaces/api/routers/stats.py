@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 
 from application.ports.api.stats_queries import StatsQueries
 from interfaces.api.deps import (
-    get_root_structure_id_sync,
+    get_apc_structure_ids_sync,
     stats_queries_sync,
 )
 from interfaces.api.filters import parse_int_csv
@@ -44,7 +44,7 @@ def publisher_stats(
     """
     return PublisherStatsResponse.model_validate(
         queries.publisher_stats(
-            root_structure_id=get_root_structure_id_sync(),
+            apc_structure_ids=get_apc_structure_ids_sync(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             oa_status=oa_status,
@@ -73,7 +73,7 @@ def journal_stats(
     """Stats d'articles par revue."""
     return JournalStatsResponse.model_validate(
         queries.journal_stats(
-            root_structure_id=get_root_structure_id_sync(),
+            apc_structure_ids=get_apc_structure_ids_sync(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             publisher_id=publisher_id,
@@ -101,7 +101,7 @@ def stats_by_year(
     return [
         YearStatsRow.model_validate(r)
         for r in queries.stats_by_year(
-            root_structure_id=get_root_structure_id_sync(),
+            apc_structure_ids=get_apc_structure_ids_sync(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             publisher_id=publisher_id,
@@ -125,7 +125,7 @@ def stats_summary(
     """Agrégats globaux (total, taux OA, total APC, etc.) pour le jeu de filtres."""
     return StatsSummary.model_validate(
         queries.stats_summary(
-            root_structure_id=get_root_structure_id_sync(),
+            apc_structure_ids=get_apc_structure_ids_sync(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             publisher_id=publisher_id,
@@ -152,7 +152,7 @@ def stats_labs(
     """Stats d'articles par laboratoire."""
     return LabStatsResponse.model_validate(
         queries.stats_labs(
-            root_structure_id=get_root_structure_id_sync(),
+            apc_structure_ids=get_apc_structure_ids_sync(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             publisher_id=publisher_id,
@@ -192,7 +192,7 @@ def stats_facets(
     """Facettes dynamiques : années, labos, oa_status, apc."""
     return StatsFacetsResponse.model_validate(
         queries.stats_facets(
-            root_structure_id=get_root_structure_id_sync(),
+            apc_structure_ids=get_apc_structure_ids_sync(),
             lab_ids=parse_int_csv(lab_id),
             years=parse_int_csv(year),
             publisher_id=publisher_id,

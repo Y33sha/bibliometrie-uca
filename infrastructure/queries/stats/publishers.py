@@ -29,7 +29,7 @@ _PUBLISHER_SORT_MAP = {
 
 def _build_publisher_stats_sql(
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     oa_status: str,
@@ -53,7 +53,7 @@ def _build_publisher_stats_sql(
             lab_clause(lab_ids),
             year_clause(years),
             oa_clause(oa_status),
-            stats_apc_clause(has_apc, root_structure_id),
+            stats_apc_clause(has_apc, apc_structure_ids),
         ]
     )
     where = f"{static_clauses} AND {dyn_where}"
@@ -93,7 +93,7 @@ def _build_publisher_stats_sql(
     """
     binds = {
         **where_binds,
-        "apc_root": root_structure_id,
+        "apc_root_ids": apc_structure_ids,
         "pg_limit": per_page,
         "pg_offset": offset,
     }
@@ -103,7 +103,7 @@ def _build_publisher_stats_sql(
 def publisher_stats(
     conn: Connection,
     *,
-    root_structure_id: int,
+    apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
     oa_status: str,
@@ -116,7 +116,7 @@ def publisher_stats(
     """Stats agrégées par éditeur, paginées."""
     conn.execute(text("SET LOCAL jit = off"))
     count_sql, rows_sql, binds = _build_publisher_stats_sql(
-        root_structure_id=root_structure_id,
+        apc_structure_ids=apc_structure_ids,
         lab_ids=lab_ids,
         years=years,
         oa_status=oa_status,

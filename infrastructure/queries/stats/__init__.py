@@ -42,7 +42,7 @@ class PgStatsQueries(StatsQueries):
     def publisher_stats(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         oa_status: str,
@@ -54,7 +54,7 @@ class PgStatsQueries(StatsQueries):
     ) -> dict[str, Any]:
         return _publisher_stats(
             self._conn,
-            root_structure_id=root_structure_id,
+            apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
             oa_status=oa_status,
@@ -68,7 +68,7 @@ class PgStatsQueries(StatsQueries):
     def journal_stats(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_id: int | None,
@@ -81,7 +81,7 @@ class PgStatsQueries(StatsQueries):
     ) -> dict[str, Any]:
         return _journal_stats(
             self._conn,
-            root_structure_id=root_structure_id,
+            apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_id=publisher_id,
@@ -96,7 +96,7 @@ class PgStatsQueries(StatsQueries):
     def stats_labs(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_id: int | None,
@@ -109,7 +109,7 @@ class PgStatsQueries(StatsQueries):
     ) -> dict[str, Any]:
         return _stats_labs(
             self._conn,
-            root_structure_id=root_structure_id,
+            apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_id=publisher_id,
@@ -124,7 +124,7 @@ class PgStatsQueries(StatsQueries):
     def stats_by_year(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_id: int | None,
@@ -134,7 +134,7 @@ class PgStatsQueries(StatsQueries):
     ) -> list[dict[str, Any]]:
         return _stats_by_year(
             self._conn,
-            root_structure_id=root_structure_id,
+            apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_id=publisher_id,
@@ -146,7 +146,7 @@ class PgStatsQueries(StatsQueries):
     def stats_summary(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_id: int | None,
@@ -156,7 +156,7 @@ class PgStatsQueries(StatsQueries):
     ) -> dict[str, Any]:
         return _stats_summary(
             self._conn,
-            root_structure_id=root_structure_id,
+            apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_id=publisher_id,
@@ -171,7 +171,7 @@ class PgStatsQueries(StatsQueries):
     def stats_facets(
         self,
         *,
-        root_structure_id: int,
+        apc_structure_ids: list[int],
         lab_ids: list[int],
         years: list[int],
         publisher_id: int | None,
@@ -181,7 +181,7 @@ class PgStatsQueries(StatsQueries):
     ) -> dict[str, list[dict[str, Any]]]:
         return _stats_facets(
             self._conn,
-            root_structure_id=root_structure_id,
+            apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
             publisher_id=publisher_id,
