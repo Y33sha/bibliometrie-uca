@@ -110,6 +110,12 @@ WHERE s.source != :target AND s.doi IS NOT NULL [AND s.processed = FALSE]
   )
 ```
 
+**Conséquence sur la scope policy `cross_imports`.** Aujourd'hui, l'étape 2 (DOI) a une scope policy `unprocessed` vs `all` parce que le pool de DOI à re-tenter n'est pas borné (les 404 chez HAL/OpenAlex/WoS/ScanR ne sont pas tracés → retentés à chaque run). L'étape 1 (hal-id) tourne *auto-bornée* parce que son pool est fini par construction (hal-id 404 → sort définitivement via `not_found=TRUE`).
+
+Avec le backoff de cette phase, le pool DOI devient lui aussi auto-borné et convergent : 1er pass tente tout, les 404 reçoivent `next_retry`, les passes suivantes ne retentent que ceux dont `next_retry <= NOW()`. L'asymétrie disparaît : les deux étapes deviennent auto-bornées, et la scope policy `unprocessed` vs `all` perd sa raison d'être.
+
+À traiter dans cette phase : retirer le champ `fetch_missing_doi_scope` de `ModePolicy` et le flag `--all` du CLI `interfaces/cli/pipeline/fetch_missing_doi.py`, simplifier `phase_cross_imports` en conséquence. Note : la distinction sources (`fetch_missing_doi_sources`, qui exclut WoS hors `full` pour son quota API) reste pertinente — c'est un critère orthogonal au backoff.
+
 ### Phase 3 — Détection des publications disparues
 
 - Définir la politique : N runs ? N jours ? Action ?
