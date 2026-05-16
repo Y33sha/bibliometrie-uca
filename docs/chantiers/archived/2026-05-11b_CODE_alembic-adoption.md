@@ -39,8 +39,7 @@ table `schema_migrations`) par Alembic, et bénéficier de
 
 - [x] `alembic init alembic` → crée `alembic/` + `alembic.ini`
 - [x] Adapter `alembic/env.py` : `target_metadata = metadata`, URL
-  construite depuis `infrastructure.settings`, support
-  `BIBLIOMETRIE_SANDBOX` cohérent avec `connection.py`
+  construite depuis `infrastructure.settings`
 - [x] Adapter `alembic.ini` : `file_template` avec préfixe date,
   URL retirée (gérée par env.py)
 
