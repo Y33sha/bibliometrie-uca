@@ -2,24 +2,20 @@
 
 Appelé par `application/pipeline/persons/populate_person_name_forms.py`.
 Collecte les formes brutes (table `persons` + `source_authorships`),
-passe par une table temporaire pour normalisation SQL via
-`normalize_name_form()`, puis synchronise `person_name_forms`.
+passe par une table temporaire pour la normalisation SQL via
+`normalize_name_form()`, puis synchronise `person_name_forms` par
+agrégation `GROUP BY (name_form, person_id)` + diff INSERT/UPDATE/DELETE.
 
-La colonne de vérité est `persons jsonb` au format
-``{ "<person_id>": ["<source1>", ...], ... }`` — voir
-`domain/persons/name_forms.py`. Les anciennes colonnes `person_ids` /
-`sources` ne sont plus écrites depuis ce module (chantier
-`DATA_person-name-forms-normalisation`, Phase 4) ; elles seront DROP en
-Phase 6.
+Modèle de table cible : `(name_form, person_id, sources text[])` avec
+PK composite — pas de JSONB, pas d'`id` de row. La fusion par couple
+est faite en SQL (`array_agg DISTINCT`), pas en Python.
 """
 
 from typing import Any
 
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection, text
 
 from application.ports.pipeline.name_forms import NameFormsQueries
-from domain.persons.name_forms import PersonsDict
 
 
 def fetch_persons_names(conn: Connection) -> list[dict[str, Any]]:
@@ -43,22 +39,14 @@ def fetch_persons_names(conn: Connection) -> list[dict[str, Any]]:
     return [dict(r._mapping) for r in rows]
 
 
-def fetch_source_authorship_name_forms(conn: Connection) -> list[dict[str, Any]]:
-    """`(name_form, person_id, source)` distincts des authorships non exclus."""
-    rows = conn.execute(
-        text("""
-            SELECT DISTINCT sa.author_name_normalized AS name_form,
-                   sa.person_id, sa.source::text AS source
-            FROM source_authorships sa
-            WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
-              AND sa.author_name_normalized IS NOT NULL AND sa.author_name_normalized != ''
-        """)
-    ).all()
-    return [dict(r._mapping) for r in rows]
-
-
 def create_temp_raw_forms_table(conn: Connection) -> None:
-    """Crée la table temporaire `_raw_forms(raw_text, person_id, source)`."""
+    """Crée la table temporaire `_raw_forms(raw_text, person_id, source)`.
+
+    Reçoit les triplets calculés en Python depuis `persons` (un par
+    forme retournée par `compute_person_name_forms`, source `'persons'`).
+    Les formes issues de `source_authorships` sont lues directement par
+    la query d'agrégation, sans transiter par cette table.
+    """
     conn.execute(text("CREATE TEMP TABLE _raw_forms (raw_text TEXT, person_id INT, source TEXT)"))
 
 
@@ -75,81 +63,87 @@ def insert_raw_forms_batch(conn: Connection, rows: list[dict[str, Any]]) -> None
     )
 
 
-def fetch_normalized_forms_from_temp(conn: Connection) -> list[dict[str, Any]]:
-    """Normalise les formes brutes via `normalize_name_form()` SQL.
-
-    Retourne les triplets ``(name_form, person_id, source)`` distincts.
-    L'agrégation par forme est faite côté Python par l'orchestrateur via
-    les helpers `domain/persons/name_forms.py` (cf. note du chantier :
-    fusion en Python plutôt qu'en SQL, l'orchestrateur a déjà la donnée
-    en mémoire).
-    """
-    rows = conn.execute(
-        text("""
-            SELECT DISTINCT normalize_name_form(raw_text) AS name_form,
-                   person_id, source
-            FROM _raw_forms
-            WHERE trim(raw_text) != ''
-        """)
-    ).all()
-    return [dict(r._mapping) for r in rows]
-
-
 def drop_temp_raw_forms_table(conn: Connection) -> None:
     conn.execute(text("DROP TABLE _raw_forms"))
 
 
-def fetch_existing_name_forms(conn: Connection) -> list[dict[str, Any]]:
-    """Charge toutes les lignes de `person_name_forms` (id, name_form, persons)."""
-    rows = conn.execute(text("SELECT id, name_form, persons FROM person_name_forms")).all()
-    return [dict(r._mapping) for r in rows]
+def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
+    """Agrège `_raw_forms` ∪ `source_authorships` et synchronise `person_name_forms`.
 
+    Construit en table temp `_expected_pnf` l'état attendu agrégé par
+    `(name_form, person_id)` avec sources triées dédupliquées. Puis 3
+    statements de sync :
+      1. DELETE des couples manquants.
+      2. INSERT des couples nouveaux.
+      3. UPDATE des `sources` qui ont changé.
 
-def update_name_form(conn: Connection, form_id: int, persons: PersonsDict) -> None:
-    """Met à jour le `persons` d'une ligne existante de `person_name_forms`.
-
-    Le dict `persons` doit déjà être consolidé côté Python (fusion par
-    clé, sources triées) — cette fonction n'opère aucun merge SQL.
+    Retourne `(inserted, updated, deleted)`.
     """
-    stmt = text("""
-        UPDATE person_name_forms
-        SET persons = :persons, updated_at = now()
-        WHERE id = :form_id
-    """).bindparams(bindparam("persons", type_=JSONB))
-    conn.execute(stmt, {"persons": persons, "form_id": form_id})
-
-
-def insert_name_form(conn: Connection, name_form: str, persons: PersonsDict) -> None:
-    """INSERT d'une nouvelle ligne `person_name_forms`.
-
-    L'orchestrateur calcule le diff (`expected_forms` vs `existing`) et
-    n'appelle ce point que pour les formes absentes en base. Pas de
-    ON CONFLICT côté SQL : la fusion par forme est déjà faite en
-    Python.
-    """
-    stmt = text("""
-        INSERT INTO person_name_forms (name_form, persons)
-        VALUES (:name_form, :persons)
-    """).bindparams(bindparam("persons", type_=JSONB))
-    conn.execute(stmt, {"name_form": name_form, "persons": persons})
-
-
-def delete_name_form(conn: Connection, form_id: int) -> None:
-    """Supprime une ligne de `person_name_forms` par id."""
     conn.execute(
-        text("DELETE FROM person_name_forms WHERE id = :form_id"),
-        {"form_id": form_id},
+        text("""
+            CREATE TEMP TABLE _expected_pnf AS
+            WITH all_forms AS (
+                SELECT normalize_name_form(raw_text) AS name_form,
+                       person_id, source
+                FROM _raw_forms
+                WHERE trim(raw_text) != ''
+                UNION
+                SELECT sa.author_name_normalized AS name_form,
+                       sa.person_id, sa.source::text AS source
+                FROM source_authorships sa
+                WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
+                  AND sa.author_name_normalized IS NOT NULL
+                  AND sa.author_name_normalized != ''
+            )
+            SELECT name_form, person_id,
+                   array_agg(DISTINCT source ORDER BY source) AS sources
+            FROM all_forms
+            WHERE name_form != ''
+            GROUP BY name_form, person_id
+        """)
     )
+    conn.execute(text("CREATE INDEX ON _expected_pnf (name_form, person_id)"))
+
+    deleted = conn.execute(
+        text("""
+            DELETE FROM person_name_forms p
+            WHERE NOT EXISTS (
+                SELECT 1 FROM _expected_pnf e
+                WHERE e.name_form = p.name_form AND e.person_id = p.person_id
+            )
+        """)
+    ).rowcount
+
+    inserted = conn.execute(
+        text("""
+            INSERT INTO person_name_forms (name_form, person_id, sources)
+            SELECT e.name_form, e.person_id, e.sources FROM _expected_pnf e
+            WHERE NOT EXISTS (
+                SELECT 1 FROM person_name_forms p
+                WHERE p.name_form = e.name_form AND p.person_id = e.person_id
+            )
+        """)
+    ).rowcount
+
+    updated = conn.execute(
+        text("""
+            UPDATE person_name_forms p
+            SET sources = e.sources
+            FROM _expected_pnf e
+            WHERE p.name_form = e.name_form AND p.person_id = e.person_id
+              AND p.sources IS DISTINCT FROM e.sources
+        """)
+    ).rowcount
+
+    conn.execute(text("DROP TABLE _expected_pnf"))
+    return inserted, updated, deleted
 
 
 class PgNameFormsQueries(NameFormsQueries):
-    """Adapter PostgreSQL pour `application.ports.name_forms.NameFormsQueries`."""
+    """Adapter PostgreSQL pour `application.ports.pipeline.name_forms.NameFormsQueries`."""
 
     def fetch_persons_names(self, conn: Connection) -> list[dict[str, Any]]:
         return fetch_persons_names(conn)
-
-    def fetch_source_authorship_name_forms(self, conn: Connection) -> list[dict[str, Any]]:
-        return fetch_source_authorship_name_forms(conn)
 
     def create_temp_raw_forms_table(self, conn: Connection) -> None:
         create_temp_raw_forms_table(conn)
@@ -157,20 +151,8 @@ class PgNameFormsQueries(NameFormsQueries):
     def insert_raw_forms_batch(self, conn: Connection, rows: list[dict[str, Any]]) -> None:
         insert_raw_forms_batch(conn, rows)
 
-    def fetch_normalized_forms_from_temp(self, conn: Connection) -> list[dict[str, Any]]:
-        return fetch_normalized_forms_from_temp(conn)
-
     def drop_temp_raw_forms_table(self, conn: Connection) -> None:
         drop_temp_raw_forms_table(conn)
 
-    def fetch_existing_name_forms(self, conn: Connection) -> list[dict[str, Any]]:
-        return fetch_existing_name_forms(conn)
-
-    def update_name_form(self, conn: Connection, form_id: int, persons: PersonsDict) -> None:
-        update_name_form(conn, form_id, persons)
-
-    def insert_name_form(self, conn: Connection, name_form: str, persons: PersonsDict) -> None:
-        insert_name_form(conn, name_form, persons)
-
-    def delete_name_form(self, conn: Connection, form_id: int) -> None:
-        delete_name_form(conn, form_id)
+    def sync_from_raw_forms(self, conn: Connection) -> tuple[int, int, int]:
+        return sync_from_raw_forms(conn)

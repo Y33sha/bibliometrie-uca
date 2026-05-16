@@ -1,17 +1,11 @@
 """SQL d'écriture sur `persons`, `distinct_persons`, et la fusion."""
 
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection, text
 
 from domain.errors import NotFoundError
 from domain.normalize import normalize_name
 from domain.persons.identifiers import AttributionStatus
-from domain.persons.name_forms import (
-    PersonNameForm,
-    compute_person_name_forms,
-    merge,
-    remove_person,
-)
+from domain.persons.name_forms import PersonNameForm, compute_person_name_forms
 from domain.persons.person import Person
 from domain.persons.person_identifier import PersonIdentifier
 from infrastructure.repositories.person_repository import _name_forms
@@ -55,8 +49,11 @@ def find_by_id(conn: Connection, person_id: int) -> Person | None:
     )
 
     nf_rows = conn.execute(
-        text("SELECT name_form FROM person_name_forms WHERE persons ? :pid"),
-        {"pid": str(person_id)},
+        text(
+            "SELECT DISTINCT name_form FROM person_name_forms "
+            "WHERE person_id = :pid ORDER BY name_form"
+        ),
+        {"pid": person_id},
     ).all()
     name_forms = tuple(PersonNameForm(value=r.name_form) for r in nf_rows)
 
@@ -187,22 +184,25 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
         """),
         {"t": target_id, "s": source_id},
     )
-    s_text = str(source_id)
-    t_text = str(target_id)
-    rows = conn.execute(
-        text("SELECT id, persons FROM person_name_forms WHERE persons ? :s"),
-        {"s": s_text},
-    ).all()
-    for row in rows:
-        without_source = remove_person(row.persons, source_id)
-        source_contribution = {t_text: list(row.persons.get(s_text, []))}
-        new_persons = merge(without_source, source_contribution)
-        conn.execute(
-            text(
-                "UPDATE person_name_forms SET persons = :p, updated_at = now() WHERE id = :id"
-            ).bindparams(bindparam("p", type_=JSONB)),
-            {"id": row.id, "p": new_persons},
-        )
+    # Transférer les rows (name_form, source_id) vers (name_form, target_id) :
+    # UPSERT cross-person_id qui fusionne les sources si la name_form existe
+    # déjà côté target, puis DELETE des rows source résiduelles.
+    conn.execute(
+        text("""
+            INSERT INTO person_name_forms (name_form, person_id, sources)
+            SELECT name_form, :t, sources FROM person_name_forms WHERE person_id = :s
+            ON CONFLICT (name_form, person_id) DO UPDATE SET
+                sources = (
+                    SELECT COALESCE(array_agg(DISTINCT s ORDER BY s), '{}'::text[])
+                    FROM unnest(person_name_forms.sources || EXCLUDED.sources) AS s
+                )
+        """),
+        {"t": target_id, "s": source_id},
+    )
+    conn.execute(
+        text("DELETE FROM person_name_forms WHERE person_id = :s"),
+        {"s": source_id},
+    )
     target = conn.execute(
         text("SELECT last_name, first_name FROM persons WHERE id = :id"),
         {"id": target_id},

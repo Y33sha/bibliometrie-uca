@@ -126,12 +126,11 @@ def name_form_authorships(conn: Connection, person_id: int, name_form: str) -> d
             SELECT p.id, p.first_name, p.last_name,
                    pr.department_name,
                    EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh
-            FROM person_name_forms pnf,
-                 LATERAL jsonb_object_keys(pnf.persons) AS pid_text
-            JOIN persons p ON p.id = pid_text::int
+            FROM person_name_forms pnf
+            JOIN persons p ON p.id = pnf.person_id
             LEFT JOIN persons_rh pr ON pr.person_id = p.id
             WHERE pnf.name_form = :nf
-              AND pid_text::int <> :pid
+              AND pnf.person_id <> :pid
               AND p.rejected = FALSE
             ORDER BY p.last_name, p.first_name
         """),

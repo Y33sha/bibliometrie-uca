@@ -602,19 +602,11 @@ person_identifiers = Table(
 person_name_forms = Table(
     "person_name_forms",
     metadata,
-    Column("id", Integer, primary_key=True),
     Column("name_form", Text, nullable=False),
-    Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("updated_at", DateTime(timezone=True), server_default=func.now()),
-    Column("persons", JSONB, nullable=False),
-    CheckConstraint("persons <> '{}'::jsonb", name="persons_not_empty"),
-    UniqueConstraint("name_form", name="person_name_forms_name_form_uq"),
-    Index(
-        "idx_pnf_persons_gin",
-        "persons",
-        postgresql_using="gin",
-        postgresql_ops={"persons": "jsonb_path_ops"},
-    ),
+    Column("person_id", Integer, nullable=False),
+    Column("sources", ARRAY(Text), nullable=False, server_default="{}"),
+    PrimaryKeyConstraint("name_form", "person_id", name="person_name_forms_pkey"),
+    Index("idx_pnf_person_id", "person_id"),
 )
 
 

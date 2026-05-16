@@ -27,9 +27,9 @@ Total estimé des tables de jointure à créer : ~580 K rows répartis sur 3 tab
 |---|---|
 | `source_authorships.structure_ids integer[]` | Table `source_authorship_structures (source_authorship_id, structure_id)` avec FK `ON DELETE CASCADE` des deux côtés |
 | `authorships.structure_ids integer[]` | Table `authorship_structures (authorship_id, structure_id)` avec FK `ON DELETE CASCADE` des deux côtés |
-| `person_name_forms.persons jsonb` (`{"<person_id>": ["<source>", ...]}`) | Table `person_name_form_persons (name_form_id, person_id, sources text[])` avec FK `ON DELETE CASCADE` |
+| `person_name_forms.persons jsonb` (`{"<person_id>": ["<source>", ...]}`) | Dénormalisation de la table existante : `person_name_forms (name_form, person_id, sources text[])` avec PK composite `(name_form, person_id)` et FK `person_id → persons(id) ON DELETE CASCADE`. Pas de table de jointure dédiée — la table n'a plus de propriétés propres (les `id`/`created_at`/`updated_at` disparaissent), elle devient elle-même la relation many-to-many. C'est la contrainte historique `UNIQUE (name_form)` qui forçait le JSONB ; sans elle, le modèle simple "une row par (name_form, person_id)" est l'évidence. |
 
-Pour `person_name_form_persons`, le `sources text[]` reste justifié : la liste des sources où la forme a été observée pour cette personne est une donnée de la relation, sans cardinalité forte (1-6 valeurs dans un enum fixe). C'est l'élément JSONB clé/valeur (`person_id → list[source]`) qui pose problème, pas le détail "sources observées".
+Le `sources text[]` reste justifié : la liste des sources où la forme a été observée pour cette personne est une donnée de la relation, sans cardinalité forte (1-6 valeurs dans un enum fixe). C'est l'élément JSONB clé/valeur (`person_id → list[source]`) qui posait problème, pas le détail "sources observées".
 
 ### Garder l'array sur `perimeters`
 
@@ -41,18 +41,25 @@ Pas de conservation d'un "cache dénormalisé" (colonne `structure_ids` qui rest
 
 ## Phasage
 
-### Phase 1 — `person_name_form_persons` (le plus simple)
+### Phase 1 — Dénormaliser `person_name_forms` (le plus simple)
 
 - Volume le plus petit (50 K liens).
 - Moins de call-sites à adapter (alimentation : `populate_person_name_forms.py` ; consommation : matching de personnes dans `create_persons_from_source_authorships.py` et requêtes admin).
 - Sert de POC pour valider l'approche avant d'attaquer les deux tables plus lourdes.
 
-Migration :
-- Créer `person_name_form_persons` avec FK `ON DELETE CASCADE` des deux côtés.
-- Backfill : `INSERT INTO person_name_form_persons SELECT id, (k)::int, COALESCE(persons->>k, '[]'::jsonb)::jsonb::... FROM person_name_forms, jsonb_object_keys(persons) k`.
-- Adapter le code (queries + populate + matching).
-- Drop `person_name_forms.persons`.
-- Le CHECK `persons_not_empty` disparaît (remplacé par une contrainte applicative ou un trigger qui supprime la name_form si plus aucun lien — à décider).
+Décisions tranchées au démarrage : `sources text[]` (pas de 3 colonnes), pas de contrainte DB sur l'invariant "row supprimée si sources vide" (logique applicative pure côté repo).
+
+- [x] Migration Alembic `0016_person_name_forms_denormalize` : décompose JSONB → triplets en table temp, DROP TABLE, recrée la table dénormalisée, repopuler (cascade CHECK / UNIQUE / index GIN / sequence supprimés au passage).
+- [x] `infrastructure/db/tables.py` : nouvelle déclaration `(name_form, person_id, sources[])` + PK composite + index sur `person_id`.
+- [x] `domain/persons/name_forms.py` : ne garde que le VO `PersonNameForm` et la factory `compute_person_name_forms`. Helpers JSONB (`add_person_source`, `remove_person_source`, `remove_person`, `merge`, `is_ambiguous`, `person_ids`, `all_sources`, type `PersonsDict`) supprimés.
+- [x] `infrastructure/repositories/person_repository/_name_forms.py` : réécriture en SQL direct. Conserve `refresh_name_forms` / `add_name_form` / `detach_name_form` (API publique du repo) et expose `add_person_source` / `remove_person_source` / `is_ambiguous` comme opérations SQL (sémantique préservée, implémentation DB).
+- [x] `infrastructure/repositories/person_repository/_core.py` : adapter `merge_into` (cross-person UPSERT + DELETE) et `find_by_id` (`WHERE person_id = :pid` au lieu de `WHERE persons ? :pid`).
+- [x] Port `application/ports/pipeline/name_forms.py` + adapter `infrastructure/queries/name_forms.py` : nouvelle signature de synchronisation (sync depuis table temp en bulk au lieu de boucle update/insert/delete par row).
+- [x] Orchestrateur `application/pipeline/persons/populate_person_name_forms.py` : agrégation SQL `GROUP BY name_form, person_id` + sync bulk.
+- [x] Queries lecture (`infrastructure/queries/persons/admin.py`, `list.py`, `create.py`) : `LATERAL jsonb_object_keys(pnf.persons)` → JOIN naturel sur `person_name_forms`.
+- [x] Supprimer `interfaces/cli/oneshot/backfill_name_forms_persons.py` (one-shot historique du chantier précédent, sans objet maintenant).
+- [x] Tests : adapter `tests/integration/infrastructure/queries/test_name_forms_queries.py`, retirer les tests unitaires des helpers JSONB disparus dans `tests/unit/domain/persons/test_name_forms.py`.
+- [x] `alembic upgrade head` (Laura) + run pytest ciblé sur le périmètre — 248/248 passent.
 
 ### Phase 2 — `authorship_structures` (volume modéré)
 
@@ -76,7 +83,6 @@ Migration :
 ## Questions ouvertes
 
 - **`person_name_form_persons.sources`** : on garde en `text[]` ou on normalise en `(name_form_id, person_id, source)` à 3 colonnes ? Si la cardinalité reste bornée (1-6, valeurs dans un enum), `text[]` est OK. Si on veut suivre individuellement chaque observation (date, run pipeline…), 3 colonnes serait nécessaire. À trancher au démarrage de la Phase 1.
-- **Stratégie de migration zéro-downtime** ? Probablement non nécessaire (mono-utilisateur), mais à confirmer si la DSI a une politique de fenêtres de maintenance.
 - **Phase 2 et 3 fusionnables ?** Les deux tables `authorships` et `source_authorships` partagent une logique de propagation (`build_authorships.propagate_perimeter_and_structures_from`). Migrer les deux en même temps pourrait être plus simple que séquentiel — à voir au démarrage.
 - **Coût d'adaptation** estimé à 1 semaine de travail concentré pour les 3 phases. À affiner après audit des call-sites au démarrage.
 
