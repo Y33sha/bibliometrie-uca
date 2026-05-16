@@ -89,7 +89,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_sync_engine(None)
 
 
-app = FastAPI(title="Bibliométrie UCA", lifespan=lifespan)
+# `root_path` : préfixe de déploiement (ex. `/bibliometrie` en prod).
+# Le strip du préfixe est fait par le serveur ASGI (uvicorn `--root-path` ou
+# env `UVICORN_ROOT_PATH`) avant que FastAPI route ; cette valeur sert ici à
+# générer correctement les URLs absolues dans OpenAPI et les redirections.
+# Vide par défaut (dev local nu, ou reverse proxy qui strip déjà en amont).
+app = FastAPI(
+    title="Bibliométrie UCA",
+    lifespan=lifespan,
+    root_path=os.environ.get("ROOT_PATH", ""),
+)
 
 
 # ----- Exception handlers -----
@@ -192,14 +201,6 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
             },
         )
     return response
-
-
-@app.middleware("http")
-async def strip_prefix(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Strip /bibliometrie prefix pour que les routes /api/* fonctionnent en accès direct."""
-    if request.url.path.startswith("/bibliometrie/api/"):
-        request.scope["path"] = request.url.path[len("/bibliometrie") :]
-    return await call_next(request)
 
 
 # Endpoints exclus du logging de timing (trop bavards, peu utiles)
