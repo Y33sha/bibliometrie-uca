@@ -108,11 +108,34 @@ _RENAMES: list[tuple[str, str, str]] = [
 ]
 
 
+def _rename_if_exists(table: str, old_name: str, new_name: str) -> None:
+    """Renomme une contrainte uniquement si l'ancien nom existe en base.
+
+    Idempotente : sans effet si le rename a déjà été fait (ou si la
+    contrainte n'a jamais existé sous l'ancien nom, comme sur les bases
+    fraîches dont la baseline porte déjà certains nouveaux noms).
+    """
+    op.execute(
+        f"""
+        DO $$
+        BEGIN
+          IF EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = '{old_name}'
+              AND conrelid = 'public.{table}'::regclass
+          ) THEN
+            EXECUTE 'ALTER TABLE public.{table} RENAME CONSTRAINT "{old_name}" TO "{new_name}"';
+          END IF;
+        END $$;
+        """
+    )
+
+
 def upgrade() -> None:
     for table, old_name, new_name in _RENAMES:
-        op.execute(f'ALTER TABLE public.{table} RENAME CONSTRAINT "{old_name}" TO "{new_name}"')
+        _rename_if_exists(table, old_name, new_name)
 
 
 def downgrade() -> None:
     for table, old_name, new_name in _RENAMES:
-        op.execute(f'ALTER TABLE public.{table} RENAME CONSTRAINT "{new_name}" TO "{old_name}"')
+        _rename_if_exists(table, new_name, old_name)
