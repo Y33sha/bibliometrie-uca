@@ -130,7 +130,7 @@ Ne rien changer aux sources existantes, juste convenir que CrossRef ne crée pas
 | `domain/person.py::PersonSourceIds` | Model | oui | Inchangé (encore utilisé pour HAL `source_ids`) |
 
 **Stratégie de test de non-régression**
-- Avant migration : snapshot `pg_dump` des tables `persons`, `person_identifiers`, `source_authorships` (sur la base sandbox).
+- Avant migration : snapshot `pg_dump` des tables `persons`, `person_identifiers`, `source_authorships`.
 - Après chaque phase : compteurs comparatifs :
   - `SELECT count(*) FROM persons` → strictement stable (ne doit pas changer)
   - `SELECT source, count(*) FROM source_persons GROUP BY source` → drop attendu pour OA/WoS/CrossRef ; HAL/ScanR/theses doivent baisser proportionnellement aux `nokey-*`/`scanr-<seq>`/`nokey-*` synthétiques

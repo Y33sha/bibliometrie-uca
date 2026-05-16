@@ -3,16 +3,16 @@
 ### Extraction
 * [ ] possible de paralléliser les extracteurs *entre eux*? ->> **CODE_async-extractions-http.md**
 * [ ] vérif http2 pour extracteurs ->> **CODE_async-extractions-http.md**
-* [ ] Backoff `not_found_at` sur DOI: Pour limiter la croissance du pool de DOI retentés à chaque run de `fetch_missing_doi`, stocker un `not_found_at TIMESTAMP` sur les DOI qu'une source n'a pas pu résoudre, et ne les réessayer qu'après N jours (30 ?)
-* [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour
-* [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids
+* [ ] Backoff `not_found_at` sur DOI: Pour limiter la croissance du pool de DOI retentés à chaque run de `fetch_missing_doi`, stocker un `not_found_at TIMESTAMP` sur les DOI qu'une source n'a pas pu résoudre, et ne les réessayer qu'après N jours (30 ?) ->> **DATA_cycle-vie-staging.md**
+* [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour ->> **DATA_cycle-vie-staging.md**
+* [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids?
 * [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] extraction par ORCID: vérifier faisabilité (quelles sources?)
 ### Normalisation
 * [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
-* [ ] création erronée d'idhal numériques par normalize-hal
+* [ ] création erronée d'idhal numériques par normalize-hal: vérifier que le problème ne réapparaît pas
 ### Suite du traitement
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications". / DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint? ->> **METIER_metadata-deduplication.md**
@@ -36,6 +36,7 @@
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] fetch_unlinked_authorships: relire la requête pour comprendre ce qu'elle fait
 * [ ] organiser le dossier queries
+* [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 ## Sujets
