@@ -142,6 +142,26 @@ def reset_authorships_perimeter_and_structures(conn: Connection) -> int:
     ).rowcount
 
 
+def purge_authorships(conn: Connection) -> int:
+    """Vide la table `authorships` et délie les `source_authorships` qui y pointaient.
+
+    Utilisé en mode pipeline `full` pour garantir la convergence absolue :
+    on repart de zéro et `build_authorships` reconstruit tout depuis les
+    `source_authorships`. Le build incrémental (modes daily/weekly) ne
+    déclenche pas ce purge, sa logique étant idempotente.
+
+    Délie d'abord les `source_authorships.authorship_id` (la FK est ON
+    DELETE SET NULL mais on le fait explicitement pour pouvoir TRUNCATE
+    qui ignore les triggers). Retourne le nombre d'authorships purgées.
+    """
+    n = conn.execute(text("SELECT COUNT(*) FROM authorships")).scalar_one()
+    conn.execute(
+        text("UPDATE source_authorships SET authorship_id = NULL WHERE authorship_id IS NOT NULL")
+    )
+    conn.execute(text("TRUNCATE TABLE authorships RESTART IDENTITY"))
+    return n
+
+
 def propagate_perimeter_and_structures_from(conn: Connection, source: str) -> int:
     """Étape 4 : propage `in_perimeter` (OR) et `structure_ids` (union) depuis une source.
 
@@ -188,6 +208,9 @@ def count_authorships_in_perimeter(conn: Connection) -> int:
 
 class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
     """Adapter PostgreSQL pour `application.ports.authorships_build.AuthorshipsBuildQueries`."""
+
+    def purge_authorships(self, conn: Connection) -> int:
+        return purge_authorships(conn)
 
     def insert_missing_authorships(self, conn: Connection) -> int:
         return insert_missing_authorships(conn)

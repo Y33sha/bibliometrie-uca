@@ -24,7 +24,17 @@ def build(
     queries: AuthorshipsBuildQueries,
     logger: logging.Logger,
     sources: Iterable[str] | None = None,
+    *,
+    rebuild_full: bool = False,
 ) -> None:
+    """Reconstruit la table `authorships` depuis les `source_authorships`.
+
+    Le build est idempotent : appel répété sans `rebuild_full` converge
+    vers le même résultat tant que toutes les sources participent. Le
+    flag `rebuild_full=True` purge d'abord la table (utile en mode
+    pipeline `full` pour garantir la convergence absolue, par ex. si
+    une row a divergé suite à un chemin de mise à jour partielle).
+    """
     all_sources = [
         ("HAL", "hal"),
         ("OpenAlex", "openalex"),
@@ -41,6 +51,11 @@ def build(
 
     t0 = time.perf_counter()
     logger.info(f"Sources : {', '.join(n for n, _ in active_sources)}")
+
+    if rebuild_full:
+        logger.info("Mode rebuild_full : purge complète des authorships canoniques...")
+        n_purged = queries.purge_authorships(conn)
+        logger.info(f"  {n_purged} authorships purgées (source_authorships.authorship_id délié)")
 
     logger.info("Étape 1 : insertion des authorships manquantes...")
     inserted = queries.insert_missing_authorships(conn)
