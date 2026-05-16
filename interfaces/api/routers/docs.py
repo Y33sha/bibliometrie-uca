@@ -1,11 +1,18 @@
-"""Documentation router — sert les fichiers .md depuis docs/."""
+"""Documentation router — sert les fichiers .md depuis docs/.
+
+Note typage : les retours utilisent `dict[str, Any]` plutôt que
+`dict[str, JsonValue]` parce que Pydantic 2.x ne sait pas résoudre
+l'alias récursif `JsonValue` au moment de générer le `TypeAdapter`
+du `response_model` implicite (`PydanticUserError: ... is not fully
+defined`). Cas isolé, frontière JSON libre côté API.
+"""
 
 import logging
 import re
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from domain.json_types import JsonValue
 from infrastructure import PROJECT_ROOT
 
 router = APIRouter()
@@ -32,9 +39,9 @@ def list_docs() -> list[dict[str, str]]:
 
 
 @router.get("/api/docs/todos/all")
-def list_all_todos() -> list[dict[str, JsonValue]]:
+def list_all_todos() -> list[dict[str, Any]]:
     """Collecte tous les <!-- TODO: ... --> de tous les fichiers .md."""
-    todos: list[dict[str, JsonValue]] = []
+    todos: list[dict[str, Any]] = []
     todo_re = re.compile(r"<!--\s*TODO\s*:\s*(.+?)\s*-->")
 
     for page in DOC_PAGES:
@@ -56,7 +63,7 @@ def list_all_todos() -> list[dict[str, JsonValue]]:
 
 
 @router.get("/api/docs/{slug}")
-def get_doc(slug: str) -> dict[str, JsonValue]:
+def get_doc(slug: str) -> dict[str, Any]:
     """Retourne le contenu markdown d'une page de documentation."""
     # Sécurité : pas de traversal
     if "/" in slug or "\\" in slug or ".." in slug:
