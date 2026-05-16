@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict FAPxUJRfZFLinm50qZIkYFF2JObXuT5X47CVkdtlDv2JhJLSvrYrjfQXV1aenue
+\restrict bX8F0dXyQ1aX7OK3Q1FExVvQ0LBPE3njxzE7Ei5VwE0AnOG0GxjFbgoMa6g0hhe
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -691,33 +691,10 @@ ALTER SEQUENCE public.person_identifiers_id_seq OWNED BY public.person_identifie
 --
 
 CREATE TABLE public.person_name_forms (
-    id integer NOT NULL,
     name_form text NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    persons jsonb NOT NULL,
-    CONSTRAINT persons_not_empty CHECK ((persons <> '{}'::jsonb))
+    person_id integer NOT NULL,
+    sources text[] DEFAULT '{}'::text[] NOT NULL
 );
-
-
---
--- Name: person_name_forms_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.person_name_forms_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: person_name_forms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.person_name_forms_id_seq OWNED BY public.person_name_forms.id;
 
 
 --
@@ -1355,13 +1332,6 @@ ALTER TABLE ONLY public.person_identifiers ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
--- Name: person_name_forms id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.person_name_forms ALTER COLUMN id SET DEFAULT nextval('public.person_name_forms_id_seq'::regclass);
-
-
---
 -- Name: persons id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1637,19 +1607,11 @@ ALTER TABLE ONLY public.person_identifiers
 
 
 --
--- Name: person_name_forms person_name_forms_name_form_uq; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.person_name_forms
-    ADD CONSTRAINT person_name_forms_name_form_uq UNIQUE (name_form);
-
-
---
 -- Name: person_name_forms person_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.person_name_forms
-    ADD CONSTRAINT person_name_forms_pkey PRIMARY KEY (id);
+    ADD CONSTRAINT person_name_forms_pkey PRIMARY KEY (name_form, person_id);
 
 
 --
@@ -2128,10 +2090,10 @@ CREATE INDEX idx_persons_rh_person_id ON public.persons_rh USING btree (person_i
 
 
 --
--- Name: idx_pnf_persons_gin; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_pnf_person_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_pnf_persons_gin ON public.person_name_forms USING gin (persons jsonb_path_ops);
+CREATE INDEX idx_pnf_person_id ON public.person_name_forms USING btree (person_id);
 
 
 --
@@ -2545,6 +2507,14 @@ ALTER TABLE ONLY public.person_identifiers
 
 
 --
+-- Name: person_name_forms person_name_forms_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.person_name_forms
+    ADD CONSTRAINT person_name_forms_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+
+
+--
 -- Name: persons_rh persons_rh_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2700,4 +2670,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict FAPxUJRfZFLinm50qZIkYFF2JObXuT5X47CVkdtlDv2JhJLSvrYrjfQXV1aenue
+\unrestrict bX8F0dXyQ1aX7OK3Q1FExVvQ0LBPE3njxzE7Ei5VwE0AnOG0GxjFbgoMa6g0hhe

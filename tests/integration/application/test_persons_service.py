@@ -342,10 +342,10 @@ class TestUpdateName:
         p = _insert_person(sa_sync_conn, "Dupont", "Jean")
         sa_sync_conn.execute(
             text(
-                "INSERT INTO person_name_forms (name_form, persons) "
-                "VALUES ('dupont jean', CAST(:persons AS jsonb))"
+                "INSERT INTO person_name_forms (name_form, person_id, sources) "
+                "VALUES ('dupont jean', :pid, ARRAY['persons'])"
             ),
-            {"persons": json.dumps({str(p): ["persons"]})},
+            {"pid": p},
         )
 
         update_name(p, "Martin", "Sophie", repo=repo)
@@ -357,14 +357,22 @@ class TestUpdateName:
         assert row.first_name == "Sophie"
 
         row = sa_sync_conn.execute(
-            text("SELECT persons FROM person_name_forms WHERE name_form = 'martin sophie'")
+            text(
+                "SELECT sources FROM person_name_forms "
+                "WHERE name_form = 'martin sophie' AND person_id = :pid"
+            ),
+            {"pid": p},
         ).one()
-        assert row.persons == {str(p): ["persons"]}
+        assert row.sources == ["persons"]
 
         # L'ancienne forme 'dupont jean' n'avait que la source 'persons'
-        # pour ce pid : refresh_name_forms a dû la supprimer entièrement.
+        # pour ce pid : refresh_name_forms a dû supprimer la row entièrement.
         row = sa_sync_conn.execute(
-            text("SELECT id FROM person_name_forms WHERE name_form = 'dupont jean'")
+            text(
+                "SELECT 1 FROM person_name_forms "
+                "WHERE name_form = 'dupont jean' AND person_id = :pid"
+            ),
+            {"pid": p},
         ).first()
         assert row is None
 
@@ -477,10 +485,13 @@ class TestDetachAuthorships:
         assert result["cleaned_form"] is True
 
         row = sa_sync_conn.execute(
-            text("SELECT persons FROM person_name_forms WHERE name_form = 'dupont jean'")
+            text(
+                "SELECT 1 FROM person_name_forms "
+                "WHERE name_form = 'dupont jean' AND person_id = :pid"
+            ),
+            {"pid": person_id},
         ).first()
-        if row:
-            assert str(person_id) not in (row.persons or {})
+        assert row is None
 
     def test_keeps_name_form_if_another_authorship_uses_it(
         self, sa_sync_conn, repo, authorship_repo
@@ -565,12 +576,12 @@ class TestDetachNameForm:
 
         detach_name_form(p1, "dupont jean", repo=repo)
 
-        row = sa_sync_conn.execute(
-            text("SELECT persons FROM person_name_forms WHERE name_form = 'dupont jean'")
-        ).first()
-        assert row is not None
-        assert str(p1) not in row.persons
-        assert str(p2) in row.persons
+        rows = sa_sync_conn.execute(
+            text("SELECT person_id FROM person_name_forms WHERE name_form = 'dupont jean'")
+        ).all()
+        pids = {r.person_id for r in rows}
+        assert p1 not in pids
+        assert p2 in pids
 
     def test_deletes_form_when_last_person_detached(self, sa_sync_conn, repo):
         person_id = create_person("Unique", "Name", repo=repo)
@@ -578,7 +589,7 @@ class TestDetachNameForm:
         detach_name_form(person_id, "name unique", repo=repo)
 
         row = sa_sync_conn.execute(
-            text("SELECT id FROM person_name_forms WHERE name_form = 'name unique'")
+            text("SELECT 1 FROM person_name_forms WHERE name_form = 'name unique'")
         ).first()
         assert row is None
 
@@ -641,6 +652,6 @@ class TestAssignOrphanAuthorship:
         assign_orphan_authorship(person_id, "hal", sa_id, repo=repo)
 
         row = sa_sync_conn.execute(
-            text("SELECT id FROM person_name_forms WHERE name_form = 'other name'")
+            text("SELECT 1 FROM person_name_forms WHERE name_form = 'other name'")
         ).first()
         assert row is None

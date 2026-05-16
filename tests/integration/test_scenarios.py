@@ -1,7 +1,5 @@
 """Tests d'intégration — nécessitent la base bibliometrie_test."""
 
-import json
-
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -257,17 +255,17 @@ class TestMergePersons:
 
         sa_sync_conn.execute(
             text(
-                "INSERT INTO person_name_forms (name_form, persons) "
-                "VALUES ('jean dupont', CAST(:p AS jsonb))"
+                "INSERT INTO person_name_forms (name_form, person_id, sources) "
+                "VALUES ('jean dupont', :pid, ARRAY['persons'])"
             ),
-            {"p": json.dumps({str(target): ["persons"]})},
+            {"pid": target},
         )
         sa_sync_conn.execute(
             text(
-                "INSERT INTO person_name_forms (name_form, persons) "
-                "VALUES ('j dupont', CAST(:p AS jsonb))"
+                "INSERT INTO person_name_forms (name_form, person_id, sources) "
+                "VALUES ('j dupont', :pid, ARRAY['hal'])"
             ),
-            {"p": json.dumps({str(source): ["hal"]})},
+            {"pid": source},
         )
 
         merge_person(target, source, repo=person_repo)
@@ -281,13 +279,23 @@ class TestMergePersons:
         )
 
         # Name forms transférées : la source 'hal' attachée à `source` est
-        # remontée sous la clé `target` après merge.
-        persons = sa_sync_conn.execute(
-            text("SELECT persons FROM person_name_forms WHERE name_form = 'j dupont'")
-        ).scalar_one()
-        assert str(target) in persons
-        assert "hal" in persons[str(target)]
-        assert str(source) not in persons
+        # remontée sur la row `(j dupont, target)` après merge ; plus aucune
+        # row ne référence l'id `source`.
+        row = sa_sync_conn.execute(
+            text(
+                "SELECT sources FROM person_name_forms "
+                "WHERE name_form = 'j dupont' AND person_id = :pid"
+            ),
+            {"pid": target},
+        ).one()
+        assert "hal" in row.sources
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT 1 FROM person_name_forms WHERE person_id = :pid"),
+                {"pid": source},
+            ).first()
+            is None
+        )
 
     def test_merge_blocked_if_both_rh(self, sa_sync_conn, person_repo):
         target = create_person(sa_sync_conn, "Dupont", "Jean")

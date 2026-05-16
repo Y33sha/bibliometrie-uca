@@ -230,40 +230,29 @@ def list_persons(
 
     name_forms_map: dict[int, Any] = {}
     if person_ids:
-        # `sources` exposé au frontend = union triée des sources de toutes
-        # les clés (form-level), pour rester compatible avec le contrat
-        # `NameFormSummaryOut`. Filtre :  on n'expose la forme que si
-        # *au moins une clé* a une source autre que 'persons' (sinon la
-        # forme est entièrement dérivée de la table persons et n'a aucune
-        # valeur d'audit cross-source).
+        # Filtre : on n'expose la forme que si elle a au moins une source
+        # autre que 'persons' (sinon elle est entièrement dérivée de la
+        # table persons et n'a aucune valeur d'audit cross-source).
+        # `ambiguous` : >1 person_id pour ce name_form (sous-select sur
+        # la PK composite, lookup index B-tree).
         nf_rows = conn.execute(
             text("""
-                SELECT pid_text::int AS person_id,
+                SELECT pnf.person_id,
                        json_agg(json_build_object(
                            'name_form', pnf.name_form,
-                           'sources', (
-                               SELECT COALESCE(
-                                   array_agg(DISTINCT s ORDER BY s),
-                                   '{}'::text[]
-                               )
-                               FROM jsonb_each(pnf.persons) AS j(k, v),
-                                    jsonb_array_elements_text(v) AS s
-                           ),
+                           'sources', pnf.sources,
                            'ambiguous', (
                                SELECT COUNT(*) > 1
-                               FROM jsonb_object_keys(pnf.persons)
+                               FROM person_name_forms p2
+                               WHERE p2.name_form = pnf.name_form
                            )
                        ) ORDER BY pnf.name_form) AS name_forms
-                FROM person_name_forms pnf,
-                     LATERAL jsonb_object_keys(pnf.persons) AS pid_text
-                WHERE pid_text::int = ANY(:ids)
+                FROM person_name_forms pnf
+                WHERE pnf.person_id = ANY(:ids)
                   AND EXISTS (
-                      SELECT 1
-                      FROM jsonb_each(pnf.persons) AS j(k, v),
-                           jsonb_array_elements_text(v) AS s
-                      WHERE s <> 'persons'
+                      SELECT 1 FROM unnest(pnf.sources) s WHERE s <> 'persons'
                   )
-                GROUP BY pid_text
+                GROUP BY pnf.person_id
             """),
             {"ids": person_ids},
         ).all()
