@@ -855,6 +855,10 @@ staging = Table(
     Column("not_found", Boolean, server_default="false"),
     Column("hal_collections", ARRAY(Text)),
     UniqueConstraint("source", "source_id", name="staging_source_source_id_key"),
+    CheckConstraint(
+        "NOT not_found OR processed",
+        name="staging_not_found_implies_processed",
+    ),
     Index("idx_staging_doi", "doi", postgresql_where=text("doi IS NOT NULL")),
     Index(
         "idx_staging_not_found",
