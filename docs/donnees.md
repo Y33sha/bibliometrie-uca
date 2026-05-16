@@ -203,6 +203,10 @@ Table de liaison recensant les contributions individuelles aux publications. Cha
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
 - `excluded` : authorship rejetée manuellement
 
+**Cohérence avec les sources** : la table est **dérivée** des `source_authorships` — `in_perimeter`, `structure_ids`, `is_corresponding`, `author_position`, `roles` sont des consolidations (union ou priorité par source) des authorships sources. Le build (`application/pipeline/authorships/build_authorships.py`) est idempotent en mode incrémental ; le mode pipeline `full` exécute en plus une purge complète + rebuild from scratch (TRUNCATE + reset des FK), pour garantir la convergence absolue à intervalle mensuel. Le champ `excluded`, lui, est métier natif (rejet manuel via l'admin) et survit au rebuild — le build ne le touche pas.
+
+**Évolution envisagée — vue matérialisée** : la table `authorships` étant strictement dérivée (sauf `excluded`), elle pourrait être remplacée par une `MATERIALIZED VIEW` dont la définition SQL serait la source unique de la consolidation. Avantages : plus de code de build à maintenir, single source of truth conceptuel. Inconvénients : (1) `excluded` ne peut pas vivre sur une VMV → table à part `excluded_authorships(publication_id, person_id)` ; (2) la FK `source_authorships.authorship_id` ne peut pas pointer vers une VMV — il faudrait soit la supprimer (jointures via `(publication_id, person_id)` dans les requêtes), soit garder la table mais l'alimenter via la VMV. Chantier à explorer si le code de `build_authorships` devient un point de friction (logique de priorité, propagation, idempotence). Pas urgent au volume actuel.
+
 ### Tables source
 
 Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses, crossref).

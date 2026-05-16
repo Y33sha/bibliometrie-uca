@@ -269,8 +269,13 @@ def phase_authorships(**kw: Any) -> Any:
     source_authorship peut etre touchee par d'autres voies que sa propre
     normalisation (re-population d'affiliations, refresh_from_sources,
     etc.) — toutes les sources doivent etre reconsolidees a chaque run.
+
+    En mode `full` (`policy.rebuild_authorships_full = True`), la table
+    est purgée avant rebuild pour garantir la convergence absolue.
     """
-    _run_build_authorships()
+    mode = kw.get("mode", "full")
+    rebuild_full = MODES[mode].rebuild_authorships_full
+    _run_build_authorships(rebuild_full=rebuild_full)
 
 
 def phase_countries(**kw: Any) -> Any:
@@ -348,16 +353,16 @@ def _run_create_persons() -> None:
     log.info("✓ create_persons_from_source_authorships terminé en %.1fs", time.time() - t0)
 
 
-def _run_build_authorships() -> None:
+def _run_build_authorships(*, rebuild_full: bool = False) -> None:
     from application.pipeline.authorships.build_authorships import build
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.authorships_build import PgAuthorshipsBuildQueries
 
-    log.info("▶ build_authorships")
+    log.info("▶ build_authorships%s", " (rebuild_full)" if rebuild_full else "")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        build(conn, PgAuthorshipsBuildQueries(), log)
+        build(conn, PgAuthorshipsBuildQueries(), log, rebuild_full=rebuild_full)
         conn.commit()
     finally:
         conn.close()

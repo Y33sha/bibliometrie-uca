@@ -27,6 +27,10 @@ class ModePolicy:
     fetch_missing_doi_scope: FetchMissingDoiScope
     vacuum_full: bool
     run_enrich: bool
+    # True = purge complète des authorships canoniques avant rebuild
+    # (TRUNCATE + UPDATE FK), pour garantir la convergence absolue.
+    # En mode incrémental, le build idempotent suffit.
+    rebuild_authorships_full: bool
 
 
 # WoS : crédit API contractuel limité à 50 000 full records/an. WoS est
@@ -45,6 +49,7 @@ MODES: dict[str, ModePolicy] = {
         fetch_missing_doi_scope="unprocessed",
         vacuum_full=False,
         run_enrich=False,
+        rebuild_authorships_full=False,
     ),
     "weekly": ModePolicy(
         # Pas de WoS (cf. note crédit API ci-dessus).
@@ -56,6 +61,7 @@ MODES: dict[str, ModePolicy] = {
         fetch_missing_doi_scope="unprocessed",
         vacuum_full=False,
         run_enrich=False,
+        rebuild_authorships_full=False,
     ),
     "full": ModePolicy(
         extract_sources=frozenset({"hal", "openalex", "wos", "scanr", "theses"}),
@@ -65,6 +71,7 @@ MODES: dict[str, ModePolicy] = {
         fetch_missing_doi_scope="all",
         vacuum_full=True,
         run_enrich=True,
+        rebuild_authorships_full=True,
     ),
 }
 
