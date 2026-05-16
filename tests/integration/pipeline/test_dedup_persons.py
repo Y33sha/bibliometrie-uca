@@ -33,7 +33,7 @@ _logger = logging.getLogger("test")
 # ── Helpers ──────────────────────────────────────────────────────
 
 
-def _seed_identifier(conn, person_id, id_type, id_value, status, source="hal"):
+def _seed_identifier(conn, person_id, id_type, id_value, status, source="auto"):
     """Seed direct d'un person_identifiers avec statut arbitraire.
 
     `application.persons.add_identifier` ne prend plus de `status` en paramètre
@@ -43,7 +43,8 @@ def _seed_identifier(conn, person_id, id_type, id_value, status, source="hal"):
     conn.execute(
         text("""
             INSERT INTO person_identifiers (person_id, id_type, id_value, source, status)
-            VALUES (:pid, :it, :iv, :src, CAST(:st AS identifier_status))
+            VALUES (:pid, :it, :iv, CAST(:src AS identifier_origin),
+                    CAST(:st AS identifier_status))
         """),
         {"pid": person_id, "it": id_type, "iv": id_value, "src": source, "st": status},
     )
