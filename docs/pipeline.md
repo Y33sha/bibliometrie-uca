@@ -10,8 +10,7 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 
 ### Moissonnage
 - [Moissonnage](#extract) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
-- [Fetch missing HAL id](#fetch_missing_hal_id) : récupère depuis HAL les documents référencés par d'autres sources mais absents de notre staging HAL.
-- [Fetch missing DOI](#fetch_missing_doi) : recherche ciblée par DOI dans chaque source des records manquants.
+- [Cross-imports](#cross_imports) : deux mécanismes de rattrapage cross-source enchaînés — (1) docs HAL manquants repérés par hal-id ou NNT dans d'autres sources, (2) recherche par DOI des records absents d'une source mais présents dans une autre.
 
 ### Normalisation
 - [Normalisation](#normalize) : transforme les données brutes (*staging*) en tables structurées *par source* (`source_publications`, `source_authorships`). Crée également les `addresses` et leurs liens `source_authorship_addresses`.
@@ -28,8 +27,7 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 
 ### Enrichissements divers
 - [Pays](#countries) : détection automatisée des pays des adresses. Utile pour interroger les collaborations internationales.
-- [Sujets](#subjects) : ingestion des sujets/mots-clés des `source_publications` vers les tables canoniques `subjects` et `publication_subjects`.
-- [Co-occurrences](#cooccurrences) : recalcule `subjects.usage_count` et la table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
+- [Sujets](#subjects) : deux étapes enchaînées — (1) ingestion des sujets/mots-clés des `source_publications` vers les tables canoniques `subjects` et `publication_subjects`, (2) recalcul de `subjects.usage_count` + table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
 - [Statut open access et APC](#enrich) : statut OA via Unpaywall (plus à jour que les sources) ; montant APC par revue via OpenAlex Sources.
 
 ## Phases détaillées
@@ -66,13 +64,17 @@ L'API OpenAlex limite les authorships à 100 par publication dans les requêtes 
 Pour éviter d'écraser ces publications lors de l'import suivant, un *hash* est calculé en faisant abstraction des authorships.
 <!-- TODO: Tester que le meta_hash fonctionne effectivement et que les publis de >100 auteurs ne sont pas écrasées au réimport. -->
 
-### <span id="fetch_missing_hal_id"></span>`fetch_missing_hal_id` : HAL ids manquants
+### <span id="cross_imports"></span>`cross_imports` : Rattrapage cross-source
 
-Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging HAL. Code dans `infrastructure/sources/hal/fetch_missing_hal_id.py`. Auto-borné, tourne dans tous les modes.
+Deux étapes enchaînées, chacune adressant un cas distinct de "doc visible dans une source mais absent d'une autre".
 
-### <span id="fetch_missing_doi"></span>`fetch_missing_doi` : DOI manquants par source
+**Étape 1 — `fetch_missing_hal_id` : HAL ids manquants.**
+Télécharge depuis HAL les documents référencés (par hal-id ou NNT) dans d'autres sources mais absents de notre staging HAL. Code dans `infrastructure/sources/hal/fetch_missing_hal_id.py`. Auto-borné, tourne dans tous les modes : les hal-ids/NNT introuvables sont marqués `not_found=TRUE` dans staging et ne sont jamais re-interrogés (HAL = source native pour les hal-ids, un 404 est définitif).
 
-Pour chaque source cible (OpenAlex, HAL, WoS, ScanR), recherche par DOI les records trouvés dans les autres sources mais absents de celle-ci. La plupart sont effectivement absents ; certains sont repêchés (cause : affiliations différentes selon source). Dispatcher dans `interfaces/cli/pipeline/fetch_missing_doi.py`, adapter par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Exécuté en mode `full` uniquement (scope policy).
+**Étape 2 — `fetch_missing_doi` : DOI manquants par source.**
+Pour chaque source cible (OpenAlex, HAL, WoS, ScanR, Crossref), recherche par DOI les records trouvés dans les autres sources mais absents de celle-ci. La plupart sont effectivement absents ; certains sont repêchés (cause : affiliations différentes selon source). Dispatcher dans `interfaces/cli/pipeline/fetch_missing_doi.py`, adapter par source dans `infrastructure/sources/<source>/fetch_missing_doi.py`. Sources cibles et scope (`unprocessed` vs `all`) déterminés par la policy du mode (cf. `domain/pipeline_modes.py`).
+
+Le comportement "ne jamais retenter un DOI 404" évoluera avec le chantier [`DATA_cycle-vie-staging.md`](chantiers/DATA_cycle-vie-staging.md) : pour les sources non natives (HAL/OpenAlex/WoS/ScanR cherché par DOI), un backoff temporel permettra de re-tenter après N jours.
 
 ### <span id="normalize"></span>`normalize` : Normalisation
 
@@ -218,15 +220,17 @@ Trois étapes enchaînées :
 
 3. **`interfaces/cli/pipeline/refresh_publication_countries.py`** : recalcule `publications.countries` comme union des `source_publications.countries` de toutes les sources rattachées à chaque publication canonique.
 
-### <span id="subjects"></span>`subjects` : Sujets et mots-clés
+### <span id="subjects"></span>`subjects` : Sujets, mots-clés et co-occurrences
 
+Deux étapes enchaînées, indissociables (l'une sans l'autre n'a pas de sens).
+
+**Étape 1 — Ingestion.**
 Pour chaque source : purge les liens `publication_subjects` existants pour cette source (idempotence), puis ré-ingère les sujets/mots-clés des `source_publications` rattachées à une publication canonique. Dispatch par source dans `application/pipeline/subjects/ingest_<source>.py` ; un `SubjectCache` partagé évite les UPSERT répétés sur les sujets récurrents.
 
 Le référentiel `subjects` n'est jamais purgé : un sujet peut rester orphelin si plus aucune publication ne le référence (historique des labels observés).
 
-### <span id="cooccurrences"></span>`cooccurrences` : Co-occurrences de sujets
-
-Tourne après la phase [subjects](#subjects). Recalcule depuis `publication_subjects` :
+**Étape 2 — Co-occurrences.**
+Recalcule depuis `publication_subjects` :
 1. `subjects.usage_count` — nombre de publications distinctes par sujet.
 2. `subject_cooccurrences` — paires de sujets co-présents sur une même publication, avec leur effectif. Filtré par `min_count >= 2` par défaut pour borner la cardinalité.
 

@@ -15,9 +15,10 @@ Usage:
     python run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
 
 Phases (dans l'ordre d'execution):
-    extract              Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
-    fetch_missing_hal_id Fetch des documents HAL manquants par hal-id/NNT (auto-borné, tourne toujours)
-    fetch_missing_doi    Fetch par DOI des records manquants dans chaque source (scope policy)
+    extract        Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
+    cross_imports  Rattrapage cross-source : (1) docs HAL manquants par hal-id/NNT
+                   (auto-borné, tourne toujours), puis (2) par DOI dans chaque source
+                   cible (scope policy)
     normalize      Normalisation staging -> tables sources (source_publications,
                    source_authorships). Rattachement aux publications existantes par DOI/NNT/
                    HAL-ID, mais PAS de creation de publications. Inclut enrichissement
@@ -31,8 +32,8 @@ Phases (dans l'ordre d'execution):
     persons        Creation/mapping personnes + formes de noms
     authorships    Reconstruction authorships canoniques (table de verite) + propagation UCA
     countries      Detection pays des adresses + recalcul pays des publications
-    subjects       Ingestion des sujets/mots-cles depuis source_publications vers subjects + publication_subjects
-    cooccurrences  Recalcul de subjects.usage_count + table subject_cooccurrences (post-subjects)
+    subjects       Sujets/mots-clés : ingestion source_publications → subjects + publication_subjects,
+                   puis recalcul subjects.usage_count + subject_cooccurrences
     enrich         Enrichissements optionnels (statut OA via Unpaywall, APC revues)
 """
 
@@ -128,26 +129,33 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
         run_python("infrastructure/sources/openalex/refetch_truncated.py")
 
 
-def phase_fetch_missing_hal_id(mode: Any = "full", sources: Any = None, **kw: Any) -> Any:
-    """Phase 2a : fetch des documents HAL manquants par hal-id/NNT.
+def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> Any:
+    """Rattrapage des documents repérés dans une source mais absents d'une autre.
 
-    Opération auto-bornée : les hal-ids/NNT introuvables sont marqués
-    `not_found=TRUE` dans staging et ne sont jamais re-interrogés. Tourne
-    donc systématiquement (daily/weekly/full) sans scope.
+    Deux mécanismes complémentaires, exécutés dans cet ordre :
+
+    1. **Cross-import par hal-id / NNT** (`fetch_missing_hal_id`).
+       Pour chaque hal-id ou NNT mentionné dans une autre source mais
+       absent du staging HAL, on télécharge le document via l'API HAL.
+       Auto-bornée : les hal-ids/NNT introuvables sont marqués
+       `not_found=TRUE` dans staging et ne sont jamais re-interrogés.
+       Tourne systématiquement (daily/weekly/full).
+
+    2. **Cross-import par DOI** (`fetch_missing_doi`).
+       Pour chaque source cible, on cherche les DOI vus dans les autres
+       sources mais absents de la sienne, et on tente de les fetcher.
+       Sources cibles et scope (`unprocessed` vs `all`) viennent de la
+       policy du mode (cf. `domain/pipeline_modes.py`).
+
+    Le scope cross-import DOI évoluera avec le chantier
+    `DATA_cycle-vie-staging.md` (backoff `not_found_at` / `next_retry`
+    pour les sources non natives).
     """
-    if sources and "hal" not in sources:
-        return
-    run_python("infrastructure/sources/hal/fetch_missing_hal_id.py", "--mode", mode)
+    # Étape 1 : par hal-id / NNT
+    if not sources or "hal" in sources:
+        run_python("infrastructure/sources/hal/fetch_missing_hal_id.py", "--mode", mode)
 
-
-def phase_fetch_missing_doi(mode: Any = "full", sources: Any = None, **kw: Any) -> Any:
-    """Phase 2b : fetch des records manquants par DOI dans chaque source.
-
-    Scope (`unprocessed` vs `all`) et sources cibles viennent de la policy
-    du mode (cf. `domain/pipeline_modes.py`). Un seul dispatcher CLI
-    (`interfaces.cli.pipeline.fetch_missing_doi`) est appelé une fois
-    par source cible.
-    """
+    # Étape 2 : par DOI, sources selon la policy
     policy = MODES[mode]
     effective = (
         set(sources) if sources else set(policy.fetch_missing_doi_sources)
@@ -286,25 +294,24 @@ def phase_countries(**kw: Any) -> Any:
 
 
 def phase_subjects(**kw: Any) -> Any:
-    """Ingestion des sujets/mots-clés depuis source_publications.
+    """Sujets / mots-clés : ingestion + recalcul des co-occurrences.
 
-    Lit les colonnes `keywords` et `topics` déjà persistées par les
-    normalizers et alimente les tables canoniques `subjects` et
-    `publication_subjects`. Idempotent.
+    Deux étapes enchaînées, indissociables :
+
+    1. **Ingestion** (`subjects` + `publication_subjects`) — lit
+       `keywords` et `topics` des `source_publications` et alimente les
+       tables canoniques.
+
+    2. **Co-occurrences** (`subjects.usage_count` + `subject_cooccurrences`)
+       — recalcule l'usage de chaque sujet et les paires de sujets
+       co-présents sur une même publication.
 
     Phase source-agnostique : `--sources` n'est pas propagé. Les topics
     peuvent évoluer côté `source_publications` par d'autres voies (re-
     normalisation, refresh_from_sources) — toutes les sources doivent
-    être ré-ingérées à chaque run.
+    être ré-ingérées à chaque run. Idempotente.
     """
     _run_ingest_subjects()
-
-
-def phase_cooccurrences(**kw: Any) -> Any:
-    """Recalcul de `subjects.usage_count` + table `subject_cooccurrences`.
-
-    Doit tourner après `subjects`. Idempotent.
-    """
     _run_cooccurrences()
 
 
@@ -745,8 +752,7 @@ def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
 # Registre des phases, dans l'ordre
 PHASES = [
     ("extract", phase_extract),
-    ("fetch_missing_hal_id", phase_fetch_missing_hal_id),
-    ("fetch_missing_doi", phase_fetch_missing_doi),
+    ("cross_imports", phase_cross_imports),
     ("normalize", phase_normalize),
     ("affiliations", phase_affiliations),
     ("publications", phase_publications),
@@ -754,7 +760,6 @@ PHASES = [
     ("authorships", phase_authorships),
     ("countries", phase_countries),
     ("subjects", phase_subjects),
-    ("cooccurrences", phase_cooccurrences),
     ("enrich", phase_enrich),
 ]
 
