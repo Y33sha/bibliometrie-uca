@@ -32,6 +32,15 @@ Le chantier `CODE_rich-domain-model` Phase 8 hydrate les **aggregates roots** (f
 - **Sweep par couche** : domain ports → application ports → infrastructure adapters → application services. Le déplacement des DTOs Pydantic est un sous-sweep dédié (changement de package + adaptation des Pg*Queries et routers).
 - **Retrait progressif des modules** correspondants de l'override de désactivation `disallow_any_explicit = false` dans `pyproject.toml`. Suppression d'une bonne partie de l'override « `interfaces.api.models` + records DB » au passage.
 
+## Résiduel JSONB (à tout hasard)
+
+Le typage des colonnes JSONB côté Python est **déjà largement fait** dans `infrastructure/jsonb_models/` (cf. `PublicationMeta`, `PublicationTopics`, `PublicationBiblio`, `ExternalIds`, `StructureApiIds`). Restent **2 colonnes non modélisées** sur `source_authorships`, à intégrer opportunément quand un sweep touche le code qui les manipule (normalizers + `create_persons_from_source_authorships`) :
+
+- **`source_authorships.person_identifiers`** : dict avec clés normalisées (`orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id` selon la source). Un modèle Pydantic réutiliserait les VOs `ORCID`, `IdHAL`, `IdRef` existants pour normaliser à l'écriture — cohérent avec `ExternalIds`.
+- **`source_authorships.source_data`** : fourre-tout par source (payload résiduel hétérogène). Modèle plausible mais retour sur investissement faible — cette colonne est consommée brut, sans logique métier dessus. À laisser tel quel à moins d'un cas d'usage concret.
+
+Le volet "introspection BI" du reproche initial (un outil Metabase/Superset ne sait pas explorer un JSONB libre) n'est pas couvert par les Pydantic models — il demanderait de promouvoir des clés en colonnes natives ou créer des vues SQL. À attendre un signal réel de la DSI sur un outil BI à brancher avant d'instruire.
+
 ## Bénéfices attendus
 
 - Typage fort de bout en bout (query service → router → réponse HTTP) sans `dict[str, Any]` intermédiaire.
