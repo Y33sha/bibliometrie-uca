@@ -303,6 +303,13 @@ identifier_status_enum = PgEnum(
     create_type=False,
 )
 
+identifier_origin_enum = PgEnum(
+    "manual",
+    "auto",
+    name="identifier_origin",
+    create_type=False,
+)
+
 source_type_enum = PgEnum(
     "hal",
     "openalex",
@@ -482,7 +489,7 @@ source_authorships = Table(
     "source_authorships",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("source", Text, nullable=False),
+    Column("source", source_type_enum, nullable=False),
     Column("source_publication_id", Integer, nullable=False),
     Column("author_position", SmallInteger),
     Column("in_perimeter", Boolean, server_default="false"),
@@ -517,7 +524,7 @@ source_authorships = Table(
         "idx_sa_nonhal_outscope",
         "source_publication_id",
         "author_position",
-        postgresql_where=text("(source <> 'hal'::text) AND (in_perimeter = false)"),
+        postgresql_where=text("source <> 'hal' AND in_perimeter = false"),
     ),
     Index("idx_sa_person", "person_id", postgresql_where=text("person_id IS NOT NULL")),
 )
@@ -583,7 +590,7 @@ person_identifiers = Table(
     Column("person_id", Integer, nullable=False),
     Column("id_type", Text, nullable=False),
     Column("id_value", Text, nullable=False),
-    Column("source", Text),
+    Column("source", identifier_origin_enum, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("status", identifier_status_enum, nullable=False, server_default="pending"),
     UniqueConstraint("id_type", "id_value", name="person_identifiers_id_type_id_value_key"),
@@ -675,7 +682,7 @@ source_publications = Table(
     "source_publications",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("source", Text, nullable=False),
+    Column("source", source_type_enum, nullable=False),
     Column("source_id", Text, nullable=False),
     Column("doi", Text),
     Column("title", Text, nullable=False),
@@ -836,7 +843,7 @@ staging = Table(
     "staging",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("source", Text, nullable=False),
+    Column("source", source_type_enum, nullable=False),
     Column("source_id", Text, nullable=False),
     Column("doi", Text),
     Column("raw_data", JSONB, nullable=False),

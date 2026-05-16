@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict JM7y3DII1NeteqdIlNrm4ySvBBtRrAhCjy9qz9WvkdggtVdTLmQpmxAyafSaCk8
+\restrict kNd9GXp6IE4ak2pRleOXSnxWGvHYENnG61ZaYoX0ikLF2EiVxfLVhciGibMzbQW
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -76,6 +76,16 @@ CREATE TYPE public.doc_type AS ENUM (
     'book_review',
     'data_paper',
     'proceedings'
+);
+
+
+--
+-- Name: identifier_origin; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.identifier_origin AS ENUM (
+    'manual',
+    'auto'
 );
 
 
@@ -650,7 +660,7 @@ CREATE TABLE public.person_identifiers (
     person_id integer NOT NULL,
     id_type text NOT NULL,
     id_value text NOT NULL,
-    source text,
+    source public.identifier_origin NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     status public.identifier_status DEFAULT 'pending'::public.identifier_status NOT NULL
 );
@@ -964,7 +974,7 @@ ALTER SEQUENCE public.source_authorship_addresses_id_seq OWNED BY public.source_
 
 CREATE TABLE public.source_authorships (
     id integer NOT NULL,
-    source text NOT NULL,
+    source public.source_type NOT NULL,
     source_publication_id integer NOT NULL,
     author_position smallint,
     in_perimeter boolean DEFAULT false,
@@ -1009,7 +1019,7 @@ ALTER SEQUENCE public.source_authorships_id_seq OWNED BY public.source_authorshi
 
 CREATE TABLE public.source_publications (
     id integer NOT NULL,
-    source text NOT NULL,
+    source public.source_type NOT NULL,
     source_id text NOT NULL,
     doi text,
     title text NOT NULL,
@@ -1063,7 +1073,7 @@ ALTER SEQUENCE public.source_publications_id_seq OWNED BY public.source_publicat
 
 CREATE TABLE public.staging (
     id integer NOT NULL,
-    source text NOT NULL,
+    source public.source_type NOT NULL,
     source_id text NOT NULL,
     doi text,
     raw_data jsonb NOT NULL,
@@ -2225,7 +2235,7 @@ CREATE INDEX idx_sa_excluded ON public.source_authorships USING btree (excluded)
 -- Name: idx_sa_nonhal_outscope; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_nonhal_outscope ON public.source_authorships USING btree (source_publication_id, author_position) WHERE ((source <> 'hal'::text) AND (in_perimeter = false));
+CREATE INDEX idx_sa_nonhal_outscope ON public.source_authorships USING btree (source_publication_id, author_position) WHERE ((source <> 'hal'::public.source_type) AND (in_perimeter = false));
 
 
 --
@@ -2689,4 +2699,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict JM7y3DII1NeteqdIlNrm4ySvBBtRrAhCjy9qz9WvkdggtVdTLmQpmxAyafSaCk8
+\unrestrict kNd9GXp6IE4ak2pRleOXSnxWGvHYENnG61ZaYoX0ikLF2EiVxfLVhciGibMzbQW
