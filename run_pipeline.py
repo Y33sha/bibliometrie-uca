@@ -201,7 +201,16 @@ def phase_normalize(**kw: Any) -> Any:
 
 
 def _vacuum_staging(full: bool = False) -> Any:
-    """VACUUM sur staging. FULL en mode full/monthly, simple sinon."""
+    """VACUUM sur staging. FULL en mode full/monthly, simple sinon.
+
+    `staging.raw_data` est un JSONB potentiellement gros (payload brut
+    HAL/OpenAlex/WoS) vidé après normalisation : `VACUUM` simple marque
+    l'espace réutilisable mais ne le rend pas à l'OS — la table TOAST
+    reste gonflée. `VACUUM FULL` réécrit la table et libère l'espace.
+    Lock exclusif sur staging pendant la durée — sans conséquence dans
+    le créneau d'exécution du mode `full` (mensuel nocturne, aucun
+    autre accès concurrent au staging).
+    """
     from sqlalchemy import text
 
     from infrastructure.db.engine import get_sync_engine
