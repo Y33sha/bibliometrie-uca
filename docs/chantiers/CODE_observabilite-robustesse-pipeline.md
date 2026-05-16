@@ -31,6 +31,22 @@ fait, tout dashboard construit ici reposera sur du parsing de logs
 fragile. **Ne pas démarrer le volet dashboard avant que A' soit
 tranché et appliqué.**
 
+**Sous-chantier inclus dans A' : sweep `subprocess → import direct`.**
+Aujourd'hui `run_pipeline.py` invoque 10 scripts via `subprocess.run(...)`
+(les 5 extracteurs + `refetch_truncated`, `fetch_missing_hal_id`, le
+dispatcher `fetch_missing_doi`, `detect_address_countries`,
+`suggest_address_countries`). Ces invocations ne peuvent pas retourner
+de métriques typées — la seule récupération possible est du parsing de
+stdout/stderr, fragile. Pour que l'option A' fonctionne proprement,
+chaque script doit exposer sa logique de `main()` en fonction
+réutilisable (`extract_hal(...) -> ExtractStats`, etc.) que
+l'orchestrateur appelle en import direct, reçoit la struct typée, et
+sérialise en JSON métrique. Coût estimé : ~3-5 h pour le sweep
+complet (extraction de `main()` en fonction + thin wrapper CLI +
+adaptation `run_pipeline.py`). Pas de perte d'isolation processus en
+pratique : le `try/except` actuel dans la boucle de phases capture
+déjà les exceptions au niveau orchestrateur.
+
 Le volet « checks post-pipeline » est indépendant : il consomme l'état
 final de la base, pas les métriques de phases.
 
@@ -96,7 +112,7 @@ final de la base, pas les métriques de phases.
   ou colonne sur `audit_log` ? Trancher avant d'implémenter.
 - **Seuils d'alerte** : on les hardcode ou on les rend
   configurables ? Probablement hardcodés au début, configurables
-  plus tard si Laura en a besoin.
+  plus tard si besoin.
 - **Volet B vs Grafana DSI** : si la DSI met en place sa propre
   observabilité (logs centralisés, Grafana…) une fois la
   transmission faite, le volet B peut devenir inutile. À
