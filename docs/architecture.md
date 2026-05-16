@@ -171,10 +171,6 @@ d'import :
 - **`application/ports/<nom>.py`** (racine) — autres ports
   applicatifs sans famille (ex. `config.py`).
 
-Si un même port pourrait raisonnablement aller dans deux
-emplacements, choisir au feeling : c'est cosmétique, on peut le
-déplacer plus tard sans casse.
-
 **Exception assumée pour les repositories** :
 - `address_repository` expose des méthodes de propagation
   cross-aggregate (ex. `refresh_publications_countries_for_addresses`)
@@ -225,7 +221,6 @@ Contenu :
   - `engine.py` — Engine SQLAlchemy synchrone (driver
     `postgresql+psycopg`). Source unique pour l'API FastAPI (via le
     threadpool Starlette) et le pipeline.
-  - `connection.py` — constantes communes (`SANDBOX_DB_NAME`).
 - **`queries/`** — query services SQL : projections plates pour
   lectures (listings, facets, détails, stats). Implémentent les ports
   `application/ports/api/*` et `application/ports/pipeline/*`. Un
@@ -260,7 +255,7 @@ abstraction SQL ?** C'est un compromis CQRS-light :
   règles métier, garantit la cohérence à l'écriture. Signatures en
   termes métier (`find_by_doi`, `merge_into`, `save`).
 - `queries/` est orienté **lecture pour l'UI** : projections plates,
-  joinures, agrégations, filtres dynamiques (facets). Retourne des
+  jointures, agrégations, filtres dynamiques (facets). Retourne des
   records (`dict[str, object]` ou `Row[Any]`) directement
   consommables par les routers et leur Pydantic ; pas d'hydratation
   d'agrégat.

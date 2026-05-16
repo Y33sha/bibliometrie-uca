@@ -39,7 +39,6 @@ Phases (dans l'ordre d'execution):
 import argparse
 import atexit
 import datetime
-import os
 import signal
 import subprocess
 import sys
@@ -821,14 +820,7 @@ def main() -> None:
     parser.add_argument(
         "--year", type=int, help="Surcharger l'année d'extraction (une seule année)"
     )
-    parser.add_argument(
-        "--sandbox", action="store_true", help="Utiliser la base bibliometrie_sandbox"
-    )
     args = parser.parse_args()
-
-    if args.sandbox:
-        os.environ["BIBLIOMETRIE_SANDBOX"] = "1"
-        log.info("MODE SANDBOX — base bibliometrie_sandbox")
 
     if args.list:
         print("Phases disponibles :")

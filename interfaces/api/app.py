@@ -243,7 +243,6 @@ def health() -> JSONResponse | dict[str, JsonValue]:
     """Vérifie que l'API est opérationnelle, la DB accessible, et la fraîcheur
     des données (date de la dernière extraction par source).
     """
-    sandbox = os.environ.get("BIBLIOMETRIE_SANDBOX") == "1"
     try:
         engine = get_sync_engine()
         with engine.connect() as conn:
@@ -276,7 +275,6 @@ def health() -> JSONResponse | dict[str, JsonValue]:
     return {
         "status": "ok",
         "db": "ok",
-        "sandbox": sandbox,
         "pipeline_running": _PIPELINE_STATUS_FILE.exists(),
         "last_extraction": last_extraction,
         "stale_sources": stale,

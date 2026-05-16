@@ -6,18 +6,13 @@ permettre `alembic revision --autogenerate`.
 L'URL de connexion est construite depuis `infrastructure.settings`,
 avec driver `postgresql+psycopg` (psycopg3) aligné sur
 `infrastructure/db/engine.py`.
-
-Si `BIBLIOMETRIE_SANDBOX=1` est défini, bascule sur la base sandbox
-(`SANDBOX_DB_NAME` depuis `infrastructure/db/connection.py`).
 """
 
-import os
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from infrastructure.db.connection import SANDBOX_DB_NAME
 from infrastructure.db.tables import metadata
 from infrastructure.settings import settings
 
@@ -52,10 +47,9 @@ def _build_url() -> str:
     configured = config.get_main_option("sqlalchemy.url")
     if configured:
         return configured
-    db_name = SANDBOX_DB_NAME if os.environ.get("BIBLIOMETRIE_SANDBOX") == "1" else settings.db_name
     return (
         f"postgresql+psycopg://{settings.db_user}:{settings.db_password}"
-        f"@{settings.db_host}:{settings.db_port}/{db_name}"
+        f"@{settings.db_host}:{settings.db_port}/{settings.db_name}"
     )
 
 
