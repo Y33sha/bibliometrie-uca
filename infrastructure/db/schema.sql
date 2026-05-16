@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict kNd9GXp6IE4ak2pRleOXSnxWGvHYENnG61ZaYoX0ikLF2EiVxfLVhciGibMzbQW
+\restrict FAPxUJRfZFLinm50qZIkYFF2JObXuT5X47CVkdtlDv2JhJLSvrYrjfQXV1aenue
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -1083,7 +1083,8 @@ CREATE TABLE public.staging (
     last_seen_at timestamp with time zone DEFAULT now(),
     meta_hash text,
     not_found boolean DEFAULT false,
-    hal_collections text[]
+    hal_collections text[],
+    CONSTRAINT staging_not_found_implies_processed CHECK (((NOT not_found) OR processed))
 );
 
 
@@ -2699,4 +2700,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kNd9GXp6IE4ak2pRleOXSnxWGvHYENnG61ZaYoX0ikLF2EiVxfLVhciGibMzbQW
+\unrestrict FAPxUJRfZFLinm50qZIkYFF2JObXuT5X47CVkdtlDv2JhJLSvrYrjfQXV1aenue

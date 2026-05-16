@@ -222,9 +222,34 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 - `audit_log` — journal des opérations admin destructives.
 - `distinct_persons` — paires de personnes marquées comme distinctes
   (symétrique de `distinct_publications`).
-- `staging` — table d'ingestion par source ; cycle de vie particulier
-  (`raw_data` JSONB vidé après normalisation, conserve `processed`,
-  `last_seen_at`, `not_found`).
+- `staging` — table d'ingestion par source. Cycle de vie en 3 états explicites :
+
+  | État | `processed` | `not_found` | `raw_data` | Inséré par |
+  |---|---|---|---|---|
+  | **À traiter** | FALSE | FALSE | plein (payload source) | extracteurs sources |
+  | **Normalisée** | TRUE | FALSE | `{}` (vidé) | normalizers après traitement |
+  | **Non trouvée** | TRUE | TRUE | `{}` (jamais peuplé) | `fetch_missing_hal_id` (hal-id 404), `crossref/fetch_missing_doi` (DOI 404 sur source native) |
+
+  Transitions valides :
+  - `[INSERT extracteur]` → **À traiter** → (`normalize`) → **Normalisée**
+  - `[INSERT fetch_missing_*]` → **Non trouvée** (état terminal direct, pas re-tenté)
+
+  `raw_data` vidé après normalisation pour libérer l'espace TOAST
+  (le payload brut sera ré-introduit hors DB par le chantier
+  [`DATA_raw-data-store.md`](chantiers/DATA_raw-data-store.md)).
+  `last_seen_at` est mis à jour à chaque ré-extraction d'un même doc.
+
+  CHECK SQL `staging_not_found_implies_processed` (migration 0015) :
+  `NOT not_found OR processed`. Verrouille la transition impossible
+  "non trouvée à re-traiter". Les autres invariants (corrélation
+  `processed` ↔ `raw_data` vidé) ne sont pas verrouillés en SQL —
+  laissés en discipline pour ne pas bloquer les évolutions futures.
+
+  Évolutions prévues dans
+  [`DATA_cycle-vie-staging.md`](chantiers/DATA_cycle-vie-staging.md) :
+  backoff `not_found_at` / `next_retry` (4e nuance "non trouvée
+  temporaire" pour les cross-imports DOI sur sources non natives),
+  détection des publications disparues, re-fetch périodique.
 - `subjects`, `publication_subjects`, `subject_cooccurrences` —
   référentiel des sujets/mots-clés et leurs co-occurrences (alimenté
   par les phases `subjects` et `cooccurrences` du pipeline).
