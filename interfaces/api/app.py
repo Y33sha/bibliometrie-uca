@@ -16,7 +16,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -287,7 +287,7 @@ def health() -> JSONResponse | dict[str, JsonValue]:
 
 
 @app.get("/api/metrics")
-def metrics() -> dict[str, JsonValue]:
+def metrics() -> dict[str, Any]:
     """Métriques internes : état du pool de connexions SQLAlchemy.
 
     Le timing des requêtes est émis via le middleware `timing_middleware`
