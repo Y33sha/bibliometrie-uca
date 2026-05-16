@@ -90,7 +90,16 @@ def delete_structure(
     repo: StructureRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Supprime une structure. Lève NotFoundError si elle n'existe pas."""
+    """Supprime une structure. Lève NotFoundError si elle n'existe pas.
+
+    Cascade applicative avant le DELETE : purge l'id de tous les
+    `structure_ids[]` qui le référencent (`authorships`,
+    `source_authorships`, `perimeters`). Postgres ne supporte pas de FK
+    sur élément d'array — sans ce purge, les arrays garderaient des ids
+    morts. Cf. `DATA_jointures-many-to-many.md` pour le plan de migration
+    qui rendrait ce purge obsolète (tables de jointure + FK natives).
+    """
+    repo.purge_structure_id_from_arrays(structure_id)
     row = repo.delete_structure(structure_id)
     if not row:
         raise NotFoundError(f"Structure {structure_id} introuvable")
