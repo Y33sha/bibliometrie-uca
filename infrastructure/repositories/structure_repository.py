@@ -1,9 +1,9 @@
 """Adapter PostgreSQL sync pour les 3 tables du concept Structure."""
 
-from typing import Any
+from typing import Any, NamedTuple
 
 from pydantic import ValidationError as PydanticValidationError
-from sqlalchemy import Connection, Row, Text, bindparam, cast, delete, select, text, update
+from sqlalchemy import Connection, Text, bindparam, cast, delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.structure_repository import (
@@ -22,7 +22,29 @@ from infrastructure.db.tables import (
 from infrastructure.jsonb_models.structure import StructureApiIds
 
 
-def _structure_name_form_from_row(row: Row[Any]) -> StructureNameForm:
+class _StructureNameFormRow(NamedTuple):
+    """Projection SQL sur `structure_name_forms` (find_by_id de l'aggregate Structure)."""
+
+    form_text: str
+    is_word_boundary: bool
+    is_excluding: bool
+    requires_context_of: list[int] | None
+
+
+class _StructureRow(NamedTuple):
+    """Projection SQL `find_by_id` sur `structures` (sans `rnsr_id`, non utilisé par l'hydratation aggregate)."""
+
+    id: int
+    code: str
+    name: str
+    acronym: str | None
+    structure_type: str
+    ror_id: str | None
+    hal_collection: str | None
+    api_ids: dict[str, Any] | None
+
+
+def _structure_name_form_from_row(row: _StructureNameFormRow) -> StructureNameForm:
     """Mapping d'une row `structure_name_forms` SQL vers le VO."""
     return StructureNameForm(
         form_text=row.form_text,
@@ -32,7 +54,7 @@ def _structure_name_form_from_row(row: Row[Any]) -> StructureNameForm:
     )
 
 
-def _structure_from_row(row: Row[Any], name_forms: tuple[StructureNameForm, ...]) -> Structure:
+def _structure_from_row(row: _StructureRow, name_forms: tuple[StructureNameForm, ...]) -> Structure:
     """Mapping d'une row `structures` SQL vers l'aggregate `Structure`.
 
     Reçoit en paramètre la liste hydratée des `name_forms` (chargée à
@@ -122,8 +144,10 @@ class PgStructureRepository:
                 structure_name_forms.c.requires_context_of,
             ).where(structure_name_forms.c.structure_id == structure_id)
         )
-        name_forms = tuple(_structure_name_form_from_row(r) for r in nf_result)
-        return _structure_from_row(row, name_forms)
+        name_forms = tuple(
+            _structure_name_form_from_row(_StructureNameFormRow(*r)) for r in nf_result
+        )
+        return _structure_from_row(_StructureRow(*row), name_forms)
 
     # ── structures ─────────────────────────────────────────────────
 
