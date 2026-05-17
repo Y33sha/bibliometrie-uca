@@ -57,7 +57,6 @@ from interfaces.api.routers import (  # noqa: E402
     publications,
     publishers,
     stats,
-    structures,
     subjects,
 )
 from interfaces.api.routers.admin import addresses as admin_addresses  # noqa: E402
@@ -77,6 +76,9 @@ from interfaces.api.routers.admin import (  # noqa: E402
 )
 from interfaces.api.routers.admin import (  # noqa: E402
     publication_duplicates as admin_publication_duplicates,
+)
+from interfaces.api.routers.admin import (  # noqa: E402
+    structures as admin_structures,
 )
 
 logger = logging.getLogger(__name__)
@@ -336,7 +338,7 @@ app.include_router(admin_publication_duplicates.router)
 app.include_router(admin_addresses.router)
 app.include_router(admin_feedback.router)
 app.include_router(laboratories.router)
-app.include_router(structures.router)
+app.include_router(admin_structures.router)
 app.include_router(persons.router)
 app.include_router(admin_persons.router)
 app.include_router(admin_person_duplicates.router)
