@@ -13,6 +13,7 @@ from application.ports.api.persons_queries import (
     ListFilters,
     PersonsQueries,
 )
+from application.ports.api.subjects_queries import SubjectFrequency
 from interfaces.api.deps import persons_queries_sync
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
@@ -27,7 +28,6 @@ from interfaces.api.models import (
     PersonsStatsResponse,
     PersonThesesResponse,
     RoleCount,
-    SubjectFrequency,
 )
 
 router = APIRouter()

@@ -12,9 +12,12 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.ports.api.subjects_queries import SubjectsAdminQueries
+from application.ports.api.subjects_queries import (
+    SubjectListItem,
+    SubjectNeighborOut,
+    SubjectsAdminQueries,
+)
 from application.ports.pipeline.subjects import SubjectsQueries
-from application.subjects.dtos import SubjectListItem, SubjectNeighborOut
 from domain.subjects.subject import normalize_label
 
 # Le ON CONFLICT fusionne par ontologie : pour chaque clé présente dans l'un

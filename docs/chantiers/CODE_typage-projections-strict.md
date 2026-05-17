@@ -22,7 +22,13 @@ Le chantier `CODE_rich-domain-model` Phase 8 hydrate les **aggregates roots** (f
      - **TypedDict** quand le dict existe déjà (`RealDictCursor` psycopg, JSON parsé) — zero-cost. Aussi pour les champs optionnels avec `total=False`.
      - **NamedTuple** quand on crée la structure à partir d'un tuple-like SA (`row.col` accès nommé + destructuration possible).
      - **dataclass(frozen=True)** quand on veut des methods / properties calculées / defaults complexes.
-3. **DTOs API — déplacement structurel** : les Pydantic `BaseModel` actuels dans `interfaces/api/models/` sortent vers `application/<feature>/dtos.py` (**colocation par feature** plutôt que `application/dtos/` global — cohérent avec le découpage `application/` actuel, et compatible avec un sweep progressif feature par feature). Les Protocols `application/ports/api/*` retournent ces DTOs au lieu de `dict[str, Any]`. Les adapters `infrastructure/queries/Pg*Queries` instancient les DTOs côté infra. Les routers ne font plus de `model_validate` — ils propagent directement le DTO renvoyé par le query service.
+3. **DTOs API — co-localisés avec le port qui les retourne**. Les Pydantic `BaseModel` qui sont les **types de retour d'un query service** sont définis dans `application/ports/api/<feature>_queries.py`, à côté du `Protocol` et des dataclasses de filtres déjà présentes (`DirectoryFilters`, `ListFilters`). Aucun dossier `application/<feature>/dtos.py` séparé — la zone neutre `application.ports.**` est leur place naturelle (les adapters `infrastructure.queries.*` peuvent les instancier sans casser le contrat DDD layered).
+
+   Restent dans `interfaces/api/models/` les schémas Pydantic qui ne sont **pas** retournés par un query service : bodies de requête HTTP (POST/PUT/PATCH validés par FastAPI à l'entrée), réponses construites directement par le router (`OkResponse`, `MergeResponse`, etc.), enrichissements router-only.
+
+   Test mental : « Est-ce qu'un adapter `Pg*Queries` instancie ce model ? » Oui → port. Non → `interfaces/api/models/`.
+
+   Les routers ne font plus de `model_validate` sur les retours port — ils propagent directement le DTO renvoyé.
 4. **Partial updates** : `TypedDict(total=False)` par port (`JournalUpdateFields`, `PerimeterUpdateFields`, `PublisherUpdateFields`, `StructureUpdateFields`, `StructureNameFormUpdateFields`). Absorbé depuis `rich-domain-model` Phase 8.
 5. **Batchs SQL hétérogènes** (`normalize_wos` notamment) : décomposer par batch (`WosAddressBatch`, `WosAuthorshipBatch`, …) avec un dataclass ou TypedDict par contrat.
 6. **`Row[Any]` SQLAlchemy** : remplacer par **NamedTuple par requête** (pas par `Row[tuple[...]]` paramétré, plus fragile au reorder de colonnes du SELECT). Critère de seuil : on type dès qu'on accède à `row.col_x` ou qu'on propage la row hors de la fonction. Les `.scalar_one()` mono-colonne restent intactes.
@@ -71,8 +77,8 @@ Un NamedTuple par `_*_from_row`, **local au repo** (préfixe `_`, pure projectio
 
 Un sweep par feature, dans cet ordre (du plus petit au plus gros pour roder le pattern) :
 
-- [x] **subjects** (7 BaseModel) — pilote, le plus petit. DTOs déplacés vers `application/subjects/dtos.py` ; port retourne `list[SubjectListItem]` / `SubjectListItem | None` / `list[SubjectNeighborOut]` ; PgSubjectsAdminQueries instancie les DTOs ; router propage sans `model_validate`. `interfaces/api/models/subjects.py` réduit à un re-export pour rétrocompat (utilisé par `routers/persons.py`, `routers/laboratories.py`, `models/publications.py`).
-- [x] **auth** (2). DTOs déplacés vers `application/auth/dtos.py`. Pas de port query associé (l'auth lit un cookie HMAC en mémoire, pas la DB) ; le router instancie déjà directement.
+- [x] **subjects** (7 BaseModel). DTOs (`SubjectOntologyEntry`, `SubjectOut`, `SubjectListItem`, `SubjectListResponse`, `SubjectNeighborOut`, `SubjectDetailResponse`, `SubjectFrequency`) co-localisés dans `application/ports/api/subjects_queries.py` avec le `Protocol`. PgSubjectsAdminQueries instancie les DTOs ; router propage sans `model_validate`. `interfaces/api/models/subjects.py` supprimé (les 3 importeurs cross-feature — `models/publications.py`, `routers/persons.py`, `routers/laboratories.py` — pointent directement vers le port).
+- [x] **auth** (2). Pas de port query (auth lit un cookie HMAC, pas la DB). `LoginRequest` est un body HTTP (entrée FastAPI), `AuthCheckResponse` est construit par le router — les deux restent dans `interfaces/api/models/auth.py` (cf. Décision 3 : seuls les retours de query service migrent au port).
 - [ ] **journals** (3)
 - [ ] **publishers** (4)
 - [ ] **perimeters** (5 admin)
@@ -90,17 +96,19 @@ Un sweep par feature, dans cet ordre (du plus petit au plus gros pour roder le p
 
 Pour chaque feature, étapes type :
 
-1. Créer `application/<feature>/dtos.py` (ou `application/<feature>/admin/dtos.py` pour les routes admin).
-2. Déplacer les Pydantic models depuis `interfaces/api/models/<feature>.py`.
-3. Adapter le port `application/ports/api/<feature>_queries.py` pour retourner les DTOs au lieu de `dict[str, Any]`.
+1. Identifier les BaseModels qui sont des **retours de query service** (le port `application/ports/api/<feature>_queries.py` les retourne) vs les **bodies / réponses router-only** (qui restent dans `interfaces/api/models/`).
+2. Déplacer les premiers vers `application/ports/api/<feature>_queries.py`, à côté du `Protocol` (cf. Décision 3). Les seconds restent en place.
+3. Adapter la signature du port pour retourner les DTOs typés au lieu de `dict[str, Any]`.
 4. Adapter `infrastructure/queries/<feature>` pour instancier les DTOs côté infra.
-5. Simplifier le routeur (plus de `model_validate`).
-6. Réduire `interfaces/api/models/<feature>.py` à un re-export pour rétrocompat des imports `from interfaces.api.models import XxxDTO`.
-7. Tests : la suite d'intégration de la feature doit rester verte.
+5. Simplifier le routeur (plus de `model_validate` sur les retours port).
+6. Supprimer `interfaces/api/models/<feature>.py` si plus aucun BaseModel n'y vit (sinon le réduire à ce qui reste).
+7. Adapter `interfaces/api/models/__init__.py` (retirer les imports/exports déplacés).
+8. Adapter les importeurs cross-feature qui pointaient via `interfaces.api.models` → pointage direct vers le port.
+9. Tests : la suite d'intégration de la feature doit rester verte.
 
-**Override mypy** : `application.*.dtos` est dans l'override `disallow_any_explicit = false` (cf. `pyproject.toml`) au même titre que `interfaces.api.models.*` historiquement. Pydantic 2 propage des `Any` en interne sur les `BaseModel`, le glob déplacé reflète la même contrainte que l'ancien. L'objectif Phase 4 n'est donc pas de sortir les DTOs de l'override, mais d'évacuer les `dict[str, Any]` des ports et adapters.
+**Override mypy** : le glob `interfaces.api.models.*` reste dans l'override `disallow_any_explicit = false` (Pydantic 2 propage des `Any` en interne). Les DTOs déplacés vers `application/ports/api/*` sont couverts par le glob `application.ports.api.*` qui existe déjà dans le même override — pas de nouvelle exception à ajouter. L'objectif Phase 4 n'est pas de sortir les DTOs de l'override, mais d'évacuer les `dict[str, Any]` des ports et adapters.
 
-Note `_common.py` (16 BaseModel partagés transverses) : à traiter à la fin, probablement dans `application/dtos/_common.py` ou colocation feature-by-feature selon les usages.
+Note `_common.py` (16 BaseModel partagés transverses) : à traiter à la fin selon la nature (retours port vs réponses router-only).
 
 ### Phase 5 — Records DB pipeline restants
 
