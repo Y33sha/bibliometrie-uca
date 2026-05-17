@@ -1,18 +1,8 @@
 """Router admin feedback : diagnostics qualité de la détection d'adresses.
 
-Expose les endpoints `/api/admin/feedback/*` qui servent le tableau de
-bord qualité : taux de détection global, liste des faux négatifs
-(adresses confirmées manuellement mais non détectées par le script) et
-faux positifs (adresses détectées mais rejetées manuellement).
+Expose les endpoints `/api/admin/feedback/*` qui servent le tableau de bord qualité : taux de détection global, liste des faux négatifs (adresses confirmées manuellement mais non détectées par le script) et faux positifs (adresses détectées mais rejetées manuellement).
 
-Les endpoints d'assignation manuelle
-(`/api/addresses/{addr_id}/assign-structure` POST/DELETE) sont dans
-`addresses.py` — ils partagent la surface URL `/api/addresses/*`.
-
-L'endpoint `feedback_rerun` reste `async def` : il pilote un
-sous-processus en streaming SSE (asyncio), incompatible avec un
-threadpool sync. FastAPI sait cohabiter `def` et `async def` dans le
-même router.
+L'endpoint `feedback_rerun` reste `async def` : il pilote un sous-processus en streaming SSE (asyncio), incompatible avec un threadpool sync. FastAPI sait cohabiter `def` et `async def` dans le même router.
 """
 
 import logging

@@ -16,10 +16,6 @@ class BatchReviewAction(BaseModel):
     is_confirmed: bool | None
 
 
-class AssignStructureAction(BaseModel):
-    structure_id: int
-
-
 class SetCountry(BaseModel):
     countries: list[str] | None = None
 
@@ -104,16 +100,6 @@ class BatchCountryResponse(BaseModel):
 
     updated: int
     propagated: int
-
-
-class AssignStructureResponse(BaseModel):
-    id: int
-    structure_id: int
-    status: str
-
-
-class UnassignStructureResponse(BaseModel):
-    deleted: bool
 
 
 class CountryOut(BaseModel):

@@ -348,53 +348,6 @@ class TestBatchSetCountry:
         assert r.status_code == 200
 
 
-# ── POST/DELETE /api/addresses/{addr_id}/assign-structure ────────
-
-
-class TestAssignStructure:
-    def test_requires_admin(self, client):
-        r = client.post("/api/addresses/1/assign-structure", json={"structure_id": 1})
-        assert r.status_code == 401
-
-    def test_404_missing_address(self, auth_client):
-        struct = _seed_structure("LAB-ASSIGN-MISS-ADDR")
-        r = auth_client.post(
-            "/api/addresses/999999999/assign-structure", json={"structure_id": struct}
-        )
-        assert r.status_code == 404
-
-    def test_404_missing_structure(self, auth_client):
-        addr = _seed_address("Assign miss struct")
-        r = auth_client.post(
-            f"/api/addresses/{addr}/assign-structure", json={"structure_id": 999999999}
-        )
-        assert r.status_code == 404
-
-    def test_ok(self, auth_client):
-        addr = _seed_address("Assign ok")
-        struct = _seed_structure("LAB-ASSIGN-OK")
-        r = auth_client.post(
-            f"/api/addresses/{addr}/assign-structure", json={"structure_id": struct}
-        )
-        assert r.status_code == 200
-        assert r.json()["status"] == "assigned"
-
-
-class TestUnassignStructure:
-    def test_requires_admin(self, client):
-        r = client.delete("/api/addresses/1/assign-structure", params={"structure_id": 1})
-        assert r.status_code == 401
-
-    def test_returns_ok_even_when_no_link(self, auth_client):
-        addr = _seed_address("Unassign no link")
-        struct = _seed_structure("LAB-UNASSIGN-NOLINK")
-        r = auth_client.delete(
-            f"/api/addresses/{addr}/assign-structure", params={"structure_id": struct}
-        )
-        assert r.status_code == 200
-        assert r.json()["deleted"] is False
-
-
 # ── GET /api/admin/address-stats ─────────────────────────────────
 
 

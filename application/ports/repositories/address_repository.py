@@ -31,12 +31,6 @@ class AddressRepository(Protocol):
         is_confirmed: bool,
     ) -> None: ...
 
-    def delete_manual_structure_link(
-        self,
-        address_id: int,
-        structure_id: int,
-    ) -> bool: ...
-
     def which_contribute_to_perimeter(
         self,
         address_ids: list[int],

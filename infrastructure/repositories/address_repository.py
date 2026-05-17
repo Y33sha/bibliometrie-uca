@@ -92,19 +92,6 @@ class PgAddressRepository:
             ],
         )
 
-    def delete_manual_structure_link(
-        self,
-        address_id: int,
-        structure_id: int,
-    ) -> bool:
-        result = self._conn.execute(
-            delete(address_structures)
-            .where(address_structures.c.address_id == address_id)
-            .where(address_structures.c.structure_id == structure_id)
-            .where(address_structures.c.matched_form_id.is_(None))
-        )
-        return result.rowcount > 0
-
     def which_contribute_to_perimeter(
         self,
         address_ids: list[int],

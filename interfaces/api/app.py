@@ -48,7 +48,6 @@ from interfaces.api.deps import _verify_token
 configure_root_logging()
 
 from interfaces.api.routers import (  # noqa: E402
-    addresses,
     admin_duplicates,
     admin_feedback,
     admin_person_duplicates,
@@ -67,6 +66,7 @@ from interfaces.api.routers import (  # noqa: E402
     structures,
     subjects,
 )
+from interfaces.api.routers.admin import addresses as admin_addresses  # noqa: E402
 from interfaces.api.routers.admin import persons as admin_persons  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -323,7 +323,7 @@ app.include_router(auth.router)
 app.include_router(stats.router)
 app.include_router(publications.router)
 app.include_router(admin_duplicates.router)
-app.include_router(addresses.router)
+app.include_router(admin_addresses.router)
 app.include_router(admin_feedback.router)
 app.include_router(laboratories.router)
 app.include_router(structures.router)

@@ -17,7 +17,6 @@ from application.addresses.countries import (
 from application.addresses.structures import (
     batch_review_structure_link,
     review_structure_link,
-    unassign_manual_structure,
 )
 from infrastructure.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import address_repository, authorship_repository
@@ -300,74 +299,6 @@ class TestBatchReviewStructureLink:
         # Les 2 liens manuels ont été supprimés
         assert _get_link(sa_sync_conn, a1, uca) is None
         assert _get_link(sa_sync_conn, a2, uca) is None
-
-
-# ── unassign_manual_structure ───────────────────────────────────────
-
-
-class TestUnassignManualStructure:
-    def test_deletes_manual_link(self, sa_sync_conn, repo, authorship_repo, perimeter_queries):
-        uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
-        _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)  # manuel
-
-        assert (
-            unassign_manual_structure(
-                sa_sync_conn,
-                addr,
-                uca,
-                repo=repo,
-                authorship_repo=authorship_repo,
-                perimeter_queries=perimeter_queries,
-            )
-            is True
-        )
-        assert _get_link(sa_sync_conn, addr, uca) is None
-
-    def test_preserves_auto_link(self, sa_sync_conn, repo, authorship_repo, perimeter_queries):
-        """Un lien auto-détecté (matched_form_id non NULL) n'est pas supprimé."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
-        form_id = sa_sync_conn.execute(
-            text(
-                "INSERT INTO structure_name_forms (structure_id, form_text) "
-                "VALUES (:sid, 'uca') RETURNING id"
-            ),
-            {"sid": uca},
-        ).scalar_one()
-        _insert_address_structure(
-            sa_sync_conn, addr, uca, is_confirmed=True, matched_form_id=form_id
-        )
-
-        assert (
-            unassign_manual_structure(
-                sa_sync_conn,
-                addr,
-                uca,
-                repo=repo,
-                authorship_repo=authorship_repo,
-                perimeter_queries=perimeter_queries,
-            )
-            is False
-        )  # rien supprimé
-        link = _get_link(sa_sync_conn, addr, uca)
-        assert link is not None  # lien auto préservé
-        assert link["is_confirmed"] is True  # is_confirmed NON touché
-
-    def test_returns_false_if_no_link(self, sa_sync_conn, repo, authorship_repo, perimeter_queries):
-        uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
-        assert (
-            unassign_manual_structure(
-                sa_sync_conn,
-                addr,
-                uca,
-                repo=repo,
-                authorship_repo=authorship_repo,
-                perimeter_queries=perimeter_queries,
-            )
-            is False
-        )
 
 
 # ── set_country ─────────────────────────────────────────────────────
@@ -762,63 +693,3 @@ class TestPropagationSkipsNoOp:
         assert len(spy_propagate) == 1
         # a1 inchangée (déjà contribuait), a2 et a3 nouvellement contribuent
         assert set(spy_propagate[0]) == {a2, a3}
-
-    def test_unassign_nonexistent_skips_propagation(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries, spy_propagate
-    ):
-        """Unassign sur un lien inexistant : rien à faire, skip."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
-
-        deleted = unassign_manual_structure(
-            sa_sync_conn,
-            addr,
-            uca,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
-
-        assert deleted is False
-        assert spy_propagate == []
-
-    def test_unassign_rejected_manual_skips_propagation(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries, spy_propagate
-    ):
-        """Unassign d'un lien manuel FALSE : avant ne contribue pas, après
-        non plus (lien disparu) → skip."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
-        _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=False)
-
-        deleted = unassign_manual_structure(
-            sa_sync_conn,
-            addr,
-            uca,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
-
-        assert deleted is True
-        assert spy_propagate == []
-
-    def test_unassign_confirmed_manual_triggers_propagation(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries, spy_propagate
-    ):
-        """Unassign d'un lien manuel TRUE : contribuait, ne contribue plus → propagation."""
-        uca = _setup_uca_perimeter(sa_sync_conn)
-        addr = _create_address(sa_sync_conn)
-        _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)
-
-        deleted = unassign_manual_structure(
-            sa_sync_conn,
-            addr,
-            uca,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
-
-        assert deleted is True
-        assert spy_propagate == [[addr]]
