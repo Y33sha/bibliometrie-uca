@@ -117,7 +117,7 @@ Mesure détaillée post-Phase 2 (`coverage report --include="application/pipelin
 Tous partiellement couverts par les tests d'idempotence existants ; il reste les branches edge.
 
 - [x] `application/pipeline/normalize/normalize_wos.py` (315 stmts → 97 %)
-- [ ] `application/pipeline/affiliations/resolve_addresses.py` (105, 49 %).
+- [x] `application/pipeline/affiliations/resolve_addresses.py` (105 stmts → 99 %, 1 branche défensive 210→217 inatteignable car `process_addresses` n'est appelé qu'avec rows non-vide).
 - [x] `application/pipeline/publications/merge_pubs_by_hal_id.py` (70 stmts → 100 %)
 - [ ] `application/pipeline/normalize/normalize_theses.py` (107, 52 %).
 - [ ] `application/pipeline/normalize/normalize_openalex.py` (221, 57 %).
