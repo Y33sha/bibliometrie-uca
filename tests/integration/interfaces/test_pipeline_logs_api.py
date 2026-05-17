@@ -27,7 +27,7 @@ def _isolate_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline_logs, "REPORTS_DIR", reports_dir)
     monkeypatch.setattr(pipeline_logs, "CRON_LOG", cron_log)
 
-    import infrastructure.pipeline_status as ps
+    import infrastructure.observability.pipeline_status as ps
 
     monkeypatch.setattr(ps, "STATUS_FILE", status_file)
     return tmp_path
@@ -42,7 +42,7 @@ class TestPipelineStatus:
     def test_returns_status_when_alive(self, client, _isolate_paths, monkeypatch):
         # `read_status` valide le PID — on stub `_is_pid_alive` pour
         # éviter de devoir spawner un vrai process.
-        import infrastructure.pipeline_status as ps
+        import infrastructure.observability.pipeline_status as ps
 
         monkeypatch.setattr(ps, "_is_pid_alive", lambda pid: True)
 

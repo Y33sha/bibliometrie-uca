@@ -50,8 +50,8 @@ from typing import Any
 from domain.pipeline_metrics import PhaseMetrics
 from domain.pipeline_modes import MODE_NAMES, MODES
 from domain.sources import ALL_SOURCES_SET
-from infrastructure.log import setup_logger
-from infrastructure.pipeline_status import clear_status, read_status, write_status
+from infrastructure.observability.log import setup_logger
+from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
 
 BASE = Path(__file__).resolve().parent
 
@@ -90,7 +90,7 @@ def phase_extract(
         # OpenAlex n'a pas d'équivalent (filtre `from_updated_date` payant ;
         # changefiles non filtrables par institution) et est rattrapé par
         # le mode weekly.
-        from infrastructure.pipeline_metrics import get_last_report_date
+        from infrastructure.observability.pipeline_report import get_last_report_date
 
         last = get_last_report_date()
         if last is not None:
@@ -1077,7 +1077,11 @@ def main() -> None:
     log.info("Sources : %s", ", ".join(sorted(sources)))
 
     # Métriques pipeline
-    from infrastructure.pipeline_metrics import capture_log_offsets, generate_report, read_new_logs
+    from infrastructure.observability.pipeline_report import (
+        capture_log_offsets,
+        generate_report,
+        read_new_logs,
+    )
 
     phase_results = []  # [(name, duration, logs)]
     phase_metrics: dict[str, PhaseMetrics] = {}  # collecté pour Volet B (dashboard)

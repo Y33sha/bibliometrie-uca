@@ -40,7 +40,7 @@ from infrastructure.db.engine import (
     get_sync_engine,
     set_sync_engine,
 )
-from infrastructure.log import configure_root_logging
+from infrastructure.observability.log import configure_root_logging
 from interfaces.api.deps import _verify_token
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).

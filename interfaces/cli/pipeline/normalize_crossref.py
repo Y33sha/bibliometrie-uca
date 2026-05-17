@@ -4,7 +4,7 @@ import os
 
 from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.queries.normalize_crossref import PgCrossrefNormalizeQueries
 from infrastructure.queries.staging import PgStagingQueries
 from infrastructure.repositories import (

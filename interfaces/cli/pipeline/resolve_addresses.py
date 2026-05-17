@@ -15,7 +15,7 @@ import os
 
 from application.pipeline.affiliations.resolve_addresses import run_resolution
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.perimeter import get_persons_structure_ids
 from infrastructure.queries.address_resolution import PgAddressResolutionQueries
 

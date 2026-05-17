@@ -9,7 +9,7 @@ import time
 import requests
 
 from domain.sources.zenodo import ZENODO_DOI_RE, ZenodoResolutionError
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.sources.api_limits import ZENODO_DELAY
 
 logger = setup_logger("zenodo", os.path.join(os.path.dirname(__file__), "logs"))

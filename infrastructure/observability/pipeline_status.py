@@ -1,7 +1,7 @@
 """État du pipeline en cours, persisté dans ``logs/status.json``.
 
 Écriture côté orchestrateur (``run_pipeline.py``), lecture côté API
-(``interfaces/api/routers/admin_pipeline.py``). Le PID du writer est
+(``interfaces/api/routers/admin/pipeline_logs.py``). Le PID du writer est
 embarqué dans le fichier : si le process n'existe plus (SIGKILL, crash
 C-level, OOM killer — cas non couverts par atexit/signal), le statut
 est considéré comme orphelin et nettoyé.

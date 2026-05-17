@@ -20,7 +20,7 @@ from sqlalchemy import Connection, text
 
 from application.publications import merge_publications
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import publication_repository
 
 log = setup_logger("merge_publications", os.path.dirname(__file__))

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
-from infrastructure.pipeline_status import read_status
+from infrastructure.observability.pipeline_status import read_status
 from interfaces.api.models import (
     PipelineLogsResponse,
     PipelineReportContent,

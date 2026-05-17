@@ -4,7 +4,7 @@ import os
 
 from application.pipeline.normalize.normalize_wos import WosNormalizer
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.queries.normalize_wos import PgWosNormalizeQueries
 from infrastructure.queries.staging import PgStagingQueries
 from infrastructure.repositories import (

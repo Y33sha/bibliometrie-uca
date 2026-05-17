@@ -5,7 +5,7 @@ import os
 
 from application.pipeline.enrich.enrich_oa_status import run_enrich
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.queries.enrich import PgEnrichQueries
 from infrastructure.repositories import publication_repository
 from infrastructure.sources.api_limits import UNPAYWALL_DELAY
