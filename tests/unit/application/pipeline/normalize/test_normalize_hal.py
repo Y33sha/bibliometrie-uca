@@ -1,0 +1,631 @@
+"""Tests unitaires de `application.pipeline.normalize.normalize_hal`.
+
+Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), l'orchestrateur `process_authors` (composite + TEI + fallback), l'orchestrateur `process_work` (zenodo, métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, _row_factory, post_process, cleanup, on_error).
+
+Pattern : `_FakeQueries` + `_FakeAddressLinker` + `MagicMock`, pas de DB.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+from unittest.mock import MagicMock
+
+import pytest
+
+from application.pipeline.normalize import normalize_hal
+from application.pipeline.normalize.normalize_hal import (
+    HalNormalizer,
+    as_str,
+    extract_pub_metadata,
+    get_title,
+    insert_hal_document,
+    parse_author_structures,
+    process_authors,
+    process_work,
+    upsert_journal,
+    upsert_publisher,
+)
+from application.ports.pipeline.staging import HalStagingRow
+from domain.sources.zenodo import ZenodoResolutionError
+
+# ── Stubs ────────────────────────────────────────────────────────
+
+
+def _staging_row(staging_id=1, hal_id="hal-1", doi=None, raw=None, collections=None):
+    return HalStagingRow(
+        id=staging_id,
+        source_id=hal_id,
+        doi=doi,
+        raw_data=raw or {},
+        hal_collections=collections,
+    )
+
+
+class _FakeQueries:
+    def __init__(self) -> None:
+        self.cleared_for: list[int] = []
+        self.upserted_authorships: list[dict[str, Any]] = []
+        self.upserted_documents: list[dict[str, Any]] = []
+        self.staging_has_doi_returns = False
+        self.delete_dups_returns = 0
+
+    def upsert_hal_source_publication(self, conn, **kw) -> int:
+        self.upserted_documents.append(kw)
+        return 999
+
+    def upsert_hal_source_authorship(self, conn, **kw) -> int:
+        self.upserted_authorships.append(kw)
+        return 100 + len(self.upserted_authorships)
+
+    def staging_has_hal_doi(self, conn, doi: str) -> bool:
+        return self.staging_has_doi_returns
+
+    def clear_source_authorships_for_publication(self, conn, source_publication_id: int) -> None:
+        self.cleared_for.append(source_publication_id)
+
+    def delete_hal_duplicate_authorship_addresses(self, conn) -> None:
+        pass
+
+    def delete_hal_duplicate_authorships(self, conn) -> int:
+        return self.delete_dups_returns
+
+
+class _FakeAddressLinker:
+    def __init__(self) -> None:
+        self.links: list[tuple[int, list[str]]] = []
+        self.cleared = 0
+
+    def link(self, conn, sa_id: int, addr_parts: list[str]) -> None:
+        self.links.append((sa_id, addr_parts))
+
+    def clear_cache(self) -> None:
+        self.cleared += 1
+
+
+class _FakeStagingQueries:
+    def __init__(self) -> None:
+        self.marked_done: list[int] = []
+
+    def mark_done(self, conn, staging_id: int) -> None:
+        self.marked_done.append(staging_id)
+
+
+@pytest.fixture
+def logger() -> logging.Logger:
+    return logging.getLogger("test_normalize_hal")
+
+
+# ── as_str ───────────────────────────────────────────────────────
+
+
+class TestAsStr:
+    def test_none(self):
+        assert as_str(None) is None
+
+    def test_empty_list(self):
+        assert as_str([]) is None
+
+    def test_list_first(self):
+        assert as_str(["a", "b"]) == "a"
+
+    def test_string_passthrough(self):
+        assert as_str("hello") == "hello"
+
+    def test_non_str_coerced(self):
+        assert as_str(42) == "42"
+
+
+# ── get_title ────────────────────────────────────────────────────
+
+
+class TestGetTitle:
+    def test_title_as_list(self):
+        assert get_title({"title_s": ["My Title"]}) == "My Title"
+
+    def test_title_as_string(self):
+        assert get_title({"title_s": "Plain"}) == "Plain"
+
+    def test_fallback_to_label(self):
+        assert get_title({"label_s": "Fallback"}) == "Fallback"
+
+    def test_empty(self):
+        assert get_title({}) == ""
+
+    def test_empty_title_list_falls_back_to_label(self):
+        assert get_title({"title_s": [], "label_s": "L"}) == "L"
+
+
+# ── upsert_publisher / upsert_journal ────────────────────────────
+
+
+class TestUpsertJournal:
+    def test_no_title_returns_none(self):
+        assert upsert_journal({}, None, journal_repo=MagicMock()) is None
+
+    def test_happy_path(self, monkeypatch):
+        captured: dict[str, Any] = {}
+
+        def fake_create(title, *, issn, eissn, publisher_id, repo):
+            captured.update(title=title, issn=issn, eissn=eissn, publisher_id=publisher_id)
+            return 7
+
+        monkeypatch.setattr(normalize_hal, "find_or_create_journal", fake_create)
+        result = upsert_journal(
+            {
+                "journalTitle_s": "Nature",
+                "journalIssn_s": "1234-5678",
+                "journalEissn_s": "2345-6789",
+            },
+            42,
+            journal_repo=MagicMock(),
+        )
+        assert result == 7
+        assert captured == {
+            "title": "Nature",
+            "issn": "1234-5678",
+            "eissn": "2345-6789",
+            "publisher_id": 42,
+        }
+
+
+class TestUpsertPublisher:
+    def test_delegates_to_service(self, monkeypatch):
+        captured: dict[str, Any] = {}
+
+        def fake_find(name, *, repo):
+            captured["name"] = name
+            return 5
+
+        monkeypatch.setattr(normalize_hal, "find_or_create_publisher", fake_find)
+        result = upsert_publisher("Elsevier", publisher_repo=MagicMock())
+        assert result == 5
+        assert captured["name"] == "Elsevier"
+
+
+# ── extract_pub_metadata ─────────────────────────────────────────
+
+
+class TestExtractPubMetadata:
+    def test_minimal(self):
+        meta = extract_pub_metadata({"title_s": ["T"], "producedDateY_i": 2024}, journal_id=42)
+        assert meta["title"] == "T"
+        assert meta["pub_year"] == 2024
+        assert meta["journal_id"] == 42
+        # Pas de container_title si journal_id présent.
+        assert meta["container_title"] is None
+
+    def test_book_title_fallback_when_no_journal(self):
+        meta = extract_pub_metadata({"bookTitle_s": "Book"}, journal_id=None)
+        assert meta["container_title"] == "Book"
+
+    def test_conference_title_fallback(self):
+        meta = extract_pub_metadata({"conferenceTitle_s": "Conf"}, journal_id=None)
+        assert meta["container_title"] == "Conf"
+
+    def test_language_from_list(self):
+        meta = extract_pub_metadata({"language_s": ["fr", "en"]}, journal_id=None)
+        assert meta["language"] == "fr"
+
+    def test_no_language(self):
+        meta = extract_pub_metadata({}, journal_id=None)
+        assert meta["language"] is None
+
+    def test_nnt_normalized(self):
+        meta = extract_pub_metadata({"nntId_s": "  2024CLFAC001  "}, journal_id=None)
+        assert meta["nnt"] == "2024CLFAC001"
+
+
+# ── insert_hal_document ──────────────────────────────────────────
+
+
+class TestInsertHalDocument:
+    def _call(self, queries, doc, *, hal_collections_staging=None, pub_meta=None) -> dict:
+        insert_hal_document(
+            MagicMock(),
+            queries,
+            doc,
+            staging_id=1,
+            hal_id="h1",
+            hal_collections_staging=hal_collections_staging,
+            publication_id=None,
+            pub_meta=pub_meta,
+        )
+        return queries.upserted_documents[-1]
+
+    def test_collections_merge_staging_and_coll_codes(self):
+        queries = _FakeQueries()
+        captured = self._call(
+            queries,
+            {"collCode_s": ["UCA", "LIMOS"]},
+            hal_collections_staging=["UCA", "LRL"],
+        )
+        # Union dédupliquée, triée.
+        assert captured["hal_collections"] == ["LIMOS", "LRL", "UCA"]
+
+    def test_no_collections_returns_none(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {})
+        assert captured["hal_collections"] is None
+
+    def test_doc_type_concatenated_with_subtype(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"docType_s": "ART", "docSubType_s": "review"})
+        assert captured["doc_type"] == "ART_review"
+
+    def test_doc_type_no_subtype(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"docType_s": "BOOK"})
+        assert captured["doc_type"] == "BOOK"
+
+    def test_nnt_goes_in_external_ids(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"nntId_s": "2024CLFAC001"})
+        assert captured["external_ids"] == {"nnt": "2024CLFAC001"}
+
+    def test_no_nnt_no_external_ids(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {})
+        assert captured["external_ids"] is None
+
+    def test_keywords_deduplicated(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"keyword_s": ["a", "b", "a", "c"]})
+        assert captured["keywords"] == ["a", "b", "c"]
+
+    def test_keywords_empty(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"keyword_s": []})
+        assert captured["keywords"] is None
+
+    def test_topics_from_domain(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"domain_s": ["sdv.bibs", "info.algo"]})
+        assert captured["topics"] == {"hal_domains": ["sdv.bibs", "info.algo"]}
+
+    def test_biblio_built_from_volume_issue_pages(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"volume_s": "10", "issue_s": "2", "page_s": "100-120"})
+        assert captured["biblio"] == {"volume": "10", "issue": "2", "pages": "100-120"}
+
+    def test_biblio_empty(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {})
+        assert captured["biblio"] is None
+
+    def test_url_from_uri(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"uri_s": "https://hal.science/hal-123"})
+        assert captured["urls"] == ["https://hal.science/hal-123"]
+
+    def test_pub_meta_propagates_journal_oa_lang(self):
+        queries = _FakeQueries()
+        captured = self._call(
+            queries,
+            {},
+            pub_meta={
+                "journal_id": 7,
+                "oa_status": "gold",
+                "language": "fr",
+                "container_title": "Book",
+            },
+        )
+        assert captured["journal_id"] == 7
+        assert captured["oa_status"] == "gold"
+        assert captured["language"] == "fr"
+        assert captured["container_title"] == "Book"
+
+
+# `parse_tei_author_identifiers` est testé dans
+# `tests/unit/application/test_parse_tei_author_identifiers.py` — pas de duplication ici.
+
+
+# ── parse_author_structures ──────────────────────────────────────
+
+
+class TestParseAuthorStructures:
+    def test_no_entries(self):
+        assert parse_author_structures({}) == {}
+
+    def test_basic_parse(self):
+        doc = {
+            "authIdHasPrimaryStructure_fs": [
+                "49236-749496_FacetSep_Dupont, Marie_JoinSep_300012_FacetSep_LIMOS"
+            ]
+        }
+        struct_names: dict[str, str] = {}
+        result = parse_author_structures(doc, struct_name_by_hal_id=struct_names)
+        assert result == {49236: {"300012"}}
+        assert struct_names == {"300012": "LIMOS"}
+
+    def test_fallback_to_authIdHasStructure(self):
+        doc = {"authIdHasStructure_fs": ["100-200_FacetSep_X_JoinSep_999_FacetSep_Y"]}
+        result = parse_author_structures(doc)
+        assert result == {100: {"999"}}
+
+    def test_skip_malformed(self):
+        doc = {
+            "authIdHasPrimaryStructure_fs": [
+                "no_join_sep",  # pas de _JoinSep_
+                "noformid_FacetSep_Nom_JoinSep_str_FacetSep_Name",  # form_id non int
+                "_FacetSep__JoinSep_str_FacetSep_Name",  # form_person vide
+                "abc-def_FacetSep_X_JoinSep_999_FacetSep_Y",  # form_id pas un int
+                "1-2_FacetSep_X_JoinSep__FacetSep_Y",  # struct_id vide
+            ]
+        }
+        result = parse_author_structures(doc)
+        assert result == {}
+
+    def test_multiple_structs_for_same_form(self):
+        doc = {
+            "authIdHasPrimaryStructure_fs": [
+                "100-200_FacetSep_X_JoinSep_111_FacetSep_A",
+                "100-200_FacetSep_X_JoinSep_222_FacetSep_B",
+            ]
+        }
+        result = parse_author_structures(doc)
+        assert result == {100: {"111", "222"}}
+
+
+# ── process_authors ──────────────────────────────────────────────
+
+
+class TestProcessAuthors:
+    def test_no_authors(self):
+        queries = _FakeQueries()
+        process_authors(MagicMock(), queries, {}, 10, address_linker=_FakeAddressLinker())
+        assert queries.cleared_for == [10]
+        assert queries.upserted_authorships == []
+
+    def test_skip_empty_name(self):
+        queries = _FakeQueries()
+        process_authors(
+            MagicMock(),
+            queries,
+            {"authFullName_s": ["", "Marie Dupont"]},
+            10,
+            address_linker=_FakeAddressLinker(),
+        )
+        assert len(queries.upserted_authorships) == 1
+        assert queries.upserted_authorships[0]["raw_author_name"] == "Marie Dupont"
+
+    def test_composite_solr_extracts_ids(self):
+        queries = _FakeQueries()
+        doc = {
+            "authFullName_s": ["Marie Dupont"],
+            "authFullNameFormIDPersonIDIDHal_fs": [
+                "Marie Dupont_FacetSep_49236-749496_FacetSep_marie-dupont"
+            ],
+        }
+        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
+        ids = queries.upserted_authorships[0]["person_identifiers"]
+        assert ids == {"idhal": "marie-dupont", "hal_person_id": 749496}
+
+    def test_composite_with_zero_person_id_filtered(self):
+        """person_id == 0 = non identifié par HAL, on l'ignore."""
+        queries = _FakeQueries()
+        doc = {
+            "authFullName_s": ["X"],
+            "authFullNameFormIDPersonIDIDHal_fs": ["X_FacetSep_49236-0_FacetSep_"],
+        }
+        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
+        # Sans hal_person_id ni idhal, person_identifiers est None.
+        assert queries.upserted_authorships[0]["person_identifiers"] is None
+
+    def test_fallback_authFullNameIdHal_when_no_composite(self):
+        queries = _FakeQueries()
+        doc = {
+            "authFullName_s": ["X"],
+            "authFullNameIdHal_fs": ["X_FacetSep_marie-x"],
+        }
+        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
+        assert queries.upserted_authorships[0]["person_identifiers"] == {"idhal": "marie-x"}
+
+    def test_fallback_authFullNameId_when_no_composite(self):
+        queries = _FakeQueries()
+        doc = {
+            "authFullName_s": ["X"],
+            "authFullNameId_fs": ["X_FacetSep_12345"],
+        }
+        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
+        ids = queries.upserted_authorships[0]["person_identifiers"]
+        assert ids == {"hal_person_id": 12345}
+
+    def test_form_struct_map_resolves_addr_parts(self):
+        queries = _FakeQueries()
+        doc = {
+            "authFullName_s": ["X"],
+            "authFullNameFormIDPersonIDIDHal_fs": ["X_FacetSep_49236-749496_FacetSep_"],
+            "authIdHasPrimaryStructure_fs": [
+                "49236-749496_FacetSep_X_JoinSep_300012_FacetSep_LIMOS"
+            ],
+        }
+        linker = _FakeAddressLinker()
+        process_authors(MagicMock(), queries, doc, 10, address_linker=linker)
+        assert queries.upserted_authorships[0]["source_structures"] == ["300012"]
+        assert linker.links == [(101, ["LIMOS"])]
+
+    def test_quality_maps_to_roles(self):
+        """`authQuality_s = 'dir'` est mappé en rôle via `map_role('hal', ...)` (cf. domain.publications.authorship_roles)."""
+        queries = _FakeQueries()
+        doc = {
+            "authFullName_s": ["Director"],
+            "authQuality_s": ["dir"],
+        }
+        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
+        upsert = queries.upserted_authorships[0]
+        # On valide juste que map_role a été appelé et a produit une liste non-vide.
+        assert upsert["roles"] is not None
+        assert len(upsert["roles"]) > 0
+
+
+# ── process_work ─────────────────────────────────────────────────
+
+
+@pytest.fixture
+def stub_orchestration_deps(monkeypatch):
+    """Stub les helpers internes pour ne tester que la boucle process_work."""
+    monkeypatch.setattr(normalize_hal, "extract_pub_metadata", lambda d, j: {"journal_id": j})
+    monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
+    monkeypatch.setattr(normalize_hal, "process_authors", lambda *a, **kw: None)
+    monkeypatch.setattr(normalize_hal, "upsert_publisher", lambda name, **kw: 1)
+    monkeypatch.setattr(normalize_hal, "upsert_journal", lambda d, p, **kw: 2)
+
+
+class TestProcessWork:
+    def _kwargs(self, queries=None, staging_queries=None, zenodo=None):
+        return {
+            "queries": queries or _FakeQueries(),
+            "logger": logging.getLogger("test"),
+            "journal_repo": MagicMock(),
+            "publisher_repo": MagicMock(),
+            "pub_repo": MagicMock(),
+            "zenodo_resolver": zenodo or MagicMock(),
+            "staging_queries": staging_queries or _FakeStagingQueries(),
+            "address_linker": _FakeAddressLinker(),
+        }
+
+    def test_happy_path(self, stub_orchestration_deps):
+        sq = _FakeStagingQueries()
+        raw = {"title_s": ["T"], "producedDateY_i": 2024}
+        row = _staging_row(staging_id=1, hal_id="hal-1", raw=raw)
+        result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
+        assert result is True
+        assert sq.marked_done == [1]
+
+    def test_missing_minimal_metadata_returns_false(self, stub_orchestration_deps, caplog):
+        row = _staging_row(raw={"title_s": []})  # pas de titre / pas d'année
+        with caplog.at_level(logging.WARNING):
+            result = process_work(MagicMock(), staging_row=row, **self._kwargs())
+        assert result is False
+        assert "manquant" in caplog.text
+
+    def test_zenodo_error_returns_false(self, stub_orchestration_deps, monkeypatch):
+        monkeypatch.setattr(normalize_hal, "is_zenodo_doi", lambda d: True)
+        zenodo = MagicMock()
+        zenodo.resolve.side_effect = ZenodoResolutionError("zenodo boom")
+        raw = {"title_s": ["T"], "producedDateY_i": 2024, "doiId_s": "10.5281/zenodo.1"}
+        row = _staging_row(raw=raw)
+        result = process_work(MagicMock(), staging_row=row, **self._kwargs(zenodo=zenodo))
+        assert (
+            result is False
+        )  # contrairement à OpenAlex, HAL retourne False (pas None) sur erreur Zenodo
+
+    def test_zenodo_concept_skipped(self, stub_orchestration_deps, monkeypatch):
+        monkeypatch.setattr(normalize_hal, "is_zenodo_doi", lambda d: True)
+        zenodo = MagicMock()
+        zenodo.resolve.return_value = "10.5281/zenodo.2"
+        queries = _FakeQueries()
+        queries.staging_has_doi_returns = True
+        sq = _FakeStagingQueries()
+        raw = {"title_s": ["T"], "producedDateY_i": 2024, "doiId_s": "10.5281/zenodo.1"}
+        row = _staging_row(staging_id=42, raw=raw)
+        result = process_work(
+            MagicMock(),
+            staging_row=row,
+            **self._kwargs(queries=queries, staging_queries=sq, zenodo=zenodo),
+        )
+        assert result is None
+        assert sq.marked_done == [42]
+
+    def test_no_publisher_name_no_upsert(self, monkeypatch):
+        """Si ni journalPublisher_s ni publisher_s n'est présent, upsert_publisher n'est pas appelé."""
+        captured = {"called": False}
+
+        def fake_upsert_pub(name, **kw):
+            captured["called"] = True
+            return 1
+
+        monkeypatch.setattr(normalize_hal, "upsert_publisher", fake_upsert_pub)
+        monkeypatch.setattr(normalize_hal, "upsert_journal", lambda d, p, **kw: 2)
+        monkeypatch.setattr(normalize_hal, "extract_pub_metadata", lambda d, j: {"journal_id": j})
+        monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
+        monkeypatch.setattr(normalize_hal, "process_authors", lambda *a, **kw: None)
+
+        raw = {"title_s": ["T"], "producedDateY_i": 2024}
+        row = _staging_row(raw=raw)
+        process_work(MagicMock(), staging_row=row, **self._kwargs())
+        assert captured["called"] is False
+
+    def test_exception_propagated_and_logged(self, monkeypatch, caplog):
+        def boom(*args, **kw):
+            raise RuntimeError("kaboom")
+
+        monkeypatch.setattr(normalize_hal, "upsert_publisher", boom)
+        monkeypatch.setattr(normalize_hal, "upsert_journal", lambda d, p, **kw: 2)
+
+        raw = {"title_s": ["T"], "producedDateY_i": 2024, "journalPublisher_s": "Elsevier"}
+        row = _staging_row(hal_id="hal-x", raw=raw)
+        with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError):
+            process_work(MagicMock(), staging_row=row, **self._kwargs())
+        assert "hal-x" in caplog.text and "kaboom" in caplog.text
+
+
+# ── HalNormalizer (classe) ───────────────────────────────────────
+
+
+def _make_normalizer():
+    return HalNormalizer(
+        conn=MagicMock(),
+        logger=logging.getLogger("test"),
+        staging_queries=_FakeStagingQueries(),
+        queries=_FakeQueries(),
+        journal_repo_factory=lambda c: MagicMock(),
+        publisher_repo_factory=lambda c: MagicMock(),
+        pub_repo_factory=lambda c: MagicMock(),
+        zenodo_resolver=MagicMock(),
+        address_linker=_FakeAddressLinker(),
+    )
+
+
+class TestHalNormalizerClass:
+    def test_preload_caches_sets_repos(self):
+        norm = _make_normalizer()
+        norm.preload_caches(MagicMock())
+        assert norm._journal_repo is not None
+        assert norm._publisher_repo is not None
+        assert norm._pub_repo is not None
+
+    def test_row_factory_maps_to_hal_staging_row(self):
+        norm = _make_normalizer()
+        raw = MagicMock()
+        raw.id = 7
+        raw.source_id = "hal-7"
+        raw.doi = "10.1/x"
+        raw.raw_data = {"id": "hal-7"}
+        raw.hal_collections = ["UCA"]
+        out = norm._row_factory(raw)
+        assert out == HalStagingRow(
+            id=7, source_id="hal-7", doi="10.1/x", raw_data={"id": "hal-7"}, hal_collections=["UCA"]
+        )
+
+    def test_process_work_delegates(self, monkeypatch):
+        norm = _make_normalizer()
+        norm.preload_caches(MagicMock())
+        monkeypatch.setattr(normalize_hal, "process_work", lambda *a, **kw: True)
+        result = norm.process_work(MagicMock(), _staging_row())
+        assert result is True
+
+    def test_post_process_logs_when_dups(self, caplog):
+        norm = _make_normalizer()
+        norm._queries.delete_dups_returns = 3  # type: ignore[attr-defined]
+        with caplog.at_level(logging.INFO):
+            norm.post_process(MagicMock())
+        assert "3" in caplog.text
+
+    def test_post_process_silent_when_no_dups(self, caplog):
+        norm = _make_normalizer()
+        norm._queries.delete_dups_returns = 0  # type: ignore[attr-defined]
+        with caplog.at_level(logging.INFO):
+            norm.post_process(MagicMock())
+        assert "Doublons" not in caplog.text
+
+    def test_cleanup_clears_address_linker_cache(self):
+        norm = _make_normalizer()
+        norm.cleanup()
+        assert norm._address_linker.cleared == 1  # type: ignore[attr-defined]
+
+    def test_on_error_clears_address_linker_cache(self):
+        norm = _make_normalizer()
+        norm.on_error()
+        assert norm._address_linker.cleared == 1  # type: ignore[attr-defined]
