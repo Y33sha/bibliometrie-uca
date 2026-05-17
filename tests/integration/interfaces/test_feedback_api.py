@@ -318,8 +318,6 @@ class TestFeedbackFalsePositives:
 
 class TestFeedbackRerun:
     def test_script_missing_returns_500(self, client):
-        """Le chemin compilé pointe sur interfaces/api/processing/resolve_addresses.py
-        qui n'existe plus (script déplacé vers interfaces/cli/pipeline/).
-        C'est un bug latent — en attendant, le router renvoie 500."""
+        """Le chemin compilé pointe sur interfaces/api/routers/processing/resolve_addresses.py qui n'existe pas (le vrai script est dans interfaces/cli/pipeline/). C'est un bug latent — en attendant, le router renvoie 500."""
         r = client.get("/api/admin/feedback/rerun")
         assert r.status_code == 500
