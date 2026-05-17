@@ -191,10 +191,10 @@ def person_theses(conn: Connection, person_id: int) -> dict[str, Any]:
                       AND sa2.roles && ARRAY['author']::text[]
                     LIMIT 1
                    ) AS author_person_id,
-                   (SELECT ARRAY_AGG(DISTINCT sid)
-                    FROM authorships a,
-                         UNNEST(a.structure_ids) AS sid
-                    JOIN structures st ON st.id = sid
+                   (SELECT ARRAY_AGG(DISTINCT aus.structure_id)
+                    FROM authorships a
+                    JOIN authorship_structures aus ON aus.authorship_id = a.id
+                    JOIN structures st ON st.id = aus.structure_id
                     WHERE a.publication_id = p.id AND a.in_perimeter
                       AND st.structure_type = 'labo'
                    ) AS structure_ids

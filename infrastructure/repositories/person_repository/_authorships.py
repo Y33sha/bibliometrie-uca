@@ -87,26 +87,48 @@ def create_authorships_from_sources(
 
     Pour chaque `publication_id` distinct du lot, insère une row dans
     `authorships` en prenant les colonnes (author_position, in_perimeter,
-    is_corresponding, structure_ids) depuis la source de plus haute
-    priorité (paramétrée par le use case).
+    is_corresponding) et les structures depuis la source de plus haute
+    priorité (paramétrée par le use case). Les structures sont insérées
+    dans la table de jointure `authorship_structures`.
     """
     if not sa_ids:
         return
     conn.execute(
         text(f"""
-            INSERT INTO authorships (publication_id, person_id,
-                author_position, in_perimeter, is_corresponding, structure_ids)
+            CREATE TEMP TABLE _chosen_sa AS
             SELECT DISTINCT ON (sd.publication_id)
-                sd.publication_id, :pid,
-                sa.author_position, sa.in_perimeter, sa.is_corresponding, sa.structure_ids
+                sd.publication_id, sa.id AS sa_id,
+                sa.author_position, sa.in_perimeter, sa.is_corresponding
             FROM source_authorships sa
             JOIN source_publications sd ON sd.id = sa.source_publication_id
             WHERE sa.id = ANY(:ids) AND sd.publication_id IS NOT NULL
             ORDER BY sd.publication_id, {source_case_sql(source_priority)}
+        """),
+        {"ids": sa_ids},
+    )
+    conn.execute(
+        text("""
+            INSERT INTO authorships (publication_id, person_id,
+                author_position, in_perimeter, is_corresponding)
+            SELECT publication_id, :pid, author_position, in_perimeter, is_corresponding
+            FROM _chosen_sa
             ON CONFLICT (publication_id, person_id) DO NOTHING
         """),
-        {"pid": person_id, "ids": sa_ids},
+        {"pid": person_id},
     )
+    conn.execute(
+        text("""
+            INSERT INTO authorship_structures (authorship_id, structure_id)
+            SELECT DISTINCT a.id, sas.structure_id
+            FROM _chosen_sa cs
+            JOIN authorships a ON a.publication_id = cs.publication_id
+                              AND a.person_id = :pid
+            JOIN source_authorship_structures sas ON sas.source_authorship_id = cs.sa_id
+            ON CONFLICT DO NOTHING
+        """),
+        {"pid": person_id},
+    )
+    conn.execute(text("DROP TABLE _chosen_sa"))
 
 
 def link_source_authorships_to_authorships(
@@ -242,28 +264,46 @@ def recompute_authorship_in_perimeter_and_structures(
     person_id: int,
     sources: tuple[str, ...],
 ) -> None:
-    """Réagrège `authorships.in_perimeter` (OR-bool des sources) et
-    `structure_ids` (union des arrays sources) pour la paire."""
+    """Réagrège `authorships.in_perimeter` (OR-bool des sources) et resync
+    `authorship_structures` (union des structures cross-source) pour la paire."""
     sources_sql = "(" + ", ".join(f"'{s}'" for s in sources) + ")"
     conn.execute(
         text(f"""
-            WITH src AS (
-                SELECT sa.in_perimeter AS uca, sa.structure_ids AS sids
-                FROM source_authorships sa
-                JOIN source_publications sd ON sd.id = sa.source_publication_id
-                WHERE sa.source IN {sources_sql}
-                  AND sd.publication_id = :pub AND sa.person_id = :pid AND NOT sa.excluded
-            ),
-            agg AS (
-                SELECT bool_or(uca) AS in_perimeter,
-                       array_agg(DISTINCT sid) FILTER (WHERE sid IS NOT NULL) AS all_sids
-                FROM src, LATERAL unnest(COALESCE(sids, '{{}}'::int[])) AS sid
-            )
             UPDATE authorships a
-            SET in_perimeter = COALESCE(agg.in_perimeter, FALSE),
-                structure_ids = NULLIF(agg.all_sids, ARRAY[]::int[]),
+            SET in_perimeter = COALESCE((
+                    SELECT bool_or(sa.in_perimeter)
+                    FROM source_authorships sa
+                    JOIN source_publications sd ON sd.id = sa.source_publication_id
+                    WHERE sa.source IN {sources_sql}
+                      AND sd.publication_id = :pub
+                      AND sa.person_id = :pid
+                      AND NOT sa.excluded
+                ), FALSE),
                 updated_at = now()
-            FROM agg
+            WHERE a.publication_id = :pub AND a.person_id = :pid
+        """),
+        {"pub": publication_id, "pid": person_id},
+    )
+    conn.execute(
+        text("""
+            DELETE FROM authorship_structures aus
+            USING authorships a
+            WHERE aus.authorship_id = a.id
+              AND a.publication_id = :pub AND a.person_id = :pid
+        """),
+        {"pub": publication_id, "pid": person_id},
+    )
+    conn.execute(
+        text(f"""
+            INSERT INTO authorship_structures (authorship_id, structure_id)
+            SELECT DISTINCT a.id, sas.structure_id
+            FROM authorships a
+            JOIN source_publications sd ON sd.publication_id = a.publication_id
+            JOIN source_authorships sa ON sa.source_publication_id = sd.id
+                                       AND sa.person_id = a.person_id
+                                       AND sa.source IN {sources_sql}
+                                       AND NOT sa.excluded
+            JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id
             WHERE a.publication_id = :pub AND a.person_id = :pid
         """),
         {"pub": publication_id, "pid": person_id},

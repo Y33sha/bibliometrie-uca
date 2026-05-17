@@ -253,10 +253,11 @@ class PgHalProblemsQueries(HalProblemsQueries):
 
         base_where = """
             FROM publications p
-            JOIN authorships a
-              ON a.publication_id = p.id
-             AND a.structure_ids && CAST(:lab_arr AS int[])
-            WHERE EXISTS (SELECT 1 FROM source_publications sd
+            JOIN authorships a ON a.publication_id = p.id
+            WHERE EXISTS (SELECT 1 FROM authorship_structures aus
+                          WHERE aus.authorship_id = a.id
+                            AND aus.structure_id = ANY(:lab_arr))
+              AND EXISTS (SELECT 1 FROM source_publications sd
                           WHERE sd.publication_id = p.id AND sd.source = 'hal')
               AND NOT EXISTS (SELECT 1 FROM source_publications sd
                               WHERE sd.publication_id = p.id AND sd.source = 'hal'
@@ -304,8 +305,9 @@ class PgHalProblemsQueries(HalProblemsQueries):
             WHERE a.in_perimeter = TRUE
               AND EXISTS (SELECT 1 FROM source_authorships sa
                           WHERE sa.authorship_id = a.id AND sa.source = 'hal')
-              AND EXISTS (SELECT 1 FROM structures s
-                          WHERE s.id = ANY(a.structure_ids) AND s.structure_type = 'labo')
+              AND EXISTS (SELECT 1 FROM authorship_structures aus
+                          JOIN structures s ON s.id = aus.structure_id
+                          WHERE aus.authorship_id = a.id AND s.structure_type = 'labo')
         ),
         conflict_pubs AS (
             SELECT DISTINCT h.publication_id
@@ -336,7 +338,8 @@ class PgHalProblemsQueries(HalProblemsQueries):
                         WHERE sd2.publication_id = p.id AND sd2.source = 'hal') AS halids,
                        (SELECT string_agg(DISTINCT s.acronym, ', ' ORDER BY s.acronym)
                         FROM authorships a2
-                        JOIN structures s ON s.id = ANY(a2.structure_ids)
+                        JOIN authorship_structures aus2 ON aus2.authorship_id = a2.id
+                        JOIN structures s ON s.id = aus2.structure_id
                         WHERE a2.publication_id = p.id
                           AND a2.in_perimeter = TRUE
                           AND s.structure_type = 'labo') AS labs

@@ -116,8 +116,9 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 SELECT COUNT(*) AS count
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
+                JOIN authorship_structures aus ON aus.authorship_id = a.id
                 WHERE p.doc_type IN ('thesis', 'ongoing_thesis')
-                  AND :lab_id = ANY(a.structure_ids)
+                  AND aus.structure_id = :lab_id
                   AND a.roles && ARRAY['author']::text[]
             """),
             {"lab_id": lab_id},
@@ -146,7 +147,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         extra_where, extra_binds = assemble_where(_lab_persons_extra_clauses(filters))
         base_where = (
             "a.person_id IS NOT NULL "
-            "AND a.structure_ids && CAST(:lab_arr AS int[]) "
+            "AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr)) "
             "AND a.roles && ARRAY['author']::text[]"
         )
         full_where = f"{base_where} AND {extra_where}"
@@ -210,7 +211,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 SELECT COUNT(DISTINCT a.id) AS total
                 FROM authorships a
                 WHERE a.person_id IS NULL
-                  AND a.structure_ids && CAST(:lab_arr AS int[])
+                  AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
                   AND a.roles && ARRAY['author']::text[]
             """),
             {"lab_arr": lab_arr},
@@ -259,7 +260,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                         )
             full = (
                 "a.person_id IS NOT NULL "
-                "AND a.structure_ids && CAST(:lab_arr AS int[]) "
+                "AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr)) "
                 "AND a.roles && ARRAY['author']::text[]"
             )
             if parts:
@@ -400,7 +401,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                   AND EXISTS (
                       SELECT 1 FROM authorships a
                       WHERE a.publication_id = p.id
-                        AND a.structure_ids && CAST(:lab_arr AS int[])
+                        AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
                         AND a.roles && ARRAY['author']::text[]
                         AND a.in_perimeter = TRUE
                   )
@@ -423,7 +424,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
                 WHERE a.in_perimeter = TRUE
-                  AND a.structure_ids && CAST(:lab_arr AS int[])
+                  AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
                   AND a.roles && ARRAY['author']::text[]
                   AND p.pub_year IS NOT NULL
                   AND p.pub_year >= :min_year
@@ -448,7 +449,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
                 WHERE a.in_perimeter = TRUE
-                  AND a.structure_ids && CAST(:lab_arr AS int[])
+                  AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
                   AND a.roles && ARRAY['author']::text[]
             """),
             {"lab_arr": lab_arr},
@@ -465,7 +466,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
                 WHERE a.in_perimeter = TRUE
-                  AND a.structure_ids && CAST(:lab_arr AS int[])
+                  AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
                   AND a.roles && ARRAY['author']::text[]
                   AND p.doc_type = 'article'
             """),
@@ -486,7 +487,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                           SELECT 1 FROM authorships a
                           WHERE a.publication_id = p.id
                             AND a.in_perimeter = TRUE
-                            AND a.structure_ids && CAST(:lab_arr AS int[])
+                            AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
                             AND a.roles && ARRAY['author']::text[]
                       )
                 ) sub

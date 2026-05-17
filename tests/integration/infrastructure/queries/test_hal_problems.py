@@ -182,11 +182,15 @@ def _create_authorship_uca(conn, pub_id, lab_id, position=0):
     row = conn.execute(
         text("""
             INSERT INTO authorships
-                (publication_id, author_position, structure_ids, in_perimeter, roles)
-            VALUES (:p, :pos, CAST(ARRAY[:lab] AS int[]), TRUE, ARRAY['author']) RETURNING id
+                (publication_id, author_position, in_perimeter, roles)
+            VALUES (:p, :pos, TRUE, ARRAY['author']) RETURNING id
         """),
-        {"p": pub_id, "pos": position, "lab": lab_id},
+        {"p": pub_id, "pos": position},
     ).one()
+    conn.execute(
+        text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
+        {"a": row.id, "s": lab_id},
+    )
     return row.id
 
 

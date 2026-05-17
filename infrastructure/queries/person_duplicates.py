@@ -245,9 +245,10 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
                 SELECT DISTINCT s.id, s.acronym, s.name
                 FROM structures s
                 WHERE s.structure_type = 'labo' AND s.id IN (
-                    SELECT UNNEST(sa.structure_ids)
-                    FROM source_authorships sa
-                    WHERE sa.person_id = :pid AND sa.structure_ids IS NOT NULL
+                    SELECT sas.structure_id
+                    FROM source_authorship_structures sas
+                    JOIN source_authorships sa ON sa.id = sas.source_authorship_id
+                    WHERE sa.person_id = :pid
                 )
                 ORDER BY s.acronym NULLS LAST, s.name
             """),

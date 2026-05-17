@@ -133,8 +133,9 @@ def _count_affiliations(conn) -> dict:
         ).scalar_one()
         counts[f"{src}_with_structs"] = conn.execute(
             text(
-                "SELECT COUNT(*) AS cnt FROM source_authorships "
-                "WHERE source = :src AND structure_ids IS NOT NULL"
+                "SELECT COUNT(DISTINCT sa.id) AS cnt FROM source_authorships sa "
+                "JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id "
+                "WHERE sa.source = :src"
             ),
             {"src": src},
         ).scalar_one()
@@ -196,7 +197,13 @@ class TestPopulateAffiliationsIdempotence:
         )
 
         row = sa_sync_conn.execute(
-            text("SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = 80002")
+            text(
+                "SELECT sa.in_perimeter, "
+                "       (SELECT array_agg(structure_id ORDER BY structure_id) "
+                "        FROM source_authorship_structures "
+                "        WHERE source_authorship_id = sa.id) AS structure_ids "
+                "FROM source_authorships sa WHERE sa.id = 80002"
+            )
         ).one()
         assert row.in_perimeter is True
         assert row.structure_ids == [80001]

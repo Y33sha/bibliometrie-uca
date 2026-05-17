@@ -37,7 +37,10 @@ def _fetch_biblio_source_authorships(
     rows = conn.execute(
         text("""
             SELECT sa.id, sa.author_position, sa.raw_author_name AS full_name, sa.person_id,
-                   sa.in_perimeter, sa.structure_ids,
+                   sa.in_perimeter,
+                   (SELECT array_agg(sas.structure_id ORDER BY sas.structure_id)
+                    FROM source_authorship_structures sas
+                    WHERE sas.source_authorship_id = sa.id) AS structure_ids,
                    (SELECT string_agg(addr.raw_text, ' | ' ORDER BY addr.id)
                     FROM source_authorship_addresses saa2
                     JOIN addresses addr ON addr.id = saa2.address_id
@@ -98,7 +101,9 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
     auth_rows = conn.execute(
         text("""
             SELECT a.author_position, a.in_perimeter, a.is_corresponding,
-                   a.structure_ids,
+                   (SELECT array_agg(aus.structure_id ORDER BY aus.structure_id)
+                    FROM authorship_structures aus
+                    WHERE aus.authorship_id = a.id) AS structure_ids,
                    EXISTS (SELECT 1 FROM source_authorships sa
                            WHERE sa.authorship_id = a.id AND sa.source = 'hal') AS source_hal,
                    EXISTS (SELECT 1 FROM source_authorships sa

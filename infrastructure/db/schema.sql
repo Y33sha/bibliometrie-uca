@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bX8F0dXyQ1aX7OK3Q1FExVvQ0LBPE3njxzE7Ei5VwE0AnOG0GxjFbgoMa6g0hhe
+\restrict j4BBspoOUknPGSUcw3lsXsc103jNNC9KcbH3hQqDdp0mvvvBrIW9p9OBipIthXT
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -377,6 +377,16 @@ ALTER SEQUENCE public.audit_log_id_seq OWNED BY public.audit_log.id;
 
 
 --
+-- Name: authorship_structures; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.authorship_structures (
+    authorship_id integer NOT NULL,
+    structure_id integer NOT NULL
+);
+
+
+--
 -- Name: authorships; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -391,7 +401,6 @@ CREATE TABLE public.authorships (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    structure_ids integer[],
     is_corresponding boolean,
     roles text[]
 );
@@ -946,6 +955,16 @@ ALTER SEQUENCE public.source_authorship_addresses_id_seq OWNED BY public.source_
 
 
 --
+-- Name: source_authorship_structures; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_authorship_structures (
+    source_authorship_id integer NOT NULL,
+    structure_id integer NOT NULL
+);
+
+
+--
 -- Name: source_authorships; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -956,7 +975,6 @@ CREATE TABLE public.source_authorships (
     author_position smallint,
     in_perimeter boolean DEFAULT false,
     excluded boolean DEFAULT false,
-    structure_ids integer[],
     countries text[],
     person_id integer,
     author_name_normalized text,
@@ -1471,6 +1489,14 @@ ALTER TABLE ONLY public.audit_log
 
 
 --
+-- Name: authorship_structures authorship_structures_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.authorship_structures
+    ADD CONSTRAINT authorship_structures_pkey PRIMARY KEY (authorship_id, structure_id);
+
+
+--
 -- Name: authorships authorships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1711,6 +1737,14 @@ ALTER TABLE ONLY public.source_authorship_addresses
 
 
 --
+-- Name: source_authorship_structures source_authorship_structures_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorship_structures
+    ADD CONSTRAINT source_authorship_structures_pkey PRIMARY KEY (source_authorship_id, structure_id);
+
+
+--
 -- Name: source_authorships source_authorships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1943,6 +1977,13 @@ CREATE INDEX idx_apc_pub ON public.apc_payments USING btree (publication_id) WHE
 
 
 --
+-- Name: idx_authorship_structures_structure_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_authorship_structures_structure_id ON public.authorship_structures USING btree (structure_id);
+
+
+--
 -- Name: idx_authorships_corresponding_uca; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1968,13 +2009,6 @@ CREATE INDEX idx_authorships_pub ON public.authorships USING btree (publication_
 --
 
 CREATE INDEX idx_authorships_pub_uca ON public.authorships USING btree (publication_id) WHERE (in_perimeter = true);
-
-
---
--- Name: idx_authorships_structs; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_authorships_structs ON public.authorships USING gin (structure_ids) WHERE (structure_ids IS NOT NULL);
 
 
 --
@@ -2216,6 +2250,13 @@ CREATE INDEX idx_saa_address ON public.source_authorship_addresses USING btree (
 
 
 --
+-- Name: idx_source_authorship_structures_structure_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_authorship_structures_structure_id ON public.source_authorship_structures USING btree (structure_id);
+
+
+--
 -- Name: idx_source_docs_countries; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2427,6 +2468,22 @@ ALTER TABLE ONLY public.apc_payments
 
 
 --
+-- Name: authorship_structures authorship_structures_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.authorship_structures
+    ADD CONSTRAINT authorship_structures_authorship_id_fkey FOREIGN KEY (authorship_id) REFERENCES public.authorships(id) ON DELETE CASCADE;
+
+
+--
+-- Name: authorship_structures authorship_structures_structure_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.authorship_structures
+    ADD CONSTRAINT authorship_structures_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES public.structures(id) ON DELETE CASCADE;
+
+
+--
 -- Name: authorships authorships_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2579,6 +2636,22 @@ ALTER TABLE ONLY public.source_authorship_addresses
 
 
 --
+-- Name: source_authorship_structures source_authorship_structures_source_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorship_structures
+    ADD CONSTRAINT source_authorship_structures_source_authorship_id_fkey FOREIGN KEY (source_authorship_id) REFERENCES public.source_authorships(id) ON DELETE CASCADE;
+
+
+--
+-- Name: source_authorship_structures source_authorship_structures_structure_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.source_authorship_structures
+    ADD CONSTRAINT source_authorship_structures_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES public.structures(id) ON DELETE CASCADE;
+
+
+--
 -- Name: source_authorships source_authorships_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2670,4 +2743,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bX8F0dXyQ1aX7OK3Q1FExVvQ0LBPE3njxzE7Ei5VwE0AnOG0GxjFbgoMa6g0hhe
+\unrestrict j4BBspoOUknPGSUcw3lsXsc103jNNC9KcbH3hQqDdp0mvvvBrIW9p9OBipIthXT

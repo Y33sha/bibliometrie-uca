@@ -65,12 +65,16 @@ def _create_pub_with_authorship(
         ),
         {"y": pub_year, "dt": doc_type},
     ).scalar_one()
-    conn.execute(
+    aid = conn.execute(
         text(
-            "INSERT INTO authorships (publication_id, person_id, structure_ids, in_perimeter, roles) "
-            "VALUES (:pid, :perid, :sids, :inp, ARRAY['author']::text[]) RETURNING id"
+            "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
+            "VALUES (:pid, :perid, :inp, ARRAY['author']::text[]) RETURNING id"
         ),
-        {"pid": pub_id, "perid": person_id, "sids": [lab_id], "inp": in_perimeter},
+        {"pid": pub_id, "perid": person_id, "inp": in_perimeter},
+    ).scalar_one()
+    conn.execute(
+        text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
+        {"a": aid, "s": lab_id},
     )
     return pub_id
 
@@ -146,12 +150,16 @@ class TestGetLaboratoryPersons:
                 "VALUES ('X', 'x', 2024, 'article') RETURNING id"
             )
         ).scalar_one()
-        sa_sync_conn.execute(
+        aid = sa_sync_conn.execute(
             text(
-                "INSERT INTO authorships (publication_id, person_id, structure_ids, roles) "
-                "VALUES (:pid, NULL, :sids, ARRAY['author']::text[])"
+                "INSERT INTO authorships (publication_id, person_id, roles) "
+                "VALUES (:pid, NULL, ARRAY['author']::text[]) RETURNING id"
             ),
-            {"pid": pub, "sids": [lab]},
+            {"pid": pub},
+        ).scalar_one()
+        sa_sync_conn.execute(
+            text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
+            {"a": aid, "s": lab},
         )
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_persons(
@@ -218,12 +226,16 @@ class TestGetLaboratoryDashboard:
                 RETURNING id
             """)
         ).scalar_one()
-        sa_sync_conn.execute(
+        aid = sa_sync_conn.execute(
             text(
-                "INSERT INTO authorships (publication_id, person_id, structure_ids, in_perimeter, roles) "
-                "VALUES (:pid, :perid, :sids, TRUE, ARRAY['author']::text[])"
+                "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
+                "VALUES (:pid, :perid, TRUE, ARRAY['author']::text[]) RETURNING id"
             ),
-            {"pid": pub_id, "perid": pid, "sids": [lab]},
+            {"pid": pub_id, "perid": pid},
+        ).scalar_one()
+        sa_sync_conn.execute(
+            text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
+            {"a": aid, "s": lab},
         )
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_dashboard(lab)
@@ -243,12 +255,16 @@ class TestGetLaboratoryDashboard:
                 RETURNING id
             """)
         ).scalar_one()
-        sa_sync_conn.execute(
+        aid = sa_sync_conn.execute(
             text(
-                "INSERT INTO authorships (publication_id, person_id, structure_ids, in_perimeter, roles) "
-                "VALUES (:pid, :perid, :sids, TRUE, ARRAY['author']::text[])"
+                "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
+                "VALUES (:pid, :perid, TRUE, ARRAY['author']::text[]) RETURNING id"
             ),
-            {"pid": pub_id, "perid": pid, "sids": [lab]},
+            {"pid": pub_id, "perid": pid},
+        ).scalar_one()
+        sa_sync_conn.execute(
+            text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
+            {"a": aid, "s": lab},
         )
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_dashboard(lab)
@@ -291,12 +307,19 @@ class TestGetLaboratorySubjects:
             )
 
         def _attach(pub_id):
+            aid = sa_sync_conn.execute(
+                text(
+                    "INSERT INTO authorships (publication_id, in_perimeter, roles) "
+                    "VALUES (:p, TRUE, ARRAY['author']::text[]) RETURNING id"
+                ),
+                {"p": pub_id},
+            ).scalar_one()
             sa_sync_conn.execute(
                 text(
-                    "INSERT INTO authorships (publication_id, structure_ids, in_perimeter, roles) "
-                    "VALUES (:p, :sids, TRUE, ARRAY['author']::text[])"
+                    "INSERT INTO authorship_structures (authorship_id, structure_id) "
+                    "VALUES (:a, :s)"
                 ),
-                {"p": pub_id, "sids": [lab]},
+                {"a": aid, "s": lab},
             )
 
         p1 = _create_pub("p1")
@@ -330,12 +353,16 @@ class TestGetLaboratorySubjects:
                 "VALUES ('X', 'x', 2024, CAST('peer_review' AS doc_type)) RETURNING id"
             )
         ).scalar_one()
-        sa_sync_conn.execute(
+        aid = sa_sync_conn.execute(
             text(
-                "INSERT INTO authorships (publication_id, structure_ids, in_perimeter, roles) "
-                "VALUES (:p, :sids, TRUE, ARRAY['author']::text[])"
+                "INSERT INTO authorships (publication_id, in_perimeter, roles) "
+                "VALUES (:p, TRUE, ARRAY['author']::text[]) RETURNING id"
             ),
-            {"p": excluded_pub, "sids": [lab]},
+            {"p": excluded_pub},
+        ).scalar_one()
+        sa_sync_conn.execute(
+            text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
+            {"a": aid, "s": lab},
         )
         sid = sa_sync_conn.execute(
             text("INSERT INTO subjects (label, ontologies) VALUES ('X', :o) RETURNING id"),

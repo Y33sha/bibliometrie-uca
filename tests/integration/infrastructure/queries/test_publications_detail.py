@@ -177,12 +177,16 @@ class TestGetPublicationDetail:
 
         pid = _create_person(sa_sync_conn)
         pub = _create_pub(sa_sync_conn)
-        sa_sync_conn.execute(
+        aid = sa_sync_conn.execute(
             text("""
-                INSERT INTO authorships (publication_id, person_id, structure_ids)
-                VALUES (:pub, :pid, :sids) RETURNING id
+                INSERT INTO authorships (publication_id, person_id)
+                VALUES (:pub, :pid) RETURNING id
             """),
-            {"pub": pub, "pid": pid, "sids": [lab_id]},
+            {"pub": pub, "pid": pid},
+        ).scalar_one()
+        sa_sync_conn.execute(
+            text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
+            {"a": aid, "s": lab_id},
         )
 
         detail = get_publication_detail(sa_sync_conn, pub)

@@ -49,14 +49,12 @@ LAB_PERSONS_CTE = """
         SELECT DISTINCT s.id AS lab_id, s.name AS lab_name, p.id AS person_id,
                p.last_name_normalized, p.first_name_normalized
         FROM structures s
-        JOIN (
-            SELECT DISTINCT sa.structure_ids, sa.person_id
-            FROM source_authorships sa
-            WHERE sa.in_perimeter = TRUE AND sa.person_id IS NOT NULL
-              AND sa.structure_ids IS NOT NULL
-        ) sa ON s.id = ANY(sa.structure_ids)
+        JOIN source_authorship_structures sas ON sas.structure_id = s.id
+        JOIN source_authorships sa ON sa.id = sas.source_authorship_id
         JOIN persons p ON p.id = sa.person_id
-        WHERE s.structure_type = 'labo'
+        WHERE sa.in_perimeter = TRUE
+          AND sa.person_id IS NOT NULL
+          AND s.structure_type = 'labo'
     )
 """
 

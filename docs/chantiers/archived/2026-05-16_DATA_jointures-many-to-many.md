@@ -1,5 +1,7 @@
 # Normaliser les relations many-to-many cachées (arrays + JSONB de jointure)
 
+Commencé et terminé le 2026-05-16
+
 ## Contexte
 
 Le schéma actuel encode plusieurs relations many-to-many dans des colonnes non-relationnelles (arrays `integer[]` ou JSONB), au lieu de tables de jointure normales. Ce choix a été fait pour le confort de l'écriture (un seul UPDATE au lieu de DELETE + INSERT multiples) et pour éviter de multiplier les tables. Mais le coût est réel :
@@ -61,17 +63,46 @@ Décisions tranchées au démarrage : `sources text[]` (pas de 3 colonnes), pas 
 - [x] Tests : adapter `tests/integration/infrastructure/queries/test_name_forms_queries.py`, retirer les tests unitaires des helpers JSONB disparus dans `tests/unit/domain/persons/test_name_forms.py`.
 - [x] `alembic upgrade head` (Laura) + run pytest ciblé sur le périmètre — 248/248 passent.
 
-### Phase 2 — `authorship_structures` (volume modéré)
+### Phase 2 + 3 fusionnées — `authorship_structures` + `source_authorship_structures`
 
-- 196 K liens, 151 K rows source.
-- Adaptation des call-sites lecture (filtres `:sid = ANY(structure_ids)` → JOIN), écriture (`build_authorships` qui propage in_perimeter et structure_ids).
-- Drop colonne après migration.
+Décision prise au démarrage : les deux migrations sont fusionnées en une seule passe. Raison : `build_authorships.propagate_perimeter_and_structures_from` lit `source_authorships.structure_ids[]` et écrit `authorships.structure_ids[]` ; les séparer impose une transition asymétrique (lecture array / écriture jointure) qui sera réécrite dans Phase 3. De plus, les queries de lecture qui touchent les deux tables ensemble (`hal_problems`, `affiliations`, `laboratories`, `stats/labs`) imposeraient un double passage sur les mêmes fichiers.
 
-### Phase 3 — `source_authorship_structures` (le plus gros)
+Volumes cumulés :
+- `authorship_structures` : 196 K liens, 151 K rows source.
+- `source_authorship_structures` : 338 K liens, 8.1 M rows source (2 % seulement avec structure_ids).
 
-- 338 K liens, 8.1 M rows source (mais 2 % seulement avec structure_ids).
-- Plus de call-sites adaptés : `populate_affiliations` (alimentation), tous les filtres affiliation côté API.
-- Drop colonne après migration.
+Call-sites cartographiés (cf. cartographie au démarrage 2026-05-16) :
+- ~41 occurrences `authorships.structure_ids` sur ~16 fichiers.
+- ~20 occurrences `source_authorships.structure_ids` sur ~11 fichiers.
+- Forte intersection : `authorships_build.py`, `affiliations.py`, `laboratories.py`, `stats/labs.py`, `hal_problems.py`.
+
+Adaptations principales :
+- **Pipeline alimentation** : `populate_affiliations.py` (écrit dans `source_authorships.structure_ids[]`), `build_authorships.py` (propage vers `authorships.structure_ids[]`). Les deux passent à INSERT dans les tables de jointure.
+- **Lecture filtres** : `:sid = ANY(structure_ids)` → `JOIN authorship_structures USING (authorship_id)` (ou `source_authorship_structures`).
+- **Drop colonnes** après migration.
+- **`in_perimeter`** : conservé en l'état (la propagation `build_authorships` reste, on déplace juste les `structure_ids[]`). La question de supprimer cette colonne et matérialiser le périmètre fait l'objet d'une fiche séparée [`DATA_perimeter-materialise.md`](DATA_perimeter-materialise.md), à traiter après ce chantier.
+
+Étapes :
+
+- [x] Cartographier les call-sites `authorships.structure_ids` et `source_authorships.structure_ids`.
+- [x] Migration Alembic `0017_authorship_structures_normalize` : crée `authorship_structures` + `source_authorship_structures` (FK ON DELETE CASCADE, PK composite, index sur `structure_id`), backfill via `unnest` croisé avec `structures` (filtre les ids morts), DROP des colonnes array.
+- [x] `infrastructure/db/tables.py` : ajout des deux tables de jointure.
+- [x] `application/structures.py` : retrait de l'appel à `purge_structure_id_from_arrays` (cascade DB la remplace) et docstring mise à jour.
+- [x] Pipeline : `application/pipeline/affiliations/populate_affiliations.py` + `infrastructure/queries/affiliations.py` : INSERT dans `source_authorship_structures`.
+- [x] Pipeline : `application/pipeline/authorships/build_authorships.py` + `infrastructure/queries/authorships_build.py` : INSERT dans `authorship_structures` depuis `source_authorship_structures` (propagation union des sources).
+- [x] Repo : `infrastructure/repositories/authorship_repository.py` (`find_by_publication_id`, `recompute_in_perimeter_on_source_authorships`, `propagate_in_perimeter_to_authorships`) et `infrastructure/repositories/person_repository/_authorships.py`.
+- [x] Queries : `infrastructure/queries/filters.py` (`lab_clause`, `no_lab_clause`).
+- [x] Queries : `infrastructure/queries/laboratories.py`.
+- [x] Queries : `infrastructure/queries/hal_problems.py`.
+- [x] Queries : `infrastructure/queries/persons/detail.py`.
+- [x] Queries : `infrastructure/queries/person_duplicates.py`.
+- [x] Queries : `infrastructure/queries/publications/list.py`, `detail.py`, `facets.py`.
+- [x] Queries : `infrastructure/queries/stats/labs.py`, `summary.py`.
+- [x] CLI : `interfaces/cli/maintenance/merge_person_duplicates_by_lab.py`.
+- [x] Tests intégration (laboratories, publications_list, publications_detail, hal_problems, authorships_service, idempotence/test_authorships, idempotence/test_affiliations).
+- [x] Docs : `docs/architecture.md`, `docs/donnees.md`.
+- [x] `alembic upgrade head` (Laura) + `python -m infrastructure.db.dump_schema` (Laura).
+- [x] Run pytest ciblé sur le périmètre touché.
 
 ## Bénéfices attendus
 
@@ -79,12 +110,6 @@ Décisions tranchées au démarrage : `sources text[]` (pas de 3 colonnes), pas 
 - **Requêtes plus naturelles** : `JOIN authorship_structures USING (authorship_id)` au lieu de `WHERE :sid = ANY(structure_ids)`. Plans Postgres plus lisibles.
 - **Introspection BI possible** : Metabase/Superset peuvent suivre les relations comme des FK normales.
 - **Cohérence avec le reste du schéma** : tu as déjà `source_authorship_addresses`, `structure_relations`, `address_structures` — toutes des tables de jointure normales. Sortir les 3 cas restants harmonise.
-
-## Questions ouvertes
-
-- **`person_name_form_persons.sources`** : on garde en `text[]` ou on normalise en `(name_form_id, person_id, source)` à 3 colonnes ? Si la cardinalité reste bornée (1-6, valeurs dans un enum), `text[]` est OK. Si on veut suivre individuellement chaque observation (date, run pipeline…), 3 colonnes serait nécessaire. À trancher au démarrage de la Phase 1.
-- **Phase 2 et 3 fusionnables ?** Les deux tables `authorships` et `source_authorships` partagent une logique de propagation (`build_authorships.propagate_perimeter_and_structures_from`). Migrer les deux en même temps pourrait être plus simple que séquentiel — à voir au démarrage.
-- **Coût d'adaptation** estimé à 1 semaine de travail concentré pour les 3 phases. À affiner après audit des call-sites au démarrage.
 
 ## Court terme (déjà fait)
 

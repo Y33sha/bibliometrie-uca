@@ -110,7 +110,7 @@ Légende:
 Tables associées :
 - `perimeters` : un périmètre est un ensemble de structures, incluant récursivement les sous-structures. Actuellement deux périmètres sont définis: **UCA** et **UCA élargi** (UCA + CHU + INP). Impacte:
     - les critères d'affiliation utilisés en paramètre des requêtes API;
-    - les authorships sources dont le champ `structure_ids` sera peuplé par la phase `affiliations` du pipeline, et qui serviront à générer des `publications` et des `personnes` dans les tables canoniques.
+    - les authorships sources dont les affiliations résolues (table de jointure `source_authorship_structures`) seront peuplées par la phase `affiliations` du pipeline, et qui serviront à générer des `publications` et des `personnes` dans les tables canoniques.
 
 - `structure_relations` : définit les relations entre structures. Deux relations existent: **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans le [référentiel ROR](glossaire#ror)); la relation "tutelle" a une conséquence sur les **structures incluses dans un périmètre** donné.
 - `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `affiliations` du [pipeline](pipeline.md) pour peupler la table de liaison `address_structures`.
@@ -193,17 +193,18 @@ Tables associées :
 
 #### `authorships`
 
-Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures. Construite par `application/pipeline/authorships/build_authorships.py` à partir des *authorships* sources.
+Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la table de jointure `authorship_structures`). Construite par `application/pipeline/authorships/build_authorships.py` à partir des *authorships* sources.
 
 - `person_id`
-- `structure_ids`
 - `in_perimeter` : TRUE si l'auteur est affilié UCA sur cette publication
 - `author_position` : position dans la liste d'auteurs
 - `is_corresponding` : auteur correspondant
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
 - `excluded` : authorship rejetée manuellement
 
-**Cohérence avec les sources** : la table est **dérivée** des `source_authorships` — `in_perimeter`, `structure_ids`, `is_corresponding`, `author_position`, `roles` sont des consolidations (union ou priorité par source) des authorships sources. Le build (`application/pipeline/authorships/build_authorships.py`) est idempotent en mode incrémental ; le mode pipeline `full` exécute en plus une purge complète + rebuild from scratch (TRUNCATE + reset des FK), pour garantir la convergence absolue à intervalle mensuel. Le champ `excluded`, lui, est métier natif (rejet manuel via l'admin) et survit au rebuild — le build ne le touche pas.
+La table de jointure `authorship_structures (authorship_id, structure_id)` porte les affiliations résolues — FK `ON DELETE CASCADE` des deux côtés, PK composite.
+
+**Cohérence avec les sources** : la table est **dérivée** des `source_authorships` — `in_perimeter`, les liens via `authorship_structures`, `is_corresponding`, `author_position`, `roles` sont des consolidations (union ou priorité par source) des authorships sources. Le build (`application/pipeline/authorships/build_authorships.py`) est idempotent en mode incrémental ; le mode pipeline `full` exécute en plus une purge complète + rebuild from scratch (TRUNCATE + reset des FK), pour garantir la convergence absolue à intervalle mensuel. Le champ `excluded`, lui, est métier natif (rejet manuel via l'admin) et survit au rebuild — le build ne le touche pas.
 
 **Évolution envisagée — vue matérialisée** : la table `authorships` étant strictement dérivée (sauf `excluded`), elle pourrait être remplacée par une `MATERIALIZED VIEW` dont la définition SQL serait la source unique de la consolidation. Avantages : plus de code de build à maintenir, single source of truth conceptuel. Inconvénients : (1) `excluded` ne peut pas vivre sur une VMV → table à part `excluded_authorships(publication_id, person_id)` ; (2) la FK `source_authorships.authorship_id` ne peut pas pointer vers une VMV — il faudrait soit la supprimer (jointures via `(publication_id, person_id)` dans les requêtes), soit garder la table mais l'alimenter via la VMV. Chantier à explorer si le code de `build_authorships` devient un point de friction (logique de priorité, propagation, idempotence). Pas urgent au volume actuel.
 
@@ -212,7 +213,7 @@ Table de liaison recensant les contributions individuelles aux publications. Cha
 Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses, crossref).
 
 - **`source_publications`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées (doc_type non mappé, oa_status, abstract, keywords, topics, biblio, meta). Le champ `hal_collections` (text[]) est spécifique à HAL.
-- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `structure_ids` (affiliation canonique résolue), `source_structures` (ARRAY[TEXT] des IDs natifs des structures côté source : numérique HAL, `I****` OpenAlex, noms d'institutions WoS, etc.), `raw_author_name`, `author_name_normalized`, `person_identifiers` (JSONB : `orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id`), `countries` (ARRAY[CHAR(2)]), `roles`, `excluded`. Les affiliations textuelles brutes sont reliées via `source_authorship_addresses` → `addresses.raw_text`.
+- **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `source_structures` (ARRAY[TEXT] des IDs natifs des structures côté source : numérique HAL, `I****` OpenAlex, noms d'institutions WoS, etc.), `raw_author_name`, `author_name_normalized`, `person_identifiers` (JSONB : `orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id`), `countries` (ARRAY[CHAR(2)]), `roles`, `excluded`. Les affiliations canoniques résolues sont reliées via la table de jointure `source_authorship_structures (source_authorship_id, structure_id)` (FK ON DELETE CASCADE des deux côtés, PK composite). Les affiliations textuelles brutes sont reliées via `source_authorship_addresses` → `addresses.raw_text`.
 - **`source_authorship_addresses`** : table de liaison `source_authorships ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs authorships, et alimente la résolution structure ↔ adresse de la phase `affiliations`.
 
 ## Autres tables, à documenter

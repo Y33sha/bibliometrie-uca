@@ -80,8 +80,9 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
     return WhereClause(
         """EXISTS (
             SELECT 1 FROM authorships a
+            JOIN authorship_structures aus ON aus.authorship_id = a.id
             WHERE a.publication_id = p.id
-              AND a.structure_ids && CAST(:flt_lab_ids AS int[])
+              AND aus.structure_id = ANY(:flt_lab_ids)
               AND NOT a.excluded
         )""",
         {"flt_lab_ids": lab_ids},
@@ -331,7 +332,8 @@ def no_lab_clause() -> WhereClause:
     return WhereClause(
         """NOT EXISTS (
             SELECT 1 FROM authorships a
-            JOIN structures s ON s.id = ANY(a.structure_ids)
+            JOIN authorship_structures aus ON aus.authorship_id = a.id
+            JOIN structures s ON s.id = aus.structure_id
             WHERE a.publication_id = p.id
               AND NOT a.excluded
               AND s.structure_type = 'labo'
