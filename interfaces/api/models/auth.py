@@ -1,12 +1,8 @@
-"""Modèles Pydantic pour l'authentification."""
+"""Re-export des DTOs Auth.
 
-from pydantic import BaseModel
+Les modèles vivent désormais dans `application.auth.dtos` (chantier `CODE_typage-projections-strict` Phase 4 : sweep DTO par feature). Ce module reste pour les imports historiques `from interfaces.api.models import LoginRequest, AuthCheckResponse`.
+"""
 
+from application.auth.dtos import AuthCheckResponse, LoginRequest
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class AuthCheckResponse(BaseModel):
-    authenticated: bool
+__all__ = ["AuthCheckResponse", "LoginRequest"]

@@ -72,7 +72,7 @@ Un NamedTuple par `_*_from_row`, **local au repo** (préfixe `_`, pure projectio
 Un sweep par feature, dans cet ordre (du plus petit au plus gros pour roder le pattern) :
 
 - [x] **subjects** (7 BaseModel) — pilote, le plus petit. DTOs déplacés vers `application/subjects/dtos.py` ; port retourne `list[SubjectListItem]` / `SubjectListItem | None` / `list[SubjectNeighborOut]` ; PgSubjectsAdminQueries instancie les DTOs ; router propage sans `model_validate`. `interfaces/api/models/subjects.py` réduit à un re-export pour rétrocompat (utilisé par `routers/persons.py`, `routers/laboratories.py`, `models/publications.py`).
-- [ ] **auth** (2)
+- [x] **auth** (2). DTOs déplacés vers `application/auth/dtos.py`. Pas de port query associé (l'auth lit un cookie HMAC en mémoire, pas la DB) ; le router instancie déjà directement.
 - [ ] **journals** (3)
 - [ ] **publishers** (4)
 - [ ] **perimeters** (5 admin)
