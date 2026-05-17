@@ -1,20 +1,8 @@
-"""Liste de toutes les années disponibles + détail d'une publication."""
+"""Détail d'une publication."""
 
 from typing import Any
 
 from sqlalchemy import Connection, text
-
-
-def all_years(conn: Connection) -> list[int]:
-    """Toutes les années de publication disponibles (hors filtre UCA)."""
-    rows = conn.execute(
-        text("""
-            SELECT DISTINCT pub_year FROM publications
-            WHERE pub_year IS NOT NULL
-            ORDER BY pub_year DESC
-        """)
-    ).all()
-    return [r.pub_year for r in rows]
 
 
 def _fetch_biblio_source_authorships(

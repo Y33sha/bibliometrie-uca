@@ -1,6 +1,6 @@
-"""Persons admin router : identifiants, fusion, rejet, renommage, détachement, orphelines.
+"""Persons admin router : identifiants, fusion, rejet, renommage, détachement.
 
-Toutes les mutations sur personnes et les opérations d'administration adjacentes (orphan-authorships, exclusion d'authorship). Les lectures purement publiques restent dans `routers/persons.py`.
+Toutes les mutations sur personnes. Les opérations sur les authorships en tant que telles (exclude, orphan-authorships) sont dans `admin/authorships.py`. Les lectures publiques restent dans `routers/persons.py`.
 """
 
 import logging
@@ -9,18 +9,8 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection, text
 
-from application.authorships.assign_orphans import (
-    assign_orphan_authorship as _assign_orphan,
-)
-from application.authorships.assign_orphans import (
-    batch_assign_orphan_authorships as _batch_assign_orphan,
-)
-from application.authorships.core import exclude_authorship
 from application.persons import (
     add_identifier as _add_identifier,
-)
-from application.persons import (
-    create_person as _create_person,
 )
 from application.persons import (
     detach_authorships as _detach_authorships_service,
@@ -51,7 +41,6 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
-from domain.sources import ALL_SOURCES_SET
 from interfaces.api.deps import (
     audit_repo_sync,
     authorship_repo_sync,
@@ -62,9 +51,6 @@ from interfaces.api.deps import (
 from interfaces.api.models import (
     AddIdentifier,
     AddIdentifierResponse,
-    AssignOrphanAuthorship,
-    AuthorshipExcludeResponse,
-    BatchAssignOrphanAuthorships,
     DetachAuthorships,
     DetachAuthorshipsResponse,
     DetachedResponse,
@@ -75,10 +61,6 @@ from interfaces.api.models import (
     MergeResponse,
     NameFormAuthorshipsResponse,
     OkResponse,
-    OrphanAssignResponse,
-    OrphanAuthorshipsResponse,
-    OrphanBatchAssignResponse,
-    OrphanCountResponse,
     ReassignIdentifier,
     RejectPerson,
     RemovedResponse,
@@ -200,18 +182,7 @@ def reassign_identifier(
     return IdentifierReassignResponse(id=ident_id, person_id=body.person_id, status="pending")
 
 
-@router.patch("/api/authorships/{authorship_id}/exclude", response_model=AuthorshipExcludeResponse)
-def toggle_authorship_excluded(
-    authorship_id: int,
-    repo: AuthorshipRepository = Depends(authorship_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
-) -> AuthorshipExcludeResponse:
-    """Marque un authorship comme exclu."""
-    row = exclude_authorship(authorship_id, repo=repo, audit_repo=audit)
-    row_id = row["id"]
-    row_excluded = row["excluded"]
-    assert isinstance(row_id, int) and isinstance(row_excluded, bool)
-    return AuthorshipExcludeResponse(id=row_id, excluded=row_excluded)
+# ── Rejet / renommage / fusion ───────────────────────────────────
 
 
 @router.patch("/api/persons/{person_id}/reject", response_model=OkResponse)
@@ -266,73 +237,6 @@ def merge_persons(
 
     _merge_person(person_id, source_id, repo=repo, audit_repo=audit)
     return MergeResponse(merged=True, source_id=source_id, target_id=person_id)
-
-
-# ── Authorships orphelines ───────────────────────────────────────
-
-
-@router.get("/api/admin/orphan-authorships/count", response_model=OrphanCountResponse)
-def orphan_authorships_count(
-    queries: PersonsQueries = Depends(persons_queries_sync),
-) -> OrphanCountResponse:
-    """Nombre d'authorships UCA sans person_id."""
-    return OrphanCountResponse.model_validate(queries.orphan_authorships_count())
-
-
-@router.get("/api/admin/orphan-authorships", response_model=OrphanAuthorshipsResponse)
-def list_orphan_authorships(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
-    search: str = Query(""),
-    queries: PersonsQueries = Depends(persons_queries_sync),
-) -> OrphanAuthorshipsResponse:
-    """Liste les authorships UCA sans person_id."""
-    return OrphanAuthorshipsResponse.model_validate(
-        queries.list_orphan_authorships(search=search, page=page, per_page=per_page)
-    )
-
-
-@router.post("/api/admin/orphan-authorships/assign", response_model=OrphanAssignResponse)
-def assign_orphan_authorship_endpoint(
-    body: AssignOrphanAuthorship,
-    queries: PersonsQueries = Depends(persons_queries_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-) -> OrphanAssignResponse:
-    """Attribue une authorship orpheline à une personne."""
-    if body.source not in ALL_SOURCES_SET:
-        raise HTTPException(status_code=400, detail=f"Source inconnue: {body.source}")
-
-    person_id = body.person_id
-    if body.create_person:
-        ln = body.create_person.last_name.strip()
-        fn = body.create_person.first_name.strip()
-        if not ln:
-            raise HTTPException(status_code=400, detail="Nom requis")
-        person_id = _create_person(ln, fn, repo=repo)
-    elif not person_id:
-        raise HTTPException(status_code=400, detail="person_id ou create_person requis")
-    if not queries.person_exists(person_id):
-        raise HTTPException(status_code=404, detail="Personne introuvable")
-    _assign_orphan(person_id, body.source, body.authorship_id, repo=repo)
-    return OrphanAssignResponse(person_id=person_id)
-
-
-@router.post("/api/admin/orphan-authorships/batch-assign", response_model=OrphanBatchAssignResponse)
-def batch_assign_orphan_authorships(
-    body: BatchAssignOrphanAuthorships,
-    queries: PersonsQueries = Depends(persons_queries_sync),
-    repo: PersonRepository = Depends(person_repo_sync),
-) -> OrphanBatchAssignResponse:
-    """Attribue plusieurs authorships orphelines à une même personne."""
-    person_id = body.person_id
-    sa_ids = [a.authorship_id for a in body.authorships if a.source in ALL_SOURCES_SET]
-    if not sa_ids:
-        return OrphanBatchAssignResponse(assigned=0)
-
-    if not queries.person_exists(person_id):
-        raise HTTPException(status_code=404, detail="Personne introuvable")
-    assigned = _batch_assign_orphan(person_id, sa_ids, repo=repo)
-    return OrphanBatchAssignResponse(assigned=assigned)
 
 
 # ── Formes de noms / détachement authorships ─────────────────────

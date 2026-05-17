@@ -170,12 +170,7 @@ def stats_labs(
 def available_years(
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> list[int]:
-    """Liste des années présentes dans les publications validées (tri asc).
-
-    Contrairement à `/api/publications/years` qui remonte toutes les
-    années, celui-ci ne remonte que les années validées (config
-    `years_validated`).
-    """
+    """Liste des années présentes dans les publications validées (tri asc, restreint via la config `years_validated`)."""
     return queries.available_years()
 
 
