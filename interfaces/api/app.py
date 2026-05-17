@@ -48,7 +48,6 @@ from interfaces.api.deps import _verify_token
 configure_root_logging()
 
 from interfaces.api.routers import (  # noqa: E402
-    admin_pipeline,
     auth,
     config,
     docs,
@@ -69,6 +68,9 @@ from interfaces.api.routers.admin import (  # noqa: E402
     person_duplicates as admin_person_duplicates,
 )
 from interfaces.api.routers.admin import persons as admin_persons  # noqa: E402
+from interfaces.api.routers.admin import (  # noqa: E402
+    pipeline_logs as admin_pipeline_logs,
+)
 from interfaces.api.routers.admin import (  # noqa: E402
     publication_duplicates as admin_publication_duplicates,
 )
@@ -340,7 +342,7 @@ app.include_router(config.router)
 app.include_router(perimeters.router)
 app.include_router(publishers.router)
 app.include_router(journals.router)
-app.include_router(admin_pipeline.router)
+app.include_router(admin_pipeline_logs.router)
 app.include_router(subjects.router)
 
 
