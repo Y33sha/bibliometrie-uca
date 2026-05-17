@@ -1,8 +1,8 @@
-"""Tests de caractérisation pour `infrastructure.addresses.PgAddressLinker`."""
+"""Tests de caractérisation pour `infrastructure.repositories.address_linker.PgAddressLinker`."""
 
 from sqlalchemy import text
 
-from infrastructure.addresses import PgAddressLinker
+from infrastructure.repositories.address_linker import PgAddressLinker
 
 
 def _create_authorship_stub(conn):

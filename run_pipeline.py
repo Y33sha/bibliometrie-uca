@@ -447,7 +447,6 @@ def _run_merge_pubs_by_hal_id() -> None:
 
 def _run_normalize_hal() -> None:
     from application.pipeline.normalize.normalize_hal import HalNormalizer
-    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
@@ -456,6 +455,7 @@ def _run_normalize_hal() -> None:
         publication_repository,
         publisher_repository,
     )
+    from infrastructure.repositories.address_linker import PgAddressLinker
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.zenodo import HttpZenodoResolver
 
@@ -507,7 +507,6 @@ def _run_normalize_wos() -> None:
 
 def _run_normalize_openalex() -> None:
     from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
-    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
@@ -516,6 +515,7 @@ def _run_normalize_openalex() -> None:
         publication_repository,
         publisher_repository,
     )
+    from infrastructure.repositories.address_linker import PgAddressLinker
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.zenodo import HttpZenodoResolver
 
@@ -541,7 +541,6 @@ def _run_normalize_openalex() -> None:
 
 def _run_normalize_scanr() -> None:
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
-    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
@@ -550,6 +549,7 @@ def _run_normalize_scanr() -> None:
         publication_repository,
         publisher_repository,
     )
+    from infrastructure.repositories.address_linker import PgAddressLinker
 
     log.info("▶ normalize_scanr")
     t0 = time.time()
@@ -569,11 +569,11 @@ def _run_normalize_scanr() -> None:
 
 def _run_normalize_theses() -> None:
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
-    from infrastructure.addresses import PgAddressLinker
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.normalize_theses import PgThesesNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import publication_repository
+    from infrastructure.repositories.address_linker import PgAddressLinker
 
     log.info("▶ normalize_theses")
     t0 = time.time()
