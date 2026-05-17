@@ -25,8 +25,7 @@
 * [ ] extracteur hal : manque indication sur documents réimportés et mis à jour: harmoniser le logging entre sources (et les tailles de batch) ->> **CODE_observabilite-robustesse-pipeline.md**
 ## Code
 * [ ] auditer le code pour voir où l'interface continue de requêter source_authorships (sauf trucs vraiment source-spécifiques): supprimer les requêtes pouvant être remplacées par des requêtes vers les tables canoniques
-* [ ] organiser les dossiers queries et infrastructure + interfaces/api/models
-* [ ] typage des ports?
+* [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
 
