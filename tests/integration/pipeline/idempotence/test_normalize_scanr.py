@@ -163,6 +163,7 @@ def run_normalize_scanr(conn):
     from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_scanr import process_work
+    from application.ports.pipeline.staging import StagingRow
     from infrastructure.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -182,7 +183,7 @@ def run_normalize_scanr(conn):
 
     rows = conn.execute(
         text("""
-            SELECT id, source_id AS scanr_id, doi, raw_data
+            SELECT id, source_id, doi, raw_data
             FROM staging
             WHERE source = 'scanr' AND processed = FALSE
             ORDER BY id
@@ -190,11 +191,14 @@ def run_normalize_scanr(conn):
     ).all()
     processed = 0
     for row in rows:
+        staging_row = StagingRow(
+            id=row.id, source_id=row.source_id, doi=row.doi, raw_data=row.raw_data
+        )
         if process_work(
             conn,
             queries,
             logger,
-            row,
+            staging_row,
             journal_repo=journal_repo,
             publisher_repo=publisher_repo,
             pub_repo=pub_repo,

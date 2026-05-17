@@ -72,6 +72,7 @@ def run_normalize_hal(conn):
     from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_hal import process_work
+    from application.ports.pipeline.staging import HalStagingRow
     from infrastructure.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -99,11 +100,18 @@ def run_normalize_hal(conn):
     ).all()
     processed = 0
     for row in rows:
+        staging_row = HalStagingRow(
+            id=row.id,
+            source_id=row.source_id,
+            doi=row.doi,
+            raw_data=row.raw_data,
+            hal_collections=row.hal_collections,
+        )
         if process_work(
             conn,
             queries,
             logger,
-            row,
+            staging_row,
             journal_repo=journal_repo,
             publisher_repo=publisher_repo,
             pub_repo=pub_repo,
