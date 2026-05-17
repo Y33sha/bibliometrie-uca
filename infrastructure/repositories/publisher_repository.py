@@ -11,9 +11,9 @@ d'éditeurs ; la détection préalable des journaux à titre partagé
 deux.
 """
 
-from typing import Any
+from typing import NamedTuple
 
-from sqlalchemy import Connection, Row, delete, func, select, text, update
+from sqlalchemy import Connection, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.publisher_repository import PublisherUpdateFields
@@ -21,7 +21,19 @@ from domain.publishers.publisher import Publisher
 from infrastructure.db.tables import publisher_name_forms, publishers
 
 
-def _publisher_from_row(row: Row[Any]) -> Publisher:
+class _PublisherRow(NamedTuple):
+    """Projection SQL `find_by_id` sur `publishers`."""
+
+    id: int
+    name: str
+    country: str | None
+    openalex_id: str | None
+    is_predatory: bool
+    notes: str | None
+    doi_prefix: str | None
+
+
+def _publisher_from_row(row: _PublisherRow) -> Publisher:
     """Mapping d'une row `publishers` SQL vers l'aggregate `Publisher`."""
     return Publisher(
         id=row.id,
@@ -56,7 +68,7 @@ class PgPublisherRepository:
         ).first()
         if row is None:
             return None
-        return _publisher_from_row(row)
+        return _publisher_from_row(_PublisherRow(*row))
 
     # ── publisher_name_forms ───────────────────────────────────────
 

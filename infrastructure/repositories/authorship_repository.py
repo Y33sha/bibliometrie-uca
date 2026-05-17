@@ -1,13 +1,29 @@
 """Adapter PostgreSQL sync pour les authorships et source_authorships."""
 
-from typing import Any
+from typing import NamedTuple
 
-from sqlalchemy import Connection, Row, text
+from sqlalchemy import Connection, text
 
 from domain.publications.authorship import Authorship
 
 
-def _authorship_from_row(row: Row[Any]) -> Authorship:
+class _AuthorshipRow(NamedTuple):
+    """Projection SQL `find_by_publication_id` sur `authorships` (avec `structure_ids` agrégé depuis `authorship_structures`)."""
+
+    id: int
+    publication_id: int
+    person_id: int | None
+    author_position: int | None
+    in_perimeter: bool | None
+    source_manual: bool | None
+    excluded: bool | None
+    is_corresponding: bool | None
+    roles: list[str] | None
+    structure_ids: list[int]
+    notes: str | None
+
+
+def _authorship_from_row(row: _AuthorshipRow) -> Authorship:
     """Mapping d'une row `authorships` SQL vers l'entité fille `Authorship`.
 
     Les colonnes nullable avec DEFAULT côté DB (`in_perimeter`,
@@ -58,7 +74,7 @@ class PgAuthorshipRepository:
             """),
             {"pub_id": publication_id},
         )
-        return tuple(_authorship_from_row(row) for row in result)
+        return tuple(_authorship_from_row(_AuthorshipRow(*row)) for row in result)
 
     # ── authorships ────────────────────────────────────────────────
 

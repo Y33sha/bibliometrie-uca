@@ -8,9 +8,9 @@ intriquées en casts enum (oa_type, doc_type, source_type) et opérations
 array pour gagner à passer par MetaData.
 """
 
-from typing import Any
+from typing import Any, NamedTuple
 
-from sqlalchemy import Connection, Row, text
+from sqlalchemy import Connection, text
 
 from domain.publication import (  # noqa: F401 — re-export pour compat
     PubByDoi,
@@ -23,7 +23,36 @@ from domain.publications.publication import Publication
 from domain.source_publications.source_publication import SourcePublication
 
 
-def _source_publication_from_row(row: Row[Any]) -> SourcePublication:
+class _SourcePublicationRow(NamedTuple):
+    """Projection SQL `get_source_publications` sur `source_publications`."""
+
+    id: int
+    source: str
+    source_id: str
+    title: str
+    pub_year: int | None
+    doc_type: str | None
+    doi: str | None
+    publication_id: int | None
+    staging_id: int | None
+    journal_id: int | None
+    container_title: str | None
+    language: str | None
+    oa_status: str | None
+    cited_by_count: int | None
+    is_retracted: bool | None
+    abstract: str | None
+    countries: list[str] | None
+    hal_collections: list[str] | None
+    urls: list[str] | None
+    keywords: list[str] | None
+    external_ids: dict[str, Any] | None
+    topics: dict[str, Any] | None
+    biblio: dict[str, Any] | None
+    meta: dict[str, Any] | None
+
+
+def _source_publication_from_row(row: _SourcePublicationRow) -> SourcePublication:
     """Mapping d'une row `source_publications` SQL vers le VO `SourcePublication`. Convertit les colonnes `text[]` Postgres en tuples immutables."""
     return SourcePublication(
         id=row.id,
@@ -328,7 +357,7 @@ class PgPublicationRepository:
             """),
             {"id": pub_id},
         )
-        return [_source_publication_from_row(row) for row in result]
+        return [_source_publication_from_row(_SourcePublicationRow(*row)) for row in result]
 
     # ── Création ───────────────────────────────────────────────────
 

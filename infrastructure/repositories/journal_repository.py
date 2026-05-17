@@ -6,9 +6,10 @@ Même contrat que les autres PgXxxRepository : exceptions du domaine,
 pas d'orchestration métier (qui reste dans `application/journals.py`).
 """
 
-from typing import Any
+from decimal import Decimal
+from typing import NamedTuple
 
-from sqlalchemy import Connection, Row, case, delete, func, or_, select, text, update
+from sqlalchemy import Connection, case, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.journal_repository import JournalUpdateFields
@@ -16,8 +17,32 @@ from domain.journals.journal import Journal
 from infrastructure.db.tables import journal_name_forms, journals
 
 
-def _journal_from_row(row: Row[Any]) -> Journal:
-    """Mapping d'une row `journals` SQL vers l'aggregate `Journal`."""
+class _JournalRow(NamedTuple):
+    """Projection SQL `find_by_id` sur `journals`."""
+
+    id: int
+    title: str
+    issn: str | None
+    eissn: str | None
+    issnl: str | None
+    publisher_id: int | None
+    openalex_id: str | None
+    is_in_doaj: bool
+    is_predatory: bool
+    apc_amount: Decimal | None
+    apc_currency: str | None
+    oa_model: str | None
+    notes: str | None
+    journal_type: str | None
+    is_academic: bool | None
+    doi_prefix: str | None
+
+
+def _journal_from_row(row: _JournalRow) -> Journal:
+    """Mapping d'une row `journals` SQL vers l'aggregate `Journal`.
+
+    `journal_type` et `is_academic` ont des DEFAULT côté DB ('journal' / true) mais leur colonne reste nullable au schéma — on coerce vers le default pour préserver la sémantique non-nullable de l'aggregate.
+    """
     return Journal(
         id=row.id,
         title=row.title,
@@ -32,8 +57,8 @@ def _journal_from_row(row: Row[Any]) -> Journal:
         apc_currency=row.apc_currency,
         oa_model=row.oa_model,
         notes=row.notes,
-        journal_type=row.journal_type,
-        is_academic=row.is_academic,
+        journal_type=row.journal_type if row.journal_type is not None else "journal",
+        is_academic=row.is_academic if row.is_academic is not None else True,
         doi_prefix=row.doi_prefix,
     )
 
@@ -69,7 +94,7 @@ class PgJournalRepository:
         ).first()
         if row is None:
             return None
-        return _journal_from_row(row)
+        return _journal_from_row(_JournalRow(*row))
 
     # ── journal_name_forms ─────────────────────────────────────────
 

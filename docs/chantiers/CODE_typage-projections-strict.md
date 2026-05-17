@@ -57,10 +57,15 @@ Les 6 normalizers (`normalize_wos`, `_hal`, `_openalex`, `_crossref`, `_scanr`, 
 
 ### Phase 3 — `Row[Any]` des repositories (hydratation entité)
 
-Un NamedTuple par `_*_from_row` (structure, publisher, perimeter, authorship, journal, publication). 10 occurrences dans 6 fichiers `infrastructure/repositories/*`.
+Un NamedTuple par `_*_from_row`, **local au repo** (préfixe `_`, pure projection SQL, pas un concept domain). 7 NamedTuple créés sur 6 fichiers `infrastructure/repositories/*`.
 
-- [ ] Une NamedTuple `<Entity>Row` par repo, signature de `_*_from_row` typée fortement.
-- [ ] Reste à arbitrer : NamedTuple local au repo (couplé à l'implémentation Postgres) vs partagé dans `domain/`. A priori local au repo — pure projection SQL, pas un concept domain.
+- [x] `_PerimeterRow` (perimeter_repository) — projection `find_by_id`.
+- [x] `_PublisherRow` (publisher_repository) — projection `find_by_id`.
+- [x] `_JournalRow` (journal_repository) — projection `find_by_id`. Coerce `journal_type` et `is_academic` vers leur DEFAULT côté `_journal_from_row` (DB nullable, aggregate non-nullable).
+- [x] `_AuthorshipRow` (authorship_repository) — projection `find_by_publication_id` avec `structure_ids` agrégé depuis `authorship_structures`.
+- [x] `_SourcePublicationRow` (publication_repository) — projection `get_source_publications`. 24 colonnes.
+- [x] `_StructureRow` + `_StructureNameFormRow` (structure_repository) — projections `find_by_id` (l'aggregate Structure compose les deux).
+- [x] Construction des NamedTuple au site d'appel par déballage positionnel : `_XxxRow(*raw)`. Les signatures `_xxx_from_row` sont strictement typées au NamedTuple.
 
 ### Phase 4 — Sweep DTO par feature (gros morceau)
 
