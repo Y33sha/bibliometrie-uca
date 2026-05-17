@@ -48,7 +48,6 @@ from interfaces.api.deps import _verify_token
 configure_root_logging()
 
 from interfaces.api.routers import (  # noqa: E402
-    admin_person_duplicates,
     admin_pipeline,
     auth,
     config,
@@ -66,6 +65,9 @@ from interfaces.api.routers import (  # noqa: E402
 )
 from interfaces.api.routers.admin import addresses as admin_addresses  # noqa: E402
 from interfaces.api.routers.admin import feedback as admin_feedback  # noqa: E402
+from interfaces.api.routers.admin import (  # noqa: E402
+    person_duplicates as admin_person_duplicates,
+)
 from interfaces.api.routers.admin import persons as admin_persons  # noqa: E402
 from interfaces.api.routers.admin import (  # noqa: E402
     publication_duplicates as admin_publication_duplicates,
