@@ -1,4 +1,4 @@
-"""Tests d'intégration pour le router `interfaces.api.routers.admin_pipeline`.
+"""Tests d'intégration pour le router `interfaces.api.routers.admin.pipeline_logs`.
 
 Couvre :
 - GET /api/admin/pipeline/status (avec / sans pipeline en cours)
@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from interfaces.api.routers import admin_pipeline
+from interfaces.api.routers.admin import pipeline_logs
 
 
 @pytest.fixture
@@ -24,8 +24,8 @@ def _isolate_paths(tmp_path, monkeypatch):
     cron_log = tmp_path / "cron.log"
     status_file = tmp_path / "status.json"
 
-    monkeypatch.setattr(admin_pipeline, "REPORTS_DIR", reports_dir)
-    monkeypatch.setattr(admin_pipeline, "CRON_LOG", cron_log)
+    monkeypatch.setattr(pipeline_logs, "REPORTS_DIR", reports_dir)
+    monkeypatch.setattr(pipeline_logs, "CRON_LOG", cron_log)
 
     import infrastructure.pipeline_status as ps
 

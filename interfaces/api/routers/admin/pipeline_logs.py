@@ -16,7 +16,7 @@ from interfaces.api.models import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-BASE = Path(__file__).resolve().parent.parent.parent.parent
+BASE = Path(__file__).resolve().parent.parent.parent.parent.parent
 REPORTS_DIR = BASE / "logs" / "reports"
 
 
@@ -24,8 +24,7 @@ REPORTS_DIR = BASE / "logs" / "reports"
 def pipeline_status() -> PipelineStatus | None:
     """Retourne le statut du pipeline en cours, ou null si aucun ne tourne.
 
-    Un status.json orphelin (PID mort) est traité comme "inactif" et
-    nettoyé par ``read_status``.
+    Un status.json orphelin (PID mort) est traité comme "inactif" et nettoyé par ``read_status``.
     """
     status = read_status()
     return PipelineStatus.model_validate(status) if status else None
