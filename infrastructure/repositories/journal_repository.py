@@ -11,6 +11,7 @@ from typing import Any
 from sqlalchemy import Connection, Row, case, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from application.ports.repositories.journal_repository import JournalUpdateFields
 from domain.journals.journal import Journal
 from infrastructure.db.tables import journal_name_forms, journals
 
@@ -208,7 +209,7 @@ class PgJournalRepository:
             is not None
         )
 
-    def update_journal_fields(self, journal_id: int, fields: dict) -> None:
+    def update_journal_fields(self, journal_id: int, fields: JournalUpdateFields) -> None:
         """UPDATE dynamique sur journals. Pas de validation ici (l'existence
         et la non-vacuité des fields sont vérifiées par le service)."""
         stmt = (

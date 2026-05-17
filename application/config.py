@@ -5,10 +5,15 @@ Le SQL vit dans `infrastructure/repositories/perimeter_repository.py` (agrégat 
 `config` clé/valeur). Les routers passent par ces fonctions pour toute écriture. Les lectures restent autorisées dans les routers (convention du projet).
 """
 
+from typing import cast
+
 from application.audit import emit_event
 from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.perimeter_repository import PerimeterRepository
+from application.ports.repositories.perimeter_repository import (
+    PerimeterRepository,
+    PerimeterUpdateFields,
+)
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.json_types import JsonValue
 
@@ -104,7 +109,7 @@ def update_perimeter(
         raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
     allowed = {"name", "description", "structure_ids"}
-    clean = {k: v for k, v in fields.items() if k in allowed}
+    clean = cast(PerimeterUpdateFields, {k: v for k, v in fields.items() if k in allowed})
     if not clean:
         raise ValidationError("Aucun champ à mettre à jour")
 

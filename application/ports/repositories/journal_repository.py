@@ -12,9 +12,32 @@ d'éditeurs pour détecter les conflits avant `merge_publisher_into`.
 Implémenté par `infrastructure/repositories/journal_repository.py`.
 """
 
-from typing import Any, Protocol
+from typing import Any, Protocol, TypedDict
 
 from domain.journals.journal import Journal
+
+
+class JournalUpdateFields(TypedDict, total=False):
+    """Partial update sur la table `journals`.
+
+    Toutes les clés sont optionnelles (`total=False`) ; le repo applique
+    un UPDATE sur les clés effectivement présentes. `title_normalized`
+    est calculé par le service quand `title` est fourni.
+    """
+
+    title: str
+    title_normalized: str
+    issn: str | None
+    eissn: str | None
+    issnl: str | None
+    doi_prefix: str | None
+    oa_model: str | None
+    journal_type: str | None
+    is_academic: bool | None
+    is_predatory: bool | None
+    is_in_doaj: bool | None
+    apc_amount: float | None
+    notes: str | None
 
 
 class JournalRepository(Protocol):
@@ -78,7 +101,7 @@ class JournalRepository(Protocol):
 
     def journal_exists(self, journal_id: int) -> bool: ...
 
-    def update_journal_fields(self, journal_id: int, fields: dict[str, Any]) -> None: ...
+    def update_journal_fields(self, journal_id: int, fields: JournalUpdateFields) -> None: ...
 
     # ── APC / DOAJ ─────────────────────────────────────────────────
 

@@ -6,11 +6,16 @@ Séparé de `application/journals.py` (principe SRP) : publishers et journals so
 La fusion d'éditeurs (`merge_publishers`) reste ici parce que sémantiquement c'est une opération sur l'agrégat Publisher ; elle a besoin du port `JournalRepository` en complément pour détecter les journaux à conflit entre les deux éditeurs à fusionner avant de déléguer les transferts SQL.
 """
 
+from typing import cast
+
 from application.audit import emit_event
 from application.journals import merge_journals
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
-from application.ports.repositories.publisher_repository import PublisherRepository
+from application.ports.repositories.publisher_repository import (
+    PublisherRepository,
+    PublisherUpdateFields,
+)
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.json_types import JsonValue
 from domain.normalize import normalize_text
@@ -77,12 +82,12 @@ def update_publisher(
     if not repo.publisher_exists(publisher_id):
         raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
-    fields = dict(fields)
-    if "name" in fields:
-        name = fields["name"]
+    update_fields = cast(PublisherUpdateFields, dict(fields))
+    if "name" in update_fields:
+        name = update_fields["name"]
         assert isinstance(name, str), "fields['name'] doit être un str (validé par Pydantic)"
-        fields["name_normalized"] = normalize_text(name)
-    repo.update_publisher_fields(publisher_id, fields)
+        update_fields["name_normalized"] = normalize_text(name)
+    repo.update_publisher_fields(publisher_id, update_fields)
 
 
 def merge_publishers(

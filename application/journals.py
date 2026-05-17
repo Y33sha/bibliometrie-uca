@@ -6,9 +6,11 @@ Les opérations sur l'agrégat Publisher vivent dans `application/publishers.py`
 Les routers FastAPI utilisent les mêmes repos que le pipeline (routes `def` exécutées dans le threadpool Starlette).
 """
 
+from typing import cast
+
 from application.audit import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.journal_repository import JournalRepository, JournalUpdateFields
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.json_types import JsonValue
 from domain.normalize import normalize_text
@@ -117,12 +119,12 @@ def update_journal(
     if not repo.journal_exists(journal_id):
         raise NotFoundError(f"Revue {journal_id} introuvable")
 
-    fields = dict(fields)
-    if "title" in fields:
-        title = fields["title"]
+    update_fields = cast(JournalUpdateFields, dict(fields))
+    if "title" in update_fields:
+        title = update_fields["title"]
         assert isinstance(title, str), "fields['title'] doit être un str (validé par Pydantic)"
-        fields["title_normalized"] = normalize_text(title)
-    repo.update_journal_fields(journal_id, fields)
+        update_fields["title_normalized"] = normalize_text(title)
+    repo.update_journal_fields(journal_id, update_fields)
 
 
 def update_journal_apc(

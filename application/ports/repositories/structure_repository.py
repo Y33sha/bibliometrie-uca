@@ -1,19 +1,42 @@
 """Port StructureRepository — contrat d'accès à l'agrégat Structure."""
 
-from typing import Any, Protocol
+from typing import Any, Protocol, TypedDict
 
 from domain.structures.structure import Structure
+
+
+class StructureUpdateFields(TypedDict, total=False):
+    """Partial update sur la table `structures`.
+
+    Le service mappe le champ API `type` vers la colonne DB `structure_type` avant d'appeler le repo.
+    """
+
+    name: str
+    acronym: str | None
+    structure_type: str
+    ror_id: str | None
+    rnsr_id: str | None
+    hal_collection: str | None
+    api_ids: dict[str, str | list[str]] | None
+
+
+class StructureNameFormUpdateFields(TypedDict, total=False):
+    """Partial update sur la table `structure_name_forms`.
+
+    `form_text` reçu en clair est normalisé par le service via `normalize_text` avant d'être passé au repo.
+    """
+
+    form_text: str
+    is_word_boundary: bool
+    is_excluding: bool
+    requires_context_of: list[int] | None
 
 
 class StructureRepository(Protocol):
     """Contrat d'accès aux 3 tables du concept Structure
     (structures, structure_relations, structure_name_forms).
 
-    Les retours `dict[str, Any]` sont des records DB (colonnes
-    hétérogènes par table) ; le paramètre `fields: dict[str, Any]`
-    porte des couples (colonne, valeur) pour un UPDATE générique
-    (les types varient selon la colonne). Ces `Any` sont des
-    frontières DB intrinsèques.
+    Les retours `dict[str, Any]` sont des records DB (colonnes hétérogènes par table) ; ces `Any` sont des frontières DB intrinsèques, traités par les phases ultérieures du chantier `CODE_typage-projections-strict`.
     """
 
     # ── Chargement de l'aggregate ──────────────────────────────────
@@ -49,7 +72,7 @@ class StructureRepository(Protocol):
     def update_structure_fields(
         self,
         structure_id: int,
-        fields: dict[str, Any],
+        fields: StructureUpdateFields,
     ) -> dict[str, Any]: ...
 
     def delete_structure(self, structure_id: int) -> dict[str, Any] | None: ...
@@ -90,7 +113,7 @@ class StructureRepository(Protocol):
     def update_name_form_fields(
         self,
         form_id: int,
-        fields: dict[str, Any],
+        fields: StructureNameFormUpdateFields,
     ) -> dict[str, Any]: ...
 
     def delete_name_form(self, form_id: int) -> dict[str, Any] | None: ...

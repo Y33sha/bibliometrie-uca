@@ -3,9 +3,17 @@
 Implémenté par `infrastructure/repositories/perimeter_repository.py`.
 """
 
-from typing import Any, Protocol
+from typing import Protocol, TypedDict
 
 from domain.perimeters.perimeter import Perimeter
+
+
+class PerimeterUpdateFields(TypedDict, total=False):
+    """Partial update sur la table `perimeters` (clés optionnelles)."""
+
+    name: str
+    description: str | None
+    structure_ids: list[int]
 
 
 class PerimeterRepository(Protocol):
@@ -48,7 +56,7 @@ class PerimeterRepository(Protocol):
         description: str | None,
     ) -> int: ...
 
-    def update_perimeter_fields(self, perimeter_id: int, fields: dict[str, Any]) -> None: ...
+    def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdateFields) -> None: ...
 
     def get_perimeter_code(self, perimeter_id: int) -> str | None: ...
 
