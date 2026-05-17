@@ -23,7 +23,7 @@ from interfaces.api.models._common import (
     ValueConfirmedOut,
     YesNoCount,
 )
-from interfaces.api.models.addresses import (
+from interfaces.api.models.admin.addresses import (
     AddressesCountriesResponse,
     AddressForCountryAttribution,
     AddressListResponse,
@@ -42,16 +42,7 @@ from interfaces.api.models.addresses import (
     ReviewAction,
     SetCountry,
 )
-from interfaces.api.models.admin_duplicates import (
-    PubDedupAuthor,
-    PubDedupDetail,
-    PubDedupJournal,
-    PubDedupSource,
-    PubDuplicateNextResponse,
-    PubDuplicatePair,
-    PubMergeResponse,
-)
-from interfaces.api.models.admin_feedback import (
+from interfaces.api.models.admin.feedback import (
     FeedbackAddressesResponse,
     FeedbackAddressItem,
     FeedbackLabDetected,
@@ -60,18 +51,59 @@ from interfaces.api.models.admin_feedback import (
     FeedbackStructureItem,
     FeedbackStructuresResponse,
 )
-from interfaces.api.models.admin_pipeline import (
+from interfaces.api.models.admin.perimeters import (
+    AddPerimeterStructure,
+    PerimeterCreate,
+    PerimeterOut,
+    PerimeterStructureItem,
+    PerimeterUpdate,
+)
+from interfaces.api.models.admin.person_duplicates import (
+    PersonConflictPair,
+    PersonConflictPairResponse,
+    PersonConflictPub,
+    PersonDedupDetail,
+    PersonDedupIdentifier,
+    PersonDedupLab,
+    PersonDedupPublication,
+    PersonDuplicatePair,
+    PersonDuplicatePairResponse,
+)
+from interfaces.api.models.admin.pipeline_config import (
+    ConfigItem,
+    ConfigValueUpdate,
+    HalCollectionsResponse,
+)
+from interfaces.api.models.admin.pipeline_logs import (
     PipelineLogsResponse,
     PipelineReportContent,
     PipelineReportItem,
     PipelineStatus,
 )
-from interfaces.api.models.auth import AuthCheckResponse, LoginRequest
-from interfaces.api.models.config import (
-    ConfigItem,
-    ConfigValueUpdate,
-    HalCollectionsResponse,
+from interfaces.api.models.admin.publication_duplicates import (
+    PubDedupAuthor,
+    PubDedupDetail,
+    PubDedupJournal,
+    PubDedupSource,
+    PubDuplicateNextResponse,
+    PubDuplicatePair,
+    PubMergeResponse,
 )
+from interfaces.api.models.admin.structures import (
+    NameFormCreate,
+    NameFormOut,
+    NameFormUpdate,
+    RelatedStructureOut,
+    RelationCreate,
+    StructureCreate,
+    StructureDetailResponse,
+    StructureListItem,
+    StructureOut,
+    StructureRelationCreateResponse,
+    StructureRelationOut,
+    StructureUpdate,
+)
+from interfaces.api.models.auth import AuthCheckResponse, LoginRequest
 from interfaces.api.models.hal_problems import (
     HalAccountSummary,
     HalAffiliationConflictPub,
@@ -108,24 +140,6 @@ from interfaces.api.models.laboratories import (
     LabStructureCore,
     LabTopCountry,
     LabTutelle,
-)
-from interfaces.api.models.perimeters import (
-    AddPerimeterStructure,
-    PerimeterCreate,
-    PerimeterOut,
-    PerimeterStructureItem,
-    PerimeterUpdate,
-)
-from interfaces.api.models.person_duplicates import (
-    PersonConflictPair,
-    PersonConflictPairResponse,
-    PersonConflictPub,
-    PersonDedupDetail,
-    PersonDedupIdentifier,
-    PersonDedupLab,
-    PersonDedupPublication,
-    PersonDuplicatePair,
-    PersonDuplicatePairResponse,
 )
 from interfaces.api.models.persons import (
     AddIdentifier,
@@ -223,20 +237,6 @@ from interfaces.api.models.stats import (
     StatsSummary,
     YearFacet,
     YearStatsRow,
-)
-from interfaces.api.models.structures import (
-    NameFormCreate,
-    NameFormOut,
-    NameFormUpdate,
-    RelatedStructureOut,
-    RelationCreate,
-    StructureCreate,
-    StructureDetailResponse,
-    StructureListItem,
-    StructureOut,
-    StructureRelationCreateResponse,
-    StructureRelationOut,
-    StructureUpdate,
 )
 from interfaces.api.models.subjects import (
     SubjectDetailResponse,
