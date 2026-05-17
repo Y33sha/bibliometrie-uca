@@ -122,7 +122,7 @@ Tous partiellement couverts par les tests d'idempotence existants ; il reste les
 - [ ] `application/pipeline/normalize/normalize_theses.py` (107, 52 %).
 - [x] `application/pipeline/normalize/normalize_openalex.py` (220 stmts → 99 %, 3 branches partielles défensives — skip issn_l dans upsert_journal, theses_fr sans nnt extrait, branche non-zenodo déjà couverte par le happy path).
 - [ ] `application/pipeline/normalize/base.py` (116, 68 %).
-- [ ] `application/pipeline/normalize/normalize_hal.py` (296, 71 %).
+- [x] `application/pipeline/normalize/normalize_hal.py` (298 stmts → 95 %, 8 lignes / 11 branches partielles défensives — `int()` ValueError dans le parsing composite Solr / authFullNameId, et `if not x_parts: continue` jamais atteints car `str.split()` retourne toujours une liste truthy).
 
 ## Questions ouvertes
 
