@@ -31,15 +31,15 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.pipeline_metrics import PhaseMetrics
-from infrastructure.api_limits import THESES_DELAY, THESES_PER_PAGE
-from infrastructure.api_retry import http_request_with_retry
-from infrastructure.app_config import get_api_base_urls, get_extraction_api_ids
+from infrastructure.sources.api_limits import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.sources.base import (
     ExtractionConfigError,
     SourceExtractor,
     run_extractor,
 )
 from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.config import get_api_base_urls, get_extraction_api_ids
+from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.theses.parsing import (
     build_query,
     extract_doi,

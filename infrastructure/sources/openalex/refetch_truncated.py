@@ -20,10 +20,14 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.pipeline_metrics import PhaseMetrics
-from infrastructure.api_limits import OPENALEX_DELAY
-from infrastructure.app_config import get_api_base_urls, get_openalex_api_key, get_openalex_email
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.sources.api_limits import OPENALEX_DELAY
 from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.config import (
+    get_api_base_urls,
+    get_openalex_api_key,
+    get_openalex_email,
+)
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
 from infrastructure.sources.openalex.parsing import compute_meta_hash
 

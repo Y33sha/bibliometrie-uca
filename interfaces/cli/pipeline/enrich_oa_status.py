@@ -4,12 +4,12 @@ import argparse
 import os
 
 from application.pipeline.enrich.enrich_oa_status import run_enrich
-from infrastructure.api_limits import UNPAYWALL_DELAY
-from infrastructure.app_config import get_api_base_urls
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.log import setup_logger
 from infrastructure.queries.enrich import PgEnrichQueries
 from infrastructure.repositories import publication_repository
+from infrastructure.sources.api_limits import UNPAYWALL_DELAY
+from infrastructure.sources.config import get_api_base_urls
 
 logger = setup_logger("enrich_oa_unpaywall", os.path.join(os.path.dirname(__file__), "logs"))
 

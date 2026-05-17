@@ -16,10 +16,10 @@ import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from infrastructure.api_retry_async import http_request_with_retry_async
-from infrastructure.app_config import get_api_base_urls
-from infrastructure.hal import HAL_FIELDS_STR
 from infrastructure.sources.common import compute_hash
+from infrastructure.sources.config import get_api_base_urls
+from infrastructure.sources.hal.fields import HAL_FIELDS_STR
+from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
 _INSERT_HAL_SQL = text(
     """

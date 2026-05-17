@@ -309,9 +309,10 @@ exclude = [
 # - `infrastructure.repositories.*` et `infrastructure.queries.*` :
 #   couche SQL — Row, records DB, batchs hétérogènes. Phase 8.
 # - `infrastructure.sources.*` : extracteurs API, payloads JSON.
-# - `infrastructure.{api_retry,api_retry_async,settings,pipeline_status}`
-#   et `interfaces.cli.{imports,maintenance}.*` : hors scope du
-#   chantier (CLIs / framework).
+# - `infrastructure.{settings,pipeline_status}` et
+#   `interfaces.cli.{imports,maintenance}.*` : hors scope du chantier
+#   (CLIs / framework). `infrastructure.sources.*` couvre déjà les
+#   helpers HTTP (http_retry, http_retry_async).
 # - `interfaces.api.models:ConfigItem.value` / `ConfigValueUpdate.value` :
 #   pydantic ne supporte pas l'alias récursif `JsonValue` (py310).
 # - `interfaces.cli.dev.generate_seed.TABLES` : schéma de seed,
@@ -338,8 +339,6 @@ module = [
     "application.ports.repositories.*",
     "domain.publications.aggregation",
     "domain.sources.*",
-    "infrastructure.api_retry",
-    "infrastructure.api_retry_async",
     "infrastructure.jsonb_models.*",
     "infrastructure.queries.*",
     "infrastructure.repositories.*",

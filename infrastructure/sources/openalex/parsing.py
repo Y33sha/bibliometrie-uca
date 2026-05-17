@@ -58,7 +58,7 @@ def build_params(
     Les paramètres d'auth (`api_key` ou `mailto`) sont ajoutés via
     `auth_params()` qui lit l'état initialisé par `init_auth()`.
     """
-    from infrastructure.api_limits import OPENALEX_PER_PAGE
+    from infrastructure.sources.api_limits import OPENALEX_PER_PAGE
 
     lineage_filter = "|".join(institution_ids or [])
     if since:

@@ -31,13 +31,13 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.pipeline_metrics import PhaseMetrics
 from domain.publication import extract_hal_id_from_url
-from infrastructure.api_limits import HAL_DELAY
-from infrastructure.api_retry_async import http_request_with_retry_async
-from infrastructure.app_config import get_api_base_urls
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.hal import HAL_FIELDS_STR
 from infrastructure.log import setup_logger
+from infrastructure.sources.api_limits import HAL_DELAY
 from infrastructure.sources.common import compute_hash
+from infrastructure.sources.config import get_api_base_urls
+from infrastructure.sources.hal.fields import HAL_FIELDS_STR
+from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
 _UPSERT_HAL_SQL = text(
     """
