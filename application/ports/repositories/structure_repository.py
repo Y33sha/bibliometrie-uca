@@ -54,18 +54,6 @@ class StructureRepository(Protocol):
 
     def delete_structure(self, structure_id: int) -> dict[str, Any] | None: ...
 
-    def purge_structure_id_from_arrays(self, structure_id: int) -> dict[str, int]:
-        """Retire `structure_id` de tous les `structure_ids[]` qui le référencent.
-
-        Cascade applicative au défaut de FK Postgres sur les éléments
-        d'array : nettoie `authorships.structure_ids`,
-        `source_authorships.structure_ids`, `perimeters.structure_ids`.
-        À appeler avant `delete_structure`.
-
-        Retourne un dict avec le rowcount par table (audit / log).
-        """
-        ...
-
     # ── structure_relations ────────────────────────────────────────
 
     def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:

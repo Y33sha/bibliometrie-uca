@@ -30,15 +30,19 @@ def _create_lab(conn):
 
 
 def _attach(conn, pub_id, lab_id):
-    """Authorship reliant la publi à un labo (via structure_ids).
+    """Authorship reliant la publi à un labo via authorship_structures.
     Évite source_authorships : `lab_ids` filter ne s'appuie que sur
     authorships, pas de besoin d'enregistrement source côté."""
-    conn.execute(
+    aid = conn.execute(
         text(
-            "INSERT INTO authorships (publication_id, structure_ids, in_perimeter, roles) "
-            "VALUES (:pid, :sids, TRUE, ARRAY['author']::text[])"
+            "INSERT INTO authorships (publication_id, in_perimeter, roles) "
+            "VALUES (:pid, TRUE, ARRAY['author']::text[]) RETURNING id"
         ),
-        {"pid": pub_id, "sids": [lab_id]},
+        {"pid": pub_id},
+    ).scalar_one()
+    conn.execute(
+        text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
+        {"a": aid, "s": lab_id},
     )
 
 

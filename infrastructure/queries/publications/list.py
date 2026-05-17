@@ -194,20 +194,18 @@ def list_publications(
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
-                 CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
-                 JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
+                 JOIN authorship_structures aus3 ON aus3.authorship_id = a3.id
+                 JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = 'labo'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                   AND a3.structure_ids IS NOT NULL
                    {person_lab_filter_a3}
                 ) AS labs,
                 (SELECT json_agg(sub ORDER BY sub.label)
                  FROM (
                     SELECT DISTINCT s.id, COALESCE(s.acronym, s.name) AS label
                     FROM authorships a4
-                    CROSS JOIN LATERAL unnest(a4.structure_ids) AS struct_id
-                    JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
+                    JOIN authorship_structures aus4 ON aus4.authorship_id = a4.id
+                    JOIN structures s ON s.id = aus4.structure_id AND s.structure_type = 'labo'
                     WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
-                      AND a4.structure_ids IS NOT NULL
                       {person_lab_filter_a4}
                  ) sub
                 ) AS lab_items,
@@ -392,10 +390,9 @@ def export_publications_csv(
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
-                 CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
-                 JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
+                 JOIN authorship_structures aus3 ON aus3.authorship_id = a3.id
+                 JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = 'labo'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                   AND a3.structure_ids IS NOT NULL
                    {person_lab_filter_a3}
                 ) AS labs
             FROM publications p
@@ -507,10 +504,9 @@ def export_theses_csv(
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
-                 CROSS JOIN LATERAL unnest(a3.structure_ids) AS struct_id
-                 JOIN structures s ON s.id = struct_id AND s.structure_type = 'labo'
+                 JOIN authorship_structures aus3 ON aus3.authorship_id = a3.id
+                 JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = 'labo'
                  WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                   AND a3.structure_ids IS NOT NULL
                 ) AS labs
             FROM publications p
             LEFT JOIN LATERAL (

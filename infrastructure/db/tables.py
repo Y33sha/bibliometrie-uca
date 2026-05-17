@@ -451,7 +451,6 @@ authorships = Table(
     Column("notes", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
-    Column("structure_ids", ARRAY(Integer)),
     Column("is_corresponding", Boolean),
     Column("roles", ARRAY(Text)),
     UniqueConstraint("publication_id", "person_id", name="authorships_publication_person_uq"),
@@ -472,16 +471,20 @@ authorships = Table(
         postgresql_where=text("in_perimeter = true"),
     ),
     Index(
-        "idx_authorships_structs",
-        "structure_ids",
-        postgresql_using="gin",
-        postgresql_where=text("structure_ids IS NOT NULL"),
-    ),
-    Index(
         "idx_authorships_uca",
         "in_perimeter",
         postgresql_where=text("in_perimeter = true"),
     ),
+)
+
+
+authorship_structures = Table(
+    "authorship_structures",
+    metadata,
+    Column("authorship_id", Integer, nullable=False),
+    Column("structure_id", Integer, nullable=False),
+    PrimaryKeyConstraint("authorship_id", "structure_id", name="authorship_structures_pkey"),
+    Index("idx_authorship_structures_structure_id", "structure_id"),
 )
 
 
@@ -494,7 +497,6 @@ source_authorships = Table(
     Column("author_position", SmallInteger),
     Column("in_perimeter", Boolean, server_default="false"),
     Column("excluded", Boolean, server_default="false"),
-    Column("structure_ids", ARRAY(Integer)),
     Column("source_structures", ARRAY(Text)),
     Column("countries", ARRAY(Text)),
     Column("person_id", Integer),
@@ -542,6 +544,20 @@ source_authorship_addresses = Table(
         name="source_authorship_addresses_source_authorship_id_address_id_key",
     ),
     Index("idx_saa_address", "address_id"),
+)
+
+
+source_authorship_structures = Table(
+    "source_authorship_structures",
+    metadata,
+    Column("source_authorship_id", Integer, nullable=False),
+    Column("structure_id", Integer, nullable=False),
+    PrimaryKeyConstraint(
+        "source_authorship_id",
+        "structure_id",
+        name="source_authorship_structures_pkey",
+    ),
+    Index("idx_source_authorship_structures_structure_id", "structure_id"),
 )
 
 

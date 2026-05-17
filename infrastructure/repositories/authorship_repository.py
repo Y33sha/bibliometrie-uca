@@ -42,12 +42,19 @@ class PgAuthorshipRepository:
         par `author_position`). Retourne un tuple vide si aucune."""
         result = self._conn.execute(
             text("""
-                SELECT id, publication_id, person_id, author_position,
-                       in_perimeter, source_manual, excluded,
-                       is_corresponding, roles, structure_ids, notes
-                FROM authorships
-                WHERE publication_id = :pub_id
-                ORDER BY author_position NULLS LAST, id
+                SELECT a.id, a.publication_id, a.person_id, a.author_position,
+                       a.in_perimeter, a.source_manual, a.excluded,
+                       a.is_corresponding, a.roles,
+                       COALESCE(
+                           (SELECT array_agg(structure_id ORDER BY structure_id)
+                            FROM authorship_structures aus
+                            WHERE aus.authorship_id = a.id),
+                           '{}'::int[]
+                       ) AS structure_ids,
+                       a.notes
+                FROM authorships a
+                WHERE a.publication_id = :pub_id
+                ORDER BY a.author_position NULLS LAST, a.id
             """),
             {"pub_id": publication_id},
         )
@@ -181,77 +188,103 @@ class PgAuthorshipRepository:
         source_authorship_ids: list[int],
         perimeter_structure_ids: list[int],
     ) -> None:
+        # Resync `source_authorship_structures` pour les sa donnés : on
+        # repart de zéro (DELETE) puis on insère les liens dérivés des
+        # adresses résolues filtrées par le périmètre.
+        self._conn.execute(
+            text(
+                "DELETE FROM source_authorship_structures WHERE source_authorship_id = ANY(:sa_ids)"
+            ),
+            {"sa_ids": source_authorship_ids},
+        )
         self._conn.execute(
             text("""
-                WITH affected AS (
-                    SELECT unnest(CAST(:sa_ids AS int[])) AS sa_id
-                ),
-                uca_per_authorship AS (
-                    SELECT saa.source_authorship_id AS sa_id,
-                           array_agg(DISTINCT ast.structure_id) AS struct_ids
-                    FROM affected af
-                    JOIN source_authorship_addresses saa ON saa.source_authorship_id = af.sa_id
-                    JOIN address_structures ast ON ast.address_id = saa.address_id
-                    WHERE ast.structure_id = ANY(:struct_ids)
-                      AND ast.is_confirmed IS DISTINCT FROM FALSE
-                    GROUP BY saa.source_authorship_id
-                )
-                UPDATE source_authorships sa
-                SET in_perimeter = (upa.struct_ids IS NOT NULL),
-                    structure_ids = upa.struct_ids
-                FROM affected af
-                LEFT JOIN uca_per_authorship upa ON upa.sa_id = af.sa_id
-                WHERE sa.id = af.sa_id
+                INSERT INTO source_authorship_structures (source_authorship_id, structure_id)
+                SELECT DISTINCT saa.source_authorship_id, ast.structure_id
+                FROM source_authorship_addresses saa
+                JOIN address_structures ast ON ast.address_id = saa.address_id
+                WHERE saa.source_authorship_id = ANY(:sa_ids)
+                  AND ast.structure_id = ANY(:struct_ids)
+                  AND ast.is_confirmed IS DISTINCT FROM FALSE
+                ON CONFLICT DO NOTHING
             """),
             {"sa_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},
+        )
+        self._conn.execute(
+            text("""
+                UPDATE source_authorships sa
+                SET in_perimeter = EXISTS (
+                    SELECT 1 FROM source_authorship_structures sas
+                    WHERE sas.source_authorship_id = sa.id
+                )
+                WHERE sa.id = ANY(:sa_ids)
+            """),
+            {"sa_ids": source_authorship_ids},
         )
 
     def propagate_in_perimeter_to_authorships(
         self,
         source_authorship_ids: list[int],
     ) -> None:
+        # Identifie les (publication_id, person_id) impactées par les
+        # source_authorships modifiées, puis resync les authorships
+        # correspondantes : DELETE de leurs liens existants, INSERT depuis
+        # `source_authorship_structures`, UPDATE du booléen `in_perimeter`.
         self._conn.execute(
             text("""
-                WITH affected_pubs AS (
-                    SELECT DISTINCT sd.publication_id, sa.person_id
-                    FROM source_authorships sa
-                    JOIN source_publications sd ON sd.id = sa.source_publication_id
-                    WHERE sa.id = ANY(:ids)
-                      AND sd.publication_id IS NOT NULL
-                      AND sa.person_id IS NOT NULL
-                ),
-                src_uca AS (
-                    SELECT sd.publication_id, sa.person_id, sa.source,
-                           sa.structure_ids AS struct_ids
-                    FROM affected_pubs ap
-                    JOIN source_publications sd ON sd.publication_id = ap.publication_id
-                    JOIN source_authorships sa ON sa.source_publication_id = sd.id
-                        AND sa.person_id = ap.person_id
-                        AND sa.source = sd.source
-                    WHERE sa.in_perimeter = TRUE AND sa.structure_ids IS NOT NULL
-                ),
-                merged AS (
-                    SELECT ap.publication_id, ap.person_id,
-                           (SELECT array_agg(DISTINCT x)
-                            FROM src_uca su, unnest(su.struct_ids) AS x
-                            WHERE su.publication_id = ap.publication_id
-                              AND su.person_id = ap.person_id
-                           ) AS all_structs,
-                           EXISTS (
-                               SELECT 1 FROM src_uca su
-                               WHERE su.publication_id = ap.publication_id
-                                 AND su.person_id = ap.person_id
-                           ) AS any_uca
-                    FROM affected_pubs ap
-                )
-                UPDATE authorships a
-                SET in_perimeter = m.any_uca,
-                    structure_ids = NULLIF(m.all_structs, ARRAY[]::int[]),
-                    updated_at = now()
-                FROM merged m
-                WHERE a.publication_id = m.publication_id
-                  AND a.person_id = m.person_id
-                  AND a.person_id IS NOT NULL
-            """),
+            CREATE TEMP TABLE _affected_authorships AS
+            SELECT DISTINCT a.id AS authorship_id
+            FROM source_authorships sa
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
+            JOIN authorships a ON a.publication_id = sd.publication_id
+                              AND a.person_id = sa.person_id
+            WHERE sa.id = ANY(:ids)
+              AND sd.publication_id IS NOT NULL
+              AND sa.person_id IS NOT NULL
+        """),
             {"ids": source_authorship_ids},
         )
+
+        self._conn.execute(
+            text("""
+            DELETE FROM authorship_structures aus
+            USING _affected_authorships af
+            WHERE aus.authorship_id = af.authorship_id
+        """)
+        )
+
+        self._conn.execute(
+            text("""
+            INSERT INTO authorship_structures (authorship_id, structure_id)
+            SELECT DISTINCT a.id, sas.structure_id
+            FROM _affected_authorships af
+            JOIN authorships a ON a.id = af.authorship_id
+            JOIN source_publications sd ON sd.publication_id = a.publication_id
+            JOIN source_authorships sa ON sa.source_publication_id = sd.id
+                                       AND sa.person_id = a.person_id
+                                       AND sa.source = sd.source
+            JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id
+            WHERE sa.in_perimeter = TRUE
+              AND NOT sa.excluded
+        """)
+        )
+
+        self._conn.execute(
+            text("""
+            UPDATE authorships a
+            SET in_perimeter = EXISTS (
+                    SELECT 1 FROM source_publications sd
+                    JOIN source_authorships sa ON sa.source_publication_id = sd.id
+                                              AND sa.person_id = a.person_id
+                                              AND sa.source = sd.source
+                    WHERE sd.publication_id = a.publication_id
+                      AND sa.in_perimeter = TRUE
+                      AND NOT sa.excluded
+                ),
+                updated_at = now()
+            FROM _affected_authorships af
+            WHERE a.id = af.authorship_id
+        """)
+        )
+
+        self._conn.execute(text("DROP TABLE _affected_authorships"))

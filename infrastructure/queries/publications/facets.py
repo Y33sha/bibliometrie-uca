@@ -134,8 +134,8 @@ class _PublicationFacetsBuilder:
                        COUNT(DISTINCT a.publication_id) AS count
                 FROM authorships a
                 JOIN publications p ON p.id = a.publication_id
-                CROSS JOIN LATERAL unnest(a.structure_ids) AS struct_id
-                JOIN structures s ON s.id = struct_id
+                JOIN authorship_structures aus ON aus.authorship_id = a.id
+                JOIN structures s ON s.id = aus.structure_id
                 WHERE {where_sql}
                   AND s.structure_type = 'labo'
                 GROUP BY s.id, s.acronym, s.name
@@ -151,7 +151,8 @@ class _PublicationFacetsBuilder:
                 WHERE {where_sql}
                   AND NOT EXISTS (
                       SELECT 1 FROM authorships a
-                      JOIN structures s ON s.id = ANY(a.structure_ids)
+                      JOIN authorship_structures aus ON aus.authorship_id = a.id
+                      JOIN structures s ON s.id = aus.structure_id
                       WHERE a.publication_id = p.id
                         AND NOT a.excluded
                         AND s.structure_type = 'labo'

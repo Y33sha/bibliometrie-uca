@@ -92,14 +92,11 @@ def delete_structure(
 ) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas.
 
-    Cascade applicative avant le DELETE : purge l'id de tous les
-    `structure_ids[]` qui le référencent (`authorships`,
-    `source_authorships`, `perimeters`). Postgres ne supporte pas de FK
-    sur élément d'array — sans ce purge, les arrays garderaient des ids
-    morts. Cf. `DATA_jointures-many-to-many.md` pour le plan de migration
-    qui rendrait ce purge obsolète (tables de jointure + FK natives).
+    Cascade DB via FK `ON DELETE CASCADE` sur `authorship_structures`
+    et `source_authorship_structures`. `perimeters.structure_ids` reste
+    en array (volume trivial, ids morts inoffensifs car JOIN sur
+    `structures(id)` les filtre côté lecture).
     """
-    repo.purge_structure_id_from_arrays(structure_id)
     row = repo.delete_structure(structure_id)
     if not row:
         raise NotFoundError(f"Structure {structure_id} introuvable")

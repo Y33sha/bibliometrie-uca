@@ -178,28 +178,6 @@ class PgStructureRepository:
         row = result.first()
         return dict(row._mapping) if row else None
 
-    def purge_structure_id_from_arrays(self, structure_id: int) -> dict[str, int]:
-        """Retire `structure_id` des `structure_ids[]` des 3 tables qui
-        référencent une structure par array. Postgres ne supporte pas
-        de FK sur élément d'array, on cascade ici à la main.
-
-        Cf. fiche chantier `DATA_jointures-many-to-many.md` pour le plan
-        de migration vers de vraies tables de jointure (qui rendrait ce
-        purge inutile via FK natives).
-        """
-        counts: dict[str, int] = {}
-        for table_name in ("authorships", "source_authorships", "perimeters"):
-            result = self._conn.execute(
-                text(
-                    f"UPDATE {table_name} "
-                    "SET structure_ids = array_remove(structure_ids, :sid) "
-                    "WHERE :sid = ANY(structure_ids)"
-                ),
-                {"sid": structure_id},
-            )
-            counts[table_name] = result.rowcount
-        return counts
-
     # ── structure_relations ────────────────────────────────────────
 
     def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:

@@ -26,10 +26,11 @@ _LAB_SORT_MAP = {
 
 _STRUCTS_CTE = """
     pub_structs AS (
-        SELECT sd.publication_id, sa.structure_ids AS struct_ids
+        SELECT DISTINCT sd.publication_id, sas.structure_id
         FROM source_authorships sa
         JOIN source_publications sd ON sd.id = sa.source_publication_id
-        WHERE sa.in_perimeter = TRUE AND sa.structure_ids IS NOT NULL
+        JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id
+        WHERE sa.in_perimeter = TRUE
           AND sd.publication_id IS NOT NULL
     )
 """
@@ -55,11 +56,15 @@ def _build_stats_labs_sql(
             "(j.oa_model IS DISTINCT FROM 'repository')",
         ]
     )
-    # Spécificité de cet endpoint : lab filter sur ps_structs.struct_ids
-    # (CTE) plutôt que sur authorships, donc lab_clause générique inadapté.
+    # Spécificité de cet endpoint : lab filter passe par la CTE `pub_structs`
+    # (sources, pas authorships) — `lab_clause` générique ne convient pas.
     lab_struct_clause = (
         WhereClause(
-            "ps_structs.struct_ids && CAST(:flt_lab_ids AS int[])",
+            """EXISTS (
+                SELECT 1 FROM pub_structs ps_lab
+                WHERE ps_lab.publication_id = p.id
+                  AND ps_lab.structure_id = ANY(:flt_lab_ids)
+            )""",
             {"flt_lab_ids": lab_ids},
         )
         if lab_ids
@@ -88,7 +93,7 @@ def _build_stats_labs_sql(
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
         JOIN pub_structs ps_structs ON ps_structs.publication_id = p.id
-        JOIN structures s ON s.id = ANY(ps_structs.struct_ids)
+        JOIN structures s ON s.id = ps_structs.structure_id
                          AND s.structure_type = 'labo'
         WHERE {where}
     """
@@ -111,7 +116,7 @@ def _build_stats_labs_sql(
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
         JOIN pub_structs ps_structs ON ps_structs.publication_id = p.id
-        JOIN structures s ON s.id = ANY(ps_structs.struct_ids)
+        JOIN structures s ON s.id = ps_structs.structure_id
                          AND s.structure_type = 'labo'
         LEFT JOIN apc_payments ap_lab
                ON ap_lab.publication_id = p.id AND ap_lab.lab_structure_id = s.id

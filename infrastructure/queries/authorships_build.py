@@ -136,10 +136,10 @@ def propagate_roles(conn: Connection) -> int:
 
 
 def reset_authorships_perimeter_and_structures(conn: Connection) -> int:
-    """Étape 4 (full run) : remet `in_perimeter = FALSE` et `structure_ids = NULL`."""
-    return conn.execute(
-        text("UPDATE authorships SET in_perimeter = FALSE, structure_ids = NULL")
-    ).rowcount
+    """Étape 4 (full run) : remet `in_perimeter = FALSE` et purge `authorship_structures`."""
+    n = conn.execute(text("UPDATE authorships SET in_perimeter = FALSE")).rowcount
+    conn.execute(text("TRUNCATE TABLE authorship_structures"))
+    return n
 
 
 def purge_authorships(conn: Connection) -> int:
@@ -163,40 +163,48 @@ def purge_authorships(conn: Connection) -> int:
 
 
 def propagate_perimeter_and_structures_from(conn: Connection, source: str) -> int:
-    """Étape 4 : propage `in_perimeter` (OR) et `structure_ids` (union) depuis une source.
+    """Étape 4 : propage `in_perimeter` (OR) et les structures (UPSERT) depuis une source.
 
-    Se base sur `source_authorships.structure_ids` et `in_perimeter`, déjà
-    posés par `populate_affiliations`. Retourne le rowcount.
+    Lit `source_authorships.in_perimeter` + `source_authorship_structures` (déjà
+    posés par `populate_affiliations`). Met à jour le booléen `in_perimeter`
+    sur `authorships` et insère les liens manquants dans `authorship_structures`
+    (ON CONFLICT DO NOTHING pour cumuler avec les sources précédentes).
+
+    Retourne la somme des deux rowcounts, à titre indicatif pour le log.
     """
-    return conn.execute(
+    n_perim = conn.execute(
         text("""
-            WITH src_data AS (
-                SELECT sd.publication_id, sa.person_id,
-                       sa.structure_ids AS struct_ids, sa.in_perimeter AS src_in_perimeter
-                FROM source_authorships sa
-                JOIN source_publications sd ON sd.id = sa.source_publication_id
-                JOIN v_active_publications vap ON vap.id = sd.publication_id
-                WHERE sa.source = :source
-                  AND (sa.structure_ids IS NOT NULL OR sa.in_perimeter = TRUE)
-                  AND sa.person_id IS NOT NULL
-                  AND NOT sa.excluded
-            )
             UPDATE authorships a
-            SET structure_ids = CASE
-                    WHEN sd.struct_ids IS NOT NULL THEN (
-                        SELECT array_agg(DISTINCT x)
-                        FROM unnest(COALESCE(a.structure_ids, '{}'::int[]) || sd.struct_ids) AS x
-                    )
-                    ELSE a.structure_ids
-                END,
-                in_perimeter = a.in_perimeter OR sd.src_in_perimeter,
-                updated_at = now()
-            FROM src_data sd
-            WHERE a.publication_id = sd.publication_id
-              AND a.person_id = sd.person_id
+            SET in_perimeter = TRUE, updated_at = now()
+            FROM source_authorships sa
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
+            JOIN v_active_publications vap ON vap.id = sd.publication_id
+            WHERE sa.source = :source
+              AND sa.in_perimeter = TRUE
+              AND sa.person_id IS NOT NULL
+              AND NOT sa.excluded
+              AND a.id = sa.authorship_id
+              AND a.in_perimeter = FALSE
         """),
         {"source": source},
     ).rowcount
+    n_struct = conn.execute(
+        text("""
+            INSERT INTO authorship_structures (authorship_id, structure_id)
+            SELECT DISTINCT sa.authorship_id, sas.structure_id
+            FROM source_authorships sa
+            JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id
+            JOIN source_publications sd ON sd.id = sa.source_publication_id
+            JOIN v_active_publications vap ON vap.id = sd.publication_id
+            WHERE sa.source = :source
+              AND sa.person_id IS NOT NULL
+              AND NOT sa.excluded
+              AND sa.authorship_id IS NOT NULL
+            ON CONFLICT DO NOTHING
+        """),
+        {"source": source},
+    ).rowcount
+    return n_perim + n_struct
 
 
 def count_authorships_in_perimeter(conn: Connection) -> int:

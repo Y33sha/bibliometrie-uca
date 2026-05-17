@@ -31,7 +31,7 @@ def _count_authorships_tables(conn) -> dict:
         )
     ).scalar_one()
     counts["with_structs"] = conn.execute(
-        text("SELECT COUNT(*) AS cnt FROM authorships WHERE structure_ids IS NOT NULL")
+        text("SELECT COUNT(DISTINCT authorship_id) AS cnt FROM authorship_structures")
     ).scalar_one()
     return counts
 

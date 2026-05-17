@@ -90,8 +90,8 @@ def _create_source_authorship(
             "INSERT INTO source_authorships (source, source_publication_id, "
             "                                author_position, person_id, "
             "                                authorship_id, excluded, "
-            "                                in_perimeter, structure_ids) "
-            "VALUES (:s, :spid, :pos, :pid, :aid, :ex, :ip, :sids) RETURNING id"
+            "                                in_perimeter) "
+            "VALUES (:s, :spid, :pos, :pid, :aid, :ex, :ip) RETURNING id"
         ),
         {
             "s": source,
@@ -101,9 +101,16 @@ def _create_source_authorship(
             "aid": authorship_id,
             "ex": excluded,
             "ip": in_perimeter,
-            "sids": structure_ids,
         },
     ).one()
+    for sid in structure_ids or []:
+        conn.execute(
+            text(
+                "INSERT INTO source_authorship_structures (source_authorship_id, structure_id) "
+                "VALUES (:sa, :s)"
+            ),
+            {"sa": row.id, "s": sid},
+        )
     return row.id
 
 
@@ -208,23 +215,27 @@ class TestFindByPublicationId:
     def test_hydrates_full_authorship(self, sa_sync_conn, repo):
         pub_id = _create_publication(sa_sync_conn)
         person_id = _create_person(sa_sync_conn)
-        sa_sync_conn.execute(
+        s42 = _create_structure(sa_sync_conn, code="S42", name="S42")
+        s43 = _create_structure(sa_sync_conn, code="S43", name="S43")
+        aid = sa_sync_conn.execute(
             text("""
                 INSERT INTO authorships
                     (publication_id, person_id, author_position, in_perimeter,
-                     source_manual, excluded, is_corresponding, roles, structure_ids,
-                     notes)
+                     source_manual, excluded, is_corresponding, roles, notes)
                 VALUES (:p, :pid, 3, TRUE, TRUE, FALSE, TRUE,
-                        CAST(:roles AS text[]), CAST(:sids AS integer[]),
-                        'note')
+                        CAST(:roles AS text[]), 'note')
+                RETURNING id
             """),
-            {
-                "p": pub_id,
-                "pid": person_id,
-                "roles": ["author"],
-                "sids": [42, 43],
-            },
-        )
+            {"p": pub_id, "pid": person_id, "roles": ["author"]},
+        ).scalar_one()
+        for sid in (s42, s43):
+            sa_sync_conn.execute(
+                text(
+                    "INSERT INTO authorship_structures (authorship_id, structure_id) "
+                    "VALUES (:a, :s)"
+                ),
+                {"a": aid, "s": sid},
+            )
         auths = repo.find_by_publication_id(pub_id)
         assert len(auths) == 1
         a = auths[0]
@@ -235,7 +246,7 @@ class TestFindByPublicationId:
         assert a.source_manual is True
         assert a.is_corresponding is True
         assert a.roles == ("author",)
-        assert a.structure_ids == (42, 43)
+        assert a.structure_ids == (s42, s43)
         assert a.notes == "note"
 
 
@@ -531,14 +542,26 @@ class TestPropagateUcaForAddresses:
         )
 
         sa = sa_sync_conn.execute(
-            text("SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = :id"),
+            text(
+                "SELECT sa.in_perimeter, "
+                "       (SELECT array_agg(structure_id ORDER BY structure_id) "
+                "        FROM source_authorship_structures "
+                "        WHERE source_authorship_id = sa.id) AS structure_ids "
+                "FROM source_authorships sa WHERE sa.id = :id"
+            ),
             {"id": sa_id},
         ).one()
         assert sa.in_perimeter is True
         assert sa.structure_ids == [uca_id]
 
         a = sa_sync_conn.execute(
-            text("SELECT in_perimeter, structure_ids FROM authorships WHERE id = :id"),
+            text(
+                "SELECT a.in_perimeter, "
+                "       (SELECT array_agg(structure_id ORDER BY structure_id) "
+                "        FROM authorship_structures "
+                "        WHERE authorship_id = a.id) AS structure_ids "
+                "FROM authorships a WHERE a.id = :id"
+            ),
             {"id": authorship_id},
         ).one()
         assert a.in_perimeter is True
@@ -569,7 +592,13 @@ class TestPropagateUcaForAddresses:
         )
 
         sa = sa_sync_conn.execute(
-            text("SELECT in_perimeter, structure_ids FROM source_authorships WHERE id = :id"),
+            text(
+                "SELECT sa.in_perimeter, "
+                "       (SELECT array_agg(structure_id ORDER BY structure_id) "
+                "        FROM source_authorship_structures "
+                "        WHERE source_authorship_id = sa.id) AS structure_ids "
+                "FROM source_authorships sa WHERE sa.id = :id"
+            ),
             {"id": sa_id},
         ).one()
         assert sa.in_perimeter is False

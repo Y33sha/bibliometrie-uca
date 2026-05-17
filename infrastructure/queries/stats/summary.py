@@ -255,8 +255,8 @@ def _facets_sqls(
         FROM authorships a
         JOIN publications p ON p.id = a.publication_id
         LEFT JOIN journals j ON j.id = p.journal_id
-        CROSS JOIN LATERAL unnest(a.structure_ids) AS struct_id
-        JOIN structures s ON s.id = struct_id
+        JOIN authorship_structures aus ON aus.authorship_id = a.id
+        JOIN structures s ON s.id = aus.structure_id
         WHERE {_BASE_CLAUSES} AND {lab_where}
           AND s.structure_type = 'labo'
         GROUP BY s.id, s.acronym, s.name
