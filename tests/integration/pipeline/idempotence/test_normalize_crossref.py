@@ -86,6 +86,7 @@ def _run_normalize_crossref(conn):
     from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_crossref import process_work
+    from application.ports.pipeline.staging import StagingRow
     from infrastructure.queries.normalize_crossref import PgCrossrefNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -109,11 +110,14 @@ def _run_normalize_crossref(conn):
     ).all()
     processed = 0
     for row in rows:
+        staging_row = StagingRow(
+            id=row.id, source_id=row.source_id, doi=row.doi, raw_data=row.raw_data
+        )
         if process_work(
             conn,
             queries,
             logger,
-            row,
+            staging_row,
             journal_repo=journal_repo,
             publisher_repo=publisher_repo,
             pub_repo=pub_repo,

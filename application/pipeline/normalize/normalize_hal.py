@@ -32,7 +32,7 @@ from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.hal import HalNormalizeQueries
-from application.ports.pipeline.staging import StagingQueries
+from application.ports.pipeline.staging import HalStagingRow, StagingQueries
 from application.ports.pipeline.zenodo_resolver import ZenodoResolver
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -506,7 +506,7 @@ def process_work(
     conn: Connection,
     queries: HalNormalizeQueries,
     logger: logging.Logger,
-    staging_row: Row[Any],
+    staging_row: HalStagingRow,
     *,
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
@@ -587,7 +587,7 @@ def process_work(
         raise
 
 
-class HalNormalizer(SourceNormalizer):
+class HalNormalizer(SourceNormalizer[HalStagingRow]):
     SOURCE = "hal"
     DEFAULT_BATCH_SIZE = 500
     USE_DICT_CURSOR = False
@@ -622,7 +622,16 @@ class HalNormalizer(SourceNormalizer):
         self._publisher_repo = self._publisher_repo_factory(conn)
         self._pub_repo = self._pub_repo_factory(conn)
 
-    def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
+    def _row_factory(self, raw: Row[Any]) -> HalStagingRow:
+        return HalStagingRow(
+            id=raw.id,
+            source_id=raw.source_id,
+            doi=raw.doi,
+            raw_data=raw.raw_data,
+            hal_collections=raw.hal_collections,
+        )
+
+    def process_work(self, conn: Connection, row: HalStagingRow) -> bool | None:
         assert self._journal_repo is not None, "preload_caches doit être appelé avant"
         assert self._publisher_repo is not None, "preload_caches doit être appelé avant"
         assert self._pub_repo is not None, "preload_caches doit être appelé avant"

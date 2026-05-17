@@ -16,8 +16,8 @@ import pytest
 from application.pipeline.normalize.base import SourceNormalizer
 
 
-class _SpyNormalizer(SourceNormalizer):
-    """Fake normalizer qui compte les appels à `on_error()`."""
+class _SpyNormalizer(SourceNormalizer[Any]):
+    """Fake normalizer qui compte les appels à `on_error()`. Paramétré sur `Any` car les tests passent des dicts mockés directement à `_process_one`, sans passer par `_iter_rows` / `_row_factory`."""
 
     SOURCE = "spy"
 
@@ -40,11 +40,14 @@ class _SpyNormalizer(SourceNormalizer):
         self.on_error_calls = 0
         self.processed_ids: list[int] = []
 
-    def process_work(self, conn: Any, row: Any) -> bool | None:  # type: ignore[override]
+    def process_work(self, conn: Any, row: Any) -> bool | None:
         self.processed_ids.append(row["id"])
         if row["id"] in self._error_on_ids:
             raise RuntimeError(f"boom on {row['id']}")
         return True
+
+    def _row_factory(self, raw: Any) -> Any:
+        return raw  # tests pass dicts directly, no SA row mapping needed.
 
     def on_error(self) -> None:
         self.on_error_calls += 1

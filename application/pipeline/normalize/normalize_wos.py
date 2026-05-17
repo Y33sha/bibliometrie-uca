@@ -29,7 +29,7 @@ from sqlalchemy import Connection, Row
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.normalize.wos import WosNormalizeQueries
-from application.ports.pipeline.staging import StagingQueries
+from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
@@ -562,7 +562,7 @@ def process_record(
     conn: Connection,
     queries: WosNormalizeQueries,
     logger: logging.Logger,
-    staging_row: Row[Any],
+    staging_row: StagingRow,
     *,
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
@@ -602,13 +602,12 @@ def process_record(
         raise
 
 
-class WosNormalizer(SourceNormalizer):
+class WosNormalizer(SourceNormalizer[StagingRow]):
     SOURCE = "wos"
     DEFAULT_BATCH_SIZE = 500
     USE_DICT_CURSOR = False
     USE_SAVEPOINT = True
     FETCH_SUB_BATCH = 50
-    FETCH_COLUMNS = "id, source_id AS ut, doi, raw_data"
 
     def __init__(
         self,
@@ -634,7 +633,10 @@ class WosNormalizer(SourceNormalizer):
         self._publisher_repo = self._publisher_repo_factory(conn)
         self._pub_repo = self._pub_repo_factory(conn)
 
-    def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
+    def _row_factory(self, raw: Row[Any]) -> StagingRow:
+        return StagingRow(id=raw.id, source_id=raw.source_id, doi=raw.doi, raw_data=raw.raw_data)
+
+    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
         assert (
             self._journal_repo is not None
             and self._publisher_repo is not None

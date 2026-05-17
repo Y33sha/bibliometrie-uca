@@ -957,8 +957,10 @@ class TestProcessAuthorships:
 
 
 def _staging_row(staging_id=1, ut="WOS:1", doi=None, raw=None):
-    """Reproduit la structure tuple-like `Row[Any]` que SQLAlchemy renvoie."""
-    return (staging_id, ut, doi, raw or {})
+    """Construit une `StagingRow` (NamedTuple) pour les tests de `process_record`."""
+    from application.ports.pipeline.staging import StagingRow
+
+    return StagingRow(id=staging_id, source_id=ut, doi=doi, raw_data=raw or {})
 
 
 class TestProcessRecord:

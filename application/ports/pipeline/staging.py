@@ -4,9 +4,31 @@ Implémenté par `infrastructure.queries.staging.PgStagingQueries`.
 Partagé par tous les normalizers via `SourceNormalizer`.
 """
 
-from typing import Any, Protocol
+from typing import Any, NamedTuple, Protocol
 
 from sqlalchemy import Connection, Row
+
+
+class StagingRow(NamedTuple):
+    """Projection des 4 colonnes communes de `staging` consommées par les normalizers (wos, openalex, scanr, crossref, theses)."""
+
+    id: int
+    source_id: str
+    doi: str | None
+    raw_data: dict[str, Any]
+
+
+class HalStagingRow(NamedTuple):
+    """Projection HAL : colonnes communes + `hal_collections` (text[]).
+
+    HAL est la seule source qui consomme la colonne `staging.hal_collections` ; les autres normalizers passent par `StagingRow`.
+    """
+
+    id: int
+    source_id: str
+    doi: str | None
+    raw_data: dict[str, Any]
+    hal_collections: list[str] | None
 
 
 class StagingQueries(Protocol):

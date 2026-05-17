@@ -30,7 +30,7 @@ from sqlalchemy import Connection, Row
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
-from application.ports.pipeline.staging import StagingQueries
+from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.publication_repository import PublicationRepository
 from domain.dates import french_date_to_iso
 from domain.json_types import JsonValue
@@ -217,7 +217,7 @@ def process_work(
     conn: Connection,
     queries: ThesesNormalizeQueries,
     logger: logging.Logger,
-    row: Row[Any],
+    row: StagingRow,
     *,
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
@@ -251,7 +251,7 @@ def process_work(
         raise
 
 
-class ThesesNormalizer(SourceNormalizer):
+class ThesesNormalizer(SourceNormalizer[StagingRow]):
     SOURCE = "theses"
     DEFAULT_BATCH_SIZE = 100
 
@@ -273,7 +273,10 @@ class ThesesNormalizer(SourceNormalizer):
     def preload_caches(self, conn: Connection) -> None:
         self._pub_repo = self._pub_repo_factory(conn)
 
-    def process_work(self, conn: Connection, row: Row[Any]) -> bool | None:
+    def _row_factory(self, raw: Row[Any]) -> StagingRow:
+        return StagingRow(id=raw.id, source_id=raw.source_id, doi=raw.doi, raw_data=raw.raw_data)
+
+    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
         assert self._pub_repo is not None
         return process_work(
             conn,

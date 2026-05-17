@@ -45,12 +45,15 @@ Les 6 `fields: dict[str, Any]` des ports repository deviennent des `TypedDict(to
 
 ### Phase 2 — `Row[Any]` des normalizers (staging)
 
-Les 6 normalizers (`normalize_wos`, `_hal`, `_openalex`, `_crossref`, `_scanr`, `_theses`) partagent un même `process_work(row: Row[Any])` où la row vient de `staging.raw_data`. Colonnes connues et stables. Un seul NamedTuple partagé `StagingRow` couvre les 14 occurrences (signatures + helpers internes `staging_row`) + 6 occurrences ports/queries `staging`.
+Les 6 normalizers (`normalize_wos`, `_hal`, `_openalex`, `_crossref`, `_scanr`, `_theses`) consomment une row issue de `staging.raw_data`. Deux NamedTuple : `StagingRow` (4 colonnes : id, source_id, doi, raw_data) commune à 5 normalizers, `HalStagingRow` (5 colonnes, +`hal_collections`) pour HAL. `SourceNormalizer` devient `Generic[T_Row]`, et chaque sous-classe hydrate la row SA via un `_row_factory` abstract.
 
-- [ ] Définir `StagingRow` (NamedTuple) — où ? probablement `application/ports/pipeline/staging.py`.
-- [ ] Adapter `application/pipeline/normalize/base.py` (`process_work`, `_iter_rows`, `_process_one`).
-- [ ] Propager à chaque normalizer (6 modules).
-- [ ] Adapter `infrastructure/queries/staging.py`.
+- [x] Définir `StagingRow` et `HalStagingRow` (NamedTuple) dans `application/ports/pipeline/staging.py`.
+- [x] Adapter `application/pipeline/normalize/base.py` : `Generic[T_Row]`, `_row_factory` abstract, `_iter_rows` mappe via `_row_factory`, `process_work(row: T_Row)`.
+- [x] Propager aux 6 normalizers (wos, hal, openalex, crossref, scanr, theses) : sous-classe `SourceNormalizer[StagingRow]` ou `[HalStagingRow]`, implémenter `_row_factory`, typer `process_work` / `process_record`.
+- [x] Supprimer les alias FETCH_COLUMNS devenus inutiles (`source_id AS ut/scanr_id/openalex_id`) et l'override redondant Crossref.
+- [x] Supprimer la branche morte `isinstance(staging_row, dict)` dans `normalize_openalex.process_work`.
+- [x] Adapter les tests d'intégration idempotence et `test_reprocessing` qui appellent `process_work` directement (construction de `StagingRow`/`HalStagingRow` à partir de la row SA).
+- [x] `infrastructure/queries/staging.py` reste avec `list[Row[Any]]` : le port garde son contrat paramétrable (`columns: str` ad-hoc). Les 6 `Row[Any]` ports/queries staging sont reportés à Phase 5 (records DB restants) — le mapping fort est dans la base normalizer, suffisant pour purger les 14 occurrences `Row[Any]` côté pipeline.
 
 ### Phase 3 — `Row[Any]` des repositories (hydratation entité)
 

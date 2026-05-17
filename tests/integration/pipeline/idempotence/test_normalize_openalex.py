@@ -109,6 +109,7 @@ def run_normalize_oa(conn):
     from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_openalex import process_work
+    from application.ports.pipeline.staging import StagingRow
     from infrastructure.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -130,17 +131,20 @@ def run_normalize_oa(conn):
 
     rows = conn.execute(
         text("""
-            SELECT id, source_id AS openalex_id, doi, raw_data
+            SELECT id, source_id, doi, raw_data
             FROM staging WHERE source = 'openalex' AND processed = FALSE ORDER BY id
         """)
     ).all()
     processed = 0
     for row in rows:
+        staging_row = StagingRow(
+            id=row.id, source_id=row.source_id, doi=row.doi, raw_data=row.raw_data
+        )
         if process_work(
             conn,
             queries,
             logger,
-            row,
+            staging_row,
             journal_repo=journal_repo,
             publisher_repo=publisher_repo,
             pub_repo=pub_repo,
