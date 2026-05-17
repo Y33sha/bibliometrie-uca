@@ -53,7 +53,6 @@ from interfaces.api.routers import (  # noqa: E402
     hal_problems,
     journals,
     laboratories,
-    perimeters,
     persons,
     publications,
     publishers,
@@ -63,6 +62,9 @@ from interfaces.api.routers import (  # noqa: E402
 )
 from interfaces.api.routers.admin import addresses as admin_addresses  # noqa: E402
 from interfaces.api.routers.admin import feedback as admin_feedback  # noqa: E402
+from interfaces.api.routers.admin import (  # noqa: E402
+    perimeters as admin_perimeters,
+)
 from interfaces.api.routers.admin import (  # noqa: E402
     person_duplicates as admin_person_duplicates,
 )
@@ -341,7 +343,7 @@ app.include_router(admin_person_duplicates.router)
 app.include_router(hal_problems.router)
 app.include_router(docs.router)
 app.include_router(admin_pipeline_config.router)
-app.include_router(perimeters.router)
+app.include_router(admin_perimeters.router)
 app.include_router(publishers.router)
 app.include_router(journals.router)
 app.include_router(admin_pipeline_logs.router)
