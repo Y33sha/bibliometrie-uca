@@ -18,39 +18,6 @@ _DOC_TYPES_EXCLUDED_FROM_CONTRIBUTIONS_SQL = (
 )
 
 
-def get_person(conn: Connection, person_id: int) -> dict[str, Any] | None:
-    """Détail d'une personne avec auteurs liés (admin)."""
-    row = conn.execute(
-        text("""
-            SELECT p.id, p.last_name, p.first_name,
-                p.last_name_normalized, p.first_name_normalized,
-                prh.role_title, prh.department_name, prh.start_date, prh.end_date,
-                (prh.id IS NOT NULL) AS has_rh,
-                (SELECT json_agg(x) FROM (
-                    SELECT MIN(sa.id) AS id, sa.source,
-                           sa.raw_author_name AS full_name
-                    FROM source_authorships sa
-                    WHERE sa.person_id = p.id AND NOT sa.excluded
-                    GROUP BY sa.source, sa.raw_author_name
-                    ORDER BY sa.source, sa.raw_author_name
-                ) x) AS linked_authors,
-                (SELECT json_agg(json_build_object(
-                    'id', pi.id, 'id_type', pi.id_type, 'id_value', pi.id_value,
-                    'source', pi.source, 'status', pi.status
-                ) ORDER BY pi.id_type, pi.id_value)
-                 FROM person_identifiers pi
-                 WHERE pi.person_id = p.id
-                   AND pi.id_type = ANY(:public_id_types)
-                ) AS identifiers
-            FROM persons p
-            LEFT JOIN persons_rh prh ON prh.person_id = p.id
-            WHERE p.id = :pid
-        """),
-        {"pid": person_id, "public_id_types": list(PUBLIC_PERSON_IDENTIFIER_TYPES)},
-    ).one_or_none()
-    return dict(row._mapping) if row else None
-
-
 def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
     """Profil public : infos + identifiants + auteurs liés."""
     person_row = conn.execute(

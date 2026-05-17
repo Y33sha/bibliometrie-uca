@@ -9,7 +9,6 @@ import type { components } from "$lib/api/schema";
 
 // ── Types API (générés) ──
 export type PersonStats = components["schemas"]["PersonsStatsResponse"];
-export type LinkedAuthor = components["schemas"]["LinkedAuthorOut"];
 export type PersonIdentifier = components["schemas"]["PersonIdentifierOut"];
 export type NameForm = components["schemas"]["NameFormSummaryOut"];
 export type Person = components["schemas"]["PersonOut"];

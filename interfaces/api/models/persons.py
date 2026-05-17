@@ -97,14 +97,6 @@ class PersonIdentifierOut(BaseModel):
     status: Literal["pending", "confirmed", "rejected"]
 
 
-class LinkedAuthorOut(BaseModel):
-    """Auteur source (HAL/OpenAlex/WoS) lié à une personne."""
-
-    id: int
-    source: str
-    full_name: str
-
-
 class NameFormSummaryOut(BaseModel):
     """Forme de nom observée pour une personne (liste admin)."""
 
@@ -203,25 +195,8 @@ class PersonsStatsResponse(BaseModel):
     departments: int
 
 
-class PersonDetail(BaseModel):
-    """Réponse de `/api/persons/{id}` (détail + auteurs liés)."""
-
-    id: int
-    last_name: str
-    first_name: str
-    last_name_normalized: str
-    first_name_normalized: str
-    role_title: str | None
-    department_name: str | None
-    start_date: date | None
-    end_date: date | None
-    has_rh: bool
-    linked_authors: list[LinkedAuthorOut] | None
-    identifiers: list[PersonIdentifierOut] | None
-
-
 class PersonProfileCore(BaseModel):
-    """Bloc `person` de `/api/persons/{id}/profile`."""
+    """Bloc `person` de `/api/persons/{id}`."""
 
     id: int
     last_name: str
@@ -233,7 +208,7 @@ class PersonProfileCore(BaseModel):
 
 
 class PersonProfileAuthor(BaseModel):
-    """Auteur source dans `/api/persons/{id}/profile` (vue publique enrichie)."""
+    """Auteur source dans `/api/persons/{id}` (vue publique enrichie)."""
 
     id: int
     source: str

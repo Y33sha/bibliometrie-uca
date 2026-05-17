@@ -244,12 +244,8 @@ class TestPersonEndpoints:
 
 
 class TestPersonDetail:
-    def test_not_found(self, client):
-        r = client.get("/api/persons/999999999")
-        assert r.status_code == 404
-
     def test_profile_not_found(self, client):
-        r = client.get("/api/persons/999999999/profile")
+        r = client.get("/api/persons/999999999")
         assert r.status_code == 404
 
     def test_theses_not_found(self, client):
@@ -260,14 +256,9 @@ class TestPersonDetail:
         r = client.get("/api/persons/999999999/addresses")
         assert r.status_code in (200, 404)
 
-    def test_get_person_ok(self, client):
-        pid = _seed_person("Durand", "Alice")
-        r = client.get(f"/api/persons/{pid}")
-        assert r.status_code == 200
-
     def test_profile_ok(self, client):
         pid = _seed_person("Profileur", "Zoé")
-        r = client.get(f"/api/persons/{pid}/profile")
+        r = client.get(f"/api/persons/{pid}")
         assert r.status_code == 200
 
     def test_addresses_ok(self, client):

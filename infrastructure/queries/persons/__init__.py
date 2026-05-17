@@ -3,7 +3,7 @@
 Le package est organisé par thème :
 - `list` : `persons_directory`, `search_persons`, `list_persons`
 - `facets` : `persons_facets`, `list_departments`, `list_roles`, `persons_stats`
-- `detail` : `get_person`, `person_profile`, `person_theses`, `person_addresses`,
+- `detail` : `person_profile`, `person_theses`, `person_addresses`,
   `person_dashboard`, `person_subjects`
 - `admin` : `person_exists`, orphan authorships, name-form authorships
 - `create` : `PgPersonsCreateQueries` (adapter sync du port
@@ -46,9 +46,6 @@ from infrastructure.queries.persons.admin import (
     person_exists as _person_exists,
 )
 from infrastructure.queries.persons.create import PgPersonsCreateQueries
-from infrastructure.queries.persons.detail import (
-    get_person as _get_person,
-)
 from infrastructure.queries.persons.detail import (
     person_addresses as _person_addresses,
 )
@@ -125,9 +122,6 @@ class PgPersonsQueries(PersonsQueries):
         return _persons_stats(self._conn)
 
     # ── Détail d'une personne ──────────────────────────────────────
-
-    def get_person(self, person_id: int) -> dict[str, Any] | None:
-        return _get_person(self._conn, person_id)
 
     def person_profile(self, person_id: int) -> dict[str, Any] | None:
         return _person_profile(self._conn, person_id)
