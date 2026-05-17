@@ -49,7 +49,6 @@ configure_root_logging()
 
 from interfaces.api.routers import (  # noqa: E402
     auth,
-    config,
     docs,
     hal_problems,
     journals,
@@ -68,6 +67,9 @@ from interfaces.api.routers.admin import (  # noqa: E402
     person_duplicates as admin_person_duplicates,
 )
 from interfaces.api.routers.admin import persons as admin_persons  # noqa: E402
+from interfaces.api.routers.admin import (  # noqa: E402
+    pipeline_config as admin_pipeline_config,
+)
 from interfaces.api.routers.admin import (  # noqa: E402
     pipeline_logs as admin_pipeline_logs,
 )
@@ -338,7 +340,7 @@ app.include_router(admin_persons.router)
 app.include_router(admin_person_duplicates.router)
 app.include_router(hal_problems.router)
 app.include_router(docs.router)
-app.include_router(config.router)
+app.include_router(admin_pipeline_config.router)
 app.include_router(perimeters.router)
 app.include_router(publishers.router)
 app.include_router(journals.router)

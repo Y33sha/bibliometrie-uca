@@ -1,8 +1,6 @@
-"""Configuration router — paramètres applicatifs clé/valeur.
+"""Configuration du pipeline — paramètres applicatifs clé/valeur.
 
-La table `config` stocke des paramètres globaux (années pipeline, clés
-API, credentials sources, etc.). Les périmètres (table `perimeters`)
-sont dans le router dédié `perimeters.py`.
+La table `config` stocke des paramètres globaux (années pipeline, clés API, credentials sources, etc.). Les périmètres (table `perimeters`) sont dans le router dédié `admin/perimeters.py`.
 """
 
 import logging
@@ -25,9 +23,7 @@ def list_config(
 ) -> list[ConfigItem]:
     """Liste tous les paramètres applicatifs (clé, valeur JSON, description).
 
-    Retourne la table `config` triée par clé. Les valeurs sont
-    renvoyées telles quelles (jsonb) — la sémantique de chaque clé
-    est documentée dans `docs/exploitation.md`.
+    Retourne la table `config` triée par clé. Les valeurs sont renvoyées telles quelles (jsonb) — la sémantique de chaque clé est documentée dans `docs/exploitation.md`.
     """
     return [ConfigItem.model_validate(r) for r in queries.list_config()]
 
@@ -49,9 +45,7 @@ def update_config(
 ) -> ConfigItem:
     """Met à jour la valeur d'un paramètre de config.
 
-    La clé doit préexister (pas de création via cet endpoint — les
-    clés sont déclarées dans les migrations). 404 si la clé est
-    inconnue.
+    La clé doit préexister (pas de création via cet endpoint — les clés sont déclarées dans les migrations). 404 si la clé est inconnue.
     """
     return ConfigItem.model_validate(
         config_service.update_config_value(key, body.value, config=config_repo)
