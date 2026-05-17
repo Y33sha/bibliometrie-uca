@@ -48,7 +48,6 @@ from interfaces.api.deps import _verify_token
 configure_root_logging()
 
 from interfaces.api.routers import (  # noqa: E402
-    admin_duplicates,
     admin_feedback,
     admin_person_duplicates,
     admin_pipeline,
@@ -68,6 +67,9 @@ from interfaces.api.routers import (  # noqa: E402
 )
 from interfaces.api.routers.admin import addresses as admin_addresses  # noqa: E402
 from interfaces.api.routers.admin import persons as admin_persons  # noqa: E402
+from interfaces.api.routers.admin import (  # noqa: E402
+    publication_duplicates as admin_publication_duplicates,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -322,7 +324,7 @@ async def root() -> RedirectResponse:
 app.include_router(auth.router)
 app.include_router(stats.router)
 app.include_router(publications.router)
-app.include_router(admin_duplicates.router)
+app.include_router(admin_publication_duplicates.router)
 app.include_router(admin_addresses.router)
 app.include_router(admin_feedback.router)
 app.include_router(laboratories.router)
