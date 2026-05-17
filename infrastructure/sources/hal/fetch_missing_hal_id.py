@@ -32,7 +32,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from domain.pipeline_metrics import PhaseMetrics
 from domain.publication import extract_hal_id_from_url
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.sources.api_limits import HAL_DELAY
 from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import get_api_base_urls

@@ -25,7 +25,7 @@ from domain.normalize import normalize_text
 from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.tables import addresses, country_name_forms
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 
 logger = setup_logger("suggest_countries", "processing/logs")
 

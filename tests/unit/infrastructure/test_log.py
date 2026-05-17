@@ -1,6 +1,6 @@
 """Tests de la consolidation des logs (infrastructure/log.py)."""
 
-from infrastructure.log import _PROJECT_ROOT, _rebase_log_dir
+from infrastructure.observability.log import _PROJECT_ROOT, _rebase_log_dir
 
 
 class TestRebaseLogDir:
@@ -48,7 +48,7 @@ class TestSetupLoggerFileLocation:
     def test_writes_under_logs_tree(self, tmp_path, monkeypatch):
         import importlib.util
 
-        import infrastructure.log as log_module
+        import infrastructure.observability.log as log_module
 
         spec = importlib.util.spec_from_file_location(
             "infrastructure_log_fresh", log_module.__file__
@@ -78,7 +78,7 @@ class TestMakeFormatter:
     def test_json_default(self, monkeypatch):
         import logging as _logging
 
-        from infrastructure.log import _make_formatter
+        from infrastructure.observability.log import _make_formatter
 
         # Le .env du projet définit LOG_FORMAT=text ; on isole le test
         # pour vérifier le fallback "json" quand la var n'est pas posée.
@@ -99,7 +99,7 @@ class TestMakeFormatter:
     def test_text_when_env_text(self, monkeypatch):
         import logging as _logging
 
-        from infrastructure.log import _make_formatter
+        from infrastructure.observability.log import _make_formatter
 
         monkeypatch.setenv("LOG_FORMAT", "text")
         fmt = _make_formatter()
@@ -121,7 +121,7 @@ class TestJsonFormatter:
         import json
         import logging as _logging
 
-        from infrastructure.log import JsonFormatter
+        from infrastructure.observability.log import JsonFormatter
 
         fmt = JsonFormatter()
         record = _logging.LogRecord(
@@ -144,7 +144,7 @@ class TestJsonFormatter:
         import logging as _logging
         import sys as _sys
 
-        from infrastructure.log import JsonFormatter
+        from infrastructure.observability.log import JsonFormatter
 
         fmt = JsonFormatter()
         try:
@@ -173,7 +173,7 @@ class TestConfigureRootLogging:
         monkeypatch.delenv("PYTEST_VERSION", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
-        from infrastructure.log import configure_root_logging
+        from infrastructure.observability.log import configure_root_logging
 
         root = _logging.getLogger()
         dummy = _logging.NullHandler()
@@ -195,7 +195,7 @@ class TestConfigureRootLogging:
 
         monkeypatch.setenv("PYTEST_VERSION", "test")
 
-        from infrastructure.log import configure_root_logging
+        from infrastructure.observability.log import configure_root_logging
 
         root = _logging.getLogger()
         dummy = _logging.NullHandler()

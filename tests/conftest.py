@@ -1,6 +1,6 @@
 """Configuration pytest partagée entre tests unitaires et d'intégration.
 
-- Mocke `infrastructure.log.setup_logger` pour éviter que les tests
+- Mocke `infrastructure.observability.log.setup_logger` pour éviter que les tests
   écrivent dans les fichiers log de production.
 - Fixture `_clear_caches` (autouse) qui vide les caches module-level
   entre chaque test.
@@ -27,7 +27,7 @@ def pytest_configure(config):
     Évite que les scripts importés par les tests écrivent dans
     `logs/*.log` (pollution du répertoire projet et concurrence disque).
     """
-    import infrastructure.log as _log_module
+    import infrastructure.observability.log as _log_module
 
     def _test_setup_logger(name, log_dir):
         import logging

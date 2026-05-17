@@ -5,7 +5,7 @@ import os
 
 from application.pipeline.persons.create_persons_from_source_authorships import run
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.queries.persons.create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 

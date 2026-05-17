@@ -5,7 +5,7 @@ import os
 
 from application.pipeline.publications.merge_pubs_by_hal_id import run_merge
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.queries.merge import PgMergeQueries
 from infrastructure.repositories import publication_repository
 

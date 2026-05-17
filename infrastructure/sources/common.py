@@ -9,7 +9,9 @@ from sqlalchemy import Connection, text
 
 from domain.publication import clean_doi  # noqa: F401 — réexporté pour les scripts d'extraction
 from domain.sources import ALL_SOURCES_SET as VALID_SOURCES
-from infrastructure.log import setup_logger  # noqa: F401 — réexporté pour les scripts d'extraction
+from infrastructure.observability.log import (
+    setup_logger,  # noqa: F401 — réexporté pour les scripts d'extraction
+)
 
 
 def compute_hash(raw_data: dict) -> str:

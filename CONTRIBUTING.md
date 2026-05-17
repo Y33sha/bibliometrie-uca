@@ -44,7 +44,7 @@ Créer `infrastructure/sources/<source>/extract_<source>.py` héritant de `Sourc
 
 ```python
 from domain.pipeline_metrics import PhaseMetrics
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.sources.base import SourceExtractor, run_extractor
 
 class MaSourceExtractor(SourceExtractor):

@@ -14,7 +14,7 @@ import os
 
 from application.pipeline.countries.refresh_publication_countries import refresh
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.log import setup_logger
+from infrastructure.observability.log import setup_logger
 from infrastructure.queries.countries import PgCountryQueries
 
 logger = setup_logger(

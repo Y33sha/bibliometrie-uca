@@ -101,7 +101,7 @@ ignore_imports = [
     # projet (en attendant la refonte du mode d'affichage de la doc).
     # Ces 2 cas ne sont pas des queries / repos et ne dépendent pas
     # d'une connexion DB.
-    "interfaces.api.routers.admin.pipeline_logs -> infrastructure.pipeline_status",
+    "interfaces.api.routers.admin.pipeline_logs -> infrastructure.observability.pipeline_status",
     "interfaces.api.routers.docs -> infrastructure",
 ]
 

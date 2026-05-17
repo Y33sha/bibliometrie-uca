@@ -1,12 +1,12 @@
-"""Tests de la capture/rapport pipeline (infrastructure/pipeline_metrics.py)."""
+"""Tests de la capture/rapport pipeline (`infrastructure/observability/pipeline_report.py`)."""
 
 import importlib.util
 from pathlib import Path
 
 
 def _fresh_module(tmp_path: Path, monkeypatch):
-    """Recharge pipeline_metrics avec BASE pointée vers tmp_path."""
-    import infrastructure.pipeline_metrics as pm
+    """Recharge pipeline_report avec BASE pointée vers tmp_path."""
+    import infrastructure.observability.pipeline_report as pm
 
     spec = importlib.util.spec_from_file_location("pm_fresh", pm.__file__)
     fresh = importlib.util.module_from_spec(spec)
