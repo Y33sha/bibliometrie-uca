@@ -2,35 +2,101 @@
 
 ## Contexte
 
-Le chantier `CODE_chasse-aux-any` a verrouillé `disallow_any_explicit` et `disallow_any_generics` globalement. Subsistent quatre familles de types « bâtards » documentés et désactivés par module dans `pyproject.toml` :
+Le chantier `CODE_chasse-aux-any` a verrouillé `disallow_any_explicit` et `disallow_any_generics` globalement. Subsistent quatre familles de types « bâtards » documentés et désactivés par module dans `pyproject.toml` (chiffres recomptés à l'ouverture du chantier) :
 
-- **`Row[Any]`** (28 occ.) — surtout signatures `process_work` des normalizers et retours de queries SA `.one()/.all()`. Le `[Any]` neutralise la vérification du contenu de la row alors qu'on sait quels champs sont sélectionnés.
-- **`list[dict[str, Any]]`** (130 occ.) — mélange hétérogène : listes de records DB hydratés en dict, batchs SQL `executemany` à valeurs hétérogènes, listes JSON externes, retours de query services API (`infrastructure/queries/*` consommés par les routers FastAPI).
-- **`fields: dict[str, Any]`** (6 occ.) — partial updates côté ports repository (`update_*_fields`). Les colonnes possibles sont connues du port mais pas exprimées dans le type.
-- **Pydantic `BaseModel` dans `interfaces/api/models.py`** — DTOs de retour API. Les query services renvoient `dict[str, Any]`, les routers font `Model.model_validate(...)` pour fabriquer le `BaseModel` correspondant au `response_model` (option A retenue par `CODE_chasse-aux-any` Phase 2.4). Option C écartée à l'époque : faire en sorte que les query services renvoient directement des DTOs typés.
+- **`Row[Any]`** (45 occ., 23 fichiers) — surtout signatures `process_work` des normalizers et retours de queries SA `.one()/.all()`. Le `[Any]` neutralise la vérification du contenu de la row alors qu'on sait quels champs sont sélectionnés.
+- **`list[dict[str, Any]]`** (141 occ., 56 fichiers) — mélange hétérogène : listes de records DB hydratés en dict, batchs SQL `executemany` à valeurs hétérogènes, listes JSON externes, retours de query services API (`infrastructure/queries/*` consommés par les routers FastAPI).
+- **`fields: dict[str, Any]`** (6 occ., 5 ports repository) — partial updates côté ports repository (`update_*_fields`). Les colonnes possibles sont connues du port mais pas exprimées dans le type.
+- **Pydantic `BaseModel` dans `interfaces/api/models/`** (~175 classes réparties par feature) — DTOs de retour API. Les query services renvoient `dict[str, Any]`, les routers font `Model.model_validate(...)` pour fabriquer le `BaseModel` correspondant au `response_model` (option A retenue par `CODE_chasse-aux-any` Phase 2.4). Option C écartée à l'époque : faire en sorte que les query services renvoient directement des DTOs typés.
 
 Le chantier `CODE_rich-domain-model` Phase 8 hydrate les **aggregates roots** (find_by_id → entité riche). Ce chantier-ci traite **tout le reste** : projections délibérément non hydratées, partial updates, DTOs de retour API.
 
 ## Décisions
 
-À instruire au démarrage. Hypothèses de travail :
-
-1. **Pas une hydratation systématique** : si une méthode retourne 2-3 colonnes pour usage immédiat, pas la peine de fabriquer une entité — un `NamedTuple` ou `TypedDict` suffit. Le critère « entité riche vs projection » se tranche au cas par cas selon ce que le caller en fait.
+1. **Pas d'hydratation systématique** : si une méthode retourne 2-3 colonnes pour usage immédiat, pas la peine de fabriquer une entité — un `NamedTuple` ou `TypedDict` suffit. Le critère « entité riche vs projection » se tranche au cas par cas selon ce que le caller en fait.
 2. **Pattern de remplacement selon la couche** :
    - **Retours consommés par routers FastAPI** (`application/ports/api/*_queries.py`) : **Pydantic `BaseModel`**, parce que FastAPI a besoin du `response_model` pour la validation et la sérialisation JSON.
-   - **Tout le reste** (pipeline, repos d'aggregate, batchs SQL, partial updates) : `TypedDict` / `NamedTuple` / `dataclass(frozen)` selon le cas. `NamedTuple` immutable et indexable, `TypedDict` zero-cost (pas d'objet créé), `dataclass` plus expressif (defaults, validators).
-3. **DTOs API — déplacement structurel** : les Pydantic `BaseModel` actuels dans `interfaces/api/models.py` sortent vers `application/dtos/` (placement à trancher : global `application/dtos/` ou colocation par feature `application/persons/dtos.py`, etc.). Les Protocols `application/ports/api/*` retournent ces DTOs au lieu de `dict[str, Any]`. Les adapters `infrastructure/queries/Pg*Queries` instancient les DTOs côté infra. Les routers ne font plus de `model_validate` — ils propagent directement le DTO renvoyé par le query service.
+   - **Tout le reste** (pipeline, repos d'aggregate, batchs SQL, partial updates) : `TypedDict` / `NamedTuple` / `dataclass(frozen)` selon le cas. Règles de choix :
+     - **TypedDict** quand le dict existe déjà (`RealDictCursor` psycopg, JSON parsé) — zero-cost. Aussi pour les champs optionnels avec `total=False`.
+     - **NamedTuple** quand on crée la structure à partir d'un tuple-like SA (`row.col` accès nommé + destructuration possible).
+     - **dataclass(frozen=True)** quand on veut des methods / properties calculées / defaults complexes.
+3. **DTOs API — déplacement structurel** : les Pydantic `BaseModel` actuels dans `interfaces/api/models/` sortent vers `application/<feature>/dtos.py` (**colocation par feature** plutôt que `application/dtos/` global — cohérent avec le découpage `application/` actuel, et compatible avec un sweep progressif feature par feature). Les Protocols `application/ports/api/*` retournent ces DTOs au lieu de `dict[str, Any]`. Les adapters `infrastructure/queries/Pg*Queries` instancient les DTOs côté infra. Les routers ne font plus de `model_validate` — ils propagent directement le DTO renvoyé par le query service.
 4. **Partial updates** : `TypedDict(total=False)` par port (`JournalUpdateFields`, `PerimeterUpdateFields`, `PublisherUpdateFields`, `StructureUpdateFields`, `StructureNameFormUpdateFields`). Absorbé depuis `rich-domain-model` Phase 8.
 5. **Batchs SQL hétérogènes** (`normalize_wos` notamment) : décomposer par batch (`WosAddressBatch`, `WosAuthorshipBatch`, …) avec un dataclass ou TypedDict par contrat.
+6. **`Row[Any]` SQLAlchemy** : remplacer par **NamedTuple par requête** (pas par `Row[tuple[...]]` paramétré, plus fragile au reorder de colonnes du SELECT). Critère de seuil : on type dès qu'on accède à `row.col_x` ou qu'on propage la row hors de la fonction. Les `.scalar_one()` mono-colonne restent intactes.
+7. **Périodicité** : **sweep progressif par feature** (persons d'abord, puis publications, …) plutôt qu'un gros bang. Vu le volume (175 BaseModel + 141 `dict[str, Any]` + 45 `Row[Any]`), un refactor monolithique aurait un blast radius ingérable. Une feature à la fois, sortie de l'override mypy module par module.
 
 ## Phasage
 
-À instruire. Esquisse :
+Audit Phase 0 effectué à l'ouverture (cf. chiffres dans Contexte). Phases d'exécution :
 
-- **Audit** : inventaire des 28 `Row[Any]` + 130 `list[dict[str, Any]]` + 6 `fields: dict[str, Any]` + ~30 modèles `BaseModel` de `interfaces/api/models.py`, classifiés par catégorie (record DB interne / batch SQL / liste JSON / partial update / retour API) et par fréquence d'usage.
-- **Décision de pattern** par catégorie (cf. Décisions ci-dessus).
-- **Sweep par couche** : domain ports → application ports → infrastructure adapters → application services. Le déplacement des DTOs Pydantic est un sous-sweep dédié (changement de package + adaptation des Pg*Queries et routers).
-- **Retrait progressif des modules** correspondants de l'override de désactivation `disallow_any_explicit = false` dans `pyproject.toml`. Suppression d'une bonne partie de l'override « `interfaces.api.models` + records DB » au passage.
+### Phase 1 — Partial updates (TypedDict, scope étroit)
+
+Les 6 `fields: dict[str, Any]` des ports repository deviennent des `TypedDict(total=False)` (un par port). Victoire rapide, test : type-check verrouille les callers à des clés de colonne valides.
+
+- [ ] `application/ports/repositories/journal_repository.py` → `JournalUpdateFields`
+- [ ] `application/ports/repositories/perimeter_repository.py` → `PerimeterUpdateFields`
+- [ ] `application/ports/repositories/publisher_repository.py` → `PublisherUpdateFields`
+- [ ] `application/ports/repositories/structure_repository.py` → `StructureUpdateFields` + `StructureNameFormUpdateFields`
+- [ ] Adapter les implémentations `infrastructure/repositories/*` correspondantes.
+- [ ] Adapter les callers application services.
+
+### Phase 2 — `Row[Any]` des normalizers (staging)
+
+Les 6 normalizers (`normalize_wos`, `_hal`, `_openalex`, `_crossref`, `_scanr`, `_theses`) partagent un même `process_work(row: Row[Any])` où la row vient de `staging.raw_data`. Colonnes connues et stables. Un seul NamedTuple partagé `StagingRow` couvre les 14 occurrences (signatures + helpers internes `staging_row`) + 6 occurrences ports/queries `staging`.
+
+- [ ] Définir `StagingRow` (NamedTuple) — où ? probablement `application/ports/pipeline/staging.py`.
+- [ ] Adapter `application/pipeline/normalize/base.py` (`process_work`, `_iter_rows`, `_process_one`).
+- [ ] Propager à chaque normalizer (6 modules).
+- [ ] Adapter `infrastructure/queries/staging.py`.
+
+### Phase 3 — `Row[Any]` des repositories (hydratation entité)
+
+Un NamedTuple par `_*_from_row` (structure, publisher, perimeter, authorship, journal, publication). 10 occurrences dans 6 fichiers `infrastructure/repositories/*`.
+
+- [ ] Une NamedTuple `<Entity>Row` par repo, signature de `_*_from_row` typée fortement.
+- [ ] Reste à arbitrer : NamedTuple local au repo (couplé à l'implémentation Postgres) vs partagé dans `domain/`. A priori local au repo — pure projection SQL, pas un concept domain.
+
+### Phase 4 — Sweep DTO par feature (gros morceau)
+
+Un sweep par feature, dans cet ordre (du plus petit au plus gros pour rôder le pattern) :
+
+- [ ] **subjects** (7 BaseModel) — pilote, le plus petit
+- [ ] **auth** (2)
+- [ ] **journals** (3)
+- [ ] **publishers** (4)
+- [ ] **perimeters** (5 admin)
+- [ ] **person_duplicates** (9 admin)
+- [ ] **hal_problems** (14)
+- [ ] **publication_duplicates** (7 admin)
+- [ ] **feedback** (7 admin)
+- [ ] **pipeline_config** (3 admin) + **pipeline_logs** (4 admin)
+- [ ] **structures** (12 admin)
+- [ ] **addresses** (17 admin)
+- [ ] **stats** (14)
+- [ ] **laboratories** (14)
+- [ ] **publications** (21)
+- [ ] **persons** (21 + 16 admin + 12 authorships admin = 49)
+
+Pour chaque feature, étapes type :
+
+1. Créer `application/<feature>/dtos.py` (ou `application/<feature>/admin/dtos.py` pour les routes admin).
+2. Déplacer les Pydantic models depuis `interfaces/api/models/<feature>.py`.
+3. Adapter le port `application/ports/api/<feature>_queries.py` pour retourner les DTOs au lieu de `dict[str, Any]`.
+4. Adapter `infrastructure/queries/<feature>` pour instancier les DTOs côté infra.
+5. Simplifier le routeur (plus de `model_validate`).
+6. Retirer le module de l'override mypy `disallow_any_explicit = false` dans `pyproject.toml`.
+7. Tests : la suite d'intégration de la feature doit rester verte.
+
+Note `_common.py` (16 BaseModel partagés transverses) : à traiter à la fin, probablement dans `application/dtos/_common.py` ou colocation feature-by-feature selon les usages.
+
+### Phase 5 — Records DB pipeline restants
+
+Les `list[dict[str, Any]]` non triés par Phase 1-4 : queries `merge`, `name_forms`, `normalize_wos`, batchs SQL `executemany`, services `merge_pubs_by_hal_id`, `create_persons_from_source_authorships`, `resolve_addresses`. TypedDict ou dataclass par contrat, au cas par cas. Estimation ~80 occurrences restantes à ce stade.
+
+### Phase 6 — Bilan override mypy
+
+Retrait final des modules de l'override `disallow_any_explicit = false` qui peuvent l'être. Documentation des modules irréductibles (sources API externes, CLI) avec justification durable dans le commentaire `pyproject.toml`.
 
 ## Résiduel JSONB (à tout hasard)
 
@@ -49,10 +115,7 @@ Le volet "introspection BI" du reproche initial (un outil Metabase/Superset ne s
 
 ## Questions ouvertes
 
-- **`Row[Any]` vs `Row[tuple[type1, type2, ...]]`** : la version paramétrée est précise mais fragile (changement de SELECT → type cassé sans erreur runtime). Décision pragmatique probable : `NamedTuple` par requête plutôt que `Row` paramétré.
-- **Coût/bénéfice par cas** : certains `Row[Any]` ne valent pas le typage (résultat lu une fois sur place, `.scalar_one()`). Un critère « > 2 colonnes ou propagé hors de la fonction » est probablement le bon seuil.
-- **Placement des DTOs déplacés** : `application/dtos/` global vs colocation par feature (`application/persons/dtos.py`, `application/publications/dtos.py`, …). Le second est plus cohérent avec le découpage actuel par feature de `application/` ; le premier rassemble le contrat API en un point.
-- **Periodicité du sweep** : un seul gros refactor par catégorie, ou progressif par feature (Pg*Queries persons d'abord, puis publications, …) ? Probablement progressif pour limiter le blast radius.
+Aucune au démarrage — les 4 questions initiales ont été tranchées (cf. Décisions 3, 6, 7 et le seuil de typage en 6). Toute question apparaissant en cours de chantier va ici.
 
 ## Liens
 
