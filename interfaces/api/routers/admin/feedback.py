@@ -22,10 +22,7 @@ from interfaces.api.models import (
     FeedbackStructuresResponse,
 )
 
-# Types de structures éligibles au tableau de bord feedback, dans l'ordre
-# d'affichage (universités en premier, laboratoires en dernier). Règle
-# métier : le feedback porte sur les entités organisationnelles de
-# haut niveau, pas sur les sites physiques ni les équipes internes.
+# Types de structures éligibles au tableau de bord feedback, dans l'ordre d'affichage (universités en premier, laboratoires en dernier).
 _FEEDBACK_STRUCTURE_TYPES: tuple[str, ...] = (
     "universite",
     "onr",
@@ -54,10 +51,8 @@ def feedback_structures(
     """Structures éligibles au tableau de bord feedback, groupées par type.
 
     Encode deux règles métier :
-    - seuls les types listés dans `_FEEDBACK_STRUCTURE_TYPES` sont
-      éligibles (universités, organismes, CHU, écoles, labos) ;
-    - la structure UCA (code = "uca") est sélectionnée par défaut si
-      elle existe, sinon la première structure du premier type non vide.
+    - seuls les types listés dans `_FEEDBACK_STRUCTURE_TYPES` sont éligibles (universités, organismes, CHU, écoles, labos) ;
+    - la structure UCA (code = "uca") est sélectionnée par défaut si elle existe, sinon la première structure du premier type non vide.
     """
     rows = queries.feedback_structures(list(_FEEDBACK_STRUCTURE_TYPES))
 
@@ -140,8 +135,7 @@ async def feedback_rerun() -> StreamingResponse:
     """Lance resolve_addresses en SSE (détection complète sur toutes les adresses).
 
     `async def` parce qu'on streame stdout d'un subprocess via
-    `asyncio.create_subprocess_exec` + `StreamingResponse`. Aucune
-    connexion DB en jeu, cohabitation supportée par FastAPI.
+    `asyncio.create_subprocess_exec` + `StreamingResponse`. Aucune connexion DB en jeu, cohabitation supportée par FastAPI.
     """
     import asyncio
 
