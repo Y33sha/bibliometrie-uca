@@ -33,8 +33,6 @@ from interfaces.api.models.addresses import (
     AddressReviewResponse,
     AddressStatsResponse,
     AddressStructureSummary,
-    AssignStructureAction,
-    AssignStructureResponse,
     BatchCountryResponse,
     BatchReviewAction,
     BatchSetCountry,
@@ -43,7 +41,6 @@ from interfaces.api.models.addresses import (
     CountrySuggestionsResponse,
     ReviewAction,
     SetCountry,
-    UnassignStructureResponse,
 )
 from interfaces.api.models.admin_duplicates import (
     PubDedupAuthor,
@@ -266,8 +263,6 @@ __all__ = [
     "AddressesCountriesResponse",
     "ApcFacet",
     "AssignOrphanAuthorship",
-    "AssignStructureAction",
-    "AssignStructureResponse",
     "AuthCheckResponse",
     "AuthorshipExcludeResponse",
     "BatchAssignOrphanAuthorships",
@@ -457,7 +452,6 @@ __all__ = [
     "ThesesAuthorshipOut",
     "ThesisMeta",
     "TotalCountResponse",
-    "UnassignStructureResponse",
     "UpdateIdentifierStatus",
     "UpdatePersonName",
     "ValueConfirmedOut",

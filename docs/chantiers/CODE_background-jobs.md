@@ -22,9 +22,7 @@ Plan :
   (l'utilisatrice relance la mutation si besoin), on reste simple. Sinon,
   introduire un job queue (pg-boss like) — plus gros chantier.
 
-Endpoints candidats (à vérifier) : `review_structure_link`,
-`batch_review_structure_link`, `unassign_manual_structure`, puis les
-endpoints pays `batch_set_country_by_ids` / `batch_set_country_by_filter`.
+Endpoints candidats (à vérifier) : `review_structure_link`, `batch_review_structure_link`, puis les endpoints pays `batch_set_country_by_ids` / `batch_set_country_by_filter`.
 
 ## Audit endpoints long-running
 
@@ -32,8 +30,7 @@ Lister les endpoints POST/PUT/PATCH qui peuvent franchir le timeout
 reverse-proxy (60s classique) selon le volume. Priorité :
 user-triggered (pas les scripts CLI). Candidats pressentis :
 
-- `review_structure_link` / `batch_review_structure_link` /
-  `unassign_manual_structure` (périmètre d'adresses populaires)
+- `review_structure_link` / `batch_review_structure_link` (périmètre d'adresses populaires)
 - `batch_set_country_by_ids` / `batch_set_country_by_filter` (pays
   sur beaucoup d'adresses)
 - Endpoints merge de `admin/duplicates` (publications / persons)

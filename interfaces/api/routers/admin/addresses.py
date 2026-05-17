@@ -19,7 +19,6 @@ from application.ports.api.addresses_queries import (
 )
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
-from application.ports.repositories.structure_repository import StructureRepository
 from interfaces.api.deps import (
     address_repo_sync,
     addresses_queries_sync,
@@ -28,7 +27,6 @@ from interfaces.api.deps import (
     db_conn_sync,
     get_perimeter_queries_sync,
     require_admin,
-    structure_repo_sync,
 )
 from interfaces.api.models import (
     AddressesCountriesResponse,
@@ -36,8 +34,6 @@ from interfaces.api.models import (
     AddressPublicationsResponse,
     AddressReviewResponse,
     AddressStatsResponse,
-    AssignStructureAction,
-    AssignStructureResponse,
     BatchCountryResponse,
     BatchReviewAction,
     BatchSetCountry,
@@ -47,7 +43,6 @@ from interfaces.api.models import (
     OkResponse,
     ReviewAction,
     SetCountry,
-    UnassignStructureResponse,
 )
 
 router = APIRouter()
@@ -260,56 +255,6 @@ def batch_set_country(
 
     bg.add_task(bg_propagate_countries_sync, all_ids)
     return BatchCountryResponse(updated=updated, propagated=propagated)
-
-
-@router.post("/api/addresses/{addr_id}/assign-structure", response_model=AssignStructureResponse)
-def assign_structure(
-    addr_id: int,
-    action: AssignStructureAction,
-    conn: Connection = Depends(db_conn_sync),
-    queries: AddressesQueries = Depends(addresses_queries_sync),
-    addr_repo: AddressRepository = Depends(address_repo_sync),
-    auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
-    struct_repo: StructureRepository = Depends(structure_repo_sync),
-) -> AssignStructureResponse:
-    """Assigne manuellement une structure à une adresse."""
-    if not queries.address_exists(addr_id):
-        raise HTTPException(status_code=404, detail="Address not found")
-    if not struct_repo.structure_exists(action.structure_id):
-        raise HTTPException(status_code=404, detail="Structure not found")
-
-    structures_service.review_structure_link(
-        conn,
-        addr_id,
-        action.structure_id,
-        True,
-        repo=addr_repo,
-        authorship_repo=auth_repo,
-        perimeter_queries=get_perimeter_queries_sync(),
-    )
-    return AssignStructureResponse(id=addr_id, structure_id=action.structure_id, status="assigned")
-
-
-@router.delete(
-    "/api/addresses/{addr_id}/assign-structure", response_model=UnassignStructureResponse
-)
-def unassign_structure(
-    addr_id: int,
-    structure_id: int = Query(...),
-    conn: Connection = Depends(db_conn_sync),
-    addr_repo: AddressRepository = Depends(address_repo_sync),
-    auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
-) -> UnassignStructureResponse:
-    """Supprime l'assignation manuelle d'une structure."""
-    deleted = structures_service.unassign_manual_structure(
-        conn,
-        addr_id,
-        structure_id,
-        repo=addr_repo,
-        authorship_repo=auth_repo,
-        perimeter_queries=get_perimeter_queries_sync(),
-    )
-    return UnassignStructureResponse(deleted=deleted)
 
 
 @router.get("/api/admin/address-stats", response_model=AddressStatsResponse)

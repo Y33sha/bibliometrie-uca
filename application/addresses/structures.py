@@ -95,31 +95,3 @@ def batch_review_structure_link(
             conn, changed, repo=authorship_repo, perimeter_queries=perimeter_queries
         )
     return updated
-
-
-def unassign_manual_structure(
-    conn: Connection,
-    address_id: int,
-    structure_id: int,
-    *,
-    repo: AddressRepository,
-    authorship_repo: AuthorshipRepository,
-    perimeter_queries: PerimeterQueries,
-) -> bool:
-    """Supprime uniquement le lien manuel (matched_form_id IS NULL) entre
-    une adresse et une structure. Les liens auto-détectés et leurs is_confirmed
-    ne sont pas touchés (contrairement à review_structure_link(None)).
-
-    Propage l'UCA uniquement si la contribution de l'adresse au calcul
-    in_perimeter change effectivement.
-    Retourne True si un lien manuel a été supprimé, False sinon.
-    """
-    before = repo.which_contribute_to_perimeter([address_id], structure_id)
-    deleted = repo.delete_manual_structure_link(address_id, structure_id)
-    after = repo.which_contribute_to_perimeter([address_id], structure_id)
-
-    if before != after:
-        propagate_uca_for_addresses(
-            conn, [address_id], repo=authorship_repo, perimeter_queries=perimeter_queries
-        )
-    return deleted
