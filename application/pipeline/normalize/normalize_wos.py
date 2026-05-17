@@ -458,7 +458,11 @@ def _resolve_addresses_batch(
 
 
 def process_authorships(
-    conn: Connection, queries: WosNormalizeQueries, rec: dict, source_publication_id: int
+    conn: Connection,
+    queries: WosNormalizeQueries,
+    logger: logging.Logger,
+    rec: dict,
+    source_publication_id: int,
 ) -> None:
     """Traite les authorships d'un record WoS + crée les liens adresses.
 
@@ -470,9 +474,20 @@ def process_authorships(
     queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
     # Filtrer les auteurs exploitables (cf. `is_wos_author_exploitable`
-    # pour la sémantique du filtre).
-    authors_kept = [a for a in rec.get("authors", []) if is_wos_author_exploitable(a)]
+    # pour la sémantique du filtre). Si tous les auteurs échouent au
+    # filtre, le record est jeté sans authorships : on logge pour
+    # détecter une dérive éventuelle de l'API WoS (perte silencieuse
+    # de records sinon ; cf. audit `is_wos_author_exploitable`).
+    raw_authors = rec.get("authors", [])
+    authors_kept = [a for a in raw_authors if is_wos_author_exploitable(a)]
     if not authors_kept:
+        if raw_authors:
+            logger.warning(
+                "WoS record %s : %d auteurs présents mais aucun exploitable "
+                "(filtre is_wos_author_exploitable) — authorships ignorés",
+                rec.get("ut", "?"),
+                len(raw_authors),
+            )
         return
 
     # Batch INSERT source_authorships (person_identifiers JSONB,
@@ -575,7 +590,7 @@ def process_record(
         source_publication_id = insert_wos_document(conn, queries, rec, staging_id, None, pub_meta)
         t.mark("wos_doc")
 
-        process_authorships(conn, queries, rec, source_publication_id)
+        process_authorships(conn, queries, logger, rec, source_publication_id)
         t.mark("authors")
 
         staging_queries.mark_done(conn, staging_id)
