@@ -82,21 +82,37 @@ def _insert_authorship(
     in_perimeter=True,
     person_id=None,
     identifiers=None,
+    source_data=None,
 ):
     """Insère une source_authorship.
 
     `identifiers` est un dict pour `person_identifiers` (JSONB) :
     ex. `{"orcid": "0000-...", "idref": "...", "hal_person_id": 42, ...}`.
+
+    `source_data` est un dict pour `source_data` (JSONB). Pour les rows
+    OpenAlex qui portent un ORCID, on attend en pratique
+    `{"display_name": ...}` (le filtre `keep_orcid_if_name_matches`
+    rejette l'ORCID sinon — cf. `domain/sources/openalex.py`). Pour les
+    helpers qui ne précisent rien, on défaut sur `display_name =
+    raw_author_name` quand `source == "openalex"` et qu'un ORCID est
+    fourni, pour reproduire le cas nominal où OA a correctement
+    matché l'entité auteur.
     """
+    if source_data is None and source == "openalex" and identifiers and identifiers.get("orcid"):
+        source_data = {"display_name": raw_author_name}
+
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, author_position,
              in_perimeter, person_id, raw_author_name, person_identifiers,
-             author_name_normalized)
+             source_data, author_name_normalized)
         VALUES (:src, :sd, :pos, :in_perim, :person_id,
-                :raw, :person_identifiers, normalize_name_form(:raw))
+                :raw, :person_identifiers, :source_data, normalize_name_form(:raw))
         RETURNING id
-    """).bindparams(bindparam("person_identifiers", type_=JSONB))
+    """).bindparams(
+        bindparam("person_identifiers", type_=JSONB),
+        bindparam("source_data", type_=JSONB),
+    )
     return conn.execute(
         stmt,
         {
@@ -107,6 +123,7 @@ def _insert_authorship(
             "person_id": person_id,
             "raw": raw_author_name,
             "person_identifiers": identifiers,
+            "source_data": source_data,
         },
     ).scalar_one()
 

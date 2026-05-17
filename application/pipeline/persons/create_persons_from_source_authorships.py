@@ -72,14 +72,21 @@ def get_all_unlinked_authorships(
 
         r["allow_create"] = allow_person_creation(r["source"], r.get("roles") or [])
 
-        if r.get("oa_orcid"):
+        # OpenAlex assigne à chaque authorship une entité auteur de son
+        # référentiel ; cette assignation peut être fautive, et l'ORCID
+        # rattaché à l'entité auteur peut alors être celui d'une autre
+        # personne. On confronte le nom de l'entité auteur OA
+        # (`oa_display_name`) au `raw_author_name` de la signature : si
+        # incompatibles ou si `display_name` est absent, on drop l'ORCID.
+        # Les autres sources fournissent un ORCID lié directement à la
+        # signature, pas de filtre nécessaire.
+        if r["source"] == "openalex" and r.get("orcid"):
             r["orcid"] = keep_orcid_if_name_matches(
                 raw_full_name=r["full_name"],
-                oa_full_name=r.get("oa_full_name", ""),
-                oa_orcid=r["oa_orcid"],
+                oa_full_name=r.get("oa_display_name"),
+                oa_orcid=r["orcid"],
             )
-            r.pop("oa_orcid", None)
-            r.pop("oa_full_name", None)
+        r.pop("oa_display_name", None)
 
         all_rows.append(r)
 

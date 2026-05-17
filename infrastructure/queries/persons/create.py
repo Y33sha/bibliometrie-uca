@@ -13,34 +13,17 @@ from application.ports.pipeline.persons_create import PersonsCreateQueries
 
 
 def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
-    """Liste tous les `source_authorships` in-perimeter non rattachés à une
-    `person`, toutes sources confondues (HAL, OpenAlex, WoS, ScanR, theses).
+    """Liste les `source_authorships` in-perimeter non rattachés à une `person`, toutes sources confondues.
 
-    Une seule requête (un seul round-trip DB) — les différences sémantiques
-    entre sources sont portées par des CASE expressions :
+    Colonnes :
 
-    - `orcid` : NULL pour OpenAlex/WoS/CrossRef (filtré à part via
-      `oa_orcid` ci-dessous, ces sources n'étant pas fiables pour
-      l'ORCID au niveau matching).
-    - `idhal` : renseigné uniquement pour HAL. Pas exploité par le
-      matching actuel — le matching par idhal sera réintroduit dans le
-      chantier `METIER_decide-person-match`.
-    - `idref` : renseigné toutes sources (le pipeline `persons`
-      l'utilise comme critère de match cross-source).
-    - `oa_orcid` / `oa_full_name` : exposés pour OpenAlex/WoS/CrossRef
-      pour permettre au caller la vérification de compatibilité des noms.
-    - `roles` : renseigné pour theses uniquement (distingue auteur vs
-      directeur de thèse).
+    - `orcid`, `idref` : lus directement depuis `person_identifiers` (JSONB), sans filtre par source. Le caller décide ce qu'il en fait selon la source (cf. `keep_orcid_if_name_matches` pour OpenAlex).
+    - `oa_display_name` : nom de l'entité auteur OpenAlex (`source_data->>'display_name'`), renseigné uniquement pour les rows OpenAlex et seulement quand `display_name` était présent dans le payload. Sert au filtre `keep_orcid_if_name_matches` qui rejette un ORCID OA si le nom de l'entité auteur diverge du `raw_author_name` de la signature (OA assigne parfois une mauvaise entité auteur, on hérite alors d'un ORCID qui n'est pas celui de l'auteur). `None` pour les autres sources.
+    - `roles` : remonté tel quel ; en pratique non vide uniquement pour theses (distingue auteur vs directeur).
 
-    Tous les identifiants sont lus depuis
-    `source_authorships.person_identifiers` (JSONB).
+    Le nom (last/first) est parsé côté caller via `parse_raw_author_name(full_name)`.
 
-    Le nom (last/first) est parsé côté caller via
-    `domain.names.parse_raw_author_name(full_name)` — uniformément pour
-    toutes les sources.
-
-    Filtre supplémentaire : OpenAlex/WoS/CrossRef exclus des lignes avec
-    `raw_author_name IS NULL` (pas de nom utilisable).
+    Les lignes sans `raw_author_name` sont exclues toutes sources confondues (sans nom, l'authorship est inexploitable pour le matching personnes).
     """
     rows = conn.execute(
         text("""
@@ -48,20 +31,12 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
                    sa_auth.source::text AS source,
                    sa_auth.raw_author_name AS full_name,
                    sa_auth.author_name_normalized,
-                   CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref') THEN NULL::text
-                        ELSE sa_auth.person_identifiers->>'orcid' END AS orcid,
-                   CASE WHEN sa_auth.source = 'hal'
-                        THEN sa_auth.person_identifiers->>'idhal'
-                        ELSE NULL::text END AS idhal,
+                   sa_auth.person_identifiers->>'orcid' AS orcid,
                    sa_auth.person_identifiers->>'idref' AS idref,
-                   CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref')
-                        THEN sa_auth.person_identifiers->>'orcid'
-                        ELSE NULL::text END AS oa_orcid,
-                   CASE WHEN sa_auth.source IN ('openalex', 'wos', 'crossref')
-                        THEN sa_auth.raw_author_name
-                        ELSE NULL::text END AS oa_full_name,
-                   CASE WHEN sa_auth.source = 'theses' THEN sa_auth.roles
-                        ELSE NULL END AS roles,
+                   CASE WHEN sa_auth.source = 'openalex'
+                        THEN sa_auth.source_data->>'display_name'
+                        ELSE NULL::text END AS oa_display_name,
+                   sa_auth.roles,
                    sd.publication_id,
                    sa_auth.author_position
             FROM source_authorships sa_auth
@@ -70,8 +45,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
             WHERE sa_auth.person_id IS NULL
               AND sa_auth.in_perimeter = TRUE
               AND sd.publication_id IS NOT NULL
-              AND (sa_auth.source NOT IN ('openalex', 'wos', 'crossref')
-                   OR sa_auth.raw_author_name IS NOT NULL)
+              AND sa_auth.raw_author_name IS NOT NULL
         """)
     ).all()
     return [dict(r._mapping) for r in rows]
@@ -80,9 +54,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
 def fetch_linked_authorships(conn: Connection) -> list[dict[str, Any]]:
     """`source_authorships` déjà rattachées (toutes sources confondues).
 
-    Ramène `raw_author_name` ; le caller parse via
-    `domain.names.parse_raw_author_name` pour toutes les sources
-    uniformément.
+    Ramène `raw_author_name` ; le caller parse via `domain.names.parse_raw_author_name` pour toutes les sources uniformément.
     """
     rows = conn.execute(
         text("""

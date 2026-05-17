@@ -239,7 +239,7 @@ def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]:
 
 def keep_orcid_if_name_matches(
     raw_full_name: str,
-    oa_full_name: str,
+    oa_full_name: str | None,
     oa_orcid: str | None,
 ) -> str | None:
     """Filtre l'ORCID porté par une entité auteur OpenAlex.
@@ -253,13 +253,18 @@ def keep_orcid_if_name_matches(
     Garde-fou : on ne conserve l'ORCID OpenAlex que si le nom de
     l'entité auteur OpenAlex (``oa_full_name``) est compatible (au
     sens de ``names_compatible``) avec le ``raw_author_name`` que
-    l'authorship porte côté source. Sinon ``None`` — l'ORCID n'est
-    pas remonté en ``person_identifiers``.
+    l'authorship porte côté source.
 
-    Renvoie ``oa_orcid`` si compatible, ``None`` sinon (ou si
-    ``oa_orcid`` est déjà ``None``).
+    Renvoie ``oa_orcid`` si compatible. Renvoie ``None`` si :
+
+    - ``oa_orcid`` est ``None`` ou vide ;
+    - ``oa_full_name`` est ``None`` ou vide (cas où le payload OA
+      n'embarque pas le ``display_name`` de l'entité auteur — on ne
+      peut pas vérifier la compatibilité, donc on rejette par défaut
+      pour éviter d'introduire un faux positif) ;
+    - les deux noms sont incompatibles.
     """
-    if not oa_orcid:
+    if not oa_orcid or not oa_full_name:
         return None
     src_ln, src_fn = parse_raw_author_name(raw_full_name)
     oa_ln, oa_fn = parse_raw_author_name(oa_full_name)
