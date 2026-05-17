@@ -5,18 +5,9 @@ Usage :
     emit_event(audit_repo, "person.merged", "person", target_id,
                {"source_id": source_id})
 
-Le user_id est récupéré automatiquement depuis le contexte d'authentification
-(middleware HTTP). Les opérations déclenchées hors contexte (pipeline, scripts,
-tests) sont silencieusement ignorées — elles ne polluent pas la table.
+Le user_id est récupéré automatiquement depuis le contexte d'authentification (middleware HTTP). Les opérations déclenchées hors contexte (pipeline, scripts, tests) sont silencieusement ignorées — elles ne polluent pas la table.
 
-Pourquoi un ContextVar : pour propager le user_id à travers ~15 fonctions de
-services sans ajouter `user_id: str | None = None` à toutes leurs signatures.
-Les ContextVar sont async-local — chaque requête HTTP a son propre contexte,
-pas de fuite entre requêtes.
-
-L'écriture SQL elle-même passe par le port `AuditRepository` (cf.
-`application/ports/repositories/audit_repository.py`), pas par un `cur.execute` inline :
-règle DDD `application ⊥ infrastructure`.
+Pourquoi un ContextVar : pour propager le user_id à travers ~15 fonctions de services sans ajouter `user_id: str | None = None` à toutes leurs signatures. Les ContextVar sont async-local — chaque requête HTTP a son propre contexte, pas de fuite entre requêtes.
 """
 
 import contextvars

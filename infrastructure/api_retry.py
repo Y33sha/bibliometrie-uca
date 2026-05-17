@@ -4,8 +4,7 @@ Helper générique pour les requêtes HTTP avec retry + backoff exponentiel.
 Encapsule le pattern commun aux extracteurs :
   - retry sur HTTP 429 (Too Many Requests)
   - retry sur les erreurs réseau (RequestException)
-  - optionnellement retry sur body vide (certaines API comme WoS renvoient
-    parfois un body vide sans 429, typiquement sous rate-limit silencieux)
+  - optionnellement retry sur body vide (certaines API comme WoS renvoient parfois un body vide sans 429, typiquement sous rate-limit silencieux)
 
 Les scripts d'extraction utilisent ce module au lieu de dupliquer la logique.
 """

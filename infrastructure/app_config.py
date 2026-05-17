@@ -1,8 +1,6 @@
 """Lecture de la configuration applicative.
 
-Lit depuis la table `config` en base. Les scripts du pipeline appellent ce
-module pour les paramètres externalisés (années, collections, affiliations,
-clés API, credentials ScanR).
+Lit depuis la table `config` en base. Les scripts du pipeline appellent ce module pour les paramètres externalisés (années, collections, affiliations, clés API, credentials ScanR).
 """
 
 import datetime

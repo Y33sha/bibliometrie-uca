@@ -1,8 +1,6 @@
 """Service Référentiel Personnes — accès exclusif en écriture aux tables `persons`, `person_identifiers`, `person_name_forms`.
 
 Gère aussi le rattachement/détachement des authorships sources (`source_authorships`) puisque le `person_id` y est la source de vérité du lien personne.
-
-Les identifiants par observation (orcid/idhal/idref/hal_person_id) sont portés par `source_authorships.person_identifiers` (JSONB) côté sources.
 """
 
 import logging

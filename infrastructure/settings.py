@@ -1,17 +1,13 @@
 """
 Configuration du projet bibliometrie-uca.
 
-Settings typés chargés depuis les variables d'environnement ou un fichier
-`.env` à la racine du projet (gitignored). En prod, les variables sont
-injectées par l'orchestrateur (pm2, systemd, docker).
+Settings typés chargés depuis les variables d'environnement ou un fichier `.env` à la racine du projet (gitignored). En prod, les variables sont injectées par l'orchestrateur (pm2, systemd, docker).
 
 Usage :
     from infrastructure.settings import settings
     print(settings.db_host)
 
-Les paramètres externalisés dynamiques (périmètres, clés API, credentials
-ScanR, collections HAL, années pipeline) sont lus depuis la table `config`
-en base via utils.app_config.
+Les paramètres externalisés dynamiques (périmètres, clés API, credentials ScanR, collections HAL, années pipeline) sont lus depuis la table `config` en base via utils.app_config.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -44,9 +40,7 @@ class Settings(BaseSettings):
     db_password: str
 
     # ----- Pool de connexions -----
-    # Ratio max/min recommandé : ~1:15. Bumper db_pool_max à 50+ si l'API
-    # admin charge plusieurs facettes en parallèle et qu'on observe des
-    # TimeoutError côté pool. Cf. `.env.example` pour la note opérationnelle.
+    # Ratio max/min recommandé : ~1:15. Bumper db_pool_max à 50+ si l'API admin charge plusieurs facettes en parallèle et qu'on observe des TimeoutError côté pool. Cf. `.env.example` pour la note opérationnelle.
     db_pool_min: int = 2
     db_pool_max: int = 30
 
@@ -62,6 +56,5 @@ class Settings(BaseSettings):
         }
 
 
-# pydantic-settings lit les champs required depuis l'environnement / .env ;
-# mypy ne le voit pas et les exige comme kwargs explicites.
+# pydantic-settings lit les champs required depuis l'environnement / .env ; mypy ne le voit pas et les exige comme kwargs explicites.
 settings = Settings()  # type: ignore[call-arg]
