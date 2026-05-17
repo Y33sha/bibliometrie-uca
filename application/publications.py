@@ -1,12 +1,9 @@
 """
 Service Publications — accès exclusif en écriture à la table `publications`.
 
-Toute création, mise à jour ou recherche de publication passe par ce module.
-Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres
-traitements appellent ces fonctions au lieu de faire du SQL direct.
+Toute création, mise à jour ou recherche de publication passe par ce module. Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions au lieu de faire du SQL direct.
 
-Les fonctions find_by_* retournent des namedtuples pour un accès par nom
-indépendant du type de curseur (tuple ou dict_row).
+Les fonctions find_by_* retournent des namedtuples pour un accès par nom indépendant du type de curseur (tuple ou dict_row).
 """
 
 from application.audit import emit_event

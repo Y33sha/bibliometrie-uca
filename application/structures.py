@@ -1,15 +1,9 @@
 """
-Service Structures — orchestrateur des opérations sur `structures`,
-`structure_relations`, `structure_name_forms`.
+Service Structures — orchestrateur des opérations sur `structures`, `structure_relations`, `structure_name_forms`.
 
-Le SQL vit dans `infrastructure/repositories/structure_repository.py`.
-La validation du JSONB `api_ids` se fait à la frontière infra (repo)
-plutôt qu'ici — tout chemin d'écriture (service applicatif + scripts
-CLI éventuels) passe par le repo, donc la validation y est appliquée
-uniformément.
+Le SQL vit dans `infrastructure/repositories/structure_repository.py`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) plutôt qu'ici — tout chemin d'écriture (service applicatif + scripts CLI éventuels) passe par le repo, donc la validation y est appliquée uniformément.
 
-Les routers passent par ces fonctions pour toute écriture. Les lectures
-restent autorisées dans les routers (convention du projet).
+Les routers passent par ces fonctions pour toute écriture. Les lectures restent autorisées dans les routers (convention du projet).
 """
 
 from application.audit import emit_event

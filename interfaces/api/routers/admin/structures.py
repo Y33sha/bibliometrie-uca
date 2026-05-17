@@ -1,10 +1,6 @@
 """Router structures — CRUD structures, relations parent-enfant, formes de noms.
 
-Les structures couvrent les entités organisationnelles (labos, UFR,
-universités, CHU, écoles, sites). Les relations `structure_relations`
-expriment les tutelles (`est_tutelle_de`, `est_partenaire_de`) et les
-formes de nom `structure_name_forms` servent au matching d'adresses
-(phase pipeline `addresses`).
+Les structures couvrent les entités organisationnelles (labos, UFR, universités, CHU, écoles, sites). Les relations `structure_relations` expriment les tutelles (`est_tutelle_de`, `est_partenaire_de`) et les formes de nom `structure_name_forms` servent au matching d'adresses.
 """
 
 import logging
@@ -46,11 +42,7 @@ def list_structures(
 ) -> list[StructureListItem]:
     """Liste des structures, filtrable par type et par texte libre.
 
-    `type` : enum `structure_type` (`labo`, `universite`, `onr`,
-    `chu`, `ecole`, `site`, `equipe`, `autre`). `search` : matching
-    accent-insensible sur nom / acronyme / code. Tri canonique par
-    type (labo > universite > onr > chu > ecole > site > autre) puis
-    nom.
+    `type` : enum `structure_type` (`labo`, `universite`, `onr`, `chu`, `ecole`, `site`, `equipe`, `autre`). `search` : matching accent-insensible sur nom / acronyme / code. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
     """
     return [
         StructureListItem.model_validate(r)
@@ -65,10 +57,7 @@ def get_structure(
 ) -> StructureDetailResponse:
     """Détail complet d'une structure : identifiants + parents + enfants + formes de nom.
 
-    Retourne `{structure, parents, children, forms}`. Les parents
-    sont les structures qui ont cette structure comme `child_id`
-    dans `structure_relations` ; les enfants inversement. 404 si la
-    structure n'existe pas.
+    Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_relations` ; les enfants inversement. 404 si la structure n'existe pas.
     """
     detail = queries.get_structure_detail(structure_id)
     if detail is None:
@@ -120,8 +109,7 @@ def delete_structure(
     repo: StructureRepository = Depends(structure_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> DeletedResponse:
-    """Supprime une structure. Cascade sur les relations et formes de
-    noms liées. 404 si inconnue."""
+    """Supprime une structure. Cascade sur les relations et formes de noms liées. 404 si inconnue."""
     structures_service.delete_structure(structure_id, repo=repo, audit_repo=audit)
     return DeletedResponse()
 
@@ -133,9 +121,7 @@ def create_relation(
 ) -> StructureRelationCreateResponse:
     """Crée une relation parent-enfant entre deux structures.
 
-    Idempotent : si une relation identique (même parent, child, type)
-    existe, renvoie `{"status": "already_exists"}` au lieu de la
-    recréer.
+    Idempotent : si une relation identique (même parent, child, type) existe, renvoie `{"status": "already_exists"}` au lieu de la recréer.
     """
     row = structures_service.create_relation(
         parent_id=data.parent_id,
@@ -178,12 +164,8 @@ def create_name_form(
 ) -> NameFormOut:
     """Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
 
-    `form_text` est normalisé (accents, casse, ponctuation) par le
-    service avant insertion. `is_word_boundary` : le match exige
-    une frontière de mot dans l'adresse brute. `is_excluding` :
-    forme à exclure, pas à matcher (anti-pattern).
-    `requires_context_of` : liste d'ids de structures qui doivent
-    elles-mêmes matcher l'adresse pour que cette forme active.
+    `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme à exclure, pas à matcher (anti-pattern).
+    `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active.
     """
     return NameFormOut.model_validate(
         structures_service.create_name_form(

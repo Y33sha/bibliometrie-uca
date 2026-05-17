@@ -1,9 +1,6 @@
 """Router périmètres — définition des ensembles de structures UCA.
 
-Un `perimeter` (table `perimeters`) nomme un ensemble de structures
-racines (colonne `structure_ids`) ; l'ensemble effectif est résolu par
-la CTE récursive `get_perimeter_structure_ids` (descend
-est_tutelle_de et est_partenaire_de).
+Un `perimeter` (table `perimeters`) nomme un ensemble de structures racines (colonne `structure_ids`) ; l'ensemble effectif est résolu par la CTE récursive `get_perimeter_structure_ids` (descend est_tutelle_de et est_partenaire_de).
 """
 
 import logging
@@ -41,10 +38,7 @@ def list_perimeters(
 ) -> list[PerimeterOut]:
     """Liste tous les périmètres avec leurs structures racines résolues.
 
-    Pour chaque périmètre, renvoie les structures racines directes
-    (`structures`) et le décompte total après descente récursive des
-    relations (`structure_count`). Le décompte inclut donc les
-    sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
+    Pour chaque périmètre, renvoie les structures racines directes (`structures`) et le décompte total après descente récursive des relations (`structure_count`). Le décompte inclut donc les sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
     """
     return [PerimeterOut.model_validate(p) for p in queries.list_perimeters_with_structures()]
 
@@ -104,8 +98,7 @@ def add_perimeter_structure(
 ) -> StatusResponse:
     """Ajoute une structure racine au périmètre.
 
-    Renvoie `{"status": "added"}` ou `"already_present"` si la
-    structure était déjà racine.
+    Renvoie `{"status": "added"}` ou `"already_present"` si la structure était déjà racine.
     """
     status = config_service.add_perimeter_structure(perimeter_id, body.structure_id, repo=repo)
     return StatusResponse(status=status)
@@ -119,7 +112,6 @@ def remove_perimeter_structure(
     structure_id: int,
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> StatusResponse:
-    """Retire une structure racine du périmètre. N'affecte pas ses
-    sous-structures tant qu'elles sont rattachées à d'autres racines."""
+    """Retire une structure racine du périmètre. N'affecte pas ses sous-structures tant qu'elles sont rattachées à d'autres racines."""
     config_service.remove_perimeter_structure(perimeter_id, structure_id, repo=repo)
     return StatusResponse(status="removed")

@@ -1,8 +1,6 @@
 """Adapter PostgreSQL pour `application.ports.address_linker.AddressLinker`.
 
-Crée les adresses et les liens `source_authorship_addresses` au moment
-de l'INSERT des source_authorships. Le cache instance-level évite les
-lookups répétés dans un même run.
+Crée les adresses et les liens `source_authorship_addresses` au moment de l'INSERT des source_authorships. Le cache instance-level évite les lookups répétés dans un même run.
 """
 
 from sqlalchemy import Connection, text

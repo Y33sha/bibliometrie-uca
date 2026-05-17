@@ -13,29 +13,21 @@
 * [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
 * [ ] création erronée d'idhal numériques par normalize-hal: vérifier que le problème ne réapparaît pas
+* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 ### Suite du traitement
-* [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ?
+* [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ? / voire supprimer cette colonne? ->> **DATA_perimeter-materialise.md**
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications". / DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint? ->> **METIER_metadata-deduplication.md**
 * [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
-* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 * refresh_publication_countries: peut-on éviter de tout reset à chaque run?
 ### Logging
-* [ ] logs pas clairs dans l'extracteur hal: "mode incrémental (0 orphelins vs 1 pages full-fetch)" => quézaco?; + le mode full-fetch pour PRES_CLERMONT est catastrophiquement lent. Ajouter une condition nb individual vs nb total?
-* autre log pas clair: pipeline:   → "Lancer build_authorships.py pour propager in_perimeter/structure_ids" (?) (juste avant [INFO] pipeline: ✓ create_persons_from_source_authorships terminé en 103.6s)
-* [ ] extracteur hal : manque indication sur documents réimportés et mis à jour: harmoniser le logging entre sources (et les tailles de batch)
-## Problèmes spécifiques HAL
-* [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
-* [ ] embargos (HAL, theses.fr): afficher dates dans l'UI (existent-elles dans le retour api? creuser)
-* [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
+* [ ] logs pas clairs dans l'extracteur hal: "mode incrémental (0 orphelins vs 1 pages full-fetch)" => quézaco?; + le mode full-fetch pour PRES_CLERMONT est catastrophiquement lent. Ajouter une condition nb individual vs nb total? ->> **CODE_observabilite-robustesse-pipeline.md**
+* autre log pas clair: pipeline:   → "Lancer build_authorships. py pour propager in_perimeter/structure_ids" (?) (juste avant [INFO] pipeline: ✓ create_persons_from_source_authorships terminé en 103.6s) ->> **CODE_observabilite-robustesse-pipeline.md**
+* [ ] extracteur hal : manque indication sur documents réimportés et mis à jour: harmoniser le logging entre sources (et les tailles de batch) ->> **CODE_observabilite-robustesse-pipeline.md**
 ## Code
 * [ ] auditer le code pour voir où l'interface continue de requêter source_authorships (sauf trucs vraiment source-spécifiques): supprimer les requêtes pouvant être remplacées par des requêtes vers les tables canoniques
-* [ ] nommage et arborescence des routers pas totalement cohérents
-* [ ] is_wos_author_exploitable, authors_kept: à quoi ça sert? auditer
-* [ ] sortir les use cases des repositories; clarifier la distinction repositories / db/queries: dichotomie écriture-lecture? Si oui, documenter
+* [ ] organiser les dossiers queries et infrastructure + interfaces/api/models
 * [ ] typage des ports?
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
-* [ ] fetch_unlinked_authorships: relire la requête pour comprendre ce qu'elle fait
-* [ ] organiser le dossier queries
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
@@ -46,9 +38,14 @@
 * [ ] pour les jeux de données: DataCite, Zenodo, autres?
 * [ ] divers: ORCID, IdRef, DOAJ
 ## Types de documents: algo de résolution de conflits
-* [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger
-* [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); preprints en accès gold selon OpenAlex (?); data papers?
+* [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger à la source
+* [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); data papers?
 * [ ] types wos "composites": étudier, voir si ça représente des types/sous-types comme dans HAL
+## OA_status / embargos
+* preprints en accès gold selon OpenAlex: suspect
+* [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
+* [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
+* [ ] embargos (HAL, theses.fr): afficher dates dans l'UI (existent-elles dans le retour api? creuser)
 ## Journals/Publishers
 * [ ] publishers: distinguer types d'entités (établissements d'enseignement, sociétés savantes, éditeurs commerciaux)
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
@@ -57,6 +54,8 @@
 ## Méga-authorships et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap); en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
 * [ ] élucider pourquoi Openalex contient parfois beaucoup plus d'auteurs : ex. 21105 (OpenAlex semble résoudre les noms d'équipes en listes de noms de personnes, mais je ne sais pas comment)
+## Relations entre publications
+* [ ] relations entre publications (est traduction de, est preprint de..., fait partie de..., data paper décrit dataset, dataset référencé dans...) => nouveau chantier données à part entière (trouver sources de données: Crossref, dépôts de preprints; créer algo pour compléter; créer circuit manuel)
 ## Chantier des signatures institutionnelles
 ### Côté backend
 * [ ] pays des adresses: aller plus loin dans l'automatisation de la détection (GeoNames? index n-gram des adresses avec pays associés et degré de certitude?)
@@ -70,6 +69,7 @@
 # Détails à régler au fil de l'eau (interface)
 ## Admin
 * [ ] interface pour consulter l'audit trail
+* [ ] bouton relancer détection (page /admin/feedback): cassé; supprimer ou réparer?
 ### Personnes (admin)
 * [ ] quoi faire des entités fausses? a minima, rejeter leurs authorships et s'assurer qu'elles n'apparaissent pas dans orphan-authorships
 * [ ] si source erronée: rejeter authorship source + recalculer affiliations de l'authorship à partir des sources non rejetées / caveat: Clarifier la sémantique de `excluded` sur les authorships sources: est-ce l'authorship qui est fausse, ou son affiliation? (allons plus loin: pourrait-on déclarer fausses certaines colonnes et pas d'autres? via un champ jsonb par exemple)
@@ -83,7 +83,6 @@
 ### Publications
 * [ ] filtre langue? (y a-t-il un code langue unique trans-sources? sinon, faire une table langues)
 * [ ] ajouter DOI dans les facettes sources?
-* [ ] relations entre publications (est traduction de, est preprint de..., fait partie de..., data paper décrit dataset, dataset référencé dans...) => quasiment un nouveau chantier données à part entière
 * [ ] ajouter filtre corresponding_is_uca?
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
 * [ ] afficher mémoires master et thèses en cours sur liste publications de la page personnes/id
