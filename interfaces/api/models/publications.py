@@ -18,10 +18,6 @@ class MarkDistinctPublications(BaseModel):
     pub_id_b: int
 
 
-class ExcludeSourceAuthorship(BaseModel):
-    excluded: bool = True
-
-
 # ----- Listing -----
 
 
@@ -239,8 +235,3 @@ class PublicationDetailResponse(BaseModel):
     thesis_meta: ThesisMeta | None
     structures: dict[str, StructureInfo]
     subjects: list[SubjectOut]
-
-
-class ExcludeSourceAuthorshipResponse(BaseModel):
-    ok: bool
-    excluded: bool
