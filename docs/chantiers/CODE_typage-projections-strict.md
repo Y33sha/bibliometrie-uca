@@ -123,3 +123,9 @@ Aucune au démarrage — les 4 questions initiales ont été tranchées (cf. Dé
 
 - Préalable : `2026-05-15_CODE_chasse-aux-any.md` (verrou global posé, modules avec `Any` documentés en désactivation).
 - Articulation avec `CODE_rich-domain-model.md` Phase 8 : la Phase 8 hydrate les aggregates roots (charge `Entity` au lieu de `dict[str, Any]` sur les `find_by_id`). Ce chantier-ci traite tous les autres retours non typés (projections minimales, batchs, partial updates, DTOs API).
+
+## Exceptions documentées
+
+Cas où le typage statique ne peut pas être strict, avec justification durable. Chaque entrée doit pointer un emplacement précis (fichier + ligne ou fonction) et expliquer pourquoi l'exception est inévitable, pas juste pratique.
+
+- **`application/structures.update_structure` — `# type: ignore[literal-required]`** (Phase 1) : la clé de l'affectation `update_fields[col_name] = val` vient d'une variable (`col_name` issu de `_STRUCTURE_FIELD_MAP`), pas d'un littéral. TypedDict exige des clés littérales pour vérifier la conformité statiquement. Alternative possible : déplier en `if/elif` avec littéraux, mais le mapping reste plus lisible et la valeur traversée est en sortie de whitelist Pydantic.
