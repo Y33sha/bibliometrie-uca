@@ -103,9 +103,9 @@ Mesure détaillée post-Phase 2 (`coverage report --include="application/pipelin
 
 **3b — Orchestrateurs pipeline sous 20 %**
 
-- [ ] `application/pipeline/publications/match_or_create_publications.py` (119 stmts, 17 %) — cœur du pipeline publications, sous-testé pour son poids.
-- [ ] `application/pipeline/publications/merge_by_key.py` (41 stmts, 13 %) — helper de merge ; probablement couvert indirectement par `merge_pubs_by_hal_id` mais à expliciter.
-- [ ] `application/pipeline/persons/populate_person_name_forms.py` (28 stmts, 17 %) — orchestrateur des formes de noms personnes.
+- [x] `application/pipeline/publications/match_or_create_publications.py` (119 stmts → 98 %)
+- [x] `application/pipeline/publications/merge_by_key.py` (41 stmts → 96 %, 1 ligne défensive cycle-break inatteignable)
+- [x] `application/pipeline/persons/populate_person_name_forms.py` (28 stmts → 100 %)
 
 **3c — Helpers et routeur suspendu**
 
