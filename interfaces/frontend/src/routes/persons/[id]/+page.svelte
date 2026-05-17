@@ -231,7 +231,7 @@
 		addrLoaded = false;
 		dashboardLoaded = false;
 		try {
-			const profileData = await api<ProfileResponse>(`/api/persons/${id}/profile`);
+			const profileData = await api<ProfileResponse>(`/api/persons/${id}`);
 			profile = profileData.person;
 			identifiers = profileData.identifiers;
 			authors = profileData.authors;
