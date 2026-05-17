@@ -14,10 +14,6 @@ from sqlalchemy import Connection, Row, text
 
 from application.ports.api.laboratories_queries import LaboratoriesQueries, LabPersonsFilters
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
-from infrastructure.perimeter import (
-    get_persons_perimeter_root_ids,
-    get_persons_structure_ids_list,
-)
 from infrastructure.queries.filters import (
     OA_CLOSED_SQL,
     WhereClause,
@@ -25,6 +21,10 @@ from infrastructure.queries.filters import (
     person_has_identifier_clause,
     person_has_rh_clause,
     persons_sort_clause,
+)
+from infrastructure.queries.perimeter import (
+    get_persons_perimeter_root_ids,
+    get_persons_structure_ids_list,
 )
 
 # Filtre étendu pour les stats de contribution effective d'un labo :
