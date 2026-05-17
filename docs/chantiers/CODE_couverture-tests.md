@@ -89,10 +89,40 @@ Tests d'intégration FastAPI (`TestClient`) sur les routers dont la couverture i
 - [x] `interfaces/api/routers/docs.py` (22 %) — **abandonné** : router court, éphémère (Laura prévoit de le réécrire) ; pas de ROI sur les tests.
 - [x] Couverture post-Phase 2 mesurée : 77.09 % (1678 tests). `fail_under` bumpé `75 → 77`. Le palier 80 % n'est pas franchi par Phase 1+2 — Phase 3 + autres poches diffuses nécessaires.
 
-### Phase 3 — Reste hétérogène
+### Phase 3 — Couvrir les autres poches sous-couvertes
 
-- [ ] `interfaces/api/routers/auth.py` (56 %) — dépend de la décision DSI sur le remplacement du JWT actuel par CAS. À traiter une fois la doctrine d'auth tranchée.
-- [ ] `infrastructure/sources/base.py` (38 %) — helpers de retry / pagination, tests unitaires sans I/O réseau. Quick-win technique distinct, pas un router.
+Mesure détaillée post-Phase 2 (`coverage report --include="application/pipeline/*" --sort=cover`) : 5 orchestrateurs pipeline à 0 % et 3 sous 20 %. C'est la principale poche restante pour franchir 80 %. Phase 3 enrichie en conséquence ; estimation d'impact = `stmts × (1 - cov)`.
+
+**3a — Orchestrateurs pipeline à 0 %** (gain le plus massif)
+
+- [x] `application/pipeline/normalize/normalize_crossref.py` (181 stmts, 0 %) — orchestrateur normalize source Crossref ; semble totalement non testé, à confirmer.
+- [ ] `application/pipeline/enrich/enrich_journal_apc.py` (107 stmts, 0 %) — enrichissement APC via DOAJ + OpenAlex sources. Demande des mocks `respx`.
+- [ ] `application/pipeline/enrich/enrich_oa_status.py` (68 stmts, 0 %) — enrichissement OA via Unpaywall. Demande des mocks `respx`.
+- [x] `application/pipeline/countries/refresh_publication_countries.py` (20 stmts, 0 %) — petit script SQL, test d'intégration trivial.
+- [x] `application/pipeline/publications/merge_pubs_by_nnt.py` (26 stmts → 100 %)
+
+**3b — Orchestrateurs pipeline sous 20 %**
+
+- [ ] `application/pipeline/publications/match_or_create_publications.py` (119 stmts, 17 %) — cœur du pipeline publications, sous-testé pour son poids.
+- [ ] `application/pipeline/publications/merge_by_key.py` (41 stmts, 13 %) — helper de merge ; probablement couvert indirectement par `merge_pubs_by_hal_id` mais à expliciter.
+- [ ] `application/pipeline/persons/populate_person_name_forms.py` (28 stmts, 17 %) — orchestrateur des formes de noms personnes.
+
+**3c — Helpers et routeur suspendu**
+
+- [ ] `infrastructure/sources/base.py` (38 %) — helpers de retry / pagination, tests unitaires sans I/O réseau. Quick-win technique distinct.
+- [ ] `interfaces/api/routers/auth.py` (56 %) — dépend de la décision DSI sur le remplacement du JWT par CAS. À traiter une fois la doctrine d'auth tranchée.
+
+**3d — Normalizers à compléter** (optionnel selon palier atteint après 3a+3b)
+
+Tous partiellement couverts par les tests d'idempotence existants ; il reste les branches edge.
+
+- [ ] `application/pipeline/normalize/normalize_wos.py` (312 stmts, 47 %) — gros volume, beaucoup à gagner.
+- [ ] `application/pipeline/affiliations/resolve_addresses.py` (105, 49 %).
+- [x] `application/pipeline/publications/merge_pubs_by_hal_id.py` (70 stmts → 100 %)
+- [ ] `application/pipeline/normalize/normalize_theses.py` (107, 52 %).
+- [ ] `application/pipeline/normalize/normalize_openalex.py` (221, 57 %).
+- [ ] `application/pipeline/normalize/base.py` (116, 68 %).
+- [ ] `application/pipeline/normalize/normalize_hal.py` (296, 71 %).
 
 ## Questions ouvertes
 

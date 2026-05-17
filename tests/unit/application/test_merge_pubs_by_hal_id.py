@@ -1,16 +1,24 @@
-"""Tests unitaires de `find_duplicates` (déduplication par identifiant HAL).
+"""Tests unitaires de l'orchestrateur de déduplication par identifiant HAL.
 
-Mock du port `MergeQueries` — pas de DB.
+Mocks : port `MergeQueries`, `Connection` (commit/rollback), `PublicationRepository`. `merge_publications_by_key` monkeypatché dans `run_merge` pour capturer les `groups` transmis. Pas de DB.
 
-Couvre notamment le cas qui avait causé l'accumulation silencieuse de doublons
-ScanR↔HAL : un même hal_id partagé entre OpenAlex (déjà fusionnée à HAL) et
-ScanR (orpheline). L'ancienne implémentation gardait uniquement la 1ère
-occurrence par hal_id et ignorait silencieusement la suivante.
+Couvre `find_duplicates` (pure shuffle), `link_hal_to_publication` (cas 1 : lien simple) et `run_merge` (orchestration : link + merge + commit/rollback). La régression historique (OA+ScanR sur même hal_id) est dans `test_second_source_with_same_hal_id_is_not_dropped`.
 """
 
-from typing import Any
+from __future__ import annotations
 
-from application.pipeline.publications.merge_pubs_by_hal_id import find_duplicates
+import logging
+from typing import Any
+from unittest.mock import MagicMock
+
+import pytest
+
+from application.pipeline.publications import merge_pubs_by_hal_id
+from application.pipeline.publications.merge_pubs_by_hal_id import (
+    find_duplicates,
+    link_hal_to_publication,
+    run_merge,
+)
 
 
 class _FakeQueries:
@@ -145,3 +153,238 @@ def test_no_match_when_hal_id_absent_from_hal_table():
 
     assert link_only == []
     assert merge_needed == []
+
+
+# ── link_hal_to_publication ───────────────────────────────────────────
+
+
+class _RecordingQueries:
+    """Capture les appels `link_source_publication_to_publication`."""
+
+    def __init__(self) -> None:
+        self.link_calls: list[tuple[int, int]] = []
+
+    def link_source_publication_to_publication(
+        self, conn: object, hal_doc_id: int, src_pub_id: int
+    ) -> None:
+        self.link_calls.append((hal_doc_id, src_pub_id))
+
+
+def _link_item(hal_doc_id: int, src_pub_id: int, source: str = "openalex") -> dict[str, Any]:
+    return {
+        "source": source,
+        "src_id": f"{source}-x",
+        "src_pub_id": src_pub_id,
+        "hal_doc_id": hal_doc_id,
+        "halid": "hal-X",
+    }
+
+
+@pytest.fixture
+def logger() -> logging.Logger:
+    return logging.getLogger("test_merge_pubs_by_hal_id")
+
+
+class TestLinkHalToPublication:
+    def test_live_calls_queries_and_repo_per_item(self, logger):
+        queries = _RecordingQueries()
+        repo = MagicMock()
+        items = [_link_item(100, 10), _link_item(101, 11, source="scanr")]
+
+        n = link_hal_to_publication(
+            conn=None, queries=queries, items=items, logger=logger, pub_repo=repo
+        )
+
+        assert n == 2
+        assert queries.link_calls == [(100, 10), (101, 11)]
+        assert [c.args for c in repo.update_sources.call_args_list] == [(10,), (11,)]
+
+    def test_dry_run_skips_side_effects(self, logger):
+        queries = _RecordingQueries()
+        repo = MagicMock()
+        items = [_link_item(100, 10), _link_item(101, 11)]
+
+        n = link_hal_to_publication(
+            conn=None, queries=queries, items=items, logger=logger, dry_run=True, pub_repo=repo
+        )
+
+        assert n == 2
+        assert queries.link_calls == []
+        assert repo.update_sources.call_args_list == []
+
+    def test_empty_returns_zero(self, logger):
+        queries = _RecordingQueries()
+        repo = MagicMock()
+
+        n = link_hal_to_publication(
+            conn=None, queries=queries, items=[], logger=logger, pub_repo=repo
+        )
+
+        assert n == 0
+        assert queries.link_calls == []
+
+
+# ── run_merge ─────────────────────────────────────────────────────────
+
+
+class _FakeConn:
+    """Stub minimal de `sqlalchemy.Connection` — capture commit/rollback."""
+
+    def __init__(self) -> None:
+        self.committed = False
+        self.rolled_back = False
+
+    def commit(self) -> None:
+        self.committed = True
+
+    def rollback(self) -> None:
+        self.rolled_back = True
+
+
+class _StubQueries:
+    """Stub combiné find_duplicates + link_source_publication_to_publication.
+
+    `find_duplicates` est appelée via `fetch_source_publications_with_hal_external_id` + `fetch_hal_source_publications`. Pour tester `run_merge`, on monkeypatche directement `find_duplicates` du module, donc seul `link_source_publication_to_publication` est utilisé ici.
+    """
+
+    def __init__(self) -> None:
+        self.link_calls: list[tuple[int, int]] = []
+
+    def link_source_publication_to_publication(
+        self, conn: object, hal_doc_id: int, src_pub_id: int
+    ) -> None:
+        self.link_calls.append((hal_doc_id, src_pub_id))
+
+
+@pytest.fixture
+def patched(monkeypatch):
+    """Monkeypatche `find_duplicates` et `merge_publications_by_key` du module.
+
+    Retourne un dict `{find: ..., merge: ...}` où chaque entrée a une clé `result` (lectée par le stub) et `calls` (liste des appels).
+    """
+    state: dict[str, Any] = {
+        "find_result": ([], []),
+        "find_calls": [],
+        "merge_result": (0, 0),
+        "merge_calls": [],
+    }
+
+    def fake_find(conn, queries):  # noqa: ARG001
+        state["find_calls"].append(True)
+        if isinstance(state["find_result"], Exception):
+            raise state["find_result"]
+        return state["find_result"]
+
+    def fake_merge(conn, groups, *, logger, pub_repo, dry_run=False):  # noqa: ARG001
+        groups_list = list(groups)
+        state["merge_calls"].append({"groups": groups_list, "dry_run": dry_run})
+        return state["merge_result"]
+
+    monkeypatch.setattr(merge_pubs_by_hal_id, "find_duplicates", fake_find)
+    monkeypatch.setattr(merge_pubs_by_hal_id, "merge_publications_by_key", fake_merge)
+    return state
+
+
+class TestRunMerge:
+    def test_no_duplicates_short_circuits(self, patched, logger):
+        conn = _FakeConn()
+        queries = _StubQueries()
+        repo = MagicMock()
+        patched["find_result"] = ([], [])
+
+        run_merge(conn, queries, logger, pub_repo=repo)
+
+        assert patched["merge_calls"] == []
+        assert queries.link_calls == []
+        assert conn.committed is False
+        assert conn.rolled_back is False
+
+    def test_only_link_only_skips_merge(self, patched, logger):
+        conn = _FakeConn()
+        queries = _StubQueries()
+        repo = MagicMock()
+        patched["find_result"] = ([_link_item(100, 10)], [])
+
+        run_merge(conn, queries, logger, pub_repo=repo)
+
+        assert queries.link_calls == [(100, 10)]
+        assert patched["merge_calls"] == []
+        assert conn.committed is True
+        assert conn.rolled_back is False
+
+    def test_only_merge_needed_skips_link(self, patched, logger):
+        conn = _FakeConn()
+        queries = _StubQueries()
+        repo = MagicMock()
+        merge_item = {
+            "source": "openalex",
+            "src_id": "openalex-1",
+            "src_pub_id": 20,
+            "hal_pub_id": 21,
+            "halid": "hal-W",
+        }
+        patched["find_result"] = ([], [merge_item])
+
+        run_merge(conn, queries, logger, pub_repo=repo)
+
+        assert queries.link_calls == []
+        assert len(patched["merge_calls"]) == 1
+        call = patched["merge_calls"][0]
+        assert call["groups"] == [("[openalex] openalex-1 ↔ hal-W", [20, 21])]
+        assert call["dry_run"] is False
+        assert conn.committed is True
+
+    def test_both_paths_link_then_merge(self, patched, logger):
+        conn = _FakeConn()
+        queries = _StubQueries()
+        repo = MagicMock()
+        link_item = _link_item(100, 10, source="scanr")
+        merge_item = {
+            "source": "scanr",
+            "src_id": "scanr-2",
+            "src_pub_id": 30,
+            "hal_pub_id": 31,
+            "halid": "hal-Y",
+        }
+        patched["find_result"] = ([link_item], [merge_item])
+
+        run_merge(conn, queries, logger, pub_repo=repo)
+
+        assert queries.link_calls == [(100, 10)]
+        assert patched["merge_calls"][0]["groups"] == [("[scanr] scanr-2 ↔ hal-Y", [30, 31])]
+        assert conn.committed is True
+
+    def test_dry_run_does_not_commit(self, patched, logger):
+        conn = _FakeConn()
+        queries = _StubQueries()
+        repo = MagicMock()
+        link_item = _link_item(100, 10)
+        merge_item = {
+            "source": "openalex",
+            "src_id": "openalex-1",
+            "src_pub_id": 20,
+            "hal_pub_id": 21,
+            "halid": "hal-Z",
+        }
+        patched["find_result"] = ([link_item], [merge_item])
+
+        run_merge(conn, queries, logger, pub_repo=repo, dry_run=True)
+
+        # link_only en dry_run : pas d'appel à la query
+        assert queries.link_calls == []
+        # merge propagé en dry_run
+        assert patched["merge_calls"][0]["dry_run"] is True
+        assert conn.committed is False
+        assert conn.rolled_back is False
+
+    def test_exception_triggers_rollback_and_reraises(self, patched, logger):
+        conn = _FakeConn()
+        queries = _StubQueries()
+        repo = MagicMock()
+        patched["find_result"] = RuntimeError("DB exploded")
+
+        with pytest.raises(RuntimeError, match="DB exploded"):
+            run_merge(conn, queries, logger, pub_repo=repo)
+
+        assert conn.rolled_back is True
+        assert conn.committed is False
