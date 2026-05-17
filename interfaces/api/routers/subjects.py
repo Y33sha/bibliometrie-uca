@@ -5,8 +5,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.api.subjects_queries import SubjectsAdminQueries
+from application.subjects.dtos import SubjectDetailResponse, SubjectListResponse
 from interfaces.api.deps import subjects_admin_queries
-from interfaces.api.models import SubjectDetailResponse, SubjectListResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -24,9 +24,7 @@ def list_subjects(
     offset = (page - 1) * per_page
     items = queries.list_subjects(q=q, limit=per_page, offset=offset, min_count=min_count)
     total = queries.count_subjects(q=q, min_count=min_count)
-    return SubjectListResponse.model_validate(
-        {"items": items, "total": total, "page": page, "per_page": per_page}
-    )
+    return SubjectListResponse(items=items, total=total, page=page, per_page=per_page)
 
 
 @router.get("/api/subjects/{subject_id}", response_model=SubjectDetailResponse)
@@ -43,4 +41,4 @@ def get_subject(
     neighbors = queries.get_subject_neighbors(
         subject_id, limit=neighbors_limit, min_count=min_cooccurrence
     )
-    return SubjectDetailResponse.model_validate({"subject": subject, "neighbors": neighbors})
+    return SubjectDetailResponse(subject=subject, neighbors=neighbors)

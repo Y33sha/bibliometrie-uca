@@ -71,7 +71,7 @@ Un NamedTuple par `_*_from_row`, **local au repo** (préfixe `_`, pure projectio
 
 Un sweep par feature, dans cet ordre (du plus petit au plus gros pour roder le pattern) :
 
-- [ ] **subjects** (7 BaseModel) — pilote, le plus petit
+- [x] **subjects** (7 BaseModel) — pilote, le plus petit. DTOs déplacés vers `application/subjects/dtos.py` ; port retourne `list[SubjectListItem]` / `SubjectListItem | None` / `list[SubjectNeighborOut]` ; PgSubjectsAdminQueries instancie les DTOs ; router propage sans `model_validate`. `interfaces/api/models/subjects.py` réduit à un re-export pour rétrocompat (utilisé par `routers/persons.py`, `routers/laboratories.py`, `models/publications.py`).
 - [ ] **auth** (2)
 - [ ] **journals** (3)
 - [ ] **publishers** (4)
@@ -95,8 +95,10 @@ Pour chaque feature, étapes type :
 3. Adapter le port `application/ports/api/<feature>_queries.py` pour retourner les DTOs au lieu de `dict[str, Any]`.
 4. Adapter `infrastructure/queries/<feature>` pour instancier les DTOs côté infra.
 5. Simplifier le routeur (plus de `model_validate`).
-6. Retirer le module de l'override mypy `disallow_any_explicit = false` dans `pyproject.toml`.
+6. Réduire `interfaces/api/models/<feature>.py` à un re-export pour rétrocompat des imports `from interfaces.api.models import XxxDTO`.
 7. Tests : la suite d'intégration de la feature doit rester verte.
+
+**Override mypy** : `application.*.dtos` est dans l'override `disallow_any_explicit = false` (cf. `pyproject.toml`) au même titre que `interfaces.api.models.*` historiquement. Pydantic 2 propage des `Any` en interne sur les `BaseModel`, le glob déplacé reflète la même contrainte que l'ancien. L'objectif Phase 4 n'est donc pas de sortir les DTOs de l'override, mais d'évacuer les `dict[str, Any]` des ports et adapters.
 
 Note `_common.py` (16 BaseModel partagés transverses) : à traiter à la fin, probablement dans `application/dtos/_common.py` ou colocation feature-by-feature selon les usages.
 

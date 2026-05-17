@@ -75,8 +75,15 @@ layers = ["interfaces", "infrastructure | application", "domain"]
 # d'architecture.md). `infrastructure` peut en importer les
 # dataclasses de transport pour typer ses signatures (cf. règle 3).
 # Les Protocols restent implémentés via duck typing.
+#
+# Exception : `application.<feature>.dtos` est aussi zone neutre.
+# Les DTOs Pydantic sont définis côté application (contrat de retour
+# des query services API) ; les adapters `infrastructure.queries.*`
+# les instancient pour respecter le port (chantier
+# `CODE_typage-projections-strict` Phase 4).
 ignore_imports = [
     "infrastructure.** -> application.ports.**",
+    "infrastructure.** -> application.*.dtos",
 ]
 
 [[tool.importlinter.contracts]]
@@ -318,6 +325,7 @@ exclude = [
 #   `list[dict[str, Any]]` délibéré.
 [[tool.mypy.overrides]]
 module = [
+    "application.*.dtos",  # DTOs Pydantic deplaces des interfaces.api.models par features (chantier CODE_typage-projections-strict Phase 4) ; Pydantic propage Any en interne, justification identique au glob interfaces.api.models.*.
     "application.persons",
     "application.structures",
     "application.pipeline.affiliations.resolve_addresses",

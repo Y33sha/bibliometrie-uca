@@ -14,6 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.api.subjects_queries import SubjectsAdminQueries
 from application.ports.pipeline.subjects import SubjectsQueries
+from application.subjects.dtos import SubjectListItem, SubjectNeighborOut
 from domain.subjects.subject import normalize_label
 
 # Le ON CONFLICT fusionne par ontologie : pour chaque clé présente dans l'un
@@ -264,7 +265,7 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
 
     def list_subjects(
         self, *, q: str | None, limit: int, offset: int, min_count: int
-    ) -> list[dict[str, Any]]:
+    ) -> list[SubjectListItem]:
         binds: dict[str, Any] = {"min_count": min_count, "lim": limit, "off": offset}
         where = "usage_count >= :min_count"
         if q:
@@ -280,7 +281,16 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
             """),
             binds,
         ).all()
-        return [dict(r._mapping) for r in rows]
+        return [
+            SubjectListItem(
+                id=r.id,
+                label=r.label,
+                language=r.language,
+                ontologies=r.ontologies or {},
+                usage_count=r.usage_count,
+            )
+            for r in rows
+        ]
 
     def count_subjects(self, *, q: str | None, min_count: int) -> int:
         binds: dict[str, Any] = {"min_count": min_count}
@@ -294,7 +304,7 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
         ).one()
         return row.n
 
-    def get_subject(self, subject_id: int) -> dict[str, Any] | None:
+    def get_subject(self, subject_id: int) -> SubjectListItem | None:
         row = self._conn.execute(
             text("""
                 SELECT id, label, language, ontologies, usage_count
@@ -303,11 +313,19 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
             """),
             {"id": subject_id},
         ).one_or_none()
-        return dict(row._mapping) if row else None
+        if row is None:
+            return None
+        return SubjectListItem(
+            id=row.id,
+            label=row.label,
+            language=row.language,
+            ontologies=row.ontologies or {},
+            usage_count=row.usage_count,
+        )
 
     def get_subject_neighbors(
         self, subject_id: int, *, limit: int, min_count: int
-    ) -> list[dict[str, Any]]:
+    ) -> list[SubjectNeighborOut]:
         rows = self._conn.execute(
             text("""
                 SELECT s.id, s.label, s.ontologies, s.usage_count,
@@ -326,7 +344,16 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
             """),
             {"sid": subject_id, "min_count": min_count, "lim": limit},
         ).all()
-        return [dict(r._mapping) for r in rows]
+        return [
+            SubjectNeighborOut(
+                id=r.id,
+                label=r.label,
+                ontologies=r.ontologies or {},
+                usage_count=r.usage_count,
+                cooccurrence_count=r.cooccurrence_count,
+            )
+            for r in rows
+        ]
 
 
 class PgSubjectsQueries(SubjectsQueries):
