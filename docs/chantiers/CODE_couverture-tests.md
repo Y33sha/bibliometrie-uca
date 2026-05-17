@@ -120,7 +120,7 @@ Tous partiellement couverts par les tests d'idempotence existants ; il reste les
 - [x] `application/pipeline/affiliations/resolve_addresses.py` (105 stmts → 99 %, 1 branche défensive 210→217 inatteignable car `process_addresses` n'est appelé qu'avec rows non-vide).
 - [x] `application/pipeline/publications/merge_pubs_by_hal_id.py` (70 stmts → 100 %)
 - [ ] `application/pipeline/normalize/normalize_theses.py` (107, 52 %).
-- [ ] `application/pipeline/normalize/normalize_openalex.py` (221, 57 %).
+- [x] `application/pipeline/normalize/normalize_openalex.py` (220 stmts → 99 %, 3 branches partielles défensives — skip issn_l dans upsert_journal, theses_fr sans nnt extrait, branche non-zenodo déjà couverte par le happy path).
 - [ ] `application/pipeline/normalize/base.py` (116, 68 %).
 - [ ] `application/pipeline/normalize/normalize_hal.py` (296, 71 %).
 
