@@ -5,7 +5,6 @@ import json
 from sqlalchemy import text
 
 from infrastructure.queries.publications.detail import (
-    all_years,
     get_publication_detail,
     get_publication_subjects,
 )
@@ -41,19 +40,6 @@ def _create_person(conn):
         )
     ).one()
     return row.id
-
-
-class TestAllYears:
-    def test_returns_distinct_years_desc(self, sa_sync_conn):
-        _create_pub(sa_sync_conn, pub_year=2020)
-        _create_pub(sa_sync_conn, pub_year=2024)
-        _create_pub(sa_sync_conn, pub_year=2024)
-
-        years = all_years(sa_sync_conn)
-        assert 2024 in years
-        assert 2020 in years
-        # Tri décroissant
-        assert years == sorted(years, reverse=True)
 
 
 class TestGetPublicationDetail:

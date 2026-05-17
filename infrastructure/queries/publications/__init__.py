@@ -3,11 +3,11 @@
 Le package est organisé par thème :
 - `list` : `list_publications`, `export_publications_csv`, `export_theses_csv`
 - `facets` : `publications_facets`
-- `detail` : `all_years`, `get_publication_detail`
+- `detail` : `get_publication_detail`
 - `match_or_create` : `PgPublicationsMatchOrCreateQueries` (adapter du port
   `application.ports.pipeline.publications_match_or_create`, sync, consommé par le pipeline)
 
-`PgPublicationsQueries` agrège les 6 fonctions de lecture sous le port
+`PgPublicationsQueries` agrège les 5 fonctions de lecture sous le port
 `application.ports.publications_queries.PublicationsQueries`. Les
 dataclasses `FacetFilters` / `ListFilters` (importées du port) typent
 les signatures internes.
@@ -26,9 +26,6 @@ from application.ports.api.publications_queries import (
     FacetFilters,
     ListFilters,
     PublicationsQueries,
-)
-from infrastructure.queries.publications.detail import (
-    all_years as _all_years,
 )
 from infrastructure.queries.publications.detail import (
     get_publication_detail as _get_publication_detail,
@@ -94,9 +91,6 @@ class PgPublicationsQueries(PublicationsQueries):
         return _export_theses_csv(
             self._conn, filters=filters, apc_structure_ids=apc_structure_ids, sort=sort
         )
-
-    def all_years(self) -> list[int]:
-        return _all_years(self._conn)
 
     def get_publication_detail(self, pub_id: int) -> dict[str, Any] | None:
         return _get_publication_detail(self._conn, pub_id)

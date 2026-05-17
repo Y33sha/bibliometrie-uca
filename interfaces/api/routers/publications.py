@@ -1,33 +1,20 @@
-"""Router /api/publications/* — délègue au port `PublicationsQueries`.
-
-Seul le endpoint POST /api/source-authorships/.../exclude contient encore
-du comportement applicatif (invocation d'un use case), pas une query pure.
-"""
+"""Router /api/publications/* — délègue au port `PublicationsQueries`."""
 
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from application.authorships.core import (
-    set_source_authorship_excluded as _set_source_authorship_excluded,
-)
 from application.ports.api.publications_queries import (
     FacetFilters,
     ListFilters,
     PublicationsQueries,
 )
-from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.authorship_repository import AuthorshipRepository
 from interfaces.api.deps import (
-    audit_repo_sync,
-    authorship_repo_sync,
     get_apc_structure_ids_sync,
     publications_queries_sync,
 )
 from interfaces.api.filters import parse_int_csv, parse_str_csv
 from interfaces.api.models import (
-    ExcludeSourceAuthorship,
-    ExcludeSourceAuthorshipResponse,
     PublicationDetailResponse,
     PublicationListResponse,
     PublicationsFacetsResponse,
@@ -89,19 +76,6 @@ def publications_facets(
     return PublicationsFacetsResponse.model_validate(
         queries.publications_facets(filters=filters, apc_structure_ids=get_apc_structure_ids_sync())
     )
-
-
-@router.get("/api/publications/years", response_model=list[int])
-def all_years(
-    queries: PublicationsQueries = Depends(publications_queries_sync),
-) -> list[int]:
-    """Liste de toutes les années présentes en base (validées ou non).
-
-    Contrairement à `/stats/years` qui restreint aux années validées,
-    cet endpoint remonte l'intégralité des `pub_year` distincts pour
-    alimenter le filtre « année » côté admin.
-    """
-    return queries.all_years()
 
 
 @router.get("/api/publications/export.csv")
@@ -188,28 +162,6 @@ def get_publication(
     return PublicationDetailResponse.model_validate(detail)
 
 
-@router.post(
-    "/api/source-authorships/{source}/{authorship_id}/exclude",
-    response_model=ExcludeSourceAuthorshipResponse,
-)
-def exclude_source_authorship(
-    source: str,
-    authorship_id: int,
-    body: ExcludeSourceAuthorship = ExcludeSourceAuthorship(),
-    repo: AuthorshipRepository = Depends(authorship_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
-) -> ExcludeSourceAuthorshipResponse:
-    """Marque/démarque une authorship source comme fausse.
-
-    Si aucune source non exclue n'atteste plus l'authorship consolidée,
-    celle-ci est supprimée.
-    """
-    _set_source_authorship_excluded(
-        authorship_id, source, body.excluded, repo=repo, audit_repo=audit
-    )
-    return ExcludeSourceAuthorshipResponse(ok=True, excluded=body.excluded)
-
-
 @router.get("/api/publications", response_model=PublicationListResponse)
 def list_publications(
     page: int = Query(1, ge=1),
@@ -236,12 +188,7 @@ def list_publications(
 ) -> PublicationListResponse:
     """Liste paginée des publications avec sources, labos et journal rattachés.
 
-    Filtres multiples cumulables. `lab_id` et `year` acceptent des
-    listes CSV ; `lab_id=none` = publications sans labo rattaché.
-    `sort` : `year_desc` / `year_asc` / `title` / `cited_by`.
-    `in_perimeter=yes|no|""` sélectionne les publications dont au
-    moins un auteur est in_perimeter. `subject_id` filtre les
-    publications annotées par ce sujet.
+    Filtres multiples cumulables. `lab_id` et `year` acceptent des listes CSV ; `lab_id=none` = publications sans labo rattaché. `sort` : `year_desc` / `year_asc` / `title` / `cited_by`. `in_perimeter=yes|no|""` sélectionne les publications dont au moins un auteur est in_perimeter. `subject_id` filtre les publications annotées par ce sujet.
     """
     lab_ids, lab_none = _parse_lab_id(lab_id)
     filters = ListFilters(
