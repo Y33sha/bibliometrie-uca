@@ -20,6 +20,7 @@ import pytest
 import respx
 
 from application.pipeline.fetch_missing_doi import run_async
+from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.api_retry_async import http_request_with_retry_async
 from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
 from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
@@ -87,7 +88,7 @@ class TestRunAsyncOrchestrator:
             logging.getLogger("test"),
             cross_import_dois_reader=_reader(["10.1/a", "10.1/b", "10.1/c"]),
         )
-        assert result == {"dois": 3, "fetched": 3, "inserted": 3}
+        assert result == PhaseMetrics(total=3, new=3, extras={"fetched": 3})
         assert len(adapter.inserted_records) == 3
 
     @pytest.mark.asyncio
@@ -118,7 +119,7 @@ class TestRunAsyncOrchestrator:
             cross_import_dois_reader=_reader(["10.1/a", "10.1/b"]),
             dry_run=True,
         )
-        assert result == {"dois": 2, "fetched": 0, "inserted": 0}
+        assert result == PhaseMetrics(total=2)
         assert adapter.inserted_records == []
 
     @pytest.mark.asyncio
@@ -131,7 +132,7 @@ class TestRunAsyncOrchestrator:
             cross_import_dois_reader=_reader([f"10.1/{i}" for i in range(10)]),
             limit=3,
         )
-        assert result["dois"] == 3
+        assert result.total == 3
 
     @pytest.mark.asyncio
     async def test_empty_dois_returns_zero(self):
@@ -142,7 +143,7 @@ class TestRunAsyncOrchestrator:
             logging.getLogger("test"),
             cross_import_dois_reader=_reader([]),
         )
-        assert result == {"dois": 0, "fetched": 0, "inserted": 0}
+        assert result == PhaseMetrics()
 
     @pytest.mark.asyncio
     async def test_fetch_error_continues_other_dois(self):
@@ -164,9 +165,9 @@ class TestRunAsyncOrchestrator:
             logging.getLogger("test"),
             cross_import_dois_reader=_reader(["10.1/ok1", "10.1/bad", "10.1/ok2"]),
         )
-        assert result["dois"] == 3
-        assert result["fetched"] == 2  # seulement les 2 OK
-        assert result["inserted"] == 2
+        assert result.total == 3
+        assert result.extras["fetched"] == 2  # seulement les 2 OK
+        assert result.new == 2
 
 
 # ── helper api_retry_async ───────────────────────────────────────

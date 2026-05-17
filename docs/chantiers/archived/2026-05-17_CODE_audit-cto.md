@@ -1,5 +1,7 @@
 # Audit "DSI qui reprend le projet"
+
 Commencé le 2026-05-05
+Terminé le 2026-05-17
 
 Vue extérieure du projet, comme si une DSI d'université le récupérait
 sans contexte. Constats classés en 4 sections (confusion, scalabilité,
@@ -194,52 +196,7 @@ immédiat.
 Ces choix dimensionnent les chantiers suivants. Tant qu'ils ne sont
 pas tranchés, toute évolution amplifie la dette.
 
-- [ ] **Pipeline : `subprocess`, imports, ou hybride ?**
-
-  Trois options identifiées après discussion :
-
-  - **A — Statu quo** : `run_pipeline.py` lance les phases via
-    `subprocess.run`. Simple à comprendre (1 phase = 1 commande
-    shell), isolation mémoire totale entre phases, robuste aux
-    crashes. Inconvénient principal : `pipeline_metrics.py` parse
-    les logs des subprocess avec des regex pour reconstituer les
-    rapports `/admin/pipeline` — un changement de format de log
-    casse les rapports silencieusement.
-
-  - **A' — Subprocess + métriques structurées** *(recommandation
-    actuelle)* : on garde `subprocess` (donc tous les avantages
-    d'isolation et de simplicité d'A), mais chaque phase écrit en
-    fin de run un fichier JSON de métriques à un chemin connu de
-    l'orchestrateur (ex. `logs/metrics/<phase>.json`). L'orchestrateur
-    lit ces JSON au lieu de parser les logs. Helper unique
-    `write_metrics({phase, duration_s, inserted, updated, errors})`
-    appelé en fin de chaque phase. Si une phase ne produit pas son
-    JSON, c'est une erreur explicite. Estimation : ~50 lignes pour
-    le helper + 1 appel par phase. Migration incrémentale possible
-    (1 phase à la fois).
-
-  - **B — Imports + appels de fonction** : `run_pipeline.py`
-    importe les fonctions `run()` des phases et les appelle
-    directement, dans un seul process Python. Les CLI dans
-    `interfaces/cli/pipeline/*` restent comme entry points fins
-    (parse argparse + appelle `run()`), donc lancer une phase
-    isolément reste possible. Gains : exceptions Python typées,
-    debugging cross-phase au pdb, testabilité directe. Pertes :
-    isolation mémoire (un parsing TEI HAL lourd peut grever la
-    suite), discipline à tenir (pas de `sys.exit()` dans les
-    phases, gestion propre des connexions DB partagées).
-
-  **Pourquoi A' plutôt que B aujourd'hui** : les vrais bénéfices
-  de B (perf, transactions cross-phase) sont marginaux pour ce
-  pipeline (idempotence par phase déjà acquise, durée totale en
-  minutes). Le seul vrai pain point d'A est le parsing fragile
-  des logs, et A' le règle sans toucher à la structure
-  d'exécution. B reste compatible avec une migration future si
-  un besoin émerge (testabilité poussée, debugging récurrent).
-
-  **Décision attendue** : confirmer A' et lister les phases à
-  migrer (1 par 1), ou rouvrir le débat. Document court à écrire
-  dans `docs/chantiers/` quand le chantier sera lancé.
+- [x] **Pipeline : sweep `subprocess` → imports + retour direct** — décision actée 2026-05-16. État de départ hybride : 12 phases déjà en import direct dans `run_pipeline.py` (via les helpers `_run_*`), 10 invocations encore en `subprocess.run` (les 5 extracteurs + `refetch_truncated`, `fetch_missing_hal_id`, `fetch_missing_doi`, `detect_address_countries`, `suggest_address_countries`). Cible : chaque script restant expose `run(...) -> Metrics` importable, l'orchestrateur appelle des fonctions et reçoit les métriques typées directement (pas de JSON intermédiaire ni de parsing de logs). Sweep rapatrié comme phase préalable du chantier observabilité, dont il est de toute façon le pré-requis. Voir [`CODE_observabilite-robustesse-pipeline.md`](CODE_observabilite-robustesse-pipeline.md).
 
 - [x] **Sync + async dupliqué : décision actée** — option D retenue
   (tout sync + threadpool FastAPI), implémentation reportée au
@@ -281,8 +238,7 @@ pas tranchés, toute évolution amplifie la dette.
 À démarrer une fois Phase 1 tranchée. Ce sont les gros chantiers,
 chacun mérite son fichier dans `docs/chantiers/`.
 
-- [ ] **Refonte pipeline** selon décision Phase 1 (subprocess vs
-  imports)
+- [x] **Refonte pipeline** — rapatriée dans [`CODE_observabilite-robustesse-pipeline.md`](CODE_observabilite-robustesse-pipeline.md) (Volet 0).
 - [x] **Convergence sync/async** selon décision Phase 1
 - [x] **§1.6 ROADMAP — DI complète FastAPI** : chantier
   [`routers-di.md`](routers-di.md) bouclé. Tous les routers admin
@@ -360,14 +316,13 @@ généralisé, background tasks).
 
 Dernière passe avant de remettre le dossier.
 
-- [ ] **Réécriture intégrale de la doc** (déjà prévu) — intégrer
+- [x] **Réécriture intégrale de la doc** (déjà prévu) — intégrer
   les corrections de chemins morts (`processing/*`,
   `cross_import_<source>.py`, `harvest_hal_identifiers`,
   `monthly` → `full`, etc.)
 - [x] **Backlog unifié** — ROADMAP dissoute en fiches chantiers
   thématiques dans `docs/chantiers/` (préfixes METIER/DATA/CODE).
   TODO_CLAUDE résorbé ; TODO_LAURA conservé comme TODO personnel.
-- [ ] **Tests E2E Playwright** sur 2-3 parcours critiques
 
 ---
 

@@ -16,19 +16,16 @@ import os
 import time
 
 import requests
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.api_limits import OPENALEX_DELAY
 from infrastructure.app_config import get_api_base_urls, get_openalex_api_key, get_openalex_email
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.sources.common import compute_hash, setup_logger
-from infrastructure.sources.openalex import (
-    SELECT_FIELDS,
-    auth_params,
-    compute_meta_hash,
-    init_auth,
-)
+from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
+from infrastructure.sources.openalex.parsing import compute_meta_hash
 
 _UPDATE_SQL = text(
     """
@@ -59,19 +56,17 @@ def fetch_work(openalex_id: str, *, base_url: str) -> dict | None:
     return None
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Re-fetch publications OA tronquées (>= 100 auteurs)"
-    )
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
-    args = parser.parse_args()
+def refetch(conn: Connection, *, dry_run: bool = False, limit: int | None = None) -> PhaseMetrics:
+    """Re-fetch les works OpenAlex avec exactement 100 authorships.
 
-    conn = get_sync_engine().connect()
+    Phase importable depuis `run_pipeline.py` ; ne ferme pas la connexion
+    (responsabilité du caller). `updated` compte les works ré-écrits ;
+    `already_complete` (extras) ceux qui avaient pile 100 auteurs ;
+    `errors` les fetchs échoués.
+    """
     init_auth(api_key=get_openalex_api_key(conn), email=get_openalex_email(conn))
     base_url = get_api_base_urls(conn)["openalex"]
 
-    # Détecter les works avec exactement 100 authorships dans le staging
     truncated = conn.execute(
         text(
             """
@@ -83,33 +78,23 @@ def main() -> None:
             """
         )
     ).all()
-
-    if args.limit:
-        truncated = truncated[: args.limit]
-
+    if limit:
+        truncated = truncated[:limit]
     logger.info(f"{len(truncated)} works avec 100 auteurs détectés (potentiellement tronqués)")
 
-    if not truncated or args.dry_run:
-        conn.close()
-        return
-
-    updated = 0
-    already_complete = 0
-    errors = 0
+    metrics = PhaseMetrics(total=len(truncated))
+    if not truncated or dry_run:
+        return metrics
 
     for i, row in enumerate(truncated):
         work = fetch_work(row.source_id, base_url=base_url)
         time.sleep(OPENALEX_DELAY)
-
         if not work:
-            errors += 1
+            metrics.add(errors=1)
             continue
-
         if len(work.get("authorships", [])) <= 100:
-            # Pas réellement tronqué (la publication a exactement 100 auteurs)
-            already_complete += 1
+            metrics.add(already_complete=1)
             continue
-
         conn.execute(
             _UPDATE_SQL,
             {
@@ -119,21 +104,37 @@ def main() -> None:
                 "id": row.id,
             },
         )
-        updated += 1
-
+        metrics.add(updated=1)
         if (i + 1) % 50 == 0:
             conn.commit()
             logger.info(
-                f"  {i + 1}/{len(truncated)}... ({updated} mis à jour, {already_complete} déjà complets)"
+                f"  {i + 1}/{len(truncated)}... "
+                f"({metrics.updated} mis à jour, "
+                f"{metrics.extras.get('already_complete', 0)} déjà complets)"
             )
 
     conn.commit()
-    conn.close()
-
     logger.info(
-        f"Terminé : {updated} works mis à jour avec authorships complètes, "
-        f"{already_complete} déjà complets, {errors} erreurs"
+        f"Terminé : {metrics.updated} works mis à jour avec authorships complètes, "
+        f"{metrics.extras.get('already_complete', 0)} déjà complets, "
+        f"{metrics.errors} erreurs"
     )
+    return metrics
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Re-fetch publications OA tronquées (>= 100 auteurs)"
+    )
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
+    args = parser.parse_args()
+
+    conn = get_sync_engine().connect()
+    try:
+        refetch(conn, dry_run=args.dry_run, limit=args.limit)
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

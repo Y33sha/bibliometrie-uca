@@ -10,6 +10,11 @@ Capture le boilerplate commun aux 5 extractors :
 Chaque source hérite et implémente `load_config()` + `extract_all()`.
 L'itération (cursor / search_after / firstRecord / collections × pages)
 reste spécifique à chaque source — pas de template trop contraignant.
+
+Deux entry points :
+- `run(argv)` : CLI standalone, gère exit codes et logs d'erreur.
+- `run_as_phase()` : depuis `run_pipeline.py`, lève les exceptions à
+  l'orchestrateur et retourne `PhaseMetrics`.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from typing import Any, ClassVar
 import requests
 from sqlalchemy import Connection
 
+from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.sources.common import get_existing_ids
 
@@ -37,20 +43,6 @@ class ExtractionConfigError(Exception):
     """
 
 
-class ExtractionStats:
-    """Résultat d'une extraction. Les sources peuvent étendre/customiser."""
-
-    def __init__(self, new: int = 0, updated: int = 0, total: int = 0) -> None:
-        self.new = new
-        self.updated = updated
-        self.total = total
-
-    def add(self, new: int = 0, updated: int = 0, total: int = 0) -> None:
-        self.new += new
-        self.updated += updated
-        self.total += total
-
-
 class SourceExtractor(ABC):
     """Template pour l'extraction API → staging.
 
@@ -58,7 +50,7 @@ class SourceExtractor(ABC):
     - `SOURCE` : identifiant source (ex: "hal", "openalex")
     - `DESCRIPTION` : description CLI
     - `load_config(conn) -> dict` : charge la config depuis la DB (URL, auth, affiliations, etc.)
-    - `extract_all(args, config, existing_ids) -> ExtractionStats` : boucle d'extraction
+    - `extract_all(args, config, existing_ids) -> PhaseMetrics` : boucle d'extraction
 
     Points d'override optionnels :
     - `add_cli_args(parser)` : args spécifiques au-delà de --dry-run
@@ -82,8 +74,8 @@ class SourceExtractor(ABC):
     @abstractmethod
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
-    ) -> ExtractionStats:
-        """Pilote l'extraction complète. Retourne les stats finales."""
+    ) -> PhaseMetrics:
+        """Pilote l'extraction complète. Retourne les métriques finales."""
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:  # noqa: B027
         """Ajoute les args CLI spécifiques à la source (au-delà de --dry-run)."""
@@ -93,14 +85,32 @@ class SourceExtractor(ABC):
     ) -> None:
         """Logs de header personnalisés (ex: affiliations, collections, années)."""
 
-    def log_summary(self, stats: ExtractionStats, args: argparse.Namespace) -> None:
-        """Logs de summary. Défaut : `=== Terminé : X nouveaux, Y mis à jour ===`."""
-        parts = [f"{stats.new} nouveaux"]
-        if stats.updated:
-            parts.append(f"{stats.updated} mis à jour")
-        self.logger.info(f"=== Terminé : {', '.join(parts)} ===")
+    def log_summary(self, metrics: PhaseMetrics, args: argparse.Namespace) -> None:
+        """Logs de summary. Défaut : `=== Terminé : <as_summary> ===`."""
+        self.logger.info(f"=== Terminé : {metrics.as_summary()} ===")
 
-    # ── Template method ────────────────────────────────────────
+    # ── Entry point pipeline (imports) ──────────────────────────
+
+    def run_as_phase(self, args: argparse.Namespace | None = None) -> PhaseMetrics:
+        """Variante non-CLI : pas de sys.exit, laisse remonter les exceptions.
+
+        Utilisée par `run_pipeline.py` quand la phase est invoquée par
+        import direct. Les exceptions (`ExtractionConfigError`, HTTP,
+        `KeyboardInterrupt`) remontent à l'orchestrateur qui décide quoi
+        en faire (rapport partiel, exit code).
+        """
+        if args is None:
+            args = argparse.Namespace(dry_run=False)
+        config = self.load_config(self.conn)
+        self.logger.info(f"=== Extraction {self.SOURCE} démarrée ===")
+        self.setup_logging(args, config)
+        existing_ids = get_existing_ids(self.conn, self.SOURCE) if not args.dry_run else set()
+        self.logger.info(f"{len(existing_ids)} documents déjà en staging")
+        metrics = self.extract_all(args, config, existing_ids)
+        self.log_summary(metrics, args)
+        return metrics
+
+    # ── Entry point CLI (subprocess / standalone) ──────────────
 
     def parse_args(self, argv: list[str] | None = None) -> argparse.Namespace:
         parser = argparse.ArgumentParser(description=self.DESCRIPTION)
@@ -109,26 +119,13 @@ class SourceExtractor(ABC):
         return parser.parse_args(argv)
 
     def run(self, argv: list[str] | None = None) -> None:
-        """Entry point : parse, load config, extract, handle errors, close."""
+        """Entry point CLI : parse, run_as_phase, exit codes."""
         args = self.parse_args(argv)
-
         try:
-            config = self.load_config(self.conn)
+            self.run_as_phase(args)
         except ExtractionConfigError as e:
             self.logger.error(f"Extraction {self.SOURCE} interrompue : {e}")
-            self.conn.close()
             sys.exit(2)
-
-        self.logger.info(f"=== Extraction {self.SOURCE} démarrée ===")
-        self.setup_logging(args, config)
-
-        try:
-            existing_ids = get_existing_ids(self.conn, self.SOURCE) if not args.dry_run else set()
-            self.logger.info(f"{len(existing_ids)} documents déjà en staging")
-
-            stats = self.extract_all(args, config, existing_ids)
-            self.log_summary(stats, args)
-
         except requests.exceptions.HTTPError as e:
             self.logger.error(f"Erreur API : {e}")
             if e.response is not None:
@@ -144,6 +141,6 @@ class SourceExtractor(ABC):
 
 
 def run_extractor(cls: type[SourceExtractor], logger: logging.Logger) -> None:
-    """Helper pour les entry points : instancie et lance."""
+    """Helper pour les entry points CLI : instancie et lance."""
     conn = get_sync_engine().connect()
     cls(conn, logger).run()

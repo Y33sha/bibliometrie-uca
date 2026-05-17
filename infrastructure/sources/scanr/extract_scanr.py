@@ -18,7 +18,8 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from infrastructure.api_limits import SCANR_DELAY, SCANR_PER_PAGE
+from domain.pipeline_metrics import PhaseMetrics
+from infrastructure.api_limits import SCANR_DELAY
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import (
     get_api_base_urls,
@@ -28,11 +29,11 @@ from infrastructure.app_config import (
 )
 from infrastructure.sources.base import (
     ExtractionConfigError,
-    ExtractionStats,
     SourceExtractor,
     run_extractor,
 )
-from infrastructure.sources.common import clean_doi, compute_hash, setup_logger
+from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.scanr.parsing import build_query, extract_doi, extract_scanr_id
 
 logger = setup_logger("extract_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -51,38 +52,6 @@ _INSERT_SCANR_SQL = text(
     ON CONFLICT (source, source_id) DO NOTHING
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
-
-
-def build_query(year: int, affiliation_ids: list[str], search_after: list | None = None) -> dict:
-    """Construit la requête Elasticsearch pour ScanR."""
-    query = {
-        "size": SCANR_PER_PAGE,
-        "track_total_hits": True,
-        "query": {
-            "bool": {
-                "must": [{"term": {"year": year}}],
-                "should": [{"term": {"affiliations.id.keyword": aid}} for aid in affiliation_ids],
-                "minimum_should_match": 1,
-            }
-        },
-        "sort": [{"id.keyword": "asc"}],
-    }
-    if search_after:
-        query["search_after"] = search_after
-    return query
-
-
-def extract_scanr_id(doc: dict) -> str:
-    """Extrait l'identifiant ScanR (champ id du document)."""
-    return doc.get("id", "")
-
-
-def extract_doi(doc: dict) -> str | None:
-    """Extrait le DOI depuis les externalIds."""
-    for ext in doc.get("externalIds") or []:
-        if ext.get("type") == "doi":
-            return clean_doi(ext.get("id"))
-    return None
 
 
 def fetch_page(url: str, auth: tuple, query: dict) -> dict:
@@ -207,11 +176,11 @@ class ScanrExtractor(SourceExtractor):
 
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
-    ) -> ExtractionStats:
+    ) -> PhaseMetrics:
         config_years = get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
         self.logger.info(f"Années : {years}")
-        stats = ExtractionStats()
+        stats = PhaseMetrics()
         for year in years:
             total, inserted, updated = extract_year(
                 self.conn,
@@ -226,7 +195,7 @@ class ScanrExtractor(SourceExtractor):
             self.logger.info(f"  {year} terminé : {inserted} nouveaux, {updated} mis à jour")
         return stats
 
-    def log_summary(self, stats: ExtractionStats, args: argparse.Namespace) -> None:
+    def log_summary(self, stats: PhaseMetrics, args: argparse.Namespace) -> None:
         self.logger.info("\n=== Terminé ===")
         self.logger.info(f"Total API : {stats.total}")
         self.logger.info(f"Nouveaux : {stats.new}")

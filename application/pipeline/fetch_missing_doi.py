@@ -30,6 +30,8 @@ from typing import Any, Protocol
 import httpx
 from sqlalchemy import Connection
 
+from domain.pipeline_metrics import PhaseMetrics
+
 CrossImportDoisReader = Callable[[Any, str, bool], list[str]]
 """Signature : ``(conn, target, all_staged) -> list[doi]``."""
 
@@ -69,7 +71,7 @@ async def run_async(
     all_staged: bool = False,
     dry_run: bool = False,
     limit: int | None = None,
-) -> dict[str, int]:
+) -> PhaseMetrics:
     """Boucle principale : missing DOIs → fetch async → insert.
 
     Lance les fetchs HTTP en parallèle via `asyncio.gather`, bornés par
@@ -90,7 +92,8 @@ async def run_async(
         limit: nombre max de DOI à traiter.
 
     Returns:
-        Stats {dois, fetched, inserted}.
+        `PhaseMetrics` : `total` = DOI traités, `new` = inserts effectifs,
+        `extras["fetched"]` = records reçus de l'API.
     """
     adapter.configure(conn)
 
@@ -103,11 +106,11 @@ async def run_async(
 
     if dry_run:
         log.info("Dry-run — rien inséré.")
-        return {"dois": len(dois), "fetched": 0, "inserted": 0}
+        return PhaseMetrics(total=len(dois))
 
     total = len(dois)
     if total == 0:
-        return {"dois": 0, "fetched": 0, "inserted": 0}
+        return PhaseMetrics()
 
     batches = [dois[i : i + adapter.batch_size] for i in range(0, total, adapter.batch_size)]
 
@@ -159,4 +162,6 @@ async def run_async(
         progress["fetched"],
         progress["inserted"],
     )
-    return {"dois": total, "fetched": progress["fetched"], "inserted": progress["inserted"]}
+    return PhaseMetrics(
+        total=total, new=progress["inserted"], extras={"fetched": progress["fetched"]}
+    )

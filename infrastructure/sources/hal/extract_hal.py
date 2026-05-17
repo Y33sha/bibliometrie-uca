@@ -19,6 +19,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.api_limits import HAL_DELAY, hal_per_page_for
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import (
@@ -28,8 +29,16 @@ from infrastructure.app_config import (
     get_years,
 )
 from infrastructure.hal import HAL_FIELDS
-from infrastructure.sources.base import ExtractionStats, SourceExtractor, run_extractor
-from infrastructure.sources.common import clean_doi, compute_hash, setup_logger
+from infrastructure.sources.base import SourceExtractor, run_extractor
+from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.hal.parsing import (
+    build_query,
+    build_url,
+    choose_extraction_mode,
+    count_full_fetch_pages,
+    extract_doi,
+    extract_hal_id,
+)
 
 _TAG_COLLECTION_SQL = text(
     """
@@ -72,26 +81,6 @@ _UPSERT_HAL_SQL = text(
 
 # ----- Logging -----
 logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "logs"))
-
-
-def build_query(years: list | None, since: str | None = None) -> str:
-    """Construit la requête HAL (paramètre q).
-
-    Si since est fourni (format YYYY-MM-DD), filtre sur dateLastIndexed_tdate
-    au lieu de filtrer par années.
-    """
-    if since:
-        return f"submittedDate_tdate:[{since}T00:00:00Z TO *]"
-    if not years:
-        raise ValueError("build_query requires either `since` or a non-empty `years` list")
-    year_min = min(years)
-    year_max = max(years)
-    return f"producedDateY_i:[{year_min} TO {year_max}]"
-
-
-def build_url(base_url: str) -> str:
-    """Construit l'URL de base."""
-    return f"{base_url}/"
 
 
 def fetch_page(
@@ -188,16 +177,6 @@ def tag_existing_with_collection(conn: Connection, hal_ids: list[str], collectio
     result = conn.execute(_TAG_COLLECTION_SQL, {"code": collection_code, "ids": hal_ids})
     conn.commit()
     return result.rowcount
-
-
-def extract_hal_id(doc: dict) -> str:
-    """Extrait le halId."""
-    return doc.get("halId_s", "")
-
-
-def extract_doi(doc: dict) -> str | None:
-    """Extrait le DOI nettoyé."""
-    return clean_doi(doc.get("doiId_s"))
 
 
 def upsert_work(
@@ -316,10 +295,8 @@ def extract_collection(
       1. Preview : liste des halIds de la collection via Solr `fl=halId_s`
          (payload léger, ~1 call même pour les méga-collections)
       2. Diff contre `existing_ids` (déjà en staging depuis d'autres collections)
-      3. Heuristique : si `len(orphelins) < nb_pages_full_fetch` → mode incrémental
-         (fetch individuel des orphelins + UPDATE SQL pour les connus).
-         Sinon → mode full-fetch traditionnel (coût habituel sur les collections
-         peu chevauchantes).
+      3. Décision via `choose_extraction_mode` (cf. `parsing.py`) : compare
+         le nombre d'orphelins au nombre de pages full-fetch.
 
     Retourne (nb_total, nb_nouveaux).
     """
@@ -337,20 +314,25 @@ def extract_collection(
     orphans = [hid for hid in all_ids if hid not in existing_ids]
     known = [hid for hid in all_ids if hid in existing_ids]
     per_page = hal_per_page_for(collection_code)
-    full_fetch_pages = (total_count + per_page - 1) // per_page
+    full_fetch_pages = count_full_fetch_pages(total_count, per_page)
+    mode = choose_extraction_mode(total_count, len(orphans), per_page)
 
-    if len(orphans) < full_fetch_pages:
-        logger.info(
-            f"    → mode incrémental ({len(orphans)} orphelins vs "
-            f"{full_fetch_pages} pages full-fetch) — {len(known)} déjà en staging"
-        )
+    logger.info(
+        "    Aiguillage %s : total=%d, orphelins=%d, pages_full=%d, per_page=%d → mode=%s",
+        collection_code,
+        total_count,
+        len(orphans),
+        full_fetch_pages,
+        per_page,
+        mode,
+    )
+
+    if mode == "incremental":
+        logger.info(f"    {len(known)} déjà en staging (UPDATE SQL pour les tagger)")
         total_new, _tagged = _extract_incremental(
             url, collection_code, orphans, known, conn, existing_ids
         )
-    else:
-        logger.info(
-            f"    → mode full-fetch ({full_fetch_pages} pages vs {len(orphans)} individual)"
-        )
+    else:  # mode == "full"
         total_new = _extract_full(url, query, collection_code, conn, existing_ids, total_count)
 
     return total_count, total_new
@@ -399,12 +381,12 @@ class HalExtractor(SourceExtractor):
 
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
-    ) -> ExtractionStats:
+    ) -> PhaseMetrics:
         # Années : from CLI ou from config
         config_years = get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
 
-        stats = ExtractionStats()
+        stats = PhaseMetrics()
         for code, label in config["all_collections"].items():
             total, new = extract_collection(
                 code,
@@ -421,7 +403,7 @@ class HalExtractor(SourceExtractor):
                 self.logger.info(f"    ->{new} nouveaux insérés")
         return stats
 
-    def log_summary(self, stats: ExtractionStats, args: argparse.Namespace) -> None:
+    def log_summary(self, stats: PhaseMetrics, args: argparse.Namespace) -> None:
         self.logger.info(f"\n=== Terminé : {stats.new} works insérés au total ===")
 
 

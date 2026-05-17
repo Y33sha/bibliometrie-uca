@@ -38,15 +38,16 @@ Phases (dans l'ordre d'execution):
 """
 
 import argparse
+import asyncio
 import atexit
 import datetime
 import signal
-import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
+from domain.pipeline_metrics import PhaseMetrics
 from domain.pipeline_modes import MODE_NAMES, MODES
 from domain.sources import ALL_SOURCES_SET
 from infrastructure.log import setup_logger
@@ -71,7 +72,9 @@ atexit.register(clear_status)
 # ---------------------------------------------------------------------------
 
 
-def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **kw: Any) -> Any:
+def phase_extract(
+    mode: Any = "full", sources: Any = None, year: Any = None, **kw: Any
+) -> PhaseMetrics:
     """Phase 1 : Extraction des sources vers staging + refetch truncated.
 
     La politique du mode (sources à interroger, plage d'années, refetch OA)
@@ -80,7 +83,7 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
     """
     policy = MODES[mode]
     effective = (set(sources) if sources else set(policy.extract_sources)) & policy.extract_sources
-    year_args = ["--year", str(year)] if year else []
+    metrics = PhaseMetrics()
 
     if policy.year_selection == "since_last":
         # HAL uniquement, depuis le dernier rapport de pipeline (à 00:00).
@@ -97,39 +100,29 @@ def phase_extract(mode: Any = "full", sources: Any = None, year: Any = None, **k
             since = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
             log.info("Mode quotidien : HAL depuis %s (fallback, aucun rapport)", since)
         if "hal" in effective:
-            run_python("infrastructure/sources/hal/extract_hal.py", "--since", since)
+            metrics.merge(_run_extract_hal(mode="full", since=since))
     else:
         sub_mode = policy.year_selection  # "weekly" ou "full"
         if mode == "weekly":
             log.info("Mode hebdomadaire (WoS exclu)")
         if "openalex" in effective:
-            run_python(
-                "infrastructure/sources/openalex/extract_openalex.py",
-                "--mode",
-                sub_mode,
-                *year_args,
-            )
+            metrics.merge(_run_extract_openalex(mode=sub_mode, year=year))
         if "hal" in effective:
-            run_python("infrastructure/sources/hal/extract_hal.py", "--mode", sub_mode, *year_args)
+            metrics.merge(_run_extract_hal(mode=sub_mode, year=year))
         if "wos" in effective:
-            run_python("infrastructure/sources/wos/extract_wos.py", "--mode", sub_mode, *year_args)
+            metrics.merge(_run_extract_wos(mode=sub_mode, year=year))
         if "scanr" in effective:
-            run_python(
-                "infrastructure/sources/scanr/extract_scanr.py", "--mode", sub_mode, *year_args
-            )
+            metrics.merge(_run_extract_scanr(mode=sub_mode, year=year))
         if "theses" in effective:
-            run_python(
-                "infrastructure/sources/theses/extract_theses.py",
-                "--mode",
-                sub_mode,
-                *year_args,
-            )
+            metrics.merge(_run_extract_theses(mode=sub_mode, year=year))
 
     if policy.refetch_truncated_oa and "openalex" in effective:
-        run_python("infrastructure/sources/openalex/refetch_truncated.py")
+        metrics.merge(_run_refetch_truncated())
+
+    return metrics
 
 
-def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> Any:
+def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> PhaseMetrics:
     """Rattrapage des documents repérés dans une source mais absents d'une autre.
 
     Deux mécanismes complémentaires, exécutés dans cet ordre :
@@ -151,25 +144,24 @@ def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> A
     `DATA_cycle-vie-staging.md` (backoff `not_found_at` / `next_retry`
     pour les sources non natives).
     """
+    metrics = PhaseMetrics()
+
     # Étape 1 : par hal-id / NNT
     if not sources or "hal" in sources:
-        run_python("infrastructure/sources/hal/fetch_missing_hal_id.py", "--mode", mode)
+        metrics.merge(_run_fetch_missing_hal_id(mode=mode))
 
     # Étape 2 : par DOI, sources selon la policy
     policy = MODES[mode]
     effective = (
         set(sources) if sources else set(policy.fetch_missing_doi_sources)
     ) & policy.fetch_missing_doi_sources
-    scope_flag = ["--all"] if policy.fetch_missing_doi_scope == "all" else []
+    all_staged = policy.fetch_missing_doi_scope == "all"
 
     for target in ("hal", "openalex", "wos", "scanr", "crossref"):
         if target in effective:
-            run_python(
-                "interfaces/cli/pipeline/fetch_missing_doi.py",
-                "--target",
-                target,
-                *scope_flag,
-            )
+            metrics.merge(_run_fetch_missing_doi(target, all_staged=all_staged))
+
+    return metrics
 
 
 def phase_normalize(**kw: Any) -> Any:
@@ -286,11 +278,13 @@ def phase_authorships(**kw: Any) -> Any:
     _run_build_authorships(rebuild_full=rebuild_full)
 
 
-def phase_countries(**kw: Any) -> Any:
+def phase_countries(**kw: Any) -> PhaseMetrics:
     """Detection des pays des adresses et recalcul sur les publications."""
-    run_python("interfaces/cli/pipeline/detect_address_countries.py", "--direct", "--apply")
-    run_python("interfaces/cli/pipeline/suggest_address_countries.py")
+    metrics = PhaseMetrics()
+    metrics.merge(_run_detect_address_countries())
+    metrics.merge(_run_suggest_address_countries())
     _run_refresh_publication_countries()
+    return metrics
 
 
 def phase_subjects(**kw: Any) -> Any:
@@ -737,6 +731,229 @@ def _run_cooccurrences() -> None:
     log.info("✓ cooccurrences terminé en %.1fs", time.time() - t0)
 
 
+# ── Extracteurs sources (Volet 0 — sweep subprocess → imports) ──
+
+
+def _extractor_args(
+    *, mode: str = "full", year: int | None = None, since: str | None = None
+) -> argparse.Namespace:
+    """Construit le Namespace `args` consommé par `SourceExtractor.run_as_phase`.
+
+    Tous les extracteurs s'attendent à `dry_run, mode, year, since`. HAL est
+    le seul qui exploite `since` ; les autres l'ignorent silencieusement.
+    """
+    return argparse.Namespace(dry_run=False, mode=mode, year=year, since=since)
+
+
+def _run_extract_hal(
+    *, mode: str = "full", year: int | None = None, since: str | None = None
+) -> PhaseMetrics:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.hal.extract_hal import HalExtractor
+
+    log.info("▶ extract_hal")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = HalExtractor(conn, log).run_as_phase(
+            _extractor_args(mode=mode, year=year, since=since)
+        )
+    finally:
+        conn.close()
+    log.info("✓ extract_hal terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
+    return metrics
+
+
+def _run_extract_openalex(
+    *, mode: str = "full", year: int | None = None, since: str | None = None
+) -> PhaseMetrics:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.openalex.extract_openalex import OpenalexExtractor
+
+    log.info("▶ extract_openalex")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = OpenalexExtractor(conn, log).run_as_phase(
+            _extractor_args(mode=mode, year=year, since=since)
+        )
+    finally:
+        conn.close()
+    log.info("✓ extract_openalex terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
+    return metrics
+
+
+def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.wos.extract_wos import WosExtractor
+
+    log.info("▶ extract_wos")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = WosExtractor(conn, log).run_as_phase(_extractor_args(mode=mode, year=year))
+    finally:
+        conn.close()
+    log.info("✓ extract_wos terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
+    return metrics
+
+
+def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.scanr.extract_scanr import ScanrExtractor
+
+    log.info("▶ extract_scanr")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = ScanrExtractor(conn, log).run_as_phase(_extractor_args(mode=mode, year=year))
+    finally:
+        conn.close()
+    log.info("✓ extract_scanr terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
+    return metrics
+
+
+def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.theses.extract_theses import ThesesExtractor
+
+    log.info("▶ extract_theses")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = ThesesExtractor(conn, log).run_as_phase(_extractor_args(mode=mode, year=year))
+    finally:
+        conn.close()
+    log.info("✓ extract_theses terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
+    return metrics
+
+
+def _run_refetch_truncated() -> PhaseMetrics:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.openalex.refetch_truncated import refetch
+
+    log.info("▶ refetch_truncated")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = refetch(conn)
+    finally:
+        conn.close()
+    log.info("✓ refetch_truncated terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
+    return metrics
+
+
+def _run_fetch_missing_hal_id(*, mode: str = "full") -> PhaseMetrics:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.hal.fetch_missing_hal_id import fetch_missing_hal_ids
+
+    log.info("▶ fetch_missing_hal_id --mode %s", mode)
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = asyncio.run(fetch_missing_hal_ids(conn, mode=mode))
+    finally:
+        conn.close()
+    log.info(
+        "✓ fetch_missing_hal_id terminé en %.1fs — %s",
+        time.time() - t0,
+        metrics.as_summary(),
+    )
+    return metrics
+
+
+def _run_fetch_missing_doi(target: str, *, all_staged: bool) -> PhaseMetrics:
+    from typing import cast
+
+    from application.pipeline.fetch_missing_doi import (
+        AsyncFetchMissingDoiAdapter,
+        run_async,
+    )
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.common import get_cross_import_dois
+    from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
+    from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
+    from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
+    from infrastructure.sources.scanr.fetch_missing_doi import ScanrFetchMissingDoiAdapter
+    from infrastructure.sources.wos.fetch_missing_doi import WosFetchMissingDoiAdapter
+
+    # Cast : mypy ne reconnaît pas la conformité structurelle d'une classe
+    # concrète à un Protocol via `type[Protocol]` (cf. même pattern dans
+    # interfaces/cli/pipeline/fetch_missing_doi.py).
+    adapter_classes: dict[str, type[AsyncFetchMissingDoiAdapter]] = cast(
+        "dict[str, type[AsyncFetchMissingDoiAdapter]]",
+        {
+            "hal": HalFetchMissingDoiAdapter,
+            "openalex": OpenalexFetchMissingDoiAdapter,
+            "wos": WosFetchMissingDoiAdapter,
+            "scanr": ScanrFetchMissingDoiAdapter,
+            "crossref": CrossrefFetchMissingDoiAdapter,
+        },
+    )
+    adapter = adapter_classes[target]()
+
+    log.info("▶ fetch_missing_doi --target %s%s", target, " --all" if all_staged else "")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = asyncio.run(
+            run_async(
+                conn,
+                adapter,
+                log,
+                cross_import_dois_reader=get_cross_import_dois,
+                all_staged=all_staged,
+            )
+        )
+    finally:
+        conn.close()
+    log.info(
+        "✓ fetch_missing_doi (%s) terminé en %.1fs — %s",
+        target,
+        time.time() - t0,
+        metrics.as_summary(),
+    )
+    return metrics
+
+
+def _run_detect_address_countries() -> PhaseMetrics:
+    from infrastructure.db.engine import get_sync_engine
+    from interfaces.cli.pipeline.detect_address_countries import detect_countries
+
+    log.info("▶ detect_address_countries --direct --apply")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = detect_countries(conn, apply=True, direct=True)
+    finally:
+        conn.close()
+    log.info(
+        "✓ detect_address_countries terminé en %.1fs — %s",
+        time.time() - t0,
+        metrics.as_summary(),
+    )
+    return metrics
+
+
+def _run_suggest_address_countries() -> PhaseMetrics:
+    from infrastructure.db.engine import get_sync_engine
+    from interfaces.cli.pipeline.suggest_address_countries import suggest_countries
+
+    log.info("▶ suggest_address_countries")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = suggest_countries(conn)
+    finally:
+        conn.close()
+    log.info(
+        "✓ suggest_address_countries terminé en %.1fs — %s",
+        time.time() - t0,
+        metrics.as_summary(),
+    )
+    return metrics
+
+
 def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
     """Enrichissements optionnels (Unpaywall, APC revues).
 
@@ -769,25 +986,6 @@ PHASE_NAMES = [name for name, _ in PHASES]
 # ---------------------------------------------------------------------------
 # Helpers d'exécution
 # ---------------------------------------------------------------------------
-
-
-def run_python(script: str, *args: Any) -> Any:
-    """Lance un script Python du projet."""
-    path = BASE / script
-    if not path.exists():
-        log.warning("Script introuvable : %s — ignoré", script)
-        return
-    cmd = [sys.executable, str(path)] + list(args)
-    log.info("▶ %s %s", script, " ".join(args) if args else "")
-    t0 = time.time()
-    result = subprocess.run(cmd, cwd=str(BASE))
-    elapsed = time.time() - t0
-    if result.returncode != 0:
-        log.error("✗ %s a échoué (code %d) en %.1fs", script, result.returncode, elapsed)
-        raise RuntimeError(f"{script} a échoué (code {result.returncode})")
-    log.info("✓ %s terminé en %.1fs", script, elapsed)
-
-    # run_sql supprimé — tous les scripts SQL ont été convertis en Python
 
 
 # ---------------------------------------------------------------------------
@@ -882,6 +1080,7 @@ def main() -> None:
     from infrastructure.pipeline_metrics import capture_log_offsets, generate_report, read_new_logs
 
     phase_results = []  # [(name, duration, logs)]
+    phase_metrics: dict[str, PhaseMetrics] = {}  # collecté pour Volet B (dashboard)
 
     t0_total = time.time()
     pipeline_started_at = datetime.datetime.now().isoformat(timespec="seconds")
@@ -901,7 +1100,7 @@ def main() -> None:
         log_offsets = capture_log_offsets()
         t0_phase = time.time()
         try:
-            fn(
+            result = fn(
                 mode=args.mode,
                 sources=sources,
                 year=args.year,
@@ -928,6 +1127,9 @@ def main() -> None:
         duration = time.time() - t0_phase
         phase_logs = read_new_logs(log_offsets)
         phase_results.append((name, duration, phase_logs))
+        if isinstance(result, PhaseMetrics):
+            phase_metrics[name] = result
+            log.info("Total phase %s : %s", name, result.as_summary())
 
     elapsed_total = time.time() - t0_total
 

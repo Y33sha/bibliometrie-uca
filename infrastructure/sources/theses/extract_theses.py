@@ -30,16 +30,22 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.api_limits import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import get_api_base_urls, get_extraction_api_ids
 from infrastructure.sources.base import (
     ExtractionConfigError,
-    ExtractionStats,
     SourceExtractor,
     run_extractor,
 )
 from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.theses.parsing import (
+    build_query,
+    extract_doi,
+    extract_theses_id,
+    resolve_statuses,
+)
 
 logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -65,14 +71,6 @@ _INSERT_THESES_SQL = text(
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
 
-def build_query(ppn: str, status: str | None = None) -> str:
-    """Construit la chaîne de recherche pour l'API theses.fr."""
-    q = f"etabSoutenancePpn:({ppn})"
-    if status:
-        q += f" AND status:({status})"
-    return q
-
-
 def fetch_page(base_url: str, query: str, debut: int = 0, nombre: int = 500) -> dict:
     """Récupère une page de résultats depuis l'API theses.fr (avec retry/backoff)."""
     params = {
@@ -87,25 +85,6 @@ def fetch_page(base_url: str, query: str, debut: int = 0, nombre: int = 500) -> 
         timeout=30,
         label=f"theses debut={debut}",
     )
-
-
-def extract_theses_id(these: dict) -> str:
-    """Extrait l'identifiant unique d'une thèse.
-
-    - Thèse soutenue : NNT (ex: "2021UCFAC022")
-    - Thèse en cours : id theses.fr (ex: "s367812")
-    Les deux sont dans le champ 'id' de l'API recherche,
-    et le NNT est aussi dans 'nnt' (null pour les en cours).
-    """
-    return these.get("id", "")
-
-
-def extract_doi(these: dict) -> str | None:
-    """Extrait le DOI si présent."""
-    doi = these.get("doi")
-    if doi and isinstance(doi, str) and doi.strip():
-        return doi.strip()
-    return None
 
 
 def extract_ppn(
@@ -196,17 +175,6 @@ def extract_ppn(
     return total, inserted, updated
 
 
-def _resolve_statuses(args: argparse.Namespace) -> list[str]:
-    """Détermine les statuts à extraire depuis les args CLI."""
-    if args.soutenues and args.en_cours:
-        return ["soutenue", "enCours"]
-    if args.soutenues:
-        return ["soutenue"]
-    if args.en_cours:
-        return ["enCours"]
-    return ["soutenue", "enCours"]
-
-
 class ThesesExtractor(SourceExtractor):
     SOURCE = "theses"
     DESCRIPTION = "Extraction theses.fr → staging"
@@ -242,16 +210,16 @@ class ThesesExtractor(SourceExtractor):
 
     def setup_logging(self, args: argparse.Namespace, config: dict[str, Any]) -> None:
         self.logger.info(f"Établissements PPN : {config['ppns']}")
-        self.logger.info(f"Statuts : {_resolve_statuses(args)}")
+        self.logger.info(f"Statuts : {resolve_statuses(args)}")
         if args.year is not None:
             self.logger.info(f"Filtre année (NNT préfixe) : {args.year}")
 
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
-    ) -> ExtractionStats:
-        stats = ExtractionStats()
+    ) -> PhaseMetrics:
+        stats = PhaseMetrics()
         for ppn in config["ppns"]:
-            for status in _resolve_statuses(args):
+            for status in resolve_statuses(args):
                 total, inserted, updated = extract_ppn(
                     ppn,
                     self.conn,
@@ -264,7 +232,7 @@ class ThesesExtractor(SourceExtractor):
                 stats.add(new=inserted, updated=updated, total=total)
         return stats
 
-    def log_summary(self, stats: ExtractionStats, args: argparse.Namespace) -> None:
+    def log_summary(self, stats: PhaseMetrics, args: argparse.Namespace) -> None:
         self.logger.info("\n=== Terminé ===")
         self.logger.info(f"Total API : {stats.total}")
         self.logger.info(f"Nouveaux : {stats.new}")

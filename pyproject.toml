@@ -219,6 +219,23 @@ omit = [
     "interfaces/cli/*",
     # Debug scripts dans interfaces/cli/debug/
     "interfaces/cli/debug/*",
+    # Wiring HTTP des adapters sources : pure functions de parsing
+    # extraites dans `<source>/parsing.py` (couvert par tests unit) ;
+    # ce qui reste = httpx + pagination + sleep + subclass
+    # SourceExtractor. Faible ROI sur tests fixtures (cf.
+    # docs/chantiers/CODE_couverture-tests.md).
+    "infrastructure/sources/hal/extract_hal.py",
+    "infrastructure/sources/hal/fetch_missing_hal_id.py",
+    "infrastructure/sources/hal/fetch_missing_doi.py",
+    "infrastructure/sources/openalex/extract_openalex.py",
+    "infrastructure/sources/openalex/fetch_missing_doi.py",
+    "infrastructure/sources/openalex/refetch_truncated.py",
+    "infrastructure/sources/scanr/extract_scanr.py",
+    "infrastructure/sources/scanr/fetch_missing_doi.py",
+    "infrastructure/sources/theses/extract_theses.py",
+    "infrastructure/sources/wos/extract_wos.py",
+    "infrastructure/sources/wos/fetch_missing_doi.py",
+    "infrastructure/sources/crossref/fetch_missing_doi.py",
 ]
 
 [tool.coverage.report]
@@ -226,7 +243,7 @@ skip_empty = true
 show_missing = true
 # Seuil progressif : ne jamais régresser. À faire remonter au fur et à
 # mesure qu'on ajoute des tests.
-fail_under = 70
+fail_under = 75
 exclude_lines = [
     "pragma: no cover",
     "raise NotImplementedError",

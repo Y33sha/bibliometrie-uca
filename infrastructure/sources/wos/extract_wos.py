@@ -24,6 +24,7 @@ import requests
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.api_limits import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import (
@@ -34,11 +35,17 @@ from infrastructure.app_config import (
 )
 from infrastructure.sources.base import (
     ExtractionConfigError,
-    ExtractionStats,
     SourceExtractor,
     run_extractor,
 )
 from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.wos.parsing import (
+    build_query,
+    extract_doi,
+    extract_ut,
+    get_records,
+    get_records_found,
+)
 
 # ----- Logging -----
 logger = setup_logger("extract_wos", os.path.join(os.path.dirname(__file__), "logs"))
@@ -50,40 +57,6 @@ BREATHER_SECS = 15  # durée de la pause longue (secondes)
 # Initialisées dans main() depuis la config DB
 BASE_URL = ""
 HEADERS: dict[str, str] = {}
-
-
-def build_query(year: int, affiliations: list[str] | None = None) -> str:
-    """Construit la requête WoS Advanced Search pour une année."""
-    orgs = " OR ".join(affiliations or [])
-    return f"OG=({orgs}) AND PY=({year})"
-
-
-def extract_doi(rec: dict) -> str | None:
-    """Extrait le DOI depuis les identifiants du record."""
-    try:
-        identifiers = (
-            rec.get("dynamic_data", {})
-            .get("cluster_related", {})
-            .get("identifiers", {})
-            .get("identifier", [])
-        )
-        # L'API retourne tantôt une liste, tantôt un dict unique
-        if isinstance(identifiers, dict):
-            identifiers = [identifiers]
-        if not isinstance(identifiers, list):
-            return None
-        for ident in identifiers:
-            if isinstance(ident, dict) and ident.get("type") == "doi":
-                val = ident.get("value")
-                return str(val).strip() if val is not None else None
-    except (KeyError, TypeError, AttributeError):
-        pass
-    return None
-
-
-def extract_ut(rec: dict) -> str:
-    """Extrait le WoS UID (ex: WOS:000819841500009)."""
-    return rec["UID"]
 
 
 def _fetch_with_retry(url: str, params: dict, label: str = "") -> dict:
@@ -113,22 +86,6 @@ def fetch_page(year: int, first_record: int) -> dict:
         "firstRecord": first_record,
     }
     return _fetch_with_retry(BASE_URL, params, label=f"({year}, rec {first_record})")
-
-
-def get_records(data: dict) -> list[dict]:
-    """Extrait la liste de records depuis la réponse API."""
-    try:
-        return data["Data"]["Records"]["records"]["REC"]
-    except (KeyError, TypeError):
-        return []
-
-
-def get_records_found(data: dict) -> int:
-    """Extrait le nombre total de records trouvés."""
-    try:
-        return data["QueryResult"]["RecordsFound"]
-    except (KeyError, TypeError):
-        return 0
 
 
 def get_existing_uts(conn: Connection) -> set:
@@ -317,12 +274,12 @@ class WosExtractor(SourceExtractor):
 
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
-    ) -> ExtractionStats:
+    ) -> PhaseMetrics:
         config_years = get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
         self.logger.info(f"Années : {years}")
 
-        stats = ExtractionStats()
+        stats = PhaseMetrics()
         for i, year in enumerate(years):
             try:
                 inserted = extract_year(year, self.conn, existing_ids, dry_run=args.dry_run)
@@ -334,7 +291,7 @@ class WosExtractor(SourceExtractor):
                 time.sleep(30)
         return stats
 
-    def log_summary(self, stats: ExtractionStats, args: argparse.Namespace) -> None:
+    def log_summary(self, stats: PhaseMetrics, args: argparse.Namespace) -> None:
         self.logger.info(f"=== Terminé : {stats.new} records insérés au total ===")
 
 

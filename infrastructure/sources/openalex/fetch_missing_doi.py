@@ -18,13 +18,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from infrastructure.api_retry_async import http_request_with_retry_async
 from infrastructure.app_config import get_api_base_urls, get_openalex_api_key, get_openalex_email
 from infrastructure.sources.common import compute_hash
-from infrastructure.sources.openalex import (
-    SELECT_FIELDS,
-    auth_params,
-    extract_doi,
-    extract_openalex_id,
-    init_auth,
-)
+from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
+from infrastructure.sources.openalex.parsing import extract_doi, extract_openalex_id
 
 _INSERT_OA_SQL = text(
     """
