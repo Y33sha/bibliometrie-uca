@@ -241,15 +241,6 @@ from interfaces.api.models.stats import (
     YearFacet,
     YearStatsRow,
 )
-from interfaces.api.models.subjects import (
-    SubjectDetailResponse,
-    SubjectFrequency,
-    SubjectListItem,
-    SubjectListResponse,
-    SubjectNeighborOut,
-    SubjectOntologyEntry,
-    SubjectOut,
-)
 
 __all__ = [
     "AddIdentifier",
@@ -443,13 +434,6 @@ __all__ = [
     "StructureRelationCreateResponse",
     "StructureRelationOut",
     "StructureUpdate",
-    "SubjectDetailResponse",
-    "SubjectFrequency",
-    "SubjectListItem",
-    "SubjectListResponse",
-    "SubjectNeighborOut",
-    "SubjectOntologyEntry",
-    "SubjectOut",
     "TextStrFacet",
     "ThesesAuthorshipOut",
     "ThesisMeta",

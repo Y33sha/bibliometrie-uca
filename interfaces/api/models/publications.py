@@ -2,8 +2,8 @@
 
 from pydantic import BaseModel
 
+from application.ports.api.subjects_queries import SubjectOut
 from interfaces.api.models._common import YesNoCount
-from interfaces.api.models.subjects import SubjectOut
 
 # ----- Entrées (POST/PUT/PATCH) -----
 

@@ -8,6 +8,7 @@ from application.ports.api.laboratories_queries import (
     LaboratoriesQueries,
     LabPersonsFilters,
 )
+from application.ports.api.subjects_queries import SubjectFrequency
 from interfaces.api.deps import laboratories_queries_sync
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
@@ -16,7 +17,6 @@ from interfaces.api.models import (
     LaboratoryDetailResponse,
     LaboratoryListItem,
     LaboratoryPersonsResponse,
-    SubjectFrequency,
 )
 
 router = APIRouter()
