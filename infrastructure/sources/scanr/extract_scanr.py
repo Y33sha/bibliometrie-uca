@@ -19,20 +19,20 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.pipeline_metrics import PhaseMetrics
-from infrastructure.api_limits import SCANR_DELAY
-from infrastructure.api_retry import http_request_with_retry
-from infrastructure.app_config import (
-    get_api_base_urls,
-    get_extraction_api_ids,
-    get_scanr_credentials,
-    get_years,
-)
+from infrastructure.sources.api_limits import SCANR_DELAY
 from infrastructure.sources.base import (
     ExtractionConfigError,
     SourceExtractor,
     run_extractor,
 )
 from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.config import (
+    get_api_base_urls,
+    get_extraction_api_ids,
+    get_scanr_credentials,
+    get_years,
+)
+from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.scanr.parsing import build_query, extract_doi, extract_scanr_id
 
 logger = setup_logger("extract_scanr", os.path.join(os.path.dirname(__file__), "logs"))

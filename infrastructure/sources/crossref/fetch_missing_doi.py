@@ -22,9 +22,9 @@ import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from infrastructure.api_retry_async import http_request_with_retry_async
-from infrastructure.app_config import get_api_base_urls, get_crossref_email
 from infrastructure.sources.common import compute_hash
+from infrastructure.sources.config import get_api_base_urls, get_crossref_email
+from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
 _USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
 

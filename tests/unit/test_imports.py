@@ -38,7 +38,7 @@ MODULES = [
     "application.journals",
     "domain.publications.doc_types",
     "domain.sources",
-    "infrastructure.app_config",
+    "infrastructure.sources.config",
     "infrastructure.pipeline_metrics",
 ]
 

@@ -4,7 +4,6 @@ import os
 
 from application.pipeline.normalize.normalize_hal import HalNormalizer
 from infrastructure.addresses import PgAddressLinker
-from infrastructure.app_config import get_api_base_urls
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.log import setup_logger
 from infrastructure.queries.normalize_hal import PgHalNormalizeQueries
@@ -14,6 +13,7 @@ from infrastructure.repositories import (
     publication_repository,
     publisher_repository,
 )
+from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.zenodo import HttpZenodoResolver
 
 logger = setup_logger("normalize_hal", os.path.join(os.path.dirname(__file__), "logs"))

@@ -6,7 +6,7 @@ search_after). Ne fait aucun I/O.
 
 from __future__ import annotations
 
-from infrastructure.api_limits import SCANR_PER_PAGE
+from infrastructure.sources.api_limits import SCANR_PER_PAGE
 from infrastructure.sources.common import clean_doi
 
 

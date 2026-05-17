@@ -21,8 +21,8 @@ import respx
 
 from application.pipeline.fetch_missing_doi import run_async
 from domain.pipeline_metrics import PhaseMetrics
-from infrastructure.api_retry_async import http_request_with_retry_async
 from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
+from infrastructure.sources.http_retry_async import http_request_with_retry_async
 from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
 from infrastructure.sources.scanr.fetch_missing_doi import ScanrFetchMissingDoiAdapter
 from infrastructure.sources.wos.fetch_missing_doi import WosFetchMissingDoiAdapter

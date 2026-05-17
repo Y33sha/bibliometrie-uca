@@ -20,17 +20,16 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.pipeline_metrics import PhaseMetrics
-from infrastructure.api_limits import HAL_DELAY, hal_per_page_for
-from infrastructure.api_retry import http_request_with_retry
-from infrastructure.app_config import (
+from infrastructure.sources.api_limits import HAL_DELAY, hal_per_page_for
+from infrastructure.sources.base import SourceExtractor, run_extractor
+from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.config import (
     get_api_base_urls,
     get_hal_collections,
     get_hal_extra_collections,
     get_years,
 )
-from infrastructure.hal import HAL_FIELDS
-from infrastructure.sources.base import SourceExtractor, run_extractor
-from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.hal.fields import HAL_FIELDS
 from infrastructure.sources.hal.parsing import (
     build_query,
     build_url,
@@ -39,6 +38,7 @@ from infrastructure.sources.hal.parsing import (
     extract_doi,
     extract_hal_id,
 )
+from infrastructure.sources.http_retry import http_request_with_retry
 
 _TAG_COLLECTION_SQL = text(
     """

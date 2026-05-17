@@ -20,21 +20,21 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.pipeline_metrics import PhaseMetrics
-from infrastructure.api_limits import OPENALEX_DELAY
-from infrastructure.api_retry import http_request_with_retry
-from infrastructure.app_config import (
-    get_api_base_urls,
-    get_extraction_api_ids,
-    get_openalex_api_key,
-    get_openalex_email,
-    get_years,
-)
+from infrastructure.sources.api_limits import OPENALEX_DELAY
 from infrastructure.sources.base import (
     ExtractionConfigError,
     SourceExtractor,
     run_extractor,
 )
 from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.config import (
+    get_api_base_urls,
+    get_extraction_api_ids,
+    get_openalex_api_key,
+    get_openalex_email,
+    get_years,
+)
+from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.openalex import init_auth
 from infrastructure.sources.openalex.parsing import (
     build_params,
