@@ -109,7 +109,7 @@ Mesure détaillée post-Phase 2 (`coverage report --include="application/pipelin
 
 **3c — Helpers et routeur suspendu**
 
-- [ ] `infrastructure/sources/base.py` (38 %) — helpers de retry / pagination, tests unitaires sans I/O réseau. Quick-win technique distinct.
+- [x] `infrastructure/sources/base.py` (61 stmts → 100 %)
 - [ ] `interfaces/api/routers/auth.py` (56 %) — dépend de la décision DSI sur le remplacement du JWT par CAS. À traiter une fois la doctrine d'auth tranchée.
 
 **3d — Normalizers à compléter** (optionnel selon palier atteint après 3a+3b)
