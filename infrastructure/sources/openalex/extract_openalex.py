@@ -19,7 +19,8 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from infrastructure.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
+from domain.pipeline_metrics import PhaseMetrics
+from infrastructure.api_limits import OPENALEX_DELAY
 from infrastructure.api_retry import http_request_with_retry
 from infrastructure.app_config import (
     get_api_base_urls,
@@ -30,44 +31,20 @@ from infrastructure.app_config import (
 )
 from infrastructure.sources.base import (
     ExtractionConfigError,
-    ExtractionStats,
     SourceExtractor,
     run_extractor,
 )
 from infrastructure.sources.common import compute_hash, setup_logger
-from infrastructure.sources.openalex import (
-    SELECT_FIELDS,
-    auth_params,
+from infrastructure.sources.openalex import init_auth
+from infrastructure.sources.openalex.parsing import (
+    build_params,
     compute_meta_hash,
     extract_doi,
     extract_openalex_id,
-    init_auth,
 )
 
 # ----- Logging -----
 logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__), "logs"))
-
-
-def build_params(
-    year: int = None, cursor: str = "*", institution_ids: list[str] | None = None, since: str = None
-) -> dict:
-    """Construit les paramètres de requête pour l'API OpenAlex.
-
-    Si since est fourni (YYYY-MM-DD), filtre sur from_updated_date
-    au lieu de filtrer par année.
-    """
-    lineage_filter = "|".join(institution_ids or [])
-    if since:
-        filter_str = f"authorships.institutions.lineage:{lineage_filter},from_updated_date:{since}"
-    else:
-        filter_str = f"authorships.institutions.lineage:{lineage_filter},publication_year:{year}"
-    return {
-        "filter": filter_str,
-        "select": SELECT_FIELDS,
-        "per_page": OPENALEX_PER_PAGE,
-        "cursor": cursor,
-        **auth_params(),
-    }
 
 
 def fetch_page(
@@ -286,13 +263,13 @@ class OpenalexExtractor(SourceExtractor):
 
     def extract_all(
         self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
-    ) -> ExtractionStats:
+    ) -> PhaseMetrics:
         config_years = get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
         if not args.since:
             self.logger.info(f"Années : {years}")
 
-        stats = ExtractionStats()
+        stats = PhaseMetrics()
         if args.since:
             year_new, year_updated = extract_year(
                 conn=self.conn,

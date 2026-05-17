@@ -23,13 +23,79 @@ Usage:
 import argparse
 import time
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
+from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.log import setup_logger
 from infrastructure.queries.countries import suggest_addresses_countries_batch
 
 logger = setup_logger("suggest_countries", "processing/logs")
+
+
+def suggest_countries(
+    conn: Connection,
+    *,
+    batch_size: int = 500,
+    direct: bool = False,
+    reset: bool = False,
+) -> PhaseMetrics:
+    """Suggère des pays pour les adresses sans pays via match trigramme.
+
+    Phase importable depuis `run_pipeline.py` ; ne ferme pas la connexion.
+    Defaults pipeline : `direct=False` (écrit dans `suggested_countries`,
+    confirmation manuelle attendue). `total` = adresses traitées, `new` =
+    nb d'adresses pour lesquelles une suggestion a été trouvée.
+    """
+    target_column = "countries" if direct else "suggested_countries"
+
+    if reset:
+        with conn.begin():
+            result = conn.execute(
+                text("""
+                    UPDATE addresses SET suggested_countries = NULL
+                    WHERE countries IS NULL AND suggested_countries IS NOT NULL
+                """)
+            )
+        logger.info(f"{result.rowcount} suggestions réinitialisées")
+
+    total = conn.execute(
+        text("""
+            SELECT COUNT(*) AS n FROM addresses
+            WHERE countries IS NULL
+              AND suggested_countries IS NULL
+              AND length(normalized_text) >= 5
+        """)
+    ).scalar_one()
+    logger.info(f"{total} adresses à traiter (batch_size={batch_size})")
+
+    if total == 0:
+        logger.info("Rien à faire.")
+        return PhaseMetrics()
+
+    processed = 0
+    found = 0
+    t0 = time.time()
+    while True:
+        n_done, n_found = suggest_addresses_countries_batch(
+            conn, batch_size=batch_size, target_column=target_column
+        )
+        conn.commit()
+        if n_done == 0:
+            break
+        processed += n_done
+        found += n_found
+        elapsed = time.time() - t0
+        rate = processed / elapsed if elapsed > 0 else 0
+        remaining = (total - processed) / rate if rate > 0 else 0
+        logger.info(
+            f"  {processed}/{total} traités "
+            f"({found} avec suggestion, {elapsed:.0f}s, ~{remaining:.0f}s restantes)"
+        )
+
+    elapsed = time.time() - t0
+    logger.info(f"\nTerminé : {processed} traitées, {found} avec suggestion, en {elapsed:.0f}s")
+    return PhaseMetrics(total=processed, new=found)
 
 
 def main() -> None:
@@ -45,56 +111,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    target_column = "countries" if args.direct else "suggested_countries"
-
-    engine = get_sync_engine()
-    with engine.connect() as conn:
-        if args.reset:
-            with conn.begin():
-                result = conn.execute(
-                    text("""
-                        UPDATE addresses SET suggested_countries = NULL
-                        WHERE countries IS NULL AND suggested_countries IS NOT NULL
-                    """)
-                )
-            logger.info(f"{result.rowcount} suggestions réinitialisées")
-
-        total = conn.execute(
-            text("""
-                SELECT COUNT(*) AS n FROM addresses
-                WHERE countries IS NULL
-                  AND suggested_countries IS NULL
-                  AND length(normalized_text) >= 5
-            """)
-        ).scalar_one()
-        logger.info(f"{total} adresses à traiter (batch_size={args.batch_size})")
-
-        if total == 0:
-            logger.info("Rien à faire.")
-            return
-
-        processed = 0
-        found = 0
-        t0 = time.time()
-        while True:
-            n_done, n_found = suggest_addresses_countries_batch(
-                conn, batch_size=args.batch_size, target_column=target_column
-            )
-            conn.commit()
-            if n_done == 0:
-                break
-            processed += n_done
-            found += n_found
-            elapsed = time.time() - t0
-            rate = processed / elapsed if elapsed > 0 else 0
-            remaining = (total - processed) / rate if rate > 0 else 0
-            logger.info(
-                f"  {processed}/{total} traités "
-                f"({found} avec suggestion, {elapsed:.0f}s, ~{remaining:.0f}s restantes)"
-            )
-
-        elapsed = time.time() - t0
-        logger.info(f"\nTerminé : {processed} traitées, {found} avec suggestion, en {elapsed:.0f}s")
+    with get_sync_engine().connect() as conn:
+        suggest_countries(conn, batch_size=args.batch_size, direct=args.direct, reset=args.reset)
 
 
 if __name__ == "__main__":

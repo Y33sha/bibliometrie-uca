@@ -43,8 +43,9 @@ Côté base, ajouter la valeur à l'enum Postgres `source_type` via une migratio
 Créer `infrastructure/sources/<source>/extract_<source>.py` héritant de `SourceExtractor` (cf. [`infrastructure/sources/base.py`](infrastructure/sources/base.py)). Le template gère parsing CLI, cycle connexion, chargement `existing_ids`, gestion des erreurs HTTP/interruption, logs.
 
 ```python
+from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.log import setup_logger
-from infrastructure.sources.base import SourceExtractor, ExtractionStats, run_extractor
+from infrastructure.sources.base import SourceExtractor, run_extractor
 
 class MaSourceExtractor(SourceExtractor):
     SOURCE = "ma_source"
@@ -54,8 +55,8 @@ class MaSourceExtractor(SourceExtractor):
         # Lire URL/API key depuis la table `config`.
         ...
 
-    def extract_all(self, args, config, existing_ids) -> ExtractionStats:
-        stats = ExtractionStats()
+    def extract_all(self, args, config, existing_ids) -> PhaseMetrics:
+        stats = PhaseMetrics()
         # Itération spécifique (pagination, filtres, …).
         # Insérer en staging(source, source_id, raw_data).
         return stats

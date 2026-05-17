@@ -29,6 +29,7 @@ import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from domain.pipeline_metrics import PhaseMetrics
 from domain.publication import extract_hal_id_from_url
 from infrastructure.api_limits import HAL_DELAY
 from infrastructure.api_retry_async import http_request_with_retry_async
@@ -428,24 +429,25 @@ async def _fetch_by_nnt_async(refs: list[dict], conn: Connection, base_url: str)
     return progress["fetched"], progress["not_found"]
 
 
-async def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Récupère les entrées HAL manquantes découvertes via OpenAlex"
-    )
-    parser.add_argument("--dry-run", action="store_true", help="Lister sans télécharger")
-    parser.add_argument("--stats", action="store_true", help="Statistiques uniquement")
-    parser.add_argument(
-        "--mode",
-        choices=["full", "weekly", "daily"],
-        default="full",
-        help="Mode pipeline (NNT ignoré en daily/weekly)",
-    )
-    args = parser.parse_args()
+async def fetch_missing_hal_ids(
+    conn: Connection,
+    *,
+    mode: str = "full",
+    dry_run: bool = False,
+    stats_only: bool = False,
+) -> PhaseMetrics:
+    """Récupère les entrées HAL manquantes via OpenAlex / ScanR / NNT theses.
 
-    conn = get_sync_engine().connect()
+    Phase importable depuis `run_pipeline.py` ; la connexion n'est pas
+    fermée (responsabilité du caller). `new` compte les documents HAL
+    insérés ; `extras["not_found"]` ceux marqués not_found (introuvables
+    côté HAL). `total` = nombre de halIds manquants à traiter.
+
+    Modes pipeline : `full` interroge aussi les NNT theses sans HAL ;
+    `weekly`/`daily` les ignorent (volume trop large pour run incrémental).
+    """
     base_url = get_api_base_urls(conn)["hal"]
 
-    # 1. Trouver les HAL IDs manquants depuis OpenAlex et ScanR
     log.info("Recherche des works OpenAlex avec primary_location HAL...")
     hal_refs_oa = find_hal_primary_locations(conn)
     log.info(f"  {len(hal_refs_oa)} halIds OpenAlex absents de staging_hal")
@@ -454,38 +456,37 @@ async def main() -> None:
     hal_refs_scanr = find_hal_ids_from_scanr(conn)
     log.info(f"  {len(hal_refs_scanr)} halIds ScanR absents de staging_hal")
 
-    if args.mode == "full":
+    if mode == "full":
         log.info("Recherche des NNT sans document HAL...")
         nnt_refs = find_nnt_without_hal(conn)
         log.info(f"  {len(nnt_refs)} NNT (thèses soutenues) sans HAL")
     else:
         nnt_refs = []
-        log.info("NNT ignoré en mode %s", args.mode)
+        log.info("NNT ignoré en mode %s", mode)
 
-    # Combiner et dédupliquer par hal_id
-    seen_hal_ids = set()
-    missing = []
+    seen_hal_ids: set[str] = set()
+    missing: list[dict] = []
     for ref in hal_refs_oa + hal_refs_scanr:
         if ref["hal_id"] not in seen_hal_ids:
             seen_hal_ids.add(ref["hal_id"])
             missing.append(ref)
     log.info(f"  {len(missing)} halIds manquants au total (après déduplication)")
 
-    if args.stats:
+    metrics = PhaseMetrics(total=len(missing) + len(nnt_refs))
+
+    if stats_only:
         log.info("--- Statistiques ---")
         log.info(f"  halIds OA absents de staging_hal : {len(hal_refs_oa)}")
         log.info(f"  halIds ScanR absents de staging_hal : {len(hal_refs_scanr)}")
         log.info(f"  NNT sans HAL : {len(nnt_refs)}")
         log.info(f"  Total halIds manquants (dédupliqués) : {len(missing)}")
-        conn.close()
-        return
+        return metrics
 
     if not missing and not nnt_refs:
         log.info("Rien à faire.")
-        conn.close()
-        return
+        return metrics
 
-    if args.dry_run:
+    if dry_run:
         if missing:
             log.info(f"[DRY RUN] {len(missing)} documents HAL à télécharger (par halId) :")
             for ref in missing[:10]:
@@ -500,21 +501,17 @@ async def main() -> None:
                 log.info(f"  [nnt] {ref['theses_id']} → NNT={ref['nnt']}")
             if len(nnt_refs) > 10:
                 log.info(f"  ... et {len(nnt_refs) - 10} autres")
-        conn.close()
-        return
+        return metrics
 
-    # 3. Télécharger et insérer (async, sem={HAL_MAX_CONCURRENT})
     fetched = 0
     not_found = 0
 
-    # 3a. Par halId (OpenAlex + ScanR)
     if missing:
         log.info(f"\n--- Fetch par halId ({len(missing)} documents) ---")
         f1, nf1 = await _fetch_by_halid_async(missing, conn, base_url)
         fetched += f1
         not_found += nf1
 
-    # 3b. Par NNT (theses.fr)
     if nnt_refs:
         log.info(f"\n--- Fetch par NNT ({len(nnt_refs)} thèses) ---")
         f2, nf2 = await _fetch_by_nnt_async(nnt_refs, conn, base_url)
@@ -522,10 +519,38 @@ async def main() -> None:
         not_found += nf2
         log.info(f"  NNT : {f2} récupérés, {nf2} absents de HAL")
 
+    metrics.add(new=fetched, not_found=not_found)
     log.info(f"\nTerminé : {fetched} récupérés, {not_found} introuvables")
     log.info("Relancer normalize_hal.py pour les integrer")
-    conn.close()
+    return metrics
+
+
+async def _main_async() -> None:
+    parser = argparse.ArgumentParser(
+        description="Récupère les entrées HAL manquantes découvertes via OpenAlex"
+    )
+    parser.add_argument("--dry-run", action="store_true", help="Lister sans télécharger")
+    parser.add_argument("--stats", action="store_true", help="Statistiques uniquement")
+    parser.add_argument(
+        "--mode",
+        choices=["full", "weekly", "daily"],
+        default="full",
+        help="Mode pipeline (NNT ignoré en daily/weekly)",
+    )
+    args = parser.parse_args()
+
+    conn = get_sync_engine().connect()
+    try:
+        await fetch_missing_hal_ids(
+            conn, mode=args.mode, dry_run=args.dry_run, stats_only=args.stats
+        )
+    finally:
+        conn.close()
+
+
+def main() -> None:
+    asyncio.run(_main_async())
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

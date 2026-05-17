@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from collections.abc import Iterable
 
 import httpx
@@ -28,6 +27,7 @@ from infrastructure.api_limits import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.api_retry_async import http_request_with_retry_async
 from infrastructure.app_config import get_api_base_urls, get_wos_api_key
 from infrastructure.sources.common import compute_hash
+from infrastructure.sources.wos.parsing import clean_doi_for_wos, extract_doi, extract_ut
 
 log = logging.getLogger(__name__)
 
@@ -48,41 +48,6 @@ _INSERT_WOS_SQL = text(
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
 
-def _clean_doi_for_wos(doi: str) -> str | None:
-    doi = re.split(r"[&?]", doi.strip())[0]
-    skip_prefixes = ("10.48550/", "10.2139/", "10.21203/", "10.5281/zenodo")
-    if any(doi.lower().startswith(p) for p in skip_prefixes):
-        return None
-    if '"' in doi or "\n" in doi:
-        return None
-    return doi
-
-
-def _extract_ut(rec: dict) -> str:
-    return rec["UID"]
-
-
-def _extract_doi(rec: dict) -> str | None:
-    try:
-        identifiers = (
-            rec.get("dynamic_data", {})
-            .get("cluster_related", {})
-            .get("identifiers", {})
-            .get("identifier", [])
-        )
-        if isinstance(identifiers, dict):
-            identifiers = [identifiers]
-        if not isinstance(identifiers, list):
-            return None
-        for ident in identifiers:
-            if isinstance(ident, dict) and ident.get("type") == "doi":
-                val = ident.get("value")
-                return str(val).strip() if val is not None else None
-    except (KeyError, TypeError, AttributeError):
-        pass
-    return None
-
-
 class WosFetchMissingDoiAdapter:
     """Adapter async conforme au `AsyncFetchMissingDoiAdapter` Protocol."""
 
@@ -101,7 +66,7 @@ class WosFetchMissingDoiAdapter:
         self.headers = {"X-ApiKey": get_wos_api_key(conn), "Accept": "application/json"}
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
-        clean = [d for d in (_clean_doi_for_wos(x) for x in dois) if d]
+        clean = [d for d in (clean_doi_for_wos(x) for x in dois) if d]
         if not clean:
             return []
         query = "DO=(" + " OR ".join(f'"{d}"' for d in clean) + ")"
@@ -168,8 +133,8 @@ class WosFetchMissingDoiAdapter:
         result = conn.execute(
             _INSERT_WOS_SQL,
             {
-                "source_id": _extract_ut(record),
-                "doi": _extract_doi(record),
+                "source_id": extract_ut(record),
+                "doi": extract_doi(record),
                 "raw_data": record,
                 "raw_hash": compute_hash(record),
             },

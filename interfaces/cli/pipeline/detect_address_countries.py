@@ -22,6 +22,7 @@ from collections import Counter
 from sqlalchemy import Connection, bindparam, select, text, update
 
 from domain.normalize import normalize_text
+from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.tables import addresses, country_name_forms
 from infrastructure.log import setup_logger
@@ -62,6 +63,78 @@ def show_stats(conn: Connection) -> None:
     logger.info(f"  Sans rien        : {row.sans_rien}")
 
 
+def detect_countries(
+    conn: Connection,
+    *,
+    apply: bool = True,
+    direct: bool = True,
+    stats_only: bool = False,
+) -> PhaseMetrics:
+    """Détecte les pays des adresses via match du dernier segment.
+
+    Phase importable depuis `run_pipeline.py` ; ne ferme pas la connexion
+    (responsabilité du caller). Defaults pipeline : `apply=True direct=True`
+    (écrit dans `countries`). `total` = adresses sans pays, `new` = matchées
+    et écrites, `extras["unmatched"]` = sans correspondance.
+    """
+    if stats_only:
+        show_stats(conn)
+        return PhaseMetrics()
+
+    country_forms = load_country_forms(conn)
+    logger.info(f"{len(country_forms)} formes de noms de pays chargées")
+
+    rows = conn.execute(
+        select(addresses.c.id, addresses.c.raw_text).where(addresses.c.countries.is_(None))
+    ).all()
+    logger.info(f"{len(rows)} adresses sans pays")
+
+    matched: list[tuple[int, str]] = []
+    unmatched = 0
+    for r in rows:
+        last_seg = extract_last_segment(r.raw_text)
+        if not last_seg:
+            unmatched += 1
+            continue
+        iso = country_forms.get(last_seg)
+        if iso:
+            matched.append((r.id, iso))
+        else:
+            unmatched += 1
+
+    logger.info(f"Matchés : {len(matched)}, non matchés : {unmatched}")
+
+    if not apply:
+        unknown: Counter[str] = Counter()
+        for r in rows:
+            last_seg = extract_last_segment(r.raw_text)
+            if last_seg and last_seg not in country_forms:
+                unknown[last_seg] += 1
+        logger.info("\nTop 20 formes non reconnues :")
+        for form, cnt in unknown.most_common(20):
+            logger.info(f"  {cnt:>5}  {form}")
+        logger.info("\nDry-run — ajouter --apply pour appliquer.")
+        return PhaseMetrics(total=len(rows), extras={"unmatched": unmatched})
+
+    column = addresses.c.countries if direct else addresses.c.suggested_countries
+    stmt = (
+        update(addresses)
+        .where(addresses.c.id == bindparam("addr_id"))
+        .values({column: bindparam("val")})
+    )
+    for i in range(0, len(matched), 5000):
+        batch = matched[i : i + 5000]
+        conn.execute(
+            stmt,
+            [{"addr_id": addr_id, "val": [iso.lower()]} for addr_id, iso in batch],
+        )
+    conn.commit()
+
+    logger.info(f"{len(matched)} adresses mises à jour ({column.name})")
+    show_stats(conn)
+    return PhaseMetrics(total=len(rows), new=len(matched), extras={"unmatched": unmatched})
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Détection pays des adresses")
     parser.add_argument("--apply", action="store_true", help="Appliquer (sinon dry-run)")
@@ -71,69 +144,8 @@ def main() -> None:
     parser.add_argument("--stats", action="store_true", help="Stats uniquement")
     args = parser.parse_args()
 
-    engine = get_sync_engine()
-    with engine.connect() as conn:
-        if args.stats:
-            show_stats(conn)
-            return
-
-        country_forms = load_country_forms(conn)
-        logger.info(f"{len(country_forms)} formes de noms de pays chargées")
-
-        # Récupérer les adresses sans pays
-        rows = conn.execute(
-            select(addresses.c.id, addresses.c.raw_text).where(addresses.c.countries.is_(None))
-        ).all()
-        logger.info(f"{len(rows)} adresses sans pays")
-
-        matched = 0
-        unmatched = 0
-        updates: list[tuple[int, str]] = []
-
-        for r in rows:
-            last_seg = extract_last_segment(r.raw_text)
-            if not last_seg:
-                unmatched += 1
-                continue
-            iso = country_forms.get(last_seg)
-            if iso:
-                updates.append((r.id, iso))
-                matched += 1
-            else:
-                unmatched += 1
-
-        logger.info(f"Matchés : {matched}, non matchés : {unmatched}")
-
-        if not args.apply:
-            unknown: Counter[str] = Counter()
-            for r in rows:
-                last_seg = extract_last_segment(r.raw_text)
-                if last_seg and last_seg not in country_forms:
-                    unknown[last_seg] += 1
-            logger.info("\nTop 20 formes non reconnues :")
-            for form, cnt in unknown.most_common(20):
-                logger.info(f"  {cnt:>5}  {form}")
-            logger.info("\nDry-run — ajouter --apply pour appliquer.")
-            return
-
-        # Appliquer (transaction unique, commit en fin de boucle)
-        column = addresses.c.countries if args.direct else addresses.c.suggested_countries
-        # executemany SA : un seul stmt paramétré + liste de dicts
-        stmt = (
-            update(addresses)
-            .where(addresses.c.id == bindparam("addr_id"))
-            .values({column: bindparam("val")})
-        )
-        for i in range(0, len(updates), 5000):
-            batch = updates[i : i + 5000]
-            conn.execute(
-                stmt,
-                [{"addr_id": addr_id, "val": [iso.lower()]} for addr_id, iso in batch],
-            )
-        conn.commit()
-
-        logger.info(f"{matched} adresses mises à jour ({column.name})")
-        show_stats(conn)
+    with get_sync_engine().connect() as conn:
+        detect_countries(conn, apply=args.apply, direct=args.direct, stats_only=args.stats)
 
 
 if __name__ == "__main__":

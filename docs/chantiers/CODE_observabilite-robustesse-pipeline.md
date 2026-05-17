@@ -1,5 +1,7 @@
 # Chantier — Observabilité et robustesse du pipeline
 
+Commencé le 2026-05-16
+
 ## Contexte
 
 Deux manques persistants sur la production du pipeline, identifiés de
@@ -21,34 +23,11 @@ longue date mais jamais instruits comme chantier dédié :
    consolidée temps de réponse / pool DB / taux d'erreur / durée des
    phases.
 
-## Dépendance — audit-cto
+## Volets
 
-Le volet « dashboard métriques » a un pré-requis dans
-[CODE_audit-cto.md](CODE_audit-cto.md) Phase 1 option A' : chaque phase
-écrit un `logs/metrics/<phase>.json` en fin de run, l'orchestrateur lit
-ces JSON au lieu de parser les logs. Tant que ce pré-requis n'est pas
-fait, tout dashboard construit ici reposera sur du parsing de logs
-fragile. **Ne pas démarrer le volet dashboard avant que A' soit
-tranché et appliqué.**
-
-**Sous-chantier inclus dans A' : sweep `subprocess → import direct`.**
-Aujourd'hui `run_pipeline.py` invoque 10 scripts via `subprocess.run(...)`
-(les 5 extracteurs + `refetch_truncated`, `fetch_missing_hal_id`, le
-dispatcher `fetch_missing_doi`, `detect_address_countries`,
-`suggest_address_countries`). Ces invocations ne peuvent pas retourner
-de métriques typées — la seule récupération possible est du parsing de
-stdout/stderr, fragile. Pour que l'option A' fonctionne proprement,
-chaque script doit exposer sa logique de `main()` en fonction
-réutilisable (`extract_hal(...) -> ExtractStats`, etc.) que
-l'orchestrateur appelle en import direct, reçoit la struct typée, et
-sérialise en JSON métrique. Coût estimé : ~3-5 h pour le sweep
-complet (extraction de `main()` en fonction + thin wrapper CLI +
-adaptation `run_pipeline.py`). Pas de perte d'isolation processus en
-pratique : le `try/except` actuel dans la boucle de phases capture
-déjà les exceptions au niveau orchestrateur.
-
-Le volet « checks post-pipeline » est indépendant : il consomme l'état
-final de la base, pas les métriques de phases.
+- **Volet 0 — Sweep `subprocess → import`** (pré-requis du Volet B). État actuel hybride : 12 phases déjà en import direct dans `run_pipeline.py` (via les helpers `_run_*`), 10 invocations encore en `subprocess.run` (les 5 extracteurs + `refetch_truncated`, `fetch_missing_hal_id`, `fetch_missing_doi`, `detect_address_countries`, `suggest_address_countries`). Une invocation subprocess ne peut pas remonter de métriques typées à l'orchestrateur — il faudrait parser stdout. On finit donc le sweep : chaque script restant expose `run(...) -> Metrics`, l'orchestrateur appelle des fonctions et reçoit la struct typée. Pas de perte d'isolation processus en pratique : le `try/except` autour des phases capture déjà les exceptions. Coût estimé ~3-5 h.
+- **Volet A — Checks automatiques post-pipeline**. Indépendant : consomme l'état final de la base, pas les métriques de phases.
+- **Volet B — Dashboard métriques**. Suppose Volet 0 fait.
 
 ## Décisions
 
@@ -68,6 +47,14 @@ final de la base, pas les métriques de phases.
    suffisant pour le périmètre actuel.
 
 ## Phasage
+
+### Volet 0 — Sweep `subprocess → import`
+
+- [x] Dataclass partagé `application/pipeline/_metrics.py:PhaseMetrics` (champs `new`/`updated`/`total`/`errors` + `extras: dict[str, int]` libre + `as_summary()` pour les logs, `merge()` pour les phases multi-helpers).
+- [x] `SourceExtractor.run_as_phase(args) -> PhaseMetrics` ajouté à `infrastructure/sources/base.py` (variante non-CLI : laisse remonter les exceptions, retourne les métriques). `run()` reste le wrapper CLI standalone. `ExtractionStats` retiré, remplacé par `PhaseMetrics` dans les 5 extracteurs HAL/OA/WoS/ScanR/theses.
+- [x] Logique des 4 autres scripts extraite en fonction importable : `refetch(conn, ...) -> PhaseMetrics`, `async fetch_missing_hal_ids(conn, ...) -> PhaseMetrics`, `detect_countries(conn, ...) -> PhaseMetrics`, `suggest_countries(conn, ...) -> PhaseMetrics`. Chaque `main()` argparse reste comme thin wrapper. `application/pipeline/fetch_missing_doi.run_async` retourne désormais un `PhaseMetrics` au lieu d'un `dict[str, int]`.
+- [x] `run_pipeline.py` : remplacement des 10 appels `run_python(...)` par 10 nouveaux helpers `_run_extract_{hal,openalex,wos,scanr,theses}`, `_run_refetch_truncated`, `_run_fetch_missing_hal_id`, `_run_fetch_missing_doi`, `_run_detect_address_countries`, `_run_suggest_address_countries`. `phase_extract`/`phase_cross_imports`/`phase_countries` agrègent via `metrics.merge(...)` et retournent `PhaseMetrics`. L'orchestrateur collecte ces métriques dans `phase_metrics: dict[str, PhaseMetrics]` (consommé par Volet B).
+- [x] `run_python` et l'import `subprocess` retirés de `run_pipeline.py`. Plus aucun `subprocess.run` dans le pipeline orchestré.
 
 ### Volet A — Checks automatiques post-pipeline
 
@@ -93,7 +80,7 @@ final de la base, pas les métriques de phases.
 
 ### Volet B — Dashboard métriques
 
-**Bloqué tant que audit-cto Phase 1 (option A') n'est pas appliquée.**
+**Bloqué tant que Volet 0 n'est pas appliqué.**
 
 - [ ] **Modèle de données métriques** : qu'est-ce qu'on stocke,
   comment (table dédiée ? `logs/metrics/*.json` parsés à la

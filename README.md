@@ -181,7 +181,7 @@ export DB_PASSWORD=...                      # Requis pour les tests d'intégrati
 python -m pytest tests/ -v                  # Tout
 python -m pytest tests/unit/ -q             # Unitaires seuls (~1s)
 python -m pytest tests/integration/ -q      # Intégration (~10s, base bibliometrie_test)
-python -m pytest tests/ --cov               # Avec couverture (seuil 70%)
+python -m pytest tests/ --cov               # Avec couverture (seuil 75%)
 ```
 
 Les tests d'intégration utilisent une base `bibliometrie_test` créée

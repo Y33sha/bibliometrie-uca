@@ -1,12 +1,13 @@
-"""Constantes et utilitaires partagés pour l'extraction OpenAlex.
+"""Constantes et utilitaires de configuration pour l'extraction OpenAlex.
 
-L'URL de base de l'API vit dans la config (`api_base_urls.openalex`).
-Les scripts CLI qui ont accès à un curseur doivent la lire via
-`infrastructure.app_config.get_api_base_urls(cur)["openalex"]` et la
-passer en paramètre aux fonctions `fetch_*`.
+L'URL de base de l'API vit dans la config DB (`api_base_urls.openalex`),
+lue via `infrastructure.app_config.get_api_base_urls(cur)["openalex"]`.
+
+Le parsing pur (build_params, extract_*, compute_meta_hash) vit dans
+`parsing.py` et est couvert par tests unitaires. Ce module ne garde que
+l'état d'auth (mutable via `init_auth`) et la liste des champs
+demandés à l'API (`SELECT_FIELDS`, analogue d'`HAL_FIELDS`).
 """
-
-from infrastructure.sources.common import clean_doi, compute_hash
 
 # Paramètres d'authentification — initialisés par le premier script lancé
 _api_key = None
@@ -52,23 +53,3 @@ SELECT_FIELDS = ",".join(
         "abstract_inverted_index",
     ]
 )
-
-
-def extract_openalex_id(work: dict) -> str:
-    """Extrait l'ID OpenAlex court (ex: W2741809807)."""
-    return work["id"].replace("https://openalex.org/", "")
-
-
-def extract_doi(work: dict) -> str | None:
-    """Extrait le DOI nettoyé (sans préfixe URL)."""
-    return clean_doi(work.get("doi"))
-
-
-def compute_meta_hash(raw_data: dict) -> str:
-    """Hash des métadonnées hors authorships.
-
-    Permet de détecter les changements réels (OA status, titre, etc.)
-    sans être perturbé par la troncature à 100 auteurs de l'API bulk.
-    """
-    filtered = {k: v for k, v in raw_data.items() if k != "authorships"}
-    return compute_hash(filtered)

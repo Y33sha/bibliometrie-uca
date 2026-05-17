@@ -190,7 +190,8 @@ Contenu :
 - **Orchestrateurs pipeline** dans `application/pipeline/` :
   - `normalize/` — staging → tables sources (un module par source)
   - `affiliations/` — propagation adresses ↔ structures vers
-    `source_authorships.in_perimeter` / `structure_ids`
+    `source_authorships.in_perimeter` et la table de jointure
+    `source_authorship_structures`
   - `publications/` — création/merge publications canoniques
   - `persons/` — création personnes + formes de noms
   - `authorships/` — reconstruction de la table de vérité
@@ -370,7 +371,8 @@ chacune.
 ## Tests
 
 - **Unit** (`tests/unit/`) — pas de DB. Couvre `domain/`,
-  `application/` (services avec mocks), parsing des normalizers,
+  `application/` (services avec mocks), parsing des normalizers et
+  des adapters sources (`infrastructure/sources/<source>/parsing.py`),
   infrastructure pure (log, pipeline_metrics).
 - **Intégration** (`tests/integration/`) — base `bibliometrie_test`
   créée à la volée (`alembic upgrade head` sur DB vierge), fixtures
@@ -384,10 +386,13 @@ Conftest splitté :
 - `tests/integration/conftest.py` — setup BDD via Alembic, fixtures
   `db` / `sa_sync_conn`
 
-Seuil de couverture `fail_under = 70` (`[tool.coverage.report]` dans
-`pyproject.toml`). Cible à terme : 80 %, après couverture des
-extracteurs API et de quelques routers admin (cf.
+Seuil de couverture `fail_under = 75` (`[tool.coverage.report]` dans
+`pyproject.toml`). Mesure courante : 76 %. Cible à terme : 80 %, après
+extension de la couverture aux routers admin sous 70 % (cf.
 [chantiers/CODE_couverture-tests.md](chantiers/CODE_couverture-tests.md)).
+Les modules de wiring HTTP des adapters sources sont exclus du calcul ;
+leur logique pure vit dans `<source>/parsing.py` et est couverte par
+tests unitaires.
 
 ## Composition roots
 
