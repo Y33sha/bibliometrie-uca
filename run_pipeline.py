@@ -373,11 +373,11 @@ def _run_build_authorships(*, rebuild_full: bool = False) -> None:
 def _run_populate_affiliations(*, mode: str) -> None:
     from application.pipeline.affiliations.populate_affiliations import run_populate
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.perimeter import (
+    from infrastructure.queries.affiliations import PgAffiliationsQueries
+    from infrastructure.queries.perimeter import (
         get_affiliations_structure_ids,
         get_persons_structure_ids,
     )
-    from infrastructure.queries.affiliations import PgAffiliationsQueries
 
     log.info("▶ populate_affiliations --mode %s", mode)
     t0 = time.time()
@@ -669,8 +669,8 @@ def _run_enrich_journal_apc() -> None:
 def _run_resolve_addresses(mode: str) -> None:
     from application.pipeline.affiliations.resolve_addresses import run_resolution
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.perimeter import get_persons_structure_ids
     from infrastructure.queries.address_resolution import PgAddressResolutionQueries
+    from infrastructure.queries.perimeter import get_persons_structure_ids
 
     log.info("▶ resolve_addresses --mode %s", mode)
     t0 = time.time()

@@ -319,7 +319,7 @@ def get_apc_structure_ids_sync() -> list[int]:
     transparente si le périmètre change via `/admin/config` ou si les
     structures du périmètre évoluent.
     """
-    from infrastructure.perimeter import get_persons_structure_ids_list
+    from infrastructure.queries.perimeter import get_persons_structure_ids_list
 
     engine = get_sync_engine()
     with engine.connect() as conn:

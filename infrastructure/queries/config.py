@@ -42,7 +42,7 @@ class PgConfigQueries(ConfigQueries):
         sur la clé `hal_collections` de la table config si aucune dérivation
         possible.
         """
-        from infrastructure.perimeter import get_perimeter_structure_ids
+        from infrastructure.queries.perimeter import get_perimeter_structure_ids
 
         try:
             perim_row = self._conn.execute(
