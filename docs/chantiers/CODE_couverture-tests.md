@@ -50,7 +50,12 @@ Pas de mock sur l'infra DB : les tests d'intégration tournent contre `bibliomet
 
 ### 3. Cible chiffrée
 
-Une fois (1) appliqué, recalculer le `fail_under`. Mesure post-Phase 1 : couverture totale **75.65 %** (1582 tests). `fail_under` bumpé `70 → 75`. La Phase 2 (routers admin sous 70 %) doit apporter le delta restant pour franchir 80 %.
+Une fois (1) appliqué, recalculer le `fail_under`. Mesures :
+
+- Post-Phase 1 : 75.65 % (1582 tests). `fail_under` 70 → 75.
+- Post-Phase 2 : 77.09 % (1678 tests). `fail_under` 75 → 77.
+
+Le palier 80 % n'est pas franchi par Phase 1+2. Phase 3 (`base.py`, éventuellement `auth.py`) et la couverture d'autres poches diffuses (orchestrateurs pipeline, helpers) sont nécessaires pour atteindre 80.
 
 Une fois le palier 80 % atteint, on suit la doctrine actuelle : seuil progressif jamais à la baisse.
 
@@ -70,25 +75,24 @@ Une fois le palier 80 % atteint, on suit la doctrine actuelle : seuil progressif
 - [x] Couverture recalculée : 75.65 %. `fail_under` bumpé `70 → 75`.
 - [x] Mise à jour `docs/architecture.md` (section Tests) et `README.md` (commande pytest cov) avec le nouveau seuil 75 %.
 
-### Phase 2 — Routers admin sous 70 %
+### Phase 2 — Couvrir les routers sous 70 %
 
-Par ordre de priorité (impact UI puis surface) :
+Tests d'intégration FastAPI (`TestClient`) sur les routers dont la couverture initiale est sous 70 %. Critère unique = pourcentage de couverture ; le nom du module (`admin_*` ou pas) n'est pas un discriminant — le nommage est incohérent côté code (`journals`, `perimeters`, `subjects` portent des opérations admin sans préfixe `admin_`). À rationaliser dans un sous-dossier `routers/admin/` après le chantier tests.
 
-- [ ] `interfaces/api/routers/admin_pipeline.py` (32 %) — endpoints de relance / consultation de runs. Pages `/admin/pipeline`.
-- [ ] `interfaces/api/routers/admin_duplicates.py` (43 %) — gestion des doublons de publications. Page `/admin/duplicates`.
-- [ ] `interfaces/api/routers/journals.py` (48 %) — CRUD journaux (mode admin).
-- [ ] `interfaces/api/routers/perimeters.py` (50 %) — CRUD perimeters.
-- [ ] `interfaces/api/routers/subjects.py` (50 %) — facettes / recherche subjects.
-- [ ] `interfaces/api/routers/docs.py` (22 %) — *à arbitrer* : si le router est en passe d'être retiré ou réécrit DSI-side, ne pas y investir. Sinon, l'inclure en dernier.
+- [x] `interfaces/api/routers/admin_pipeline.py` (32 → 100 %)
+- [x] `interfaces/api/routers/admin_duplicates.py` (43 → 100 %)
+- [x] `interfaces/api/routers/journals.py` (48 → 100 %)
+- [x] `interfaces/api/routers/perimeters.py` (50 → 100 %)
+- [x] `interfaces/api/routers/subjects.py` (50 → 100 %)
+- [x] `interfaces/api/routers/admin_person_duplicates.py` (59 → 100 %)
+- [x] `interfaces/api/routers/hal_problems.py` (63 → 100 %)
+- [x] `interfaces/api/routers/docs.py` (22 %) — **abandonné** : router court, éphémère (Laura prévoit de le réécrire) ; pas de ROI sur les tests.
+- [x] Couverture post-Phase 2 mesurée : 77.09 % (1678 tests). `fail_under` bumpé `75 → 77`. Le palier 80 % n'est pas franchi par Phase 1+2 — Phase 3 + autres poches diffuses nécessaires.
 
-### Phase 3 — Quick-wins ciblés
+### Phase 3 — Reste hétérogène
 
-Optionnel si Phase 1+2 a déjà fait passer le seuil :
-
-- [ ] `interfaces/api/routers/admin_person_duplicates.py` (59 %)
-- [ ] `interfaces/api/routers/auth.py` (56 %) — dépend du contrat CAS final ; pas prioritaire avant que la doctrine d'auth soit tranchée par la DSI.
-- [ ] `interfaces/api/routers/hal_problems.py` (63 %)
-- [ ] `infrastructure/sources/base.py` (38 %) — helpers de retry / pagination, tests unitaires (pas d'I/O réseau).
+- [ ] `interfaces/api/routers/auth.py` (56 %) — dépend de la décision DSI sur le remplacement du JWT actuel par CAS. À traiter une fois la doctrine d'auth tranchée.
+- [ ] `infrastructure/sources/base.py` (38 %) — helpers de retry / pagination, tests unitaires sans I/O réseau. Quick-win technique distinct, pas un router.
 
 ## Questions ouvertes
 

@@ -104,7 +104,7 @@ def add_perimeter_structure(
 ) -> StatusResponse:
     """Ajoute une structure racine au périmètre.
 
-    Renvoie `{"status": "added"}` ou `"already_exists"` si la
+    Renvoie `{"status": "added"}` ou `"already_present"` si la
     structure était déjà racine.
     """
     status = config_service.add_perimeter_structure(perimeter_id, body.structure_id, repo=repo)
