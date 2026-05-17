@@ -163,7 +163,6 @@ def run_normalize_scanr(conn):
     from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_scanr import process_work
-    from infrastructure.addresses import PgAddressLinker
     from infrastructure.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -171,6 +170,7 @@ def run_normalize_scanr(conn):
         publication_repository,
         publisher_repository,
     )
+    from infrastructure.repositories.address_linker import PgAddressLinker
 
     queries = PgScanrNormalizeQueries()
     staging_queries = PgStagingQueries()

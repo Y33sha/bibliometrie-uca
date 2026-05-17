@@ -3,7 +3,6 @@
 import os
 
 from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
-from infrastructure.addresses import PgAddressLinker
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.normalize_scanr import PgScanrNormalizeQueries
@@ -13,6 +12,7 @@ from infrastructure.repositories import (
     publication_repository,
     publisher_repository,
 )
+from infrastructure.repositories.address_linker import PgAddressLinker
 
 logger = setup_logger("normalize_scanr", os.path.join(os.path.dirname(__file__), "logs"))
 

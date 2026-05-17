@@ -1,6 +1,6 @@
 """Port : création des adresses et liens source_authorship_addresses.
 
-Implémenté par `infrastructure.addresses.PgAddressLinker`.
+Implémenté par `infrastructure.repositories.address_linker.PgAddressLinker`.
 
 Chaque adapter porte son propre cache d'adresses (raw_text → id) pour
 éviter les lookups répétés dans un même run.

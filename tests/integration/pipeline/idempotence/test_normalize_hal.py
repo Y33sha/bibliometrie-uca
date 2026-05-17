@@ -72,7 +72,6 @@ def run_normalize_hal(conn):
     from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_hal import process_work
-    from infrastructure.addresses import PgAddressLinker
     from infrastructure.queries.normalize_hal import PgHalNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -80,6 +79,7 @@ def run_normalize_hal(conn):
         publication_repository,
         publisher_repository,
     )
+    from infrastructure.repositories.address_linker import PgAddressLinker
     from infrastructure.sources.zenodo import HttpZenodoResolver
 
     queries = PgHalNormalizeQueries()

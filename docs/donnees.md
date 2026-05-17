@@ -295,7 +295,7 @@ Table unique pour toutes les sources. Colonnes notables : `source` (enum), `sour
 |-------|-------------|
 | `source_publications` | `application/pipeline/normalize/normalize_*.py` |
 | `source_authorships` | `application/pipeline/normalize/normalize_*.py` |
-| `source_authorship_addresses` | `application/pipeline/normalize/normalize_*.py` (via `infrastructure.addresses.PgAddressLinker`) |
+| `source_authorship_addresses` | `application/pipeline/normalize/normalize_*.py` (via `infrastructure.repositories.address_linker.PgAddressLinker`) |
 
 Note : `person_id` sur `source_authorships` est écrit par `application/persons.py` et `application/authorships/assign_orphans.py` (rattachement), pas par les normalizers. `in_perimeter` et `structure_ids` sont écrits par `application/pipeline/affiliations/populate_affiliations.py`.
 
