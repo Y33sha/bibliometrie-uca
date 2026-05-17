@@ -57,6 +57,23 @@ class TestKeepOrcidIfNameMatches:
             is None
         )
 
+    def test_none_oa_full_name_returns_none(self):
+        """`display_name` absent du payload OA (cas `None`) → rejet par défaut.
+
+        Sans `display_name` on ne peut pas vérifier la compatibilité avec
+        le `raw_author_name`. Comportement défensif : on préfère perdre un
+        ORCID légitime plutôt que d'accepter un ORCID dont on ne peut pas
+        confirmer l'attribution.
+        """
+        assert (
+            keep_orcid_if_name_matches(
+                raw_full_name="Dupont, Jean",
+                oa_full_name=None,
+                oa_orcid="0000-0001-2345-6789",
+            )
+            is None
+        )
+
 
 class TestExtractExternalIdsFromUrls:
     def test_hal(self):

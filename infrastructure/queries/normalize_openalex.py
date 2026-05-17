@@ -109,6 +109,7 @@ def upsert_openalex_source_authorship(
     raw_author_name: str | None,
     is_corresponding: bool,
     person_identifiers: JsonValue,
+    source_data: JsonValue,
 ) -> int:
     """UPSERT d'une `source_authorships` OpenAlex.
 
@@ -117,15 +118,22 @@ def upsert_openalex_source_authorship(
 
     `source_structures` (TEXT[]) stocke les `openalex_id` natifs des
     institutions référencées.
+
+    `source_data` (JSONB) porte les champs OpenAlex-spécifiques utiles à
+    la validation du matching côté pipeline `persons` — notamment
+    `display_name` (nom de l'entité auteur OpenAlex, distinct du
+    `raw_author_name` de la signature) pour le filtre
+    `keep_orcid_if_name_matches`.
     """
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, author_position,
              source_structures,
-             author_name_normalized, is_corresponding, raw_author_name, person_identifiers)
+             author_name_normalized, is_corresponding, raw_author_name,
+             person_identifiers, source_data)
         VALUES ('openalex', :spid, :pos, :source_structures,
                 normalize_name_form(:raw_author_name), :is_corresponding,
-                :raw_author_name, :person_identifiers)
+                :raw_author_name, :person_identifiers, :source_data)
         ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
             author_name_normalized = COALESCE(
                 EXCLUDED.author_name_normalized,
@@ -134,9 +142,13 @@ def upsert_openalex_source_authorship(
             is_corresponding = EXCLUDED.is_corresponding,
             raw_author_name = EXCLUDED.raw_author_name,
             source_structures = EXCLUDED.source_structures,
-            person_identifiers = EXCLUDED.person_identifiers
+            person_identifiers = EXCLUDED.person_identifiers,
+            source_data = EXCLUDED.source_data
         RETURNING id
-    """).bindparams(bindparam("person_identifiers", type_=JSONB))
+    """).bindparams(
+        bindparam("person_identifiers", type_=JSONB),
+        bindparam("source_data", type_=JSONB),
+    )
     row = conn.execute(
         stmt,
         {
@@ -146,6 +158,7 @@ def upsert_openalex_source_authorship(
             "raw_author_name": raw_author_name,
             "is_corresponding": is_corresponding,
             "person_identifiers": person_identifiers,
+            "source_data": source_data,
         },
     ).one()
     return row.id
@@ -231,6 +244,7 @@ class PgOpenalexNormalizeQueries(OpenalexNormalizeQueries):
         raw_author_name: str | None,
         is_corresponding: bool,
         person_identifiers: JsonValue,
+        source_data: JsonValue,
     ) -> int:
         return upsert_openalex_source_authorship(
             conn,
@@ -240,6 +254,7 @@ class PgOpenalexNormalizeQueries(OpenalexNormalizeQueries):
             raw_author_name=raw_author_name,
             is_corresponding=is_corresponding,
             person_identifiers=person_identifiers,
+            source_data=source_data,
         )
 
     def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool:
