@@ -386,9 +386,9 @@ Conftest splitté :
 - `tests/integration/conftest.py` — setup BDD via Alembic, fixtures
   `db` / `sa_sync_conn`
 
-Seuil de couverture `fail_under = 75` (`[tool.coverage.report]` dans
-`pyproject.toml`). Mesure courante : 76 %. Cible à terme : 80 %, après
-extension de la couverture aux routers admin sous 70 % (cf.
+Seuil de couverture `fail_under = 77` (`[tool.coverage.report]` dans
+`pyproject.toml`). Mesure courante : 77 %. Cible à terme : 80 %, après
+Phase 3 et couverture des poches diffuses encore sous le seuil (cf.
 [chantiers/CODE_couverture-tests.md](chantiers/CODE_couverture-tests.md)).
 Les modules de wiring HTTP des adapters sources sont exclus du calcul ;
 leur logique pure vit dans `<source>/parsing.py` et est couverte par
