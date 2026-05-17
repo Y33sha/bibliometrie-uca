@@ -1,5 +1,7 @@
 # Chantier — Typage strict des projections et DTOs
 
+Commencé le 2026-05-17
+
 ## Contexte
 
 Le chantier `CODE_chasse-aux-any` a verrouillé `disallow_any_explicit` et `disallow_any_generics` globalement. Subsistent quatre familles de types « bâtards » documentés et désactivés par module dans `pyproject.toml` (chiffres recomptés à l'ouverture du chantier) :
@@ -34,12 +36,12 @@ Audit Phase 0 effectué à l'ouverture (cf. chiffres dans Contexte). Phases d'ex
 
 Les 6 `fields: dict[str, Any]` des ports repository deviennent des `TypedDict(total=False)` (un par port). Victoire rapide, test : type-check verrouille les callers à des clés de colonne valides.
 
-- [ ] `application/ports/repositories/journal_repository.py` → `JournalUpdateFields`
-- [ ] `application/ports/repositories/perimeter_repository.py` → `PerimeterUpdateFields`
-- [ ] `application/ports/repositories/publisher_repository.py` → `PublisherUpdateFields`
-- [ ] `application/ports/repositories/structure_repository.py` → `StructureUpdateFields` + `StructureNameFormUpdateFields`
-- [ ] Adapter les implémentations `infrastructure/repositories/*` correspondantes.
-- [ ] Adapter les callers application services.
+- [x] `application/ports/repositories/journal_repository.py` → `JournalUpdateFields`
+- [x] `application/ports/repositories/perimeter_repository.py` → `PerimeterUpdateFields`
+- [x] `application/ports/repositories/publisher_repository.py` → `PublisherUpdateFields`
+- [x] `application/ports/repositories/structure_repository.py` → `StructureUpdateFields` + `StructureNameFormUpdateFields`
+- [x] Adapter les implémentations `infrastructure/repositories/*` correspondantes.
+- [x] Adapter les callers application services (`journals`, `publishers`, `config`, `structures`).
 
 ### Phase 2 — `Row[Any]` des normalizers (staging)
 
@@ -59,7 +61,7 @@ Un NamedTuple par `_*_from_row` (structure, publisher, perimeter, authorship, jo
 
 ### Phase 4 — Sweep DTO par feature (gros morceau)
 
-Un sweep par feature, dans cet ordre (du plus petit au plus gros pour rôder le pattern) :
+Un sweep par feature, dans cet ordre (du plus petit au plus gros pour roder le pattern) :
 
 - [ ] **subjects** (7 BaseModel) — pilote, le plus petit
 - [ ] **auth** (2)

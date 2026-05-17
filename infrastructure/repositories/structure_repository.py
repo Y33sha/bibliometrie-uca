@@ -6,6 +6,10 @@ from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import Connection, Row, Text, bindparam, cast, delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from application.ports.repositories.structure_repository import (
+    StructureNameFormUpdateFields,
+    StructureUpdateFields,
+)
 from domain.errors import ValidationError
 from domain.structures.identifiers import HalCollection, RorId
 from domain.structures.name_forms import StructureNameForm
@@ -156,7 +160,7 @@ class PgStructureRepository:
         result = self._conn.execute(stmt)
         return dict(result.one()._mapping)
 
-    def update_structure_fields(self, structure_id: int, fields: dict) -> dict:
+    def update_structure_fields(self, structure_id: int, fields: StructureUpdateFields) -> dict:
         if "api_ids" in fields:
             fields = {**fields, "api_ids": _normalize_api_ids(fields["api_ids"])}
         stmt = (
@@ -274,7 +278,7 @@ class PgStructureRepository:
         result = self._conn.execute(stmt)
         return dict(result.one()._mapping)
 
-    def update_name_form_fields(self, form_id: int, fields: dict) -> dict:
+    def update_name_form_fields(self, form_id: int, fields: StructureNameFormUpdateFields) -> dict:
         stmt = (
             update(structure_name_forms)
             .where(structure_name_forms.c.id == form_id)

@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection, Row, delete, func, select, update
 
+from application.ports.repositories.perimeter_repository import PerimeterUpdateFields
 from domain.perimeters.perimeter import Perimeter
 from infrastructure.db.tables import perimeters
 
@@ -89,7 +90,7 @@ class PgPerimeterRepository:
         result = self._conn.execute(stmt)
         return result.scalar_one()
 
-    def update_perimeter_fields(self, perimeter_id: int, fields: dict) -> None:
+    def update_perimeter_fields(self, perimeter_id: int, fields: PerimeterUpdateFields) -> None:
         stmt = update(perimeters).where(perimeters.c.id == perimeter_id).values(**fields)
         self._conn.execute(stmt)
 

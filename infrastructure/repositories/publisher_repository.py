@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import Connection, Row, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from application.ports.repositories.publisher_repository import PublisherUpdateFields
 from domain.publishers.publisher import Publisher
 from infrastructure.db.tables import publisher_name_forms, publishers
 
@@ -122,7 +123,7 @@ class PgPublisherRepository:
             is not None
         )
 
-    def update_publisher_fields(self, publisher_id: int, fields: dict) -> None:
+    def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdateFields) -> None:
         """UPDATE dynamique sur publishers."""
         stmt = (
             update(publishers)

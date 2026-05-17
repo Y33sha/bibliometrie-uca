@@ -8,7 +8,11 @@ Les routers passent par ces fonctions pour toute écriture. Les lectures restent
 
 from application.audit import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.structure_repository import StructureRepository
+from application.ports.repositories.structure_repository import (
+    StructureNameFormUpdateFields,
+    StructureRepository,
+    StructureUpdateFields,
+)
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.structures.relations import check_can_create_relation
@@ -61,11 +65,11 @@ def update_structure(structure_id: int, *, fields: dict, repo: StructureReposito
     if not repo.structure_exists(structure_id):
         raise NotFoundError(f"Structure {structure_id} introuvable")
 
-    update_fields: dict = {}
+    update_fields: StructureUpdateFields = {}
     for field_name, col_name in _STRUCTURE_FIELD_MAP.items():
         val = fields.get(field_name)
         if val is not None:
-            update_fields[col_name] = val
+            update_fields[col_name] = val  # type: ignore[literal-required]
 
     if "api_ids" in fields and fields["api_ids"] is not None:
         # SA sérialise auto en JSONB depuis un dict Python ; pas de Json() wrap.
@@ -187,7 +191,7 @@ def update_name_form(form_id: int, *, fields: dict, repo: StructureRepository) -
     if not repo.name_form_exists(form_id):
         raise NotFoundError(f"Forme {form_id} introuvable")
 
-    update_fields: dict = {}
+    update_fields: StructureNameFormUpdateFields = {}
 
     if fields.get("form_text") is not None:
         update_fields["form_text"] = normalize_text(fields["form_text"])

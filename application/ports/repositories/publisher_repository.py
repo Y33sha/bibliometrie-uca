@@ -16,9 +16,23 @@ query sur `journals`.
 Implémenté par `infrastructure/repositories/publisher_repository.py`.
 """
 
-from typing import Any, Protocol
+from typing import Protocol, TypedDict
 
 from domain.publishers.publisher import Publisher
+
+
+class PublisherUpdateFields(TypedDict, total=False):
+    """Partial update sur la table `publishers`.
+
+    `name_normalized` est calculé par le service quand `name` est fourni.
+    """
+
+    name: str
+    name_normalized: str
+    country: str | None
+    doi_prefix: str | None
+    is_predatory: bool | None
+    notes: str | None
 
 
 class PublisherRepository(Protocol):
@@ -63,7 +77,7 @@ class PublisherRepository(Protocol):
 
     def publisher_exists(self, publisher_id: int) -> bool: ...
 
-    def update_publisher_fields(self, publisher_id: int, fields: dict[str, Any]) -> None: ...
+    def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdateFields) -> None: ...
 
     # ── Fusion ─────────────────────────────────────────────────────
 
