@@ -77,6 +77,28 @@ Si on s'y attaque :
 - OpenAlex : parallélisme inter-années (`asyncio.gather` sur N tâches « extraire année Y »).
 - ScanR, WoS : rate-limit contractuel strict, parallélisme limité.
 
+### Phase 4 — HTTP/2 sur les clients async (optionnel, à valider avant lancement)
+
+**Pré-requis : Phase 2 terminée.** HTTP/2 sans parallélisme côté client = aucun gain (le multiplexing ne sert qu'avec des requêtes concurrentes). Sur les extracteurs ThreadPool (Phase 1, 1 thread par source), HTTP/2 ne change rien — hors scope.
+
+Hypothèse : sur les clients async (`fetch_missing_doi/*`, `fetch_missing_hal_id`, et les enrichissements Phase 2), HTTP/2 économise des connexions TCP+TLS. Gain attendu : 5-15% sur le throughput au premier batch, dilué ensuite par le keep-alive HTTP/1.1 qui amortit déjà le setup.
+
+Sur la plupart des APIs cibles, le bottleneck est le rate-limit serveur (OpenAlex 10 req/s, WoS, Crossref polite), pas le client. Donc le gain réel peut être nul.
+
+**Approche : mesurer avant d'activer largement.**
+
+- [ ] Ajouter `h2` aux dépendances (`pyproject.toml`, ~5 sous-paquets) et vérifier que ça n'introduit pas de souci de wheels sur Windows.
+- [ ] Activer `http2=True` sur **un seul** client async — candidat : Unpaywall via `enrich_oa_status` après Phase 2 (volume élevé, max_concurrent ~10, serveur sur Cloudflare donc HTTP/2 quasi-certain).
+- [ ] Vérifier que le serveur négocie effectivement HTTP/2 (logger la version protocole via `response.http_version`).
+- [ ] Bench A/B sur un run réel : HTTP/1.1 vs HTTP/2, ≥5 000 requêtes. Comparer throughput, latence p50/p95, nombre de connexions TCP ouvertes.
+- [ ] **Seuil de décision : si gain throughput < 10 %, fermer Phase 4 sans généraliser** (le coût de maintenance — dépendance `h2`, branche fallback, debug binaire — ne se justifie pas).
+- [ ] Si gain ≥ 10 % : généraliser aux 5 `fetch_missing_doi/*`, `fetch_missing_hal_id`, `enrich_journal_apc`, `refetch_truncated`. Documenter le `http_version` observé par API dans la fiche pour suivi.
+
+Risques :
+- Une API serveur sans HTTP/2 fait fallback silencieux en HTTP/1.1 (httpx gère) — pas de régression, mais le gain attendu disparaît pour cette API.
+- `h2` package introduit du code binaire (HPACK). Sur Windows, vérifier le pip install.
+- Debug réseau plus dur (HTTP/2 binaire vs HTTP/1.1 textuel) — Wireshark / curl `--http2` requis pour inspection.
+
 ## Implications observabilité
 
 Avec Phase 1 (ThreadPool sur extracteurs) :

@@ -5,6 +5,9 @@ L'API OpenAlex bulk retourne max 100 authorships par work. Ce script
 détecte les works avec exactement 100 auteurs dans le staging et les
 re-fetche individuellement via l'API (qui retourne alors tous les auteurs).
 
+Implémentation async : `httpx.AsyncClient` partagé + `asyncio.Semaphore(3)`
+pour respecter le plafond OpenAlex (~10 req/s, cf. fetch_missing_doi).
+
 Usage:
     python refetch_truncated.py              # re-fetch complet
     python refetch_truncated.py --dry-run    # compter seulement
@@ -12,24 +15,27 @@ Usage:
 """
 
 import argparse
+import asyncio
 import os
-import time
 
-import requests
+import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.sources.api_limits import OPENALEX_DELAY
 from infrastructure.sources.common import compute_hash, setup_logger
 from infrastructure.sources.config import (
     get_api_base_urls,
     get_openalex_api_key,
     get_openalex_email,
 )
+from infrastructure.sources.http_retry_async import http_request_with_retry_async
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
 from infrastructure.sources.openalex.parsing import compute_meta_hash
+
+MAX_CONCURRENT = 3
+COMMIT_EVERY = 50
 
 _UPDATE_SQL = text(
     """
@@ -43,24 +49,34 @@ _UPDATE_SQL = text(
 logger = setup_logger("refetch_truncated", os.path.join(os.path.dirname(__file__), "logs"))
 
 
-def fetch_work(openalex_id: str, *, base_url: str) -> dict | None:
-    """Fetch un work individuel par son ID OpenAlex (retourne tous les auteurs)."""
+async def fetch_work(client: httpx.AsyncClient, openalex_id: str, *, base_url: str) -> dict | None:
+    """Fetch un work individuel par son ID OpenAlex (retourne tous les auteurs).
+
+    Retourne le dict ou None si l'API renvoie 404 (work introuvable) ou
+    si la requête a échoué après tous les retries.
+    """
     url = f"{base_url}/{openalex_id}"
     params = {"select": SELECT_FIELDS, **auth_params()}
     try:
-        resp = requests.get(url, params=params, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.HTTPError as e:
-        if e.response is not None and e.response.status_code == 404:
-            return None
-        logger.warning(f"Erreur API pour {openalex_id}: {e}")
-    except Exception as e:
-        logger.warning(f"Erreur pour {openalex_id}: {e}")
-    return None
+        return await http_request_with_retry_async(
+            client, "GET", url, params=params, timeout=30, label=f"OA {openalex_id}"
+        )
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code != 404:
+            logger.warning(f"Erreur API pour {openalex_id}: HTTP {e.response.status_code}")
+        return None
+    except httpx.RequestError as e:
+        logger.warning(f"Erreur réseau pour {openalex_id}: {e}")
+        return None
 
 
-def refetch(conn: Connection, *, dry_run: bool = False, limit: int | None = None) -> PhaseMetrics:
+async def refetch(
+    conn: Connection,
+    *,
+    dry_run: bool = False,
+    limit: int | None = None,
+    max_concurrent: int = MAX_CONCURRENT,
+) -> PhaseMetrics:
     """Re-fetch les works OpenAlex avec exactement 100 authorships.
 
     Phase importable depuis `run_pipeline.py` ; ne ferme pas la connexion
@@ -90,32 +106,49 @@ def refetch(conn: Connection, *, dry_run: bool = False, limit: int | None = None
     if not truncated or dry_run:
         return metrics
 
-    for i, row in enumerate(truncated):
-        work = fetch_work(row.source_id, base_url=base_url)
-        time.sleep(OPENALEX_DELAY)
-        if not work:
-            metrics.add(errors=1)
-            continue
-        if len(work.get("authorships", [])) <= 100:
-            metrics.add(already_complete=1)
-            continue
+    sem = asyncio.Semaphore(max_concurrent)
+    # La `Connection` SA sync n'est pas thread-safe ; tous les writes
+    # (UPDATE, commit) passent par `to_thread` sous ce lock.
+    db_lock = asyncio.Lock()
+    progress = {"processed": 0}
+
+    def _apply_update(staging_id: int, work: dict) -> None:
         conn.execute(
             _UPDATE_SQL,
             {
                 "raw_data": work,
                 "raw_hash": compute_hash(work),
                 "meta_hash": compute_meta_hash(work),
-                "id": row.id,
+                "id": staging_id,
             },
         )
-        metrics.add(updated=1)
-        if (i + 1) % 50 == 0:
-            conn.commit()
-            logger.info(
-                f"  {i + 1}/{len(truncated)}... "
-                f"({metrics.updated} mis à jour, "
-                f"{metrics.extras.get('already_complete', 0)} déjà complets)"
-            )
+
+    async with httpx.AsyncClient() as client:
+
+        async def process_one(staging_id: int, openalex_id: str) -> None:
+            async with sem:
+                work = await fetch_work(client, openalex_id, base_url=base_url)
+
+            if not work:
+                metrics.add(errors=1)
+            elif len(work.get("authorships", [])) <= 100:
+                metrics.add(already_complete=1)
+            else:
+                async with db_lock:
+                    await asyncio.to_thread(_apply_update, staging_id, work)
+                metrics.add(updated=1)
+
+            progress["processed"] += 1
+            if progress["processed"] % COMMIT_EVERY == 0:
+                async with db_lock:
+                    await asyncio.to_thread(conn.commit)
+                logger.info(
+                    f"  {progress['processed']}/{len(truncated)}... "
+                    f"({metrics.updated} mis à jour, "
+                    f"{metrics.extras.get('already_complete', 0)} déjà complets)"
+                )
+
+        await asyncio.gather(*(process_one(row.id, row.source_id) for row in truncated))
 
     conn.commit()
     logger.info(
@@ -136,7 +169,7 @@ def main() -> None:
 
     conn = get_sync_engine().connect()
     try:
-        refetch(conn, dry_run=args.dry_run, limit=args.limit)
+        asyncio.run(refetch(conn, dry_run=args.dry_run, limit=args.limit))
     finally:
         conn.close()
 

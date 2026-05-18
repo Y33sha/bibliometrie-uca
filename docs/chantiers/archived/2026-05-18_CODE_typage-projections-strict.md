@@ -1,6 +1,7 @@
 # Chantier — Typage strict des projections et DTOs
 
 Commencé le 2026-05-17
+Terminé le 2026-05-18
 
 ## Contexte
 

@@ -39,10 +39,11 @@ class OpenalexFetchMissingDoiAdapter:
 
     source_key = "openalex"
     batch_size = 1
-    # Polite pool OpenAlex = 10 req/s. Latence mesurée ~280 ms
-    # (run initial : 9979 DOIs en 555 s avec sem=5 = 18 req/s).
-    # sem=3 donne ~10.8 req/s peak, aligné avec le seuil documenté.
-    # Monter à 5 déclenche des 429 à retardement (quota rolling du free tier).
+    # OpenAlex impose 10 req/s comme plafond documenté, quel que soit le pool
+    # (polite via `mailto` ou authentifié via `api_key`). `auth_params()` envoie
+    # `api_key` si configurée (cas prod), sinon `mailto`.
+    # Latence mesurée ~280 ms ; sem=3 donne ~10.8 req/s peak, aligné avec le
+    # seuil. Monter à 5 (~18 req/s observé) déclenche des 429 à retardement.
     max_concurrent = 3
 
     base_url: str
