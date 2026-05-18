@@ -39,13 +39,15 @@ def suggest_countries(
     batch_size: int = 500,
     direct: bool = False,
     reset: bool = False,
+    reset_empty: bool = False,
 ) -> PhaseMetrics:
     """Suggère des pays pour les adresses sans pays via match trigramme.
 
     Phase importable depuis `run_pipeline.py` ; ne ferme pas la connexion.
-    Defaults pipeline : `direct=False` (écrit dans `suggested_countries`,
-    confirmation manuelle attendue). `total` = adresses traitées, `new` =
-    nb d'adresses pour lesquelles une suggestion a été trouvée.
+    Defaults pipeline : `direct=False` (écrit dans `suggested_countries`, confirmation manuelle attendue). `total` = adresses traitées, `new` = nb d'adresses pour lesquelles une suggestion a été trouvée.
+
+    `reset` : remet à NULL toutes les suggestions (vides + non vides). Usage manuel.
+    `reset_empty` : remet à NULL uniquement les suggestions vides (`= []`, adresses déjà tentées sans match). Activé par défaut en mode `full` du pipeline pour bénéficier d'une éventuelle évolution des heuristiques sans perdre les suggestions positives existantes.
     """
     target_column = "countries" if direct else "suggested_countries"
 
@@ -58,16 +60,41 @@ def suggest_countries(
                 """)
             )
         logger.info(f"{result.rowcount} suggestions réinitialisées")
+    elif reset_empty:
+        with conn.begin():
+            result = conn.execute(
+                text("""
+                    UPDATE addresses SET suggested_countries = NULL
+                    WHERE countries IS NULL
+                      AND suggested_countries IS NOT NULL
+                      AND cardinality(suggested_countries) = 0
+                """)
+            )
+        logger.info(f"{result.rowcount} suggestions vides réinitialisées (mode full)")
 
-    total = conn.execute(
+    counts = conn.execute(
         text("""
-            SELECT COUNT(*) AS n FROM addresses
+            SELECT
+                COUNT(*) FILTER (
+                    WHERE suggested_countries IS NULL AND length(normalized_text) >= 5
+                ) AS eligible,
+                COUNT(*) FILTER (WHERE cardinality(suggested_countries) > 0) AS has_suggestion,
+                COUNT(*) FILTER (
+                    WHERE suggested_countries IS NOT NULL
+                      AND cardinality(suggested_countries) = 0
+                ) AS empty_attempted,
+                COUNT(*) FILTER (WHERE length(normalized_text) < 5) AS too_short
+            FROM addresses
             WHERE countries IS NULL
-              AND suggested_countries IS NULL
-              AND length(normalized_text) >= 5
         """)
-    ).scalar_one()
-    logger.info(f"{total} adresses à traiter (batch_size={batch_size})")
+    ).one()
+    total = counts.eligible
+    logger.info(
+        f"{total} adresses à traiter (batch_size={batch_size}) — "
+        f"{counts.has_suggestion} déjà avec suggestion, "
+        f"{counts.empty_attempted} déjà tentées sans match, "
+        f"{counts.too_short} trop courtes"
+    )
 
     if total == 0:
         logger.info("Rien à faire.")
