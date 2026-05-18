@@ -52,6 +52,7 @@ from domain.pipeline_modes import MODE_NAMES, MODES
 from domain.sources import ALL_SOURCES_SET
 from infrastructure.observability.log import setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
+from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
 
 BASE = Path(__file__).resolve().parent
 
@@ -1037,6 +1038,11 @@ def main() -> None:
     parser.add_argument(
         "--year", type=int, help="Surcharger l'année d'extraction (une seule année)"
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Tuer un éventuel pipeline déjà en cours avant de démarrer (SIGTERM puis SIGKILL).",
+    )
     args = parser.parse_args()
 
     if args.list:
@@ -1045,6 +1051,13 @@ def main() -> None:
             doc = fn.__doc__.strip().split("\n")[0] if fn.__doc__ else ""
             print(f"  {i}. {name:15s} — {doc}")
         return
+
+    # Mutex pipeline (évite deadlocks cron vs lancement manuel).
+    try:
+        acquire_pipeline_lock(force=args.force)
+    except PipelineAlreadyRunningError as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)
 
     # Déterminer les phases à exécuter
     if args.only:
