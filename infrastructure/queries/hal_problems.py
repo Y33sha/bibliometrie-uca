@@ -1,16 +1,29 @@
 """Query services pour le router `/api/hal-problems/*`.
 
-Contrôles qualité HAL au niveau des publications (doublons de dépôts,
-manques dans les collections, conflits d'affiliation) + comptes HAL
-multiples par personne. `PgHalProblemsQueries` hérite explicitement du
-Protocol `application.ports.hal_problems_queries.HalProblemsQueries`.
+Contrôles qualité HAL au niveau des publications (doublons de dépôts, manques dans les collections, conflits d'affiliation) + comptes HAL multiples par personne. `PgHalProblemsQueries` hérite explicitement du Protocol `application.ports.hal_problems_queries.HalProblemsQueries`.
 """
 
 from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.hal_problems_queries import HalProblemsQueries
+from application.ports.api.hal_problems_queries import (
+    HalAccountSummary,
+    HalAffiliationConflictPub,
+    HalAffiliationConflictsResponse,
+    HalCollectionLab,
+    HalDocSummary,
+    HalDoiDuplicatePair,
+    HalDoiDuplicatesResponse,
+    HalDuplicateAccountPerson,
+    HalDuplicateAccountsResponse,
+    HalMetaDuplicatePair,
+    HalMetaDuplicatesResponse,
+    HalMissingCollectionPub,
+    HalMissingCollectionsResponse,
+    HalProblemsQueries,
+    HalPubDetail,
+)
 
 
 class PgHalProblemsQueries(HalProblemsQueries):
@@ -19,7 +32,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def _hal_pub_detail(self, pub_id: int) -> dict[str, Any] | None:
+    def _hal_pub_detail(self, pub_id: int) -> HalPubDetail | None:
         pub_row = self._conn.execute(
             text("""
                 SELECT p.id, p.title, p.pub_year, p.doc_type::text AS doc_type,
@@ -43,19 +56,29 @@ class PgHalProblemsQueries(HalProblemsQueries):
             """),
             {"pid": pub_id},
         ).all()
-        hal_docs = [dict(r._mapping) for r in hal_rows]
-        return {**dict(pub_row._mapping), "hal_docs": hal_docs}
+        hal_docs = [
+            HalDocSummary(
+                halid=r.halid,
+                hal_collections=list(r.hal_collections) if r.hal_collections else None,
+                hal_doc_type=r.hal_doc_type,
+                hal_pub_year=r.hal_pub_year,
+                hal_title=r.hal_title,
+                author_count=r.author_count,
+            )
+            for r in hal_rows
+        ]
+        return HalPubDetail(
+            id=pub_row.id,
+            title=pub_row.title,
+            pub_year=pub_row.pub_year,
+            doc_type=pub_row.doc_type,
+            doi=pub_row.doi,
+            container_title=pub_row.container_title,
+            hal_docs=hal_docs,
+        )
 
-    def hal_duplicate_accounts(self, *, page: int, per_page: int) -> dict[str, Any]:
-        # Note sur les agrégats MIN() ci-dessous : pour un même `hal_person_id`,
-        # les valeurs de `raw_author_name`/`orcid`/`idhal`/`idref` observées sur
-        # les `source_authorships` HAL devraient être constantes (ces champs
-        # sont attachés au compte HAL, pas à la signature). En théorie aucune
-        # variation possible. En pratique, si des imports à des dates
-        # différentes ont posé des valeurs divergentes (avant que la
-        # comparaison de hash ne réimporte les payloads obsolètes), MIN()
-        # ramasse une valeur déterministe arbitraire. L'optimal aurait été
-        # MAX(created_at), mais `source_authorships` n'a pas de `created_at`.
+    def hal_duplicate_accounts(self, *, page: int, per_page: int) -> HalDuplicateAccountsResponse:
+        # Note sur les agrégats MIN() ci-dessous : pour un même `hal_person_id`, les valeurs de `raw_author_name`/`orcid`/`idhal`/`idref` observées sur les `source_authorships` HAL devraient être constantes (ces champs sont attachés au compte HAL, pas à la signature). En théorie aucune variation possible. En pratique, si des imports à des dates différentes ont posé des valeurs divergentes (avant que la comparaison de hash ne réimporte les payloads obsolètes), MIN() ramasse une valeur déterministe arbitraire. L'optimal aurait été MAX(created_at), mais `source_authorships` n'a pas de `created_at`.
         offset = (page - 1) * per_page
         total_row = self._conn.execute(
             text("""
@@ -115,17 +138,26 @@ class PgHalProblemsQueries(HalProblemsQueries):
             """),
             {"pg_limit": per_page, "pg_offset": offset},
         ).all()
-        persons = [dict(r._mapping) for r in rows]
+        persons = [
+            HalDuplicateAccountPerson(
+                person_id=r.person_id,
+                last_name=r.last_name,
+                first_name=r.first_name,
+                has_rh=r.has_rh,
+                hal_accounts=[HalAccountSummary(**acc) for acc in (r.hal_accounts or [])],
+            )
+            for r in rows
+        ]
 
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page or 1,
-            "persons": persons,
-        }
+        return HalDuplicateAccountsResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=(total + per_page - 1) // per_page or 1,
+            persons=persons,
+        )
 
-    def hal_duplicate_pubs_by_doi(self, *, page: int, per_page: int) -> dict[str, Any]:
+    def hal_duplicate_pubs_by_doi(self, *, page: int, per_page: int) -> HalDoiDuplicatesResponse:
         offset = (page - 1) * per_page
         total_row = self._conn.execute(
             text("""
@@ -154,21 +186,23 @@ class PgHalProblemsQueries(HalProblemsQueries):
             """),
             {"pg_limit": per_page, "pg_offset": offset},
         ).all()
-        pairs = []
+        pairs: list[HalDoiDuplicatePair] = []
         for r in rows:
             pub = self._hal_pub_detail(r.pub_id)
             if pub:
-                pairs.append({"doi": r.doi, "halids": r.halids, "publication": pub})
+                pairs.append(HalDoiDuplicatePair(doi=r.doi, halids=list(r.halids), publication=pub))
 
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page or 1,
-            "pairs": pairs,
-        }
+        return HalDoiDuplicatesResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=(total + per_page - 1) // per_page or 1,
+            pairs=pairs,
+        )
 
-    def hal_duplicate_pubs_by_metadata(self, *, page: int, per_page: int) -> dict[str, Any]:
+    def hal_duplicate_pubs_by_metadata(
+        self, *, page: int, per_page: int
+    ) -> HalMetaDuplicatesResponse:
         offset = (page - 1) * per_page
         dup_query = """
             FROM publications p1
@@ -208,22 +242,22 @@ class PgHalProblemsQueries(HalProblemsQueries):
             """),
             {"pg_limit": per_page, "pg_offset": offset},
         ).all()
-        pairs = []
+        pairs: list[HalMetaDuplicatePair] = []
         for r in rows:
             pub_a = self._hal_pub_detail(r.id_a)
             pub_b = self._hal_pub_detail(r.id_b)
             if pub_a and pub_b:
-                pairs.append({"pub_a": pub_a, "pub_b": pub_b})
+                pairs.append(HalMetaDuplicatePair(pub_a=pub_a, pub_b=pub_b))
 
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page or 1,
-            "pairs": pairs,
-        }
+        return HalMetaDuplicatesResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=(total + per_page - 1) // per_page or 1,
+            pairs=pairs,
+        )
 
-    def hal_missing_collections_labs(self) -> list[dict[str, Any]]:
+    def hal_missing_collections_labs(self) -> list[HalCollectionLab]:
         rows = self._conn.execute(
             text("""
                 SELECT s.id, s.acronym, s.name, s.hal_collection
@@ -232,15 +266,23 @@ class PgHalProblemsQueries(HalProblemsQueries):
                 ORDER BY s.acronym
             """)
         ).all()
-        return [dict(r._mapping) for r in rows]
+        return [
+            HalCollectionLab(
+                id=r.id, acronym=r.acronym, name=r.name, hal_collection=r.hal_collection
+            )
+            for r in rows
+        ]
 
-    def hal_missing_collections(self, *, lab_id: int, page: int, per_page: int) -> dict[str, Any]:
+    def hal_missing_collections(
+        self, *, lab_id: int, page: int, per_page: int
+    ) -> HalMissingCollectionsResponse | None:
+        """Retourne None si le labo n'a pas de collection HAL configurée (le router transformera en 400)."""
         lab_row = self._conn.execute(
             text("SELECT acronym, hal_collection FROM structures WHERE id = :id"),
             {"id": lab_id},
         ).one_or_none()
         if not lab_row or not lab_row.hal_collection:
-            return {"error": "no_collection"}
+            return None
 
         offset = (page - 1) * per_page
         col = lab_row.hal_collection
@@ -284,19 +326,32 @@ class PgHalProblemsQueries(HalProblemsQueries):
             """),
             binds,
         ).all()
-        pubs = [dict(r._mapping) for r in rows]
+        pubs = [
+            HalMissingCollectionPub(
+                id=r.id,
+                title=r.title,
+                pub_year=r.pub_year,
+                doc_type=r.doc_type,
+                doi=r.doi,
+                halids=list(r.halids) if r.halids else None,
+                hors_uca=r.hors_uca,
+            )
+            for r in rows
+        ]
 
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page or 1,
-            "lab_acronym": lab_row.acronym,
-            "hal_collection": col,
-            "publications": pubs,
-        }
+        return HalMissingCollectionsResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=(total + per_page - 1) // per_page or 1,
+            lab_acronym=lab_row.acronym,
+            hal_collection=col,
+            publications=pubs,
+        )
 
-    def hal_affiliation_conflicts(self, *, page: int, per_page: int) -> dict[str, Any]:
+    def hal_affiliation_conflicts(
+        self, *, page: int, per_page: int
+    ) -> HalAffiliationConflictsResponse:
         offset = (page - 1) * per_page
         base_cte = """
         WITH hal_uca AS (
@@ -351,22 +406,22 @@ class PgHalProblemsQueries(HalProblemsQueries):
             {"pg_limit": per_page, "pg_offset": offset},
         ).all()
         pubs = [
-            {
-                "id": r.id,
-                "title": r.title,
-                "pub_year": r.pub_year,
-                "doc_type": r.doc_type,
-                "doi": r.doi,
-                "halids": r.halids,
-                "labs": r.labs,
-            }
+            HalAffiliationConflictPub(
+                id=r.id,
+                title=r.title,
+                pub_year=r.pub_year,
+                doc_type=r.doc_type,
+                doi=r.doi,
+                halids=list(r.halids) if r.halids else None,
+                labs=r.labs,
+            )
             for r in rows
         ]
 
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page or 1,
-            "publications": pubs,
-        }
+        return HalAffiliationConflictsResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=(total + per_page - 1) // per_page or 1,
+            publications=pubs,
+        )
