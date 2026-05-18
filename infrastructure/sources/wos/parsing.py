@@ -12,13 +12,16 @@ from __future__ import annotations
 import re
 
 
-def build_query(year: int, affiliations: list[str] | None = None) -> str:
+def build_query(year: int, affiliations: list[str]) -> str:
     """Construit la requête WoS Advanced Search pour une année donnée.
 
     Filtre `OG=(...)` (Organization-Enhanced, OR sur les variantes
-    d'affiliation) et `PY=<year>`.
+    d'affiliation) et `PY=<year>`. `affiliations` doit être non vide :
+    sans organisations, l'API WoS répond 400 Bad Request sur `OG=()`.
     """
-    orgs = " OR ".join(affiliations or [])
+    if not affiliations:
+        raise ValueError("build_query: affiliations vide (la requête WoS exige au moins une org)")
+    orgs = " OR ".join(affiliations)
     return f"OG=({orgs}) AND PY=({year})"
 
 

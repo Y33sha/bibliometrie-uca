@@ -23,13 +23,11 @@ class TestBuildQuery:
             "OG=(UCA OR CHU OR INP) AND PY=(2024)"
         )
 
-    def test_empty_affiliations(self):
-        # Cas dégénéré : `OG=()` côté WoS — la requête ne renverra rien.
-        # Pinné pour ne pas régresser silencieusement.
-        assert build_query(year=2024, affiliations=[]) == "OG=() AND PY=(2024)"
-
-    def test_none_affiliations(self):
-        assert build_query(year=2024) == "OG=() AND PY=(2024)"
+    def test_empty_affiliations_raises(self):
+        # `OG=()` côté WoS renvoie 400 Bad Request — on échoue tôt côté client
+        # plutôt que d'envoyer une requête qu'on sait inutile.
+        with pytest.raises(ValueError, match="affiliations vide"):
+            build_query(year=2024, affiliations=[])
 
 
 class TestExtractUt:
