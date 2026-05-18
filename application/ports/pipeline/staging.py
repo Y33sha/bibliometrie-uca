@@ -4,13 +4,15 @@ Implémenté par `infrastructure.queries.staging.PgStagingQueries`.
 Partagé par tous les normalizers via `SourceNormalizer`.
 """
 
-from typing import Any, NamedTuple, Protocol
+from dataclasses import dataclass
+from typing import Any, Protocol
 
-from sqlalchemy import Connection, Row
+from sqlalchemy import Connection
 
 
-class StagingRow(NamedTuple):
-    """Projection des 4 colonnes communes de `staging` consommées par les normalizers (wos, openalex, scanr, crossref, theses)."""
+@dataclass(frozen=True)
+class StagingRow:
+    """Projection commune de `staging` (4 colonnes) consommée par les normalizers wos, openalex, scanr, crossref, theses."""
 
     id: int
     source_id: str
@@ -18,36 +20,36 @@ class StagingRow(NamedTuple):
     raw_data: dict[str, Any]
 
 
-class HalStagingRow(NamedTuple):
-    """Projection HAL : colonnes communes + `hal_collections` (text[]).
+@dataclass(frozen=True)
+class HalStagingRow(StagingRow):
+    """`StagingRow` + la colonne `hal_collections` (TEXT[]) propre à HAL.
 
-    HAL est la seule source qui consomme la colonne `staging.hal_collections` ; les autres normalizers passent par `StagingRow`.
+    Par substitution LSP : un `HalStagingRow` remplit le contrat de `StagingRow`. Le port retourne `list[StagingRow]` uniformément ; le normalizer HAL fait `isinstance(row, HalStagingRow)` pour accéder à `.hal_collections`.
     """
 
-    id: int
-    source_id: str
-    doi: str | None
-    raw_data: dict[str, Any]
     hal_collections: list[str] | None
 
 
 class StagingQueries(Protocol):
-    """Opérations SQL génériques sur la table `staging`."""
+    """Opérations SQL sur la table `staging`.
+
+    `fetch_pending_staging` / `fetch_staging_by_ids` retournent `list[StagingRow]` ; pour `source == 'hal'`, l'implémentation construit des `HalStagingRow` (sous-type de `StagingRow`) qui exposent en plus `.hal_collections`.
+    """
 
     def reset_processed_flag(self, conn: Connection, source: str) -> int: ...
 
     def count_pending_staging(self, conn: Connection, source: str) -> int: ...
 
     def fetch_pending_staging(
-        self, conn: Connection, source: str, *, columns: str, limit: int
-    ) -> list[Row[Any]]: ...
+        self, conn: Connection, source: str, *, limit: int
+    ) -> list[StagingRow]: ...
 
     def fetch_pending_staging_ids(
         self, conn: Connection, source: str, *, limit: int
     ) -> list[int]: ...
 
     def fetch_staging_by_ids(
-        self, conn: Connection, staging_ids: list[int], *, columns: str
-    ) -> list[Row[Any]]: ...
+        self, conn: Connection, staging_ids: list[int], *, source: str
+    ) -> list[StagingRow]: ...
 
     def mark_done(self, conn: Connection, staging_id: int) -> None: ...

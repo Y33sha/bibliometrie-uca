@@ -17,9 +17,8 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 import logging
 import time
 from collections.abc import Callable
-from typing import Any
 
-from sqlalchemy import Connection, Row
+from sqlalchemy import Connection
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
@@ -344,7 +343,7 @@ def process_work(
         raise
 
 
-class ScanrNormalizer(SourceNormalizer[StagingRow]):
+class ScanrNormalizer(SourceNormalizer):
     SOURCE = "scanr"
     DEFAULT_BATCH_SIZE = 100
 
@@ -373,9 +372,6 @@ class ScanrNormalizer(SourceNormalizer[StagingRow]):
         self._journal_repo = self._journal_repo_factory(conn)
         self._publisher_repo = self._publisher_repo_factory(conn)
         self._pub_repo = self._pub_repo_factory(conn)
-
-    def _row_factory(self, raw: Row[Any]) -> StagingRow:
-        return StagingRow(id=raw.id, source_id=raw.source_id, doi=raw.doi, raw_data=raw.raw_data)
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
         assert (

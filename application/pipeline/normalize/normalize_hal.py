@@ -24,15 +24,14 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 import logging
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
-from typing import Any
 
-from sqlalchemy import Connection, Row
+from sqlalchemy import Connection
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.hal import HalNormalizeQueries
-from application.ports.pipeline.staging import HalStagingRow, StagingQueries
+from application.ports.pipeline.staging import HalStagingRow, StagingQueries, StagingRow
 from application.ports.pipeline.zenodo_resolver import ZenodoResolver
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -518,7 +517,10 @@ def process_work(
     """Traite un work du staging HAL."""
     from application.pipeline.timings import StepTimer
 
-    staging_id, hal_id, doi, raw_data, hal_collections_staging = staging_row
+    staging_id = staging_row.id
+    hal_id = staging_row.source_id
+    raw_data = staging_row.raw_data
+    hal_collections_staging = staging_row.hal_collections
     doc = raw_data
 
     try:
@@ -587,12 +589,10 @@ def process_work(
         raise
 
 
-class HalNormalizer(SourceNormalizer[HalStagingRow]):
+class HalNormalizer(SourceNormalizer):
     SOURCE = "hal"
     DEFAULT_BATCH_SIZE = 500
-    USE_DICT_CURSOR = False
     USE_SAVEPOINT = True
-    FETCH_COLUMNS = "id, source_id, doi, raw_data, hal_collections"
 
     def __init__(
         self,
@@ -622,16 +622,11 @@ class HalNormalizer(SourceNormalizer[HalStagingRow]):
         self._publisher_repo = self._publisher_repo_factory(conn)
         self._pub_repo = self._pub_repo_factory(conn)
 
-    def _row_factory(self, raw: Row[Any]) -> HalStagingRow:
-        return HalStagingRow(
-            id=raw.id,
-            source_id=raw.source_id,
-            doi=raw.doi,
-            raw_data=raw.raw_data,
-            hal_collections=raw.hal_collections,
+    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
+        # `StagingQueries` retourne des `HalStagingRow` pour source='hal' (LSP).
+        assert isinstance(row, HalStagingRow), (
+            "HalNormalizer attend des HalStagingRow (port mal configuré ?)"
         )
-
-    def process_work(self, conn: Connection, row: HalStagingRow) -> bool | None:
         assert self._journal_repo is not None, "preload_caches doit être appelé avant"
         assert self._publisher_repo is not None, "preload_caches doit être appelé avant"
         assert self._pub_repo is not None, "preload_caches doit être appelé avant"

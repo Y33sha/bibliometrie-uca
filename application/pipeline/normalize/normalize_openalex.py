@@ -18,9 +18,8 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 import logging
 from collections.abc import Callable
-from typing import Any
 
-from sqlalchemy import Connection, Row
+from sqlalchemy import Connection
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
@@ -424,7 +423,10 @@ def process_work(
     address_linker: AddressLinker,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
-    staging_id, openalex_id, doi, work = staging_row
+    staging_id = staging_row.id
+    openalex_id = staging_row.source_id
+    doi = staging_row.doi
+    work = staging_row.raw_data
 
     try:
         raw_doi = clean_doi(doi)
@@ -470,7 +472,7 @@ def process_work(
         raise
 
 
-class OpenalexNormalizer(SourceNormalizer[StagingRow]):
+class OpenalexNormalizer(SourceNormalizer):
     SOURCE = "openalex"
     DEFAULT_BATCH_SIZE = 500
     FETCH_SUB_BATCH = 50
@@ -502,9 +504,6 @@ class OpenalexNormalizer(SourceNormalizer[StagingRow]):
         self._journal_repo = self._journal_repo_factory(conn)
         self._publisher_repo = self._publisher_repo_factory(conn)
         self._pub_repo = self._pub_repo_factory(conn)
-
-    def _row_factory(self, raw: Row[Any]) -> StagingRow:
-        return StagingRow(id=raw.id, source_id=raw.source_id, doi=raw.doi, raw_data=raw.raw_data)
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
         assert (

@@ -21,6 +21,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.pipeline.staging import StagingRow
+
+
+def _row(label: str) -> StagingRow:
+    """Construit une StagingRow identifiable par son `source_id` pour les assertions."""
+    return StagingRow(id=hash(label) & 0xFFFF, source_id=label, doi=None, raw_data={})
 
 
 class _FakeStaging:
@@ -29,9 +35,9 @@ class _FakeStaging:
     def __init__(self) -> None:
         self.reset_called = 0
         self.count_returns = 0
-        self.pending_rows: list[Any] = []
+        self.pending_rows: list[StagingRow] = []
         self.batch_ids: list[int] = []
-        self.batch_id_rows: dict[tuple[int, ...], list[Any]] = {}
+        self.batch_id_rows: dict[tuple[int, ...], list[StagingRow]] = {}
 
     def reset_processed_flag(self, conn, source: str) -> int:
         self.reset_called += 1
@@ -40,18 +46,18 @@ class _FakeStaging:
     def count_pending_staging(self, conn, source: str) -> int:
         return self.count_returns
 
-    def fetch_pending_staging(self, conn, source: str, *, columns: str, limit: int) -> list[Any]:
+    def fetch_pending_staging(self, conn, source: str, *, limit: int) -> list[StagingRow]:
         return self.pending_rows[:limit]
 
     def fetch_pending_staging_ids(self, conn, source: str, *, limit: int) -> list[int]:
         return self.batch_ids[:limit]
 
-    def fetch_staging_by_ids(self, conn, ids: list[int], *, columns: str) -> list[Any]:
+    def fetch_staging_by_ids(self, conn, ids: list[int], *, source: str) -> list[StagingRow]:
         return self.batch_id_rows.get(tuple(ids), [])
 
 
-class _Norm(SourceNormalizer[Any]):
-    """Normalizer instrumenté pour pinguer `run()`. Paramétré `Any` car on injecte des rows mockées (pas de SA Row réelle)."""
+class _Norm(SourceNormalizer):
+    """Normalizer instrumenté pour pinguer `run()`."""
 
     SOURCE = "test"
     DEFAULT_BATCH_SIZE = 2
@@ -61,31 +67,28 @@ class _Norm(SourceNormalizer[Any]):
         staging: _FakeStaging,
         *,
         results: list[Any] | None = None,
-        raises_on: set[Any] | None = None,
+        raises_on: set[str] | None = None,
     ) -> None:
         super().__init__(
             conn=MagicMock(), logger=logging.getLogger("test"), staging_queries=staging
         )
         self.results = results or []
         self.raises_on = raises_on or set()
-        self.processed_ids: list[Any] = []
+        self.processed_rows: list[StagingRow] = []
         self.preload_called = False
         self.post_process_called = False
         self.cleanup_called = False
         self.on_error_called = 0
 
-    def process_work(self, conn, row):
-        self.processed_ids.append(row)
-        if row in self.raises_on:
-            raise RuntimeError(f"boom on {row}")
+    def process_work(self, conn, row: StagingRow) -> bool | None:
+        self.processed_rows.append(row)
+        if row.source_id in self.raises_on:
+            raise RuntimeError(f"boom on {row.source_id}")
         # Retourne le résultat indexé par position (True/None/False).
-        idx = len(self.processed_ids) - 1
+        idx = len(self.processed_rows) - 1
         if idx < len(self.results):
             return self.results[idx]
         return True
-
-    def _row_factory(self, raw):
-        return raw  # passthrough — les rows sont déjà des "rows" identifiables.
 
     def preload_caches(self, conn):
         self.preload_called = True
@@ -138,11 +141,11 @@ class TestRunHappyPath:
     def test_processes_all_rows(self):
         staging = _FakeStaging()
         staging.count_returns = 3
-        staging.pending_rows = ["r1", "r2", "r3"]
+        staging.pending_rows = [_row("r1"), _row("r2"), _row("r3")]
         norm = _Norm(staging, results=[True, True, True])
         norm.run(argv=[])
         assert norm.preload_called is True
-        assert norm.processed_ids == ["r1", "r2", "r3"]
+        assert [r.source_id for r in norm.processed_rows] == ["r1", "r2", "r3"]
         assert norm.post_process_called is True
         assert norm.cleanup_called is True
 
@@ -150,7 +153,7 @@ class TestRunHappyPath:
         """`True` → processed, `None` → skipped, `False` → errors. Le log final reporte les 3 totaux."""
         staging = _FakeStaging()
         staging.count_returns = 3
-        staging.pending_rows = ["ok", "skip", "err"]
+        staging.pending_rows = [_row("ok"), _row("skip"), _row("err")]
         norm = _Norm(staging, results=[True, None, False])
         with caplog.at_level(logging.INFO):
             norm.run(argv=[])
@@ -162,7 +165,7 @@ class TestRunHappyPath:
         """Avec DEFAULT_BATCH_SIZE=2, un commit + log au 2e traité."""
         staging = _FakeStaging()
         staging.count_returns = 4
-        staging.pending_rows = ["a", "b", "c", "d"]
+        staging.pending_rows = [_row(s) for s in ("a", "b", "c", "d")]
         norm = _Norm(staging, results=[True, True, True, True])
         with caplog.at_level(logging.INFO):
             norm.run(argv=[])
@@ -173,7 +176,7 @@ class TestRunHappyPath:
         """Le log de progression mentionne aussi les `ignorés` et `erreurs` quand >0."""
         staging = _FakeStaging()
         staging.count_returns = 2
-        staging.pending_rows = ["a", "b"]
+        staging.pending_rows = [_row("a"), _row("b")]
         # 1 ok + 1 skip → done=2 (batch_size=2) → log avec skipped et 0 errors (errors=0 donc pas affiché).
         norm = _Norm(staging, results=[True, None])
         with caplog.at_level(logging.INFO):
@@ -188,7 +191,7 @@ class TestRunHappyPath:
 
         staging = _FakeStaging()
         staging.count_returns = 1
-        staging.pending_rows = ["x"]
+        staging.pending_rows = [_row("x")]
         norm = _NormWithSummary(staging, results=[True])
         with caplog.at_level(logging.INFO):
             norm.run(argv=[])
@@ -199,10 +202,10 @@ class TestRunHappyPath:
         """`--limit 1` limite à 1 row même si total=3."""
         staging = _FakeStaging()
         staging.count_returns = 3
-        staging.pending_rows = ["a", "b", "c"]
+        staging.pending_rows = [_row("a"), _row("b"), _row("c")]
         norm = _Norm(staging, results=[True, True, True])
         norm.run(argv=["--limit", "1"])
-        assert norm.processed_ids == ["a"]
+        assert [r.source_id for r in norm.processed_rows] == ["a"]
 
 
 # ── Exception sans SAVEPOINT ──────────────────────────────────────
@@ -212,14 +215,14 @@ class TestRunExceptionWithoutSavepoint:
     def test_rollback_and_on_error_called(self, caplog):
         staging = _FakeStaging()
         staging.count_returns = 2
-        staging.pending_rows = ["a", "b"]
+        staging.pending_rows = [_row("a"), _row("b")]
         norm = _Norm(staging, results=[True, True], raises_on={"a"})
         with caplog.at_level(logging.INFO):
             norm.run(argv=[])
         # USE_SAVEPOINT=False par défaut → conn.rollback + on_error appelés
         assert norm.on_error_called == 1
         # Le 2e row est quand même traité après le rollback du 1er.
-        assert "b" in norm.processed_ids
+        assert "b" in [r.source_id for r in norm.processed_rows]
         assert "Erreurs : 1" in caplog.text
 
 
@@ -230,7 +233,7 @@ class TestRunKeyboardInterrupt:
     def test_commit_and_warning(self, caplog):
         staging = _FakeStaging()
         staging.count_returns = 1
-        staging.pending_rows = ["a"]
+        staging.pending_rows = [_row("a")]
 
         class _Kb(_Norm):
             def process_work(self, conn, row):
@@ -251,7 +254,7 @@ class TestRunFatalException:
         """Si `preload_caches` lève (avant la boucle), c'est une erreur fatale : rollback + log + reraise."""
         staging = _FakeStaging()
         staging.count_returns = 1
-        staging.pending_rows = ["a"]
+        staging.pending_rows = [_row("a")]
 
         class _Fatal(_Norm):
             def preload_caches(self, conn):
@@ -276,7 +279,8 @@ class TestIterRowsSubBatch:
 
         staging = _FakeStaging()
         staging.batch_ids = [10, 20, 30]
-        staging.batch_id_rows = {(10, 20): ["a", "b"], (30,): ["c"]}
+        a, b, c = _row("a"), _row("b"), _row("c")
+        staging.batch_id_rows = {(10, 20): [a, b], (30,): [c]}
         norm = _SubBatch(staging)
         rows = list(norm._iter_rows(MagicMock(), limit=3))
-        assert rows == ["a", "b", "c"]
+        assert rows == [a, b, c]

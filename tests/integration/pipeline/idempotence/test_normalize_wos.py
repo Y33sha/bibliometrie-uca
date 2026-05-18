@@ -63,8 +63,6 @@ def insert_wos_staging(conn, docs):
 def run_normalize_wos(conn):
     import logging
 
-    from sqlalchemy import text
-
     from application.pipeline.normalize.normalize_wos import process_record
     from infrastructure.queries.normalize_wos import PgWosNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
@@ -81,12 +79,7 @@ def run_normalize_wos(conn):
     publisher_repo = publisher_repository(conn)
     pub_repo = publication_repository(conn)
 
-    rows = conn.execute(
-        text("""
-            SELECT id, source_id AS ut, doi, raw_data
-            FROM staging WHERE source = 'wos' AND processed = FALSE ORDER BY id
-        """)
-    ).all()
+    rows = staging_queries.fetch_pending_staging(conn, "wos", limit=10_000)
     processed = 0
     for row in rows:
         if process_record(

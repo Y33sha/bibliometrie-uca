@@ -23,9 +23,8 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 import logging
 from collections.abc import Callable
-from typing import Any
 
-from sqlalchemy import Connection, Row
+from sqlalchemy import Connection
 
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.address_linker import AddressLinker
@@ -251,7 +250,7 @@ def process_work(
         raise
 
 
-class ThesesNormalizer(SourceNormalizer[StagingRow]):
+class ThesesNormalizer(SourceNormalizer):
     SOURCE = "theses"
     DEFAULT_BATCH_SIZE = 100
 
@@ -272,9 +271,6 @@ class ThesesNormalizer(SourceNormalizer[StagingRow]):
 
     def preload_caches(self, conn: Connection) -> None:
         self._pub_repo = self._pub_repo_factory(conn)
-
-    def _row_factory(self, raw: Row[Any]) -> StagingRow:
-        return StagingRow(id=raw.id, source_id=raw.source_id, doi=raw.doi, raw_data=raw.raw_data)
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
         assert self._pub_repo is not None
