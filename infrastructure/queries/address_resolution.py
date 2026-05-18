@@ -8,14 +8,15 @@ Séparé de `infrastructure/queries/addresses.py`, qui sert la couche API
 (lecture/CRUD des adresses). Ici : écritures de la pipeline.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.address_resolution import AddressResolutionQueries
+from application.ports.pipeline.address_resolution import (
+    AddressResolutionQueries,
+    StructureNameForm,
+)
 
 
-def load_name_forms(conn: Connection) -> list[dict[str, Any]]:
+def load_name_forms(conn: Connection) -> list[StructureNameForm]:
     """Charge toutes les formes depuis `structure_name_forms` + infos structure."""
     rows = conn.execute(
         text("""
@@ -28,7 +29,19 @@ def load_name_forms(conn: Connection) -> list[dict[str, Any]]:
             ORDER BY nf.id
         """)
     ).all()
-    return [dict(r._mapping) for r in rows]
+    return [
+        StructureNameForm(
+            id=r.id,
+            structure_id=r.structure_id,
+            form_text=r.form_text,
+            is_word_boundary=r.is_word_boundary,
+            requires_context_of=r.requires_context_of,
+            is_excluding=r.is_excluding,
+            struct_code=r.struct_code,
+            struct_type=r.struct_type,
+        )
+        for r in rows
+    ]
 
 
 def reset_auto_detected(conn: Connection) -> int:
@@ -151,7 +164,7 @@ def mark_address_resolved(conn: Connection, addr_id: int) -> None:
 class PgAddressResolutionQueries(AddressResolutionQueries):
     """Adapter PostgreSQL pour `application.ports.address_resolution.AddressResolutionQueries`."""
 
-    def load_name_forms(self, conn: Connection) -> list[dict[str, Any]]:
+    def load_name_forms(self, conn: Connection) -> list[StructureNameForm]:
         return load_name_forms(conn)
 
     def reset_auto_detected(self, conn: Connection) -> int:

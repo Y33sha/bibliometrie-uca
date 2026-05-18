@@ -54,10 +54,10 @@ class TestLoadNameForms:
         s = _create_structure(sa_sync_conn)
         f = _create_form(sa_sync_conn, s, form_text="uca")
         rows = load_name_forms(sa_sync_conn)
-        assert any(r["id"] == f for r in rows)
-        ours = next(r for r in rows if r["id"] == f)
-        assert ours["structure_id"] == s
-        assert ours["form_text"] == "uca"
+        assert any(r.id == f for r in rows)
+        ours = next(r for r in rows if r.id == f)
+        assert ours.structure_id == s
+        assert ours.form_text == "uca"
 
 
 class TestResetAutoDetected:
