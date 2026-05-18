@@ -11,11 +11,13 @@ Expose :
 - `PgPerimeterQueries` / `PgPerimetersAdminQueries` : adapters pour les ports `application.ports.pipeline.perimeter` et `application.ports.api.perimeters_queries`.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
-from application.ports.api.perimeters_queries import PerimetersAdminQueries
+from application.ports.api.perimeters_queries import (
+    PerimeterOut,
+    PerimetersAdminQueries,
+    PerimeterStructureItem,
+)
 from application.ports.pipeline.perimeter import PerimeterQueries
 
 # ── Fonctions libres ──────────────────────────────────────────────
@@ -112,15 +114,14 @@ class PgPerimetersAdminQueries(PerimetersAdminQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def list_perimeters_with_structures(self) -> list[dict[str, Any]]:
+    def list_perimeters_with_structures(self) -> list[PerimeterOut]:
         """Liste tous les périmètres avec leurs structures racines + le décompte après descente récursive (CTE `get_perimeter_structure_ids`)."""
         perim_rows = self._conn.execute(
             text("SELECT id, code, name, description, structure_ids FROM perimeters ORDER BY id")
         ).all()
-        perimeters: list[dict[str, Any]] = []
+        perimeters: list[PerimeterOut] = []
         for p_row in perim_rows:
-            p = dict(p_row._mapping)
-            root_ids = p["structure_ids"] or []
+            root_ids = list(p_row.structure_ids or [])
             if root_ids:
                 struct_rows = self._conn.execute(
                     text(
@@ -129,10 +130,22 @@ class PgPerimetersAdminQueries(PerimetersAdminQueries):
                     ),
                     {"ids": root_ids},
                 ).all()
-                p["structures"] = [dict(r._mapping) for r in struct_rows]
+                structures = [
+                    PerimeterStructureItem(id=r.id, name=r.name, acronym=r.acronym, code=r.code)
+                    for r in struct_rows
+                ]
             else:
-                p["structures"] = []
-            resolved = get_perimeter_structure_ids(self._conn, p["code"])
-            p["structure_count"] = len(resolved)
-            perimeters.append(p)
+                structures = []
+            resolved = get_perimeter_structure_ids(self._conn, p_row.code)
+            perimeters.append(
+                PerimeterOut(
+                    id=p_row.id,
+                    code=p_row.code,
+                    name=p_row.name,
+                    description=p_row.description,
+                    structure_ids=root_ids,
+                    structures=structures,
+                    structure_count=len(resolved),
+                )
+            )
         return perimeters

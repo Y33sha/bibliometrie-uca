@@ -1,13 +1,16 @@
 """Router Revues — liste, recherche, fusion."""
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
-from application.ports.api.journals_queries import JournalQueries
+from application.ports.api.journals_queries import (
+    JournalBasic,
+    JournalListResponse,
+    JournalQueries,
+)
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from interfaces.api.deps import (
@@ -15,7 +18,7 @@ from interfaces.api.deps import (
     journal_queries_sync,
     journal_repo_sync,
 )
-from interfaces.api.models import JournalListResponse, JournalUpdate, MergeRequest
+from interfaces.api.models import JournalUpdate, MergeRequest, MergeResponse, OkResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -37,34 +40,33 @@ def list_journals(
     `sort` : `title` / `-title` / `publisher` / `-publisher` /
     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
     """
-    data = queries.list_journals(
+    return queries.list_journals(
         search=search,
         publisher_id=publisher_id,
         sort=sort,
         page=page,
         per_page=per_page,
     )
-    return JournalListResponse.model_validate(data)
 
 
-@router.get("/api/journals/{journal_id}")
+@router.get("/api/journals/{journal_id}", response_model=JournalBasic)
 def get_journal(
     journal_id: int,
     queries: JournalQueries = Depends(journal_queries_sync),
-) -> dict[str, Any]:
+) -> JournalBasic:
     """Récupère une revue par son id (titre uniquement). 404 si inconnue."""
     row = queries.get_journal(journal_id)
-    if not row:
+    if row is None:
         raise HTTPException(status_code=404, detail="Revue introuvable")
     return row
 
 
-@router.put("/api/journals/{journal_id}")
+@router.put("/api/journals/{journal_id}", response_model=OkResponse)
 def update_journal(
     journal_id: int,
     body: JournalUpdate,
     repo: JournalRepository = Depends(journal_repo_sync),
-) -> dict[str, bool]:
+) -> OkResponse:
     """Met à jour une revue (modification sélective des champs fournis).
 
     Seuls les champs explicitement présents dans le body sont écrits
@@ -72,17 +74,17 @@ def update_journal(
     """
     fields = body.model_dump(exclude_unset=True)
     _update_journal(journal_id, fields=fields, repo=repo)
-    return {"ok": True}
+    return OkResponse()
 
 
-@router.post("/api/journals/{journal_id}/merge")
+@router.post("/api/journals/{journal_id}/merge", response_model=MergeResponse)
 def merge(
     journal_id: int,
     body: MergeRequest,
     queries: JournalQueries = Depends(journal_queries_sync),
     repo: JournalRepository = Depends(journal_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
-) -> dict[str, Any]:
+) -> MergeResponse:
     """Fusionne la revue `source_id` dans la revue `journal_id`.
 
     Les publications et métadonnées de la source sont transférées à
@@ -96,4 +98,4 @@ def merge(
         raise HTTPException(status_code=404, detail="Revue source introuvable")
 
     merge_journals(journal_id, body.source_id, repo=repo, audit_repo=audit)
-    return {"merged": True, "source_id": body.source_id, "target_id": journal_id}
+    return MergeResponse(merged=True, source_id=body.source_id, target_id=journal_id)

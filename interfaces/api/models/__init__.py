@@ -68,8 +68,6 @@ from interfaces.api.models.admin.feedback import (
 from interfaces.api.models.admin.perimeters import (
     AddPerimeterStructure,
     PerimeterCreate,
-    PerimeterOut,
-    PerimeterStructureItem,
     PerimeterUpdate,
 )
 from interfaces.api.models.admin.person_duplicates import (
@@ -152,11 +150,7 @@ from interfaces.api.models.hal_problems import (
     HalMissingCollectionsResponse,
     HalPubDetail,
 )
-from interfaces.api.models.journals import (
-    JournalListResponse,
-    JournalOut,
-    JournalUpdate,
-)
+from interfaces.api.models.journals import JournalUpdate
 from interfaces.api.models.laboratories import (
     LabAddressOut,
     LabDashboardCollab,
@@ -219,12 +213,7 @@ from interfaces.api.models.publications import (
     ThesesAuthorshipOut,
     ThesisMeta,
 )
-from interfaces.api.models.publishers import (
-    PublisherBasic,
-    PublisherListItem,
-    PublisherListResponse,
-    PublisherUpdate,
-)
+from interfaces.api.models.publishers import PublisherUpdate
 from interfaces.api.models.stats import (
     ApcFacet,
     JournalStatsResponse,
@@ -308,8 +297,6 @@ __all__ = [
     "IdentifierReassignResponse",
     "IdentifierStatusResponse",
     "IntValueFacet",
-    "JournalListResponse",
-    "JournalOut",
     "JournalStatsResponse",
     "JournalStatsRow",
     "JournalUpdate",
@@ -355,8 +342,6 @@ __all__ = [
     "OtherPersonOut",
     "PartenaireThese",
     "PerimeterCreate",
-    "PerimeterOut",
-    "PerimeterStructureItem",
     "PerimeterUpdate",
     "PersonAddressOut",
     "PersonAddressStruct",
@@ -404,9 +389,6 @@ __all__ = [
     "PublicationListItem",
     "PublicationListResponse",
     "PublicationsFacetsResponse",
-    "PublisherBasic",
-    "PublisherListItem",
-    "PublisherListResponse",
     "PublisherStatsResponse",
     "PublisherStatsRow",
     "PublisherUpdate",

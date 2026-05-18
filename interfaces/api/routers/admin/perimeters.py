@@ -8,7 +8,7 @@ import logging
 from fastapi import APIRouter, Depends
 
 from application import config as config_service
-from application.ports.api.perimeters_queries import PerimetersAdminQueries
+from application.ports.api.perimeters_queries import PerimeterOut, PerimetersAdminQueries
 from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
@@ -23,7 +23,6 @@ from interfaces.api.models import (
     CreatedIdResponse,
     OkResponse,
     PerimeterCreate,
-    PerimeterOut,
     PerimeterUpdate,
     StatusResponse,
 )
@@ -40,7 +39,7 @@ def list_perimeters(
 
     Pour chaque périmètre, renvoie les structures racines directes (`structures`) et le décompte total après descente récursive des relations (`structure_count`). Le décompte inclut donc les sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
     """
-    return [PerimeterOut.model_validate(p) for p in queries.list_perimeters_with_structures()]
+    return queries.list_perimeters_with_structures()
 
 
 @router.post("/api/perimeters", response_model=CreatedIdResponse)
