@@ -1,21 +1,11 @@
-"""Modèles Pydantic pour la table de config (paramètres applicatifs clé/valeur)."""
+"""Modèles Pydantic (router-only) pour la config pipeline.
 
-from datetime import datetime
+Le DTO `ConfigItem` (retourné par `ConfigQueries.list_config`) vit dans `application/ports/api/config_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4). Restent ici la réponse `HalCollectionsResponse` composée par le router (queries retourne un dict, le router ajoute `count`) et le body `ConfigValueUpdate`.
+"""
+
 from typing import Any
 
 from pydantic import BaseModel
-
-
-class ConfigItem(BaseModel):
-    """Ligne de la table `config` (paramètres applicatifs clé/valeur)."""
-
-    key: str
-    # `Any` plutôt que `JsonValue` : pydantic ne supporte pas l'alias
-    # récursif (RecursionError à la génération de schéma). Frontière
-    # JSONB libre côté API ; cas isolé documenté.
-    value: Any
-    description: str | None
-    updated_at: datetime
 
 
 class HalCollectionsResponse(BaseModel):
@@ -28,5 +18,5 @@ class HalCollectionsResponse(BaseModel):
 class ConfigValueUpdate(BaseModel):
     """Corps de PUT /api/config/{key} : value JSON-sérialisable arbitraire."""
 
-    # cf. `ConfigItem.value` — pydantic ne supporte pas l'alias récursif.
+    # pydantic ne supporte pas l'alias récursif `JsonValue` (RecursionError à la génération de schéma).
     value: Any
