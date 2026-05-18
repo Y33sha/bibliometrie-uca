@@ -132,24 +132,16 @@ Sous-phasage (du plus simple au plus risqué) :
 
 ### Phase 6 — Bilan override mypy
 
-Retrait final des modules de l'override `disallow_any_explicit = false` qui peuvent l'être. Documentation des modules irréductibles (sources API externes, CLI) avec justification durable dans le commentaire `pyproject.toml`.
+- [x] **Retrait de 8 modules de l'override `disallow_any_explicit = false`** : `application.ports.pipeline.{merge,name_forms,normalize.wos,persons_create}` (4 ports Phase 5), `application.pipeline.{affiliations.resolve_addresses,persons.create_persons_from_source_authorships,publications.merge_pubs_by_hal_id}` (3 callers Phase 5), `interfaces.api.routers.journals` (rendu strict par Phase 4). Mypy passe sur 344 fichiers.
+- [x] **Mise à jour du commentaire `pyproject.toml`** : justifications regroupées par catégorie (Pydantic héritage, JSONB, payloads API, services racine RDM Phase 8, scripts CLI).
 
-**Candidats au retrait immédiat (0 `Any` après Phase 5)** :
+**Modules toujours dans l'override** (justifiés et durables) :
 
-- `application.ports.pipeline.merge` (Phase 5.1)
-- `application.ports.pipeline.name_forms` (Phase 5.2)
-- `application.ports.pipeline.normalize.wos` (Phase 5.3)
-- `application.ports.pipeline.persons_create` (Phase 5.4)
-
-**Modules avec `Any` délibéré (à garder OU à refactorer)** :
-
-- `application.ports.pipeline.staging` : 1 `dict[str, Any]` sur `StagingRow.raw_data` (colonne JSONB brute, pas de schéma).
-- `application.ports.pipeline.subjects` : 1 `list[Any]` sur `select_source_publications_with_subjects` (records DB hétérogènes — pourrait devenir un NamedTuple ad-hoc).
-- `application.pipeline.normalize.*` et `application.pipeline.publications.merge_pubs_by_hal_id` : payloads d'API externes via `domain.sources.*` (`dict[str, Any]` propagé légitimement).
-- `application.pipeline.persons.create_persons_from_source_authorships` : conversion `._asdict()` au boundary `application/persons.py` (API historique dict).
-- `application.pipeline.affiliations.resolve_addresses` et `application.pipeline.subjects._common` : à tester (port migré, mais le caller peut conserver des Any internes).
-
-Phase 6 vérifie module par module ce qui peut sortir et met à jour le commentaire `pyproject.toml`.
+- **Pydantic** : `application.ports.api.*`, `infrastructure.settings`, `interfaces.api.{app,models.*,routers.docs}` — héritage `BaseModel` / `BaseSettings` propage `Any` via les stubs Pydantic.
+- **Payloads d'API externes / JSONB** : `domain.sources.*`, `infrastructure.sources.*`, `infrastructure.jsonb_models.*`, `application.pipeline.normalize.*`, `application.pipeline.publications.match_or_create_publications`, `application.pipeline.subjects._common`, `application.ports.pipeline.{staging,subjects}` — payloads bruts hétérogènes.
+- **Records DB / partial updates (Phase 8 RDM)** : `application.persons`, `application.structures`, `application.ports.repositories.*`, `infrastructure.repositories.*`, `infrastructure.queries.*`.
+- **CLI / scripts** : `interfaces.cli.{dev.generate_seed,imports.*,maintenance.*}`, `run_pipeline`.
+- **Pipeline secondaire** : `application.pipeline.{enrich.*,fetch_missing_doi}` — hors scope chantier.
 
 ## Résiduel JSONB (à tout hasard)
 
