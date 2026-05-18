@@ -45,17 +45,17 @@ class TestFindNntDuplicates:
         _create_sd(sa_sync_conn, "theses", "t-1", p2, external_ids={"nnt": "2023UCFA0001"})
 
         dups = find_nnt_duplicates(sa_sync_conn)
-        ours = [d for d in dups if d["nnt"] == "2023UCFA0001"]
+        ours = [d for d in dups if d.nnt == "2023UCFA0001"]
         assert len(ours) == 1
-        assert sorted(ours[0]["pub_ids"]) == sorted([p1, p2])
-        assert set(ours[0]["sources"]) == {"hal", "theses"}
+        assert sorted(ours[0].pub_ids) == sorted([p1, p2])
+        assert set(ours[0].sources) == {"hal", "theses"}
 
     def test_ignores_nnt_on_single_publication(self, sa_sync_conn):
         p1 = _create_pub(sa_sync_conn)
         _create_sd(sa_sync_conn, "hal", "h-2", p1, external_ids={"nnt": "UNIQUE_NNT"})
 
         dups = find_nnt_duplicates(sa_sync_conn)
-        assert not any(d["nnt"] == "UNIQUE_NNT" for d in dups)
+        assert not any(d.nnt == "UNIQUE_NNT" for d in dups)
 
 
 class TestFetchSourcePublicationsWithHalExternalId:
@@ -67,9 +67,9 @@ class TestFetchSourcePublicationsWithHalExternalId:
         _create_sd(sa_sync_conn, "openalex", "oa-2", p)  # sans external.hal_id
 
         rows = fetch_source_publications_with_hal_external_id(sa_sync_conn)
-        ids = {r["src_doc_id"] for r in rows}
+        ids = {r.src_doc_id for r in rows}
         assert oa in ids and sc in ids
-        assert all(r["hal_id"] in ("hal-X1", "hal-X2") for r in rows if r["src_doc_id"] in (oa, sc))
+        assert all(r.hal_id in ("hal-X1", "hal-X2") for r in rows if r.src_doc_id in (oa, sc))
 
 
 class TestFetchHalSourcePublications:
@@ -79,7 +79,7 @@ class TestFetchHalSourcePublications:
         _create_sd(sa_sync_conn, "openalex", "oa-999", p)
 
         rows = fetch_hal_source_publications(sa_sync_conn)
-        halids = [r["halid"] for r in rows if r["hal_doc_id"] == h]
+        halids = [r.halid for r in rows if r.hal_doc_id == h]
         assert halids == ["hal-999"]
 
 

@@ -12,7 +12,7 @@ L'orchestrateur dépend du port `MergeQueries`. Le point d'entrée CLI est dans 
 """
 
 import logging
-from typing import Any
+from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
@@ -21,9 +21,30 @@ from application.ports.pipeline.merge import MergeQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 
 
+@dataclass(frozen=True)
+class HalLinkItem:
+    """Cas 1 : `source_publications` HAL orphelin à rattacher à la publication d'une source non-HAL."""
+
+    source: str
+    src_pub_id: int
+    hal_doc_id: int
+    halid: str
+
+
+@dataclass(frozen=True)
+class HalMergeItem:
+    """Cas 2 : deux publications distinctes à fusionner via leur identifiant HAL commun."""
+
+    source: str
+    src_id: str
+    src_pub_id: int
+    hal_pub_id: int
+    halid: str
+
+
 def find_duplicates(
     conn: Connection, queries: MergeQueries
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[HalLinkItem], list[HalMergeItem]]:
     """Croise `source_publications` OA/ScanR (avec hal_id) et HAL.
 
     Retourne deux listes :
@@ -32,39 +53,46 @@ def find_duplicates(
 
     Itère sur **toutes** les lignes non-HAL : un même hal_id peut être porté par plusieurs sources (OpenAlex + ScanR) pointant vers des publications distinctes, et il faut traiter chacune.
     """
-    hal_by_id = {r["halid"]: r for r in queries.fetch_hal_source_publications(conn)}
+    hal_by_id = {r.halid: r for r in queries.fetch_hal_source_publications(conn)}
 
-    link_only: list[dict[str, Any]] = []
-    merge_needed: list[dict[str, Any]] = []
+    link_only: list[HalLinkItem] = []
+    merge_needed: list[HalMergeItem] = []
     seen_link: set[int] = set()
     seen_merge: set[tuple[int, int]] = set()
 
     for r in queries.fetch_source_publications_with_hal_external_id(conn):
-        hid = r["hal_id"]
-        if hid not in hal_by_id:
+        hal_info = hal_by_id.get(r.hal_id)
+        if hal_info is None:
             continue
-        hal_info = hal_by_id[hid]
-        hal_pub = hal_info["hal_pub_id"]
-        src_pub = r["src_pub_id"]
-        src_info = {
-            "source": r["source"],
-            "src_doc_id": r["src_doc_id"],
-            "src_id": r["src_id"],
-            "src_pub_id": src_pub,
-        }
+        src_pub = r.src_pub_id
+        hal_pub = hal_info.hal_pub_id
 
         if hal_pub is None and src_pub is not None:
-            hal_doc_id = hal_info["hal_doc_id"]
-            if hal_doc_id in seen_link:
+            if hal_info.hal_doc_id in seen_link:
                 continue
-            seen_link.add(hal_doc_id)
-            link_only.append({**src_info, **hal_info, "halid": hid})
+            seen_link.add(hal_info.hal_doc_id)
+            link_only.append(
+                HalLinkItem(
+                    source=r.source,
+                    src_pub_id=src_pub,
+                    hal_doc_id=hal_info.hal_doc_id,
+                    halid=r.hal_id,
+                )
+            )
         elif hal_pub is not None and src_pub is not None and hal_pub != src_pub:
             pair = (src_pub, hal_pub)
             if pair in seen_merge:
                 continue
             seen_merge.add(pair)
-            merge_needed.append({**src_info, **hal_info, "halid": hid})
+            merge_needed.append(
+                HalMergeItem(
+                    source=r.source,
+                    src_id=r.src_id,
+                    src_pub_id=src_pub,
+                    hal_pub_id=hal_pub,
+                    halid=r.hal_id,
+                )
+            )
 
     return link_only, merge_needed
 
@@ -72,7 +100,7 @@ def find_duplicates(
 def link_hal_to_publication(
     conn: Connection,
     queries: MergeQueries,
-    items: list[dict[str, Any]],
+    items: list[HalLinkItem],
     logger: logging.Logger,
     dry_run: bool = False,
     *,
@@ -80,16 +108,12 @@ def link_hal_to_publication(
 ) -> int:
     """Cas 1 : le document HAL n'a pas de `publication_id` → lien vers la publication de la source."""
     for item in items:
-        hal_doc_id = item["hal_doc_id"]
-        src_pub_id = item["src_pub_id"]
-        halid = item["halid"]
-
         if dry_run:
-            logger.info(f"  [LINK] [{item['source']}] hal_doc {halid} → pub {src_pub_id}")
+            logger.info(f"  [LINK] [{item.source}] hal_doc {item.halid} → pub {item.src_pub_id}")
             continue
 
-        queries.link_source_publication_to_publication(conn, hal_doc_id, src_pub_id)
-        pub_repo.update_sources(src_pub_id)
+        queries.link_source_publication_to_publication(conn, item.hal_doc_id, item.src_pub_id)
+        pub_repo.update_sources(item.src_pub_id)
     return len(items)
 
 
@@ -123,8 +147,8 @@ def run_merge(
             logger.info("\n--- Fusion de publications ---")
             groups = [
                 (
-                    f"[{item['source']}] {item['src_id']} ↔ {item['halid']}",
-                    [item["src_pub_id"], item["hal_pub_id"]],
+                    f"[{item.source}] {item.src_id} ↔ {item.halid}",
+                    [item.src_pub_id, item.hal_pub_id],
                 )
                 for item in merge_needed
             ]

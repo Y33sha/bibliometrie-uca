@@ -31,7 +31,7 @@ def run_merge(
             return
 
         groups = [
-            (f"NNT={dup['nnt']} (sources: {', '.join(dup['sources'])})", dup["pub_ids"])
+            (f"NNT={dup.nnt} (sources: {', '.join(dup.sources)})", dup.pub_ids)
             for dup in duplicates
         ]
         merged, errors = merge_publications_by_key(

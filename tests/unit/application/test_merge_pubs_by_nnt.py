@@ -13,13 +13,14 @@ import pytest
 
 from application.pipeline.publications import merge_pubs_by_nnt
 from application.pipeline.publications.merge_pubs_by_nnt import run_merge
+from application.ports.pipeline.merge import NntDuplicateRow
 
 
 class _FakeQueries:
-    def __init__(self, duplicates: list[dict[str, Any]] | Exception) -> None:
+    def __init__(self, duplicates: list[NntDuplicateRow] | Exception) -> None:
         self._duplicates = duplicates
 
-    def find_nnt_duplicates(self, conn: object) -> list[dict[str, Any]]:
+    def find_nnt_duplicates(self, conn: object) -> list[NntDuplicateRow]:
         if isinstance(self._duplicates, Exception):
             raise self._duplicates
         return self._duplicates
@@ -79,8 +80,8 @@ def test_happy_path_formats_groups_and_commits(captured_calls, logger):
     """Plusieurs NNT à fusionner : groups formatés `NNT=... (sources: ...)`, commit appelé."""
     conn = _FakeConn()
     duplicates = [
-        {"nnt": "2023UCFA0001", "sources": ["theses", "openalex"], "pub_ids": [10, 11]},
-        {"nnt": "2023UCFA0042", "sources": ["theses", "scanr"], "pub_ids": [42, 43, 44]},
+        NntDuplicateRow(nnt="2023UCFA0001", pub_ids=[10, 11], sources=["theses", "openalex"]),
+        NntDuplicateRow(nnt="2023UCFA0042", pub_ids=[42, 43, 44], sources=["theses", "scanr"]),
     ]
     queries = _FakeQueries(duplicates=duplicates)
     repo = MagicMock()
@@ -101,7 +102,7 @@ def test_happy_path_formats_groups_and_commits(captured_calls, logger):
 def test_dry_run_does_not_commit(captured_calls, logger):
     """`dry_run=True` propagé à `merge_publications_by_key`, pas de commit."""
     conn = _FakeConn()
-    duplicates = [{"nnt": "2024UCFA0099", "sources": ["theses"], "pub_ids": [99, 100]}]
+    duplicates = [NntDuplicateRow(nnt="2024UCFA0099", pub_ids=[99, 100], sources=["theses"])]
     queries = _FakeQueries(duplicates=duplicates)
     repo = MagicMock()
 
