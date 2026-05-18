@@ -1,18 +1,21 @@
 """Query services pour /api/admin/duplicates/*.
 
-`PgPublicationDuplicatesQueries` hérite explicitement du Protocol
-`application.ports.publication_duplicates_queries.PublicationDuplicatesQueries`.
+`PgPublicationDuplicatesQueries` hérite explicitement du Protocol `application.ports.publication_duplicates_queries.PublicationDuplicatesQueries`.
 """
-
-from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.publication_duplicates_queries import PublicationDuplicatesQueries
+from application.ports.api.publication_duplicates_queries import (
+    PubDedupAuthor,
+    PubDedupDetail,
+    PubDedupJournal,
+    PubDedupSource,
+    PubDuplicateNextResponse,
+    PubDuplicatePair,
+    PublicationDuplicatesQueries,
+)
 
-# `:min_title_len` apparaît une seule fois dans la sous-requête SELECT
-# qui est utilisée 2× : une fois pour COUNT, une fois pour LIMIT/OFFSET.
-# SA réutilise le même bind dans les deux compositions.
+# `:min_title_len` apparaît une seule fois dans la sous-requête SELECT qui est utilisée 2× : une fois pour COUNT, une fois pour LIMIT/OFFSET. SA réutilise le même bind dans les deux compositions.
 _PUB_CANDIDATE_WHERE = """
     FROM publications p1
     JOIN publications p2
@@ -41,7 +44,7 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def _get_pub_detail(self, pub_id: int) -> dict[str, Any] | None:
+    def _get_pub_detail(self, pub_id: int) -> PubDedupDetail | None:
         pub_row = self._conn.execute(
             text("""
                 SELECT p.id, p.title, p.title_normalized, p.doi, p.pub_year,
@@ -62,7 +65,7 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
             text("SELECT source, source_id FROM source_publications WHERE publication_id = :pid"),
             {"pid": pub_id},
         ).all()
-        sources = [{"source": r.source, "source_id": r.source_id} for r in src_rows]
+        sources = [PubDedupSource(source=r.source, source_id=r.source_id) for r in src_rows]
 
         auth_rows = self._conn.execute(
             text("""
@@ -85,31 +88,45 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
             """),
             {"pid": pub_id},
         ).all()
-        authors = [dict(r._mapping) for r in auth_rows]
+        authors = [
+            PubDedupAuthor(
+                author_position=r.author_position,
+                in_perimeter=r.in_perimeter,
+                person_id=r.person_id,
+                last_name=r.last_name,
+                first_name=r.first_name,
+                full_name=r.full_name,
+            )
+            for r in auth_rows
+        ]
 
-        return {
-            "id": pub_row.id,
-            "title": pub_row.title,
-            "title_normalized": pub_row.title_normalized,
-            "doi": pub_row.doi,
-            "pub_year": pub_row.pub_year,
-            "doc_type": pub_row.doc_type,
-            "container_title": pub_row.container_title,
-            "oa_status": pub_row.oa_status,
-            "language": pub_row.language,
-            "journal": {
-                "id": pub_row.journal_id,
-                "title": pub_row.journal_title,
-                "issn": pub_row.issn,
-                "eissn": pub_row.eissn,
-            }
+        journal = (
+            PubDedupJournal(
+                id=pub_row.journal_id,
+                title=pub_row.journal_title,
+                issn=pub_row.issn,
+                eissn=pub_row.eissn,
+            )
             if pub_row.journal_id
-            else None,
-            "sources": sources,
-            "authors": authors,
-        }
+            else None
+        )
 
-    def next_pub_duplicate(self, *, min_title_len: int, offset: int) -> dict[str, Any]:
+        return PubDedupDetail(
+            id=pub_row.id,
+            title=pub_row.title,
+            title_normalized=pub_row.title_normalized,
+            doi=pub_row.doi,
+            pub_year=pub_row.pub_year,
+            doc_type=pub_row.doc_type,
+            container_title=pub_row.container_title,
+            oa_status=pub_row.oa_status,
+            language=pub_row.language,
+            journal=journal,
+            sources=sources,
+            authors=authors,
+        )
+
+    def next_pub_duplicate(self, *, min_title_len: int, offset: int) -> PubDuplicateNextResponse:
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM (SELECT p1.id {_PUB_CANDIDATE_WHERE}) sub"),
             {"min_title_len": min_title_len},
@@ -124,24 +141,22 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
             {"min_title_len": min_title_len, "pg_offset": offset},
         ).one_or_none()
         if not pair_row:
-            return {"total": total, "offset": offset, "pair": None}
+            return PubDuplicateNextResponse(total=total, offset=offset, pair=None)
 
-        return {
-            "total": total,
-            "offset": offset,
-            "pair": {
-                "pub_a": self._get_pub_detail(pair_row.id_a),
-                "pub_b": self._get_pub_detail(pair_row.id_b),
-            },
-        }
+        pub_a = self._get_pub_detail(pair_row.id_a)
+        pub_b = self._get_pub_detail(pair_row.id_b)
+        pair = (
+            PubDuplicatePair(pub_a=pub_a, pub_b=pub_b)
+            if pub_a is not None and pub_b is not None
+            else None
+        )
+        return PubDuplicateNextResponse(total=total, offset=offset, pair=pair)
 
-    def get_publications_basic(self, pub_ids: list[int]) -> dict[int, Any]:
+    def existing_publication_ids(self, pub_ids: tuple[int, ...]) -> set[int]:
+        if not pub_ids:
+            return set()
         result = self._conn.execute(
-            text(
-                "SELECT id, doi, journal_id, oa_status::text AS oa_status, "
-                "language, container_title "
-                "FROM publications WHERE id = ANY(:ids)"
-            ),
+            text("SELECT id FROM publications WHERE id = ANY(:ids)"),
             {"ids": list(pub_ids)},
         )
-        return {row.id: dict(row._mapping) for row in result}
+        return {row.id for row in result}

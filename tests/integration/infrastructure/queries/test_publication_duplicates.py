@@ -26,17 +26,17 @@ class TestNextPubDuplicate:
         p2 = _create_pub(sa_sync_conn, title="Same Title For Long Enough Detection To Trigger")
 
         res = _q(sa_sync_conn).next_pub_duplicate(min_title_len=30, offset=0)
-        assert res["total"] >= 1
-        pair = res["pair"]
+        assert res.total >= 1
+        pair = res.pair
         assert pair is not None
-        assert {pair["pub_a"]["id"], pair["pub_b"]["id"]} == {p1, p2}
+        assert {pair.pub_a.id, pair.pub_b.id} == {p1, p2}
 
     def test_no_candidate(self, sa_sync_conn):
         _create_pub(sa_sync_conn, title="A Unique Title That No One Else Will Use Here")
         _create_pub(sa_sync_conn, title="Another Totally Distinct Title For This Test")
 
         res = _q(sa_sync_conn).next_pub_duplicate(min_title_len=30, offset=0)
-        assert res["pair"] is None
+        assert res.pair is None
 
     def test_excludes_pairs_in_distinct_publications(self, sa_sync_conn):
         p1 = _create_pub(sa_sync_conn, title="Same Title For Long Enough Detection To Trigger Me")
@@ -46,15 +46,17 @@ class TestNextPubDuplicate:
             {"a": min(p1, p2), "b": max(p1, p2)},
         )
         res = _q(sa_sync_conn).next_pub_duplicate(min_title_len=30, offset=0)
-        assert res["total"] == 0
+        assert res.total == 0
 
 
-class TestGetPublicationsBasic:
-    def test_returns_only_requested(self, sa_sync_conn):
+class TestExistingPublicationIds:
+    def test_returns_only_existing(self, sa_sync_conn):
         p1 = _create_pub(sa_sync_conn, doi="10.1/a")
         p2 = _create_pub(sa_sync_conn, doi="10.1/b")
         _create_pub(sa_sync_conn, doi="10.1/c")
 
-        res = _q(sa_sync_conn).get_publications_basic([p1, p2])
-        assert set(res.keys()) == {p1, p2}
-        assert res[p1]["doi"] == "10.1/a"
+        res = _q(sa_sync_conn).existing_publication_ids((p1, p2, 999_999))
+        assert res == {p1, p2}
+
+    def test_returns_empty_for_empty_input(self, sa_sync_conn):
+        assert _q(sa_sync_conn).existing_publication_ids(()) == set()

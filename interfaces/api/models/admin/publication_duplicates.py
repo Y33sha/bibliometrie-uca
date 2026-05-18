@@ -1,55 +1,9 @@
-"""Modèles Pydantic pour la déduplication de publications (admin)."""
+"""Modèles Pydantic (router-only) pour la déduplication de publications (admin).
+
+Les DTOs de retour du query service (`PubDedupDetail`, `PubDuplicatePair`, `PubDuplicateNextResponse`, et les sous-types) vivent dans `application/ports/api/publication_duplicates_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4). Reste ici la réponse construite par le router après merge.
+"""
 
 from pydantic import BaseModel
-
-
-class PubDedupJournal(BaseModel):
-    id: int
-    title: str | None
-    issn: str | None
-    eissn: str | None
-
-
-class PubDedupSource(BaseModel):
-    source: str
-    source_id: str
-
-
-class PubDedupAuthor(BaseModel):
-    author_position: int | None
-    in_perimeter: bool
-    person_id: int | None
-    last_name: str | None
-    first_name: str | None
-    full_name: str | None
-
-
-class PubDedupDetail(BaseModel):
-    """Détail d'une publication pour la page de déduplication."""
-
-    id: int
-    title: str
-    title_normalized: str
-    doi: str | None
-    pub_year: int | None
-    doc_type: str
-    container_title: str | None
-    oa_status: str
-    language: str | None
-    journal: PubDedupJournal | None
-    sources: list[PubDedupSource]
-    authors: list[PubDedupAuthor]
-
-
-class PubDuplicatePair(BaseModel):
-    pub_a: PubDedupDetail
-    pub_b: PubDedupDetail
-
-
-class PubDuplicateNextResponse(BaseModel):
-    total: int
-    offset: int
-    pair: PubDuplicatePair | None
 
 
 class PubMergeResponse(BaseModel):

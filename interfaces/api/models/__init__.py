@@ -103,15 +103,7 @@ from interfaces.api.models.admin.pipeline_logs import (
     PipelineReportItem,
     PipelineStatus,
 )
-from interfaces.api.models.admin.publication_duplicates import (
-    PubDedupAuthor,
-    PubDedupDetail,
-    PubDedupJournal,
-    PubDedupSource,
-    PubDuplicateNextResponse,
-    PubDuplicatePair,
-    PubMergeResponse,
-)
+from interfaces.api.models.admin.publication_duplicates import PubMergeResponse
 from interfaces.api.models.admin.structures import (
     NameFormCreate,
     NameFormOut,
@@ -331,12 +323,6 @@ __all__ = [
     "PipelineReportItem",
     "PipelineStatus",
     "PubApcPayment",
-    "PubDedupAuthor",
-    "PubDedupDetail",
-    "PubDedupJournal",
-    "PubDedupSource",
-    "PubDuplicateNextResponse",
-    "PubDuplicatePair",
     "PubLabItem",
     "PubMergeResponse",
     "PubYearCount",
