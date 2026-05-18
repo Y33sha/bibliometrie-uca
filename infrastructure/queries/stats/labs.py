@@ -26,12 +26,11 @@ _LAB_SORT_MAP = {
 
 _STRUCTS_CTE = """
     pub_structs AS (
-        SELECT DISTINCT sd.publication_id, sas.structure_id
-        FROM source_authorships sa
-        JOIN source_publications sd ON sd.id = sa.source_publication_id
-        JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id
-        WHERE sa.in_perimeter = TRUE
-          AND sd.publication_id IS NOT NULL
+        SELECT DISTINCT a.publication_id, aus.structure_id
+        FROM authorships a
+        JOIN authorship_structures aus ON aus.authorship_id = a.id
+        WHERE a.in_perimeter = TRUE
+          AND NOT a.excluded
     )
 """
 
@@ -56,8 +55,7 @@ def _build_stats_labs_sql(
             "(j.oa_model IS DISTINCT FROM 'repository')",
         ]
     )
-    # Spécificité de cet endpoint : lab filter passe par la CTE `pub_structs`
-    # (sources, pas authorships) — `lab_clause` générique ne convient pas.
+    # Spécificité de cet endpoint : lab filter passe par la CTE `pub_structs` (utilisée aussi pour le GROUP BY structure plus bas), donc `lab_clause` générique ferait un EXISTS séparé sur `authorships`/`authorship_structures` — on factorise via la CTE déjà en place.
     lab_struct_clause = (
         WhereClause(
             """EXISTS (
