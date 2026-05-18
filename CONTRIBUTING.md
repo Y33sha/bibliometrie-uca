@@ -16,7 +16,7 @@ Prérequis : comprendre l'architecture DDD en 4 couches — voir [`docs/architec
 - **Logging** : `setup_logger` de `infrastructure/log.py` pour les scripts CLI (`interfaces/cli/`) et les extracteurs ; `logging.getLogger(__name__)` dans le code applicatif (routers, services, queries) — le root logger est configuré au démarrage de l'app.
 - **Noms de personnes / DOI** : `names_compatible`, `parse_raw_author_name` de `domain/names.py` ; `DOI`, `DOI.try_parse` de `domain/publication.py`.
 - **Couches DDD** : le contrat `import-linter` interdit certaines directions d'import (`domain/` ne peut rien importer, `application/` ne peut pas importer `infrastructure/`, etc.). Un import interdit fera échouer le pre-commit et la CI.
-- **Tests** : `python -m pytest tests/ -v` (la base `DB_PASSWORD` doit être exportée). Les tests unitaires (`tests/unit/`) tournent aussi au pre-commit. Seuil de couverture global : `fail_under = 70` dans `pyproject.toml`, à faire monter progressivement (cible 80 %, cf. `docs/chantiers/CODE_couverture-tests.md`).
+- **Tests** : `python -m pytest tests/ -v` (la base `DB_PASSWORD` doit être exportée). Les tests unitaires (`tests/unit/`) tournent aussi au pre-commit. Seuil de couverture global : `fail_under = 85` dans `pyproject.toml`, à faire monter progressivement (cf. `docs/chantiers/CODE_couverture-tests.md`).
 - **Pre-commit** : lance ruff + ruff format + mypy + lint-imports + pytest-unit + uv-lock. Lancer `ruff format .` avant `git commit` évite le double-commit quand le hook reformate.
 
 ---
