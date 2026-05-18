@@ -119,9 +119,9 @@ Tous partiellement couverts par les tests d'idempotence existants ; il reste les
 - [x] `application/pipeline/normalize/normalize_wos.py` (315 stmts → 97 %)
 - [x] `application/pipeline/affiliations/resolve_addresses.py` (105 stmts → 99 %, 1 branche défensive 210→217 inatteignable car `process_addresses` n'est appelé qu'avec rows non-vide).
 - [x] `application/pipeline/publications/merge_pubs_by_hal_id.py` (70 stmts → 100 %)
-- [ ] `application/pipeline/normalize/normalize_theses.py` (107, 52 %).
+- [x] `application/pipeline/normalize/normalize_theses.py` (109 stmts → 100 %).
 - [x] `application/pipeline/normalize/normalize_openalex.py` (220 stmts → 99 %, 3 branches partielles défensives — skip issn_l dans upsert_journal, theses_fr sans nnt extrait, branche non-zenodo déjà couverte par le happy path).
-- [ ] `application/pipeline/normalize/base.py` (116, 68 %).
+- [x] `application/pipeline/normalize/base.py` (121 stmts → 99 %, 1 branche partielle 183→186 défensive — chemin sans SAVEPOINT couvert par le scénario nominal).
 - [x] `application/pipeline/normalize/normalize_hal.py` (298 stmts → 95 %, 8 lignes / 11 branches partielles défensives — `int()` ValueError dans le parsing composite Solr / authFullNameId, et `if not x_parts: continue` jamais atteints car `str.split()` retourne toujours une liste truthy).
 
 ## Questions ouvertes
