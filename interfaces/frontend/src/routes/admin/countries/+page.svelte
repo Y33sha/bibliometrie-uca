@@ -188,7 +188,6 @@
 			const data = await addressesApi.batchSetCountry(body);
 			batchResult = `${data.updated} adresse${data.updated > 1 ? 's' : ''} mise${data.updated > 1 ? 's' : ''} à jour`;
 			selectedIds = new Set();
-			if (applyToAll) selectedSugCountry = [];
 		} catch (e) {
 			batchResult = 'Erreur : ' + (e instanceof Error ? e.message : String(e));
 		} finally {
