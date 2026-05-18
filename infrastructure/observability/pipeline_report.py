@@ -3,8 +3,9 @@
 import datetime
 from pathlib import Path
 
-BASE = Path(__file__).resolve().parent.parent
-LOGS_ROOT = BASE / "logs"
+from infrastructure import PROJECT_ROOT
+
+LOGS_ROOT = PROJECT_ROOT / "logs"
 REPORTS_DIR = LOGS_ROOT / "reports"
 
 
@@ -67,7 +68,7 @@ def read_new_logs(offsets: dict[str, int]) -> str:
             fh.seek(prev_size)
             content = fh.read().rstrip()
         if content:
-            rel = f.relative_to(BASE)
+            rel = f.relative_to(PROJECT_ROOT)
             parts.append(f"### {rel.as_posix()}\n```\n{content}\n```")
     return "\n\n".join(parts)
 
