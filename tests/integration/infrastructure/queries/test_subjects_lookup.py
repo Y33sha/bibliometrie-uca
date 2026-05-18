@@ -40,7 +40,7 @@ class TestListSubjects:
         _create_subject(sa_sync_conn, label="frequent", usage_count=50)
         _create_subject(sa_sync_conn, label="moderate", usage_count=10)
         items = _q(sa_sync_conn).list_subjects(q=None, limit=50, offset=0, min_count=1)
-        labels_ordered = [i["label"] for i in items]
+        labels_ordered = [i.label for i in items]
         # Frequent en premier, rare en dernier.
         assert labels_ordered.index("frequent") < labels_ordered.index("moderate")
         assert labels_ordered.index("moderate") < labels_ordered.index("rare")
@@ -49,7 +49,7 @@ class TestListSubjects:
         _create_subject(sa_sync_conn, label="low", usage_count=1)
         _create_subject(sa_sync_conn, label="high", usage_count=10)
         items = _q(sa_sync_conn).list_subjects(q=None, limit=50, offset=0, min_count=5)
-        labels = {i["label"] for i in items}
+        labels = {i.label for i in items}
         assert "high" in labels
         assert "low" not in labels
 
@@ -59,14 +59,14 @@ class TestListSubjects:
         _create_subject(sa_sync_conn, label="biology", usage_count=10)
         items = _q(sa_sync_conn).list_subjects(q="climate", limit=50, offset=0, min_count=1)
         assert len(items) == 1
-        assert items[0]["label"] == "Climate Change"
+        assert items[0].label == "Climate Change"
 
     def test_pagination(self, sa_sync_conn):
         for i in range(10):
             _create_subject(sa_sync_conn, label=f"s{i:02d}", usage_count=10 - i)
         page1 = _q(sa_sync_conn).list_subjects(q=None, limit=3, offset=0, min_count=1)
         page2 = _q(sa_sync_conn).list_subjects(q=None, limit=3, offset=3, min_count=1)
-        assert {i["label"] for i in page1}.isdisjoint({i["label"] for i in page2})
+        assert {i.label for i in page1}.isdisjoint({i.label for i in page2})
         assert len(page1) == 3 and len(page2) == 3
 
 
@@ -82,12 +82,12 @@ class TestCountSubjects:
 
 
 class TestGetSubject:
-    def test_returns_dict(self, sa_sync_conn):
+    def test_returns_dto(self, sa_sync_conn):
         sid = _create_subject(sa_sync_conn, label="quantum", usage_count=42)
         s = _q(sa_sync_conn).get_subject(sid)
         assert s is not None
-        assert s["label"] == "quantum"
-        assert s["usage_count"] == 42
+        assert s.label == "quantum"
+        assert s.usage_count == 42
 
     def test_returns_none_for_missing(self, sa_sync_conn):
         assert _q(sa_sync_conn).get_subject(999_999) is None
@@ -102,7 +102,7 @@ class TestGetSubjectNeighbors:
         _link_cooccurrence(sa_sync_conn, center, left, 5)
         _link_cooccurrence(sa_sync_conn, center, right, 3)
         neighbors = _q(sa_sync_conn).get_subject_neighbors(center, limit=20, min_count=2)
-        labels = {n["label"] for n in neighbors}
+        labels = {n.label for n in neighbors}
         assert labels == {"left", "right"}
 
     def test_orders_by_count_desc(self, sa_sync_conn):
@@ -112,8 +112,8 @@ class TestGetSubjectNeighbors:
         _link_cooccurrence(sa_sync_conn, c, n1, 2)
         _link_cooccurrence(sa_sync_conn, c, n2, 50)
         neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=20, min_count=1)
-        assert neighbors[0]["label"] == "strong"
-        assert neighbors[0]["cooccurrence_count"] == 50
+        assert neighbors[0].label == "strong"
+        assert neighbors[0].cooccurrence_count == 50
 
     def test_filters_by_min_count(self, sa_sync_conn):
         c = _create_subject(sa_sync_conn, label="c", usage_count=10)
@@ -122,7 +122,7 @@ class TestGetSubjectNeighbors:
         _link_cooccurrence(sa_sync_conn, c, keep, 5)
         _link_cooccurrence(sa_sync_conn, c, skip, 1)
         neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=20, min_count=3)
-        labels = {n["label"] for n in neighbors}
+        labels = {n.label for n in neighbors}
         assert labels == {"keep"}
 
     def test_limit(self, sa_sync_conn):
