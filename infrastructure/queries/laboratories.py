@@ -1,10 +1,10 @@
 """Query services pour /api/laboratories/*.
 
 `PgLaboratoriesQueries` hérite explicitement du Protocol
-`application.ports.laboratories_queries.LaboratoriesQueries` : mypy
+`application.ports.api.laboratories_queries.LaboratoriesQueries` : mypy
 vérifie la conformité à la définition de classe. La dataclass
-`LabPersonsFilters` est importée du port pour typer les signatures
-(cf. règle 3 d'`architecture.md`).
+`LabPersonsFilters` et les DTOs sont importés du port (cf. règle 3
+d'`architecture.md`).
 """
 
 import datetime
@@ -12,7 +12,32 @@ from typing import Any
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.api.laboratories_queries import LaboratoriesQueries, LabPersonsFilters
+from application.ports.api._common import (
+    DashboardOa,
+    FacetValueCount,
+    PubYearCount,
+    ValueConfirmedOut,
+    YesNoCount,
+)
+from application.ports.api.laboratories_queries import (
+    LabAddressOut,
+    LabDashboardCollab,
+    LaboratoriesQueries,
+    LaboratoryAddressesResponse,
+    LaboratoryDashboardResponse,
+    LaboratoryDetailResponse,
+    LaboratoryListItem,
+    LaboratoryPersonsResponse,
+    LabOrphanAuthorships,
+    LabPersonOut,
+    LabPersonsFacets,
+    LabPersonsFilters,
+    LabRelatedStructure,
+    LabStructureCore,
+    LabTopCountry,
+    LabTutelle,
+)
+from application.ports.api.subjects_queries import SubjectFrequency
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from infrastructure.queries.filters import (
     OA_CLOSED_SQL,
@@ -37,12 +62,12 @@ _DOC_TYPES_EXCLUDED_FROM_LAB_CONTRIBUTIONS_SQL = (
 
 
 class PgLaboratoriesQueries(LaboratoriesQueries):
-    """Adapter SA pour `application.ports.laboratories_queries.LaboratoriesQueries`."""
+    """Adapter SA pour `application.ports.api.laboratories_queries.LaboratoriesQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def list_laboratories(self) -> list[dict[str, Any]]:
+    def list_laboratories(self) -> list[LaboratoryListItem]:
         """Liste des labos du périmètre, avec leurs tutelles (hors racines du périmètre).
 
         Résout en interne le périmètre `persons` (ids des structures + racines)
@@ -71,9 +96,20 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             """),
             {"root_ids": root_ids, "perimeter_ids": perimeter_ids},
         ).all()
-        return [dict(r._mapping) for r in rows]
+        return [
+            LaboratoryListItem(
+                id=r.id,
+                code=r.code,
+                name=r.name,
+                acronym=r.acronym,
+                ror_id=r.ror_id,
+                hal_collection=r.hal_collection,
+                tutelles=[LabTutelle(**t) for t in r.tutelles] if r.tutelles else None,
+            )
+            for r in rows
+        ]
 
-    def get_laboratory(self, lab_id: int) -> dict[str, Any] | None:
+    def get_laboratory(self, lab_id: int) -> LaboratoryDetailResponse | None:
         """Profil public d'un laboratoire (None si absent)."""
         struct_row = self._conn.execute(
             text("""
@@ -113,7 +149,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
 
         theses_row = self._conn.execute(
             text("""
-                SELECT COUNT(*) AS count
+                SELECT COUNT(*) AS n
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
                 JOIN authorship_structures aus ON aus.authorship_id = a.id
@@ -124,12 +160,39 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             {"lab_id": lab_id},
         ).one()
 
-        return {
-            "structure": dict(struct_row._mapping),
-            "parents": [dict(r._mapping) for r in parents],
-            "children": [dict(r._mapping) for r in children],
-            "theses_count": theses_row.count,
-        }
+        return LaboratoryDetailResponse(
+            structure=LabStructureCore(
+                id=struct_row.id,
+                code=struct_row.code,
+                name=struct_row.name,
+                acronym=struct_row.acronym,
+                type=struct_row.type,
+                ror_id=struct_row.ror_id,
+                rnsr_id=struct_row.rnsr_id,
+                hal_collection=struct_row.hal_collection,
+            ),
+            parents=[
+                LabRelatedStructure(
+                    id=r.id,
+                    name=r.name,
+                    acronym=r.acronym,
+                    type=r.type,
+                    relation_type=r.relation_type,
+                )
+                for r in parents
+            ],
+            children=[
+                LabRelatedStructure(
+                    id=r.id,
+                    name=r.name,
+                    acronym=r.acronym,
+                    type=r.type,
+                    relation_type=r.relation_type,
+                )
+                for r in children
+            ],
+            theses_count=theses_row.n,
+        )
 
     def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
         self,
@@ -139,7 +202,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         page: int,
         per_page: int,
         sort: str,
-    ) -> dict[str, Any]:
+    ) -> LaboratoryPersonsResponse:
         """Personnes liées à un labo + authorships orphelines + facettes."""
         offset = (page - 1) * per_page
         lab_arr = [lab_id]
@@ -204,7 +267,21 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             """),
             {**common_binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
-        persons = [dict(r._mapping) for r in persons_rows]
+        persons = [
+            LabPersonOut(
+                id=r.id,
+                last_name=r.last_name,
+                first_name=r.first_name,
+                role_title=r.role_title,
+                department_name=r.department_name,
+                has_rh=r.has_rh,
+                pub_count=r.pub_count,
+                orcids=[ValueConfirmedOut(**o) for o in r.orcids] if r.orcids else None,
+                idhals=[ValueConfirmedOut(**o) for o in r.idhals] if r.idhals else None,
+                idrefs=[ValueConfirmedOut(**o) for o in r.idrefs] if r.idrefs else None,
+            )
+            for r in persons_rows
+        ]
 
         orphan_row = self._conn.execute(
             text("""
@@ -306,45 +383,47 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 p,
             ).one()
 
-        def run_value_facet(*, skip: str, column: str) -> list[dict[str, Any]]:
+        def run_value_facet(*, skip: str, column: str) -> list[FacetValueCount]:
             w, p = facet_clauses(skip=skip)
             rows = self._conn.execute(
                 text(f"""
-                    SELECT prh.{column} AS value, COUNT(DISTINCT per.id) AS count
+                    SELECT prh.{column} AS value, COUNT(DISTINCT per.id) AS n
                     FROM authorships a
                     JOIN persons per ON per.id = a.person_id
                     LEFT JOIN persons_rh prh ON prh.person_id = per.id
                     WHERE {w} AND prh.{column} IS NOT NULL
                     GROUP BY prh.{column}
-                    ORDER BY count DESC
+                    ORDER BY n DESC
                 """),
                 p,
             ).all()
-            return [dict(r._mapping) for r in rows]
+            return [FacetValueCount(value=r.value, count=r.n) for r in rows]
 
         facet_rh = run_yesno_facet("has_rh")
         facet_ids = run_yesno_facet("ids")
         facet_depts = run_value_facet(skip="departments", column="department_name")
         facet_roles = run_value_facet(skip="roles", column="role_title")
 
-        return {
-            "total_persons": total_persons,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total_persons + per_page - 1) // per_page or 1,
-            "persons": persons,
-            "orphan_authorships": {"total": orphan_total},
-            "facets": {
-                "departments": facet_depts,
-                "roles": facet_roles,
-                "rh": {"yes": facet_rh.rh_yes, "no": facet_rh.rh_no},
-                "orcid": {"yes": facet_ids.orcid_yes, "no": facet_ids.orcid_no},
-                "idhal": {"yes": facet_ids.idhal_yes, "no": facet_ids.idhal_no},
-                "idref": {"yes": facet_ids.idref_yes, "no": facet_ids.idref_no},
-            },
-        }
+        return LaboratoryPersonsResponse(
+            total_persons=total_persons,
+            page=page,
+            per_page=per_page,
+            pages=(total_persons + per_page - 1) // per_page or 1,
+            persons=persons,
+            orphan_authorships=LabOrphanAuthorships(total=orphan_total),
+            facets=LabPersonsFacets(
+                departments=facet_depts,
+                roles=facet_roles,
+                rh=YesNoCount(yes=facet_rh.rh_yes, no=facet_rh.rh_no),
+                orcid=YesNoCount(yes=facet_ids.orcid_yes, no=facet_ids.orcid_no),
+                idhal=YesNoCount(yes=facet_ids.idhal_yes, no=facet_ids.idhal_no),
+                idref=YesNoCount(yes=facet_ids.idref_yes, no=facet_ids.idref_no),
+            ),
+        )
 
-    def get_laboratory_addresses(self, lab_id: int, *, page: int, per_page: int) -> dict[str, Any]:
+    def get_laboratory_addresses(
+        self, lab_id: int, *, page: int, per_page: int
+    ) -> LaboratoryAddressesResponse:
         """Adresses liées à un laboratoire."""
         offset = (page - 1) * per_page
         count_row = self._conn.execute(
@@ -371,15 +450,18 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             """),
             {"lab_id": lab_id, "pg_limit": per_page, "pg_offset": offset},
         ).all()
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page or 1,
-            "addresses": [dict(r._mapping) for r in rows],
-        }
+        return LaboratoryAddressesResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=(total + per_page - 1) // per_page or 1,
+            addresses=[
+                LabAddressOut(id=r.id, raw_text=r.raw_text, is_confirmed=r.is_confirmed)
+                for r in rows
+            ],
+        )
 
-    def get_laboratory_subjects(self, lab_id: int, *, limit: int = 30) -> list[dict[str, Any]]:
+    def get_laboratory_subjects(self, lab_id: int, *, limit: int = 30) -> list[SubjectFrequency]:
         """Top sujets des publications d'un labo, ordonnés par fréquence locale.
 
         Filtre `peer_review`, `memoir`, `ongoing_thesis` pour rester cohérent
@@ -392,7 +474,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         # (pub_id, subject_id) (sources différentes).
         rows = self._conn.execute(
             text(f"""
-                SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS count
+                SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS n
                 FROM publication_subjects ps
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN subjects s ON s.id = ps.subject_id
@@ -406,21 +488,24 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                         AND a.in_perimeter = TRUE
                   )
                 GROUP BY s.id, s.label, s.ontologies
-                ORDER BY count DESC, lower(s.label)
+                ORDER BY n DESC, lower(s.label)
                 LIMIT :lim
             """),
             {"lab_arr": [lab_id], "lim": limit},
         ).all()
-        return [dict(r._mapping) for r in rows]
+        return [
+            SubjectFrequency(id=r.id, label=r.label, ontologies=r.ontologies, count=r.n)
+            for r in rows
+        ]
 
-    def get_laboratory_dashboard(self, lab_id: int) -> dict[str, Any]:
+    def get_laboratory_dashboard(self, lab_id: int) -> LaboratoryDashboardResponse:
         """Dashboard labo : publis/an, répartition OA, collab internationales, top pays."""
         lab_arr = [lab_id]
         current_year = datetime.date.today().year
 
         pubs_year_rows = self._conn.execute(
             text("""
-                SELECT p.pub_year, COUNT(DISTINCT p.id) AS count
+                SELECT p.pub_year, COUNT(DISTINCT p.id) AS n
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
                 WHERE a.in_perimeter = TRUE
@@ -433,7 +518,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             """),
             {"lab_arr": lab_arr, "min_year": current_year - 6},
         ).all()
-        pubs_by_year = [{"year": r.pub_year, "count": r.count} for r in pubs_year_rows]
+        pubs_by_year = [PubYearCount(year=r.pub_year, count=r.n) for r in pubs_year_rows]
 
         oa = self._conn.execute(
             text(f"""
@@ -478,7 +563,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         # ce qui faisait déborder le sort sur disque.
         top_country_rows = self._conn.execute(
             text("""
-                SELECT co.code, co.name, COUNT(*) AS count
+                SELECT co.code, co.name, COUNT(*) AS n
                 FROM (
                     SELECT p.id, unnest(p.countries) AS cc
                     FROM publications p
@@ -494,30 +579,30 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 JOIN countries co ON co.code = sub.cc
                 WHERE sub.cc NOT IN ('fr', 'xx')
                 GROUP BY co.code, co.name
-                ORDER BY count DESC
+                ORDER BY n DESC
                 LIMIT 5
             """),
             {"lab_arr": lab_arr},
         ).all()
         top_countries = [
-            {"code": r.code.strip(), "name": r.name, "count": r.count} for r in top_country_rows
+            LabTopCountry(code=r.code.strip(), name=r.name, count=r.n) for r in top_country_rows
         ]
 
-        return {
-            "pubs_by_year": pubs_by_year,
-            "oa": {
-                "open_access": oa.open_access,
-                "closed": oa.closed,
-                "unknown": oa.unknown,
-                "total": oa.total,
-            },
-            "collab": {
-                "total_articles": collab.total_articles,
-                "international": collab.international,
-                "domestic": collab.total_articles - collab.international,
-            },
-            "top_countries": top_countries,
-        }
+        return LaboratoryDashboardResponse(
+            pubs_by_year=pubs_by_year,
+            oa=DashboardOa(
+                open_access=oa.open_access,
+                closed=oa.closed,
+                unknown=oa.unknown,
+                total=oa.total,
+            ),
+            collab=LabDashboardCollab(
+                total_articles=collab.total_articles,
+                international=collab.international,
+                domestic=collab.total_articles - collab.international,
+            ),
+            top_countries=top_countries,
+        )
 
 
 def _lab_persons_extra_clauses(filters: LabPersonsFilters) -> list[WhereClause | None]:
