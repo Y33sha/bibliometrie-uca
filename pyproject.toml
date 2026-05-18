@@ -288,50 +288,50 @@ exclude = [
 
 # Désactivation explicite pour les modules dont les `Any` sont
 # délibérés. Documentés au cas par cas :
-# - `domain.sources.*` : payloads JSON bruts d'APIs externes (lecture
-#   dynamique, forcer `JsonValue` exigerait des isinstance partout).
+# - `domain.sources.*`, `infrastructure.sources.*`, `infrastructure.jsonb_models.*` :
+#   payloads JSON bruts d'APIs externes / colonnes JSONB libres.
+# - `application.ports.api.*` : DTOs Pydantic co-localisés — `BaseModel`
+#   propage `Any` via ses stubs (`__init__: **data: Any`), ce qui déclenche
+#   `explicit-any` à chaque héritage `class X(BaseModel)`. Le `Any` côté
+#   projet est strict (Phase 4 du chantier `CODE_typage-projections-strict`)
+#   mais l'override couvre Pydantic. Idem pour `infrastructure.settings` qui
+#   hérite de `BaseSettings`.
 # - `application.ports.repositories.*` (sauf audit, déjà strict) : records DB
-#   hydratés et partial updates `fields: dict[str, Any]` — délégués au chantier
-#   `CODE_rich-domain-model` Phase 8.
+#   hydratés et partial updates — délégués au chantier `CODE_rich-domain-model`
+#   Phase 8.
+# - `application.ports.pipeline.{staging,subjects}` : `raw_data: dict[str, Any]`
+#   JSONB sur `StagingRow`, `list[Any]` sur
+#   `select_source_publications_with_subjects`.
 # - `domain.publications.aggregation` : `first_non_null` /
 #   `merge_lists_dedup_ci` polymorphiques sur `getattr(source, attr)`.
-# - `application.ports.api.*` et `application.ports.pipeline.*` (hors
-#   normalize ciblés) : Protocols qui retournent `dict[str, Any]`
-#   records DB.
-# - `application.pipeline.normalize.*` : consomment des `dict[str, Any]`
-#   payloads venant des APIs (cf. `domain.sources.*`).
-# - `application.pipeline.persons.create_persons_from_source_authorships` :
-#   cascade matching bloquée par `METIER_decide-person-match`.
-# - Services racine `application.{config,persons,journals,publishers,
-#   structures,addresses.countries,authorships.core}` : retournent ou
-#   reçoivent des records / partial updates DB (Phase 8).
+# - `application.pipeline.normalize.*` (hors port `normalize.wos`, déjà strict) :
+#   consomment des payloads `dict[str, Any]` venant des APIs externes (cf.
+#   `domain.sources.*`).
+# - `application.pipeline.publications.match_or_create_publications` :
+#   `external_ids` JSONB + `doc: dict[str, Any]` payload source.
+# - `application.pipeline.subjects._common` : `_PushedOntology` interne au
+#   cache (dict mutable avec sets, difficile à typer).
+# - Services racine `application.{persons,structures}` : `list` / `dict` sans
+#   paramètres (records DB hydratés) — délégués à Phase 8 (`CODE_rich-domain-model`).
 # - `infrastructure.repositories.*` et `infrastructure.queries.*` :
 #   couche SQL — Row, records DB, batchs hétérogènes. Phase 8.
-# - `infrastructure.sources.*` : extracteurs API, payloads JSON.
-# - `infrastructure.settings` et `interfaces.cli.{imports,maintenance}.*` :
-#   hors scope du chantier (CLIs / framework). `infrastructure.sources.*`
-#   couvre déjà les helpers HTTP (http_retry, http_retry_async).
+# - `interfaces.cli.{imports,maintenance}.*` : scripts one-shot, hors scope.
 # - `interfaces.api.models:ConfigItem.value` / `ConfigValueUpdate.value` :
 #   pydantic ne supporte pas l'alias récursif `JsonValue` (py310).
 # - `interfaces.cli.dev.generate_seed.TABLES` : schéma de seed,
 #   `list[dict[str, Any]]` délibéré.
+# - `run_pipeline` : entry-point CLI qui orchestre des subprocess + dict
+#   d'options hétérogènes — hors scope du chantier typage.
 [[tool.mypy.overrides]]
 module = [
     "application.persons",
     "application.structures",
-    "application.pipeline.affiliations.resolve_addresses",
     "application.pipeline.enrich.*",
     "application.pipeline.fetch_missing_doi",
     "application.pipeline.normalize.*",
-    "application.pipeline.persons.create_persons_from_source_authorships",
     "application.pipeline.publications.match_or_create_publications",
-    "application.pipeline.publications.merge_pubs_by_hal_id",
     "application.pipeline.subjects._common",
     "application.ports.api.*",
-    "application.ports.pipeline.merge",
-    "application.ports.pipeline.name_forms",
-    "application.ports.pipeline.normalize.wos",
-    "application.ports.pipeline.persons_create",
     "application.ports.pipeline.staging",
     "application.ports.pipeline.subjects",
     "application.ports.repositories.*",
@@ -345,7 +345,6 @@ module = [
     "interfaces.api.app",
     "interfaces.api.models.*",
     "interfaces.api.routers.docs",
-    "interfaces.api.routers.journals",
     "interfaces.cli.dev.generate_seed",
     "interfaces.cli.imports.*",
     "interfaces.cli.maintenance.*",
