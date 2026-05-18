@@ -1,10 +1,6 @@
 """Query services sync pour /api/addresses/* et /api/countries.
 
-`PgAddressesQueries` hérite explicitement du Protocol
-`application.ports.addresses_queries.AddressesQueries` : mypy vérifie
-la conformité à la définition de classe. Les dataclasses de filtres
-(`AddressListFilters`, `AddressCountriesFilters`) sont importées du
-port pour typer les signatures (cf. règle 3 d'`architecture.md`).
+`PgAddressesQueries` hérite explicitement du Protocol `application.ports.addresses_queries.AddressesQueries` : mypy vérifie la conformité à la définition de classe. Les dataclasses de filtres (`AddressListFilters`, `AddressCountriesFilters`) sont importées du port pour typer les signatures (cf. règle 3 d'`architecture.md`).
 """
 
 from typing import Any
@@ -13,9 +9,29 @@ from sqlalchemy import Connection, text
 
 from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
+    AddressesCountriesResponse,
     AddressesQueries,
+    AddressForCountryAttribution,
     AddressListFilters,
+    AddressListResponse,
+    AddressOut,
+    AddressPublicationItem,
+    AddressStatsResponse,
+    AddressStructureSummary,
+    CountryOut,
+    CountrySuggestion,
+    CountrySuggestionsResponse,
 )
+
+
+def _structure_summary(d: dict[str, Any]) -> AddressStructureSummary:
+    return AddressStructureSummary(
+        id=d["id"],
+        name=d["name"],
+        acronym=d.get("acronym"),
+        is_confirmed=d.get("is_confirmed"),
+        is_detected=d["is_detected"],
+    )
 
 
 class PgAddressesQueries(AddressesQueries):
@@ -27,10 +43,7 @@ class PgAddressesQueries(AddressesQueries):
     def resolve_default_structure_id(self) -> int:
         """Résout la structure de travail par défaut (première racine du périmètre).
 
-        Lit `perimeters.structure_ids[1]` pour le périmètre configuré dans
-        `config.perimeter_persons`. Retourne 0 si la config est absente ou
-        si le périmètre n'a aucune structure (les filtres aval sont alors
-        sans effet).
+        Lit `perimeters.structure_ids[1]` pour le périmètre configuré dans `config.perimeter_persons`. Retourne 0 si la config est absente ou si le périmètre n'a aucune structure (les filtres aval sont alors sans effet).
         """
         row = self._conn.execute(
             text("""
@@ -51,7 +64,7 @@ class PgAddressesQueries(AddressesQueries):
         filters: AddressListFilters,
         page: int,
         per_page: int,
-    ) -> dict[str, Any]:
+    ) -> AddressListResponse:
         """Liste paginée des adresses avec filtres détection/validation."""
         offset = (page - 1) * per_page
         use_inner_join = filters.detected == "yes"
@@ -114,33 +127,33 @@ class PgAddressesQueries(AddressesQueries):
         ).all()
 
         addresses = [
-            {
-                "id": r.id,
-                "raw_text": r.raw_text,
-                "is_confirmed": r.is_confirmed,
-                "is_detected": r.is_detected or False,
-                "structures": r.structures or [],
-                "pub_count": r.pub_count,
-            }
+            AddressOut(
+                id=r.id,
+                raw_text=r.raw_text,
+                is_confirmed=r.is_confirmed,
+                is_detected=r.is_detected or False,
+                structures=[_structure_summary(s) for s in (r.structures or [])],
+                pub_count=r.pub_count,
+            )
             for r in rows
         ]
 
-        return {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page,
-            "addresses": addresses,
-        }
+        return AddressListResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=(total + per_page - 1) // per_page,
+            addresses=addresses,
+        )
 
-    def get_address_basic(self, addr_id: int) -> dict[str, Any] | None:
+    def get_address_raw_text(self, addr_id: int) -> str | None:
         row = self._conn.execute(
-            text("SELECT id, raw_text FROM addresses WHERE id = :id"),
+            text("SELECT raw_text FROM addresses WHERE id = :id"),
             {"id": addr_id},
         ).one_or_none()
-        return dict(row._mapping) if row else None
+        return row.raw_text if row else None
 
-    def get_address_publications(self, addr_id: int, limit: int) -> list[dict[str, Any]]:
+    def get_address_publications(self, addr_id: int, limit: int) -> list[AddressPublicationItem]:
         rows = self._conn.execute(
             text("""
                 SELECT DISTINCT ON (p.id)
@@ -160,9 +173,21 @@ class PgAddressesQueries(AddressesQueries):
             """),
             {"id": addr_id, "lim": limit},
         ).all()
-        return [dict(r._mapping) for r in rows]
+        return [
+            AddressPublicationItem(
+                id=r.id,
+                title=r.title,
+                pub_year=r.pub_year,
+                doi=r.doi,
+                doc_type=r.doc_type,
+                journal_title=r.journal_title,
+                author_name=r.author_name,
+                source_id=r.source_id,
+            )
+            for r in rows
+        ]
 
-    def get_address_structures(self, addr_id: int) -> list[dict[str, Any]]:
+    def get_address_structures(self, addr_id: int) -> list[AddressStructureSummary]:
         row = self._conn.execute(
             text("""
                 SELECT json_agg(json_build_object(
@@ -176,7 +201,7 @@ class PgAddressesQueries(AddressesQueries):
             """),
             {"id": addr_id},
         ).one_or_none()
-        return list(row.structures) if row and row.structures else []
+        return [_structure_summary(s) for s in (row.structures if row and row.structures else [])]
 
     def get_structure_link(self, addr_id: int, structure_id: int) -> dict[str, Any] | None:
         row = self._conn.execute(
@@ -190,11 +215,11 @@ class PgAddressesQueries(AddressesQueries):
         ).one_or_none()
         return dict(row._mapping) if row else None
 
-    def list_countries(self) -> list[dict[str, Any]]:
+    def list_countries(self) -> list[CountryOut]:
         rows = self._conn.execute(
             text("SELECT code, name FROM countries ORDER BY (code = 'xx') DESC, name")
         ).all()
-        return [dict(r._mapping) for r in rows]
+        return [CountryOut(code=r.code, name=r.name) for r in rows]
 
     def country_exists(self, code: str) -> bool:
         row = self._conn.execute(
@@ -212,7 +237,7 @@ class PgAddressesQueries(AddressesQueries):
 
     def addresses_countries(
         self, *, filters: AddressCountriesFilters, page: int, per_page: int
-    ) -> dict[str, Any]:
+    ) -> AddressesCountriesResponse:
         offset = (page - 1) * per_page
         parts: list[str] = []
         binds: dict[str, Any] = {}
@@ -249,23 +274,26 @@ class PgAddressesQueries(AddressesQueries):
             """),
             {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
-        addresses = [dict(r._mapping) for r in rows]
 
-        for a in addresses:
-            sc = a.pop("suggested_countries", None)
-            if filters.suggest and not a["countries"] and sc:
-                a["suggested_countries"] = [{"code": c.strip(), "count": 1} for c in sc]
-            else:
-                a["suggested_countries"] = []
+        addresses: list[AddressForCountryAttribution] = []
+        for r in rows:
+            sc = r.suggested_countries
+            suggestions = (
+                [CountrySuggestion(code=c.strip(), count=1) for c in sc]
+                if filters.suggest and not r.countries and sc
+                else []
+            )
+            addresses.append(
+                AddressForCountryAttribution(
+                    id=r.id,
+                    raw_text=r.raw_text,
+                    countries=list(r.countries) if r.countries else None,
+                    suggested_countries=suggestions,
+                    pub_count=r.pub_count,
+                )
+            )
 
-        result: dict[str, Any] = {
-            "total": total,
-            "page": page,
-            "per_page": per_page,
-            "pages": (total + per_page - 1) // per_page or 1,
-            "addresses": addresses,
-        }
-
+        suggestion_facets: list[CountrySuggestion] | None = None
         if filters.suggest and not filters.suggested_country:
             extra = "a.suggested_countries IS NOT NULL"
             sug_where = f"{where} AND {extra}" if where else f"WHERE {extra}"
@@ -278,8 +306,8 @@ class PgAddressesQueries(AddressesQueries):
                 """),
                 binds,
             ).all()
-            result["suggestion_facets"] = [
-                {"code": r.code.strip(), "count": r.cnt} for r in sug_rows
+            suggestion_facets = [
+                CountrySuggestion(code=r.code.strip(), count=r.cnt) for r in sug_rows
             ]
 
         # Facette pays (exclut country_code, garde le reste + a.countries IS NOT NULL).
@@ -306,11 +334,19 @@ class PgAddressesQueries(AddressesQueries):
             """),
             cf_binds,
         ).all()
-        result["country_facets"] = [{"code": r.code.strip(), "count": r.cnt} for r in cf_rows]
+        country_facets = [CountrySuggestion(code=r.code.strip(), count=r.cnt) for r in cf_rows]
 
-        return result
+        return AddressesCountriesResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            pages=(total + per_page - 1) // per_page or 1,
+            addresses=addresses,
+            suggestion_facets=suggestion_facets,
+            country_facets=country_facets,
+        )
 
-    def suggest_countries(self, search: str) -> dict[str, Any]:
+    def suggest_countries(self, search: str) -> CountrySuggestionsResponse:
         binds: dict[str, Any] = {}
         where_clause = ""
         if search.strip():
@@ -331,7 +367,7 @@ class PgAddressesQueries(AddressesQueries):
             """),
             binds,
         ).all()
-        suggestions = [{"code": r.c.strip(), "count": r.cnt} for r in sug_rows]
+        suggestions = [CountrySuggestion(code=r.c.strip(), count=r.cnt) for r in sug_rows]
 
         no_country_where = (
             where_clause.replace("WHERE", "WHERE countries IS NULL AND")
@@ -342,11 +378,10 @@ class PgAddressesQueries(AddressesQueries):
             text(f"SELECT COUNT(*) AS total FROM addresses a {no_country_where}"),
             binds,
         ).one()
-        without_country = nc_row.total
 
-        return {"suggestions": suggestions, "without_country": without_country}
+        return CountrySuggestionsResponse(suggestions=suggestions, without_country=nc_row.total)
 
-    def admin_address_stats(self, structure_id: int) -> dict[str, Any]:
+    def admin_address_stats(self, structure_id: int) -> AddressStatsResponse:
         total_row = self._conn.execute(text("SELECT COUNT(*) AS total FROM addresses")).one()
         total = total_row.total
 
@@ -363,10 +398,10 @@ class PgAddressesQueries(AddressesQueries):
             {"sid": structure_id},
         ).one()
 
-        return {
-            "total": total,
-            "detected": row.detected,
-            "pending": row.pending,
-            "rejected": row.rejected,
-            "confirmed": row.confirmed,
-        }
+        return AddressStatsResponse(
+            total=total,
+            detected=row.detected,
+            pending=row.pending,
+            rejected=row.rejected,
+            confirmed=row.confirmed,
+        )
