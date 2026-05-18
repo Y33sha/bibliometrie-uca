@@ -8,9 +8,9 @@ Le package est organisé par thème :
   `application.ports.pipeline.publications_match_or_create`, sync, consommé par le pipeline)
 
 `PgPublicationsQueries` agrège les 5 fonctions de lecture sous le port
-`application.ports.publications_queries.PublicationsQueries`. Les
-dataclasses `FacetFilters` / `ListFilters` (importées du port) typent
-les signatures internes.
+`application.ports.api.publications_queries.PublicationsQueries`. Les fonctions
+libres retournent des dicts (réutilisables hors API) ; la conversion vers les
+DTOs Pydantic est faite ici à la sortie de l'adapter.
 """
 
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module
@@ -18,13 +18,14 @@ les signatures internes.
 # namespace global du __init__ shadow le builtin `list`).
 from __future__ import annotations
 
-from typing import Any
-
 from sqlalchemy import Connection
 
 from application.ports.api.publications_queries import (
     FacetFilters,
     ListFilters,
+    PublicationDetailResponse,
+    PublicationListResponse,
+    PublicationsFacetsResponse,
     PublicationsQueries,
 )
 from infrastructure.queries.publications.detail import (
@@ -48,7 +49,7 @@ from infrastructure.queries.publications.match_or_create import (
 
 
 class PgPublicationsQueries(PublicationsQueries):
-    """Adapter SA pour `application.ports.publications_queries.PublicationsQueries`."""
+    """Adapter SA pour `application.ports.api.publications_queries.PublicationsQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -61,8 +62,8 @@ class PgPublicationsQueries(PublicationsQueries):
         page: int,
         per_page: int,
         sort: str,
-    ) -> dict[str, Any]:
-        return _list_publications(
+    ) -> PublicationListResponse:
+        data = _list_publications(
             self._conn,
             filters=filters,
             apc_structure_ids=apc_structure_ids,
@@ -70,13 +71,15 @@ class PgPublicationsQueries(PublicationsQueries):
             per_page=per_page,
             sort=sort,
         )
+        return PublicationListResponse.model_validate(data)
 
     def publications_facets(
         self, *, filters: FacetFilters, apc_structure_ids: list[int]
-    ) -> dict[str, Any]:
-        return _publications_facets(
+    ) -> PublicationsFacetsResponse:
+        data = _publications_facets(
             self._conn, filters=filters, apc_structure_ids=apc_structure_ids
         )
+        return PublicationsFacetsResponse.model_validate(data)
 
     def export_publications_csv(
         self, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
@@ -92,8 +95,11 @@ class PgPublicationsQueries(PublicationsQueries):
             self._conn, filters=filters, apc_structure_ids=apc_structure_ids, sort=sort
         )
 
-    def get_publication_detail(self, pub_id: int) -> dict[str, Any] | None:
-        return _get_publication_detail(self._conn, pub_id)
+    def get_publication_detail(self, pub_id: int) -> PublicationDetailResponse | None:
+        data = _get_publication_detail(self._conn, pub_id)
+        if data is None:
+            return None
+        return PublicationDetailResponse.model_validate(data)
 
 
 __all__ = ["PgPublicationsMatchOrCreateQueries", "PgPublicationsQueries"]
