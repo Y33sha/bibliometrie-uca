@@ -13,14 +13,14 @@ from collections.abc import AsyncIterator
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from application.ports.api.admin_feedback_queries import AdminFeedbackQueries
-from interfaces.api.deps import admin_feedback_queries_sync
-from interfaces.api.models import (
+from application.ports.api.admin_feedback_queries import (
+    AdminFeedbackQueries,
     FeedbackAddressesResponse,
     FeedbackStats,
     FeedbackStructureItem,
-    FeedbackStructuresResponse,
 )
+from interfaces.api.deps import admin_feedback_queries_sync
+from interfaces.api.models import FeedbackStructuresResponse
 
 # Types de structures éligibles au tableau de bord feedback, dans l'ordre d'affichage (universités en premier, laboratoires en dernier).
 _FEEDBACK_STRUCTURE_TYPES: tuple[str, ...] = (
@@ -54,18 +54,17 @@ def feedback_structures(
     - seuls les types listés dans `_FEEDBACK_STRUCTURE_TYPES` sont éligibles (universités, organismes, CHU, écoles, labos) ;
     - la structure UCA (code = "uca") est sélectionnée par défaut si elle existe, sinon la première structure du premier type non vide.
     """
-    rows = queries.feedback_structures(list(_FEEDBACK_STRUCTURE_TYPES))
+    items = queries.feedback_structures(list(_FEEDBACK_STRUCTURE_TYPES))
 
     by_type: dict[str, list[FeedbackStructureItem]] = {}
     default_id: int | None = None
-    for row in rows:
-        by_type.setdefault(row["type"], []).append(FeedbackStructureItem(**row))
-        if row["code"] == _DEFAULT_STRUCTURE_CODE:
-            default_id = row["id"]
+    for item in items:
+        by_type.setdefault(item.type, []).append(item)
+        if item.code == _DEFAULT_STRUCTURE_CODE:
+            default_id = item.id
 
     if default_id is None:
-        # Fallback : première structure du premier type non vide, dans
-        # l'ordre `_FEEDBACK_STRUCTURE_TYPES`.
+        # Fallback : première structure du premier type non vide, dans l'ordre `_FEEDBACK_STRUCTURE_TYPES`.
         for t in _FEEDBACK_STRUCTURE_TYPES:
             if by_type.get(t):
                 default_id = by_type[t][0].id
@@ -80,24 +79,7 @@ def feedback_stats(
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
 ) -> FeedbackStats:
     """Statistiques de qualité de la détection pour une structure donnée."""
-    row = queries.feedback_stats(structure_id)
-
-    reviewed = (
-        (row["concordant_valid"] or 0)
-        + (row["concordant_rejected"] or 0)
-        + (row["false_negatives"] or 0)
-        + (row["false_positives"] or 0)
-    )
-    concordant = (row["concordant_valid"] or 0) + (row["concordant_rejected"] or 0)
-
-    return FeedbackStats(
-        total_reviewed=reviewed,
-        detection_rate=round(concordant / reviewed * 100, 1) if reviewed else None,
-        false_negatives=row["false_negatives"] or 0,
-        false_positives=row["false_positives"] or 0,
-        concordant_valid=row["concordant_valid"] or 0,
-        pending=row["pending"] or 0,
-    )
+    return queries.feedback_stats(structure_id)
 
 
 @router.get("/api/admin/feedback/false-negatives", response_model=FeedbackAddressesResponse)
@@ -109,10 +91,9 @@ def feedback_false_negatives(
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
 ) -> FeedbackAddressesResponse:
     """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
-    data = queries.feedback_false_negatives(
+    return queries.feedback_false_negatives(
         structure_id=structure_id, page=page, per_page=per_page, search=search
     )
-    return FeedbackAddressesResponse(**data)
 
 
 @router.get("/api/admin/feedback/false-positives", response_model=FeedbackAddressesResponse)
@@ -124,10 +105,9 @@ def feedback_false_positives(
     queries: AdminFeedbackQueries = Depends(admin_feedback_queries_sync),
 ) -> FeedbackAddressesResponse:
     """Adresses détectées pour cette structure mais rejetées manuellement."""
-    data = queries.feedback_false_positives(
+    return queries.feedback_false_positives(
         structure_id=structure_id, page=page, per_page=per_page, search=search
     )
-    return FeedbackAddressesResponse(**data)
 
 
 @router.get("/api/admin/feedback/rerun")

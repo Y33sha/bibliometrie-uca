@@ -1,73 +1,15 @@
-"""Modèles Pydantic pour la page admin feedback (qualité détection adresses)."""
+"""Modèles Pydantic (router-only) pour la page admin feedback.
+
+Les DTOs retournés par le port `AdminFeedbackQueries` (FeedbackStats, FeedbackAddressesResponse, FeedbackStructureItem, et les sous-types FeedbackLabDetected/FeedbackMatchedForm/FeedbackAddressItem) vivent dans `application/ports/api/admin_feedback_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4). Reste ici la réponse composée par le router (groupement par type + structure par défaut).
+"""
 
 from pydantic import BaseModel
 
-
-class FeedbackStats(BaseModel):
-    """GET /api/admin/feedback/stats : qualité de la détection d'adresses."""
-
-    total_reviewed: int
-    detection_rate: float | None
-    false_negatives: int
-    false_positives: int
-    concordant_valid: int
-    pending: int
-
-
-class FeedbackLabDetected(BaseModel):
-    """Lien adresse↔structure tel que vu sur la page feedback.
-
-    Distinct de AddressStructureSummary : `structure_id` au lieu de `id`.
-    """
-
-    structure_id: int
-    name: str
-    acronym: str | None
-    is_detected: bool
-    is_confirmed: bool | None
-
-
-class FeedbackMatchedForm(BaseModel):
-    """Forme de nom ayant matché lors de la détection (faux positif)."""
-
-    form_id: int
-    form_text: str
-    structure_name: str
-    requires_context_of: list[int] | None
-
-
-class FeedbackAddressItem(BaseModel):
-    """Ligne d'adresse dans false-negatives / false-positives.
-
-    `matched_forms` n'est rempli que pour les faux positifs.
-    """
-
-    id: int
-    raw_text: str
-    pub_count: int
-    labs: list[FeedbackLabDetected]
-    matched_forms: list[FeedbackMatchedForm] | None = None
-
-
-class FeedbackAddressesResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
-    addresses: list[FeedbackAddressItem]
-
-
-class FeedbackStructureItem(BaseModel):
-    id: int
-    code: str
-    name: str
-    acronym: str | None
-    type: str
+from application.ports.api.admin_feedback_queries import FeedbackStructureItem
 
 
 class FeedbackStructuresResponse(BaseModel):
-    """Structures éligibles au tableau de bord feedback, groupées par type,
-    avec la structure à sélectionner par défaut (UCA si présente)."""
+    """Structures éligibles au tableau de bord feedback, groupées par type, avec la structure à sélectionner par défaut (UCA si présente)."""
 
     by_type: dict[str, list[FeedbackStructureItem]]
     default_structure_id: int | None

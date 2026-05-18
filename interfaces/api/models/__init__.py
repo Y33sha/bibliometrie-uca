@@ -56,15 +56,7 @@ from interfaces.api.models.admin.authorships import (
     OrphanCountResponse,
     SourceAuthorshipRef,
 )
-from interfaces.api.models.admin.feedback import (
-    FeedbackAddressesResponse,
-    FeedbackAddressItem,
-    FeedbackLabDetected,
-    FeedbackMatchedForm,
-    FeedbackStats,
-    FeedbackStructureItem,
-    FeedbackStructuresResponse,
-)
+from interfaces.api.models.admin.feedback import FeedbackStructuresResponse
 from interfaces.api.models.admin.perimeters import (
     AddPerimeterStructure,
     PerimeterCreate,
@@ -241,12 +233,6 @@ __all__ = [
     "ExcludeSourceAuthorship",
     "ExcludeSourceAuthorshipResponse",
     "FacetValueCount",
-    "FeedbackAddressItem",
-    "FeedbackAddressesResponse",
-    "FeedbackLabDetected",
-    "FeedbackMatchedForm",
-    "FeedbackStats",
-    "FeedbackStructureItem",
     "FeedbackStructuresResponse",
     "HalCollectionsResponse",
     "IdentifierReassignResponse",
