@@ -1,4 +1,10 @@
-"""Modèles Pydantic pour les mutations sur personnes (identifiants, fusion, renommage)."""
+"""Modèles Pydantic (router-only) pour les mutations sur personnes.
+
+Bodies HTTP (POST/PATCH) et réponses construites par le router après
+mutation. Les retours de query service (`NameFormAuthorshipRef`,
+`OtherPersonOut`, `NameFormAuthorshipsResponse`) vivent dans
+`application/ports/api/persons_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4).
+"""
 
 from typing import Literal
 
@@ -49,32 +55,7 @@ class DetachNameForm(BaseModel):
     name_form: str
 
 
-# ----- Sorties (lecture admin) -----
-
-
-class NameFormAuthorshipRef(BaseModel):
-    source: str
-    authorship_id: int
-    pub_id: int
-    title: str
-    pub_year: int | None
-    doi: str | None
-
-
-class OtherPersonOut(BaseModel):
-    id: int
-    first_name: str
-    last_name: str
-    department_name: str | None
-    has_rh: bool
-
-
-class NameFormAuthorshipsResponse(BaseModel):
-    authorships: list[NameFormAuthorshipRef]
-    other_persons: list[OtherPersonOut]
-
-
-# ----- Réponses mutations -----
+# ----- Réponses mutations (construites par le router) -----
 
 
 class AddIdentifierResponse(BaseModel):

@@ -21,7 +21,11 @@ from application.authorships.core import (
     set_source_authorship_excluded as _set_source_authorship_excluded,
 )
 from application.persons import create_person as _create_person
-from application.ports.api.persons_queries import PersonsQueries
+from application.ports.api.persons_queries import (
+    OrphanAuthorshipsResponse,
+    OrphanCountResponse,
+    PersonsQueries,
+)
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -39,9 +43,7 @@ from interfaces.api.models import (
     ExcludeSourceAuthorship,
     ExcludeSourceAuthorshipResponse,
     OrphanAssignResponse,
-    OrphanAuthorshipsResponse,
     OrphanBatchAssignResponse,
-    OrphanCountResponse,
 )
 
 router = APIRouter()
@@ -94,7 +96,7 @@ def orphan_authorships_count(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> OrphanCountResponse:
     """Nombre d'authorships UCA sans person_id."""
-    return OrphanCountResponse.model_validate(queries.orphan_authorships_count())
+    return queries.orphan_authorships_count()
 
 
 @router.get("/api/admin/orphan-authorships", response_model=OrphanAuthorshipsResponse)
@@ -105,9 +107,7 @@ def list_orphan_authorships(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> OrphanAuthorshipsResponse:
     """Liste les authorships UCA sans person_id."""
-    return OrphanAuthorshipsResponse.model_validate(
-        queries.list_orphan_authorships(search=search, page=page, per_page=per_page)
-    )
+    return queries.list_orphan_authorships(search=search, page=page, per_page=per_page)
 
 
 @router.post("/api/admin/orphan-authorships/assign", response_model=OrphanAssignResponse)

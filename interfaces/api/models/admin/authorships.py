@@ -1,4 +1,10 @@
-"""Modèles Pydantic pour les authorships admin (exclusion, orphelines)."""
+"""Modèles Pydantic (router-only) pour les authorships admin.
+
+Bodies HTTP (POST) et réponses construites par le router après mutation.
+Les retours de query service (`OrphanCountResponse`, `OrphanAuthorshipOut`,
+`OrphanAuthorshipsResponse`) vivent dans `application/ports/api/persons_queries.py`
+(cf. chantier `CODE_typage-projections-strict` Phase 4).
+"""
 
 from pydantic import BaseModel
 
@@ -31,32 +37,7 @@ class ExcludeSourceAuthorship(BaseModel):
     excluded: bool = True
 
 
-# ----- Sorties -----
-
-
-class OrphanCountResponse(BaseModel):
-    total: int
-
-
-class OrphanAuthorshipOut(BaseModel):
-    source: str
-    authorship_id: int
-    full_name: str
-    last_name: str
-    first_name: str
-    publication_id: int
-    pub_title: str
-    pub_year: int | None
-
-
-class OrphanAuthorshipsResponse(BaseModel):
-    total: int
-    page: int
-    pages: int
-    authorships: list[OrphanAuthorshipOut]
-
-
-# ----- Réponses mutations -----
+# ----- Réponses mutations (construites par le router) -----
 
 
 class AuthorshipExcludeResponse(BaseModel):

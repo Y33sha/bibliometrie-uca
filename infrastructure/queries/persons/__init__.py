@@ -10,9 +10,9 @@ Le package est organisé par thème :
   `application.ports.persons_create`, consommé par le pipeline)
 
 `PgPersonsQueries` agrège l'ensemble des fonctions de lecture + admin
-sous le port `application.ports.persons_queries.PersonsQueries`.
-Les dataclasses `DirectoryFilters` / `ListFilters` / `FacetFilters`
-(importées du port) typent les signatures internes.
+sous le port `application.ports.api.persons_queries.PersonsQueries`. Les
+fonctions libres retournent des dicts (réutilisables hors API) ; la
+conversion vers les DTOs Pydantic est faite ici à la sortie de l'adapter.
 """
 
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module
@@ -20,16 +20,29 @@ Les dataclasses `DirectoryFilters` / `ListFilters` / `FacetFilters`
 # namespace global du __init__ shadow le builtin `list`).
 from __future__ import annotations
 
-from typing import Any
-
 from sqlalchemy import Connection
 
 from application.ports.api.persons_queries import (
+    DepartmentCount,
     DirectoryFilters,
     FacetFilters,
     ListFilters,
+    NameFormAuthorshipsResponse,
+    OrphanAuthorshipsResponse,
+    OrphanCountResponse,
+    PersonAddressesResponse,
+    PersonDashboardResponse,
+    PersonDirectoryResponse,
+    PersonListResponse,
+    PersonProfileResponse,
+    PersonSearchResult,
+    PersonsFacetsResponse,
     PersonsQueries,
+    PersonsStatsResponse,
+    PersonThesesResponse,
+    RoleCount,
 )
+from application.ports.api.subjects_queries import SubjectFrequency
 from infrastructure.queries.persons.admin import (
     list_orphan_authorships as _list_orphan_authorships,
 )
@@ -85,7 +98,7 @@ from infrastructure.queries.persons.list import (
 
 
 class PgPersonsQueries(PersonsQueries):
-    """Adapter SA pour `application.ports.persons_queries.PersonsQueries`."""
+    """Adapter SA pour `application.ports.api.persons_queries.PersonsQueries`."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -94,63 +107,84 @@ class PgPersonsQueries(PersonsQueries):
 
     def persons_directory(
         self, *, filters: DirectoryFilters, page: int, per_page: int, sort: str
-    ) -> dict[str, Any]:
-        return _persons_directory(
-            self._conn, filters=filters, page=page, per_page=per_page, sort=sort
+    ) -> PersonDirectoryResponse:
+        return PersonDirectoryResponse.model_validate(
+            _persons_directory(self._conn, filters=filters, page=page, per_page=per_page, sort=sort)
         )
 
-    def search_persons(self, *, q: str, limit: int) -> list[dict[str, Any]]:
-        return _search_persons(self._conn, q=q, limit=limit)
+    def search_persons(self, *, q: str, limit: int) -> list[PersonSearchResult]:
+        return [
+            PersonSearchResult.model_validate(r)
+            for r in _search_persons(self._conn, q=q, limit=limit)
+        ]
 
     def list_persons(
         self, *, filters: ListFilters, page: int, per_page: int, sort: str
-    ) -> dict[str, Any]:
-        return _list_persons(self._conn, filters=filters, page=page, per_page=per_page, sort=sort)
+    ) -> PersonListResponse:
+        return PersonListResponse.model_validate(
+            _list_persons(self._conn, filters=filters, page=page, per_page=per_page, sort=sort)
+        )
 
     # ── Facettes / listes de référence / stats ─────────────────────
 
-    def persons_facets(self, *, filters: FacetFilters) -> dict[str, Any]:
-        return _persons_facets(self._conn, filters=filters)
+    def persons_facets(self, *, filters: FacetFilters) -> PersonsFacetsResponse:
+        return PersonsFacetsResponse.model_validate(_persons_facets(self._conn, filters=filters))
 
-    def list_departments(self) -> list[dict[str, Any]]:
-        return _list_departments(self._conn)
+    def list_departments(self) -> list[DepartmentCount]:
+        return [DepartmentCount.model_validate(r) for r in _list_departments(self._conn)]
 
-    def list_roles(self) -> list[dict[str, Any]]:
-        return _list_roles(self._conn)
+    def list_roles(self) -> list[RoleCount]:
+        return [RoleCount.model_validate(r) for r in _list_roles(self._conn)]
 
-    def persons_stats(self) -> dict[str, Any]:
-        return _persons_stats(self._conn)
+    def persons_stats(self) -> PersonsStatsResponse:
+        return PersonsStatsResponse.model_validate(_persons_stats(self._conn))
 
     # ── Détail d'une personne ──────────────────────────────────────
 
-    def person_profile(self, person_id: int) -> dict[str, Any] | None:
-        return _person_profile(self._conn, person_id)
+    def person_profile(self, person_id: int) -> PersonProfileResponse | None:
+        data = _person_profile(self._conn, person_id)
+        if data is None:
+            return None
+        return PersonProfileResponse.model_validate(data)
 
-    def person_theses(self, person_id: int) -> dict[str, Any]:
-        return _person_theses(self._conn, person_id)
+    def person_theses(self, person_id: int) -> PersonThesesResponse:
+        return PersonThesesResponse.model_validate(_person_theses(self._conn, person_id))
 
-    def person_addresses(self, person_id: int, *, page: int, per_page: int) -> dict[str, Any]:
-        return _person_addresses(self._conn, person_id, page=page, per_page=per_page)
+    def person_addresses(
+        self, person_id: int, *, page: int, per_page: int
+    ) -> PersonAddressesResponse:
+        return PersonAddressesResponse.model_validate(
+            _person_addresses(self._conn, person_id, page=page, per_page=per_page)
+        )
 
-    def person_dashboard(self, person_id: int) -> dict[str, Any]:
-        return _person_dashboard(self._conn, person_id)
+    def person_dashboard(self, person_id: int) -> PersonDashboardResponse:
+        return PersonDashboardResponse.model_validate(_person_dashboard(self._conn, person_id))
 
-    def person_subjects(self, person_id: int, *, limit: int) -> list[dict[str, Any]]:
-        return _person_subjects(self._conn, person_id, limit=limit)
+    def person_subjects(self, person_id: int, *, limit: int) -> list[SubjectFrequency]:
+        return [
+            SubjectFrequency.model_validate(r)
+            for r in _person_subjects(self._conn, person_id, limit=limit)
+        ]
 
     # ── Admin : existence, orphan authorships, name forms ──────────
 
     def person_exists(self, person_id: int) -> bool:
         return _person_exists(self._conn, person_id)
 
-    def orphan_authorships_count(self) -> dict[str, Any]:
-        return _orphan_authorships_count(self._conn)
+    def orphan_authorships_count(self) -> OrphanCountResponse:
+        return OrphanCountResponse.model_validate(_orphan_authorships_count(self._conn))
 
-    def list_orphan_authorships(self, *, search: str, page: int, per_page: int) -> dict[str, Any]:
-        return _list_orphan_authorships(self._conn, search=search, page=page, per_page=per_page)
+    def list_orphan_authorships(
+        self, *, search: str, page: int, per_page: int
+    ) -> OrphanAuthorshipsResponse:
+        return OrphanAuthorshipsResponse.model_validate(
+            _list_orphan_authorships(self._conn, search=search, page=page, per_page=per_page)
+        )
 
-    def name_form_authorships(self, person_id: int, name_form: str) -> dict[str, Any]:
-        return _name_form_authorships(self._conn, person_id, name_form)
+    def name_form_authorships(self, person_id: int, name_form: str) -> NameFormAuthorshipsResponse:
+        return NameFormAuthorshipsResponse.model_validate(
+            _name_form_authorships(self._conn, person_id, name_form)
+        )
 
     def name_form_remaining_authorships(self, person_id: int, name_form: str) -> int:
         return _name_form_remaining_authorships(self._conn, person_id, name_form)
