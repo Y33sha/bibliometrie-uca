@@ -54,8 +54,7 @@ Une fois (1) appliqué, recalculer le `fail_under`. Mesures :
 
 - Post-Phase 1 : 75.65 % (1582 tests). `fail_under` 70 → 75.
 - Post-Phase 2 : 77.09 % (1678 tests). `fail_under` 75 → 77.
-
-Le palier 80 % n'est pas franchi par Phase 1+2. Phase 3 (`base.py`, éventuellement `auth.py`) et la couverture d'autres poches diffuses (orchestrateurs pipeline, helpers) sont nécessaires pour atteindre 80.
+- Post-Phase 3 (3a partiel, 3b complet, 3c partiel, 3d quasi complet) : 86.09 % (2061 tests). `fail_under` 77 → 85. Palier 80 % franchi.
 
 Une fois le palier 80 % atteint, on suit la doctrine actuelle : seuil progressif jamais à la baisse.
 
