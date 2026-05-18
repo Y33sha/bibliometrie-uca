@@ -5,12 +5,15 @@ UPSERT batch (via SA executemany) sur `source_authorships` et
 `source_authorship_addresses`, et les lectures/préchargements de caches.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.ports.pipeline.normalize.wos import WosNormalizeQueries
+from application.ports.pipeline.normalize.wos import (
+    WosAddressBatchItem,
+    WosAuthorshipAddressItem,
+    WosAuthorshipBatchItem,
+    WosNormalizeQueries,
+)
 from domain.json_types import JsonValue
 from infrastructure.queries.source_authorships import (
     clear_source_authorships_for_publication,
@@ -101,7 +104,7 @@ def upsert_wos_source_publication(
     return row.id
 
 
-def upsert_addresses_batch(conn: Connection, values: list[dict[str, Any]]) -> None:
+def upsert_addresses_batch(conn: Connection, values: list[WosAddressBatchItem]) -> None:
     """INSERT INTO addresses ON CONFLICT DO NOTHING pour un batch ``[{raw, norm}, ...]``."""
     if not values:
         return
@@ -124,14 +127,10 @@ def fetch_address_ids_by_raw_text(conn: Connection, raw_texts: list[str]) -> dic
     return {r.raw_text: r.id for r in rows}
 
 
-def upsert_wos_source_authorships_batch(conn: Connection, values: list[dict[str, Any]]) -> None:
+def upsert_wos_source_authorships_batch(
+    conn: Connection, values: list[WosAuthorshipBatchItem]
+) -> None:
     """Batch UPSERT de `source_authorships` WoS.
-
-    Chaque dict du batch a les clés : ``source_publication_id``,
-    ``author_position``, ``is_corresponding``, ``author_name_normalized``,
-    ``source_structures`` (TEXT[] des noms d'institutions WoS, qui sont
-    les seuls identifiants stables disponibles côté WoS), ``roles``,
-    ``raw_author_name``, ``person_identifiers``.
 
     Les identifiants normalisés (`orcid`, `researcher_id`) vivent sur
     `person_identifiers` (entités auteurs WoS algorithmiques via
@@ -183,7 +182,7 @@ def fetch_source_authorship_ids_by_position(
 
 
 def insert_source_authorship_addresses_batch(
-    conn: Connection, values: list[dict[str, int]]
+    conn: Connection, values: list[WosAuthorshipAddressItem]
 ) -> None:
     """Batch INSERT de liens `source_authorship_addresses`. Dicts ``{sa_id, addr_id}``."""
     if not values:
@@ -246,7 +245,7 @@ class PgWosNormalizeQueries(WosNormalizeQueries):
             external_ids=external_ids,
         )
 
-    def upsert_addresses_batch(self, conn: Connection, values: list[dict[str, Any]]) -> None:
+    def upsert_addresses_batch(self, conn: Connection, values: list[WosAddressBatchItem]) -> None:
         upsert_addresses_batch(conn, values)
 
     def fetch_address_ids_by_raw_text(
@@ -255,7 +254,7 @@ class PgWosNormalizeQueries(WosNormalizeQueries):
         return fetch_address_ids_by_raw_text(conn, raw_texts)
 
     def upsert_wos_source_authorships_batch(
-        self, conn: Connection, values: list[dict[str, Any]]
+        self, conn: Connection, values: list[WosAuthorshipBatchItem]
     ) -> None:
         upsert_wos_source_authorships_batch(conn, values)
 
@@ -269,7 +268,7 @@ class PgWosNormalizeQueries(WosNormalizeQueries):
         )
 
     def insert_source_authorship_addresses_batch(
-        self, conn: Connection, values: list[dict[str, int]]
+        self, conn: Connection, values: list[WosAuthorshipAddressItem]
     ) -> None:
         insert_source_authorship_addresses_batch(conn, values)
 
