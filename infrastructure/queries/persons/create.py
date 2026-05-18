@@ -5,14 +5,16 @@ Regroupe les SELECT nécessaires aux 4 passes de rattachement
 (comptes HAL, cross-source, IdRef/ORCID connus, lookup `person_name_forms`).
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.persons_create import PersonsCreateQueries
+from application.ports.pipeline.persons_create import (
+    BareUnlinkedAuthorship,
+    LinkedAuthorshipRow,
+    PersonsCreateQueries,
+)
 
 
-def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
+def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]:
     """Liste les `source_authorships` in-perimeter non rattachés à une `person`, toutes sources confondues.
 
     Colonnes :
@@ -48,10 +50,24 @@ def fetch_unlinked_authorships(conn: Connection) -> list[dict[str, Any]]:
               AND sa_auth.raw_author_name IS NOT NULL
         """)
     ).all()
-    return [dict(r._mapping) for r in rows]
+    return [
+        BareUnlinkedAuthorship(
+            authorship_id=r.authorship_id,
+            source=r.source,
+            full_name=r.full_name,
+            author_name_normalized=r.author_name_normalized,
+            orcid=r.orcid,
+            idref=r.idref,
+            oa_display_name=r.oa_display_name,
+            roles=r.roles,
+            publication_id=r.publication_id,
+            author_position=r.author_position,
+        )
+        for r in rows
+    ]
 
 
-def fetch_linked_authorships(conn: Connection) -> list[dict[str, Any]]:
+def fetch_linked_authorships(conn: Connection) -> list[LinkedAuthorshipRow]:
     """`source_authorships` déjà rattachées (toutes sources confondues).
 
     Ramène `raw_author_name` ; le caller parse via `domain.names.parse_raw_author_name` pour toutes les sources uniformément.
@@ -68,7 +84,16 @@ def fetch_linked_authorships(conn: Connection) -> list[dict[str, Any]]:
               AND sd.publication_id IS NOT NULL
         """)
     ).all()
-    return [dict(r._mapping) for r in rows]
+    return [
+        LinkedAuthorshipRow(
+            person_id=r.person_id,
+            author_position=r.author_position,
+            publication_id=r.publication_id,
+            full_name=r.full_name,
+            source=r.source,
+        )
+        for r in rows
+    ]
 
 
 def fetch_idref_to_person_map(conn: Connection) -> dict[str, int]:
@@ -118,10 +143,10 @@ def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
 class PgPersonsCreateQueries(PersonsCreateQueries):
     """Adapter PostgreSQL pour `application.ports.persons_create.PersonsCreateQueries`."""
 
-    def fetch_unlinked_authorships(self, conn: Connection) -> list[dict[str, Any]]:
+    def fetch_unlinked_authorships(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
         return fetch_unlinked_authorships(conn)
 
-    def fetch_linked_authorships(self, conn: Connection) -> list[dict[str, Any]]:
+    def fetch_linked_authorships(self, conn: Connection) -> list[LinkedAuthorshipRow]:
         return fetch_linked_authorships(conn)
 
     def fetch_idref_to_person_map(self, conn: Connection) -> dict[str, int]:

@@ -27,7 +27,7 @@ est dans `interfaces/cli/pipeline/create_persons_from_source_authorships.py`.
 
 import logging
 from collections import defaultdict
-from typing import Any
+from typing import NamedTuple
 
 from sqlalchemy import Connection
 
@@ -41,7 +41,10 @@ from application.persons import (
 from application.persons import (
     link_authorships as link_to_person,
 )
-from application.ports.pipeline.persons_create import PersonsCreateQueries
+from application.ports.pipeline.persons_create import (
+    BareUnlinkedAuthorship,
+    PersonsCreateQueries,
+)
 from application.ports.repositories.person_repository import PersonRepository
 from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
@@ -54,43 +57,80 @@ from domain.persons.matching import (
 from domain.persons.name_matching import parse_raw_author_name
 from domain.sources.openalex import keep_orcid_if_name_matches
 
+
+class EnrichedAuthorship(NamedTuple):
+    """`BareUnlinkedAuthorship` enrichie côté Python : nom parsé, normalisations, flag de création autorisée, ORCID filtré pour OpenAlex. Sans `oa_display_name` qui ne sert qu'à l'enrichissement."""
+
+    authorship_id: int
+    source: str
+    full_name: str
+    author_name_normalized: str | None
+    orcid: str | None
+    idref: str | None
+    roles: list[str] | None
+    publication_id: int | None
+    author_position: int
+    last_name: str
+    first_name: str
+    last_norm: str
+    first_norm: str
+    allow_create: bool
+
+
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
 
 
+def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
+    """Parse le nom, normalise, et filtre l'ORCID OpenAlex contre `oa_display_name`.
+
+    OpenAlex assigne à chaque authorship une entité auteur de son
+    référentiel ; cette assignation peut être fautive, et l'ORCID
+    rattaché à l'entité auteur peut alors être celui d'une autre
+    personne. On confronte le nom de l'entité auteur OA
+    (`oa_display_name`) au `raw_author_name` de la signature : si
+    incompatibles ou si `display_name` est absent, on drop l'ORCID.
+    Les autres sources fournissent un ORCID lié directement à la
+    signature, pas de filtre nécessaire.
+    """
+    last_name, first_name = parse_raw_author_name(row.full_name)
+    last_norm = normalize_name(last_name)
+    first_norm = normalize_name(first_name)
+    allow_create = allow_person_creation(row.source, row.roles or [])
+
+    orcid = row.orcid
+    if row.source == "openalex" and orcid:
+        orcid = keep_orcid_if_name_matches(
+            raw_full_name=row.full_name,
+            oa_full_name=row.oa_display_name,
+            oa_orcid=orcid,
+        )
+
+    return EnrichedAuthorship(
+        authorship_id=row.authorship_id,
+        source=row.source,
+        full_name=row.full_name,
+        author_name_normalized=row.author_name_normalized,
+        orcid=orcid,
+        idref=row.idref,
+        roles=row.roles,
+        publication_id=row.publication_id,
+        author_position=row.author_position,
+        last_name=last_name,
+        first_name=first_name,
+        last_norm=last_norm,
+        first_norm=first_norm,
+        allow_create=allow_create,
+    )
+
+
 def get_all_unlinked_authorships(
     conn: Connection, queries: PersonsCreateQueries
-) -> list[dict[str, Any]]:
+) -> list[EnrichedAuthorship]:
     """Charge les authorships UCA sans person_id (toutes sources) et les enrichit
     (parsing noms, filtrage ORCID OpenAlex, flag allow_create)."""
-    all_rows = []
-    for r in queries.fetch_unlinked_authorships(conn):
-        r["last_name"], r["first_name"] = parse_raw_author_name(r["full_name"])
-        r["last_norm"] = normalize_name(r["last_name"])
-        r["first_norm"] = normalize_name(r["first_name"])
-
-        r["allow_create"] = allow_person_creation(r["source"], r.get("roles") or [])
-
-        # OpenAlex assigne à chaque authorship une entité auteur de son
-        # référentiel ; cette assignation peut être fautive, et l'ORCID
-        # rattaché à l'entité auteur peut alors être celui d'une autre
-        # personne. On confronte le nom de l'entité auteur OA
-        # (`oa_display_name`) au `raw_author_name` de la signature : si
-        # incompatibles ou si `display_name` est absent, on drop l'ORCID.
-        # Les autres sources fournissent un ORCID lié directement à la
-        # signature, pas de filtre nécessaire.
-        if r["source"] == "openalex" and r.get("orcid"):
-            r["orcid"] = keep_orcid_if_name_matches(
-                raw_full_name=r["full_name"],
-                oa_full_name=r.get("oa_display_name"),
-                oa_orcid=r["orcid"],
-            )
-        r.pop("oa_display_name", None)
-
-        all_rows.append(r)
-
-    return all_rows
+    return [_enrich(row) for row in queries.fetch_unlinked_authorships(conn)]
 
 
 def load_linked_authorships_by_pub(
@@ -100,17 +140,15 @@ def load_linked_authorships_by_pub(
     index: dict[tuple[int, int], list[tuple[int, str, str, str]]] = defaultdict(list)
 
     for r in queries.fetch_linked_authorships(conn):
-        last, first = parse_raw_author_name(r["full_name"])
+        last, first = parse_raw_author_name(r.full_name)
         ln, fn = normalize_name(last), normalize_name(first)
-        index[(r["publication_id"], r["author_position"])].append(
-            (r["person_id"], ln, fn, r["source"])
-        )
+        index[(r.publication_id, r.author_position)].append((r.person_id, ln, fn, r.source))
 
     return index
 
 
 def _max_authors_per_pub(
-    all_authorships: list[dict[str, Any]],
+    all_authorships: list[EnrichedAuthorship],
     linked_index: dict[tuple[int, int], list[tuple[int, str, str, str]]],
 ) -> dict[int, int]:
     """Max d'auteurs sur une publication par source (linked + unlinked).
@@ -124,10 +162,9 @@ def _max_authors_per_pub(
     """
     counts: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for a in all_authorships:
-        pub_id = a.get("publication_id")
-        if pub_id is None:
+        if a.publication_id is None:
             continue
-        counts[pub_id][a["source"]] += 1
+        counts[a.publication_id][a.source] += 1
     for (pub_id, _pos), candidates in linked_index.items():
         for _pid, _ln, _fn, src in candidates:
             counts[pub_id][src] += 1
@@ -169,26 +206,26 @@ def run(
     for a in all_authorships:
         # ── Sous-décisions ─────────────────────────────────────────
         cross_source_match: int | None = None
-        pub_id = a["publication_id"]
-        position = a["author_position"]
-        if pub_id is not None and position is not None:
+        pub_id = a.publication_id
+        position = a.author_position
+        if pub_id is not None:
             candidates = linked_index.get((pub_id, position), [])
             if candidates:
                 cross_source_match = decide_cross_source_match(
-                    authorship_source=a["source"],
-                    last_norm=a["last_norm"],
-                    first_norm=a["first_norm"],
+                    authorship_source=a.source,
+                    last_norm=a.last_norm,
+                    first_norm=a.first_norm,
                     candidates=candidates,
                     total_author_count=pub_max_authors.get(pub_id),
                 )
 
-        idref_match = decide_match_by_identifier(a.get("idref"), idref_map)
-        orcid_match = decide_match_by_identifier(a.get("orcid"), orcid_map)
+        idref_match = decide_match_by_identifier(a.idref, idref_map)
+        orcid_match = decide_match_by_identifier(a.orcid, orcid_map)
 
-        norm = a.get("author_name_normalized")
+        norm = a.author_name_normalized
         name_form_outcome = decide_name_form_outcome(
             name_form_map.get(norm) if norm else None,
-            a.get("allow_create", True),
+            a.allow_create,
         )
 
         # ── Décision unifiée ────────────────────────────────────────
@@ -204,33 +241,43 @@ def run(
             pid = decision.person_id
             assert pid is not None  # garanti par decide_person_match action=match
             if not dry_run:
-                link_to_person(pid, [a], repo=person_repo)
-                add_name_form(pid, a["full_name"], repo=person_repo)
+                # `link_to_person` et `add_identifiers` consomment des dicts (API
+                # historique de `application.persons`) : on convertit l'EnrichedAuthorship
+                # via `_asdict()` au boundary. Le typage strict reste interne au pipeline.
+                a_dict = a._asdict()
+                link_to_person(pid, [a_dict], repo=person_repo)
+                add_name_form(pid, a.full_name, repo=person_repo)
                 # Identifiants ajoutés en statut `pending` quelle que soit la
                 # source du match (cross-source/idref/orcid/name_form) —
                 # vérifiables manuellement via l'admin si erronés.
-                add_identifiers(pid, [a], repo=person_repo)
+                add_identifiers(pid, [a_dict], repo=person_repo)
             matched_counts[decision.reason] += 1
             # Mettre à jour linked_index pour que les authorships suivantes
             # sur la même (pub_id, position) puissent matcher en cross-source.
-            if pub_id is not None and position is not None:
-                ln, fn = a["last_norm"], a["first_norm"]
-                linked_index[(pub_id, position)].append((pid, ln, fn, a["source"]))
+            if pub_id is not None:
+                linked_index[(pub_id, position)].append((pid, a.last_norm, a.first_norm, a.source))
 
         elif decision.action == "create":
-            last = a["last_name"] or a["full_name"] or "?"
-            first = a["first_name"] or ""
+            last = a.last_name or a.full_name or "?"
+            first = a.first_name or ""
             # On pré-popule la map en mémoire avec les deux ordres normalisés
             # pour qu'une autre authorship du même run avec l'ordre inverse
             # match cette personne nouvellement créée. La forme déjà
             # cherchée (norm) est forcément l'un des deux ordres.
-            ln, fn = a["last_norm"], a["first_norm"]
-            cache_forms = [f for f in [f"{fn} {ln}".strip(), f"{ln} {fn}".strip()] if f]
+            cache_forms = [
+                f
+                for f in [
+                    f"{a.first_norm} {a.last_norm}".strip(),
+                    f"{a.last_norm} {a.first_norm}".strip(),
+                ]
+                if f
+            ]
             if not dry_run:
                 pid = create_person(last, first, repo=person_repo)
-                link_to_person(pid, [a], repo=person_repo)
-                add_identifiers(pid, [a], repo=person_repo)
-                add_name_form(pid, a["full_name"], repo=person_repo)
+                a_dict = a._asdict()
+                link_to_person(pid, [a_dict], repo=person_repo)
+                add_identifiers(pid, [a_dict], repo=person_repo)
+                add_name_form(pid, a.full_name, repo=person_repo)
                 for form in cache_forms:
                     name_form_map[form] = [pid]
             else:
