@@ -145,20 +145,16 @@ def reset_authorships_perimeter_and_structures(conn: Connection) -> int:
 def purge_authorships(conn: Connection) -> int:
     """Vide la table `authorships` et délie les `source_authorships` qui y pointaient.
 
-    Utilisé en mode pipeline `full` pour garantir la convergence absolue :
-    on repart de zéro et `build_authorships` reconstruit tout depuis les
-    `source_authorships`. Le build incrémental (modes daily/weekly) ne
-    déclenche pas ce purge, sa logique étant idempotente.
+    Utilisé en mode pipeline `full` pour garantir la convergence absolue : on repart de zéro et `build_authorships` reconstruit tout depuis les `source_authorships`. Le build incrémental (modes daily/weekly) ne déclenche pas ce purge, sa logique étant idempotente.
 
-    Délie d'abord les `source_authorships.authorship_id` (la FK est ON
-    DELETE SET NULL mais on le fait explicitement pour pouvoir TRUNCATE
-    qui ignore les triggers). Retourne le nombre d'authorships purgées.
+    Délie d'abord les `source_authorships.authorship_id` (FK ON DELETE SET NULL), puis DELETE de toutes les lignes. TRUNCATE refusé par Postgres dès lors qu'une FK existe (même `SET NULL` et même si aucune ligne ne référence) — DELETE contourne. Reset de la séquence d'identité ensuite pour cohérence avec l'ancien comportement. Retourne le nombre d'authorships purgées.
     """
     n = conn.execute(text("SELECT COUNT(*) FROM authorships")).scalar_one()
     conn.execute(
         text("UPDATE source_authorships SET authorship_id = NULL WHERE authorship_id IS NOT NULL")
     )
-    conn.execute(text("TRUNCATE TABLE authorships RESTART IDENTITY"))
+    conn.execute(text("DELETE FROM authorships"))
+    conn.execute(text("ALTER SEQUENCE authorships_id_seq RESTART WITH 1"))
     return n
 
 
