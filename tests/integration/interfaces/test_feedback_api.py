@@ -4,13 +4,6 @@ Couvre :
 - /api/admin/feedback/stats : cas vide + cas avec données (branches des COUNT FILTER)
 - /api/admin/feedback/false-negatives : cas vide + cas avec données + filtre search
 - /api/admin/feedback/false-positives : idem
-- /api/admin/feedback/rerun : script introuvable (branche 500)
-
-Le /rerun happy-path n'est pas testé car il lance un subprocess réel
-(resolve_addresses.py) ; de toute façon le chemin compilé dans le router
-pointe sur `interfaces/api/processing/` qui n'existe plus (script déplacé
-en `interfaces/cli/pipeline/`) — la branche 500 est donc la seule
-actuellement fonctionnelle.
 """
 
 import os
@@ -311,13 +304,3 @@ class TestFeedbackFalsePositives:
             params={"structure_id": sid, "page": 2, "per_page": 10},
         )
         assert r.status_code == 200
-
-
-# ── /api/admin/feedback/rerun ───────────────────────────────────
-
-
-class TestFeedbackRerun:
-    def test_script_missing_returns_500(self, client):
-        """Le chemin compilé pointe sur interfaces/api/routers/processing/resolve_addresses.py qui n'existe pas (le vrai script est dans interfaces/cli/pipeline/). C'est un bug latent — en attendant, le router renvoie 500."""
-        r = client.get("/api/admin/feedback/rerun")
-        assert r.status_code == 500

@@ -1,17 +1,11 @@
 """Router admin feedback : diagnostics qualité de la détection d'adresses.
 
 Expose les endpoints `/api/admin/feedback/*` qui servent le tableau de bord qualité : taux de détection global, liste des faux négatifs (adresses confirmées manuellement mais non détectées par le script) et faux positifs (adresses détectées mais rejetées manuellement).
-
-L'endpoint `feedback_rerun` reste `async def` : il pilote un sous-processus en streaming SSE (asyncio), incompatible avec un threadpool sync. FastAPI sait cohabiter `def` et `async def` dans le même router.
 """
 
 import logging
-import os
-import sys
-from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, Query
 
 from application.ports.api.admin_feedback_queries import (
     AdminFeedbackQueries,
@@ -36,12 +30,6 @@ _DEFAULT_STRUCTURE_CODE = "uca"
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-_RESOLVE_ADDRESSES_SCRIPT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "processing",
-    "resolve_addresses.py",
-)
 
 
 @router.get("/api/admin/feedback/structures", response_model=FeedbackStructuresResponse)
@@ -108,44 +96,3 @@ def feedback_false_positives(
     return queries.feedback_false_positives(
         structure_id=structure_id, page=page, per_page=per_page, search=search
     )
-
-
-@router.get("/api/admin/feedback/rerun")
-async def feedback_rerun() -> StreamingResponse:
-    """Lance resolve_addresses en SSE (détection complète sur toutes les adresses).
-
-    `async def` parce qu'on streame stdout d'un subprocess via
-    `asyncio.create_subprocess_exec` + `StreamingResponse`. Aucune connexion DB en jeu, cohabitation supportée par FastAPI.
-    """
-    import asyncio
-
-    if not os.path.exists(_RESOLVE_ADDRESSES_SCRIPT):  # noqa: ASYNC240
-        raise HTTPException(status_code=500, detail="Script resolve_addresses.py introuvable")
-
-    async def event_stream() -> AsyncIterator[str]:
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable,
-            "-u",
-            _RESOLVE_ADDRESSES_SCRIPT,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        assert proc.stdout is not None  # subprocess créé avec stdout=PIPE
-        try:
-            while True:
-                line = await asyncio.wait_for(proc.stdout.readline(), timeout=600)
-                if not line:
-                    break
-                text = line.decode("utf-8", errors="replace").rstrip()
-                if text:
-                    yield f"data: {text}\n\n"
-            returncode = await proc.wait()
-            if returncode == 0:
-                yield "data: [DONE]\n\n"
-            else:
-                yield f"data: [ERROR] Code retour {returncode}\n\n"
-        except asyncio.TimeoutError:
-            proc.kill()
-            yield "data: [ERROR] Timeout (>10min)\n\n"
-
-    return StreamingResponse(event_stream(), media_type="text/event-stream")

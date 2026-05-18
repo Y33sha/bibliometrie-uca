@@ -79,8 +79,6 @@
   let addresses: FeedbackAddress[] = $state([]);
   let search = $state("");
   let searchTimeout: ReturnType<typeof setTimeout> | null = $state(null);
-  let rerunState = $state<"idle" | "running" | "done" | "error">("idle");
-  let rerunLines: string[] = $state([]);
 
   // Context picker state
   let ctxPicker: { formId: number; x: number; y: number } | null = $state(null);
@@ -104,9 +102,6 @@
     };
   });
 
-  const rerunLabel = $derived(
-    rerunState === "running" ? "\u23F3 En cours\u2026" : rerunState === "done" ? "\u2713 Terminé" : rerunState === "error" ? "\u25B6 Réessayer la détection" : "\u25B6 Relancer la détection",
-  );
 
   // ---------- Data loading ----------
 
@@ -231,46 +226,6 @@
     }
   }
 
-  // ---------- Rerun ----------
-
-  function launchRerun() {
-    rerunState = "running";
-    rerunLines = [];
-
-    const evtSource = new EventSource(base + "/api/admin/feedback/rerun");
-
-    evtSource.onmessage = (event) => {
-      const text: string = event.data;
-
-      if (text === "[DONE]") {
-        evtSource.close();
-        rerunState = "done";
-        loadStats();
-        loadTable();
-        setTimeout(() => {
-          rerunState = "idle";
-          rerunLines = [];
-        }, 5000);
-        return;
-      }
-
-      if (text.startsWith("[ERROR]")) {
-        evtSource.close();
-        rerunLines = [...rerunLines, text];
-        rerunState = "error";
-        return;
-      }
-
-      rerunLines = [...rerunLines, text];
-    };
-
-    evtSource.onerror = () => {
-      evtSource.close();
-      rerunLines = [...rerunLines, "[ERROR] Connexion perdue"];
-      rerunState = "error";
-    };
-  }
-
   // ---------- Helpers ----------
 
   function uniqueForms(forms: MatchedForm[]): MatchedForm[] {
@@ -383,30 +338,7 @@
     </div>
     <input type="text" placeholder="Rechercher dans les adresses..." bind:value={search} oninput={onSearchInput} />
     <span class="count">{total} adresses</span>
-    <button class="rerun-btn" disabled={rerunState === "running" || rerunState === "done"} onclick={launchRerun}>
-      {rerunLabel}
-    </button>
   </div>
-
-  <!-- Rerun progress -->
-  {#if rerunLines.length > 0}
-    <div class="rerun-log" class:rerun-error={rerunState === "error"} class:rerun-done={rerunState === "done"}>
-      <div class="rerun-log-header">
-        {#if rerunState === "running"}
-          <span class="rerun-spinner"></span> Détection en cours…
-        {:else if rerunState === "done"}
-          Détection terminée
-        {:else}
-          Erreur lors de la détection
-        {/if}
-      </div>
-      <div class="rerun-log-body">
-        {#each rerunLines.slice(-8) as line}
-          <div class="rerun-log-line">{line}</div>
-        {/each}
-      </div>
-    </div>
-  {/if}
 
   <!-- Table -->
   {#if addresses.length === 0}
@@ -628,26 +560,6 @@
     background: white;
   }
 
-  .rerun-btn {
-    padding: 6px 14px;
-    border: 1px solid var(--accent);
-    border-radius: 4px;
-    background: white;
-    color: var(--accent);
-    font-size: 0.95rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .rerun-btn:hover:not(:disabled) {
-    background: var(--accent);
-    color: white;
-  }
-  .rerun-btn:disabled {
-    opacity: 0.5;
-    cursor: wait;
-  }
-
   /* Table */
   .addr-text {
     font-family: "SF Mono", "Consolas", monospace;
@@ -659,66 +571,6 @@
   .muted-small {
     color: var(--muted);
     font-size: 0.8rem;
-  }
-
-  /* Rerun log */
-  .rerun-log {
-    background: #1e1e2e;
-    color: #cdd6f4;
-    border-radius: 6px;
-    margin-bottom: 16px;
-    font-family: "SF Mono", "Consolas", monospace;
-    font-size: 0.82rem;
-    overflow: hidden;
-    border: 1px solid #313244;
-  }
-  .rerun-log.rerun-error {
-    border-color: var(--danger);
-  }
-  .rerun-log.rerun-done {
-    border-color: var(--success);
-  }
-  .rerun-log-header {
-    padding: 8px 12px;
-    background: #313244;
-    font-weight: 600;
-    font-size: 0.85rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .rerun-error .rerun-log-header {
-    background: #45292a;
-    color: #f38ba8;
-  }
-  .rerun-done .rerun-log-header {
-    background: #1e3a2a;
-    color: #a6e3a1;
-  }
-  .rerun-log-body {
-    padding: 8px 12px;
-    max-height: 200px;
-    overflow-y: auto;
-  }
-  .rerun-log-line {
-    padding: 1px 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-    line-height: 1.5;
-  }
-  .rerun-spinner {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border: 2px solid #585b70;
-    border-top-color: #89b4fa;
-    border-radius: 50%;
-    animation: rerun-spin 0.8s linear infinite;
-  }
-  @keyframes rerun-spin {
-    to {
-      transform: rotate(360deg);
-    }
   }
 
   /* Structure tags */
