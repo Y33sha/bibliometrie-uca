@@ -44,6 +44,9 @@ import datetime
 import signal
 import sys
 import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -106,16 +109,30 @@ def phase_extract(
         sub_mode = policy.year_selection  # "weekly" ou "full"
         if mode == "weekly":
             log.info("Mode hebdomadaire (WoS exclu)")
+        tasks: list[tuple[str, Callable[[], PhaseMetrics]]] = []
         if "openalex" in effective:
-            metrics.merge(_run_extract_openalex(mode=sub_mode, year=year))
+            tasks.append(("openalex", partial(_run_extract_openalex, mode=sub_mode, year=year)))
         if "hal" in effective:
-            metrics.merge(_run_extract_hal(mode=sub_mode, year=year))
+            tasks.append(("hal", partial(_run_extract_hal, mode=sub_mode, year=year)))
         if "wos" in effective:
-            metrics.merge(_run_extract_wos(mode=sub_mode, year=year))
+            tasks.append(("wos", partial(_run_extract_wos, mode=sub_mode, year=year)))
         if "scanr" in effective:
-            metrics.merge(_run_extract_scanr(mode=sub_mode, year=year))
+            tasks.append(("scanr", partial(_run_extract_scanr, mode=sub_mode, year=year)))
         if "theses" in effective:
-            metrics.merge(_run_extract_theses(mode=sub_mode, year=year))
+            tasks.append(("theses", partial(_run_extract_theses, mode=sub_mode, year=year)))
+        if tasks:
+            # Les helpers `_run_extract_*` ouvrent chacun leur propre connexion DB
+            # et écrivent dans des tables `staging.*` distinctes : aucun état
+            # partagé, parallélisme thread-safe. La merge des PhaseMetrics est
+            # effectuée séquentiellement dans le thread principal (PhaseMetrics
+            # n'est pas thread-safe).
+            log.info(
+                "▶ extracteurs en parallèle (%d) : %s", len(tasks), ", ".join(n for n, _ in tasks)
+            )
+            with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
+                futures = {pool.submit(fn): name for name, fn in tasks}
+                for future in as_completed(futures):
+                    metrics.merge(future.result())
 
     if policy.refetch_truncated_oa and "openalex" in effective:
         metrics.merge(_run_refetch_truncated())
