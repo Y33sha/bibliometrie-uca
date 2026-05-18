@@ -5,78 +5,44 @@ Pour les publications ayant un DOI, interroge Unpaywall et met à jour
 le statut OA. Écrase les valeurs existantes, SAUF : ne remplace jamais
 'diamond' par 'gold' (Unpaywall ne connaît pas le diamond OA).
 
-L'orchestrateur dépend du port `EnrichQueries` ; le point d'entrée
-CLI (argparse + connexion + rate limiter) est dans
+L'orchestrateur dépend du port `EnrichQueries` et reçoit en injection
+un `OaStatusFetcher` (le fetcher concret vit dans
+`infrastructure/sources/unpaywall.py` pour respecter l'étanchéité DDD).
+Le point d'entrée CLI (argparse + connexion + `asyncio.run`) est dans
 `interfaces/cli/pipeline/enrich_oa_status.py`.
 
-API: https://api.unpaywall.org/v2/{doi}?email=...
-Rate limit: 100 000 req/jour, ~10 req/s recommandé
+Implémentation async : `httpx.AsyncClient` partagé +
+`asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).
 """
 
+import asyncio
 import logging
-import time
+from collections.abc import Awaitable, Callable
+from typing import TypeAlias
 
-import requests
+import httpx
 from sqlalchemy import Connection
 
 from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 
-# Email requis par Unpaywall (politesse, pas d'auth)
-UNPAYWALL_EMAIL = "bibliometrie@uca.fr"
-
-# Mapping Unpaywall oa_status → notre enum oa_type
-OA_MAP = {
-    "gold": "gold",
-    "hybrid": "hybrid",
-    "bronze": "bronze",
-    "green": "green",
-    "closed": "closed",
-}
+OaStatusFetcher: TypeAlias = Callable[[httpx.AsyncClient, str], Awaitable[str | None]]
+"""Signature : ``(client, doi) → statut OA mappé (str) | None``."""
 
 BATCH_SIZE = 50
+MAX_CONCURRENT = 5
 
 
-def fetch_oa_status(doi: str, logger: logging.Logger, *, unpaywall_base: str) -> str | None:
-    """Interroge Unpaywall pour un DOI. Retourne le statut OA ou None."""
-    for attempt in range(3):
-        try:
-            url = f"{unpaywall_base}/{doi}?email={UNPAYWALL_EMAIL}"
-            resp = requests.get(url, timeout=10)
-
-            if resp.status_code == 404:
-                return None
-            if resp.status_code == 429:
-                wait = 5 * (attempt + 1)
-                logger.warning(f"Rate limited, pause {wait}s (tentative {attempt + 1}/3)...")
-                time.sleep(wait)
-                continue
-            if resp.status_code != 200:
-                logger.warning(f"  HTTP {resp.status_code} pour {doi}")
-                return None
-
-            data = resp.json()
-            oa_status = data.get("oa_status")
-            return OA_MAP.get(oa_status)
-
-        except requests.RequestException as e:
-            logger.warning(f"  Erreur réseau pour {doi}: {e}")
-            return None
-
-    logger.warning(f"  Échec après 3 tentatives pour {doi}")
-    return None
-
-
-def run_enrich(
+async def run_enrich(
     conn: Connection,
     queries: EnrichQueries,
     logger: logging.Logger,
     *,
     pub_repo: PublicationRepository,
-    unpaywall_base: str,
+    fetcher: OaStatusFetcher,
     limit: int = 0,
     dry_run: bool = False,
-    rate_delay: float = 0.1,
+    max_concurrent: int = MAX_CONCURRENT,
 ) -> None:
     pubs = queries.fetch_publications_with_doi(conn, limit=limit or None)
     total = len(pubs)
@@ -85,48 +51,51 @@ def run_enrich(
     if not total:
         return
 
-    updated = 0
-    skipped = 0
-    not_found = 0
-    errors = 0
+    sem = asyncio.Semaphore(max_concurrent)
+    # La `Connection` SA sync n'est pas thread-safe ; tous les writes
+    # (update, commit) passent par `to_thread` sous ce lock.
+    db_lock = asyncio.Lock()
+    progress = {"processed": 0, "updated": 0, "skipped": 0, "not_found": 0}
 
-    for i, (pub_id, doi, current_status) in enumerate(pubs):
-        if i > 0 and i % BATCH_SIZE == 0:
-            if not dry_run:
-                conn.commit()
-            logger.info(
-                f"  {i}/{total} — {updated} mis à jour, {skipped} inchangés, {not_found} non trouvés"
-            )
+    async with httpx.AsyncClient() as client:
 
-        status = fetch_oa_status(doi, logger, unpaywall_base=unpaywall_base)
+        async def process_one(pub_id: int, doi: str, current_status: str | None) -> None:
+            async with sem:
+                status = await fetcher(client, doi)
 
-        if status:
-            if current_status == "diamond" and status == "gold":
-                skipped += 1
-                time.sleep(rate_delay)
-                continue
-
-            if status == current_status:
-                skipped += 1
-                time.sleep(rate_delay)
-                continue
-
-            if dry_run:
+            if status is None:
+                progress["not_found"] += 1
+            elif current_status == "diamond" and status == "gold":
+                # Préservation : Unpaywall ne connaît pas diamond, ne pas écraser.
+                progress["skipped"] += 1
+            elif status == current_status:
+                progress["skipped"] += 1
+            elif dry_run:
                 logger.info(f"  [DRY] {doi} : {current_status} → {status}")
+                progress["updated"] += 1
             else:
-                pub_repo.update_oa_status(pub_id, status)
-            updated += 1
-        elif status is None:
-            not_found += 1
-        else:
-            errors += 1
+                async with db_lock:
+                    await asyncio.to_thread(pub_repo.update_oa_status, pub_id, status)
+                progress["updated"] += 1
 
-        time.sleep(rate_delay)
+            progress["processed"] += 1
+            if progress["processed"] % BATCH_SIZE == 0:
+                if not dry_run:
+                    async with db_lock:
+                        await asyncio.to_thread(conn.commit)
+                logger.info(
+                    f"  {progress['processed']}/{total} — "
+                    f"{progress['updated']} mis à jour, "
+                    f"{progress['skipped']} inchangés, "
+                    f"{progress['not_found']} non trouvés"
+                )
+
+        await asyncio.gather(*(process_one(pid, doi, cur) for pid, doi, cur in pubs))
 
     if not dry_run:
         conn.commit()
 
     logger.info(
-        f"Terminé : {updated} mis à jour, {skipped} inchangés, "
-        f"{not_found} non trouvés sur Unpaywall, {errors} erreurs"
+        f"Terminé : {progress['updated']} mis à jour, {progress['skipped']} inchangés, "
+        f"{progress['not_found']} non trouvés sur Unpaywall"
     )
