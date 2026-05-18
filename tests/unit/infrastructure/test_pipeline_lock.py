@@ -9,6 +9,7 @@ Vérifie :
 """
 
 import os
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -33,8 +34,10 @@ class TestAcquire:
 
     def test_orphan_lockfile_is_overwritten(self, lockfile: Path) -> None:
         # PID 999999 : pratiquement garanti de ne pas exister (pid_max usuellement < 100k)
+        # Sur Windows, `os.kill(pid, 0)` tente une terminaison au lieu d'une sonde — on patch `_process_alive` pour le rendre cross-platform.
         lockfile.write_text("999999")
-        acquire_pipeline_lock(lockfile=lockfile)
+        with patch("infrastructure.pipeline_lock._process_alive", return_value=False):
+            acquire_pipeline_lock(lockfile=lockfile)
         assert lockfile.read_text() == str(os.getpid())
 
     def test_corrupted_lockfile_is_overwritten(self, lockfile: Path) -> None:
@@ -77,6 +80,7 @@ class TestAcquire:
         assert kill_calls == [(12345, 15)]  # signal.SIGTERM = 15
         assert lockfile.read_text() == str(os.getpid())
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="SIGKILL n'existe pas sur Windows")
     def test_alive_lockfile_force_falls_back_to_sigkill(self, lockfile: Path) -> None:
         lockfile.write_text("12345")
 
