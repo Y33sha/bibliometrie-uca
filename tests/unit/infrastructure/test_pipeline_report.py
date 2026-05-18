@@ -5,13 +5,13 @@ from pathlib import Path
 
 
 def _fresh_module(tmp_path: Path, monkeypatch):
-    """Recharge pipeline_report avec BASE pointée vers tmp_path."""
+    """Recharge pipeline_report avec PROJECT_ROOT / LOGS_ROOT / REPORTS_DIR pointés vers tmp_path."""
     import infrastructure.observability.pipeline_report as pm
 
     spec = importlib.util.spec_from_file_location("pm_fresh", pm.__file__)
     fresh = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(fresh)
-    monkeypatch.setattr(fresh, "BASE", tmp_path)
+    monkeypatch.setattr(fresh, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(fresh, "LOGS_ROOT", tmp_path / "logs")
     monkeypatch.setattr(fresh, "REPORTS_DIR", tmp_path / "logs" / "reports")
     return fresh
