@@ -8,16 +8,10 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.api.persons_queries import (
+    DepartmentCount,
     DirectoryFilters,
     FacetFilters,
     ListFilters,
-    PersonsQueries,
-)
-from application.ports.api.subjects_queries import SubjectFrequency
-from interfaces.api.deps import persons_queries_sync
-from interfaces.api.filters import parse_str_csv
-from interfaces.api.models import (
-    DepartmentCount,
     PersonAddressesResponse,
     PersonDashboardResponse,
     PersonDirectoryResponse,
@@ -25,10 +19,14 @@ from interfaces.api.models import (
     PersonProfileResponse,
     PersonSearchResult,
     PersonsFacetsResponse,
+    PersonsQueries,
     PersonsStatsResponse,
     PersonThesesResponse,
     RoleCount,
 )
+from application.ports.api.subjects_queries import SubjectFrequency
+from interfaces.api.deps import persons_queries_sync
+from interfaces.api.filters import parse_str_csv
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -58,9 +56,7 @@ def persons_directory(
         has_idref=has_idref,
         has_rh=has_rh,
     )
-    return PersonDirectoryResponse.model_validate(
-        queries.persons_directory(filters=filters, page=page, per_page=per_page, sort=sort)
-    )
+    return queries.persons_directory(filters=filters, page=page, per_page=per_page, sort=sort)
 
 
 @router.get("/api/persons/search", response_model=list[PersonSearchResult])
@@ -70,7 +66,7 @@ def search_persons(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> list[PersonSearchResult]:
     """Recherche rapide de personnes (autocomplete)."""
-    return [PersonSearchResult.model_validate(r) for r in queries.search_persons(q=q, limit=limit)]
+    return queries.search_persons(q=q, limit=limit)
 
 
 @router.get("/api/persons", response_model=PersonListResponse)
@@ -97,9 +93,7 @@ def list_persons(
         has_idhal=has_idhal,
         has_rh=has_rh,
     )
-    return PersonListResponse.model_validate(
-        queries.list_persons(filters=filters, page=page, per_page=per_page, sort=sort)
-    )
+    return queries.list_persons(filters=filters, page=page, per_page=per_page, sort=sort)
 
 
 @router.get("/api/persons/facets", response_model=PersonsFacetsResponse)
@@ -123,7 +117,7 @@ def persons_facets(
         has_rh=has_rh,
         linked=linked,
     )
-    return PersonsFacetsResponse.model_validate(queries.persons_facets(filters=filters))
+    return queries.persons_facets(filters=filters)
 
 
 @router.get("/api/persons/departments", response_model=list[DepartmentCount])
@@ -131,7 +125,7 @@ def list_departments(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> list[DepartmentCount]:
     """Liste des départements distincts."""
-    return [DepartmentCount.model_validate(r) for r in queries.list_departments()]
+    return queries.list_departments()
 
 
 @router.get("/api/persons/roles", response_model=list[RoleCount])
@@ -139,7 +133,7 @@ def list_roles(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> list[RoleCount]:
     """Liste des rôles distincts."""
-    return [RoleCount.model_validate(r) for r in queries.list_roles()]
+    return queries.list_roles()
 
 
 @router.get("/api/persons/stats", response_model=PersonsStatsResponse)
@@ -147,7 +141,7 @@ def persons_stats(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> PersonsStatsResponse:
     """Statistiques sur les personnes et l'alignement."""
-    return PersonsStatsResponse.model_validate(queries.persons_stats())
+    return queries.persons_stats()
 
 
 @router.get("/api/persons/{person_id}", response_model=PersonProfileResponse)
@@ -159,7 +153,7 @@ def person_profile(
     profile = queries.person_profile(person_id)
     if not profile:
         raise HTTPException(status_code=404, detail="Person not found")
-    return PersonProfileResponse.model_validate(profile)
+    return profile
 
 
 @router.get("/api/persons/{person_id}/theses", response_model=PersonThesesResponse)
@@ -168,7 +162,7 @@ def person_theses(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> PersonThesesResponse:
     """Thèses liées à cette personne avec un rôle non-auteur."""
-    return PersonThesesResponse.model_validate(queries.person_theses(person_id))
+    return queries.person_theses(person_id)
 
 
 @router.get("/api/persons/{person_id}/addresses", response_model=PersonAddressesResponse)
@@ -179,9 +173,7 @@ def person_addresses(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> PersonAddressesResponse:
     """Adresses distinctes utilisées dans les authorships sources de cette personne."""
-    return PersonAddressesResponse.model_validate(
-        queries.person_addresses(person_id, page=page, per_page=per_page)
-    )
+    return queries.person_addresses(person_id, page=page, per_page=per_page)
 
 
 @router.get("/api/persons/{person_id}/dashboard", response_model=PersonDashboardResponse)
@@ -190,7 +182,7 @@ def person_dashboard(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> PersonDashboardResponse:
     """Dashboard personne : publis/an + Open Access."""
-    return PersonDashboardResponse.model_validate(queries.person_dashboard(person_id))
+    return queries.person_dashboard(person_id)
 
 
 @router.get("/api/persons/{person_id}/subjects", response_model=list[SubjectFrequency])
@@ -200,6 +192,4 @@ def person_subjects(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> list[SubjectFrequency]:
     """Top sujets des publications de cette personne (nuage de mots)."""
-    return [
-        SubjectFrequency.model_validate(r) for r in queries.person_subjects(person_id, limit=limit)
-    ]
+    return queries.person_subjects(person_id, limit=limit)

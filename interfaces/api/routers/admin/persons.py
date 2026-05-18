@@ -36,7 +36,7 @@ from application.persons import (
 from application.persons import (
     update_name as _update_name,
 )
-from application.ports.api.persons_queries import PersonsQueries
+from application.ports.api.persons_queries import NameFormAuthorshipsResponse, PersonsQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -59,7 +59,6 @@ from interfaces.api.models import (
     IdentifierStatusResponse,
     MergePersons,
     MergeResponse,
-    NameFormAuthorshipsResponse,
     OkResponse,
     ReassignIdentifier,
     RejectPerson,
@@ -252,9 +251,7 @@ def name_form_authorships(
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> NameFormAuthorshipsResponse:
     """Authorships sources + autres personnes partageant une forme de nom."""
-    return NameFormAuthorshipsResponse.model_validate(
-        queries.name_form_authorships(person_id, name_form)
-    )
+    return queries.name_form_authorships(person_id, name_form)
 
 
 @router.post(
