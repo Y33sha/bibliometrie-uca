@@ -12,7 +12,7 @@ leurs signatures (cf. règle 3 d'`architecture.md`).
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from application.ports.api._common import YesNoCount
 from application.ports.api.subjects_queries import SubjectOut
@@ -253,20 +253,30 @@ class ThesesAuthorshipOut(BaseModel):
 
 
 class EcoleDoctorale(BaseModel):
-    """École doctorale (projection theses.fr → DTO API).
+    """École doctorale d'une thèse (metadata theses.fr).
 
-    Distinct de `infrastructure.jsonb_models.publication.EcoleDoctorale`
-    qui modélise la colonne JSONB ; même shape mais responsabilité
-    différente.
+    Sert à la fois de DTO API (champ de `ThesisMeta` dans la réponse
+    détail publication) et de modèle de la colonne JSONB `meta.ecoles_doctorales`
+    (importé par `infrastructure/jsonb_models/publication.py`).
+    `extra="allow"` pour tolérer des clés inconnues côté JSONB sans casser.
     """
 
+    model_config = ConfigDict(extra="allow")
     nom: str
-    ppn: str | None = None
+    ppn: str | None = None  # IdRef de l'ED quand disponible
 
 
 class PartenaireThese(BaseModel):
+    """Partenaire de recherche d'une thèse (metadata theses.fr).
+
+    Sert à la fois de DTO API et de modèle de la colonne JSONB
+    `meta.partenaires`. `extra="allow"` pour tolérer des clés inconnues
+    côté JSONB sans casser.
+    """
+
+    model_config = ConfigDict(extra="allow")
     nom: str
-    type: str | None = None
+    type: str | None = None  # ex: "etablissement", "laboratoire", …
 
 
 class ThesisMeta(BaseModel):

@@ -7,7 +7,7 @@ from infrastructure.jsonb_models.publication import (
     EcoleDoctorale,
     ExternalIds,
     OpenAlexTopic,
-    Partenaire,
+    PartenaireThese,
     PublicationBiblio,
     PublicationMeta,
     PublicationTopics,
@@ -137,7 +137,7 @@ class TestPublicationMeta:
 
     def test_partenaire_requires_nom(self):
         with pytest.raises(PydanticValidationError):
-            Partenaire()  # nom obligatoire
+            PartenaireThese()  # nom obligatoire
 
 
 # ── PublicationTopics ──────────────────────────────────────────────

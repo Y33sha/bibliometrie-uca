@@ -9,7 +9,20 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from application.ports.api.publications_queries import EcoleDoctorale, PartenaireThese
 from domain.publication import NNT, HALId
+
+# Re-export pour compat des tests / importeurs historiques.
+__all__ = [
+    "EcoleDoctorale",
+    "ExternalIds",
+    "OpenAlexTopic",
+    "PartenaireThese",
+    "PublicationBiblio",
+    "PublicationMeta",
+    "PublicationTopics",
+    "ThesesTopics",
+]
 
 # ── ExternalIds : colonne source_publications.external_ids ─────────
 
@@ -102,22 +115,6 @@ class PublicationBiblio(BaseModel):
 # ── PublicationMeta : colonne meta ─────────────────────────────────
 
 
-class EcoleDoctorale(BaseModel):
-    """École doctorale d'une thèse (metadata theses.fr)."""
-
-    model_config = ConfigDict(extra="allow")
-    nom: str
-    ppn: str | None = None  # IdRef de l'ED quand disponible
-
-
-class Partenaire(BaseModel):
-    """Partenaire de recherche d'une thèse (metadata theses.fr)."""
-
-    model_config = ConfigDict(extra="allow")
-    nom: str
-    type: str | None = None  # ex: "etablissement", "laboratoire", …
-
-
 class PublicationMeta(BaseModel):
     """Modèle de la colonne JSONB `meta` (sur source_publications ET
     publications).
@@ -141,7 +138,7 @@ class PublicationMeta(BaseModel):
 
     discipline: str | None = None
     ecoles_doctorales: list[EcoleDoctorale] | None = None
-    partenaires: list[Partenaire] | None = None
+    partenaires: list[PartenaireThese] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Sérialise pour écriture en base (colonne JSONB `meta`). `Any`
