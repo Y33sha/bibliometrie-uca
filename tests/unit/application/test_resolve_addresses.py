@@ -1,7 +1,6 @@
 """Tests pour la résolution d'adresses (processing/resolve_addresses.py)."""
 
 import logging
-from typing import Any
 
 import pytest
 
@@ -13,6 +12,7 @@ from application.pipeline.affiliations.resolve_addresses import (
     resolve_address,
     run_resolution,
 )
+from application.ports.pipeline.address_resolution import StructureNameForm
 
 # ── Helpers pour construire des formes de test ───────────────────
 
@@ -26,17 +26,17 @@ def _form(
     is_word_boundary=False,
     is_excluding=False,
 ):
-    """Construit un dict de forme pour les tests."""
-    return {
-        "id": form_id or structure_id * 100,
-        "structure_id": structure_id,
-        "form_text": form_normalized or form_text.lower(),
-        "is_word_boundary": is_word_boundary,
-        "is_excluding": is_excluding,
-        "requires_context_of": requires_context_of,
-        "struct_code": None,
-        "struct_type": "laboratory",
-    }
+    """Construit un StructureNameForm pour les tests."""
+    return StructureNameForm(
+        id=form_id or structure_id * 100,
+        structure_id=structure_id,
+        form_text=form_normalized or form_text.lower(),
+        is_word_boundary=is_word_boundary,
+        is_excluding=is_excluding,
+        requires_context_of=requires_context_of,
+        struct_code=None,
+        struct_type="laboratory",
+    )
 
 
 # ── match_form_in_text ───────────────────────────────────────────
@@ -74,10 +74,6 @@ class TestMatchFormInText:
 
     def test_empty_form(self):
         form = _form(1, "", form_normalized="")
-        assert match_form_in_text(form, "some text") is False
-
-    def test_none_form(self):
-        form = _form(1, "", form_normalized=None)
         assert match_form_in_text(form, "some text") is False
 
 
@@ -225,7 +221,7 @@ class _FakeQueries:
     def __init__(
         self,
         *,
-        forms: list[dict[str, Any]] | None = None,
+        forms: list[StructureNameForm] | None = None,
         addresses: list[tuple[int, str]] | None = None,
         reset_count: int = 0,
         obsolete_per_addr: int = 0,
@@ -244,7 +240,7 @@ class _FakeQueries:
         self.delete_calls: list[tuple[int, list[int]]] = []
         self.unflag_calls: list[tuple[int, list[int]]] = []
 
-    def load_name_forms(self, conn: object) -> list[dict[str, Any]]:
+    def load_name_forms(self, conn: object) -> list[StructureNameForm]:
         self.load_called = True
         return self._forms
 

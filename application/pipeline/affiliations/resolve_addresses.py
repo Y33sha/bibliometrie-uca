@@ -18,11 +18,13 @@ Schéma v2 :
 import logging
 import re
 import time
-from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.address_resolution import AddressResolutionQueries
+from application.ports.pipeline.address_resolution import (
+    AddressResolutionQueries,
+    StructureNameForm,
+)
 from domain.normalize import normalize_text as normalize
 
 BATCH_SIZE = 1000
@@ -31,37 +33,36 @@ BATCH_SIZE = 1000
 # ─── Matching ────────────────────────────────────────────────────
 
 
-def match_form_in_text(form: dict[str, Any], text_normalized: str) -> bool:
+def match_form_in_text(form: StructureNameForm, text_normalized: str) -> bool:
     """Vérifie si une forme matche dans le texte normalisé.
 
     Si is_word_boundary ou forme <= 6 chars : mot entier (word boundary).
     Sinon : sous-chaîne.
     """
-    form_text = form["form_text"]
-    if not form_text:
+    if not form.form_text:
         return False
 
-    if form.get("is_word_boundary") or len(form_text) <= 6:
-        pattern = r"(?<![a-z0-9])" + re.escape(form_text) + r"(?![a-z0-9])"
+    if form.is_word_boundary or len(form.form_text) <= 6:
+        pattern = r"(?<![a-z0-9])" + re.escape(form.form_text) + r"(?![a-z0-9])"
         return bool(re.search(pattern, text_normalized))
     else:
-        return form_text in text_normalized
+        return form.form_text in text_normalized
 
 
 def build_forms_by_structure(
-    forms: list[dict[str, Any]],
-) -> dict[int, list[dict[str, Any]]]:
+    forms: list[StructureNameForm],
+) -> dict[int, list[StructureNameForm]]:
     """Index : structure_id → [forms]."""
-    idx: dict[int, list[dict[str, Any]]] = {}
+    idx: dict[int, list[StructureNameForm]] = {}
     for f in forms:
-        idx.setdefault(f["structure_id"], []).append(f)
+        idx.setdefault(f.structure_id, []).append(f)
     return idx
 
 
 def has_form_match_for_structure(
     struct_id: int,
     text_normalized: str,
-    forms_by_structure: dict[int, list[dict[str, Any]]],
+    forms_by_structure: dict[int, list[StructureNameForm]],
 ) -> bool:
     """Vérifie si au moins une forme de la structure donnée matche."""
     for f in forms_by_structure.get(struct_id, []):
@@ -72,8 +73,8 @@ def has_form_match_for_structure(
 
 def resolve_address(
     text_normalized: str,
-    forms: list[dict[str, Any]],
-    forms_by_structure: dict[int, list[dict[str, Any]]],
+    forms: list[StructureNameForm],
+    forms_by_structure: dict[int, list[StructureNameForm]],
 ) -> list[tuple[int, int]]:
     """Résout une adresse : trouve toutes les structures identifiées.
 
@@ -88,22 +89,22 @@ def resolve_address(
 
     # Passe 1 : détecter les exclusions
     for f in forms:
-        if f.get("is_excluding") and match_form_in_text(f, text_normalized):
-            excluded_structures.add(f["structure_id"])
+        if f.is_excluding and match_form_in_text(f, text_normalized):
+            excluded_structures.add(f.structure_id)
 
     # Passe 2 : matcher les formes normales
     for f in forms:
-        sid = f["structure_id"]
+        sid = f.structure_id
         if sid in seen_structures or sid in excluded_structures:
             continue
-        if f.get("is_excluding"):
+        if f.is_excluding:
             continue
 
         if not match_form_in_text(f, text_normalized):
             continue
 
         # Vérifier le contexte (requires_context_of = integer[])
-        ctx = f["requires_context_of"]
+        ctx = f.requires_context_of
         if ctx:
             context_satisfied = any(
                 has_form_match_for_structure(cid, text_normalized, forms_by_structure)
@@ -112,7 +113,7 @@ def resolve_address(
             if not context_satisfied:
                 continue
 
-        matches.append((sid, f["id"]))
+        matches.append((sid, f.id))
         seen_structures.add(sid)
 
     return matches
@@ -161,8 +162,8 @@ def process_addresses(
     conn: Connection,
     queries: AddressResolutionQueries,
     rows: list[tuple[int, str]],
-    forms: list[dict[str, Any]],
-    forms_by_structure: dict[int, list[dict[str, Any]]],
+    forms: list[StructureNameForm],
+    forms_by_structure: dict[int, list[StructureNameForm]],
     perimeter: set[int],
     logger: logging.Logger,
 ) -> tuple[int, int]:
