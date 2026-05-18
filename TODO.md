@@ -19,20 +19,23 @@
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications". / DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint? ->> **METIER_metadata-deduplication.md**
 * [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
 * refresh_publication_countries: peut-on éviter de tout reset à chaque run?
+* [ ] authorships: propagate_roles, propagate_is_corresponding, propagate_author_position: tout faire en une passe?
 ### Logging
 * [ ] logs pas clairs dans l'extracteur hal: "mode incrémental (0 orphelins vs 1 pages full-fetch)" => quézaco?; + le mode full-fetch pour PRES_CLERMONT est catastrophiquement lent. Ajouter une condition nb individual vs nb total? ->> **CODE_observabilite-robustesse-pipeline.md**
-* autre log pas clair: pipeline:   → "Lancer build_authorships. py pour propager in_perimeter/structure_ids" (?) (juste avant [INFO] pipeline: ✓ create_persons_from_source_authorships terminé en 103.6s) ->> **CODE_observabilite-robustesse-pipeline.md**
+* autre log pas clair: pipeline: → "Lancer build_authorships. py pour propager in_perimeter/structure_ids" (?) (juste avant [INFO] pipeline: ✓ create_persons_from_source_authorships terminé en 103.6s) ->> **CODE_observabilite-robustesse-pipeline.md**
 * [ ] extracteur hal : manque indication sur documents réimportés et mis à jour: harmoniser le logging entre sources (et les tailles de batch) ->> **CODE_observabilite-robustesse-pipeline.md**
+* [ ] phase persons, formule pas claire: Promotion ignorée pour person_id=9986, orcid='0009-0005-5459-9885' : Identifiant orcid='0009-0005-5459-9885' déjà attribué à person_id=4768 avec statut 'pending' ; impossible d'attribuer à person_id=9986. + ne pas signaler quand person_id cible = person_id existant!
 ## Code
-* [ ] auditer le code pour voir où l'interface continue de requêter source_authorships (sauf trucs vraiment source-spécifiques): supprimer les requêtes pouvant être remplacées par des requêtes vers les tables canoniques — audit fait, 3 sites migrés (filters.person_clause, publications/list._initial_clauses_for_export, persons/detail.person_theses) ; reste à creuser stats/labs._STRUCTS_CTE (delta ~0.3% sur pub_count par labo, raison historique du choix `source_authorship_structures` à investiguer)
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
+* [ ] adresses/pays: attribution de pays cassée
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 ## Sujets
 * [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation manuelle des sujets? / ajouter seuil de score de pertinence? / algos pour évaluer pertinence (co-occurrences suspectes, NLP...)
 ## Explorer autres sources possibles
+* [ ] Crossref: définir sa place dans le pipeline (actuellement: pas d'affiliations donc pas de matching possible)
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); récupérer pmid dans api HAL
 * [ ] pour les jeux de données: DataCite, Zenodo, autres?
 * [ ] divers: ORCID, IdRef, DOAJ
@@ -69,6 +72,7 @@
 ## Admin
 * [ ] interface pour consulter l'audit trail
 * [ ] bouton relancer détection (page /admin/feedback): cassé; supprimer ou réparer?
+* [ ] comportement capricieux de l'UI sur la page countries (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine.
 ### Personnes (admin)
 * [ ] quoi faire des entités fausses? a minima, rejeter leurs authorships et s'assurer qu'elles n'apparaissent pas dans orphan-authorships
 * [ ] si source erronée: rejeter authorship source + recalculer affiliations de l'authorship à partir des sources non rejetées / caveat: Clarifier la sémantique de `excluded` sur les authorships sources: est-ce l'authorship qui est fausse, ou son affiliation? (allons plus loin: pourrait-on déclarer fausses certaines colonnes et pas d'autres? via un champ jsonb par exemple)
@@ -107,7 +111,7 @@
 * 2020CLFAC007 thèse du CROC, pas récupérée via theses.fr! (158960) => aurait dû être récupéré par API theses.fr ET par cross-import de scanR via le NNT
 * Eric Beyssac pas reconnu par nom dans les authorships de thèses: voir où est le problème
 * Daniel Roux: 1 authorship hal, zéro publication sur sa page (ce n'est pas le seul)
-* bizarrerie dans l'import crossref: fetch_missing_doi: 10325 DOI manquants pour crossref 2026-05-14 09:15:18,898 [INFO] fetch_missing_doi:   100/10325 — 101 trouvés, 100 insérés 2026-05-14 09:15:27,004 [INFO] fetch_missing_doi:   200/10325 — 202 trouvés, 200 insérés / + 800/10325 — 800 trouvés, 732 inséré : pourquoi tout n'est pas inséré?
+* bizarrerie dans l'import crossref: fetch_missing_doi: 10325 DOI manquants pour crossref 2026-05-14 09:15:18,898 [INFO] fetch_missing_doi: 100/10325 — 101 trouvés, 100 insérés 2026-05-14 09:15:27,004 [INFO] fetch_missing_doi: 200/10325 — 202 trouvés, 200 insérés / + 800/10325 — 800 trouvés, 732 inséré : pourquoi tout n'est pas inséré?
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
