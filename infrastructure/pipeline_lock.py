@@ -7,12 +7,15 @@ Le lock est un fichier `logs/pipeline.lock` qui contient le PID du process actue
 - Démarrage : si le fichier existe et le PID dedans est vivant → on abort (sauf `force=True` qui SIGTERM puis SIGKILL le précédent).
 - Fin (normale ou exception) : `atexit` supprime le lockfile.
 - Lockfile orphelin (crash brutal SIGKILL/OOM) : le PID dedans ne vit plus → on l'écrase silencieusement au démarrage suivant.
+
+Comportement Windows (dev) dégradé : `os.kill(pid, 0)` n'est pas une sonde sur Windows (il termine le process avec exit code 0) et `signal.SIGKILL` n'existe pas. `_process_alive` retourne toujours False sur Windows — le module devient effectivement no-op. La prod tourne sous Linux (cron), seule plateforme où la concurrence est à craindre.
 """
 
 import atexit
 import logging
 import os
 import signal
+import sys
 import time
 from pathlib import Path
 
@@ -28,7 +31,12 @@ class PipelineAlreadyRunningError(RuntimeError):
 
 
 def _process_alive(pid: int) -> bool:
-    """Retourne True si le process PID existe (signal.0 = sonde, ne tue pas)."""
+    """Retourne True si le process PID existe (signal.0 = sonde, ne tue pas).
+
+    No-op (toujours False) sur Windows : cf. docstring du module.
+    """
+    if sys.platform == "win32":
+        return False
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -60,6 +68,8 @@ def _terminate_existing(pid: int, *, grace_seconds: int = _SIGTERM_GRACE_SECONDS
             log.info("Pipeline précédent (PID %d) terminé proprement", pid)
             return
         time.sleep(1)
+    if sys.platform == "win32":
+        return  # SIGKILL n'existe pas sur Windows ; cf. docstring du module.
     log.warning("Pipeline précédent (PID %d) ne répond pas après %ds — SIGKILL", pid, grace_seconds)
     try:
         os.kill(pid, signal.SIGKILL)
