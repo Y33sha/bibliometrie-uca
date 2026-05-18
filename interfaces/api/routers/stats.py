@@ -4,20 +4,20 @@ import logging
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.api.stats_queries import StatsQueries
+from application.ports.api.stats_queries import (
+    JournalStatsResponse,
+    LabStatsResponse,
+    PublisherStatsResponse,
+    StatsFacetsResponse,
+    StatsQueries,
+    StatsSummary,
+    YearStatsRow,
+)
 from interfaces.api.deps import (
     get_apc_structure_ids_sync,
     stats_queries_sync,
 )
 from interfaces.api.filters import parse_int_csv
-from interfaces.api.models import (
-    JournalStatsResponse,
-    LabStatsResponse,
-    PublisherStatsResponse,
-    StatsFacetsResponse,
-    StatsSummary,
-    YearStatsRow,
-)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -37,23 +37,18 @@ def publisher_stats(
 ) -> PublisherStatsResponse:
     """Classement des éditeurs par volume de publications filtrées.
 
-    `lab_id`, `year` : listes CSV d'entiers. `oa_status` : valeur
-    unique (`gold`/`green`/`hybrid`/`bronze`/`closed`/`unknown`).
-    `has_apc=yes|no|""` : filtre sur la présence d'un paiement APC
-    connu.
+    `lab_id`, `year` : listes CSV d'entiers. `oa_status` : valeur unique (`gold`/`green`/`hybrid`/`bronze`/`closed`/`unknown`). `has_apc=yes|no|""` : filtre sur la présence d'un paiement APC connu.
     """
-    return PublisherStatsResponse.model_validate(
-        queries.publisher_stats(
-            apc_structure_ids=get_apc_structure_ids_sync(),
-            lab_ids=parse_int_csv(lab_id),
-            years=parse_int_csv(year),
-            oa_status=oa_status,
-            has_apc=has_apc,
-            search=search,
-            page=page,
-            per_page=per_page,
-            sort=sort,
-        )
+    return queries.publisher_stats(
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        lab_ids=parse_int_csv(lab_id),
+        years=parse_int_csv(year),
+        oa_status=oa_status,
+        has_apc=has_apc,
+        search=search,
+        page=page,
+        per_page=per_page,
+        sort=sort,
     )
 
 
@@ -71,19 +66,17 @@ def journal_stats(
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> JournalStatsResponse:
     """Stats d'articles par revue."""
-    return JournalStatsResponse.model_validate(
-        queries.journal_stats(
-            apc_structure_ids=get_apc_structure_ids_sync(),
-            lab_ids=parse_int_csv(lab_id),
-            years=parse_int_csv(year),
-            publisher_id=publisher_id,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            search=search,
-            page=page,
-            per_page=per_page,
-            sort=sort,
-        )
+    return queries.journal_stats(
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        lab_ids=parse_int_csv(lab_id),
+        years=parse_int_csv(year),
+        publisher_id=publisher_id,
+        oa_status=oa_status,
+        has_apc=has_apc,
+        search=search,
+        page=page,
+        per_page=per_page,
+        sort=sort,
     )
 
 
@@ -98,18 +91,15 @@ def stats_by_year(
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> list[YearStatsRow]:
     """Ventilation par année (pour les graphiques)."""
-    return [
-        YearStatsRow.model_validate(r)
-        for r in queries.stats_by_year(
-            apc_structure_ids=get_apc_structure_ids_sync(),
-            lab_ids=parse_int_csv(lab_id),
-            years=parse_int_csv(year),
-            publisher_id=publisher_id,
-            journal_id=journal_id,
-            oa_status=oa_status,
-            has_apc=has_apc,
-        )
-    ]
+    return queries.stats_by_year(
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        lab_ids=parse_int_csv(lab_id),
+        years=parse_int_csv(year),
+        publisher_id=publisher_id,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        has_apc=has_apc,
+    )
 
 
 @router.get("/api/stats/summary", response_model=StatsSummary)
@@ -123,16 +113,14 @@ def stats_summary(
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> StatsSummary:
     """Agrégats globaux (total, taux OA, total APC, etc.) pour le jeu de filtres."""
-    return StatsSummary.model_validate(
-        queries.stats_summary(
-            apc_structure_ids=get_apc_structure_ids_sync(),
-            lab_ids=parse_int_csv(lab_id),
-            years=parse_int_csv(year),
-            publisher_id=publisher_id,
-            journal_id=journal_id,
-            oa_status=oa_status,
-            has_apc=has_apc,
-        )
+    return queries.stats_summary(
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        lab_ids=parse_int_csv(lab_id),
+        years=parse_int_csv(year),
+        publisher_id=publisher_id,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        has_apc=has_apc,
     )
 
 
@@ -150,19 +138,17 @@ def stats_labs(
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> LabStatsResponse:
     """Stats d'articles par laboratoire."""
-    return LabStatsResponse.model_validate(
-        queries.stats_labs(
-            apc_structure_ids=get_apc_structure_ids_sync(),
-            lab_ids=parse_int_csv(lab_id),
-            years=parse_int_csv(year),
-            publisher_id=publisher_id,
-            journal_id=journal_id,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            page=page,
-            per_page=per_page,
-            sort=sort,
-        )
+    return queries.stats_labs(
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        lab_ids=parse_int_csv(lab_id),
+        years=parse_int_csv(year),
+        publisher_id=publisher_id,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        has_apc=has_apc,
+        page=page,
+        per_page=per_page,
+        sort=sort,
     )
 
 
@@ -185,14 +171,12 @@ def stats_facets(
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> StatsFacetsResponse:
     """Facettes dynamiques : années, labos, oa_status, apc."""
-    return StatsFacetsResponse.model_validate(
-        queries.stats_facets(
-            apc_structure_ids=get_apc_structure_ids_sync(),
-            lab_ids=parse_int_csv(lab_id),
-            years=parse_int_csv(year),
-            publisher_id=publisher_id,
-            journal_id=journal_id,
-            oa_status=oa_status,
-            has_apc=has_apc,
-        )
+    return queries.stats_facets(
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        lab_ids=parse_int_csv(lab_id),
+        years=parse_int_csv(year),
+        publisher_id=publisher_id,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        has_apc=has_apc,
     )
