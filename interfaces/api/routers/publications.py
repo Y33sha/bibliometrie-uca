@@ -7,6 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from application.ports.api.publications_queries import (
     FacetFilters,
     ListFilters,
+    PublicationDetailResponse,
+    PublicationListResponse,
+    PublicationsFacetsResponse,
     PublicationsQueries,
 )
 from interfaces.api.deps import (
@@ -14,11 +17,6 @@ from interfaces.api.deps import (
     publications_queries_sync,
 )
 from interfaces.api.filters import parse_int_csv, parse_str_csv
-from interfaces.api.models import (
-    PublicationDetailResponse,
-    PublicationListResponse,
-    PublicationsFacetsResponse,
-)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -73,8 +71,8 @@ def publications_facets(
         in_perimeter=in_perimeter,
         subject_id=subject_id,
     )
-    return PublicationsFacetsResponse.model_validate(
-        queries.publications_facets(filters=filters, apc_structure_ids=get_apc_structure_ids_sync())
+    return queries.publications_facets(
+        filters=filters, apc_structure_ids=get_apc_structure_ids_sync()
     )
 
 
@@ -159,7 +157,7 @@ def get_publication(
     detail = queries.get_publication_detail(pub_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Publication not found")
-    return PublicationDetailResponse.model_validate(detail)
+    return detail
 
 
 @router.get("/api/publications", response_model=PublicationListResponse)
@@ -211,12 +209,10 @@ def list_publications(
         in_perimeter=in_perimeter,
         subject_id=subject_id,
     )
-    return PublicationListResponse.model_validate(
-        queries.list_publications(
-            filters=filters,
-            apc_structure_ids=get_apc_structure_ids_sync(),
-            page=page,
-            per_page=per_page,
-            sort=sort,
-        )
+    return queries.list_publications(
+        filters=filters,
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        page=page,
+        per_page=per_page,
+        sort=sort,
     )
