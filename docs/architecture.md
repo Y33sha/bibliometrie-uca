@@ -387,9 +387,7 @@ Conftest splitté :
   `db` / `sa_sync_conn`
 
 Seuil de couverture `fail_under = 85` (`[tool.coverage.report]` dans
-`pyproject.toml`). Mesure courante : 86 %. Cible 80 % franchie ; suite à
-faire monter au gré des chantiers (cf.
-[chantiers/CODE_couverture-tests.md](chantiers/CODE_couverture-tests.md)).
+`pyproject.toml`). Mesure courante : 86 %.
 Les modules de wiring HTTP des adapters sources sont exclus du calcul ;
 leur logique pure vit dans `<source>/parsing.py` et est couverte par
 tests unitaires.
