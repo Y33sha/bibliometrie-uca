@@ -1,6 +1,7 @@
-"""Modèles Pydantic pour les structures (référentiel institutionnel)."""
+"""Modèles Pydantic pour les structures (référentiel institutionnel).
 
-from datetime import datetime
+Les DTOs de retour des query services (`StructureListItem`, `StructureOut`, `RelatedStructureOut`, `NameFormOut`, `StructureDetailResponse`) vivent dans `application/ports/api/structures_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4). Restent ici les bodies HTTP et la réponse polymorphe construite par le router pour la création de relation.
+"""
 
 from pydantic import BaseModel
 
@@ -15,8 +16,7 @@ class StructureCreate(BaseModel):
     ror_id: str | None = None
     rnsr_id: str | None = None
     hal_collection: str | None = None
-    # Pré-coercion : `str` toléré et wrappé en list par `StructureApiIds`
-    # côté repo. Output (`StructureOut.api_ids`) est `dict[str, list[str]]`.
+    # Pré-coercion : `str` toléré et wrappé en list par `StructureApiIds` côté repo. Output (`StructureOut.api_ids`) est `dict[str, list[str]]`.
     api_ids: dict[str, str | list[str]] | None = None
 
 
@@ -51,73 +51,7 @@ class NameFormUpdate(BaseModel):
     requires_context_of: list[int] | None = None
 
 
-# ----- Sorties -----
-
-
-class StructureListItem(BaseModel):
-    """Ligne résumée de `/api/structures` (liste + recherche)."""
-
-    id: int
-    code: str
-    name: str
-    acronym: str | None
-    type: str
-
-
-class StructureOut(BaseModel):
-    """Structure complète — renvoyée par GET/POST/PUT sur `/api/structures`."""
-
-    id: int
-    code: str
-    name: str
-    acronym: str | None
-    type: str
-    ror_id: str | None
-    rnsr_id: str | None
-    hal_collection: str | None
-    api_ids: dict[str, list[str]] | None
-
-
-class RelatedStructureOut(BaseModel):
-    """Structure voisine (parent/enfant) dans le détail d'une structure."""
-
-    id: int
-    code: str
-    name: str
-    acronym: str | None
-    type: str
-    relation_id: int
-    relation_type: str
-
-
-class NameFormOut(BaseModel):
-    """Forme de nom d'une structure."""
-
-    id: int
-    structure_id: int
-    form_text: str
-    is_word_boundary: bool
-    is_excluding: bool
-    requires_context_of: list[int] | None
-    created_at: datetime | None = None
-
-
-class StructureDetailResponse(BaseModel):
-    """Détail complet renvoyé par GET /api/structures/{id}."""
-
-    structure: StructureOut
-    parents: list[RelatedStructureOut]
-    children: list[RelatedStructureOut]
-    forms: list[NameFormOut]
-
-
-class StructureRelationOut(BaseModel):
-    """Relation structure-à-structure."""
-
-    id: int
-    parent_id: int
-    child_id: int
-    relation_type: str
+# ----- Sorties router-only -----
 
 
 class StructureRelationCreateResponse(BaseModel):

@@ -8,7 +8,13 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application import structures as structures_service
-from application.ports.api.structures_queries import StructuresQueries
+from application.ports.api.structures_queries import (
+    NameFormOut,
+    StructureDetailResponse,
+    StructureListItem,
+    StructureOut,
+    StructuresQueries,
+)
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.structure_repository import StructureRepository
 from interfaces.api.deps import (
@@ -19,13 +25,9 @@ from interfaces.api.deps import (
 from interfaces.api.models import (
     DeletedResponse,
     NameFormCreate,
-    NameFormOut,
     NameFormUpdate,
     RelationCreate,
     StructureCreate,
-    StructureDetailResponse,
-    StructureListItem,
-    StructureOut,
     StructureRelationCreateResponse,
     StructureUpdate,
 )
@@ -44,10 +46,7 @@ def list_structures(
 
     `type` : enum `structure_type` (`labo`, `universite`, `onr`, `chu`, `ecole`, `site`, `equipe`, `autre`). `search` : matching accent-insensible sur nom / acronyme / code. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
     """
-    return [
-        StructureListItem.model_validate(r)
-        for r in queries.list_structures(type_filter=type, search=search)
-    ]
+    return queries.list_structures(type_filter=type, search=search)
 
 
 @router.get("/api/structures/{structure_id}", response_model=StructureDetailResponse)
@@ -62,7 +61,7 @@ def get_structure(
     detail = queries.get_structure_detail(structure_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Structure not found")
-    return StructureDetailResponse.model_validate(detail)
+    return detail
 
 
 @router.post("/api/structures", response_model=StructureOut)
@@ -154,7 +153,7 @@ def get_name_form(
     row = queries.get_name_form(form_id)
     if not row:
         raise HTTPException(status_code=404, detail="Form not found")
-    return NameFormOut.model_validate(row)
+    return row
 
 
 @router.post("/api/name-forms", response_model=NameFormOut)
