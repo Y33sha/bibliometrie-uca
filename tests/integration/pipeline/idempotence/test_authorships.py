@@ -55,3 +55,35 @@ class TestBuildAuthorshipsIdempotence:
         assert counts_2 == counts_1, (
             f"Compteurs différents après 2e passe !\n  1ère : {counts_1}\n  2ème : {counts_2}"
         )
+
+
+class TestBuildAuthorshipsRebuildFull:
+    """`rebuild_full=True` purge la table et reconstruit sans erreur FK.
+
+    Régression : `TRUNCATE TABLE authorships` était refusé par Postgres à cause de la FK `source_authorships.authorship_id`, même après avoir mis cette FK à NULL et même si la table était vide. Le fix remplace `TRUNCATE` par `DELETE`.
+    """
+
+    def test_rebuild_full_succeeds_and_converges(self, sa_sync_conn):
+        import logging
+
+        from application.pipeline.authorships.build_authorships import build
+        from infrastructure.queries.authorships_build import PgAuthorshipsBuildQueries
+
+        setup_persons_test_data(sa_sync_conn)
+        run_create_persons(sa_sync_conn)
+        _run_build_authorships(sa_sync_conn)
+        counts_before = _count_authorships_tables(sa_sync_conn)
+        assert counts_before["total"] >= 3
+
+        build(
+            sa_sync_conn,
+            PgAuthorshipsBuildQueries(),
+            logging.getLogger("test"),
+            rebuild_full=True,
+        )
+        counts_after = _count_authorships_tables(sa_sync_conn)
+
+        assert counts_after == counts_before, (
+            f"rebuild_full doit converger vers le même état !\n"
+            f"  avant : {counts_before}\n  après : {counts_after}"
+        )
