@@ -4,7 +4,12 @@ from typing import Any
 
 from sqlalchemy import Connection, select, text
 
-from application.ports.api.journals_queries import JournalQueries
+from application.ports.api.journals_queries import (
+    JournalBasic,
+    JournalListResponse,
+    JournalOut,
+    JournalQueries,
+)
 from infrastructure.db.tables import journals as t_journals
 
 _SORT_MAP = {
@@ -31,7 +36,7 @@ class PgJournalQueries(JournalQueries):
         sort: str,
         page: int,
         per_page: int,
-    ) -> dict[str, Any]:
+    ) -> JournalListResponse:
         binds: dict[str, Any] = {}
         parts: list[str] = []
         if search and len(search) >= 2:
@@ -67,19 +72,43 @@ class PgJournalQueries(JournalQueries):
             """),
             {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
-        return {
-            "total": total,
-            "page": page,
-            "pages": (total + per_page - 1) // per_page,
-            "journals": [dict(r._mapping) for r in rows],
-        }
+        return JournalListResponse(
+            total=total,
+            page=page,
+            pages=(total + per_page - 1) // per_page,
+            journals=[
+                JournalOut(
+                    id=r.id,
+                    title=r.title,
+                    issn=r.issn,
+                    eissn=r.eissn,
+                    issnl=r.issnl,
+                    publisher_id=r.publisher_id,
+                    pub_name=r.pub_name,
+                    openalex_id=r.openalex_id,
+                    is_in_doaj=r.is_in_doaj,
+                    is_predatory=r.is_predatory,
+                    apc_amount=r.apc_amount,
+                    apc_currency=r.apc_currency,
+                    oa_model=r.oa_model,
+                    journal_type=r.journal_type,
+                    is_academic=r.is_academic,
+                    doi_prefix=r.doi_prefix,
+                    notes=r.notes,
+                    pub_count=r.pub_count,
+                )
+                for r in rows
+            ],
+        )
 
-    def get_journal(self, journal_id: int) -> dict[str, Any] | None:
+    def get_journal(self, journal_id: int) -> JournalBasic | None:
         row = self._conn.execute(
             text("SELECT id, title FROM journals WHERE id = :id"),
             {"id": journal_id},
         ).one_or_none()
-        return dict(row._mapping) if row else None
+        if row is None:
+            return None
+        return JournalBasic(id=row.id, title=row.title)
 
     def existing_journal_ids(self, journal_ids: tuple[int, ...]) -> set[int]:
         if not journal_ids:

@@ -79,9 +79,9 @@ Un sweep par feature, dans cet ordre (du plus petit au plus gros pour roder le p
 
 - [x] **subjects** (7 BaseModel). DTOs (`SubjectOntologyEntry`, `SubjectOut`, `SubjectListItem`, `SubjectListResponse`, `SubjectNeighborOut`, `SubjectDetailResponse`, `SubjectFrequency`) co-localisés dans `application/ports/api/subjects_queries.py` avec le `Protocol`. PgSubjectsAdminQueries instancie les DTOs ; router propage sans `model_validate`. `interfaces/api/models/subjects.py` supprimé (les 3 importeurs cross-feature — `models/publications.py`, `routers/persons.py`, `routers/laboratories.py` — pointent directement vers le port).
 - [x] **auth** (2). Pas de port query (auth lit un cookie HMAC, pas la DB). `LoginRequest` est un body HTTP (entrée FastAPI), `AuthCheckResponse` est construit par le router — les deux restent dans `interfaces/api/models/auth.py` (cf. Décision 3 : seuls les retours de query service migrent au port).
-- [ ] **journals** (3)
-- [ ] **publishers** (4)
-- [ ] **perimeters** (5 admin)
+- [x] **journals** (3 → port). `JournalOut`, `JournalListResponse` migrés vers `application/ports/api/journals_queries.py`. `JournalBasic` ajouté (port) pour typer `get_journal` (le router renvoyait `dict[str, Any]` avant). `JournalUpdate` (body PUT) reste dans `interfaces/api/models/journals.py`. Router propage les DTOs sans `model_validate`. PUT/POST passent à `OkResponse` / `MergeResponse` au lieu de dicts inline (shape JSON identique).
+- [x] **publishers** (4 → port). `PublisherListItem`, `PublisherListResponse`, `PublisherBasic` migrés vers `application/ports/api/publishers_queries.py`. `PublisherUpdate` (body PUT) reste dans `interfaces/api/models/publishers.py`. Router propage les DTOs sans wrapping intermédiaire.
+- [x] **perimeters** (5 admin → 2 port, 3 restent). `PerimeterOut` et `PerimeterStructureItem` migrés vers `application/ports/api/perimeters_queries.py`. `PerimeterCreate`, `PerimeterUpdate`, `AddPerimeterStructure` (bodies HTTP) restent dans `interfaces/api/models/admin/perimeters.py`. `PgPerimetersAdminQueries` instancie les DTOs directement (lecture `_mapping → dict` supprimée). Router propage sans `model_validate`.
 - [ ] **person_duplicates** (9 admin)
 - [ ] **hal_problems** (14)
 - [ ] **publication_duplicates** (7 admin)
@@ -106,7 +106,12 @@ Pour chaque feature, étapes type :
 8. Adapter les importeurs cross-feature qui pointaient via `interfaces.api.models` → pointage direct vers le port.
 9. Tests : la suite d'intégration de la feature doit rester verte.
 
-**Override mypy** : le glob `interfaces.api.models.*` reste dans l'override `disallow_any_explicit = false` (Pydantic 2 propage des `Any` en interne). Les DTOs déplacés vers `application/ports/api/*` sont couverts par le glob `application.ports.api.*` qui existe déjà dans le même override — pas de nouvelle exception à ajouter. L'objectif Phase 4 n'est pas de sortir les DTOs de l'override, mais d'évacuer les `dict[str, Any]` des ports et adapters.
+**Override mypy** : deux globs concernent ce chantier dans `[[tool.mypy.overrides]]` (`disallow_any_explicit = false`) :
+
+- `interfaces.api.models.*` : nécessaire pour `ConfigItem.value: Any` / `ConfigValueUpdate.value: Any` (Pydantic ne supporte pas l'alias récursif `JsonValue` sur py310). Sans ces deux fields, le glob pourrait sortir.
+- `application.ports.api.*` : nécessaire tant que la majorité des ports retournent `dict[str, Any]` — c'est précisément ce que Phase 4 vient liquider port par port. Un module qui n'a plus aucun `Any` après migration pourrait en sortir individuellement, mais le glob étant collectif, l'éclater à chaque sweep serait du bruit. **Phase 6 fera le ménage d'un bloc** une fois tous les ports passés.
+
+Pas de nouvelle exception à ajouter pendant Phase 4 : les DTOs migrés tombent sous un glob qui existe déjà.
 
 Note `_common.py` (16 BaseModel partagés transverses) : à traiter à la fin selon la nature (retours port vs réponses router-only).
 

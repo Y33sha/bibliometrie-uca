@@ -4,7 +4,11 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.api.publishers_queries import PublisherQueries
+from application.ports.api.publishers_queries import (
+    PublisherBasic,
+    PublisherListResponse,
+    PublisherQueries,
+)
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
@@ -20,8 +24,6 @@ from interfaces.api.models import (
     MergeRequest,
     MergeResponse,
     OkResponse,
-    PublisherBasic,
-    PublisherListResponse,
     PublisherUpdate,
 )
 
@@ -43,8 +45,7 @@ def list_publishers(
     caractères. `sort` : `name` / `-name` / `journals` / `-journals`
     / `pubs` / `-pubs` ; fallback sur `name` si inconnu.
     """
-    data = queries.list_publishers(search=search, sort=sort, page=page, per_page=per_page)
-    return PublisherListResponse(**data)
+    return queries.list_publishers(search=search, sort=sort, page=page, per_page=per_page)
 
 
 @router.get("/api/publishers/{publisher_id}", response_model=PublisherBasic)
@@ -54,9 +55,9 @@ def get_publisher(
 ) -> PublisherBasic:
     """Récupère un éditeur par son id (nom uniquement). 404 si inconnu."""
     row = queries.get_publisher(publisher_id)
-    if not row:
+    if row is None:
         raise HTTPException(status_code=404, detail="Éditeur introuvable")
-    return PublisherBasic(**row)
+    return row
 
 
 @router.put("/api/publishers/{publisher_id}", response_model=OkResponse)
