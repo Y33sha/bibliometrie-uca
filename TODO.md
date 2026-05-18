@@ -1,7 +1,8 @@
 # A régler avant transmission
-## Pipeline
+## Schéma de données
+* [ ] peut-on remplacer certaines tables par des vues matérialisées? (source_authorship_structures, authorship_structures, authorships?)
+## Pipeline de traitement
 ### Extraction
-* [ ] possible de paralléliser les extracteurs *entre eux*? ->> **CODE_async-extractions-http.md**
 * [ ] vérif http2 pour extracteurs ->> **CODE_async-extractions-http.md**
 * [ ] Backoff `not_found_at` sur DOI: Pour limiter la croissance du pool de DOI retentés à chaque run de `fetch_missing_doi`, stocker un `not_found_at TIMESTAMP` sur les DOI qu'une source n'a pas pu résoudre, et ne les réessayer qu'après N jours (30 ?) ->> **DATA_cycle-vie-staging.md**
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour ->> **DATA_cycle-vie-staging.md**
@@ -29,9 +30,9 @@
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
-* [ ] adresses/pays: attribution de pays cassée
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
+* [ ] beaucoup de résultats ScanR sont rejetés en phase "affiliations" => auditer
 ## Sujets
 * [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation manuelle des sujets? / ajouter seuil de score de pertinence? / algos pour évaluer pertinence (co-occurrences suspectes, NLP...)
 ## Explorer autres sources possibles
@@ -71,7 +72,6 @@
 # Détails à régler au fil de l'eau (interface)
 ## Admin
 * [ ] interface pour consulter l'audit trail
-* [ ] bouton relancer détection (page /admin/feedback): cassé; supprimer ou réparer?
 * [ ] comportement capricieux de l'UI sur la page countries (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine.
 ### Personnes (admin)
 * [ ] quoi faire des entités fausses? a minima, rejeter leurs authorships et s'assurer qu'elles n'apparaissent pas dans orphan-authorships

@@ -138,7 +138,7 @@ flowchart LR
     authorships --- persons
     structures --- apc_payments
     apc_payments ---|DOI| publications
-    source_publications-->|normalize|publications
+    source_publications-->|match_or_create|publications
     publications---journals
     journals---publishers
 
@@ -169,7 +169,7 @@ flowchart LR
 
     authorships --- publications
     authorships ---- persons
-    source_authorships-->persons
+    source_authorships-->|match_or_create|persons
     persons---persons_rh
     persons---person_identifiers
     persons---person_name_forms
@@ -189,7 +189,7 @@ flowchart LR
 Tables associées :
 - `persons_rh`: Table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](sources#donnees-rh).
 - `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hal`, `openalex`, `scanr`, `theses`, `manual`, `auto`). La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources.
-- `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes. Une colonne JSONB `persons` au format `{ "<person_id>": ["<source1>", ...], ... }` couple chaque personne aux sources où la forme a été observée. Lorsqu'une authorship source est reliée à une personne, la forme de nom est ajoutée (si absente) aux name_forms de cette personne avec la source correspondante.
+- `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes.
 
 #### `authorships`
 

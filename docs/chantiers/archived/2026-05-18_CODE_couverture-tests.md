@@ -1,6 +1,7 @@
 # Chantier — Couverture de tests : viser 80 %
 
 Commencé le 2026-05-17
+Terminé le 2026-05-18: cible dépassée (85% de couverture); 3 fichiers ont été laissés (auth + 2 extracteurs que je ne suis pas sûre de garder)
 
 ## Contexte
 
@@ -125,7 +126,6 @@ Tous partiellement couverts par les tests d'idempotence existants ; il reste les
 
 ## Questions ouvertes
 
-- **Fonction de coût de l'aiguillage HAL `extract_collection`.** Une fois la branche choisie pinée par test (Phase 1, décision 1bis), l'heuristique actuelle (`len(orphans) < full_fetch_pages`) reste insatisfaisante : elle compte les requêtes mais ignore la taille de payload, ce qui sur les requêtes umbrella (PRES_UCA) inverse le bon choix. Pistes à arbitrer : (a) borne dure sur les orphelins (« si `orphans < N`, toujours individuel »), (b) cost function pondérée payload (poids par source via `hal_per_page_for`), (c) compteur empirique sur les derniers runs. Décision distincte de l'extraction `parsing.py`, à ouvrir une fois les tests posés.
 - **Snapshot des réponses API.** Si on veut une garantie sur le format des réponses (champ renommé côté API source détecté avant le run), on peut ajouter quelques tests `respx` ciblés (1-2 par source) marqués `@pytest.mark.snapshot` et exclus du `pytest tests/` par défaut. À discuter si une régression d'API arrive en prod et qu'on veut un filet.
 - **Router `docs` retiré ou conservé ?** Le frontend actuel disparaît à la transmission. Si la doc consultable côté admin est jugée Laura-only (et donc retirée avec le frontend), ne pas couvrir. Sinon, la DSI réécrira un router équivalent et nos tests serviront de spec — à inclure.
 - **Tests d'auth** : conditionner à la décision DSI sur le remplacement du JWT actuel par CAS. Tant que ce n'est pas tranché, laisser auth.py à 56 % sans investir.

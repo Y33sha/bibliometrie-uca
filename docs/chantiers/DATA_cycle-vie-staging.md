@@ -145,3 +145,6 @@ Quand HAL/OA/WoS/ScanR `fetch_missing_doi.py` insère un stub not_found pour un 
 **Phase 4 — Stratégie de re-fetch.** Re-fetch tous les K mois ? Re-fetch quand `meta_hash` est ancien ? Quel impact sur les quotas API (notamment WoS) ?
 
 **Cohabitation avec le statut OA via Unpaywall.** Aujourd'hui `enrich_oa_status` rafraîchit le statut OA depuis Unpaywall pour les publis sans statut. Le re-fetch périodique pourrait soit le compléter (re-fetch toutes les métadonnées en plus du statut OA), soit s'aligner sur la même fréquence pour limiter les appels API.
+
+Note extraite du chantier "couverture-tests":
+- **Fonction de coût de l'aiguillage HAL `extract_collection`.** Une fois la branche choisie pinée par test (Phase 1, décision 1bis), l'heuristique actuelle (`len(orphans) < full_fetch_pages`) reste insatisfaisante : elle compte les requêtes mais ignore la taille de payload, ce qui sur les requêtes umbrella (PRES_UCA) inverse le bon choix. Pistes à arbitrer : (a) borne dure sur les orphelins (« si `orphans < N`, toujours individuel »), (b) cost function pondérée payload (poids par source via `hal_per_page_for`), (c) compteur empirique sur les derniers runs. Décision distincte de l'extraction `parsing.py`, à ouvrir une fois les tests posés.
