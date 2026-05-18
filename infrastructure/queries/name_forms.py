@@ -11,14 +11,16 @@ PK composite — pas de JSONB, pas d'`id` de row. La fusion par couple
 est faite en SQL (`array_agg DISTINCT`), pas en Python.
 """
 
-from typing import Any
-
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.name_forms import NameFormsQueries
+from application.ports.pipeline.name_forms import (
+    NameFormsQueries,
+    PersonNameRow,
+    RawFormBatchItem,
+)
 
 
-def fetch_persons_names(conn: Connection) -> list[dict[str, Any]]:
+def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
     """`(id, first_name, last_name)` de toutes les personnes avec un nom.
 
     Inclut les ``rejected = TRUE`` : leurs name_forms doivent rester
@@ -36,7 +38,7 @@ def fetch_persons_names(conn: Connection) -> list[dict[str, Any]]:
             WHERE last_name IS NOT NULL AND last_name != ''
         """)
     ).all()
-    return [dict(r._mapping) for r in rows]
+    return [PersonNameRow(id=r.id, first_name=r.first_name, last_name=r.last_name) for r in rows]
 
 
 def create_temp_raw_forms_table(conn: Connection) -> None:
@@ -50,11 +52,8 @@ def create_temp_raw_forms_table(conn: Connection) -> None:
     conn.execute(text("CREATE TEMP TABLE _raw_forms (raw_text TEXT, person_id INT, source TEXT)"))
 
 
-def insert_raw_forms_batch(conn: Connection, rows: list[dict[str, Any]]) -> None:
-    """Insert par batch dans la table temporaire `_raw_forms`.
-
-    Chaque dict du batch a les clés ``raw_text``, ``person_id``, ``source``.
-    """
+def insert_raw_forms_batch(conn: Connection, rows: list[RawFormBatchItem]) -> None:
+    """Insert par batch dans la table temporaire `_raw_forms`."""
     if not rows:
         return
     conn.execute(
@@ -142,13 +141,13 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
 class PgNameFormsQueries(NameFormsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.name_forms.NameFormsQueries`."""
 
-    def fetch_persons_names(self, conn: Connection) -> list[dict[str, Any]]:
+    def fetch_persons_names(self, conn: Connection) -> list[PersonNameRow]:
         return fetch_persons_names(conn)
 
     def create_temp_raw_forms_table(self, conn: Connection) -> None:
         create_temp_raw_forms_table(conn)
 
-    def insert_raw_forms_batch(self, conn: Connection, rows: list[dict[str, Any]]) -> None:
+    def insert_raw_forms_batch(self, conn: Connection, rows: list[RawFormBatchItem]) -> None:
         insert_raw_forms_batch(conn, rows)
 
     def drop_temp_raw_forms_table(self, conn: Connection) -> None:
