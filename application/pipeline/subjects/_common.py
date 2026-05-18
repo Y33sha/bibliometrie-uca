@@ -4,7 +4,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.subjects import SubjectsQueries
+from application.ports.pipeline.subjects import OntologyEntry, SubjectsQueries
 
 
 def dedup_strs(values: object) -> list[str]:
@@ -61,7 +61,7 @@ class SubjectCache:
         *,
         label: str,
         language: str | None = None,
-        ontologies: dict[str, dict[str, Any]] | None = None,
+        ontologies: dict[str, OntologyEntry] | None = None,
     ) -> int:
         """Retourne l'id du sujet pour ce label (UPSERT au besoin).
 
@@ -97,7 +97,7 @@ class SubjectCache:
         return sid
 
     @staticmethod
-    def _covers(pushed: dict[str, _PushedOntology], requested: dict[str, dict[str, Any]]) -> bool:
+    def _covers(pushed: dict[str, _PushedOntology], requested: dict[str, OntologyEntry]) -> bool:
         """True si toutes les ontologies/codes/level/parent demandées sont
         déjà couvertes par `pushed`."""
         for o, body in requested.items():

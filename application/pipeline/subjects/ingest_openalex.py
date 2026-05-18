@@ -20,6 +20,7 @@ feuille ; les niveaux supérieurs sont liés sans score.
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
+from application.ports.pipeline.subjects import OntologyEntry
 from domain.json_types import JsonValue
 from domain.subjects.subject import ONTOLOGY_OPENALEX_TOPIC
 
@@ -82,7 +83,7 @@ def _collect_topic_chain(
     parent_label: str | None = None
     deepest_idx = levels_present[-1][2]
     for _name, label, idx in levels_present:
-        ontology_entry: dict[str, JsonValue] = {
+        ontology_entry: OntologyEntry = {
             "codes": [label.lower()],
             "level": idx,
         }
