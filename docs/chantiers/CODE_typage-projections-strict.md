@@ -119,6 +119,17 @@ Note `_common.py` : la séparation port-side / router-side a été faite lors du
 
 Les `list[dict[str, Any]]` non triés par Phase 1-4 : queries `merge`, `name_forms`, `normalize_wos`, batchs SQL `executemany`, services `merge_pubs_by_hal_id`, `create_persons_from_source_authorships`, `resolve_addresses`. TypedDict ou dataclass par contrat, au cas par cas. Estimation ~80 occurrences restantes à ce stade.
 
+Sous-phasage (du plus simple au plus risqué) :
+
+- [x] **5.1 — `MergeQueries` + `merge_pubs_by_hal_id`**. 3 NamedTuple co-localisés dans le port (`NntDuplicateRow`, `OaScanrHalRow`, `HalSourceRow`) + 2 dataclass locales au caller (`HalLinkItem`, `HalMergeItem`) au lieu des fusions `{**dict, **dict}`. Tests `test_merge_pubs_by_hal_id.py` + `test_merge_pubs_by_nnt.py` adaptés (accès attribut au lieu de `["clé"]`). Test d'intégration `test_merge.py` aussi.
+- [ ] **5.2 — `NameFormsQueries`**. 1 NamedTuple `PersonNameRow` pour `fetch_persons_names`. 1 TypedDict `RawFormBatchItem` pour le batch executemany.
+- [ ] **5.3 — `WosNormalizeQueries` (batchs executemany)**. 3 TypedDict : `WosAddressUpsertItem`, `WosAuthorshipUpsertItem`, `WosAuthorshipAddressItem`. Construction explicite typée dans `normalize_wos.py`. Tests `test_normalize_wos.py`.
+- [ ] **5.4 — `PersonsCreateQueries` + `create_persons_from_source_authorships`**. Refactor propre en 2 NamedTuple : `BareUnlinkedAuthorship` (depuis SQL) → `EnrichedAuthorship` (après parsing nom + flags). Plus de mutation de dict.
+- [ ] **5.5 — `AddressResolutionQueries` + `resolve_addresses`**. 1 NamedTuple `StructureNameForm` pour `load_name_forms`. Helpers (`match_form_in_text`, `resolve_address`, `build_forms_by_structure`, `has_form_match_for_structure`) typés.
+- [ ] **5.6 — Subjects**. 1 TypedDict `OntologyEntry`. Port `upsert_subject` et `SubjectCache.get_or_upsert` signent `ontologies: dict[str, OntologyEntry] | None`.
+- [ ] **5.7 — Staging : refactor en dataclass héritée**. Passer `StagingRow`/`HalStagingRow` de NamedTuple à `dataclass(frozen=True)` avec vrai héritage (`class HalStagingRow(StagingRow)`). Une seule méthode au port (`fetch_pending_staging → list[StagingRow]`, l'implémentation HAL retourne en fait des `HalStagingRow` — substitution LSP). Suppression du paramètre `columns: str`, des `Row[Any]`, de `_row_factory` côté `SourceNormalizer`, du `Generic[T_Row]`. Le normalizer HAL accède `.hal_collections` via `cast`/`isinstance`. Sweep plus large que prévu initialement mais nettement plus propre.
+- [ ] **5.8 — Bilan**. Suite intégration verte, recompte des `Any` restants dans les zones traitées, mise à jour de la note Phase 6 sur les overrides mypy résiduels.
+
 ### Phase 6 — Bilan override mypy
 
 Retrait final des modules de l'override `disallow_any_explicit = false` qui peuvent l'être. Documentation des modules irréductibles (sources API externes, CLI) avec justification durable dans le commentaire `pyproject.toml`.

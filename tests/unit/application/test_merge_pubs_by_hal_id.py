@@ -15,42 +15,45 @@ import pytest
 
 from application.pipeline.publications import merge_pubs_by_hal_id
 from application.pipeline.publications.merge_pubs_by_hal_id import (
+    HalLinkItem,
+    HalMergeItem,
     find_duplicates,
     link_hal_to_publication,
     run_merge,
 )
+from application.ports.pipeline.merge import HalSourceRow, OaScanrHalRow
 
 
 class _FakeQueries:
     def __init__(
         self,
-        src_rows: list[dict[str, Any]],
-        hal_rows: list[dict[str, Any]],
+        src_rows: list[OaScanrHalRow],
+        hal_rows: list[HalSourceRow],
     ) -> None:
         self._src_rows = src_rows
         self._hal_rows = hal_rows
 
     # `conn: object` car l'argument n'est pas utilisé dans le fake (les tests
     # passent `conn=None` ; le fake retourne directement les rows pré-fournies).
-    def fetch_source_publications_with_hal_external_id(self, conn: object) -> list[dict[str, Any]]:
+    def fetch_source_publications_with_hal_external_id(self, conn: object) -> list[OaScanrHalRow]:
         return self._src_rows
 
-    def fetch_hal_source_publications(self, conn: object) -> list[dict[str, Any]]:
+    def fetch_hal_source_publications(self, conn: object) -> list[HalSourceRow]:
         return self._hal_rows
 
 
-def _src(source: str, src_pub_id: int | None, hal_id: str, src_doc_id: int = 1) -> dict:
-    return {
-        "src_doc_id": src_doc_id,
-        "source": source,
-        "src_id": f"{source}-{src_doc_id}",
-        "src_pub_id": src_pub_id,
-        "hal_id": hal_id,
-    }
+def _src(source: str, src_pub_id: int | None, hal_id: str, src_doc_id: int = 1) -> OaScanrHalRow:
+    return OaScanrHalRow(
+        src_doc_id=src_doc_id,
+        source=source,
+        src_id=f"{source}-{src_doc_id}",
+        src_pub_id=src_pub_id,
+        hal_id=hal_id,
+    )
 
 
-def _hal(hal_id: str, hal_pub_id: int | None, hal_doc_id: int = 100) -> dict:
-    return {"hal_doc_id": hal_doc_id, "halid": hal_id, "hal_pub_id": hal_pub_id}
+def _hal(hal_id: str, hal_pub_id: int | None, hal_doc_id: int = 100) -> HalSourceRow:
+    return HalSourceRow(hal_doc_id=hal_doc_id, halid=hal_id, hal_pub_id=hal_pub_id)
 
 
 # ── Régression : OA + ScanR sur même hal_id ──────────────────────────
@@ -74,10 +77,10 @@ def test_second_source_with_same_hal_id_is_not_dropped():
     assert link_only == []
     assert len(merge_needed) == 1
     item = merge_needed[0]
-    assert item["source"] == "scanr"
-    assert item["src_pub_id"] == 160452
-    assert item["hal_pub_id"] == 86628
-    assert item["halid"] == "hal-05508565"
+    assert item.source == "scanr"
+    assert item.src_pub_id == 160452
+    assert item.hal_pub_id == 86628
+    assert item.halid == "hal-05508565"
 
 
 def test_no_op_when_both_sources_already_merged():
@@ -106,8 +109,8 @@ def test_link_only_when_hal_has_no_publication_id():
 
     assert merge_needed == []
     assert len(link_only) == 1
-    assert link_only[0]["src_pub_id"] == 10
-    assert link_only[0]["hal_doc_id"] == 500
+    assert link_only[0].src_pub_id == 10
+    assert link_only[0].hal_doc_id == 500
 
 
 def test_link_only_dedup_per_hal_doc_when_multiple_sources():
@@ -125,7 +128,7 @@ def test_link_only_dedup_per_hal_doc_when_multiple_sources():
     link_only, _ = find_duplicates(conn=None, queries=_FakeQueries(src_rows, hal_rows))
 
     assert len(link_only) == 1
-    assert link_only[0]["hal_doc_id"] == 700
+    assert link_only[0].hal_doc_id == 700
 
 
 # ── merge_needed ──────────────────────────────────────────────────────
@@ -170,14 +173,13 @@ class _RecordingQueries:
         self.link_calls.append((hal_doc_id, src_pub_id))
 
 
-def _link_item(hal_doc_id: int, src_pub_id: int, source: str = "openalex") -> dict[str, Any]:
-    return {
-        "source": source,
-        "src_id": f"{source}-x",
-        "src_pub_id": src_pub_id,
-        "hal_doc_id": hal_doc_id,
-        "halid": "hal-X",
-    }
+def _link_item(hal_doc_id: int, src_pub_id: int, source: str = "openalex") -> HalLinkItem:
+    return HalLinkItem(
+        source=source,
+        src_pub_id=src_pub_id,
+        hal_doc_id=hal_doc_id,
+        halid="hal-X",
+    )
 
 
 @pytest.fixture
@@ -316,13 +318,13 @@ class TestRunMerge:
         conn = _FakeConn()
         queries = _StubQueries()
         repo = MagicMock()
-        merge_item = {
-            "source": "openalex",
-            "src_id": "openalex-1",
-            "src_pub_id": 20,
-            "hal_pub_id": 21,
-            "halid": "hal-W",
-        }
+        merge_item = HalMergeItem(
+            source="openalex",
+            src_id="openalex-1",
+            src_pub_id=20,
+            hal_pub_id=21,
+            halid="hal-W",
+        )
         patched["find_result"] = ([], [merge_item])
 
         run_merge(conn, queries, logger, pub_repo=repo)
@@ -339,13 +341,13 @@ class TestRunMerge:
         queries = _StubQueries()
         repo = MagicMock()
         link_item = _link_item(100, 10, source="scanr")
-        merge_item = {
-            "source": "scanr",
-            "src_id": "scanr-2",
-            "src_pub_id": 30,
-            "hal_pub_id": 31,
-            "halid": "hal-Y",
-        }
+        merge_item = HalMergeItem(
+            source="scanr",
+            src_id="scanr-2",
+            src_pub_id=30,
+            hal_pub_id=31,
+            halid="hal-Y",
+        )
         patched["find_result"] = ([link_item], [merge_item])
 
         run_merge(conn, queries, logger, pub_repo=repo)
@@ -359,13 +361,13 @@ class TestRunMerge:
         queries = _StubQueries()
         repo = MagicMock()
         link_item = _link_item(100, 10)
-        merge_item = {
-            "source": "openalex",
-            "src_id": "openalex-1",
-            "src_pub_id": 20,
-            "hal_pub_id": 21,
-            "halid": "hal-Z",
-        }
+        merge_item = HalMergeItem(
+            source="openalex",
+            src_id="openalex-1",
+            src_pub_id=20,
+            hal_pub_id=21,
+            halid="hal-Z",
+        )
         patched["find_result"] = ([link_item], [merge_item])
 
         run_merge(conn, queries, logger, pub_repo=repo, dry_run=True)
