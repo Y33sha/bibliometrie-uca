@@ -1,5 +1,6 @@
 # Chantier — Repositories → use cases (orchestration en application)
-Identifié le 2026-05-11
+
+Commencé le 2026-05-11
 
 ## Contexte
 
@@ -170,13 +171,13 @@ d'intégration des merges existants.
 
 ### Phase 4 — Cascade countries de `address_repository.py`
 
-- Créer `application/addresses_countries_propagation.py` (nom à
+- [ ] Créer `application/addresses_countries_propagation.py` (nom à
   confirmer). Y orchestrer la cascade
   `addresses.countries → source_publications.countries → publications.countries`.
-- Le repo `address_repository.py` conserve les méthodes SQL atomiques
+- [ ] Le repo `address_repository.py` conserve les méthodes SQL atomiques
   (`update_address_countries`, `bulk_update_source_publications_countries`,
   etc.) sans logique de cascade.
-- Mettre à jour `docs/architecture.md` : retirer (ou nuancer) la
+- [ ] Mettre à jour `docs/architecture.md` : retirer (ou nuancer) la
   mention « exception cross-aggregate documentée » puisque la cascade
   devient explicite côté application.
 
@@ -186,29 +187,29 @@ Tests : tests d'intégration sur la cascade countries.
 
 À traiter en queue de chantier (ordre indifférent) :
 
-- Investiguer le double commit `normalize/base.py:194-196`. Soit
+- [ ] Investiguer le double commit `normalize/base.py:194-196`. Soit
   documenter pourquoi, soit nettoyer.
-- Décider du sort du `commit()` après reset dans
+- [ ] Décider du sort du `commit()` après reset dans
   `enrich_journal_apc.py:118` : savepoint englobant ou statu quo
   documenté.
-- Auditer les commits sur `KeyboardInterrupt` : nécessaires ou
+- [ ] Auditer les commits sur `KeyboardInterrupt` : nécessaires ou
   doublon des batch commits ?
-- Ajouter à `docs/architecture.md` une section « Discipline
+- [ ] Ajouter à `docs/architecture.md` une section « Discipline
   transactionnelle » qui formalise : repositories sans commit, batch
   commits dans pipelines comme exception assumée, commits dans
   `infrastructure/sources/*` comme adapters batch.
 
 ## Hors scope
 
-- **Pas de réécriture des merges sains** (`journal_repository`,
+- [ ] **Pas de réécriture des merges sains** (`journal_repository`,
   `publisher_repository`). La chorégraphie SQL y est déjà bien
   orchestrée par les use cases.
-- **Pas de migration des batch commits vers un autre pattern** :
+- [ ] **Pas de migration des batch commits vers un autre pattern** :
   conserver, documenter.
-- **Pas de migration des extracteurs `infrastructure/sources/*`**
+- [ ] **Pas de migration des extracteurs `infrastructure/sources/*`**
   vers `application/`. Ce sont des adapters batch, leur place est
   défendable en infra.
-- **Pas de refonte du `_savepoint.py`** : le pattern est correct.
+- [ ] **Pas de refonte du `_savepoint.py`** : le pattern est correct.
 
 ## Questions ouvertes
 

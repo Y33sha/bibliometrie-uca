@@ -105,3 +105,7 @@ longue date mais jamais instruits comme chantier dédié :
   transmission faite, le volet B peut devenir inutile. À
   reconsidérer au moment de la transmission. En attendant, une
   page admin minimaliste suffit.
+
+## Idées à intégrer
+statement_timeout côté pipeline : si une requête tourne > 10 min sans logging, c'est un signe — interrompre et logger.
+Logging de progression dans les UPDATE longs (propagate_is_corresponding, propagate_roles) : actuellement on n'a qu'une ligne avant + une après, pas de visibilité pendant.

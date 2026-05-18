@@ -39,3 +39,6 @@ user-triggered (pas les scripts CLI). Candidats pressentis :
 Livrable audit : tableau par endpoint avec volume max observable,
 temps moyen, temps P99, décision (sync / seuil + bg task / toujours
 bg task).
+
+## Idées à intégrer
+Cleanup explicite des idle in transaction côté API (BG tasks notamment) : vérifier qu'aucune BackgroundTasks ne laisse une transaction ouverte si elle plante.
