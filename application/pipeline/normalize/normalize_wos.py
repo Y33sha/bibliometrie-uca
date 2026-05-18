@@ -28,7 +28,12 @@ from sqlalchemy import Connection, Row
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
-from application.ports.pipeline.normalize.wos import WosNormalizeQueries
+from application.ports.pipeline.normalize.wos import (
+    WosAddressBatchItem,
+    WosAuthorshipAddressItem,
+    WosAuthorshipBatchItem,
+    WosNormalizeQueries,
+)
 from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -452,7 +457,7 @@ def _resolve_addresses_batch(
     """Résout un ensemble d'adresses en batch. Retourne {raw_text: id}."""
     if not raw_texts:
         return {}
-    values = [{"raw": t, "norm": normalize_text(t)} for t in raw_texts]
+    values: list[WosAddressBatchItem] = [{"raw": t, "norm": normalize_text(t)} for t in raw_texts]
     queries.upsert_addresses_batch(conn, values)
     return queries.fetch_address_ids_by_raw_text(conn, list(raw_texts))
 
@@ -494,7 +499,7 @@ def process_authorships(
     # source_structures TEXT[]).
     from domain.normalize import normalize_name_form
 
-    values = {}  # clé = author_position, dédupliqué (1 row par position)
+    values: dict[int, WosAuthorshipBatchItem] = {}  # clé = author_position, dédupliqué
     for author in authors_kept:
         position = author["position"]
         if position in values:
@@ -540,7 +545,7 @@ def process_authorships(
             conn, source_publication_id=source_publication_id, positions=positions_needed
         )
 
-        addr_values: list[dict[str, int]] = []
+        addr_values: list[WosAuthorshipAddressItem] = []
         for author in authors_with_addrs:
             sa_id = sa_id_map.get(author["position"])
             if not sa_id:
