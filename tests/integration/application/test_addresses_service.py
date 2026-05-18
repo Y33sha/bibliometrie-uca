@@ -420,9 +420,9 @@ class TestBatchSetCountryByFilter:
 
 
 class TestPropagateCountriesToSimilar:
-    def test_propagates_divergent_values(self, sa_sync_conn, repo):
+    def test_propagates_divergent_values_from_modified_source(self, sa_sync_conn, repo):
         """Deux adresses de même normalized_text avec countries différents :
-        la 2e reçoit les countries de la 1ère."""
+        la 2e reçoit les countries de la 1ère quand a1 est dans modified_ids."""
         _ensure_country(sa_sync_conn, "FR")
         a1 = _create_address(sa_sync_conn, raw_text="UCA AA")
         a2 = _create_address(sa_sync_conn, raw_text="UCA BB")
@@ -439,10 +439,36 @@ class TestPropagateCountriesToSimilar:
             {"c": ["FR"], "id": a1},
         )
 
-        propagated = propagate_countries_to_similar(repo=repo)
+        propagated = propagate_countries_to_similar(modified_ids=[a1], repo=repo)
 
         assert a2 in propagated
         assert _get_countries(sa_sync_conn, a2) == ["FR"]
+
+    def test_does_not_propagate_from_unmodified_sources(self, sa_sync_conn, repo):
+        """Seules les adresses passées en modified_ids servent de source de propagation : une adresse `a1` avec pays mais hors `modified_ids` ne doit PAS propager vers `a2` similaire. Régression : avant le ciblage, la propagation balayait toute la table et propageait depuis n'importe quelle adresse avec un pays, ce qui rendait la query O(n²) sur 475k lignes."""
+        _ensure_country(sa_sync_conn, "FR")
+        a1 = _create_address(sa_sync_conn, raw_text="UCA CC")
+        a2 = _create_address(sa_sync_conn, raw_text="UCA DD")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE addresses SET normalized_text = 'universite clermont auvergne' "
+                "WHERE id = ANY(:ids)"
+            ),
+            {"ids": [a1, a2]},
+        )
+        sa_sync_conn.execute(
+            text("UPDATE addresses SET countries = :c WHERE id = :id"),
+            {"c": ["FR"], "id": a1},
+        )
+
+        # On passe un id qui n'a aucun pays : pas de propagation depuis lui.
+        propagated = propagate_countries_to_similar(modified_ids=[a2], repo=repo)
+
+        assert propagated == []
+        assert _get_countries(sa_sync_conn, a2) is None
+
+    def test_empty_modified_ids_is_noop(self, repo):
+        assert propagate_countries_to_similar(modified_ids=[], repo=repo) == []
 
 
 # ── propagate_countries_to_publications ─────────────────────────────

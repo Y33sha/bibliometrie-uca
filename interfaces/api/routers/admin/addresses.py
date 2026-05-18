@@ -249,7 +249,9 @@ def batch_set_country(
         )
     updated = len(modified_ids)
 
-    propagated_ids = countries_service.propagate_countries_to_similar(repo=addr_repo)
+    propagated_ids = countries_service.propagate_countries_to_similar(
+        modified_ids=modified_ids, repo=addr_repo
+    )
     propagated = len(propagated_ids)
     all_ids = modified_ids + propagated_ids
 

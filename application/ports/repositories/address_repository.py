@@ -54,11 +54,6 @@ class AddressRepository(Protocol):
         countries: list[str] | None,
     ) -> None: ...
 
-    def propagate_countries_to_similar_address(
-        self,
-        address_id: int,
-    ) -> list[int]: ...
-
     def batch_add_country_by_ids(
         self,
         country_code: str,
@@ -74,7 +69,12 @@ class AddressRepository(Protocol):
         where_params: list[Any],
     ) -> list[int]: ...
 
-    def propagate_countries_across_similar_addresses(self) -> list[int]: ...
+    def propagate_countries_across_similar_addresses(
+        self,
+        source_ids: list[int],
+    ) -> list[int]:
+        """Propage `countries` depuis les adresses `source_ids` vers les autres adresses qui partagent leur `normalized_text` et qui ont un `countries` différent (ou NULL). Retourne les IDs propagés. `source_ids` doit être non vide ; sinon retourne `[]` immédiatement."""
+        ...
 
     # ── Propagation vers source_authorships, source_publications et publications ──
 
