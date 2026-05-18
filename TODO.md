@@ -24,7 +24,7 @@
 * autre log pas clair: pipeline:   → "Lancer build_authorships. py pour propager in_perimeter/structure_ids" (?) (juste avant [INFO] pipeline: ✓ create_persons_from_source_authorships terminé en 103.6s) ->> **CODE_observabilite-robustesse-pipeline.md**
 * [ ] extracteur hal : manque indication sur documents réimportés et mis à jour: harmoniser le logging entre sources (et les tailles de batch) ->> **CODE_observabilite-robustesse-pipeline.md**
 ## Code
-* [ ] auditer le code pour voir où l'interface continue de requêter source_authorships (sauf trucs vraiment source-spécifiques): supprimer les requêtes pouvant être remplacées par des requêtes vers les tables canoniques
+* [ ] auditer le code pour voir où l'interface continue de requêter source_authorships (sauf trucs vraiment source-spécifiques): supprimer les requêtes pouvant être remplacées par des requêtes vers les tables canoniques — audit fait, 3 sites migrés (filters.person_clause, publications/list._initial_clauses_for_export, persons/detail.person_theses) ; reste à creuser stats/labs._STRUCTS_CTE (delta ~0.3% sur pub_count par labo, raison historique du choix `source_authorship_structures` à investiguer)
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
@@ -50,7 +50,7 @@
 * [ ] source theConversation: pas closed (statut oa erroné), et pas vraiment "article"; détecter les sources qui s'apparentent à de la vulgarisation, les taguer dans la table journals?
 * [ ] utiliser DOAJ pour enrichir données journals et s'en servir pour contrôler oa_status?
 * [ ] contrôler données journal/doc_type via DOI? + DOI peut permettre de dédoublonner journals
-## Méga-authorships et alignement inter-sources
+## Méga-papers et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap); en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
 * [ ] élucider pourquoi Openalex contient parfois beaucoup plus d'auteurs : ex. 21105 (OpenAlex semble résoudre les noms d'équipes en listes de noms de personnes, mais je ne sais pas comment)
 ## Relations entre publications

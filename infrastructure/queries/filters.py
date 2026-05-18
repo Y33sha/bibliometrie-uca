@@ -165,10 +165,9 @@ def person_clause(person_id: int) -> WhereClause:
     """Filtre : la personne donnée est auteur (rôle 'author') de la publication."""
     return WhereClause(
         """EXISTS (SELECT 1 FROM authorships a
-                JOIN source_authorships sa ON sa.authorship_id = a.id
                 WHERE a.publication_id = p.id AND a.person_id = :flt_person_id
                   AND NOT a.excluded
-                  AND sa.roles && ARRAY['author']::text[])""",
+                  AND a.roles && ARRAY['author']::text[])""",
         {"flt_person_id": person_id},
     )
 
