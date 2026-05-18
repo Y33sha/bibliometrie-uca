@@ -128,11 +128,28 @@ Sous-phasage (du plus simple au plus risqué) :
 - [x] **5.5 — `AddressResolutionQueries` + `resolve_addresses`**. 1 NamedTuple `StructureNameForm` (8 colonnes : id, structure_id, form_text, is_word_boundary, requires_context_of, is_excluding, struct_code, struct_type) pour `load_name_forms`. Helpers (`match_form_in_text`, `resolve_address`, `build_forms_by_structure`, `has_form_match_for_structure`, `process_addresses`) typés. Test `test_none_form` supprimé (NOT NULL schema, cas non réaliste). 28 tests unit + 14 intégration verts.
 - [x] **5.6 — Subjects**. 1 TypedDict `OntologyEntry(codes, level, parent)` `total=False` au port. Port `upsert_subject`, adapter `PgSubjectsQueries.upsert_subject` et caller `SubjectCache.get_or_upsert` signent `ontologies: dict[str, OntologyEntry] | None`. `ingest_openalex.ontology_entry` typé. 45 tests intégration verts.
 - [x] **5.7 — Staging : refactor en dataclass héritée**. `StagingRow` et `HalStagingRow` passent de NamedTuple à `dataclass(frozen=True)` avec vrai héritage (`class HalStagingRow(StagingRow)`). Une seule méthode au port (`fetch_pending_staging → list[StagingRow]`) ; l'adapter dispatche en interne par `source` (HAL → SELECT avec `hal_collections` + construction `HalStagingRow`, sinon `StagingRow`). Suppression du paramètre `columns: str`, des `Row[Any]`, de `_row_factory` côté `SourceNormalizer`, du `Generic[T_Row]`. `HalNormalizer.process_work(row: StagingRow)` fait `assert isinstance(row, HalStagingRow)` pour accéder à `.hal_collections`. 300 tests unit + 159 tests intégration pipeline verts.
-- [ ] **5.8 — Bilan**. Suite intégration verte, recompte des `Any` restants dans les zones traitées, mise à jour de la note Phase 6 sur les overrides mypy résiduels.
+- [x] **5.8 — Bilan**. Suite complète verte (**2067 passed, 1 skipped**). Recompte `dict[str, Any]` : **265 → 203** (62 éliminés dans le scope ciblé). Recompte `Row[Any]` : **17 → 6** (11 éliminés). Les 203 `dict[str, Any]` restants sont hors scope : extracteurs d'API externes (`infrastructure/sources/*`, `domain/sources/*`), ports repository non-Phase-1 (`find_*_by_id` retours), modules queries `stats/*`, `publications/{detail,facets,list}`, `persons/{admin,facets,list,detail}`, `filters`, `addresses`, JSONB models (`extra="allow"`), CLI scripts. Tous justifiés ou rattachés à d'autres aires.
 
 ### Phase 6 — Bilan override mypy
 
 Retrait final des modules de l'override `disallow_any_explicit = false` qui peuvent l'être. Documentation des modules irréductibles (sources API externes, CLI) avec justification durable dans le commentaire `pyproject.toml`.
+
+**Candidats au retrait immédiat (0 `Any` après Phase 5)** :
+
+- `application.ports.pipeline.merge` (Phase 5.1)
+- `application.ports.pipeline.name_forms` (Phase 5.2)
+- `application.ports.pipeline.normalize.wos` (Phase 5.3)
+- `application.ports.pipeline.persons_create` (Phase 5.4)
+
+**Modules avec `Any` délibéré (à garder OU à refactorer)** :
+
+- `application.ports.pipeline.staging` : 1 `dict[str, Any]` sur `StagingRow.raw_data` (colonne JSONB brute, pas de schéma).
+- `application.ports.pipeline.subjects` : 1 `list[Any]` sur `select_source_publications_with_subjects` (records DB hétérogènes — pourrait devenir un NamedTuple ad-hoc).
+- `application.pipeline.normalize.*` et `application.pipeline.publications.merge_pubs_by_hal_id` : payloads d'API externes via `domain.sources.*` (`dict[str, Any]` propagé légitimement).
+- `application.pipeline.persons.create_persons_from_source_authorships` : conversion `._asdict()` au boundary `application/persons.py` (API historique dict).
+- `application.pipeline.affiliations.resolve_addresses` et `application.pipeline.subjects._common` : à tester (port migré, mais le caller peut conserver des Any internes).
+
+Phase 6 vérifie module par module ce qui peut sortir et met à jour le commentaire `pyproject.toml`.
 
 ## Résiduel JSONB (à tout hasard)
 
