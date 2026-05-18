@@ -17,7 +17,7 @@ from application.ports.api.subjects_queries import (
     SubjectNeighborOut,
     SubjectsAdminQueries,
 )
-from application.ports.pipeline.subjects import SubjectsQueries
+from application.ports.pipeline.subjects import OntologyEntry, SubjectsQueries
 from domain.subjects.subject import normalize_label
 
 # Le ON CONFLICT fusionne par ontologie : pour chaque clé présente dans l'un
@@ -83,7 +83,7 @@ def upsert_subject(
     *,
     label: str,
     language: str | None = None,
-    ontologies: dict[str, dict[str, Any]] | None = None,
+    ontologies: dict[str, OntologyEntry] | None = None,
 ) -> int:
     """UPSERT d'un sujet identifié par `lower(label)`. Retourne l'id.
 
@@ -368,7 +368,7 @@ class PgSubjectsQueries(SubjectsQueries):
         *,
         label: str,
         language: str | None = None,
-        ontologies: dict[str, dict[str, Any]] | None = None,
+        ontologies: dict[str, OntologyEntry] | None = None,
     ) -> int:
         return upsert_subject(
             conn,
