@@ -90,16 +90,16 @@ class TestFetchPersonsNames:
         rejected = _create_person(sa_sync_conn, last="B", rejected=True)
 
         rows = fetch_persons_names(sa_sync_conn)
-        ids = [r["id"] for r in rows]
+        ids = [r.id for r in rows]
         assert active in ids
         assert rejected in ids
 
     def test_trims_names(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn, last="  Dupond", first="Jean  ")
         rows = fetch_persons_names(sa_sync_conn)
-        row = next(r for r in rows if r["id"] == pid)
-        assert row["last_name"] == "Dupond"
-        assert row["first_name"] == "Jean"
+        row = next(r for r in rows if r.id == pid)
+        assert row.last_name == "Dupond"
+        assert row.first_name == "Jean"
 
 
 class TestSyncFromRawForms:

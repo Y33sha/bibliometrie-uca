@@ -122,7 +122,7 @@ Les `list[dict[str, Any]]` non triés par Phase 1-4 : queries `merge`, `name_for
 Sous-phasage (du plus simple au plus risqué) :
 
 - [x] **5.1 — `MergeQueries` + `merge_pubs_by_hal_id`**. 3 NamedTuple co-localisés dans le port (`NntDuplicateRow`, `OaScanrHalRow`, `HalSourceRow`) + 2 dataclass locales au caller (`HalLinkItem`, `HalMergeItem`) au lieu des fusions `{**dict, **dict}`. Tests `test_merge_pubs_by_hal_id.py` + `test_merge_pubs_by_nnt.py` adaptés (accès attribut au lieu de `["clé"]`). Test d'intégration `test_merge.py` aussi.
-- [ ] **5.2 — `NameFormsQueries`**. 1 NamedTuple `PersonNameRow` pour `fetch_persons_names`. 1 TypedDict `RawFormBatchItem` pour le batch executemany.
+- [x] **5.2 — `NameFormsQueries`**. 1 NamedTuple `PersonNameRow` pour `fetch_persons_names`. 1 TypedDict `RawFormBatchItem` pour le batch executemany (SA consomme les dicts tels quels). Caller `populate_person_name_forms` adapté ; tests unit + intégration verts.
 - [ ] **5.3 — `WosNormalizeQueries` (batchs executemany)**. 3 TypedDict : `WosAddressUpsertItem`, `WosAuthorshipUpsertItem`, `WosAuthorshipAddressItem`. Construction explicite typée dans `normalize_wos.py`. Tests `test_normalize_wos.py`.
 - [ ] **5.4 — `PersonsCreateQueries` + `create_persons_from_source_authorships`**. Refactor propre en 2 NamedTuple : `BareUnlinkedAuthorship` (depuis SQL) → `EnrichedAuthorship` (après parsing nom + flags). Plus de mutation de dict.
 - [ ] **5.5 — `AddressResolutionQueries` + `resolve_addresses`**. 1 NamedTuple `StructureNameForm` pour `load_name_forms`. Helpers (`match_form_in_text`, `resolve_address`, `build_forms_by_structure`, `has_form_match_for_structure`) typés.

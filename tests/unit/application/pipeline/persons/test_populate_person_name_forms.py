@@ -8,30 +8,30 @@ L'orchestrateur calcule les formes de noms en Python via `compute_person_name_fo
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import pytest
 
 from application.pipeline.persons import populate_person_name_forms
 from application.pipeline.persons.populate_person_name_forms import BATCH_SIZE, populate
+from application.ports.pipeline.name_forms import PersonNameRow, RawFormBatchItem
 
 
 class _FakeQueries:
-    def __init__(self, persons_rows: list[dict[str, Any]]) -> None:
+    def __init__(self, persons_rows: list[PersonNameRow]) -> None:
         self._persons_rows = persons_rows
         self.create_temp_called = False
         self.drop_temp_called = False
-        self.batches: list[list[dict[str, object]]] = []
+        self.batches: list[list[RawFormBatchItem]] = []
         self.sync_return = (0, 0, 0)
         self.sync_called = False
 
-    def fetch_persons_names(self, conn: object) -> list[dict[str, Any]]:
+    def fetch_persons_names(self, conn: object) -> list[PersonNameRow]:
         return self._persons_rows
 
     def create_temp_raw_forms_table(self, conn: object) -> None:
         self.create_temp_called = True
 
-    def insert_raw_forms_batch(self, conn: object, rows: list[dict[str, Any]]) -> None:
+    def insert_raw_forms_batch(self, conn: object, rows: list[RawFormBatchItem]) -> None:
         # Snapshot par copie : le code source réutilise la liste `batch` en la réaffectant à `[]`, donc une référence directe serait OK, mais on copie pour figer le contenu vu à l'appel.
         self.batches.append(list(rows))
 
@@ -74,8 +74,8 @@ def test_single_person_single_batch(logger):
     """Quelques personnes : tout passe dans un seul `insert_raw_forms_batch` final."""
     queries = _FakeQueries(
         persons_rows=[
-            {"id": 1, "last_name": "Dupont", "first_name": "Marie"},
-            {"id": 2, "last_name": "Martin", "first_name": "Jean"},
+            PersonNameRow(id=1, last_name="Dupont", first_name="Marie"),
+            PersonNameRow(id=2, last_name="Martin", first_name="Jean"),
         ]
     )
     conn = _FakeConn()
@@ -96,7 +96,7 @@ def test_single_person_single_batch(logger):
 def test_strips_whitespace_in_names(logger):
     """Les noms / prénoms reçus de la DB sont strippés avant `compute_person_name_forms`."""
     queries = _FakeQueries(
-        persons_rows=[{"id": 1, "last_name": "  Dupont  ", "first_name": "  Marie  "}]
+        persons_rows=[PersonNameRow(id=1, last_name="  Dupont  ", first_name="  Marie  ")]
     )
     conn = _FakeConn()
 
@@ -111,7 +111,9 @@ def test_strips_whitespace_in_names(logger):
 
 def test_handles_null_first_name(logger):
     """`first_name = None` est converti en chaîne vide avant strip — pas d'AttributeError."""
-    queries = _FakeQueries(persons_rows=[{"id": 1, "last_name": "Sansprenom", "first_name": None}])
+    queries = _FakeQueries(
+        persons_rows=[PersonNameRow(id=1, last_name="Sansprenom", first_name=None)]
+    )
     conn = _FakeConn()
 
     populate(conn, queries, logger)
@@ -131,7 +133,7 @@ def test_batches_flush_at_batch_size(monkeypatch, logger):
     # Chaque personne produit plusieurs formes ; quelques personnes suffisent à dépasser 3.
     queries = _FakeQueries(
         persons_rows=[
-            {"id": i, "last_name": f"Nom{i}", "first_name": f"Prenom{i}"} for i in range(1, 5)
+            PersonNameRow(id=i, last_name=f"Nom{i}", first_name=f"Prenom{i}") for i in range(1, 5)
         ]
     )
     conn = _FakeConn()
