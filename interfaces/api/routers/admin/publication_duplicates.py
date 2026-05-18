@@ -5,7 +5,10 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.ports.api.publication_duplicates_queries import PublicationDuplicatesQueries
+from application.ports.api.publication_duplicates_queries import (
+    PubDuplicateNextResponse,
+    PublicationDuplicatesQueries,
+)
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.publications import mark_distinct as _mark_pubs_distinct
@@ -20,7 +23,6 @@ from interfaces.api.models import (
     MarkDistinctPublications,
     MergePublications,
     OkResponse,
-    PubDuplicateNextResponse,
     PubMergeResponse,
 )
 
@@ -41,9 +43,7 @@ def next_duplicate_candidate(
     `min_title_len` filtre les titres trop courts pour être
     discriminants. Permet au front d'itérer pair par pair via offset.
     """
-    return PubDuplicateNextResponse.model_validate(
-        queries.next_pub_duplicate(min_title_len=min_title_len, offset=offset)
-    )
+    return queries.next_pub_duplicate(min_title_len=min_title_len, offset=offset)
 
 
 @router.post("/api/admin/duplicates/merge", response_model=PubMergeResponse)
@@ -67,8 +67,8 @@ def merge_duplicate_publications(
             status_code=400, detail="target_id et source_id doivent être différents"
         )
 
-    pubs = queries.get_publications_basic([body.target_id, body.source_id])
-    if body.target_id not in pubs or body.source_id not in pubs:
+    found = queries.existing_publication_ids((body.target_id, body.source_id))
+    if body.target_id not in found or body.source_id not in found:
         raise HTTPException(status_code=404, detail="Publication introuvable")
 
     savepoint = conn.begin_nested()
