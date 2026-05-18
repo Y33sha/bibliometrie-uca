@@ -106,7 +106,7 @@ class TestListAddresses:
         res = _q(sa_sync_conn).list_addresses(
             structure_id=struct, filters=AddressListFilters(), page=1, per_page=10
         )
-        ids = [a["id"] for a in res["addresses"]]
+        ids = [a.id for a in res.addresses]
         assert addr_pending in ids
         assert addr_confirmed not in ids  # validation=pending → exclut confirmed
 
@@ -129,7 +129,7 @@ class TestListAddresses:
             page=1,
             per_page=10,
         )
-        assert any(a["id"] == addr for a in res["addresses"])
+        assert any(a.id == addr for a in res.addresses)
 
     def test_search_filter(self, sa_sync_conn):
         struct = _create_structure(sa_sync_conn)
@@ -152,20 +152,18 @@ class TestListAddresses:
             page=1,
             per_page=10,
         )
-        ids = [a["id"] for a in res["addresses"]]
+        ids = [a.id for a in res.addresses]
         assert a1 in ids
         assert a2 not in ids
 
 
-class TestGetAddressBasic:
+class TestGetAddressRawText:
     def test_returns_none_for_missing(self, sa_sync_conn):
-        assert _q(sa_sync_conn).get_address_basic(999_999) is None
+        assert _q(sa_sync_conn).get_address_raw_text(999_999) is None
 
-    def test_returns_address(self, sa_sync_conn):
+    def test_returns_raw_text(self, sa_sync_conn):
         addr = _create_address(sa_sync_conn, raw_text="rue X")
-        row = _q(sa_sync_conn).get_address_basic(addr)
-        assert row["id"] == addr
-        assert row["raw_text"] == "rue X"
+        assert _q(sa_sync_conn).get_address_raw_text(addr) == "rue X"
 
 
 class TestGetAddressPublications:
@@ -205,7 +203,7 @@ class TestGetAddressPublications:
 
         rows = _q(sa_sync_conn).get_address_publications(addr, limit=10)
         assert len(rows) == 1
-        assert rows[0]["id"] == pub
+        assert rows[0].id == pub
 
 
 class TestGetAddressStructures:
@@ -216,7 +214,7 @@ class TestGetAddressStructures:
 
         rows = _q(sa_sync_conn).get_address_structures(addr)
         assert len(rows) == 1
-        assert rows[0]["id"] == struct
+        assert rows[0].id == struct
 
     def test_returns_empty_list_when_no_link(self, sa_sync_conn):
         addr = _create_address(sa_sync_conn)
@@ -246,7 +244,7 @@ class TestCountryCheckers:
         _ensure_country(sa_sync_conn, "xx", "Inconnu")
 
         rows = _q(sa_sync_conn).list_countries()
-        codes = [r["code"].strip() for r in rows]
+        codes = [r.code.strip() for r in rows]
         # Tri `(code = 'xx') DESC, name` : TRUE > FALSE → 'xx' arrive en tête
         assert codes[0] == "xx"
         assert "FR" in codes
@@ -271,8 +269,8 @@ class TestAddressesCountries:
         res = _q(sa_sync_conn).addresses_countries(
             filters=AddressCountriesFilters(has_country="yes"), page=1, per_page=50
         )
-        assert res["total"] >= 1
-        assert all(a["countries"] is not None for a in res["addresses"])
+        assert res.total >= 1
+        assert all(a.countries is not None for a in res.addresses)
 
     def test_filters_by_country_code(self, sa_sync_conn):
         _ensure_country(sa_sync_conn, "FR")
@@ -283,10 +281,10 @@ class TestAddressesCountries:
         res = _q(sa_sync_conn).addresses_countries(
             filters=AddressCountriesFilters(country_code="FR"), page=1, per_page=50
         )
-        ids = [a["id"] for a in res["addresses"]]
+        ids = [a.id for a in res.addresses]
         assert a_fr in ids
         # La facette countries doit être présente
-        assert "country_facets" in res
+        assert res.country_facets is not None
 
     def test_suggest_mode_returns_facets(self, sa_sync_conn):
         _ensure_country(sa_sync_conn, "FR")
@@ -294,7 +292,7 @@ class TestAddressesCountries:
         res = _q(sa_sync_conn).addresses_countries(
             filters=AddressCountriesFilters(suggest=True), page=1, per_page=50
         )
-        assert "suggestion_facets" in res
+        assert res.suggestion_facets is not None
 
 
 class TestSuggestCountries:
@@ -304,8 +302,8 @@ class TestSuggestCountries:
         _create_address(sa_sync_conn, raw_text="Without", countries=None)
 
         res = _q(sa_sync_conn).suggest_countries(search="")
-        assert any(s["code"] == "FR" for s in res["suggestions"])
-        assert res["without_country"] >= 1
+        assert any(s.code == "FR" for s in res.suggestions)
+        assert res.without_country >= 1
 
     def test_filters_by_search(self, sa_sync_conn):
         _ensure_country(sa_sync_conn, "FR")
@@ -313,4 +311,4 @@ class TestSuggestCountries:
         _create_address(sa_sync_conn, raw_text="Nope", countries=["FR"])
 
         res = _q(sa_sync_conn).suggest_countries(search="Match")
-        assert any(s["code"] == "FR" for s in res["suggestions"])
+        assert any(s.code == "FR" for s in res.suggestions)

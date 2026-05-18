@@ -14,8 +14,13 @@ from application.addresses import countries as countries_service
 from application.addresses import structures as structures_service
 from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
+    AddressesCountriesResponse,
     AddressesQueries,
     AddressListFilters,
+    AddressListResponse,
+    AddressStatsResponse,
+    CountryOut,
+    CountrySuggestionsResponse,
 )
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
@@ -29,17 +34,12 @@ from interfaces.api.deps import (
     require_admin,
 )
 from interfaces.api.models import (
-    AddressesCountriesResponse,
-    AddressListResponse,
     AddressPublicationsResponse,
     AddressReviewResponse,
-    AddressStatsResponse,
     BatchCountryResponse,
     BatchReviewAction,
     BatchSetCountry,
     BatchUpdatedResponse,
-    CountryOut,
-    CountrySuggestionsResponse,
     OkResponse,
     ReviewAction,
     SetCountry,
@@ -79,9 +79,7 @@ def list_addresses(
         search_mode=search_mode,
     )
     sid = structure_id if structure_id is not None else queries.resolve_default_structure_id()
-    return AddressListResponse.model_validate(
-        queries.list_addresses(structure_id=sid, filters=filters, page=page, per_page=per_page)
-    )
+    return queries.list_addresses(structure_id=sid, filters=filters, page=page, per_page=per_page)
 
 
 @router.get("/api/addresses/{addr_id}/publications", response_model=AddressPublicationsResponse)
@@ -91,16 +89,12 @@ def get_address_publications(
     queries: AddressesQueries = Depends(addresses_queries_sync),
 ) -> AddressPublicationsResponse:
     """Échantillon de publications liées à une adresse."""
-    addr = queries.get_address_basic(addr_id)
-    if not addr:
+    raw_text = queries.get_address_raw_text(addr_id)
+    if not raw_text:
         raise HTTPException(status_code=404, detail="Address not found")
     publications = queries.get_address_publications(addr_id, limit)
-    return AddressPublicationsResponse.model_validate(
-        {
-            "address_id": addr_id,
-            "raw_text": addr["raw_text"],
-            "publications": publications,
-        }
+    return AddressPublicationsResponse(
+        address_id=addr_id, raw_text=raw_text, publications=publications
     )
 
 
@@ -125,13 +119,11 @@ def review_address(
     )
     structures = queries.get_address_structures(addr_id)
     link = queries.get_structure_link(addr_id, action.structure_id)
-    return AddressReviewResponse.model_validate(
-        {
-            "id": addr_id,
-            "is_confirmed": link["is_confirmed"] if link else None,
-            "is_detected": link["is_detected"] if link else False,
-            "structures": structures,
-        }
+    return AddressReviewResponse(
+        id=addr_id,
+        is_confirmed=link["is_confirmed"] if link else None,
+        is_detected=link["is_detected"] if link else False,
+        structures=structures,
     )
 
 
@@ -160,7 +152,7 @@ def list_countries(
     queries: AddressesQueries = Depends(addresses_queries_sync),
 ) -> list[CountryOut]:
     """Liste des pays."""
-    return [CountryOut.model_validate(c) for c in queries.list_countries()]
+    return queries.list_countries()
 
 
 @router.get("/api/addresses/countries", response_model=AddressesCountriesResponse)
@@ -182,9 +174,7 @@ def list_addresses_countries(
         suggested_country=suggested_country,
         suggest=suggest,
     )
-    return AddressesCountriesResponse.model_validate(
-        queries.addresses_countries(filters=filters, page=page, per_page=per_page)
-    )
+    return queries.addresses_countries(filters=filters, page=page, per_page=per_page)
 
 
 @router.get("/api/addresses/suggest-countries", response_model=CountrySuggestionsResponse)
@@ -194,7 +184,7 @@ def suggest_countries(
     _: None = Depends(require_admin),
 ) -> CountrySuggestionsResponse:
     """Distribution des pays des adresses matchantes + compte des sans-pays."""
-    return CountrySuggestionsResponse.model_validate(queries.suggest_countries(search))
+    return queries.suggest_countries(search)
 
 
 @router.post("/api/addresses/{addr_id}/country", response_model=OkResponse)
@@ -267,4 +257,4 @@ def admin_address_stats(
     """Compteurs d'adresses par détection/validation pour une structure."""
     if structure_id is None:
         structure_id = queries.resolve_default_structure_id()
-    return AddressStatsResponse.model_validate(queries.admin_address_stats(structure_id))
+    return queries.admin_address_stats(structure_id)

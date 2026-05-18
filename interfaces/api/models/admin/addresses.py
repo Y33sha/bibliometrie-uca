@@ -1,8 +1,16 @@
-"""Modèles Pydantic pour les adresses (validation, pays, propagation)."""
+"""Modèles Pydantic (bodies + réponses router-only) pour les adresses.
+
+Les DTOs retournés par le port `AddressesQueries` (AddressOut, AddressListResponse, AddressStructureSummary, AddressPublicationItem, CountryOut, CountrySuggestion, AddressForCountryAttribution, AddressesCountriesResponse, CountrySuggestionsResponse, AddressStatsResponse) vivent dans `application/ports/api/addresses_queries.py` (cf. chantier `CODE_typage-projections-strict` Phase 4). Restent ici les bodies HTTP et les réponses composées par le router.
+"""
 
 from pydantic import BaseModel
 
-# ----- Entrées -----
+from application.ports.api.addresses_queries import (
+    AddressPublicationItem,
+    AddressStructureSummary,
+)
+
+# ----- Bodies HTTP -----
 
 
 class ReviewAction(BaseModel):
@@ -29,55 +37,7 @@ class BatchSetCountry(BaseModel):
     suggested_country: str = ""
 
 
-# ----- Sorties -----
-
-
-class AddressStructureSummary(BaseModel):
-    """Lien adresse ↔ structure (élément de `structures` dans la liste/review)."""
-
-    id: int
-    name: str
-    acronym: str | None
-    is_confirmed: bool | None
-    is_detected: bool
-
-
-class AddressOut(BaseModel):
-    """Ligne de `/api/addresses` (liste paginée pour validation)."""
-
-    id: int
-    raw_text: str
-    is_confirmed: bool | None
-    is_detected: bool
-    structures: list[AddressStructureSummary]
-    pub_count: int
-
-
-class AddressListResponse(BaseModel):
-    """Réponse paginée de `/api/addresses`.
-
-    `requires_search=True` quand le caller utilise un filtre trop large
-    (no/all + pas de search) et que le serveur a renvoyé une liste vide
-    par garde-fou.
-    """
-
-    total: int
-    page: int
-    per_page: int
-    pages: int
-    addresses: list[AddressOut]
-    requires_search: bool | None = None
-
-
-class AddressPublicationItem(BaseModel):
-    id: int
-    title: str
-    pub_year: int | None
-    doi: str | None
-    doc_type: str
-    journal_title: str | None
-    author_name: str | None
-    source_id: str | None
+# ----- Réponses composées par le router -----
 
 
 class AddressPublicationsResponse(BaseModel):
@@ -100,50 +60,3 @@ class BatchCountryResponse(BaseModel):
 
     updated: int
     propagated: int
-
-
-class CountryOut(BaseModel):
-    code: str
-    name: str
-
-
-class CountrySuggestion(BaseModel):
-    code: str
-    count: int
-
-
-class AddressForCountryAttribution(BaseModel):
-    """Ligne de `/api/addresses/countries`."""
-
-    id: int
-    raw_text: str
-    countries: list[str] | None
-    suggested_countries: list[CountrySuggestion]
-    pub_count: int
-
-
-class AddressesCountriesResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
-    addresses: list[AddressForCountryAttribution]
-    suggestion_facets: list[CountrySuggestion] | None = None
-    country_facets: list[CountrySuggestion]
-
-
-class CountrySuggestionsResponse(BaseModel):
-    """GET /api/addresses/suggest-countries (admin)."""
-
-    suggestions: list[CountrySuggestion]
-    without_country: int
-
-
-class AddressStatsResponse(BaseModel):
-    """GET /api/admin/address-stats."""
-
-    total: int
-    detected: int
-    pending: int
-    rejected: int
-    confirmed: int
