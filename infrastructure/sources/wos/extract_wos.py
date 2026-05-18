@@ -73,7 +73,7 @@ def _fetch_with_retry(url: str, params: dict, label: str = "") -> dict:
     )
 
 
-def fetch_page(year: int, first_record: int) -> dict:
+def fetch_page(year: int, first_record: int, affiliations: list[str]) -> dict:
     """Récupère une page de résultats via une requête de recherche complète.
 
     Note : la pagination via queryId ne fonctionne pas de façon fiable
@@ -81,7 +81,7 @@ def fetch_page(year: int, first_record: int) -> dict:
     """
     params = {
         "databaseId": "WOS",
-        "usrQuery": build_query(year),
+        "usrQuery": build_query(year, affiliations),
         "count": WOS_PER_PAGE,
         "firstRecord": first_record,
     }
@@ -120,13 +120,19 @@ def insert_batch(conn: Connection, batch: list[dict]) -> None:
     conn.commit()
 
 
-def extract_year(year: int, conn: Connection, existing_uts: set, dry_run: bool = False) -> int:
+def extract_year(
+    year: int,
+    conn: Connection,
+    existing_uts: set,
+    affiliations: list[str],
+    dry_run: bool = False,
+) -> int:
     """Extrait toutes les publications d'une année. Retourne le nb insérés."""
-    logger.info(f"Requête WoS : {build_query(year)}")
+    logger.info(f"Requête WoS : {build_query(year, affiliations)}")
 
     # Premier appel
     time.sleep(WOS_DELAY)
-    data = fetch_page(year, 1)
+    data = fetch_page(year, 1, affiliations)
     if not data:
         logger.error(f"Impossible d'exécuter la requête pour {year}")
         return 0
@@ -145,7 +151,7 @@ def extract_year(year: int, conn: Connection, existing_uts: set, dry_run: bool =
         # Première page déjà récupérée
         if first_record > 1:
             time.sleep(WOS_DELAY)
-            data = fetch_page(year, first_record)
+            data = fetch_page(year, first_record, affiliations)
 
         records = get_records(data)
         if not records:
@@ -280,9 +286,12 @@ class WosExtractor(SourceExtractor):
         self.logger.info(f"Années : {years}")
 
         stats = PhaseMetrics()
+        affiliations = config["affiliations"]
         for i, year in enumerate(years):
             try:
-                inserted = extract_year(year, self.conn, existing_ids, dry_run=args.dry_run)
+                inserted = extract_year(
+                    year, self.conn, existing_ids, affiliations, dry_run=args.dry_run
+                )
                 stats.add(new=inserted)
             except Exception as e:
                 self.logger.error(f"Erreur sur l'année {year} : {e} — passage à la suivante")
