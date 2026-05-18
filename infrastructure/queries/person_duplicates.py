@@ -1,24 +1,24 @@
 """Query services pour /api/admin/person-duplicates/*.
 
-`PgPersonDuplicatesQueries` hérite explicitement du Protocol
-`application.ports.person_duplicates_queries.PersonDuplicatesQueries`.
+`PgPersonDuplicatesQueries` hérite explicitement du Protocol `application.ports.person_duplicates_queries.PersonDuplicatesQueries`.
 
-**Divergence assumée** avec `domain/names.py:names_compatible`
-(matching pipeline). Les 4 `PERSON_DUP_QUERIES` + `_tokens_match`
-ici sont plus larges : ils servent à présenter des candidats à la
-validation manuelle dans l'interface admin (recall important, faux
-positifs filtrés à l'œil par Laura). En particulier, `_tokens_match`
-gère « Jean Michel Dupont » vs « JM Dupont » (initiales jointes/
-séparées), cas rejeté par `names_compatible`. Ne pas tenter
-d'unifier : les deux contextes (pipeline strict vs admin lâche)
-ont des exigences opposées sur le compromis precision/recall.
+**Divergence assumée** avec `domain/names.py:names_compatible` (matching pipeline). Les 4 `PERSON_DUP_QUERIES` + `_tokens_match` ici sont plus larges : ils servent à présenter des candidats à la validation manuelle dans l'interface admin (recall important, faux positifs filtrés à l'œil par Laura). En particulier, `_tokens_match` gère « Jean Michel Dupont » vs « JM Dupont » (initiales jointes/séparées), cas rejeté par `names_compatible`. Ne pas tenter d'unifier : les deux contextes (pipeline strict vs admin lâche) ont des exigences opposées sur le compromis precision/recall.
 """
 
 from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.api.person_duplicates_queries import PersonDuplicatesQueries
+from application.ports.api.person_duplicates_queries import (
+    PersonConflictPair,
+    PersonConflictPub,
+    PersonDedupDetail,
+    PersonDedupIdentifier,
+    PersonDedupLab,
+    PersonDedupPublication,
+    PersonDuplicatePair,
+    PersonDuplicatesQueries,
+)
 
 
 def _person_name_tokens(ln_norm: str, fn_norm: str) -> set[str]:
@@ -198,7 +198,7 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
                     break
         return found, count, skipped
 
-    def _get_person_dedup_detail(self, person_id: int) -> dict[str, Any] | None:
+    def _get_person_dedup_detail(self, person_id: int) -> PersonDedupDetail | None:
         person_row = self._conn.execute(
             text("""
                 SELECT p.id, p.last_name, p.first_name,
@@ -222,7 +222,12 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
             """),
             {"pid": person_id},
         ).all()
-        identifiers = [dict(r._mapping) for r in id_rows]
+        identifiers = [
+            PersonDedupIdentifier(
+                id=r.id, id_type=r.id_type, id_value=r.id_value, source=r.source, status=r.status
+            )
+            for r in id_rows
+        ]
 
         pub_rows = self._conn.execute(
             text("""
@@ -238,7 +243,17 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
             """),
             {"pid": person_id},
         ).all()
-        publications = [dict(r._mapping) for r in pub_rows]
+        publications = [
+            PersonDedupPublication(
+                id=r.id,
+                title=r.title,
+                pub_year=r.pub_year,
+                doi=r.doi,
+                doc_type=r.doc_type,
+                sources=list(r.sources or []),
+            )
+            for r in pub_rows
+        ]
 
         lab_rows = self._conn.execute(
             text("""
@@ -254,22 +269,22 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
             """),
             {"pid": person_id},
         ).all()
-        labs = [{"id": r.id, "acronym": r.acronym, "name": r.name} for r in lab_rows]
+        labs = [PersonDedupLab(id=r.id, acronym=r.acronym, name=r.name) for r in lab_rows]
 
-        return {
-            "id": person_row.id,
-            "last_name": person_row.last_name,
-            "first_name": person_row.first_name,
-            "last_name_normalized": person_row.last_name_normalized,
-            "first_name_normalized": person_row.first_name_normalized,
-            "has_rh": person_row.has_rh,
-            "role_title": person_row.role_title,
-            "department_name": person_row.department_name,
-            "identifiers": identifiers,
-            "publications": publications,
-            "pub_count": len(publications),
-            "labs": labs,
-        }
+        return PersonDedupDetail(
+            id=person_row.id,
+            last_name=person_row.last_name,
+            first_name=person_row.first_name,
+            last_name_normalized=person_row.last_name_normalized,
+            first_name_normalized=person_row.first_name_normalized,
+            has_rh=person_row.has_rh,
+            role_title=person_row.role_title,
+            department_name=person_row.department_name,
+            identifiers=identifiers,
+            publications=publications,
+            pub_count=len(publications),
+            labs=labs,
+        )
 
     def count_person_duplicates(self) -> int:
         total = 0
@@ -280,15 +295,16 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
 
     def next_person_duplicate(
         self, *, skip_pairs: set[tuple[int, int]] | None, offset: int
-    ) -> dict[str, Any] | None:
+    ) -> PersonDuplicatePair | None:
         remaining_skip = offset
         for sql in PERSON_DUP_QUERIES:
             found, _, actual_skipped = self._scan_dup_rows(sql, skip_pairs, True, remaining_skip)
             if found:
-                return {
-                    "person_a": self._get_person_dedup_detail(found.id_a),
-                    "person_b": self._get_person_dedup_detail(found.id_b),
-                }
+                person_a = self._get_person_dedup_detail(found.id_a)
+                person_b = self._get_person_dedup_detail(found.id_b)
+                if person_a is None or person_b is None:
+                    return None
+                return PersonDuplicatePair(person_a=person_a, person_b=person_b)
             remaining_skip -= actual_skipped
         return None
 
@@ -300,7 +316,7 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
 
     def next_person_conflict(
         self, *, skip_pairs: set[tuple[int, int]], offset: int
-    ) -> dict[str, Any] | None:
+    ) -> PersonConflictPair | None:
         rows = self._conn.execute(text(CONFLICT_PAIRS_SQL)).all()
         skipped = 0
         for row in rows:
@@ -311,7 +327,7 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
                 skipped += 1
                 continue
 
-            conflict_pubs = []
+            conflict_pubs: list[PersonConflictPub] = []
             for c in row.conflicts:
                 pub_id = c["pub_id"]
                 pub_row = self._conn.execute(
@@ -323,19 +339,21 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
                 ).one_or_none()
                 if pub_row:
                     conflict_pubs.append(
-                        {
-                            "id": pub_row.id,
-                            "title": pub_row.title,
-                            "pub_year": pub_row.pub_year,
-                            "doc_type": pub_row.doc_type,
-                            "position": c["position"],
-                        }
+                        PersonConflictPub(
+                            id=pub_row.id,
+                            title=pub_row.title,
+                            pub_year=pub_row.pub_year,
+                            doc_type=pub_row.doc_type,
+                            position=c["position"],
+                        )
                     )
 
-            return {
-                "person_a": self._get_person_dedup_detail(row.id_a),
-                "person_b": self._get_person_dedup_detail(row.id_b),
-                "conflict_pubs": conflict_pubs,
-            }
+            person_a = self._get_person_dedup_detail(row.id_a)
+            person_b = self._get_person_dedup_detail(row.id_b)
+            if person_a is None or person_b is None:
+                continue
+            return PersonConflictPair(
+                person_a=person_a, person_b=person_b, conflict_pubs=conflict_pubs
+            )
 
         return None
