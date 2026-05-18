@@ -8,10 +8,10 @@ import logging
 from fastapi import APIRouter, Depends
 
 from application import config as config_service
-from application.ports.api.config_queries import ConfigQueries
+from application.ports.api.config_queries import ConfigItem, ConfigQueries
 from application.ports.config import ConfigStore
 from interfaces.api.deps import config_queries_sync, config_store_sync
-from interfaces.api.models import ConfigItem, ConfigValueUpdate, HalCollectionsResponse
+from interfaces.api.models import ConfigValueUpdate, HalCollectionsResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ def list_config(
 
     Retourne la table `config` triée par clé. Les valeurs sont renvoyées telles quelles (jsonb) — la sémantique de chaque clé est documentée dans `docs/exploitation.md`.
     """
-    return [ConfigItem.model_validate(r) for r in queries.list_config()]
+    return queries.list_config()
 
 
 @router.get("/api/config/hal-collections", response_model=HalCollectionsResponse)

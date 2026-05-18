@@ -85,7 +85,6 @@ from interfaces.api.models.admin.persons import (
     UpdatePersonName,
 )
 from interfaces.api.models.admin.pipeline_config import (
-    ConfigItem,
     ConfigValueUpdate,
     HalCollectionsResponse,
 )
@@ -214,7 +213,6 @@ __all__ = [
     "BatchReviewAction",
     "BatchSetCountry",
     "BatchUpdatedResponse",
-    "ConfigItem",
     "ConfigValueUpdate",
     "ConsolidatedAuthorshipOut",
     "CountryOut",
