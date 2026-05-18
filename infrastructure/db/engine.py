@@ -11,6 +11,7 @@ Le driver `postgresql+psycopg` permet d'accéder aux features psycopg3
 si besoin.
 """
 
+import psycopg  # noqa: F401 — driver chargé par SA via la URL postgresql+psycopg://
 from sqlalchemy import URL, Engine, create_engine
 
 from infrastructure.settings import settings

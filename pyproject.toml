@@ -9,11 +9,11 @@ requires-python = ">=3.10"
 dependencies = [
     "requests==2.33.0",          # CVE-2024-35195, CVE-2024-47081, CVE-2026-25645 fixed
     "httpx==0.27.2",             # extractions HTTP async dans le pipeline
-    "psycopg[binary]==3.3.3",
-    "psycopg-pool==3.3.0",
+    "psycopg[binary]==3.3.3",     # driver Postgres pour SQLAlchemy ; import symbolique dans infrastructure/db/engine.py
     "sqlalchemy==2.0.43",        # query builder Core (chantier sqlalchemy-core-adoption.md)
     "alembic==1.18.0",           # migrations DB (chantier alembic-adoption.md)
     "fastapi==0.128.2",
+    "starlette==0.50.0",         # importé directement (Response, Scope, RequestResponseEndpoint) — épinglé sur la version embarquée par fastapi
     "uvicorn==0.40.0",
     "bcrypt==5.0.0",
     "python-dotenv==1.2.2",      # requis par pydantic-settings pour env_file ; CVE-2026-28684 fixed
@@ -138,10 +138,8 @@ forbidden_modules = ["pydantic", "sqlalchemy", "fastapi", "starlette", "psycopg"
 # l'appelle en interne dès qu'on utilise `env_file=...`.
 DEP002 = ["python-dotenv"]
 
-# Alias paquet distribué → nom de module importé (les noms peuvent
-# différer : `psycopg-pool` installe le module `psycopg_pool`, etc.).
+# Alias paquet distribué → nom de module importé (les noms peuvent différer).
 [tool.deptry.package_module_name_map]
-psycopg-pool = "psycopg_pool"
 pydantic-settings = "pydantic_settings"
 
 # ----------------------------------------------------------------------
