@@ -139,38 +139,48 @@ _THESIS_ROLE_LABELS = {
 
 
 def person_theses(conn: Connection, person_id: int) -> dict[str, Any]:
-    """Thèses liées à cette personne avec un rôle non-auteur."""
+    """Thèses liées à cette personne avec un rôle non-auteur.
+
+    Les rôles sont lus depuis `authorships` canonique (alignement vérifié
+    avec `source_authorships.roles` sur la base). Le filtre `source = 'theses'`
+    reste source-spécifique (HAL/ScanR remontent quelques rôles non-auteur
+    qu'on n'affiche pas dans cette page) et passe par un `EXISTS`.
+    """
     rows = conn.execute(
         text("""
             SELECT p.id, p.title, p.pub_year, p.doi,
-                   sa.roles,
+                   a.roles,
                    (SELECT sa2.raw_author_name
                     FROM source_authorships sa2
-                    WHERE sa2.source_publication_id = sd.id
+                    JOIN source_publications sd2 ON sd2.id = sa2.source_publication_id
+                    WHERE sd2.publication_id = p.id
                       AND sa2.source = 'theses'
                       AND sa2.roles && ARRAY['author']::text[]
                     LIMIT 1
                    ) AS author_name,
                    (SELECT sa2.person_id
                     FROM source_authorships sa2
-                    WHERE sa2.source_publication_id = sd.id
+                    JOIN source_publications sd2 ON sd2.id = sa2.source_publication_id
+                    WHERE sd2.publication_id = p.id
                       AND sa2.source = 'theses'
                       AND sa2.roles && ARRAY['author']::text[]
                     LIMIT 1
                    ) AS author_person_id,
                    (SELECT ARRAY_AGG(DISTINCT aus.structure_id)
-                    FROM authorships a
-                    JOIN authorship_structures aus ON aus.authorship_id = a.id
+                    FROM authorships a2
+                    JOIN authorship_structures aus ON aus.authorship_id = a2.id
                     JOIN structures st ON st.id = aus.structure_id
-                    WHERE a.publication_id = p.id AND a.in_perimeter
+                    WHERE a2.publication_id = p.id AND a2.in_perimeter
                       AND st.structure_type = 'labo'
                    ) AS structure_ids
-            FROM source_authorships sa
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN publications p ON p.id = sd.publication_id
-            WHERE sa.person_id = :pid
-              AND sa.source = 'theses'
-              AND NOT (sa.roles && ARRAY['author']::text[])
+            FROM authorships a
+            JOIN publications p ON p.id = a.publication_id
+            WHERE a.person_id = :pid
+              AND NOT (a.roles && ARRAY['author']::text[])
+              AND EXISTS (
+                  SELECT 1 FROM source_authorships sa
+                  WHERE sa.authorship_id = a.id AND sa.source = 'theses'
+              )
             ORDER BY p.pub_year DESC NULLS LAST, p.title
         """),
         {"pid": person_id},

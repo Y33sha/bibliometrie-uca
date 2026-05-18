@@ -288,26 +288,6 @@ def list_publications(
 # ── Export CSV ────────────────────────────────────────────────────
 
 
-def _initial_clauses_for_export(filters: ListFilters) -> list[WhereClause]:
-    """Variante export : le filtre person passe par `source_authorships`
-    directement (comportement historique différent de list_publications).
-    """
-    if filters.person_id:
-        return [
-            WhereClause(
-                """EXISTS (SELECT 1 FROM source_publications sd
-                        JOIN source_authorships sa ON sa.source_publication_id = sd.id
-                        WHERE sd.publication_id = p.id AND sa.person_id = :flt_export_person
-                          AND sa.excluded = FALSE
-                          AND sa.roles && ARRAY['author']::text[])""",
-                {"flt_export_person": filters.person_id},
-            )
-        ]
-    if filters.lab_ids:
-        return []
-    return [WhereClause(PUB_IS_UCA, {})]
-
-
 def _export_source_clause(source_values: list[str]) -> WhereClause | None:
     """Filtre source pour l'export — comportement historique 4 valeurs
     hal_yes/no oa_yes/no uniquement."""
@@ -347,7 +327,7 @@ def _export_oa_clause(oa_status: str) -> WhereClause | None:
 def _build_export_clauses(filters: ListFilters) -> tuple[str, dict[str, Any]]:
     """Conditions WHERE pour l'export CSV publications (pas de hal_status,
     pas d'in_perimeter — comportement historique)."""
-    clauses: list[WhereClause | None] = list(_initial_clauses_for_export(filters))
+    clauses: list[WhereClause | None] = list(_initial_clauses(filters))
     clauses.extend(_inline_clauses(filters))
     if filters.lab_none and not filters.lab_ids:
         clauses.append(no_lab_clause())
@@ -468,7 +448,7 @@ def _build_theses_export_clauses(filters: ListFilters) -> tuple[str, dict[str, A
     - support des 4 sources (hal/oa/scanr/theses) via source_clause
     - support du filtre `access` (open/closed) — facette primaire de la page thèses.
     """
-    clauses: list[WhereClause | None] = list(_initial_clauses_for_export(filters))
+    clauses: list[WhereClause | None] = list(_initial_clauses(filters))
     clauses.extend(_inline_clauses(filters))
     if filters.lab_none and not filters.lab_ids:
         clauses.append(no_lab_clause())
