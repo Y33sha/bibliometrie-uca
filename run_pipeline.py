@@ -634,24 +634,34 @@ def _run_normalize_crossref() -> None:
 
 
 def _run_enrich_oa_status() -> None:
+    import asyncio
+
+    import httpx
+
     from application.pipeline.enrich.enrich_oa_status import run_enrich
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import publication_repository
-    from infrastructure.sources.api_limits import UNPAYWALL_DELAY
     from infrastructure.sources.config import get_api_base_urls
+    from infrastructure.sources.unpaywall import fetch_oa_status
 
     log.info("▶ enrich_oa_status")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        run_enrich(
-            conn,
-            PgEnrichQueries(),
-            log,
-            pub_repo=publication_repository(conn),
-            unpaywall_base=get_api_base_urls(conn)["unpaywall"],
-            rate_delay=UNPAYWALL_DELAY,
+        base_url = get_api_base_urls(conn)["unpaywall"]
+
+        async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
+            return await fetch_oa_status(client, doi, base_url=base_url, logger=log)
+
+        asyncio.run(
+            run_enrich(
+                conn,
+                PgEnrichQueries(),
+                log,
+                pub_repo=publication_repository(conn),
+                fetcher=fetcher,
+            )
         )
     finally:
         conn.close()

@@ -1,15 +1,18 @@
 """Point d'entrée CLI : enrichissement OA via Unpaywall."""
 
 import argparse
+import asyncio
 import os
+
+import httpx
 
 from application.pipeline.enrich.enrich_oa_status import run_enrich
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.enrich import PgEnrichQueries
 from infrastructure.repositories import publication_repository
-from infrastructure.sources.api_limits import UNPAYWALL_DELAY
 from infrastructure.sources.config import get_api_base_urls
+from infrastructure.sources.unpaywall import fetch_oa_status
 
 logger = setup_logger("enrich_oa_unpaywall", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -24,15 +27,21 @@ def main() -> None:
 
     conn = get_sync_engine().connect()
     try:
-        run_enrich(
-            conn,
-            PgEnrichQueries(),
-            logger,
-            pub_repo=publication_repository(conn),
-            unpaywall_base=get_api_base_urls(conn)["unpaywall"],
-            limit=args.limit,
-            dry_run=args.dry_run,
-            rate_delay=UNPAYWALL_DELAY,
+        base_url = get_api_base_urls(conn)["unpaywall"]
+
+        async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
+            return await fetch_oa_status(client, doi, base_url=base_url, logger=logger)
+
+        asyncio.run(
+            run_enrich(
+                conn,
+                PgEnrichQueries(),
+                logger,
+                pub_repo=publication_repository(conn),
+                fetcher=fetcher,
+                limit=args.limit,
+                dry_run=args.dry_run,
+            )
         )
     finally:
         conn.close()
