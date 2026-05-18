@@ -99,16 +99,16 @@ class TestHalDuplicateAccounts:
         )
 
         res = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50)
-        assert res["total"] >= 1
-        ours = next((p for p in res["persons"] if p["person_id"] == pid), None)
+        assert res.total >= 1
+        ours = next((p for p in res.persons if p.person_id == pid), None)
         assert ours is not None
-        assert len(ours["hal_accounts"]) == 2
+        assert len(ours.hal_accounts) == 2
 
     def test_ignores_single_account(self, sa_sync_conn):
         pid = _create_person(sa_sync_conn)
         _create_hal_sa_with_hal_id(sa_sync_conn, person_id=pid, hal_person_id=42, source_id="hal-1")
         res = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50)
-        assert not any(p["person_id"] == pid for p in res["persons"])
+        assert not any(p.person_id == pid for p in res.persons)
 
 
 class TestHalDuplicatePubsByDoi:
@@ -118,14 +118,14 @@ class TestHalDuplicatePubsByDoi:
         _create_hal_sd(sa_sync_conn, pub, "h-2", doi="10.1/shared")
 
         res = _q(sa_sync_conn).hal_duplicate_pubs_by_doi(page=1, per_page=50)
-        assert res["total"] >= 1
-        assert any(len(p["halids"]) >= 2 for p in res["pairs"])
+        assert res.total >= 1
+        assert any(len(p.halids) >= 2 for p in res.pairs)
 
     def test_noop_without_duplicates(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn)
         _create_hal_sd(sa_sync_conn, pub, "h-uniq", doi="10.1/u")
         res = _q(sa_sync_conn).hal_duplicate_pubs_by_doi(page=1, per_page=50)
-        assert res["total"] == 0
+        assert res.total == 0
 
 
 class TestHalDuplicatePubsByMetadata:
@@ -139,7 +139,7 @@ class TestHalDuplicatePubsByMetadata:
         _create_hal_sd(sa_sync_conn, p2, "h-meta-2")
 
         res = _q(sa_sync_conn).hal_duplicate_pubs_by_metadata(page=1, per_page=50)
-        assert res["total"] >= 1
+        assert res.total >= 1
 
 
 class TestHalMissingCollectionsLabs:
@@ -148,22 +148,23 @@ class TestHalMissingCollectionsLabs:
         _create_lab(sa_sync_conn, code="LAB-NO", hal_collection=None)
 
         labs = _q(sa_sync_conn).hal_missing_collections_labs()
-        ids = [lab_["id"] for lab_ in labs]
+        ids = [lab_.id for lab_ in labs]
         assert lab in ids
-        assert all(lab_["hal_collection"] for lab_ in labs)
+        assert all(lab_.hal_collection for lab_ in labs)
 
 
 class TestHalMissingCollections:
-    def test_returns_error_for_lab_without_collection(self, sa_sync_conn):
+    def test_returns_none_for_lab_without_collection(self, sa_sync_conn):
         lab = _create_lab(sa_sync_conn, code="LAB-NO-COL", hal_collection=None)
         res = _q(sa_sync_conn).hal_missing_collections(lab_id=lab, page=1, per_page=50)
-        assert res == {"error": "no_collection"}
+        assert res is None
 
     def test_returns_empty_when_no_missing(self, sa_sync_conn):
         lab = _create_lab(sa_sync_conn, code="LAB-X", hal_collection="COLL-X")
         res = _q(sa_sync_conn).hal_missing_collections(lab_id=lab, page=1, per_page=50)
-        assert res["total"] == 0
-        assert res["lab_acronym"] is None  # structure sans acronyme
+        assert res is not None
+        assert res.total == 0
+        assert res.lab_acronym is None  # structure sans acronyme
 
 
 def _create_other_sd(conn, pub_id, source, source_id, pub_year=2024, title="T"):
@@ -229,8 +230,8 @@ def _create_address_for_sa(conn, sa_id):
 class TestHalAffiliationConflicts:
     def test_noop_when_no_data(self, sa_sync_conn):
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert res["total"] == 0
-        assert res["publications"] == []
+        assert res.total == 0
+        assert res.publications == []
 
     def test_detects_conflict_with_openalex(self, sa_sync_conn):
         pub = _create_pub(sa_sync_conn, title="Conflict OA")
@@ -245,7 +246,7 @@ class TestHalAffiliationConflicts:
         _create_address_for_sa(sa_sync_conn, oa_sa)
 
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert pub in [p["id"] for p in res["publications"]]
+        assert pub in [p.id for p in res.publications]
 
     def test_detects_conflict_with_non_oa_wos_source(self, sa_sync_conn):
         # Élargissement : la détection couvre toutes les sources non-HAL (ici scanr).
@@ -261,7 +262,7 @@ class TestHalAffiliationConflicts:
         _create_address_for_sa(sa_sync_conn, sr_sa)
 
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert pub in [p["id"] for p in res["publications"]]
+        assert pub in [p.id for p in res.publications]
 
     def test_ignores_when_other_source_has_no_address(self, sa_sync_conn):
         # Sans adresse, la source n'a pas "examiné l'affiliation" → pas un conflit.
@@ -276,7 +277,7 @@ class TestHalAffiliationConflicts:
         _create_source_authorship(sa_sync_conn, "openalex", oa_sd, 0, in_perimeter=False)
 
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert pub not in [p["id"] for p in res["publications"]]
+        assert pub not in [p.id for p in res.publications]
 
     def test_ignores_position_mismatch(self, sa_sync_conn):
         # HAL atteste position 0, OA hors-UCA position 1 → pas de conflit.
@@ -292,4 +293,4 @@ class TestHalAffiliationConflicts:
         _create_address_for_sa(sa_sync_conn, oa_sa)
 
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
-        assert pub not in [p["id"] for p in res["publications"]]
+        assert pub not in [p.id for p in res.publications]
