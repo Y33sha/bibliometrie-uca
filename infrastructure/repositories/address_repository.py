@@ -125,25 +125,6 @@ class PgAddressRepository:
             .values(countries=countries if countries else None)
         )
 
-    def propagate_countries_to_similar_address(
-        self,
-        address_id: int,
-    ) -> list[int]:
-        result = self._conn.execute(
-            text("""
-                UPDATE addresses a2
-                SET countries = a1.countries
-                FROM addresses a1
-                WHERE a1.id = :id
-                  AND a2.normalized_text = a1.normalized_text
-                  AND a2.id <> a1.id
-                  AND LENGTH(a2.normalized_text) >= 5
-                RETURNING a2.id
-            """),
-            {"id": address_id},
-        )
-        return [row.id for row in result]
-
     def batch_add_country_by_ids(
         self,
         country_code: str,
@@ -194,19 +175,26 @@ class PgAddressRepository:
         )
         return [row.id for row in result]
 
-    def propagate_countries_across_similar_addresses(self) -> list[int]:
+    def propagate_countries_across_similar_addresses(
+        self,
+        source_ids: list[int],
+    ) -> list[int]:
+        if not source_ids:
+            return []
         result = self._conn.execute(
             text("""
                 UPDATE addresses a2
                 SET countries = a1.countries
                 FROM addresses a1
-                WHERE a1.countries IS NOT NULL
+                WHERE a1.id = ANY(:source_ids)
+                  AND a1.countries IS NOT NULL
                   AND a2.normalized_text = a1.normalized_text
                   AND a2.countries IS DISTINCT FROM a1.countries
                   AND LENGTH(a2.normalized_text) >= 5
                   AND a2.id <> a1.id
                 RETURNING a2.id
-            """)
+            """),
+            {"source_ids": source_ids},
         )
         return [row.id for row in result]
 

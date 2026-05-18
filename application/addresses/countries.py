@@ -33,7 +33,7 @@ def set_country(
     repo.set_countries(address_id, countries)
     affected = [address_id]
     if countries:
-        affected.extend(repo.propagate_countries_to_similar_address(address_id))
+        affected.extend(repo.propagate_countries_across_similar_addresses([address_id]))
     return affected
 
 
@@ -94,14 +94,14 @@ def batch_set_country_by_filter(
     )
 
 
-def propagate_countries_to_similar(*, repo: AddressRepository) -> list[int]:
-    """Propage addresses.countries vers toutes les adresses partageant le même
-    normalized_text, quand l'autre adresse a des countries différents.
+def propagate_countries_to_similar(
+    *, modified_ids: list[int], repo: AddressRepository
+) -> list[int]:
+    """Propage les `countries` des adresses `modified_ids` vers leurs jumelles (même `normalized_text`).
 
-    Appelée après un batch_set_country_by_* pour propager à travers tout le
-    référentiel d'adresses. Retourne les IDs propagés.
+    Appelée après un `batch_set_country_by_*` pour propager les modifications fraîches aux adresses similaires. Cible explicitement les sources de propagation pour rester sub-seconde (vs un balayage global O(n²) sur les ~475k adresses sans index btree sur `normalized_text`).
     """
-    return repo.propagate_countries_across_similar_addresses()
+    return repo.propagate_countries_across_similar_addresses(modified_ids)
 
 
 def propagate_countries_to_publications(address_ids: list[int], *, repo: AddressRepository) -> None:

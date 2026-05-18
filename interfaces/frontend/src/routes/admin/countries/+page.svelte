@@ -183,11 +183,17 @@
 		} else {
 			body.address_ids = [...selectedIds];
 		}
-		const data = await addressesApi.batchSetCountry(body);
-		batchResult = `${data.updated} adresse${data.updated > 1 ? 's' : ''} mise${data.updated > 1 ? 's' : ''} à jour`;
-		selectedIds = new Set();
-		if (applyToAll) selectedSugCountry = [];
-		batchApplying = false;
+		// try/finally pour ne jamais laisser `batchApplying = true` sticky en cas d'erreur HTTP — sinon le bouton reste disabled à vie après une 504/500.
+		try {
+			const data = await addressesApi.batchSetCountry(body);
+			batchResult = `${data.updated} adresse${data.updated > 1 ? 's' : ''} mise${data.updated > 1 ? 's' : ''} à jour`;
+			selectedIds = new Set();
+			if (applyToAll) selectedSugCountry = [];
+		} catch (e) {
+			batchResult = 'Erreur : ' + (e instanceof Error ? e.message : String(e));
+		} finally {
+			batchApplying = false;
+		}
 		loadAddresses();
 		setTimeout(() => { batchResult = ''; }, 3000);
 	}
@@ -232,14 +238,16 @@
 			<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
 		{/each}
 	</select>
-	{#if selectedIds.size > 0}
-		<button class="btn-primary" onclick={() => batchAddCountry(false)} disabled={!batchCountry || batchApplying}>
+	{#if selectedIds.size > 0 && batchCountry}
+		<button class="btn-primary" onclick={() => batchAddCountry(false)} disabled={batchApplying}>
 			Ajouter aux {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}
 		</button>
 	{/if}
-	<button class="btn-secondary" onclick={() => batchAddCountry(true)} disabled={!batchCountry || batchApplying}>
-		Ajouter à tout le filtre ({total.toLocaleString('fr-FR')})
-	</button>
+	{#if batchCountry}
+		<button class="btn-secondary" onclick={() => batchAddCountry(true)} disabled={batchApplying}>
+			Ajouter à tout le filtre ({total.toLocaleString('fr-FR')})
+		</button>
+	{/if}
 	{#if batchResult}
 		<span class="batch-result">{batchResult}</span>
 	{/if}
