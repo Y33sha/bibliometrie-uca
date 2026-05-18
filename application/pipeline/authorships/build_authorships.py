@@ -61,6 +61,11 @@ def build(
     inserted = queries.insert_missing_authorships(conn)
     logger.info(f"  {inserted} authorships créées")
 
+    # ANALYZE après l'INSERT massif : sinon les stats Postgres restent à zéro sur les colonnes fraîchement insérées (`is_corresponding`, `roles`), et les UPDATE de l'étape 3 partent en Nested Loop catastrophique (estimate `rows=1` au lieu de `rows=100_000+`).
+    if rebuild_full:
+        logger.info("  ANALYZE authorships (stats fraîches pour le planner)")
+        queries.analyze_authorships(conn)
+
     logger.info("Étape 2 : peuplement des FK (source_authorships → authorships)...")
     for source_name, source_value in active_sources:
         n = queries.link_source_authorships_to_authorship_for(conn, source_value)

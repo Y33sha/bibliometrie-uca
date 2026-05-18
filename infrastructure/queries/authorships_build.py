@@ -219,6 +219,10 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
     def insert_missing_authorships(self, conn: Connection) -> int:
         return insert_missing_authorships(conn)
 
+    def analyze_authorships(self, conn: Connection) -> None:
+        # ANALYZE intra-transaction est valide : Postgres met à jour pg_statistic immédiatement, et le planner relit ces stats au moment où il prépare chaque requête suivante de la même session. Sans ça, les UPDATE de l'étape 3 (`propagate_is_corresponding`, `propagate_roles`) partaient en Nested Loop sur estimate `rows=1` au lieu de Hash Join, bloquant le pipeline pendant des heures sur ~100 k authorships fraîchement insérées (null_frac obsolète à 0).
+        conn.execute(text("ANALYZE authorships"))
+
     def link_source_authorships_to_authorship_for(self, conn: Connection, source: str) -> int:
         return link_source_authorships_to_authorship_for(conn, source)
 
