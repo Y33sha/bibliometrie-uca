@@ -279,11 +279,11 @@ def phase_authorships(**kw: Any) -> Any:
     _run_build_authorships(rebuild_full=rebuild_full)
 
 
-def phase_countries(**kw: Any) -> PhaseMetrics:
+def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     """Detection des pays des adresses et recalcul sur les publications."""
     metrics = PhaseMetrics()
     metrics.merge(_run_detect_address_countries())
-    metrics.merge(_run_suggest_address_countries())
+    metrics.merge(_run_suggest_address_countries(reset_empty=MODES[mode].reset_country_suggestions))
     _run_refresh_publication_countries()
     return metrics
 
@@ -936,15 +936,15 @@ def _run_detect_address_countries() -> PhaseMetrics:
     return metrics
 
 
-def _run_suggest_address_countries() -> PhaseMetrics:
+def _run_suggest_address_countries(*, reset_empty: bool = False) -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from interfaces.cli.pipeline.suggest_address_countries import suggest_countries
 
-    log.info("▶ suggest_address_countries")
+    log.info("▶ suggest_address_countries%s", " (reset_empty)" if reset_empty else "")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        metrics = suggest_countries(conn)
+        metrics = suggest_countries(conn, reset_empty=reset_empty)
     finally:
         conn.close()
     log.info(

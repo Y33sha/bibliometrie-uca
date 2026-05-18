@@ -31,6 +31,12 @@ class ModePolicy:
     # (TRUNCATE + UPDATE FK), pour garantir la convergence absolue.
     # En mode incrémental, le build idempotent suffit.
     rebuild_authorships_full: bool
+    # True = remet `addresses.suggested_countries` à NULL pour les adresses
+    # déjà tentées sans succès (`= []`) avant la phase countries. Permet de
+    # bénéficier d'éventuelles évolutions des heuristiques de matching ou
+    # d'un nouveau corpus d'adresses similaires. En mode incrémental, on
+    # garde le cache (pas de raison de retenter si l'algo est stable).
+    reset_country_suggestions: bool
 
 
 # WoS : crédit API contractuel limité à 50 000 full records/an. WoS est
@@ -50,6 +56,7 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=False,
         run_enrich=False,
         rebuild_authorships_full=False,
+        reset_country_suggestions=False,
     ),
     "weekly": ModePolicy(
         # Pas de WoS (cf. note crédit API ci-dessus).
@@ -62,6 +69,7 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=False,
         run_enrich=False,
         rebuild_authorships_full=False,
+        reset_country_suggestions=False,
     ),
     "full": ModePolicy(
         extract_sources=frozenset({"hal", "openalex", "wos", "scanr", "theses"}),
@@ -72,6 +80,7 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=True,
         run_enrich=True,
         rebuild_authorships_full=True,
+        reset_country_suggestions=True,
     ),
 }
 
