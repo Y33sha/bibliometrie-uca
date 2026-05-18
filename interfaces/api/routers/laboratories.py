@@ -6,18 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.api.laboratories_queries import (
     LaboratoriesQueries,
-    LabPersonsFilters,
-)
-from application.ports.api.subjects_queries import SubjectFrequency
-from interfaces.api.deps import laboratories_queries_sync
-from interfaces.api.filters import parse_str_csv
-from interfaces.api.models import (
     LaboratoryAddressesResponse,
     LaboratoryDashboardResponse,
     LaboratoryDetailResponse,
     LaboratoryListItem,
     LaboratoryPersonsResponse,
+    LabPersonsFilters,
 )
+from application.ports.api.subjects_queries import SubjectFrequency
+from interfaces.api.deps import laboratories_queries_sync
+from interfaces.api.filters import parse_str_csv
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -28,7 +26,7 @@ def list_laboratories(
     queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
 ) -> list[LaboratoryListItem]:
     """Liste des labos du périmètre."""
-    return [LaboratoryListItem.model_validate(r) for r in queries.list_laboratories()]
+    return queries.list_laboratories()
 
 
 @router.get("/api/laboratories/{lab_id}", response_model=LaboratoryDetailResponse)
@@ -40,7 +38,7 @@ def get_laboratory(
     result = queries.get_laboratory(lab_id)
     if not result:
         raise HTTPException(404, "Laboratory not found")
-    return LaboratoryDetailResponse.model_validate(result)
+    return result
 
 
 @router.get("/api/laboratories/{lab_id}/persons", response_model=LaboratoryPersonsResponse)
@@ -68,10 +66,8 @@ def get_laboratory_persons(
         has_idhal=has_idhal,
         has_idref=has_idref,
     )
-    return LaboratoryPersonsResponse.model_validate(
-        queries.get_laboratory_persons(
-            lab_id, filters=filters, page=page, per_page=per_page, sort=sort
-        )
+    return queries.get_laboratory_persons(
+        lab_id, filters=filters, page=page, per_page=per_page, sort=sort
     )
 
 
@@ -83,9 +79,7 @@ def get_laboratory_addresses(
     queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
 ) -> LaboratoryAddressesResponse:
     """Adresses liées à un laboratoire."""
-    return LaboratoryAddressesResponse.model_validate(
-        queries.get_laboratory_addresses(lab_id, page=page, per_page=per_page)
-    )
+    return queries.get_laboratory_addresses(lab_id, page=page, per_page=per_page)
 
 
 @router.get("/api/laboratories/{lab_id}/dashboard", response_model=LaboratoryDashboardResponse)
@@ -94,7 +88,7 @@ def get_laboratory_dashboard(
     queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
 ) -> LaboratoryDashboardResponse:
     """Dashboard labo : publications par an + répartition OA."""
-    return LaboratoryDashboardResponse.model_validate(queries.get_laboratory_dashboard(lab_id))
+    return queries.get_laboratory_dashboard(lab_id)
 
 
 @router.get("/api/laboratories/{lab_id}/subjects", response_model=list[SubjectFrequency])
@@ -104,7 +98,4 @@ def get_laboratory_subjects(
     queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
 ) -> list[SubjectFrequency]:
     """Top sujets des publications du labo (pour le nuage de mots dashboard)."""
-    return [
-        SubjectFrequency.model_validate(r)
-        for r in queries.get_laboratory_subjects(lab_id, limit=limit)
-    ]
+    return queries.get_laboratory_subjects(lab_id, limit=limit)

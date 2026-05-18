@@ -84,7 +84,7 @@ class TestListLaboratories:
         lab = _create_structure(sa_sync_conn, code="LAB-1", name="Lab 1")
         _setup_perimeter(sa_sync_conn, [lab])
         labs = PgLaboratoriesQueries(sa_sync_conn).list_laboratories()
-        ids = [lab_["id"] for lab_ in labs]
+        ids = [lab_.id for lab_ in labs]
         assert lab in ids
 
     def test_excludes_root_as_tutelle(self, sa_sync_conn):
@@ -92,9 +92,9 @@ class TestListLaboratories:
         root = _setup_perimeter(sa_sync_conn, [lab])
         labs = PgLaboratoriesQueries(sa_sync_conn).list_laboratories()
         for lab_ in labs:
-            if lab_["id"] == lab:
+            if lab_.id == lab:
                 # La racine est filtrée des tutelles
-                tutelles_ids = [t["id"] for t in (lab_["tutelles"] or [])]
+                tutelles_ids = [t.id for t in (lab_.tutelles or [])]
                 assert root not in tutelles_ids
 
 
@@ -106,11 +106,11 @@ class TestGetLaboratory:
         lab = _create_structure(sa_sync_conn, code="LAB", name="Le labo", hal_collection="LAB-COL")
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory(lab)
         assert res is not None
-        assert res["structure"]["code"] == "LAB"
-        assert res["structure"]["hal_collection"] == "LAB-COL"
-        assert isinstance(res["parents"], list)
-        assert isinstance(res["children"], list)
-        assert isinstance(res["theses_count"], int)
+        assert res.structure.code == "LAB"
+        assert res.structure.hal_collection == "LAB-COL"
+        assert isinstance(res.parents, list)
+        assert isinstance(res.children, list)
+        assert isinstance(res.theses_count, int)
 
 
 class TestGetLaboratoryPersons:
@@ -122,8 +122,8 @@ class TestGetLaboratoryPersons:
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_persons(
             lab, filters=LabPersonsFilters(), page=1, per_page=50, sort="name"
         )
-        assert res["total_persons"] == 1
-        assert res["persons"][0]["id"] == pid
+        assert res.total_persons == 1
+        assert res.persons[0].id == pid
 
     def test_search_filters_by_name(self, sa_sync_conn):
         lab = _create_structure(sa_sync_conn, code="LAB")
@@ -139,7 +139,7 @@ class TestGetLaboratoryPersons:
             per_page=50,
             sort="name",
         )
-        ids = [p["id"] for p in res["persons"]]
+        ids = [p.id for p in res.persons]
         assert p_match in ids and p_other not in ids
 
     def test_counts_orphan_authorships(self, sa_sync_conn):
@@ -165,7 +165,7 @@ class TestGetLaboratoryPersons:
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_persons(
             lab, filters=LabPersonsFilters(), page=1, per_page=50, sort="name"
         )
-        assert res["orphan_authorships"]["total"] == 1
+        assert res.orphan_authorships.total == 1
 
 
 class TestGetLaboratoryAddresses:
@@ -183,7 +183,7 @@ class TestGetLaboratoryAddresses:
         )
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_addresses(lab, page=1, per_page=50)
-        ids = [a["id"] for a in res["addresses"]]
+        ids = [a.id for a in res.addresses]
         assert addr in ids
 
     def test_excludes_rejected_links(self, sa_sync_conn):
@@ -199,7 +199,7 @@ class TestGetLaboratoryAddresses:
             {"a": addr, "s": lab},
         )
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_addresses(lab, page=1, per_page=50)
-        ids = [a["id"] for a in res["addresses"]]
+        ids = [a.id for a in res.addresses]
         assert addr not in ids
 
 
@@ -207,11 +207,10 @@ class TestGetLaboratoryDashboard:
     def test_returns_structure_even_when_empty(self, sa_sync_conn):
         lab = _create_structure(sa_sync_conn, code="LAB")
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_dashboard(lab)
-        assert "pubs_by_year" in res
-        assert "oa" in res
-        assert "collab" in res
-        assert "top_countries" in res
-        assert res["oa"]["total"] == 0
+        assert res.pubs_by_year == []
+        assert res.oa.total == 0
+        assert res.collab.total_articles == 0
+        assert res.top_countries == []
 
     def test_aggregates_oa_and_countries(self, sa_sync_conn):
         sa_sync_conn.execute(
@@ -239,9 +238,9 @@ class TestGetLaboratoryDashboard:
         )
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_dashboard(lab)
-        assert res["oa"]["open_access"] == 1
-        assert res["collab"]["international"] == 1
-        assert any(c["code"] == "us" for c in res["top_countries"])
+        assert res.oa.open_access == 1
+        assert res.collab.international == 1
+        assert any(c.code == "us" for c in res.top_countries)
 
     def test_excludes_non_applicable_country(self, sa_sync_conn):
         """`xx` (Non applicable) ne doit ni gonfler le compte international
@@ -268,10 +267,10 @@ class TestGetLaboratoryDashboard:
         )
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_dashboard(lab)
-        assert res["collab"]["total_articles"] == 1
-        assert res["collab"]["international"] == 0
-        assert res["collab"]["domestic"] == 1
-        assert not any(c["code"] == "xx" for c in res["top_countries"])
+        assert res.collab.total_articles == 1
+        assert res.collab.international == 0
+        assert res.collab.domestic == 1
+        assert not any(c.code == "xx" for c in res.top_countries)
 
 
 class TestGetLaboratorySubjects:
@@ -337,10 +336,10 @@ class TestGetLaboratorySubjects:
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_subjects(lab, limit=10)
         assert len(res) == 2
-        assert res[0]["label"] == "AI"
-        assert res[0]["count"] == 3
-        assert res[1]["label"] == "Biology"
-        assert res[1]["count"] == 1
+        assert res[0].label == "AI"
+        assert res[0].count == 3
+        assert res[1].label == "Biology"
+        assert res[1].count == 1
 
     def test_excludes_peer_review_memoir_ongoing_thesis(self, sa_sync_conn):
         lab = _create_structure(sa_sync_conn, "L1")

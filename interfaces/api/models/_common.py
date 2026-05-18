@@ -1,21 +1,24 @@
-"""Modèles Pydantic transverses : facets, réponses génériques, refs partagées."""
+"""Modèles Pydantic transverses router-side : réponses génériques + bodies.
+
+Les types **retournés par les ports** (facets, refs de structure, blocs
+dashboard partagés) vivent dans `application/ports/api/_common.py` et
+sont re-exportés ici pour compat des importeurs historiques. Les types
+**router-only** (réponses d'acquittement après mutation, bodies HTTP)
+sont définis ici.
+"""
 
 from pydantic import BaseModel
 
-# ----- Facet primitives -----
+from application.ports.api._common import (
+    DashboardOa,
+    FacetValueCount,
+    PubYearCount,
+    StructureRef,
+    ValueConfirmedOut,
+    YesNoCount,
+)
 
-
-class FacetValueCount(BaseModel):
-    value: str
-    count: int
-
-
-class YesNoCount(BaseModel):
-    yes: int
-    no: int
-
-
-# ----- Réponses génériques d'acquittement -----
+# ----- Réponses génériques d'acquittement (router-only) -----
 
 
 class DeletedResponse(BaseModel):
@@ -71,33 +74,21 @@ class MergeResponse(BaseModel):
     target_id: int
 
 
-# ----- Refs partagées entre publications, persons, laboratories -----
-
-
-class StructureRef(BaseModel):
-    """Référence courte à une structure (acronyme + nom)."""
-
-    acronym: str | None
-    name: str
-
-
-class ValueConfirmedOut(BaseModel):
-    """Identifiant sous forme condensée (annuaire public)."""
-
-    value: str
-    confirmed: bool
-
-
-# ----- Blocs dashboard partagés (laboratoires + personnes) -----
-
-
-class PubYearCount(BaseModel):
-    year: int
-    count: int
-
-
-class DashboardOa(BaseModel):
-    open_access: int
-    closed: int
-    unknown: int
-    total: int
+__all__ = [
+    "BatchUpdatedResponse",
+    "CreatedIdResponse",
+    "DashboardOa",
+    "DeletedResponse",
+    "DetachedResponse",
+    "FacetValueCount",
+    "MergeRequest",
+    "MergeResponse",
+    "OkResponse",
+    "PubYearCount",
+    "RemovedResponse",
+    "StatusResponse",
+    "StructureRef",
+    "TotalCountResponse",
+    "ValueConfirmedOut",
+    "YesNoCount",
+]
