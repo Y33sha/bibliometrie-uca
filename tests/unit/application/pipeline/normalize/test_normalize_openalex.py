@@ -709,16 +709,6 @@ class TestOpenalexNormalizerClass:
         assert norm._publisher_repo is not None
         assert norm._pub_repo is not None
 
-    def test_row_factory_maps_to_staging_row(self):
-        norm = _make_normalizer()
-        raw = MagicMock()
-        raw.id = 7
-        raw.source_id = "W7"
-        raw.doi = "10.1/x"
-        raw.raw_data = {"id": "W7"}
-        out = norm._row_factory(raw)
-        assert out == StagingRow(id=7, source_id="W7", doi="10.1/x", raw_data={"id": "W7"})
-
     def test_process_work_delegates_to_module_function(self, monkeypatch):
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())

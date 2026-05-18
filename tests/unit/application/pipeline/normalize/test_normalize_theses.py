@@ -378,18 +378,6 @@ class TestThesesNormalizerClass:
         norm.preload_caches(MagicMock())
         assert norm._pub_repo is not None
 
-    def test_row_factory(self):
-        norm = _make_normalizer()
-        raw = MagicMock()
-        raw.id = 7
-        raw.source_id = "2024CLFAC007"
-        raw.doi = None
-        raw.raw_data = {"titrePrincipal": "T"}
-        out = norm._row_factory(raw)
-        assert out == StagingRow(
-            id=7, source_id="2024CLFAC007", doi=None, raw_data={"titrePrincipal": "T"}
-        )
-
     def test_process_work_delegates(self, monkeypatch):
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())

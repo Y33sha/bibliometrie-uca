@@ -586,19 +586,6 @@ class TestHalNormalizerClass:
         assert norm._publisher_repo is not None
         assert norm._pub_repo is not None
 
-    def test_row_factory_maps_to_hal_staging_row(self):
-        norm = _make_normalizer()
-        raw = MagicMock()
-        raw.id = 7
-        raw.source_id = "hal-7"
-        raw.doi = "10.1/x"
-        raw.raw_data = {"id": "hal-7"}
-        raw.hal_collections = ["UCA"]
-        out = norm._row_factory(raw)
-        assert out == HalStagingRow(
-            id=7, source_id="hal-7", doi="10.1/x", raw_data={"id": "hal-7"}, hal_collections=["UCA"]
-        )
-
     def test_process_work_delegates(self, monkeypatch):
         norm = _make_normalizer()
         norm.preload_caches(MagicMock())

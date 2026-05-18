@@ -14,16 +14,21 @@ from unittest.mock import MagicMock
 import pytest
 
 from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.pipeline.staging import StagingRow
 
 
-class _SpyNormalizer(SourceNormalizer[Any]):
-    """Fake normalizer qui compte les appels à `on_error()`. Paramétré sur `Any` car les tests passent des dicts mockés directement à `_process_one`, sans passer par `_iter_rows` / `_row_factory`."""
+def _row(rid: int) -> StagingRow:
+    return StagingRow(id=rid, source_id=f"s{rid}", doi=None, raw_data={})
+
+
+class _SpyNormalizer(SourceNormalizer):
+    """Fake normalizer qui compte les appels à `on_error()`."""
 
     SOURCE = "spy"
 
-    # `Any` toléré ici (cf. décision 4 du chantier `CODE_chasse-aux-any`) :
-    # les tests passent `MagicMock()` pour conn / logger / staging_queries
-    # — typer strictement obligerait à `MagicMock(spec=Connection)` partout.
+    # `Any` toléré sur conn/logger/staging_queries : les tests passent
+    # `MagicMock()` pour ces dépendances — typer strictement obligerait à
+    # `MagicMock(spec=Connection)` partout.
     def __init__(
         self,
         conn: Any,
@@ -31,7 +36,7 @@ class _SpyNormalizer(SourceNormalizer[Any]):
         staging_queries: Any,
         *,
         use_savepoint: bool = False,
-        error_on_ids: set | None = None,
+        error_on_ids: set[int] | None = None,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         # Override at instance level (ClassVar défini dans la classe)
@@ -40,14 +45,11 @@ class _SpyNormalizer(SourceNormalizer[Any]):
         self.on_error_calls = 0
         self.processed_ids: list[int] = []
 
-    def process_work(self, conn: Any, row: Any) -> bool | None:
-        self.processed_ids.append(row["id"])
-        if row["id"] in self._error_on_ids:
-            raise RuntimeError(f"boom on {row['id']}")
+    def process_work(self, conn: Any, row: StagingRow) -> bool | None:
+        self.processed_ids.append(row.id)
+        if row.id in self._error_on_ids:
+            raise RuntimeError(f"boom on {row.id}")
         return True
-
-    def _row_factory(self, raw: Any) -> Any:
-        return raw  # tests pass dicts directly, no SA row mapping needed.
 
     def on_error(self) -> None:
         self.on_error_calls += 1
@@ -59,7 +61,7 @@ class TestOnErrorHook:
     def test_savepoint_success_no_on_error(self):
         normalizer = _SpyNormalizer(MagicMock(), MagicMock(), MagicMock(), use_savepoint=True)
         cur = MagicMock()
-        normalizer._process_one(cur, {"id": 1})
+        normalizer._process_one(cur, _row(1))
         assert normalizer.on_error_calls == 0
 
     def test_savepoint_error_calls_on_error(self):
@@ -72,7 +74,7 @@ class TestOnErrorHook:
         )
         cur = MagicMock()
         with pytest.raises(RuntimeError):
-            normalizer._process_one(cur, {"id": 42})
+            normalizer._process_one(cur, _row(42))
         assert normalizer.on_error_calls == 1
 
     def test_savepoint_error_rollback_also_fails_still_calls_on_error(self):
@@ -89,7 +91,7 @@ class TestOnErrorHook:
             conn, MagicMock(), MagicMock(), use_savepoint=True, error_on_ids={42}
         )
         with pytest.raises(RuntimeError):
-            normalizer._process_one(conn, {"id": 42})
+            normalizer._process_one(conn, _row(42))
         assert conn.rollback.called
         assert normalizer.on_error_calls == 1
 
@@ -101,7 +103,7 @@ class TestOnErrorHook:
         conn = MagicMock()
         staging = MagicMock()
         staging.count_pending_staging.return_value = 3
-        staging.fetch_pending_staging.return_value = iter([{"id": 1}, {"id": 42}, {"id": 3}])
+        staging.fetch_pending_staging.return_value = [_row(1), _row(42), _row(3)]
 
         normalizer = _SpyNormalizer(
             conn,
@@ -121,7 +123,7 @@ class TestOnErrorHook:
         conn = MagicMock()
         staging = MagicMock()
         staging.count_pending_staging.return_value = 2
-        staging.fetch_pending_staging.return_value = iter([{"id": 1}, {"id": 2}])
+        staging.fetch_pending_staging.return_value = [_row(1), _row(2)]
 
         normalizer = _SpyNormalizer(conn, MagicMock(), staging, use_savepoint=False)
         normalizer.run([])

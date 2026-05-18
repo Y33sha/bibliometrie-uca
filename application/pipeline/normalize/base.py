@@ -19,29 +19,25 @@ import argparse
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import Any, ClassVar, Generic, TypeVar
+from typing import ClassVar
 
-from sqlalchemy import Connection, Row
+from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
-from application.ports.pipeline.staging import StagingQueries
-
-T_Row = TypeVar("T_Row")
+from application.ports.pipeline.staging import StagingQueries, StagingRow
 
 
-class SourceNormalizer(ABC, Generic[T_Row]):
+class SourceNormalizer(ABC):
     """Template method pour la normalisation source → tables structurées.
 
-    Paramétré par `T_Row` (typiquement `StagingRow` ou `HalStagingRow`) : chaque sous-classe choisit le NamedTuple à hydrater depuis la row SA via `_row_factory`. La base ne touche jamais aux champs de la row — elle ne fait que la passer à `process_work`.
+    Le port `StagingQueries` retourne `list[StagingRow]` ; pour HAL, ce sont en réalité des `HalStagingRow` (substitution LSP). Le normalizer HAL accède à `.hal_collections` via `isinstance` au début de son `process_work`.
 
     Override points :
     - `SOURCE` : identifiant source (obligatoire, ex: "hal", "openalex")
     - `DEFAULT_BATCH_SIZE` : taille de commit (défaut 500)
     - `USE_SAVEPOINT` : `True` pour encadrer chaque `process_work` dans un SAVEPOINT
     - `FETCH_SUB_BATCH` : si défini, charge les ids puis fetch par sous-lots de cette taille
-    - `FETCH_COLUMNS` : colonnes du SELECT (défaut "id, source_id, doi, raw_data")
     - `process_work(conn, row) -> bool | None` : abstract, logique métier
-    - `_row_factory(raw) -> T_Row` : abstract, mappe une row SA en NamedTuple typé
     - `preload_caches(conn)` : pré-chargement optionnel
     - `post_process(conn)` : nettoyage post-traitement optionnel
     - `summary_stats(conn) -> list[str]` : lignes log additionnelles
@@ -52,7 +48,6 @@ class SourceNormalizer(ABC, Generic[T_Row]):
     DEFAULT_BATCH_SIZE: ClassVar[int] = 500
     USE_SAVEPOINT: ClassVar[bool] = False
     FETCH_SUB_BATCH: ClassVar[int | None] = None
-    FETCH_COLUMNS: ClassVar[str] = "id, source_id, doi, raw_data"
 
     def __init__(
         self, conn: Connection, logger: logging.Logger, staging_queries: StagingQueries
@@ -64,12 +59,8 @@ class SourceNormalizer(ABC, Generic[T_Row]):
     # ── Hooks métier ────────────────────────────────────────────
 
     @abstractmethod
-    def process_work(self, conn: Connection, row: T_Row) -> bool | None:
+    def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
         """Traite une ligne staging. Retourne True (ok), None (skip), False (erreur)."""
-
-    @abstractmethod
-    def _row_factory(self, raw: Row[Any]) -> T_Row:
-        """Hydrate une row SA en NamedTuple typé (StagingRow / HalStagingRow)."""
 
     def preload_caches(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
         """Pré-chargement optionnel (ex: struct_cache pour HAL)."""
@@ -117,24 +108,18 @@ class SourceNormalizer(ABC, Generic[T_Row]):
     def _count_pending(self, conn: Connection) -> int:
         return self._staging.count_pending_staging(conn, self.SOURCE)
 
-    def _iter_rows(self, conn: Connection, limit: int) -> Iterator[T_Row]:
-        """Itère les lignes à traiter. Peut faire un fetch en un coup ou par sous-lots. Mappe chaque row SA en NamedTuple typé via `_row_factory`."""
+    def _iter_rows(self, conn: Connection, limit: int) -> Iterator[StagingRow]:
+        """Itère les lignes à traiter, soit d'un coup soit par sous-lots."""
         if self.FETCH_SUB_BATCH is None:
-            for raw in self._staging.fetch_pending_staging(
-                conn, self.SOURCE, columns=self.FETCH_COLUMNS, limit=limit
-            ):
-                yield self._row_factory(raw)
+            yield from self._staging.fetch_pending_staging(conn, self.SOURCE, limit=limit)
             return
 
         work_ids = self._staging.fetch_pending_staging_ids(conn, self.SOURCE, limit=limit)
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]
-            for raw in self._staging.fetch_staging_by_ids(
-                conn, batch_ids, columns=self.FETCH_COLUMNS
-            ):
-                yield self._row_factory(raw)
+            yield from self._staging.fetch_staging_by_ids(conn, batch_ids, source=self.SOURCE)
 
-    def _process_one(self, conn: Connection, row: T_Row) -> bool | None:
+    def _process_one(self, conn: Connection, row: StagingRow) -> bool | None:
         """Enveloppe process_work avec SAVEPOINT optionnel."""
         if not self.USE_SAVEPOINT:
             return self.process_work(conn, row)
