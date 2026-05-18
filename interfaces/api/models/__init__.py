@@ -71,14 +71,7 @@ from interfaces.api.models.admin.perimeters import (
     PerimeterUpdate,
 )
 from interfaces.api.models.admin.person_duplicates import (
-    PersonConflictPair,
     PersonConflictPairResponse,
-    PersonConflictPub,
-    PersonDedupDetail,
-    PersonDedupIdentifier,
-    PersonDedupLab,
-    PersonDedupPublication,
-    PersonDuplicatePair,
     PersonDuplicatePairResponse,
 )
 from interfaces.api.models.admin.persons import (
@@ -346,17 +339,10 @@ __all__ = [
     "PersonAddressOut",
     "PersonAddressStruct",
     "PersonAddressesResponse",
-    "PersonConflictPair",
     "PersonConflictPairResponse",
-    "PersonConflictPub",
     "PersonDashboardResponse",
-    "PersonDedupDetail",
-    "PersonDedupIdentifier",
-    "PersonDedupLab",
-    "PersonDedupPublication",
     "PersonDirectoryEntry",
     "PersonDirectoryResponse",
-    "PersonDuplicatePair",
     "PersonDuplicatePairResponse",
     "PersonIdentifierOut",
     "PersonListResponse",

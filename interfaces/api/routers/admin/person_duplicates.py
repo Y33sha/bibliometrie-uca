@@ -50,7 +50,7 @@ def next_person_duplicate(
     """
     skip_pairs = parse_skip_pairs(skip) if skip else None
     pair = queries.next_person_duplicate(skip_pairs=skip_pairs, offset=offset)
-    return PersonDuplicatePairResponse.model_validate({"pair": pair})
+    return PersonDuplicatePairResponse(pair=pair)
 
 
 @router.post("/api/admin/person-duplicates/mark-distinct", response_model=OkResponse)
@@ -97,4 +97,4 @@ def next_person_conflict(
     """
     skip_pairs = parse_skip_pairs(skip) if skip else set()
     pair = queries.next_person_conflict(skip_pairs=skip_pairs, offset=offset)
-    return PersonConflictPairResponse.model_validate({"pair": pair})
+    return PersonConflictPairResponse(pair=pair)

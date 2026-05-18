@@ -65,7 +65,7 @@ class TestNextPersonDuplicate:
 
         res = _q(sa_sync_conn).next_person_duplicate(skip_pairs=None, offset=0)
         assert res is not None
-        ids = {res["person_a"]["id"], res["person_b"]["id"]}
+        ids = {res.person_a.id, res.person_b.id}
         assert ids == {p1, p2}
 
     def test_skips_specified_pairs(self, sa_sync_conn):
@@ -78,7 +78,7 @@ class TestNextPersonDuplicate:
         # Peut matcher d'autres paires dans le fixture global — on vérifie juste
         # que celle skippée n'apparaît pas
         if res is not None:
-            got = {res["person_a"]["id"], res["person_b"]["id"]}
+            got = {res.person_a.id, res.person_b.id}
             assert got != {p1, p2}
 
 
