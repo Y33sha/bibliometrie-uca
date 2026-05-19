@@ -42,9 +42,12 @@ class OpenalexFetchMissingDoiAdapter:
     # OpenAlex impose 10 req/s comme plafond documenté, quel que soit le pool
     # (polite via `mailto` ou authentifié via `api_key`). `auth_params()` envoie
     # `api_key` si configurée (cas prod), sinon `mailto`.
-    # Latence mesurée ~280 ms ; sem=3 donne ~10.8 req/s peak, aligné avec le
-    # seuil. Monter à 5 (~18 req/s observé) déclenche des 429 à retardement.
+    # Calibrage : 3 workers + 100 ms de pause par worker après chaque fetch.
+    # Avec une latence OpenAlex typique ~280 ms, débit effectif
+    # ≈ 3 / (0.28 + 0.1) ≈ 7.9 req/s. Marge de sécurité sous le seuil de 10
+    # req/s pour absorber les bursts initiaux et la variabilité de latence.
     max_concurrent = 3
+    request_delay_s = 0.1
 
     base_url: str
 
