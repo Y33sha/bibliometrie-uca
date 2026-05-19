@@ -674,7 +674,11 @@ def _run_enrich_journal_apc() -> None:
     from infrastructure.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
     from infrastructure.sources.api_limits import DOAJ_DELAY
-    from infrastructure.sources.config import get_api_base_urls
+    from infrastructure.sources.config import (
+        get_api_base_urls,
+        get_openalex_api_key,
+        get_openalex_email,
+    )
 
     log.info("▶ enrich_journal_apc")
     t0 = time.time()
@@ -685,7 +689,8 @@ def _run_enrich_journal_apc() -> None:
             PgEnrichQueries(),
             log,
             journal_repo=journal_repository(conn),
-            mailto="bibliometrie@uca.fr",
+            api_key=get_openalex_api_key(conn),
+            mailto=get_openalex_email(conn),
             openalex_sources_api=get_api_base_urls(conn)["openalex_sources"],
             rate_delay=DOAJ_DELAY,
         )

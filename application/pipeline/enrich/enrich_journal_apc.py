@@ -40,7 +40,12 @@ def to_short_id(full_id: str) -> str:
 
 
 def fetch_sources_batch(
-    openalex_ids: list[str], mailto: str, logger: logging.Logger, *, openalex_sources_api: str
+    openalex_ids: list[str],
+    logger: logging.Logger,
+    *,
+    openalex_sources_api: str,
+    api_key: str | None,
+    mailto: str,
 ) -> dict[str, dict]:
     """Interroge l'API OpenAlex pour un lot d'IDs et retourne un dict short_id → données."""
     full_ids = [to_full_id(oid) for oid in openalex_ids]
@@ -49,8 +54,11 @@ def fetch_sources_batch(
         "filter": f"openalex:{filter_value}",
         "per_page": str(len(openalex_ids)),
         "select": "id,apc_usd,apc_prices,is_in_doaj",
-        "mailto": mailto,
     }
+    if api_key:
+        params["api_key"] = api_key
+    else:
+        params["mailto"] = mailto
 
     for attempt in range(3):
         try:
@@ -105,6 +113,7 @@ def run_enrich(
     logger: logging.Logger,
     *,
     journal_repo: JournalRepository,
+    api_key: str | None,
     mailto: str,
     openalex_sources_api: str,
     limit: int = 0,
@@ -137,7 +146,11 @@ def run_enrich(
             id_map = {row[1]: row[0] for row in batch}
 
             sources = fetch_sources_batch(
-                oa_ids, mailto, logger, openalex_sources_api=openalex_sources_api
+                oa_ids,
+                logger,
+                openalex_sources_api=openalex_sources_api,
+                api_key=api_key,
+                mailto=mailto,
             )
             time.sleep(rate_delay)
 
