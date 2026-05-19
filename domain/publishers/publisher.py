@@ -21,4 +21,3 @@ class Publisher:
     openalex_id: str | None = None
     is_predatory: bool = False
     notes: str | None = None
-    doi_prefix: str | None = None

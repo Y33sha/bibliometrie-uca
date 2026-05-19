@@ -8,14 +8,13 @@
 	type Publisher = components['schemas']['PublisherListItem'];
 
 	// Modal édition
-	let editModal: { id: number; name: string; country: string; doi_prefix: string; is_predatory: boolean; notes: string } | null = $state(null);
+	let editModal: { id: number; name: string; country: string; is_predatory: boolean; notes: string } | null = $state(null);
 
 	function openEdit(pub: Publisher) {
 		editModal = {
 			id: pub.id,
 			name: pub.name,
 			country: pub.country || '',
-			doi_prefix: pub.doi_prefix || '',
 			is_predatory: pub.is_predatory,
 			notes: '',
 		};
@@ -26,7 +25,6 @@
 		const body: Record<string, any> = {};
 		if (editModal.name.trim()) body.name = editModal.name.trim();
 		body.country = editModal.country.trim() || null;
-		body.doi_prefix = editModal.doi_prefix.trim() || null;
 		body.is_predatory = editModal.is_predatory;
 		if (editModal.notes.trim()) body.notes = editModal.notes.trim();
 		try {
@@ -123,7 +121,7 @@
 				Nom {sort === 'name' ? '▲' : sort === '-name' ? '▼' : ''}
 			</th>
 			<th>Pays</th>
-			<th>DOI prefix</th>
+			<th>Préfixes DOI</th>
 			<th class="sortable num" onclick={() => setSort(sort === '-journals' ? 'journals' : '-journals')}>
 				Revues {sort === '-journals' ? '▲' : sort === 'journals' ? '▼' : ''}
 			</th>
@@ -141,7 +139,11 @@
 					{#if pub.is_predatory}<span class="badge-pred">prédateur</span>{/if}
 				</td>
 				<td class="muted">{pub.country || ''}</td>
-				<td class="muted">{pub.doi_prefix || ''}</td>
+				<td class="prefixes">
+					{#each pub.doi_prefixes as p (p.prefix)}
+						<span class="prefix-chip" title="RA : {p.ra}{p.crossref_member_id ? ` / member ${p.crossref_member_id}` : ''}">{p.prefix}</span>
+					{/each}
+				</td>
 				<td class="num">{pub.journal_count}</td>
 				<td class="num">{pub.pub_count}</td>
 				<td class="actions">
@@ -187,8 +189,6 @@
 		<input bind:value={editModal.name} />
 		<label>Pays</label>
 		<input bind:value={editModal.country} placeholder="ex: FR, US" />
-		<label>DOI prefix</label>
-		<input bind:value={editModal.doi_prefix} placeholder="ex: 10.1038" />
 		<label>
 			<input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur
 		</label>
@@ -230,4 +230,6 @@
 	.merge-result { display: block; width: 100%; padding: 5px 8px; font-size: 0.85rem; cursor: pointer; background: none; border: none; text-align: left; font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.merge-result:hover { background: var(--warning-light, #fff3e0); }
 
+	.prefixes { font-family: var(--font-mono, monospace); font-size: 0.78rem; line-height: 1.6; }
+	.prefix-chip { display: inline-block; padding: 0 5px; margin: 0 3px 2px 0; background: var(--accent-light, #f0f4f8); border: 1px solid var(--border); border-radius: 3px; color: var(--text, #333); }
 </style>

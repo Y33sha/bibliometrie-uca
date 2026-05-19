@@ -12,6 +12,5 @@ from pydantic import BaseModel
 class PublisherUpdate(BaseModel):
     name: str | None = None
     country: str | None = None
-    doi_prefix: str | None = None
     is_predatory: bool | None = None
     notes: str | None = None

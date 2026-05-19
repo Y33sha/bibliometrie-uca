@@ -145,10 +145,7 @@ export interface paths {
          * Publisher Stats
          * @description Classement des éditeurs par volume de publications filtrées.
          *
-         *     `lab_id`, `year` : listes CSV d'entiers. `oa_status` : valeur
-         *     unique (`gold`/`green`/`hybrid`/`bronze`/`closed`/`unknown`).
-         *     `has_apc=yes|no|""` : filtre sur la présence d'un paiement APC
-         *     connu.
+         *     `lab_id`, `year` : listes CSV d'entiers. `oa_status` : valeur unique (`gold`/`green`/`hybrid`/`bronze`/`closed`/`unknown`). `has_apc=yes|no|""` : filtre sur la présence d'un paiement APC connu.
          */
         get: operations["publisher_stats_api_stats_publishers_get"];
         put?: never;
@@ -248,11 +245,7 @@ export interface paths {
         };
         /**
          * Available Years
-         * @description Liste des années présentes dans les publications validées (tri asc).
-         *
-         *     Contrairement à `/api/publications/years` qui remonte toutes les
-         *     années, celui-ci ne remonte que les années validées (config
-         *     `years_validated`).
+         * @description Liste des années présentes dans les publications validées (tri asc, restreint via la config `years_validated`).
          */
         get: operations["available_years_api_stats_years_get"];
         put?: never;
@@ -295,30 +288,6 @@ export interface paths {
          * @description Facettes dynamiques pour la page publications.
          */
         get: operations["publications_facets_api_publications_facets_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/publications/years": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * All Years
-         * @description Liste de toutes les années présentes en base (validées ou non).
-         *
-         *     Contrairement à `/stats/years` qui restreint aux années validées,
-         *     cet endpoint remonte l'intégralité des `pub_year` distincts pour
-         *     alimenter le filtre « année » côté admin.
-         */
-        get: operations["all_years_api_publications_years_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -387,29 +356,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/source-authorships/{source}/{authorship_id}/exclude": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Exclude Source Authorship
-         * @description Marque/démarque une authorship source comme fausse.
-         *
-         *     Si aucune source non exclue n'atteste plus l'authorship consolidée,
-         *     celle-ci est supprimée.
-         */
-        post: operations["exclude_source_authorship_api_source_authorships__source___authorship_id__exclude_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/publications": {
         parameters: {
             query?: never;
@@ -421,12 +367,7 @@ export interface paths {
          * List Publications
          * @description Liste paginée des publications avec sources, labos et journal rattachés.
          *
-         *     Filtres multiples cumulables. `lab_id` et `year` acceptent des
-         *     listes CSV ; `lab_id=none` = publications sans labo rattaché.
-         *     `sort` : `year_desc` / `year_asc` / `title` / `cited_by`.
-         *     `in_perimeter=yes|no|""` sélectionne les publications dont au
-         *     moins un auteur est in_perimeter. `subject_id` filtre les
-         *     publications annotées par ce sujet.
+         *     Filtres multiples cumulables. `lab_id` et `year` acceptent des listes CSV ; `lab_id=none` = publications sans labo rattaché. `sort` : `year_desc` / `year_asc` / `title` / `cited_by`. `in_perimeter=yes|no|""` sélectionne les publications dont au moins un auteur est in_perimeter. `subject_id` filtre les publications annotées par ce sujet.
          */
         get: operations["list_publications_api_publications_get"];
         put?: never;
@@ -692,30 +633,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/addresses/{addr_id}/assign-structure": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Assign Structure
-         * @description Assigne manuellement une structure à une adresse.
-         */
-        post: operations["assign_structure_api_addresses__addr_id__assign_structure_post"];
-        /**
-         * Unassign Structure
-         * @description Supprime l'assignation manuelle d'une structure.
-         */
-        delete: operations["unassign_structure_api_addresses__addr_id__assign_structure_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/admin/address-stats": {
         parameters: {
             query?: never;
@@ -748,10 +665,8 @@ export interface paths {
          * @description Structures éligibles au tableau de bord feedback, groupées par type.
          *
          *     Encode deux règles métier :
-         *     - seuls les types listés dans `_FEEDBACK_STRUCTURE_TYPES` sont
-         *       éligibles (universités, organismes, CHU, écoles, labos) ;
-         *     - la structure UCA (code = "uca") est sélectionnée par défaut si
-         *       elle existe, sinon la première structure du premier type non vide.
+         *     - seuls les types listés dans `_FEEDBACK_STRUCTURE_TYPES` sont éligibles (universités, organismes, CHU, écoles, labos) ;
+         *     - la structure UCA (code = "uca") est sélectionnée par défaut si elle existe, sinon la première structure du premier type non vide.
          */
         get: operations["feedback_structures_api_admin_feedback_structures_get"];
         put?: never;
@@ -814,30 +729,6 @@ export interface paths {
          * @description Adresses détectées pour cette structure mais rejetées manuellement.
          */
         get: operations["feedback_false_positives_api_admin_feedback_false_positives_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/feedback/rerun": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Feedback Rerun
-         * @description Lance resolve_addresses en SSE (détection complète sur toutes les adresses).
-         *
-         *     `async def` parce qu'on streame stdout d'un subprocess via
-         *     `asyncio.create_subprocess_exec` + `StreamingResponse`. Aucune
-         *     connexion DB en jeu, cohabitation supportée par FastAPI.
-         */
-        get: operations["feedback_rerun_api_admin_feedback_rerun_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -977,11 +868,7 @@ export interface paths {
          * List Structures
          * @description Liste des structures, filtrable par type et par texte libre.
          *
-         *     `type` : enum `structure_type` (`labo`, `universite`, `onr`,
-         *     `chu`, `ecole`, `site`, `equipe`, `autre`). `search` : matching
-         *     accent-insensible sur nom / acronyme / code. Tri canonique par
-         *     type (labo > universite > onr > chu > ecole > site > autre) puis
-         *     nom.
+         *     `type` : enum `structure_type` (`labo`, `universite`, `onr`, `chu`, `ecole`, `site`, `equipe`, `autre`). `search` : matching accent-insensible sur nom / acronyme / code. Tri canonique par type (labo > universite > onr > chu > ecole > site > autre) puis nom.
          */
         get: operations["list_structures_api_structures_get"];
         put?: never;
@@ -1007,10 +894,7 @@ export interface paths {
          * Get Structure
          * @description Détail complet d'une structure : identifiants + parents + enfants + formes de nom.
          *
-         *     Retourne `{structure, parents, children, forms}`. Les parents
-         *     sont les structures qui ont cette structure comme `child_id`
-         *     dans `structure_relations` ; les enfants inversement. 404 si la
-         *     structure n'existe pas.
+         *     Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_relations` ; les enfants inversement. 404 si la structure n'existe pas.
          */
         get: operations["get_structure_api_structures__structure_id__get"];
         /**
@@ -1024,8 +908,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Structure
-         * @description Supprime une structure. Cascade sur les relations et formes de
-         *     noms liées. 404 si inconnue.
+         * @description Supprime une structure. Cascade sur les relations et formes de noms liées. 404 si inconnue.
          */
         delete: operations["delete_structure_api_structures__structure_id__delete"];
         options?: never;
@@ -1046,9 +929,7 @@ export interface paths {
          * Create Relation
          * @description Crée une relation parent-enfant entre deux structures.
          *
-         *     Idempotent : si une relation identique (même parent, child, type)
-         *     existe, renvoie `{"status": "already_exists"}` au lieu de la
-         *     recréer.
+         *     Idempotent : si une relation identique (même parent, child, type) existe, renvoie `{"status": "already_exists"}` au lieu de la recréer.
          */
         post: operations["create_relation_api_structure_relations_post"];
         delete?: never;
@@ -1118,12 +999,8 @@ export interface paths {
          * Create Name Form
          * @description Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
          *
-         *     `form_text` est normalisé (accents, casse, ponctuation) par le
-         *     service avant insertion. `is_word_boundary` : le match exige
-         *     une frontière de mot dans l'adresse brute. `is_excluding` :
-         *     forme à exclure, pas à matcher (anti-pattern).
-         *     `requires_context_of` : liste d'ids de structures qui doivent
-         *     elles-mêmes matcher l'adresse pour que cette forme active.
+         *     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme à exclure, pas à matcher (anti-pattern).
+         *     `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active.
          */
         post: operations["create_name_form_api_name_forms_post"];
         delete?: never;
@@ -1280,30 +1157,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Person
-         * @description Détail d'une personne avec auteurs liés.
-         */
-        get: operations["get_person_api_persons__person_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/persons/{person_id}/profile": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
          * Person Profile
          * @description Profil public complet d'une personne.
          */
-        get: operations["person_profile_api_persons__person_id__profile_get"];
+        get: operations["person_profile_api_persons__person_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1472,26 +1329,6 @@ export interface paths {
         patch: operations["reassign_identifier_api_person_identifiers__ident_id__reassign_patch"];
         trace?: never;
     };
-    "/api/authorships/{authorship_id}/exclude": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /**
-         * Toggle Authorship Excluded
-         * @description Marque un authorship comme exclu.
-         */
-        patch: operations["toggle_authorship_excluded_api_authorships__authorship_id__exclude_patch"];
-        trace?: never;
-    };
     "/api/persons/{person_id}/reject": {
         parameters: {
             query?: never;
@@ -1550,6 +1387,108 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/persons/{person_id}/name-form-authorships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Name Form Authorships
+         * @description Authorships sources + autres personnes partageant une forme de nom.
+         */
+        get: operations["name_form_authorships_api_persons__person_id__name_form_authorships_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/{person_id}/detach-authorships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detach Authorships
+         * @description Détache des authorships sources d'une personne et nettoie les formes de noms.
+         */
+        post: operations["detach_authorships_api_persons__person_id__detach_authorships_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/{person_id}/detach-name-form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Detach Name Form
+         * @description Détache une forme de nom d'une personne (quand aucune authorship n'y est liée).
+         */
+        post: operations["detach_name_form_api_persons__person_id__detach_name_form_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/source-authorships/{source}/{authorship_id}/exclude": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exclude Source Authorship
+         * @description Marque/démarque une authorship source comme fausse.
+         *
+         *     Si aucune source non exclue n'atteste plus l'authorship consolidée, celle-ci est supprimée.
+         */
+        post: operations["exclude_source_authorship_api_source_authorships__source___authorship_id__exclude_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/authorships/{authorship_id}/exclude": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Toggle Authorship Excluded
+         * @description Marque un authorship consolidée comme exclu.
+         */
+        patch: operations["toggle_authorship_excluded_api_authorships__authorship_id__exclude_patch"];
         trace?: never;
     };
     "/api/admin/orphan-authorships/count": {
@@ -1626,66 +1565,6 @@ export interface paths {
          * @description Attribue plusieurs authorships orphelines à une même personne.
          */
         post: operations["batch_assign_orphan_authorships_api_admin_orphan_authorships_batch_assign_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/persons/{person_id}/name-form-authorships": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Name Form Authorships
-         * @description Authorships sources + autres personnes partageant une forme de nom.
-         */
-        get: operations["name_form_authorships_api_persons__person_id__name_form_authorships_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/persons/{person_id}/detach-authorships": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Detach Authorships
-         * @description Détache des authorships sources d'une personne et nettoie les formes de noms.
-         */
-        post: operations["detach_authorships_api_persons__person_id__detach_authorships_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/persons/{person_id}/detach-name-form": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Detach Name Form
-         * @description Détache une forme de nom d'une personne (quand aucune authorship n'y est liée).
-         */
-        post: operations["detach_name_form_api_persons__person_id__detach_name_form_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1995,9 +1874,7 @@ export interface paths {
          * List Config
          * @description Liste tous les paramètres applicatifs (clé, valeur JSON, description).
          *
-         *     Retourne la table `config` triée par clé. Les valeurs sont
-         *     renvoyées telles quelles (jsonb) — la sémantique de chaque clé
-         *     est documentée dans `docs/exploitation.md`.
+         *     Retourne la table `config` triée par clé. Les valeurs sont renvoyées telles quelles (jsonb) — la sémantique de chaque clé est documentée dans `docs/exploitation.md`.
          */
         get: operations["list_config_api_config_get"];
         put?: never;
@@ -2040,9 +1917,7 @@ export interface paths {
          * Update Config
          * @description Met à jour la valeur d'un paramètre de config.
          *
-         *     La clé doit préexister (pas de création via cet endpoint — les
-         *     clés sont déclarées dans les migrations). 404 si la clé est
-         *     inconnue.
+         *     La clé doit préexister (pas de création via cet endpoint — les clés sont déclarées dans les migrations). 404 si la clé est inconnue.
          */
         put: operations["update_config_api_config__key__put"];
         post?: never;
@@ -2063,10 +1938,7 @@ export interface paths {
          * List Perimeters
          * @description Liste tous les périmètres avec leurs structures racines résolues.
          *
-         *     Pour chaque périmètre, renvoie les structures racines directes
-         *     (`structures`) et le décompte total après descente récursive des
-         *     relations (`structure_count`). Le décompte inclut donc les
-         *     sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
+         *     Pour chaque périmètre, renvoie les structures racines directes (`structures`) et le décompte total après descente récursive des relations (`structure_count`). Le décompte inclut donc les sous-structures rattachées par `est_tutelle_de` / `est_partenaire_de`.
          */
         get: operations["list_perimeters_api_perimeters_get"];
         put?: never;
@@ -2118,8 +1990,7 @@ export interface paths {
          * Add Perimeter Structure
          * @description Ajoute une structure racine au périmètre.
          *
-         *     Renvoie `{"status": "added"}` ou `"already_exists"` si la
-         *     structure était déjà racine.
+         *     Renvoie `{"status": "added"}` ou `"already_present"` si la structure était déjà racine.
          */
         post: operations["add_perimeter_structure_api_perimeters__perimeter_id__structures_post"];
         delete?: never;
@@ -2140,8 +2011,7 @@ export interface paths {
         post?: never;
         /**
          * Remove Perimeter Structure
-         * @description Retire une structure racine du périmètre. N'affecte pas ses
-         *     sous-structures tant qu'elles sont rattachées à d'autres racines.
+         * @description Retire une structure racine du périmètre. N'affecte pas ses sous-structures tant qu'elles sont rattachées à d'autres racines.
          */
         delete: operations["remove_perimeter_structure_api_perimeters__perimeter_id__structures__structure_id__delete"];
         options?: never;
@@ -2311,8 +2181,7 @@ export interface paths {
          * Pipeline Status
          * @description Retourne le statut du pipeline en cours, ou null si aucun ne tourne.
          *
-         *     Un status.json orphelin (PID mort) est traité comme "inactif" et
-         *     nettoyé par ``read_status``.
+         *     Un status.json orphelin (PID mort) est traité comme "inactif" et nettoyé par ``read_status``.
          */
         get: operations["pipeline_status_api_admin_pipeline_status_get"];
         put?: never;
@@ -2480,9 +2349,7 @@ export interface components {
          * AddressListResponse
          * @description Réponse paginée de `/api/addresses`.
          *
-         *     `requires_search=True` quand le caller utilise un filtre trop large
-         *     (no/all + pas de search) et que le serveur a renvoyé une liste vide
-         *     par garde-fou.
+         *     `requires_search=True` quand le caller utilise un filtre trop large (no/all + pas de search) et que le serveur a renvoyé une liste vide par garde-fou.
          */
         AddressListResponse: {
             /** Total */
@@ -2628,20 +2495,6 @@ export interface components {
             /** Person Id */
             person_id?: number | null;
             create_person?: components["schemas"]["CreatePersonName"] | null;
-        };
-        /** AssignStructureAction */
-        AssignStructureAction: {
-            /** Structure Id */
-            structure_id: number;
-        };
-        /** AssignStructureResponse */
-        AssignStructureResponse: {
-            /** Id */
-            id: number;
-            /** Structure Id */
-            structure_id: number;
-            /** Status */
-            status: string;
         };
         /** AuthCheckResponse */
         AuthCheckResponse: {
@@ -2866,12 +2719,34 @@ export interface components {
              */
             detached: boolean;
         };
-        /** EcoleDoctorale */
+        /**
+         * DoiPrefixInfo
+         * @description Préfixe DOI rattaché à un éditeur (lecture seule, vient de la table `doi_prefixes`).
+         */
+        DoiPrefixInfo: {
+            /** Prefix */
+            prefix: string;
+            /** Ra */
+            ra: string;
+            /** Crossref Member Id */
+            crossref_member_id?: number | null;
+        };
+        /**
+         * EcoleDoctorale
+         * @description École doctorale d'une thèse (metadata theses.fr).
+         *
+         *     Sert à la fois de DTO API (champ de `ThesisMeta` dans la réponse
+         *     détail publication) et de modèle de la colonne JSONB `meta.ecoles_doctorales`
+         *     (importé par `infrastructure/jsonb_models/publication.py`).
+         *     `extra="allow"` pour tolérer des clés inconnues côté JSONB sans casser.
+         */
         EcoleDoctorale: {
             /** Nom */
             nom: string;
             /** Ppn */
             ppn?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** ExcludeSourceAuthorship */
         ExcludeSourceAuthorship: {
@@ -2991,8 +2866,7 @@ export interface components {
         };
         /**
          * FeedbackStructuresResponse
-         * @description Structures éligibles au tableau de bord feedback, groupées par type,
-         *     avec la structure à sélectionner par défaut (UCA si présente).
+         * @description Structures éligibles au tableau de bord feedback, groupées par type, avec la structure à sélectionner par défaut (UCA si présente).
          */
         FeedbackStructuresResponse: {
             /** By Type */
@@ -3238,6 +3112,16 @@ export interface components {
             /** Count */
             count: number;
         };
+        /**
+         * JournalBasic
+         * @description GET /api/journals/{id} : id + title (recherche par id).
+         */
+        JournalBasic: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+        };
         /** JournalListResponse */
         JournalListResponse: {
             /** Total */
@@ -3251,12 +3135,11 @@ export interface components {
         };
         /**
          * JournalOut
-         * @description Représentation d'une revue dans les réponses de /api/journals.
+         * @description Représentation d'une revue dans la liste paginée `/api/journals`.
          *
-         *     Source : SELECT dans list_journals (router journals). Les champs
-         *     reflètent les colonnes retournées — pub_name (nom éditeur joint)
-         *     et pub_count (agrégat) ne sont pas des colonnes de la table
-         *     journals mais sont exposés aux clients.
+         *     `pub_name` est joint depuis `publishers`, `pub_count` est un agrégat
+         *     sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives
+         *     de la table `journals`.
          */
         JournalOut: {
             /** Id */
@@ -3620,18 +3503,6 @@ export interface components {
             orphan_authorships: components["schemas"]["LabOrphanAuthorships"];
             facets: components["schemas"]["LabPersonsFacets"];
         };
-        /**
-         * LinkedAuthorOut
-         * @description Auteur source (HAL/OpenAlex/WoS) lié à une personne.
-         */
-        LinkedAuthorOut: {
-            /** Id */
-            id: number;
-            /** Source */
-            source: string;
-            /** Full Name */
-            full_name: string;
-        };
         /** LoginRequest */
         LoginRequest: {
             /** Username */
@@ -3849,12 +3720,21 @@ export interface components {
             /** Has Rh */
             has_rh: boolean;
         };
-        /** PartenaireThese */
+        /**
+         * PartenaireThese
+         * @description Partenaire de recherche d'une thèse (metadata theses.fr).
+         *
+         *     Sert à la fois de DTO API et de modèle de la colonne JSONB
+         *     `meta.partenaires`. `extra="allow"` pour tolérer des clés inconnues
+         *     côté JSONB sans casser.
+         */
         PartenaireThese: {
             /** Nom */
             nom: string;
             /** Type */
             type?: string | null;
+        } & {
+            [key: string]: unknown;
         };
         /** PerimeterCreate */
         PerimeterCreate: {
@@ -4032,36 +3912,6 @@ export interface components {
             sources: string[];
         };
         /**
-         * PersonDetail
-         * @description Réponse de `/api/persons/{id}` (détail + auteurs liés).
-         */
-        PersonDetail: {
-            /** Id */
-            id: number;
-            /** Last Name */
-            last_name: string;
-            /** First Name */
-            first_name: string;
-            /** Last Name Normalized */
-            last_name_normalized: string;
-            /** First Name Normalized */
-            first_name_normalized: string;
-            /** Role Title */
-            role_title: string | null;
-            /** Department Name */
-            department_name: string | null;
-            /** Start Date */
-            start_date: string | null;
-            /** End Date */
-            end_date: string | null;
-            /** Has Rh */
-            has_rh: boolean;
-            /** Linked Authors */
-            linked_authors: components["schemas"]["LinkedAuthorOut"][] | null;
-            /** Identifiers */
-            identifiers: components["schemas"]["PersonIdentifierOut"][] | null;
-        };
-        /**
          * PersonDirectoryEntry
          * @description Ligne de l'annuaire public `/api/persons/directory`.
          */
@@ -4179,7 +4029,7 @@ export interface components {
         };
         /**
          * PersonProfileAuthor
-         * @description Auteur source dans `/api/persons/{id}/profile` (vue publique enrichie).
+         * @description Auteur source dans `/api/persons/{id}` (vue publique enrichie).
          */
         PersonProfileAuthor: {
             /** Id */
@@ -4201,7 +4051,7 @@ export interface components {
         };
         /**
          * PersonProfileCore
-         * @description Bloc `person` de `/api/persons/{id}/profile`.
+         * @description Bloc `person` de `/api/persons/{id}`.
          */
         PersonProfileCore: {
             /** Id */
@@ -4635,7 +4485,7 @@ export interface components {
         };
         /**
          * PublisherBasic
-         * @description GET /api/publishers/{id} : juste id + name (recherche par id).
+         * @description GET /api/publishers/{id} : id + name (recherche par id).
          */
         PublisherBasic: {
             /** Id */
@@ -4653,8 +4503,8 @@ export interface components {
             openalex_id: string | null;
             /** Country */
             country: string | null;
-            /** Doi Prefix */
-            doi_prefix: string | null;
+            /** Doi Prefixes */
+            doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
             /** Is Predatory */
             is_predatory: boolean;
             /** Journal Count */
@@ -4719,8 +4569,6 @@ export interface components {
             name?: string | null;
             /** Country */
             country?: string | null;
-            /** Doi Prefix */
-            doi_prefix?: string | null;
             /** Is Predatory */
             is_predatory?: boolean | null;
             /** Notes */
@@ -4857,8 +4705,7 @@ export interface components {
          * StatsSummary
          * @description Totaux globaux pour la page stats.
          *
-         *     Pas de champ `diamond` — le résumé remonte gold/hybrid/green/bronze/
-         *     closed/unknown uniquement (diamond non distingué côté summary SQL).
+         *     Pas de champ `diamond` — le résumé remonte gold/hybrid/green/bronze/closed/unknown uniquement (diamond non distingué côté summary SQL).
          */
         StatsSummary: {
             /** Total Pubs */
@@ -4913,7 +4760,7 @@ export interface components {
             hal_collection?: string | null;
             /** Api Ids */
             api_ids?: {
-                [key: string]: unknown;
+                [key: string]: string | string[];
             } | null;
         };
         /**
@@ -5024,7 +4871,7 @@ export interface components {
             hal_collection?: string | null;
             /** Api Ids */
             api_ids?: {
-                [key: string]: unknown;
+                [key: string]: string | string[];
             } | null;
         };
         /**
@@ -5038,8 +4885,7 @@ export interface components {
         };
         /**
          * SubjectFrequency
-         * @description Sujet avec fréquence locale (count des publis du contexte parent :
-         *     labo ou personne). Utilisé pour les nuages de mots.
+         * @description Sujet avec fréquence locale (count des publis du contexte parent : labo ou personne). Utilisé pour les nuages de mots. Retourné par `PersonsQueries.person_subjects` et `LaboratoriesQueries.lab_subjects`.
          */
         SubjectFrequency: {
             /** Id */
@@ -5117,8 +4963,7 @@ export interface components {
         };
         /**
          * SubjectOut
-         * @description Sujet attaché à une publication, agrégé par `subject_id` sur les
-         *     différentes sources qui l'ont annoté.
+         * @description Sujet attaché à une publication, agrégé par `subject_id` sur les différentes sources qui l'ont annoté.
          *
          *     `ontologies` : annotations multi-sources. Vide pour un libre.
          */
@@ -5180,11 +5025,6 @@ export interface components {
         TotalCountResponse: {
             /** Total */
             total: number;
-        };
-        /** UnassignStructureResponse */
-        UnassignStructureResponse: {
-            /** Deleted */
-            deleted: boolean;
         };
         /** UpdateIdentifierStatus */
         UpdateIdentifierStatus: {
@@ -5710,26 +5550,6 @@ export interface operations {
             };
         };
     };
-    all_years_api_publications_years_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": number[];
-                };
-            };
-        };
-    };
     export_publications_csv_api_publications_export_csv_get: {
         parameters: {
             query?: {
@@ -5826,42 +5646,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicationDetailResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    exclude_source_authorship_api_source_authorships__source___authorship_id__exclude_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                source: string;
-                authorship_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["ExcludeSourceAuthorship"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExcludeSourceAuthorshipResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6323,74 +6107,6 @@ export interface operations {
             };
         };
     };
-    assign_structure_api_addresses__addr_id__assign_structure_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                addr_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssignStructureAction"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssignStructureResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    unassign_structure_api_addresses__addr_id__assign_structure_delete: {
-        parameters: {
-            query: {
-                structure_id: number;
-            };
-            header?: never;
-            path: {
-                addr_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UnassignStructureResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     admin_address_stats_api_admin_address_stats_get: {
         parameters: {
             query?: {
@@ -6537,26 +6253,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    feedback_rerun_api_admin_feedback_rerun_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
                 };
             };
         };
@@ -7317,38 +7013,7 @@ export interface operations {
             };
         };
     };
-    get_person_api_persons__person_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                person_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    person_profile_api_persons__person_id__profile_get: {
+    person_profile_api_persons__person_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -7646,37 +7311,6 @@ export interface operations {
             };
         };
     };
-    toggle_authorship_excluded_api_authorships__authorship_id__exclude_patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                authorship_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AuthorshipExcludeResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     reject_person_api_persons__person_id__reject_patch: {
         parameters: {
             query?: never;
@@ -7769,6 +7403,176 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MergeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    name_form_authorships_api_persons__person_id__name_form_authorships_get: {
+        parameters: {
+            query: {
+                name_form: string;
+            };
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameFormAuthorshipsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_authorships_api_persons__person_id__detach_authorships_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetachAuthorships"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetachAuthorshipsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    detach_name_form_api_persons__person_id__detach_name_form_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DetachNameForm"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetachedResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    exclude_source_authorship_api_source_authorships__source___authorship_id__exclude_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                source: string;
+                authorship_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ExcludeSourceAuthorship"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExcludeSourceAuthorshipResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    toggle_authorship_excluded_api_authorships__authorship_id__exclude_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                authorship_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthorshipExcludeResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7888,109 +7692,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrphanBatchAssignResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    name_form_authorships_api_persons__person_id__name_form_authorships_get: {
-        parameters: {
-            query: {
-                name_form: string;
-            };
-            header?: never;
-            path: {
-                person_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["NameFormAuthorshipsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    detach_authorships_api_persons__person_id__detach_authorships_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                person_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DetachAuthorships"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetachAuthorshipsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    detach_name_form_api_persons__person_id__detach_name_form_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                person_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DetachNameForm"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DetachedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8847,9 +8548,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["JournalBasic"];
                 };
             };
             /** @description Validation Error */
@@ -8884,9 +8583,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: boolean;
-                    };
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8921,9 +8618,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MergeResponse"];
                 };
             };
             /** @description Validation Error */

@@ -10,12 +10,20 @@ from typing import Protocol
 from pydantic import BaseModel
 
 
+class DoiPrefixInfo(BaseModel):
+    """Préfixe DOI rattaché à un éditeur (lecture seule, vient de la table `doi_prefixes`)."""
+
+    prefix: str
+    ra: str
+    crossref_member_id: int | None = None
+
+
 class PublisherListItem(BaseModel):
     id: int
     name: str
     openalex_id: str | None
     country: str | None
-    doi_prefix: str | None
+    doi_prefixes: list[DoiPrefixInfo]
     is_predatory: bool
     journal_count: int
     pub_count: int

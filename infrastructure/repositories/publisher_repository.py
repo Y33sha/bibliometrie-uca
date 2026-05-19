@@ -30,7 +30,6 @@ class _PublisherRow(NamedTuple):
     openalex_id: str | None
     is_predatory: bool
     notes: str | None
-    doi_prefix: str | None
 
 
 def _publisher_from_row(row: _PublisherRow) -> Publisher:
@@ -42,7 +41,6 @@ def _publisher_from_row(row: _PublisherRow) -> Publisher:
         openalex_id=row.openalex_id,
         is_predatory=row.is_predatory,
         notes=row.notes,
-        doi_prefix=row.doi_prefix,
     )
 
 
@@ -63,7 +61,6 @@ class PgPublisherRepository:
                 publishers.c.openalex_id,
                 publishers.c.is_predatory,
                 publishers.c.notes,
-                publishers.c.doi_prefix,
             ).where(publishers.c.id == publisher_id)
         ).first()
         if row is None:
