@@ -17,9 +17,10 @@ ALL_SOURCES = ("hal", "openalex", "wos", "scanr", "theses", "crossref")
 # Sources comme set (pour les tests d'appartenance et les valeurs par défaut)
 ALL_SOURCES_SET = frozenset(ALL_SOURCES)
 
-# Sources bibliographiques (hors theses.fr, qui a un traitement spécifique)
-BIBLIO_SOURCES = ("hal", "openalex", "wos", "scanr", "crossref")
-BIBLIO_SOURCES_SET = frozenset(BIBLIO_SOURCES)
+# Sources interrogeables par DOI pour le cross-import (`fetch_missing_doi`).
+# Theses absent car son API ne se requête pas par DOI mais par NNT.
+DOI_SEARCHABLE_SOURCES = ("hal", "openalex", "wos", "scanr", "crossref")
+DOI_SEARCHABLE_SOURCES_SET = frozenset(DOI_SEARCHABLE_SOURCES)
 
 
 def _to_sql(sources: tuple[str, ...]) -> str:

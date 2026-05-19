@@ -102,10 +102,8 @@ def _run_populate_affiliations(conn):
     """Exécute populate_affiliations sur la Connection SA de test."""
     import logging
 
-    from application.pipeline.affiliations.populate_affiliations import (
-        _step_address_source,
-        step3d_theses,
-    )
+    from application.pipeline.affiliations.populate_affiliations import _step_address_source
+    from domain.sources import ALL_SOURCES
     from infrastructure.queries.affiliations import PgAffiliationsQueries
     from infrastructure.queries.perimeter import (
         get_affiliations_structure_ids,
@@ -117,9 +115,8 @@ def _run_populate_affiliations(conn):
     queries = PgAffiliationsQueries()
     logger = logging.getLogger("test")
 
-    for source in ["hal", "openalex", "wos", "scanr"]:
+    for source in ALL_SOURCES:
         _step_address_source(conn, queries, logger, source, perimeter_ids, wide_ids)
-    step3d_theses(conn, queries, logger, wide_ids)
 
 
 def _count_affiliations(conn) -> dict:
@@ -206,6 +203,57 @@ class TestPopulateAffiliationsIdempotence:
                 "        FROM source_authorship_structures "
                 "        WHERE source_authorship_id = sa.id) AS structure_ids "
                 "FROM source_authorships sa WHERE sa.id = 80002"
+            )
+        ).one()
+        assert row.in_perimeter is True
+        assert row.structure_ids == [80001]
+
+
+class TestPopulateAffiliationsTheses:
+    """Régression : les authorships theses doivent passer par
+    `set_in_perimeter_from_addresses` comme les autres sources. Avant fix,
+    `BIBLIO_SOURCES` excluait theses → `in_perimeter` restait FALSE et la
+    cascade `create_persons_from_source_authorships` ne voyait jamais ces
+    authorships (jury, directeurs, rapporteurs, voire auteurs)."""
+
+    def test_theses_authorship_in_perimeter_via_address(self, sa_sync_conn):
+        from sqlalchemy import text
+
+        _setup_affiliations_test_data(sa_sync_conn)
+
+        # Ajoute une source_publication + source_authorship theses,
+        # liées à l'adresse 80001 (déjà résolue vers structure 80001
+        # via address_structures par _setup_affiliations_test_data).
+        sa_sync_conn.execute(
+            text("""
+                INSERT INTO source_publications (id, source, source_id, title, pub_year, doc_type, publication_id)
+                VALUES (80003, 'theses', '2024UCFA0001', 'Thèse Test', 2024, 'thesis', 80001)
+            """)
+        )
+        sa_sync_conn.execute(
+            text("""
+                INSERT INTO source_authorships
+                    (id, source, source_publication_id, author_position,
+                     in_perimeter, author_name_normalized, roles)
+                VALUES (80003, 'theses', 80003, 0, FALSE, 'alice dupont', ARRAY['author'])
+            """)
+        )
+        sa_sync_conn.execute(
+            text("""
+                INSERT INTO source_authorship_addresses (source_authorship_id, address_id)
+                VALUES (80003, 80001)
+            """)
+        )
+
+        _run_populate_affiliations(sa_sync_conn)
+
+        row = sa_sync_conn.execute(
+            text(
+                "SELECT sa.in_perimeter, "
+                "       (SELECT array_agg(structure_id ORDER BY structure_id) "
+                "        FROM source_authorship_structures "
+                "        WHERE source_authorship_id = sa.id) AS structure_ids "
+                "FROM source_authorships sa WHERE sa.id = 80003"
             )
         ).one()
         assert row.in_perimeter is True

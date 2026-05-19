@@ -3,7 +3,6 @@
 from infrastructure.queries.affiliations import (
     set_in_perimeter_from_addresses,
     set_structure_ids_from_addresses,
-    set_theses_structure_ids,
 )
 
 
@@ -39,14 +38,4 @@ class TestSetStructureIdsFromAddressesDailyClause:
         n = set_structure_ids_from_addresses(
             sa_sync_conn, source="openalex", wide_ids=[1, 2, 3], daily=False
         )
-        assert n == 0
-
-
-class TestSetThesesStructureIdsDailyClause:
-    def test_daily_true_does_not_raise(self, sa_sync_conn):
-        n = set_theses_structure_ids(sa_sync_conn, wide_ids=[1, 2, 3], daily=True)
-        assert n == 0
-
-    def test_daily_false_does_not_raise(self, sa_sync_conn):
-        n = set_theses_structure_ids(sa_sync_conn, wide_ids=[1, 2, 3], daily=False)
         assert n == 0

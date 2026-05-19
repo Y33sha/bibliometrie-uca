@@ -17,7 +17,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from domain.errors import NotFoundError, ValidationError
 from domain.json_types import JsonValue
-from domain.sources import BIBLIO_SOURCES as VALID_SOURCES
+from domain.sources import ALL_SOURCES_SET as VALID_SOURCES
 
 
 def exclude_authorship(

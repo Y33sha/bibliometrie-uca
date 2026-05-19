@@ -411,6 +411,7 @@ def _run_populate_affiliations(*, mode: str) -> None:
             wide_ids,
             mode=mode,
         )
+        conn.commit()
     finally:
         conn.close()
     log.info("✓ populate_affiliations terminé en %.1fs", time.time() - t0)
