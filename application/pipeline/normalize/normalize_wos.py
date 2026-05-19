@@ -613,7 +613,6 @@ class WosNormalizer(SourceNormalizer):
     SOURCE = "wos"
     DEFAULT_BATCH_SIZE = 500
     USE_SAVEPOINT = True
-    FETCH_SUB_BATCH = 50
 
     def __init__(
         self,

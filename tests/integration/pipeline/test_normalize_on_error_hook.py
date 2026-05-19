@@ -103,7 +103,8 @@ class TestOnErrorHook:
         conn = MagicMock()
         staging = MagicMock()
         staging.count_pending_staging.return_value = 3
-        staging.fetch_pending_staging.return_value = [_row(1), _row(42), _row(3)]
+        staging.fetch_pending_staging_ids.return_value = [1, 42, 3]
+        staging.fetch_staging_by_ids.return_value = [_row(1), _row(42), _row(3)]
 
         normalizer = _SpyNormalizer(
             conn,
@@ -123,7 +124,8 @@ class TestOnErrorHook:
         conn = MagicMock()
         staging = MagicMock()
         staging.count_pending_staging.return_value = 2
-        staging.fetch_pending_staging.return_value = [_row(1), _row(2)]
+        staging.fetch_pending_staging_ids.return_value = [1, 2]
+        staging.fetch_staging_by_ids.return_value = [_row(1), _row(2)]
 
         normalizer = _SpyNormalizer(conn, MagicMock(), staging, use_savepoint=False)
         normalizer.run([])
