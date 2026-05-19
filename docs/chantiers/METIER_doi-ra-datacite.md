@@ -84,15 +84,11 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
 ## Phases d'implémentation
 
 ### Phase 0 — Spike & validation
-- [ ] Inventaire des préfixes en staging (`SELECT split_part(doi, '/', 1) AS prefix, COUNT(*) FROM staging WHERE doi IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 50`).
-- [ ] Pour chaque préfixe distinct, requête `doi.org/ra` (un seul appel par préfixe via un DOI échantillon) → distribution des RAs.
-- [ ] Sample d'~100 DOIs DataCite, requête API DataCite, évaluer :
-  - Format de réponse (JSON-API vs Crossref REST différent).
-  - Couverture sur theses.fr / Zenodo / HAL / dépôts univ.
-  - Champs exploitables (creators, contributors, dates, container, relatedIdentifiers, rightsList, types).
-  - ORCID dans les creators (article-level si présent).
-- [ ] Estimer le volume CrossRef qui sera économisé après le filtre par préfixe.
-- **Livrable** : note `docs/chantiers/doi-prefixes-spike.md` + script `interfaces/cli/oneshot/doi_prefixes_spike.py`. Décision go/no-go sur la phase 2.
+- [x] Inventaire des préfixes en staging (`SELECT split_part(doi, '/', 1) AS prefix, COUNT(*) FROM staging WHERE doi IS NOT NULL GROUP BY 1 ORDER BY 2 DESC LIMIT 50`).
+- [x] Pour chaque préfixe distinct, requête `doi.org/ra` (un seul appel par préfixe via un DOI échantillon) → distribution des RAs.
+- [x] Sample d'~70 DOIs DataCite stratifiés par doc_type, requête API DataCite, évaluation des champs (creators avec ORCID, affiliations, container, relatedIdentifiers, types).
+- [x] Volume CrossRef économisé par le filtre : ≈ 12 % d'appels (3 000 / 24 000) + élimination des stubs `not_found=TRUE` polluants.
+- **Livrable** : note `docs/chantiers/doi-prefixes-spike.md` + script `interfaces/cli/oneshot/doi_prefixes_spike.py`. **Phase 1 = GO. Phase 2 = GO** avec exclusion explicite du préfixe `10.60692` (OpenAlex generated DOIs).
 
 ### Phase 1 — Table `doi_prefixes` + filtre CrossRef + retrait `publishers.doi_prefix`
 - [ ] Migration : `CREATE TABLE doi_prefixes` (DDL → migration via `db/migrate.py`).
@@ -112,7 +108,7 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
 - [ ] `domain/sources.py` : ajout aux constantes (`ALL_SOURCES`, `DOI_SEARCHABLE_SOURCES`, `SOURCE_PRIORITY`).
 - [ ] `domain/doc_types.py` : `_SOURCE_MAPS["datacite"]` (mapping resourceTypeGeneral → enum canonique).
 - [ ] Client API DataCite + adapter `fetch_missing_doi` (extends `AsyncFetchMissingDoiAdapter`), rate limits prudents.
-- [ ] Filtre `get_cross_import_dois("datacite")` : `ra = 'DataCite'` via JOIN sur `doi_prefixes`.
+- [ ] Filtre `get_cross_import_dois("datacite")` : `ra = 'DataCite'` via JOIN sur `doi_prefixes`, **avec exclusion explicite du préfixe `10.60692`** (DOIs synthétiques générés par OpenAlex pour ses propres publis sans DOI éditeur — métadonnées DataCite vides ou strictement redondantes avec ce qu'OpenAlex fournit déjà).
 - [ ] Wiring dans `run_pipeline.py` (cible datacite dans `fetch_missing_doi`).
 - [ ] Normalizer DataCite (ports + queries + orchestrator + CLI), alimente `source_publications` / `source_authorships`.
 - [ ] Tests d'intégration.
