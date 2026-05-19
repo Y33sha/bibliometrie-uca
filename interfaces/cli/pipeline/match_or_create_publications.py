@@ -1,4 +1,4 @@
-"""Point d'entrée CLI : rattache ou crée les publications canoniques pour les source_publications in-perimeter, et rafraîchit les pubs stale."""
+"""Point d'entrée CLI : rattache ou crée les publications canoniques pour les source_publications orphelins (tous périmètres, création gated par périmètre), et rafraîchit les pubs stale."""
 
 import argparse
 import os
@@ -18,7 +18,7 @@ logger = setup_logger(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Rattache ou crée les publications canoniques pour les source_publications in-perimeter, puis rafraîchit les publications stale"
+        description="Rattache ou crée les publications canoniques pour les source_publications orphelins (création gated par périmètre, rattachement universel), puis rafraîchit les publications stale"
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

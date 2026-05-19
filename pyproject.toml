@@ -307,8 +307,6 @@ exclude = [
 # - `application.pipeline.normalize.*` (hors port `normalize.wos`, déjà strict) :
 #   consomment des payloads `dict[str, Any]` venant des APIs externes (cf.
 #   `domain.sources.*`).
-# - `application.pipeline.publications.match_or_create_publications` :
-#   `external_ids` JSONB + `doc: dict[str, Any]` payload source.
 # - `application.pipeline.subjects._common` : `_PushedOntology` interne au
 #   cache (dict mutable avec sets, difficile à typer).
 # - Services racine `application.{persons,structures}` : `list` / `dict` sans
@@ -329,7 +327,6 @@ module = [
     "application.pipeline.enrich.*",
     "application.pipeline.fetch_missing_doi",
     "application.pipeline.normalize.*",
-    "application.pipeline.publications.match_or_create_publications",
     "application.pipeline.subjects._common",
     "application.ports.api.*",
     "application.ports.pipeline.staging",

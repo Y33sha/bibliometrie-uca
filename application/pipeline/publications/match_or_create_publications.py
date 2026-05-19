@@ -1,22 +1,23 @@
 """
-Matche ou crée les publications canoniques pour les `source_publications` in-perimeter non rattachés, puis rafraîchit les publications dont au moins un source a été modifié.
+Matche ou crée les publications canoniques pour les `source_publications` non rattachés, puis rafraîchit les publications dont au moins un source a été modifié.
 
 Phase du pipeline qui s'exécute APRÈS affiliations (quand in_perimeter est déterminé sur les source_authorships) et AVANT persons/authorships.
 
 Deux passes :
-1. Pour chaque `source_publication` sans `publication_id` ayant au moins un `source_authorship` in_perimeter : cascade de matching cross-source (`decide_publication_match` sur DOI, NNT, HAL_ID, THESIS_TITLE_YEAR). Si match : rattache. Sinon : crée la publication.
+1. Pour chaque `source_publication` sans `publication_id` (tous périmètres confondus) : cascade de matching cross-source (`decide_publication_match` sur DOI, NNT, HAL_ID, THESIS_TITLE_YEAR). Si match : rattache, quel que soit le périmètre — c'est ce qui permet de résoudre les conflits inter-sources (ex. version HAL hors-UCA + version OpenAlex UCA → rattachement à la même publication canonique). Sinon : crée la publication, mais uniquement si `allow_create` (dérivé de la colonne `in_perimeter`) est vrai — sans authorship in_perimeter, on ne fait pas entrer une nouvelle publication dans le périmètre.
 2. Pour chaque publication stale (au moins un `source_publication.updated_at > publications.updated_at`) : `refresh_from_sources` pour ré-agréger les méta canoniques (dont DOI promu par priorité de source).
 
 L'orchestrateur dépend du port `PublicationsMatchOrCreateQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/match_or_create_publications.py`.
 """
 
 import logging
-from typing import Any
+from typing import Literal
 
 from sqlalchemy import Connection
 
 from application.ports.pipeline.publications_match_or_create import (
     PublicationsMatchOrCreateQueries,
+    SourcePublicationRow,
 )
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -45,11 +46,13 @@ _NATIVE_KIND_BY_SOURCE: dict[str, str] = {
     "scanr": "scanr_id",
 }
 
+Outcome = Literal["created", "linked", "skipped_no_metadata", "skipped_no_perimeter"]
+
 
 def extract_known_identifiers(
     source: str,
     source_id: str | None,
-    external_ids: dict[str, Any] | None,
+    external_ids: dict[str, object] | None,
 ) -> dict[str, str]:
     """Aplatit les identifiants connus d'un `source_publication`.
 
@@ -69,31 +72,34 @@ def extract_known_identifiers(
 def process_document(
     conn: Connection,
     queries: PublicationsMatchOrCreateQueries,
-    doc: dict[str, Any],
+    doc: SourcePublicationRow,
     dry_run: bool,
     *,
     pub_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
-) -> bool:
-    """Crée ou rattache une publication pour un `source_publication` orphelin.
+) -> Outcome:
+    """Crée, rattache ou ignore une publication pour un `source_publication` orphelin.
 
-    Pattern prefetch → décideur → dispatch : extrait les identifiants candidats, les confronte aux index existants, puis délègue le choix `match`/`create` à `decide_publication_match`.
+    Pattern prefetch → décideur → dispatch : extrait les identifiants candidats, les confronte aux index existants, puis délègue le choix `match`/`create` à `decide_publication_match`. La création est gated par `allow_create = doc.in_perimeter` : un orphelin hors-périmètre peut être rattaché à une publication canonique existante (résolution des conflits inter-sources), mais ne peut pas en créer une nouvelle.
+
+    En dry_run, la cascade de matching (avec son effet de bord `clear_doi` côté `resolve_doi_conflict`) n'est pas jouée — le doc est compté comme "à traiter" sans distinction entre match/create/skip-no-perimeter.
     """
-    title = doc["title"] or ""
-    pub_year = doc["pub_year"]
+    title = doc.title or ""
+    pub_year = doc.pub_year
     if not has_minimal_publication_metadata(title, pub_year):
-        return False
+        return "skipped_no_metadata"
+    assert pub_year is not None  # garanti par has_minimal_publication_metadata (truthy check)
 
     if dry_run:
-        return True
+        return "created"
 
-    doi = doc["doi"]
-    source = doc["source"]
-    doc_type = map_doc_type(doc["doc_type"], source) or "other"
-    journal_id = doc["journal_id"]
-    oa_status = doc["oa_status"] or OA_STATUS_UNKNOWN_DEFAULT
-    language = doc["language"]
-    container_title = doc["container_title"]
+    doi = doc.doi
+    source = doc.source
+    doc_type = map_doc_type(doc.doc_type, source) or "other"
+    journal_id = doc.journal_id
+    oa_status = doc.oa_status or OA_STATUS_UNKNOWN_DEFAULT
+    language = doc.language
+    container_title = doc.container_title
 
     # Décodage HTML double-encodage du titre (OpenAlex / ScanR) avant comparaison ou écriture.
     cleaned_title = clean_publication_title(title) or ""
@@ -101,7 +107,7 @@ def process_document(
         title = cleaned_title
     title_normalized = normalize_text(title)
 
-    known_ids = extract_known_identifiers(source, doc["source_id"], doc["external_ids"])
+    known_ids = extract_known_identifiers(source, doc.source_id, doc.external_ids)
     nnt = known_ids.get("nnt")
     if nnt:
         nnt = normalize_nnt(nnt)
@@ -139,7 +145,7 @@ def process_document(
         metadata_match = _match_thesis_by_title_year(
             conn,
             queries=queries,
-            source_publication_id=doc["id"],
+            source_publication_id=doc.id,
             title_normalized=title_normalized,
             pub_year=pub_year,
             pub_repo=pub_repo,
@@ -155,7 +161,11 @@ def process_document(
     if decision.action == "match":
         assert decision.publication_id is not None
         publication_id = decision.publication_id
+        outcome: Outcome = "linked"
     else:
+        allow_create = doc.in_perimeter
+        if not allow_create:
+            return "skipped_no_perimeter"
         publication_id = pub_repo.create(
             title=title,
             title_normalized=title_normalized,
@@ -167,11 +177,12 @@ def process_document(
             container_title=container_title,
             language=language,
         )
+        outcome = "created"
 
-    queries.link_source_publication_to_publication(conn, doc["id"], publication_id)
+    queries.link_source_publication_to_publication(conn, doc.id, publication_id)
     refresh_from_sources(publication_id, repo=pub_repo, audit_repo=audit_repo)
 
-    return True
+    return outcome
 
 
 def _match_thesis_by_title_year(
@@ -212,18 +223,20 @@ def run(
     dry_run: bool = False,
 ) -> None:
     try:
-        docs = queries.fetch_orphan_in_perimeter_source_publications(conn)
-        logger.info("%d source_publications in-perimeter sans publication", len(docs))
+        docs = queries.fetch_orphan_source_publications(conn)
+        logger.info("%d source_publications orphelins (tous périmètres)", len(docs))
 
-        created = 0
-        skipped = 0
+        counts: dict[Outcome, int] = {
+            "created": 0,
+            "linked": 0,
+            "skipped_no_metadata": 0,
+            "skipped_no_perimeter": 0,
+        }
         for i, doc in enumerate(docs):
-            if process_document(
+            outcome = process_document(
                 conn, queries, doc, dry_run, pub_repo=pub_repo, audit_repo=audit_repo
-            ):
-                created += 1
-            else:
-                skipped += 1
+            )
+            counts[outcome] += 1
 
             if (i + 1) % 500 == 0:
                 if not dry_run:
@@ -248,18 +261,20 @@ def run(
 
         if dry_run:
             logger.info(
-                "DRY-RUN : %d publications à créer, %d ignorées, %d à rafraîchir",
-                created,
-                skipped,
+                "DRY-RUN : %d à traiter (approx.), %d sans métadonnées, %d à rafraîchir",
+                counts["created"],
+                counts["skipped_no_metadata"],
                 refreshed,
             )
             conn.rollback()
         else:
             conn.commit()
             logger.info(
-                "Terminé : %d publications créées/rattachées, %d ignorées, %d rafraîchies",
-                created,
-                skipped,
+                "Terminé : %d créées, %d rattachées (dont hors-périmètre), %d sans métadonnées, %d hors-périmètre sans match, %d rafraîchies",
+                counts["created"],
+                counts["linked"],
+                counts["skipped_no_metadata"],
+                counts["skipped_no_perimeter"],
                 refreshed,
             )
 
