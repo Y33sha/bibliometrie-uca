@@ -39,6 +39,7 @@ def main() -> None:
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
     if result.returncode != 0:
         print(f"ERREUR pg_dump : {result.stderr}", file=sys.stderr)
