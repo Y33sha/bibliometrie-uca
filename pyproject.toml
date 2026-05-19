@@ -348,6 +348,7 @@ module = [
     "interfaces.cli.dev.generate_seed",
     "interfaces.cli.imports.*",
     "interfaces.cli.maintenance.*",
+    "interfaces.cli.oneshot.*",
     "run_pipeline",
 ]
 disallow_any_explicit = false

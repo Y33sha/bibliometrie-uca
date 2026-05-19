@@ -28,6 +28,9 @@ db/backup/
 # Cache local du spike CrossRef (réponses brutes API)
 docs/chantiers/crossref-spike-data/
 
+# Cache local du spike DOI prefixes / RA / DataCite
+docs/chantiers/doi-prefixes-spike-data/
+
 # IDE
 .vscode/
 .idea/

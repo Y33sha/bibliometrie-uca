@@ -92,7 +92,7 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
   - Champs exploitables (creators, contributors, dates, container, relatedIdentifiers, rightsList, types).
   - ORCID dans les creators (article-level si présent).
 - [ ] Estimer le volume CrossRef qui sera économisé après le filtre par préfixe.
-- **Livrable** : note `docs/chantiers/datacite-spike.md` + script `interfaces/cli/datacite_spike.py`. Décision go/no-go sur la phase 2.
+- **Livrable** : note `docs/chantiers/doi-prefixes-spike.md` + script `interfaces/cli/oneshot/doi_prefixes_spike.py`. Décision go/no-go sur la phase 2.
 
 ### Phase 1 — Table `doi_prefixes` + filtre CrossRef + retrait `publishers.doi_prefix`
 - [ ] Migration : `CREATE TABLE doi_prefixes` (DDL → migration via `db/migrate.py`).
