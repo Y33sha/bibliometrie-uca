@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +32,7 @@ from sqlalchemy import text
 from domain.normalize import normalize_text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from infrastructure.sources.doi_prefixes.clients import parse_member_id
 
 log = setup_logger("seed_doi_prefixes", os.path.dirname(__file__))
 
@@ -40,21 +40,6 @@ ROOT = Path(__file__).resolve().parents[3]
 DATA_DIR = ROOT / "docs" / "chantiers" / "doi-prefixes-spike-data"
 RA_CACHE = DATA_DIR / "ra_cache.json"
 PUBLISHER_CACHE = DATA_DIR / "publisher_cache.json"
-
-_MEMBER_URL_RE = re.compile(r"/member/(\d+)\b")
-
-
-def _parse_member_id(member: Any) -> int | None:
-    """`https://id.crossref.org/member/10` → `10`."""
-    if member is None:
-        return None
-    if isinstance(member, int):
-        return member
-    if isinstance(member, str):
-        m = _MEMBER_URL_RE.search(member)
-        if m:
-            return int(m.group(1))
-    return None
 
 
 def main() -> int:
@@ -101,7 +86,7 @@ def main() -> int:
             if ra == "Crossref":
                 pub_info = publisher_cache.get(prefix, {})
                 name_raw = pub_info.get("name")
-                member_id = _parse_member_id(pub_info.get("member"))
+                member_id = parse_member_id(pub_info.get("member"))
                 if name_raw:
                     name_norm = normalize_text(name_raw) or None
                     row["publisher_name_raw"] = name_raw
