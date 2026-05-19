@@ -93,3 +93,8 @@ Conséquence implémentation : les maps précalculées doivent être restreintes
 - Pattern de référence (décision pure déjà en domain) : [`resolve_doi_conflict`](../../domain/publication.py)
 - Briques sous-décisions déjà migrées : [`domain/persons/matching.py`](../../domain/persons/matching.py)
 - Phase 5 de `CODE_rich-domain-model.md` (refactor `create_persons_from_source_authorships` côté entités) — débloquée après Phase 1 de ce chantier.
+
+
+
+## idées à intégrer
+* signaux supplémentaires (affiliation notamment) pour trancher entre homonymes

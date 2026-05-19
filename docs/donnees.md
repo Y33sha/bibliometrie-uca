@@ -163,6 +163,8 @@ Tables associées:
 
 Référentiel des individus. Une ligne = une personne physique. Alimenté par le script `create_persons_from_source_authorships.py` (création automatique depuis les authorships) et complété par les exports RH (données dans la table satellite `persons_rh`).
 
+**Périmètre** : `persons` couvre les personnes ayant cosigné au moins une publication UCA — pas un référentiel mondial des co-auteurs. Miroir conceptuel de `structures` (limitées au périmètre UCA / co-tutelles / partenaires). Conséquence : les co-auteurs externes des publications UCA n'ont pas de `person_id` ; leurs signatures restent uniquement dans `source_authorships`.
+
 ```mermaid
 flowchart LR
     structures --- authorships
@@ -194,6 +196,8 @@ Tables associées :
 #### `authorships`
 
 Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la table de jointure `authorship_structures`). Construite par `application/pipeline/authorships/build_authorships.py` à partir des *authorships* sources.
+
+**Couverture partielle assumée** : la table ne contient des entrées que pour les signataires ayant une `person_id` (cf. [périmètre des persons](#persons)). Les co-auteurs externes des publications UCA n'apparaissent pas ici ; pour obtenir la liste exhaustive des auteurs d'une publication (incluant les externes), passer par `source_authorships`.
 
 - `person_id`
 - `in_perimeter` : TRUE si l'auteur est affilié UCA sur cette publication
