@@ -50,10 +50,17 @@ class _FakeStaging:
         return self.pending_rows[:limit]
 
     def fetch_pending_staging_ids(self, conn, source: str, *, limit: int) -> list[int]:
-        return self.batch_ids[:limit]
+        # Le test dédié à `FETCH_SUB_BATCH` peuple `batch_ids` directement.
+        # Pour les autres tests qui peuplent `pending_rows`, on dérive les ids.
+        if self.batch_ids:
+            return self.batch_ids[:limit]
+        return [r.id for r in self.pending_rows[:limit]]
 
     def fetch_staging_by_ids(self, conn, ids: list[int], *, source: str) -> list[StagingRow]:
-        return self.batch_id_rows.get(tuple(ids), [])
+        if self.batch_id_rows:
+            return self.batch_id_rows.get(tuple(ids), [])
+        ids_set = set(ids)
+        return [r for r in self.pending_rows if r.id in ids_set]
 
 
 class _Norm(SourceNormalizer):

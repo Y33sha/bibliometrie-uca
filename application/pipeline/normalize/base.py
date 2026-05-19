@@ -36,7 +36,7 @@ class SourceNormalizer(ABC):
     - `SOURCE` : identifiant source (obligatoire, ex: "hal", "openalex")
     - `DEFAULT_BATCH_SIZE` : taille de commit (défaut 500)
     - `USE_SAVEPOINT` : `True` pour encadrer chaque `process_work` dans un SAVEPOINT
-    - `FETCH_SUB_BATCH` : si défini, charge les ids puis fetch par sous-lots de cette taille
+    - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50). À ajuster source par source si nécessaire ; charger d'un coup n'est pas supporté.
     - `process_work(conn, row) -> bool | None` : abstract, logique métier
     - `preload_caches(conn)` : pré-chargement optionnel
     - `post_process(conn)` : nettoyage post-traitement optionnel
@@ -47,7 +47,11 @@ class SourceNormalizer(ABC):
     SOURCE: ClassVar[str] = ""
     DEFAULT_BATCH_SIZE: ClassVar[int] = 500
     USE_SAVEPOINT: ClassVar[bool] = False
-    FETCH_SUB_BATCH: ClassVar[int | None] = None
+    # Taille des sous-lots de fetch staging. Charger tous les staging d'un
+    # coup fait exploser la RAM côté Python (JSONB désérialisés en dicts
+    # imbriqués, overhead ~3-5× la taille brute). 50 est la valeur retenue
+    # pour toutes les sources.
+    FETCH_SUB_BATCH: ClassVar[int] = 50
 
     def __init__(
         self, conn: Connection, logger: logging.Logger, staging_queries: StagingQueries
@@ -109,11 +113,7 @@ class SourceNormalizer(ABC):
         return self._staging.count_pending_staging(conn, self.SOURCE)
 
     def _iter_rows(self, conn: Connection, limit: int) -> Iterator[StagingRow]:
-        """Itère les lignes à traiter, soit d'un coup soit par sous-lots."""
-        if self.FETCH_SUB_BATCH is None:
-            yield from self._staging.fetch_pending_staging(conn, self.SOURCE, limit=limit)
-            return
-
+        """Itère les lignes à traiter par sous-lots de `FETCH_SUB_BATCH`."""
         work_ids = self._staging.fetch_pending_staging_ids(conn, self.SOURCE, limit=limit)
         for start in range(0, len(work_ids), self.FETCH_SUB_BATCH):
             batch_ids = work_ids[start : start + self.FETCH_SUB_BATCH]

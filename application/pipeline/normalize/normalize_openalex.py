@@ -475,7 +475,6 @@ def process_work(
 class OpenalexNormalizer(SourceNormalizer):
     SOURCE = "openalex"
     DEFAULT_BATCH_SIZE = 500
-    FETCH_SUB_BATCH = 50
 
     def __init__(
         self,
