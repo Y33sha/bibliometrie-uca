@@ -168,11 +168,20 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
 
 
 def get_openalex_email(conn: Connection) -> str:
-    """Retourne l'email pour le polite pool OpenAlex."""
+    """Retourne l'email pour le polite pool OpenAlex (et fallback Crossref / Unpaywall).
+
+    Raise si la row `openalex_email` n'est pas configurée : un email
+    invalide envoyé à l'API peut entraîner un blacklist côté serveur,
+    donc on force la config explicite plutôt que de fallback sur un
+    email inventé.
+    """
     val = _get_from_db(conn, "openalex_email")
     if val and isinstance(val, str):
         return val
-    return "bibliometrie@uca.fr"
+    raise RuntimeError(
+        "openalex_email manquant dans la table `config` — requis pour le polite pool "
+        "des APIs (OpenAlex, Crossref, Unpaywall, etc.)."
+    )
 
 
 def get_crossref_email(conn: Connection) -> str:

@@ -16,9 +16,6 @@ import httpx
 
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
-# Email requis par Unpaywall (politesse, pas d'auth)
-UNPAYWALL_EMAIL = "bibliometrie@uca.fr"
-
 # Mapping Unpaywall oa_status → notre enum oa_type
 OA_MAP = {
     "gold": "gold",
@@ -34,6 +31,7 @@ async def fetch_oa_status(
     doi: str,
     *,
     base_url: str,
+    email: str,
     logger: logging.Logger,
 ) -> str | None:
     """Interroge Unpaywall pour un DOI. Retourne le statut OA mappé ou None (DOI inconnu / erreur)."""
@@ -43,7 +41,7 @@ async def fetch_oa_status(
             client,
             "GET",
             url,
-            params={"email": UNPAYWALL_EMAIL},
+            params={"email": email},
             timeout=10,
             label=f"DOI {doi}",
         )

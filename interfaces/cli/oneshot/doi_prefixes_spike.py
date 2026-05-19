@@ -39,6 +39,7 @@ from sqlalchemy import Connection, text
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from infrastructure.sources.config import get_openalex_email
 
 log = setup_logger("doi_prefixes_spike", os.path.dirname(__file__))
 
@@ -49,8 +50,11 @@ PUBLISHER_CACHE = DATA_DIR / "publisher_cache.json"
 DOI_RA_URL = "https://doi.org/ra"
 CROSSREF_PREFIX_URL = "https://api.crossref.org/prefixes"
 DATACITE_DOI_URL = "https://api.datacite.org/dois"
-USER_AGENT = "UCA-bibliometrie-spike/0.1 (mailto:bibliometrie@uca.fr)"
 SLEEP_BETWEEN_CALLS = 0.1
+
+
+def _user_agent(email: str) -> str:
+    return f"UCA-bibliometrie-spike/0.1 (mailto:{email})"
 
 
 def _save_json(path: Path, payload: Any) -> None:
@@ -167,14 +171,14 @@ def phase_inventory(conn: Connection) -> dict[str, Any]:
     return inventory
 
 
-def phase_resolve_ra(prefix_samples: list[dict[str, str]]) -> dict[str, str]:
+def phase_resolve_ra(prefix_samples: list[dict[str, str]], user_agent: str) -> dict[str, str]:
     log.info(f"▶ resolve-ra : doi.org/ra pour {len(prefix_samples)} préfixes")
     cache: dict[str, str] = _load_json(RA_CACHE, {})
     todo = [s for s in prefix_samples if s["prefix"] not in cache]
     log.info(f"  {len(cache)} en cache, {len(todo)} à résoudre")
 
     with httpx.Client(
-        headers={"User-Agent": USER_AGENT, "Accept": "application/json"}, timeout=15.0
+        headers={"User-Agent": user_agent, "Accept": "application/json"}, timeout=15.0
     ) as client:
         for i, sample in enumerate(todo, 1):
             prefix = sample["prefix"]
@@ -205,7 +209,7 @@ def phase_resolve_ra(prefix_samples: list[dict[str, str]]) -> dict[str, str]:
     return cache
 
 
-def phase_publishers(ra_cache: dict[str, str]) -> dict[str, dict[str, Any]]:
+def phase_publishers(ra_cache: dict[str, str], user_agent: str) -> dict[str, dict[str, Any]]:
     crossref_prefixes = sorted(p for p, ra in ra_cache.items() if ra == "Crossref")
     log.info(
         f"▶ publishers : api.crossref.org/prefixes pour {len(crossref_prefixes)} préfixes Crossref"
@@ -216,7 +220,7 @@ def phase_publishers(ra_cache: dict[str, str]) -> dict[str, dict[str, Any]]:
     log.info(f"  {len(cache)} en cache, {len(todo)} à résoudre")
 
     with httpx.Client(
-        headers={"User-Agent": USER_AGENT, "Accept": "application/json"}, timeout=15.0
+        headers={"User-Agent": user_agent, "Accept": "application/json"}, timeout=15.0
     ) as client:
         for i, prefix in enumerate(todo, 1):
             try:
@@ -309,6 +313,7 @@ def phase_sample_datacite(
     conn: Connection,
     ra_cache: dict[str, str],
     sample_size: int,
+    user_agent: str,
 ) -> list[dict[str, Any]]:
     datacite_prefixes = [p for p, ra in ra_cache.items() if ra == "DataCite"]
     log.info(
@@ -352,7 +357,7 @@ def phase_sample_datacite(
 
     samples: list[dict[str, Any]] = []
     with httpx.Client(
-        headers={"User-Agent": USER_AGENT, "Accept": "application/vnd.api+json"}, timeout=15.0
+        headers={"User-Agent": user_agent, "Accept": "application/vnd.api+json"}, timeout=15.0
     ) as client:
         for i, row in enumerate(selected, 1):
             doi = row["doi"]
@@ -408,6 +413,7 @@ def main() -> int:
 
     engine = get_sync_engine()
     with engine.connect() as conn:
+        user_agent = _user_agent(get_openalex_email(conn))
         inventory: dict[str, Any] | None = None
         ra_cache: dict[str, str] = {}
         publisher_cache: dict[str, dict[str, Any]] = {}
@@ -421,12 +427,12 @@ def main() -> int:
             if inventory is None:
                 log.error("inventory manquant — lance d'abord --phase inventory")
                 return 1
-            ra_cache = phase_resolve_ra(inventory["prefix_samples"])
+            ra_cache = phase_resolve_ra(inventory["prefix_samples"], user_agent)
         else:
             ra_cache = _load_json(RA_CACHE, {})
 
         if args.phase in ("publishers", "all"):
-            publisher_cache = phase_publishers(ra_cache)
+            publisher_cache = phase_publishers(ra_cache, user_agent)
         else:
             publisher_cache = _load_json(PUBLISHER_CACHE, {})
 
@@ -437,7 +443,7 @@ def main() -> int:
             phase_coherence(inventory, ra_cache, publisher_cache)
 
         if args.phase in ("sample-datacite", "all"):
-            phase_sample_datacite(conn, ra_cache, args.sample_size)
+            phase_sample_datacite(conn, ra_cache, args.sample_size, user_agent)
 
     log.info(f"✓ outputs dans {DATA_DIR}")
     return 0
