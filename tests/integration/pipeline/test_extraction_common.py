@@ -126,3 +126,49 @@ class TestGetCrossImportDois:
         )
         result = get_cross_import_dois(db.connection, "hal")
         assert result == ["10.1234/a"]
+
+    def test_crossref_target_filters_non_crossref_prefixes(self, db):
+        """target='crossref' : DOIs DataCite/mEDRA filtrés via doi_prefixes."""
+        # Préfixes résolus
+        db.execute(
+            "INSERT INTO doi_prefixes (prefix, ra) VALUES (%s, %s)",
+            ("10.5281", "DataCite"),
+        )
+        db.execute(
+            "INSERT INTO doi_prefixes (prefix, ra) VALUES (%s, %s)",
+            ("10.1038", "Crossref"),
+        )
+        # Trois DOIs en staging non-crossref : un DataCite, un Crossref, un préfixe inconnu
+        for src, sid, doi in (
+            ("hal", "h1", "10.5281/zenodo.1"),
+            ("hal", "h2", "10.1038/nature.1"),
+            ("hal", "h3", "10.99999/x.1"),  # préfixe absent de doi_prefixes
+        ):
+            db.execute(
+                "INSERT INTO staging (source, source_id, doi, raw_data, processed) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                (src, sid, doi, "{}", False),
+            )
+
+        result = get_cross_import_dois(db.connection, "crossref")
+
+        # DataCite éliminé, Crossref gardé, NULL gardé (best-effort).
+        assert "10.5281/zenodo.1" not in result
+        assert "10.1038/nature.1" in result
+        assert "10.99999/x.1" in result
+
+    def test_hal_target_no_prefix_filter(self, db):
+        """target='hal' : aucun filtre par RA, tous les DOIs candidats remontent."""
+        db.execute(
+            "INSERT INTO doi_prefixes (prefix, ra) VALUES (%s, %s)",
+            ("10.5281", "DataCite"),
+        )
+        db.execute(
+            "INSERT INTO staging (source, source_id, doi, raw_data, processed) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("openalex", "W1", "10.5281/zenodo.1", "{}", False),
+        )
+
+        result = get_cross_import_dois(db.connection, "hal")
+
+        assert result == ["10.5281/zenodo.1"]
