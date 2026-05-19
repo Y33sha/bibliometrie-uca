@@ -53,10 +53,13 @@ class WosFetchMissingDoiAdapter:
 
     source_key = "wos"
     batch_size = 20
-    # WoS API Clarivate : instable historiquement, mais les soucis étaient
-    # liés aux pages larges (fixé par WOS_PER_PAGE=10). 3 requêtes concurrentes
-    # reste conservateur, à ajuster si besoin.
-    max_concurrent = 3
+    # WoS API Clarivate : instable historiquement et rate-limit serré
+    # (variable selon contrat, généralement 2-5 req/s). 2 workers + 500 ms
+    # de pause par worker garantissent un débit ≈ 2 req/s peak (avec
+    # latence WoS typique ~500 ms), sous le seuil habituel et sans burst
+    # initial.
+    max_concurrent = 2
+    request_delay_s = 0.5
 
     base_url: str
     headers: dict[str, str]
