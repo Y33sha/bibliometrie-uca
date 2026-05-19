@@ -86,6 +86,24 @@ class TestListPublishers:
         assert r.status_code == 200
         assert any(p["name"] == name for p in r.json()["publishers"])
 
+    def test_doi_prefixes_aggregated(self, client):
+        """Les préfixes DOI rattachés à un éditeur sont remontés via JOIN sur doi_prefixes."""
+        name = _uniq("PrefixedPub")
+        pid = _seed_publisher(name)
+        with _pool() as cur:
+            cur.execute(
+                "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id) "
+                "VALUES (%s, %s, %s, %s), (%s, %s, %s, %s)",
+                ("10.aaaa", "Crossref", pid, 42, "10.bbbb", "Crossref", pid, 42),
+            )
+        r = client.get("/api/publishers", params={"search": name.lower()})
+        assert r.status_code == 200
+        pub = next(p for p in r.json()["publishers"] if p["id"] == pid)
+        prefixes = {p["prefix"] for p in pub["doi_prefixes"]}
+        assert prefixes == {"10.aaaa", "10.bbbb"}
+        assert all(p["ra"] == "Crossref" for p in pub["doi_prefixes"])
+        assert all(p["crossref_member_id"] == 42 for p in pub["doi_prefixes"])
+
     def test_sort_name_desc(self, client):
         r = client.get("/api/publishers", params={"sort": "-name"})
         assert r.status_code == 200
@@ -144,7 +162,6 @@ class TestUpdatePublisher:
             json={
                 "name": "UpdatedName",
                 "country": "FR",
-                "doi_prefix": "10.1234",
                 "is_predatory": False,
                 "notes": "Note",
             },

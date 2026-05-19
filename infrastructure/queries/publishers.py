@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import Connection, select, text
 
 from application.ports.api.publishers_queries import (
+    DoiPrefixInfo,
     PublisherBasic,
     PublisherListItem,
     PublisherListResponse,
@@ -47,13 +48,22 @@ class PgPublisherQueries(PublisherQueries):
         offset = (page - 1) * per_page
         rows = self._conn.execute(
             text(f"""
-                SELECT p.id, p.name, p.openalex_id, p.country,
-                       p.doi_prefix, p.is_predatory,
+                SELECT p.id, p.name, p.openalex_id, p.country, p.is_predatory,
                        (SELECT COUNT(*) FROM journals j
                         WHERE j.publisher_id = p.id) AS journal_count,
                        (SELECT COUNT(*) FROM publications pub
                         JOIN journals j2 ON j2.id = pub.journal_id
-                        WHERE j2.publisher_id = p.id) AS pub_count
+                        WHERE j2.publisher_id = p.id) AS pub_count,
+                       COALESCE(
+                           (SELECT jsonb_agg(jsonb_build_object(
+                                       'prefix', dp.prefix,
+                                       'ra', dp.ra,
+                                       'crossref_member_id', dp.crossref_member_id
+                                   ) ORDER BY dp.prefix)
+                            FROM doi_prefixes dp
+                            WHERE dp.publisher_id = p.id),
+                           '[]'::jsonb
+                       ) AS doi_prefixes
                 FROM publishers p
                 WHERE {where}
                 ORDER BY {order}
@@ -71,7 +81,7 @@ class PgPublisherQueries(PublisherQueries):
                     name=r.name,
                     openalex_id=r.openalex_id,
                     country=r.country,
-                    doi_prefix=r.doi_prefix,
+                    doi_prefixes=[DoiPrefixInfo(**p) for p in r.doi_prefixes],
                     is_predatory=r.is_predatory,
                     journal_count=r.journal_count,
                     pub_count=r.pub_count,
