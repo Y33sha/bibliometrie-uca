@@ -24,6 +24,7 @@ from application.pipeline.publications.match_or_create_publications import (
     process_document,
     run,
 )
+from application.ports.pipeline.publications_match_or_create import SourcePublicationRow
 from domain.publications.deduplication import MetadataDeduplicationCase
 
 
@@ -95,8 +96,11 @@ def logger() -> logging.Logger:
     return logging.getLogger("test_match_or_create_publications")
 
 
-def _make_doc(**overrides: Any) -> dict[str, Any]:
-    """Crée un doc avec valeurs par défaut acceptables pour `process_document`."""
+def _make_doc(**overrides: Any) -> SourcePublicationRow:
+    """Crée un doc avec valeurs par défaut acceptables pour `process_document`.
+
+    `in_perimeter=True` par défaut (cas le plus courant) ; passer `in_perimeter=False` pour tester le gate `allow_create`.
+    """
     base: dict[str, Any] = {
         "id": 1,
         "title": "Some title",
@@ -110,9 +114,10 @@ def _make_doc(**overrides: Any) -> dict[str, Any]:
         "container_title": None,
         "source_id": "W123",
         "external_ids": None,
+        "in_perimeter": True,
     }
     base.update(overrides)
-    return base
+    return SourcePublicationRow(**base)
 
 
 @pytest.fixture
@@ -292,28 +297,28 @@ class TestMatchThesisByTitleYear:
 
 
 class TestProcessDocumentEarlyReturns:
-    def test_no_minimal_metadata_returns_false(self, captured, logger):
-        """Title vide → skipped sans appel à la DB."""
+    def test_no_minimal_metadata_returns_skipped(self, captured, logger):
+        """Title vide → outcome `skipped_no_metadata` sans appel à la DB."""
         queries = MagicMock()
         repo = MagicMock()
         doc = _make_doc(title="")
 
         result = process_document(conn=None, queries=queries, doc=doc, dry_run=False, pub_repo=repo)
 
-        assert result is False
+        assert result == "skipped_no_metadata"
         repo.create.assert_not_called()
 
-    def test_no_pub_year_returns_false(self, captured, logger):
+    def test_no_pub_year_returns_skipped(self, captured, logger):
         queries = MagicMock()
         repo = MagicMock()
         doc = _make_doc(pub_year=None)
 
         result = process_document(conn=None, queries=queries, doc=doc, dry_run=False, pub_repo=repo)
 
-        assert result is False
+        assert result == "skipped_no_metadata"
 
     def test_dry_run_short_circuits_after_minimal_check(self, captured, logger):
-        """Dry-run + métadonnées minimales OK → True sans aucun appel DB."""
+        """Dry-run + métadonnées minimales OK → `created` (approximation) sans aucun appel DB."""
         queries = MagicMock()
         repo = MagicMock()
 
@@ -321,7 +326,7 @@ class TestProcessDocumentEarlyReturns:
             conn=None, queries=queries, doc=_make_doc(), dry_run=True, pub_repo=repo
         )
 
-        assert result is True
+        assert result == "created"
         repo.find_by_doi.assert_not_called()
         repo.create.assert_not_called()
         queries.link_source_publication_to_publication.assert_not_called()
@@ -346,7 +351,7 @@ class TestProcessDocumentCreate:
             pub_repo=repo,
         )
 
-        assert result is True
+        assert result == "created"
         repo.create.assert_called_once()
         queries.link_source_publication_to_publication.assert_called_once_with(None, 1, 4242)
         assert captured["refresh_calls"] == [4242]
@@ -368,7 +373,7 @@ class TestProcessDocumentDoiMatch:
             pub_repo=repo,
         )
 
-        assert result is True
+        assert result == "linked"
         # Pas de création — match utilisé.
         repo.create.assert_not_called()
         queries.link_source_publication_to_publication.assert_called_once_with(None, 1, 77)
@@ -393,7 +398,7 @@ class TestProcessDocumentDoiMatch:
             pub_repo=repo,
         )
 
-        assert result is True
+        assert result == "created"
         # `doi` est passé tel quel (None) à `repo.create`.
         repo.create.assert_called_once()
         assert repo.create.call_args.kwargs["doi"] is None
@@ -420,7 +425,7 @@ class TestProcessDocumentNntMatch:
             pub_repo=repo,
         )
 
-        assert result is True
+        assert result == "linked"
         repo.create.assert_not_called()
         queries.link_source_publication_to_publication.assert_called_once_with(None, 1, 55)
 
@@ -441,7 +446,7 @@ class TestProcessDocumentHalMatch:
             pub_repo=repo,
         )
 
-        assert result is True
+        assert result == "linked"
         repo.create.assert_not_called()
         queries.link_source_publication_to_publication.assert_called_once_with(None, 1, 33)
 
@@ -466,9 +471,57 @@ class TestProcessDocumentThesisMetadata:
             pub_repo=repo,
         )
 
-        assert result is True
+        assert result == "linked"
         repo.create.assert_not_called()
         queries.link_source_publication_to_publication.assert_called_once_with(None, 1, 123)
+
+
+class TestProcessDocumentPerimeterGate:
+    """Non-régression : la création est gated par `allow_create = doc["in_perimeter"]`, le matching est universel.
+
+    Couvre le trou de couverture des conflits inter-sources : si HAL classe une publication hors-UCA alors qu'OpenAlex l'a classée UCA, la version HAL hors-périmètre doit pouvoir se rattacher (via DOI/NNT/HAL_ID) à la publication canonique créée par OpenAlex — et non créer un doublon ni être ignorée. À l'inverse, un orphelin hors-périmètre sans match ne doit pas faire entrer une nouvelle publication dans le périmètre.
+    """
+
+    def test_match_succeeds_outside_perimeter(self, captured, logger):
+        """source_publication hors-périmètre + DOI matchant publi existante → linked, link + refresh appelés."""
+        queries = MagicMock()
+        repo = MagicMock()
+        repo.find_by_doi.return_value = _PubByDoiStub(id=99)
+        captured["resolve_doi_return"] = ("10.1/x", 99)
+
+        result = process_document(
+            conn=None,
+            queries=queries,
+            doc=_make_doc(doi="10.1/x", in_perimeter=False),
+            dry_run=False,
+            pub_repo=repo,
+        )
+
+        assert result == "linked"
+        repo.create.assert_not_called()
+        queries.link_source_publication_to_publication.assert_called_once_with(None, 1, 99)
+        assert captured["refresh_calls"] == [99]
+
+    def test_no_match_outside_perimeter_skips_creation(self, captured, logger):
+        """source_publication hors-périmètre + aucun match → skipped_no_perimeter, ni create ni link ni refresh."""
+        queries = MagicMock()
+        repo = MagicMock()
+        repo.find_by_doi.return_value = None
+        repo.find_by_nnt.return_value = None
+        repo.find_by_hal_id.return_value = None
+
+        result = process_document(
+            conn=None,
+            queries=queries,
+            doc=_make_doc(in_perimeter=False),
+            dry_run=False,
+            pub_repo=repo,
+        )
+
+        assert result == "skipped_no_perimeter"
+        repo.create.assert_not_called()
+        queries.link_source_publication_to_publication.assert_not_called()
+        assert captured["refresh_calls"] == []
 
 
 class TestProcessDocumentTitleCleaning:
@@ -514,11 +567,11 @@ def patched_process(monkeypatch):
     }
 
     def fake_process(conn, queries, doc, dry_run, *, pub_repo, audit_repo=None):  # noqa: ARG001
-        state["process_calls"].append({"doc_id": doc["id"], "dry_run": dry_run})
-        # Si pas de return programmé : True par défaut.
+        state["process_calls"].append({"doc_id": doc.id, "dry_run": dry_run})
+        # Si pas de return programmé : "created" par défaut.
         if state["process_returns"]:
             return state["process_returns"].pop(0)
-        return True
+        return "created"
 
     def fake_refresh(pub_id, *, repo, audit_repo=None):  # noqa: ARG001
         state["refresh_calls"].append(pub_id)
@@ -548,7 +601,7 @@ class TestRun:
     def test_no_docs_no_stale_only_logs(self, patched_process, logger):
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = []
+        queries.fetch_orphan_source_publications.return_value = []
         queries.fetch_stale_publication_ids.return_value = []
         repo = MagicMock()
 
@@ -559,28 +612,34 @@ class TestRun:
         # Run normal → commit final même sans travail.
         assert conn.committed is True
 
-    def test_mixed_created_and_skipped(self, patched_process, logger):
-        """`process_document` retourne True/False/True → 2 créées, 1 ignorée."""
+    def test_mixed_outcomes(self, patched_process, logger):
+        """`process_document` retourne created/linked/skipped → tous les compteurs s'incrémentent sans crasher."""
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = [
+        queries.fetch_orphan_source_publications.return_value = [
             _make_doc(id=10),
             _make_doc(id=11),
             _make_doc(id=12),
+            _make_doc(id=13),
         ]
         queries.fetch_stale_publication_ids.return_value = []
         repo = MagicMock()
-        patched_process["process_returns"] = [True, False, True]
+        patched_process["process_returns"] = [
+            "created",
+            "linked",
+            "skipped_no_metadata",
+            "skipped_no_perimeter",
+        ]
 
         run(conn, queries, logger, pub_repo=repo)
 
-        assert [c["doc_id"] for c in patched_process["process_calls"]] == [10, 11, 12]
+        assert [c["doc_id"] for c in patched_process["process_calls"]] == [10, 11, 12, 13]
         assert conn.committed is True
 
     def test_dry_run_rollbacks_at_end(self, patched_process, logger):
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = [_make_doc(id=10)]
+        queries.fetch_orphan_source_publications.return_value = [_make_doc(id=10)]
         queries.fetch_stale_publication_ids.return_value = []
         repo = MagicMock()
 
@@ -595,7 +654,7 @@ class TestRun:
     def test_stale_publications_refreshed(self, patched_process, logger):
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = []
+        queries.fetch_orphan_source_publications.return_value = []
         queries.fetch_stale_publication_ids.return_value = [100, 200, 300]
         repo = MagicMock()
 
@@ -608,7 +667,7 @@ class TestRun:
         """Passe 2 : commit intermédiaire tous les 500 refresh (hors dry-run)."""
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = []
+        queries.fetch_orphan_source_publications.return_value = []
         queries.fetch_stale_publication_ids.return_value = list(range(1, 1001))
         repo = MagicMock()
 
@@ -621,7 +680,7 @@ class TestRun:
         """Tous les 500 docs traités, un commit intermédiaire est lancé (hors dry-run)."""
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = [
+        queries.fetch_orphan_source_publications.return_value = [
             _make_doc(id=i) for i in range(1, 1001)
         ]
         queries.fetch_stale_publication_ids.return_value = []
@@ -636,7 +695,7 @@ class TestRun:
         """Une exception dans `refresh_from_sources` (passe 2) → rollback + re-raise."""
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = []
+        queries.fetch_orphan_source_publications.return_value = []
         queries.fetch_stale_publication_ids.return_value = [10, 20, 30]
         repo = MagicMock()
         patched_process["refresh_raises_on_id"] = 20
@@ -648,10 +707,10 @@ class TestRun:
         assert conn.committed is False
 
     def test_top_level_exception_rollbacks_and_reraises(self, patched_process, logger):
-        """Exception venant de `fetch_orphan_in_perimeter_source_publications` → rollback + re-raise."""
+        """Exception venant de `fetch_orphan_source_publications` → rollback + re-raise."""
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.side_effect = RuntimeError("boom")
+        queries.fetch_orphan_source_publications.side_effect = RuntimeError("boom")
         repo = MagicMock()
 
         with pytest.raises(RuntimeError, match="boom"):
