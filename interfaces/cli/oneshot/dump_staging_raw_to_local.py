@@ -26,7 +26,6 @@ from __future__ import annotations
 
 import argparse
 import gzip
-import json
 import os
 import urllib.parse
 from pathlib import Path
@@ -65,10 +64,15 @@ def main() -> None:
 
         RAW_STORE_DIR.mkdir(parents=True, exist_ok=True)
 
-        # Streaming pour éviter de charger toutes les payloads en mémoire d'un coup.
-        result = conn.execution_options(stream_results=True).execute(
+        # Streaming + cast JSONB → text côté SQL (évite la désérialisation
+        # JSONB → dict Python et la re-sérialisation json.dumps en Python,
+        # qui créent des centaines de milliers d'objets dict/list/str
+        # transitoires et font exploser le GC).
+        # `yield_per` force un fetch chunked explicite (le `stream_results`
+        # seul ne suffit pas à empêcher SA de bufferiser).
+        result = conn.execution_options(yield_per=100).execute(
             text(
-                "SELECT source::text AS source, source_id, raw_data "
+                "SELECT source::text AS source, source_id, raw_data::text AS raw_data "
                 "FROM staging WHERE NOT processed ORDER BY id"
             )
         )
@@ -82,7 +86,7 @@ def main() -> None:
             target = source_dir / f"{safe_id}.json.gz"
 
             with gzip.open(target, "wb") as f:
-                f.write(json.dumps(row.raw_data, ensure_ascii=False).encode("utf-8"))
+                f.write(row.raw_data.encode("utf-8"))
 
             written += 1
             if written % 1000 == 0:
