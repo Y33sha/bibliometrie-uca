@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VCAL8rU4fN3J58vaxFHuJo3JagT5NJlaft9NQ76Ps0whBWP9t0QFwAZHeSnoxP4
+\restrict 3YTBG2ungWg2r2VnvuYOu5aSLWkAd1Nw3SmZJ5ujKcQnHUMfC6ZhccQGqwcKcGg
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -903,8 +903,7 @@ CREATE TABLE public.publishers (
     is_predatory boolean DEFAULT false,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    doi_prefix text
+    updated_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -926,16 +925,6 @@ CREATE SEQUENCE public.publishers_id_seq
 --
 
 ALTER SEQUENCE public.publishers_id_seq OWNED BY public.publishers.id;
-
-
---
--- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.schema_migrations (
-    version text NOT NULL,
-    applied_at timestamp with time zone DEFAULT now()
-);
 
 
 --
@@ -1736,14 +1725,6 @@ ALTER TABLE ONLY public.publishers
 
 
 --
--- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.schema_migrations
-    ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
-
-
---
 -- Name: source_authorship_addresses source_authorship_addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2242,13 +2223,6 @@ CREATE INDEX idx_publications_year ON public.publications USING btree (pub_year)
 --
 
 CREATE INDEX idx_publications_year_type ON public.publications USING btree (pub_year, doc_type);
-
-
---
--- Name: idx_publishers_doi_prefix; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_publishers_doi_prefix ON public.publishers USING btree (doi_prefix) WHERE (doi_prefix IS NOT NULL);
 
 
 --
@@ -2802,4 +2776,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VCAL8rU4fN3J58vaxFHuJo3JagT5NJlaft9NQ76Ps0whBWP9t0QFwAZHeSnoxP4
+\unrestrict 3YTBG2ungWg2r2VnvuYOu5aSLWkAd1Nw3SmZJ5ujKcQnHUMfC6ZhccQGqwcKcGg
