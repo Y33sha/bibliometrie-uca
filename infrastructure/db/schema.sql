@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict MIOgAiFzilek6OsF8Un6qCp26vg4SCVUz16RzqpckqV7dYLueiCTkyjAiLluuIb
+\restrict VCAL8rU4fN3J58vaxFHuJo3JagT5NJlaft9NQ76Ps0whBWP9t0QFwAZHeSnoxP4
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped from database version 18.1
+-- Dumped by pg_dump version 18.1
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -135,7 +135,6 @@ CREATE TYPE public.source_type AS ENUM (
 
 CREATE TYPE public.structure_type AS ENUM (
     'universite',
-    '__epst_deprecated',
     'chu',
     'ecole',
     'labo',
@@ -548,6 +547,21 @@ ALTER SEQUENCE public.distinct_publications_id_seq OWNED BY public.distinct_publ
 
 
 --
+-- Name: doi_prefixes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.doi_prefixes (
+    prefix text NOT NULL,
+    ra text NOT NULL,
+    publisher_id integer,
+    publisher_name_raw text,
+    publisher_name_normalized text,
+    crossref_member_id integer,
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: journal_name_forms; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -912,6 +926,16 @@ CREATE SEQUENCE public.publishers_id_seq
 --
 
 ALTER SEQUENCE public.publishers_id_seq OWNED BY public.publishers.id;
+
+
+--
+-- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.schema_migrations (
+    version text NOT NULL,
+    applied_at timestamp with time zone DEFAULT now()
+);
 
 
 --
@@ -1568,6 +1592,14 @@ ALTER TABLE ONLY public.distinct_publications
 
 
 --
+-- Name: doi_prefixes doi_prefixes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.doi_prefixes
+    ADD CONSTRAINT doi_prefixes_pkey PRIMARY KEY (prefix);
+
+
+--
 -- Name: journal_name_forms journal_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1701,6 +1733,14 @@ ALTER TABLE ONLY public.publishers
 
 ALTER TABLE ONLY public.publishers
     ADD CONSTRAINT publishers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.schema_migrations
+    ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
 
 
 --
@@ -1911,6 +1951,13 @@ CREATE INDEX idx_addresses_countries ON public.addresses USING gin (countries) W
 
 
 --
+-- Name: idx_addresses_normalized_text; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_addresses_normalized_text ON public.addresses USING btree (normalized_text);
+
+
+--
 -- Name: idx_addresses_normalized_text_trgm; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2020,6 +2067,27 @@ CREATE INDEX idx_distinct_pubs_a ON public.distinct_publications USING btree (pu
 --
 
 CREATE INDEX idx_distinct_pubs_b ON public.distinct_publications USING btree (pub_id_b);
+
+
+--
+-- Name: idx_doi_prefixes_publisher; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_publisher ON public.doi_prefixes USING btree (publisher_id) WHERE (publisher_id IS NOT NULL);
+
+
+--
+-- Name: idx_doi_prefixes_publisher_name_normalized; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_publisher_name_normalized ON public.doi_prefixes USING btree (publisher_name_normalized) WHERE (publisher_id IS NULL);
+
+
+--
+-- Name: idx_doi_prefixes_ra; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_ra ON public.doi_prefixes USING btree (ra);
 
 
 --
@@ -2240,45 +2308,45 @@ CREATE INDEX idx_source_authorship_structures_structure_id ON public.source_auth
 
 
 --
--- Name: idx_source_pubs_countries; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_docs_countries; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_pubs_countries ON public.source_publications USING gin (countries) WHERE (countries IS NOT NULL);
-
-
---
--- Name: idx_source_pubs_doi; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_pubs_doi ON public.source_publications USING btree (doi) WHERE (doi IS NOT NULL);
+CREATE INDEX idx_source_docs_countries ON public.source_publications USING gin (countries) WHERE (countries IS NOT NULL);
 
 
 --
--- Name: idx_source_pubs_external_ids; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_docs_doi; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_pubs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids IS NOT NULL);
-
-
---
--- Name: idx_source_pubs_hal_collections; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_pubs_hal_collections ON public.source_publications USING gin (hal_collections) WHERE (hal_collections IS NOT NULL);
+CREATE INDEX idx_source_docs_doi ON public.source_publications USING btree (doi) WHERE (doi IS NOT NULL);
 
 
 --
--- Name: idx_source_pubs_pub; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_docs_external_ids; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_pubs_pub ON public.source_publications USING btree (publication_id) WHERE (publication_id IS NOT NULL);
+CREATE INDEX idx_source_docs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids IS NOT NULL);
 
 
 --
--- Name: idx_source_pubs_staging; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_docs_hal_collections; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_pubs_staging ON public.source_publications USING btree (staging_id) WHERE (staging_id IS NOT NULL);
+CREATE INDEX idx_source_docs_hal_collections ON public.source_publications USING gin (hal_collections) WHERE (hal_collections IS NOT NULL);
+
+
+--
+-- Name: idx_source_docs_pub; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_docs_pub ON public.source_publications USING btree (publication_id) WHERE (publication_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_docs_staging; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_docs_staging ON public.source_publications USING btree (staging_id) WHERE (staging_id IS NOT NULL);
 
 
 --
@@ -2515,6 +2583,14 @@ ALTER TABLE ONLY public.distinct_publications
 
 
 --
+-- Name: doi_prefixes doi_prefixes_publisher_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.doi_prefixes
+    ADD CONSTRAINT doi_prefixes_publisher_id_fkey FOREIGN KEY (publisher_id) REFERENCES public.publishers(id) ON DELETE SET NULL;
+
+
+--
 -- Name: journal_name_forms journal_name_forms_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2726,4 +2802,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MIOgAiFzilek6OsF8Un6qCp26vg4SCVUz16RzqpckqV7dYLueiCTkyjAiLluuIb
+\unrestrict VCAL8rU4fN3J58vaxFHuJo3JagT5NJlaft9NQ76Ps0whBWP9t0QFwAZHeSnoxP4
