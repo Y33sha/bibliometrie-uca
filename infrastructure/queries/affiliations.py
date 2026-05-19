@@ -81,7 +81,6 @@ def set_structure_ids_from_addresses(
 ) -> int:
     """Alimente `source_authorship_structures` via le périmètre large.
 
-    Pour toutes les sources sauf `theses` (qui a un traitement spécifique).
     Insère un couple `(source_authorship_id, structure_id)` par adresse
     résolue dans le périmètre large. ON CONFLICT DO NOTHING pour préserver
     l'idempotence cross-run.
@@ -101,29 +100,6 @@ def set_structure_ids_from_addresses(
             ON CONFLICT DO NOTHING
         """),
         {"source": source, "wide_ids": wide_ids},
-    ).rowcount
-
-
-def set_theses_structure_ids(conn: Connection, *, wide_ids: list[int], daily: bool) -> int:
-    """Alimente `source_authorship_structures` pour la source `theses` uniquement.
-
-    `in_perimeter` est déjà posé par `normalize_theses` : on ne le reset pas.
-    """
-    daily_filter = _DAILY_JOIN_SA2 if daily else ""
-    return conn.execute(
-        text(f"""
-            INSERT INTO source_authorship_structures (source_authorship_id, structure_id)
-            SELECT DISTINCT saa.source_authorship_id, ast.structure_id
-            FROM source_authorship_addresses saa
-            JOIN address_structures ast ON ast.address_id = saa.address_id
-            JOIN source_authorships sa2 ON sa2.id = saa.source_authorship_id
-            {daily_filter}
-            WHERE sa2.source = 'theses'
-              AND ast.structure_id = ANY(:wide_ids)
-              AND ast.is_confirmed IS DISTINCT FROM FALSE
-            ON CONFLICT DO NOTHING
-        """),
-        {"wide_ids": wide_ids},
     ).rowcount
 
 
@@ -169,11 +145,6 @@ class PgAffiliationsQueries(AffiliationsQueries):
         self, conn: Connection, *, source: str, wide_ids: list[int], daily: bool
     ) -> int:
         return set_structure_ids_from_addresses(conn, source=source, wide_ids=wide_ids, daily=daily)
-
-    def set_theses_structure_ids(
-        self, conn: Connection, *, wide_ids: list[int], daily: bool
-    ) -> int:
-        return set_theses_structure_ids(conn, wide_ids=wide_ids, daily=daily)
 
     def count_source_authorships_stats(self, conn: Connection, source: str) -> tuple[int, int, int]:
         return count_source_authorships_stats(conn, source)

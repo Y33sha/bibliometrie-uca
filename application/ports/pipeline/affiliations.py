@@ -21,10 +21,6 @@ class AffiliationsQueries(Protocol):
         self, conn: Connection, *, source: str, wide_ids: list[int], daily: bool
     ) -> int: ...
 
-    def set_theses_structure_ids(
-        self, conn: Connection, *, wide_ids: list[int], daily: bool
-    ) -> int: ...
-
     def count_source_authorships_stats(
         self, conn: Connection, source: str
     ) -> tuple[int, int, int]: ...

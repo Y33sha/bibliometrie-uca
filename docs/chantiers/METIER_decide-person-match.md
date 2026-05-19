@@ -82,8 +82,6 @@ Conséquence implémentation : les maps précalculées doivent être restreintes
 
 ## Questions ouvertes
 
-- **Trou de couverture theses** : `BIBLIO_SOURCES = ("hal", "openalex", "wos", "scanr", "crossref")` exclut délibérément theses. Conséquence : aucune `source_authorship` theses n'a `in_perimeter = TRUE` (le mécanisme `set_in_perimeter_from_addresses` n'est appelé que pour `BIBLIO_SOURCES` dans `populate_affiliations.run_populate`). `fetch_unlinked_authorships` filtre `WHERE in_perimeter = TRUE`, donc les authorships theses ne passent jamais dans la cascade. Les rattachements visibles aujourd'hui (ex. personne 2557 liée à 8 thèses comme non-auteur) sont vestiges d'un état antérieur du code (commentaire trompeur `populate_affiliations.py:60` « in_perimeter est déjà à TRUE (posé par normalize_theses) »). À réexaminer après refactor : (a) pourquoi `BIBLIO_SOURCES` exclut-il theses initialement ? (b) conséquences d'inclure theses dans le périmètre standard sur les autres consommateurs (`application/authorships/core.py:VALID_SOURCES`, `domain/pipeline_modes.py`) ? (c) ajout à `BIBLIO_SOURCES` ou solution alternative (boucle dédiée theses dans `populate_affiliations`) ?
-
 - **Matching cross-source sur méga-papers** : le seuil `MAX_AUTHORS_CROSS_SOURCE = 50` court-circuite le cross-source au-delà. Suffit-il, ou faut-il restreindre davantage ? Mesure préalable du ratio matchings utiles / faux positifs sur les papers à 30-50 auteurs encore couverts par le matching. À examiner après Phase 1.
 
 - **Statuts `pending` vs `confirmed`** : aujourd'hui les deux sont utilisés indistinctement pour le matching. Restreindre aux `confirmed` réduirait le bruit mais fragiliserait la cascade sur des identifiers récents non encore validés. À reconsidérer plus tard.

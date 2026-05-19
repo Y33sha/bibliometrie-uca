@@ -3,7 +3,7 @@ des sources et ordres de priorité."""
 
 from domain.sources import (
     ALL_SOURCES,
-    BIBLIO_SOURCES,
+    DOI_SEARCHABLE_SOURCES,
     SOURCE_PRIORITY,
     SOURCE_PRIORITY_IS_CORRESPONDING,
     source_case_sql,
@@ -49,9 +49,10 @@ class TestSourceCaseSql:
         assert "WHEN 'wos' THEN 6" in sql
 
 
-class TestBiblioSources:
+class TestDoiSearchableSources:
     def test_excludes_theses(self):
-        assert "theses" not in BIBLIO_SOURCES
+        """theses.fr ne se requête pas par DOI mais par NNT — exclue du pool DOI-driven."""
+        assert "theses" not in DOI_SEARCHABLE_SOURCES
 
-    def test_contains_all_biblio(self):
-        assert set(BIBLIO_SOURCES) == {"hal", "openalex", "wos", "scanr", "crossref"}
+    def test_contains_all_doi_searchable(self):
+        assert set(DOI_SEARCHABLE_SOURCES) == {"hal", "openalex", "wos", "scanr", "crossref"}

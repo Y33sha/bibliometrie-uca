@@ -44,6 +44,7 @@ def main() -> None:
             wide_ids,
             mode=args.mode,
         )
+        conn.commit()
     finally:
         conn.close()
 

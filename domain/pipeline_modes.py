@@ -12,7 +12,7 @@ des CLI qui acceptent `--mode`).
 from dataclasses import dataclass
 from typing import Literal
 
-from domain.sources import BIBLIO_SOURCES_SET
+from domain.sources import DOI_SEARCHABLE_SOURCES_SET
 
 YearSelection = Literal["since_last", "weekly", "full"]
 FetchMissingDoiScope = Literal["unprocessed", "all"]
@@ -43,7 +43,7 @@ class ModePolicy:
 # donc réservé au mode `full` (extraction comme cross-imports DOI), et
 # exclu des modes daily/weekly où l'appel consommerait du crédit sans
 # rapporter d'information non couverte par le mode full.
-_FETCH_MISSING_DOI_LIGHT = BIBLIO_SOURCES_SET - {"wos"}
+_FETCH_MISSING_DOI_LIGHT = DOI_SEARCHABLE_SOURCES_SET - {"wos"}
 
 
 MODES: dict[str, ModePolicy] = {
@@ -75,7 +75,7 @@ MODES: dict[str, ModePolicy] = {
         extract_sources=frozenset({"hal", "openalex", "wos", "scanr", "theses"}),
         year_selection="full",
         refetch_truncated_oa=True,
-        fetch_missing_doi_sources=BIBLIO_SOURCES_SET,
+        fetch_missing_doi_sources=DOI_SEARCHABLE_SOURCES_SET,
         fetch_missing_doi_scope="all",
         vacuum_full=True,
         run_enrich=True,

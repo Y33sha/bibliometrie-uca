@@ -18,7 +18,7 @@ import time
 from sqlalchemy import Connection
 
 from application.ports.pipeline.affiliations import AffiliationsQueries
-from domain.sources import BIBLIO_SOURCES
+from domain.sources import ALL_SOURCES
 
 
 def _step_address_source(
@@ -46,21 +46,6 @@ def _step_address_source(
         conn, source=source, wide_ids=list(wide_ids), daily=daily
     )
     logger.info(f"  {label} structure_ids : {n} authorships")
-
-
-def step3d_theses(
-    conn: Connection,
-    queries: AffiliationsQueries,
-    logger: logging.Logger,
-    wide_ids: set[int],
-    daily: bool = False,
-) -> None:
-    """Étape 3d : theses.fr — résoudre structure_ids via adresses.
-
-    in_perimeter est déjà à TRUE (posé par normalize_theses), on ne le reset pas.
-    """
-    n = queries.set_theses_structure_ids(conn, wide_ids=list(wide_ids), daily=daily)
-    logger.info(f"Étape 3d — theses.fr structure_ids : {n} authorships")
 
 
 def show_stats(conn: Connection, queries: AffiliationsQueries, logger: logging.Logger) -> None:
@@ -103,10 +88,11 @@ def run_populate(
     if daily:
         logger.info("Mode daily : traitement des authorships récentes uniquement")
 
-    for source in BIBLIO_SOURCES:
+    for source in ALL_SOURCES:
         _step_address_source(conn, queries, logger, source, perimeter_ids, wide_ids, daily=daily)
-    step3d_theses(conn, queries, logger, wide_ids, daily=daily)
 
-    conn.commit()
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")
+    # Commit laissé au caller (CLI commit, tests d'intégration restent dans
+    # leur transaction rollbackée). Pattern cohérent avec
+    # create_persons_from_source_authorships.run().

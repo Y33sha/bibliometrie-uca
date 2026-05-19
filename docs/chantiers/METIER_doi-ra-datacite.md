@@ -24,7 +24,7 @@ Ce chantier traite les deux faces du problème : **savoir** d'où vient chaque D
 - Mapping prefix → publisher : pour les préfixes Crossref, l'endpoint `api.crossref.org/prefixes/{prefix}` renvoie le `name` du publisher → matching contre `publishers.name_normalized`. La table `doi_prefixes` devient la source canonique du mapping prefix → publisher.
 - Retrait de la colonne `publishers.doi_prefix` (limitée à un seul préfixe par publisher) — remplacée par la jointure sur `doi_prefixes.publisher_id`.
 - Filtrage de `get_cross_import_dois("crossref")` : skip les DOIs dont le préfixe a `ra != 'Crossref'` (et `ra IS NULL` accepté pour traiter les nouveaux préfixes en best-effort).
-- Nouvelle source `datacite` : extracteur DOI-driven, normalizer, mapping `doc_type`, ajout à `SOURCE_PRIORITY`, `ALL_SOURCES`, `BIBLIO_SOURCES`, et à l'enum SQL `source_type`.
+- Nouvelle source `datacite` : extracteur DOI-driven, normalizer, mapping `doc_type`, ajout à `SOURCE_PRIORITY`, `ALL_SOURCES`, `DOI_SEARCHABLE_SOURCES`, et à l'enum SQL `source_type`.
 - Affichage UI : icône DataCite dans la cellule "Sources" des tableaux publi, facette source.
 
 ### Exclus
@@ -64,7 +64,7 @@ Ce chantier traite les deux faces du problème : **savoir** d'où vient chaque D
 - **`application/pipeline/normalize/normalize_datacite.py`** + ports + queries : normalizer DataCite (mapping resourceTypeGeneral → doc_type, extraction creators, dates, container, identifiers).
 - **`infrastructure/sources/common.py::get_cross_import_dois`** : LEFT JOIN sur `doi_prefixes` via `split_part(doi, '/', 1) = doi_prefixes.prefix`, filtrage `ra = target_ra OR ra IS NULL` (où `target_ra='Crossref'` pour cible crossref, `'DataCite'` pour cible datacite).
 - **Modifications dans `domain/`** :
-  - `domain/sources.py` : ajout de `"datacite"` à `ALL_SOURCES`, `BIBLIO_SOURCES`, et insertion dans `SOURCE_PRIORITY` (position à arbitrer, cf. décisions à prendre).
+  - `domain/sources.py` : ajout de `"datacite"` à `ALL_SOURCES`, `DOI_SEARCHABLE_SOURCES`, et insertion dans `SOURCE_PRIORITY` (position à arbitrer, cf. décisions à prendre).
   - `domain/doc_types.py` : entrée `"datacite"` dans `_SOURCE_MAPS` (mapping resourceTypeGeneral DataCite → enum canonique).
 - **Adaptation des consommateurs de `publishers.doi_prefix`** :
   - API : `interfaces/api/routers/publishers.py` (SELECT + UPDATE) et models Pydantic associés.
@@ -109,7 +109,7 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
 
 ### Phase 2 — Source DataCite (sous réserve phase 0 favorable)
 - [ ] Migration : ajout de `'datacite'` à l'enum SQL `source_type`.
-- [ ] `domain/sources.py` : ajout aux constantes (`ALL_SOURCES`, `BIBLIO_SOURCES`, `SOURCE_PRIORITY`).
+- [ ] `domain/sources.py` : ajout aux constantes (`ALL_SOURCES`, `DOI_SEARCHABLE_SOURCES`, `SOURCE_PRIORITY`).
 - [ ] `domain/doc_types.py` : `_SOURCE_MAPS["datacite"]` (mapping resourceTypeGeneral → enum canonique).
 - [ ] Client API DataCite + adapter `fetch_missing_doi` (extends `AsyncFetchMissingDoiAdapter`), rate limits prudents.
 - [ ] Filtre `get_cross_import_dois("datacite")` : `ra = 'DataCite'` via JOIN sur `doi_prefixes`.
