@@ -292,6 +292,30 @@ publisher_name_forms = Table(
 )
 
 
+doi_prefixes = Table(
+    "doi_prefixes",
+    metadata,
+    Column("prefix", Text, primary_key=True),
+    Column("ra", Text, nullable=False),
+    Column("publisher_id", Integer),
+    Column("publisher_name_raw", Text),
+    Column("publisher_name_normalized", Text),
+    Column("crossref_member_id", Integer),
+    Column("fetched_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Index("idx_doi_prefixes_ra", "ra"),
+    Index(
+        "idx_doi_prefixes_publisher",
+        "publisher_id",
+        postgresql_where=text("publisher_id IS NOT NULL"),
+    ),
+    Index(
+        "idx_doi_prefixes_publisher_name_normalized",
+        "publisher_name_normalized",
+        postgresql_where=text("publisher_id IS NULL"),
+    ),
+)
+
+
 # ── Enums Postgres communs ────────────────────────────────────────
 
 

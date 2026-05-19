@@ -21,6 +21,7 @@ from sqlalchemy import Connection
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
+from application.ports.repositories.doi_prefix_repository import DoiPrefixRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -32,6 +33,7 @@ from infrastructure.queries.config import PgConfig
 from .address_repository import PgAddressRepository
 from .audit_repository import PgAuditRepository
 from .authorship_repository import PgAuthorshipRepository
+from .doi_prefix_repository import PgDoiPrefixRepository
 from .journal_repository import PgJournalRepository
 from .perimeter_repository import PgPerimeterRepository
 from .person_repository import PgPersonRepository
@@ -58,6 +60,11 @@ def authorship_repository(conn: Connection) -> AuthorshipRepository:
 def config_store(conn: Connection) -> PgConfig:
     """Retourne un ConfigStore (port défini dans application/ports/config.py)."""
     return PgConfig(conn)
+
+
+def doi_prefix_repository(conn: Connection) -> DoiPrefixRepository:
+    """Retourne un DoiPrefixRepository lié à la Connection SA donnée."""
+    return PgDoiPrefixRepository(conn)
 
 
 def journal_repository(conn: Connection) -> JournalRepository:

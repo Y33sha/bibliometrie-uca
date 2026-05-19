@@ -87,10 +87,15 @@ Ce chantier traite les deux faces du problème : **savoir** d'où vient chaque D
 Nouvel ordre dans `run_pipeline.py` :
 
 ```
-extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, datacite, hal, oa, …) → normalize → …
+extract → cross_imports (fetch_missing_hal_id + fetch_missing_doi) → normalize → resolve_doi_prefixes → publications → …
 ```
 
-`resolve_doi_prefixes` se lance **après** extract (pour avoir tous les DOIs en staging) et **avant** `fetch_missing_doi` pour qu'il filtre proprement par RA. Idempotent : ne ré-interroge que les préfixes absents de `doi_prefixes`. Volume des appels API minuscule comparé à per-DOI (un appel par nouveau préfixe au lieu d'un par DOI).
+`resolve_doi_prefixes` se lance **après normalize** pour deux raisons :
+
+1. `cross_imports` enchaîne `fetch_missing_hal_id` puis `fetch_missing_doi` — le premier peut introduire de nouveaux DOIs en staging via les refetch HAL. Résoudre avant `fetch_missing_doi` raterait ces DOIs et obligerait à un second passage.
+2. `normalize` crée les publishers via `find_or_create_publisher` (depuis crossref, openalex). Matcher `publisher_name_normalized` contre `publisher_name_forms` **après** normalize donne un vrai match au lieu d'un best-effort qui aurait laissé `publisher_id NULL` à reconcilier plus tard.
+
+**Conséquence sur le filtre `fetch_missing_doi --target crossref` :** les préfixes inédits d'un run donné ne sont résolus qu'à la fin de ce run, donc le `fetch_missing_doi` du run suivant en profite. Au run N le filtre couvre tout ce qui était déjà connu (seed + runs précédents) ; au run N+1, les préfixes ajoutés au run N sont eux aussi filtrés. Idempotent : ne ré-interroge que les préfixes absents de `doi_prefixes`. Volume des appels API minuscule (un appel par nouveau préfixe).
 
 ## Phases d'implémentation
 
@@ -106,7 +111,7 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
 - [ ] One-shot `interfaces/cli/oneshot/seed_doi_prefixes.py` : seed initial depuis `docs/chantiers/doi-prefixes-spike-data/ra_cache.json` + `publisher_cache.json` (871 préfixes résolus + 711 mappings publisher). Évite ~900 appels API redondants au premier run prod. Lancé une seule fois par Laura après la migration.
 - [ ] Client `doi.org/ra` + client `api.crossref.org/prefixes/{prefix}` dans `infrastructure/sources/doi_prefixes/`.
 - [ ] Phase pipeline `resolve_doi_prefixes` : retry multi-DOI (N=3), résolution RA, mapping publisher pour Crossref, insert dans `doi_prefixes`. Préfixe non résolvable → pas d'insert (retry au run suivant).
-- [ ] Wiring dans `run_pipeline.py` (`--only resolve_doi_prefixes`, `--from resolve_doi_prefixes`), placé après extract et avant `fetch_missing_doi`.
+- [ ] Wiring dans `run_pipeline.py` (`--only resolve_doi_prefixes`, `--from resolve_doi_prefixes`), placé **après normalize** (cf. section Place dans le pipeline).
 - [ ] Modification `get_cross_import_dois` : LEFT JOIN sur `doi_prefixes` via `split_part(doi, '/', 1)`, filtre `ra = 'Crossref' OR ra IS NULL` pour la cible crossref. NULL accepté pour traiter les préfixes pas encore résolus en best-effort.
 - [ ] Migration Alembic `0020_drop_publishers_doi_prefix` : `ALTER TABLE publishers DROP COLUMN doi_prefix` (après que les consommateurs côté API/UI aient été adaptés).
 - [ ] Adapter API/UI publishers : retirer le champ `doi_prefix` côté Pydantic + admin Svelte ; ajouter une vue "préfixes" en lecture seule via JOIN sur `doi_prefixes`.
