@@ -238,6 +238,59 @@ def _vacuum_staging(full: bool = False) -> Any:
         conn.execute(text(sql))
 
 
+def phase_resolve_doi_prefixes(**kw: Any) -> PhaseMetrics:
+    """Résolution préfixe DOI → Registration Agency + éditeur Crossref.
+
+    Pour chaque préfixe DOI présent en staging mais absent de
+    `doi_prefixes`, interroge `doi.org/ra` puis (si Crossref)
+    `api.crossref.org/prefixes` pour rattacher le préfixe à un éditeur
+    existant.
+
+    Placée **après normalize** : (a) `cross_imports` (en amont) peut
+    introduire de nouveaux DOIs via `fetch_missing_hal_id`, (b)
+    `normalize` crée les `publishers` qu'on veut matcher direct.
+
+    Idempotente : ne traite que les préfixes absents de `doi_prefixes`.
+    """
+    return _run_resolve_doi_prefixes()
+
+
+def _run_resolve_doi_prefixes() -> PhaseMetrics:
+    from application.pipeline.resolve_doi_prefixes import run_resolve_doi_prefixes
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.repositories import doi_prefix_repository, publisher_repository
+    from infrastructure.sources.config import get_openalex_email
+    from infrastructure.sources.doi_prefixes.clients import (
+        build_user_agent,
+        fetch_crossref_prefix,
+        resolve_ra,
+    )
+
+    log.info("▶ resolve_doi_prefixes")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        user_agent = build_user_agent(get_openalex_email(conn))
+        metrics = run_resolve_doi_prefixes(
+            log,
+            repo=doi_prefix_repository(conn),
+            publisher_repo=publisher_repository(conn),
+            resolve_ra_fn=lambda doi: resolve_ra(doi, user_agent=user_agent),
+            fetch_crossref_prefix_fn=lambda prefix: fetch_crossref_prefix(
+                prefix, user_agent=user_agent
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    log.info(
+        "✓ resolve_doi_prefixes terminé en %.1fs — %s",
+        time.time() - t0,
+        metrics.as_summary(),
+    )
+    return metrics
+
+
 def phase_affiliations(**kw: Any) -> Any:
     """Résolution des affiliations UCA sur les source_authorships.
 
@@ -1008,6 +1061,7 @@ PHASES = [
     ("extract", phase_extract),
     ("cross_imports", phase_cross_imports),
     ("normalize", phase_normalize),
+    ("resolve_doi_prefixes", phase_resolve_doi_prefixes),
     ("affiliations", phase_affiliations),
     ("publications", phase_publications),
     ("persons", phase_persons),
