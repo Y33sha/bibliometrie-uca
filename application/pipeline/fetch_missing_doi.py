@@ -145,22 +145,26 @@ async def run_async(
 
             progress["processed"] += len(batch)
             if progress["processed"] % 100 == 0 or progress["processed"] >= total:
+                duplicates = progress["fetched"] - progress["inserted"]
                 log.info(
-                    "  %d/%d — %d trouvés, %d insérés",
+                    "  %d/%d — %d records (%d nouveaux, %d doublons)",
                     progress["processed"],
                     total,
                     progress["fetched"],
                     progress["inserted"],
+                    duplicates,
                 )
 
         await asyncio.gather(*(process_batch(b, i) for i, b in enumerate(batches)))
 
+    duplicates = progress["fetched"] - progress["inserted"]
     log.info(
-        "Terminé %s : %d DOI, %d trouvés, %d insérés",
+        "Terminé %s : %d DOI interrogés, %d records (%d nouveaux, %d doublons déjà en staging)",
         adapter.source_key,
         total,
         progress["fetched"],
         progress["inserted"],
+        duplicates,
     )
     return PhaseMetrics(
         total=total, new=progress["inserted"], extras={"fetched": progress["fetched"]}
