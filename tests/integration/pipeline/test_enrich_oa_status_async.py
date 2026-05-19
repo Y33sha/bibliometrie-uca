@@ -27,13 +27,16 @@ from application.pipeline.enrich import enrich_oa_status as module
 from infrastructure.sources.unpaywall import fetch_oa_status
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
+TEST_EMAIL = "test@example.com"
 
 
 def _make_fetcher(logger: logging.Logger):
     """Compose le fetcher infrastructure pour les tests (couverture end-to-end)."""
 
     async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
-        return await fetch_oa_status(client, doi, base_url=UNPAYWALL_BASE, logger=logger)
+        return await fetch_oa_status(
+            client, doi, base_url=UNPAYWALL_BASE, email=TEST_EMAIL, logger=logger
+        )
 
     return fetcher
 

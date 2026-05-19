@@ -11,7 +11,7 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.enrich import PgEnrichQueries
 from infrastructure.repositories import publication_repository
-from infrastructure.sources.config import get_api_base_urls
+from infrastructure.sources.config import get_api_base_urls, get_openalex_email
 from infrastructure.sources.unpaywall import fetch_oa_status
 
 logger = setup_logger("enrich_oa_unpaywall", os.path.join(os.path.dirname(__file__), "logs"))
@@ -28,9 +28,10 @@ def main() -> None:
     conn = get_sync_engine().connect()
     try:
         base_url = get_api_base_urls(conn)["unpaywall"]
+        email = get_openalex_email(conn)
 
         async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
-            return await fetch_oa_status(client, doi, base_url=base_url, logger=logger)
+            return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=logger)
 
         asyncio.run(
             run_enrich(
