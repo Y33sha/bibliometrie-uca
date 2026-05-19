@@ -32,6 +32,8 @@
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
+* [ ] un test a créé un faux labo (NOV) dans la vraie base et l'a persisté: enquêter
+* page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup de résultats ScanR sont rejetés en phase "affiliations" => auditer
