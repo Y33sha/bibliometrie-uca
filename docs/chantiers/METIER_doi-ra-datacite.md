@@ -42,25 +42,36 @@ Ce chantier traite les deux faces du problème : **savoir** d'où vient chaque D
   ```sql
   CREATE TABLE doi_prefixes (
       prefix text PRIMARY KEY,                    -- '10.1038', '10.5281', etc.
-      ra text NOT NULL,                           -- 'Crossref', 'DataCite', 'mEDRA', 'unknown'
+      ra text NOT NULL,                           -- 'Crossref', 'DataCite', 'mEDRA', 'JaLC', 'KISTI', 'Airiti', 'OP', 'unknown'
       publisher_id integer REFERENCES publishers(id) ON DELETE SET NULL,
       publisher_name_raw text,                    -- nom brut depuis api.crossref.org/prefixes/{prefix}
+      publisher_name_normalized text,             -- normalize_text(publisher_name_raw), pour re-match différé
+      crossref_member_id integer,                 -- 'member' renvoyé par api.crossref.org/prefixes/{prefix}
       fetched_at timestamptz NOT NULL DEFAULT now()
   );
   CREATE INDEX idx_doi_prefixes_ra ON doi_prefixes (ra);
   CREATE INDEX idx_doi_prefixes_publisher ON doi_prefixes (publisher_id) WHERE publisher_id IS NOT NULL;
+  CREATE INDEX idx_doi_prefixes_publisher_name_normalized
+      ON doi_prefixes (publisher_name_normalized) WHERE publisher_id IS NULL;
   ```
   - **Préfixe en PK** : un préfixe = un registrant = une RA permanente. ~quelques centaines de préfixes distincts pour un corpus UCA (vs des millions de DOIs). Lookup compact, refresh trivial.
-  - **`ra='unknown'`** : préfixe résolu par doi.org mais avec une RA hors du sous-ensemble qu'on traite — on stocke pour ne pas réinterroger.
-  - **`publisher_id` nullable** : peut rester NULL pour les préfixes DataCite (pas d'équivalent éditeur académique pour Zenodo, figshare, etc.) ou les Crossref dont le `name` ne matche pas une row `publishers` existante.
+  - **`ra='unknown'`** : préfixe résolu par doi.org mais avec une RA hors du sous-ensemble nommé (les 8 RAs connues) — on stocke pour ne pas réinterroger.
+  - **Préfixe non insérable** : si tous les DOI samples d'un préfixe échouent (404, `"DOI Not Found"`, erreur réseau), **on n'insère pas** la row. Le préfixe reste absent de `doi_prefixes` et sera retenté au prochain run du pipeline. Idempotent, pas de sentinelle « unresolved ».
+  - **`publisher_id` nullable** : peut rester NULL pour les préfixes DataCite (pas d'équivalent éditeur académique pour Zenodo, figshare, etc.) ou les Crossref dont le `name` ne matche pas une row `publishers` existante. Dans ce dernier cas, `publisher_name_normalized` reste rempli pour permettre un re-match différé (job de réconciliation ou nouvelle création de publisher via OpenAlex).
+  - **`crossref_member_id`** : info observée à l'instant de la résolution. Co-stockée par préfixe plutôt que sur `publishers` ; les préfixes d'un même publisher partageront la même valeur (cohérence vérifiable via `SELECT DISTINCT crossref_member_id FROM doi_prefixes WHERE publisher_id = X`).
 - **`publishers.doi_prefix` (à supprimer)** : colonne devenue redondante avec `doi_prefixes`. Retrait après migration des données existantes.
 - **`source_type` enum (modif)** : ajout de `'datacite'`.
 
 ### Code
 
 - **`infrastructure/sources/datacite/`** : client API REST (https://api.datacite.org), polite pool si documenté, retry, gestion 404 → `not_found=TRUE`. Modèle calqué sur `crossref/fetch_missing_doi.py`.
-- **`infrastructure/sources/doi_prefixes/`** (ou intégré à `infrastructure/sources/common.py`) : client `doi.org/ra` (un appel par préfixe inconnu) + client `api.crossref.org/prefixes/{prefix}` pour récupérer le nom du publisher.
-- **`application/pipeline/resolve_doi_prefixes.py`** : orchestrateur de la phase pipeline. Pour chaque préfixe DOI absent de `doi_prefixes`, résout RA + publisher_name, matche contre `publishers.name_normalized`, insère.
+- **`infrastructure/sources/doi_prefixes/`** (ou intégré à `infrastructure/sources/common.py`) : client `doi.org/ra` (un appel par DOI sample) + client `api.crossref.org/prefixes/{prefix}` pour récupérer `name` et `member` du publisher.
+- **`application/pipeline/resolve_doi_prefixes.py`** : orchestrateur de la phase pipeline. Pour chaque préfixe DOI absent de `doi_prefixes` :
+  1. Récupère jusqu'à N DOI samples du staging pour ce préfixe (N=3 par défaut).
+  2. Tente `doi.org/ra` dans l'ordre ; premier 200 avec RA ≠ `"DOI Not Found"` → on garde la valeur.
+  3. Si tous les samples échouent → on n'insère pas, retry au run suivant.
+  4. Si RA = `"Crossref"` → appel `api.crossref.org/prefixes/{prefix}` pour `name` + `member`, normalisation via `normalize_text`, matching contre `publishers.name_normalized`.
+  5. Insert avec `publisher_id` (ou NULL si pas de match), `publisher_name_raw`, `publisher_name_normalized`, `crossref_member_id`.
 - **`application/pipeline/normalize/normalize_datacite.py`** + ports + queries : normalizer DataCite (mapping resourceTypeGeneral → doc_type, extraction creators, dates, container, identifiers).
 - **`infrastructure/sources/common.py::get_cross_import_dois`** : LEFT JOIN sur `doi_prefixes` via `split_part(doi, '/', 1) = doi_prefixes.prefix`, filtrage `ra = target_ra OR ra IS NULL` (où `target_ra='Crossref'` pour cible crossref, `'DataCite'` pour cible datacite).
 - **Modifications dans `domain/`** :
@@ -91,13 +102,13 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
 - **Livrable** : note `docs/chantiers/doi-prefixes-spike.md` + script `interfaces/cli/oneshot/doi_prefixes_spike.py`. **Phase 1 = GO. Phase 2 = GO** avec exclusion explicite du préfixe `10.60692` (OpenAlex generated DOIs).
 
 ### Phase 1 — Table `doi_prefixes` + filtre CrossRef + retrait `publishers.doi_prefix`
-- [ ] Migration : `CREATE TABLE doi_prefixes` (DDL → migration via `db/migrate.py`).
-- [ ] Migration : copier les `(doi_prefix, publisher_id)` existants depuis `publishers` vers `doi_prefixes` (avec `ra='Crossref'` par défaut, ou via résolution doi.org/ra si on veut être rigoureux).
-- [ ] Migration : `ALTER TABLE publishers DROP COLUMN doi_prefix` + drop index.
-- [ ] Client `doi.org/ra` (un appel par préfixe) + client `api.crossref.org/prefixes/{prefix}` (récup `name` du publisher).
-- [ ] Phase pipeline `resolve_doi_prefixes` : extrait les préfixes distincts en staging absents de `doi_prefixes`, résout RA + publisher_name, matche contre `publishers.name_normalized` (création ou rattachement), insère.
-- [ ] Wiring dans `run_pipeline.py` (`--only resolve_doi_prefixes`, `--from resolve_doi_prefixes`).
-- [ ] Modification `get_cross_import_dois` : LEFT JOIN sur `doi_prefixes` via `split_part(doi, '/', 1)`, filtre `ra = 'Crossref' OR ra IS NULL` pour la cible crossref. NULL accepté pour ne pas bloquer un préfixe nouveau pas encore résolu.
+- [ ] Migration Alembic `0019_doi_prefixes` : `CREATE TABLE doi_prefixes` + index.
+- [ ] One-shot `interfaces/cli/oneshot/seed_doi_prefixes.py` : seed initial depuis `docs/chantiers/doi-prefixes-spike-data/ra_cache.json` + `publisher_cache.json` (871 préfixes résolus + 711 mappings publisher). Évite ~900 appels API redondants au premier run prod. Lancé une seule fois par Laura après la migration.
+- [ ] Client `doi.org/ra` + client `api.crossref.org/prefixes/{prefix}` dans `infrastructure/sources/doi_prefixes/`.
+- [ ] Phase pipeline `resolve_doi_prefixes` : retry multi-DOI (N=3), résolution RA, mapping publisher pour Crossref, insert dans `doi_prefixes`. Préfixe non résolvable → pas d'insert (retry au run suivant).
+- [ ] Wiring dans `run_pipeline.py` (`--only resolve_doi_prefixes`, `--from resolve_doi_prefixes`), placé après extract et avant `fetch_missing_doi`.
+- [ ] Modification `get_cross_import_dois` : LEFT JOIN sur `doi_prefixes` via `split_part(doi, '/', 1)`, filtre `ra = 'Crossref' OR ra IS NULL` pour la cible crossref. NULL accepté pour traiter les préfixes pas encore résolus en best-effort.
+- [ ] Migration Alembic `0020_drop_publishers_doi_prefix` : `ALTER TABLE publishers DROP COLUMN doi_prefix` (après que les consommateurs côté API/UI aient été adaptés).
 - [ ] Adapter API/UI publishers : retirer le champ `doi_prefix` côté Pydantic + admin Svelte ; ajouter une vue "préfixes" en lecture seule via JOIN sur `doi_prefixes`.
 - [ ] Tests : intégration sur petit lot mixte (Crossref + DataCite + Zenodo).
 - [ ] Lancer une fois en prod, mesurer la réduction du volume CrossRef et la disparition des 404.
@@ -134,7 +145,7 @@ extract → resolve_doi_prefixes → fetch_missing_doi (par cible : crossref, da
 ## Décisions à prendre
 
 1. **Position de DataCite dans `SOURCE_PRIORITY`** : à arbitrer en phase 2, après spike. Hypothèse : DataCite fait autorité pour les DOIs DataCite (datasets, theses, preprints) au même titre que CrossRef pour les Crossref. Comme un DOI a une seule RA, les deux ne s'arbitrent jamais sur la même publi — la position relative entre CrossRef et DataCite n'a en pratique aucun effet. À mettre symétriquement à CrossRef (2ᵉ ou 3ᵉ position).
-2. **Politique de réinterrogation `ra='unknown'`** : ré-essayer après N jours (backoff) ou jamais ? Recommandation : jamais par défaut, refetch manuel possible via flag CLI.
+2. **Politique de réinterrogation `ra='unknown'`** : ré-essayer après N jours (backoff) ou jamais ? Recommandation : jamais par défaut, refetch manuel possible via flag CLI. Les préfixes non insérés (samples tous échoués) sont eux retentés à chaque run, sans politique particulière.
 3. **Politique de purge des `not_found=TRUE` côté CrossRef** post-filtre : les DOIs DataCite déjà marqués `not_found=TRUE` dans `staging` (legacy avant ce chantier) restent comme stubs. Choix : (a) les laisser, ou (b) un script one-shot qui les supprime pour permettre une éventuelle re-tentative sur DataCite source.
 4. **Mapping doc_types DataCite** : à concevoir en phase 0 avec exemples réels. La taxonomie DataCite (`resourceTypeGeneral` : Dataset, Software, Preprint, Text, JournalArticle, Audiovisual, etc.) est plus large que CrossRef. Probable mapping :
    - `Dataset` → `dataset`
