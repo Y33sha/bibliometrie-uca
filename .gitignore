@@ -25,6 +25,9 @@ interfaces/frontend/openapi.json
 # Backups DB
 db/backup/
 
+# Raw store local : snapshots gzippés des payloads sources (cf. chantier DATA_raw-data-store)
+data/raw_store/
+
 # Cache local du spike CrossRef (réponses brutes API)
 docs/chantiers/crossref-spike-data/
 

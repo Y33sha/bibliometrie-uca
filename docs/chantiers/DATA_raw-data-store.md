@@ -2,11 +2,11 @@
 
 ## Objectif
 
-Conserver les payloads JSON bruts renvoyés par les APIs sources (HAL, OpenAlex, WoS, theses.fr…) dans un store externe à la BDD, pour :
+Conserver les payloads JSON bruts renvoyés par les APIs sources (HAL, OpenAlex, WoS, ScanR, theses.fr, Crossref) dans un store externe à la BDD, pour :
 
-1. Pouvoir **re-normaliser** sans re-moissonner (bug de parsing découvert après coup, nouveau champ à extraire).
+1. Pouvoir **re-normaliser** sans re-moissonner (bug de parsing découvert après coup, nouveau champ à extraire, changement de mapping).
 2. Garder un **témoin auditable** de ce que chaque source a renvoyé à un instant T.
-3. **Alléger la BDD** : supprimer le stockage des `source_authorships` hors périmètre une fois le raw en place (item ligne 6 du TODO).
+3. **Alléger la BDD** : à terme, supprimer le stockage des `source_authorships` hors périmètre et les re-matérialiser à la demande depuis le raw.
 
 ## Principe architectural
 
@@ -16,110 +16,59 @@ Deux rôles distincts, pas une duplication :
 - **Raw store** = snapshot write-once, rarement lu, pour debug / reproduction / re-extraction.
 
 Abstraction côté code via un Protocol `RawStore` avec deux implémentations :
-- `LocalFileRawStore` — pour dev local (dossier hors projet, cf. phase 2).
+
+- `LocalFileRawStore` — pour dev local.
 - `B2RawStore` — production, API S3-compatible de Backblaze B2 via `boto3`.
 
-Sélection par variable d'env (`BIBLIO_RAW_STORE_URL` = `file:///...` ou `s3://bucket/prefix`).
+Sélection par variable d'env `BIBLIO_RAW_STORE_URL` (`file:///...` ou `s3://bucket/prefix`).
 
-## Décisions à prendre en amont
+## Conventions
 
-Avant d'écrire du code, trancher :
-
-1. **Convention de clé** : `{source}/{source_id}.json.gz` proposé. À valider : est-ce que `source_id` est toujours disponible et unique au moment du fetch ?
-2. **Politique de mise à jour** : quand on re-fetch une publi (hash différent), on **écrase** ou on **versionne** (`{source}/{source_id}/{fetched_at}.json.gz`) ? Recommandation : écraser au début, on verra si le besoin de versionnage apparaît.
-3. **Granularité** : un objet par publi (proposé) ou des batchs ? Un objet par publi est plus simple, plus granulaire, pas de souci de taille.
-4. **Ce qu'on stocke** : strictement le payload fournisseur, sans métadonnées locales ajoutées. Les métadonnées (date de fetch, version de schéma) vont en *object metadata* S3, pas dans le JSON.
+- **Clé** : `{source}/{source_id_url_encoded}.json.gz`. `source_id` est URL-encodé pour gérer les caractères filesystem-unsafe (`/` dans les IDs ScanR du type `doi10.1002/...`, `:` dans les IDs WoS du type `WOS:000...`).
+- **Politique de mise à jour** : écraser. Pas de versionnage multi-dates.
+- **Granularité** : un objet par publication (pas de batchs).
+- **Contenu** : strictement le payload fournisseur, sans métadonnées locales ajoutées. Les métadonnées éventuelles (date de fetch, version de schéma) vont en *object metadata* côté S3, pas dans le JSON.
 
 ## Phases
 
-### Phase 1 — Audit de pureté de la normalisation
+### Phase 0 — Snapshot d'urgence des `raw_data` actuels
 
-**Prérequis pour que la re-normalisation soit fiable.**
+Sauvegarde locale du contenu de `staging.raw_data` issu d'un extract récent, avant que la normalisation ne vide ces colonnes.
 
-Scanner le code des phases de normalisation pour identifier les dépendances non-pures :
-- `datetime.now()`, `date.today()` utilisés pour dériver des valeurs stockées (≠ pour logger).
-- Dépendances à l'état de la BDD au moment du run (ex : "regarder ce qui existe déjà pour décider quoi insérer").
-- Génération d'IDs non-déterministes.
+- [x] Script `interfaces/cli/oneshot/dump_staging_raw_to_local.py` : lit les rows `staging` avec `processed = FALSE` (= raw_data plein) et écrit chaque payload dans `data/raw_store/{source}/{source_id_encoded}.json.gz`. Écrase si existant.
+- [x] `data/raw_store/` ajouté à `.gitignore`.
 
-Sortie : une note listant ce qui est pur, ce qui ne l'est pas, et ce qui doit être fixé avant que la re-normalisation soit faisable.
+### Phase 1 — Abstraction `RawStore` + implémentation locale
 
-### Phase 2 — Abstraction `RawStore`
+- [ ] `infrastructure/raw_store/base.py` — Protocol `RawStore` :
+  - `put(source, source_id, payload_bytes) -> None`
+  - `get(source, source_id) -> bytes`
+  - `exists(source, source_id) -> bool`
+  - `iter_keys(source) -> Iterator[str]`
+- [ ] `infrastructure/raw_store/local.py` — `LocalFileRawStore(root_dir)`. URL-encoding des `source_id`, gzip à l'écriture, gunzip à la lecture.
+- [ ] `infrastructure/raw_store/factory.py` — sélection par variable d'env. Au démarrage, seule l'impl locale (`file://`) est supportée ; `s3://` reste un placeholder.
+- [ ] Config ajoutée dans `infrastructure/settings.py`.
+- [ ] Tests unit avec `tmp_path` pytest.
 
-Créer `infrastructure/raw_store/`  :
-- `base.py` — Protocol `RawStore` avec `put(source, source_id, payload) -> None`, `get(source, source_id) -> bytes`, `exists(source, source_id) -> bool`, `iter_keys(source) -> Iterator[str]`.
-- `local.py` — `LocalFileRawStore(root_dir)`.
-- `b2.py` — `B2RawStore(bucket, prefix, endpoint_url, credentials)` via `boto3`.
-- `factory.py` — construit l'impl selon `BIBLIO_RAW_STORE_URL`.
+### Phase 2 — Intégration dans les extracteurs
 
-Ajouter la config dans `infrastructure/settings.py`.
+- [ ] Au point d'insert dans `staging` (dans chaque `infrastructure/sources/{source}/extract_*.py`), appel `raw_store.put(...)` en parallèle.
+- [ ] Re-fetch : écrase l'objet raw existant, cohérent avec la convention de mise à jour.
+- [ ] Validation : après un run de pipeline, comparer les hashs (`staging.raw_hash` vs hash du contenu raw store) sur un échantillon, pour confirmer la fidélité de l'écriture.
 
-Tests : store en mémoire (`InMemoryRawStore`) ou tmpdir, pas besoin de taper Backblaze en CI.
+## Plus tard
 
-### Phase 3 — Setup Backblaze B2
+- **Setup Backblaze B2.** Bucket dédié `bibliometrie-uca-raw` (privé), clé applicative scopée à ce seul bucket (pas la master key), credentials dans `.env`. Permet de basculer `BIBLIO_RAW_STORE_URL` du `file://` local vers `s3://` en prod sans toucher au code.
 
-- Créer un bucket dédié `bibliometrie-uca-raw` (privé).
-- Créer une clé applicative scopée à ce seul bucket (pas la master key).
-- Stocker credentials dans `.env` (pas dans git).
-- Documenter le setup dans un court `roadmaps/raw-data-store-setup.md` ou dans le README.
-- Tester manuellement que `B2RawStore` écrit et relit.
+- **Script de re-normalisation** (`interfaces/cli/renormalize_from_raw.py`). Détail technique : lit le raw store et ré-exécute la même fonction de normalisation que le pipeline standard. Juste un changement de source d'entrée (JSON files au lieu de `staging.raw_data`), pas de logique métier nouvelle.
 
-### Phase 4 — Intégration dans le pipeline
+- **Suppression du stockage des `source_authorships` hors périmètre.** Payoff principal du chantier. Une fois le raw store éprouvé en prod, on peut supprimer les rows hors-périmètre de `source_authorships` (HAL, OA, WoS) et les re-matérialiser à la demande depuis le raw via le script de re-normalisation.
 
-Au moment du moissonnage (dans `infrastructure/sources/` pour chaque source), après fetch et avant normalisation :
-
-```python
-raw_store.put(source="hal", source_id=publi_hal_id, payload=gzip(json_bytes))
-```
-
-Décider : on met l'appel dans l'extracteur lui-même, ou dans une phase pipeline dédiée qui wrappe l'extracteur ? Probablement dans l'extracteur, au plus près de la donnée fraîchement reçue.
-
-Idempotence : re-fetcher une publi écrase l'objet raw (cohérent avec la décision phase 0).
-
-### Phase 5 — Script de re-normalisation
-
-CLI dédié : `interfaces/cli/renormalize_from_raw.py`.
-
-```
-python -m interfaces.cli.renormalize_from_raw --source hal [--publication-id ...] [--dry-run]
-```
-
-Lit le raw store, ré-exécute la normalisation pour chaque objet, écrit en BDD (en respectant la même logique que le pipeline normal). Utile pour les cas d'usage 1 et 2 (bug fix / nouveau champ).
-
-### Phase 6 — Suppression du stockage des `source_authorships` hors périmètre
-
-**Payoff du chantier.**
-
-- Vérifier qu'on peut reconstruire à la demande les `source_authorships` d'une publi hors périmètre à partir du raw (script ad-hoc ou extension du script de re-normalisation).
-- Migration SQL : supprimer les lignes hors périmètre de `*_authorships` (HAL, OA, WoS).
-- Ajuster le pipeline pour ne plus les insérer dans ce cas.
-- Documenter comment re-matérialiser ces données si le besoin surgit.
-
-### Phase 7 — Documentation de transmission DSI
-
-- Section dans le README / dans un doc d'archi : rôle du raw store, schéma de clé, convention de mise à jour.
-- Variables d'env à renseigner en prod.
-- Note sur la politique de rétention (à définir avec la DSI — a priori pas de suppression).
+- **Documentation de transmission DSI.** Section dans le README ou doc d'archi : rôle du raw store, schéma de clé, convention de mise à jour, variables d'env, politique de rétention (a priori pas de suppression).
 
 ## Hors scope
 
 - Pas de versionnage multi-dates des objets raw (on écrase).
 - Pas de chiffrement côté client (données publiques).
-- Pas de réplication / backup dédié : Backblaze gère la durabilité, on ne met pas de stratégie de backup du raw store par-dessus.
+- Pas de stratégie de backup dédiée au-dessus de B2 — Backblaze gère la durabilité, on n'ajoute pas une couche de redondance par-dessus.
 - Pas d'interface d'exploration du raw store — accès en ligne de commande uniquement.
-
-## Estimation grossière
-
-- Phases 0-1 (décisions + audit) : 1 demi-journée.
-- Phases 2-3 (abstraction + setup B2) : 1 journée.
-- Phase 4 (intégration pipeline) : 1 journée.
-- Phase 5 (re-normalisation) : 1 journée.
-- Phase 6 (suppression source_authorships hors périmètre) : 1 demi-journée.
-- Phase 7 (doc) : 1 demi-journée.
-
-**Total : ~4-5 journées** réparties, sans urgence.
-
-## Dépendances / ordre
-
-Phases 0 → 1 → 2 → (3 en parallèle de 2) → 4 → 5 → 6 → 7.
-
-Phase 1 peut se faire en parallèle de 0 (audit, pas bloquant pour les décisions).
