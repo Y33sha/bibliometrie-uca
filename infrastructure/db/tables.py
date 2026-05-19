@@ -138,7 +138,6 @@ perimeters = Table(
 # `create_type=False` : l'enum est créé par les migrations SQL, pas par SA.
 structure_type_enum = PgEnum(
     "universite",
-    "__epst_deprecated",
     "chu",
     "ecole",
     "labo",
