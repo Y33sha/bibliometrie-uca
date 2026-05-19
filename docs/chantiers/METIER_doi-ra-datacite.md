@@ -107,15 +107,14 @@ extract → cross_imports (fetch_missing_hal_id + fetch_missing_doi) → normali
 - **Livrable** : note `docs/chantiers/doi-prefixes-spike.md` + script `interfaces/cli/oneshot/doi_prefixes_spike.py`. **Phase 1 = GO. Phase 2 = GO** avec exclusion explicite du préfixe `10.60692` (OpenAlex generated DOIs).
 
 ### Phase 1 — Table `doi_prefixes` + filtre CrossRef + retrait `publishers.doi_prefix`
-- [ ] Migration Alembic `0019_doi_prefixes` : `CREATE TABLE doi_prefixes` + index.
-- [ ] One-shot `interfaces/cli/oneshot/seed_doi_prefixes.py` : seed initial depuis `docs/chantiers/doi-prefixes-spike-data/ra_cache.json` + `publisher_cache.json` (871 préfixes résolus + 711 mappings publisher). Évite ~900 appels API redondants au premier run prod. Lancé une seule fois par Laura après la migration.
-- [ ] Client `doi.org/ra` + client `api.crossref.org/prefixes/{prefix}` dans `infrastructure/sources/doi_prefixes/`.
-- [ ] Phase pipeline `resolve_doi_prefixes` : retry multi-DOI (N=3), résolution RA, mapping publisher pour Crossref, insert dans `doi_prefixes`. Préfixe non résolvable → pas d'insert (retry au run suivant).
-- [ ] Wiring dans `run_pipeline.py` (`--only resolve_doi_prefixes`, `--from resolve_doi_prefixes`), placé **après normalize** (cf. section Place dans le pipeline).
-- [ ] Modification `get_cross_import_dois` : LEFT JOIN sur `doi_prefixes` via `split_part(doi, '/', 1)`, filtre `ra = 'Crossref' OR ra IS NULL` pour la cible crossref. NULL accepté pour traiter les préfixes pas encore résolus en best-effort.
-- [ ] Migration Alembic `drop_publishers_doi_prefix` : `ALTER TABLE publishers DROP COLUMN doi_prefix` (après que les consommateurs côté API/UI aient été adaptés).
-- [ ] Adapter API/UI publishers : retirer le champ `doi_prefix` côté Pydantic + admin Svelte ; ajouter une vue "préfixes" en lecture seule via JOIN sur `doi_prefixes`.
-- [ ] Tests : intégration sur petit lot mixte (Crossref + DataCite + Zenodo).
+- [x] Migration Alembic `0019_doi_prefixes` : `CREATE TABLE doi_prefixes` + index.
+- [x] One-shot `interfaces/cli/oneshot/seed_doi_prefixes.py` : seed initial depuis `docs/chantiers/doi-prefixes-spike-data/ra_cache.json` + `publisher_cache.json` (871 préfixes résolus + 711 mappings publisher). Évite ~900 appels API redondants au premier run prod. Lancé une seule fois par Laura après la migration.
+- [x] Client `doi.org/ra` + client `api.crossref.org/prefixes/{prefix}` dans `infrastructure/sources/doi_prefixes/`.
+- [x] Phase pipeline `resolve_doi_prefixes` : retry multi-DOI (N=3), résolution RA, mapping publisher pour Crossref, insert dans `doi_prefixes`. Préfixe non résolvable → pas d'insert (retry au run suivant).
+- [x] Wiring dans `run_pipeline.py` (`--only resolve_doi_prefixes`, `--from resolve_doi_prefixes`), placé **après normalize** (cf. section Place dans le pipeline).
+- [x] Modification `get_cross_import_dois` : LEFT JOIN sur `doi_prefixes` via `split_part(doi, '/', 1)`, filtre `ra = 'Crossref' OR ra IS NULL` pour la cible crossref. NULL accepté pour traiter les préfixes pas encore résolus en best-effort.
+- [x] Adapter API/UI publishers : retirer le champ `doi_prefix` côté Pydantic + admin Svelte ; ajouter une vue "préfixes" en lecture seule via JOIN sur `doi_prefixes`.
+- [x] Migration Alembic `drop_publishers_doi_prefix` : `ALTER TABLE publishers DROP COLUMN doi_prefix` (après que les consommateurs côté API/UI aient été adaptés).
 - [ ] Lancer une fois en prod, mesurer la réduction du volume CrossRef et la disparition des 404.
 - **Livrable** : appels CrossRef ciblés, `doi_prefixes` peuplée, mapping prefix → publisher many-to-one en place, pas encore de DataCite ingérée.
 

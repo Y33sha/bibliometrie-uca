@@ -262,13 +262,7 @@ publishers = Table(
     Column("notes", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
-    Column("doi_prefix", Text),
     UniqueConstraint("openalex_id", name="publishers_openalex_id_key"),
-    Index(
-        "idx_publishers_doi_prefix",
-        "doi_prefix",
-        postgresql_where=text("doi_prefix IS NOT NULL"),
-    ),
     Index("idx_publishers_name_norm", "name_normalized"),
     Index(
         "idx_publishers_name_trgm",
