@@ -151,14 +151,19 @@ def _max_authors_per_pub(
     all_authorships: list[EnrichedAuthorship],
     linked_index: dict[tuple[int, int], list[tuple[int, str, str, str]]],
 ) -> dict[int, int]:
-    """Max d'auteurs sur une publication par source (linked + unlinked).
+    """Nombre d'auteurs pour chaque publication (max parmi les sources).
 
-    Sur les méga-papers (consortiums), le matching cross-source par
-    position est désactivé via `MAX_AUTHORS_CROSS_SOURCE` car les
-    positions divergent trop entre sources. Pour appliquer ce seuil,
-    on calcule pour chaque publi le max d'auteurs trouvés sur une
-    même source — cohérent avec le filtre `MAX_AUTHORS_CONFLICT`
-    côté admin (`infrastructure/queries/person_duplicates.py`).
+    Sert au court-circuit du matching cross-source au-delà de
+    `MAX_AUTHORS_CROSS_SOURCE`. Le matching personnes "cross-source" repose sur le
+    triplet "même publi récupérée sur plusieurs sources, même position auteur, noms compatibles". Sur les méga-papers, ce triplet cesse d'être discriminant : désalignements de positions fréquents entre sources, homonymes de patronyme, prénoms réduits à l'initiale. Le seuil 50 est un proxy arbitraire pour écarter ces publis.
+
+    Une publi peut avoir un nombre d'auteurs différent selon
+    la source — il faut bien retenir un chiffre pour comparer au
+    seuil. On prend le plus élevé par défensivité : si HAL dit 48 et
+    OpenAlex 52, on est dans le régime méga-paper.
+
+    Cohérent avec `MAX_AUTHORS_CONFLICT = 50` côté admin
+    (`infrastructure/queries/person_duplicates.py`).
     """
     counts: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for a in all_authorships:

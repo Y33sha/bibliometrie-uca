@@ -3,7 +3,7 @@
 * [ ] peut-on remplacer certaines tables par des vues matérialisées? (source_authorship_structures, authorship_structures, authorships?)
 ## Pipeline de traitement
 ### Extraction
-* [ ] vérif http2 pour extracteurs ->> **CODE_async-extractions-http.md**
+* [ ] cross-import openalex: 429 dès la première requête "2026-05-19 14:30:16,946 [INFO] pipeline: 24491 DOI manquants pour openalex 429 Too Many Requests DOI 10.1001/jama.2021.0135 — attente 1.0s (tentative 1/5) 429 Too Many Requests DOI 10.1001/jama.2020.23068 — attente 1.0s (tentative 1/5)"
 * [ ] Backoff `not_found_at` sur DOI: Pour limiter la croissance du pool de DOI retentés à chaque run de `fetch_missing_doi`, stocker un `not_found_at TIMESTAMP` sur les DOI qu'une source n'a pas pu résoudre, et ne les réessayer qu'après N jours (30 ?) ->> **DATA_cycle-vie-staging.md**
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour ->> **DATA_cycle-vie-staging.md**
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids?
