@@ -188,9 +188,17 @@ Contenu :
   leurs dépendances par injection (kwarg `repo=`, `audit_repo=`,
   `queries=`).
 - **Orchestrateurs pipeline** dans `application/pipeline/` :
-  - `extract/` — extracteurs sources → staging (un module par source,
-    pilote la pagination ; HTTP + SQL délégués à un adapter Port
-    `application/ports/pipeline/extract/<source>.py`)
+  - `extract/` — tous les pilotes d'ingestion → staging :
+    - `extract_<source>.py` — extraction de masse par source (HAL,
+      OpenAlex, WoS, ScanR, theses.fr) ; pilote la pagination
+    - `fetch_missing_doi.py` — fetch cross-source par DOI
+    - `fetch_missing_hal_id.py` — fetch HAL par halId / NNT depuis
+      les références d'autres sources
+    - `refetch_truncated.py` — re-fetch OpenAlex des works tronqués
+      à 100 auteurs
+
+    Chaque pilote délègue HTTP + SQL à un adapter via un Port
+    (`application/ports/pipeline/extract/<nom>.py`).
   - `normalize/` — staging → tables sources (un module par source)
   - `affiliations/` — propagation adresses ↔ structures vers
     `source_authorships.in_perimeter` et la table de jointure
@@ -202,7 +210,6 @@ Contenu :
   - `subjects/` — ingestion sujets/mots-clés
   - `cooccurrences/` — recalcul co-occurrences sujets
   - `enrich/` — Unpaywall, APC
-  - `fetch_missing_doi.py` — cross-source DOI lookup
 - **Ports** (`application/ports/*`) : interfaces Protocol pour les
   query services (adapters dans `infrastructure/queries/*`) et
   pour les repositories d'agrégats (`application/ports/repositories/*`,
