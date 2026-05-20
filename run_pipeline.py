@@ -973,14 +973,16 @@ def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> Phase
 def _run_refetch_truncated() -> PhaseMetrics:
     import asyncio
 
+    from application.pipeline.extract.refetch_truncated import refetch
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.openalex.refetch_truncated import refetch
+    from infrastructure.sources.openalex.refetch_truncated import PgOpenalexRefetchAdapter
 
     log.info("▶ refetch_truncated")
     t0 = time.time()
     conn = get_sync_engine().connect()
+    adapter = PgOpenalexRefetchAdapter()
     try:
-        metrics = asyncio.run(refetch(conn))
+        metrics = asyncio.run(refetch(conn, adapter, log))
     finally:
         conn.close()
     log.info("✓ refetch_truncated terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
