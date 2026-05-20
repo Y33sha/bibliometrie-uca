@@ -724,7 +724,12 @@ source_publications = Table(
     ),
     Column("countries", ARRAY(Text)),
     Column("hal_collections", ARRAY(Text)),
-    Column("external_ids", JSONB),
+    Column(
+        "external_ids",
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    ),
     Column("urls", ARRAY(Text)),
     Column("cited_by_count", Integer),
     Column("journal_id", Integer),
@@ -749,7 +754,11 @@ source_publications = Table(
         "idx_source_pubs_external_ids",
         "external_ids",
         postgresql_using="gin",
-        postgresql_where=text("external_ids IS NOT NULL"),
+        postgresql_where=text("external_ids != '{}'::jsonb"),
+    ),
+    CheckConstraint(
+        "jsonb_typeof(external_ids) = 'object'",
+        name="source_publications_external_ids_is_object",
     ),
     Index(
         "idx_source_pubs_hal_collections",

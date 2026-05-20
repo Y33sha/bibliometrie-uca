@@ -61,7 +61,7 @@ def extract_known_identifiers(
     Renvoie un dict `{kind: value}` plat où `kind` est une clé canonique (`hal_id`, `nnt`, `pmid`, …). Seules les valeurs `str` non vides sont retenues.
     """
     ids: dict[str, str] = {}
-    if external_ids:
+    if isinstance(external_ids, dict):
         ids.update({k: v for k, v in external_ids.items() if isinstance(v, str) and v})
     native_kind = _NATIVE_KIND_BY_SOURCE.get(source)
     if native_kind and source_id:
