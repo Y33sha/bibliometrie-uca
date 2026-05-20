@@ -11,6 +11,8 @@ Le driver `postgresql+psycopg` permet d'accéder aux features psycopg3
 si besoin.
 """
 
+import os
+
 import psycopg  # noqa: F401 — driver chargé par SA via la URL postgresql+psycopg://
 from sqlalchemy import URL, Engine, create_engine
 
@@ -39,7 +41,17 @@ def build_sync_engine() -> Engine:
       supplémentaires sous charge, fermées au retour
     - `pool_pre_ping = True` : détecte les connexions perdues
       (timeout réseau, reset SGBD) avant de les remettre en service
+
+    Garde-fou : sous pytest, refuse les bases dont le nom n'a pas le
+    suffixe `_test`. Cas historique : un monkey-patch de `build_sync_engine`
+    qui aurait été contourné pourrait laisser un test toucher la prod
+    (cf. incident structure "Nouvelle" créée dans `bibliometrie`).
     """
+    if os.environ.get("PYTEST_CURRENT_TEST") and not settings.db_name.endswith("_test"):
+        raise RuntimeError(
+            f"build_sync_engine refusé sous pytest sur DB '{settings.db_name}' "
+            f"(suffixe '_test' requis). Vérifier le monkey-patch dans le conftest."
+        )
     return create_engine(
         _db_url(),
         pool_size=settings.db_pool_min,

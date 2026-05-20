@@ -42,9 +42,10 @@ def create_structure(
     hal_collection: str | None = None,
     api_ids: dict[str, str | list[str]] | None = None,
     repo: StructureRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> dict:
     """Crée une structure. Retourne la ligne insérée (dict)."""
-    return repo.create_structure(
+    row = repo.create_structure(
         code=code,
         name=name,
         acronym=acronym,
@@ -54,6 +55,14 @@ def create_structure(
         hal_collection=hal_collection,
         api_ids=api_ids,
     )
+    emit_event(
+        audit_repo,
+        "structure.created",
+        "structure",
+        row["id"],
+        {"code": code, "name": name, "type": type},
+    )
+    return row
 
 
 def update_structure(structure_id: int, *, fields: dict, repo: StructureRepository) -> dict:

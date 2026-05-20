@@ -68,6 +68,7 @@ def get_structure(
 def create_structure(
     data: StructureCreate,
     repo: StructureRepository = Depends(structure_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> StructureOut:
     """Crée une structure. Lève 409 si le `code` est déjà utilisé."""
     return StructureOut.model_validate(
@@ -81,6 +82,7 @@ def create_structure(
             hal_collection=data.hal_collection,
             api_ids=data.api_ids,
             repo=repo,
+            audit_repo=audit,
         )
     )
 
