@@ -63,26 +63,42 @@ def bulk_link_remaining_orphans(conn: Connection) -> BulkLinkCounts:
         """)
     ).rowcount
 
+    # NNT et hal_id sont stockés sur `source_publications.external_ids`
+    # (et `source_id` pour les SP HAL natives), pas en colonne canonique
+    # sur `publications`. On joint donc orphan ↔ donor via le SP du donor
+    # déjà lié, en répliquant les paths que `PublicationRepository.find_by_nnt`
+    # et `find_by_hal_id` ouvrent côté Python.
     n_nnt = conn.execute(
         text("""
             UPDATE source_publications sp
-            SET publication_id = p.id
-            FROM publications p
+            SET publication_id = donor.publication_id
+            FROM source_publications donor
             WHERE sp.publication_id IS NULL
-              AND p.nnt IS NOT NULL
-              AND (sp.external_ids ->> 'nnt') = p.nnt
+              AND donor.publication_id IS NOT NULL
+              AND sp.external_ids ? 'nnt'
+              AND donor.external_ids ? 'nnt'
+              AND (sp.external_ids ->> 'nnt') = (donor.external_ids ->> 'nnt')
         """)
     ).rowcount
 
+    # hal_id : orphan peut matcher (a) une SP HAL native via `source_id`,
+    # ou (b) une SP cross-source qui a `hal_id` dans son external_ids
+    # (posé par les normalizers OpenAlex/ScanR). Cf. `find_by_hal_id`.
     n_hal_id = conn.execute(
         text("""
             UPDATE source_publications sp
-            SET publication_id = sphal.publication_id
-            FROM source_publications sphal
+            SET publication_id = donor.publication_id
+            FROM source_publications donor
             WHERE sp.publication_id IS NULL
-              AND sphal.source = 'hal'
-              AND sphal.publication_id IS NOT NULL
-              AND (sp.external_ids ->> 'hal_id') = sphal.source_id
+              AND donor.publication_id IS NOT NULL
+              AND sp.external_ids ? 'hal_id'
+              AND (
+                  (donor.source = 'hal' AND (sp.external_ids ->> 'hal_id') = donor.source_id)
+                  OR (
+                      donor.external_ids ? 'hal_id'
+                      AND (sp.external_ids ->> 'hal_id') = (donor.external_ids ->> 'hal_id')
+                  )
+              )
         """)
     ).rowcount
 
