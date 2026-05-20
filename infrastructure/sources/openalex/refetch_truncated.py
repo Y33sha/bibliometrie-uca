@@ -24,7 +24,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.sources.common import compute_hash, setup_logger
+from infrastructure.sources.common import setup_logger
 from infrastructure.sources.config import (
     get_api_base_urls,
     get_openalex_api_key,
@@ -32,16 +32,22 @@ from infrastructure.sources.config import (
 )
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
-from infrastructure.sources.openalex.parsing import compute_meta_hash
 
 MAX_CONCURRENT = 3
 COMMIT_EVERY = 50
 
+# Le refetch ne recalcule **pas** `raw_hash` : la ligne garde le hash du
+# payload bulk initial. Cette dissymétrie volontaire est le mécanisme de
+# préservation : tant que le bulk renvoie le même payload tronqué, son
+# hash matchera celui en base et l'UPSERT bulk ne touchera pas `raw_data`
+# (qui contient pourtant les auteurs complets). Un changement bulk
+# (raw_hash diffèrent) écrasera raw_data avec la version tronquée, et le
+# prochain passage du refetch dans le même run pipeline (count repassé à
+# 100) ré-amorcera le cycle.
 _UPDATE_SQL = text(
     """
     UPDATE staging
-    SET raw_data = :raw_data, raw_hash = :raw_hash, meta_hash = :meta_hash,
-        processed = FALSE, last_seen_at = now()
+    SET raw_data = :raw_data, processed = FALSE, last_seen_at = now()
     WHERE id = :id
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
@@ -93,6 +99,7 @@ async def refetch(
             SELECT id, source_id
             FROM staging
             WHERE source = 'openalex'
+              AND processed = FALSE
               AND jsonb_array_length(raw_data->'authorships') = 100
             ORDER BY id
             """
@@ -117,8 +124,6 @@ async def refetch(
             _UPDATE_SQL,
             {
                 "raw_data": work,
-                "raw_hash": compute_hash(work),
-                "meta_hash": compute_meta_hash(work),
                 "id": staging_id,
             },
         )

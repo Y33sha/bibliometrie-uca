@@ -142,7 +142,7 @@ Quand HAL/OA/WoS/ScanR `fetch_missing_doi.py` insère un stub not_found pour un 
 
 **Phase 3 — Action sur disparition.** DELETE cascade (perte historique), table archive `staging_archived` (conservation, complexité +1), flag `disappeared_at` sur staging (la row reste mais exclue des requêtes par défaut) ? Idem côté `source_publications` et publications canoniques.
 
-**Phase 4 — Stratégie de re-fetch.** Re-fetch tous les K mois ? Re-fetch quand `meta_hash` est ancien ? Quel impact sur les quotas API (notamment WoS) ?
+**Phase 4 — Stratégie de re-fetch.** Re-fetch tous les K mois ? Re-fetch quand `last_seen_at` est ancien ? Quel impact sur les quotas API (notamment WoS) ?
 
 **Cohabitation avec le statut OA via Unpaywall.** Aujourd'hui `enrich_oa_status` rafraîchit le statut OA depuis Unpaywall pour les publis sans statut. Le re-fetch périodique pourrait soit le compléter (re-fetch toutes les métadonnées en plus du statut OA), soit s'aligner sur la même fréquence pour limiter les appels API.
 

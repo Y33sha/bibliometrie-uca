@@ -7,7 +7,6 @@ import pytest
 from infrastructure.sources.openalex import init_auth
 from infrastructure.sources.openalex.parsing import (
     build_params,
-    compute_meta_hash,
     extract_doi,
     extract_openalex_id,
 )
@@ -44,27 +43,6 @@ class TestExtractDoi:
 
     def test_none_when_explicit_none(self):
         assert extract_doi({"doi": None}) is None
-
-
-class TestComputeMetaHash:
-    def test_identical_metadata_same_hash(self):
-        a = {"title": "Foo", "publication_year": 2024, "authorships": [{"a": 1}]}
-        b = {"title": "Foo", "publication_year": 2024, "authorships": [{"a": 1}]}
-        assert compute_meta_hash(a) == compute_meta_hash(b)
-
-    def test_authorships_difference_ignored(self):
-        # `compute_meta_hash` filtre les authorships : deux raw_data qui
-        # diffèrent uniquement sur ce champ produisent le même hash.
-        # Justifie le mécanisme `meta_hash` vs `raw_hash` pour l'idempotence
-        # après refetch tronqué.
-        a = {"title": "Foo", "authorships": [{"a": 1}]}
-        b = {"title": "Foo", "authorships": [{"a": 1}, {"b": 2}]}
-        assert compute_meta_hash(a) == compute_meta_hash(b)
-
-    def test_metadata_change_changes_hash(self):
-        a = {"title": "Foo", "authorships": [{"a": 1}]}
-        b = {"title": "Bar", "authorships": [{"a": 1}]}
-        assert compute_meta_hash(a) != compute_meta_hash(b)
 
 
 class TestBuildParams:

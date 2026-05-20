@@ -38,7 +38,6 @@ from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.openalex import init_auth
 from infrastructure.sources.openalex.parsing import (
     build_params,
-    compute_meta_hash,
     extract_doi,
     extract_openalex_id,
 )
@@ -62,37 +61,19 @@ def fetch_page(
 
 _INSERT_OA_BATCH_SQL = text(
     """
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, meta_hash)
-    VALUES ('openalex', :source_id, :doi, :raw_data, :raw_hash, :meta_hash)
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+    VALUES ('openalex', :source_id, :doi, :raw_data, :raw_hash)
     ON CONFLICT (source, source_id) DO UPDATE SET
         raw_data = CASE
-            WHEN staging.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
-                THEN staging.raw_data
-            WHEN jsonb_array_length(staging.raw_data->'authorships')
-                 > jsonb_array_length(EXCLUDED.raw_data->'authorships')
-                THEN jsonb_set(staging.raw_data,
-                     '{title}', EXCLUDED.raw_data->'title')
-                  || jsonb_build_object(
-                     'open_access', EXCLUDED.raw_data->'open_access',
-                     'primary_location', EXCLUDED.raw_data->'primary_location',
-                     'locations', EXCLUDED.raw_data->'locations',
-                     'cited_by_count', EXCLUDED.raw_data->'cited_by_count',
-                     'type', EXCLUDED.raw_data->'type',
-                     'language', EXCLUDED.raw_data->'language',
-                     'biblio', EXCLUDED.raw_data->'biblio',
-                     'is_retracted', EXCLUDED.raw_data->'is_retracted')
-            ELSE EXCLUDED.raw_data
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN EXCLUDED.raw_data
+            ELSE staging.raw_data
         END,
-        raw_hash = CASE
-            WHEN staging.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
-                THEN staging.raw_hash
-            ELSE EXCLUDED.raw_hash
-        END,
-        meta_hash = COALESCE(EXCLUDED.meta_hash, staging.meta_hash),
+        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
         processed = CASE
-            WHEN staging.meta_hash IS NOT DISTINCT FROM EXCLUDED.meta_hash
-                THEN staging.processed
-            ELSE FALSE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN FALSE
+            ELSE staging.processed
         END,
         last_seen_at = now()
     """
@@ -100,36 +81,37 @@ _INSERT_OA_BATCH_SQL = text(
 
 
 def insert_batch(conn: Connection, batch: list[dict]) -> int:
-    """Insère un batch de works dans staging.
+    """Insère / met à jour un batch de works dans staging.
 
-    Logique de mise à jour :
-    - Compare meta_hash (métadonnées hors authorships) pour détecter les vrais changements
-    - Si meta_hash identique → rien à faire
-    - Si meta_hash différent → met à jour raw_data en préservant les authorships de la
-      version en base si elle en a plus (cas des works >100 auteurs déjà re-fetchés)
+    `raw_hash` est l'unique clé de détection de changement, aligné sur le
+    pattern des autres sources (HAL/ScanR/WoS/theses/crossref). La
+    préservation des authorships complètes obtenues par
+    `refetch_truncated` repose sur le fait que **refetch ne recalcule pas
+    `raw_hash`** : la ligne refetchée garde le hash du payload bulk
+    initial. Tant que le bulk renvoie ce même payload, la comparaison
+    `raw_hash` reste équivalente et l'UPSERT ne touche pas `raw_data`.
 
-    Retourne le nombre de documents dont les métadonnées ont changé.
+    Le caller est responsable du `conn.commit()` après cette fonction.
+
+    Retourne le nombre de documents dont le hash a changé.
     """
-    # Compter les documents existants avec un meta_hash différent
     source_ids = [b["source_id"] for b in batch]
     rows = conn.execute(
         text(
-            "SELECT source_id, meta_hash FROM staging "
+            "SELECT source_id, raw_hash FROM staging "
             "WHERE source = 'openalex' AND source_id = ANY(:ids)"
         ),
         {"ids": source_ids},
     ).all()
-    old_hashes = {r.source_id: r.meta_hash for r in rows}
+    old_hashes = {r.source_id: r.raw_hash for r in rows}
 
     conn.execute(_INSERT_OA_BATCH_SQL, batch)
-    conn.commit()
 
-    # Compter les mises à jour réelles (meta_hash différent, document existant)
-    updated = 0
-    for entry in batch:
-        old = old_hashes.get(entry["source_id"])
-        if old is not None and old != entry["meta_hash"]:
-            updated += 1
+    updated = sum(
+        1
+        for entry in batch
+        if entry["source_id"] in old_hashes and old_hashes[entry["source_id"]] != entry["raw_hash"]
+    )
     return updated
 
 
@@ -185,7 +167,6 @@ def extract_year(
                     "doi": extract_doi(work),
                     "raw_data": work,
                     "raw_hash": compute_hash(work),
-                    "meta_hash": compute_meta_hash(work),
                 }
             )
             if existing_ids is not None and oa_id not in existing_ids:
@@ -196,6 +177,7 @@ def extract_year(
         updated_count = 0
         if batch:
             updated_count = insert_batch(conn, batch)
+            conn.commit()
             total_new += new_count
             total_updated += updated_count
 
