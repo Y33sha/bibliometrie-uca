@@ -1,0 +1,105 @@
+"""Orchestrateur du re-fetch des works OpenAlex tronqués à 100 auteurs.
+
+L'API OpenAlex bulk retourne max 100 authorships par work. Cet
+orchestrateur détecte les works avec exactement 100 auteurs dans le
+staging et les re-fetche individuellement via l'API
+(qui retourne alors tous les auteurs).
+
+Implémentation async : `httpx.AsyncClient` partagé +
+`asyncio.Semaphore(adapter.max_concurrent)` pour respecter le plafond
+OpenAlex (~10 req/s, cf. fetch_missing_doi).
+
+**Préservation des authorships complètes.** Le refetch ne recalcule
+**pas** `raw_hash` (cf. adapter `update_raw_data`) : la ligne refetchée
+garde le hash du payload bulk initial. Tant que le bulk renvoie le
+même payload tronqué, son hash matchera celui en base et l'UPSERT bulk
+ne touchera pas `raw_data` (qui contient pourtant les auteurs complets).
+Un changement bulk (raw_hash différent) écrasera raw_data avec la
+version tronquée, et le prochain passage du refetch dans le même run
+pipeline (count repassé à 100) ré-amorcera le cycle.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+
+import httpx
+from sqlalchemy import Connection
+
+from application.ports.pipeline.extract.refetch_truncated import (
+    OpenalexRefetchAdapter,
+    TruncatedWork,
+)
+from domain.pipeline_metrics import PhaseMetrics
+
+COMMIT_EVERY = 50
+
+
+async def refetch(
+    conn: Connection,
+    adapter: OpenalexRefetchAdapter,
+    log: logging.Logger,
+    *,
+    dry_run: bool = False,
+    limit: int | None = None,
+) -> PhaseMetrics:
+    """Re-fetch les works OpenAlex avec exactement 100 authorships.
+
+    Phase importable depuis `run_pipeline.py` ; ne ferme pas la
+    connexion (responsabilité du caller). `updated` compte les works
+    ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100
+    auteurs ; `errors` les fetchs échoués.
+    """
+    adapter.configure(conn)
+
+    truncated = adapter.find_truncated(conn, limit=limit)
+    log.info(f"{len(truncated)} works avec 100 auteurs détectés (potentiellement tronqués)")
+
+    metrics = PhaseMetrics(total=len(truncated))
+    if not truncated or dry_run:
+        return metrics
+
+    sem = asyncio.Semaphore(adapter.max_concurrent)
+    # La `Connection` SA sync n'est pas thread-safe ; tous les writes
+    # (UPDATE, commit) passent par `to_thread` sous ce lock.
+    db_lock = asyncio.Lock()
+    progress = {"processed": 0}
+
+    async with httpx.AsyncClient() as client:
+
+        async def process_one(ref: TruncatedWork) -> None:
+            async with sem:
+                work = await adapter.fetch_work(client, ref.openalex_id)
+
+            if not work:
+                metrics.add(errors=1)
+            elif len(work.get("authorships", [])) <= 100:
+                metrics.add(already_complete=1)
+            else:
+                async with db_lock:
+                    await asyncio.to_thread(adapter.update_raw_data, conn, ref.staging_id, work)
+                metrics.add(updated=1)
+
+            progress["processed"] += 1
+            if progress["processed"] % COMMIT_EVERY == 0:
+                async with db_lock:
+                    await asyncio.to_thread(conn.commit)
+                log.info(
+                    f"  {progress['processed']}/{len(truncated)}... "
+                    f"({metrics.updated} mis à jour, "
+                    f"{metrics.extras.get('already_complete', 0)} déjà complets)"
+                )
+
+        await asyncio.gather(*(process_one(ref) for ref in truncated))
+
+    conn.commit()
+    log.info(
+        f"Terminé : {metrics.updated} works mis à jour avec authorships complètes, "
+        f"{metrics.extras.get('already_complete', 0)} déjà complets, "
+        f"{metrics.errors} erreurs"
+    )
+    return metrics
+
+
+__all__ = ["refetch"]
