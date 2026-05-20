@@ -1,19 +1,22 @@
 """Tests de l'extraction HAL adaptive (preview IDs → full-fetch ou incrémental).
 
-Stratégie : monkeypatcher `fetch_collection_ids`, `_extract_full` et
-`_extract_incremental` pour observer lequel est choisi. On ne teste pas
-la plomberie HTTP/SQL (couverte par le helper retry) — on teste le
-dispatch heuristique et les tags de collection.
+Stratégie : un fake `HalExtractAdapter` (MagicMock) injecté à
+`extract_collection`. On monkeypatche `_extract_full` et
+`_extract_incremental` dans `application.pipeline.extract.extract_hal`
+pour observer lequel est choisi. On ne teste pas la plomberie HTTP/SQL
+(couverte par le helper retry + tests adapter dédiés).
 """
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import MagicMock
 
 import pytest
 from sqlalchemy import text
 
-from infrastructure.sources.hal import extract_hal
+from application.pipeline.extract import extract_hal
+from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
 
 
 @pytest.fixture
@@ -25,13 +28,13 @@ def no_sleep(monkeypatch):
 @pytest.fixture
 def spies(monkeypatch):
     """Remplace les deux chemins d'extraction par des spies simples."""
-    calls = {"full": [], "incremental": []}
+    calls: dict[str, list] = {"full": [], "incremental": []}
 
-    def fake_full(url, query, collection_code, conn, existing_ids, total_count):
+    def fake_full(adapter, query, collection_code, conn, existing_ids, total_count, logger):
         calls["full"].append({"collection": collection_code, "total": total_count})
         return 0  # nb_new
 
-    def fake_incremental(url, collection_code, orphans, known, conn, existing_ids):
+    def fake_incremental(adapter, collection_code, orphans, known, conn, existing_ids, logger):
         calls["incremental"].append(
             {
                 "collection": collection_code,
@@ -46,21 +49,29 @@ def spies(monkeypatch):
     return calls
 
 
+def _fake_adapter(preview_ids: list[str]) -> MagicMock:
+    """Construit un MagicMock du port HalExtractAdapter avec preview_ids fixé."""
+    a = MagicMock()
+    a.fetch_collection_ids.return_value = preview_ids
+    return a
+
+
 class TestAdaptiveDispatch:
-    def test_incremental_mode_triggered_for_umbrella(self, monkeypatch, no_sleep, spies):
+    def test_incremental_mode_triggered_for_umbrella(self, no_sleep, spies):
         """5000 papiers, 4995 connus, 5 orphelins.
         per_page=500 → full_fetch_pages=10. 5 < 10 → MODE INCRÉMENTAL.
         """
         preview_ids = [f"hal-{i}" for i in range(5000)]
-        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids)
+        adapter = _fake_adapter(preview_ids)
         existing = {f"hal-{i}" for i in range(5, 5000)}
 
-        total, new = extract_hal.extract_collection(
+        total, _new = extract_hal.extract_collection(
             collection_code="UMBRELLA",
             collection_label="Umbrella",
             conn=MagicMock(),
             existing_ids=existing,
-            base_url="https://api.archives-ouvertes.fr/search/",
+            adapter=adapter,
+            logger=logging.getLogger("test"),
             years=[2025, 2026],
         )
         assert total == 5000
@@ -70,18 +81,19 @@ class TestAdaptiveDispatch:
         assert sorted(call["orphans"]) == [f"hal-{i}" for i in range(5)]
         assert len(call["known"]) == 4995
 
-    def test_full_fetch_mode_when_staging_empty(self, monkeypatch, no_sleep, spies):
+    def test_full_fetch_mode_when_staging_empty(self, no_sleep, spies):
         """100 papiers, staging vide → 100 orphelins, full_fetch_pages=1.
         100 ≥ 1 → MODE FULL-FETCH."""
         preview_ids = [f"hal-{i}" for i in range(100)]
-        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids)
+        adapter = _fake_adapter(preview_ids)
 
-        total, new = extract_hal.extract_collection(
+        total, _new = extract_hal.extract_collection(
             collection_code="FRESH",
             collection_label="Fresh",
             conn=MagicMock(),
             existing_ids=set(),
-            base_url="https://api.archives-ouvertes.fr/search/",
+            adapter=adapter,
+            logger=logging.getLogger("test"),
             years=[2025, 2026],
         )
         assert total == 100
@@ -89,30 +101,31 @@ class TestAdaptiveDispatch:
         assert spies["full"][0]["collection"] == "FRESH"
         assert spies["full"][0]["total"] == 100
 
-    def test_boundary_orphans_equals_pages_picks_full(self, monkeypatch, no_sleep, spies):
+    def test_boundary_orphans_equals_pages_picks_full(self, no_sleep, spies):
         """Borne : orphans == full_fetch_pages → mode full-fetch (règle `<` stricte).
         1000 papiers, 998 connus, 2 orphelins. per_page=500 → pages=2. 2 < 2 = False.
         """
         preview_ids = [f"hal-{i}" for i in range(1000)]
-        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids)
+        adapter = _fake_adapter(preview_ids)
         existing = {f"hal-{i}" for i in range(2, 1000)}
 
-        total, new = extract_hal.extract_collection(
+        total, _new = extract_hal.extract_collection(
             collection_code="BOUNDARY",
             collection_label="Boundary",
             conn=MagicMock(),
             existing_ids=existing,
-            base_url="https://api.archives-ouvertes.fr/search/",
+            adapter=adapter,
+            logger=logging.getLogger("test"),
             years=[2025],
         )
         assert total == 1000
         assert spies["full"] and not spies["incremental"]
 
-    def test_boundary_orphans_less_than_pages_picks_incremental(self, monkeypatch, no_sleep, spies):
+    def test_boundary_orphans_less_than_pages_picks_incremental(self, no_sleep, spies):
         """Borne inverse : orphans == pages - 1 → mode incrémental.
         1000 papiers, 999 connus, 1 orphelin. per_page=500 → pages=2. 1 < 2 = True."""
         preview_ids = [f"hal-{i}" for i in range(1000)]
-        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids)
+        adapter = _fake_adapter(preview_ids)
         existing = {f"hal-{i}" for i in range(1, 1000)}
 
         total, _new = extract_hal.extract_collection(
@@ -120,22 +133,24 @@ class TestAdaptiveDispatch:
             collection_label="JustBelow",
             conn=MagicMock(),
             existing_ids=existing,
-            base_url="https://api.archives-ouvertes.fr/search/",
+            adapter=adapter,
+            logger=logging.getLogger("test"),
             years=[2025],
         )
         assert total == 1000
         assert spies["incremental"] and not spies["full"]
 
-    def test_dry_run_skips_both_paths(self, monkeypatch, no_sleep, spies):
+    def test_dry_run_skips_both_paths(self, no_sleep, spies):
         preview_ids = [f"hal-{i}" for i in range(50)]
-        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: preview_ids)
+        adapter = _fake_adapter(preview_ids)
 
         total, new = extract_hal.extract_collection(
             collection_code="DRY",
             collection_label="Dry",
             conn=MagicMock(),
             existing_ids=set(),
-            base_url="https://api.archives-ouvertes.fr/search/",
+            adapter=adapter,
+            logger=logging.getLogger("test"),
             years=[2025],
             dry_run=True,
         )
@@ -143,15 +158,16 @@ class TestAdaptiveDispatch:
         assert new == 0
         assert not spies["full"] and not spies["incremental"]
 
-    def test_empty_collection_returns_zero(self, monkeypatch, no_sleep, spies):
-        monkeypatch.setattr(extract_hal, "fetch_collection_ids", lambda *a, **kw: [])
+    def test_empty_collection_returns_zero(self, no_sleep, spies):
+        adapter = _fake_adapter([])
 
         total, new = extract_hal.extract_collection(
             collection_code="EMPTY",
             collection_label="Empty",
             conn=MagicMock(),
             existing_ids=set(),
-            base_url="https://api.archives-ouvertes.fr/search/",
+            adapter=adapter,
+            logger=logging.getLogger("test"),
             years=[2025],
         )
         assert total == 0
@@ -162,50 +178,27 @@ class TestAdaptiveDispatch:
 class TestExtractFullSafeguard:
     """Tests du safeguard qui évite les boucles infinies sur `_extract_full`."""
 
-    def test_empty_docs_breaks_loop_even_if_start_below_total(self, monkeypatch, no_sleep):
+    def test_empty_docs_breaks_loop_even_if_start_below_total(self, no_sleep):
         """Si l'API retourne une page vide alors que start < total_count
         (incohérence rare côté Solr), on sort du loop au lieu de spinner."""
-        # fetch_page retourne toujours une page vide avec numFound=1000 → piège
-        monkeypatch.setattr(
-            extract_hal,
-            "fetch_page",
-            lambda *a, **kw: {"response": {"numFound": 1000, "docs": []}},
-        )
-        monkeypatch.setattr(extract_hal, "upsert_work", lambda *a, **kw: None)
+        adapter = MagicMock()
+        adapter.fetch_page.return_value = {"response": {"numFound": 1000, "docs": []}}
 
         conn = MagicMock()
-        # Ne doit pas tourner indéfiniment : retourne 0 docs traités
         total_new = extract_hal._extract_full(
-            url="https://example/",
+            adapter=adapter,
             query="q",
             collection_code="C",
             conn=conn,
             existing_ids=set(),
             total_count=1000,
+            logger=logging.getLogger("test"),
         )
         assert total_new == 0  # sortie propre
+        adapter.upsert_work.assert_not_called()
 
 
-class TestTagExistingWithCollection:
-    def test_empty_hal_ids_skips_query(self):
-        conn = MagicMock()
-        n = extract_hal.tag_existing_with_collection(conn, [], "FOO")
-        assert n == 0
-        conn.cursor.assert_not_called()
-
-    def test_executes_update_with_array_append(self):
-        conn = MagicMock()
-        conn.execute.return_value.rowcount = 3
-
-        n = extract_hal.tag_existing_with_collection(conn, ["hal-1", "hal-2", "hal-3"], "PRES_UCA")
-        assert n == 3
-        sql = str(conn.execute.call_args[0][0])
-        assert "UPDATE staging" in sql
-        assert "hal_collections" in sql
-        assert "ANY(:ids)" in sql
-        params = conn.execute.call_args[0][1]
-        assert params == {"code": "PRES_UCA", "ids": ["hal-1", "hal-2", "hal-3"]}
-        conn.commit.assert_called_once()
+# ── tag_existing_with_collection : tests SQL via l'adapter Pg ────
 
 
 class _NoCommitConn:
@@ -222,18 +215,23 @@ class _NoCommitConn:
         pass
 
 
-class TestTagExistingWithCollectionSql:
-    """Exécute le vrai SQL contre la base de test pour attraper les bugs
-    de typage côté Postgres (ex. cast manquant sur `array || element`)."""
+class TestTagExistingWithCollection:
+    def test_empty_hal_ids_skips_query(self):
+        adapter = PgHalExtractAdapter(base_url="https://example/")
+        conn = MagicMock()
+        n = adapter.tag_existing_with_collection(conn, [], "FOO")
+        assert n == 0
+        conn.execute.assert_not_called()
 
     def test_append_collection_to_existing_array(self, sa_sync_conn):
+        adapter = PgHalExtractAdapter(base_url="https://example/")
         sa_sync_conn.execute(
             text(
                 "INSERT INTO staging (source, source_id, raw_data, hal_collections) "
                 "VALUES ('hal', 'hal-existing', '{}'::jsonb, ARRAY['OLD']::TEXT[])"
             )
         )
-        n = extract_hal.tag_existing_with_collection(
+        n = adapter.tag_existing_with_collection(
             _NoCommitConn(sa_sync_conn), ["hal-existing"], "GEOLAB"
         )
         assert n == 1
@@ -243,13 +241,14 @@ class TestTagExistingWithCollectionSql:
         assert row.hal_collections == ["OLD", "GEOLAB"]
 
     def test_init_collection_array_when_null(self, sa_sync_conn):
+        adapter = PgHalExtractAdapter(base_url="https://example/")
         sa_sync_conn.execute(
             text(
                 "INSERT INTO staging (source, source_id, raw_data, hal_collections) "
                 "VALUES ('hal', 'hal-null', '{}'::jsonb, NULL)"
             )
         )
-        n = extract_hal.tag_existing_with_collection(
+        n = adapter.tag_existing_with_collection(
             _NoCommitConn(sa_sync_conn), ["hal-null"], "GEOLAB"
         )
         assert n == 1
@@ -259,15 +258,14 @@ class TestTagExistingWithCollectionSql:
         assert row.hal_collections == ["GEOLAB"]
 
     def test_no_duplicate_when_collection_already_present(self, sa_sync_conn):
+        adapter = PgHalExtractAdapter(base_url="https://example/")
         sa_sync_conn.execute(
             text(
                 "INSERT INTO staging (source, source_id, raw_data, hal_collections) "
                 "VALUES ('hal', 'hal-dup', '{}'::jsonb, ARRAY['GEOLAB']::TEXT[])"
             )
         )
-        n = extract_hal.tag_existing_with_collection(
-            _NoCommitConn(sa_sync_conn), ["hal-dup"], "GEOLAB"
-        )
+        n = adapter.tag_existing_with_collection(_NoCommitConn(sa_sync_conn), ["hal-dup"], "GEOLAB")
         assert n == 1
         row = sa_sync_conn.execute(
             text("SELECT hal_collections FROM staging WHERE source_id = 'hal-dup'")
