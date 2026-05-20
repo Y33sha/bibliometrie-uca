@@ -1,4 +1,4 @@
-"""Adapter WoS pour `application.pipeline.fetch_missing_doi`.
+"""Adapter WoS pour `application.pipeline.extract.fetch_missing_doi`.
 
 WoS accepte une requête groupée par DOI (`DO=("doi1" OR "doi2" OR ...)`).
 Lot de 20 DOI par requête pour éviter des URLs trop longues, pagination

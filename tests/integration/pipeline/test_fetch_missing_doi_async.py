@@ -1,4 +1,4 @@
-"""Tests pour `application.pipeline.fetch_missing_doi.run_async`.
+"""Tests pour `application.pipeline.extract.fetch_missing_doi.run_async`.
 
 Deux angles :
 1. **Orchestrateur** : via un fake adapter, vérifie la parallélisation,
@@ -19,7 +19,7 @@ import httpx
 import pytest
 import respx
 
-from application.pipeline.fetch_missing_doi import run_async
+from application.pipeline.extract.fetch_missing_doi import run_async
 from domain.pipeline_metrics import PhaseMetrics
 from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
 from infrastructure.sources.http_retry_async import http_request_with_retry_async

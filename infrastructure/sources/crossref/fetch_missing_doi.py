@@ -1,4 +1,4 @@
-"""Adapter CrossRef pour ``application.pipeline.fetch_missing_doi``.
+"""Adapter CrossRef pour ``application.pipeline.extract.fetch_missing_doi``.
 
 CrossRef est ingérée DOI-driven : pour chaque DOI présent dans une autre
 source mais absent du staging CrossRef, on interroge l'endpoint

@@ -1,7 +1,7 @@
 """Point d'entrée CLI : fetch des DOI manquants dans une source cible.
 
 Composition root : sélectionne l'adapter async selon `--target`, ouvre
-la connexion, appelle `application.pipeline.fetch_missing_doi.run_async`.
+la connexion, appelle `application.pipeline.extract.fetch_missing_doi.run_async`.
 
 Les 4 sources (hal, openalex, wos, scanr) utilisent le chemin async
 (`AsyncFetchMissingDoiAdapter` + `httpx.AsyncClient`), avec un débit
@@ -22,7 +22,8 @@ import asyncio
 import os
 from typing import cast
 
-from application.pipeline.fetch_missing_doi import AsyncFetchMissingDoiAdapter, run_async
+from application.pipeline.extract.fetch_missing_doi import run_async
+from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.sources.common import get_cross_import_dois
