@@ -263,13 +263,7 @@ def add_identifiers_from_authorships(
             try:
                 add_identifier(person_id, id_type, value, repo=repo)
             except CannotAttributeConflict as exc:
-                logger.warning(
-                    "Promotion ignorée pour person_id=%s, %s=%r : %s",
-                    person_id,
-                    id_type,
-                    value,
-                    exc,
-                )
+                logger.warning("%s", exc)
 
 
 # ── Formes de noms ──
