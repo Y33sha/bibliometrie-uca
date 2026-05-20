@@ -29,18 +29,6 @@ class SourcePublicationRow(NamedTuple):
     in_perimeter: bool
 
 
-class BulkLinkCounts(NamedTuple):
-    """Compteurs retournés par `bulk_link_remaining_orphans` (phase B)."""
-
-    by_doi: int
-    by_nnt: int
-    by_hal_id: int
-
-    @property
-    def total(self) -> int:
-        return self.by_doi + self.by_nnt + self.by_hal_id
-
-
 class PublicationsMatchOrCreateQueries(Protocol):
     """Opérations SQL pour le rattachement (match ou création) des `source_publications` aux `publications` canoniques."""
 
@@ -53,14 +41,17 @@ class PublicationsMatchOrCreateQueries(Protocol):
         un par un via la cascade Python `decide_publication_match`.
         """
 
-    def bulk_link_remaining_orphans(self, conn: Connection) -> BulkLinkCounts:
-        """Phase B : rattache en bulk les orphelins restants (hors-périmètre).
+    def bulk_link_orphans_by_doi(self, conn: Connection) -> int:
+        """Phase B step 1/3 : rattache les orphelins par DOI."""
 
-        3 UPDATEs SQL set-based qui matchent par DOI, NNT, hal_id contre
-        les publications canoniques. Pas de création (gated par
-        `in_perimeter`). Bénéficie naturellement des publications créées
-        en Phase A puisqu'elle tourne après.
-        """
+    def bulk_link_orphans_by_nnt(self, conn: Connection) -> int:
+        """Phase B step 2/3 : rattache les orphelins par NNT
+        (stocké sur `source_publications.external_ids`)."""
+
+    def bulk_link_orphans_by_hal_id(self, conn: Connection) -> int:
+        """Phase B step 3/3 : rattache les orphelins par hal_id
+        (deux donor paths : SP HAL native via `source_id`, OU SP
+        cross-source via `external_ids->>'hal_id'`)."""
 
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int

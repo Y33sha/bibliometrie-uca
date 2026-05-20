@@ -12,7 +12,6 @@ L'attachement d'un `source_publications` à un `publications` est mutualisé ave
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.publications_match_or_create import (
-    BulkLinkCounts,
     PublicationsMatchOrCreateQueries,
     SourcePublicationRow,
 )
@@ -44,14 +43,12 @@ def fetch_orphan_in_perimeter_source_publications(
     return [SourcePublicationRow(**r._mapping) for r in rows]
 
 
-def bulk_link_remaining_orphans(conn: Connection) -> BulkLinkCounts:
-    """Rattache en bulk les orphelins restants (post-Phase A) par DOI, NNT, hal_id.
+def bulk_link_orphans_by_doi(conn: Connection) -> int:
+    """Rattache les orphelins par DOI (exact match contre `publications.doi`).
 
-    3 UPDATEs SQL set-based, équivalent fonctionnel de la cascade Python sur les voies « match seul » (sans création, ni dédup métadonnées thèse). Bénéficie des publications créées en Phase A puisqu'elle tourne après. Pas de `resolve_doi_conflict` : les cas chapter/book limites sont rares en pratique, traitables en aval via admin/duplicates ; le gain de simplicité et de vitesse compense.
-
-    Pas de `refresh_from_sources` ici non plus — pas pertinent puisqu'on n'a fait que du rattachement (les métadonnées des publis canoniques sont déjà figées pour ce run, la phase 2 du `run()` les recomposera via `fetch_stale_publication_ids`).
+    Rapide grâce à `idx_source_pubs_doi` + index sur `publications.doi`.
     """
-    n_doi = conn.execute(
+    return conn.execute(
         text("""
             UPDATE source_publications sp
             SET publication_id = p.id
@@ -63,46 +60,64 @@ def bulk_link_remaining_orphans(conn: Connection) -> BulkLinkCounts:
         """)
     ).rowcount
 
-    # NNT et hal_id sont stockés sur `source_publications.external_ids`
-    # (et `source_id` pour les SP HAL natives), pas en colonne canonique
-    # sur `publications`. On joint donc orphan ↔ donor via le SP du donor
-    # déjà lié, en répliquant les paths que `PublicationRepository.find_by_nnt`
-    # et `find_by_hal_id` ouvrent côté Python.
-    n_nnt = conn.execute(
+
+def bulk_link_orphans_by_nnt(conn: Connection) -> int:
+    """Rattache les orphelins par NNT (stocké sur `source_publications.external_ids`).
+
+    CTE de lookup `(nnt, publication_id)` matérialisée d'abord, puis JOIN avec les orphans — évite un self-join 11M × 11M en JSONB extraction qui mettait >10 min.
+    """
+    return conn.execute(
         text("""
+            WITH nnt_lookup AS (
+                SELECT (external_ids->>'nnt') AS nnt,
+                       MIN(publication_id) AS publication_id
+                FROM source_publications
+                WHERE publication_id IS NOT NULL
+                  AND external_ids ? 'nnt'
+                GROUP BY (external_ids->>'nnt')
+            )
             UPDATE source_publications sp
-            SET publication_id = donor.publication_id
-            FROM source_publications donor
+            SET publication_id = nl.publication_id
+            FROM nnt_lookup nl
             WHERE sp.publication_id IS NULL
-              AND donor.publication_id IS NOT NULL
               AND sp.external_ids ? 'nnt'
-              AND donor.external_ids ? 'nnt'
-              AND (sp.external_ids ->> 'nnt') = (donor.external_ids ->> 'nnt')
+              AND (sp.external_ids ->> 'nnt') = nl.nnt
         """)
     ).rowcount
 
-    # hal_id : orphan peut matcher (a) une SP HAL native via `source_id`,
-    # ou (b) une SP cross-source qui a `hal_id` dans son external_ids
-    # (posé par les normalizers OpenAlex/ScanR). Cf. `find_by_hal_id`.
-    n_hal_id = conn.execute(
+
+def bulk_link_orphans_by_hal_id(conn: Connection) -> int:
+    """Rattache les orphelins par hal_id.
+
+    Deux paths de donor (cf. `PublicationRepository.find_by_hal_id`) :
+    SP HAL native via `source_id`, OU SP cross-source via
+    `external_ids->>'hal_id'`. Unifiés dans une CTE de lookup matérialisée.
+    """
+    return conn.execute(
         text("""
+            WITH hal_id_lookup AS (
+                SELECT key, MIN(publication_id) AS publication_id
+                FROM (
+                    SELECT source_id AS key, publication_id
+                    FROM source_publications
+                    WHERE source = 'hal' AND publication_id IS NOT NULL
+                    UNION ALL
+                    SELECT external_ids->>'hal_id' AS key, publication_id
+                    FROM source_publications
+                    WHERE publication_id IS NOT NULL
+                      AND external_ids ? 'hal_id'
+                ) u
+                WHERE key IS NOT NULL
+                GROUP BY key
+            )
             UPDATE source_publications sp
-            SET publication_id = donor.publication_id
-            FROM source_publications donor
+            SET publication_id = hl.publication_id
+            FROM hal_id_lookup hl
             WHERE sp.publication_id IS NULL
-              AND donor.publication_id IS NOT NULL
               AND sp.external_ids ? 'hal_id'
-              AND (
-                  (donor.source = 'hal' AND (sp.external_ids ->> 'hal_id') = donor.source_id)
-                  OR (
-                      donor.external_ids ? 'hal_id'
-                      AND (sp.external_ids ->> 'hal_id') = (donor.external_ids ->> 'hal_id')
-                  )
-              )
+              AND (sp.external_ids ->> 'hal_id') = hl.key
         """)
     ).rowcount
-
-    return BulkLinkCounts(by_doi=n_doi, by_nnt=n_nnt, by_hal_id=n_hal_id)
 
 
 def fetch_thesis_primary_author(conn: Connection, publication_id: int) -> tuple[str, str] | None:
@@ -184,8 +199,14 @@ class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
     ) -> list[SourcePublicationRow]:
         return fetch_orphan_in_perimeter_source_publications(conn)
 
-    def bulk_link_remaining_orphans(self, conn: Connection) -> BulkLinkCounts:
-        return bulk_link_remaining_orphans(conn)
+    def bulk_link_orphans_by_doi(self, conn: Connection) -> int:
+        return bulk_link_orphans_by_doi(conn)
+
+    def bulk_link_orphans_by_nnt(self, conn: Connection) -> int:
+        return bulk_link_orphans_by_nnt(conn)
+
+    def bulk_link_orphans_by_hal_id(self, conn: Connection) -> int:
+        return bulk_link_orphans_by_hal_id(conn)
 
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int

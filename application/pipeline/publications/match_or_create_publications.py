@@ -11,6 +11,7 @@ L'orchestrateur dépend du port `PublicationsMatchOrCreateQueries`. Le point d'e
 """
 
 import logging
+import time
 from typing import Literal
 
 from sqlalchemy import Connection
@@ -254,19 +255,37 @@ def run(
         )
 
         # ── Phase B : rattachement set-based des orphelins hors-périmètre ──
-        # 3 UPDATEs SQL bulk (DOI / NNT / hal_id). Bénéficie des publications
-        # créées en Phase A. Pas de création (gated par in_perimeter).
+        # 3 UPDATEs SQL bulk (DOI / NNT / hal_id), exécutés séparément avec
+        # commit + log entre chaque pour granularité d'observabilité.
+        # Bénéficie des publications créées en Phase A. Pas de création
+        # (gated par in_perimeter).
         if dry_run:
             logger.info("Phase B (bulk link hors-périmètre) : skipped (dry-run)")
         else:
-            bulk = queries.bulk_link_remaining_orphans(conn)
+            logger.info("Phase B step 1/3 : rattachement par DOI...")
+            t0 = time.perf_counter()
+            n_doi = queries.bulk_link_orphans_by_doi(conn)
             conn.commit()
+            logger.info("  → %d rattachées (%.1fs)", n_doi, time.perf_counter() - t0)
+
+            logger.info("Phase B step 2/3 : rattachement par NNT...")
+            t0 = time.perf_counter()
+            n_nnt = queries.bulk_link_orphans_by_nnt(conn)
+            conn.commit()
+            logger.info("  → %d rattachées (%.1fs)", n_nnt, time.perf_counter() - t0)
+
+            logger.info("Phase B step 3/3 : rattachement par hal_id...")
+            t0 = time.perf_counter()
+            n_hal_id = queries.bulk_link_orphans_by_hal_id(conn)
+            conn.commit()
+            logger.info("  → %d rattachées (%.1fs)", n_hal_id, time.perf_counter() - t0)
+
             logger.info(
                 "Phase B terminée : %d rattachées (DOI=%d, NNT=%d, hal_id=%d)",
-                bulk.total,
-                bulk.by_doi,
-                bulk.by_nnt,
-                bulk.by_hal_id,
+                n_doi + n_nnt + n_hal_id,
+                n_doi,
+                n_nnt,
+                n_hal_id,
             )
 
         # ── Phase 2 : refresh des publications stale ──
