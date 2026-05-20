@@ -1,15 +1,30 @@
-"""Pure functions de parsing pour l'extraction WoS.
+"""Constantes et helpers purs pour l'extraction WoS.
 
-Vit à côté de `extract_wos.py` (wiring HTTP) et `fetch_missing_doi.py`
-(adapter async). Mutualise les helpers de parsing qui étaient
-dupliqués entre ces deux fichiers (`extract_ut`, `extract_doi`).
+Tout ce qui peut être consommé par l'orchestrateur applicatif sans
+toucher à `infrastructure` : timing de rate-limit, construction de
+requête WoS Advanced Search, parsing des records, filtrage des DOIs
+non indexés.
 
-Ne fait aucun I/O.
+L'adapter HTTP (`PgWosExtractAdapter`) importe ces helpers ; la
+constante `WOS_PER_PAGE` qui paramètre l'URL Solr reste côté
+`infrastructure.sources.api_limits`.
 """
 
 from __future__ import annotations
 
 import re
+from typing import Any
+
+# ── Rate-limit ─────────────────────────────────────────────────────
+
+WOS_DELAY = 1.0
+"""Pause entre deux requêtes consécutives à WoS (s).
+
+API Clarivate instable : 1 req/s par marge de sécurité.
+"""
+
+
+# ── Requête WoS Advanced Search ───────────────────────────────────
 
 
 def build_query(year: int, affiliations: list[str]) -> str:
@@ -25,7 +40,10 @@ def build_query(year: int, affiliations: list[str]) -> str:
     return f"OG=({orgs}) AND PY=({year})"
 
 
-def extract_ut(rec: dict) -> str:
+# ── Parsing de records ─────────────────────────────────────────────
+
+
+def extract_ut(rec: dict[str, Any]) -> str:
     """Extrait le WoS UID (ex: `WOS:000819841500009`).
 
     Le champ est obligatoire dans la réponse WoS — `KeyError` si absent
@@ -34,7 +52,7 @@ def extract_ut(rec: dict) -> str:
     return rec["UID"]
 
 
-def get_records(data: dict) -> list[dict]:
+def get_records(data: dict[str, Any]) -> list[dict[str, Any]]:
     """Extrait la liste de records depuis la réponse API WoS.
 
     Chemin profond `data.Data.Records.records.REC`. Retourne `[]` si
@@ -46,7 +64,7 @@ def get_records(data: dict) -> list[dict]:
         return []
 
 
-def get_records_found(data: dict) -> int:
+def get_records_found(data: dict[str, Any]) -> int:
     """Extrait le nombre total de records trouvés depuis la réponse API WoS."""
     try:
         return data["QueryResult"]["RecordsFound"]
@@ -54,7 +72,7 @@ def get_records_found(data: dict) -> int:
         return 0
 
 
-def extract_doi(rec: dict) -> str | None:
+def extract_doi(rec: dict[str, Any]) -> str | None:
     """Extrait le DOI depuis les identifiants WoS, ou `None`.
 
     L'API WoS retourne les identifiants à un emplacement profond
@@ -100,7 +118,7 @@ def clean_doi_for_wos(doi: str) -> str | None:
     - DOI contenant `"` ou newline (casserait la requête WoS).
 
     Sinon, retourne le DOI nettoyé (préfixes URL retirés en amont via
-    `infrastructure.sources.common.clean_doi` ; cette fonction se
+    `domain.publications.identifiers.clean_doi` ; cette fonction se
     concentre sur les filtres spécifiques à WoS).
     """
     doi = re.split(r"[&?]", doi.strip())[0]
