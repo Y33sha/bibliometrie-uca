@@ -219,10 +219,10 @@ omit = [
     # Debug scripts dans interfaces/cli/debug/
     "interfaces/cli/debug/*",
     # Wiring HTTP des adapters sources : pure functions de parsing
-    # extraites dans `<source>/parsing.py` (couvert par tests unit) ;
-    # ce qui reste = httpx + pagination + sleep + subclass
-    # SourceExtractor. Faible ROI sur tests fixtures (cf.
-    # docs/chantiers/CODE_couverture-tests.md).
+    # extraites dans `domain/sources/<source>_extract.py` (couvert par
+    # tests unit) ; ce qui reste = httpx + pagination + sleep + impl
+    # du port `<Source>ExtractAdapter`. Faible ROI sur tests fixtures
+    # (cf. docs/chantiers/CODE_couverture-tests.md).
     "infrastructure/sources/hal/extract_hal.py",
     "infrastructure/sources/hal/fetch_missing_hal_id.py",
     "infrastructure/sources/hal/fetch_missing_doi.py",

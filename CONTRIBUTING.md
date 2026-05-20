@@ -40,33 +40,37 @@ Côté base, ajouter la valeur à l'enum Postgres `source_type` via une migratio
 
 ### 2. Extractor : API → `staging`
 
-Créer `infrastructure/sources/<source>/extract_<source>.py` héritant de `SourceExtractor` (cf. [`infrastructure/sources/base.py`](infrastructure/sources/base.py)). Le template gère parsing CLI, cycle connexion, chargement `existing_ids`, gestion des erreurs HTTP/interruption, logs.
+L'extraction suit le pattern hexagonal en 5 morceaux :
+
+- `domain/sources/<source>_extract.py` — constantes + helpers purs (parsing, requête, rate-limit)
+- `application/ports/pipeline/extract/<source>.py` — `Protocol` `<Source>ExtractAdapter` + dataclass `<Source>ExtractConfig`
+- `application/pipeline/extract/extract_<source>.py` — orchestrateur (`<Source>Extractor` héritant de `SourceExtractor` de [`application/pipeline/extract/base.py`](application/pipeline/extract/base.py))
+- `infrastructure/sources/<source>/extract_<source>.py` — adapter Postgres (`Pg<Source>ExtractAdapter`) qui implémente le port (HTTP + SQL)
+- `interfaces/cli/pipeline/extract_<source>.py` — entry point CLI (thin wrapper)
 
 ```python
-from domain.pipeline_metrics import PhaseMetrics
-from infrastructure.observability.log import setup_logger
-from infrastructure.sources.base import SourceExtractor, run_extractor
+# application/pipeline/extract/extract_ma_source.py
+from application.pipeline.extract.base import SourceExtractor
+from application.ports.pipeline.extract.ma_source import MaSourceExtractAdapter, MaSourceExtractConfig
 
-class MaSourceExtractor(SourceExtractor):
+class MaSourceExtractor(SourceExtractor[MaSourceExtractConfig]):
     SOURCE = "ma_source"
     DESCRIPTION = "Extraction MaSource → staging"
 
-    def load_config(self, cur):
-        # Lire URL/API key depuis la table `config`.
-        ...
+    def __init__(self, conn, logger, staging, adapter):
+        super().__init__(conn, logger, staging)
+        self._adapter = adapter
+
+    def load_config(self, conn):
+        return self._adapter.load_config(conn)
 
     def extract_all(self, args, config, existing_ids) -> PhaseMetrics:
-        stats = PhaseMetrics()
-        # Itération spécifique (pagination, filtres, …).
-        # Insérer en staging(source, source_id, raw_data).
-        return stats
-
-if __name__ == "__main__":
-    logger = setup_logger("extract_ma_source", "infrastructure/sources/ma_source/logs")
-    run_extractor(MaSourceExtractor, logger)
+        # Boucle d'itération spécifique ; appelle `adapter.fetch_page`,
+        # `adapter.insert_batch` / `adapter.upsert_*`.
+        ...
 ```
 
-Modèle à copier : [`infrastructure/sources/theses/extract_theses.py`](infrastructure/sources/theses/extract_theses.py) (structure simple, pas de spécificité HAL).
+Modèles à copier : [`application/pipeline/extract/extract_theses.py`](application/pipeline/extract/extract_theses.py) (structure simple, pas de spécificité HAL) avec [`application/ports/pipeline/extract/theses.py`](application/ports/pipeline/extract/theses.py) et [`infrastructure/sources/theses/extract_theses.py`](infrastructure/sources/theses/extract_theses.py).
 
 ### 3. Fetch missing DOI : hydratation cross-source
 
