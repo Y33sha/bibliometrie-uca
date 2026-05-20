@@ -83,14 +83,14 @@ Transforme les données brutes (staging) en tables structurées par source (`sou
 
 ```mermaid
 flowchart LR
-    A[API HAL]-->B[staging]-->|normalize_hal|G@{ shape: processes, label: "source_publications, source_authorships, addresses, source_authorship_addresses" }
-    C[API OpenAlex]-->B-->|normalize_openalex|G
-    E[API WOS]-->B-->|normalize_wos|G
-    K[API ScanR]-->B-->|normalize_scanr|G
-    L[API theses.fr]-->B-->|normalize_theses|G
-    M[API CrossRef]-->B-->|normalize_crossref|G
+    B[staging]-->|normalize_*|G
+    subgraph G[tables sources]
+        direction TB
+        C[source_documents]---D[source_authorships]
+    end
+    D---|source_authorship_addresses|F[addresses]
     classDef new  fill:#bbf
-    class G new;
+    class C,D,F new;
 ```
 
 ### <span id="affiliations"></span>`affiliations` : Résolution et propagation

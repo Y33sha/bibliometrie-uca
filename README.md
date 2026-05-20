@@ -226,7 +226,5 @@ d'import entre couches (vérifiées par import-linter en pre-commit + CI).
 
 Les chantiers en cours et terminés sont documentés dans
 [docs/chantiers/](docs/chantiers/). Chaque fiche porte un préfixe :
-`METIER_` (changement de comportement), `DATA_` (révision de schéma)
-ou `CODE_` (refactor / chantier qualité). Les fiches datées
-correspondent aux chantiers terminés ; les fiches non datées sont en
-cours.
+`METIER_` (nouvelles fonctionnalités, changements de comportement), `DATA_` (révision du schéma ou du traitement des données) ou `CODE_` (refactor / chantier qualité). Les fiches datées
+correspondent aux chantiers terminés ; les fiches non datées sont en cours.

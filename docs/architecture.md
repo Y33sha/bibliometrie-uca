@@ -12,7 +12,7 @@ système est `application/` (use-cases et orchestrateurs), qui
 dépend de `domain/` (noyau pur). Autour de ce cœur, deux bandes
 périphériques d'**adapters frères** qui ne se connaissent pas :
 `interfaces/` (adapters entrants — HTTP, CLI) et `infrastructure/`
-(adapters sortants — DB, APIs externes, logs, settings). La
+(adapters sortants — DB, APIs externes, logs). La
 neutralité entre ces deux bandes repose sur les **ports**
 (`Protocol`) définis dans `application/ports/`, qui forment une zone
 neutre dont dépendent tous les autres modules.

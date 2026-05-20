@@ -27,7 +27,6 @@
 * [ ] logs pas clairs dans l'extracteur hal: "mode incrémental (0 orphelins vs 1 pages full-fetch)" => quézaco?; + le mode full-fetch pour PRES_CLERMONT est catastrophiquement lent. Ajouter une condition nb individual vs nb total? ->> **CODE_observabilite-robustesse-pipeline.md**
 * autre log pas clair: pipeline: → "Lancer build_authorships. py pour propager in_perimeter/structure_ids" (?) (juste avant [INFO] pipeline: ✓ create_persons_from_source_authorships terminé en 103.6s) ->> **CODE_observabilite-robustesse-pipeline.md**
 * [ ] extracteur hal : manque indication sur documents réimportés et mis à jour: harmoniser le logging entre sources (et les tailles de batch) ->> **CODE_observabilite-robustesse-pipeline.md**
-* [ ] phase persons, formule pas claire: Promotion ignorée pour person_id=9986, orcid='0009-0005-5459-9885' : Identifiant orcid='0009-0005-5459-9885' déjà attribué à person_id=4768 avec statut 'pending' ; impossible d'attribuer à person_id=9986. + ne pas signaler quand person_id cible = person_id existant!
 ## Code
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
@@ -37,6 +36,7 @@
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup de résultats ScanR sont rejetés en phase "affiliations" => auditer
+* [ ] normalisation des titres: supprimer les balises mml ou html
 ## Sujets
 * [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation manuelle des sujets? / ajouter seuil de score de pertinence? / algos pour évaluer pertinence (co-occurrences suspectes, NLP...)
 ## Explorer autres sources possibles
@@ -121,6 +121,7 @@
 * stats en compte fractionnaire vs compte entier
 * collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement: contrôler seulement cohérence entre sources et corriger quand incohérent?
 * [ ] brevets? INPI?
+* audit log: uniformiser les types d'action qui génèrent un log ou pas.
 
 # Pas nécessaire de le régler, du moment qu'on le documente
 * [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer) => pas urgent, pas d'imports csv à terme en prod
