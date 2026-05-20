@@ -16,7 +16,13 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.sources.common import compute_hash
-from infrastructure.sources.openalex.extract_openalex import insert_batch
+from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
+
+_adapter = PgOpenalexExtractAdapter(base_url="https://api.openalex.org/works")
+
+
+def insert_batch(conn, works):
+    return _adapter.insert_batch(conn, works)
 
 
 def _make_work(openalex_id, n_authors, title="Test Publication", cited_by_count=10):
@@ -51,16 +57,6 @@ def _make_work(openalex_id, n_authors, title="Test Publication", cited_by_count=
         "cited_by_count": cited_by_count,
         "biblio": {"volume": "1", "issue": "1"},
         "is_retracted": False,
-    }
-
-
-def _bulk_entry(work):
-    """Entrée de batch telle que produite par `extract_year`."""
-    return {
-        "source_id": work["id"].replace("https://openalex.org/", ""),
-        "doi": work["doi"].replace("https://doi.org/", ""),
-        "raw_data": work,
-        "raw_hash": compute_hash(work),
     }
 
 
@@ -106,7 +102,7 @@ class TestRawHashUpsert:
     def test_new_row(self, sa_sync_conn):
         """Insert nouveau via bulk → raw_data + raw_hash posés, processed=FALSE."""
         work = _make_work("W001", 50)
-        insert_batch(sa_sync_conn, [_bulk_entry(work)])
+        insert_batch(sa_sync_conn, [work])
 
         row = _get_staging(sa_sync_conn, "W001")
         assert len(row.raw_data["authorships"]) == 50
@@ -116,12 +112,12 @@ class TestRawHashUpsert:
     def test_bulk_unchanged_no_op(self, sa_sync_conn):
         """Bulk identique → raw_data inchangé, processed préservé."""
         work = _make_work("W002", 50)
-        insert_batch(sa_sync_conn, [_bulk_entry(work)])
+        insert_batch(sa_sync_conn, [work])
         sa_sync_conn.execute(
             text("UPDATE staging SET processed=TRUE WHERE source='openalex' AND source_id='W002'")
         )
 
-        updated = insert_batch(sa_sync_conn, [_bulk_entry(work)])
+        updated = insert_batch(sa_sync_conn, [work])
 
         row = _get_staging(sa_sync_conn, "W002")
         assert row.processed is True
@@ -130,13 +126,13 @@ class TestRawHashUpsert:
     def test_bulk_changed_replaces(self, sa_sync_conn):
         """Bulk modifié → raw_data remplacé, processed=FALSE."""
         work = _make_work("W003", 50, title="Original")
-        insert_batch(sa_sync_conn, [_bulk_entry(work)])
+        insert_batch(sa_sync_conn, [work])
         sa_sync_conn.execute(
             text("UPDATE staging SET processed=TRUE WHERE source='openalex' AND source_id='W003'")
         )
 
         new_work = _make_work("W003", 60, title="Updated")
-        updated = insert_batch(sa_sync_conn, [_bulk_entry(new_work)])
+        updated = insert_batch(sa_sync_conn, [new_work])
 
         row = _get_staging(sa_sync_conn, "W003")
         assert row.raw_data["title"] == "Updated"
@@ -158,7 +154,7 @@ class TestRefetchPreservation:
             processed=True,
         )
 
-        updated = insert_batch(sa_sync_conn, [_bulk_entry(bulk_payload)])
+        updated = insert_batch(sa_sync_conn, [bulk_payload])
 
         row = _get_staging(sa_sync_conn, "W100")
         assert len(row.raw_data["authorships"]) == 150
@@ -180,7 +176,7 @@ class TestRefetchPreservation:
         )
 
         bulk_payload_v2 = _make_work("W101", 100, title="Updated", cited_by_count=42)
-        updated = insert_batch(sa_sync_conn, [_bulk_entry(bulk_payload_v2)])
+        updated = insert_batch(sa_sync_conn, [bulk_payload_v2])
 
         row = _get_staging(sa_sync_conn, "W101")
         # raw_data écrasé par la version tronquée v2

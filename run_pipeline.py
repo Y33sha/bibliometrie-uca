@@ -865,14 +865,21 @@ def _run_extract_hal(
 def _run_extract_openalex(
     *, mode: str = "full", year: int | None = None, since: str | None = None
 ) -> PhaseMetrics:
+    from application.pipeline.extract.extract_openalex import OpenalexExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.openalex.extract_openalex import OpenalexExtractor
+    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.sources.config import get_api_base_urls
+    from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
 
     log.info("▶ extract_openalex")
     t0 = time.time()
-    conn = get_sync_engine().connect()
+    engine = get_sync_engine()
+    with engine.connect() as bootstrap:
+        base_url = get_api_base_urls(bootstrap).get("openalex", "https://api.openalex.org/works")
+    conn = engine.connect()
+    adapter = PgOpenalexExtractAdapter(base_url=base_url)
     try:
-        metrics = OpenalexExtractor(conn, log).run_as_phase(
+        metrics = OpenalexExtractor(conn, log, PgStagingQueries(), adapter).run_as_phase(
             _extractor_args(mode=mode, year=year, since=since)
         )
     finally:
