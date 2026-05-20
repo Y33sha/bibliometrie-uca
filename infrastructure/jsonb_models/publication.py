@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from application.ports.api.publications_queries import EcoleDoctorale, PartenaireThese
-from domain.publication import NNT, HALId
+from domain.publications.identifiers import NNT, HALId
 
 # Re-export pour compat des tests / importeurs historiques.
 __all__ = [

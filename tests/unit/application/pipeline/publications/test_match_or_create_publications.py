@@ -155,13 +155,6 @@ class _PubByDoiStub:
         self.title_normalized = title_normalized
 
 
-class _ThesisCandidate:
-    """Stub d'une publication candidate pour les matchs thèse par titre+année."""
-
-    def __init__(self, id: int) -> None:
-        self.id = id
-
-
 # ── _match_thesis_by_title_year ──────────────────────────────────
 
 
@@ -218,7 +211,7 @@ class TestMatchThesisByTitleYear:
         """Quand l'auteur du source_publication est inconnu, le 1er candidat passe sans vérif (préserve le comportement historique)."""
         queries = MagicMock()
         repo = MagicMock()
-        repo.find_thesis_by_title.return_value = [_ThesisCandidate(42)]
+        repo.find_thesis_by_title.return_value = [42]
         queries.fetch_thesis_primary_author_from_source_publication.return_value = None
 
         result = _match_thesis_by_title_year(
@@ -238,7 +231,7 @@ class TestMatchThesisByTitleYear:
         """Itère sur les candidats jusqu'à trouver un auteur compatible."""
         queries = MagicMock()
         repo = MagicMock()
-        repo.find_thesis_by_title.return_value = [_ThesisCandidate(10), _ThesisCandidate(20)]
+        repo.find_thesis_by_title.return_value = [10, 20]
         queries.fetch_thesis_primary_author_from_source_publication.return_value = (
             "Doe",
             "Jane",
@@ -269,7 +262,7 @@ class TestMatchThesisByTitleYear:
     def test_all_incompatible_returns_none(self, monkeypatch):
         queries = MagicMock()
         repo = MagicMock()
-        repo.find_thesis_by_title.return_value = [_ThesisCandidate(10), _ThesisCandidate(20)]
+        repo.find_thesis_by_title.return_value = [10, 20]
         queries.fetch_thesis_primary_author_from_source_publication.return_value = (
             "Doe",
             "Jane",
@@ -409,7 +402,7 @@ class TestProcessDocumentNntMatch:
         queries = MagicMock()
         repo = MagicMock()
         repo.find_by_doi.return_value = None
-        repo.find_by_nnt.return_value = MagicMock(id=55)
+        repo.find_by_nnt.return_value = 55
         repo.find_by_hal_id.return_value = None
 
         result = process_document(
@@ -459,7 +452,7 @@ class TestProcessDocumentThesisMetadata:
         repo.find_by_doi.return_value = None
         repo.find_by_nnt.return_value = None
         repo.find_by_hal_id.return_value = None
-        repo.find_thesis_by_title.return_value = [_ThesisCandidate(123)]
+        repo.find_thesis_by_title.return_value = [123]
         queries.fetch_thesis_primary_author_from_source_publication.return_value = None
         queries.fetch_thesis_primary_author.return_value = None
 

@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.publication import clean_doi
+from domain.publications.identifiers import clean_doi
 from infrastructure.sources.common import compute_hash, get_cross_import_dois, get_existing_ids
 
 # ── compute_hash ─────────────────────────────────────────────────

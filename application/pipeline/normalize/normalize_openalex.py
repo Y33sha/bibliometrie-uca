@@ -33,7 +33,7 @@ from application.ports.repositories.publisher_repository import PublisherReposit
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
-from domain.publication import clean_doi
+from domain.publications.identifiers import clean_doi
 from domain.sources.openalex import (
     correct_openalex_doc_type,
     extract_external_ids_from_urls,

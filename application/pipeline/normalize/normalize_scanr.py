@@ -32,8 +32,8 @@ from application.publishers import find_or_create_publisher
 from domain.json_types import JsonValue
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
-from domain.publication import clean_doi
 from domain.publications.authorship_roles import map_role
+from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.scanr import (
     derive_scanr_oa_status,

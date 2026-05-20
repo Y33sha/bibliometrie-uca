@@ -8,10 +8,10 @@ import pytest
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.repositories.publication_repository import PubByDoi
 from application.publications import (
     find_by_doi,
     find_by_nnt,
-    find_by_title,
     find_thesis_by_title,
     mark_distinct,
     merge_publications,
@@ -149,9 +149,7 @@ class TestFindByNnt:
             source_id="t-1",
             external_ids={"nnt": "2024UCAC0001"},
         )
-        result = find_by_nnt("2024UCAC0001", repo=repo)
-        assert result is not None
-        assert result.id == pub_id
+        assert find_by_nnt("2024UCAC0001", repo=repo) == pub_id
 
     def test_nnt_uppercased_for_lookup(self, sa_sync_conn, repo):
         pub_id = _insert_publication(sa_sync_conn, doc_type="thesis")
@@ -163,8 +161,7 @@ class TestFindByNnt:
             external_ids={"nnt": "2024UCAC0001"},
         )
         # Même en minuscules en entrée, trouve
-        result = find_by_nnt("2024ucac0001", repo=repo)
-        assert result is not None
+        assert find_by_nnt("2024ucac0001", repo=repo) == pub_id
 
 
 class TestFindByHalId:
@@ -199,24 +196,6 @@ class TestFindByHalId:
         assert repo.find_by_hal_id("hal-orphan") is None
 
 
-class TestFindByTitle:
-    def test_returns_none_on_missing_input(self, sa_sync_conn, repo):
-        assert find_by_title("", 2024, 1, repo=repo) is None
-        assert find_by_title("title", 2024, None, repo=repo) is None
-
-    def test_finds_by_title_year_journal(self, sa_sync_conn, repo):
-        j_id = _insert_journal(sa_sync_conn)
-        pub_id = _insert_publication(sa_sync_conn, title="My Paper", journal_id=j_id)
-        result = find_by_title("my paper", 2024, j_id, repo=repo)
-        assert result is not None
-        assert result.id == pub_id
-
-    def test_not_found_if_year_differs(self, sa_sync_conn, repo):
-        j_id = _insert_journal(sa_sync_conn)
-        _insert_publication(sa_sync_conn, title="X", pub_year=2023, journal_id=j_id)
-        assert find_by_title("x", 2024, j_id, repo=repo) is None
-
-
 class TestFindThesisByTitle:
     def test_returns_empty_on_missing_input(self, sa_sync_conn, repo):
         assert find_thesis_by_title("", 2024, repo=repo) == []
@@ -226,14 +205,12 @@ class TestFindThesisByTitle:
         """Ne retourne que les thèses."""
         _insert_publication(sa_sync_conn, title="A", pub_year=2024, doc_type="article")
         t_id = _insert_publication(sa_sync_conn, title="A", pub_year=2024, doc_type="thesis")
-        result = find_thesis_by_title("a", 2024, repo=repo)
-        assert [r.id for r in result] == [t_id]
+        assert find_thesis_by_title("a", 2024, repo=repo) == [t_id]
 
     def test_returns_multiple_candidates(self, sa_sync_conn, repo):
         t1 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
         t2 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
-        result = find_thesis_by_title("dup", 2024, repo=repo)
-        assert {r.id for r in result} == {t1, t2}
+        assert set(find_thesis_by_title("dup", 2024, repo=repo)) == {t1, t2}
 
 
 # ── resolve_doi_conflict ───────────────────────────────────────────
@@ -242,8 +219,6 @@ class TestFindThesisByTitle:
 class TestResolveDoiConflict:
     def test_chapter_vs_existing_book_drops_doi(self, sa_sync_conn, repo):
         """Chapitre avec DOI qui pointe vers livre : DOI retiré du chapitre."""
-        from application.publications import PubByDoi
-
         existing = PubByDoi(id=1, doc_type="book", title_normalized="livre")
 
         doi, merge_id = resolve_doi_conflict(
@@ -254,8 +229,6 @@ class TestResolveDoiConflict:
 
     def test_book_vs_existing_chapter_strips_doi_from_chapter(self, sa_sync_conn, repo):
         """Livre avec DOI existant sur un chapitre : DOI retiré du chapitre, livre garde."""
-        from application.publications import PubByDoi
-
         existing_id = _insert_publication(
             sa_sync_conn, title="Chapitre", doc_type="book_chapter", doi="10.x/book"
         )
@@ -271,8 +244,6 @@ class TestResolveDoiConflict:
 
     def test_two_chapters_different_titles_strip_both(self, sa_sync_conn, repo):
         """2 chapitres avec titres différents partageant un DOI : les 2 perdent le DOI."""
-        from application.publications import PubByDoi
-
         existing_id = _insert_publication(
             sa_sync_conn, title="C1", doc_type="book_chapter", doi="10.x/shared"
         )
@@ -290,8 +261,6 @@ class TestResolveDoiConflict:
 
     def test_two_chapters_same_title_merges(self, sa_sync_conn, repo):
         """2 chapitres avec même titre + DOI → fusion."""
-        from application.publications import PubByDoi
-
         existing = PubByDoi(id=42, doc_type="book_chapter", title_normalized="same")
 
         doi, merge_id = resolve_doi_conflict(
@@ -302,8 +271,6 @@ class TestResolveDoiConflict:
 
     def test_compatible_types_merge(self, sa_sync_conn, repo):
         """Types compatibles (ex: 2 articles) → fusion normale."""
-        from application.publications import PubByDoi
-
         existing = PubByDoi(id=42, doc_type="article", title_normalized="a")
         doi, merge_id = resolve_doi_conflict("10.x/a", "article", "a", existing, repo=repo)
         assert doi == "10.x/a"

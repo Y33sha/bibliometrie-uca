@@ -44,7 +44,7 @@ from application.ports.repositories.publisher_repository import PublisherReposit
 from application.publishers import find_or_create_publisher
 from domain.json_types import JsonValue
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
-from domain.publication import clean_doi
+from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.crossref import (
     extract_crossref_meta,

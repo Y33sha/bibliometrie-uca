@@ -2,20 +2,12 @@
 Service Publications — accès exclusif en écriture à la table `publications`.
 
 Toute création, mise à jour ou recherche de publication passe par ce module. Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions au lieu de faire du SQL direct.
-
-Les fonctions find_by_* retournent des namedtuples pour un accès par nom indépendant du type de curseur (tuple ou dict_row).
 """
 
 from application.audit import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.publication_repository import PublicationRepository
+from application.ports.repositories.publication_repository import PubByDoi, PublicationRepository
 from domain.errors import NotFoundError
-from domain.publication import (
-    PubByDoi,
-    PubByNnt,
-    PubByTitle,
-    PubThesisCandidate,
-)
 from domain.publications.aggregation import (
     first_non_null,
 )
@@ -28,36 +20,15 @@ from domain.publications.deduplication import (
 from domain.publications.identifiers import DOI
 from domain.sources import SOURCE_PRIORITY
 
-# Re-export des namedtuples pour les call sites historiques (scripts,
-# processing) qui font `from application.publications import PubByDoi`.
-__all__ = [
-    "PubByDoi",
-    "PubByNnt",
-    "PubByTitle",
-    "PubThesisCandidate",
-    # Fonctions publiques du service (ajoutées au fur et à mesure).
-]
-
 
 def find_by_doi(doi: str, *, repo: PublicationRepository) -> PubByDoi | None:
     """Cherche une publication par DOI (case-insensitive)."""
     return repo.find_by_doi(doi)
 
 
-def find_by_nnt(nnt: str, *, repo: PublicationRepository) -> PubByNnt | None:
+def find_by_nnt(nnt: str, *, repo: PublicationRepository) -> int | None:
     """Cherche une publication via NNT (source_publications.external_ids)."""
     return repo.find_by_nnt(nnt)
-
-
-def find_by_title(
-    title_normalized: str,
-    pub_year: int,
-    journal_id: int,
-    *,
-    repo: PublicationRepository,
-) -> PubByTitle | None:
-    """Cherche une publication par titre normalisé + année + journal."""
-    return repo.find_by_title(title_normalized, pub_year, journal_id)
 
 
 def find_thesis_by_title(
@@ -65,7 +36,7 @@ def find_thesis_by_title(
     pub_year: int,
     *,
     repo: PublicationRepository,
-) -> list[PubThesisCandidate]:
+) -> list[int]:
     """Cherche des thèses par titre normalisé + année (sans journal_id)."""
     return repo.find_thesis_by_title(title_normalized, pub_year)
 
