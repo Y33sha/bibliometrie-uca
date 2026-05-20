@@ -223,8 +223,9 @@ def run(
     dry_run: bool = False,
 ) -> None:
     try:
-        docs = queries.fetch_orphan_source_publications(conn)
-        logger.info("%d source_publications orphelins (tous périmètres)", len(docs))
+        # ── Phase A : orphelins in_perimeter (création ou rattachement) ──
+        docs = queries.fetch_orphan_in_perimeter_source_publications(conn)
+        logger.info("Phase A : %d source_publications orphelins in_perimeter", len(docs))
 
         counts: dict[Outcome, int] = {
             "created": 0,
@@ -241,9 +242,37 @@ def run(
             if (i + 1) % 500 == 0:
                 if not dry_run:
                     conn.commit()
-                logger.info("  %d/%d traités...", i + 1, len(docs))
+                logger.info("  Phase A : %d/%d traités...", i + 1, len(docs))
 
-        # Passe 2 : refresh des publications stale (au moins un source_publication modifié depuis le dernier refresh canonique). Couvre les re-traitements des normalizers qui mettent à jour des méta sans toucher au rattachement.
+        if not dry_run:
+            conn.commit()
+        logger.info(
+            "Phase A terminée : %d créées, %d rattachées, %d sans métadonnées",
+            counts["created"],
+            counts["linked"],
+            counts["skipped_no_metadata"],
+        )
+
+        # ── Phase B : rattachement set-based des orphelins hors-périmètre ──
+        # 3 UPDATEs SQL bulk (DOI / NNT / hal_id). Bénéficie des publications
+        # créées en Phase A. Pas de création (gated par in_perimeter).
+        if dry_run:
+            logger.info("Phase B (bulk link hors-périmètre) : skipped (dry-run)")
+        else:
+            bulk = queries.bulk_link_remaining_orphans(conn)
+            conn.commit()
+            logger.info(
+                "Phase B terminée : %d rattachées (DOI=%d, NNT=%d, hal_id=%d)",
+                bulk.total,
+                bulk.by_doi,
+                bulk.by_nnt,
+                bulk.by_hal_id,
+            )
+
+        # ── Phase 2 : refresh des publications stale ──
+        # Au moins un source_publication modifié depuis le dernier refresh
+        # canonique (couvre les re-traitements des normalizers + les nouveaux
+        # rattachements effectués en Phase A/B).
         stale_ids = queries.fetch_stale_publication_ids(conn)
         logger.info("%d publications stale à rafraîchir", len(stale_ids))
         refreshed = 0
@@ -269,14 +298,7 @@ def run(
             conn.rollback()
         else:
             conn.commit()
-            logger.info(
-                "Terminé : %d créées, %d rattachées (dont hors-périmètre), %d sans métadonnées, %d hors-périmètre sans match, %d rafraîchies",
-                counts["created"],
-                counts["linked"],
-                counts["skipped_no_metadata"],
-                counts["skipped_no_perimeter"],
-                refreshed,
-            )
+            logger.info("Terminé : %d publications rafraîchies", refreshed)
 
     except Exception:
         conn.rollback()
