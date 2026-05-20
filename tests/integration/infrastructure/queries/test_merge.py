@@ -32,7 +32,7 @@ def _create_sd(conn, source, source_id, pub_id, external_ids=None):
             "source": source,
             "source_id": source_id,
             "pub_id": pub_id,
-            "external_ids": external_ids,
+            "external_ids": external_ids or {},
         },
     ).scalar_one()
 

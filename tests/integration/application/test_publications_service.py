@@ -85,7 +85,7 @@ def _insert_source_publication(
             "source_id": source_id,
             "title": title,
             "publication_id": publication_id,
-            "external_ids": external_ids,
+            "external_ids": external_ids or {},
         },
     ).scalar_one()
 
