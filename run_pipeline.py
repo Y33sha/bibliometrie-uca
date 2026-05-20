@@ -990,14 +990,16 @@ def _run_refetch_truncated() -> PhaseMetrics:
 
 
 def _run_fetch_missing_hal_id(*, mode: str = "full") -> PhaseMetrics:
+    from application.pipeline.extract.fetch_missing_hal_id import fetch_missing_hal_ids
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.hal.fetch_missing_hal_id import fetch_missing_hal_ids
+    from infrastructure.sources.hal.fetch_missing_hal_id import PgHalFetchMissingAdapter
 
     log.info("▶ fetch_missing_hal_id --mode %s", mode)
     t0 = time.time()
     conn = get_sync_engine().connect()
+    adapter = PgHalFetchMissingAdapter()
     try:
-        metrics = asyncio.run(fetch_missing_hal_ids(conn, mode=mode))
+        metrics = asyncio.run(fetch_missing_hal_ids(conn, adapter, log, mode=mode))
     finally:
         conn.close()
     log.info(
