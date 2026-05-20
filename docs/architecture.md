@@ -122,9 +122,12 @@ Contenu, organisé par concept métier :
   - Enums : `StructureType`, `AttributionStatus` (statut d'un
     `PersonIdentifier`)
 - **Règles métier pures** : matching de personnes
-  (`domain/persons/matching.py`), fusion de publications
-  (`domain/publications/merge.py`, `deduplication.py`), validation
-  des relations structure (`domain/structures/relations.py`),
+  (`domain/persons/matching.py`), invariant de fusion de personnes
+  (`Person.can_merge_with` dans `domain/persons/person.py`),
+  déduplication et agrégation cross-source des publications
+  (`domain/publications/deduplication.py`, `aggregation.py`, méthode
+  `Publication.absorb` dans `domain/publications/publication.py`),
+  validation des relations structure (`domain/structures/relations.py`),
   `doc_types`, `authorship_roles`, `sources` (référentiel des 6
   sources).
 
