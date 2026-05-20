@@ -11,7 +11,7 @@ testables au sens où on entend ici.
 
 from __future__ import annotations
 
-from infrastructure.sources.common import clean_doi, compute_hash
+from infrastructure.sources.common import clean_doi
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params
 
 
@@ -28,19 +28,6 @@ def extract_openalex_id(work: dict) -> str:
 def extract_doi(work: dict) -> str | None:
     """Extrait le DOI nettoyé d'un work OpenAlex (sans préfixe URL)."""
     return clean_doi(work.get("doi"))
-
-
-def compute_meta_hash(raw_data: dict) -> str:
-    """Hash des métadonnées hors `authorships`.
-
-    Permet de détecter les changements de métadonnées (titre, OA status,
-    etc.) sans être perturbé par la troncature à 100 auteurs de l'API
-    bulk. Utilisé par `extract_openalex.insert_batch` pour décider
-    s'il faut écraser `raw_data` ou préserver une version plus complète
-    (cf. `refetch_truncated`).
-    """
-    filtered = {k: v for k, v in raw_data.items() if k != "authorships"}
-    return compute_hash(filtered)
 
 
 def build_params(

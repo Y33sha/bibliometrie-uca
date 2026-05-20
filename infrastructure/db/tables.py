@@ -874,9 +874,22 @@ staging = Table(
     Column("raw_data", JSONB, nullable=False),
     Column("processed", Boolean, server_default="false"),
     Column("imported_at", DateTime(timezone=True), server_default=func.now()),
-    Column("raw_hash", Text),
+    Column(
+        "raw_hash",
+        Text,
+        comment=(
+            "Empreinte md5 du payload tel qu'extrait de la source bulk. "
+            "Sert de clé de détection de changement à l'UPSERT (et "
+            "d'empreinte d'intégrité pour le chantier DATA_raw-data-store). "
+            "Cas particulier OpenAlex : `refetch_truncated` n'écrit PAS "
+            "`raw_hash` quand il complète les authorships d'une publication "
+            "tronquée à 100 — la ligne garde le hash du payload bulk pour "
+            "que le bulk suivant ne déclenche pas de réécriture inutile. "
+            "L'invariant `raw_hash = md5(raw_data)` est donc volontairement "
+            "rompu sur les lignes OpenAlex refetchées."
+        ),
+    ),
     Column("last_seen_at", DateTime(timezone=True), server_default=func.now()),
-    Column("meta_hash", Text),
     Column("not_found", Boolean, server_default="false"),
     Column("hal_collections", ARRAY(Text)),
     UniqueConstraint("source", "source_id", name="staging_source_source_id_key"),
