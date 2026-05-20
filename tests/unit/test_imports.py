@@ -10,6 +10,8 @@ import pytest
 
 MODULES = [
     "infrastructure.sources.hal.extract_hal",
+    "application.pipeline.extract.extract_hal",
+    "interfaces.cli.pipeline.extract_hal",
     "infrastructure.sources.hal.fetch_missing_hal_id",
     "infrastructure.sources.hal.fetch_missing_doi",
     "infrastructure.sources.openalex.extract_openalex",

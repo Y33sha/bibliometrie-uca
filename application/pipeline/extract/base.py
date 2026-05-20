@@ -26,14 +26,21 @@ import argparse
 import logging
 import sys
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import ClassVar
+from typing import ClassVar, Generic, TypeVar
 
 import requests
 from sqlalchemy import Connection
 
 from application.ports.pipeline.staging import StagingQueries
 from domain.pipeline_metrics import PhaseMetrics
+
+ConfigT = TypeVar("ConfigT")
+"""Type de la config chargée par `load_config`, propre à chaque source.
+
+Permet aux sous-classes de retourner une dataclass typée plutôt qu'un
+`dict[str, Any]` opaque. Le base class ne consomme jamais le contenu
+de la config — il la passe à `extract_all` qui sait l'interpréter.
+"""
 
 
 class ExtractionConfigError(Exception):
@@ -46,7 +53,7 @@ class ExtractionConfigError(Exception):
     """
 
 
-class SourceExtractor(ABC):
+class SourceExtractor(ABC, Generic[ConfigT]):
     """Template pour l'extraction API → staging.
 
     Points d'override obligatoires :
@@ -77,12 +84,12 @@ class SourceExtractor(ABC):
     # ── Hooks métier ────────────────────────────────────────────
 
     @abstractmethod
-    def load_config(self, conn: Connection) -> Mapping[str, object]:
+    def load_config(self, conn: Connection) -> ConfigT:
         """Charge la config DB (URL, auth, affiliations, années, etc.)."""
 
     @abstractmethod
     def extract_all(
-        self, args: argparse.Namespace, config: Mapping[str, object], existing_ids: set[str]
+        self, args: argparse.Namespace, config: ConfigT, existing_ids: set[str]
     ) -> PhaseMetrics:
         """Pilote l'extraction complète. Retourne les métriques finales."""
 
@@ -90,7 +97,7 @@ class SourceExtractor(ABC):
         """Ajoute les args CLI spécifiques à la source (au-delà de --dry-run)."""
 
     def setup_logging(  # noqa: B027
-        self, args: argparse.Namespace, config: Mapping[str, object]
+        self, args: argparse.Namespace, config: ConfigT
     ) -> None:
         """Logs de header personnalisés (ex: affiliations, collections, années)."""
 

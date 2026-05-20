@@ -836,14 +836,23 @@ def _extractor_args(
 def _run_extract_hal(
     *, mode: str = "full", year: int | None = None, since: str | None = None
 ) -> PhaseMetrics:
+    from application.pipeline.extract.extract_hal import HalExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.hal.extract_hal import HalExtractor
+    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.sources.config import get_api_base_urls
+    from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
 
     log.info("▶ extract_hal")
     t0 = time.time()
-    conn = get_sync_engine().connect()
+    engine = get_sync_engine()
+    with engine.connect() as bootstrap:
+        hal_url = get_api_base_urls(bootstrap).get(
+            "hal", "https://api.archives-ouvertes.fr/search/"
+        )
+    conn = engine.connect()
+    adapter = PgHalExtractAdapter(base_url=hal_url)
     try:
-        metrics = HalExtractor(conn, log).run_as_phase(
+        metrics = HalExtractor(conn, log, PgStagingQueries(), adapter).run_as_phase(
             _extractor_args(mode=mode, year=year, since=since)
         )
     finally:

@@ -1,17 +1,19 @@
-"""Tests unitaires de `infrastructure/sources/hal/parsing.py`.
+"""Tests unitaires de `domain/sources/hal_extract.py`.
 
-Couvre les pure functions du module HAL (build_query, build_url,
-extract_hal_id, extract_doi) et la décision d'aiguillage
-full-fetch / incrémental (choose_extraction_mode, count_full_fetch_pages).
+Couvre les pure functions du module HAL (build_query, extract_hal_id,
+extract_doi) et la décision d'aiguillage full-fetch / incrémental
+(choose_extraction_mode, count_full_fetch_pages).
+
+`build_url` est un helper infra (formatage d'URL Solr HAL) et reste
+dans `infrastructure/sources/hal/extract_hal.py`.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from infrastructure.sources.hal.parsing import (
+from domain.sources.hal_extract import (
     build_query,
-    build_url,
     choose_extraction_mode,
     count_full_fetch_pages,
     extract_doi,
@@ -46,19 +48,6 @@ class TestBuildQuery:
     def test_raises_on_empty_years(self):
         with pytest.raises(ValueError):
             build_query(years=[])
-
-
-class TestBuildUrl:
-    def test_appends_trailing_slash(self):
-        assert build_url("https://api.archives-ouvertes.fr/search") == (
-            "https://api.archives-ouvertes.fr/search/"
-        )
-
-    def test_idempotent_on_already_slashed(self):
-        # `build_url` ajoute systématiquement un slash : si la base en a déjà un,
-        # on double — c'est OK pour Solr qui tolère, à pinner pour ne pas régresser
-        # silencieusement.
-        assert build_url("https://example.com/") == "https://example.com//"
 
 
 class TestExtractHalId:
