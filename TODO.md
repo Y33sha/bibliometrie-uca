@@ -1,6 +1,7 @@
 # A régler avant transmission
 ## Schéma de données
 * [ ] peut-on remplacer certaines tables par des vues matérialisées? (source_authorship_structures, authorship_structures, authorships?)
+* ajouter created_at,updated_at partout
 ## Pipeline de traitement
 ### Extraction
 * [ ] cross-import openalex: 429 dès la première requête "2026-05-19 14:30:16,946 [INFO] pipeline: 24491 DOI manquants pour openalex 429 Too Many Requests DOI 10.1001/jama.2021.0135 — attente 1.0s (tentative 1/5) 429 Too Many Requests DOI 10.1001/jama.2020.23068 — attente 1.0s (tentative 1/5)"
