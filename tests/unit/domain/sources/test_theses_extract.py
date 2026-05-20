@@ -1,10 +1,10 @@
-"""Tests unitaires de `infrastructure/sources/theses/parsing.py`."""
+"""Tests unitaires de `domain/sources/theses_extract.py`."""
 
 from __future__ import annotations
 
 import argparse
 
-from infrastructure.sources.theses.parsing import (
+from domain.sources.theses_extract import (
     build_query,
     extract_doi,
     extract_theses_id,
