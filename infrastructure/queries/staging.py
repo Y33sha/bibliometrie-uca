@@ -115,6 +115,15 @@ def mark_done(conn: Connection, staging_id: int) -> None:
     )
 
 
+def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
+    """Set des `source_id` déjà présents en staging pour une source."""
+    rows = conn.execute(
+        text("SELECT source_id FROM staging WHERE source = :source"),
+        {"source": source},
+    ).scalars()
+    return set(rows)
+
+
 class PgStagingQueries(StagingQueries):
     """Adapter PostgreSQL pour `application.ports.staging.StagingQueries`."""
 
@@ -139,3 +148,6 @@ class PgStagingQueries(StagingQueries):
 
     def mark_done(self, conn: Connection, staging_id: int) -> None:
         mark_done(conn, staging_id)
+
+    def fetch_existing_source_ids(self, conn: Connection, source: str) -> set[str]:
+        return fetch_existing_source_ids(conn, source)
