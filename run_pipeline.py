@@ -914,14 +914,30 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
 
 
 def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
+    from application.pipeline.extract.extract_scanr import ScanrExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.scanr.extract_scanr import ScanrExtractor
+    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.sources.config import get_api_base_urls
+    from infrastructure.sources.scanr.extract_scanr import (
+        PgScanrExtractAdapter,
+        get_scanr_credentials_from_db,
+    )
 
     log.info("▶ extract_scanr")
     t0 = time.time()
-    conn = get_sync_engine().connect()
+    engine = get_sync_engine()
+    with engine.connect() as bootstrap:
+        base_url = get_api_base_urls(bootstrap).get(
+            "scanr",
+            "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
+        )
+        credentials = get_scanr_credentials_from_db(bootstrap)
+    conn = engine.connect()
+    adapter = PgScanrExtractAdapter(base_url=base_url, credentials=credentials)
     try:
-        metrics = ScanrExtractor(conn, log).run_as_phase(_extractor_args(mode=mode, year=year))
+        metrics = ScanrExtractor(conn, log, PgStagingQueries(), adapter).run_as_phase(
+            _extractor_args(mode=mode, year=year)
+        )
     finally:
         conn.close()
     log.info("✓ extract_scanr terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
