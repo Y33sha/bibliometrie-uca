@@ -30,13 +30,15 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.create_index(
-        "idx_sa_in_perimeter",
-        "source_authorships",
-        ["source_publication_id"],
-        postgresql_where="in_perimeter = TRUE",
+    # IF NOT EXISTS : tolère l'index déjà créé hors-bande (typiquement
+    # via `CREATE INDEX CONCURRENTLY` lors d'un test de perf en prod
+    # antérieur à cette migration).
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sa_in_perimeter "
+        "ON source_authorships (source_publication_id) "
+        "WHERE in_perimeter = TRUE"
     )
 
 
 def downgrade() -> None:
-    op.drop_index("idx_sa_in_perimeter", table_name="source_authorships")
+    op.execute("DROP INDEX IF EXISTS idx_sa_in_perimeter")
