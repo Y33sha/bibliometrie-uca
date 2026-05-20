@@ -945,14 +945,25 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
 
 
 def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
+    from application.pipeline.extract.extract_theses import ThesesExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.theses.extract_theses import ThesesExtractor
+    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.sources.config import get_api_base_urls
+    from infrastructure.sources.theses.extract_theses import PgThesesExtractAdapter
 
     log.info("▶ extract_theses")
     t0 = time.time()
-    conn = get_sync_engine().connect()
+    engine = get_sync_engine()
+    with engine.connect() as bootstrap:
+        base_url = get_api_base_urls(bootstrap).get(
+            "theses", "https://theses.fr/api/v1/theses/recherche/"
+        )
+    conn = engine.connect()
+    adapter = PgThesesExtractAdapter(base_url=base_url)
     try:
-        metrics = ThesesExtractor(conn, log).run_as_phase(_extractor_args(mode=mode, year=year))
+        metrics = ThesesExtractor(conn, log, PgStagingQueries(), adapter).run_as_phase(
+            _extractor_args(mode=mode, year=year)
+        )
     finally:
         conn.close()
     log.info("✓ extract_theses terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())

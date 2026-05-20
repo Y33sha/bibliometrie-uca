@@ -1,11 +1,28 @@
-"""Pure functions de parsing pour l'extraction theses.fr.
+"""Constantes et helpers purs pour l'extraction theses.fr.
 
-Vit à côté de `extract_theses.py` (wiring HTTP). Ne fait aucun I/O.
+Tout ce qui peut être consommé par l'orchestrateur applicatif sans
+toucher à `infrastructure` : timing de rate-limit, taille de page,
+construction de requête `q=...`, parsing des thèses.
+
+`resolve_statuses` agit sur un `Namespace` argparse — pratique mais sans
+dépendance externe, donc accepté côté domaine.
 """
 
 from __future__ import annotations
 
 import argparse
+from typing import Any
+
+# ── Rate-limit / pagination ────────────────────────────────────────
+
+THESES_DELAY = 0.3
+"""Pause entre deux requêtes consécutives à theses.fr (s)."""
+
+THESES_PER_PAGE = 500
+"""Taille de page (max accepté par l'API)."""
+
+
+# ── Requête ───────────────────────────────────────────────────────
 
 
 def build_query(ppn: str, status: str | None = None) -> str:
@@ -20,7 +37,10 @@ def build_query(ppn: str, status: str | None = None) -> str:
     return q
 
 
-def extract_theses_id(these: dict) -> str:
+# ── Parsing de documents ───────────────────────────────────────────
+
+
+def extract_theses_id(these: dict[str, Any]) -> str:
     """Extrait l'identifiant unique d'une thèse (champ `id`).
 
     Pour les thèses soutenues, c'est le NNT (ex: `2021UCFAC022`) ;
@@ -30,7 +50,7 @@ def extract_theses_id(these: dict) -> str:
     return these.get("id", "")
 
 
-def extract_doi(these: dict) -> str | None:
+def extract_doi(these: dict[str, Any]) -> str | None:
     """Extrait le DOI s'il est présent et non vide, sinon `None`."""
     doi = these.get("doi")
     if doi and isinstance(doi, str) and doi.strip():

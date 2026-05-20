@@ -1,53 +1,27 @@
-"""
-Extraction des thèses UCA depuis l'API theses.fr.
+"""Adapter theses.fr pour la phase extract : HTTP (recherche paginée
+par `debut`/`nombre`) + écritures staging + config.
 
-Usage:
-    python extract_theses.py              # extraction complète (soutenues + en cours)
-    python extract_theses.py --soutenues  # thèses soutenues uniquement
-    python extract_theses.py --en-cours   # thèses en cours uniquement
-    python extract_theses.py --year 2024  # filtre par année (NNT préfixé YYYY ;
-                                          # ne s'applique qu'aux thèses soutenues,
-                                          # les en-cours n'ont pas d'année dans leur id)
-    python extract_theses.py --mode weekly  # accepté pour cohérence CLI mais sans
-                                            # effet : theses.fr a un volume bas, le
-                                            # weekly ferait la même chose qu'un full
-    python extract_theses.py --dry-run    # compter sans insérer
-
-L'API est interrogée via etabSoutenancePpn (identifiants IdRef de l'établissement).
-UCA a deux IdRef successifs : 252404955 (2021-...) et 196200032 (2017-2020).
-Les résultats bruts sont stockés dans staging (source='theses', JSONB).
-
-L'identifiant unique est :
-  - le NNT (numéro national de thèse) pour les thèses soutenues
-  - l'id theses.fr (ex: "s367812") pour les thèses en cours (pas de NNT)
+Implémente le port
+`application.ports.pipeline.extract.theses.ThesesExtractAdapter`.
+L'orchestration de la phase (boucle par PPN × statut, filtre année
+post-fetch) vit côté `application.pipeline.extract.extract_theses`.
 """
 
-import argparse
-import os
-import time
+from __future__ import annotations
+
 from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from domain.pipeline_metrics import PhaseMetrics
-from infrastructure.sources.api_limits import THESES_DELAY, THESES_PER_PAGE
-from infrastructure.sources.base import (
-    ExtractionConfigError,
-    SourceExtractor,
-    run_extractor,
+from application.ports.pipeline.extract.theses import (
+    ThesesExtractAdapter,
+    ThesesExtractConfig,
 )
-from infrastructure.sources.common import compute_hash, setup_logger
-from infrastructure.sources.config import get_api_base_urls, get_extraction_api_ids
+from domain.sources.theses_extract import extract_doi, extract_theses_id
+from infrastructure.sources.common import compute_hash
+from infrastructure.sources.config import get_extraction_api_ids
 from infrastructure.sources.http_retry import http_request_with_retry
-from infrastructure.sources.theses.parsing import (
-    build_query,
-    extract_doi,
-    extract_theses_id,
-    resolve_statuses,
-)
-
-logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), "logs"))
 
 _UPDATE_THESES_SQL = text(
     """
@@ -71,177 +45,55 @@ _INSERT_THESES_SQL = text(
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
 
-def fetch_page(base_url: str, query: str, debut: int = 0, nombre: int = 500) -> dict:
-    """Récupère une page de résultats depuis l'API theses.fr (avec retry/backoff)."""
-    params = {
-        "q": query,
-        "debut": debut,
-        "nombre": nombre or THESES_PER_PAGE,
-    }
-    return http_request_with_retry(
-        "GET",
-        base_url,
-        params=params,
-        timeout=30,
-        label=f"theses debut={debut}",
-    )
+class PgThesesExtractAdapter(ThesesExtractAdapter):
+    """Adapter PostgreSQL + HTTP pour `ThesesExtractAdapter`.
 
-
-def extract_ppn(
-    ppn: str,
-    conn: Connection,
-    existing_ids: set,
-    base_url: str,
-    status: str | None = None,
-    year: int | None = None,
-    dry_run: bool = False,
-) -> tuple[int, int, int]:
-    """Extrait toutes les thèses d'un établissement (par PPN).
-
-    Si `year` est fourni, ne conserve que les thèses dont le NNT commence
-    par cette année (filtre post-fetch ; ne ramène pas les en-cours qui
-    n'ont pas d'année dans leur id).
-
-    Retourne (total, insérés, mis à jour).
+    Construit avec une `base_url` (endpoint `/api/v1/theses/recherche/`).
     """
-    query = build_query(ppn, status)
-    status_label = status or "toutes"
 
-    # Premier appel pour le total
-    data = fetch_page(base_url, query, debut=0, nombre=1)
-    total = data["totalHits"]
-    logger.info(f"  PPN {ppn} ({status_label}) : {total} thèses")
+    def __init__(self, base_url: str) -> None:
+        self._url = base_url
 
-    if dry_run or total == 0:
-        return total, 0, 0
+    # ── Config ─────────────────────────────────────────────────
 
-    inserted = 0
-    updated = 0
-    debut = 0
-    per_page = THESES_PER_PAGE
-
-    while debut < total:
-        data = fetch_page(base_url, query, debut=debut, nombre=per_page)
-        theses = data.get("theses", [])
-
-        if not theses:
-            break
-
-        for these in theses:
-            theses_id = extract_theses_id(these)
-            if not theses_id:
-                continue
-
-            if year is not None and not theses_id.startswith(str(year)):
-                continue
-
-            doi = extract_doi(these)
-            raw_hash = compute_hash(these)
-
-            if theses_id in existing_ids:
-                result = conn.execute(
-                    _UPDATE_THESES_SQL,
-                    {
-                        "raw_data": these,
-                        "doi": doi,
-                        "raw_hash": raw_hash,
-                        "source_id": theses_id,
-                    },
-                )
-                if result.rowcount:
-                    updated += 1
-            else:
-                result = conn.execute(
-                    _INSERT_THESES_SQL,
-                    {
-                        "source_id": theses_id,
-                        "doi": doi,
-                        "raw_data": these,
-                        "raw_hash": raw_hash,
-                    },
-                )
-                if result.rowcount:
-                    inserted += 1
-                    existing_ids.add(theses_id)
-
-        conn.commit()
-        debut += len(theses)
-
-        if debut % 1000 == 0 or debut >= total:
-            logger.info(f"    {debut}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
-
-        time.sleep(THESES_DELAY)
-
-    return total, inserted, updated
-
-
-class ThesesExtractor(SourceExtractor):
-    SOURCE = "theses"
-    DESCRIPTION = "Extraction theses.fr → staging"
-
-    def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--soutenues", action="store_true", help="Thèses soutenues uniquement")
-        parser.add_argument("--en-cours", action="store_true", help="Thèses en cours uniquement")
-        parser.add_argument(
-            "--year",
-            type=int,
-            help="Filtre post-fetch par année (NNT préfixé YYYY ; ne ramène que les soutenues)",
-        )
-        parser.add_argument(
-            "--mode",
-            choices=["full", "weekly"],
-            default="full",
-            help="Accepté pour cohérence CLI ; sans effet (theses.fr a un volume bas)",
-        )
-
-    def load_config(self, conn: Connection) -> dict[str, Any]:
+    def load_config(self, conn: Connection) -> ThesesExtractConfig:
         ppns = get_extraction_api_ids(conn, "theses")
-        if not ppns:
-            raise ExtractionConfigError(
-                "aucun PPN d'établissement theses.fr configuré "
-                "(structures.api_ids->'theses' vide pour le périmètre d'extraction)"
-            )
-        return {
-            "ppns": ppns,
-            "base_url": get_api_base_urls(conn).get(
-                "theses", "https://theses.fr/api/v1/theses/recherche/"
-            ),
+        return ThesesExtractConfig(base_url=self._url, ppns=ppns)
+
+    # ── HTTP ───────────────────────────────────────────────────
+
+    def fetch_page(self, query: str, *, debut: int, nombre: int) -> dict[str, Any]:
+        """Récupère une page de résultats depuis l'API theses.fr."""
+        params = {
+            "q": query,
+            "debut": debut,
+            "nombre": nombre,
         }
+        return http_request_with_retry(
+            "GET",
+            self._url,
+            params=params,
+            timeout=30,
+            label=f"theses debut={debut}",
+        )
 
-    def setup_logging(self, args: argparse.Namespace, config: dict[str, Any]) -> None:
-        self.logger.info(f"Établissements PPN : {config['ppns']}")
-        self.logger.info(f"Statuts : {resolve_statuses(args)}")
-        if args.year is not None:
-            self.logger.info(f"Filtre année (NNT préfixe) : {args.year}")
+    # ── SQL ────────────────────────────────────────────────────
 
-    def extract_all(
-        self, args: argparse.Namespace, config: dict[str, Any], existing_ids: set
-    ) -> PhaseMetrics:
-        stats = PhaseMetrics()
-        for ppn in config["ppns"]:
-            for status in resolve_statuses(args):
-                total, inserted, updated = extract_ppn(
-                    ppn,
-                    self.conn,
-                    existing_ids,
-                    config["base_url"],
-                    status=status,
-                    year=args.year,
-                    dry_run=args.dry_run,
-                )
-                stats.add(new=inserted, updated=updated, total=total)
-        return stats
-
-    def log_summary(self, stats: PhaseMetrics, args: argparse.Namespace) -> None:
-        self.logger.info("\n=== Terminé ===")
-        self.logger.info(f"Total API : {stats.total}")
-        self.logger.info(f"Nouveaux : {stats.new}")
-        self.logger.info(f"Mis à jour : {stats.updated}")
-
-
-def main() -> None:
-    run_extractor(ThesesExtractor, logger)
-
-
-if __name__ == "__main__":
-    main()
+    def upsert_these(
+        self, conn: Connection, these: dict[str, Any], *, is_new: bool
+    ) -> tuple[bool, bool]:
+        """INSERT pour les nouvelles, UPDATE conditionnel (sur raw_hash) sinon."""
+        theses_id = extract_theses_id(these)
+        doi = extract_doi(these)
+        raw_hash = compute_hash(these)
+        params = {
+            "source_id": theses_id,
+            "doi": doi,
+            "raw_data": these,
+            "raw_hash": raw_hash,
+        }
+        if is_new:
+            result = conn.execute(_INSERT_THESES_SQL, params)
+            return (bool(result.rowcount), False)
+        result = conn.execute(_UPDATE_THESES_SQL, params)
+        return (False, bool(result.rowcount))
