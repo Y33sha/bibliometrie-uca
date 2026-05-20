@@ -1,43 +1,38 @@
-"""
-Récupère les entrées HAL manquantes découvertes via OpenAlex, ScanR et theses.fr.
+"""Adapter HAL pour `application.pipeline.extract.fetch_missing_hal_id`.
 
-Sources de halIds :
-- OpenAlex : primary_location pointant vers hal.science/hal-XXXXX
-- ScanR : externalIds contenant un identifiant de type "hal"
-- theses.fr (via NNT) : thèses soutenues avec NNT mais sans document HAL associé
+Implémente les lookups SQL (depuis OpenAlex, ScanR, NNT theses),
+les fetchs HTTP async (par halId et par NNT) et les inserts staging.
 
-Quand un halId (ou un NNT) n'est pas dans notre staging_hal, on le télécharge
-via l'API HAL. Ces entrées sont marquées collection = NULL (hors
-périmètre UCA), ce qui permet de les distinguer des entrées issues
-du portail ou des collections labo.
-
-Fetch HTTP en async via httpx + `asyncio.Semaphore(HAL_MAX_CONCURRENT)` pour
-saturer le rate-limit toléré par HAL sans le dépasser. Les inserts DB restent
-sync (`Connection` SA) et sont sérialisés via `asyncio.Lock` + `asyncio.to_thread`.
-
-Usage:
-    python fetch_missing_hal_id.py              # télécharger les manquants
-    python fetch_missing_hal_id.py --dry-run    # lister sans télécharger
-    python fetch_missing_hal_id.py --stats      # statistiques uniquement
+L'orchestration (combinaison des refs, dedup, boucles async, commits
+intermédiaires) vit côté
+`application.pipeline.extract.fetch_missing_hal_id`.
 """
 
-import argparse
-import asyncio
-import os
+from __future__ import annotations
+
+from typing import Any
 
 import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from domain.pipeline_metrics import PhaseMetrics
+from application.ports.pipeline.extract.fetch_missing_hal_id import (
+    HalFetchMissingAdapter,
+    HalIdRef,
+    NntRef,
+)
 from domain.publication import extract_hal_id_from_url
-from infrastructure.db.engine import get_sync_engine
-from infrastructure.observability.log import setup_logger
 from infrastructure.sources.api_limits import HAL_DELAY
 from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
+
+# HAL ne publie pas de seuil officiel : on combine concurrence (5 workers)
+# + délai par worker (HAL_DELAY = 0.5 s) → ~6-7 req/s sustained (5× le débit
+# de la variante sync précédente), sans burst.
+HAL_MAX_CONCURRENT = 5
+
 
 _UPSERT_HAL_SQL = text(
     """
@@ -71,36 +66,23 @@ _INSERT_NOT_FOUND_SQL = text(
     """
 )
 
-log = setup_logger("fetch_missing_hal_id", os.path.join(os.path.dirname(__file__), "logs"))
 
-# HAL ne publie pas de seuil officiel : on combine concurrence (5 workers)
-# + délai par worker (HAL_DELAY = 0.5 s) → ~6-7 req/s sustained (5× le débit
-# de la variante sync précédente), sans burst. Plus prudent qu'un Semaphore
-# seul qui pourrait spiker à ~20 req/s avec une latence basse.
-HAL_MAX_CONCURRENT = 5
-
-
-def find_hal_primary_locations(conn: Connection) -> list[dict]:
-    """
-    Trouve les HAL IDs référencés par OpenAlex mais absents de staging_hal.
+def find_hal_primary_locations(conn: Connection) -> list[dict[str, Any]]:
+    """halIds référencés par OpenAlex mais absents de staging HAL.
 
     Deux sources :
     - staging non normalisé (raw_data.primary_location) — nouveaux docs du run en cours
     - source_publications déjà normalisés (external_ids->>'hal_id') — docs des runs précédents
 
-    Filtrage en SQL :
-    - extraction de l'URL via JSONB path (évite de remonter les raw_data
-      complets en Python — gain perf décisif sur les méga-papers OA)
-    - filtrage `LIKE '%hal.science%' / '%hal.archives-ouvertes.fr%'` côté SQL
-    - dédup `NOT EXISTS staging_hal` en batch après extraction des hal_ids
-      (l'extraction depuis l'URL passe par une regex Python pas trivialement
-      reproductible en SQL, donc ce filtre se fait en post-traitement).
+    Retourne `[{openalex_id, hal_id, landing_url}, ...]`.
 
-    Retourne [{openalex_id, hal_id, landing_url}, ...] absents de staging_hal.
+    Conservé comme fonction libre (et non méthode) parce que l'extraction
+    `landing_page_url → hal_id` passe par `extract_hal_id_from_url` (regex
+    Python), faite après le SELECT. Le filtre `NOT EXISTS staging_hal`
+    est appliqué en post-traitement sur l'ensemble dédupliqué.
     """
-    results: dict[str, dict] = {}
+    results: dict[str, dict[str, Any]] = {}
 
-    # 1. Staging OA non normalisé : extraire l'URL via JSONB path en SQL.
     rows = conn.execute(
         text(
             """
@@ -125,7 +107,6 @@ def find_hal_primary_locations(conn: Connection) -> list[dict]:
                 "landing_url": row.url,
             }
 
-    # 2. Source publications OA déjà normalisés.
     rows = conn.execute(
         text(
             """
@@ -144,7 +125,6 @@ def find_hal_primary_locations(conn: Connection) -> list[dict]:
                 "landing_url": None,
             }
 
-    # 3. Filtrer ceux déjà en staging_hal (batch NOT EXISTS).
     if not results:
         return []
     already_staged = set(
@@ -156,17 +136,18 @@ def find_hal_primary_locations(conn: Connection) -> list[dict]:
     return [r for hal_id, r in results.items() if hal_id not in already_staged]
 
 
-def find_hal_ids_from_scanr(conn: Connection) -> list[dict]:
-    """
-    Trouve les HAL IDs référencés par ScanR mais absents de staging HAL.
+def find_hal_ids_from_scanr(conn: Connection) -> list[dict[str, Any]]:
+    """halIds référencés par ScanR mais absents de staging HAL.
 
     Deux sources :
     - source_publications ScanR déjà normalisés (external_ids->>'hal_id')
     - staging ScanR non encore normalisé (raw_data.externalIds type='hal')
 
-    Retourne [{source: "scanr", hal_id, scanr_id}, ...]
+    Retourne `[{source: "scanr", hal_id, scanr_id}, ...]`.
+
+    Conservé comme fonction libre pour permettre des tests d'intégration
+    ciblés (cf. `tests/integration/infrastructure/sources/hal/test_fetch_missing_hal_id.py`).
     """
-    # 1. Source documents déjà normalisés
     rows = conn.execute(
         text(
             """
@@ -180,14 +161,11 @@ def find_hal_ids_from_scanr(conn: Connection) -> list[dict]:
             """
         )
     ).all()
-    results = {
+    results: dict[str, dict[str, Any]] = {
         row.hal_id: {"source": "scanr", "hal_id": row.hal_id, "scanr_id": row.scanr_id}
         for row in rows
     }
 
-    # 2. Staging ScanR non normalisé : extraction des externalIds en SQL
-    # (jsonb_array_elements côté DB) — éviter de matérialiser les raw_data
-    # ScanR complets en mémoire Python, comme pour OpenAlex ci-dessus.
     rows = conn.execute(
         text(
             """
@@ -216,12 +194,14 @@ def find_hal_ids_from_scanr(conn: Connection) -> list[dict]:
     return list(results.values())
 
 
-def find_nnt_without_hal(conn: Connection) -> list[dict]:
-    """
-    Trouve les NNT (thèses soutenues) qui n'ont pas de document HAL associé.
-    Recherche via source_publications.external_ids->>'nnt' pour les publications
-    qui n'ont pas 'hal' dans leurs sources.
-    Retourne [{source: "nnt", nnt, theses_id}, ...]
+def find_nnt_without_hal(conn: Connection) -> list[dict[str, Any]]:
+    """NNT (thèses soutenues) sans document HAL associé.
+
+    Recherche via `source_publications.external_ids->>'nnt'` pour les
+    publications qui n'ont pas `'hal'` dans leurs sources et ne sont pas
+    de type `ongoing_thesis`.
+
+    Retourne `[{source: "nnt", nnt, theses_id}, ...]`.
     """
     rows = conn.execute(
         text(
@@ -242,70 +222,11 @@ def find_nnt_without_hal(conn: Connection) -> list[dict]:
     return [{"source": "nnt", "nnt": row.nnt, "theses_id": row.theses_id} for row in rows]
 
 
-async def fetch_hal_by_nnt(client: httpx.AsyncClient, nnt: str, *, base_url: str) -> dict | None:
-    """Télécharge un document depuis l'API HAL par NNT."""
-    try:
-        data = await http_request_with_retry_async(
-            client,
-            "GET",
-            base_url,
-            params={
-                "q": f"nntId_s:{nnt}",
-                "fl": HAL_FIELDS_STR,
-                "wt": "json",
-                "rows": "1",
-            },
-            timeout=15,
-            label=f"NNT {nnt}",
-        )
-    except httpx.HTTPStatusError as e:
-        log.warning(f"  HTTP {e.response.status_code} pour NNT {nnt}")
-        return None
-    except httpx.RequestError as e:
-        log.warning(f"  Erreur réseau pour NNT {nnt}: {e}")
-        return None
+def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict[str, Any]) -> None:
+    """Insère un document dans staging HAL avec ses collections.
 
-    docs = data.get("response", {}).get("docs", [])
-    if not docs:
-        return None  # pas sur HAL, c'est normal pour certaines thèses
-    return docs[0]
-
-
-async def fetch_hal_document(
-    client: httpx.AsyncClient, hal_id: str, *, base_url: str
-) -> dict | None:
-    """Télécharge un document depuis l'API HAL."""
-    try:
-        data = await http_request_with_retry_async(
-            client,
-            "GET",
-            base_url,
-            params={
-                "q": f"halId_s:{hal_id}",
-                "fl": HAL_FIELDS_STR,
-                "wt": "json",
-                "rows": "1",
-            },
-            timeout=15,
-            label=f"halId {hal_id}",
-        )
-    except httpx.HTTPStatusError as e:
-        log.warning(f"  HTTP {e.response.status_code} pour {hal_id}")
-        return None
-    except httpx.RequestError as e:
-        log.warning(f"  Erreur réseau pour {hal_id}: {e}")
-        return None
-
-    docs = data.get("response", {}).get("docs", [])
-    if not docs:
-        log.warning(f"  {hal_id} non trouvé dans HAL")
-        return None
-    return docs[0]
-
-
-def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict) -> None:
-    """Insere un document dans staging HAL avec ses collections.
-    Si le document existe et a change (hash different), met a jour et remet processed = FALSE.
+    Si le document existe et a changé (hash différent), met à jour et
+    remet `processed = FALSE`.
     """
     coll_codes = doc.get("collCode_s") or []
     hal_collections = coll_codes if isinstance(coll_codes, list) and coll_codes else None
@@ -322,235 +243,113 @@ def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict
     )
 
 
-def _insert_halid_result(conn: Connection, hal_id: str, doc: dict | None) -> bool:
-    """Insère le résultat d'un fetch par halId. Retourne True si trouvé."""
-    if doc:
-        doi_str = doc.get("doiId_s")
-        if isinstance(doi_str, list):
-            doi_str = doi_str[0] if doi_str else None
-        insert_staging_hal(conn, hal_id, doi_str, doc)
-        return True
-    # Marquer comme not_found dans staging pour ne plus le re-chercher
-    conn.execute(_INSERT_NOT_FOUND_SQL, {"source_id": hal_id})
-    return False
+def _extract_doi_str(doc: dict[str, Any]) -> str | None:
+    doi = doc.get("doiId_s")
+    if isinstance(doi, list):
+        return doi[0] if doi else None
+    return doi
 
 
-def _insert_nnt_result(conn: Connection, nnt: str, doc: dict | None) -> tuple[bool, bool]:
-    """Insère le résultat d'un fetch par NNT. Retourne (api_found, inserted)."""
-    if not doc:
-        return (False, False)
-    hal_id = doc.get("halId_s")
-    if not hal_id:
-        return (True, False)
-    exists = conn.execute(
-        text("SELECT 1 FROM staging WHERE source = 'hal' AND source_id = :id"),
-        {"id": hal_id},
-    ).first()
-    if exists:
-        log.debug(f"  NNT={nnt} → {hal_id} déjà en staging")
-        return (True, False)
-    doi_str = doc.get("doiId_s")
-    if isinstance(doi_str, list):
-        doi_str = doi_str[0] if doi_str else None
-    insert_staging_hal(conn, hal_id, doi_str, doc)
-    return (True, True)
+class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
+    """Adapter PostgreSQL + HTTP pour `HalFetchMissingAdapter`."""
 
+    max_concurrent: int = HAL_MAX_CONCURRENT
+    delay_s: float = HAL_DELAY
 
-async def _fetch_by_halid_async(
-    refs: list[dict], conn: Connection, base_url: str
-) -> tuple[int, int]:
-    """Fetch en parallèle par halId. Retourne (fetched, not_found)."""
-    sem = asyncio.Semaphore(HAL_MAX_CONCURRENT)
-    db_lock = asyncio.Lock()
-    progress = {"done": 0, "fetched": 0, "not_found": 0}
-    total = len(refs)
+    def __init__(self) -> None:
+        self._base_url: str = ""
 
-    async with httpx.AsyncClient() as client:
+    def configure(self, conn: Connection) -> None:
+        self._base_url = get_api_base_urls(conn)["hal"]
 
-        async def process_one(ref: dict) -> None:
-            hal_id = ref["hal_id"]
-            async with sem:
-                doc = await fetch_hal_document(client, hal_id, base_url=base_url)
-                await asyncio.sleep(HAL_DELAY)
+    # ── Lookups SQL ────────────────────────────────────────────
 
-            async with db_lock:
-                found = await asyncio.to_thread(_insert_halid_result, conn, hal_id, doc)
-                if found:
-                    progress["fetched"] += 1
-                else:
-                    progress["not_found"] += 1
+    def find_halid_refs_from_openalex(self, conn: Connection) -> list[HalIdRef]:
+        return [
+            HalIdRef(
+                source="openalex",
+                hal_id=r["hal_id"],
+                foreign_id=r["openalex_id"],
+                landing_url=r.get("landing_url"),
+            )
+            for r in find_hal_primary_locations(conn)
+        ]
 
-                progress["done"] += 1
-                if progress["done"] % 50 == 0:
-                    await asyncio.to_thread(conn.commit)
-                    log.info(f"  {progress['done']}/{total} — {progress['fetched']} récupérés")
+    def find_halid_refs_from_scanr(self, conn: Connection) -> list[HalIdRef]:
+        return [
+            HalIdRef(source="scanr", hal_id=r["hal_id"], foreign_id=r["scanr_id"])
+            for r in find_hal_ids_from_scanr(conn)
+        ]
 
-        await asyncio.gather(*(process_one(r) for r in refs))
+    def find_nnt_refs_from_theses(self, conn: Connection) -> list[NntRef]:
+        return [NntRef(nnt=r["nnt"], theses_id=r["theses_id"]) for r in find_nnt_without_hal(conn)]
 
-    await asyncio.to_thread(conn.commit)
-    return progress["fetched"], progress["not_found"]
+    # ── HTTP ───────────────────────────────────────────────────
 
+    async def fetch_by_halid(self, client: httpx.AsyncClient, hal_id: str) -> dict[str, Any] | None:
+        try:
+            data = await http_request_with_retry_async(
+                client,
+                "GET",
+                self._base_url,
+                params={
+                    "q": f"halId_s:{hal_id}",
+                    "fl": HAL_FIELDS_STR,
+                    "wt": "json",
+                    "rows": "1",
+                },
+                timeout=15,
+                label=f"halId {hal_id}",
+            )
+        except (httpx.HTTPStatusError, httpx.RequestError):
+            return None
+        docs = data.get("response", {}).get("docs", [])
+        return docs[0] if docs else None
 
-async def _fetch_by_nnt_async(refs: list[dict], conn: Connection, base_url: str) -> tuple[int, int]:
-    """Fetch en parallèle par NNT. Retourne (fetched, not_found)."""
-    sem = asyncio.Semaphore(HAL_MAX_CONCURRENT)
-    db_lock = asyncio.Lock()
-    progress = {"done": 0, "fetched": 0, "not_found": 0}
-    total = len(refs)
+    async def fetch_by_nnt(self, client: httpx.AsyncClient, nnt: str) -> dict[str, Any] | None:
+        try:
+            data = await http_request_with_retry_async(
+                client,
+                "GET",
+                self._base_url,
+                params={
+                    "q": f"nntId_s:{nnt}",
+                    "fl": HAL_FIELDS_STR,
+                    "wt": "json",
+                    "rows": "1",
+                },
+                timeout=15,
+                label=f"NNT {nnt}",
+            )
+        except (httpx.HTTPStatusError, httpx.RequestError):
+            return None
+        docs = data.get("response", {}).get("docs", [])
+        return docs[0] if docs else None
 
-    async with httpx.AsyncClient() as client:
+    # ── SQL (inserts) ──────────────────────────────────────────
 
-        async def process_one(ref: dict) -> None:
-            async with sem:
-                doc = await fetch_hal_by_nnt(client, ref["nnt"], base_url=base_url)
-                await asyncio.sleep(HAL_DELAY)
+    def insert_halid_result(
+        self, conn: Connection, hal_id: str, doc: dict[str, Any] | None
+    ) -> bool:
+        if doc:
+            insert_staging_hal(conn, hal_id, _extract_doi_str(doc), doc)
+            return True
+        conn.execute(_INSERT_NOT_FOUND_SQL, {"source_id": hal_id})
+        return False
 
-            async with db_lock:
-                api_found, inserted = await asyncio.to_thread(
-                    _insert_nnt_result, conn, ref["nnt"], doc
-                )
-                if inserted:
-                    progress["fetched"] += 1
-                if not api_found:
-                    progress["not_found"] += 1
-
-                progress["done"] += 1
-                if progress["done"] % 50 == 0:
-                    await asyncio.to_thread(conn.commit)
-                    log.info(
-                        f"  {progress['done']}/{total} — "
-                        f"{progress['fetched']} récupérés, "
-                        f"{progress['not_found']} absents de HAL"
-                    )
-
-        await asyncio.gather(*(process_one(r) for r in refs))
-
-    await asyncio.to_thread(conn.commit)
-    return progress["fetched"], progress["not_found"]
-
-
-async def fetch_missing_hal_ids(
-    conn: Connection,
-    *,
-    mode: str = "full",
-    dry_run: bool = False,
-    stats_only: bool = False,
-) -> PhaseMetrics:
-    """Récupère les entrées HAL manquantes via OpenAlex / ScanR / NNT theses.
-
-    Phase importable depuis `run_pipeline.py` ; la connexion n'est pas
-    fermée (responsabilité du caller). `new` compte les documents HAL
-    insérés ; `extras["not_found"]` ceux marqués not_found (introuvables
-    côté HAL). `total` = nombre de halIds manquants à traiter.
-
-    Modes pipeline : `full` interroge aussi les NNT theses sans HAL ;
-    `weekly`/`daily` les ignorent (volume trop large pour run incrémental).
-    """
-    base_url = get_api_base_urls(conn)["hal"]
-
-    log.info("Recherche des works OpenAlex avec primary_location HAL...")
-    hal_refs_oa = find_hal_primary_locations(conn)
-    log.info(f"  {len(hal_refs_oa)} halIds OpenAlex absents de staging_hal")
-
-    log.info("Recherche des HAL IDs dans ScanR...")
-    hal_refs_scanr = find_hal_ids_from_scanr(conn)
-    log.info(f"  {len(hal_refs_scanr)} halIds ScanR absents de staging_hal")
-
-    if mode == "full":
-        log.info("Recherche des NNT sans document HAL...")
-        nnt_refs = find_nnt_without_hal(conn)
-        log.info(f"  {len(nnt_refs)} NNT (thèses soutenues) sans HAL")
-    else:
-        nnt_refs = []
-        log.info("NNT ignoré en mode %s", mode)
-
-    seen_hal_ids: set[str] = set()
-    missing: list[dict] = []
-    for ref in hal_refs_oa + hal_refs_scanr:
-        if ref["hal_id"] not in seen_hal_ids:
-            seen_hal_ids.add(ref["hal_id"])
-            missing.append(ref)
-    log.info(f"  {len(missing)} halIds manquants au total (après déduplication)")
-
-    metrics = PhaseMetrics(total=len(missing) + len(nnt_refs))
-
-    if stats_only:
-        log.info("--- Statistiques ---")
-        log.info(f"  halIds OA absents de staging_hal : {len(hal_refs_oa)}")
-        log.info(f"  halIds ScanR absents de staging_hal : {len(hal_refs_scanr)}")
-        log.info(f"  NNT sans HAL : {len(nnt_refs)}")
-        log.info(f"  Total halIds manquants (dédupliqués) : {len(missing)}")
-        return metrics
-
-    if not missing and not nnt_refs:
-        log.info("Rien à faire.")
-        return metrics
-
-    if dry_run:
-        if missing:
-            log.info(f"[DRY RUN] {len(missing)} documents HAL à télécharger (par halId) :")
-            for ref in missing[:10]:
-                source = ref.get("source", "openalex")
-                label = ref.get("openalex_id") or ref.get("scanr_id", "?")
-                log.info(f"  [{source}] {label} → {ref['hal_id']}")
-            if len(missing) > 10:
-                log.info(f"  ... et {len(missing) - 10} autres")
-        if nnt_refs:
-            log.info(f"[DRY RUN] {len(nnt_refs)} documents HAL à chercher (par NNT) :")
-            for ref in nnt_refs[:10]:
-                log.info(f"  [nnt] {ref['theses_id']} → NNT={ref['nnt']}")
-            if len(nnt_refs) > 10:
-                log.info(f"  ... et {len(nnt_refs) - 10} autres")
-        return metrics
-
-    fetched = 0
-    not_found = 0
-
-    if missing:
-        log.info(f"\n--- Fetch par halId ({len(missing)} documents) ---")
-        f1, nf1 = await _fetch_by_halid_async(missing, conn, base_url)
-        fetched += f1
-        not_found += nf1
-
-    if nnt_refs:
-        log.info(f"\n--- Fetch par NNT ({len(nnt_refs)} thèses) ---")
-        f2, nf2 = await _fetch_by_nnt_async(nnt_refs, conn, base_url)
-        fetched += f2
-        not_found += nf2
-        log.info(f"  NNT : {f2} récupérés, {nf2} absents de HAL")
-
-    metrics.add(new=fetched, not_found=not_found)
-    log.info(f"\nTerminé : {fetched} récupérés, {not_found} introuvables")
-    log.info("Relancer normalize_hal.py pour les integrer")
-    return metrics
-
-
-async def _main_async() -> None:
-    parser = argparse.ArgumentParser(
-        description="Récupère les entrées HAL manquantes découvertes via OpenAlex"
-    )
-    parser.add_argument("--dry-run", action="store_true", help="Lister sans télécharger")
-    parser.add_argument("--stats", action="store_true", help="Statistiques uniquement")
-    parser.add_argument(
-        "--mode",
-        choices=["full", "weekly", "daily"],
-        default="full",
-        help="Mode pipeline (NNT ignoré en daily/weekly)",
-    )
-    args = parser.parse_args()
-
-    conn = get_sync_engine().connect()
-    try:
-        await fetch_missing_hal_ids(
-            conn, mode=args.mode, dry_run=args.dry_run, stats_only=args.stats
-        )
-    finally:
-        conn.close()
-
-
-def main() -> None:
-    asyncio.run(_main_async())
-
-
-if __name__ == "__main__":
-    main()
+    def insert_nnt_result(
+        self, conn: Connection, nnt: str, doc: dict[str, Any] | None
+    ) -> tuple[bool, bool]:
+        if not doc:
+            return (False, False)
+        hal_id = doc.get("halId_s")
+        if not hal_id:
+            return (True, False)
+        exists = conn.execute(
+            text("SELECT 1 FROM staging WHERE source = 'hal' AND source_id = :id"),
+            {"id": hal_id},
+        ).first()
+        if exists:
+            return (True, False)
+        insert_staging_hal(conn, hal_id, _extract_doi_str(doc), doc)
+        return (True, True)
