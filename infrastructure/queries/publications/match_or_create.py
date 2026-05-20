@@ -1,8 +1,10 @@
 """Query service : SQL de la phase `match_or_create_publications`.
 
-Appelé par `application/pipeline/publications/match_or_create_publications.py`. Deux passes :
-1. SELECT des `source_publications` orphelins (sans `publication_id`), tous périmètres confondus, pour rattachement (match) ou création. Le filtrage par périmètre n'est plus côté SQL : l'orchestrateur traite toutes les sources pour permettre la détection des conflits inter-sources, et la création d'une publication canonique reste gated par `in_perimeter` côté Python.
-2. SELECT des `publications` stale (au moins un `source_publication` modifié depuis le dernier refresh canonique) pour ré-agrégation des méta.
+Appelé par `application/pipeline/publications/match_or_create_publications.py`. Trois SELECT / UPDATE :
+
+1. **Phase A — SELECT in_perimeter orphans** (`fetch_orphan_in_perimeter_source_publications`) : seuls les orphelins avec ≥1 source_authorship in_perimeter, traités via la cascade Python `decide_publication_match` qui peut créer ou rattacher.
+2. **Phase B — UPDATEs bulk hors-périmètre** (`bulk_link_remaining_orphans`) : 3 UPDATEs SQL set-based qui rattachent les orphelins restants par DOI, NNT, hal_id. Pas de création. Bénéficie naturellement des publications créées en Phase A.
+3. **SELECT publications stale** (`fetch_stale_publication_ids`) pour ré-agrégation des méta canoniques.
 
 L'attachement d'un `source_publications` à un `publications` est mutualisé avec le script de fusion (voir `queries.merge.link_source_publication_to_publication`).
 """
@@ -10,32 +12,81 @@ L'attachement d'un `source_publications` à un `publications` est mutualisé ave
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.publications_match_or_create import (
+    BulkLinkCounts,
     PublicationsMatchOrCreateQueries,
     SourcePublicationRow,
 )
 from domain.persons.name_matching import parse_raw_author_name
 
 
-def fetch_orphan_source_publications(conn: Connection) -> list[SourcePublicationRow]:
-    """`source_publications` sans `publication_id`, tous périmètres confondus.
+def fetch_orphan_in_perimeter_source_publications(
+    conn: Connection,
+) -> list[SourcePublicationRow]:
+    """Orphelins (`publication_id IS NULL`) avec ≥1 source_authorship in_perimeter.
 
-    Retourne les colonnes nécessaires pour la recherche/création de l'entité `publications` consolidée, plus une colonne dérivée `in_perimeter` (TRUE ssi au moins un `source_authorship` rattaché est in_perimeter). Le filtrage par périmètre n'est plus dans la requête : l'orchestrateur traite toutes les sources pour permettre la détection des conflits inter-sources (ex. version HAL hors-UCA + version OpenAlex UCA → rattachement à la même publication canonique), et n'autorise la création d'une publication que si `in_perimeter` est vrai.
+    Périmètre de la Phase A : seuls candidats à la création d'une publication canonique. Les orphelins hors-périmètre (≈ 98 % du pool typiquement) ne sont pas remontés ici — ils seront traités en Phase B par `bulk_link_remaining_orphans`, qui ne fait que du rattachement set-based, beaucoup moins coûteux qu'une itération Python.
     """
     rows = conn.execute(
         text("""
             SELECT sd.id, sd.source::text AS source, sd.source_id, sd.doi, sd.title, sd.pub_year,
                    sd.doc_type::text AS doc_type, sd.journal_id, sd.oa_status::text AS oa_status,
                    sd.language, sd.container_title, sd.external_ids,
-                   EXISTS (
-                       SELECT 1 FROM source_authorships sa
-                       WHERE sa.source_publication_id = sd.id AND sa.in_perimeter = TRUE
-                   ) AS in_perimeter
+                   TRUE AS in_perimeter
             FROM source_publications sd
             WHERE sd.publication_id IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM source_authorships sa
+                  WHERE sa.source_publication_id = sd.id AND sa.in_perimeter = TRUE
+              )
             ORDER BY sd.id
         """)
     ).all()
     return [SourcePublicationRow(**r._mapping) for r in rows]
+
+
+def bulk_link_remaining_orphans(conn: Connection) -> BulkLinkCounts:
+    """Rattache en bulk les orphelins restants (post-Phase A) par DOI, NNT, hal_id.
+
+    3 UPDATEs SQL set-based, équivalent fonctionnel de la cascade Python sur les voies « match seul » (sans création, ni dédup métadonnées thèse). Bénéficie des publications créées en Phase A puisqu'elle tourne après. Pas de `resolve_doi_conflict` : les cas chapter/book limites sont rares en pratique, traitables en aval via admin/duplicates ; le gain de simplicité et de vitesse compense.
+
+    Pas de `refresh_from_sources` ici non plus — pas pertinent puisqu'on n'a fait que du rattachement (les métadonnées des publis canoniques sont déjà figées pour ce run, la phase 2 du `run()` les recomposera via `fetch_stale_publication_ids`).
+    """
+    n_doi = conn.execute(
+        text("""
+            UPDATE source_publications sp
+            SET publication_id = p.id
+            FROM publications p
+            WHERE sp.publication_id IS NULL
+              AND sp.doi IS NOT NULL
+              AND p.doi IS NOT NULL
+              AND sp.doi = p.doi
+        """)
+    ).rowcount
+
+    n_nnt = conn.execute(
+        text("""
+            UPDATE source_publications sp
+            SET publication_id = p.id
+            FROM publications p
+            WHERE sp.publication_id IS NULL
+              AND p.nnt IS NOT NULL
+              AND (sp.external_ids ->> 'nnt') = p.nnt
+        """)
+    ).rowcount
+
+    n_hal_id = conn.execute(
+        text("""
+            UPDATE source_publications sp
+            SET publication_id = sphal.publication_id
+            FROM source_publications sphal
+            WHERE sp.publication_id IS NULL
+              AND sphal.source = 'hal'
+              AND sphal.publication_id IS NOT NULL
+              AND (sp.external_ids ->> 'hal_id') = sphal.source_id
+        """)
+    ).rowcount
+
+    return BulkLinkCounts(by_doi=n_doi, by_nnt=n_nnt, by_hal_id=n_hal_id)
 
 
 def fetch_thesis_primary_author(conn: Connection, publication_id: int) -> tuple[str, str] | None:
@@ -112,8 +163,13 @@ class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
     `infrastructure.queries.merge` (même SQL).
     """
 
-    def fetch_orphan_source_publications(self, conn: Connection) -> list[SourcePublicationRow]:
-        return fetch_orphan_source_publications(conn)
+    def fetch_orphan_in_perimeter_source_publications(
+        self, conn: Connection
+    ) -> list[SourcePublicationRow]:
+        return fetch_orphan_in_perimeter_source_publications(conn)
+
+    def bulk_link_remaining_orphans(self, conn: Connection) -> BulkLinkCounts:
+        return bulk_link_remaining_orphans(conn)
 
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int

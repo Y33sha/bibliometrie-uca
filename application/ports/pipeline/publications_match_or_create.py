@@ -29,10 +29,38 @@ class SourcePublicationRow(NamedTuple):
     in_perimeter: bool
 
 
+class BulkLinkCounts(NamedTuple):
+    """Compteurs retournés par `bulk_link_remaining_orphans` (phase B)."""
+
+    by_doi: int
+    by_nnt: int
+    by_hal_id: int
+
+    @property
+    def total(self) -> int:
+        return self.by_doi + self.by_nnt + self.by_hal_id
+
+
 class PublicationsMatchOrCreateQueries(Protocol):
     """Opérations SQL pour le rattachement (match ou création) des `source_publications` aux `publications` canoniques."""
 
-    def fetch_orphan_source_publications(self, conn: Connection) -> list[SourcePublicationRow]: ...
+    def fetch_orphan_in_perimeter_source_publications(
+        self, conn: Connection
+    ) -> list[SourcePublicationRow]:
+        """Phase A : orphelins avec ≥1 source_authorship in_perimeter.
+
+        Seuls candidats à la création d'une publication canonique. Traités
+        un par un via la cascade Python `decide_publication_match`.
+        """
+
+    def bulk_link_remaining_orphans(self, conn: Connection) -> BulkLinkCounts:
+        """Phase B : rattache en bulk les orphelins restants (hors-périmètre).
+
+        3 UPDATEs SQL set-based qui matchent par DOI, NNT, hal_id contre
+        les publications canoniques. Pas de création (gated par
+        `in_perimeter`). Bénéficie naturellement des publications créées
+        en Phase A puisqu'elle tourne après.
+        """
 
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int
