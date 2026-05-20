@@ -420,6 +420,7 @@ def _run_create_persons() -> None:
             log,
             person_repo=person_repository(conn),
         )
+        conn.commit()
     finally:
         conn.close()
     log.info("✓ create_persons_from_source_authorships terminé en %.1fs", time.time() - t0)
