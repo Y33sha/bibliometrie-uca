@@ -2,16 +2,10 @@
 de portée (scope).
 
 Sous-modules :
-- ``identifiers`` : VOs DOI/HALId/NNT + helpers de normalisation
-- ``publication`` : aggregate root ``Publication`` + entité fille
-  ``Authorship``
-- ``scope`` : doc_types hors périmètre métier aval (matching, table de
-  vérité authorships, listings).
-- ``deduplication`` : règles pures de matching et de résolution de conflit DOI (cascade `decide_publication_match`, conflit chapter/book `resolve_doi_conflict`).
-
-Note : ``domain/publication.py`` (singulier, à la racine de domain/)
-reste en place comme façade ré-exportant les VOs d'identifiants, et
-héberge encore les règles métier (``best_oa_status``,
-``resolve_doi_conflict``, ``clean_publication_title``) ainsi que les
-projections de lecture (``PubByDoi``, ``PubByNnt``, …).
+- ``identifiers`` : VOs DOI/HALId/NNT + helpers de normalisation (``clean_doi``, ``normalize_nnt``, ``extract_hal_id_from_url``)
+- ``publication`` : aggregate root ``Publication`` + entité fille ``Authorship``
+- ``scope`` : doc_types hors périmètre métier aval (matching, table de vérité authorships, listings).
+- ``deduplication`` : règles pures de matching et de résolution de conflit DOI (cascade ``decide_publication_match``, conflit chapter/book ``resolve_doi_conflict``)
+- ``metadata`` : règles sur les métadonnées canoniques (``best_oa_status``, ``clean_publication_title``, ``has_minimal_publication_metadata``)
+- ``aggregation`` : agrégation cross-source de l'aggregate (``refresh_from_sources``)
 """

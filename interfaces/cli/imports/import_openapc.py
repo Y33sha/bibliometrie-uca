@@ -14,7 +14,7 @@ import os
 
 from sqlalchemy import text
 
-from domain.publication import clean_doi
+from domain.publications.identifiers import clean_doi
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 

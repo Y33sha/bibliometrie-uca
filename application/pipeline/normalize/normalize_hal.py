@@ -39,8 +39,8 @@ from application.ports.repositories.publisher_repository import PublisherReposit
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
-from domain.publication import clean_doi, normalize_nnt
 from domain.publications.authorship_roles import map_role
+from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.hal import derive_hal_doc_type, derive_hal_oa_status
 from domain.sources.zenodo import ZenodoResolutionError, is_zenodo_doi

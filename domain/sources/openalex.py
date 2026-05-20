@@ -14,8 +14,8 @@ from typing import Any
 
 from domain.normalize import normalize_name
 from domain.persons.name_matching import names_compatible, parse_raw_author_name
-from domain.publication import extract_hal_id_from_url, normalize_nnt
 from domain.publications.doc_types import map_doc_type
+from domain.publications.identifiers import extract_hal_id_from_url, normalize_nnt
 
 # =============================================================
 # LOCATIONS

@@ -34,7 +34,7 @@ from application.ports.repositories.publication_repository import PublicationRep
 from domain.dates import french_date_to_iso
 from domain.json_types import JsonValue
 from domain.normalize import normalize_text
-from domain.publication import normalize_nnt
+from domain.publications.identifiers import normalize_nnt
 from domain.sources.theses import (
     aggregate_thesis_persons,
     derive_theses_doc_type,

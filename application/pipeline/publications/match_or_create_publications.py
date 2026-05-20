@@ -27,12 +27,12 @@ from application.publications import (
     resolve_doi_conflict,
 )
 from domain.normalize import normalize_text
-from domain.publication import normalize_nnt
 from domain.publications.deduplication import (
     MetadataDeduplicationCase,
     decide_publication_match,
 )
 from domain.publications.doc_types import map_doc_type
+from domain.publications.identifiers import normalize_nnt
 from domain.publications.metadata import (
     OA_STATUS_UNKNOWN_DEFAULT,
     clean_publication_title,
@@ -131,9 +131,7 @@ def process_document(
     # Prefetch NNT
     nnt_match_id: int | None = None
     if nnt:
-        existing_by_nnt = pub_repo.find_by_nnt(nnt)
-        if existing_by_nnt:
-            nnt_match_id = existing_by_nnt.id
+        nnt_match_id = pub_repo.find_by_nnt(nnt)
 
     # Prefetch HAL_ID (lookup cross-source : path natif HAL + external_ids posé par OpenAlex/ScanR)
     hal_id_match_id: int | None = None
@@ -201,16 +199,16 @@ def _match_thesis_by_title_year(
     """
     if not title_normalized or not pub_year:
         return None
-    candidates = pub_repo.find_thesis_by_title(title_normalized, pub_year)
-    if not candidates:
+    candidate_ids = pub_repo.find_thesis_by_title(title_normalized, pub_year)
+    if not candidate_ids:
         return None
     author = queries.fetch_thesis_primary_author_from_source_publication(
         conn, source_publication_id
     )
-    for cand in candidates:
-        primary = queries.fetch_thesis_primary_author(conn, cand.id)
+    for cand_id in candidate_ids:
+        primary = queries.fetch_thesis_primary_author(conn, cand_id)
         if not author or thesis_authors_compatible(primary, author):
-            return (cand.id, MetadataDeduplicationCase.THESIS_TITLE_YEAR)
+            return (cand_id, MetadataDeduplicationCase.THESIS_TITLE_YEAR)
     return None
 
 

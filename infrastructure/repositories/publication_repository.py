@@ -12,12 +12,7 @@ from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, text
 
-from domain.publication import (  # noqa: F401 — re-export pour compat
-    PubByDoi,
-    PubByNnt,
-    PubByTitle,
-    PubThesisCandidate,
-)
+from application.ports.repositories.publication_repository import PubByDoi
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.source_publications.source_publication import SourcePublication
@@ -105,13 +100,13 @@ class PgPublicationRepository:
             return None
         return PubByDoi(id=row.id, doc_type=row.doc_type, title_normalized=row.title_normalized)
 
-    def find_by_nnt(self, nnt: str) -> PubByNnt | None:
+    def find_by_nnt(self, nnt: str) -> int | None:
         """Cherche une publication via NNT stocké dans source_publications.external_ids."""
         if not nnt:
             return None
         row = self._conn.execute(
             text("""
-                SELECT p.id, CAST(p.doc_type AS text) AS doc_type, p.title_normalized
+                SELECT p.id
                 FROM publications p
                 JOIN source_publications sd ON sd.publication_id = p.id
                 WHERE sd.external_ids->>'nnt' = :nnt
@@ -119,9 +114,7 @@ class PgPublicationRepository:
             """),
             {"nnt": nnt.upper()},
         ).first()
-        if not row:
-            return None
-        return PubByNnt(id=row.id, doc_type=row.doc_type, title_normalized=row.title_normalized)
+        return row.id if row else None
 
     def find_by_hal_id(self, hal_id: str) -> int | None:
         """Cherche une publication rattachée à un HAL ID donné.
@@ -145,50 +138,29 @@ class PgPublicationRepository:
         ).first()
         return row.publication_id if row else None
 
-    def find_by_title(
-        self,
-        title_normalized: str,
-        pub_year: int,
-        journal_id: int,
-    ) -> PubByTitle | None:
-        """Cherche une publication par titre normalisé + année + journal.
-        Ne matche que les articles avec journal connu."""
-        if not title_normalized or not journal_id:
-            return None
-        row = self._conn.execute(
-            text("""
-                SELECT id, doi FROM publications
-                WHERE title_normalized = :tn AND pub_year = :py AND journal_id = :jid
-                LIMIT 1
-            """),
-            {"tn": title_normalized, "py": pub_year, "jid": journal_id},
-        ).first()
-        if not row:
-            return None
-        return PubByTitle(id=row.id, doi=row.doi)
-
     def find_thesis_by_title(
         self,
         title_normalized: str,
         pub_year: int,
-    ) -> list[PubThesisCandidate]:
+    ) -> list[int]:
         """Cherche des thèses par titre normalisé + année.
 
-        Retourne les candidats pour déduplication thesis-specific
-        (pas de journal_id, donc le tier 2 standard ne fonctionne pas).
+        Retourne les ids de candidats pour déduplication thesis-specific
+        (vérification ultérieure de la compatibilité auteur primary
+        dans `_match_thesis_by_title_year`).
         """
         if not title_normalized or not pub_year:
             return []
         result = self._conn.execute(
             text("""
-                SELECT id, doi FROM publications
+                SELECT id FROM publications
                 WHERE title_normalized = :tn AND pub_year = :py
                   AND doc_type IN ('thesis', 'ongoing_thesis')
                 ORDER BY id
             """),
             {"tn": title_normalized, "py": pub_year},
         )
-        return [PubThesisCandidate(id=row.id, doi=row.doi) for row in result]
+        return [row.id for row in result]
 
     # ── Chargement / persistance de l'aggregate Publication ────────
 

@@ -21,7 +21,7 @@ from application.ports.pipeline.extract.fetch_missing_hal_id import (
     HalIdRef,
     NntRef,
 )
-from domain.publication import extract_hal_id_from_url
+from domain.publications.identifiers import extract_hal_id_from_url
 from infrastructure.sources.api_limits import HAL_DELAY
 from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import get_api_base_urls

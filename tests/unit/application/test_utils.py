@@ -8,7 +8,7 @@ from domain.persons.name_matching import (
     names_compatible,
     parse_raw_author_name,
 )
-from domain.publication import clean_doi
+from domain.publications.identifiers import clean_doi
 
 # ── normalize_name ──
 

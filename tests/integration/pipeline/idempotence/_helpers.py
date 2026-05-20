@@ -1,9 +1,8 @@
 """Helpers partagés entre plusieurs fichiers de tests d'idempotence."""
 
 from domain.normalize import normalize_text
-from domain.publication import normalize_nnt
 from domain.publications.doc_types import map_doc_type
-from domain.publications.identifiers import DOI
+from domain.publications.identifiers import DOI, normalize_nnt
 from domain.publications.publication import Publication
 from infrastructure.repositories import publication_repository
 from tests.integration.helpers.publications import (

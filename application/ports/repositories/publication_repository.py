@@ -3,16 +3,24 @@
 Implémenté par infrastructure/repositories/publication_repository.py.
 """
 
+from dataclasses import dataclass
 from typing import Protocol
 
-from domain.publication import (
-    PubByDoi,
-    PubByNnt,
-    PubByTitle,
-    PubThesisCandidate,
-)
 from domain.publications.publication import Publication
 from domain.source_publications.source_publication import SourcePublication
+
+
+@dataclass(frozen=True, slots=True)
+class PubByDoi:
+    """Projection de lecture retournée par `find_by_doi`.
+
+    Porte les champs nécessaires à `resolve_doi_conflict` (arbitrage
+    chapter/book) sans hydrater l'agrégat complet.
+    """
+
+    id: int
+    doc_type: str | None
+    title_normalized: str | None
 
 
 class PublicationRepository(Protocol):
@@ -29,22 +37,15 @@ class PublicationRepository(Protocol):
 
     def find_by_doi(self, doi: str) -> PubByDoi | None: ...
 
-    def find_by_nnt(self, nnt: str) -> PubByNnt | None: ...
+    def find_by_nnt(self, nnt: str) -> int | None: ...
 
     def find_by_hal_id(self, hal_id: str) -> int | None: ...
-
-    def find_by_title(
-        self,
-        title_normalized: str,
-        pub_year: int,
-        journal_id: int,
-    ) -> PubByTitle | None: ...
 
     def find_thesis_by_title(
         self,
         title_normalized: str,
         pub_year: int,
-    ) -> list[PubThesisCandidate]: ...
+    ) -> list[int]: ...
 
     # ── Écritures simples ──────────────────────────────────────────
 

@@ -6,9 +6,9 @@
 from application.pipeline.normalize.normalize_openalex import (
     extract_short_id,
 )
-from domain.publication import extract_hal_id_from_url
 from domain.publications.doc_types import _SOURCE_MAPS, map_doc_type
 from domain.publications.doc_types import _VALID_DOC_TYPES as VALID_DOC_TYPES_SET
+from domain.publications.identifiers import extract_hal_id_from_url
 
 
 class TestOAExtractShortId:
@@ -348,7 +348,7 @@ class TestFirstDocTypeArbitration:
 # is_theses_fr_source / extract_nnt_from_openalex migrés vers
 # domain/sources/openalex.py — voir tests/unit/domain/sources/test_openalex.py.
 
-from domain.publication import normalize_nnt
+from domain.publications.identifiers import normalize_nnt
 
 
 class TestNormalizeNnt:
