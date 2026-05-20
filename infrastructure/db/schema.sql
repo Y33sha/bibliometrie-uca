@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3YTBG2ungWg2r2VnvuYOu5aSLWkAd1Nw3SmZJ5ujKcQnHUMfC6ZhccQGqwcKcGg
+\restrict OuWZFdcn0ftjRo84QjyFbLiaXk4fGBMvDO5MFGZFtG1iz3WE1ECFEWbjOPJF6DL
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -1080,11 +1080,17 @@ CREATE TABLE public.staging (
     imported_at timestamp with time zone DEFAULT now(),
     raw_hash text,
     last_seen_at timestamp with time zone DEFAULT now(),
-    meta_hash text,
     not_found boolean DEFAULT false,
     hal_collections text[],
     CONSTRAINT staging_not_found_implies_processed CHECK (((NOT not_found) OR processed))
 );
+
+
+--
+-- Name: COLUMN staging.raw_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 du payload tel qu''extrait de la source bulk. Sert de clé de détection de changement à l''UPSERT (et d''empreinte d''intégrité pour le chantier DATA_raw-data-store). Cas particulier OpenAlex : `refetch_truncated` n''écrit PAS `raw_hash` quand il complète les authorships d''une publication tronquée à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant ne déclenche pas de réécriture inutile. L''invariant `raw_hash = md5(raw_data)` est donc volontairement rompu sur les lignes OpenAlex refetchées.';
 
 
 --
@@ -1932,13 +1938,6 @@ CREATE INDEX idx_addresses_countries ON public.addresses USING gin (countries) W
 
 
 --
--- Name: idx_addresses_normalized_text; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_addresses_normalized_text ON public.addresses USING btree (normalized_text);
-
-
---
 -- Name: idx_addresses_normalized_text_trgm; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2282,45 +2281,45 @@ CREATE INDEX idx_source_authorship_structures_structure_id ON public.source_auth
 
 
 --
--- Name: idx_source_docs_countries; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_pubs_countries; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_docs_countries ON public.source_publications USING gin (countries) WHERE (countries IS NOT NULL);
-
-
---
--- Name: idx_source_docs_doi; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_doi ON public.source_publications USING btree (doi) WHERE (doi IS NOT NULL);
+CREATE INDEX idx_source_pubs_countries ON public.source_publications USING gin (countries) WHERE (countries IS NOT NULL);
 
 
 --
--- Name: idx_source_docs_external_ids; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_pubs_doi; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_docs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids IS NOT NULL);
-
-
---
--- Name: idx_source_docs_hal_collections; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_source_docs_hal_collections ON public.source_publications USING gin (hal_collections) WHERE (hal_collections IS NOT NULL);
+CREATE INDEX idx_source_pubs_doi ON public.source_publications USING btree (doi) WHERE (doi IS NOT NULL);
 
 
 --
--- Name: idx_source_docs_pub; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_pubs_external_ids; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_docs_pub ON public.source_publications USING btree (publication_id) WHERE (publication_id IS NOT NULL);
+CREATE INDEX idx_source_pubs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids IS NOT NULL);
 
 
 --
--- Name: idx_source_docs_staging; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_source_pubs_hal_collections; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_docs_staging ON public.source_publications USING btree (staging_id) WHERE (staging_id IS NOT NULL);
+CREATE INDEX idx_source_pubs_hal_collections ON public.source_publications USING gin (hal_collections) WHERE (hal_collections IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_pub; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_pub ON public.source_publications USING btree (publication_id) WHERE (publication_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_staging; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_staging ON public.source_publications USING btree (staging_id) WHERE (staging_id IS NOT NULL);
 
 
 --
@@ -2776,4 +2775,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3YTBG2ungWg2r2VnvuYOu5aSLWkAd1Nw3SmZJ5ujKcQnHUMfC6ZhccQGqwcKcGg
+\unrestrict OuWZFdcn0ftjRo84QjyFbLiaXk4fGBMvDO5MFGZFtG1iz3WE1ECFEWbjOPJF6DL
