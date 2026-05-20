@@ -1,10 +1,10 @@
-"""Tests unitaires de `infrastructure/sources/wos/parsing.py`."""
+"""Tests unitaires de `domain/sources/wos_extract.py`."""
 
 from __future__ import annotations
 
 import pytest
 
-from infrastructure.sources.wos.parsing import (
+from domain.sources.wos_extract import (
     build_query,
     clean_doi_for_wos,
     extract_doi,

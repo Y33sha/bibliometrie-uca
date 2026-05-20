@@ -889,14 +889,24 @@ def _run_extract_openalex(
 
 
 def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
+    from application.pipeline.extract.extract_wos import WosExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.wos.extract_wos import WosExtractor
+    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
+    from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
 
     log.info("▶ extract_wos")
     t0 = time.time()
-    conn = get_sync_engine().connect()
+    engine = get_sync_engine()
+    with engine.connect() as bootstrap:
+        base_url = get_api_base_urls(bootstrap).get("wos", "https://api.clarivate.com/api/wos")
+        api_key = get_wos_api_key(bootstrap)
+    conn = engine.connect()
+    adapter = PgWosExtractAdapter(base_url=base_url, api_key=api_key)
     try:
-        metrics = WosExtractor(conn, log).run_as_phase(_extractor_args(mode=mode, year=year))
+        metrics = WosExtractor(conn, log, PgStagingQueries(), adapter).run_as_phase(
+            _extractor_args(mode=mode, year=year)
+        )
     finally:
         conn.close()
     log.info("✓ extract_wos terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
