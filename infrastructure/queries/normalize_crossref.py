@@ -40,6 +40,10 @@ def upsert_crossref_source_publication(
     meta: JsonValue,
 ) -> int:
     """UPSERT d'une publication CrossRef dans ``source_publications``. Retourne l'id."""
+    # cf. note dans normalize_openalex : `external_ids` non-null en colonne,
+    # on substitue None → {} avant binding.
+    if external_ids is None:
+        external_ids = {}
     stmt = text("""
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
@@ -55,7 +59,7 @@ def upsert_crossref_source_publication(
                 source_publications.publication_id, EXCLUDED.publication_id
             ),
             doi = COALESCE(source_publications.doi, EXCLUDED.doi),
-            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            external_ids = source_publications.external_ids || EXCLUDED.external_ids,
             doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
             journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
             oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),

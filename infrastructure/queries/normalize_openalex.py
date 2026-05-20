@@ -39,6 +39,11 @@ def upsert_openalex_source_publication(
     topics_json: JsonValue,
 ) -> int:
     """UPSERT d'un document OpenAlex dans `source_publications`."""
+    # `external_ids` est garanti non-null en colonne (CHECK + NOT NULL) ;
+    # côté Python on substitue None → {} avant binding pour éviter que
+    # `bindparam(type_=JSONB)` ne produise JSONB null (≠ SQL NULL).
+    if external_ids is None:
+        external_ids = {}
     stmt = text("""
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
@@ -54,7 +59,7 @@ def upsert_openalex_source_publication(
                 source_publications.publication_id, EXCLUDED.publication_id
             ),
             doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
-            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            external_ids = source_publications.external_ids || EXCLUDED.external_ids,
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
             cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
             journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),

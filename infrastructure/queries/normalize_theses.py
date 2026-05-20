@@ -35,6 +35,10 @@ def upsert_theses_source_publication(
     source_meta_json: JsonValue,
 ) -> int:
     """UPSERT d'un document theses.fr dans `source_publications`."""
+    # cf. note dans normalize_openalex : `external_ids` non-null en colonne,
+    # on substitue None → {} avant binding.
+    if external_ids is None:
+        external_ids = {}
     stmt = text("""
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
@@ -50,7 +54,7 @@ def upsert_theses_source_publication(
                 source_publications.publication_id, EXCLUDED.publication_id
             ),
             doc_type = COALESCE(EXCLUDED.doc_type, source_publications.doc_type),
-            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            external_ids = source_publications.external_ids || EXCLUDED.external_ids,
             journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
             oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),
             language = COALESCE(EXCLUDED.language, source_publications.language),

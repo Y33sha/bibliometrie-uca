@@ -43,6 +43,10 @@ def upsert_wos_source_publication(
     external_ids: JsonValue,
 ) -> int:
     """UPSERT d'un document WoS dans `source_publications`."""
+    # cf. note dans normalize_openalex : `external_ids` non-null en colonne,
+    # on substitue None → {} avant binding.
+    if external_ids is None:
+        external_ids = {}
     stmt = text("""
         INSERT INTO source_publications
             (source, source_id, doi, title, pub_year, doc_type,
@@ -70,7 +74,7 @@ def upsert_wos_source_publication(
             keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
-            external_ids = COALESCE(source_publications.external_ids, '{}') || COALESCE(EXCLUDED.external_ids, '{}'),
+            external_ids = source_publications.external_ids || EXCLUDED.external_ids,
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
