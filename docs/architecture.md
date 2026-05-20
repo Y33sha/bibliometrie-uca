@@ -1,6 +1,6 @@
 # Architecture logicielle — Bibliométrie UCA
 
-*Document à jour au 2026-05-15.*
+*Document à jour au 2026-05-20.*
 
 Pour le modèle de données (tables, relations, domaines fonctionnels),
 voir [donnees](donnees).
@@ -188,6 +188,9 @@ Contenu :
   leurs dépendances par injection (kwarg `repo=`, `audit_repo=`,
   `queries=`).
 - **Orchestrateurs pipeline** dans `application/pipeline/` :
+  - `extract/` — extracteurs sources → staging (un module par source,
+    pilote la pagination ; HTTP + SQL délégués à un adapter Port
+    `application/ports/pipeline/extract/<source>.py`)
   - `normalize/` — staging → tables sources (un module par source)
   - `affiliations/` — propagation adresses ↔ structures vers
     `source_authorships.in_perimeter` et la table de jointure
@@ -240,10 +243,14 @@ Contenu :
   normalisation à l'écriture, parsing typé à la lecture. Pas de
   dépendance SQLAlchemy : c'est de la modélisation de données, juste
   rangée côté infra parce que la forme est dictée par le schéma DB.
-- **`sources/`** — extracteurs API (HAL, OpenAlex, WoS, ScanR,
-  theses.fr, Crossref). Héritent de `SourceExtractor` (`base.py`).
-  Inclut aussi `zenodo/` (adapter HTTP de résolution concept DOI →
-  version DOI, utilisé pendant la normalisation HAL et OpenAlex).
+- **`sources/`** — adapters HTTP/SQL des sources externes (HAL, OpenAlex,
+  WoS, ScanR, theses.fr, Crossref). Pour la phase extract, chaque source
+  expose un `Pg<Source>ExtractAdapter` qui implémente le port
+  `application.ports.pipeline.extract.<source>.<Source>ExtractAdapter` ;
+  l'orchestrateur (qui hérite du `SourceExtractor` de
+  `application/pipeline/extract/base.py`) vit côté application. Inclut
+  aussi `zenodo/` (adapter HTTP de résolution concept DOI → version DOI,
+  utilisé pendant la normalisation HAL et OpenAlex).
 - **Divers** : `log.py` (JSON structuré), `settings.py`
   (pydantic-settings), `perimeter.py`, `addresses.py`,
   `api_retry.py`, `api_limits.py`, `pipeline_metrics.py`,
