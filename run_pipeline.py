@@ -1009,9 +1009,9 @@ def _run_fetch_missing_hal_id(*, mode: str = "full") -> PhaseMetrics:
 def _run_fetch_missing_doi(target: str, *, all_staged: bool) -> PhaseMetrics:
     from typing import cast
 
-    from application.pipeline.fetch_missing_doi import (
+    from application.pipeline.extract.fetch_missing_doi import run_async
+    from application.ports.pipeline.extract.fetch_missing_doi import (
         AsyncFetchMissingDoiAdapter,
-        run_async,
     )
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.common import get_cross_import_dois

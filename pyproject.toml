@@ -326,7 +326,6 @@ module = [
     "application.structures",
     "application.pipeline.enrich.*",
     "application.pipeline.extract.*",
-    "application.pipeline.fetch_missing_doi",
     "application.pipeline.normalize.*",
     "application.pipeline.subjects._common",
     "application.ports.api.*",

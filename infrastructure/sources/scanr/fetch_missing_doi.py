@@ -1,4 +1,4 @@
-"""Adapter ScanR pour `application.pipeline.fetch_missing_doi`.
+"""Adapter ScanR pour `application.pipeline.extract.fetch_missing_doi`.
 
 API ElasticSearch — requête `terms` sur `externalIds.id.keyword` pour un
 lot de 50 DOI en un seul appel. Authentification basic.

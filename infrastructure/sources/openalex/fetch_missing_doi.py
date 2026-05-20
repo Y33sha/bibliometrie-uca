@@ -1,4 +1,4 @@
-"""Adapter OpenAlex pour `application.pipeline.fetch_missing_doi`.
+"""Adapter OpenAlex pour `application.pipeline.extract.fetch_missing_doi`.
 
 Un appel par DOI sur le filtre `doi:...` de l'API Works.
 

@@ -1,4 +1,4 @@
-"""Adapter HAL pour `application.pipeline.fetch_missing_doi`.
+"""Adapter HAL pour `application.pipeline.extract.fetch_missing_doi`.
 
 HAL fournit une API Solr ; on interroge par DOI (un appel par DOI).
 L'insertion gère la colonne `hal_collections` avec merge set-union
