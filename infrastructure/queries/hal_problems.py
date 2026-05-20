@@ -353,30 +353,59 @@ class PgHalProblemsQueries(HalProblemsQueries):
         self, *, page: int, per_page: int
     ) -> HalAffiliationConflictsResponse:
         offset = (page - 1) * per_page
+        # Publications dont :
+        #  1. au moins une source_publication HAL a au moins une authorship in_perimeter ;
+        #  2. au moins une source_publication WoS/OA a au moins une authorship
+        #     avec une adresse (= la source a effectivement examiné
+        #     l'affiliation — garde-fou contre les faux positifs sur les SPs
+        #     sans données d'adresse, qui restent in_perimeter=FALSE par
+        #     défaut sans signal métier) ;
+        #  3. aucune authorship d'une source_publication WoS/OA n'est in_perimeter.
+        # Sources comparées limitées à WoS et OpenAlex : ScanR moissonne HAL et
+        # reproduit ses affiliations (donc non informatif), theses n'arbitre
+        # pas une publi standard, crossref n'a pas d'adresses.
+        #
+        # Implémentation : on agrège d'abord par SP WoS/OA les drapeaux
+        # `any_addressed` et `any_uca`, puis on regroupe par publication
+        # canonique avant de filtrer (agg AS / sur les EXISTS imbriqués
+        # qui forçaient un Hash Join sur les 11M source_authorships).
+        # Exploite l'index partiel `idx_sa_in_perimeter`.
         base_cte = """
-        WITH hal_uca AS (
-            SELECT a.publication_id, a.author_position
-            FROM authorships a
-            WHERE a.in_perimeter = TRUE
-              AND EXISTS (SELECT 1 FROM source_authorships sa
-                          WHERE sa.authorship_id = a.id AND sa.source = 'hal')
-              AND EXISTS (SELECT 1 FROM authorship_structures aus
-                          JOIN structures s ON s.id = aus.structure_id
-                          WHERE aus.authorship_id = a.id AND s.structure_type = 'labo')
+        WITH wos_oa_sps AS (
+            SELECT id, publication_id
+            FROM source_publications
+            WHERE source IN ('wos', 'openalex')
+              AND publication_id IS NOT NULL
+        ),
+        wos_oa_pub_summary AS (
+            SELECT
+                sps.publication_id,
+                bool_or(EXISTS (
+                    SELECT 1 FROM source_authorship_addresses saa
+                    JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                    WHERE sa.source_publication_id = sps.id
+                )) AS any_addressed,
+                bool_or(EXISTS (
+                    SELECT 1 FROM source_authorships sa
+                    WHERE sa.source_publication_id = sps.id
+                      AND sa.in_perimeter = TRUE
+                )) AS any_uca
+            FROM wos_oa_sps sps
+            GROUP BY sps.publication_id
+        ),
+        hal_uca_pubs AS (
+            SELECT DISTINCT sp.publication_id
+            FROM source_publications sp
+            JOIN source_authorships sa ON sa.source_publication_id = sp.id
+            WHERE sp.source = 'hal'
+              AND sa.in_perimeter = TRUE
+              AND sp.publication_id IS NOT NULL
         ),
         conflict_pubs AS (
-            SELECT DISTINCT h.publication_id
-            FROM hal_uca h
-            JOIN source_publications sd
-              ON sd.publication_id = h.publication_id
-             AND sd.source <> 'hal'
-            JOIN source_authorships sa
-              ON sa.source_publication_id = sd.id
-             AND sa.author_position = h.author_position
-            WHERE sa.source <> 'hal'
-              AND sa.in_perimeter = FALSE
-              AND EXISTS (SELECT 1 FROM source_authorship_addresses saa
-                          WHERE saa.source_authorship_id = sa.id)
+            SELECT h.publication_id
+            FROM hal_uca_pubs h
+            JOIN wos_oa_pub_summary s ON s.publication_id = h.publication_id
+            WHERE s.any_addressed AND NOT s.any_uca
         )
         """
 

@@ -214,8 +214,11 @@ def _create_source_authorship(conn, source, sd_id, position, *, in_perimeter, au
 
 
 def _create_address_for_sa(conn, sa_id):
+    # `raw_text` doit être unique (contrainte sur md5(raw_text)). On dérive
+    # depuis sa_id pour permettre plusieurs adresses dans le même test.
     addr_id = conn.execute(
-        text("INSERT INTO addresses (raw_text, normalized_text) VALUES ('A', 'a') RETURNING id")
+        text("INSERT INTO addresses (raw_text, normalized_text) VALUES (:raw, :norm) RETURNING id"),
+        {"raw": f"addr-{sa_id}", "norm": f"addr-{sa_id}"},
     ).scalar_one()
     conn.execute(
         text(
@@ -228,6 +231,9 @@ def _create_address_for_sa(conn, sa_id):
 
 
 class TestHalAffiliationConflicts:
+    """Logique : publi avec ≥1 SP HAL ayant ≥1 authorship in_perimeter,
+    ≥1 SP WoS/OpenAlex, et aucune SP WoS/OA n'ayant d'authorship in_perimeter."""
+
     def test_noop_when_no_data(self, sa_sync_conn):
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
         assert res.total == 0
@@ -248,25 +254,26 @@ class TestHalAffiliationConflicts:
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
         assert pub in [p.id for p in res.publications]
 
-    def test_detects_conflict_with_non_oa_wos_source(self, sa_sync_conn):
-        # Élargissement : la détection couvre toutes les sources non-HAL (ici scanr).
-        pub = _create_pub(sa_sync_conn, title="Conflict scanR")
-        lab = _create_lab(sa_sync_conn, code="LAB-SCANR")
-        hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-scanr-1")
+    def test_detects_conflict_with_wos(self, sa_sync_conn):
+        pub = _create_pub(sa_sync_conn, title="Conflict WoS")
+        lab = _create_lab(sa_sync_conn, code="LAB-WOS")
+        hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-wos-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
         _create_source_authorship(
             sa_sync_conn, "hal", hal_sd, 0, in_perimeter=True, authorship_id=a_uca
         )
-        sr_sd = _create_other_sd(sa_sync_conn, pub, "scanr", "sr-1")
-        sr_sa = _create_source_authorship(sa_sync_conn, "scanr", sr_sd, 0, in_perimeter=False)
-        _create_address_for_sa(sa_sync_conn, sr_sa)
+        wos_sd = _create_other_sd(sa_sync_conn, pub, "wos", "WOS:1")
+        wos_sa = _create_source_authorship(sa_sync_conn, "wos", wos_sd, 0, in_perimeter=False)
+        _create_address_for_sa(sa_sync_conn, wos_sa)
 
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
         assert pub in [p.id for p in res.publications]
 
-    def test_ignores_when_other_source_has_no_address(self, sa_sync_conn):
-        # Sans adresse, la source n'a pas "examiné l'affiliation" → pas un conflit.
-        pub = _create_pub(sa_sync_conn, title="No address")
+    def test_ignores_oa_without_address(self, sa_sync_conn):
+        # Sans adresse sur les authorships OA, la source n'a pas "examiné"
+        # l'affiliation — l'absence d'in_perimeter est du silence, pas un
+        # désaveu. Garde-fou contre les faux positifs.
+        pub = _create_pub(sa_sync_conn, title="OA no address")
         lab = _create_lab(sa_sync_conn, code="LAB-NOADDR")
         hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-noaddr-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
@@ -279,9 +286,10 @@ class TestHalAffiliationConflicts:
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
         assert pub not in [p.id for p in res.publications]
 
-    def test_ignores_position_mismatch(self, sa_sync_conn):
-        # HAL atteste position 0, OA hors-UCA position 1 → pas de conflit.
-        pub = _create_pub(sa_sync_conn, title="Position mismatch")
+    def test_detects_regardless_of_position(self, sa_sync_conn):
+        # La nouvelle logique est au niveau publication, pas par position.
+        # HAL UCA en pos 0, OA hors-UCA en pos 1 → conflit détecté.
+        pub = _create_pub(sa_sync_conn, title="Position independent")
         lab = _create_lab(sa_sync_conn, code="LAB-POS")
         hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-pos-1")
         a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
@@ -291,6 +299,72 @@ class TestHalAffiliationConflicts:
         oa_sd = _create_other_sd(sa_sync_conn, pub, "openalex", "oa-pos")
         oa_sa = _create_source_authorship(sa_sync_conn, "openalex", oa_sd, 1, in_perimeter=False)
         _create_address_for_sa(sa_sync_conn, oa_sa)
+
+        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
+        assert pub in [p.id for p in res.publications]
+
+    def test_ignores_scanr(self, sa_sync_conn):
+        # ScanR moissonne HAL et reproduit ses affiliations — non informatif,
+        # exclu de la comparaison.
+        pub = _create_pub(sa_sync_conn, title="ScanR only")
+        lab = _create_lab(sa_sync_conn, code="LAB-SCANR")
+        hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-scanr-1")
+        a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        _create_source_authorship(
+            sa_sync_conn, "hal", hal_sd, 0, in_perimeter=True, authorship_id=a_uca
+        )
+        sr_sd = _create_other_sd(sa_sync_conn, pub, "scanr", "sr-1")
+        sr_sa = _create_source_authorship(sa_sync_conn, "scanr", sr_sd, 0, in_perimeter=False)
+        _create_address_for_sa(sa_sync_conn, sr_sa)
+
+        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
+        assert pub not in [p.id for p in res.publications]
+
+    def test_ignores_when_oa_confirms_uca(self, sa_sync_conn):
+        # OA atteste aussi UCA → pas de conflit.
+        pub = _create_pub(sa_sync_conn, title="OA confirms")
+        lab = _create_lab(sa_sync_conn, code="LAB-CONFIRM")
+        hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-confirm-1")
+        a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        _create_source_authorship(
+            sa_sync_conn, "hal", hal_sd, 0, in_perimeter=True, authorship_id=a_uca
+        )
+        oa_sd = _create_other_sd(sa_sync_conn, pub, "openalex", "oa-confirm")
+        oa_sa = _create_source_authorship(sa_sync_conn, "openalex", oa_sd, 0, in_perimeter=True)
+        _create_address_for_sa(sa_sync_conn, oa_sa)
+
+        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
+        assert pub not in [p.id for p in res.publications]
+
+    def test_ignores_when_one_of_wos_oa_confirms(self, sa_sync_conn):
+        # OA contredit mais WoS confirme → pas de conflit (la condition NOT EXISTS
+        # cherche n'importe quelle SP WoS/OA avec in_perimeter).
+        pub = _create_pub(sa_sync_conn, title="Mixed conf")
+        lab = _create_lab(sa_sync_conn, code="LAB-MIXED")
+        hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-mixed-1")
+        a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        _create_source_authorship(
+            sa_sync_conn, "hal", hal_sd, 0, in_perimeter=True, authorship_id=a_uca
+        )
+        oa_sd = _create_other_sd(sa_sync_conn, pub, "openalex", "oa-mixed")
+        oa_sa = _create_source_authorship(sa_sync_conn, "openalex", oa_sd, 0, in_perimeter=False)
+        _create_address_for_sa(sa_sync_conn, oa_sa)
+        wos_sd = _create_other_sd(sa_sync_conn, pub, "wos", "WOS:mixed")
+        wos_sa = _create_source_authorship(sa_sync_conn, "wos", wos_sd, 0, in_perimeter=True)
+        _create_address_for_sa(sa_sync_conn, wos_sa)
+
+        res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
+        assert pub not in [p.id for p in res.publications]
+
+    def test_requires_at_least_one_wos_or_oa(self, sa_sync_conn):
+        # Publi vue seulement par HAL → pas de comparaison possible, pas un conflit.
+        pub = _create_pub(sa_sync_conn, title="HAL only")
+        lab = _create_lab(sa_sync_conn, code="LAB-HALONLY")
+        hal_sd = _create_hal_sd(sa_sync_conn, pub, "h-only-1")
+        a_uca = _create_authorship_uca(sa_sync_conn, pub, lab, position=0)
+        _create_source_authorship(
+            sa_sync_conn, "hal", hal_sd, 0, in_perimeter=True, authorship_id=a_uca
+        )
 
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
         assert pub not in [p.id for p in res.publications]
