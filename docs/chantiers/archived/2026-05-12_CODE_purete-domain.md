@@ -59,8 +59,7 @@ Trois principes pertinents :
    Pydantic, pas de framework. Critère empirique : si on supprime
    toutes les libs tierces du projet, `domain/` doit encore se
    charger et ses tests passer.
-2. **Pas d'anaemic domain model.** Le domaine porte le **comportement
-   métier** (règles, invariants, transitions d'état), pas seulement
+2. **Pas d'anaemic domain model.** Le domaine porte le **comportement métier** (règles, invariants, transitions d'état), pas seulement
    des structures de données. Un `BaseModel` qui ne fait que valider
    un dict est par définition de l'I/O — sa place est ailleurs.
 3. **Schemas Pydantic = anti-corruption layer côté adapter.** Pydantic
