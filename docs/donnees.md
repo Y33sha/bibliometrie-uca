@@ -110,7 +110,7 @@ Légende:
 Tables associées :
 - `perimeters` : un périmètre est un ensemble de structures, incluant récursivement les sous-structures. Actuellement deux périmètres sont définis: **UCA** et **UCA élargi** (UCA + CHU + INP). Impacte:
     - les critères d'affiliation utilisés en paramètre des requêtes API;
-    - les authorships sources dont les affiliations résolues (table de jointure `source_authorship_structures`) seront peuplées par la phase `affiliations` du pipeline, et qui serviront à générer des `publications` et des `personnes` dans les tables canoniques.
+    - les authorships sources dont les affiliations résolues (table de jointure `source_authorship_structures`) sont peuplées par la phase `affiliations` du pipeline, et qui sont candidates au matching `publications` et `personnes`.
 
 - `structure_relations` : définit les relations entre structures. Deux relations existent: **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans le [référentiel ROR](glossaire#ror)); la relation "tutelle" a une conséquence sur les **structures incluses dans un périmètre** donné.
 - `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `affiliations` du [pipeline](pipeline.md) pour peupler la table de liaison `address_structures`.
@@ -220,7 +220,7 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 - **`source_authorships`** : contribution d'un auteur source à un document source. Porte `person_id` (rattachement à une personne canonique), `authorship_id` (FK vers l'authorship canonique), `in_perimeter`, `source_structures` (ARRAY[TEXT] des IDs natifs des structures côté source : numérique HAL, `I****` OpenAlex, noms d'institutions WoS, etc.), `raw_author_name`, `author_name_normalized`, `person_identifiers` (JSONB : `orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id`), `countries` (ARRAY[CHAR(2)]), `roles`, `excluded`. Les affiliations canoniques résolues sont reliées via la table de jointure `source_authorship_structures (source_authorship_id, structure_id)` (FK ON DELETE CASCADE des deux côtés, PK composite). Les affiliations textuelles brutes sont reliées via `source_authorship_addresses` → `addresses.raw_text`.
 - **`source_authorship_addresses`** : table de liaison `source_authorships ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs authorships, et alimente la résolution structure ↔ adresse de la phase `affiliations`.
 
-## Autres tables, à documenter
+## TODO: à mettre à jour - Autres tables, à documenter
 
 <!--TODO: rédiger des sections dédiées pour les tables ci-dessous.-->
 
@@ -277,9 +277,9 @@ Chantiers `DATA_*` actuellement ouverts dans
 
 
 
-## TODO: à réécrire - Zones fonctionnelles et propriétaires de données
+## Zones fonctionnelles et propriétaires de données
 
-<!--TODO: vérifier ce qu'il en est actuellement concernant les services propriétaires-->
+*A mettre à jour*
 
 Chaque table a un **service propriétaire** qui est le seul autorisé à y écrire
 (INSERT/UPDATE/DELETE). Les autres composants lisent via SELECT mais passent par

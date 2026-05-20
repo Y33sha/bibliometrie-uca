@@ -1,6 +1,6 @@
 # Glossaire métier — Bibliométrie UCA
 
-*A mettre à jour.*
+*A compléter*
 
 Termes métier utilisés dans le projet. Pour la documentation technique (pipeline, architecture, sources de données), voir les pages dédiées.
 
@@ -10,14 +10,14 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 |-------|-----------|
 | **HAL** | Archive ouverte nationale française. |
 | **AuréHAL** | Référentiel d'entités HAL (auteurs, structures, revues). |
-| **OpenAlex** | Index bibliographique ouvert (successeur de Microsoft Academic). |
-| **Web of Science (WoS)** | Index bibliographique commercial (Clarivate). |
-| **Unpaywall** | <span id="unpaywall"></span>Service qui associe un statut d'accès ouvert à chaque DOI. Utilisé pour enrichir le champ `oa_status` des publications. |
+| **OpenAlex** | Base bibliographique ouverte (fondation OurResearch). |
+| **Web of Science (WoS)** | Base bibliographique commerciale (Clarivate). |
+| **Unpaywall** | <span id="unpaywall"></span>Service qui résout le statut *open access* de chaque publication à partir du DOI. API utilisée pour enrichir et corriger le champ `oa_status` des publications. |
 | **OpenAPC** | TODO |
-| **ScanR** | TODO |
-| **CrossRef** | TODO |
-| **DataCite** | TODO |
-
+| **ScanR** | Portail ministériel de la recherche française. |
+| **CrossRef** | Agence d'enregistrement de DOI, principalement pour les publications. |
+| **DataCite** | Agence d'enregistrement de DOI, principalement pour les autres types de documents (jeux de données, etc.) |
+*TODO: Dumas, TEL, theses.fr
 
 ## Identifiants
 
@@ -53,15 +53,6 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 | **Bronze** | Publication accessible gratuitement sur le site de l'éditeur, sans licence OA explicite. Open access éditeur *de facto*, accès sans garantie de pérennité. |
 | **Closed** | Publication fermée, accessible uniquement via abonnement. |
 
-## Entités du référentiel
-
-| Terme | Définition |
-|-------|-----------|
-| **Publication** | Entité canonique dédupliquée. Plusieurs documents sources (HAL, OA, WoS) peuvent pointer vers la même publication. Déduplication par DOI ou par titre+année+journal. |
-| **Personne** | Individu physique unique. Hub d'identité reliant les auteurs de toutes les sources. Peut être créé automatiquement (pipeline) ou manuellement (import RH). |
-| **Authorship** | <span id="authorship"></span>Couple (publication, personne) représentant la contribution d'un auteur à une publication. Porte les informations d'affiliation (structures UCA), de position (rang dans la liste d'auteurs) et le flag `in_perimeter`. |
-| **Structure** | Entité institutionnelle : université, laboratoire, organisme national de recherche (CNRS, INRAE...), établissement partenaire (CHU, INP...). Référentiel maintenu manuellement. |
-| **Forme de nom** | Variante normalisée d'un nom de structure (`structure_name_forms`) ou d'un nom d'auteur (`person_name_forms`). Utilisée pour le matching automatique (résolution d'adresses pour les structures, création de personnes pour les auteurs). |
 
 ## Types de documents
 
@@ -69,18 +60,19 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 |-------|-----------|
 | **Article** | Publication dans une revue à comité de lecture. Type le plus courant. |
 | **Review** | Article de synthèse (revue de la littérature). Attention : dans WoS, "book review" désigne un compte-rendu d'ouvrage, pas une revue de la littérature. |
-| **Book** | Ouvrage (monographie). Peut partager un DOI avec ses chapitres. |
-| **Book chapter** | Chapitre d'ouvrage. Le DOI est parfois celui de l'ouvrage entier (cas géré par le pipeline). |
 | **Conference paper** | Communication dans un colloque ou une conférence. Inclut les posters dans certaines sources. |
 | **Preprint** | Version pré-publication déposée avant peer review (arXiv, HAL, etc.). |
-| **Thesis** | Thèse de doctorat ou HDR (habilitation à diriger des recherches). |
-| **Editorial** | Éditorial de revue. |
-| **Peer review** | Rapport d'évaluation d'un article. Les "auteurs" listés sont ceux de l'article évalué, pas du review — cas traité spécifiquement dans le pipeline. |
 
-## Périmètre UCA
+*TODO: étoffer*
+
+
+## Entités du référentiel
 
 | Terme | Définition |
 |-------|-----------|
-| **Périmètre restreint** | UCA + ses unités en tutelle directe. Détermine si un auteur est considéré "UCA" sur une publication (flag `in_perimeter`). |
-| **Périmètre élargi** | Périmètre restreint + établissements partenaires (CHU Clermont-Ferrand, Clermont Auvergne INP, VetAgro Sup...). Utilisé pour les affiliations détaillées (`structure_ids`). |
-| **Tutelle** | Relation hiérarchique entre une institution et un laboratoire. L'UCA est tutelle de ~30 laboratoires. Un laboratoire peut avoir plusieurs tutelles (co-tutelle CNRS, INRAE...). |
+| **Publication** | Entité canonique dédupliquée. Plusieurs documents sources (HAL, OA, WoS) peuvent pointer vers la même publication. Déduplication par DOI ou par titre+année+journal. |
+| **Personne** | Individu physique unique. Hub d'identité reliant les auteurs de toutes les sources. Peut être créé automatiquement (pipeline) ou manuellement (import RH). |
+| **Authorship** | <span id="authorship"></span>Pas un terme métier mais omniprésent dans l'appli. Couple (publication, personne) représentant la contribution d'**un** auteur à **une** publication. Porte les informations d'affiliation (structures UCA), de position (rang dans la liste d'auteurs) et le flag `in_perimeter`. |
+| **Structure** | Entité institutionnelle : université, laboratoire, organisme national de recherche (CNRS, INRAE...), établissement partenaire (CHU, INP...). Référentiel maintenu manuellement. Une structure peut avoir deux types de relations avec d'autres structures: tutelle, partenaire. |
+| **Forme de nom** | Variante normalisée d'un nom de structure (`structure_name_forms`) ou d'un nom d'auteur (`person_name_forms`). Utilisée pour le matching automatique (résolution d'adresses pour les structures, résolution de personnes en dernier recours pour les auteurs). |
+| **Périmètre** | Ensemble de *n* structures, incluant leurs sous-structures. Deux périmètres sont définis: UCA (contient l'UCA et ses labos en tutelle directe), UCA élargi (contient le précédent + CHU + INP). |
