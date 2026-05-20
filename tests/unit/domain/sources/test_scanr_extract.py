@@ -1,9 +1,13 @@
-"""Tests unitaires de `infrastructure/sources/scanr/parsing.py`."""
+"""Tests unitaires de `domain/sources/scanr_extract.py`."""
 
 from __future__ import annotations
 
-from infrastructure.sources.api_limits import SCANR_PER_PAGE
-from infrastructure.sources.scanr.parsing import build_query, extract_doi, extract_scanr_id
+from domain.sources.scanr_extract import (
+    SCANR_PER_PAGE,
+    build_query,
+    extract_doi,
+    extract_scanr_id,
+)
 
 
 class TestBuildQuery:
