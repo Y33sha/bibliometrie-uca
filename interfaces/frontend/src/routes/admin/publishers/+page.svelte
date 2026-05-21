@@ -17,7 +17,6 @@
 		country: string;
 		is_predatory: boolean;
 		publisher_type: string;
-		notes: string;
 	} | null = $state(null);
 
 	function openEdit(pub: Publisher) {
@@ -27,7 +26,6 @@
 			country: pub.country || '',
 			is_predatory: pub.is_predatory,
 			publisher_type: pub.publisher_type,
-			notes: '',
 		};
 	}
 
@@ -38,7 +36,6 @@
 		body.country = editModal.country.trim() || null;
 		body.is_predatory = editModal.is_predatory;
 		body.publisher_type = editModal.publisher_type;
-		if (editModal.notes.trim()) body.notes = editModal.notes.trim();
 		try {
 			await publishersApi.update(editModal.id, body);
 			editModal = null;
@@ -210,11 +207,9 @@
 				<option value={opt.value}>{opt.label_fr}</option>
 			{/each}
 		</select>
-		<label>
+		<label class="checkbox-row">
 			<input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur
 		</label>
-		<label>Notes</label>
-		<textarea bind:value={editModal.notes} rows="2"></textarea>
 		<div class="modal-actions">
 			<button class="btn" onclick={() => editModal = null}>Annuler</button>
 			<button class="btn btn-primary" onclick={saveEdit}>Enregistrer</button>

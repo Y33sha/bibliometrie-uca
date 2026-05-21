@@ -234,6 +234,22 @@ th.sorted .sort-arrow {
 	margin: 8px 0 3px;
 }
 
+.modal label.checkbox-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: normal;
+	color: inherit;
+	margin: 6px 0;
+	cursor: pointer;
+}
+
+.modal label.checkbox-row input[type="checkbox"] {
+	width: auto;
+	margin: 0;
+	padding: 0;
+}
+
 .modal input,
 .modal select,
 .modal textarea {
