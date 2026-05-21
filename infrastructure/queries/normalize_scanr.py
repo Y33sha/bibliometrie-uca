@@ -9,7 +9,7 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.scanr import ScanrNormalizeQueries
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 from infrastructure.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )

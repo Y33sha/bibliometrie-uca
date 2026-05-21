@@ -12,7 +12,7 @@ from sqlalchemy import Connection, func, select, text, update
 
 from application.ports.api.config_queries import ConfigItem, ConfigQueries
 from application.ports.config import ConfigStore
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 from infrastructure.db.tables import config
 
 logger = logging.getLogger(__name__)

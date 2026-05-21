@@ -14,16 +14,16 @@ règles sur la hiérarchie `structure_relations`) vit ici.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 from domain.structures.identifiers import HalCollection, RorId
 from domain.structures.name_forms import StructureNameForm
 
 
-class StructureType(str, Enum):
+class StructureType(StrEnum):
     """Type d'une structure de recherche / d'enseignement.
 
-    Mappe sur l'enum Postgres `structure_type`. Mixin `str` pour garder
+    Mappe sur l'enum Postgres `structure_type`. `StrEnum` (PEP 663) garde
     la valeur sérialisable telle quelle vers SQL et API.
     """
 

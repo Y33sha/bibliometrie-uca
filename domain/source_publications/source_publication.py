@@ -22,8 +22,8 @@ vit ici.
 from dataclasses import dataclass, field
 
 from domain.errors import ConflictError
-from domain.json_types import JsonValue
 from domain.source_publications.source_authorship import SourceAuthorship
+from domain.types import JsonValue
 
 
 @dataclass(slots=True)

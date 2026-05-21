@@ -27,11 +27,11 @@ import logging
 import httpx
 from sqlalchemy import Connection
 
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.refetch_truncated import (
     OpenalexRefetchAdapter,
     TruncatedWork,
 )
-from domain.pipeline_metrics import PhaseMetrics
 
 COMMIT_EVERY = 50
 

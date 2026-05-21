@@ -27,12 +27,12 @@ import logging
 import httpx
 from sqlalchemy import Connection
 
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.fetch_missing_hal_id import (
     HalFetchMissingAdapter,
     HalIdRef,
     NntRef,
 )
-from domain.pipeline_metrics import PhaseMetrics
 
 
 def _dedup_halid_refs(refs: list[HalIdRef]) -> list[HalIdRef]:

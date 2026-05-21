@@ -14,7 +14,7 @@ import contextvars
 import logging
 
 from application.ports.repositories.audit_repository import AuditRepository
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 
 logger = logging.getLogger(__name__)
 

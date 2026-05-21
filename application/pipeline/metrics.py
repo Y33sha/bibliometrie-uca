@@ -4,12 +4,6 @@ Chaque `run(...)` de phase retourne un `PhaseMetrics`. L'orchestrateur
 (`run_pipeline.py`) mesure la durée et agrège les métriques par phase.
 La consommation (rapport, dashboard) est traitée dans Volet B du chantier
 `CODE_observabilite-robustesse-pipeline.md`.
-
-Vit dans `domain/` parce que c'est un value object pur (pas d'I/O) partagé
-entre les orchestrateurs (`application/pipeline/*`) et les scripts source
-(`infrastructure/sources/*` via `SourceExtractor`) — la règle DDD interdit
-à `infrastructure` d'importer `application`, donc le module commun doit
-être placé en `domain/` ou autre zone neutre.
 """
 
 from __future__ import annotations

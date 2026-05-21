@@ -14,9 +14,9 @@ import time
 from sqlalchemy import Connection
 
 from application.pipeline.extract.base import ExtractionConfigError, SourceExtractor
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
 from application.ports.pipeline.staging import StagingQueries
-from domain.pipeline_metrics import PhaseMetrics
 from domain.sources.wos_extract import WOS_DELAY, build_query, get_records, get_records_found
 
 # Constantes techniques de l'orchestration (pas spécifiques à l'API).

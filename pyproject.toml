@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bibliometrie-uca"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "requests==2.33.0",          # CVE-2024-35195, CVE-2024-47081, CVE-2026-25645 fixed
     "httpx==0.27.2",             # extractions HTTP async dans le pipeline
@@ -148,7 +148,7 @@ pydantic-settings = "pydantic_settings"
 # ----------------------------------------------------------------------
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 extend-exclude = [
     "interfaces/frontend",
     "bibliometrie_uca.egg-info",
@@ -254,7 +254,7 @@ exclude_lines = [
 # Durcir module par module via overrides quand le code est stabilisé.
 # ----------------------------------------------------------------------
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 # Imports : ignorer les libs tierces non typées plutôt que de polluer
 ignore_missing_imports = true
 # Mode strict : toutes les fonctions doivent être annotées, et leur corps
@@ -314,8 +314,9 @@ exclude = [
 # - `infrastructure.repositories.*` et `infrastructure.queries.*` :
 #   couche SQL — Row, records DB, batchs hétérogènes. Phase 8.
 # - `interfaces.cli.{imports,maintenance}.*` : scripts one-shot, hors scope.
-# - `interfaces.api.models:ConfigItem.value` / `ConfigValueUpdate.value` :
-#   pydantic ne supporte pas l'alias récursif `JsonValue` (py310).
+# - `interfaces.api.models.*` : nombreux fields `Any` (payloads JSONB libres
+#   côté API, body dicts hétérogènes). Hors scope du chantier typage strict
+#   tant que `JsonValue` ne couvre pas tous les cas.
 # - `interfaces.cli.dev.generate_seed.TABLES` : schéma de seed,
 #   `list[dict[str, Any]]` délibéré.
 # - `run_pipeline` : entry-point CLI qui orchestre des subprocess + dict

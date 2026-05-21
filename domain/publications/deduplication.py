@@ -6,17 +6,17 @@ Asymétrie volontaire DOI vs autres clés (NNT, HAL_ID) : `resolve_doi_conflict`
 """
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 _CHAPTER_DOC_TYPES: frozenset[str] = frozenset({"book_chapter", "book-chapter", "chapter"})
 _BOOK_DOC_TYPES: frozenset[str] = frozenset({"book"})
 
 
-class DeduplicationKey(str, Enum):
+class DeduplicationKey(StrEnum):
     """Identifiants cross-source par lesquels une publication peut être dédupliquée.
 
-    Conventionnellement ordre de priorité par défaut (DOI > NNT > HAL_ID), mais chaque cascade caller décide quelles clés elle consulte et dans quel ordre. Mixin `str` pour la sérialisation transparente.
+    Conventionnellement ordre de priorité par défaut (DOI > NNT > HAL_ID), mais chaque cascade caller décide quelles clés elle consulte et dans quel ordre. `StrEnum` (PEP 663) garde la valeur sérialisable telle quelle.
     """
 
     DOI = "doi"
@@ -24,7 +24,7 @@ class DeduplicationKey(str, Enum):
     HAL_ID = "hal_id"
 
 
-class MetadataDeduplicationCase(str, Enum):
+class MetadataDeduplicationCase(StrEnum):
     """Cas de déduplication par métadonnées (algorithme de décision, pas identifiant unique).
 
     Chaque cas correspond à une combinaison de critères qui rendent deux publications considérées comme la même. Un futur algorithme de dédup pourra ajouter de nouveaux cas (ex. `ARTICLE_TITLE_JOURNAL_YEAR`).

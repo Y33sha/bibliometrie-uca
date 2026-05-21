@@ -8,7 +8,7 @@ d'insertion.
 
 from typing import Protocol
 
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 
 
 class AuditRepository(Protocol):

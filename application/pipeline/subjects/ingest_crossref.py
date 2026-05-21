@@ -10,7 +10,7 @@ Source format (cf normalize_crossref.py:140-146) :
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 
 SOURCE = "crossref"
 

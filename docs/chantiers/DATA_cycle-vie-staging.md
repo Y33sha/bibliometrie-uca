@@ -78,10 +78,8 @@ CHECK (
 
 Avant tout le reste, formaliser l'existant.
 
-- Migration : `ALTER TABLE staging ADD CONSTRAINT staging_state_valid CHECK (NOT not_found OR processed)` (état actuel, 3 colonnes).
-- `donnees.md` : ajout d'une section "Cycle de vie d'une row `staging`" avec le tableau des 3 états + diagramme de transitions.
-
-Petit, livrable indépendamment du reste. Sert de base pour les phases suivantes.
+- [x] Migration : `ALTER TABLE staging ADD CONSTRAINT staging_not_found_implies_processed CHECK (NOT not_found OR processed)` (état actuel, 3 colonnes) — posée par migration 0015.
+- [x] `donnees.md` : section "Cycle de vie d'une row `staging`" avec le tableau des 3 états (cf. [donnees.md:230-257](../donnees.md#L230)).
 
 ### Phase 2 — Backoff `not_found_at` / `next_retry`
 

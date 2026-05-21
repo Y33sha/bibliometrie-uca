@@ -31,8 +31,8 @@ from application.pipeline.subjects import (
 )
 from application.pipeline.subjects._common import SubjectCache
 from application.ports.pipeline.subjects import SubjectsQueries
-from domain.json_types import JsonValue
 from domain.sources import ALL_SOURCES
+from domain.types import JsonValue
 
 
 class SubjectIngestor(Protocol):

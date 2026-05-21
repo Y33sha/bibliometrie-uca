@@ -29,7 +29,6 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
-from domain.json_types import JsonValue
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.publications.authorship_roles import map_role
@@ -40,6 +39,7 @@ from domain.sources.scanr import (
     extract_nnt_from_scanr_id,
     select_leaf_affiliations,
 )
+from domain.types import JsonValue
 
 # =============================================================
 # UTILITAIRES

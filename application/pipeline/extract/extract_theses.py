@@ -13,12 +13,12 @@ import time
 from sqlalchemy import Connection
 
 from application.pipeline.extract.base import ExtractionConfigError, SourceExtractor
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
     ThesesExtractConfig,
 )
 from application.ports.pipeline.staging import StagingQueries
-from domain.pipeline_metrics import PhaseMetrics
 from domain.sources.theses_extract import (
     THESES_DELAY,
     THESES_PER_PAGE,

@@ -13,17 +13,17 @@ les normalizers de pipeline qui stockent la forme texte en base).
 
 import re
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from domain.errors import ValidationError
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 
 
-class AttributionStatus(str, Enum):
+class AttributionStatus(StrEnum):
     """Statut d'une attribution `PersonIdentifier ↔ Person`.
 
-    Mappe sur l'enum Postgres `identifier_status`. Mixin `str` pour
-    garder la valeur sérialisable telle quelle vers SQL et API.
+    Mappe sur l'enum Postgres `identifier_status`. `StrEnum` (PEP 663) garde
+    la valeur sérialisable telle quelle vers SQL et API.
 
     Transitions valides (cf. `domain/persons/person_identifier.py`) :
     - `PENDING → CONFIRMED` (validation) ou `→ REJECTED` (rejet)

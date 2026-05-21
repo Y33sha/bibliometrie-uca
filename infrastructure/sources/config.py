@@ -8,7 +8,7 @@ import logging
 
 from sqlalchemy import Connection, text
 
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 
 logger = logging.getLogger(__name__)
 

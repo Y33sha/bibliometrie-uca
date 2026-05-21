@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict OuWZFdcn0ftjRo84QjyFbLiaXk4fGBMvDO5MFGZFtG1iz3WE1ECFEWbjOPJF6DL
+\restrict 3teQlkWRfLz7yXSsGEDvQlQDBirY4txsqup0fps8NRBGmjLdWOkHv80sufzIt0K
 
--- Dumped from database version 18.1
--- Dumped by pg_dump version 18.1
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -797,6 +797,38 @@ ALTER SEQUENCE public.persons_rh_id_seq OWNED BY public.persons_rh.id;
 
 
 --
+-- Name: pipeline_check_snapshots; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pipeline_check_snapshots (
+    id integer NOT NULL,
+    ran_at timestamp with time zone DEFAULT now() NOT NULL,
+    mode text NOT NULL,
+    payload jsonb NOT NULL
+);
+
+
+--
+-- Name: pipeline_check_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.pipeline_check_snapshots_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: pipeline_check_snapshots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.pipeline_check_snapshots_id_seq OWNED BY public.pipeline_check_snapshots.id;
+
+
+--
 -- Name: publication_subjects; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1029,7 +1061,7 @@ CREATE TABLE public.source_publications (
     created_at timestamp with time zone DEFAULT now(),
     countries text[],
     hal_collections text[],
-    external_ids jsonb,
+    external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
     urls text[],
     cited_by_count integer,
     journal_id integer,
@@ -1042,7 +1074,8 @@ CREATE TABLE public.source_publications (
     topics jsonb,
     biblio jsonb,
     meta jsonb,
-    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL
+    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text))
 );
 
 
@@ -1374,6 +1407,13 @@ ALTER TABLE ONLY public.persons_rh ALTER COLUMN id SET DEFAULT nextval('public.p
 
 
 --
+-- Name: pipeline_check_snapshots id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pipeline_check_snapshots ALTER COLUMN id SET DEFAULT nextval('public.pipeline_check_snapshots_id_seq'::regclass);
+
+
+--
 -- Name: publications id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1683,6 +1723,14 @@ ALTER TABLE ONLY public.persons_rh
 
 
 --
+-- Name: pipeline_check_snapshots pipeline_check_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pipeline_check_snapshots
+    ADD CONSTRAINT pipeline_check_snapshots_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: publication_subjects publication_subjects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1938,6 +1986,13 @@ CREATE INDEX idx_addresses_countries ON public.addresses USING gin (countries) W
 
 
 --
+-- Name: idx_addresses_normalized_text; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_addresses_normalized_text ON public.addresses USING btree (normalized_text);
+
+
+--
 -- Name: idx_addresses_normalized_text_trgm; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2155,6 +2210,13 @@ CREATE INDEX idx_persons_rh_person_id ON public.persons_rh USING btree (person_i
 
 
 --
+-- Name: idx_pipeline_check_snapshots_mode_ran_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pipeline_check_snapshots_mode_ran_at ON public.pipeline_check_snapshots USING btree (mode, ran_at DESC);
+
+
+--
 -- Name: idx_pnf_person_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2253,6 +2315,13 @@ CREATE INDEX idx_sa_excluded ON public.source_authorships USING btree (excluded)
 
 
 --
+-- Name: idx_sa_in_perimeter; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sa_in_perimeter ON public.source_authorships USING btree (source_publication_id) WHERE (in_perimeter = true);
+
+
+--
 -- Name: idx_sa_nonhal_outscope; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2298,7 +2367,7 @@ CREATE INDEX idx_source_pubs_doi ON public.source_publications USING btree (doi)
 -- Name: idx_source_pubs_external_ids; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_pubs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids IS NOT NULL);
+CREATE INDEX idx_source_pubs_external_ids ON public.source_publications USING gin (external_ids) WHERE (external_ids <> '{}'::jsonb);
 
 
 --
@@ -2775,4 +2844,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict OuWZFdcn0ftjRo84QjyFbLiaXk4fGBMvDO5MFGZFtG1iz3WE1ECFEWbjOPJF6DL
+\unrestrict 3teQlkWRfLz7yXSsGEDvQlQDBirY4txsqup0fps8NRBGmjLdWOkHv80sufzIt0K

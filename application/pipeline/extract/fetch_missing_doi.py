@@ -25,11 +25,11 @@ import logging
 import httpx
 from sqlalchemy import Connection
 
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.fetch_missing_doi import (
     AsyncFetchMissingDoiAdapter,
     CrossImportDoisReader,
 )
-from domain.pipeline_metrics import PhaseMetrics
 
 __all__ = ["AsyncFetchMissingDoiAdapter", "CrossImportDoisReader", "run_async"]
 

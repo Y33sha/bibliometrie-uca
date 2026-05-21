@@ -13,7 +13,7 @@ import logging
 import os
 import sys
 
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 from infrastructure import PROJECT_ROOT
 
 log = logging.getLogger(__name__)

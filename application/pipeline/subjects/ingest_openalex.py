@@ -21,8 +21,8 @@ from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
 from application.ports.pipeline.subjects import OntologyEntry
-from domain.json_types import JsonValue
 from domain.subjects.subject import ONTOLOGY_OPENALEX_TOPIC
+from domain.types import JsonValue
 
 SOURCE = "openalex"
 

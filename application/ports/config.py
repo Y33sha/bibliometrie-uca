@@ -10,7 +10,7 @@ Implémenté par `infrastructure.queries.config.PgConfig`.
 
 from typing import Protocol
 
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 
 
 class ConfigStore(Protocol):

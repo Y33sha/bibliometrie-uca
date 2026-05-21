@@ -1,7 +1,7 @@
 """Tests de l'aggregate root ``AddressAffiliation`` + VO interne
 ``StructureLink`` (scaffolding Phase 1)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -92,6 +92,6 @@ class TestRejectStructure:
 class TestMarkResolved:
     def test_sets_resolved_at(self):
         aff = _make()
-        ts = datetime(2026, 5, 13, 12, 0, tzinfo=timezone.utc)
+        ts = datetime(2026, 5, 13, 12, 0, tzinfo=UTC)
         aff.mark_resolved(at=ts)
         assert aff.resolved_at == ts

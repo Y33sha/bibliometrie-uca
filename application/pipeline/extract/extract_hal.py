@@ -15,9 +15,9 @@ import time
 from sqlalchemy import Connection
 
 from application.pipeline.extract.base import SourceExtractor
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from application.ports.pipeline.staging import StagingQueries
-from domain.pipeline_metrics import PhaseMetrics
 from domain.sources.hal_extract import (
     HAL_DELAY,
     build_query,

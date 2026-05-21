@@ -1,5 +1,8 @@
 # Chantier — Parallélisation des extractions HTTP pipeline
 
+Commencé le 2026-05-18.
+Terminé le 2026-05-21.
+
 ## Contexte
 
 Le pipeline fait beaucoup d'appels HTTP à des APIs sources (OpenAlex, HAL, WoS, ScanR, theses.fr) et à des APIs d'enrichissement (Unpaywall, DOAJ). Tant que ces appels sont synchrones et exécutés en série, on plafonne au QPS du client, pas du serveur.
@@ -39,7 +42,6 @@ Sans toucher au code interne des extracteurs : lancer les 5 en parallèle dans `
 - [x] Wrapper les appels `_run_extract_*` dans un `ThreadPoolExecutor` (max_workers = nombre d'extracteurs sélectionnés).
 - [x] Récupérer chaque `PhaseMetrics` via `future.result()` puis merger séquentiellement dans le thread principal (la merge n'est pas thread-safe).
 - [x] Vérifier qu'aucun extracteur ne dépend de l'état d'un autre (chacun cible une table `staging.*` distincte ; chaque helper ouvre/ferme sa propre connexion).
-- [ ] Bench avant/après sur un run `--mode full --sources hal,openalex,wos,scanr,theses` → mentionner dans le commit.
 
 Gain attendu : `max(temps_par_source)` au lieu de `sum(temps_par_source)`. Sur un full où OpenAlex domine, gain dépendant du poids relatif des autres sources.
 
@@ -53,7 +55,7 @@ Risques :
 ROI élevé : chaque appel est un round-trip indépendant, idéal pour `asyncio.gather` + `Semaphore`.
 
 - [x] `enrich_oa_status.py` → async (Unpaywall, ~10 req/s recommandé). Pattern identique aux `fetch_missing_doi`. (commit f357786f)
-- [ ] `enrich_journal_apc.py` : laissé sync — déjà batch de 50 IDs par requête via filtre `openalex:A|B|C` (API OpenAlex Sources), volume de revues bien inférieur aux publications. Alignement auth seulement : `api_key` prioritaire, fallback `mailto` (comme les autres modules OpenAlex).
+- [x] `enrich_journal_apc.py` : laissé sync — déjà batch de 50 IDs par requête via filtre `openalex:A|B|C` (API OpenAlex Sources), volume de revues bien inférieur aux publications. Alignement auth seulement : `api_key` prioritaire, fallback `mailto` (comme les autres modules OpenAlex).
 - [x] `refetch_truncated.py` → async (OpenAlex, `max_concurrent=3` polite pool). (commit faa5e486)
 
 Pattern à reproduire :
@@ -65,39 +67,27 @@ Pattern à reproduire :
 5. Inserts DB sérialisés via `Lock` + `to_thread` (modèle `fetch_missing_hal_id`) si écriture depuis la boucle ; sinon batch sync hors îlot.
 6. Sur Windows : `WindowsSelectorEventLoopPolicy`.
 
-### Phase 3 — Async sur les extracteurs (optionnel, ROI faible)
+### Phase 3 — Async sur les extracteurs — **abandonnée**
 
-Hypothèse à réviser : la pagination cursor (OpenAlex) est intrinsèquement séquentielle (cursor[N+1] dépend de la réponse N). HAL et theses.fr en offset sont parallélisables page par page, mais le gain après Phase 1 est marginal.
+Décision 2026-05-21 : pas d'async sur les extracteurs paginés, ni WoS (seul candidat envisagé sérieusement) ni les autres.
 
-À ouvrir uniquement si Phase 1 + 2 ne suffisent pas en pratique, ou si on doit retoucher `base.py` pour autre chose.
+Raisons :
+- **HAL, theses.fr, ScanR, OpenAlex** : gain marginal après Phase 1 (les 5 sources tournent déjà en parallèle entre elles via ThreadPoolExecutor). Pagination cursor (OpenAlex) intrinsèquement séquentielle ; gain inter-pages sur les autres dominé par le wall-time de la source la plus lente, déjà parallélisée par Phase 1.
+- **WoS** : seul candidat avec pages de 10 records (`WOS_PER_PAGE=10`), donc plus de pages à charger. Mais [`fetch_missing_doi.py:56-60`](../../infrastructure/sources/wos/fetch_missing_doi.py#L56) acte déjà un plafond prudent à ≈2 req/s (« API Clarivate instable historiquement, rate-limit serré »). Le quota annuel `X-REC-AmtPerYear-Remaining` est la contrainte structurelle, pas le wall-time. Et l'extracteur a un design « breather » (pause 15s toutes les 10 pages, 30s entre années) qui perd son sens en parallèle.
 
-Si on s'y attaque :
-- `base.py` : migrer le boilerplate (exceptions, cycle connexion, User-Agent) vers un `AsyncExtractorBase`.
-- HAL, theses.fr : parallélisme inter-pages.
-- OpenAlex : parallélisme inter-années (`asyncio.gather` sur N tâches « extraire année Y »).
-- ScanR, WoS : rate-limit contractuel strict, parallélisme limité.
+Alternative légère si besoin futur : abaisser `WOS_DELAY` ([api_limits.py:37](../../infrastructure/sources/api_limits.py#L37)) en restant sur l'extracteur séquentiel. Zéro effort d'implémentation, réversible.
 
-### Phase 4 — HTTP/2 sur les clients async (optionnel, à valider avant lancement)
+### Phase 4 — HTTP/2 sur les clients async — **abandonnée sans bench**
 
-**Pré-requis : Phase 2 terminée.** HTTP/2 sans parallélisme côté client = aucun gain (le multiplexing ne sert qu'avec des requêtes concurrentes). Sur les extracteurs ThreadPool (Phase 1, 1 thread par source), HTTP/2 ne change rien — hors scope.
+Décision 2026-05-21 : NO-GO, et pas de bench préalable.
 
-Hypothèse : sur les clients async (`fetch_missing_doi/*`, `fetch_missing_hal_id`, et les enrichissements Phase 2), HTTP/2 économise des connexions TCP+TLS. Gain attendu : 5-15% sur le throughput au premier batch, dilué ensuite par le keep-alive HTTP/1.1 qui amortit déjà le setup.
+Raisons :
+- Gain attendu marginal (5-15 % au premier batch, dilué par le keep-alive HTTP/1.1 qui amortit déjà le setup TCP+TLS).
+- Sur la plupart des APIs cibles, le bottleneck est le rate-limit serveur (OpenAlex 10 req/s, WoS ≈2 req/s, Crossref polite pool), pas le client → gain réel probablement nul.
+- Le seul candidat sérieux (Unpaywall sur Cloudflare) est déjà async depuis Phase 2 — le gain facile est pris.
+- Coût de transmissibilité : dépendance binaire `h2` (HPACK), debug réseau binaire vs textuel, risque wheels Windows. Pas justifié pour un gain incertain ≤ 15 %.
 
-Sur la plupart des APIs cibles, le bottleneck est le rate-limit serveur (OpenAlex 10 req/s, WoS, Crossref polite), pas le client. Donc le gain réel peut être nul.
-
-**Approche : mesurer avant d'activer largement.**
-
-- [ ] Ajouter `h2` aux dépendances (`pyproject.toml`, ~5 sous-paquets) et vérifier que ça n'introduit pas de souci de wheels sur Windows.
-- [ ] Activer `http2=True` sur **un seul** client async — candidat : Unpaywall via `enrich_oa_status` après Phase 2 (volume élevé, max_concurrent ~10, serveur sur Cloudflare donc HTTP/2 quasi-certain).
-- [ ] Vérifier que le serveur négocie effectivement HTTP/2 (logger la version protocole via `response.http_version`).
-- [ ] Bench A/B sur un run réel : HTTP/1.1 vs HTTP/2, ≥5 000 requêtes. Comparer throughput, latence p50/p95, nombre de connexions TCP ouvertes.
-- [ ] **Seuil de décision : si gain throughput < 10 %, fermer Phase 4 sans généraliser** (le coût de maintenance — dépendance `h2`, branche fallback, debug binaire — ne se justifie pas).
-- [ ] Si gain ≥ 10 % : généraliser aux 5 `fetch_missing_doi/*`, `fetch_missing_hal_id`, `enrich_journal_apc`, `refetch_truncated`. Documenter le `http_version` observé par API dans la fiche pour suivi.
-
-Risques :
-- Une API serveur sans HTTP/2 fait fallback silencieux en HTTP/1.1 (httpx gère) — pas de régression, mais le gain attendu disparaît pour cette API.
-- `h2` package introduit du code binaire (HPACK). Sur Windows, vérifier le pip install.
-- Debug réseau plus dur (HTTP/2 binaire vs HTTP/1.1 textuel) — Wireshark / curl `--http2` requis pour inspection.
+À rouvrir uniquement si une API cible précise s'avère bottleneckée client et tourne sur un serveur HTTP/2 documenté.
 
 ## Implications observabilité
 

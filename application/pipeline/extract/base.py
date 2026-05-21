@@ -26,21 +26,13 @@ import argparse
 import logging
 import sys
 from abc import ABC, abstractmethod
-from typing import ClassVar, Generic, TypeVar
+from typing import ClassVar
 
 import requests
 from sqlalchemy import Connection
 
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.staging import StagingQueries
-from domain.pipeline_metrics import PhaseMetrics
-
-ConfigT = TypeVar("ConfigT")
-"""Type de la config chargée par `load_config`, propre à chaque source.
-
-Permet aux sous-classes de retourner une dataclass typée plutôt qu'un
-`dict[str, Any]` opaque. Le base class ne consomme jamais le contenu
-de la config — il la passe à `extract_all` qui sait l'interpréter.
-"""
 
 
 class ExtractionConfigError(Exception):
@@ -53,8 +45,13 @@ class ExtractionConfigError(Exception):
     """
 
 
-class SourceExtractor(ABC, Generic[ConfigT]):
+class SourceExtractor[ConfigT](ABC):
     """Template pour l'extraction API → staging.
+
+    `ConfigT` (paramètre PEP 695) = type de la config chargée par `load_config`,
+    propre à chaque source. Permet aux sous-classes de retourner une dataclass
+    typée plutôt qu'un `dict` opaque. Le base class ne consomme jamais le contenu
+    de la config — il la passe à `extract_all` qui sait l'interpréter.
 
     Points d'override obligatoires :
     - `SOURCE` : identifiant source (ex: "hal", "openalex")

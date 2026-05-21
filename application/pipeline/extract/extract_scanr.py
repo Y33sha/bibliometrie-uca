@@ -13,9 +13,9 @@ import time
 from sqlalchemy import Connection
 
 from application.pipeline.extract.base import ExtractionConfigError, SourceExtractor
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
 from application.ports.pipeline.staging import StagingQueries
-from domain.pipeline_metrics import PhaseMetrics
 from domain.sources.scanr_extract import SCANR_DELAY, build_query, extract_scanr_id
 
 
