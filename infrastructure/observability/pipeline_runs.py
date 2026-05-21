@@ -220,6 +220,39 @@ def _to_ratios(counts: dict[str, int]) -> dict[str, float]:
     return {k: v / total for k, v in counts.items()}
 
 
+def fetch_previous_observables(
+    conn: Connection, *, mode: str, before_ran_at: datetime.datetime
+) -> ObservablesPayload | None:
+    """Récupère les observables du snapshot précédent (même mode, strict avant `before_ran_at`).
+
+    Sert au recalcul des observations d'un snapshot pré-existant, depuis l'API
+    par exemple : on a un snapshot N et on veut le comparer au snapshot N-1.
+    """
+    row = conn.execute(
+        text(
+            "SELECT payload -> 'observables' AS observables "
+            "FROM pipeline_run_snapshots "
+            "WHERE mode = :mode AND ran_at < :before "
+            "ORDER BY ran_at DESC LIMIT 1"
+        ),
+        {"mode": mode, "before": before_ran_at},
+    ).first()
+    if row is None or row.observables is None:
+        return None
+    return cast(ObservablesPayload, row.observables)
+
+
+def build_observations(
+    current: ObservablesPayload, previous: ObservablesPayload | None
+) -> list[Observation]:
+    """Construit la liste d'observations en comparant `current` à `previous`.
+
+    Exposée publiquement pour le recalcul à la lecture (endpoint detail
+    `/api/admin/pipeline-runs/{id}`).
+    """
+    return _build_observations(current, previous)
+
+
 def _build_observations(
     current: ObservablesPayload, previous: ObservablesPayload | None
 ) -> list[Observation]:
