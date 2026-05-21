@@ -98,13 +98,19 @@ L'attribution initiale est traitée hors Phase 1 :
 
 ## Phase 3 — Enrichissement DOAJ
 
-- [ ] **Inventaire des champs DOAJ utiles** au-delà de `is_in_doaj` : license, oa_start_year, publisher, country, sujets, persistent_id_url. Décider lesquels intégrer.
-- [ ] **Décision : étendre `enrich_journal_apc` ou créer `enrich_journal_doaj`** ?
-- [ ] **Schéma** : ajouter colonnes `journals.license`, `journals.oa_start_year`, etc. — ou stocker en `notes` JSONB.
-- [ ] **Croisement avec `oa_status`** : si une publi est marquée `gold` mais le journal n'est pas dans DOAJ (ni autre liste OA), signaler. Inversement : publi marquée `subscription` dans une revue DOAJ ?
-- [ ] **Rafraîchissement** : périodicité (mensuel ? trimestriel ?) — à arbitrer (Phase 3 ou phase ultérieure).
+**Décisions tranchées** :
+- **Source principale** : dump CSV public DOAJ (mensuel, pas de rate-limit). Extracteur API à venir pour un mode incrémental si besoin (différé).
+- **Stockage** : colonne `journals.doaj_payload` (JSONB, payload brut) + `journals.doaj_imported_at` (timestamptz). Extraction des champs utiles en colonnes dédiées au fil des besoins Phase 4.
+- **Module** : `enrich_journal_doaj` (nouveau). `enrich_journal_apc` reste fonctionnel mais est marqué legacy — sera retiré une fois le flux DOAJ stable et l'APC repompé depuis `doaj_payload`.
+- **Flagging `is_in_doaj`** : CSV = source de vérité. Reset à FALSE pour tous les journals puis SET TRUE sur les ISSN matchés.
 
-**Sortie attendue** : `journals` enrichis, les incohérences `oa_status` sont détectables.
+- [x] **Migration Alembic** : `journals.doaj_payload jsonb`, `journals.doaj_imported_at timestamptz` (révision `e5a3f7b8c2d4`).
+- [ ] **Script CLI d'import CSV** : lit `data/doaj_journalcsv_*.csv`, match par ISSN/eISSN cross-colonne contre `journals.issn`/`eissn`/`issnl`, bulk update `doaj_payload` + `doaj_imported_at` + `is_in_doaj`. Stats en fin de run (matchés / non matchés / rows DOAJ sans correspondance interne).
+- [ ] **Extracteur API DOAJ** *(différé)* : pour rafraîchissement incrémental quotidien/hebdo. Le CSV mensuel suffit pour démarrer.
+- [ ] **Croisement avec `oa_status`** : Phase 4c — `full_oa` ↔ revue DOAJ, `subscription` ↔ non-DOAJ.
+- [ ] **Retirer `enrich_journal_apc`** *(différé)* : une fois `doaj_payload` exploité (APC + DOAJ flag) et stabilité confirmée.
+
+**Sortie attendue** : `journals` enrichis avec le payload DOAJ brut, incohérences `oa_status` détectables (Phase 4c), prêt pour exploitation publishers / sujets / license au fil des besoins.
 
 ## Phase 4 — Contrôles de cohérence
 
