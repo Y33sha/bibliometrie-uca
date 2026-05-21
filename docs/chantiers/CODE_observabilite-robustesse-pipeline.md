@@ -1,6 +1,7 @@
 # Chantier — Observabilité et robustesse du pipeline
 
 Commencé le 2026-05-16
+En standby en attendant d'avoir des données (plusieurs runs du pipeline)
 
 ## Contexte
 
@@ -119,8 +120,9 @@ Pistes (à arbitrer au moment d'implémenter) :
 
 Logs ambigus relevés à l'usage, à élucider et harmoniser entre sources.
 
-- [ ] **Extracteur HAL** : log `"mode incrémental (0 orphelins vs 1 pages full-fetch)"` cryptique. Décortiquer la sémantique (orphelins vs full-fetch pages = quel rapport au choix d'heuristique ?) et reformuler. À coupler avec la révision de l'heuristique d'aiguillage `extract_collection` (cf. [`DATA_cycle-vie-staging.md`](DATA_cycle-vie-staging.md), Phase 1bis) : `len(orphans) < full_fetch_pages` reste insatisfaisante (compte les requêtes, ignore la taille de payload), particulièrement sur les requêtes umbrella type `PRES_CLERMONT`/`PRES_UCA` où le mode full-fetch est catastrophiquement lent. Pistes : (a) borne dure sur les orphelins, (b) cost function pondérée payload via `hal_per_page_for`, (c) compteur empirique sur les derniers runs.
-- [ ] **Orchestrateur** : log `"Lancer build_authorships.py pour propager in_perimeter/structure_ids"` apparaît à un moment qui suggère qu'un script externe doit être lancé manuellement, alors que c'est en réalité l'orchestrateur qui enchaîne. Reformuler pour refléter l'enchaînement automatique (ex. « → build_authorships : propagation in_perimeter / structure_ids »).
+- [x] **Extracteur HAL — log d'aiguillage** : reformulé dans le commit `6d5dfa3` (chantier extract→Port). Format actuel : `Aiguillage <collection_code> : total=X, orphelins=Y, pages_full=Z, per_page=N → mode=<incremental|full>`. Sémantique transparente.
+- [ ] **Heuristique `choose_extraction_mode`** (séparée du log) : la fonction de coût `n_orphans < full_fetch_pages` ignore la taille de payload par appel, d'où des choix sous-optimaux sur les collections umbrella (`PRES_UCA`/`PRES_CLERMONT`) où le full-fetch est catastrophiquement lent. Limite documentée dans le docstring de [`choose_extraction_mode`](../../domain/sources/hal_extract.py). Pistes : (a) borne dure sur les orphelins (« si `orphans < N`, toujours individuel »), (b) cost function pondérée payload via `hal_per_page_for`, (c) compteur empirique sur les derniers runs. Lien : [`DATA_cycle-vie-staging.md`](DATA_cycle-vie-staging.md) (Phase 1bis).
+- [x] **CLI `create_persons_from_source_authorships`** : le log `"✓ Appliqué. → Lancer build_authorships.py pour propager in_perimeter/structure_ids"` (uniquement émis en CLI standalone, jamais par l'orchestrateur qui appelle `run()` directement) suggérait à tort une étape manuelle. Simplifié en `"✓ Appliqué."` — l'enchaînement vers `build_authorships` se fait via le pipeline.
 - [ ] **Extracteur HAL — réimports** : aucune indication sur les documents réimportés/mis à jour. Comparer avec ce que loguent les autres extracteurs et harmoniser le format (counters cohérents : `new` / `updated` / `unchanged` / `skipped`) + taille de batch loguée pour comprendre la cadence.
 
 Ces trois items sont indépendants côté code, mais cohérents thématiquement (lisibilité des logs d'extraction) — peuvent être traités en un commit.
