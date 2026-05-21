@@ -78,6 +78,9 @@ from interfaces.api.routers.admin import (  # noqa: E402
     pipeline_logs as admin_pipeline_logs,
 )
 from interfaces.api.routers.admin import (  # noqa: E402
+    pipeline_runs as admin_pipeline_runs,
+)
+from interfaces.api.routers.admin import (  # noqa: E402
     publication_duplicates as admin_publication_duplicates,
 )
 from interfaces.api.routers.admin import (  # noqa: E402
@@ -352,6 +355,7 @@ app.include_router(admin_perimeters.router)
 app.include_router(publishers.router)
 app.include_router(journals.router)
 app.include_router(admin_pipeline_logs.router)
+app.include_router(admin_pipeline_runs.router)
 app.include_router(subjects.router)
 
 
