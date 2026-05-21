@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict kRZQGHQQisdEWFEVzvgBaHbpkJ6kCTDw2fvPcbFBlmz2fjellBUKHb2v2fBstBw
+\restrict h1oBOEbPaJsChm1DlIaXSpdc9aAzp3OI7GxMn1bwXfavHt0Og7xT2hfBdV9FFcm
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
@@ -426,7 +426,6 @@ CREATE TABLE public.authorships (
     in_perimeter boolean DEFAULT false,
     source_manual boolean DEFAULT false,
     excluded boolean DEFAULT false,
-    notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     is_corresponding boolean,
@@ -640,7 +639,6 @@ CREATE TABLE public.journals (
     apc_amount numeric(10,2),
     apc_currency text DEFAULT 'EUR'::text,
     oa_model text,
-    notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     journal_type public.journal_type DEFAULT 'journal'::public.journal_type,
@@ -884,7 +882,6 @@ CREATE TABLE public.publications (
     journal_id integer,
     container_title text,
     language text,
-    notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     countries text[],
@@ -961,7 +958,6 @@ CREATE TABLE public.publishers (
     openalex_id text,
     country text,
     is_predatory boolean DEFAULT false,
-    notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     publisher_type public.publisher_type DEFAULT 'unknown'::public.publisher_type NOT NULL
@@ -2873,4 +2869,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict kRZQGHQQisdEWFEVzvgBaHbpkJ6kCTDw2fvPcbFBlmz2fjellBUKHb2v2fBstBw
+\unrestrict h1oBOEbPaJsChm1DlIaXSpdc9aAzp3OI7GxMn1bwXfavHt0Og7xT2hfBdV9FFcm

@@ -61,7 +61,7 @@ class PgJournalQueries(JournalQueries):
                        j.publisher_id, p.name AS pub_name,
                        j.openalex_id, j.is_in_doaj, j.is_predatory,
                        j.apc_amount, j.apc_currency, j.oa_model,
-                       j.journal_type, j.is_academic, j.doi_prefix, j.notes,
+                       j.journal_type, j.is_academic, j.doi_prefix,
                        (SELECT COUNT(*) FROM publications pub
                         WHERE pub.journal_id = j.id) AS pub_count
                 FROM journals j
@@ -94,7 +94,6 @@ class PgJournalQueries(JournalQueries):
                     journal_type=r.journal_type,
                     is_academic=r.is_academic,
                     doi_prefix=r.doi_prefix,
-                    notes=r.notes,
                     pub_count=r.pub_count,
                 )
                 for r in rows

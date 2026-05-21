@@ -55,7 +55,6 @@ class Journal:
     apc_amount: Decimal | None = None
     apc_currency: str | None = None
     oa_model: str | None = None
-    notes: str | None = None
     journal_type: str = "journal"
     is_academic: bool = True
     doi_prefix: str | None = None

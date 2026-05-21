@@ -31,7 +31,6 @@ class PublisherUpdateFields(TypedDict, total=False):
     name_normalized: str
     country: str | None
     is_predatory: bool | None
-    notes: str | None
     publisher_type: str
 
 

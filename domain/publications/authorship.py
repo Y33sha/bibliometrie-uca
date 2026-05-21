@@ -30,4 +30,3 @@ class Authorship:
     is_corresponding: bool | None = None
     roles: tuple[str, ...] = ()
     structure_ids: tuple[int, ...] = ()
-    notes: str | None = None

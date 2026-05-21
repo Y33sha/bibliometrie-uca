@@ -42,5 +42,4 @@ class Publisher:
     country: str | None = None
     openalex_id: str | None = None
     is_predatory: bool = False
-    notes: str | None = None
     publisher_type: str = "unknown"  # une des valeurs de PUBLISHER_TYPES

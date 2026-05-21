@@ -3276,8 +3276,6 @@ export interface components {
             is_academic: boolean | null;
             /** Doi Prefix */
             doi_prefix: string | null;
-            /** Notes */
-            notes: string | null;
             /** Pub Count */
             pub_count: number;
         };
@@ -3353,8 +3351,6 @@ export interface components {
             is_in_doaj?: boolean | null;
             /** Apc Amount */
             apc_amount?: number | null;
-            /** Notes */
-            notes?: string | null;
         };
         /** LabAddressOut */
         LabAddressOut: {
@@ -4786,8 +4782,6 @@ export interface components {
             country?: string | null;
             /** Is Predatory */
             is_predatory?: boolean | null;
-            /** Notes */
-            notes?: string | null;
             /** Publisher Type */
             publisher_type?: string | null;
         };

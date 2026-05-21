@@ -37,7 +37,6 @@ class JournalUpdateFields(TypedDict, total=False):
     is_predatory: bool | None
     is_in_doaj: bool | None
     apc_amount: float | None
-    notes: str | None
 
 
 class JournalRepository(Protocol):
