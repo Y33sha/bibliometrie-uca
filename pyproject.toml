@@ -235,6 +235,10 @@ omit = [
     "infrastructure/sources/wos/extract_wos.py",
     "infrastructure/sources/wos/fetch_missing_doi.py",
     "infrastructure/sources/crossref/fetch_missing_doi.py",
+    # Orchestrateurs CLI du pipeline d'extraction : wiring async
+    # (httpx + Semaphore + Lock) + branches mode/dry_run/stats_only.
+    # Même logique d'exclusion que les adapters HTTP ci-dessus.
+    "application/pipeline/extract/*",
 ]
 
 [tool.coverage.report]
