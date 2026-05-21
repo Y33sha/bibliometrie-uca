@@ -33,9 +33,7 @@ def main() -> None:
             logger.info("(dry-run — rien n'a été modifié)")
         else:
             conn.commit()
-            logger.info(
-                "✓ Appliqué. → Lancer build_authorships.py pour propager in_perimeter/structure_ids"
-            )
+            logger.info("✓ Appliqué.")
     finally:
         conn.close()
 
