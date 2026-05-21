@@ -35,21 +35,38 @@ Deux manques persistants sur la production du pipeline, identifiés de longue da
 
 ### Volet A — Checks automatiques post-pipeline
 
-- [ ] **Inventorier les invariants attendus** sur les données
-  produites. Au minimum :
-  - Comptages : publications actives, persons, authorships,
-    structures, addresses (deltas vs run précédent)
-  - Orphelins : publications sans authorships, persons sans
-    publications, authorships sans person, source_authorships
-    sans authorship_id
-  - Distributions : years (queue/médiane/mode), doc_types,
-    sources, OA status
-  - Cohérence : `truth_authorships` ⊆ `authorships` (TODO: ?), totaux
-    `source_authorships` par source cohérents avec les staging
-- [ ] **Implémenter un module `application/pipeline/checks.py`**
-  exposant `run_checks(conn) -> CheckReport` (queries SQL, calcul des deltas, comparaison à un snapshot du run précédent stocké en base).
-- [ ] **Hook en fin de `run_pipeline.py`** : exécution automatique, exit code non-zéro si seuil critique dépassé.
-- [ ] **Page admin** affichant le dernier rapport (réutilise l'infrastructure de `/admin/pipeline`).
+**Décisions actées au démarrage** (2026-05-21) :
+- **Vocabulaire** : « observables » (ou « volumes attendus »), pas « invariants ». Un invariant ne varie pas ; ici on observe une dérive.
+- **Pas de hiérarchie erreur/warning** : on ne peut pas savoir a priori si tel delta est possible ou non. Tout est signalé comme « suspect, à examiner ». Pas d'exit code non-zéro.
+- **Mode dans le snapshot** : la comparaison se fait vs dernier snapshot **du même mode** (daily/weekly/full), sinon deltas faussés.
+- **Runs partiels exclus** : pas de checks si `--only` / `--from`. Le snapshot n'a de sens que sur un run complet.
+- **Stockage** : table dédiée `pipeline_check_snapshots(id, ran_at, mode, payload jsonb)`.
+- **Sortie** : JSON en base. Résumé console structuré en fin de run (violations + deltas notables). Pas de fichier markdown intermédiaire — la page admin (Étape 2) lira le JSON.
+- **Seuils** : hardcodés en première version.
+
+#### Étape 1 — MVP CLI
+
+- [ ] Migration Alembic `pipeline_check_snapshots(id, ran_at, mode, payload jsonb)` + index `(mode, ran_at desc)`.
+- [ ] Module `application/pipeline/checks.py` exposant `run_checks(conn, mode) -> CheckReport` (queries SQL + comparaison au dernier snapshot du même mode + détection des observables suspects).
+- [ ] Value object `CheckReport` en `domain/pipeline_checks.py` (pattern PhaseMetrics).
+- [ ] Hook en fin de `run_pipeline.py` : exécution si run complet (pas `--only`/`--from`/`--dry-run`), persistance snapshot, résumé console.
+- [ ] Tests unit sur la logique de comparaison + détection (sans BDD).
+
+**Observables retenus** :
+
+| Famille | Observable | Seuil de suspicion |
+|---|---|---|
+| Volumes | publications actives, persons, authorships, addresses, `person_identifiers`, `person_name_forms` (delta vs run précédent même mode) | delta < -1 % ou > +20 % |
+| Orphelins | publications sans authorships, persons sans publications, source_authorships sans `authorship_id` | count > seuil hardcodé (calibré sur l'état actuel) |
+| Distributions | distribution `doc_type` (ratio par type), distribution `source` (ratio par source) | un ratio bouge de > 5 points |
+| Cohérence | totaux `source_authorships` par source vs `staging.processed=TRUE` correspondants | écart > 0,5 % |
+| Qualité matching | count des `person_name_forms` ambiguës (≥ 2 `person_id` distincts pour la même forme normalisée) | delta > seuil (à calibrer) |
+
+Le delta « nouvelles ambiguës insérées par le run » est dérivé du delta sur le count global vs snapshot précédent.
+
+#### Étape 2 — Page admin (différée)
+
+- [ ] Page `/admin/checks` (ou intégrée à `/admin/pipeline`) listant les derniers rapports, avec drill-down par observable.
 
 ### Volet B — Dashboard métriques
 
@@ -67,12 +84,6 @@ Deux manques persistants sur la production du pipeline, identifiés de longue da
 
 ## Questions ouvertes
 
-- **Format de stockage du snapshot** pour la comparaison
-  inter-runs (volet A) : table dédiée, fichier JSON sur disque,
-  ou colonne sur `audit_log` ? Trancher avant d'implémenter.
-- **Seuils d'alerte** : on les hardcode ou on les rend
-  configurables ? Probablement hardcodés au début, configurables
-  plus tard si besoin.
 - **Volet B vs Grafana DSI** : si la DSI met en place sa propre
   observabilité (logs centralisés, Grafana…) une fois la
   transmission faite, le volet B peut devenir inutile. À

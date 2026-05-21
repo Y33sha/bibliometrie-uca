@@ -15,7 +15,7 @@ from application.ports.repositories.perimeter_repository import (
     PerimeterUpdateFields,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 
 # ── Table config (clé / valeur JSON) ─────────────────────────────
 

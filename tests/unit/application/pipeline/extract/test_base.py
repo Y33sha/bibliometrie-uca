@@ -19,7 +19,7 @@ import pytest
 import requests
 
 from application.pipeline.extract.base import ExtractionConfigError, SourceExtractor
-from domain.pipeline_metrics import PhaseMetrics
+from application.pipeline.metrics import PhaseMetrics
 
 
 class _FakeExtractor(SourceExtractor):

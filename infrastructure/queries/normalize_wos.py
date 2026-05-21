@@ -14,7 +14,7 @@ from application.ports.pipeline.normalize.wos import (
     WosAuthorshipBatchItem,
     WosNormalizeQueries,
 )
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 from infrastructure.queries.source_authorships import (
     clear_source_authorships_for_publication,
 )

@@ -17,8 +17,8 @@ from application.ports.repositories.publisher_repository import (
     PublisherUpdateFields,
 )
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from domain.json_types import JsonValue
 from domain.normalize import normalize_text
+from domain.types import JsonValue
 
 
 def find_or_create_publisher(

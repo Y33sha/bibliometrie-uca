@@ -14,12 +14,12 @@ import time
 from sqlalchemy import Connection
 
 from application.pipeline.extract.base import ExtractionConfigError, SourceExtractor
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
 )
 from application.ports.pipeline.staging import StagingQueries
-from domain.pipeline_metrics import PhaseMetrics
 from domain.sources.openalex_extract import (
     OPENALEX_DELAY,
     extract_openalex_id,

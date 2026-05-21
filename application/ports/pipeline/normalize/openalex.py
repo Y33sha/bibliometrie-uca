@@ -7,7 +7,7 @@ from typing import Protocol
 
 from sqlalchemy import Connection
 
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 
 
 class OpenalexNormalizeQueries(Protocol):

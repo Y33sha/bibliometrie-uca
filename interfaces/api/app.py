@@ -14,7 +14,7 @@ import time
 import traceback
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 
@@ -34,7 +34,7 @@ from domain.errors import (
     UnauthorizedError,
     ValidationError,
 )
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 from infrastructure.db.engine import (
     build_sync_engine,
     get_sync_engine,
@@ -272,7 +272,7 @@ def health() -> JSONResponse | dict[str, JsonValue]:
     except Exception as e:
         return JSONResponse(status_code=503, content={"status": "error", "db": str(e)})
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     threshold = now - timedelta(days=_STALE_THRESHOLD_DAYS)
     last_extraction: dict[str, dict[str, JsonValue]] = {}
     stale: list[str] = []

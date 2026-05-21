@@ -8,17 +8,18 @@ Co-localise le DTO `ConfigItem` (retourné par `list_config`). Cf. chantier `COD
 """
 
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Protocol
 
 from pydantic import BaseModel
+
+from domain.types import JsonValue
 
 
 class ConfigItem(BaseModel):
     """Ligne de la table `config` (paramètres applicatifs clé/valeur)."""
 
     key: str
-    # `Any` plutôt que `JsonValue` : pydantic ne supporte pas l'alias récursif (RecursionError à la génération de schéma). Frontière JSONB libre côté API ; cas isolé documenté.
-    value: Any
+    value: JsonValue
     description: str | None
     updated_at: datetime
 

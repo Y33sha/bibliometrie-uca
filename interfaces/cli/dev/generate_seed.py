@@ -26,7 +26,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 
 # Tables à exporter, dans l'ordre d'insertion (respect des FK).

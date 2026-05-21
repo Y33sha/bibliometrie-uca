@@ -29,10 +29,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.repositories.doi_prefix_repository import DoiPrefixRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from domain.normalize import normalize_text
-from domain.pipeline_metrics import PhaseMetrics
 
 ResolveRaFn = Callable[[str], str | None]
 """Signature : `(doi) -> ra_name | None`. `None` = DOI inexistant ou erreur HTTP."""

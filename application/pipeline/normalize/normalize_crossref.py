@@ -42,7 +42,6 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
-from domain.json_types import JsonValue
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
@@ -52,6 +51,7 @@ from domain.sources.crossref import (
     parse_crossref_issns,
     strip_jats_tags,
 )
+from domain.types import JsonValue
 
 # =============================================================
 # EXTRACTEURS DE CHAMPS

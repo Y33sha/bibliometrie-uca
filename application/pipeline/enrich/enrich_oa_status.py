@@ -18,7 +18,6 @@ Implémentation async : `httpx.AsyncClient` partagé +
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from typing import TypeAlias
 
 import httpx
 from sqlalchemy import Connection
@@ -26,7 +25,7 @@ from sqlalchemy import Connection
 from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 
-OaStatusFetcher: TypeAlias = Callable[[httpx.AsyncClient, str], Awaitable[str | None]]
+type OaStatusFetcher = Callable[[httpx.AsyncClient, str], Awaitable[str | None]]
 """Signature : ``(client, doi) → statut OA mappé (str) | None``."""
 
 BATCH_SIZE = 50

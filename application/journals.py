@@ -12,8 +12,8 @@ from application.audit import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdateFields
 from domain.errors import ConflictError, NotFoundError, ValidationError
-from domain.json_types import JsonValue
 from domain.normalize import normalize_text
+from domain.types import JsonValue
 
 
 def find_or_create_journal(

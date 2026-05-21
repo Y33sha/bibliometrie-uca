@@ -10,8 +10,8 @@ Source format (cf normalize_wos.py:317-339) :
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
-from domain.json_types import JsonValue
 from domain.subjects.subject import ONTOLOGY_WOS_HEADING, ONTOLOGY_WOS_SUBJECT
+from domain.types import JsonValue
 
 SOURCE = "wos"
 

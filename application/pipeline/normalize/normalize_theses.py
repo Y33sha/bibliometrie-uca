@@ -32,13 +32,13 @@ from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.publication_repository import PublicationRepository
 from domain.dates import french_date_to_iso
-from domain.json_types import JsonValue
 from domain.normalize import normalize_text
 from domain.publications.identifiers import normalize_nnt
 from domain.sources.theses import (
     aggregate_thesis_persons,
     derive_theses_doc_type,
 )
+from domain.types import JsonValue
 
 # =============================================================
 # PUBLICATIONS

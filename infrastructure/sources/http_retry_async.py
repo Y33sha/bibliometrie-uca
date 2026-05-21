@@ -32,7 +32,7 @@ async def http_request_with_retry_async(
     json_body: dict | None = None,
     headers: dict | None = None,
     auth: tuple | None = None,
-    timeout: float = 30.0,
+    timeout: float = 30.0,  # noqa: ASYNC109 — wrapper httpx, le timeout est passé au client
     max_retries: int = 5,
     initial_backoff: float = 1.0,
     retry_on_empty_body: bool = False,

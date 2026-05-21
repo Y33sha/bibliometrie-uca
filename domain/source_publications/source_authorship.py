@@ -16,7 +16,7 @@ résolution de structures, scope de périmètre côté source) vit ici.
 
 from dataclasses import dataclass
 
-from domain.json_types import JsonValue
+from domain.types import JsonValue
 
 
 @dataclass(slots=True)

@@ -10,10 +10,10 @@ La logique métier touchant à une publication canonique (déduplication, fusion
 from dataclasses import dataclass, field
 
 from domain.errors import ConflictError
-from domain.json_types import JsonValue
 from domain.publications.authorship import Authorship
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import absorb_oa_status
+from domain.types import JsonValue
 
 
 @dataclass(slots=True)

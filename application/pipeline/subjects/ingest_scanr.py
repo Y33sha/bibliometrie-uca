@@ -10,8 +10,8 @@ Source format (cf normalize_scanr.py:176-190) :
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
-from domain.json_types import JsonValue
 from domain.subjects.subject import ONTOLOGY_SCANR_DOMAIN
+from domain.types import JsonValue
 
 SOURCE = "scanr"
 

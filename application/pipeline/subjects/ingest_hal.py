@@ -14,9 +14,9 @@ Source format (cf normalize_hal.py:228-235) :
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
-from domain.json_types import JsonValue
 from domain.sources.hal_domains import hal_domain_label
 from domain.subjects.subject import ONTOLOGY_HAL_DOMAIN
+from domain.types import JsonValue
 
 SOURCE = "hal"
 

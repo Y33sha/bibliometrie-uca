@@ -1,4 +1,5 @@
 # Chantier — DOI Registration Agencies & DataCite
+
 Commencé le 2026-04-28
 
 ## Contexte
@@ -115,7 +116,6 @@ extract → cross_imports (fetch_missing_hal_id + fetch_missing_doi) → normali
 - [x] Modification `get_cross_import_dois` : LEFT JOIN sur `doi_prefixes` via `split_part(doi, '/', 1)`, filtre `ra = 'Crossref' OR ra IS NULL` pour la cible crossref. NULL accepté pour traiter les préfixes pas encore résolus en best-effort.
 - [x] Adapter API/UI publishers : retirer le champ `doi_prefix` côté Pydantic + admin Svelte ; ajouter une vue "préfixes" en lecture seule via JOIN sur `doi_prefixes`.
 - [x] Migration Alembic `drop_publishers_doi_prefix` : `ALTER TABLE publishers DROP COLUMN doi_prefix` (après que les consommateurs côté API/UI aient été adaptés).
-- [ ] Lancer une fois en prod, mesurer la réduction du volume CrossRef et la disparition des 404.
 - **Livrable** : appels CrossRef ciblés, `doi_prefixes` peuplée, mapping prefix → publisher many-to-one en place, pas encore de DataCite ingérée.
 
 ### Phase 2 — Source DataCite (sous réserve phase 0 favorable)

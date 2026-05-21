@@ -11,8 +11,8 @@ Source format (cf normalize_theses.py:267-280) :
 from sqlalchemy import Connection
 
 from application.pipeline.subjects._common import SubjectCache, dedup_strs
-from domain.json_types import JsonValue
 from domain.subjects.subject import ONTOLOGY_RAMEAU, ONTOLOGY_THESES_DISCIPLINE
+from domain.types import JsonValue
 
 SOURCE = "theses"
 

@@ -50,8 +50,8 @@ from functools import partial
 from pathlib import Path
 from typing import Any
 
-from domain.pipeline_metrics import PhaseMetrics
-from domain.pipeline_modes import MODE_NAMES, MODES
+from application.pipeline.metrics import PhaseMetrics
+from application.pipeline.modes import MODE_NAMES, MODES
 from domain.sources import ALL_SOURCES_SET
 from infrastructure.observability.log import setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
@@ -82,7 +82,7 @@ def phase_extract(
     """Phase 1 : Extraction des sources vers staging + refetch truncated.
 
     La politique du mode (sources à interroger, plage d'années, refetch OA)
-    vit dans `domain/pipeline_modes.py`. Les scripts d'extraction lisent
+    vit dans `application/pipeline/modes.py`. Les scripts d'extraction lisent
     la config DB pour les plages d'années (`pipeline_years_full/weekly`).
     """
     policy = MODES[mode]
@@ -1159,7 +1159,7 @@ def _install_sigterm_handler() -> None:
     signal.signal(signal.SIGTERM, _sigterm_raises_keyboard_interrupt)
 
 
-def main() -> None:
+def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers séparé du scope actuel
     _install_sigterm_handler()
     # Nettoie un status.json orphelin (PID mort : SIGKILL, crash, OOM)
     # laissé par un run précédent — sinon le prochain lecteur verrait un
@@ -1301,6 +1301,29 @@ def main() -> None:
     # Générer le rapport
     report_path = generate_report(args.mode, sources, phase_results, elapsed_total)
     log.info("Rapport : %s", report_path)
+
+    # Checks post-pipeline (uniquement sur run complet : pas --only / --from).
+    # Capture de la forme attendue des données ; les observations suspectes sont
+    # signalées dans le résumé console, sans exit code non-zéro.
+    if not args.only and not args.from_phase:
+        try:
+            from infrastructure.db.engine import get_sync_engine
+            from infrastructure.observability.pipeline_checks import (
+                persist_snapshot,
+                render_summary,
+                run_checks,
+            )
+
+            conn = get_sync_engine().connect()
+            try:
+                report = run_checks(conn, args.mode)
+                persist_snapshot(conn, report)
+                for line in render_summary(report).splitlines():
+                    log.info(line)
+            finally:
+                conn.close()
+        except Exception as e:
+            log.warning("Échec des checks post-pipeline : %s", e)
 
     clear_status()
     log.info("=" * 60)
