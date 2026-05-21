@@ -8,7 +8,7 @@ personnes et laboratoires.
 ## Stack technique
 
 - **Frontend** : SvelteKit (Svelte 5) — `interfaces/frontend/`
-- **Backend** : FastAPI + PostgreSQL 18 (psycopg3) — `interfaces/api/`
+- **Backend** : FastAPI + PostgreSQL 18 (SQLAlchemy) — `interfaces/api/`
 - **Pipeline** : Python — `application/pipeline/` (orchestrateur
   `run_pipeline.py`), extracteurs dans `infrastructure/sources/`
 - **Architecture** : DDD en 4 couches (`domain/`, `application/`,
@@ -21,7 +21,7 @@ personnes et laboratoires.
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (recommandé)
 
 Ou, installation sans Docker :
-- Python 3.10+
+- Python 3.12+
 - Node.js 20+ / npm 10+
 - PostgreSQL 18+ avec extensions `pg_trgm`, `unaccent`
 - [`uv`](https://docs.astral.sh/uv/) recommandé pour l'install des deps
