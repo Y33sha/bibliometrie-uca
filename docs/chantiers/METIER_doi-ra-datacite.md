@@ -7,7 +7,7 @@ Commencé le 2026-04-28
 Un DOI est enregistré auprès d'une **Registration Agency** (RA) — chaque RA gère un sous-ensemble disjoint des préfixes DOI :
 
 - **Crossref** : la majorité des articles de revue et chapitres d'ouvrage.
-- **DataCite** : datasets, software, preprints (HAL via DOI propre, Zenodo, figshare), thèses (theses.fr distribue des DOI DataCite), repositories institutionnels.
+- **DataCite** : datasets, software, preprints (HAL via DOI propre<!--TODO: what?-->, Zenodo, figshare), thèses (theses.fr distribue des DOI DataCite), repositories institutionnels.
 - **mEDRA / JaLC / Airiti / Op.cit. / etc.** : volumes négligeables côté UCA.
 
 Aujourd'hui, `fetch_missing_doi --target crossref` interroge l'API CrossRef pour **tous** les DOI manquants en staging CrossRef, sans tenir compte de leur RA. Sur les 12 045 DOIs traités le 2026-04-28 :
@@ -15,6 +15,8 @@ Aujourd'hui, `fetch_missing_doi --target crossref` interroge l'API CrossRef pour
 - les DOIs DataCite (Zenodo, theses.fr, etc.) restent invisibles côté métadonnées : on a le DOI mais aucune métadonnée enrichie hors HAL/OpenAlex.
 
 Ce chantier traite les deux faces du problème : **savoir** d'où vient chaque DOI, puis **exploiter** cette information pour économiser les appels CrossRef et ouvrir DataCite comme nouvelle source.
+
+Les préfixes DOI mappés aux `publishers` (et indirectement aux `journals`) serviront aussi au dédoublonnage des éditeurs/revues et à la détection des métadonnées incohérentes issues des sources (DOI vs `journal`, DOI vs `doc_type`…). Cf chantier `METIER_publishers-journals.md`.
 
 ## Périmètre fonctionnel
 

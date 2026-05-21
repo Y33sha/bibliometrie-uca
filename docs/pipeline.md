@@ -78,9 +78,6 @@ Cette asymétrie disparaîtra avec le chantier [`DATA_cycle-vie-staging.md`](cha
 
 ### <span id="normalize"></span>`normalize` : Normalisation
 
-Transforme les données brutes (staging) en tables structurées par source (`source_publications`, `source_authorships`). Crée également les `addresses` et les liens `source_authorship_addresses` via le port `AddressLinker` (les adresses brutes extraites de chaque authorship sont dédoublonnées dans la table canonique `addresses`). Pas d'adresses brutes dans HAL → on utilise la chaîne de caractères du nom de la structure et on la traite fictivement comme une adresse.
-> **TODO :** filtrage à mettre en place côté UI pour ne pas afficher les pseudo-adresses de source HAL dans les onglets "adresses".
-
 ```mermaid
 flowchart LR
     B[staging]-->|normalize_*|G
@@ -92,6 +89,10 @@ flowchart LR
     classDef new  fill:#bbf
     class C,D,F new;
 ```
+
+Transforme les données brutes (staging) en tables structurées par source (`source_publications`, `source_authorships`). Crée également les `addresses` et les liens `source_authorship_addresses` via le port `AddressLinker` (les adresses brutes extraites de chaque authorship sont dédoublonnées dans la table canonique `addresses`). Pas d'adresses brutes dans HAL → on utilise la chaîne de caractères du nom de la structure et on la traite fictivement comme une adresse.
+> **TODO :** filtrage à mettre en place côté UI pour ne pas afficher les pseudo-adresses de source HAL dans les onglets "adresses".
+
 
 ### <span id="affiliations"></span>`affiliations` : Résolution et propagation
 
