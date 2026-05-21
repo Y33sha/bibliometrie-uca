@@ -13,6 +13,8 @@ from typing import Any, Protocol
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.extract._common import BatchInsertCounts
+
 
 @dataclass(frozen=True)
 class WosExtractConfig:
@@ -46,6 +48,6 @@ class WosExtractAdapter(Protocol):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def insert_batch(self, conn: Connection, records: list[dict[str, Any]]) -> int:
-        """UPSERT staging d'un batch de records. Retourne le nb insérés/mis à jour."""
+    def insert_batch(self, conn: Connection, records: list[dict[str, Any]]) -> BatchInsertCounts:
+        """UPSERT staging d'un batch de records. Retourne (new, updated) via xmax."""
         ...

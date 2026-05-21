@@ -163,11 +163,7 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
                 stats.add(new=inserted, updated=updated, total=total)
         return stats
 
-    def log_summary(self, stats: PhaseMetrics, args: argparse.Namespace) -> None:
-        self.logger.info("\n=== Terminé ===")
-        self.logger.info(f"Total API : {stats.total}")
-        self.logger.info(f"Nouveaux : {stats.new}")
-        self.logger.info(f"Mis à jour : {stats.updated}")
+    # log_summary : on hérite du défaut de SourceExtractor (`=== Terminé : as_summary ===`).
 
 
 __all__ = [
