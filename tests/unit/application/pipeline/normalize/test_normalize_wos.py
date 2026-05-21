@@ -475,6 +475,12 @@ class TestExtractFromApi:
             "issue": "2",
             "first_page": "100",
             "last_page": "120",
+            "publisher": "Test Publisher",
+            "journal": {
+                "title": "Test Journal",
+                "issn": "0123-4567",
+                "eissn": "1234-5678",
+            },
         }
 
     def test_fallback_to_staging_doi_when_api_missing(self):
@@ -563,13 +569,46 @@ class TestExtractFromApi:
         assert rec["language"] == "German"
 
     def test_biblio_none_when_no_fields(self):
-        raw = _make_api_record(vol=None, issue=None, page_begin=None, page_end=None)
+        raw = _make_api_record(
+            vol=None,
+            issue=None,
+            page_begin=None,
+            page_end=None,
+            publisher_name=None,
+            journal_title=None,
+            issn=None,
+            eissn=None,
+        )
         rec = extract_from_api(raw, None)
         assert rec["biblio"] is None
 
+    def test_biblio_publisher_and_journal_extracted(self):
+        """publisher + journal bruts ajoutés à biblio en parallèle des find_or_create_*."""
+        raw = _make_api_record(
+            vol=None,
+            issue=None,
+            page_begin=None,
+            page_end=None,
+            publisher_name="Elsevier",
+            journal_title="Journal of Physics",
+            issn="0022-3727",
+            eissn="1361-6463",
+        )
+        rec = extract_from_api(raw, None)
+        assert rec["biblio"] == {
+            "publisher": "Elsevier",
+            "journal": {
+                "title": "Journal of Physics",
+                "issn": "0022-3727",
+                "eissn": "1361-6463",
+            },
+        }
+
     def test_page_as_string_ignored(self):
         """L'API peut renvoyer `page` comme str (cas dégénéré) — pas de first_page/last_page produit."""
-        raw = _make_api_record(vol="1", issue=None)
+        raw = _make_api_record(
+            vol="1", issue=None, publisher_name=None, journal_title=None, issn=None, eissn=None
+        )
         raw["static_data"]["summary"]["pub_info"]["page"] = "100-120"
         rec = extract_from_api(raw, None)
         assert "first_page" not in (rec["biblio"] or {})

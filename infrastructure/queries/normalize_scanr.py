@@ -35,6 +35,7 @@ def upsert_scanr_source_publication(
     topics: JsonValue,
     cited_by_count: int | None,
     urls: list[str] | None,
+    biblio: JsonValue,
 ) -> int:
     """UPSERT d'un document ScanR dans `source_publications`. Retourne l'id."""
     # cf. note dans normalize_openalex : `external_ids` non-null en colonne,
@@ -46,11 +47,11 @@ def upsert_scanr_source_publication(
             (source, source_id, doi, title, pub_year, doc_type,
              publication_id, staging_id, external_ids,
              journal_id, oa_status, language, container_title,
-             abstract, keywords, topics, cited_by_count, urls)
+             abstract, keywords, topics, cited_by_count, urls, biblio)
         VALUES ('scanr', :scanr_id, :doi, :title, :pub_year, :doc_type,
                 :publication_id, :staging_id, :external_ids,
                 :journal_id, :oa_status, :language, :container_title,
-                :abstract, :keywords, :topics, :cited_by_count, :urls)
+                :abstract, :keywords, :topics, :cited_by_count, :urls, :biblio)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
                 source_publications.publication_id, EXCLUDED.publication_id
@@ -67,11 +68,13 @@ def upsert_scanr_source_publication(
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
+            biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
         bindparam("external_ids", type_=JSONB),
         bindparam("topics", type_=JSONB),
+        bindparam("biblio", type_=JSONB),
     )
     row = conn.execute(
         stmt,
@@ -93,6 +96,7 @@ def upsert_scanr_source_publication(
             "topics": topics,
             "cited_by_count": cited_by_count,
             "urls": urls,
+            "biblio": biblio,
         },
     ).one()
     return row.id
@@ -162,6 +166,7 @@ class PgScanrNormalizeQueries(ScanrNormalizeQueries):
         topics: JsonValue,
         cited_by_count: int | None,
         urls: list[str] | None,
+        biblio: JsonValue,
     ) -> int:
         return upsert_scanr_source_publication(
             conn,
@@ -182,6 +187,7 @@ class PgScanrNormalizeQueries(ScanrNormalizeQueries):
             topics=topics,
             cited_by_count=cited_by_count,
             urls=urls,
+            biblio=biblio,
         )
 
     def upsert_scanr_source_authorship(

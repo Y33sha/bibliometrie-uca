@@ -141,7 +141,11 @@ def get_external_ids(msg: dict) -> dict | None:
 
 
 def get_biblio(msg: dict) -> dict | None:
-    """Volume, issue, page, article-number — repris du CrossRef brut."""
+    """Volume, issue, page, article-number + publisher/journal bruts.
+
+    `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef
+    en parallèle des publishers/journals créés via `find_or_create_*`.
+    """
     biblio: dict[str, JsonValue] = {}
     for src_key, dest_key in (
         ("volume", "volume"),
@@ -152,6 +156,18 @@ def get_biblio(msg: dict) -> dict | None:
         val = msg.get(src_key)
         if isinstance(val, str) and val.strip():
             biblio[dest_key] = val.strip()
+    if publisher_raw := get_publisher_name(msg):
+        biblio["publisher"] = publisher_raw
+    journal_obj: dict[str, str] = {}
+    if jt := get_container_title(msg):
+        journal_obj["title"] = jt
+    issn_val, eissn_val = get_issns(msg)
+    if issn_val:
+        journal_obj["issn"] = issn_val
+    if eissn_val:
+        journal_obj["eissn"] = eissn_val
+    if journal_obj:
+        biblio["journal"] = journal_obj
     return biblio or None
 
 

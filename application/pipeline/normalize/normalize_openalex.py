@@ -44,6 +44,7 @@ from domain.sources.openalex import (
     should_skip_publisher_journal,
 )
 from domain.sources.zenodo import ZenodoResolutionError, is_zenodo_doi
+from domain.types import JsonValue
 
 # =============================================================
 # MAPPINGS
@@ -261,12 +262,46 @@ def insert_openalex_document(
 
     # Biblio (volume, issue, pages)
     raw_biblio = work.get("biblio") or {}
-    biblio_clean = {
+    biblio: dict[str, JsonValue] = {
         k: raw_biblio[k]
         for k in ("volume", "issue", "first_page", "last_page")
         if raw_biblio.get(k)
     }
-    biblio = biblio_clean if biblio_clean else None
+
+    # Publisher + journal bruts (traçabilité du nom tel que vu par OpenAlex,
+    # en parallèle des publishers/journals créés via find_or_create_*).
+    # Skip pour les primary locations qui ne représentent pas un éditeur
+    # (HAL, theses.fr, Zenodo, etc.) — même critère que la création.
+    if not should_skip_publisher_journal(primary):
+        location = work.get("primary_location") or {}
+        source = location.get("source") or {}
+        if publisher_raw := source.get("host_organization_name"):
+            biblio["publisher"] = publisher_raw
+        journal_obj: dict[str, str] = {}
+        if jt := source.get("display_name"):
+            journal_obj["title"] = jt
+        issn_l = source.get("issn_l")
+        journal_issn = None
+        journal_eissn = None
+        for i in source.get("issn") or []:
+            if i == issn_l:
+                continue
+            if not journal_issn:
+                journal_issn = i
+            elif not journal_eissn:
+                journal_eissn = i
+        if journal_issn:
+            journal_obj["issn"] = journal_issn
+        if journal_eissn:
+            journal_obj["eissn"] = journal_eissn
+        if issn_l:
+            journal_obj["issnl"] = issn_l
+        if journal_oa_id := extract_short_id(source.get("id") or ""):
+            journal_obj["openalex_id"] = journal_oa_id
+        if journal_obj:
+            biblio["journal"] = journal_obj
+
+    biblio_json = biblio if biblio else None
 
     # Abstract, keywords, topics
     abstract = reconstruct_abstract(work.get("abstract_inverted_index"))
@@ -302,7 +337,7 @@ def insert_openalex_document(
         language=language,
         container_title=container_title,
         is_retracted=is_retracted,
-        biblio=biblio,
+        biblio=biblio_json,
         abstract=abstract,
         keywords=keywords,
         topics_json=topics_json,

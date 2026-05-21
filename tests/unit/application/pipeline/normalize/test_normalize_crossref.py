@@ -252,6 +252,32 @@ class TestGetBiblio:
     def test_none_when_all_blank(self):
         assert get_biblio({"volume": "", "issue": "  ", "page": None}) is None
 
+    def test_publisher_extracted(self):
+        assert get_biblio({"publisher": "Elsevier"}) == {"publisher": "Elsevier"}
+
+    def test_journal_built_from_container_title_and_issns(self):
+        # Format `issn-type` permet de distinguer print/electronic ; la liste
+        # `ISSN` plate ne sert qu'à hydrater `issn` (eissn reste None).
+        msg = {
+            "container-title": ["Journal of Physics"],
+            "issn-type": [
+                {"type": "print", "value": "0022-3727"},
+                {"type": "electronic", "value": "1361-6463"},
+            ],
+        }
+        biblio = get_biblio(msg)
+        assert biblio is not None
+        assert biblio["journal"] == {
+            "title": "Journal of Physics",
+            "issn": "0022-3727",
+            "eissn": "1361-6463",
+        }
+
+    def test_journal_title_only_when_no_issns(self):
+        assert get_biblio({"container-title": ["J. Phys."]}) == {
+            "journal": {"title": "J. Phys."},
+        }
+
 
 class TestGetMeta:
     def test_delegates_to_domain(self):

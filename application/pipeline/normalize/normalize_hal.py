@@ -44,6 +44,7 @@ from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.hal import derive_hal_doc_type, derive_hal_oa_status
 from domain.sources.zenodo import ZenodoResolutionError, is_zenodo_doi
+from domain.types import JsonValue
 
 # =============================================================
 # UTILITAIRES
@@ -202,7 +203,7 @@ def insert_hal_document(
     topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
 
     # Biblio
-    biblio = {}
+    biblio: dict[str, JsonValue] = {}
     vol = as_str(doc.get("volume_s"))
     if vol:
         biblio["volume"] = vol
@@ -212,6 +213,22 @@ def insert_hal_document(
     page = as_str(doc.get("page_s"))
     if page:
         biblio["pages"] = page
+
+    # Publisher + journal bruts (traçabilité du nom tel que vu par HAL, en
+    # parallèle de publishers/journals créés via find_or_create_*).
+    publisher_raw = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
+    if publisher_raw:
+        biblio["publisher"] = publisher_raw
+    journal_obj: dict[str, str] = {}
+    if jt := as_str(doc.get("journalTitle_s")):
+        journal_obj["title"] = jt
+    if jissn := as_str(doc.get("journalIssn_s")):
+        journal_obj["issn"] = jissn
+    if jeissn := as_str(doc.get("journalEissn_s")):
+        journal_obj["eissn"] = jeissn
+    if journal_obj:
+        biblio["journal"] = journal_obj
+
     biblio_json = biblio if biblio else None
 
     # URLs
