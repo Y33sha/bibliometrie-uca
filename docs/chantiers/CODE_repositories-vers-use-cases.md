@@ -173,9 +173,7 @@ Petit refactoring isolé. Réalisé autrement que prévu : la règle OA n'est pa
 À traiter en queue de chantier (ordre indifférent) :
 
 - [x] Double commit `normalize/base.py` → nettoyé : protégeait le dernier batch partiel d'un échec de `post_process`, mais le seul override (`normalize_hal.py::post_process`) supprimait des doublons `source_authorships` `(source_publication_id, author_position)` devenus impossibles depuis le commit `984b5c70` (2026-04-23) qui a introduit `clear_source_authorships_for_publication` dans tous les normaliseurs. Audit DB → zéro doublon résiduel côté HAL. Précédent identique côté WoS supprimé en `6313b51c` (2026-05-12), HAL avait été oublié. Cascade : suppression des 2 SQL HAL, des méthodes adapter + port, de l'override HAL, du hook `post_process` dans `base.py` (devenu code mort), et du double commit qui n'avait plus rien à protéger.
-- [ ] Décider du sort du `commit()` après reset dans
-  `enrich_journal_apc.py:118` : savepoint englobant ou statu quo
-  documenté.
+- [x] `commit()` après reset dans `enrich_journal_apc.py` → simplement retiré. La fiche initiale envisageait un savepoint englobant, mais le retrait du commit suffit : le reset reste dans la transaction pending, `fetch_journals_needing_apc` voit la modif via la visibilité own-transaction, les batch commits de la boucle persistent reset + premiers updates ensemble. Bénéfices doubles : (1) atomicité reset+enrich restaurée (un crash dans la boucle rollback aussi le reset, user re-`--reset` retrouve l'état initial) ; (2) bug latent corrigé sur `--reset --dry-run` qui persistait le reset alors que `--dry-run` est documenté « Aperçu sans modifier la base » (le commit ligne 127 était inconditionnel).
 - [ ] Auditer les commits sur `KeyboardInterrupt` : nécessaires ou
   doublon des batch commits ?
 - [ ] Ajouter à `docs/architecture.md` une section « Discipline

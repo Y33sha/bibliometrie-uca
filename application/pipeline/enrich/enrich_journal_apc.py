@@ -124,7 +124,6 @@ def run_enrich(
     try:
         if reset:
             count = reset_journal_apc(repo=journal_repo)
-            conn.commit()
             logger.info(f"Reset : {count} revues réinitialisées.")
 
         journals = queries.fetch_journals_needing_apc(conn, limit=limit or None)
