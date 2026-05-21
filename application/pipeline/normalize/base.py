@@ -39,7 +39,6 @@ class SourceNormalizer(ABC):
     - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50). À ajuster source par source si nécessaire ; charger d'un coup n'est pas supporté.
     - `process_work(conn, row) -> bool | None` : abstract, logique métier
     - `preload_caches(conn)` : pré-chargement optionnel
-    - `post_process(conn)` : nettoyage post-traitement optionnel
     - `summary_stats(conn) -> list[str]` : lignes log additionnelles
     - `cleanup()` : libération des caches après commit final
     """
@@ -68,9 +67,6 @@ class SourceNormalizer(ABC):
 
     def preload_caches(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
         """Pré-chargement optionnel (ex: struct_cache pour HAL)."""
-
-    def post_process(self, conn: Connection) -> None:  # noqa: B027 (hook optionnel)
-        """Nettoyage post-traitement (ex: suppression des doublons pour HAL)."""
 
     def summary_stats(self, conn: Connection) -> list[str]:
         """Lignes additionnelles à logger en fin de run."""
@@ -188,8 +184,6 @@ class SourceNormalizer(ABC):
                         parts.append(f"{errors} erreurs")
                     self.logger.info(f"  {', '.join(parts)}")
 
-            self.conn.commit()
-            self.post_process(self.conn)
             self.conn.commit()
             self.cleanup()
 

@@ -3,7 +3,7 @@
 Couvre la template method `run()` et ses chemins :
 - mode `--reset` (commit + sortie immédiate)
 - `total == 0` (rien à faire)
-- happy path (success / skip / error mélangés, batch commit, post_process, summary)
+- happy path (success / skip / error mélangés, batch commit, summary)
 - exception dans `process_work` sans SAVEPOINT (rollback + on_error)
 - `KeyboardInterrupt` (commit pour préserver le travail)
 - exception fatale en dehors de la boucle (rollback + relève)
@@ -83,7 +83,6 @@ class _Norm(SourceNormalizer):
         self.raises_on = raises_on or set()
         self.processed_rows: list[StagingRow] = []
         self.preload_called = False
-        self.post_process_called = False
         self.cleanup_called = False
         self.on_error_called = 0
 
@@ -99,9 +98,6 @@ class _Norm(SourceNormalizer):
 
     def preload_caches(self, conn):
         self.preload_called = True
-
-    def post_process(self, conn):
-        self.post_process_called = True
 
     def cleanup(self):
         self.cleanup_called = True
@@ -153,7 +149,6 @@ class TestRunHappyPath:
         norm.run(argv=[])
         assert norm.preload_called is True
         assert [r.source_id for r in norm.processed_rows] == ["r1", "r2", "r3"]
-        assert norm.post_process_called is True
         assert norm.cleanup_called is True
 
     def test_mixes_success_skip_error(self, caplog):

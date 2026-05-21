@@ -643,12 +643,6 @@ class HalNormalizer(SourceNormalizer):
             address_linker=self._address_linker,
         )
 
-    def post_process(self, conn: Connection) -> None:
-        self._queries.delete_hal_duplicate_authorship_addresses(conn)
-        deleted_dups = self._queries.delete_hal_duplicate_authorships(conn)
-        if deleted_dups:
-            self.logger.info(f"Doublons de position supprimés : {deleted_dups}")
-
     def cleanup(self) -> None:
         self._address_linker.clear_cache()
 

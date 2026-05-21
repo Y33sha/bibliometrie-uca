@@ -2,8 +2,7 @@
 
 Appelé par `application/pipeline/normalize/normalize_hal.py`. Regroupe
 les UPSERT sur `source_publications` et `source_authorships`, ainsi
-que les lectures d'idempotence et les cleanups de post-traitement
-(doublons de position).
+que les lectures d'idempotence.
 
 Les identifiants personne (orcid/idhal/idref/hal_person_id) vivent sur
 `sa.person_identifiers` (JSONB) et les IDs natifs des structures HAL
@@ -177,43 +176,6 @@ def staging_has_hal_doi(conn: Connection, doi: str) -> bool:
     )
 
 
-def delete_hal_duplicate_authorship_addresses(conn: Connection) -> None:
-    """Post-traitement : supprime les `source_authorship_addresses` des doublons de position."""
-    conn.execute(
-        text("""
-            DELETE FROM source_authorship_addresses
-            WHERE source_authorship_id IN (
-                SELECT sa1.id FROM source_authorships sa1
-                JOIN source_authorships sa2
-                  ON sa2.source_publication_id = sa1.source_publication_id
-                 AND sa2.author_position = sa1.author_position
-                 AND sa2.id > sa1.id
-                WHERE sa1.source = 'hal' AND sa1.author_position IS NOT NULL
-            )
-        """)
-    )
-
-
-def delete_hal_duplicate_authorships(conn: Connection) -> int:
-    """Supprime les `source_authorships` HAL en doublon de position (garde le + récent).
-
-    Retourne le nombre de lignes supprimées.
-    """
-    return conn.execute(
-        text("""
-            DELETE FROM source_authorships
-            WHERE source = 'hal' AND id IN (
-                SELECT sa1.id FROM source_authorships sa1
-                JOIN source_authorships sa2
-                  ON sa2.source_publication_id = sa1.source_publication_id
-                 AND sa2.author_position = sa1.author_position
-                 AND sa2.id > sa1.id
-                WHERE sa1.source = 'hal' AND sa1.author_position IS NOT NULL
-            )
-        """)
-    ).rowcount
-
-
 class PgHalNormalizeQueries(HalNormalizeQueries):
     """Adapter PostgreSQL pour `application.ports.normalize_hal.HalNormalizeQueries`."""
 
@@ -287,12 +249,6 @@ class PgHalNormalizeQueries(HalNormalizeQueries):
 
     def staging_has_hal_doi(self, conn: Connection, doi: str) -> bool:
         return staging_has_hal_doi(conn, doi)
-
-    def delete_hal_duplicate_authorship_addresses(self, conn: Connection) -> None:
-        delete_hal_duplicate_authorship_addresses(conn)
-
-    def delete_hal_duplicate_authorships(self, conn: Connection) -> int:
-        return delete_hal_duplicate_authorships(conn)
 
     def clear_source_authorships_for_publication(
         self, conn: Connection, source_publication_id: int

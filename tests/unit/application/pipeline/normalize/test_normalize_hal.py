@@ -1,6 +1,6 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_hal`.
 
-Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), l'orchestrateur `process_authors` (composite + TEI + fallback), l'orchestrateur `process_work` (zenodo, métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, _row_factory, post_process, cleanup, on_error).
+Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), l'orchestrateur `process_authors` (composite + TEI + fallback), l'orchestrateur `process_work` (zenodo, métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, _row_factory, cleanup, on_error).
 
 Pattern : `_FakeQueries` + `_FakeAddressLinker` + `MagicMock`, pas de DB.
 """
@@ -48,7 +48,6 @@ class _FakeQueries:
         self.upserted_authorships: list[dict[str, Any]] = []
         self.upserted_documents: list[dict[str, Any]] = []
         self.staging_has_doi_returns = False
-        self.delete_dups_returns = 0
 
     def upsert_hal_source_publication(self, conn, **kw) -> int:
         self.upserted_documents.append(kw)
@@ -63,12 +62,6 @@ class _FakeQueries:
 
     def clear_source_authorships_for_publication(self, conn, source_publication_id: int) -> None:
         self.cleared_for.append(source_publication_id)
-
-    def delete_hal_duplicate_authorship_addresses(self, conn) -> None:
-        pass
-
-    def delete_hal_duplicate_authorships(self, conn) -> int:
-        return self.delete_dups_returns
 
 
 class _FakeAddressLinker:
@@ -592,20 +585,6 @@ class TestHalNormalizerClass:
         monkeypatch.setattr(normalize_hal, "process_work", lambda *a, **kw: True)
         result = norm.process_work(MagicMock(), _staging_row())
         assert result is True
-
-    def test_post_process_logs_when_dups(self, caplog):
-        norm = _make_normalizer()
-        norm._queries.delete_dups_returns = 3  # type: ignore[attr-defined]
-        with caplog.at_level(logging.INFO):
-            norm.post_process(MagicMock())
-        assert "3" in caplog.text
-
-    def test_post_process_silent_when_no_dups(self, caplog):
-        norm = _make_normalizer()
-        norm._queries.delete_dups_returns = 0  # type: ignore[attr-defined]
-        with caplog.at_level(logging.INFO):
-            norm.post_process(MagicMock())
-        assert "Doublons" not in caplog.text
 
     def test_cleanup_clears_address_linker_cache(self):
         norm = _make_normalizer()
