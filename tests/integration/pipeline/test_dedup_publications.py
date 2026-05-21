@@ -685,8 +685,7 @@ class TestDedupByNnt:
         _create_source_doc_with_nnt(sa_sync_conn, id1, "theses", "2023UCFA0069", "2023UCFA0069")
 
         result = find_by_nnt("2023UCFA0069", repo=publication_repository(sa_sync_conn))
-        assert result is not None
-        assert result.id == id1
+        assert result == id1
 
     def test_find_by_nnt_case_insensitive(self, sa_sync_conn):
         """find_by_nnt normalise en uppercase."""
@@ -700,5 +699,4 @@ class TestDedupByNnt:
         _create_source_doc_with_nnt(sa_sync_conn, id1, "theses", "2023UCFA0069", "2023UCFA0069")
 
         result = find_by_nnt("2023ucfa0069", repo=publication_repository(sa_sync_conn))
-        assert result is not None
-        assert result.id == id1
+        assert result == id1
