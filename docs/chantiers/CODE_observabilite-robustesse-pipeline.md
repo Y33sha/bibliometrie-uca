@@ -66,19 +66,13 @@ Le delta « nouvelles ambiguës insérées par le run » est dérivé du delta s
 
 **Décision 2026-05-21** : un seul snapshot par run, un seul livrable UI. Au lieu de séparer « checks » (état post-run de la BDD) et « métriques » (compteurs d'exécution), on persiste l'ensemble dans le même payload JSONB du même snapshot — c'est deux vues du même événement.
 
-Étendre le payload de `pipeline_check_snapshots` (à renommer en `pipeline_run_snapshots` à l'occasion) pour qu'il accueille aussi :
-- Métadonnées du run : `total_duration_s`, `sources`, `phases_run`
-- `metrics_per_phase` : `PhaseMetrics` par phase (`new`, `updated`, `total`, `errors`, `extras`, `duration_s`)
-
-Les `PhaseMetrics` sont déjà remontées de façon typée à l'orchestrateur depuis la Phase 1 (sweep `subprocess → import`). Il ne manque que de les écrire dans le snapshot.
-
-- [ ] Étendre le payload du snapshot (`ObservablesPayload` devient `RunSnapshotPayload` ou similaire) avec `metrics_per_phase` + métadonnées run.
-- [ ] Migration Alembic (rename de table optionnel ; sinon juste enrichissement du payload, le schéma SQL ne change pas puisque JSONB).
-- [ ] Page admin `/admin/pipeline-runs` (ou intégrée à `/admin/pipeline`) :
-  - Liste des derniers runs (mode, date, durée, nombre d'observations suspectes)
-  - Drill-down par run : observables (avec deltas), métriques par phase, métadonnées
-  - Vue historique : série temporelle des durées par phase / volumes / observations suspectes sur N runs
-- [ ] Endpoint API qui sert le snapshot le plus récent et l'historique.
+- [x] Migration Alembic `a3f7b2c9d4e1` : rename `pipeline_check_snapshots` → `pipeline_run_snapshots`.
+- [x] Payload étendu : `RunSnapshotPayload` = `observables` + `metrics_per_phase` (par phase : `new`/`updated`/`total`/`errors`/`extras`/`duration_s`) + `total_duration_s` + `sources` + `phases_run`. Hook `run_pipeline.py` adapté.
+- [x] Endpoint `GET /api/admin/pipeline-runs` (liste résumée) + `GET /api/admin/pipeline-runs/{id}` (détail avec observations recalculées en comparant aux observables du snapshot précédent du même mode).
+- [x] Page admin `/admin/pipeline` refondue avec deux onglets :
+  - **Snapshots** (par défaut) : liste des derniers runs, drill-down par run (métadonnées, observations groupées par famille avec mise en évidence des suspectes, métriques par phase).
+  - **Rapports** : structure existante (markdown) préservée.
+- [ ] *(à voir à l'usage)* Vue historique en série temporelle (durées par phase / volumes / observations suspectes sur N runs). Pas urgent.
 
 **Hors scope de ce livrable** (peuvent venir plus tard) :
 - Métriques pool DB en temps réel (déjà partiellement remontées sur `/admin/pipeline`)
