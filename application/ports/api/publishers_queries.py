@@ -25,6 +25,7 @@ class PublisherListItem(BaseModel):
     country: str | None
     doi_prefixes: list[DoiPrefixInfo]
     is_predatory: bool
+    publisher_type: str
     journal_count: int
     pub_count: int
 
