@@ -34,6 +34,7 @@ class ScanrNormalizeQueries(Protocol):
         topics: JsonValue,
         cited_by_count: int | None,
         urls: list[str] | None,
+        biblio: JsonValue,
     ) -> int: ...
 
     def upsert_scanr_source_authorship(

@@ -432,6 +432,46 @@ class TestInsertOpenalexDocument:
         captured = self._call(queries, {"id": "https://openalex.org/W1", "biblio": {}})
         assert captured["biblio"] is None
 
+    def test_biblio_publisher_and_journal_from_primary_location(self):
+        queries = _FakeQueries()
+        work = {
+            "id": "https://openalex.org/W1",
+            "primary_location": {
+                "source": {
+                    "host_organization_name": "Elsevier",
+                    "display_name": "Journal of Physics",
+                    "id": "https://openalex.org/S123",
+                    "issn": ["0022-3727", "1361-6463"],
+                    "issn_l": "0022-3727",
+                }
+            },
+        }
+        captured = self._call(queries, work)
+        # `issn_l` est mis dans `issnl` ; le premier non-issn_l de la liste passe en
+        # `issn` (pas de typage `electronic`/`print` côté OpenAlex sur ce chemin).
+        assert captured["biblio"] == {
+            "publisher": "Elsevier",
+            "journal": {
+                "title": "Journal of Physics",
+                "issn": "1361-6463",
+                "issnl": "0022-3727",
+                "openalex_id": "S123",
+            },
+        }
+
+    def test_biblio_skipped_when_primary_is_repository(self, monkeypatch):
+        """Si should_skip_publisher_journal renvoie True, publisher/journal absents de biblio."""
+        monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: object())
+        monkeypatch.setattr(normalize_openalex, "is_theses_fr_location", lambda p: False)
+        monkeypatch.setattr(normalize_openalex, "should_skip_publisher_journal", lambda p: True)
+        queries = _FakeQueries()
+        work = {
+            "id": "https://openalex.org/W1",
+            "primary_location": {"source": {"host_organization_name": "HAL"}},
+        }
+        captured = self._call(queries, work)
+        assert captured["biblio"] is None
+
     def test_theses_fr_nnt_extracted(self, monkeypatch):
         """Si le primary_location est theses.fr, le nnt va dans external_ids."""
 
@@ -443,6 +483,7 @@ class TestInsertOpenalexDocument:
         monkeypatch.setattr(
             normalize_openalex, "extract_nnt_from_location", lambda p: "2024CLFAC001"
         )
+        monkeypatch.setattr(normalize_openalex, "should_skip_publisher_journal", lambda p: True)
 
         queries = _FakeQueries()
         captured = self._call(queries, {"id": "https://openalex.org/W1"})

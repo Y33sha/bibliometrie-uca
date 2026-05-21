@@ -286,6 +286,46 @@ class TestInsertHalDocument:
         captured = self._call(queries, {})
         assert captured["biblio"] is None
 
+    def test_biblio_publisher_from_journalPublisher_s(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"journalPublisher_s": "Elsevier"})
+        assert captured["biblio"] == {"publisher": "Elsevier"}
+
+    def test_biblio_publisher_fallback_to_publisher_s(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"publisher_s": "Springer"})
+        assert captured["biblio"] == {"publisher": "Springer"}
+
+    def test_biblio_journalPublisher_s_wins_over_publisher_s(self):
+        queries = _FakeQueries()
+        captured = self._call(
+            queries, {"journalPublisher_s": "Elsevier", "publisher_s": "Springer"}
+        )
+        assert captured["biblio"] == {"publisher": "Elsevier"}
+
+    def test_biblio_journal_built_from_title_issn_eissn(self):
+        queries = _FakeQueries()
+        captured = self._call(
+            queries,
+            {
+                "journalTitle_s": "J. Phys.",
+                "journalIssn_s": "0022-3727",
+                "journalEissn_s": "1361-6463",
+            },
+        )
+        assert captured["biblio"] == {
+            "journal": {
+                "title": "J. Phys.",
+                "issn": "0022-3727",
+                "eissn": "1361-6463",
+            }
+        }
+
+    def test_biblio_journal_partial(self):
+        queries = _FakeQueries()
+        captured = self._call(queries, {"journalTitle_s": "J. Phys."})
+        assert captured["biblio"] == {"journal": {"title": "J. Phys."}}
+
     def test_url_from_uri(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"uri_s": "https://hal.science/hal-123"})

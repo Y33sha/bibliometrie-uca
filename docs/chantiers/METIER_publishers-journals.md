@@ -86,17 +86,15 @@ L'attribution initiale est traitée hors Phase 1 :
 
 **Sortie attendue** : schéma + UI prêts. Les `publisher_type` restent à `'unknown'` (default) en attendant Phase 3 ; les `journal_type` gardent leur valeur existante (`'journal'` pour la quasi-totalité).
 
-## Phase 2 — Refonte pipeline (création dans la phase `publications`)
+## Phase 2 — Traçabilité brute via biblio (approche minimale)
 
-**Coût élevé** : touche les 5 normalizers + une nouvelle étape pipeline + une migration de données. À séquencer en plusieurs commits.
+**Décision** : ne pas refondre le pipeline. Garder le comportement actuel (les 5 normalizers continuent d'appeler `find_or_create_publisher` / `find_or_create_journal` et de poser `source_publications.journal_id`), **ajouter** `biblio.publisher` (text, nom brut) et `biblio.journal` (object : `{title, issn, eissn, issnl, openalex_id}`) en parallèle pour conserver la trace de ce que chaque source a renvoyé. Les divergences inter-sources restent détectables sans pré-agrégation destructive.
 
-- [ ] **Modifier les 5 normalizers** : retirer les appels à `find_or_create_publisher` et `find_or_create_journal`. Écrire les données brutes dans `biblio` selon la convention figée (`publisher`, `journal`). Aucune migration de schéma nécessaire.
-- [ ] **Nouvelle étape dans la phase `publications`** : pour chaque publication consolidée, agrège `biblio.publisher` / `biblio.journal` des `source_publications` inter-sources, dédoublonne, crée/met à jour le `publisher_id` et le `journal_id` de `publications`. Algorithme à concevoir (priorité source, fusion noms, etc.).
-- [ ] **Déplacer `resolve_doi_prefixes`** : aujourd'hui après normalize, devra venir avant la nouvelle étape de création publisher/journal (qui peut s'appuyer sur le préfixe DOI pour le rattachement publisher).
-- [ ] **Backfill** : script one-shot qui repopule `biblio.publisher` / `biblio.journal` sur les `source_publications` existantes (depuis le raw_store si dispo, sinon en repassant le normalizer).
-- [ ] **Tests** : couverture des cas dédoublonnage cross-source (même journal écrit différemment selon HAL/OA/WoS).
+- [x] **Modifier les 5 normalizers** : à la création/mise à jour d'un `source_publication`, écrire `biblio.publisher` + `biblio.journal` selon la convention. Pas de modification d'ordonnancement, pas de migration de schéma. `source_publications.journal_id`, `container_title` et `resolve_doi_prefixes` restent en place avec leur producteur actuel.
+- [x] **Tests** : couverture de l'écriture biblio dans chaque normalizer + non-régression des `find_or_create_*`.
+- [ ] **Backfill** *(optionnel, différé)* : un réimport homogénéiserait `biblio` sur l'historique, mais les anciennes rows sans biblio ne cassent rien — les nouvelles rows portent l'info dès le prochain run. À juger plus tard, quand un usage concret émergera (probablement : outillage de détection des variants inter-sources sur le nom/ISSN d'un même journal — non spécifié à date).
 
-**Sortie attendue** : normalize redevient un module de pure traduction (raw API → schéma source canonique), la phase publications devient le seul producteur de référentiels.
+**Sortie attendue** : traçabilité du brut acquise sans refonte pipeline. La critique « création précoce et dispersée dans normalize » du contexte est **volontairement non adressée** — option de refonte gardée ouverte si la traçabilité brute s'avère insuffisante à l'usage (chantier dédié à créer alors).
 
 ## Phase 3 — Enrichissement DOAJ
 
@@ -133,9 +131,6 @@ Implémentation envisagée :
 
 ## Questions ouvertes (au-delà des décisions à trancher en amont)
 
-- **Ordre Phase 1 vs Phase 2** : faut-il typer (Phase 1) avant de refondre le pipeline (Phase 2) ? L'attribution heuristique du `publisher_type` (Phase 1) repose sur `doi_prefixes`, qui est déjà disponible — donc Phase 1 indépendante. Mais si Phase 2 réécrit la création publisher/journal, autant intégrer le typage dans le nouveau flux. → Compromis possible : Phase 1 traite uniquement le typage des **publishers/journals existants** (statique), Phase 2 ajoute la pose du type dans le nouveau flux (dynamique).
-- **Fusion d'un publisher avec un autre lors de la migration data Phase 2** : si la refonte révèle des doublons, on les fusionne ? On signale ? L'admin gère manuellement ?
-- **Rétro-compatibilité API** : si on bouge `journal_id` côté pipeline et qu'on change la sémantique des colonnes brutes, certains endpoints peuvent retourner des données légèrement différentes le temps de la transition.
 - **DOAJ : périmètre OA** : tous les journals OA ne sont pas dans DOAJ. Croiser aussi avec une liste de revues OA non-DOAJ (Sherpa, OpenAlex `oa_status` ?) pour ne pas faux-positiver les incohérences `oa_status` côté Phase 4c.
 
 ## Liens

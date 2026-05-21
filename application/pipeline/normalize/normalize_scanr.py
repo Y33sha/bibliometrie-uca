@@ -192,6 +192,23 @@ def insert_scanr_document(
     language = pub_meta.get("language") if pub_meta else None
     container_title = pub_meta.get("container_title") if pub_meta else None
 
+    # Publisher + journal bruts (traçabilité du nom tel que vu par ScanR,
+    # en parallèle des publishers/journals créés via find_or_create_*).
+    source = doc.get("source") or {}
+    biblio: dict[str, JsonValue] = {}
+    if publisher_raw := source.get("publisher"):
+        biblio["publisher"] = publisher_raw
+    journal_obj: dict[str, str] = {}
+    if jt := source.get("title"):
+        journal_obj["title"] = jt
+    if jissn := source.get("issn"):
+        journal_obj["issn"] = jissn
+    if jeissn := source.get("eissn"):
+        journal_obj["eissn"] = jeissn
+    if journal_obj:
+        biblio["journal"] = journal_obj
+    biblio_json = biblio if biblio else None
+
     return queries.upsert_scanr_source_publication(
         conn,
         scanr_id=scanr_id,
@@ -211,6 +228,7 @@ def insert_scanr_document(
         topics=topics,
         cited_by_count=cited_by_count,
         urls=urls or None,
+        biblio=biblio_json,
     )
 
 

@@ -43,6 +43,7 @@ from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
+from domain.types import JsonValue
 
 # =============================================================
 # UTILITAIRES
@@ -254,7 +255,7 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
     page = pub_info.get("page", {})
     if isinstance(page, str):
         page = {}
-    biblio = {}
+    biblio: dict[str, JsonValue] = {}
     vol = pub_info.get("vol")
     if vol:
         biblio["volume"] = str(vol)
@@ -266,6 +267,22 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
             biblio["first_page"] = str(page["begin"])
         if page.get("end"):
             biblio["last_page"] = str(page["end"])
+
+    # Publisher + journal bruts (traçabilité du nom tel que vu par WoS, en
+    # parallèle des publishers/journals créés via find_or_create_*).
+    issn_val = _get_api_issn(dynamic, "issn")
+    eissn_val = _get_api_issn(dynamic, "eissn")
+    if publisher_name:
+        biblio["publisher"] = publisher_name
+    journal_obj: dict[str, str] = {}
+    if journal_title:
+        journal_obj["title"] = journal_title
+    if issn_val:
+        journal_obj["issn"] = issn_val
+    if eissn_val:
+        journal_obj["eissn"] = eissn_val
+    if journal_obj:
+        biblio["journal"] = journal_obj
 
     # Abstract
     frm = static.get("fullrecord_metadata", {})
@@ -324,8 +341,8 @@ def extract_from_api(raw: dict, staging_doi: str | None) -> dict:
         "language": language,
         "oa_status": oa_status,
         "journal_title": journal_title,
-        "issn": _get_api_issn(dynamic, "issn"),
-        "eissn": _get_api_issn(dynamic, "eissn"),
+        "issn": issn_val,
+        "eissn": eissn_val,
         "publisher_name": publisher_name,
         "authors": _parse_api_authors(static, dynamic),
         "abstract": abstract,
