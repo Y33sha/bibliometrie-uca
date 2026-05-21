@@ -14,9 +14,7 @@ Aujourd'hui, `fetch_missing_doi --target crossref` interroge l'API CrossRef pour
 - une part significative renvoie 404 (DOI non Crossref) — appels inutiles, statistiques `not_found` artificiellement gonflées, pollution du staging avec des stubs `not_found=TRUE`.
 - les DOIs DataCite (Zenodo, theses.fr, etc.) restent invisibles côté métadonnées : on a le DOI mais aucune métadonnée enrichie hors HAL/OpenAlex.
 
-Ce chantier traite les deux faces du problème : **savoir** d'où vient chaque DOI, puis **exploiter** cette information pour économiser les appels CrossRef et ouvrir DataCite comme nouvelle source.
-
-Les préfixes DOI mappés aux `publishers` (et indirectement aux `journals`) serviront aussi au dédoublonnage des éditeurs/revues et à la détection des métadonnées incohérentes issues des sources (DOI vs `journal`, DOI vs `doc_type`…). Cf chantier `METIER_publishers-journals.md`.
+Ce chantier traite les deux faces du problème : **savoir** d'où vient chaque DOI, puis **exploiter** cette information pour économiser les appels CrossRef et ouvrir DataCite comme nouvelle source. Les préfixes DOI mappés aux `publishers` (et indirectement aux `journals`) serviront aussi au dédoublonnage des éditeurs/revues et à la détection des métadonnées incohérentes issues des sources (incohérence DOI/`journal`, DOI/`doc_type`…). Cf chantier `METIER_publishers-journals.md`.
 
 ## Périmètre fonctionnel
 
