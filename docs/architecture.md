@@ -1,6 +1,6 @@
 # Architecture logicielle — Bibliométrie UCA
 
-*Document à jour au 2026-05-20.*
+*Document à jour au 2026-05-21.*
 
 Pour le modèle de données (tables, relations, domaines fonctionnels),
 voir [donnees](donnees).
@@ -404,6 +404,24 @@ Seuil de couverture `fail_under = 85` (`[tool.coverage.report]` dans
 Les modules de wiring HTTP des adapters sources sont exclus du calcul ;
 leur logique pure vit dans `<source>/parsing.py` et est couverte par
 tests unitaires.
+
+## Discipline transactionnelle
+
+Le projet suit la règle Cosmic Python : **les repositories ne commitent jamais**. Le commit est la prérogative du use case (qui sait si une unité de travail est terminée), pas de l'adapter de persistance (qui ne sait jamais où il se situe dans une transaction plus large).
+
+### Règles
+
+1. **Zéro `commit()` dans `infrastructure/repositories/`.** Vérifiable par `grep -rn "\.commit()" infrastructure/repositories/` — doit retourner zéro résultat. Les méthodes du repo modifient la transaction courante ; c'est le caller qui décide quand persister.
+
+2. **Les use-cases pipeline commitent.** Chaque orchestrateur dans `application/pipeline/*` est responsable de son unité de travail : `commit()` en sortie nominale, `rollback()` dans `except Exception` (crash : état inconnu). Le cas `except KeyboardInterrupt` commite plutôt que rollbacker : un Ctrl+C utilisateur est un signal de « arrête-toi proprement », pas un crash.
+
+3. **Savepoints pour les sous-unités résilientes.** Quand une boucle doit isoler les échecs item-par-item sans rollbacker tout le batch, utiliser `application/pipeline/_savepoint.py` (wrapper sur `connection.begin_nested()` de SQLAlchemy). Exemple : `normalize/base.py` avec `USE_SAVEPOINT=True`.
+
+### Exceptions assumées
+
+- **Batch commits dans les pipelines** (`create_publications.py`, `enrich_journal_apc.py`, `normalize/base.py`, `resolve_addresses.py`, `refetch_truncated.py`) : commit toutes les N opérations pour qu'un crash sur un batch de 100k+ items ne perde pas tout. Suppose des phases idempotentes (vrai par construction).
+
+- **Commits dans `infrastructure/sources/*`** : extracteurs API qui commitent page-par-page. Adapters batch, pas repositories — les appels HTTP sont coûteux, les pages déjà fetchées doivent survivre.
 
 ## Composition roots
 
