@@ -6,9 +6,19 @@
 
 	import type { components } from '$lib/api/schema';
 	type Publisher = components['schemas']['PublisherListItem'];
+	type EnumOption = components['schemas']['EnumOption'];
+
+	let publisherTypes: EnumOption[] = $state([]);
 
 	// Modal édition
-	let editModal: { id: number; name: string; country: string; is_predatory: boolean; notes: string } | null = $state(null);
+	let editModal: {
+		id: number;
+		name: string;
+		country: string;
+		is_predatory: boolean;
+		publisher_type: string;
+		notes: string;
+	} | null = $state(null);
 
 	function openEdit(pub: Publisher) {
 		editModal = {
@@ -16,6 +26,7 @@
 			name: pub.name,
 			country: pub.country || '',
 			is_predatory: pub.is_predatory,
+			publisher_type: pub.publisher_type,
 			notes: '',
 		};
 	}
@@ -26,6 +37,7 @@
 		if (editModal.name.trim()) body.name = editModal.name.trim();
 		body.country = editModal.country.trim() || null;
 		body.is_predatory = editModal.is_predatory;
+		body.publisher_type = editModal.publisher_type;
 		if (editModal.notes.trim()) body.notes = editModal.notes.trim();
 		try {
 			await publishersApi.update(editModal.id, body);
@@ -102,7 +114,10 @@
 		}
 	}
 
-	onMount(load);
+	onMount(async () => {
+		publisherTypes = await api<EnumOption[]>('/api/publisher-types');
+		await load();
+	});
 </script>
 
 <svelte:head><title>Éditeurs — Bibliométrie UCA</title></svelte:head>
@@ -189,6 +204,12 @@
 		<input bind:value={editModal.name} />
 		<label>Pays</label>
 		<input bind:value={editModal.country} placeholder="ex: FR, US" />
+		<label>Type</label>
+		<select bind:value={editModal.publisher_type}>
+			{#each publisherTypes as opt (opt.value)}
+				<option value={opt.value}>{opt.label_fr}</option>
+			{/each}
+		</select>
 		<label>
 			<input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur
 		</label>

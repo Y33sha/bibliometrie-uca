@@ -7,8 +7,10 @@
 
 	type Journal = components['schemas']['JournalOut'];
 	type JournalListResponse = components['schemas']['JournalListResponse'];
+	type EnumOption = components['schemas']['EnumOption'];
 
 	let journals: Journal[] = $state([]);
+	let journalTypes: EnumOption[] = $state([]);
 	let total = $state(0);
 	let page = $state(1);
 	let pages = $state(1);
@@ -127,7 +129,10 @@
 		}
 	}
 
-	onMount(load);
+	onMount(async () => {
+		journalTypes = await api<EnumOption[]>('/api/journal-types');
+		await load();
+	});
 </script>
 
 <svelte:head><title>Revues — Bibliométrie UCA</title></svelte:head>
@@ -229,12 +234,9 @@
 			<div style="flex:1">
 				<label>Type</label>
 				<select bind:value={editModal.journal_type}>
-					<option value="journal">Revue</option>
-					<option value="proceedings">Proceedings</option>
-					<option value="repository">Archive/dépôt</option>
-					<option value="book_series">Série d'ouvrages</option>
-					<option value="preprint_server">Serveur de preprints</option>
-					<option value="media">Média</option>
+					{#each journalTypes as opt (opt.value)}
+						<option value={opt.value}>{opt.label_fr}</option>
+					{/each}
 				</select>
 			</div>
 		</div>

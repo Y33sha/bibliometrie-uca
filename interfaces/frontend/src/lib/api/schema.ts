@@ -2019,6 +2019,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publisher-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Publisher Types
+         * @description Valeurs possibles de l'enum `publisher_type` avec leur label français.
+         *
+         *     Source de vérité côté Python : `domain.publishers.publisher.PUBLISHER_TYPES`
+         *     (test d'intégration `TestPublisherTypesEnum` vérifie la cohérence avec l'enum SQL).
+         *     Sert à alimenter le dropdown de la page admin éditeurs.
+         */
+        get: operations["list_publisher_types_api_publisher_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publishers": {
         parameters: {
             query?: never;
@@ -2088,6 +2112,30 @@ export interface paths {
          *     des deux éditeurs est introuvable.
          */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journal-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Journal Types
+         * @description Valeurs possibles de l'enum `journal_type` avec leur label français.
+         *
+         *     Source de vérité côté Python : `domain.journals.journal.JOURNAL_TYPES`
+         *     (test d'intégration `TestJournalTypesEnum` vérifie la cohérence avec l'enum SQL).
+         *     Sert à alimenter le dropdown de la page admin revues.
+         */
+        get: operations["list_journal_types_api_journal_types_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2787,6 +2835,20 @@ export interface components {
             ppn?: string | null;
         } & {
             [key: string]: unknown;
+        };
+        /**
+         * EnumOption
+         * @description Une valeur d'enum exposée à l'UI : `{value, label_fr}`.
+         *
+         *     Sert aux endpoints qui alimentent les dropdowns (publisher_type,
+         *     journal_type, …). La source de vérité côté Python est l'ordre de
+         *     la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
+         */
+        EnumOption: {
+            /** Value */
+            value: string;
+            /** Label Fr */
+            label_fr: string;
         };
         /** ExcludeSourceAuthorship */
         ExcludeSourceAuthorship: {
@@ -4658,6 +4720,8 @@ export interface components {
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
             /** Is Predatory */
             is_predatory: boolean;
+            /** Publisher Type */
+            publisher_type: string;
             /** Journal Count */
             journal_count: number;
             /** Pub Count */
@@ -4724,6 +4788,8 @@ export interface components {
             is_predatory?: boolean | null;
             /** Notes */
             notes?: string | null;
+            /** Publisher Type */
+            publisher_type?: string | null;
         };
         /** ReassignIdentifier */
         ReassignIdentifier: {
@@ -8532,6 +8598,26 @@ export interface operations {
             };
         };
     };
+    list_publisher_types_api_publisher_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnumOption"][];
+                };
+            };
+        };
+    };
     list_publishers_api_publishers_get: {
         parameters: {
             query?: {
@@ -8663,6 +8749,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_journal_types_api_journal_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnumOption"][];
                 };
             };
         };

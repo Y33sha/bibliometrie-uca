@@ -49,6 +49,7 @@ class PgPublisherQueries(PublisherQueries):
         rows = self._conn.execute(
             text(f"""
                 SELECT p.id, p.name, p.openalex_id, p.country, p.is_predatory,
+                       p.publisher_type,
                        (SELECT COUNT(*) FROM journals j
                         WHERE j.publisher_id = p.id) AS journal_count,
                        (SELECT COUNT(*) FROM publications pub
@@ -83,6 +84,7 @@ class PgPublisherQueries(PublisherQueries):
                     country=r.country,
                     doi_prefixes=[DoiPrefixInfo(**p) for p in r.doi_prefixes],
                     is_predatory=r.is_predatory,
+                    publisher_type=r.publisher_type,
                     journal_count=r.journal_count,
                     pub_count=r.pub_count,
                 )
