@@ -13,7 +13,8 @@ Deux manques persistants sur la production du pipeline, identifiés de longue da
 ## Phases
 
 - **Phase 1 — Sweep `subprocess → import`** (pré-requis de la persistance étendue des `PhaseMetrics`). État au démarrage : 12 phases pipeline déjà en import direct dans `run_pipeline.py` (via les helpers `_run_*`), 10 invocations encore en `subprocess.run`. Une invocation subprocess ne peut pas remonter de métriques typées à l'orchestrateur — il faut parser stdout. Le sweep migre chaque script restant vers `run(...) -> Metrics`.
-- **Phase 2 — Snapshots de runs (observables + métriques) post-pipeline**, exposés via une page admin unique. Phase 2.1 = persistance des observables (livrée). Phase 2.2 = enrichissement du payload avec les `PhaseMetrics` + page admin (en attente).
+- **Phase 2 — Snapshots de runs (observables + métriques) post-pipeline**, exposés via une page admin unique. Phase 2.1 = persistance des observables (livrée). Phase 2.2 = enrichissement du payload avec les `PhaseMetrics` + page admin (livrée).
+- **Phase 3 — Robustesse runtime + clarté des logs**. Items indépendants : `statement_timeout` sur connexions pipeline (3.1), visibilité dans les UPDATE longs (3.2), clarification + harmonisation des logs d'extraction (3.3).
 
 ## Décisions
 
@@ -78,6 +79,52 @@ Le delta « nouvelles ambiguës insérées par le run » est dérivé du delta s
 - Métriques pool DB en temps réel (déjà partiellement remontées sur `/admin/pipeline`)
 - Taux d'erreur HTTP par source (nécessiterait d'instrumenter les adapters async)
 
+### Phase 3 — Robustesse runtime + clarté des logs
+
+Items de fiabilité runtime et de lisibilité des logs du pipeline. Indépendants entre eux, à séquencer selon l'urgence rencontrée à l'usage.
+
+#### Phase 3.1 — `statement_timeout` sur les connexions pipeline
+
+PostgreSQL `statement_timeout` annule une requête qui dépasse N millisecondes (lève une `OperationalError` `QueryCanceled` côté SA). Posé sur les connexions du pipeline, il garantit qu'aucune requête ne reste pendante indéfiniment — au pire 10 min, puis interruption + log + escalade vers le `try/except` de phase qui marque l'erreur.
+
+Valeur cible : **10 min** (à confirmer après une passe sur un run réel — il faut que ce soit largement au-dessus du percentile 99 des requêtes pipeline observées, sinon faux positifs sur des phases légitimement longues comme `propagate_is_corresponding`).
+
+**Scope d'application — à trancher** : l'`Engine` SA est partagé entre API, pipeline orchestré et CLI. Trois approches :
+
+- **A. `event.listens_for(engine, "connect")`** : SET le timeout à chaque nouvelle connexion. Simple, central, automatique. Mais s'applique aussi à l'API et aux CLI maintenance, certains endpoints admin (background tasks, propagation massive, cf. [`CODE_background-jobs.md`](CODE_background-jobs.md)) peuvent légitimement dépasser 10 min.
+- **B. Helper `pipeline_conn(engine)`** : context manager qui ouvre une connexion + SET timeout. Scope précis, mais migration de 40+ call-sites `interfaces/cli/pipeline/*` + helpers `_run_*` de `run_pipeline.py`.
+- **C. A + override par exception** : timeout global via `connect` listener + `SET LOCAL statement_timeout = '0'` dans les endpoints longs connus. Pragmatique : 99 % du code bénéficie du timeout, les exceptions sont explicites et reviewables.
+
+Recommandation initiale : **C** (commencer avec un timeout global large — ex. 30 min — pour laisser respirer ce qui existe aujourd'hui, puis le resserrer au fil des observations).
+
+**Catch + log** : SA lève `sqlalchemy.exc.OperationalError` avec `pgcode = '57014'` (query_canceled). Au niveau orchestrateur `run_pipeline.py`, le `try/except` autour de `fn(...)` capture déjà toute exception et logue l'erreur de phase — ajouter un cas spécifique pour `57014` qui logue clairement « **STATEMENT TIMEOUT** sur phase X — requête annulée après N s ».
+
+- [ ] Trancher l'approche (A / B / C) après mesure des temps réels via les `metrics_per_phase` du Phase 2.2.
+- [ ] Implémenter le scope choisi avec une constante centralisée (ex. `PIPELINE_STATEMENT_TIMEOUT_MS = 600_000`).
+- [ ] Handler dédié dans `run_pipeline.py` pour distinguer un `query_canceled` d'une autre `OperationalError`.
+- [ ] Documenter dans `docs/pipeline.md` (section robustesse) le mécanisme + comment l'override sur un endpoint admin.
+
+#### Phase 3.2 — Visibilité dans les UPDATE longs
+
+`propagate_is_corresponding`, `propagate_roles` et autres UPDATE batch n'émettent qu'un log avant + un log après. Pas de visibilité pendant l'exécution, ce qui rend impossible de distinguer « long mais avance » de « bloqué ».
+
+Pistes (à arbitrer au moment d'implémenter) :
+- Découper en batches explicites avec un `log.info` toutes les N rows.
+- Ou `RAISE NOTICE` PostgreSQL dans une fonction stockée, capturé côté Python via `connection.info`.
+
+- [ ] Identifier les UPDATE batch qui méritent l'instrumentation (probablement ceux qui dépassent ~1 min en pratique — les mesures de Phase 2.2 aideront).
+- [ ] Choisir la mécanique (découpage en batches loggés / `RAISE NOTICE` / autre).
+
+#### Phase 3.3 — Clarification + harmonisation des logs d'extraction
+
+Logs ambigus relevés à l'usage, à élucider et harmoniser entre sources.
+
+- [ ] **Extracteur HAL** : log `"mode incrémental (0 orphelins vs 1 pages full-fetch)"` cryptique. Décortiquer la sémantique (orphelins vs full-fetch pages = quel rapport au choix d'heuristique ?) et reformuler. À coupler avec la révision de l'heuristique d'aiguillage `extract_collection` (cf. [`DATA_cycle-vie-staging.md`](DATA_cycle-vie-staging.md), Phase 1bis) : `len(orphans) < full_fetch_pages` reste insatisfaisante (compte les requêtes, ignore la taille de payload), particulièrement sur les requêtes umbrella type `PRES_CLERMONT`/`PRES_UCA` où le mode full-fetch est catastrophiquement lent. Pistes : (a) borne dure sur les orphelins, (b) cost function pondérée payload via `hal_per_page_for`, (c) compteur empirique sur les derniers runs.
+- [ ] **Orchestrateur** : log `"Lancer build_authorships.py pour propager in_perimeter/structure_ids"` apparaît à un moment qui suggère qu'un script externe doit être lancé manuellement, alors que c'est en réalité l'orchestrateur qui enchaîne. Reformuler pour refléter l'enchaînement automatique (ex. « → build_authorships : propagation in_perimeter / structure_ids »).
+- [ ] **Extracteur HAL — réimports** : aucune indication sur les documents réimportés/mis à jour. Comparer avec ce que loguent les autres extracteurs et harmoniser le format (counters cohérents : `new` / `updated` / `unchanged` / `skipped`) + taille de batch loguée pour comprendre la cadence.
+
+Ces trois items sont indépendants côté code, mais cohérents thématiquement (lisibilité des logs d'extraction) — peuvent être traités en un commit.
+
 ## Questions ouvertes
 
 - **Page admin vs Grafana DSI** : si la DSI met en place sa propre
@@ -86,7 +133,3 @@ Le delta « nouvelles ambiguës insérées par le run » est dérivé du delta s
   — le JSON persisté en base reste exploitable par tout outil
   externe. À reconsidérer au moment de la transmission. En
   attendant, une page admin minimaliste suffit.
-
-## Idées à intégrer
-statement_timeout côté pipeline : si une requête tourne > 10 min sans logging, c'est un signe — interrompre et logger.
-Logging de progression dans les UPDATE longs (propagate_is_corresponding, propagate_roles) : actuellement on n'a qu'une ligne avant + une après, pas de visibilité pendant.
