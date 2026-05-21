@@ -32,7 +32,7 @@ def spies(monkeypatch):
 
     def fake_full(adapter, query, collection_code, conn, existing_ids, total_count, logger):
         calls["full"].append({"collection": collection_code, "total": total_count})
-        return 0  # nb_new
+        return 0, 0  # (new, updated)
 
     def fake_incremental(adapter, collection_code, orphans, known, conn, existing_ids, logger):
         calls["incremental"].append(
@@ -42,7 +42,7 @@ def spies(monkeypatch):
                 "known": list(known),
             }
         )
-        return len(orphans), len(known)  # (new, tagged)
+        return len(orphans), len(known)  # (new, updated)
 
     monkeypatch.setattr(extract_hal, "_extract_full", fake_full)
     monkeypatch.setattr(extract_hal, "_extract_incremental", fake_incremental)
@@ -59,13 +59,13 @@ def _fake_adapter(preview_ids: list[str]) -> MagicMock:
 class TestAdaptiveDispatch:
     def test_incremental_mode_triggered_for_umbrella(self, no_sleep, spies):
         """5000 papiers, 4995 connus, 5 orphelins.
-        per_page=500 → full_fetch_pages=10. 5 < 10 → MODE INCRÉMENTAL.
+        per_page=500 → full_fetch_pages=10. Seuil 10 × 10 = 100. 5 < 100 → INCRÉMENTAL.
         """
         preview_ids = [f"hal-{i}" for i in range(5000)]
         adapter = _fake_adapter(preview_ids)
         existing = {f"hal-{i}" for i in range(5, 5000)}
 
-        total, _new = extract_hal.extract_collection(
+        total, _new, _updated = extract_hal.extract_collection(
             collection_code="UMBRELLA",
             collection_label="Umbrella",
             conn=MagicMock(),
@@ -83,11 +83,11 @@ class TestAdaptiveDispatch:
 
     def test_full_fetch_mode_when_staging_empty(self, no_sleep, spies):
         """100 papiers, staging vide → 100 orphelins, full_fetch_pages=1.
-        100 ≥ 1 → MODE FULL-FETCH."""
+        Seuil 10 × 1 = 10. 100 > 10 → FULL-FETCH."""
         preview_ids = [f"hal-{i}" for i in range(100)]
         adapter = _fake_adapter(preview_ids)
 
-        total, _new = extract_hal.extract_collection(
+        total, _new, _updated = extract_hal.extract_collection(
             collection_code="FRESH",
             collection_label="Fresh",
             conn=MagicMock(),
@@ -101,15 +101,15 @@ class TestAdaptiveDispatch:
         assert spies["full"][0]["collection"] == "FRESH"
         assert spies["full"][0]["total"] == 100
 
-    def test_boundary_orphans_equals_pages_picks_full(self, no_sleep, spies):
-        """Borne : orphans == full_fetch_pages → mode full-fetch (règle `<` stricte).
-        1000 papiers, 998 connus, 2 orphelins. per_page=500 → pages=2. 2 < 2 = False.
+    def test_boundary_orphans_at_threshold_picks_full(self, no_sleep, spies):
+        """Borne : orphans == 10 × full_fetch_pages → full (règle `<` stricte).
+        5000 papiers, 4900 connus, 100 orphelins. per_page=500 → pages=10. Seuil 100. 100 < 100 = False.
         """
-        preview_ids = [f"hal-{i}" for i in range(1000)]
+        preview_ids = [f"hal-{i}" for i in range(5000)]
         adapter = _fake_adapter(preview_ids)
-        existing = {f"hal-{i}" for i in range(2, 1000)}
+        existing = {f"hal-{i}" for i in range(100, 5000)}
 
-        total, _new = extract_hal.extract_collection(
+        total, _new, _updated = extract_hal.extract_collection(
             collection_code="BOUNDARY",
             collection_label="Boundary",
             conn=MagicMock(),
@@ -118,17 +118,18 @@ class TestAdaptiveDispatch:
             logger=logging.getLogger("test"),
             years=[2025],
         )
-        assert total == 1000
+        assert total == 5000
         assert spies["full"] and not spies["incremental"]
 
-    def test_boundary_orphans_less_than_pages_picks_incremental(self, no_sleep, spies):
-        """Borne inverse : orphans == pages - 1 → mode incrémental.
-        1000 papiers, 999 connus, 1 orphelin. per_page=500 → pages=2. 1 < 2 = True."""
-        preview_ids = [f"hal-{i}" for i in range(1000)]
+    def test_boundary_orphans_just_below_threshold_picks_incremental(self, no_sleep, spies):
+        """Borne inverse : orphans == seuil - 1 → incrémental.
+        5000 papiers, 4901 connus, 99 orphelins. per_page=500 → pages=10. Seuil 100. 99 < 100 = True.
+        """
+        preview_ids = [f"hal-{i}" for i in range(5000)]
         adapter = _fake_adapter(preview_ids)
-        existing = {f"hal-{i}" for i in range(1, 1000)}
+        existing = {f"hal-{i}" for i in range(99, 5000)}
 
-        total, _new = extract_hal.extract_collection(
+        total, _new, _updated = extract_hal.extract_collection(
             collection_code="JUSTBELOW",
             collection_label="JustBelow",
             conn=MagicMock(),
@@ -137,14 +138,14 @@ class TestAdaptiveDispatch:
             logger=logging.getLogger("test"),
             years=[2025],
         )
-        assert total == 1000
+        assert total == 5000
         assert spies["incremental"] and not spies["full"]
 
     def test_dry_run_skips_both_paths(self, no_sleep, spies):
         preview_ids = [f"hal-{i}" for i in range(50)]
         adapter = _fake_adapter(preview_ids)
 
-        total, new = extract_hal.extract_collection(
+        total, new, updated = extract_hal.extract_collection(
             collection_code="DRY",
             collection_label="Dry",
             conn=MagicMock(),
@@ -156,12 +157,13 @@ class TestAdaptiveDispatch:
         )
         assert total == 50
         assert new == 0
+        assert updated == 0
         assert not spies["full"] and not spies["incremental"]
 
     def test_empty_collection_returns_zero(self, no_sleep, spies):
         adapter = _fake_adapter([])
 
-        total, new = extract_hal.extract_collection(
+        total, new, updated = extract_hal.extract_collection(
             collection_code="EMPTY",
             collection_label="Empty",
             conn=MagicMock(),
@@ -172,6 +174,7 @@ class TestAdaptiveDispatch:
         )
         assert total == 0
         assert new == 0
+        assert updated == 0
         assert not spies["full"] and not spies["incremental"]
 
 
@@ -185,7 +188,7 @@ class TestExtractFullSafeguard:
         adapter.fetch_page.return_value = {"response": {"numFound": 1000, "docs": []}}
 
         conn = MagicMock()
-        total_new = extract_hal._extract_full(
+        total_new, total_updated = extract_hal._extract_full(
             adapter=adapter,
             query="q",
             collection_code="C",
@@ -194,7 +197,7 @@ class TestExtractFullSafeguard:
             total_count=1000,
             logger=logging.getLogger("test"),
         )
-        assert total_new == 0  # sortie propre
+        assert (total_new, total_updated) == (0, 0)  # sortie propre
         adapter.upsert_work.assert_not_called()
 
 
