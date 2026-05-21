@@ -245,6 +245,40 @@ class TestSourcesEnum:
         )
 
 
+class TestPublisherTypesEnum:
+    def test_python_matches_db(self, sa_sync_conn):
+        """`PUBLISHER_TYPES_SET` doit correspondre à l'enum SQL `publisher_type`."""
+        from domain.publishers.publisher import PUBLISHER_TYPES_SET
+
+        db_types = set(
+            sa_sync_conn.execute(
+                text("SELECT unnest(enum_range(NULL::publisher_type))::text")
+            ).scalars()
+        )
+        assert PUBLISHER_TYPES_SET == db_types, (
+            f"Désynchronisation Python/DB !\n"
+            f"  Python : {sorted(PUBLISHER_TYPES_SET)}\n"
+            f"  DB     : {sorted(db_types)}"
+        )
+
+
+class TestJournalTypesEnum:
+    def test_python_matches_db(self, sa_sync_conn):
+        """`JOURNAL_TYPES_SET` doit correspondre à l'enum SQL `journal_type`."""
+        from domain.journals.journal import JOURNAL_TYPES_SET
+
+        db_types = set(
+            sa_sync_conn.execute(
+                text("SELECT unnest(enum_range(NULL::journal_type))::text")
+            ).scalars()
+        )
+        assert JOURNAL_TYPES_SET == db_types, (
+            f"Désynchronisation Python/DB !\n"
+            f"  Python : {sorted(JOURNAL_TYPES_SET)}\n"
+            f"  DB     : {sorted(db_types)}"
+        )
+
+
 # ── Merge persons ──
 
 

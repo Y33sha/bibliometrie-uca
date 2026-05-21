@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vaDjyzvhF1AwYAeZnFYQuBWqZxbBcMFyhNZiL9Xjy3U2BbOoAgZlP136UjwcTf6
+\restrict kRZQGHQQisdEWFEVzvgBaHbpkJ6kCTDw2fvPcbFBlmz2fjellBUKHb2v2fBstBw
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
@@ -101,6 +101,20 @@ CREATE TYPE public.identifier_status AS ENUM (
 
 
 --
+-- Name: journal_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.journal_type AS ENUM (
+    'journal',
+    'proceedings',
+    'repository',
+    'book_series',
+    'preprint_server',
+    'media'
+);
+
+
+--
 -- Name: oa_type; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -112,6 +126,20 @@ CREATE TYPE public.oa_type AS ENUM (
     'closed',
     'unknown',
     'diamond'
+);
+
+
+--
+-- Name: publisher_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.publisher_type AS ENUM (
+    'commercial',
+    'learned_society',
+    'academic_institution',
+    'repository',
+    'aggregator',
+    'unknown'
 );
 
 
@@ -615,7 +643,7 @@ CREATE TABLE public.journals (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    journal_type text DEFAULT 'journal'::text,
+    journal_type public.journal_type DEFAULT 'journal'::public.journal_type,
     is_academic boolean DEFAULT true,
     doi_prefix text
 );
@@ -935,7 +963,8 @@ CREATE TABLE public.publishers (
     is_predatory boolean DEFAULT false,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    publisher_type public.publisher_type DEFAULT 'unknown'::public.publisher_type NOT NULL
 );
 
 
@@ -2844,4 +2873,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vaDjyzvhF1AwYAeZnFYQuBWqZxbBcMFyhNZiL9Xjy3U2BbOoAgZlP136UjwcTf6
+\unrestrict kRZQGHQQisdEWFEVzvgBaHbpkJ6kCTDw2fvPcbFBlmz2fjellBUKHb2v2fBstBw
