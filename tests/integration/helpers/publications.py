@@ -46,9 +46,7 @@ def find_or_create_for_tests(
 
     nnt_match_id: int | None = None
     if nnt:
-        existing_by_nnt = repo.find_by_nnt(nnt)
-        if existing_by_nnt:
-            nnt_match_id = existing_by_nnt.id
+        nnt_match_id = repo.find_by_nnt(nnt)
 
     decision = decide_publication_match(
         doi_merge_with_id=doi_merge_with_id,
