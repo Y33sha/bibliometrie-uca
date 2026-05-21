@@ -156,39 +156,23 @@ Exceptions à expliciter (pas à supprimer) :
 
 ### Phase 3 — Règle OA dans `publication_repository.merge_into`
 
-Petit refactoring isolé.
+Petit refactoring isolé. Réalisé autrement que prévu : la règle OA n'est pas isolée en fonction libre `best_oa_status_on_merge(a, b)`, elle est intégrée à `Publication.absorb(other)` côté agrégat domain — qui porte aussi le COALESCE des scalaires nullable et l'union des countries. Plus expressif côté DDD (l'agrégat sait comment absorber un autre instance).
 
-- Créer `domain.publication.best_oa_status_on_merge(a, b)` (fonction
-  pure). La règle « diamond gagne toujours » devient testable
-  unitairement.
-- Modifier `application/publications.merge_publications` pour appeler
-  cette fonction puis passer la valeur résolue à `repo.merge_into`.
-- Simplifier le SQL de `merge_into` : `oa_status = :final_oa` au lieu
-  du `CASE` actuel.
-
-Tests : tests unitaires de la fonction de domaine + tests
-d'intégration des merges existants.
+- [x] Règle OA + enrichissement métadonnées dans `Publication.absorb(other)` (méthode de l'agrégat). Testable unitairement.
+- [x] `application/publications.merge_publications` orchestre : `target.absorb(source)` → `repo.merge_into(target_id, source_id)` (plumbing FK) → `repo.save(target)` (persiste les métadonnées enrichies) → `repo.update_sources(target_id)`.
+- [x] SQL de `merge_into` simplifié : ne fait plus que du transfert de FK et cleanup, plus aucune décision métier sur `oa_status` / `countries` / etc.
 
 ### Phase 4 — Cascade countries de `address_repository.py`
 
-- [ ] Créer `application/addresses_countries_propagation.py` (nom à
-  confirmer). Y orchestrer la cascade
-  `addresses.countries → source_publications.countries → publications.countries`.
-- [ ] Le repo `address_repository.py` conserve les méthodes SQL atomiques
-  (`update_address_countries`, `bulk_update_source_publications_countries`,
-  etc.) sans logique de cascade.
-- [ ] Mettre à jour `docs/architecture.md` : retirer (ou nuancer) la
-  mention « exception cross-aggregate documentée » puisque la cascade
-  devient explicite côté application.
-
-Tests : tests d'intégration sur la cascade countries.
+- [x] L'orchestration cascade `addresses → source_authorships → source_publications → publications` vit côté use case dans `application/addresses/countries.py::propagate_countries_to_publications` (3 appels séquentiels au repo). Rien à extraire de plus de ce côté.
+- [x] Les 3 méthodes `refresh_sa_countries_for_addresses`, `refresh_source_publications_countries`, `refresh_publications_countries_for_addresses` restent en repo : ce sont des recalculs SQL atomiques en bloc (un seul UPDATE chacun, avec `array_agg DISTINCT` natif Postgres). Les tirer en Python multiplierait les round-trips pour un gain de testabilité nul — la règle « countries d'une publication = union des countries de ses source_publications » est triviale. Même esprit que le `NOT EXISTS` laissé en Phase 2. À revisiter si la détection pays est repensée (GeoNames, n-grams) — ce sera alors un chantier dédié.
+- [x] Mention « exception cross-aggregate » nuancée dans `docs/architecture.md` : l'orchestration cascade est désormais explicite côté use case ; seules les méthodes SQL de recalcul en bloc restent cross-aggregate.
 
 ### Phase 5 — Volet B : polish transactionnel
 
 À traiter en queue de chantier (ordre indifférent) :
 
-- [ ] Investiguer le double commit `normalize/base.py:194-196`. Soit
-  documenter pourquoi, soit nettoyer.
+- [x] Double commit `normalize/base.py` → nettoyé : protégeait le dernier batch partiel d'un échec de `post_process`, mais le seul override (`normalize_hal.py::post_process`) supprimait des doublons `source_authorships` `(source_publication_id, author_position)` devenus impossibles depuis le commit `984b5c70` (2026-04-23) qui a introduit `clear_source_authorships_for_publication` dans tous les normaliseurs. Audit DB → zéro doublon résiduel côté HAL. Précédent identique côté WoS supprimé en `6313b51c` (2026-05-12), HAL avait été oublié. Cascade : suppression des 2 SQL HAL, des méthodes adapter + port, de l'override HAL, du hook `post_process` dans `base.py` (devenu code mort), et du double commit qui n'avait plus rien à protéger.
 - [ ] Décider du sort du `commit()` après reset dans
   `enrich_journal_apc.py:118` : savepoint englobant ou statu quo
   documenté.
@@ -201,29 +185,28 @@ Tests : tests d'intégration sur la cascade countries.
 
 ## Hors scope
 
-- [ ] **Pas de réécriture des merges sains** (`journal_repository`,
+- **Pas de réécriture des merges sains** (`journal_repository`,
   `publisher_repository`). La chorégraphie SQL y est déjà bien
   orchestrée par les use cases.
-- [ ] **Pas de migration des batch commits vers un autre pattern** :
+- **Pas de migration des batch commits vers un autre pattern** :
   conserver, documenter.
-- [ ] **Pas de migration des extracteurs `infrastructure/sources/*`**
+- **Pas de migration des extracteurs `infrastructure/sources/*`**
   vers `application/`. Ce sont des adapters batch, leur place est
   défendable en infra.
-- [ ] **Pas de refonte du `_savepoint.py`** : le pattern est correct.
+- **Pas de refonte du `_savepoint.py`** : le pattern est correct.
 
 ## Questions ouvertes
 
 - **Nommage des modules application/** : étendre les modules
   existants (`application/persons.py`, `application/publications.py`,
   `application/addresses_structures.py`) ou créer des modules
-  dédiés (`application/authorships_truth.py`,
+  dédiés (`application/authorships.py`,
   `application/perimeter_propagation.py`,
   `application/addresses_countries_propagation.py`) ? À trancher au
   démarrage de chaque phase selon la taille du code extrait.
 - **Granularité des ports résultants** : faut-il viser un port
   ultra-mince (une méthode = une requête SQL atomique) ou accepter
-  des méthodes « moyennes » (1 méthode = 1 transaction SQL multi-statement
-  sans logique métier) ? À discuter au démarrage de la Phase 1.
+  des méthodes « moyennes » (1 méthode = 1 transaction SQL multi-statement sans logique métier) ? À discuter au démarrage de la Phase 1.
 - **Ordre Phase 1/Phase 2** : person `batch_assign_orphans` appelle
   `_name_forms.add_name_form` (cross-module). À vérifier qu'il n'y a
   pas de dépendance avec les méthodes perimeter de

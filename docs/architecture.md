@@ -175,11 +175,7 @@ d'import :
   applicatifs sans famille (ex. `config.py`).
 
 **Exception assumée pour les repositories** :
-- `address_repository` expose des méthodes de propagation
-  cross-aggregate (ex. `refresh_publications_countries_for_addresses`)
-  qui touchent `publications.countries`. Pattern accepté en DDD quand
-  les agrégats sont étroitement liés et que la propagation fait
-  partie de la cohérence métier.
+- `address_repository` expose 3 méthodes de recalcul SQL en bloc (`refresh_sa_countries_for_addresses`, `refresh_source_publications_countries`, `refresh_publications_countries_for_addresses`) qui touchent respectivement `source_authorships.countries`, `source_publications.countries` et `publications.countries`. Chacune fait un seul UPDATE avec `array_agg DISTINCT` natif Postgres. L'**orchestration cascade** vit côté use case (`application/addresses/countries.py::propagate_countries_to_publications`, 3 appels séquentiels). Les méthodes restent en repo parce que ce sont des recalculs atomiques en bloc — les remonter en Python multiplierait les round-trips sans gain de testabilité (la règle « countries d'une publication = union des countries de ses source_publications » est triviale).
 
 ### `application/` — services et orchestrateurs
 
