@@ -70,5 +70,3 @@ Sauvegarde locale du contenu de `staging.raw_data` issu d'un extract récent, av
 
 - Pas de versionnage multi-dates des objets raw (on écrase).
 - Pas de chiffrement côté client (données publiques).
-- Pas de stratégie de backup dédiée au-dessus de B2 — Backblaze gère la durabilité, on n'ajoute pas une couche de redondance par-dessus.
-- Pas d'interface d'exploration du raw store — accès en ligne de commande uniquement.
