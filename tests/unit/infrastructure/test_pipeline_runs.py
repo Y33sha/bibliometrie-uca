@@ -1,4 +1,4 @@
-"""Tests du module `infrastructure/observability/pipeline_checks.py`.
+"""Tests du module `infrastructure/observability/pipeline_runs.py`.
 
 Couvre la logique pure (sans BDD) : construction des observations à partir
 d'un payload courant + payload précédent, calcul des deltas, détection des
@@ -9,13 +9,32 @@ from __future__ import annotations
 
 import datetime
 
-from application.ports.pipeline.checks import CheckReport, Observation
-from infrastructure.observability.pipeline_checks import (
+from application.ports.pipeline.runs import (
+    Observation,
+    RunSnapshot,
+    RunSnapshotPayload,
+)
+from infrastructure.observability.pipeline_runs import (
     _build_observations,
     _drift_observation,
     _to_ratios,
     render_summary,
 )
+
+
+def _empty_payload() -> RunSnapshotPayload:
+    return {
+        "observables": {
+            "volumes": {},
+            "orphans": {},
+            "distributions": {},
+            "matching_quality": {},
+        },
+        "metrics_per_phase": {},
+        "total_duration_s": 0.0,
+        "sources": [],
+        "phases_run": [],
+    }
 
 
 class TestToRatios:
@@ -216,17 +235,17 @@ class TestBuildObservations:
 
 
 class TestRenderSummary:
-    def _report(self, observations: list[Observation], previous_at=None):
-        return CheckReport(
+    def _snapshot(self, observations: list[Observation], previous_at=None):
+        return RunSnapshot(
             mode="full",
             ran_at=datetime.datetime(2026, 5, 21, 10, 0, tzinfo=datetime.UTC),
             previous_snapshot_at=previous_at,
-            current={},
+            current=_empty_payload(),
             observations=observations,
         )
 
     def test_no_previous_snapshot_message(self):
-        out = render_summary(self._report([]))
+        out = render_summary(self._snapshot([]))
         assert "premier snapshot" in out
         assert "mode=full" in out
 
@@ -243,7 +262,7 @@ class TestRenderSummary:
             )
         ]
         out = render_summary(
-            self._report(
+            self._snapshot(
                 obs,
                 previous_at=datetime.datetime(2026, 5, 20, 10, 0, tzinfo=datetime.UTC),
             )
@@ -272,7 +291,7 @@ class TestRenderSummary:
             ),
         ]
         out = render_summary(
-            self._report(
+            self._snapshot(
                 obs,
                 previous_at=datetime.datetime(2026, 5, 20, 10, 0, tzinfo=datetime.UTC),
             )
