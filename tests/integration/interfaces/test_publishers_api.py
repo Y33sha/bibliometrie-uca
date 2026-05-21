@@ -197,3 +197,23 @@ class TestMergePublishers:
         assert body["merged"] is True
         assert body["source_id"] == src
         assert body["target_id"] == dst
+
+
+# ── GET /api/publisher-types ────────────────────────────────────
+
+
+class TestPublisherTypes:
+    def test_returns_all_values_with_labels(self, client):
+        r = client.get("/api/publisher-types")
+        assert r.status_code == 200
+        body = r.json()
+        values = [opt["value"] for opt in body]
+        assert values == [
+            "commercial",
+            "learned_society",
+            "academic_institution",
+            "repository",
+            "aggregator",
+            "unknown",
+        ]
+        assert all("label_fr" in opt and opt["label_fr"] for opt in body)

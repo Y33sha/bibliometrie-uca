@@ -1,4 +1,4 @@
-"""Router Éditeurs — liste, recherche, fusion."""
+"""Router Éditeurs — liste, recherche, fusion, types."""
 
 import logging
 
@@ -14,6 +14,7 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import merge_publishers
 from application.publishers import update_publisher as _update_publisher
+from domain.publishers.publisher import PUBLISHER_TYPES
 from interfaces.api.deps import (
     audit_repo_sync,
     journal_repo_sync,
@@ -21,6 +22,7 @@ from interfaces.api.deps import (
     publisher_repo_sync,
 )
 from interfaces.api.models import (
+    EnumOption,
     MergeRequest,
     MergeResponse,
     OkResponse,
@@ -29,6 +31,28 @@ from interfaces.api.models import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+# Mapping value enum → label FR (concern UI, donc côté router/interfaces, pas domain).
+_PUBLISHER_TYPE_LABELS_FR: dict[str, str] = {
+    "commercial": "Éditeur commercial",
+    "learned_society": "Société savante",
+    "academic_institution": "Établissement d'enseignement",
+    "repository": "Archive / dépôt",
+    "aggregator": "Agrégateur",
+    "unknown": "Type inconnu",
+}
+
+
+@router.get("/api/publisher-types", response_model=list[EnumOption])
+def list_publisher_types() -> list[EnumOption]:
+    """Valeurs possibles de l'enum `publisher_type` avec leur label français.
+
+    Source de vérité côté Python : `domain.publishers.publisher.PUBLISHER_TYPES`
+    (test d'intégration `TestPublisherTypesEnum` vérifie la cohérence avec l'enum SQL).
+    Sert à alimenter le dropdown de la page admin éditeurs.
+    """
+    return [EnumOption(value=v, label_fr=_PUBLISHER_TYPE_LABELS_FR[v]) for v in PUBLISHER_TYPES]
 
 
 @router.get("/api/publishers", response_model=PublisherListResponse)
