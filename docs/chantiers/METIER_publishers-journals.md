@@ -62,22 +62,22 @@ Ordonnées par dépendance. Phase 2 est la plus invasive ; les Phases 1, 3, 5 pe
 ## Phase 1 — Typage publisher_type / journal_type
 
 **Côté schéma (Alembic)** :
-- [ ] Créer l'enum SQL `publisher_type` (`commercial`, `learned_society`, `academic_institution`, `repository`, `aggregator`, `unknown`).
-- [ ] Créer l'enum SQL `journal_type` (`journal`, `proceedings`, `repository`, `book_series`, `preprint_server`, `media`).
-- [ ] `ALTER TABLE publishers ADD COLUMN publisher_type publisher_type NOT NULL DEFAULT 'unknown'`.
-- [ ] `ALTER COLUMN journals.journal_type TYPE journal_type USING journal_type::journal_type` (les 4 valeurs existantes en base sont déjà toutes dans la liste cible, pas de mapping nécessaire). Garder le default à `'journal'`.
+- [x] Créer l'enum SQL `publisher_type` (`commercial`, `learned_society`, `academic_institution`, `repository`, `aggregator`, `unknown`).
+- [x] Créer l'enum SQL `journal_type` (`journal`, `proceedings`, `repository`, `book_series`, `preprint_server`, `media`).
+- [x] `ALTER TABLE publishers ADD COLUMN publisher_type publisher_type NOT NULL DEFAULT 'unknown'`.
+- [x] `ALTER COLUMN journals.journal_type TYPE journal_type USING journal_type::journal_type` (les 4 valeurs existantes en base sont déjà toutes dans la liste cible, pas de mapping nécessaire). Garder le default à `'journal'`.
 
 **Côté domain + application** :
-- [ ] Constante Literal `PUBLISHER_TYPES` dans `domain/publishers/publisher.py`, `JOURNAL_TYPES` dans `domain/journals/journal.py`.
-- [ ] Test d'intégration `TestPublisherTypesEnum` / `TestJournalTypesEnum` vérifiant la cohérence Python ↔ DB via `enum_range`, sur le modèle de [`tests/integration/test_scenarios.py::TestSourcesEnum`](../../tests/integration/test_scenarios.py#L232).
+- [x] Constante Literal `PUBLISHER_TYPES` dans `domain/publishers/publisher.py`, `JOURNAL_TYPES` dans `domain/journals/journal.py`.
+- [x] Test d'intégration `TestPublisherTypesEnum` / `TestJournalTypesEnum` vérifiant la cohérence Python ↔ DB via `enum_range`, sur le modèle de [`tests/integration/test_scenarios.py::TestSourcesEnum`](../../tests/integration/test_scenarios.py#L232).
 
 **Côté API** :
-- [ ] Endpoints `/api/publisher-types` et `/api/journal-types` qui retournent `[{value, label_fr}]` à partir de l'enum SQL. Le mapping `{value → label_fr}` vit côté router (concern UI, pas domain).
-- [ ] Modèles Pydantic associés.
+- [x] Endpoints `/api/publisher-types` et `/api/journal-types` qui retournent `[{value, label_fr}]` à partir de l'enum SQL. Le mapping `{value → label_fr}` vit côté router (concern UI, pas domain).
+- [x] Modèles Pydantic associés.
 
 **Côté UI admin** :
-- [ ] `admin/publishers/+page.svelte` : ajouter un dropdown d'édition `publisher_type`, alimenté par `/api/publisher-types`.
-- [ ] `admin/journals/+page.svelte` : remplacer le dropdown `journal_type` hardcodé (6 `<option>`) par un boucle sur l'endpoint `/api/journal-types`.
+- [x] `admin/publishers/+page.svelte` : ajouter un dropdown d'édition `publisher_type`, alimenté par `/api/publisher-types`.
+- [x] `admin/journals/+page.svelte` : remplacer le dropdown `journal_type` hardcodé (6 `<option>`) par un boucle sur l'endpoint `/api/journal-types`.
 
 L'attribution initiale est traitée hors Phase 1 :
 - L'essentiel via DOAJ (Phase 3).
