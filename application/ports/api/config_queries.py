@@ -8,18 +8,21 @@ Co-localise le DTO `ConfigItem` (retourné par `list_config`). Cf. chantier `COD
 """
 
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel
-
-from domain.types import JsonValue
 
 
 class ConfigItem(BaseModel):
     """Ligne de la table `config` (paramètres applicatifs clé/valeur)."""
 
     key: str
-    value: JsonValue
+    # `Any` plutôt que `JsonValue` (récursif PEP 695) : le schéma JSON
+    # généré par pydantic 2.12 contient des références circulaires
+    # (`JsonValue-Input` / `JsonValue-Output`) que `openapi-typescript`
+    # traduit en `components["schemas"]["JsonValue-Input"][]` self-ref,
+    # ce que TypeScript refuse d'instancier. Frontière JSONB libre côté API.
+    value: Any
     description: str | None
     updated_at: datetime
 

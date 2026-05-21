@@ -2252,6 +2252,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/pipeline-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pipeline Runs
+         * @description N derniers snapshots de runs pipeline (plus récent en premier).
+         */
+        get: operations["list_pipeline_runs_api_admin_pipeline_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/pipeline-runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Pipeline Run
+         * @description Détail d'un run : payload JSONB complet (observables + métriques + métadonnées).
+         */
+        get: operations["get_pipeline_run_api_admin_pipeline_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/subjects": {
         parameters: {
             query?: never;
@@ -3642,6 +3682,33 @@ export interface components {
             count: number;
         };
         /**
+         * ObservablesPayload
+         * @description Section `observables` du payload : état de la BDD après le run.
+         *
+         *     Quatre familles : volumes (counts entiers), orphelins (counts entiers),
+         *     distributions (ratios par clé), qualité matching (counts entiers).
+         */
+        ObservablesPayload: {
+            /** Volumes */
+            volumes: {
+                [key: string]: number;
+            };
+            /** Orphans */
+            orphans: {
+                [key: string]: number;
+            };
+            /** Distributions */
+            distributions: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            /** Matching Quality */
+            matching_quality: {
+                [key: string]: number;
+            };
+        };
+        /**
          * OkResponse
          * @description Réponse minimale d'acquittement (pas de données).
          */
@@ -4158,6 +4225,29 @@ export interface components {
             /** Departments */
             departments: number;
         };
+        /**
+         * PhaseMetricsPayload
+         * @description Métriques sérialisées d'une phase pipeline.
+         *
+         *     Sérialisation JSON-compatible de `application.pipeline.metrics.PhaseMetrics`
+         *     + la durée mesurée par l'orchestrateur.
+         */
+        PhaseMetricsPayload: {
+            /** New */
+            new: number;
+            /** Updated */
+            updated: number;
+            /** Total */
+            total: number;
+            /** Errors */
+            errors: number;
+            /** Extras */
+            extras: {
+                [key: string]: number;
+            };
+            /** Duration S */
+            duration_s: number;
+        };
         /** PipelineLogsResponse */
         PipelineLogsResponse: {
             /** Content */
@@ -4176,6 +4266,67 @@ export interface components {
             filename: string;
             /** Label */
             label: string;
+        };
+        /**
+         * PipelineRunDetail
+         * @description Détail complet d'un run : payload stocké + observations recalculées vs snapshot précédent.
+         */
+        PipelineRunDetail: {
+            /** Id */
+            id: number;
+            /**
+             * Ran At
+             * Format: date-time
+             */
+            ran_at: string;
+            /** Previous Snapshot At */
+            previous_snapshot_at: string | null;
+            /** Mode */
+            mode: string;
+            payload: components["schemas"]["RunSnapshotPayload"];
+            /** Observations */
+            observations: components["schemas"]["PipelineRunObservation"][];
+        };
+        /**
+         * PipelineRunObservation
+         * @description Une observation calculée à la lecture (par comparaison au snapshot précédent du même mode).
+         */
+        PipelineRunObservation: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Current */
+            current: number;
+            /** Previous */
+            previous: number | null;
+            /** Delta Pct */
+            delta_pct: number | null;
+            /** Suspect */
+            suspect: boolean;
+            /** Threshold Note */
+            threshold_note: string;
+        };
+        /**
+         * PipelineRunSummary
+         * @description Une ligne dans la liste des derniers runs.
+         */
+        PipelineRunSummary: {
+            /** Id */
+            id: number;
+            /**
+             * Ran At
+             * Format: date-time
+             */
+            ran_at: string;
+            /** Mode */
+            mode: string;
+            /** Total Duration S */
+            total_duration_s: number;
+            /** Sources */
+            sources: string[];
+            /** Phases Run */
+            phases_run: string[];
         };
         /**
          * PipelineStatus
@@ -4637,6 +4788,26 @@ export interface components {
             role_title: string;
             /** Count */
             count: number;
+        };
+        /**
+         * RunSnapshotPayload
+         * @description Forme complète du payload JSONB stocké dans `pipeline_run_snapshots`.
+         *
+         *     Une vue unifiée d'un run : observables (état après) + métriques par phase
+         *     (exécution) + métadonnées (sources, phases, durée totale).
+         */
+        RunSnapshotPayload: {
+            observables: components["schemas"]["ObservablesPayload"];
+            /** Metrics Per Phase */
+            metrics_per_phase: {
+                [key: string]: components["schemas"]["PhaseMetricsPayload"];
+            };
+            /** Total Duration S */
+            total_duration_s: number;
+            /** Sources */
+            sources: string[];
+            /** Phases Run */
+            phases_run: string[];
         };
         /** SetCountry */
         SetCountry: {
@@ -8721,6 +8892,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PipelineReportContent"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pipeline_runs_api_admin_pipeline_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineRunSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pipeline_run_api_admin_pipeline_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PipelineRunDetail"];
                 };
             };
             /** @description Validation Error */
