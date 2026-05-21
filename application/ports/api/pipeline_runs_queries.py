@@ -26,13 +26,27 @@ class PipelineRunSummary(BaseModel):
     phases_run: list[str]
 
 
+class PipelineRunObservation(BaseModel):
+    """Une observation calculée à la lecture (par comparaison au snapshot précédent du même mode)."""
+
+    key: str
+    label: str
+    current: float
+    previous: float | None
+    delta_pct: float | None
+    suspect: bool
+    threshold_note: str
+
+
 class PipelineRunDetail(BaseModel):
-    """Détail complet d'un run."""
+    """Détail complet d'un run : payload stocké + observations recalculées vs snapshot précédent."""
 
     id: int
     ran_at: datetime
+    previous_snapshot_at: datetime | None
     mode: str
     payload: RunSnapshotPayload
+    observations: list[PipelineRunObservation]
 
 
 class PipelineRunsQueries(Protocol):

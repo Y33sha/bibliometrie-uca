@@ -138,6 +138,38 @@ class TestGetPipelineRun:
         assert body["payload"]["observables"]["volumes"]["publications"] == 100
         assert body["payload"]["metrics_per_phase"]["extract"]["new"] == 50
         assert body["payload"]["total_duration_s"] == 42.0
+        # Premier snapshot pour ce mode → pas de précédent, pas d'observations suspectes
+        assert body["previous_snapshot_at"] is None
+        assert all(o["suspect"] is False for o in body["observations"])
+
+    def test_observations_computed_against_previous(self, _clean_table, auth_client):
+        # Snapshot N-1 : 100 publications
+        prev = _sample_payload(sources=["hal"], phases=["extract"], duration=10.0)
+        prev["observables"]["volumes"]["publications"] = 100
+        with _conn() as cur:
+            cur.execute(
+                "INSERT INTO pipeline_run_snapshots (ran_at, mode, payload) "
+                "VALUES (now() - interval '1 hour', 'full', %s::jsonb)",
+                (json.dumps(prev),),
+            )
+            # Snapshot N : 1000 publications (×10, delta très au-dessus du seuil)
+            curr = _sample_payload(sources=["hal"], phases=["extract"], duration=20.0)
+            curr["observables"]["volumes"]["publications"] = 1000
+            cur.execute(
+                "INSERT INTO pipeline_run_snapshots (mode, payload) "
+                "VALUES ('full', %s::jsonb) RETURNING id",
+                (json.dumps(curr),),
+            )
+            run_id = cur.fetchone()["id"]
+
+        r = auth_client.get(f"/api/admin/pipeline-runs/{run_id}")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["previous_snapshot_at"] is not None
+        # L'observation `volumes.publications` doit être suspecte
+        pubs_obs = next(o for o in body["observations"] if o["key"] == "volumes.publications")
+        assert pubs_obs["suspect"] is True
+        assert pubs_obs["previous"] == 100
 
     def test_unknown_id_returns_404(self, _clean_table, auth_client):
         r = auth_client.get("/api/admin/pipeline-runs/999999")
