@@ -149,6 +149,28 @@ structure_type_enum = PgEnum(
     create_type=False,
 )
 
+publisher_type_enum = PgEnum(
+    "commercial",
+    "learned_society",
+    "academic_institution",
+    "repository",
+    "aggregator",
+    "unknown",
+    name="publisher_type",
+    create_type=False,
+)
+
+journal_type_enum = PgEnum(
+    "journal",
+    "proceedings",
+    "repository",
+    "book_series",
+    "preprint_server",
+    "media",
+    name="journal_type",
+    create_type=False,
+)
+
 
 structures = Table(
     "structures",
@@ -220,7 +242,7 @@ journals = Table(
     Column("notes", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
-    Column("journal_type", Text, server_default="journal"),
+    Column("journal_type", journal_type_enum, server_default="journal"),
     Column("is_academic", Boolean, server_default="true"),
     Column("doi_prefix", Text),
     UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
@@ -262,6 +284,12 @@ publishers = Table(
     Column("notes", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
+    Column(
+        "publisher_type",
+        publisher_type_enum,
+        nullable=False,
+        server_default="unknown",
+    ),
     UniqueConstraint("openalex_id", name="publishers_openalex_id_key"),
     Index("idx_publishers_name_norm", "name_normalized"),
     Index(
