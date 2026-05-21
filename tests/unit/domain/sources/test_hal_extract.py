@@ -104,26 +104,33 @@ class TestChooseExtractionMode:
         # 5 orphelins vs 12 pages → 5 fetchs individuels.
         assert choose_extraction_mode(total_count=6000, n_orphans=5, per_page=500) == "incremental"
 
-    def test_orphans_equal_to_pages_chooses_full(self):
-        # Inégalité stricte `n_orphans < full_fetch_pages` : à égalité, on bascule en full.
-        assert choose_extraction_mode(total_count=6000, n_orphans=12, per_page=500) == "full"
+    def test_orphans_at_threshold_chooses_full(self):
+        # Inégalité stricte `n_orphans < 10 * full_fetch_pages` : à égalité, on bascule en full.
+        # 12 pages × ratio 10 = 120 orphelins seuil → 120 = full.
+        assert choose_extraction_mode(total_count=6000, n_orphans=120, per_page=500) == "full"
 
-    def test_orphans_above_pages_chooses_full(self):
-        assert choose_extraction_mode(total_count=6000, n_orphans=100, per_page=500) == "full"
+    def test_orphans_just_below_threshold_chooses_incremental(self):
+        # 12 pages × 10 = 120 ; 119 orphelins → incremental.
+        assert (
+            choose_extraction_mode(total_count=6000, n_orphans=119, per_page=500) == "incremental"
+        )
 
-    def test_pres_uca_current_behavior(self):
-        # Cas observé sur le dernier import PRES_UCA (collection umbrella) :
-        # 19 orphelins, 12 pages full-fetch. L'heuristique actuelle choisit "full",
-        # alors qu'on aurait préféré "incremental" (les pages full-fetch sont lourdes
-        # car HAL_FIELDS contient label_xml × 500 docs/page). Test contractuel :
-        # fige le comportement courant ; sera révisé quand la fonction de coût
-        # sera retravaillée (cf. CODE_couverture-tests.md, question ouverte).
-        assert choose_extraction_mode(total_count=6000, n_orphans=19, per_page=500) == "full"
+    def test_orphans_far_above_threshold_chooses_full(self):
+        # Beaucoup d'orphelins (collection essentiellement nouvelle) : full reste optimal.
+        assert choose_extraction_mode(total_count=6000, n_orphans=5000, per_page=500) == "full"
 
-    def test_small_collection_one_orphan_chooses_full(self):
-        # Cas mini-collection : 42 docs en 1 page, 1 orphelin → "full".
-        # `count_full_fetch_pages(42, 500) == 1` et `1 < 1` est faux, donc full.
-        # Sous-optimalité similaire à PRES_UCA : 1 fetch individuel + tag des 41
-        # connus aurait été plus rapide. Pinné tel quel ; sera révisé avec la
-        # fonction de coût (cf. CODE_couverture-tests.md).
-        assert choose_extraction_mode(total_count=42, n_orphans=1, per_page=500) == "full"
+    def test_pres_uca_umbrella_chooses_incremental(self):
+        # Cas typique umbrella (PRES_UCA / PRES_CLERMONT) : 19 orphelins, 12 pages full.
+        # 19 < 10 × 12 = 120 → incremental. Avec l'ancien ratio 1:1, choisissait `full`
+        # (catastrophique car HAL_FIELDS inclut label_xml × 500 docs/page).
+        assert choose_extraction_mode(total_count=6000, n_orphans=19, per_page=500) == "incremental"
+
+    def test_small_collection_few_orphans_chooses_incremental(self):
+        # Mini-collection : 42 docs en 1 page, 5 orphelins. Seuil = 1 × 10 = 10 → 5 < 10
+        # → incremental (1 page de 500 ≈ 10 fetchs unitaires, donc 5 unitaires < 1 page).
+        assert choose_extraction_mode(total_count=42, n_orphans=5, per_page=500) == "incremental"
+
+    def test_small_collection_many_orphans_chooses_full(self):
+        # Mini-collection avec beaucoup d'orphelins : 42 docs en 1 page, 15 orphelins.
+        # 15 > 10 → full (autant tirer une page).
+        assert choose_extraction_mode(total_count=42, n_orphans=15, per_page=500) == "full"

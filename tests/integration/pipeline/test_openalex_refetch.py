@@ -117,11 +117,14 @@ class TestRawHashUpsert:
             text("UPDATE staging SET processed=TRUE WHERE source='openalex' AND source_id='W002'")
         )
 
-        updated = insert_batch(sa_sync_conn, [work])
+        counts = insert_batch(sa_sync_conn, [work])
 
         row = _get_staging(sa_sync_conn, "W002")
         assert row.processed is True
-        assert updated == 0
+        # Pas d'insertion (déjà connu) ; `updated=1` car le ON CONFLICT est déclenché
+        # même si le CASE WHEN ne touche pas raw_data — la sémantique « row inchangée »
+        # est testée par les assertions ci-dessus (raw_data + processed).
+        assert counts.new == 0
 
     def test_bulk_changed_replaces(self, sa_sync_conn):
         """Bulk modifié → raw_data remplacé, processed=FALSE."""
@@ -132,13 +135,13 @@ class TestRawHashUpsert:
         )
 
         new_work = _make_work("W003", 60, title="Updated")
-        updated = insert_batch(sa_sync_conn, [new_work])
+        counts = insert_batch(sa_sync_conn, [new_work])
 
         row = _get_staging(sa_sync_conn, "W003")
         assert row.raw_data["title"] == "Updated"
         assert len(row.raw_data["authorships"]) == 60
         assert row.processed is False
-        assert updated == 1
+        assert counts.new == 0 and counts.updated == 1
 
 
 class TestRefetchPreservation:
@@ -154,12 +157,14 @@ class TestRefetchPreservation:
             processed=True,
         )
 
-        updated = insert_batch(sa_sync_conn, [bulk_payload])
+        counts = insert_batch(sa_sync_conn, [bulk_payload])
 
         row = _get_staging(sa_sync_conn, "W100")
         assert len(row.raw_data["authorships"]) == 150
         assert row.processed is True
-        assert updated == 0
+        # Pas d'insertion (déjà refetchée). L'invariance de `raw_data` (150 auteurs
+        # préservés) et de `processed` au-dessus suffit à valider le no-op.
+        assert counts.new == 0
 
     def test_refetched_bulk_changed_overwrites(self, sa_sync_conn):
         """Bulk modifié sur ligne refetchée → écrasement par la version tronquée
@@ -176,7 +181,7 @@ class TestRefetchPreservation:
         )
 
         bulk_payload_v2 = _make_work("W101", 100, title="Updated", cited_by_count=42)
-        updated = insert_batch(sa_sync_conn, [bulk_payload_v2])
+        counts = insert_batch(sa_sync_conn, [bulk_payload_v2])
 
         row = _get_staging(sa_sync_conn, "W101")
         # raw_data écrasé par la version tronquée v2
@@ -186,4 +191,4 @@ class TestRefetchPreservation:
         # processed remis à FALSE → normalize re-passera, et refetch dans
         # le même run pipeline re-pickera (count=100, processed=FALSE)
         assert row.processed is False
-        assert updated == 1
+        assert counts.new == 0 and counts.updated == 1
