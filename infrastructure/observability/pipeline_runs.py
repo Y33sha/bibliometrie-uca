@@ -1,12 +1,15 @@
-"""Checks automatiques post-pipeline (Volet A du chantier observabilité).
+"""Snapshots de runs pipeline (Phase 2 du chantier observabilité).
 
-`run_checks(conn, mode)` calcule un jeu d'observables et le compare au dernier
-snapshot du même mode (daily/weekly/full). `persist_snapshot(conn, report)` écrit
-le résultat dans `pipeline_check_snapshots`. `render_summary(report)` produit un
-résumé console à logger en fin de pipeline.
+`build_run_snapshot(conn, mode, metrics_per_phase, ...)` calcule les observables
+courants, les compare au dernier snapshot du même mode (daily/weekly/full), et
+construit le `RunSnapshot` à persister.
+`persist_snapshot(conn, snapshot)` écrit dans `pipeline_run_snapshots`.
+`render_summary(snapshot)` produit un résumé console à logger en fin de pipeline.
 
 Pas d'exit code non-zéro : les observations sont signalées comme « suspectes »
-si leur delta dépasse un seuil hardcodé, sans hiérarchie de sévérité.
+si leur delta dépasse un seuil hardcodé, sans hiérarchie de sévérité. Les
+métriques d'exécution (`metrics_per_phase`) sont persistées telles quelles, sans
+seuil de drift — ce sont des compteurs informatifs, pas un signal d'alerte.
 
 Les runs partiels (`--only` / `--from` / `--dry-run`) ne doivent pas appeler ces
 fonctions : le snapshot n'a de sens que sur un run complet (cf. fiche).
@@ -21,10 +24,12 @@ from typing import TypedDict, cast
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.checks import (
-    CheckReport,
+from application.ports.pipeline.runs import (
     ObservablesPayload,
     Observation,
+    PhaseMetricsPayload,
+    RunSnapshot,
+    RunSnapshotPayload,
 )
 
 log = logging.getLogger(__name__)
@@ -37,50 +42,69 @@ _MATCHING_AMBIGUOUS_DELTA_PCT = 10.0
 
 class _PreviousSnapshot(TypedDict):
     ran_at: datetime.datetime
-    payload: ObservablesPayload
+    payload: RunSnapshotPayload
 
 
-def run_checks(conn: Connection, mode: str) -> CheckReport:
-    """Calcule les observables et les compare au dernier snapshot du même mode."""
+def build_run_snapshot(
+    conn: Connection,
+    *,
+    mode: str,
+    metrics_per_phase: dict[str, PhaseMetricsPayload],
+    sources: list[str],
+    phases_run: list[str],
+    total_duration_s: float,
+) -> RunSnapshot:
+    """Calcule les observables, les compare au dernier snapshot du même mode, et
+    construit le snapshot complet (observables + métriques + métadonnées run).
+    """
     previous = _fetch_previous_snapshot(conn, mode)
-    current = _compute_observables(conn)
-    previous_payload = previous["payload"] if previous else None
-    observations = _build_observations(current, previous_payload)
-    return CheckReport(
+    observables = _compute_observables(conn)
+    prev_observables = previous["payload"]["observables"] if previous else None
+    observations = _build_observations(observables, prev_observables)
+    payload: RunSnapshotPayload = {
+        "observables": observables,
+        "metrics_per_phase": metrics_per_phase,
+        "total_duration_s": total_duration_s,
+        "sources": sources,
+        "phases_run": phases_run,
+    }
+    return RunSnapshot(
         mode=mode,
         ran_at=datetime.datetime.now(datetime.UTC),
         previous_snapshot_at=previous["ran_at"] if previous else None,
-        current=current,
+        current=payload,
         observations=observations,
     )
 
 
-def persist_snapshot(conn: Connection, report: CheckReport) -> None:
-    """Persiste les valeurs courantes du report comme nouveau snapshot."""
+def persist_snapshot(conn: Connection, snapshot: RunSnapshot) -> None:
+    """Persiste le payload courant du snapshot dans `pipeline_run_snapshots`."""
     conn.execute(
         text(
-            "INSERT INTO pipeline_check_snapshots (mode, payload) "
+            "INSERT INTO pipeline_run_snapshots (mode, payload) "
             "VALUES (:mode, CAST(:payload AS jsonb))"
         ),
-        {"mode": report.mode, "payload": json.dumps(report.current)},
+        {"mode": snapshot.mode, "payload": json.dumps(snapshot.current)},
     )
     conn.commit()
 
 
-def render_summary(report: CheckReport) -> str:
+def render_summary(snapshot: RunSnapshot) -> str:
     """Résumé multi-ligne pour affichage console en fin de pipeline."""
-    lines = [f"Checks post-pipeline (mode={report.mode})"]
-    if report.previous_snapshot_at is None:
+    lines = [f"Snapshot post-pipeline (mode={snapshot.mode})"]
+    if snapshot.previous_snapshot_at is None:
         lines.append("  (premier snapshot pour ce mode, aucune comparaison possible)")
     else:
-        prev = report.previous_snapshot_at.astimezone().strftime("%Y-%m-%d %H:%M")
+        prev = snapshot.previous_snapshot_at.astimezone().strftime("%Y-%m-%d %H:%M")
         lines.append(f"  Comparé au snapshot du {prev}")
-    suspects = report.suspect_observations
+    suspects = snapshot.suspect_observations
     if not suspects:
-        lines.append(f"  Aucune observation suspecte sur {len(report.observations)} observable(s).")
+        lines.append(
+            f"  Aucune observation suspecte sur {len(snapshot.observations)} observable(s)."
+        )
     else:
         lines.append(
-            f"  {len(suspects)} observation(s) suspecte(s) sur {len(report.observations)} :"
+            f"  {len(suspects)} observation(s) suspecte(s) sur {len(snapshot.observations)} :"
         )
         for o in suspects:
             prev_str = "—" if o.previous is None else f"{o.previous:g}"
@@ -94,7 +118,7 @@ def render_summary(report: CheckReport) -> str:
 def _fetch_previous_snapshot(conn: Connection, mode: str) -> _PreviousSnapshot | None:
     row = conn.execute(
         text(
-            "SELECT ran_at, payload FROM pipeline_check_snapshots "
+            "SELECT ran_at, payload FROM pipeline_run_snapshots "
             "WHERE mode = :mode ORDER BY ran_at DESC LIMIT 1"
         ),
         {"mode": mode},
@@ -103,7 +127,7 @@ def _fetch_previous_snapshot(conn: Connection, mode: str) -> _PreviousSnapshot |
         return None
     # Le payload JSONB est désérialisé par SA en dict natif ; on cast vers le
     # TypedDict attendu — le runtime ne valide pas, c'est juste une hint mypy.
-    return _PreviousSnapshot(ran_at=row[0], payload=cast(ObservablesPayload, row[1]))
+    return _PreviousSnapshot(ran_at=row[0], payload=cast(RunSnapshotPayload, row[1]))
 
 
 def _compute_observables(conn: Connection) -> ObservablesPayload:

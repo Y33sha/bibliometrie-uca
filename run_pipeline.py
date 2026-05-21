@@ -1302,28 +1302,51 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
     report_path = generate_report(args.mode, sources, phase_results, elapsed_total)
     log.info("Rapport : %s", report_path)
 
-    # Checks post-pipeline (uniquement sur run complet : pas --only / --from).
-    # Capture de la forme attendue des données ; les observations suspectes sont
-    # signalées dans le résumé console, sans exit code non-zéro.
+    # Snapshot post-pipeline (uniquement sur run complet : pas --only / --from).
+    # Capture la forme attendue des données + les métriques d'exécution ; les
+    # observations suspectes sont signalées dans le résumé console, sans exit
+    # code non-zéro.
     if not args.only and not args.from_phase:
         try:
+            from application.ports.pipeline.runs import PhaseMetricsPayload
             from infrastructure.db.engine import get_sync_engine
-            from infrastructure.observability.pipeline_checks import (
+            from infrastructure.observability.pipeline_runs import (
+                build_run_snapshot,
                 persist_snapshot,
                 render_summary,
-                run_checks,
             )
+
+            metrics_payload: dict[str, PhaseMetricsPayload] = {}
+            for name, duration, _ in phase_results:
+                pm = phase_metrics.get(name)
+                if pm is None:
+                    continue
+                metrics_payload[name] = {
+                    "new": pm.new,
+                    "updated": pm.updated,
+                    "total": pm.total,
+                    "errors": pm.errors,
+                    "extras": dict(pm.extras),
+                    "duration_s": duration,
+                }
 
             conn = get_sync_engine().connect()
             try:
-                report = run_checks(conn, args.mode)
-                persist_snapshot(conn, report)
-                for line in render_summary(report).splitlines():
+                snapshot = build_run_snapshot(
+                    conn,
+                    mode=args.mode,
+                    metrics_per_phase=metrics_payload,
+                    sources=sorted(sources),
+                    phases_run=[n for n, _ in phases_to_run],
+                    total_duration_s=elapsed_total,
+                )
+                persist_snapshot(conn, snapshot)
+                for line in render_summary(snapshot).splitlines():
                     log.info(line)
             finally:
                 conn.close()
         except Exception as e:
-            log.warning("Échec des checks post-pipeline : %s", e)
+            log.warning("Échec du snapshot post-pipeline : %s", e)
 
     clear_status()
     log.info("=" * 60)
