@@ -61,7 +61,7 @@
 		id: number; title: string; issn: string; eissn: string; issnl: string;
 		doi_prefix: string; oa_model: string; journal_type: string;
 		is_academic: boolean; is_predatory: boolean; is_in_doaj: boolean;
-		apc_amount: string; notes: string;
+		apc_amount: string;
 	} | null = $state(null);
 
 	function openEdit(j: Journal) {
@@ -73,7 +73,6 @@
 			is_academic: j.is_academic ?? true,
 			is_predatory: j.is_predatory, is_in_doaj: j.is_in_doaj,
 			apc_amount: j.apc_amount ? String(j.apc_amount) : '',
-			notes: j.notes || '',
 		};
 	}
 
@@ -91,7 +90,6 @@
 		body.is_predatory = editModal.is_predatory;
 		body.is_in_doaj = editModal.is_in_doaj;
 		body.apc_amount = editModal.apc_amount ? parseFloat(editModal.apc_amount) : null;
-		if (editModal.notes.trim()) body.notes = editModal.notes.trim();
 		try {
 			await journalsApi.update(editModal.id, body);
 			editModal = null;
@@ -241,14 +239,12 @@
 			</div>
 		</div>
 		<div style="display:flex;gap:12px;margin-top:8px">
-			<label><input type="checkbox" bind:checked={editModal.is_academic} /> Académique</label>
-			<label><input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur</label>
-			<label><input type="checkbox" bind:checked={editModal.is_in_doaj} /> DOAJ</label>
+			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_academic} /> Académique</label>
+			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur</label>
+			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_in_doaj} /> DOAJ</label>
 		</div>
 		<label>APC (€)</label>
 		<input bind:value={editModal.apc_amount} placeholder="ex: 2500" type="number" />
-		<label>Notes</label>
-		<textarea bind:value={editModal.notes} rows="2"></textarea>
 		<div class="modal-actions">
 			<button class="btn" onclick={() => editModal = null}>Annuler</button>
 			<button class="btn btn-primary" onclick={saveEdit}>Enregistrer</button>
