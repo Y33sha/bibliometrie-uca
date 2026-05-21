@@ -27,7 +27,6 @@ class TestAuthorshipConstruction:
             is_corresponding=True,
             roles=("author", "thesis_director"),
             structure_ids=(10, 20),
-            notes="manual override",
         )
         assert a.id == 1
         assert a.author_position == 2
@@ -35,4 +34,3 @@ class TestAuthorshipConstruction:
         assert a.is_corresponding is True
         assert a.roles == ("author", "thesis_director")
         assert a.structure_ids == (10, 20)
-        assert a.notes == "manual override"

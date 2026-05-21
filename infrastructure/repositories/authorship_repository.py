@@ -20,7 +20,6 @@ class _AuthorshipRow(NamedTuple):
     is_corresponding: bool | None
     roles: list[str] | None
     structure_ids: list[int]
-    notes: str | None
 
 
 def _authorship_from_row(row: _AuthorshipRow) -> Authorship:
@@ -41,7 +40,6 @@ def _authorship_from_row(row: _AuthorshipRow) -> Authorship:
         is_corresponding=row.is_corresponding,
         roles=tuple(row.roles or ()),
         structure_ids=tuple(row.structure_ids or ()),
-        notes=row.notes,
     )
 
 
@@ -66,8 +64,7 @@ class PgAuthorshipRepository:
                             FROM authorship_structures aus
                             WHERE aus.authorship_id = a.id),
                            '{}'::int[]
-                       ) AS structure_ids,
-                       a.notes
+                       ) AS structure_ids
                 FROM authorships a
                 WHERE a.publication_id = :pub_id
                 ORDER BY a.author_position NULLS LAST, a.id

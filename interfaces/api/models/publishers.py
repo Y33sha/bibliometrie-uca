@@ -13,5 +13,4 @@ class PublisherUpdate(BaseModel):
     name: str | None = None
     country: str | None = None
     is_predatory: bool | None = None
-    notes: str | None = None
     publisher_type: str | None = None

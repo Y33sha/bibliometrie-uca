@@ -163,7 +163,6 @@ class TestUpdatePublisher:
                 "name": "UpdatedName",
                 "country": "FR",
                 "is_predatory": False,
-                "notes": "Note",
             },
         )
         assert r.status_code == 200

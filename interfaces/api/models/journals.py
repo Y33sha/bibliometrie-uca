@@ -20,4 +20,3 @@ class JournalUpdate(BaseModel):
     is_predatory: bool | None = None
     is_in_doaj: bool | None = None
     apc_amount: float | None = None
-    notes: str | None = None

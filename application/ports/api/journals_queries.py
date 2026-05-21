@@ -34,7 +34,6 @@ class JournalOut(BaseModel):
     journal_type: str | None
     is_academic: bool | None
     doi_prefix: str | None
-    notes: str | None
     pub_count: int
 
 

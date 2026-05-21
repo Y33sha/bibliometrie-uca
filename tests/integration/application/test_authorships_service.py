@@ -221,9 +221,9 @@ class TestFindByPublicationId:
             text("""
                 INSERT INTO authorships
                     (publication_id, person_id, author_position, in_perimeter,
-                     source_manual, excluded, is_corresponding, roles, notes)
+                     source_manual, excluded, is_corresponding, roles)
                 VALUES (:p, :pid, 3, TRUE, TRUE, FALSE, TRUE,
-                        CAST(:roles AS text[]), 'note')
+                        CAST(:roles AS text[]))
                 RETURNING id
             """),
             {"p": pub_id, "pid": person_id, "roles": ["author"]},
@@ -247,7 +247,6 @@ class TestFindByPublicationId:
         assert a.is_corresponding is True
         assert a.roles == ("author",)
         assert a.structure_ids == (s42, s43)
-        assert a.notes == "note"
 
 
 # ── exclude_authorship ────────────────────────────────────────

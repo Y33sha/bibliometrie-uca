@@ -147,18 +147,16 @@ class TestUpdateJournal:
             json={
                 "title": "UpdatedTitle",
                 "is_predatory": True,
-                "notes": "Note",
             },
         )
         assert r.status_code == 200
         assert r.json() == {"ok": True}
         # Vérifier en base que seuls les champs envoyés sont écrits.
         with _pool() as cur:
-            cur.execute("SELECT title, is_predatory, notes FROM journals WHERE id = %s", (jid,))
+            cur.execute("SELECT title, is_predatory FROM journals WHERE id = %s", (jid,))
             row = cur.fetchone()
             assert row["title"] == "UpdatedTitle"
             assert row["is_predatory"] is True
-            assert row["notes"] == "Note"
 
 
 class TestMergeJournals:

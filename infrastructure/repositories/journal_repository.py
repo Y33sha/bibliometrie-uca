@@ -32,7 +32,6 @@ class _JournalRow(NamedTuple):
     apc_amount: Decimal | None
     apc_currency: str | None
     oa_model: str | None
-    notes: str | None
     journal_type: str | None
     is_academic: bool | None
     doi_prefix: str | None
@@ -56,7 +55,6 @@ def _journal_from_row(row: _JournalRow) -> Journal:
         apc_amount=row.apc_amount,
         apc_currency=row.apc_currency,
         oa_model=row.oa_model,
-        notes=row.notes,
         journal_type=row.journal_type if row.journal_type is not None else "journal",
         is_academic=row.is_academic if row.is_academic is not None else True,
         doi_prefix=row.doi_prefix,
@@ -86,7 +84,6 @@ class PgJournalRepository:
                 journals.c.apc_amount,
                 journals.c.apc_currency,
                 journals.c.oa_model,
-                journals.c.notes,
                 journals.c.journal_type,
                 journals.c.is_academic,
                 journals.c.doi_prefix,
