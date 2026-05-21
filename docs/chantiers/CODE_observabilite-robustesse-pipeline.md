@@ -10,30 +10,29 @@ Deux manques persistants sur la production du pipeline, identifiés de longue da
 
 2. **Dashboard métriques partiel.** Des éléments existent    (`/admin/pipeline` lit des rapports, certaines métriques de pool DB sont remontées) mais c'est éparpillé et fragile. Pas de vue consolidée temps de réponse / pool DB / taux d'erreur / durée des phases.
 
-## Volets
+## Phases
 
-- **Volet 0 — Sweep `subprocess → import`** (pré-requis du Volet B). État actuel hybride : 12 phases déjà en import direct dans `run_pipeline.py` (via les helpers `_run_*`), 10 invocations encore en `subprocess.run` (les 5 extracteurs + `refetch_truncated`, `fetch_missing_hal_id`, `fetch_missing_doi`, `detect_address_countries`, `suggest_address_countries`). Une invocation subprocess ne peut pas remonter de métriques typées à l'orchestrateur — il faudrait parser stdout. On finit donc le sweep : chaque script restant expose `run(...) -> Metrics`, l'orchestrateur appelle des fonctions et reçoit la struct typée. Pas de perte d'isolation processus en pratique : le `try/except` autour des phases capture déjà les exceptions. Coût estimé ~3-5 h.
-- **Volet A — Checks automatiques post-pipeline**. Indépendant : consomme l'état final de la base, pas les métriques de phases.
-- **Volet B — Dashboard métriques**. Suppose Volet 0 fait.
+- **Phase 1 — Sweep `subprocess → import`** (pré-requis de la persistance étendue des `PhaseMetrics`). État au démarrage : 12 phases pipeline déjà en import direct dans `run_pipeline.py` (via les helpers `_run_*`), 10 invocations encore en `subprocess.run`. Une invocation subprocess ne peut pas remonter de métriques typées à l'orchestrateur — il faut parser stdout. Le sweep migre chaque script restant vers `run(...) -> Metrics`.
+- **Phase 2 — Snapshots de runs (observables + métriques) post-pipeline**, exposés via une page admin unique. Phase 2.1 = persistance des observables (livrée). Phase 2.2 = enrichissement du payload avec les `PhaseMetrics` + page admin (en attente).
 
 ## Décisions
 
-1. **Deux volets séparés** (checks data / dashboard), pilotables indépendamment. Le volet checks peut démarrer immédiatement ; le volet dashboard attend 0.
-2. **Checks = tests de caractérisation, pas tests fonctionnels.** Le but est de capturer la forme attendue (ranges, ratios, comptages) et d'alerter quand la sortie dérive — pas de figer une vérité.
-3. **Sortie des checks = rapport lisible + exit code.** Format à trancher (JSON pour intégration future, markdown pour lecture). Pas de notification email à ce stade — Laura lit les runs à la main.
-4. **Pas d'outil externe pour le dashboard.** Pas de Grafana, pas de Prometheus tant que l'app est mono-utilisateur. Page admin FastAPI/Svelte qui lit les JSON métriques et la base, c'est suffisant pour le périmètre actuel.
+1. **Snapshot unique par run** : observables (état de la base après run) et `PhaseMetrics` (compteurs d'exécution par phase) cohabitent dans le même payload JSONB de `pipeline_check_snapshots` (à renommer en `pipeline_run_snapshots`). Deux vues du même événement, une seule page admin pour l'afficher.
+2. **Observables = tests de caractérisation, pas tests fonctionnels.** Le but est de capturer la forme attendue (ranges, ratios, comptages) et d'alerter quand la sortie dérive — pas de figer une vérité.
+3. **Sortie en fin de run = résumé console + JSON persisté en base.** Pas de notification email à ce stade — Laura lit les runs à la main, la page admin (Phase 2.2) ouvre l'historique.
+4. **Pas d'outil externe.** Pas de Grafana, pas de Prometheus tant que l'app est mono-utilisateur. Page admin FastAPI/Svelte qui lit le JSON depuis la base, suffisant pour le périmètre actuel.
 
 ## Phasage
 
-### Volet 0 — Sweep `subprocess → import`
+### Phase 1 — Sweep `subprocess → import`
 
 - [x] Dataclass partagé `application/pipeline/_metrics.py:PhaseMetrics` (champs `new`/`updated`/`total`/`errors` + `extras: dict[str, int]` libre + `as_summary()` pour les logs, `merge()` pour les phases multi-helpers).
 - [x] `SourceExtractor.run_as_phase(args) -> PhaseMetrics` ajouté à `infrastructure/sources/base.py` (variante non-CLI : laisse remonter les exceptions, retourne les métriques). `run()` reste le wrapper CLI standalone. `ExtractionStats` retiré, remplacé par `PhaseMetrics` dans les 5 extracteurs HAL/OA/WoS/ScanR/theses.
 - [x] Logique des 4 autres scripts extraite en fonction importable : `refetch(conn, ...) -> PhaseMetrics`, `async fetch_missing_hal_ids(conn, ...) -> PhaseMetrics`, `detect_countries(conn, ...) -> PhaseMetrics`, `suggest_countries(conn, ...) -> PhaseMetrics`. Chaque `main()` argparse reste comme thin wrapper. `application/pipeline/fetch_missing_doi.run_async` retourne désormais un `PhaseMetrics` au lieu d'un `dict[str, int]`.
-- [x] `run_pipeline.py` : remplacement des 10 appels `run_python(...)` par 10 nouveaux helpers `_run_extract_{hal,openalex,wos,scanr,theses}`, `_run_refetch_truncated`, `_run_fetch_missing_hal_id`, `_run_fetch_missing_doi`, `_run_detect_address_countries`, `_run_suggest_address_countries`. `phase_extract`/`phase_cross_imports`/`phase_countries` agrègent via `metrics.merge(...)` et retournent `PhaseMetrics`. L'orchestrateur collecte ces métriques dans `phase_metrics: dict[str, PhaseMetrics]` (consommé par Volet B).
+- [x] `run_pipeline.py` : remplacement des 10 appels `run_python(...)` par 10 nouveaux helpers `_run_extract_{hal,openalex,wos,scanr,theses}`, `_run_refetch_truncated`, `_run_fetch_missing_hal_id`, `_run_fetch_missing_doi`, `_run_detect_address_countries`, `_run_suggest_address_countries`. `phase_extract`/`phase_cross_imports`/`phase_countries` agrègent via `metrics.merge(...)` et retournent `PhaseMetrics`. L'orchestrateur collecte ces métriques dans `phase_metrics: dict[str, PhaseMetrics]` (consommé par Phase 2.2).
 - [x] `run_python` et l'import `subprocess` retirés de `run_pipeline.py`. Plus aucun `subprocess.run` dans le pipeline orchestré.
 
-### Volet A — Checks automatiques post-pipeline
+### Phase 2 — Snapshots de runs post-pipeline
 
 **Décisions actées au démarrage** (2026-05-21) :
 - **Vocabulaire** : « observables » (ou « volumes attendus »), pas « invariants ». Un invariant ne varie pas ; ici on observe une dérive.
@@ -41,54 +40,58 @@ Deux manques persistants sur la production du pipeline, identifiés de longue da
 - **Mode dans le snapshot** : la comparaison se fait vs dernier snapshot **du même mode** (daily/weekly/full), sinon deltas faussés.
 - **Runs partiels exclus** : pas de checks si `--only` / `--from`. Le snapshot n'a de sens que sur un run complet.
 - **Stockage** : table dédiée `pipeline_check_snapshots(id, ran_at, mode, payload jsonb)`.
-- **Sortie** : JSON en base. Résumé console structuré en fin de run (violations + deltas notables). Pas de fichier markdown intermédiaire — la page admin (Étape 2) lira le JSON.
+- **Sortie** : JSON en base. Résumé console structuré en fin de run (violations + deltas notables). Pas de fichier markdown intermédiaire — la page admin (Phase 2.2) lira le JSON.
 - **Seuils** : hardcodés en première version.
 
-#### Étape 1 — MVP CLI
+#### Phase 2.1 — MVP CLI
 
-- [ ] Migration Alembic `pipeline_check_snapshots(id, ran_at, mode, payload jsonb)` + index `(mode, ran_at desc)`.
-- [ ] Module `application/pipeline/checks.py` exposant `run_checks(conn, mode) -> CheckReport` (queries SQL + comparaison au dernier snapshot du même mode + détection des observables suspects).
-- [ ] Value object `CheckReport` en `domain/pipeline_checks.py` (pattern PhaseMetrics).
-- [ ] Hook en fin de `run_pipeline.py` : exécution si run complet (pas `--only`/`--from`/`--dry-run`), persistance snapshot, résumé console.
-- [ ] Tests unit sur la logique de comparaison + détection (sans BDD).
+- [x] Migration Alembic `pipeline_check_snapshots(id, ran_at, mode, payload jsonb)` + index `(mode, ran_at desc)`.
+- [x] Module `infrastructure/observability/pipeline_checks.py` exposant `run_checks(conn, mode) -> CheckReport`, `persist_snapshot(conn, report)`, `render_summary(report)` (queries SQL + comparaison au dernier snapshot du même mode + détection des observables suspects).
+- [x] Value objects `Observation` + `CheckReport` + `ObservablesPayload` en `application/ports/pipeline/checks.py` (zone neutre, importée par `infrastructure/observability/`).
+- [x] Hook en fin de `run_pipeline.py` : exécution si run complet (pas `--only`/`--from`/`--dry-run`), persistance snapshot, résumé console.
+- [x] Tests unit sur la logique de comparaison + détection (20 tests, sans BDD).
 
-**Observables retenus** :
+**Observables retenus** (livrés) :
 
 | Famille | Observable | Seuil de suspicion |
 |---|---|---|
-| Volumes | publications actives, persons, authorships, addresses, `person_identifiers`, `person_name_forms` (delta vs run précédent même mode) | delta < -1 % ou > +20 % |
-| Orphelins | publications sans authorships, persons sans publications, source_authorships sans `authorship_id` | count > seuil hardcodé (calibré sur l'état actuel) |
-| Distributions | distribution `doc_type` (ratio par type), distribution `source` (ratio par source) | un ratio bouge de > 5 points |
-| Cohérence | totaux `source_authorships` par source vs `staging.processed=TRUE` correspondants | écart > 0,5 % |
-| Qualité matching | count des `person_name_forms` ambiguës (≥ 2 `person_id` distincts pour la même forme normalisée) | delta > seuil (à calibrer) |
+| Volumes | publications, persons (non rejected), authorships (non excluded), addresses, `person_identifiers` (status ≠ rejected), `person_name_forms` (delta vs run précédent même mode) | delta ±5 % |
+| Orphelins | publications sans authorships, persons sans publications | delta ±20 % |
+| Distributions | ratios `doc_type` (sur publications), `source` (sur source_publications) | shift > 3 pts |
+| Qualité matching | count `person_name_forms` ambiguës (≥ 2 `person_id` pour la même forme normalisée) | croissance > 10 % (asymétrique) |
 
 Le delta « nouvelles ambiguës insérées par le run » est dérivé du delta sur le count global vs snapshot précédent.
 
-#### Étape 2 — Page admin (différée)
+#### Phase 2.2 — Persistance étendue + page admin (snapshot unique par run)
 
-- [ ] Page `/admin/checks` (ou intégrée à `/admin/pipeline`) listant les derniers rapports, avec drill-down par observable.
+**Décision 2026-05-21** : un seul snapshot par run, un seul livrable UI. Au lieu de séparer « checks » (état post-run de la BDD) et « métriques » (compteurs d'exécution), on persiste l'ensemble dans le même payload JSONB du même snapshot — c'est deux vues du même événement.
 
-### Volet B — Dashboard métriques
+Étendre le payload de `pipeline_check_snapshots` (à renommer en `pipeline_run_snapshots` à l'occasion) pour qu'il accueille aussi :
+- Métadonnées du run : `total_duration_s`, `sources`, `phases_run`
+- `metrics_per_phase` : `PhaseMetrics` par phase (`new`, `updated`, `total`, `errors`, `extras`, `duration_s`)
 
-**Bloqué tant que Volet 0 n'est pas appliqué.**
+Les `PhaseMetrics` sont déjà remontées de façon typée à l'orchestrateur depuis la Phase 1 (sweep `subprocess → import`). Il ne manque que de les écrire dans le snapshot.
 
-- [ ] **Modèle de données métriques** : qu'est-ce qu'on stocke,
-  comment (table dédiée ? `logs/metrics/*.json` parsés à la
-  demande ?).
-- [ ] **Page `/admin/metrics`** : agrégation des
-  `logs/metrics/<phase>.json` (option A') + métriques pool DB
-  (déjà remontées) + taux d'erreur HTTP par source (à exposer
-  depuis les adapters async).
-- [ ] **Vue historique** : N derniers runs en série temporelle
-  (durée par phase, volumes, taux d'erreur).
+- [ ] Étendre le payload du snapshot (`ObservablesPayload` devient `RunSnapshotPayload` ou similaire) avec `metrics_per_phase` + métadonnées run.
+- [ ] Migration Alembic (rename de table optionnel ; sinon juste enrichissement du payload, le schéma SQL ne change pas puisque JSONB).
+- [ ] Page admin `/admin/pipeline-runs` (ou intégrée à `/admin/pipeline`) :
+  - Liste des derniers runs (mode, date, durée, nombre d'observations suspectes)
+  - Drill-down par run : observables (avec deltas), métriques par phase, métadonnées
+  - Vue historique : série temporelle des durées par phase / volumes / observations suspectes sur N runs
+- [ ] Endpoint API qui sert le snapshot le plus récent et l'historique.
+
+**Hors scope de ce livrable** (peuvent venir plus tard) :
+- Métriques pool DB en temps réel (déjà partiellement remontées sur `/admin/pipeline`)
+- Taux d'erreur HTTP par source (nécessiterait d'instrumenter les adapters async)
 
 ## Questions ouvertes
 
-- **Volet B vs Grafana DSI** : si la DSI met en place sa propre
+- **Page admin vs Grafana DSI** : si la DSI met en place sa propre
   observabilité (logs centralisés, Grafana…) une fois la
-  transmission faite, le volet B peut devenir inutile. À
-  reconsidérer au moment de la transmission. En attendant, une
-  page admin minimaliste suffit.
+  transmission faite, la Phase 2.2 (page admin) peut devenir inutile
+  — le JSON persisté en base reste exploitable par tout outil
+  externe. À reconsidérer au moment de la transmission. En
+  attendant, une page admin minimaliste suffit.
 
 ## Idées à intégrer
 statement_timeout côté pipeline : si une requête tourne > 10 min sans logging, c'est un signe — interrompre et logger.
