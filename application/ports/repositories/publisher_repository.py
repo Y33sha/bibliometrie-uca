@@ -32,6 +32,7 @@ class PublisherUpdateFields(TypedDict, total=False):
     country: str | None
     is_predatory: bool | None
     notes: str | None
+    publisher_type: str
 
 
 class PublisherRepository(Protocol):

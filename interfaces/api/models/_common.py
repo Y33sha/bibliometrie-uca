@@ -61,6 +61,18 @@ class TotalCountResponse(BaseModel):
     total: int
 
 
+class EnumOption(BaseModel):
+    """Une valeur d'enum exposée à l'UI : `{value, label_fr}`.
+
+    Sert aux endpoints qui alimentent les dropdowns (publisher_type,
+    journal_type, …). La source de vérité côté Python est l'ordre de
+    la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
+    """
+
+    value: str
+    label_fr: str
+
+
 # ----- Merge (journals / publishers / persons) -----
 
 
@@ -80,6 +92,7 @@ __all__ = [
     "DashboardOa",
     "DeletedResponse",
     "DetachedResponse",
+    "EnumOption",
     "FacetValueCount",
     "MergeRequest",
     "MergeResponse",

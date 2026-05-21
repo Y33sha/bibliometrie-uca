@@ -191,3 +191,23 @@ class TestMergeJournals:
             ids = {row["id"] for row in cur.fetchall()}
             assert dst in ids
             assert src not in ids
+
+
+# ── GET /api/journal-types ──────────────────────────────────────
+
+
+class TestJournalTypes:
+    def test_returns_all_values_with_labels(self, client):
+        r = client.get("/api/journal-types")
+        assert r.status_code == 200
+        body = r.json()
+        values = [opt["value"] for opt in body]
+        assert values == [
+            "journal",
+            "proceedings",
+            "repository",
+            "book_series",
+            "preprint_server",
+            "media",
+        ]
+        assert all("label_fr" in opt and opt["label_fr"] for opt in body)
