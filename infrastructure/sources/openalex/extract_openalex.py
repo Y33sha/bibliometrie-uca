@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
@@ -47,6 +48,7 @@ _INSERT_OA_BATCH_SQL = text(
             ELSE staging.processed
         END,
         last_seen_at = now()
+    RETURNING (xmax = 0) AS inserted
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
@@ -119,8 +121,8 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def insert_batch(self, conn: Connection, works: list[dict[str, Any]]) -> int:
-        """UPSERT bulk d'un batch de works.
+    def insert_batch(self, conn: Connection, works: list[dict[str, Any]]) -> BatchInsertCounts:
+        """UPSERT bulk d'un batch de works, ventilé new/updated via `xmax`.
 
         `raw_hash` est l'unique clé de détection de changement, aligné sur
         le pattern des autres sources. La préservation des authorships
@@ -132,10 +134,12 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
 
         Le caller est responsable du `conn.commit()` après cette méthode.
 
-        Retourne le nombre de documents dont le hash a changé.
+        Sémantique des compteurs : `new` = vraies insertions (`xmax = 0`),
+        `updated` = ON CONFLICT déclenchés (même si le `CASE WHEN` n'a
+        finalement rien modifié — sémantique « row touchée »).
         """
         if not works:
-            return 0
+            return BatchInsertCounts(new=0, updated=0)
 
         batch = [
             {
@@ -146,21 +150,7 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
             }
             for work in works
         ]
-        source_ids = [b["source_id"] for b in batch]
-        rows = conn.execute(
-            text(
-                "SELECT source_id, raw_hash FROM staging "
-                "WHERE source = 'openalex' AND source_id = ANY(:ids)"
-            ),
-            {"ids": source_ids},
-        ).all()
-        old_hashes = {r.source_id: r.raw_hash for r in rows}
-
-        conn.execute(_INSERT_OA_BATCH_SQL, batch)
-
-        return sum(
-            1
-            for entry in batch
-            if entry["source_id"] in old_hashes
-            and old_hashes[entry["source_id"]] != entry["raw_hash"]
-        )
+        result = conn.execute(_INSERT_OA_BATCH_SQL, batch)
+        rows = result.all()
+        new_count = sum(1 for r in rows if r.inserted)
+        return BatchInsertCounts(new=new_count, updated=len(rows) - new_count)

@@ -35,23 +35,24 @@ def extract_year(
     logger: logging.Logger,
     *,
     dry_run: bool = False,
-) -> int:
-    """Extrait toutes les publications d'une année. Retourne le nb insérés."""
+) -> tuple[int, int]:
+    """Extrait toutes les publications d'une année. Retourne `(new, updated)`."""
     logger.info(f"Requête WoS : {build_query(year, affiliations)}")
 
     time.sleep(WOS_DELAY)
     data = adapter.fetch_page(year, 1, affiliations)
     if not data:
         logger.error(f"Impossible d'exécuter la requête pour {year}")
-        return 0
+        return 0, 0
 
     total_count = get_records_found(data)
     logger.info(f"Année {year} : {total_count} records trouvés")
 
     if dry_run or total_count == 0:
-        return 0
+        return 0, 0
 
-    total_inserted = 0
+    total_new = 0
+    total_updated = 0
     first_record = 1
     page_num = 0
     consecutive_failures = 0
@@ -80,17 +81,18 @@ def extract_year(
         page_num += 1
 
         if records:
-            adapter.insert_batch(conn, records)
+            counts = adapter.insert_batch(conn, records)
             conn.commit()
             for rec in records:
                 ut = rec.get("UID")
                 if ut:
                     existing_uts.add(ut)
-            total_inserted += len(records)
+            total_new += counts.new
+            total_updated += counts.updated
 
         logger.info(
             f"  Page {page_num} : {len(records)} records, "
-            f"{len(records)} insérés "
+            f"{counts.new} nouveaux, {counts.updated} mis à jour "
             f"({min(first_record + len(records) - 1, total_count)}/{total_count})"
         )
 
@@ -109,9 +111,10 @@ def extract_year(
             break
 
     logger.info(
-        f"Année {year} terminée : {total_inserted} records insérés sur {total_count} trouvés"
+        f"Année {year} terminée : {total_new} nouveaux, "
+        f"{total_updated} mis à jour sur {total_count} trouvés"
     )
-    return total_inserted
+    return total_new, total_updated
 
 
 class WosExtractor(SourceExtractor[WosExtractConfig]):
@@ -168,7 +171,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
         stats = PhaseMetrics()
         for i, year in enumerate(years):
             try:
-                inserted = extract_year(
+                new, updated = extract_year(
                     self._adapter,
                     self.conn,
                     year,
@@ -177,7 +180,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
                     self.logger,
                     dry_run=args.dry_run,
                 )
-                stats.add(new=inserted)
+                stats.add(new=new, updated=updated)
             except Exception as e:
                 self.logger.error(f"Erreur sur l'année {year} : {e} — passage à la suivante")
             if i < len(years) - 1:
@@ -186,7 +189,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
         return stats
 
     def log_summary(self, stats: PhaseMetrics, args: argparse.Namespace) -> None:
-        self.logger.info(f"=== Terminé : {stats.new} records insérés au total ===")
+        self.logger.info(f"=== Terminé : {stats.as_summary()} ===")
 
 
 __all__ = [

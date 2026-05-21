@@ -39,7 +39,7 @@ def extract_year(
 ) -> tuple[int, int]:
     """Extrait des publications OpenAlex par année ou par date de modification.
 
-    Retourne (nouveaux, mis_a_jour).
+    Retourne (nouveaux, mis_a_jour) — ventilation calculée par l'adapter via `xmax`.
     """
     cursor = "*"
     total_fetched = 0
@@ -67,28 +67,20 @@ def extract_year(
         if not results:
             break
 
-        new_count = 0
+        # Maintenu pour cohérence avec les autres extracteurs : on entretient
+        # `existing_ids` pour que les phases suivantes y aient accès.
         for work in results:
-            oa_id = extract_openalex_id(work)
-            if oa_id not in existing_ids:
-                existing_ids.add(oa_id)
-                new_count += 1
+            existing_ids.add(extract_openalex_id(work))
 
-        updated_count = adapter.insert_batch(conn, list(results))
+        counts = adapter.insert_batch(conn, list(results))
         conn.commit()
-        total_new += new_count
-        total_updated += updated_count
+        total_new += counts.new
+        total_updated += counts.updated
 
         total_fetched += len(results)
-        parts = []
-        if new_count:
-            parts.append(f"{new_count} nouveaux")
-        if updated_count:
-            parts.append(f"{updated_count} mis à jour")
-        if not parts:
-            parts.append("aucun changement")
         logger.info(
-            f"  Page {page_num} : {len(results)} works — {', '.join(parts)} "
+            f"  Page {page_num} : {len(results)} works — "
+            f"{counts.new} nouveaux, {counts.updated} mis à jour "
             f"({total_fetched}/{total_count})"
         )
 

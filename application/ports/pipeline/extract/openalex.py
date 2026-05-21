@@ -14,6 +14,8 @@ from typing import Any, Protocol
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.extract._common import BatchInsertCounts
+
 
 @dataclass(frozen=True)
 class OpenalexExtractConfig:
@@ -45,6 +47,6 @@ class OpenalexExtractAdapter(Protocol):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def insert_batch(self, conn: Connection, works: list[dict[str, Any]]) -> int:
-        """UPSERT staging d'un batch de works. Retourne le nb dont `raw_hash` a changé."""
+    def insert_batch(self, conn: Connection, works: list[dict[str, Any]]) -> BatchInsertCounts:
+        """UPSERT staging d'un batch de works, ventilé new/updated via `xmax`."""
         ...

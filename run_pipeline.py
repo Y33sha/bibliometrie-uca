@@ -845,6 +845,7 @@ def _run_extract_hal(
 
     log.info("▶ extract_hal")
     t0 = time.time()
+    source_log = setup_logger("hal", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
         hal_url = get_api_base_urls(bootstrap).get(
@@ -853,7 +854,7 @@ def _run_extract_hal(
     conn = engine.connect()
     adapter = PgHalExtractAdapter(base_url=hal_url)
     try:
-        metrics = HalExtractor(conn, log, PgStagingQueries(), adapter).run_as_phase(
+        metrics = HalExtractor(conn, source_log, PgStagingQueries(), adapter).run_as_phase(
             _extractor_args(mode=mode, year=year, since=since)
         )
     finally:
@@ -873,13 +874,14 @@ def _run_extract_openalex(
 
     log.info("▶ extract_openalex")
     t0 = time.time()
+    source_log = setup_logger("openalex", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
         base_url = get_api_base_urls(bootstrap).get("openalex", "https://api.openalex.org/works")
     conn = engine.connect()
     adapter = PgOpenalexExtractAdapter(base_url=base_url)
     try:
-        metrics = OpenalexExtractor(conn, log, PgStagingQueries(), adapter).run_as_phase(
+        metrics = OpenalexExtractor(conn, source_log, PgStagingQueries(), adapter).run_as_phase(
             _extractor_args(mode=mode, year=year, since=since)
         )
     finally:
@@ -897,6 +899,7 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
 
     log.info("▶ extract_wos")
     t0 = time.time()
+    source_log = setup_logger("wos", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
         base_url = get_api_base_urls(bootstrap).get("wos", "https://api.clarivate.com/api/wos")
@@ -904,7 +907,7 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
     conn = engine.connect()
     adapter = PgWosExtractAdapter(base_url=base_url, api_key=api_key)
     try:
-        metrics = WosExtractor(conn, log, PgStagingQueries(), adapter).run_as_phase(
+        metrics = WosExtractor(conn, source_log, PgStagingQueries(), adapter).run_as_phase(
             _extractor_args(mode=mode, year=year)
         )
     finally:
@@ -925,6 +928,7 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
 
     log.info("▶ extract_scanr")
     t0 = time.time()
+    source_log = setup_logger("scanr", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
         base_url = get_api_base_urls(bootstrap).get(
@@ -935,7 +939,7 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
     conn = engine.connect()
     adapter = PgScanrExtractAdapter(base_url=base_url, credentials=credentials)
     try:
-        metrics = ScanrExtractor(conn, log, PgStagingQueries(), adapter).run_as_phase(
+        metrics = ScanrExtractor(conn, source_log, PgStagingQueries(), adapter).run_as_phase(
             _extractor_args(mode=mode, year=year)
         )
     finally:
@@ -953,6 +957,7 @@ def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> Phase
 
     log.info("▶ extract_theses")
     t0 = time.time()
+    source_log = setup_logger("theses", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
         base_url = get_api_base_urls(bootstrap).get(
@@ -961,7 +966,7 @@ def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> Phase
     conn = engine.connect()
     adapter = PgThesesExtractAdapter(base_url=base_url)
     try:
-        metrics = ThesesExtractor(conn, log, PgStagingQueries(), adapter).run_as_phase(
+        metrics = ThesesExtractor(conn, source_log, PgStagingQueries(), adapter).run_as_phase(
             _extractor_args(mode=mode, year=year)
         )
     finally:

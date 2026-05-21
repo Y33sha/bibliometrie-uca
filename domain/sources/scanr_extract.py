@@ -22,7 +22,7 @@ SCANR_DELAY = 0.3
 Elasticsearch public, courtoisie.
 """
 
-SCANR_PER_PAGE = 500
+SCANR_PER_PAGE = 200
 """Taille des batchs scroll/search_after."""
 
 

@@ -14,6 +14,7 @@ import requests
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
 from domain.sources.wos_extract import build_query, extract_doi, extract_ut
 from infrastructure.sources.api_limits import WOS_PER_PAGE
@@ -37,6 +38,7 @@ _INSERT_WOS_BATCH_SQL = text(
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
             THEN FALSE ELSE staging.processed END,
         last_seen_at = now()
+    RETURNING (xmax = 0) AS inserted
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
@@ -115,14 +117,13 @@ class PgWosExtractAdapter(WosExtractAdapter):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def insert_batch(self, conn: Connection, records: list[dict[str, Any]]) -> int:
-        """UPSERT bulk d'un batch de records WoS.
+    def insert_batch(self, conn: Connection, records: list[dict[str, Any]]) -> BatchInsertCounts:
+        """UPSERT bulk d'un batch de records WoS, ventilé new/updated via `xmax`.
 
         Le caller est responsable du `conn.commit()` après cette méthode.
-        Retourne le nombre de lignes envoyées (insérées + mises à jour).
         """
         if not records:
-            return 0
+            return BatchInsertCounts(new=0, updated=0)
         batch = [
             {
                 "source_id": extract_ut(rec),
@@ -132,5 +133,7 @@ class PgWosExtractAdapter(WosExtractAdapter):
             }
             for rec in records
         ]
-        conn.execute(_INSERT_WOS_BATCH_SQL, batch)
-        return len(batch)
+        result = conn.execute(_INSERT_WOS_BATCH_SQL, batch)
+        rows = result.all()
+        new_count = sum(1 for r in rows if r.inserted)
+        return BatchInsertCounts(new=new_count, updated=len(rows) - new_count)

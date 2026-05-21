@@ -39,7 +39,7 @@ WOS_PER_PAGE = 10  # recommandation Clarivate (timeouts fréquents au-delà)
 
 # ScanR — Elasticsearch public, courtoisie
 SCANR_DELAY = 0.3
-SCANR_PER_PAGE = 500  # taille des batchs scroll/search_after
+SCANR_PER_PAGE = 200  # taille des batchs scroll/search_after
 
 # theses.fr — API publique
 THESES_DELAY = 0.3

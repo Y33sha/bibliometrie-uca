@@ -67,7 +67,7 @@ def extract_year(
 
         search_after = hits[-1]["sort"]
 
-        if seen % 2000 == 0:
+        if seen % 500 == 0:
             conn.commit()
             logger.info(f"    {seen}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
 
@@ -135,11 +135,8 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
             self.logger.info(f"  {year} terminé : {inserted} nouveaux, {updated} mis à jour")
         return stats
 
-    def log_summary(self, stats: PhaseMetrics, args: argparse.Namespace) -> None:
-        self.logger.info("\n=== Terminé ===")
-        self.logger.info(f"Total API : {stats.total}")
-        self.logger.info(f"Nouveaux : {stats.new}")
-        self.logger.info(f"Mis à jour : {stats.updated}")
+    # log_summary : on hérite du défaut de SourceExtractor (`=== Terminé : as_summary ===`)
+    # — format harmonisé entre tous les extracteurs.
 
 
 __all__ = [
