@@ -330,12 +330,13 @@ th.sorted .sort-arrow {
 	width: 100%;
 }
 
-/* Largeur fixe : on évite le shrink-to-content qui faisait wrapper les
-   titres longs à la largeur minimale (4 lignes pour « Journal of High
-   Energy Physics » sur 56px). 180px = compromis qui tient la majorité
-   des titres usuels sur 2 lignes max sans manger la place du Titre. */
+/* Min-width : `width` seul est une simple hint en table-layout: auto et la
+   colonne Titre (width: 100%) la grignotait jusqu'à la min-content-width
+   (4 lignes pour « Journal of High Energy Physics » sur 56px). `min-width`
+   est la seule contrainte que l'auto-layout respecte vraiment. */
 .pub-col-journal {
 	font-size: 0.9em;
+	min-width: 180px;
 	width: 180px;
 }
 
