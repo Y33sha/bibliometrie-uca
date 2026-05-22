@@ -117,7 +117,7 @@ L'attribution initiale est traitée hors Phase 1 :
 Quatre familles de règles, à implémenter de manière indépendante.
 
 - [ ] **4a. DOI ↔ journal** : le préfixe DOI (`doi_prefixes.publisher_id`) doit correspondre au publisher du journal de la publication. Tolérance pour les DOI green/gold sur la même publi (preprint sur archive + version éditeur sur la revue). Incohérence vraie : article + DOI dont le préfixe correspond à une autre revue.
-- [ ] **4b. doc_type ↔ journal_type** : mapping attendu (`article` → `journal`, `conference_paper` → `proceedings`, `chapter` → `book_series`, `preprint` → `preprint_repository`, etc.). Signaler les écarts.
+- [ ] **4b. doc_type ↔ journal_type** : mapping attendu (`article` → `journal`, `conference_paper` → `proceedings`, `chapter` → `book_series`, `preprint` → `preprint_server`, etc.). Signaler les écarts.
 - [ ] **4c. oa_status ↔ journal_type / DOAJ** : `full_oa` ↔ revue DOAJ ; `subscription` ↔ revue non-DOAJ. Tolérer `green` partout.
 - [ ] **4d. Sujets ↔ revue** : pour chaque revue, calculer la distribution des sujets de ses publis. Signaler les sujets aberrants (rarement vus dans la revue mais présents sur une publi donnée). Permet de remonter les sujets OpenAlex bruités (cf. TODO existant sur la qualité des sujets).
 
