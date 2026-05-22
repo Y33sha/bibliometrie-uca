@@ -330,17 +330,13 @@ th.sorted .sort-arrow {
 	width: 100%;
 }
 
-/* width: 1px = idiome HTML table « shrink to content » : la colonne
-   se rétrécit à la largeur de son contenu (le span .journal-clip plafonné
-   à 200px), au lieu de prendre la largeur naturelle du texte non wrappé. */
+/* Largeur fixe : on évite le shrink-to-content qui faisait wrapper les
+   titres longs à la largeur minimale (4 lignes pour « Journal of High
+   Energy Physics » sur 56px). 180px = compromis qui tient la majorité
+   des titres usuels sur 2 lignes max sans manger la place du Titre. */
 .pub-col-journal {
 	font-size: 0.9em;
-	width: 1px;
-}
-
-.journal-clip {
-	display: inline-block;
-	max-width: 250px;
+	width: 180px;
 }
 
 /* ── ID badge ── */
