@@ -71,7 +71,7 @@ function escapeHtmlAttr(value: string): string {
 		.replace(/>/g, '&gt;');
 }
 
-export function parseMarkdown(content: string, base: string): ParsedDoc {
+export function parseMarkdown(content: string, base: string, currentSlug: string): ParsedDoc {
 	const { title, toc } = extractHeadings(content);
 
 	const renderer: RendererObject = {
@@ -84,7 +84,7 @@ export function parseMarkdown(content: string, base: string): ParsedDoc {
 			return `<h${depth} id="${anchor}">${cleaned}</h${depth}>`;
 		},
 		link({ href, title: linkTitle, tokens }) {
-			const resolved = resolveDocLink(href, base);
+			const resolved = resolveDocLink(href, base, currentSlug);
 			const text = this.parser.parseInline(tokens);
 			const titleAttr = linkTitle ? ` title="${escapeHtmlAttr(linkTitle)}"` : '';
 			return `<a href="${escapeHtmlAttr(resolved)}"${titleAttr}>${text}</a>`;

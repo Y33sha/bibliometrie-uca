@@ -3,46 +3,68 @@ import { resolveDocLink } from './links';
 
 const BASE = '/bibliometrie';
 
-describe('resolveDocLink', () => {
+describe('resolveDocLink — depuis une page racine', () => {
+	const FROM = 'architecture';
+
 	it('préfixe un slug nu par /docs/', () => {
-		expect(resolveDocLink('pipeline', BASE)).toBe('/bibliometrie/docs/pipeline');
+		expect(resolveDocLink('pipeline', BASE, FROM)).toBe('/bibliometrie/docs/pipeline');
 	});
 
 	it('conserve une ancre interne au slug', () => {
-		expect(resolveDocLink('glossaire#ror', BASE)).toBe('/bibliometrie/docs/glossaire#ror');
+		expect(resolveDocLink('glossaire#ror', BASE, FROM)).toBe('/bibliometrie/docs/glossaire#ror');
 	});
 
 	it('strippe une extension .md finale', () => {
-		expect(resolveDocLink('pipeline.md', BASE)).toBe('/bibliometrie/docs/pipeline');
+		expect(resolveDocLink('pipeline.md', BASE, FROM)).toBe('/bibliometrie/docs/pipeline');
 	});
 
 	it('strippe .md devant une ancre', () => {
-		expect(resolveDocLink('pipeline.md#section', BASE)).toBe(
+		expect(resolveDocLink('pipeline.md#section', BASE, FROM)).toBe(
 			'/bibliometrie/docs/pipeline#section'
 		);
 	});
 
 	it('laisse les URLs externes inchangées', () => {
-		expect(resolveDocLink('https://ror.org/01a8ajp46', BASE)).toBe('https://ror.org/01a8ajp46');
-		expect(resolveDocLink('http://example.com', BASE)).toBe('http://example.com');
+		expect(resolveDocLink('https://ror.org/01a8ajp46', BASE, FROM)).toBe(
+			'https://ror.org/01a8ajp46'
+		);
 	});
 
 	it('laisse les liens absolus inchangés', () => {
-		expect(resolveDocLink('/some/path', BASE)).toBe('/some/path');
+		expect(resolveDocLink('/some/path', BASE, FROM)).toBe('/some/path');
 	});
 
 	it('laisse les ancres pures inchangées', () => {
-		expect(resolveDocLink('#persons', BASE)).toBe('#persons');
+		expect(resolveDocLink('#persons', BASE, FROM)).toBe('#persons');
 	});
 
 	it('laisse les mailto: inchangés', () => {
-		expect(resolveDocLink('mailto:foo@bar', BASE)).toBe('mailto:foo@bar');
+		expect(resolveDocLink('mailto:foo@bar', BASE, FROM)).toBe('mailto:foo@bar');
 	});
 
-	it('préfixe les chemins relatifs vers chantiers/ (cassé aujourd\'hui, statu quo)', () => {
-		// Comportement intentionnel : voir audit syntaxe markdown phase 2.
-		expect(resolveDocLink('chantiers/DATA_raw-data-store.md', BASE)).toBe(
-			'/bibliometrie/docs/chantiers/DATA_raw-data-store'
+	it('résout un chemin imbriqué vers une section', () => {
+		expect(resolveDocLink('sources/imports-manuels#donnees-rh', BASE, FROM)).toBe(
+			'/bibliometrie/docs/sources/imports-manuels#donnees-rh'
+		);
+	});
+});
+
+describe('resolveDocLink — depuis une page de section', () => {
+	const FROM = 'sources/vue-d-ensemble';
+
+	it("remonte d'un niveau avec ../ vers une page racine", () => {
+		expect(resolveDocLink('../guide-utilisateur#problemes-hal', BASE, FROM)).toBe(
+			'/bibliometrie/docs/guide-utilisateur#problemes-hal'
+		);
+	});
+
+	it('résout un lien nu comme intra-section', () => {
+		expect(resolveDocLink('hal', BASE, FROM)).toBe('/bibliometrie/docs/sources/hal');
+	});
+
+	it('résout ./ comme intra-section', () => {
+		expect(resolveDocLink('./openalex', BASE, FROM)).toBe(
+			'/bibliometrie/docs/sources/openalex'
 		);
 	});
 });

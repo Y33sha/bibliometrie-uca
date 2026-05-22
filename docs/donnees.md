@@ -55,7 +55,7 @@ flowchart LR
 >
 > Les entités "personnes" et "structures" présentes dans les sources ne peuvent pas être mappées de la même manière aux entités "personnes" et "structures" canoniques, pour deux raisons:
 > - fiabilité variable des affiliations selon les sources (soit pauvres (WOS: UCA identifiée mais pas toujours les labos), soit erratiques (OpenAlex: l'algo d'affiliation produit beaucoup de faux rattachements));
-> - entités "personnes" algorithmiques, peu fiables: soit saucissonnées à l'extrême, soit confondant des homonymes (WOS, OpenAlex), voire entités hétérogènes au sein d'une même source (HAL: personnes fiables avec `personId` *vs* auteurs réduits à une name_form quand ils n'ont pas pu être matchés à un compte HAL) (cf [documentation sources](sources)).
+> - entités "personnes" algorithmiques, peu fiables: soit saucissonnées à l'extrême, soit confondant des homonymes (WOS, OpenAlex), voire entités hétérogènes au sein d'une même source (HAL: personnes fiables avec `personId` *vs* auteurs réduits à une name_form quand ils n'ont pas pu être matchés à un compte HAL) (cf [documentation sources](sources/vue-d-ensemble)).
 >
 > Il a donc été décidé de ne pas conserver de tables `source_persons` et `source_structures`. Les informations servant au matching des personnes et des structures sont regroupées dans `source_authorships`:
 >
@@ -115,7 +115,7 @@ Tables associées :
 - `structure_relations` : définit les relations entre structures. Deux relations existent: **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans le [référentiel ROR](glossaire#ror)); la relation "tutelle" a une conséquence sur les **structures incluses dans un périmètre** donné.
 - `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `affiliations` du [pipeline](pipeline) pour peupler la table de liaison `address_structures`.
 - `address_structures`: table de liaison. Les adresses proviennent des authorships sources (peuplées via `source_authorship_addresses` lors de la phase `normalize`, exploitées lors de la phase `affiliations`). Les structures identifiées sont ensuite propagées aux authorships sources.
-- `apc_payments`: données provenant d'un import CSV, voir [doc sources](sources#donnees-apc).
+- `apc_payments`: données provenant d'un import CSV, voir [doc sources](sources/imports-manuels#donnees-apc).
 
 La page [**admin/structures**](guide-utilisateur#admin-structures) permet de gérer le CRUD des structures ainsi que leurs relations et formes de noms.
 
@@ -189,7 +189,7 @@ flowchart LR
 ```
 
 Tables associées :
-- `persons_rh`: Table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](sources#donnees-rh).
+- `persons_rh`: Table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](sources/imports-manuels#donnees-rh).
 - `person_identifiers`: Identifiants persistants : ORCID, idHAL, IdRef, etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` trace la provenance (`hal`, `openalex`, `scanr`, `theses`, `manual`, `auto`). La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources.
 - `person_name_forms`: Formes de noms normalisées, utilisées pour le matching lors de la création de personnes.
 
