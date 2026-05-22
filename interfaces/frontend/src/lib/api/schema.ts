@@ -2043,6 +2043,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publishers/countries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Countries
+         * @description Valeurs distinctes de `country` observées en base, triées par fréquence.
+         *
+         *     Sert à alimenter le filtre « Pays » de la page publique `/publishers`.
+         */
+        get: operations["list_countries_api_publishers_countries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publishers": {
         parameters: {
             query?: never;
@@ -2054,9 +2076,14 @@ export interface paths {
          * List Publishers
          * @description Liste paginée des éditeurs avec comptage revues + publications.
          *
-         *     `search` : recherche sur le nom normalisé, ignorée si < 2
-         *     caractères. `sort` : `name` / `-name` / `journals` / `-journals`
-         *     / `pubs` / `-pubs` ; fallback sur `name` si inconnu.
+         *     Filtres :
+         *     - `search` : insensible à la casse sur le nom normalisé, ignorée si
+         *       < 2 caractères.
+         *     - `publisher_type` / `country` : égalité stricte.
+         *     - `is_predatory` : booléen (true/false). Omettre = pas de filtre.
+         *
+         *     `sort` : `name` / `-name` / `journals` / `-journals` / `pubs` /
+         *     `-pubs` ; fallback sur `name` si inconnu.
          */
         get: operations["list_publishers_api_publishers_get"];
         put?: never;
@@ -2076,7 +2103,10 @@ export interface paths {
         };
         /**
          * Get Publisher
-         * @description Récupère un éditeur par son id (nom uniquement). 404 si inconnu.
+         * @description Profil complet d'un éditeur pour la page publique `/publishers/[id]`.
+         *
+         *     Inclut métadonnées + préfixes DOI + nombre de revues et publications
+         *     rattachées. 404 si l'éditeur est inconnu.
          */
         get: operations["get_publisher_api_publishers__publisher_id__get"];
         /**
@@ -2087,6 +2117,53 @@ export interface paths {
          *     (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
          */
         put: operations["update_publisher_api_publishers__publisher_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publishers/{publisher_id}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Publisher Dashboard
+         * @description Agrégats pour l'onglet « Dashboard » de la page éditeur.
+         *
+         *     Distribution des `journal_type` du portfolio + distributions `doc_type` /
+         *     `oa_status` des publications rattachées via les revues. 404 si l'éditeur
+         *     est inconnu.
+         */
+        get: operations["get_publisher_dashboard_api_publishers__publisher_id__dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publishers/{publisher_id}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Publisher Subjects
+         * @description Top sujets des publications de l'éditeur (pour l'onglet Dashboard).
+         *
+         *     Exclut les sujets génériques (`usage_count > 5000`). Retourne une liste
+         *     vide si l'éditeur existe sans publications taggées.
+         */
+        get: operations["get_publisher_subjects_api_publishers__publisher_id__subjects_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2887,7 +2964,7 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
+         * @description Compteur de publications par `doc_type` pour un éditeur.
          */
         DocTypeCount: {
             /** Doc Type */
@@ -3314,7 +3391,7 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["OaStatusCount"][];
         };
@@ -3470,6 +3547,16 @@ export interface components {
             is_predatory: boolean;
             /** Apc Amount */
             apc_amount: number | null;
+        };
+        /**
+         * JournalTypeCount
+         * @description Compteur de revues par `journal_type` pour un éditeur.
+         */
+        JournalTypeCount: {
+            /** Journal Type */
+            journal_type: string | null;
+            /** Count */
+            count: number;
         };
         /** JournalUpdate */
         JournalUpdate: {
@@ -4847,14 +4934,46 @@ export interface components {
             in_perimeter: components["schemas"]["TextStrFacet"][];
         };
         /**
-         * PublisherBasic
-         * @description GET /api/publishers/{id} : id + name (recherche par id).
+         * PublisherDashboardResponse
+         * @description GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
+         *
+         *     `journal_types` : distribution des types des revues de l'éditeur (qualifie
+         *     son portfolio). `doc_types` / `oa_statuses` : distributions des publis
+         *     rattachées via ses revues, utiles pour le repérage d'incohérences à venir.
          */
-        PublisherBasic: {
+        PublisherDashboardResponse: {
+            /** Total Publications */
+            total_publications: number;
+            /** Journal Types */
+            journal_types: components["schemas"]["JournalTypeCount"][];
+            /** Doc Types */
+            doc_types: components["schemas"]["DocTypeCount"][];
+            /** Oa Statuses */
+            oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
+        };
+        /**
+         * PublisherDetailResponse
+         * @description GET /api/publishers/{id} : profil complet pour la page publique /publishers/[id].
+         */
+        PublisherDetailResponse: {
             /** Id */
             id: number;
             /** Name */
             name: string;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Country */
+            country: string | null;
+            /** Doi Prefixes */
+            doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
+            /** Is Predatory */
+            is_predatory: boolean;
+            /** Publisher Type */
+            publisher_type: string;
+            /** Journal Count */
+            journal_count: number;
+            /** Pub Count */
+            pub_count: number;
         };
         /** PublisherListItem */
         PublisherListItem: {
@@ -5489,6 +5608,26 @@ export interface components {
             yes: number;
             /** No */
             no: number;
+        };
+        /**
+         * DocTypeCount
+         * @description Compteur de publications par `doc_type` pour une revue.
+         */
+        application__ports__api__journals_queries__DocTypeCount: {
+            /** Doc Type */
+            doc_type: string | null;
+            /** Count */
+            count: number;
+        };
+        /**
+         * OaStatusCount
+         * @description Compteur de publications par `oa_status` pour un éditeur.
+         */
+        application__ports__api__publishers_queries__OaStatusCount: {
+            /** Oa Status */
+            oa_status: string | null;
+            /** Count */
+            count: number;
         };
     };
     responses: never;
@@ -8766,12 +8905,35 @@ export interface operations {
             };
         };
     };
+    list_countries_api_publishers_countries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+        };
+    };
     list_publishers_api_publishers_get: {
         parameters: {
             query?: {
                 page?: number;
                 per_page?: number;
                 search?: string | null;
+                publisher_type?: string | null;
+                country?: string | null;
+                is_predatory?: boolean | null;
                 sort?: string;
             };
             header?: never;
@@ -8817,7 +8979,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PublisherBasic"];
+                    "application/json": components["schemas"]["PublisherDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8853,6 +9015,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_publisher_dashboard_api_publishers__publisher_id__dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publisher_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublisherDashboardResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_publisher_subjects_api_publishers__publisher_id__subjects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                publisher_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectFrequency"][];
                 };
             };
             /** @description Validation Error */

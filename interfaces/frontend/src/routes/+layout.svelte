@@ -21,7 +21,7 @@
   const isDuplicates = $derived($page.url.pathname === base + "/admin/duplicates" || $page.url.pathname === base + "/admin/person-duplicates");
   const isHalProblems = $derived($page.url.pathname.startsWith(base + "/hal-problems"));
   const isPublicReferentiels = $derived(
-    isActive("/journals") || isActive("/subjects"),
+    isActive("/publishers") || isActive("/journals") || isActive("/subjects"),
   );
 
   let pipelineDropdownOpen = $state(false);
@@ -122,6 +122,7 @@
         <button class="nav-link" class:active={isPublicReferentiels}>Référentiels &#x25BE;</button>
         {#if publicRefDropdownOpen}
           <div class="nav-dropdown-menu">
+            <a href="{base}/publishers" class:active={isActive("/publishers")}>Éditeurs</a>
             <a href="{base}/journals" class:active={isActive("/journals")}>Revues</a>
             <a href="{base}/subjects" class:active={isActive("/subjects")}>Sujets</a>
           </div>

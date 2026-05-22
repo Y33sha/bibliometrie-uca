@@ -31,6 +31,7 @@
 	// - `/laboratories/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
 	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Corresp./Périmètre)
 	// - `/journals/[id]?tab=publications` (filtre `journal_id` fixe)
+	// - `/publishers/[id]?tab=publications` (filtre `publisher_id` fixe)
 	interface ExternalFilters {
 		subjectId?: number;
 		subjectLabel?: string;
@@ -42,6 +43,7 @@
 		personId?: number;
 		personLabel?: string;
 		journalId?: number;
+		publisherId?: number;
 	}
 	type ApcMode = 'uca' | 'lab' | 'person-uca';
 	let {
@@ -218,7 +220,12 @@
 		if (selectedHalStatus.length) params.set('hal_status', selectedHalStatus.join(','));
 		if (selectedCorr.length) params.set('is_corresponding', selectedCorr.join(','));
 		if (selectedPerimeter.length) params.set('in_perimeter', selectedPerimeter.join(','));
-		if (filterPublisherId) params.set('publisher_id', filterPublisherId);
+		// `publisher_id` : externalFilters (/publishers/[id]) ou URL.
+		if (externalFilters?.publisherId != null) {
+			params.set('publisher_id', String(externalFilters.publisherId));
+		} else if (filterPublisherId) {
+			params.set('publisher_id', filterPublisherId);
+		}
 		// `journal_id` : soit imposé par la route (/journals/[id]), soit choisi
 		// par l'utilisatrice via l'URL (?journal_id=). Les deux modes sont
 		// exclusifs ; externalFilters l'emporte sur le filtre URL.

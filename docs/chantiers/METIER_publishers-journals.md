@@ -130,12 +130,12 @@ Implémentation envisagée :
 
 Routes publiques en anglais, cohérentes avec le reste du projet (`/laboratories`, `/persons`, `/publications`, `/subjects`).
 
-- [x] **Refonte du menu** (partiel) : dropdown « Référentiels » côté public avec Revues + Sujets. Éditeurs s'ajoutera quand la page sera livrée.
-- [ ] **Page `/publishers`** : liste paginée, facettes `publisher_type`, `country`, `is_predatory`. Tri par nb de publis, alphabétique.
-- [ ] **Page `/publishers/{id}`** : détail (description, type, pays, indicateurs), liste de publis (paginée, facettes existantes), liste de revues affiliées.
+- [x] **Refonte du menu** : dropdown « Référentiels » côté public avec Éditeurs + Revues + Sujets.
+- [x] **Page `/publishers`** : recherche, facettes `publisher_type` / `country` / `is_predatory`, tri (nom / nb revues / nb publis), pagination.
+- [x] **Page `/publishers/{id}`** : header métadonnées (nom, type, pays, préfixes DOI, openalex_id) + onglets Dashboard (distributions journal_type, doc_type, oa_status, sujets dominants) / Revues (tableau paginé du portfolio) / Publications (`PublicationsListView` filtré).
 - [x] **Page `/journals`** : recherche, facettes `journal_type` / `is_in_doaj` / `oa_model`, tri (titre / publis / éditeur), pagination. Filtre `publisher` différé (demanderait un autocomplete).
 - [x] **Page `/journals/{id}`** : header métadonnées + onglets Dashboard (distributions doc_type, oa_status, sujets dominants, données DOAJ) / Publications (`PublicationsListView` filtré). Charts et nuages de mots à venir quand l'usage validera ce qui mérite une visualisation. Incohérences détectées (Phase 4) viendront s'ancrer ici une fois les règles posées.
-- [x] **Endpoint API publics** revues : `GET /api/journals/{id}` (detail enrichi), `/api/journals/{id}/dashboard`, `/api/journals/{id}/subjects`, `/api/journals/oa-models`. Éditeurs : à venir.
+- [x] **Endpoint API publics** : revues (`/api/journals/{id}`, `/dashboard`, `/subjects`, `/oa-models`) + éditeurs (`/api/publishers/{id}`, `/dashboard`, `/subjects`, `/countries`).
 
 ## Questions ouvertes (au-delà des décisions à trancher en amont)
 
