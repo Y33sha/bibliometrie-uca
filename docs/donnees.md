@@ -1,4 +1,4 @@
-# Schéma de données — Bibliométrie UCA
+# Schéma de données
 
 *Document à jour au 2026-05-11.*
 
@@ -113,7 +113,7 @@ Tables associées :
     - les authorships sources dont les affiliations résolues (table de jointure `source_authorship_structures`) sont peuplées par la phase `affiliations` du pipeline, et qui sont candidates au matching `publications` et `personnes`.
 
 - `structure_relations` : définit les relations entre structures. Deux relations existent: **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans le [référentiel ROR](glossaire#ror)); la relation "tutelle" a une conséquence sur les **structures incluses dans un périmètre** donné.
-- `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `affiliations` du [pipeline](pipeline.md) pour peupler la table de liaison `address_structures`.
+- `structure_name_forms` : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple: `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon: probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `affiliations` du [pipeline](pipeline) pour peupler la table de liaison `address_structures`.
 - `address_structures`: table de liaison. Les adresses proviennent des authorships sources (peuplées via `source_authorship_addresses` lors de la phase `normalize`, exploitées lors de la phase `affiliations`). Les structures identifiées sont ensuite propagées aux authorships sources.
 - `apc_payments`: données provenant d'un import CSV, voir [doc sources](sources#donnees-apc).
 
@@ -241,7 +241,7 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 
   `raw_data` vidé après normalisation pour libérer l'espace TOAST
   (le payload brut sera ré-introduit hors DB par le chantier
-  [`DATA_raw-data-store.md`](chantiers/DATA_raw-data-store.md)).
+  `DATA_raw-data-store.md`).
   `last_seen_at` est mis à jour à chaque ré-extraction d'un même doc.
 
   CHECK SQL `staging_not_found_implies_processed` (migration 0015) :
@@ -251,7 +251,7 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
   laissés en discipline pour ne pas bloquer les évolutions futures.
 
   Évolutions prévues dans
-  [`DATA_cycle-vie-staging.md`](chantiers/DATA_cycle-vie-staging.md) :
+  `DATA_cycle-vie-staging.md` :
   backoff `not_found_at` / `next_retry` (4e nuance "non trouvée
   temporaire" pour les cross-imports DOI sur sources non natives),
   détection des publications disparues, re-fetch périodique.
@@ -267,9 +267,9 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 ## Évolutions prévues à court terme
 
 Chantiers `DATA_*` actuellement ouverts dans
-[`docs/chantiers/`](chantiers/) :
+`docs/chantiers/` :
 
-- **[`DATA_raw-data-store.md`](chantiers/DATA_raw-data-store.md)**
+- **`DATA_raw-data-store.md`**
   — stockage des payloads bruts API hors BDD (store externe type
   filesystem ou S3), pour permettre la re-normalisation sans
   re-moissonnage et alléger la BDD (notamment les

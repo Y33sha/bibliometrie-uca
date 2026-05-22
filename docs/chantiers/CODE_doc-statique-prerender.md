@@ -84,18 +84,19 @@ code highlighté, mermaid pré-rendu.
 
 ### Phase 2 — Routes prerendered
 
-- [ ] `/docs/[slug]/+page.server.ts` :
-  - [ ] `load()` lit `docs/{slug}.md` au filesystem
-  - [ ] `export const prerender = true`
-  - [ ] `export function entries()` énumère les `.md` de `docs/`
-  - [ ] retourne `{ html, toc, title, pages }` (pages = liste pour la sidebar)
-- [ ] `/docs/+layout.svelte` réécrit :
-  - [ ] sidebar gauche (props depuis `+layout.server.ts` ou un `+layout.ts`)
-  - [ ] TOC droite (props depuis la page)
-  - [ ] scrollspy via `IntersectionObserver` sur les ancres de la TOC
-- [ ] Suppression du `marked` runtime, du `MutationObserver`, du `fixLinks` regex
-- [ ] Vérifier que `vite.config.ts` watche `docs/**/*.md` en dev (HMR sur
-  édition de markdown)
+- [x] `/docs/[slug]/+page.server.ts` :
+  - [x] `load()` lit le `.md` via `import.meta.glob` (HMR gratuit, contenu embarqué au build)
+  - [x] `export const prerender = true`
+  - [x] `export function entries()` énumère les slugs de `pages.ts`
+  - [x] retourne `{ html, toc, title }`
+- [x] `/docs/+layout.svelte` réécrit :
+  - [x] sidebar gauche (props depuis `+layout.server.ts` qui extrait les h1 des `.md`)
+  - [x] TOC droite (props depuis la page)
+  - [x] scrollspy via `IntersectionObserver` sur les ancres de la TOC
+- [x] Suppression du `marked` runtime, du `MutationObserver`, du `fixLinks` regex
+- [x] Parser : support des ancres custom via `<span id="..."></span>` dans les headings, rendu inline markdown dans la TOC
+- [x] Parser : tolérance CRLF/LF (fichiers `.md` en formats mixtes)
+- [x] Audit syntaxe markdown : liens `chantiers/*` en backtick (notes internes, hors doc en ligne), liens vers code source en URL GitHub absolue, ancres cassées corrigées
 
 ### Phase 3 — Style et UX
 

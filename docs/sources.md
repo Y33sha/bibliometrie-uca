@@ -1,4 +1,4 @@
-# Sources de données — Bibliométrie UCA
+# Sources de données
 
 *Document à jour au 2026-05-11.*
 
@@ -71,7 +71,7 @@ Deux principaux cas de figure:
 
 **Search API** (`https://api.archives-ouvertes.fr/search`) — moissonnage des publications.
 - Requête par collection labo (27 collections UCA) + portail global `clermont-univ`
-- Champs Solr récupérés : voir [infrastructure/hal.py](../infrastructure/hal.py) (`HAL_FIELDS`)
+- Champs Solr récupérés : voir [infrastructure/hal.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/infrastructure/hal.py) (`HAL_FIELDS`)
 - Pagination par offset, 500 résultats/page, 0.5s de délai entre requêtes
 - Les identifiants ORCID/IdRef des auteurs sont extraits depuis le TEI `label_xml` retourné par la search API ; aucun appel séparé à `ref/author` n'est nécessaire.
 
@@ -102,7 +102,7 @@ Deux principaux cas de figure:
 **Works API** (`https://api.openalex.org/works`) — moissonnage des publications.
 - Requête par institution (filtre `lineage`) + année
 - Pagination par cursor, 200 résultats/page, 0.2s de délai (polite pool via email)
-- L'API bulk tronque les authorships à 100 auteurs ; [infrastructure/sources/openalex/refetch_truncated.py](../infrastructure/sources/openalex/refetch_truncated.py) re-télécharge individuellement les works concernés
+- L'API bulk tronque les authorships à 100 auteurs ; [infrastructure/sources/openalex/refetch_truncated.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/infrastructure/sources/openalex/refetch_truncated.py) re-télécharge individuellement les works concernés
 
 **Sources API** (`https://api.openalex.org/sources`) — enrichissement APC des journaux.
 - Récupération des prix APC catalogue (DOAJ) par openalex_id
@@ -201,8 +201,8 @@ CrossRef n'est pas une source de périmètre : aucune requête par institution /
 ### Theses.fr — à documenter
 
 Section à compléter, sur le même modèle (API utilisées, données récupérées, particularités).
-Extracteur dans [infrastructure/sources/theses/](../infrastructure/sources/theses/),
-normaliseur dans [application/pipeline/normalize/normalize_theses.py](../application/pipeline/normalize/normalize_theses.py).
+Extracteur dans [infrastructure/sources/theses/](https://github.com/Y33sha/bibliometrie-uca/tree/master/infrastructure/sources/theses),
+normaliseur dans [application/pipeline/normalize/normalize_theses.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/application/pipeline/normalize/normalize_theses.py).
 Particularité connue : couvre thèses soutenues + en cours ; jurys et
 rapporteurs matérialisés comme `source_authorships` (avec leurs `roles`)
 — PPN éventuel porté par `person_identifiers->>'idref'`.
@@ -211,7 +211,7 @@ rapporteurs matérialisés comme `source_authorships` (avec leurs `roles`)
 
 ### Unpaywall
 
-Script : [interfaces/cli/pipeline/enrich_oa_status.py](../interfaces/cli/pipeline/enrich_oa_status.py) (orchestration dans [application/pipeline/enrich/enrich_oa_status.py](../application/pipeline/enrich/enrich_oa_status.py)).
+Script : [interfaces/cli/pipeline/enrich_oa_status.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/pipeline/enrich_oa_status.py) (orchestration dans [application/pipeline/enrich/enrich_oa_status.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/application/pipeline/enrich/enrich_oa_status.py)).
 
 Interroge l'API Unpaywall (`https://api.unpaywall.org/v2/{doi}`) pour chaque publication avec DOI. Met à jour `publications.oa_status`.
 
@@ -219,7 +219,7 @@ Règle métier : ne remplace jamais un statut `diamond` par `gold` (Unpaywall ne
 
 ### OpenAlex Sources (APC)
 
-Script : [interfaces/cli/pipeline/enrich_journal_apc.py](../interfaces/cli/pipeline/enrich_journal_apc.py) (orchestration dans [application/pipeline/enrich/enrich_journal_apc.py](../application/pipeline/enrich/enrich_journal_apc.py)).
+Script : [interfaces/cli/pipeline/enrich_journal_apc.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/pipeline/enrich_journal_apc.py) (orchestration dans [application/pipeline/enrich/enrich_journal_apc.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/application/pipeline/enrich/enrich_journal_apc.py)).
 
 Interroge l'API OpenAlex Sources pour les journaux avec `openalex_id`. Récupère les prix APC catalogue (DOAJ). Met à jour `journals.apc_amount`, `apc_currency`, `is_in_doaj`.
 
@@ -230,7 +230,7 @@ Note : ces données ne sont pas encore exploitées en aval dans l'application.
 
 ### <span id="donnees-rh"></span>Base RH (personnel UCA)
 
-Fichier CSV importé via [interfaces/cli/imports/import_persons.py](../interfaces/cli/imports/import_persons.py) → table `persons_rh`.
+Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/imports/import_persons.py) → table `persons_rh`.
 - Contient : email, nom, prénom, département, rôle, dates de début/fin
 - Rattaché à une personne du référentiel via `persons_rh.person_id`
 - Sert de filtre dans l'annuaire personnes (filtre "Base RH")
@@ -239,7 +239,7 @@ Données fournies par la DPCG le 15/12/2025. La date est documentée dans la col
 
 L'**affiliation** renseignée dans cette source est une chaîne de caractères (`UFR Médecine Pr Paramédic`, `IUT Info 43`) qui ne permet pas un mapping avec les laboratoires. Elle est affichée pour information, mais ne sert pas à créer les liens personne-structure dans l'appli. Les **liens personne-structure** dépendent des [*authorships*](glossaire#authorship).
 
-La [création de personnes](pipeline#creation-personnes) se fait via les authorships des publications, indépendamment de l'existence d'une entrée `person_rh`.
+La [création de personnes](pipeline#persons) se fait via les authorships des publications, indépendamment de l'existence d'une entrée `person_rh`.
 La FK sur la table `person_rh` permet:
 - d'enrichir les données sur les personnes;
 - d'empêcher la suppression de ces personnes (lors de fusions ou de nettoyage en masse des personnes sans authorship UCA).

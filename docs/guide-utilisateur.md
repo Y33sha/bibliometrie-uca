@@ -1,4 +1,4 @@
-# Guide utilisateur — Bibliométrie UCA
+# Guide utilisateur
 
 *A mettre à jour.*
 

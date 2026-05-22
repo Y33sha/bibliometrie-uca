@@ -1,4 +1,4 @@
-# Architecture logicielle — Bibliométrie UCA
+# Architecture logicielle
 
 *Document à jour au 2026-05-21.*
 
