@@ -11,6 +11,7 @@
 	type JournalDetail = components['schemas']['JournalDetailResponse'];
 	type JournalDashboard = components['schemas']['JournalDashboardResponse'];
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
+	type EnumOption = components['schemas']['EnumOption'];
 
 	const journalId = $derived(Number($page.params.id));
 	const activeTab = $derived(
@@ -28,6 +29,8 @@
 	// PublicationsListView n'a pas remonté son total post-filtrage.
 	let pubsTotal = $state(0);
 	let showRawDoaj = $state(false);
+
+	let journalTypeLabels: Record<string, string> = $state({});
 
 	// Sélection des champs DOAJ « lisibles ». Le payload complet est exposé
 	// via le toggle (« Voir payload brut ») pour permettre l'exploration
@@ -71,7 +74,10 @@
 	}
 
 	onMount(async () => {
-		await loadJournal();
+		const labelsP = api<EnumOption[]>('/api/journal-types').then((opts) => {
+			journalTypeLabels = Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
+		});
+		await Promise.all([loadJournal(), labelsP]);
 		if (activeTab === 'dashboard') loadDashboard();
 		await tick();
 	});
@@ -128,7 +134,7 @@
 				{/if}
 				{#if journal.journal_type}
 					<span class="meta-label">Type</span>
-					<span class="type-tag">{journal.journal_type}</span>
+					<span class="type-tag">{journalTypeLabels[journal.journal_type] ?? journal.journal_type}</span>
 				{/if}
 				{#if journal.oa_model}
 					<span class="meta-label">OA</span>

@@ -15,7 +15,7 @@ from application.ports.api.journals_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
-from domain.journals.journal import JOURNAL_TYPES
+from domain.journals.journal import JOURNAL_TYPE_LABELS_FR, JOURNAL_TYPES
 from interfaces.api.deps import (
     audit_repo_sync,
     journal_queries_sync,
@@ -31,17 +31,6 @@ from interfaces.api.models import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
-# Mapping value enum → label FR (concern UI, donc côté router/interfaces, pas domain).
-_JOURNAL_TYPE_LABELS_FR: dict[str, str] = {
-    "journal": "Revue",
-    "proceedings": "Proceedings",
-    "repository": "Archive / dépôt",
-    "book_series": "Série d'ouvrages",
-    "preprint_server": "Serveur de preprints",
-    "media": "Média",
-}
 
 
 @router.get("/api/journals/oa-models", response_model=list[str])
@@ -60,11 +49,12 @@ def list_oa_models(
 def list_journal_types() -> list[EnumOption]:
     """Valeurs possibles de l'enum `journal_type` avec leur label français.
 
-    Source de vérité côté Python : `domain.journals.journal.JOURNAL_TYPES`
-    (test d'intégration `TestJournalTypesEnum` vérifie la cohérence avec l'enum SQL).
-    Sert à alimenter le dropdown de la page admin revues.
+    Source de vérité côté Python : `domain.journals.journal.JOURNAL_TYPES` +
+    `JOURNAL_TYPE_LABELS_FR` (test d'intégration `TestJournalTypesEnum`
+    vérifie la cohérence avec l'enum SQL). Sert à alimenter le dropdown de
+    la page admin revues et la colonne « Type » des pages publiques.
     """
-    return [EnumOption(value=v, label_fr=_JOURNAL_TYPE_LABELS_FR[v]) for v in JOURNAL_TYPES]
+    return [EnumOption(value=v, label_fr=JOURNAL_TYPE_LABELS_FR[v]) for v in JOURNAL_TYPES]
 
 
 @router.get("/api/journals", response_model=JournalListResponse)

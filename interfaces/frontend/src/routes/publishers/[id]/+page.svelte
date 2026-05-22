@@ -45,8 +45,10 @@
 	let journalsLoaded = $state(false);
 	const JOURNALS_PER_PAGE = 50;
 
-	// Labels FR des publisher_type, alimentés par /api/publisher-types.
+	// Labels FR des publisher_type / journal_type, alimentés par les endpoints
+	// /api/publisher-types et /api/journal-types (source de vérité côté domain).
 	let publisherTypeLabels: Record<string, string> = $state({});
+	let journalTypeLabels: Record<string, string> = $state({});
 
 	async function loadPublisher() {
 		try {
@@ -57,9 +59,13 @@
 		}
 	}
 
-	async function loadPublisherTypeLabels() {
-		const opts = await api<EnumOption[]>('/api/publisher-types');
-		publisherTypeLabels = Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
+	async function loadTypeLabels() {
+		const [pubOpts, jOpts] = await Promise.all([
+			api<EnumOption[]>('/api/publisher-types'),
+			api<EnumOption[]>('/api/journal-types')
+		]);
+		publisherTypeLabels = Object.fromEntries(pubOpts.map((o) => [o.value, o.label_fr]));
+		journalTypeLabels = Object.fromEntries(jOpts.map((o) => [o.value, o.label_fr]));
 	}
 
 	async function loadDashboard() {
@@ -99,7 +105,7 @@
 	}
 
 	onMount(async () => {
-		await Promise.all([loadPublisher(), loadPublisherTypeLabels()]);
+		await Promise.all([loadPublisher(), loadTypeLabels()]);
 		if (activeTab === 'dashboard') loadDashboard();
 		if (activeTab === 'journals') loadJournals();
 		await tick();
@@ -182,7 +188,7 @@
 								<tbody>
 									{#each dashboard.journal_types as j (j.journal_type ?? '∅')}
 										<tr>
-											<td>{j.journal_type ?? '(non renseigné)'}</td>
+											<td>{j.journal_type ? (journalTypeLabels[j.journal_type] ?? j.journal_type) : '(non renseigné)'}</td>
 											<td class="num">{j.count}</td>
 										</tr>
 									{/each}
@@ -209,7 +215,7 @@
 						{/if}
 					</div>
 
-					<div class="dash-card dash-card-wide">
+					<div class="dash-card">
 						<h3>Statuts Open Access</h3>
 						{#if dashboard.oa_statuses.length === 0}
 							<p class="muted">Aucune publication rattachée.</p>
@@ -270,7 +276,7 @@
 									{#if j.is_in_doaj}<span class="badge-doaj">DOAJ</span>{/if}
 								</td>
 								<td class="issn-cell">{formatJournalIssns(j)}</td>
-								<td class="muted">{j.journal_type ?? ''}</td>
+								<td class="muted">{j.journal_type ? (journalTypeLabels[j.journal_type] ?? j.journal_type) : ''}</td>
 								<td class="num">{j.pub_count.toLocaleString('fr-FR')}</td>
 							</tr>
 						{/each}
@@ -336,7 +342,7 @@
 	.loading, .no-results { padding: 20px; color: var(--muted); }
 
 	.dash-grid {
-		display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+		display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;
 	}
 	.dash-card-wide { grid-column: 1 / -1; }
 	.dash-card {
