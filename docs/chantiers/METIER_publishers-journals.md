@@ -130,12 +130,12 @@ Implémentation envisagée :
 
 Routes publiques en anglais, cohérentes avec le reste du projet (`/laboratories`, `/persons`, `/publications`, `/subjects`).
 
-- [ ] **Refonte du menu** : regrouper Éditeurs / Revues / Sujets dans un dropdown unique « Référentiels » pour éviter la surcharge du menu principal.
+- [x] **Refonte du menu** (partiel) : dropdown « Référentiels » côté public avec Revues + Sujets. Éditeurs s'ajoutera quand la page sera livrée.
 - [ ] **Page `/publishers`** : liste paginée, facettes `publisher_type`, `country`, `is_predatory`. Tri par nb de publis, alphabétique.
 - [ ] **Page `/publishers/{id}`** : détail (description, type, pays, indicateurs), liste de publis (paginée, facettes existantes), liste de revues affiliées.
-- [ ] **Page `/journals`** : liste paginée, facettes `journal_type`, `is_in_doaj`, `oa_model`, publisher.
+- [x] **Page `/journals`** : recherche, facettes `journal_type` / `is_in_doaj` / `oa_model`, tri (titre / publis / éditeur), pagination. Filtre `publisher` différé (demanderait un autocomplete).
 - [x] **Page `/journals/{id}`** : header métadonnées + onglets Dashboard (distributions doc_type, oa_status, sujets dominants, données DOAJ) / Publications (`PublicationsListView` filtré). Charts et nuages de mots à venir quand l'usage validera ce qui mérite une visualisation. Incohérences détectées (Phase 4) viendront s'ancrer ici une fois les règles posées.
-- [x] **Endpoint API publics** revues : `GET /api/journals/{id}` (detail enrichi), `/api/journals/{id}/dashboard`, `/api/journals/{id}/subjects`. Éditeurs : à venir.
+- [x] **Endpoint API publics** revues : `GET /api/journals/{id}` (detail enrichi), `/api/journals/{id}/dashboard`, `/api/journals/{id}/subjects`, `/api/journals/oa-models`. Éditeurs : à venir.
 
 ## Questions ouvertes (au-delà des décisions à trancher en amont)
 

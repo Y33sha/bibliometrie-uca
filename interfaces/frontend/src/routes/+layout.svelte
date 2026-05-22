@@ -20,12 +20,16 @@
   );
   const isDuplicates = $derived($page.url.pathname === base + "/admin/duplicates" || $page.url.pathname === base + "/admin/person-duplicates");
   const isHalProblems = $derived($page.url.pathname.startsWith(base + "/hal-problems"));
+  const isPublicReferentiels = $derived(
+    isActive("/journals") || isActive("/subjects"),
+  );
 
   let pipelineDropdownOpen = $state(false);
   let dropdownOpen = $state(false);
   let refDropdownOpen = $state(false);
   let dupDropdownOpen = $state(false);
   let halDropdownOpen = $state(false);
+  let publicRefDropdownOpen = $state(false);
 
   function isActive(path: string): boolean {
     const current = $page.url.pathname;
@@ -108,7 +112,21 @@
       <a href="{base}/theses" class="nav-link" class:active={isActive("/theses")}>Thèses</a>
       <a href="{base}/laboratories" class="nav-link" class:active={isActive("/laboratories")}>Laboratoires</a>
       <a href="{base}/persons" class="nav-link" class:active={isActive("/persons")}>Personnes</a>
-      <a href="{base}/subjects" class="nav-link" class:active={isActive("/subjects")}>Sujets</a>
+      <div
+        class="nav-dropdown"
+        role="navigation"
+        class:active={isPublicReferentiels}
+        onmouseenter={() => (publicRefDropdownOpen = true)}
+        onmouseleave={() => (publicRefDropdownOpen = false)}
+      >
+        <button class="nav-link" class:active={isPublicReferentiels}>Référentiels &#x25BE;</button>
+        {#if publicRefDropdownOpen}
+          <div class="nav-dropdown-menu">
+            <a href="{base}/journals" class:active={isActive("/journals")}>Revues</a>
+            <a href="{base}/subjects" class:active={isActive("/subjects")}>Sujets</a>
+          </div>
+        {/if}
+      </div>
       <div class="nav-dropdown" role="navigation" class:active={isHalProblems} onmouseenter={() => (halDropdownOpen = true)} onmouseleave={() => (halDropdownOpen = false)}>
         <button class="nav-link" class:active={isHalProblems}>Problèmes HAL &#x25BE;</button>
         {#if halDropdownOpen}

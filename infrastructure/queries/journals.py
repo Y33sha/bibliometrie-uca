@@ -37,6 +37,9 @@ class PgJournalQueries(JournalQueries):
         *,
         search: str | None,
         publisher_id: int | None,
+        journal_type: str | None,
+        is_in_doaj: bool | None,
+        oa_model: str | None,
         sort: str,
         page: int,
         per_page: int,
@@ -49,6 +52,15 @@ class PgJournalQueries(JournalQueries):
         if publisher_id:
             parts.append("j.publisher_id = :publisher_id")
             binds["publisher_id"] = publisher_id
+        if journal_type:
+            parts.append("j.journal_type = :journal_type")
+            binds["journal_type"] = journal_type
+        if is_in_doaj is not None:
+            parts.append("j.is_in_doaj = :is_in_doaj")
+            binds["is_in_doaj"] = is_in_doaj
+        if oa_model:
+            parts.append("j.oa_model = :oa_model")
+            binds["oa_model"] = oa_model
         where = " AND ".join(parts) if parts else "TRUE"
 
         total_row = self._conn.execute(
@@ -213,3 +225,14 @@ class PgJournalQueries(JournalQueries):
             return set()
         result = self._conn.execute(select(t_journals.c.id).where(t_journals.c.id.in_(journal_ids)))
         return {row.id for row in result}
+
+    def distinct_oa_models(self) -> list[str]:
+        rows = self._conn.execute(
+            text("""
+                SELECT oa_model FROM journals
+                WHERE oa_model IS NOT NULL
+                GROUP BY oa_model
+                ORDER BY COUNT(*) DESC
+            """)
+        ).all()
+        return [r.oa_model for r in rows]

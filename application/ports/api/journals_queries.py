@@ -111,6 +111,9 @@ class JournalQueries(Protocol):
         *,
         search: str | None,
         publisher_id: int | None,
+        journal_type: str | None,
+        is_in_doaj: bool | None,
+        oa_model: str | None,
         sort: str,
         page: int,
         per_page: int,
@@ -123,3 +126,5 @@ class JournalQueries(Protocol):
     def get_journal_subjects(self, journal_id: int, *, limit: int) -> list[SubjectFrequency]: ...
 
     def existing_journal_ids(self, journal_ids: tuple[int, ...]) -> set[int]: ...
+
+    def distinct_oa_models(self) -> list[str]: ...
