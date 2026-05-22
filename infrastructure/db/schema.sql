@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict h1oBOEbPaJsChm1DlIaXSpdc9aAzp3OI7GxMn1bwXfavHt0Og7xT2hfBdV9FFcm
+\restrict YKVNCMt822qyVa3txL0MffhWKFhkcK8mGNuOI4iEA9BvPInoqGEPiU1yXSvyyHo
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
@@ -643,7 +643,9 @@ CREATE TABLE public.journals (
     updated_at timestamp with time zone DEFAULT now(),
     journal_type public.journal_type DEFAULT 'journal'::public.journal_type,
     is_academic boolean DEFAULT true,
-    doi_prefix text
+    doi_prefix text,
+    doaj_payload jsonb,
+    doaj_imported_at timestamp with time zone
 );
 
 
@@ -2869,4 +2871,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict h1oBOEbPaJsChm1DlIaXSpdc9aAzp3OI7GxMn1bwXfavHt0Og7xT2hfBdV9FFcm
+\unrestrict YKVNCMt822qyVa3txL0MffhWKFhkcK8mGNuOI4iEA9BvPInoqGEPiU1yXSvyyHo
