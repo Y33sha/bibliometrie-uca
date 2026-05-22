@@ -7,10 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from application.journals import merge_journals
 from application.journals import update_journal as _update_journal
 from application.ports.api.journals_queries import (
-    JournalBasic,
+    JournalDashboardResponse,
+    JournalDetailResponse,
     JournalListResponse,
     JournalQueries,
 )
+from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from domain.journals.journal import JOURNAL_TYPES
@@ -78,16 +80,52 @@ def list_journals(
     )
 
 
-@router.get("/api/journals/{journal_id}", response_model=JournalBasic)
+@router.get("/api/journals/{journal_id}", response_model=JournalDetailResponse)
 def get_journal(
     journal_id: int,
     queries: JournalQueries = Depends(journal_queries_sync),
-) -> JournalBasic:
-    """Récupère une revue par son id (titre uniquement). 404 si inconnue."""
-    row = queries.get_journal(journal_id)
+) -> JournalDetailResponse:
+    """Profil complet d'une revue pour la page publique `/journals/[id]`.
+
+    Inclut métadonnées + payload DOAJ brut + date d'import DOAJ + nombre de
+    publications rattachées. 404 si la revue est inconnue.
+    """
+    row = queries.get_journal_detail(journal_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Revue introuvable")
     return row
+
+
+@router.get("/api/journals/{journal_id}/dashboard", response_model=JournalDashboardResponse)
+def get_journal_dashboard(
+    journal_id: int,
+    queries: JournalQueries = Depends(journal_queries_sync),
+) -> JournalDashboardResponse:
+    """Agrégats des publications de la revue (distribution `doc_type` + `oa_status`).
+
+    Sert l'onglet « Dashboard » de la page publique d'une revue pour repérer
+    visuellement les incohérences (ex. `article` sur un journal_type
+    `proceedings`). 404 si la revue est inconnue.
+    """
+    result = queries.get_journal_dashboard(journal_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Revue introuvable")
+    return result
+
+
+@router.get("/api/journals/{journal_id}/subjects", response_model=list[SubjectFrequency])
+def get_journal_subjects(
+    journal_id: int,
+    limit: int = Query(30, ge=1, le=200),
+    queries: JournalQueries = Depends(journal_queries_sync),
+) -> list[SubjectFrequency]:
+    """Top sujets des publications de la revue (pour l'onglet Dashboard).
+
+    Exclut les sujets trop génériques (`usage_count > 5000`) pour ne pas
+    noyer le top-N. Retourne une liste vide si la revue existe sans
+    publications taggées (pas de 404 pour rester idempotent à l'usage UI).
+    """
+    return queries.get_journal_subjects(journal_id, limit=limit)
 
 
 @router.put("/api/journals/{journal_id}", response_model=OkResponse)
