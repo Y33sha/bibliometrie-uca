@@ -6,6 +6,7 @@ Séparé de `application/journals.py` (principe SRP) : publishers et journals so
 La fusion d'éditeurs (`merge_publishers`) reste ici parce que sémantiquement c'est une opération sur l'agrégat Publisher ; elle a besoin du port `JournalRepository` en complément pour détecter les journaux à conflit entre les deux éditeurs à fusionner avant de déléguer les transferts SQL.
 """
 
+from collections import Counter
 from typing import cast
 
 from application.audit import emit_event
@@ -118,28 +119,38 @@ def merge_publishers(
         raise ConflictError("Impossible de fusionner un éditeur avec lui-même")
 
     # 1. Détecter les journaux partageant un titre entre les deux éditeurs.
-    #    Collecter toutes les paires bloquantes (ISSN divergents) en une passe
-    #    pour qu'on lève PublisherMergeBlockedError avec l'ensemble — l'UI peut
-    #    alors les afficher d'un coup au lieu d'itérer.
+    #    Collecter toutes les paires bloquantes en une passe pour lever
+    #    PublisherMergeBlockedError avec l'ensemble — l'UI les affiche
+    #    d'un coup.
     pairs = journal_repo.find_shared_title_journal_pairs(target_id, source_id)
+    # Si un journal apparaît dans plusieurs paires, le publisher correspondant
+    # contient un doublon interne (2 journaux au même title_normalized). La
+    # fusion N→1 casserait (le source serait supprimé puis re-fetchée). On
+    # flagge toutes les paires concernées comme blockers.
+    target_seen = Counter(p["target_journal_id"] for p in pairs)
+    source_seen = Counter(p["source_journal_id"] for p in pairs)
     blockers: list[BlockingJournal] = []
     mergeable_pairs = []
     for pair in pairs:
-        reason = None
+        reasons: list[str] = []
+        if target_seen[pair["target_journal_id"]] > 1:
+            reasons.append("doublon interne dans l'éditeur cible (titre dédupliqué)")
+        if source_seen[pair["source_journal_id"]] > 1:
+            reasons.append("doublon interne dans l'éditeur source (titre dédupliqué)")
         for field in ("issn", "eissn", "issnl"):
             tv = pair[f"t_{field}"]
             sv = pair[f"s_{field}"]
             if tv and sv and tv != sv:
-                reason = f"{field.upper()} différents : {tv} (cible) vs {sv} (source)"
+                reasons.append(f"{field.upper()} différents : {tv} (cible) vs {sv} (source)")
                 break
-        if reason:
+        if reasons:
             blockers.append(
                 BlockingJournal(
                     target_journal_id=pair["target_journal_id"],
                     target_title=pair["t_title"],
                     source_journal_id=pair["source_journal_id"],
                     source_title=pair["s_title"],
-                    reason=reason,
+                    reason=" ; ".join(reasons),
                 )
             )
         else:
