@@ -133,6 +133,7 @@ class JournalQueries(Protocol):
         journal_type: str | None,
         is_in_doaj: bool | None,
         oa_model: str | None,
+        with_pubs: bool,
         sort: str,
         page: int,
         per_page: int,

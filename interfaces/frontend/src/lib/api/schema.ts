@@ -2081,6 +2081,10 @@ export interface paths {
          *       < 2 caractères.
          *     - `publisher_type` / `country` : égalité stricte.
          *     - `is_predatory` : booléen (true/false). Omettre = pas de filtre.
+         *     - `with_pubs` : si true, n'expose que les éditeurs avec au moins 1
+         *       publication rattachée (via leurs revues). Utilisé par la page
+         *       publique /publishers pour masquer les éditeurs orphelins. L'admin
+         *       garde l'option de tout voir (défaut false).
          *
          *     `sort` : `name` / `-name` / `journals` / `-journals` / `pubs` /
          *     `-pubs` ; fallback sur `name` si inconnu.
@@ -2258,6 +2262,10 @@ export interface paths {
          *       < 2 caractères.
          *     - `publisher_id` / `journal_type` / `oa_model` : égalité stricte.
          *     - `is_in_doaj` : booléen (true/false). Omettre = pas de filtre.
+         *     - `with_pubs` : si true, n'expose que les revues avec au moins 1
+         *       publication rattachée. Utilisé par la page publique /journals pour
+         *       masquer les revues orphelines (résiduels de pipeline ou imports
+         *       sans match). L'admin garde l'option de tout voir (défaut false).
          *
          *     `sort` : `title` / `-title` / `publisher` / `-publisher` /
          *     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
@@ -2964,19 +2972,13 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
-         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
-         *     Permet au frontend de styler les inattendus en warning.
+         * @description Compteur de publications par `doc_type` pour un éditeur.
          */
         DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
         };
         /**
          * DoiPrefixInfo
@@ -3403,7 +3405,7 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["application__ports__api__journals_queries__OaStatusCount"][];
             /** Expected Doc Types */
@@ -4963,7 +4965,7 @@ export interface components {
             /** Journal Types */
             journal_types: components["schemas"]["JournalTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["OaStatusCount"][];
         };
@@ -5626,6 +5628,22 @@ export interface components {
             no: number;
         };
         /**
+         * DocTypeCount
+         * @description Compteur de publications par `doc_type` pour une revue.
+         *
+         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
+         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
+         *     Permet au frontend de styler les inattendus en warning.
+         */
+        application__ports__api__journals_queries__DocTypeCount: {
+            /** Doc Type */
+            doc_type: string | null;
+            /** Count */
+            count: number;
+            /** Expected */
+            expected: boolean;
+        };
+        /**
          * OaStatusCount
          * @description Compteur de publications par `oa_status` pour une revue.
          *
@@ -5639,16 +5657,6 @@ export interface components {
             count: number;
             /** Expected */
             expected: boolean;
-        };
-        /**
-         * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour un éditeur.
-         */
-        application__ports__api__publishers_queries__DocTypeCount: {
-            /** Doc Type */
-            doc_type: string | null;
-            /** Count */
-            count: number;
         };
     };
     responses: never;
@@ -8955,6 +8963,7 @@ export interface operations {
                 publisher_type?: string | null;
                 country?: string | null;
                 is_predatory?: boolean | null;
+                with_pubs?: boolean;
                 sort?: string;
             };
             header?: never;
@@ -9198,6 +9207,7 @@ export interface operations {
                 journal_type?: string | null;
                 is_in_doaj?: boolean | null;
                 oa_model?: string | null;
+                with_pubs?: boolean;
                 sort?: string;
             };
             header?: never;

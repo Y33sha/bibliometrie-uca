@@ -128,6 +128,28 @@ class TestListJournals:
         flags = {j["is_in_doaj"] for j in r.json()["journals"]}
         assert flags == {True}
 
+    def test_with_pubs_excludes_orphan_journals(self, client):
+        # Revue sans publi rattachée → exclue si with_pubs=true.
+        _seed_journal("OrphanJournal")
+        with_data = _seed_journal("WithPubsJournal")
+        with _pool() as cur:
+            cur.execute(
+                "INSERT INTO publications (title, pub_year, journal_id) VALUES ('p1', 2024, %s)",
+                (with_data,),
+            )
+        r = client.get("/api/journals", params={"with_pubs": "true", "per_page": 200})
+        assert r.status_code == 200
+        titles = {j["title"] for j in r.json()["journals"]}
+        assert "WithPubsJournal" in titles
+        assert "OrphanJournal" not in titles
+
+    def test_with_pubs_default_false_includes_orphans(self, client):
+        _seed_journal("OrphanDefaultJournal")
+        r = client.get("/api/journals", params={"per_page": 200})
+        assert r.status_code == 200
+        titles = {j["title"] for j in r.json()["journals"]}
+        assert "OrphanDefaultJournal" in titles
+
     def test_filter_by_oa_model(self, client):
         jid = _seed_journal()
         with _pool() as cur:

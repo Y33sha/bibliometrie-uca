@@ -46,6 +46,7 @@ class PgJournalQueries(JournalQueries):
         journal_type: str | None,
         is_in_doaj: bool | None,
         oa_model: str | None,
+        with_pubs: bool,
         sort: str,
         page: int,
         per_page: int,
@@ -67,6 +68,8 @@ class PgJournalQueries(JournalQueries):
         if oa_model:
             parts.append("j.oa_model = :oa_model")
             binds["oa_model"] = oa_model
+        if with_pubs:
+            parts.append("EXISTS (SELECT 1 FROM publications pub WHERE pub.journal_id = j.id)")
         where = " AND ".join(parts) if parts else "TRUE"
 
         total_row = self._conn.execute(

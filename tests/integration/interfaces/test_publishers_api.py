@@ -164,6 +164,31 @@ class TestListPublishers:
         countries = {p["country"] for p in r.json()["publishers"]}
         assert countries == {country}
 
+    def test_with_pubs_excludes_orphan_publishers(self, client):
+        # Éditeur sans aucune publi rattachée → exclu si with_pubs=true.
+        _seed_publisher("OrphanPub")
+        # Éditeur avec une revue et une publi → inclus.
+        with_data = _seed_publisher("WithPubsPub")
+        jid = _seed_journal(with_data)
+        with _pool() as cur:
+            cur.execute(
+                "INSERT INTO publications (title, pub_year, journal_id) VALUES ('p1', 2024, %s)",
+                (jid,),
+            )
+        r = client.get("/api/publishers", params={"with_pubs": "true", "per_page": 200})
+        assert r.status_code == 200
+        names = {p["name"] for p in r.json()["publishers"]}
+        assert "WithPubsPub" in names
+        assert "OrphanPub" not in names
+
+    def test_with_pubs_default_false_includes_orphans(self, client):
+        # Sans le flag, on liste tout comme avant.
+        _seed_publisher("OrphanDefault")
+        r = client.get("/api/publishers", params={"per_page": 200})
+        assert r.status_code == 200
+        names = {p["name"] for p in r.json()["publishers"]}
+        assert "OrphanDefault" in names
+
     def test_filter_by_is_predatory(self, client):
         pid = _seed_publisher()
         with _pool() as cur:

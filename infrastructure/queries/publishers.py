@@ -57,6 +57,7 @@ class PgPublisherQueries(PublisherQueries):
         publisher_type: str | None,
         country: str | None,
         is_predatory: bool | None,
+        with_pubs: bool,
         sort: str,
         page: int,
         per_page: int,
@@ -75,6 +76,14 @@ class PgPublisherQueries(PublisherQueries):
         if is_predatory is not None:
             parts.append("p.is_predatory = :is_predatory")
             binds["is_predatory"] = is_predatory
+        if with_pubs:
+            parts.append(
+                "EXISTS ("
+                " SELECT 1 FROM publications pub"
+                " JOIN journals j ON j.id = pub.journal_id"
+                " WHERE j.publisher_id = p.id"
+                ")"
+            )
         where = " AND ".join(parts) if parts else "TRUE"
 
         total_row = self._conn.execute(
