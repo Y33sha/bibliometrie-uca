@@ -14,7 +14,6 @@
 	let search = $state('');
 	let publisherType = $state('');
 	let country = $state('');
-	let isPredatory = $state(''); // '', 'true', 'false'
 	let sort = $state('-pubs');
 	let page = $state(1);
 
@@ -32,7 +31,6 @@
 			if (q.length >= 2) params.set('search', q);
 			if (publisherType) params.set('publisher_type', publisherType);
 			if (country) params.set('country', country);
-			if (isPredatory) params.set('is_predatory', isPredatory);
 			params.set('sort', sort);
 			params.set('page', String(page));
 			params.set('per_page', String(PER_PAGE));
@@ -122,14 +120,6 @@
 			{#each countries as c (c)}
 				<option value={c}>{c}</option>
 			{/each}
-		</select>
-	</label>
-	<label>
-		Prédateur
-		<select bind:value={isPredatory} onchange={onFilterChange}>
-			<option value="">Tous</option>
-			<option value="true">Oui</option>
-			<option value="false">Non</option>
 		</select>
 	</label>
 	<span class="spacer"></span>
