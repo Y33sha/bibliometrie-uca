@@ -7,6 +7,8 @@ des préfixes résolus.
 
 from sqlalchemy import Connection, text
 
+from application.ports.repositories.doi_prefix_repository import UnmatchedCrossrefPrefix
+
 
 class PgDoiPrefixRepository:
     """Accès PostgreSQL à `doi_prefixes` via une `Connection` SA."""
@@ -96,3 +98,34 @@ class PgDoiPrefixRepository:
             },
         )
         return result.rowcount > 0
+
+    def get_unmatched_crossref_prefixes(self) -> list[UnmatchedCrossrefPrefix]:
+        """Rows connues de Crossref mais sans publisher_id, ordre par prefix ASC."""
+        result = self._conn.execute(
+            text(
+                """
+                SELECT prefix, publisher_name_raw, publisher_name_normalized,
+                       crossref_member_id
+                FROM doi_prefixes
+                WHERE publisher_id IS NULL
+                  AND publisher_name_normalized IS NOT NULL
+                ORDER BY prefix
+                """
+            )
+        )
+        return [
+            UnmatchedCrossrefPrefix(
+                prefix=r.prefix,
+                publisher_name_raw=r.publisher_name_raw,
+                publisher_name_normalized=r.publisher_name_normalized,
+                crossref_member_id=r.crossref_member_id,
+            )
+            for r in result
+        ]
+
+    def update_publisher_id(self, prefix: str, publisher_id: int) -> None:
+        """Rattache un préfixe existant à un publisher (passe de rattrapage)."""
+        self._conn.execute(
+            text("UPDATE doi_prefixes SET publisher_id = :pid WHERE prefix = :prefix"),
+            {"pid": publisher_id, "prefix": prefix},
+        )

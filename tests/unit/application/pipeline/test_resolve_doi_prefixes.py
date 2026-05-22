@@ -10,6 +10,7 @@ import logging
 from dataclasses import dataclass, field
 
 from application.pipeline.resolve_doi_prefixes import run_resolve_doi_prefixes
+from application.ports.repositories.doi_prefix_repository import UnmatchedCrossrefPrefix
 
 
 @dataclass
@@ -17,7 +18,9 @@ class FakeDoiPrefixRepo:
     """Repo de test : on lui fournit les préfixes à résoudre, on collecte les inserts."""
 
     unresolved: list[tuple[str, list[str]]] = field(default_factory=list)
+    unmatched_existing: list[UnmatchedCrossrefPrefix] = field(default_factory=list)
     inserted: list[dict] = field(default_factory=list)
+    updates: list[tuple[str, int]] = field(default_factory=list)
 
     def get_unresolved_prefixes_with_samples(
         self, *, n_samples_per_prefix: int
@@ -46,31 +49,47 @@ class FakeDoiPrefixRepo:
         )
         return True
 
+    def get_unmatched_crossref_prefixes(self) -> list[UnmatchedCrossrefPrefix]:
+        return list(self.unmatched_existing)
+
+    def update_publisher_id(self, prefix: str, publisher_id: int) -> None:
+        self.updates.append((prefix, publisher_id))
+
 
 @dataclass
 class FakePublisherRepo:
-    """Repo publisher minimal : `find_publisher_by_name_form` est servi
-    par un dict configurable."""
+    """Repo publisher minimal pour les passes 1 et 2.
+
+    `find_publisher_by_name_form` lit `name_to_id` ; `create_publisher`
+    incrémente un compteur d'id ; `add_publisher_name_form` enrichit
+    `name_to_id` pour que les appels suivants dans la même run retombent
+    sur le publisher fraîchement créé (dédoublonnage naturel).
+    """
 
     name_to_id: dict[str, int] = field(default_factory=dict)
+    created: list[dict] = field(default_factory=list)
+    _next_id: int = 1000
 
     def find_publisher_by_name_form(self, form_normalized: str) -> int | None:
         return self.name_to_id.get(form_normalized)
 
+    def create_publisher(self, *, name: str, name_normalized: str, openalex_id):
+        new_id = self._next_id
+        self._next_id += 1
+        self.created.append({"id": new_id, "name": name, "name_normalized": name_normalized})
+        return new_id
+
+    def add_publisher_name_form(self, publisher_id: int, form_normalized: str) -> None:
+        self.name_to_id[form_normalized] = publisher_id
+
     # Méthodes non utilisées par la phase mais présentes au Protocol.
     def find_by_id(self, publisher_id):  # pragma: no cover
-        raise NotImplementedError
-
-    def add_publisher_name_form(self, publisher_id, form_normalized):  # pragma: no cover
         raise NotImplementedError
 
     def find_publisher_by_openalex_id(self, openalex_id):  # pragma: no cover
         raise NotImplementedError
 
     def set_publisher_openalex_id_if_missing(self, publisher_id, openalex_id):  # pragma: no cover
-        raise NotImplementedError
-
-    def create_publisher(self, *, name, name_normalized, openalex_id):  # pragma: no cover
         raise NotImplementedError
 
     def publisher_exists(self, publisher_id):  # pragma: no cover
@@ -141,8 +160,9 @@ def test_crossref_prefix_matched_publisher():
     assert metrics.extras.get("crossref_matched") == 1
 
 
-def test_crossref_prefix_unmatched_publisher():
-    """Le préfixe Crossref est résolu mais le name n'a aucun matching publisher."""
+def test_crossref_prefix_no_match_creates_publisher():
+    """Aucun publisher existant → on crée le publisher depuis le nom Crossref
+    plutôt que de laisser publisher_id NULL."""
     repo = FakeDoiPrefixRepo(unresolved=[("10.99999", ["10.99999/x"])])
     pubrepo = FakePublisherRepo(name_to_id={})
     ra = StubResolveRa(answers={"10.99999/x": "Crossref"})
@@ -150,13 +170,97 @@ def test_crossref_prefix_unmatched_publisher():
 
     metrics = _run(repo, pubrepo, ra, cr)
 
+    assert len(pubrepo.created) == 1
+    new_pub = pubrepo.created[0]
+    assert new_pub["name"] == "Obscure Publisher"
+    assert new_pub["name_normalized"] == "obscure publisher"
+    # La forme normalisée est ajoutée → futurs matches retombent dessus.
+    assert pubrepo.name_to_id["obscure publisher"] == new_pub["id"]
+
     row = repo.inserted[0]
-    assert row["publisher_id"] is None
+    assert row["publisher_id"] == new_pub["id"]
     assert row["publisher_name_raw"] == "Obscure Publisher"
     assert row["publisher_name_normalized"] == "obscure publisher"
     assert row["crossref_member_id"] == 12345
-    assert metrics.extras.get("crossref_unmatched") == 1
+    assert metrics.extras.get("crossref_created") == 1
     assert metrics.extras.get("crossref_matched", 0) == 0
+
+
+def test_two_prefixes_same_name_dedup_via_name_form_cache():
+    """Deux préfixes différents avec le même nom Crossref → un seul publisher créé,
+    le 2e retombe dessus via le name_form fraîchement ajouté."""
+    repo = FakeDoiPrefixRepo(unresolved=[("10.aaaa", ["10.aaaa/x"]), ("10.bbbb", ["10.bbbb/x"])])
+    pubrepo = FakePublisherRepo()
+    ra = StubResolveRa(answers={"10.aaaa/x": "Crossref", "10.bbbb/x": "Crossref"})
+    cr = StubCrossref(
+        answers={
+            "10.aaaa": ("Wiley & Sons", 311),
+            "10.bbbb": ("Wiley & Sons", 311),
+        }
+    )
+
+    metrics = _run(repo, pubrepo, ra, cr)
+
+    assert len(pubrepo.created) == 1, "publisher unique attendu"
+    created_id = pubrepo.created[0]["id"]
+    assert repo.inserted[0]["publisher_id"] == created_id
+    assert repo.inserted[1]["publisher_id"] == created_id
+    assert metrics.extras.get("crossref_created") == 1
+    assert metrics.extras.get("crossref_matched") == 1
+
+
+# ── Passe 2 : rattrapage des rows existantes ───────────────────────
+
+
+def test_pass_2_creates_publisher_for_existing_unmatched():
+    """Une row doi_prefixes connue de Crossref sans publisher_id → crée le publisher
+    et UPDATE la row."""
+    repo = FakeDoiPrefixRepo(
+        unmatched_existing=[
+            UnmatchedCrossrefPrefix(
+                prefix="10.5433",
+                publisher_name_raw="Universidade Estadual de Londrina",
+                publisher_name_normalized="universidade estadual de londrina",
+                crossref_member_id=4567,
+            )
+        ]
+    )
+    pubrepo = FakePublisherRepo()
+    ra = StubResolveRa()
+    cr = StubCrossref()
+
+    metrics = _run(repo, pubrepo, ra, cr)
+
+    assert len(pubrepo.created) == 1
+    new_id = pubrepo.created[0]["id"]
+    assert repo.updates == [("10.5433", new_id)]
+    assert metrics.extras.get("retried") == 1
+    assert metrics.extras.get("crossref_created") == 1
+
+
+def test_pass_2_matches_existing_publisher_no_creation():
+    """Si un publisher est apparu en base depuis le run précédent, la passe 2
+    rattache la row existante sans créer."""
+    repo = FakeDoiPrefixRepo(
+        unmatched_existing=[
+            UnmatchedCrossrefPrefix(
+                prefix="10.1234",
+                publisher_name_raw="Acme Publishing",
+                publisher_name_normalized="acme publishing",
+                crossref_member_id=None,
+            )
+        ]
+    )
+    pubrepo = FakePublisherRepo(name_to_id={"acme publishing": 777})
+    ra = StubResolveRa()
+    cr = StubCrossref()
+
+    metrics = _run(repo, pubrepo, ra, cr)
+
+    assert pubrepo.created == []
+    assert repo.updates == [("10.1234", 777)]
+    assert metrics.extras.get("crossref_matched") == 1
+    assert metrics.extras.get("crossref_created", 0) == 0
 
 
 def test_datacite_prefix_no_publisher_lookup():
