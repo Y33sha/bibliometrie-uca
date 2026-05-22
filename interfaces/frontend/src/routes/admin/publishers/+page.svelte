@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { base } from '$app/paths';
 	import { api, ApiError, publishers as publishersApi } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -147,7 +148,7 @@
 		{#each publishers as pub (pub.id)}
 			<tr class:predatory={pub.is_predatory}>
 				<td>
-					<span class="pub-name">{pub.name}</span>
+					<a href="{base}/publishers/{pub.id}" class="pub-name">{pub.name}</a>
 					{#if pub.is_predatory}<span class="badge-pred">prédateur</span>{/if}
 				</td>
 				<td class="muted">{pub.country || ''}</td>
@@ -231,7 +232,8 @@
 	.sortable { cursor: pointer; user-select: none; }
 	.sortable:hover { color: var(--accent); }
 
-	.pub-name { font-weight: 500; }
+	.pub-name { font-weight: 500; color: var(--accent); text-decoration: none; }
+	.pub-name:hover { text-decoration: underline; }
 	.muted { color: var(--muted); font-size: 0.85rem; }
 	.predatory td { background: #fff0f0; }
 	.badge-pred { font-size: 0.7rem; padding: 1px 5px; background: #d32f2f; color: white; border-radius: 8px; margin-left: 6px; }
