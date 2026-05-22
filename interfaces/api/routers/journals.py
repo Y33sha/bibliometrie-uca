@@ -76,6 +76,7 @@ def list_journals(
     journal_type: str | None = None,
     is_in_doaj: bool | None = None,
     oa_model: str | None = None,
+    with_pubs: bool = False,
     sort: str = "title",
     queries: JournalQueries = Depends(journal_queries_sync),
 ) -> JournalListResponse:
@@ -86,6 +87,10 @@ def list_journals(
       < 2 caractères.
     - `publisher_id` / `journal_type` / `oa_model` : égalité stricte.
     - `is_in_doaj` : booléen (true/false). Omettre = pas de filtre.
+    - `with_pubs` : si true, n'expose que les revues avec au moins 1
+      publication rattachée. Utilisé par la page publique /journals pour
+      masquer les revues orphelines (résiduels de pipeline ou imports
+      sans match). L'admin garde l'option de tout voir (défaut false).
 
     `sort` : `title` / `-title` / `publisher` / `-publisher` /
     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
@@ -96,6 +101,7 @@ def list_journals(
         journal_type=journal_type,
         is_in_doaj=is_in_doaj,
         oa_model=oa_model,
+        with_pubs=with_pubs,
         sort=sort,
         page=page,
         per_page=per_page,

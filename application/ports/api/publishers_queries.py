@@ -98,6 +98,7 @@ class PublisherQueries(Protocol):
         publisher_type: str | None,
         country: str | None,
         is_predatory: bool | None,
+        with_pubs: bool,
         sort: str,
         page: int,
         per_page: int,

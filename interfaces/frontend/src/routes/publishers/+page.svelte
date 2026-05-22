@@ -31,6 +31,7 @@
 			if (q.length >= 2) params.set('search', q);
 			if (publisherType) params.set('publisher_type', publisherType);
 			if (country) params.set('country', country);
+			params.set('with_pubs', 'true');
 			params.set('sort', sort);
 			params.set('page', String(page));
 			params.set('per_page', String(PER_PAGE));
@@ -137,6 +138,7 @@
 				</th>
 				<th>Type</th>
 				<th>Pays</th>
+				<th>Préfixes DOI</th>
 				<th class="num sortable" onclick={() => setSort('journals')}>
 					Revues {sortArrow('journals')}
 				</th>
@@ -154,12 +156,17 @@
 					</td>
 					<td class="muted">{p.publisher_type}</td>
 					<td class="muted">{p.country ?? ''}</td>
+					<td class="prefixes">
+						{#each p.doi_prefixes as dp (dp.prefix)}
+							<span class="prefix-chip" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>
+						{/each}
+					</td>
 					<td class="num">{p.journal_count.toLocaleString('fr-FR')}</td>
 					<td class="num">{p.pub_count.toLocaleString('fr-FR')}</td>
 				</tr>
 			{/each}
 			{#if data.publishers.length === 0}
-				<tr><td colspan="5" class="no-results">Aucun éditeur ne correspond aux filtres.</td></tr>
+				<tr><td colspan="6" class="no-results">Aucun éditeur ne correspond aux filtres.</td></tr>
 			{/if}
 		</tbody>
 	</table>
@@ -206,6 +213,14 @@
 	.publishers-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 	.muted { color: var(--muted); }
 	.no-results { text-align: center; color: var(--muted); padding: 30px; }
+
+	.prefixes { display: flex; flex-wrap: wrap; gap: 3px; }
+	.prefix-chip {
+		background: #f0efec; color: var(--muted);
+		padding: 1px 6px; border-radius: 8px;
+		font-size: 0.75rem; font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
 
 	.publisher-link { color: var(--accent); text-decoration: none; font-weight: 500; }
 	.publisher-link:hover { text-decoration: underline; }

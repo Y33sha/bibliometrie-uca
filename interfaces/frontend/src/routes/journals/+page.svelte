@@ -33,6 +33,7 @@
 			if (journalType) params.set('journal_type', journalType);
 			if (inDoaj) params.set('is_in_doaj', inDoaj);
 			if (oaModel) params.set('oa_model', oaModel);
+			params.set('with_pubs', 'true');
 			params.set('sort', sort);
 			params.set('page', String(page));
 			params.set('per_page', String(PER_PAGE));

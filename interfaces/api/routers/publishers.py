@@ -76,6 +76,7 @@ def list_publishers(
     publisher_type: str | None = None,
     country: str | None = None,
     is_predatory: bool | None = None,
+    with_pubs: bool = False,
     sort: str = "name",
     queries: PublisherQueries = Depends(publisher_queries_sync),
 ) -> PublisherListResponse:
@@ -86,6 +87,10 @@ def list_publishers(
       < 2 caractères.
     - `publisher_type` / `country` : égalité stricte.
     - `is_predatory` : booléen (true/false). Omettre = pas de filtre.
+    - `with_pubs` : si true, n'expose que les éditeurs avec au moins 1
+      publication rattachée (via leurs revues). Utilisé par la page
+      publique /publishers pour masquer les éditeurs orphelins. L'admin
+      garde l'option de tout voir (défaut false).
 
     `sort` : `name` / `-name` / `journals` / `-journals` / `pubs` /
     `-pubs` ; fallback sur `name` si inconnu.
@@ -95,6 +100,7 @@ def list_publishers(
         publisher_type=publisher_type,
         country=country,
         is_predatory=is_predatory,
+        with_pubs=with_pubs,
         sort=sort,
         page=page,
         per_page=per_page,
