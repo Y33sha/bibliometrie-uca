@@ -39,7 +39,13 @@ code highlighté, mermaid pré-rendu.
   un rebuild frontend (équivalent au cycle code → commit → déploiement
   déjà en place).
 
-- **Périmètre figé aux 7 pages actuelles** (`architecture`, `donnees`, `sources`, `pipeline`, `exploitation`, `guide-utilisateur`, `glossaire`). Extensions possibles à terme, hors scope de ce chantier : indexation des fiches `docs/chantiers/*.md`, ajout de pages « workflow admin », pages par agrégat (schéma + pipeline + UI pour chaque entité), ou éclatement des pages longues actuelles en pages plus courtes pour la lisibilité.
+- **Périmètre figé aux 7 pages actuelles** (`architecture`, `donnees`, `sources`, `pipeline`, `exploitation`, `guide-utilisateur`, `glossaire`). Extensions possibles à terme, hors scope de ce chantier : indexation des fiches `docs/chantiers/*.md`, ajout de pages « workflow admin », pages par agrégat (schéma + pipeline + UI pour chaque entité).
+
+- **Sidebar hiérarchique à 2 niveaux et éclatement par sous-dossiers** : les pages longues sont scindées en plusieurs `.md` regroupés dans un dossier (`docs/sources/01-vue-d-ensemble.md`, `docs/sources/02-hal.md`, …). Le dossier devient un en-tête non cliquable dans la sidebar, ses fichiers les liens. Préfixe numérique `NN-` pour l'ordre, strippé du slug. Premières pages éclatées : `sources/`, `pipeline/`. À terme, tout est éclaté sauf `glossaire`.
+
+- **Glossaire transformé à terme en liste alphabétique unique** (page non éclatée), avec popovers informatifs au survol des termes du glossaire dans les autres pages de doc. Hors scope de ce chantier — à reporter dans une roadmap ou un chantier dédié.
+
+- **Intégration d'images (schémas, screenshots) à terme** : convention de stockage dans `docs/images/` ou similaire, copie au bundle au build, résolution des liens `![alt](path)`. Hors scope de ce chantier.
 
 - **Stack de parsing minimale** : `marked` côté Node (déjà connu du projet) avec un renderer custom pour les ancres et les liens internes. Pas de syntax highlighting dans un premier temps (peu de blocs de code dans la doc actuelle). Mermaid reste client-side comme aujourd'hui — le léger délai de chargement est acceptable.
 
@@ -98,13 +104,30 @@ code highlighté, mermaid pré-rendu.
 - [x] Parser : tolérance CRLF/LF (fichiers `.md` en formats mixtes)
 - [x] Audit syntaxe markdown : liens `chantiers/*` en backtick (notes internes, hors doc en ligne), liens vers code source en URL GitHub absolue, ancres cassées corrigées
 
-### Phase 3 — Style et UX
+### Phase 3 — Sidebar hiérarchique et éclatement par sous-dossiers
+
+- [x] Route catch-all `/docs/[...slug]/+page.server.ts` (remplace `[slug]`)
+- [x] `pages.ts` : structure typée mixant pages plates et sections
+  (`{ slug } | { section, title }`)
+- [x] `filesystem.server.ts` : lecture récursive du `docs/`, mapping
+  préfixe numérique → slug strippé
+- [x] `+layout.server.ts` : construit la nav à 2 niveaux à partir de
+  `pages.ts` + extraction des titres h1 (pages éclatées incluses)
+- [x] `+layout.svelte` : en-tête de section non cliquable + sous-liens
+- [x] `links.ts` : résolution des liens relatifs (`./`, `../`) par rapport
+  au slug courant (cohérent avec la navigation GitHub)
+- [x] Migrer `sources.md` en `docs/sources/` (9 fichiers, un par source)
+- [ ] Migrer `pipeline.md` en `docs/pipeline/` (un fichier par phase)
+- [x] Mettre à jour les liens internes des autres `.md` vers les nouvelles
+  URLs hiérarchiques de `sources/`
+
+### Phase 4 — Style et UX
 
 - [ ] `/docs` (index) : landing avec présentation des sections plutôt qu'une
   redirection JS
 - [ ] Polish responsive : la sidebar passe en menu burger sur mobile
 
-### Phase 4 — Retrait du backend doc et de la page TODOs
+### Phase 5 — Retrait du backend doc et de la page TODOs
 
 - [ ] Supprimer `interfaces/api/routers/docs.py`
 - [ ] Retirer l'inclusion du router dans

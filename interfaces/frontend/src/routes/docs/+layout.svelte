@@ -16,7 +16,6 @@
 	let activeAnchor = $state('');
 
 	$effect(() => {
-		// Recalcule à chaque changement de slug
 		void currentSlug;
 		activeAnchor = '';
 		const headings = document.querySelectorAll<HTMLElement>(
@@ -43,13 +42,31 @@
 <div class="docs-layout">
 	<aside class="docs-sidebar">
 		<h3>Documentation</h3>
-		<ul>
-			{#each data.pages as p}
-				<li>
-					<a href="{base}/docs/{p.slug}" class:active={currentSlug === p.slug}>
-						{p.title}
-					</a>
-				</li>
+		<ul class="nav">
+			{#each data.nav as node}
+				{#if node.kind === 'page'}
+					<li>
+						<a href="{base}/docs/{node.slug}" class:active={currentSlug === node.slug}>
+							{node.title}
+						</a>
+					</li>
+				{:else}
+					<li class="section">
+						<span class="section-title">{node.title}</span>
+						<ul>
+							{#each node.children as child}
+								<li>
+									<a
+										href="{base}/docs/{child.slug}"
+										class:active={currentSlug === child.slug}
+									>
+										{child.title}
+									</a>
+								</li>
+							{/each}
+						</ul>
+					</li>
+				{/if}
 			{/each}
 		</ul>
 	</aside>
@@ -124,6 +141,21 @@
 	.docs-sidebar a.active {
 		background: var(--accent);
 		color: white;
+	}
+	.docs-sidebar li.section {
+		margin-top: 12px;
+	}
+	.docs-sidebar .section-title {
+		display: block;
+		padding: 6px 10px 4px;
+		color: var(--muted);
+		font-size: 0.78rem;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		font-weight: 600;
+	}
+	.docs-sidebar li.section > ul > li > a {
+		padding-left: 18px;
 	}
 	.docs-toc {
 		border-left: 1px solid var(--border);

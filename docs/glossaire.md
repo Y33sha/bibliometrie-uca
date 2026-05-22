@@ -48,7 +48,7 @@ Termes métier utilisés dans le projet. Pour la documentation technique (pipeli
 |-------|-----------|
 | **Green** | Publication déposée en archive ouverte (HAL, arXiv...), en général par l'auteur, parallèlement à sa publication dans une revue. La version déposée peut être un preprint ou un postprint. |
 | **Gold** | Publication en accès ouvert dans une revue entièrement OA. Souvent payant (APC). |
-| **Diamond** | Sous-catégorie du gold : revue OA sans APC (financement institutionnel). [Unpaywall](sources#unpaywall) ne distingue pas diamond de gold. |
+| **Diamond** | Sous-catégorie du gold : revue OA sans APC (financement institutionnel). [Unpaywall](sources/unpaywall) ne distingue pas diamond de gold. |
 | **Hybrid** | Publication en accès ouvert dans une revue sous abonnement payant. L'auteur paie un APC pour rendre son article spécifique en OA. Déconseillé (l'institution paye les APC + l'abonnement à la revue). |
 | **Bronze** | Publication accessible gratuitement sur le site de l'éditeur, sans licence OA explicite. Open access éditeur *de facto*, accès sans garantie de pérennité. |
 | **Closed** | Publication fermée, accessible uniquement via abonnement. |

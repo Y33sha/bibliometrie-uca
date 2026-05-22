@@ -464,4 +464,4 @@ Les fichiers qui jouent ce rôle :
 
 - [donnees](donnees) — modèle de données
 - [pipeline](pipeline) — détail des phases
-- [sources](sources) — API et imports par source
+- [sources](sources/vue-d-ensemble) — API et imports par source
