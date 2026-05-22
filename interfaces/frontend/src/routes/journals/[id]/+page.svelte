@@ -228,16 +228,14 @@
 						{/if}
 					</div>
 
-					<div class="dash-card dash-card-wide">
-						<h3>
-							Données DOAJ
-							{#if journal.doaj_imported_at}
-								<span class="muted small">(import {formatDate(journal.doaj_imported_at)})</span>
-							{/if}
-						</h3>
-						{#if !journal.doaj_payload}
-							<p class="muted">Revue absente du dump DOAJ.</p>
-						{:else}
+					{#if journal.doaj_payload}
+						<div class="dash-card dash-card-wide">
+							<h3>
+								Données DOAJ
+								{#if journal.doaj_imported_at}
+									<span class="muted small">(import {formatDate(journal.doaj_imported_at)})</span>
+								{/if}
+							</h3>
 							<dl class="doaj-fields">
 								{#each READABLE_DOAJ_FIELDS as f (f.key)}
 									{#if journal.doaj_payload[f.key]}
@@ -252,8 +250,8 @@
 							{#if showRawDoaj}
 								<pre class="raw-payload">{JSON.stringify(journal.doaj_payload, null, 2)}</pre>
 							{/if}
-						{/if}
-					</div>
+						</div>
+					{/if}
 				</div>
 			{/if}
 		</div>
