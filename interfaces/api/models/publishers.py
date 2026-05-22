@@ -1,7 +1,8 @@
 """Modèles Pydantic pour les éditeurs (publishers).
 
 Les DTOs de retour des query services (`PublisherListItem`,
-`PublisherListResponse`, `PublisherBasic`) vivent dans
+`PublisherListResponse`, `PublisherDetailResponse`,
+`PublisherDashboardResponse`) vivent dans
 `application/ports/api/publishers_queries.py` (cf. chantier
 `CODE_typage-projections-strict` Phase 4).
 """
