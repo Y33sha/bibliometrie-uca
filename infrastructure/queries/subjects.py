@@ -173,18 +173,25 @@ def clear_publication_subjects(
     publication_id: int,
     source: str,
 ) -> int:
-    """Supprime tous les liens d'une publication pour une source.
+    """Supprime les liens (non rejetés) d'une publication pour une source.
     Retourne le nombre de lignes supprimées."""
     return conn.execute(
-        text("DELETE FROM publication_subjects WHERE publication_id = :pid AND source = :src"),
+        text(
+            "DELETE FROM publication_subjects "
+            "WHERE publication_id = :pid AND source = :src AND NOT rejected"
+        ),
         {"pid": publication_id, "src": source},
     ).rowcount
 
 
 def clear_links_for_source(conn: Connection, *, source: str) -> int:
-    """`DELETE FROM publication_subjects WHERE source = X`. Retourne le rowcount."""
+    """`DELETE FROM publication_subjects WHERE source = X AND NOT rejected`.
+
+    Préserve les liens manuellement rejetés (colonne `rejected`) pour qu'ils
+    ne soient pas recréés au passage de la phase `subjects`.
+    """
     return conn.execute(
-        text("DELETE FROM publication_subjects WHERE source = :src"),
+        text("DELETE FROM publication_subjects WHERE source = :src AND NOT rejected"),
         {"src": source},
     ).rowcount
 
@@ -221,6 +228,7 @@ def recompute_usage_counts(conn: Connection) -> int:
             FROM (
                 SELECT subject_id, COUNT(DISTINCT publication_id) AS n
                 FROM publication_subjects
+                WHERE NOT rejected
                 GROUP BY subject_id
             ) c
             WHERE s.id = c.subject_id
@@ -249,6 +257,7 @@ def recompute_cooccurrences(conn: Connection, *, min_count: int = 2) -> int:
             JOIN publication_subjects ps2
               ON ps1.publication_id = ps2.publication_id
              AND ps1.subject_id < ps2.subject_id
+            WHERE NOT ps1.rejected AND NOT ps2.rejected
             GROUP BY ps1.subject_id, ps2.subject_id
             HAVING COUNT(DISTINCT ps1.publication_id) >= :min_count
             """
