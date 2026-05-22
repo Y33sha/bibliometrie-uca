@@ -84,8 +84,7 @@
   <title>Sujets — Bibliométrie UCA</title>
 </svelte:head>
 
-<div class="page">
-  <h1>Sujets</h1>
+<h1>Sujets</h1>
   <p class="hint">
     Liste de tous les sujets observés sur les publications, triés par nombre d'occurrences.
     Cliquer sur un sujet pour explorer ses voisins par co-occurrence.
@@ -141,14 +140,8 @@
       <Pagination page={data.page} pages={totalPages} onchange={onPageChange} />
     {/if}
   {/if}
-</div>
 
 <style>
-  .page {
-    padding: 16px 24px;
-    max-width: 1100px;
-    margin: 0 auto;
-  }
   h1 {
     margin: 0 0 4px;
     font-size: 1.4rem;

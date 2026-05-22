@@ -99,8 +99,7 @@
 	<title>Revues — Bibliométrie UCA</title>
 </svelte:head>
 
-<div class="page">
-	<h1>Revues</h1>
+<h1>Revues</h1>
 	<p class="hint">
 		Liste des revues observées sur les publications du périmètre UCA. Cliquer
 		sur une revue pour explorer ses publications, sa répartition par type/OA
@@ -182,10 +181,8 @@
 		</table>
 		<Pagination {page} pages={totalPages} onchange={(p) => { page = p; loadJournals(); }} />
 	{/if}
-</div>
 
 <style>
-	.page { max-width: 1100px; margin: 0 auto; padding: 16px; }
 	h1 { margin: 0 0 8px; font-size: 1.5rem; }
 	.hint { color: var(--muted); font-size: 0.9rem; margin: 0 0 16px; }
 

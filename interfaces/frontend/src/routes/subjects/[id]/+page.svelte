@@ -80,8 +80,7 @@
   <title>{data?.subject.label ?? "Sujet"} — Bibliométrie UCA</title>
 </svelte:head>
 
-<div class="page">
-  <a href="{base}/subjects" class="back">← Retour à la liste</a>
+<a href="{base}/subjects" class="back">← Retour à la liste</a>
 
   {#if error}
     <div class="error">Sujet introuvable.</div>
@@ -149,14 +148,8 @@
       {/key}
     {/if}
   {/if}
-</div>
 
 <style>
-  .page {
-    padding: 16px 24px;
-    max-width: 1200px;
-    margin: 0 auto;
-  }
   .back {
     color: var(--muted, #6b7280);
     text-decoration: none;
