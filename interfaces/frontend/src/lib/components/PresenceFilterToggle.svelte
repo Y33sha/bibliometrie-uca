@@ -13,6 +13,12 @@
 		items: Item[];
 		states?: Record<string, ToggleState>;
 		counts?: Record<string, { yes: number; no: number }>;
+		/** Si true, affiche toujours le décompte des « présents » (counts.yes)
+		 *  quel que soit l'état du toggle. Utile quand l'intérêt est de voir
+		 *  combien d'items ont la propriété, indépendamment du filtre courant
+		 *  (cas Sources : « combien de publis sur HAL ? »). Par défaut le
+		 *  décompte suit l'état (yes → présents, no → absents, all → total). */
+		staticPresentCount?: boolean;
 		onchange?: (states: Record<string, ToggleState>) => void;
 	}
 
@@ -21,6 +27,7 @@
 		items,
 		states = $bindable({}),
 		counts = {},
+		staticPresentCount = false,
 		onchange,
 	}: Props = $props();
 
@@ -60,6 +67,7 @@
 	function countFor(key: string, state: ToggleState): number | null {
 		const c = counts[key];
 		if (!c) return null;
+		if (staticPresentCount) return c.yes;
 		if (state === 'yes') return c.yes;
 		if (state === 'no') return c.no;
 		return c.yes + c.no;
