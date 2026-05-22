@@ -1,4 +1,4 @@
-# Pipeline de traitement — Bibliométrie UCA
+# Pipeline de traitement
 
 *Document à jour au 2026-05-13.*
 
@@ -74,7 +74,7 @@ Pour chaque source cible (OpenAlex, HAL, WoS, ScanR, Crossref), recherche par DO
 
 **Pourquoi les deux étapes ont des règles de scope différentes** : le pool de hal-ids/NNT à re-tenter est *fini par construction* (un hal-id non trouvé sort définitivement du pool via `not_found=TRUE`). À l'inverse, le pool de DOI à cross-importer est potentiellement non borné dans le modèle actuel — les DOI 404 chez HAL/OpenAlex/WoS/ScanR ne sont pas tracés, donc retentés à chaque run. D'où la scope policy : daily/weekly se limite aux DOI jamais tentés (`unprocessed`), full ré-essaie aussi les anciens (`all`), et WoS est exclu hors `full` à cause de son quota API contractuel.
 
-Cette asymétrie disparaîtra avec le chantier [`DATA_cycle-vie-staging.md`](chantiers/DATA_cycle-vie-staging.md) : un backoff temporel (`not_found_at` + `next_retry`) sur les sources non natives rendra le pool DOI également auto-borné et convergent.
+Cette asymétrie disparaîtra avec le chantier `DATA_cycle-vie-staging.md` : un backoff temporel (`not_found_at` + `next_retry`) sur les sources non natives rendra le pool DOI également auto-borné et convergent.
 
 ### <span id="normalize"></span>`normalize` : Normalisation
 

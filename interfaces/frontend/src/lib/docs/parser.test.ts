@@ -40,31 +40,82 @@ describe('parseMarkdown — titre', () => {
 		const { title } = parseMarkdown('## Pas de h1', BASE);
 		expect(title).toBe('');
 	});
+
+	it('gère les fichiers en CRLF', () => {
+		const { title, toc } = parseMarkdown('# Titre CRLF\r\n## Section\r\n', BASE);
+		expect(title).toBe('Titre CRLF');
+		expect(toc.map((t) => t.anchor)).toEqual(['section']);
+	});
 });
 
 // ── parseMarkdown / TOC ────────────────────────────────────────
 
 describe('parseMarkdown — table des matières', () => {
-	it('collecte les h2 et h3 dans l\'ordre', () => {
+	it("collecte les h2 et h3 dans l'ordre", () => {
 		const md = '# Titre\n## Section A\n### Sous A\n## Section B';
 		const { toc } = parseMarkdown(md, BASE);
-		expect(toc).toEqual([
-			{ level: 2, text: 'Section A', anchor: 'section-a' },
-			{ level: 3, text: 'Sous A', anchor: 'sous-a' },
-			{ level: 2, text: 'Section B', anchor: 'section-b' }
+		expect(toc.map((t) => ({ level: t.level, anchor: t.anchor }))).toEqual([
+			{ level: 2, anchor: 'section-a' },
+			{ level: 3, anchor: 'sous-a' },
+			{ level: 2, anchor: 'section-b' }
 		]);
 	});
 
 	it('ignore les titres dans les blocs de code', () => {
 		const md = '# Titre\n```\n## Pas un titre\n```\n## Vrai titre';
 		const { toc } = parseMarkdown(md, BASE);
-		expect(toc).toEqual([{ level: 2, text: 'Vrai titre', anchor: 'vrai-titre' }]);
+		expect(toc.map((t) => t.anchor)).toEqual(['vrai-titre']);
 	});
 
 	it('ignore les h1 et h4+ dans la TOC', () => {
 		const md = '# Titre\n## H2\n#### H4';
 		const { toc } = parseMarkdown(md, BASE);
-		expect(toc).toEqual([{ level: 2, text: 'H2', anchor: 'h2' }]);
+		expect(toc.map((t) => t.anchor)).toEqual(['h2']);
+	});
+
+	it('rend le markdown inline du texte (code, italique, etc.)', () => {
+		const { toc } = parseMarkdown('## `extract` : Moissonnage', BASE);
+		expect(toc[0].html).toContain('<code>extract</code>');
+		expect(toc[0].html).toContain('Moissonnage');
+	});
+});
+
+// ── parseMarkdown / ancres custom (<span id="...">) ────────────
+
+describe('parseMarkdown — ancres custom via <span id>', () => {
+	it('utilise l\'id du span comme ancre prioritaire', () => {
+		const md = '## <span id="extract"></span>`extract` : Moissonnage';
+		const { toc, html } = parseMarkdown(md, BASE);
+		expect(toc[0].anchor).toBe('extract');
+		expect(html).toContain('<h2 id="extract">');
+	});
+
+	it('strippe le <span> du texte affiché dans la TOC', () => {
+		const md = '## <span id="x"></span>Texte visible';
+		const { toc } = parseMarkdown(md, BASE);
+		expect(toc[0].html).not.toContain('<span');
+		expect(toc[0].html).toContain('Texte visible');
+	});
+
+	it('strippe le <span> du HTML rendu', () => {
+		const md = '## <span id="x"></span>Texte';
+		const { html } = parseMarkdown(md, BASE);
+		expect(html).toContain('<h2 id="x">');
+		expect(html).not.toContain('<span');
+	});
+
+	it('gère un <span> au milieu du heading', () => {
+		const md = "## Résumé: <span id='tables'></span>Tables canoniques";
+		const { toc, html } = parseMarkdown(md, BASE);
+		expect(toc[0].anchor).toBe('tables');
+		expect(html).toContain('<h2 id="tables">');
+		expect(html).not.toContain('<span');
+	});
+
+	it('tolère apostrophes simples ou doubles', () => {
+		const md = "## <span id='abc'></span>Foo";
+		const { toc } = parseMarkdown(md, BASE);
+		expect(toc[0].anchor).toBe('abc');
 	});
 });
 

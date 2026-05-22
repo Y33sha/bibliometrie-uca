@@ -1,49 +1,41 @@
 <script lang="ts">
-	import { page } from "$app/stores";
-	import { base } from "$app/paths";
-	import { onMount } from "svelte";
-	import { api } from "$lib/api";
-	import type { Snippet } from "svelte";
+	import { page } from '$app/stores';
+	import { base } from '$app/paths';
+	import type { Snippet } from 'svelte';
+	import type { LayoutData } from './$types';
 
-	let { children }: { children: Snippet } = $props();
-
-	interface DocPage {
-		slug: string;
-		title: string;
-	}
-	interface Heading {
-		text: string;
-		anchor: string;
-	}
-
-	let pages: DocPage[] = $state([]);
-	let headings: Heading[] = $state([]);
+	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
 	const currentSlug = $derived(
-		$page.url.pathname.replace(`${base}/docs/`, "").replace(/\/$/, "") || ""
+		$page.url.pathname.replace(`${base}/docs/`, '').replace(/\/$/, '') || ''
 	);
 
-	onMount(async () => {
-		pages = await api<DocPage[]>("/api/docs");
-	});
+	type TocEntry = { level: 2 | 3; html: string; anchor: string };
+	const toc = $derived(($page.data.toc ?? []) as TocEntry[]);
 
-	// Extraire les h2 du DOM après chaque navigation
-	function extractHeadings() {
-		const container = document.querySelector(".doc-content");
-		if (!container) return;
-		const h2s = container.querySelectorAll("h2");
-		headings = Array.from(h2s).map((h) => ({
-			text: h.textContent || "",
-			anchor: h.id,
-		})).filter((h) => h.anchor);
-	}
+	let activeAnchor = $state('');
 
-	// Observer les changements dans le contenu pour extraire les headings
-	onMount(() => {
-		const container = document.querySelector(".doc-content");
-		if (!container) return;
-		const observer = new MutationObserver(() => extractHeadings());
-		observer.observe(container, { childList: true, subtree: true });
+	$effect(() => {
+		// Recalcule à chaque changement de slug
+		void currentSlug;
+		activeAnchor = '';
+		const headings = document.querySelectorAll<HTMLElement>(
+			'.doc-content h2[id], .doc-content h3[id]'
+		);
+		if (headings.length === 0) return;
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				const visible = entries
+					.filter((e) => e.isIntersecting)
+					.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+				if (visible.length > 0) {
+					activeAnchor = visible[0].target.id;
+				}
+			},
+			{ rootMargin: '-80px 0px -70% 0px', threshold: 0 }
+		);
+		headings.forEach((h) => observer.observe(h));
 		return () => observer.disconnect();
 	});
 </script>
@@ -52,51 +44,54 @@
 	<aside class="docs-sidebar">
 		<h3>Documentation</h3>
 		<ul>
-			{#each pages as p}
+			{#each data.pages as p}
 				<li>
 					<a href="{base}/docs/{p.slug}" class:active={currentSlug === p.slug}>
 						{p.title}
 					</a>
-					{#if currentSlug === p.slug && headings.length > 0}
-						<ul class="toc">
-							{#each headings as h}
-								<li>
-									<a href="#{h.anchor}">{h.text}</a>
-								</li>
-							{/each}
-						</ul>
-					{/if}
 				</li>
 			{/each}
-			<li class="sidebar-separator"></li>
-			<li>
-				<a href="{base}/docs/todos" class:active={currentSlug === "todos"}>
-					TODOs
-				</a>
-			</li>
 		</ul>
 	</aside>
+
 	<main class="doc-content">
 		{@render children()}
 	</main>
+
+	<aside class="docs-toc" class:empty={toc.length === 0}>
+		{#if toc.length > 0}
+			<h4>Sur cette page</h4>
+			<ul>
+				{#each toc as h}
+					<li class:level-3={h.level === 3}>
+						<a href="#{h.anchor}" class:active={activeAnchor === h.anchor}>
+							{@html h.html}
+						</a>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</aside>
 </div>
 
 <style>
 	.docs-layout {
-		display: flex;
+		display: grid;
+		grid-template-columns: 240px minmax(0, 1fr) 200px;
 		gap: 32px;
 		min-height: calc(100vh - 94px);
 	}
-	.docs-sidebar {
-		width: 240px;
-		flex-shrink: 0;
-		border-right: 1px solid var(--border);
-		padding-right: 24px;
+	.docs-sidebar,
+	.docs-toc {
 		position: sticky;
 		top: 70px;
 		align-self: flex-start;
 		max-height: calc(100vh - 94px);
 		overflow-y: auto;
+	}
+	.docs-sidebar {
+		border-right: 1px solid var(--border);
+		padding-right: 24px;
 	}
 	.docs-sidebar h3 {
 		font-size: 0.85rem;
@@ -105,15 +100,17 @@
 		color: var(--muted);
 		margin: 0 0 12px;
 	}
-	.docs-sidebar ul {
+	.docs-sidebar ul,
+	.docs-toc ul {
 		list-style: none;
 		padding: 0;
 		margin: 0;
 	}
-	.docs-sidebar li {
+	.docs-sidebar li,
+	.docs-toc li {
 		margin: 0;
 	}
-	.docs-sidebar > ul > li > a {
+	.docs-sidebar a {
 		display: block;
 		padding: 6px 10px;
 		color: var(--text);
@@ -121,33 +118,46 @@
 		font-size: 0.9rem;
 		border-radius: 4px;
 	}
-	.docs-sidebar > ul > li > a:hover {
+	.docs-sidebar a:hover {
 		background: #f0efec;
 	}
-	.docs-sidebar > ul > li > a.active {
+	.docs-sidebar a.active {
 		background: var(--accent);
 		color: white;
 	}
-	.sidebar-separator {
-		border-top: 1px solid var(--border);
-		margin: 8px 0;
+	.docs-toc {
+		border-left: 1px solid var(--border);
+		padding-left: 16px;
 	}
-	.toc {
-		padding-left: 0;
-		margin: 2px 0 4px;
+	.docs-toc h4 {
+		font-size: 0.8rem;
+		text-transform: uppercase;
+		letter-spacing: 1px;
+		color: var(--muted);
+		margin: 0 0 8px;
+		font-weight: 600;
 	}
-	.toc li {
-		margin: 0;
-	}
-	.toc li a {
+	.docs-toc a {
 		display: block;
-		padding: 2px 10px 2px 16px;
+		padding: 3px 8px;
 		color: var(--muted);
 		text-decoration: none;
 		font-size: 0.8rem;
-		line-height: 1.6;
+		line-height: 1.5;
+		border-left: 2px solid transparent;
 	}
-	.toc li a:hover {
+	.docs-toc li.level-3 a {
+		padding-left: 18px;
+		font-size: 0.78rem;
+	}
+	.docs-toc a:hover {
+		color: var(--text);
+	}
+	.docs-toc a.active {
 		color: var(--accent);
+		border-left-color: var(--accent);
+	}
+	.docs-toc.empty {
+		display: none;
 	}
 </style>

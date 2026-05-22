@@ -1,4 +1,4 @@
-# Glossaire métier — Bibliométrie UCA
+# Glossaire métier
 
 *A compléter*
 
