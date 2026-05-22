@@ -479,7 +479,7 @@
 					</td>{/if}
 					{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
 					<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>
-					{#if col('journal')}<td class="journal-cell pub-col-journal"><span class="journal-clip">{p.journal || ''}</span></td>{/if}
+					{#if col('journal')}<td class="journal-cell pub-col-journal">{p.journal || ''}</td>{/if}
 					{#if !hasFixedLab && col('labs')}<td>
 						{#each p.lab_items || [] as lab}
 							<a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
