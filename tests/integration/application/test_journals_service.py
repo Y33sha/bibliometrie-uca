@@ -430,6 +430,23 @@ class TestMergePublishers:
         assert "ISSN" in b["reason"]
         assert "0028-0836" in b["reason"] and "9999-9999" in b["reason"]
 
+    def test_blocks_when_target_has_internal_duplicate_titles(self, sa_sync_conn, repo, pub_repo):
+        """Si la cible a 2 journaux au même titre et la source en a 1, la fusion
+        N→1 casserait. On flagge ces paires comme blockers."""
+        target = _insert_publisher(sa_sync_conn, "Target")
+        source = _insert_publisher(sa_sync_conn, "Source")
+        _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
+        _insert_journal(sa_sync_conn, "Nature", publisher_id=target, eissn="1476-4687")
+        _insert_journal(sa_sync_conn, "Nature", publisher_id=source)
+
+        with pytest.raises(PublisherMergeBlockedError) as exc_info:
+            merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+
+        blockers = exc_info.value.blocking_journals
+        assert len(blockers) == 2
+        for b in blockers:
+            assert "doublon interne" in b["reason"]
+
     def test_collects_all_blockers_in_one_pass(self, sa_sync_conn, repo, pub_repo):
         """Plusieurs paires de revues bloquantes → toutes remontées d'un coup."""
         target = _insert_publisher(sa_sync_conn, "Target")
