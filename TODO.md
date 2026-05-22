@@ -21,7 +21,7 @@
 * [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ? / voire supprimer cette colonne? ->> **DATA_perimeter-materialise.md**
 * [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications". / DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint? ->> **METIER_metadata-deduplication.md**
 * [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
-* [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects
+* [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects / idées:  phase_cross_imports expose sources_with_new; phase_subjects : restreindre à (extract_sources ∪ sources_with_new) / phase_countries (refresh_sa_countries_for_source) : laisser scanner toutes les sources (sécurité), mais on peut t'envisager un addresses.updated_at ciblage en option 2 plus tard
 * [ ] authorships: propagate_roles, propagate_is_corresponding, propagate_author_position: tout faire en une passe?
 ## Code
 * [ ] organiser le dossier queries
@@ -36,11 +36,13 @@
 * [ ] normalisation des titres: supprimer les balises mml ou html
 ## Sujets
 * [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation manuelle des sujets? / ajouter seuil de score de pertinence? / algos pour évaluer pertinence (co-occurrences suspectes, NLP...)
+* [ ] enrichissement sujets: audit des publis sans sujet; sujets "attendus" par revue?
 ## Explorer autres sources possibles
 * [ ] Crossref: définir sa place dans le pipeline (actuellement: pas d'affiliations donc pas de matching possible)
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); récupérer pmid dans api HAL
 * [ ] pour les jeux de données: DataCite, Zenodo, autres?
 * [ ] divers: ORCID, IdRef, DOAJ
+* [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait tenter un matching de tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 ## Types de documents: algo de résolution de conflits
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger à la source
 * [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); data papers?
