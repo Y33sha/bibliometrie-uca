@@ -142,3 +142,12 @@ Autres patterns problématiques constatés :
   (`map_doc_type` + `_SOURCE_MAPS`),
   [`application/publications.py`](../../application/publications.py)
   (`refresh_from_sources`)
+
+
+## idées à intégrer
+- titre commençant par Erratum mais doc_type autre que erratum => corriger
+- book reviews: trouver critères titre pour détecter
+- type "media" ou "presse"
+- conf, conference paper, proceedings: clarifier
+- détecter les patterns d'incohérence les plus fréquents
+- type "données additionnelles?"

@@ -378,7 +378,7 @@ pipeline de peuplement. Chaque phase est idempotente (relançable sans
 risque) ; reprise depuis une phase donnée :
 `python run_pipeline.py --from <phase>`.
 
-Voir [pipeline](pipeline) pour la liste des phases et le détail de
+Voir [pipeline](pipeline/vue-d-ensemble) pour la liste des phases et le détail de
 chacune.
 
 ## Tests
@@ -463,5 +463,5 @@ Les fichiers qui jouent ce rôle :
 ## Pour aller plus loin
 
 - [donnees](donnees) — modèle de données
-- [pipeline](pipeline) — détail des phases
+- [pipeline](pipeline/vue-d-ensemble) — détail des phases
 - [sources](sources/vue-d-ensemble) — API et imports par source

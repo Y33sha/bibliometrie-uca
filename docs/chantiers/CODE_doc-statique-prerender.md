@@ -117,9 +117,9 @@ code highlighté, mermaid pré-rendu.
 - [x] `links.ts` : résolution des liens relatifs (`./`, `../`) par rapport
   au slug courant (cohérent avec la navigation GitHub)
 - [x] Migrer `sources.md` en `docs/sources/` (9 fichiers, un par source)
-- [ ] Migrer `pipeline.md` en `docs/pipeline/` (un fichier par phase)
+- [x] Migrer `pipeline.md` en `docs/pipeline/` (12 fichiers : vue d'ensemble, 10 phases, résumé)
 - [x] Mettre à jour les liens internes des autres `.md` vers les nouvelles
-  URLs hiérarchiques de `sources/`
+  URLs hiérarchiques de `sources/` et `pipeline/`
 
 ### Phase 4 — Style et UX
 
