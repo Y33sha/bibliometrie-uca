@@ -87,9 +87,14 @@ def main() -> None:
                     issn_to_journal_id.setdefault(issn, r.id)
         log.info("%d ISSN indexés (sur journals.issn/eissn/issnl)", len(issn_to_journal_id))
 
-        # Étape 1 : reset is_in_doaj (CSV = source de vérité).
+        # Étape 1 : reset is_in_doaj (CSV = source de vérité). On ne touche
+        # que les rows actuellement à TRUE pour que le rowcount reflète le
+        # nombre réel de flags effacés (et pour éviter des dead tuples
+        # inutiles sur ~18k rows déjà à FALSE).
         if not args.dry_run:
-            result = conn.execute(text("UPDATE journals SET is_in_doaj = FALSE"))
+            result = conn.execute(
+                text("UPDATE journals SET is_in_doaj = FALSE WHERE is_in_doaj = TRUE")
+            )
             log.info("Reset is_in_doaj = FALSE sur %d journaux", result.rowcount)
 
         # Étape 2 : lecture CSV + bulk UPDATE par batch.
