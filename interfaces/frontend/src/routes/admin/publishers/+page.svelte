@@ -96,6 +96,17 @@
 		mergeSearch.clear();
 	}
 
+	interface BlockingJournal {
+		target_journal_id: number;
+		target_title: string;
+		source_journal_id: number;
+		source_title: string;
+		reason: string;
+	}
+
+	let blockingJournals: BlockingJournal[] | null = $state(null);
+	let blockingDetail = $state('');
+
 	async function doMerge(sourceId: number) {
 		if (!mergeTargetId) return;
 		try {
@@ -104,12 +115,25 @@
 			await load();
 		} catch (e: any) {
 			if (e instanceof ApiError) {
-				const detail = (e.detail as { detail?: string })?.detail;
-				alert(detail || `HTTP ${e.status}`);
+				const body = e.detail as {
+					detail?: string;
+					blocking_journals?: BlockingJournal[];
+				};
+				if (body?.blocking_journals?.length) {
+					blockingJournals = body.blocking_journals;
+					blockingDetail = body.detail ?? '';
+					return;
+				}
+				alert(body?.detail || `HTTP ${e.status}`);
 				return;
 			}
 			alert('Erreur réseau : ' + e.message);
 		}
+	}
+
+	function dismissBlocking() {
+		blockingJournals = null;
+		blockingDetail = '';
 	}
 
 	onMount(async () => {
@@ -121,6 +145,48 @@
 <svelte:head><title>Éditeurs — Bibliométrie UCA</title></svelte:head>
 
 <h2>Éditeurs <span class="count">({total})</span></h2>
+
+{#if blockingJournals}
+	<div class="blocking-panel" role="alert">
+		<div class="blocking-header">
+			<strong>Fusion impossible</strong>
+			<button class="btn btn-sm" onclick={dismissBlocking}>Fermer</button>
+		</div>
+		<p class="blocking-detail">{blockingDetail}</p>
+		<p class="muted">
+			Fusionner d'abord ces paires de revues côté <a href="{base}/admin/journals">admin Revues</a>,
+			puis relancer la fusion des éditeurs.
+		</p>
+		<table class="blocking-table">
+			<thead>
+				<tr>
+					<th>Revue (cible)</th>
+					<th>Revue (source)</th>
+					<th>Raison</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each blockingJournals as bj (bj.target_journal_id + '_' + bj.source_journal_id)}
+					<tr>
+						<td>
+							<a href="{base}/journals/{bj.target_journal_id}" target="_blank" rel="noopener">
+								{bj.target_title}
+							</a>
+							<span class="muted">#{bj.target_journal_id}</span>
+						</td>
+						<td>
+							<a href="{base}/journals/{bj.source_journal_id}" target="_blank" rel="noopener">
+								{bj.source_title}
+							</a>
+							<span class="muted">#{bj.source_journal_id}</span>
+						</td>
+						<td>{bj.reason}</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+{/if}
 
 <div class="toolbar">
 	<input type="text" placeholder="Rechercher un éditeur…" value={search}
@@ -250,4 +316,23 @@
 
 	.prefixes { font-family: var(--font-mono, monospace); font-size: 0.78rem; line-height: 1.6; }
 	.prefix-chip { display: inline-block; padding: 0 5px; margin: 0 3px 2px 0; background: var(--accent-light, #f0f4f8); border: 1px solid var(--border); border-radius: 3px; color: var(--text, #333); }
+
+	.blocking-panel {
+		background: #fef3e0; border: 1px solid #e8a838;
+		border-radius: 6px; padding: 12px 16px; margin: 12px 0;
+	}
+	.blocking-header {
+		display: flex; justify-content: space-between; align-items: center;
+		margin-bottom: 6px;
+	}
+	.blocking-detail { margin: 4px 0 8px; font-size: 0.95rem; }
+	.blocking-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+	.blocking-table th {
+		text-align: left; padding: 4px 8px; font-weight: 600; color: var(--muted);
+		border-bottom: 1px solid #e8a838;
+	}
+	.blocking-table td { padding: 6px 8px; border-bottom: 1px solid #f0d9b0; vertical-align: top; }
+	.blocking-table tr:last-child td { border-bottom: none; }
+	.blocking-table a { color: var(--accent); text-decoration: none; }
+	.blocking-table a:hover { text-decoration: underline; }
 </style>

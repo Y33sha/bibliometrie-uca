@@ -16,7 +16,13 @@ from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdateFields,
 )
-from domain.errors import ConflictError, NotFoundError, ValidationError
+from domain.errors import (
+    BlockingJournal,
+    ConflictError,
+    NotFoundError,
+    PublisherMergeBlockedError,
+    ValidationError,
+)
 from domain.normalize import normalize_text
 from domain.types import JsonValue
 
@@ -111,19 +117,37 @@ def merge_publishers(
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un éditeur avec lui-même")
 
-    # 1. Détecter les journaux partageant un titre entre les deux éditeurs,
-    #    vérifier les conflits ISSN, puis les fusionner.
-    for pair in journal_repo.find_shared_title_journal_pairs(target_id, source_id):
+    # 1. Détecter les journaux partageant un titre entre les deux éditeurs.
+    #    Collecter toutes les paires bloquantes (ISSN divergents) en une passe
+    #    pour qu'on lève PublisherMergeBlockedError avec l'ensemble — l'UI peut
+    #    alors les afficher d'un coup au lieu d'itérer.
+    pairs = journal_repo.find_shared_title_journal_pairs(target_id, source_id)
+    blockers: list[BlockingJournal] = []
+    mergeable_pairs = []
+    for pair in pairs:
+        reason = None
         for field in ("issn", "eissn", "issnl"):
             tv = pair[f"t_{field}"]
             sv = pair[f"s_{field}"]
             if tv and sv and tv != sv:
-                raise ConflictError(
-                    f"Conflit {field} lors de la fusion des revues "
-                    f"(cible #{pair['target_journal_id']}: {tv}, "
-                    f"source #{pair['source_journal_id']}: {sv}). "
-                    f"Fusionner les revues manuellement d'abord."
+                reason = f"{field.upper()} différents : {tv} (cible) vs {sv} (source)"
+                break
+        if reason:
+            blockers.append(
+                BlockingJournal(
+                    target_journal_id=pair["target_journal_id"],
+                    target_title=pair["t_title"],
+                    source_journal_id=pair["source_journal_id"],
+                    source_title=pair["s_title"],
+                    reason=reason,
                 )
+            )
+        else:
+            mergeable_pairs.append(pair)
+    if blockers:
+        raise PublisherMergeBlockedError(blockers)
+
+    for pair in mergeable_pairs:
         merge_journals(
             pair["target_journal_id"],
             pair["source_journal_id"],

@@ -294,6 +294,8 @@ class PgJournalRepository:
             select(
                 jt.c.id.label("target_journal_id"),
                 js.c.id.label("source_journal_id"),
+                jt.c.title.label("t_title"),
+                js.c.title.label("s_title"),
                 jt.c.issn.label("t_issn"),
                 jt.c.eissn.label("t_eissn"),
                 jt.c.issnl.label("t_issnl"),

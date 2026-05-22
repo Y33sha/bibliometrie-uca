@@ -31,6 +31,7 @@ from domain.errors import (
     ConflictError,
     DomainError,
     NotFoundError,
+    PublisherMergeBlockedError,
     UnauthorizedError,
     ValidationError,
 )
@@ -133,6 +134,16 @@ async def not_found_handler(request: Request, exc: NotFoundError) -> JSONRespons
 @app.exception_handler(ValidationError)
 async def validation_handler(request: Request, exc: ValidationError) -> JSONResponse:
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(PublisherMergeBlockedError)
+async def publisher_merge_blocked_handler(
+    request: Request, exc: PublisherMergeBlockedError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={"detail": str(exc), "blocking_journals": exc.blocking_journals},
+    )
 
 
 @app.exception_handler(ConflictError)
