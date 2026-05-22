@@ -65,7 +65,8 @@ export const sourceLabels: Record<string, string> = {
 	openalex: 'OpenAlex',
 	wos: 'WoS',
 	scanr: 'ScanR',
-	theses: 'theses.fr'
+	theses: 'theses.fr',
+	crossref: 'Crossref'
 };
 
 /** Classes CSS associées aux badges de source. */
@@ -74,7 +75,8 @@ export const sourceBadgeClasses: Record<string, string> = {
 	openalex: 'badge-oa',
 	wos: 'badge-wos',
 	scanr: 'badge-scanr',
-	theses: 'badge-theses'
+	theses: 'badge-theses',
+	crossref: 'badge-crossref'
 };
 
 /** Classes CSS associées aux statuts d'identifiant personne. */

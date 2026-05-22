@@ -293,6 +293,9 @@
   .badge-theses {
     background: #17a2b8;
   }
+  .badge-crossref {
+    background: #b8860b;
+  }
   .pub-meta {
     display: flex;
     gap: 8px;
