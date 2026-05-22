@@ -17,11 +17,11 @@ export function isSection(node: NavNode): node is Section {
  *   des enfants à partir du dossier.
  */
 export const NAV: NavNode[] = [
+	{ slug: 'exploitation' },
+	{ slug: 'guide-utilisateur' },
 	{ slug: 'architecture' },
 	{ slug: 'donnees' },
 	{ section: 'sources', title: 'Sources de données' },
-	{ slug: 'pipeline' },
-	{ slug: 'exploitation' },
-	{ slug: 'guide-utilisateur' },
+	{ section: 'pipeline', title: 'Pipeline de traitement' },
 	{ slug: 'glossaire' }
 ];
