@@ -5,10 +5,12 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.ports.api.publishers_queries import (
-    PublisherBasic,
+    PublisherDashboardResponse,
+    PublisherDetailResponse,
     PublisherListResponse,
     PublisherQueries,
 )
+from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
@@ -55,33 +57,95 @@ def list_publisher_types() -> list[EnumOption]:
     return [EnumOption(value=v, label_fr=_PUBLISHER_TYPE_LABELS_FR[v]) for v in PUBLISHER_TYPES]
 
 
+@router.get("/api/publishers/countries", response_model=list[str])
+def list_countries(
+    queries: PublisherQueries = Depends(publisher_queries_sync),
+) -> list[str]:
+    """Valeurs distinctes de `country` observées en base, triées par fréquence.
+
+    Sert à alimenter le filtre « Pays » de la page publique `/publishers`.
+    """
+    return queries.distinct_countries()
+
+
 @router.get("/api/publishers", response_model=PublisherListResponse)
 def list_publishers(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     search: str | None = None,
+    publisher_type: str | None = None,
+    country: str | None = None,
+    is_predatory: bool | None = None,
     sort: str = "name",
     queries: PublisherQueries = Depends(publisher_queries_sync),
 ) -> PublisherListResponse:
     """Liste paginée des éditeurs avec comptage revues + publications.
 
-    `search` : recherche sur le nom normalisé, ignorée si < 2
-    caractères. `sort` : `name` / `-name` / `journals` / `-journals`
-    / `pubs` / `-pubs` ; fallback sur `name` si inconnu.
+    Filtres :
+    - `search` : insensible à la casse sur le nom normalisé, ignorée si
+      < 2 caractères.
+    - `publisher_type` / `country` : égalité stricte.
+    - `is_predatory` : booléen (true/false). Omettre = pas de filtre.
+
+    `sort` : `name` / `-name` / `journals` / `-journals` / `pubs` /
+    `-pubs` ; fallback sur `name` si inconnu.
     """
-    return queries.list_publishers(search=search, sort=sort, page=page, per_page=per_page)
+    return queries.list_publishers(
+        search=search,
+        publisher_type=publisher_type,
+        country=country,
+        is_predatory=is_predatory,
+        sort=sort,
+        page=page,
+        per_page=per_page,
+    )
 
 
-@router.get("/api/publishers/{publisher_id}", response_model=PublisherBasic)
+@router.get("/api/publishers/{publisher_id}", response_model=PublisherDetailResponse)
 def get_publisher(
     publisher_id: int,
     queries: PublisherQueries = Depends(publisher_queries_sync),
-) -> PublisherBasic:
-    """Récupère un éditeur par son id (nom uniquement). 404 si inconnu."""
-    row = queries.get_publisher(publisher_id)
+) -> PublisherDetailResponse:
+    """Profil complet d'un éditeur pour la page publique `/publishers/[id]`.
+
+    Inclut métadonnées + préfixes DOI + nombre de revues et publications
+    rattachées. 404 si l'éditeur est inconnu.
+    """
+    row = queries.get_publisher_detail(publisher_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Éditeur introuvable")
     return row
+
+
+@router.get("/api/publishers/{publisher_id}/dashboard", response_model=PublisherDashboardResponse)
+def get_publisher_dashboard(
+    publisher_id: int,
+    queries: PublisherQueries = Depends(publisher_queries_sync),
+) -> PublisherDashboardResponse:
+    """Agrégats pour l'onglet « Dashboard » de la page éditeur.
+
+    Distribution des `journal_type` du portfolio + distributions `doc_type` /
+    `oa_status` des publications rattachées via les revues. 404 si l'éditeur
+    est inconnu.
+    """
+    result = queries.get_publisher_dashboard(publisher_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Éditeur introuvable")
+    return result
+
+
+@router.get("/api/publishers/{publisher_id}/subjects", response_model=list[SubjectFrequency])
+def get_publisher_subjects(
+    publisher_id: int,
+    limit: int = Query(30, ge=1, le=200),
+    queries: PublisherQueries = Depends(publisher_queries_sync),
+) -> list[SubjectFrequency]:
+    """Top sujets des publications de l'éditeur (pour l'onglet Dashboard).
+
+    Exclut les sujets génériques (`usage_count > 5000`). Retourne une liste
+    vide si l'éditeur existe sans publications taggées.
+    """
+    return queries.get_publisher_subjects(publisher_id, limit=limit)
 
 
 @router.put("/api/publishers/{publisher_id}", response_model=OkResponse)
