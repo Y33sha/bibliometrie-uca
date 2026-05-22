@@ -44,6 +44,18 @@ _JOURNAL_TYPE_LABELS_FR: dict[str, str] = {
 }
 
 
+@router.get("/api/journals/oa-models", response_model=list[str])
+def list_oa_models(
+    queries: JournalQueries = Depends(journal_queries_sync),
+) -> list[str]:
+    """Valeurs distinctes de `oa_model` observées en base, triées par fréquence.
+
+    Sert à alimenter le filtre « Modèle OA » de la page publique `/journals`.
+    Pas d'enum SQL ici (texte libre historique) — on lit ce qui existe.
+    """
+    return queries.distinct_oa_models()
+
+
 @router.get("/api/journal-types", response_model=list[EnumOption])
 def list_journal_types() -> list[EnumOption]:
     """Valeurs possibles de l'enum `journal_type` avec leur label français.
@@ -61,19 +73,29 @@ def list_journals(
     per_page: int = Query(50, ge=1, le=200),
     search: str | None = None,
     publisher_id: int | None = None,
+    journal_type: str | None = None,
+    is_in_doaj: bool | None = None,
+    oa_model: str | None = None,
     sort: str = "title",
     queries: JournalQueries = Depends(journal_queries_sync),
 ) -> JournalListResponse:
     """Liste paginée des revues avec comptage des publications rattachées.
 
-    `search` : recherche insensible à la casse sur le titre normalisé,
-    ignorée si < 2 caractères. `publisher_id` : filtre par éditeur.
+    Filtres :
+    - `search` : insensible à la casse sur le titre normalisé, ignorée si
+      < 2 caractères.
+    - `publisher_id` / `journal_type` / `oa_model` : égalité stricte.
+    - `is_in_doaj` : booléen (true/false). Omettre = pas de filtre.
+
     `sort` : `title` / `-title` / `publisher` / `-publisher` /
     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
     """
     return queries.list_journals(
         search=search,
         publisher_id=publisher_id,
+        journal_type=journal_type,
+        is_in_doaj=is_in_doaj,
+        oa_model=oa_model,
         sort=sort,
         page=page,
         per_page=per_page,

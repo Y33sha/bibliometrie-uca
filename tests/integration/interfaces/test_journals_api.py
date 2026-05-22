@@ -110,6 +110,33 @@ class TestListJournals:
         ids = [item["id"] for item in r.json()["journals"]]
         assert j in ids
 
+    def test_filter_by_journal_type(self, client):
+        jid = _seed_journal()
+        with _pool() as cur:
+            cur.execute("UPDATE journals SET journal_type = 'proceedings' WHERE id = %s", (jid,))
+        r = client.get("/api/journals", params={"journal_type": "proceedings", "per_page": 200})
+        assert r.status_code == 200
+        types = {j["journal_type"] for j in r.json()["journals"]}
+        assert types == {"proceedings"}
+
+    def test_filter_by_is_in_doaj(self, client):
+        jid = _seed_journal()
+        with _pool() as cur:
+            cur.execute("UPDATE journals SET is_in_doaj = TRUE WHERE id = %s", (jid,))
+        r = client.get("/api/journals", params={"is_in_doaj": "true", "per_page": 200})
+        assert r.status_code == 200
+        flags = {j["is_in_doaj"] for j in r.json()["journals"]}
+        assert flags == {True}
+
+    def test_filter_by_oa_model(self, client):
+        jid = _seed_journal()
+        with _pool() as cur:
+            cur.execute("UPDATE journals SET oa_model = 'full_oa' WHERE id = %s", (jid,))
+        r = client.get("/api/journals", params={"oa_model": "full_oa", "per_page": 200})
+        assert r.status_code == 200
+        models = {j["oa_model"] for j in r.json()["journals"]}
+        assert models == {"full_oa"}
+
     @pytest.mark.parametrize(
         "sort",
         ["title", "-title", "publisher", "-publisher", "pubs", "-pubs", "unknown"],
@@ -304,6 +331,27 @@ class TestMergeJournals:
             ids = {row["id"] for row in cur.fetchall()}
             assert dst in ids
             assert src not in ids
+
+
+# ── GET /api/journals/oa-models ─────────────────────────────────
+
+
+class TestOaModels:
+    def test_returns_distinct_values_sorted_by_frequency(self, client):
+        # Seed deux journals full_oa + un subscription.
+        j1 = _seed_journal()
+        j2 = _seed_journal()
+        j3 = _seed_journal()
+        with _pool() as cur:
+            cur.execute("UPDATE journals SET oa_model = 'full_oa' WHERE id IN (%s, %s)", (j1, j2))
+            cur.execute("UPDATE journals SET oa_model = 'subscription' WHERE id = %s", (j3,))
+        r = client.get("/api/journals/oa-models")
+        assert r.status_code == 200
+        models = r.json()
+        # 'full_oa' apparaît 2x → doit ressortir avant 'subscription'.
+        assert models[0] == "full_oa"
+        assert "subscription" in models
+        assert all(isinstance(m, str) for m in models)
 
 
 # ── GET /api/journal-types ──────────────────────────────────────

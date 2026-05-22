@@ -2118,6 +2118,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/journals/oa-models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Oa Models
+         * @description Valeurs distinctes de `oa_model` observées en base, triées par fréquence.
+         *
+         *     Sert à alimenter le filtre « Modèle OA » de la page publique `/journals`.
+         *     Pas d'enum SQL ici (texte libre historique) — on lit ce qui existe.
+         */
+        get: operations["list_oa_models_api_journals_oa_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/journal-types": {
         parameters: {
             query?: never;
@@ -2153,8 +2176,12 @@ export interface paths {
          * List Journals
          * @description Liste paginée des revues avec comptage des publications rattachées.
          *
-         *     `search` : recherche insensible à la casse sur le titre normalisé,
-         *     ignorée si < 2 caractères. `publisher_id` : filtre par éditeur.
+         *     Filtres :
+         *     - `search` : insensible à la casse sur le titre normalisé, ignorée si
+         *       < 2 caractères.
+         *     - `publisher_id` / `journal_type` / `oa_model` : égalité stricte.
+         *     - `is_in_doaj` : booléen (true/false). Omettre = pas de filtre.
+         *
          *     `sort` : `title` / `-title` / `publisher` / `-publisher` /
          *     `pubs` / `-pubs` ; fallback sur `title` si valeur inconnue.
          */
@@ -8874,6 +8901,26 @@ export interface operations {
             };
         };
     };
+    list_oa_models_api_journals_oa_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+        };
+    };
     list_journal_types_api_journal_types_get: {
         parameters: {
             query?: never;
@@ -8901,6 +8948,9 @@ export interface operations {
                 per_page?: number;
                 search?: string | null;
                 publisher_id?: number | null;
+                journal_type?: string | null;
+                is_in_doaj?: boolean | null;
+                oa_model?: string | null;
                 sort?: string;
             };
             header?: never;
