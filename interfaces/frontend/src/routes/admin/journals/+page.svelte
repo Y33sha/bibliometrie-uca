@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { base } from '$app/paths';
 	import { api, ApiError, journals as journalsApi } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -162,7 +163,7 @@
 		{#each journals as j (j.id)}
 			<tr class:predatory={j.is_predatory}>
 				<td>
-					<span class="journal-title">{j.title}</span>
+					<a href="{base}/journals/{j.id}" class="journal-title">{j.title}</a>
 					{#if j.is_predatory}<span class="badge-pred">prédateur</span>{/if}
 					{#if j.is_in_doaj}<span class="badge-doaj">DOAJ</span>{/if}
 				</td>
@@ -266,7 +267,8 @@
 	.sortable { cursor: pointer; user-select: none; }
 	.sortable:hover { color: var(--accent); }
 
-	.journal-title { font-weight: 500; }
+	.journal-title { font-weight: 500; color: var(--accent); text-decoration: none; }
+	.journal-title:hover { text-decoration: underline; }
 	.issn-cell { font-family: "JetBrains Mono", monospace; font-size: 0.8rem; white-space: nowrap; }
 	.muted { color: var(--muted); font-size: 0.85rem; }
 	.predatory td { background: #fff0f0; }
