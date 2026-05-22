@@ -433,7 +433,7 @@
 	{#if showPerimeterFacet && facets.options.perimeter.length}<FacetDropdown label="UCA" options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />{/if}
 	{#if col('apc')}<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />{/if}
 	<FacetDropdown label="Pays" options={facets.options.countries} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
-	<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} onchange={onFilterChange} />
+	<PresenceFilterToggle label="Sources" items={SOURCE_ITEMS} bind:states={sourceStates} counts={facets.sourceCounts} staticPresentCount onchange={onFilterChange} />
 	<span class="count">{pubs.total} publication{pubs.total > 1 ? 's' : ''}</span>
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
