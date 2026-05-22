@@ -2176,7 +2176,10 @@ export interface paths {
         };
         /**
          * Get Journal
-         * @description Récupère une revue par son id (titre uniquement). 404 si inconnue.
+         * @description Profil complet d'une revue pour la page publique `/journals/[id]`.
+         *
+         *     Inclut métadonnées + payload DOAJ brut + date d'import DOAJ + nombre de
+         *     publications rattachées. 404 si la revue est inconnue.
          */
         get: operations["get_journal_api_journals__journal_id__get"];
         /**
@@ -2187,6 +2190,54 @@ export interface paths {
          *     (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
          */
         put: operations["update_journal_api_journals__journal_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journals/{journal_id}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Journal Dashboard
+         * @description Agrégats des publications de la revue (distribution `doc_type` + `oa_status`).
+         *
+         *     Sert l'onglet « Dashboard » de la page publique d'une revue pour repérer
+         *     visuellement les incohérences (ex. `article` sur un journal_type
+         *     `proceedings`). 404 si la revue est inconnue.
+         */
+        get: operations["get_journal_dashboard_api_journals__journal_id__dashboard_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journals/{journal_id}/subjects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Journal Subjects
+         * @description Top sujets des publications de la revue (pour l'onglet Dashboard).
+         *
+         *     Exclut les sujets trop génériques (`usage_count > 5000`) pour ne pas
+         *     noyer le top-N. Retourne une liste vide si la revue existe sans
+         *     publications taggées (pas de 404 pour rester idempotent à l'usage UI).
+         */
+        get: operations["get_journal_subjects_api_journals__journal_id__subjects_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2808,6 +2859,16 @@ export interface components {
             detached: boolean;
         };
         /**
+         * DocTypeCount
+         * @description Compteur de publications par `doc_type` pour une revue.
+         */
+        DocTypeCount: {
+            /** Doc Type */
+            doc_type: string | null;
+            /** Count */
+            count: number;
+        };
+        /**
          * DoiPrefixInfo
          * @description Préfixe DOI rattaché à un éditeur (lecture seule, vient de la table `doi_prefixes`).
          */
@@ -3215,14 +3276,70 @@ export interface components {
             count: number;
         };
         /**
-         * JournalBasic
-         * @description GET /api/journals/{id} : id + title (recherche par id).
+         * JournalDashboardResponse
+         * @description GET /api/journals/{id}/dashboard : agrégats de signalement pour l'exploration.
+         *
+         *     Les distributions exposent les compteurs bruts (incluant `None` /
+         *     `unknown`) pour faciliter le repérage d'incohérences à l'œil
+         *     (ex. publis `article` sur un `journal_type=proceedings`).
          */
-        JournalBasic: {
+        JournalDashboardResponse: {
+            /** Total Publications */
+            total_publications: number;
+            /** Doc Types */
+            doc_types: components["schemas"]["DocTypeCount"][];
+            /** Oa Statuses */
+            oa_statuses: components["schemas"]["OaStatusCount"][];
+        };
+        /**
+         * JournalDetailResponse
+         * @description GET /api/journals/{id} : profil complet de la revue pour la page publique.
+         *
+         *     Superset de `JournalOut` + payload DOAJ brut + date d'import DOAJ.
+         *     Le payload est exposé tel quel pour permettre l'exploration en attendant
+         *     qu'on en extraie des colonnes typées (Phase 4 du chantier publishers-journals).
+         */
+        JournalDetailResponse: {
             /** Id */
             id: number;
             /** Title */
             title: string;
+            /** Issn */
+            issn: string | null;
+            /** Eissn */
+            eissn: string | null;
+            /** Issnl */
+            issnl: string | null;
+            /** Publisher Id */
+            publisher_id: number | null;
+            /** Pub Name */
+            pub_name: string | null;
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Is In Doaj */
+            is_in_doaj: boolean;
+            /** Is Predatory */
+            is_predatory: boolean;
+            /** Apc Amount */
+            apc_amount: number | null;
+            /** Apc Currency */
+            apc_currency: string | null;
+            /** Oa Model */
+            oa_model: string | null;
+            /** Journal Type */
+            journal_type: string | null;
+            /** Is Academic */
+            is_academic: boolean | null;
+            /** Doi Prefix */
+            doi_prefix: string | null;
+            /** Pub Count */
+            pub_count: number;
+            /** Doaj Payload */
+            doaj_payload: {
+                [key: string]: unknown;
+            } | null;
+            /** Doaj Imported At */
+            doaj_imported_at: string | null;
         };
         /** JournalListResponse */
         JournalListResponse: {
@@ -3736,6 +3853,16 @@ export interface components {
         OaFacet: {
             /** Value */
             value: string;
+            /** Count */
+            count: number;
+        };
+        /**
+         * OaStatusCount
+         * @description Compteur de publications par `oa_status` pour une revue.
+         */
+        OaStatusCount: {
+            /** Oa Status */
+            oa_status: string | null;
             /** Count */
             count: number;
         };
@@ -8819,7 +8946,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JournalBasic"];
+                    "application/json": components["schemas"]["JournalDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8855,6 +8982,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_journal_dashboard_api_journals__journal_id__dashboard_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                journal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalDashboardResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_journal_subjects_api_journals__journal_id__subjects_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                journal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubjectFrequency"][];
                 };
             };
             /** @description Validation Error */
