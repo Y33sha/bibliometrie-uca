@@ -350,7 +350,10 @@ class PgJournalRepository:
             {"t": target_id, "s": source_id},
         )
 
-        # SELECT puis UPDATE pour éviter le warning "cartesian product" sur UPDATE…FROM côté SA.
+        # Ordre : capture src → NULL-er openalex_id src (libère la contrainte
+        # UNIQUE) → enrich target → delete source. Sans ce NULL préalable,
+        # COALESCE essaie de coller openalex_id source sur target alors que
+        # source l'a encore → UniqueViolation.
         src = self._conn.execute(
             select(
                 journals.c.issn,
@@ -365,6 +368,9 @@ class PgJournalRepository:
                 journals.c.oa_model,
             ).where(journals.c.id == source_id)
         ).one()
+        self._conn.execute(
+            update(journals).where(journals.c.id == source_id).values(openalex_id=None)
+        )
         self._conn.execute(
             update(journals)
             .where(journals.c.id == target_id)
