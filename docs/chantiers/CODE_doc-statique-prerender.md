@@ -1,5 +1,7 @@
 # Chantier — Documentation HTML précompilée avec sommaire scrollable
 
+Commencé le 2026-05-22
+
 ## Contexte
 
 La page `/docs` fonctionne mais s'appuie sur un rendu client lourd :
@@ -37,13 +39,9 @@ code highlighté, mermaid pré-rendu.
   un rebuild frontend (équivalent au cycle code → commit → déploiement
   déjà en place).
 
-- **Stack de parsing** :
-  - `marked` côté Node (déjà connu du projet) avec un renderer custom
-    pour les ancres et les liens internes
-  - `shiki` pour le syntax highlighting (rendu en HTML au build, zéro JS
-    runtime ; thèmes intégrés)
-  - Mermaid pré-rendu en SVG au build via `@mermaid-js/mermaid` headless
-    ou un service worker au moment du SSR
+- **Périmètre figé aux 7 pages actuelles** (`architecture`, `donnees`, `sources`, `pipeline`, `exploitation`, `guide-utilisateur`, `glossaire`). Extensions possibles à terme, hors scope de ce chantier : indexation des fiches `docs/chantiers/*.md`, ajout de pages « workflow admin », pages par agrégat (schéma + pipeline + UI pour chaque entité), ou éclatement des pages longues actuelles en pages plus courtes pour la lisibilité.
+
+- **Stack de parsing minimale** : `marked` côté Node (déjà connu du projet) avec un renderer custom pour les ancres et les liens internes. Pas de syntax highlighting dans un premier temps (peu de blocs de code dans la doc actuelle). Mermaid reste client-side comme aujourd'hui — le léger délai de chargement est acceptable.
 
 - **Extraction de la TOC par le parser, pas par le DOM** : le renderer
   collecte les `h2`/`h3` et leurs ancres pendant le parse. Plus de
@@ -53,9 +51,17 @@ code highlighté, mermaid pré-rendu.
   `<a href="/bibliometrie/docs/glossaire#terme">` directement dans le
   HTML pré-rendu. Plus de regex au runtime.
 
-- **TODO collector conservé en build-time** : la collecte des
-  `<!-- TODO: ... -->` se fait au prerender et alimente la page
-  `/docs/todos` (elle aussi prerendered).
+- **Le TODO collector est retiré** : la page `/docs/todos` et l'endpoint
+  `/api/docs/todos/all` disparaissent avec la migration. Un fichier de
+  changelog viendra plus tard.
+
+- **Titre de page = premier `h1` du `.md`** : pas de duplication avec une
+  liste maintenue à part. Le parser l'extrait pendant le parse.
+
+- **Ordre des pages dans la sidebar = `interfaces/frontend/src/lib/docs/pages.ts`** :
+  un module qui exporte la liste ordonnée des slugs
+  (`architecture`, `donnees`, `sources`, `pipeline`, `exploitation`,
+  `guide-utilisateur`, `glossaire`). Court, typé, facile à éditer.
 
 - **Le layout reprend les codes svelte.dev** :
   - sidebar gauche avec arborescence (sections imbriquées si besoin),
@@ -68,67 +74,49 @@ code highlighté, mermaid pré-rendu.
 
 ### Phase 1 — Module de parsing
 
-- Ajouter `marked`, `shiki`, et la dépendance mermaid headless dans
-  `interfaces/frontend/package.json`
-- Créer `interfaces/frontend/src/lib/docs/` :
-  - `parser.ts` : `parseMarkdown(content: string) → { html, toc, title }`
-  - `links.ts` : résolution des liens internes (slug → URL absolue)
-  - `mermaid.ts` : pré-rendu SVG d'un bloc mermaid
-- Tests unitaires sur le parser : ancres déterministes, code highlight,
-  liens internes, mermaid, table des matières
+- [x] `marked` est déjà installé côté frontend, rien à ajouter
+- [x] Créer `interfaces/frontend/src/lib/docs/` :
+  - [x] `pages.ts` : liste ordonnée des slugs
+  - [x] `parser.ts` : `parseMarkdown(content, base) → { html, toc, title }`
+  - [x] `links.ts` : résolution des liens internes
+  - [x] `mermaid.ts` : fonction `renderMermaidBlocks(container)` extraite de l'inline actuel
+- [x] Tests unitaires sur le parser et les liens : ancres déterministes (Unicode), liens internes, blocs mermaid préservés, table des matières, h1 → titre
 
 ### Phase 2 — Routes prerendered
 
-- `/docs/[slug]/+page.server.ts` :
-  - `load()` lit `docs/{slug}.md` au filesystem
-  - `export const prerender = true`
-  - `export function entries()` énumère les `.md` de `docs/`
-  - retourne `{ html, toc, title, pages }` (pages = liste pour la sidebar)
-- `/docs/+layout.svelte` réécrit :
-  - sidebar gauche (props depuis `+layout.server.ts` ou un `+layout.ts`)
-  - TOC droite (props depuis la page)
-  - scrollspy via `IntersectionObserver` sur les ancres de la TOC
-- Suppression du `marked` runtime, du `MutationObserver`, du `fixLinks` regex
-- Vérifier que `vite.config.ts` watche `docs/**/*.md` en dev (HMR sur
+- [ ] `/docs/[slug]/+page.server.ts` :
+  - [ ] `load()` lit `docs/{slug}.md` au filesystem
+  - [ ] `export const prerender = true`
+  - [ ] `export function entries()` énumère les `.md` de `docs/`
+  - [ ] retourne `{ html, toc, title, pages }` (pages = liste pour la sidebar)
+- [ ] `/docs/+layout.svelte` réécrit :
+  - [ ] sidebar gauche (props depuis `+layout.server.ts` ou un `+layout.ts`)
+  - [ ] TOC droite (props depuis la page)
+  - [ ] scrollspy via `IntersectionObserver` sur les ancres de la TOC
+- [ ] Suppression du `marked` runtime, du `MutationObserver`, du `fixLinks` regex
+- [ ] Vérifier que `vite.config.ts` watche `docs/**/*.md` en dev (HMR sur
   édition de markdown)
 
 ### Phase 3 — Style et UX
 
-- Thème shiki accordé aux couleurs du projet
-- `/docs` (index) : landing avec présentation des sections plutôt qu'une
+- [ ] `/docs` (index) : landing avec présentation des sections plutôt qu'une
   redirection JS
-- Polish responsive : la sidebar passe en menu burger sur mobile
+- [ ] Polish responsive : la sidebar passe en menu burger sur mobile
 
-### Phase 4 — Retrait du backend doc
+### Phase 4 — Retrait du backend doc et de la page TODOs
 
-- Supprimer `interfaces/api/routers/docs.py`
-- Retirer l'inclusion du router dans
+- [ ] Supprimer `interfaces/api/routers/docs.py`
+- [ ] Retirer l'inclusion du router dans
   [interfaces/api/app.py](interfaces/api/app.py)
-- Nettoyer les éventuels tests
-- Vérifier qu'aucun appel `api("/api/docs/...")` ne subsiste côté frontend
-- Vérifier qu'aucun lien externe ou bookmark ne pointe vers `/api/docs/...`
+- [ ] Supprimer la route frontend `/docs/todos` et le lien correspondant
+  dans la sidebar
+  ([interfaces/frontend/src/routes/docs/+layout.svelte:71-76](interfaces/frontend/src/routes/docs/+layout.svelte#L71-L76))
+- [ ] Nettoyer les éventuels tests
+- [ ] Vérifier qu'aucun appel `api("/api/docs/...")` ne subsiste côté frontend
+- [ ] Vérifier qu'aucun lien externe ou bookmark ne pointe vers `/api/docs/...`
 
 ## Questions ouvertes
 
-- **Périmètre des pages indexées** : on garde les 7 pages actuelles,
-  ou on étend à `docs/chantiers/*.md` (≈30 fichiers, dont `archived/`) ?
-  Si on étend, la sidebar a besoin d'une hiérarchie (catégories CODE /
-  DATA / METIER, état en-cours / archived).
+- **Adapter SvelteKit** : `adapter-node` (actuel) ou `adapter-static` pour la partie docs ? On reste probablement sur `adapter-node` avec routes prerendered (le HTML est généré au build, servi par le serveur Node — pas besoin d'adapter-static).
 
-- **Search** : Pagefind compile un index de recherche au build et
-  s'intègre en quelques lignes. Utile si on indexe les chantiers (~40
-  pages au total), probablement over-engineering pour 7 pages seules.
-
-- **Pré-rendu Mermaid** : `@mermaid-js/mermaid` headless tourne sur
-  Puppeteer/Playwright en CI (lourd). Alternative : conserver Mermaid
-  client-side uniquement pour ces blocs, le reste prerendered.
-
-- **Adapter SvelteKit** : `adapter-node` (actuel) ou `adapter-static`
-  pour la partie docs ? On reste probablement sur `adapter-node` avec
-  routes prerendered (le HTML est généré au build, servi par le
-  serveur Node — pas besoin d'adapter-static).
-
-- **Migration du contenu** : certains `.md` actuels utilisent une
-  syntaxe qui passait dans le rendu client (ex. `[texte](slug)` sans
-  extension). À auditer pendant la phase 1, ou à corriger en cours
-  de migration.
+- **Migration du contenu** : certains `.md` actuels utilisent une syntaxe qui passait dans le rendu client (ex. `[texte](slug)` sans extension). À auditer pendant la phase 1, ou à corriger en cours de migration.
