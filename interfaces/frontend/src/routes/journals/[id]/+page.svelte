@@ -162,13 +162,21 @@
 				<div class="dash-grid">
 					<div class="dash-card">
 						<h3>Types de documents ({dashboard.total_publications})</h3>
+						{#if dashboard.expected_doc_types.length > 0}
+							<div class="expected-row">
+								<span class="expected-label">Attendus&nbsp;:</span>
+								{#each dashboard.expected_doc_types as t (t)}
+									<span class="expected-tag">{typeLabels[t] ?? t}</span>
+								{/each}
+							</div>
+						{/if}
 						{#if dashboard.doc_types.length === 0}
 							<p class="muted">Aucune publication rattachée.</p>
 						{:else}
 							<table class="count-table">
 								<tbody>
 									{#each dashboard.doc_types as d (d.doc_type ?? '∅')}
-										<tr>
+										<tr class:warning={!d.expected}>
 											<td>{d.doc_type ? (typeLabels[d.doc_type] ?? d.doc_type) : '(non renseigné)'}</td>
 											<td class="num">{d.count}</td>
 										</tr>
@@ -180,13 +188,21 @@
 
 					<div class="dash-card">
 						<h3>Statuts Open Access</h3>
+						{#if dashboard.expected_oa_statuses.length > 0}
+							<div class="expected-row">
+								<span class="expected-label">Attendus&nbsp;:</span>
+								{#each dashboard.expected_oa_statuses as s (s)}
+									<span class="expected-tag">{oaLabelsMap[s] ?? s}</span>
+								{/each}
+							</div>
+						{/if}
 						{#if dashboard.oa_statuses.length === 0}
 							<p class="muted">Aucune publication rattachée.</p>
 						{:else}
 							<table class="count-table">
 								<tbody>
 									{#each dashboard.oa_statuses as o (o.oa_status ?? '∅')}
-										<tr>
+										<tr class:warning={!o.expected}>
 											<td>{o.oa_status ? (oaLabelsMap[o.oa_status] ?? o.oa_status) : '(non renseigné)'}</td>
 											<td class="num">{o.count}</td>
 										</tr>
@@ -316,6 +332,18 @@
 	.count-table td { padding: 6px 8px; font-size: 0.95rem; border-bottom: 1px solid #f0efec; }
 	.count-table tr:last-child td { border-bottom: none; }
 	.count-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+	.count-table tr.warning td { background: #fef3e0; color: #8a4a00; }
+	.count-table tr.warning td.num { color: #8a4a00; }
+
+	.expected-row {
+		display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
+		margin-bottom: 10px; font-size: 0.85rem;
+	}
+	.expected-label { color: var(--muted); font-weight: 600; margin-right: 4px; }
+	.expected-tag {
+		background: #e6f4ec; color: #2a7d4f;
+		padding: 1px 8px; border-radius: 10px; font-size: 0.8rem;
+	}
 
 	.subjects-list {
 		list-style: none; padding: 0; margin: 0;
