@@ -38,6 +38,18 @@ JOURNAL_TYPES: tuple[JournalType, ...] = (
 )
 JOURNAL_TYPES_SET: frozenset[str] = frozenset(JOURNAL_TYPES)
 
+# Labels FR de chaque valeur d'enum, source de vérité côté Python pour les
+# affichages UI (dropdowns admin, colonnes/badges des pages publiques).
+# Exposés au frontend via `/api/journal-types`.
+JOURNAL_TYPE_LABELS_FR: dict[JournalType, str] = {
+    "journal": "Revue",
+    "proceedings": "Proceedings",
+    "repository": "Archive / dépôt",
+    "book_series": "Série d'ouvrages",
+    "preprint_server": "Serveur de preprints",
+    "media": "Média",
+}
+
 
 @dataclass(slots=True)
 class Journal:

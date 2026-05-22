@@ -21,6 +21,9 @@
 	let loading = $state(false);
 	let publisherTypes: EnumOption[] = $state([]);
 	let countries: string[] = $state([]);
+	const publisherTypeLabels = $derived(
+		Object.fromEntries(publisherTypes.map((t) => [t.value, t.label_fr]))
+	);
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
 	async function loadPublishers() {
@@ -154,7 +157,7 @@
 						<a href="{base}/publishers/{p.id}" class="publisher-link">{p.name}</a>
 						{#if p.is_predatory}<span class="badge-pred">prédateur</span>{/if}
 					</td>
-					<td class="muted">{p.publisher_type}</td>
+					<td class="muted">{publisherTypeLabels[p.publisher_type] ?? p.publisher_type}</td>
 					<td class="muted">{p.country ?? ''}</td>
 					<td class="prefixes">
 						{#each p.doi_prefixes as dp (dp.prefix)}

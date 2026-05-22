@@ -32,6 +32,18 @@ PUBLISHER_TYPES: tuple[PublisherType, ...] = (
 )
 PUBLISHER_TYPES_SET: frozenset[str] = frozenset(PUBLISHER_TYPES)
 
+# Labels FR de chaque valeur d'enum, source de vérité côté Python pour les
+# affichages UI (dropdowns admin, colonnes/badges des pages publiques).
+# Exposés au frontend via `/api/publisher-types`.
+PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
+    "commercial": "Éditeur commercial",
+    "learned_society": "Société savante",
+    "academic_institution": "Établissement d'enseignement",
+    "repository": "Archive / dépôt",
+    "aggregator": "Agrégateur",
+    "unknown": "Type inconnu",
+}
+
 
 @dataclass(slots=True)
 class Publisher:
