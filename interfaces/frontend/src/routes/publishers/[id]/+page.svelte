@@ -80,6 +80,7 @@
 	async function loadJournals() {
 		const params = new URLSearchParams();
 		params.set('publisher_id', String(publisherId));
+		params.set('with_pubs', 'true');
 		params.set('sort', '-pubs');
 		params.set('page', String(journalsPage));
 		params.set('per_page', String(JOURNALS_PER_PAGE));
@@ -159,7 +160,7 @@
 	<TabNav
 		tabs={[
 			{ id: 'dashboard', label: 'Dashboard', showCount: false },
-			{ id: 'journals', label: 'Revues', count: publisher.journal_count },
+			{ id: 'journals', label: 'Revues', count: journalsLoaded ? journalsTotal : publisher.journal_count },
 			{ id: 'publications', label: 'Publications', count: pubsTotal }
 		]}
 		onswitch={onTabSwitch}
