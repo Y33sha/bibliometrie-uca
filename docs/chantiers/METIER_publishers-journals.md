@@ -105,7 +105,7 @@ L'attribution initiale est traitée hors Phase 1 :
 - **Flagging `is_in_doaj`** : CSV = source de vérité. Reset à FALSE pour tous les journals puis SET TRUE sur les ISSN matchés.
 
 - [x] **Migration Alembic** : `journals.doaj_payload jsonb`, `journals.doaj_imported_at timestamptz` (révision `e5a3f7b8c2d4`).
-- [ ] **Script CLI d'import CSV** : lit `data/doaj_journalcsv_*.csv`, match par ISSN/eISSN cross-colonne contre `journals.issn`/`eissn`/`issnl`, bulk update `doaj_payload` + `doaj_imported_at` + `is_in_doaj`. Stats en fin de run (matchés / non matchés / rows DOAJ sans correspondance interne).
+- [x] **Script CLI d'import CSV** : lit `data/doaj_journalcsv_*.csv`, match par ISSN/eISSN cross-colonne contre `journals.issn`/`eissn`/`issnl`, bulk update `doaj_payload` + `doaj_imported_at` + `is_in_doaj`. Stats en fin de run (matchés / non matchés / rows DOAJ sans correspondance interne).
 - [ ] **Extracteur API DOAJ** *(différé)* : pour rafraîchissement incrémental quotidien/hebdo. Le CSV mensuel suffit pour démarrer.
 - [ ] **Croisement avec `oa_status`** : Phase 4c — `full_oa` ↔ revue DOAJ, `subscription` ↔ non-DOAJ.
 - [ ] **Retirer `enrich_journal_apc`** *(différé)* : une fois `doaj_payload` exploité (APC + DOAJ flag) et stabilité confirmée.

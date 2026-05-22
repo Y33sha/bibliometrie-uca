@@ -244,6 +244,8 @@ journals = Table(
     Column("journal_type", journal_type_enum, server_default="journal"),
     Column("is_academic", Boolean, server_default="true"),
     Column("doi_prefix", Text),
+    Column("doaj_payload", JSONB),
+    Column("doaj_imported_at", DateTime(timezone=True)),
     UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
     Index(
         "idx_journals_doi_prefix",

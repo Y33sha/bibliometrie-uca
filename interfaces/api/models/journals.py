@@ -1,8 +1,9 @@
 """Modèles Pydantic pour les revues (journals).
 
 Les DTOs de retour des query services (`JournalOut`, `JournalListResponse`,
-`JournalBasic`) vivent dans `application/ports/api/journals_queries.py`
-(cf. chantier `CODE_typage-projections-strict` Phase 4).
+`JournalDetailResponse`, `JournalDashboardResponse`) vivent dans
+`application/ports/api/journals_queries.py` (cf. chantier
+`CODE_typage-projections-strict` Phase 4).
 """
 
 from pydantic import BaseModel
