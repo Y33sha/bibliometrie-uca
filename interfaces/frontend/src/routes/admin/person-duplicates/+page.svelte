@@ -473,6 +473,7 @@
 	.badge-wos { background: #3b6b9e; }
 	.badge-scanr { background: #6f42c1; }
 	.badge-theses { background: #17a2b8; }
+	.badge-crossref { background: #b8860b; }
 	.pub-link {
 		font-size: 0.85rem;
 		color: inherit;
