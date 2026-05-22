@@ -21,7 +21,12 @@ from application.publishers import (
     merge_publishers,
     update_publisher,
 )
-from domain.errors import ConflictError, NotFoundError, ValidationError
+from domain.errors import (
+    ConflictError,
+    NotFoundError,
+    PublisherMergeBlockedError,
+    ValidationError,
+)
 from infrastructure.repositories import (
     journal_repository,
     publisher_repository,
@@ -406,19 +411,38 @@ class TestMergePublishers:
         row = _fetch_one(sa_sync_conn, "SELECT openalex_id FROM journals WHERE id = :id", id=jt)
         assert row.openalex_id == "S4210225546"
 
-    def test_raises_on_issn_conflict(self, sa_sync_conn, repo, pub_repo):
+    def test_raises_blocked_error_on_issn_conflict(self, sa_sync_conn, repo, pub_repo):
         target = _insert_publisher(sa_sync_conn, "Target")
         source = _insert_publisher(sa_sync_conn, "Source")
-        _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
-        _insert_journal(sa_sync_conn, "Nature", publisher_id=source, issn="9999-9999")
+        jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
+        js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, issn="9999-9999")
 
-        with pytest.raises(ConflictError, match="Conflit issn"):
-            merge_publishers(
-                target,
-                source,
-                publisher_repo=pub_repo,
-                journal_repo=repo,
-            )
+        with pytest.raises(PublisherMergeBlockedError) as exc_info:
+            merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+
+        blockers = exc_info.value.blocking_journals
+        assert len(blockers) == 1
+        b = blockers[0]
+        assert b["target_journal_id"] == jt
+        assert b["source_journal_id"] == js
+        assert b["target_title"] == "Nature"
+        assert b["source_title"] == "Nature"
+        assert "ISSN" in b["reason"]
+        assert "0028-0836" in b["reason"] and "9999-9999" in b["reason"]
+
+    def test_collects_all_blockers_in_one_pass(self, sa_sync_conn, repo, pub_repo):
+        """Plusieurs paires de revues bloquantes → toutes remontées d'un coup."""
+        target = _insert_publisher(sa_sync_conn, "Target")
+        source = _insert_publisher(sa_sync_conn, "Source")
+        _insert_journal(sa_sync_conn, "Rev1", publisher_id=target, issn="1111-1111")
+        _insert_journal(sa_sync_conn, "Rev1", publisher_id=source, issn="2222-2222")
+        _insert_journal(sa_sync_conn, "Rev2", publisher_id=target, eissn="3333-3333")
+        _insert_journal(sa_sync_conn, "Rev2", publisher_id=source, eissn="4444-4444")
+
+        with pytest.raises(PublisherMergeBlockedError) as exc_info:
+            merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+
+        assert len(exc_info.value.blocking_journals) == 2
 
     def test_enriches_target_flags(self, sa_sync_conn, repo, pub_repo):
         """is_predatory = OR logique : vrai si l'une des sources l'était."""
