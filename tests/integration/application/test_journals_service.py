@@ -390,6 +390,22 @@ class TestMergePublishers:
         assert row.issn == "0028-0836"
         assert row.eissn == "1476-4687"
 
+    def test_merges_same_title_journals_with_only_source_openalex_id(
+        self, sa_sync_conn, repo, pub_repo
+    ):
+        """Cible sans openalex_id, source avec : la fusion doit déplacer
+        l'openalex_id du source vers la cible sans violer UNIQUE(openalex_id)."""
+        target = _insert_publisher(sa_sync_conn, "Target")
+        source = _insert_publisher(sa_sync_conn, "Source")
+        jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target)
+        js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, openalex_id="S4210225546")
+
+        merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+
+        assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
+        row = _fetch_one(sa_sync_conn, "SELECT openalex_id FROM journals WHERE id = :id", id=jt)
+        assert row.openalex_id == "S4210225546"
+
     def test_raises_on_issn_conflict(self, sa_sync_conn, repo, pub_repo):
         target = _insert_publisher(sa_sync_conn, "Target")
         source = _insert_publisher(sa_sync_conn, "Source")
