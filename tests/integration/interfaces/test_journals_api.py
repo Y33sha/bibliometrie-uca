@@ -49,7 +49,8 @@ def _seed_publisher(name: str | None = None) -> int:
     name = name or _uniq("Publisher")
     with _pool() as cur:
         cur.execute(
-            "INSERT INTO publishers (name, name_normalized) VALUES (%s, lower(%s)) RETURNING id",
+            "INSERT INTO publishers (name, name_normalized) "
+            "VALUES (%s, normalize_name_form(%s)) RETURNING id",
             (name, name),
         )
         return cur.fetchone()["id"]
@@ -60,7 +61,7 @@ def _seed_journal(title: str | None = None, publisher_id: int | None = None) -> 
     with _pool() as cur:
         cur.execute(
             "INSERT INTO journals (title, title_normalized, publisher_id) "
-            "VALUES (%s, lower(%s), %s) RETURNING id",
+            "VALUES (%s, normalize_name_form(%s), %s) RETURNING id",
             (title, title, publisher_id),
         )
         return cur.fetchone()["id"]
@@ -101,6 +102,17 @@ class TestListJournals:
         r = client.get("/api/journals", params={"search": title.lower()})
         assert r.status_code == 200
         assert any(j["title"] == title for j in r.json()["journals"])
+
+    def test_search_with_punctuation_normalizes(self, client):
+        # `.` ne figure jamais dans title_normalized (normalize_text → espace).
+        # La query doit subir la même normalisation pour matcher.
+        suffix = _uniq("Punct").split("_")[-1]
+        title = f"Rev S.A. Etudes {suffix}"
+        _seed_journal(title)
+        r = client.get("/api/journals", params={"search": f"Rev S.A. Etudes {suffix}"})
+        assert r.status_code == 200
+        titles = {j["title"] for j in r.json()["journals"]}
+        assert title in titles
 
     def test_filter_by_publisher(self, client):
         pub = _seed_publisher()
