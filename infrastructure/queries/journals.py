@@ -14,6 +14,12 @@ from application.ports.api.journals_queries import (
     OaStatusCount,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
+from domain.journals.expected import (
+    EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE,
+    EXPECTED_OA_STATUSES_BY_OA_MODEL,
+    is_doc_type_expected,
+    is_oa_status_expected,
+)
 from infrastructure.db.tables import journals as t_journals
 
 _SORT_MAP = {
@@ -158,12 +164,15 @@ class PgJournalQueries(JournalQueries):
         )
 
     def get_journal_dashboard(self, journal_id: int) -> JournalDashboardResponse | None:
-        exists = self._conn.execute(
-            text("SELECT 1 FROM journals WHERE id = :id"),
+        # Récupère aussi journal_type + oa_model pour calculer les `expected`.
+        journal_row = self._conn.execute(
+            text("SELECT journal_type, oa_model FROM journals WHERE id = :id"),
             {"id": journal_id},
         ).one_or_none()
-        if exists is None:
+        if journal_row is None:
             return None
+        j_type = journal_row.journal_type
+        oa_model = journal_row.oa_model
 
         doc_type_rows = self._conn.execute(
             text("""
@@ -187,10 +196,29 @@ class PgJournalQueries(JournalQueries):
         ).all()
         total = sum(r.n for r in doc_type_rows)
 
+        expected_doc_types = sorted(EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE.get(j_type, frozenset()))
+        expected_oa_statuses = sorted(EXPECTED_OA_STATUSES_BY_OA_MODEL.get(oa_model, frozenset()))
+
         return JournalDashboardResponse(
             total_publications=total,
-            doc_types=[DocTypeCount(doc_type=r.doc_type, count=r.n) for r in doc_type_rows],
-            oa_statuses=[OaStatusCount(oa_status=r.oa_status, count=r.n) for r in oa_rows],
+            doc_types=[
+                DocTypeCount(
+                    doc_type=r.doc_type,
+                    count=r.n,
+                    expected=is_doc_type_expected(j_type, r.doc_type),
+                )
+                for r in doc_type_rows
+            ],
+            oa_statuses=[
+                OaStatusCount(
+                    oa_status=r.oa_status,
+                    count=r.n,
+                    expected=is_oa_status_expected(oa_model, r.oa_status),
+                )
+                for r in oa_rows
+            ],
+            expected_doc_types=expected_doc_types,
+            expected_oa_statuses=expected_oa_statuses,
         )
 
     def get_journal_subjects(self, journal_id: int, *, limit: int = 30) -> list[SubjectFrequency]:

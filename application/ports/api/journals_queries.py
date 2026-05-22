@@ -77,17 +77,28 @@ class JournalDetailResponse(BaseModel):
 
 
 class DocTypeCount(BaseModel):
-    """Compteur de publications par `doc_type` pour une revue."""
+    """Compteur de publications par `doc_type` pour une revue.
+
+    `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
+    pour le `journal_type` de la revue (cf. `domain.journals.expected`).
+    Permet au frontend de styler les inattendus en warning.
+    """
 
     doc_type: str | None
     count: int
+    expected: bool
 
 
 class OaStatusCount(BaseModel):
-    """Compteur de publications par `oa_status` pour une revue."""
+    """Compteur de publications par `oa_status` pour une revue.
+
+    `expected` est vrai si ce `oa_status` figure dans les valeurs attendues
+    pour le `oa_model` de la revue (cf. `domain.journals.expected`).
+    """
 
     oa_status: str | None
     count: int
+    expected: bool
 
 
 class JournalDashboardResponse(BaseModel):
@@ -96,11 +107,19 @@ class JournalDashboardResponse(BaseModel):
     Les distributions exposent les compteurs bruts (incluant `None` /
     `unknown`) pour faciliter le repérage d'incohérences à l'œil
     (ex. publis `article` sur un `journal_type=proceedings`).
+
+    `expected_doc_types` / `expected_oa_statuses` listent les valeurs
+    attendues pour les `journal_type` / `oa_model` de la revue (cf.
+    `domain.journals.expected`). Servent à afficher la liste « Attendus »
+    au-dessus de chaque tableau. Listes vides si la revue n'a pas de
+    journal_type / oa_model renseigné, ou si la valeur n'est pas mappée.
     """
 
     total_publications: int
     doc_types: list[DocTypeCount]
     oa_statuses: list[OaStatusCount]
+    expected_doc_types: list[str]
+    expected_oa_statuses: list[str]
 
 
 class JournalQueries(Protocol):

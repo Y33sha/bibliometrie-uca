@@ -197,7 +197,14 @@ class TestJournalDashboard:
         r = client.get(f"/api/journals/{jid}/dashboard")
         assert r.status_code == 200
         body = r.json()
-        assert body == {"total_publications": 0, "doc_types": [], "oa_statuses": []}
+        # journal_type par défaut = 'journal', oa_model NULL.
+        assert body["total_publications"] == 0
+        assert body["doc_types"] == []
+        assert body["oa_statuses"] == []
+        # `expected_doc_types` non vide (journal_type='journal' a un mapping),
+        # `expected_oa_statuses` vide (oa_model NULL = pas de mapping).
+        assert "article" in body["expected_doc_types"]
+        assert body["expected_oa_statuses"] == []
 
     def test_aggregates_publications(self, client):
         jid = _seed_journal()
@@ -217,6 +224,57 @@ class TestJournalDashboard:
         assert dt == {("article", 2), ("preprint", 1)}
         oa = {(o["oa_status"], o["count"]) for o in body["oa_statuses"]}
         assert oa == {("gold", 1), ("closed", 1), (None, 1)}
+
+    def test_expected_flags_doc_types_against_journal_type(self, client):
+        jid = _seed_journal()
+        with _pool() as cur:
+            # `journal_type=proceedings` : article inattendu, conference_paper attendu.
+            cur.execute("UPDATE journals SET journal_type = 'proceedings' WHERE id = %s", (jid,))
+            cur.execute(
+                "INSERT INTO publications (title, pub_year, doc_type, journal_id) "
+                "VALUES ('p1', 2024, 'article', %s), ('p2', 2024, 'conference_paper', %s)",
+                (jid, jid),
+            )
+        r = client.get(f"/api/journals/{jid}/dashboard")
+        body = r.json()
+        by_dt = {d["doc_type"]: d for d in body["doc_types"]}
+        assert by_dt["article"]["expected"] is False
+        assert by_dt["conference_paper"]["expected"] is True
+        assert body["expected_doc_types"] == sorted(["conference_paper", "other"])
+
+    def test_expected_flags_oa_statuses_against_oa_model(self, client):
+        jid = _seed_journal()
+        with _pool() as cur:
+            cur.execute("UPDATE journals SET oa_model = 'subscription' WHERE id = %s", (jid,))
+            cur.execute(
+                "INSERT INTO publications (title, pub_year, oa_status, journal_id) "
+                "VALUES ('p1', 2024, 'closed', %s), ('p2', 2024, 'gold', %s), "
+                "       ('p3', 2024, 'unknown', %s)",
+                (jid, jid, jid),
+            )
+        r = client.get(f"/api/journals/{jid}/dashboard")
+        body = r.json()
+        by_oa = {o["oa_status"]: o for o in body["oa_statuses"]}
+        assert by_oa["closed"]["expected"] is True
+        assert by_oa["gold"]["expected"] is False
+        # `unknown` reste expected (pas de signal).
+        assert by_oa["unknown"]["expected"] is True
+        assert set(body["expected_oa_statuses"]) == {"closed", "green", "hybrid", "bronze"}
+
+    def test_no_oa_model_yields_empty_expected_list(self, client):
+        # oa_model NULL → pas de signal côté revue → expected_oa_statuses vide,
+        # tous les counts retournent expected=True.
+        jid = _seed_journal()
+        with _pool() as cur:
+            cur.execute(
+                "INSERT INTO publications (title, pub_year, oa_status, journal_id) "
+                "VALUES ('p1', 2024, 'gold', %s), ('p2', 2024, 'closed', %s)",
+                (jid, jid),
+            )
+        r = client.get(f"/api/journals/{jid}/dashboard")
+        body = r.json()
+        assert body["expected_oa_statuses"] == []
+        assert all(o["expected"] is True for o in body["oa_statuses"])
 
 
 class TestJournalSubjects:

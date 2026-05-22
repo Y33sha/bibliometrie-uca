@@ -116,10 +116,10 @@ L'attribution initiale est traitée hors Phase 1 :
 
 Quatre familles de règles, à implémenter de manière indépendante.
 
-- [ ] **4a. DOI ↔ journal** : le préfixe DOI (`doi_prefixes.publisher_id`) doit correspondre au publisher du journal de la publication. Tolérance pour les DOI green/gold sur la même publi (preprint sur archive + version éditeur sur la revue). Incohérence vraie : article + DOI dont le préfixe correspond à une autre revue.
-- [ ] **4b. doc_type ↔ journal_type** : mapping attendu (`article` → `journal`, `conference_paper` → `proceedings`, `chapter` → `book_series`, `preprint` → `preprint_server`, etc.). Signaler les écarts.
-- [ ] **4c. oa_status ↔ journal_type / DOAJ** : `full_oa` ↔ revue DOAJ ; `subscription` ↔ revue non-DOAJ. Tolérer `green` partout.
-- [ ] **4d. Sujets ↔ revue** : pour chaque revue, calculer la distribution des sujets de ses publis. Signaler les sujets aberrants (rarement vus dans la revue mais présents sur une publi donnée). Permet de remonter les sujets OpenAlex bruités (cf. TODO existant sur la qualité des sujets).
+- [ ] **4a. DOI ↔ journal** : le préfixe DOI (`doi_prefixes.publisher_id`) doit correspondre au publisher du journal de la publication. Tolérance pour les DOI green/gold sur la même publi (preprint sur archive + version éditeur sur la revue). Incohérence vraie : article + DOI dont le préfixe correspond à une autre revue. Affichage frontend à concevoir.
+- [x] **4b. doc_type ↔ journal_type** : mapping `EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE` dans [`domain/journals/expected.py`](../../domain/journals/expected.py). Surfacé sur le dashboard `/journals/[id]` : tag « Attendus » au-dessus du tableau + lignes inattendues en warning. Backend : `expected: bool` sur chaque `DocTypeCount` + `expected_doc_types: list[str]` au niveau réponse.
+- [x] **4c. oa_status ↔ oa_model** : mapping `EXPECTED_OA_STATUSES_BY_OA_MODEL` (même structure, indexé sur `oa_model`). À raffiner ultérieurement avec les APC pour distinguer gold/diamond, et avec le DOAJ pour repérer les `subscription` qui auraient migré (Q ouverte : croiser avec DOAJ comme oracle).
+- [ ] **4d. Sujets ↔ revue** : pour chaque revue, calculer la distribution des sujets de ses publis. Signaler les sujets aberrants (rarement vus dans la revue mais présents sur une publi donnée). Permet de remonter les sujets OpenAlex bruités (cf. TODO existant sur la qualité des sujets). Point le plus difficile, à concevoir.
 
 Implémentation envisagée :
 - Vue SQL ou queries d'agrégation accessibles depuis la page admin (lecture en temps réel).
