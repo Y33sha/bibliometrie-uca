@@ -47,7 +47,8 @@ def _seed_publisher(name: str | None = None) -> int:
     name = name or _uniq("Publisher")
     with _pool() as cur:
         cur.execute(
-            "INSERT INTO publishers (name, name_normalized) VALUES (%s, lower(%s)) RETURNING id",
+            "INSERT INTO publishers (name, name_normalized) "
+            "VALUES (%s, normalize_name_form(%s)) RETURNING id",
             (name, name),
         )
         return cur.fetchone()["id"]
@@ -58,7 +59,7 @@ def _seed_journal(publisher_id: int, title: str | None = None) -> int:
     with _pool() as cur:
         cur.execute(
             "INSERT INTO journals (title, title_normalized, publisher_id) "
-            "VALUES (%s, lower(%s), %s) RETURNING id",
+            "VALUES (%s, normalize_name_form(%s), %s) RETURNING id",
             (title, title, publisher_id),
         )
         return cur.fetchone()["id"]
@@ -101,6 +102,17 @@ class TestListPublishers:
         r = client.get("/api/publishers", params={"search": name.lower()})
         assert r.status_code == 200
         assert any(p["name"] == name for p in r.json()["publishers"])
+
+    def test_search_with_punctuation_normalizes(self, client):
+        # `.` ne figure jamais dans name_normalized (normalize_text → espace).
+        # La query doit subir la même normalisation pour matcher.
+        suffix = _uniq("Punct").split("_")[-1]
+        name = f"Acme S.A. Pub {suffix}"
+        _seed_publisher(name)
+        r = client.get("/api/publishers", params={"search": f"Acme S.A. Pub {suffix}"})
+        assert r.status_code == 200
+        names = {p["name"] for p in r.json()["publishers"]}
+        assert name in names
 
     def test_doi_prefixes_aggregated(self, client):
         """Les préfixes DOI rattachés à un éditeur sont remontés via JOIN sur doi_prefixes."""

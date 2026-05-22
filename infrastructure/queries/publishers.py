@@ -16,6 +16,7 @@ from application.ports.api.publishers_queries import (
     PublisherQueries,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
+from domain.normalize import normalize_text
 from infrastructure.db.tables import publishers as t_publishers
 
 _SORT_MAP = {
@@ -65,8 +66,13 @@ class PgPublisherQueries(PublisherQueries):
         binds: dict[str, Any] = {}
         parts: list[str] = []
         if search and len(search) >= 2:
-            parts.append("p.name_normalized LIKE '%' || :search || '%'")
-            binds["search"] = search.lower()
+            # name_normalized passe par `normalize_text` à l'ingestion ; la
+            # query doit subir la même normalisation pour matcher les noms
+            # contenant ponctuation ou accents.
+            normalized = normalize_text(search)
+            if normalized:
+                parts.append("p.name_normalized LIKE '%' || :search || '%'")
+                binds["search"] = normalized
         if publisher_type:
             parts.append("p.publisher_type = :publisher_type")
             binds["publisher_type"] = publisher_type

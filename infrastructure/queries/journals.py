@@ -20,6 +20,7 @@ from domain.journals.expected import (
     is_doc_type_expected,
     is_oa_status_expected,
 )
+from domain.normalize import normalize_text
 from infrastructure.db.tables import journals as t_journals
 
 _SORT_MAP = {
@@ -54,8 +55,13 @@ class PgJournalQueries(JournalQueries):
         binds: dict[str, Any] = {}
         parts: list[str] = []
         if search and len(search) >= 2:
-            parts.append("j.title_normalized LIKE '%' || :search || '%'")
-            binds["search"] = search.lower()
+            # title_normalized passe par `normalize_text` à l'ingestion ; la
+            # query doit subir la même normalisation pour matcher les titres
+            # contenant ponctuation ou accents.
+            normalized = normalize_text(search)
+            if normalized:
+                parts.append("j.title_normalized LIKE '%' || :search || '%'")
+                binds["search"] = normalized
         if publisher_id:
             parts.append("j.publisher_id = :publisher_id")
             binds["publisher_id"] = publisher_id
