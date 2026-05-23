@@ -145,20 +145,31 @@
 		background: var(--accent);
 		color: white;
 	}
-	.docs-sidebar li.section {
-		margin-top: 12px;
+	/* Niveau 1 (FlatPage top-level + en-tête de Section) : plus gros, couleur accent, pas uppercase. */
+	.docs-sidebar > ul > li:not(.section) > a,
+	.docs-sidebar .section-title {
+		font-size: 1rem;
+		font-weight: 600;
+		color: var(--accent);
+		text-transform: none;
+		letter-spacing: normal;
+		padding: 8px 10px 6px;
 	}
 	.docs-sidebar .section-title {
 		display: block;
-		padding: 6px 10px 4px;
-		color: var(--muted);
-		font-size: 0.78rem;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-		font-weight: 600;
 	}
+	/* Trait de séparation entre items top-level. */
+	.docs-sidebar > ul > li + li {
+		border-top: 1px solid var(--border);
+		margin-top: 6px;
+		padding-top: 6px;
+	}
+	/* Children d'une Section : indentés, plus petits, couleur texte normale. */
 	.docs-sidebar li.section > ul > li > a {
-		padding-left: 18px;
+		padding-left: 22px;
+		font-size: 0.88rem;
+		color: var(--text);
+		font-weight: 400;
 	}
 	.docs-toc {
 		border-left: 1px solid var(--border);
