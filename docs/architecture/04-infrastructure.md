@@ -1,4 +1,4 @@
-# `infrastructure/` — adapters sortants
+# Infrastructure — adapters sortants
 
 Contenu :
 

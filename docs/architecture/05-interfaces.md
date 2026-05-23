@@ -1,4 +1,4 @@
-# `interfaces/` — adapters entrants
+# Interfaces — adapters entrants
 
 Contenu :
 

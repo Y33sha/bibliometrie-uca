@@ -8,10 +8,6 @@
 - Pagination par offset, 500 résultats/page, 0.5s de délai entre requêtes
 - Les identifiants ORCID/IdRef des auteurs sont extraits depuis le TEI `label_xml` retourné par la search API ; aucun appel séparé à `ref/author` n'est nécessaire.
 
-**ref/structure API** (`https://api.archives-ouvertes.fr/ref/structure/`) — métadonnées structures.
-- Enrichissement des structures HAL (dates, parents, pays, identifiants externes)
-- Requête par batch (50 IDs par requête)
-
 ## Données récupérées
 
 - **Publications** : titre, DOI, année, type de document, langue, journal, OA, URI
