@@ -2,6 +2,8 @@
 Commencé le 2026-04-27
 **En pause depuis 2026-04-28** — phases 1 et 2 livrées (ingestion + arbitrage `doc_type` avec gestion type / sous-type). Phases 3-5 (promotion ORCID, discovery, relations) reportées : sur l'échantillon CrossRef actuel (dominé par des méga-papers JAMA sans ORCID), l'utilité concrète est trop faible pour valider la logique. Reprise envisageable quand le corpus CrossRef sera plus représentatif (= cycles d'ingestion supplémentaires sur des DOIs non-mega) et qu'on pourra mesurer a priori l'impact de la promotion `pending → confirmed`.
 
+**Mise à jour 2026-05-23** — la piste « discovery par affiliation » est **réouverte pour réévaluation**. Un spike montre que `query.affiliation` est plus exploitable qu'estimé initialement : 237 847 hits annoncés sur la query UCA filtrée 2020-2026, 81 % des 30 000 paginés absents de la base locale. Le delta réel n'est pas mesurable hors prod ; nouveau standby commun avec le chantier `METIER_doi-ra-datacite` jusqu'à pouvoir rejouer sur la vraie base. Voir `docs/chantiers/datacite-vs-natives-spike.md` et la nouvelle Phase 6 ci-dessous.
+
 ## Contexte
 
 CrossRef est l'autorité officielle de l'enregistrement des DOI. Ses métadonnées sont déposées par les éditeurs au moment de l'enregistrement et sont, sur certains champs, plus fiables que celles de HAL/OpenAlex/WoS.
@@ -16,7 +18,7 @@ Le chantier vise à exploiter CrossRef sur **trois axes complémentaires**, sans
 
 ### Pistes écartées
 
-- **CrossRef comme source de découverte par affiliation** : `query.affiliation` est trop bruité (pas d'opérateurs booléens, pas de match exact), et le filtre `ror-id` souffre d'une adoption insuffisante par les éditeurs (≈16 % des records CrossRef ont des affiliations en mars 2025, ROR encore plus bas). Doublonnerait OpenAlex sans rien apporter.
+- ~~**CrossRef comme source de découverte par affiliation**~~ — **réouvert au 2026-05-23, cf. Phase 6.** Le constat initial (« `query.affiliation` trop bruité, ROR peu adopté, doublonnerait OpenAlex sans rien apporter ») n'avait pas été mesuré. Le spike `crossref_affiliation_discovery_spike.py` montre que la query renvoie un volume significatif (237 847 hits filtre 2020-2026 ; 24 351 nouveaux candidats sur les 30 000 plus pertinents paginés, soit 81 % vs base locale). « Doublonne OpenAlex » à mesurer sur prod, pas à supposer. Décision finale reportée à la rejouée sur prod.
 - **CrossRef pour enrichir les signatures (labos, équipes, services)** : les métadonnées CrossRef sont aplaties par les éditeurs vers la tutelle générique (« University Clermont Auvergne »), sans labo. Les signatures restent du ressort de HAL/OpenAlex/WoS.
 
 ## Périmètre fonctionnel
@@ -115,6 +117,21 @@ Gate exploratoire avant toute implémentation : pour un échantillon d'ORCIDs co
 Migration : création de `publication_relations` (cross-source) + extraction du champ `relation` de CrossRef. Affichage UI à concevoir séparément (TODO_LAURA.md ligne 82).
 
 **Mise en pause** : sur l'échantillon spike, ~2 % de couverture relations — bénéfice immédiat trop modeste pour prioriser. Reprise quand le corpus CrossRef sera plus volumineux ou si un besoin UI spécifique émerge.
+
+### Phase 6 — Discovery par affiliation ⏸ (en réévaluation)
+
+Réouverture de la piste initialement écartée. Spike du 2026-05-23 (`docs/chantiers/datacite-vs-natives-spike.md`, section Crossref) : `query.affiliation=Université Clermont Auvergne` + filtre `from-pub-date:2020,until-pub-date:2026` renvoie **237 847 hits annoncés** ; sur les 30 000 plus pertinents paginés, 24 351 (81 %) sont absents de la base locale. Top éditeurs nouveaux : Taylor & Francis, Wiley, MDPI, Research Square, Érudit, Oxford UP, ACS, APS.
+
+**Inconnues à lever avant implémentation** :
+- [ ] **Rejouer le spike sur la base de prod** pour mesurer le vrai delta (la base locale n'est pas représentative). Si l'overlap monte fortement, l'apport marginal de Crossref affiliation vs OpenAlex peut redevenir faible.
+- [ ] **Échantillonner la qualité des hits tardifs** (pages 20+) : à 237 k résultats, la queue de la relevance contient probablement des faux positifs token-match (« Université de X », « Clermont… ailleurs »). Cap raisonnable à fixer.
+- [ ] **Tester `query.affiliation` vs `filter=ror-id:01x0gvm65`** (note : Laura indique que le ROR UCA est quasi jamais renseigné côté Crossref ; à confirmer).
+- [ ] **Cousin DataCite** : extracteur affiliation-driven sur le même mode côté DataCite, cf. `METIER_doi-ra-datacite.md` Phase 3. Architecture probablement à partager.
+
+**Implémentation cible (si réévaluation positive)** :
+- Module `infrastructure/sources/crossref/fetch_uca_publications.py` (affiliation-driven, analogue HAL/OpenAlex) en plus du `fetch_missing_doi.py` existant (DOI-driven).
+- Réutilisation du normalizer Crossref existant (Phase 1) — la structure du payload `/works/{doi}` et `/works?query.affiliation` est identique (juste un wrapper `items: [...]`).
+- Mode incrémental via `from-index-date` (déjà acté dans les considérations techniques).
 
 ## Considérations techniques
 
