@@ -1,8 +1,8 @@
-# `domain/` — noyau métier pur
+# Domain — noyau métier pur
 
 Contenu, organisé par concept métier :
 
-- **Agrégats** (entités avec identité + comportement, racines d'invariants métier — *aggregate roots* en terminologie DDD) :
+- **Agrégats** (entités avec identité + comportement, invariants métier) :
   - `Publication` (+ entité fille `Authorship`) — `domain/publications/`
   - `SourcePublication` (+ entité fille `SourceAuthorship`) — `domain/source_publications/`
   - `Person` — `domain/persons/`

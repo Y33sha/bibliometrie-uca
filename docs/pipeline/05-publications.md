@@ -1,4 +1,4 @@
-# `publications` : Peuplement de la table Publications
+#  Création et dédoublonnage des publications
 
 ```mermaid
 flowchart LR
@@ -7,7 +7,7 @@ flowchart LR
     class B new;
 ```
 
-Les publications sources sont mappées aux publications canoniques:
+Phase `publications`: les publications sources sont rattachées aux publications canoniques:
 - par **DOI** (même DOI = même publi, sauf cas particuliers).
 - par **NNT** (numéro national de thèse)
 - par **hal-id** (un document OpenAlex ou ScanR qui référence un document HAL)

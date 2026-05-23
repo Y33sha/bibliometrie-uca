@@ -1,4 +1,4 @@
-# `persons` : Rattachement et création de personnes
+#  Matching et création de personnes
 
 ```mermaid
 flowchart LR
@@ -6,7 +6,7 @@ flowchart LR
     classDef new  fill:#bbf
     class B new;
 ```
-
+Phase `persons`:
 `create_persons_from_source_authorships` — algorithme en 3 étapes :
 
 > **Etape initiale à ajouter** : matching par ORCID attesté dans les métadonnées Crossref (= source auteur garantie => meilleur critère possible)

@@ -1,4 +1,4 @@
-# `authorships` : Construction des authorships canoniques
+#  Authorships canoniques
 
 ```mermaid
 flowchart LR
@@ -13,7 +13,7 @@ flowchart LR
     class B new;
 ```
 
-`build_authorships` construit la table `authorships` en 4 étapes :
+Phase `authorships`: `build_authorships` construit la table `authorships` en 4 étapes :
 
 1. **Insertion** des paires (publication_id, person_id) manquantes, depuis les `source_authorships` non exclues (toutes sources : HAL, OpenAlex, WoS, ScanR, theses, CrossRef)
 2. **FK** : rattache chaque `source_authorships` à son authorship canonique via `source_authorships.authorship_id`

@@ -1,4 +1,4 @@
-# `application/` — services et orchestrateurs
+# Application — services et orchestrateurs
 
 Contenu :
 
