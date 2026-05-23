@@ -2,6 +2,8 @@
 
 Commencé le 2026-04-28
 
+**Phases 0-2 livrées. Phase 3 en standby au 2026-05-23** — le spike comparatif et le spike affiliation-driven ont changé la nature de la Phase 3 : DataCite est exploitable comme source affiliation-driven (analogue HAL / OpenAlex), pas seulement comme fallback DOI-driven. Standby commun avec `METIER_crossref.md` Phase 6, en attendant de pouvoir rejouer les deux spikes sur la base de prod pour mesurer le vrai delta.
+
 ## Contexte
 
 Un DOI est enregistré auprès d'une **Registration Agency** (RA) — chaque RA gère un sous-ensemble disjoint des préfixes DOI :
@@ -28,9 +30,10 @@ Les préfixes DOI mappés aux `publishers` (et indirectement aux `journals`) ser
 
 **Exclus** :
 - Ingestion des autres RAs (mEDRA, JaLC, etc.). Volumes UCA négligeables.
-- Discovery DataCite par affiliation. DataCite n'a pas d'index affiliation/ROR exploitable, on reste DOI-driven.
 - Refetch périodique de la RA. Un préfixe ne change pas de RA en pratique (assignation permanente).
 - Modification de `journals.doi_prefix` — concept différent (pattern de matching incluant un suffixe discriminant comme `10.1038/s41586` pour Nature), conservé tel quel.
+
+*Note : l'exclusion initiale « Discovery DataCite par affiliation » a été retirée le 2026-05-23 suite au spike — voir Phase 3.*
 
 ## Décisions
 
@@ -137,18 +140,30 @@ extract → cross_imports (fetch_missing_hal_id + fetch_missing_doi) → normali
 - [x] Re-run de `--only resolve_doi_prefixes` (env de dev pour cette session). Note : sur prod, les rows DataCite existantes ont `client_*` et `datacite_client_symbol = NULL` — un rattrapage dédié sera nécessaire (one-shot ou extension passe 2) ; reporté ou couvert par un re-seed selon besoin.
 - **Livrable** : mapping préfixe → provider + client en place pour les deux RAs, sans nouvelle source ingérée.
 
-### Phase 3 — Décision ingestion (spike comparatif puis arbitrage)
+### Phase 3 — Source DataCite ⏸ (en standby au 2026-05-23)
 
-- [ ] Spike comparatif sur 2 repositories phares : **Zenodo** (préfixe 10.5281, generaliste, volume probable) et **INRAE** (préfixes 10.14758 + 10.15454 + 10.17180, repository institutionnel français).
-  - N DOIs UCA réels par repository, requête API DataCite vs API native du repository.
-  - Grille de comparaison : creators + ORCID, affiliations, container, relatedIdentifiers, abstract, license, funder, doc_type.
-  - Note de synthèse `docs/chantiers/datacite-vs-natives-spike.md` (ou enrichissement de la note existante).
-- [ ] Arbitrage : DataCite seul / extracteurs natifs / mix par repository, en pesant aussi le nombre d'extracteurs à écrire pour couvrir les principaux repositories du corpus UCA.
-- [ ] Implémentation conditionnée à la décision :
-  - Si **DataCite seul** : extracteur DataCite (`infrastructure/sources/datacite/`), normalizer, mapping `doc_type` (cf. Phase 0 §`resourceTypeGeneral`), enum SQL `source_type` += `'datacite'`, ajout aux constantes `domain/sources.py`, filtre `get_cross_import_dois("datacite")` avec exclusion explicite du préfixe `10.60692` (DOIs synthétiques OpenAlex).
-  - Si **extracteurs natifs** : un module `infrastructure/sources/<repo>/` par repository retenu, mêmes contraintes (ports, queries, mapping doc_type).
-  - Si **mix** : DataCite par défaut + override natif sur les repositories où le delta justifie l'effort.
-- **Livrable** : `source_publications` peuplée sur le périmètre DataCite-ingérable arbitré.
+Le périmètre initial de cette phase (« extracteur DataCite DOI-driven via `fetch_missing_doi` ») est obsolète. Les deux spikes ont réécrit la cible :
+
+- [x] Spike comparatif Zenodo / INRAE (`docs/chantiers/datacite-vs-natives-spike.md` §1-2).
+  - **Sur Zenodo** : DataCite ≥ API native sur les champs biblio. Pas d'extracteur Zenodo natif à écrire.
+  - **Sur INRAE** : hypothèse Dataverse invalidée (0/36). Les DOIs `inist.inra` redirigent vers HAL-INRAE ou des revues OJS isolées. Pas d'API native unique à comparer.
+- [x] Spike discovery par affiliation (`docs/chantiers/datacite-vs-natives-spike.md` §3).
+  - `creators.affiliation.name:"Université Clermont Auvergne"` retourne 2 298 publications UCA, dont 1 922 (84 %) absentes de la base locale. Top apports : INRAE 860, Zenodo 457, Recherche Data Gouv 240.
+  - L'hypothèse cadre initiale (*« DataCite n'a pas d'index affiliation/ROR exploitable »*) est invalidée. DataCite est exploitable affiliation-driven.
+
+**Cible architecturale révisée** :
+- Extracteur DataCite **affiliation-driven** (`infrastructure/sources/datacite/fetch_uca_publications.py`), analogue à HAL / OpenAlex, en plus du mode DOI-driven existant via `fetch_missing_doi --target datacite` (utile en complément pour les DOIs apportés par d'autres sources).
+- Normalizer DataCite (ports + queries + orchestrator + CLI), enum SQL `source_type` += `'datacite'`, ajout aux constantes `domain/sources.py`.
+- Mapping `doc_type` DataCite via `_SOURCE_MAPS["datacite"]` (taxonomie `resourceTypeGeneral` + fallback `resourceType` libre, cf. Phase 0).
+- Architecture probablement partagée avec le volet Crossref affiliation-driven — cf. `METIER_crossref.md` Phase 6.
+
+**Inconnues à lever avant implémentation** :
+- [ ] **Rejouer le spike affiliation-driven sur la base de prod**. Le 84 % de nouveaux candidats est mesuré sur la base locale, non représentative.
+- [ ] **Arbitrer `creators` seul vs union `creators + contributors`** (2 298 vs ~2 500-2 800 hits).
+- [ ] **Stratégie d'ingestion** : full sweep périodique ou incrémental via `updated` ?
+- [ ] **Filtre `get_cross_import_dois("datacite")`** : reste pertinent pour le mode DOI-driven en complément ; arbitrage exclusion `10.60692` (DOIs synthétiques OpenAlex) — laissé ouvert.
+
+**Livrable cible (post-standby)** : `source_publications` peuplée pour les publications UCA accessibles via DataCite, ingérées par le pipeline normal au même titre que HAL / OpenAlex.
 
 ### Phase 4 — UI & cohérence finale (conditionnel à Phase 3)
 
@@ -174,5 +189,7 @@ extract → cross_imports (fetch_missing_hal_id + fetch_missing_doi) → normali
 - CrossRef Prefixes API : <https://api.crossref.org/swagger-ui/index.html#/Prefixes>
 - DataCite REST API : <https://support.datacite.org/docs/api>
 - DataCite metadata schema : <https://schema.datacite.org/>
-- Spike note : `docs/chantiers/doi-prefixes-spike.md`
-- Chantier jumeau : `docs/chantiers/METIER_publishers-journals.md`
+- Spike note Phase 0-1 : `docs/chantiers/doi-prefixes-spike.md`
+- Spike note Phase 3 (comparatif + affiliation-driven) : `docs/chantiers/datacite-vs-natives-spike.md`
+- Chantier jumeau publishers/journals : `docs/chantiers/METIER_publishers-journals.md`
+- Chantier cousin Crossref (affiliation-driven, en réévaluation parallèle) : `docs/chantiers/METIER_crossref.md` Phase 6
