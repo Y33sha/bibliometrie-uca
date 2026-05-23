@@ -145,6 +145,41 @@ describe('parseMarkdown — ancres custom via <span id>', () => {
 	});
 });
 
+// ── parseMarkdown / dédup d'ancres pour titres homonymes ───────
+
+describe('parseMarkdown — dédup ancres', () => {
+	it('suffixe -1, -2, … les doublons (convention GitHub)', () => {
+		const md = '## Hello\n## Hello\n## Hello';
+		const { toc, html } = parseMarkdown(md, BASE, 'test');
+		expect(toc.map((t) => t.anchor)).toEqual(['hello', 'hello-1', 'hello-2']);
+		expect(html).toContain('<h2 id="hello">');
+		expect(html).toContain('<h2 id="hello-1">');
+		expect(html).toContain('<h2 id="hello-2">');
+	});
+
+	it("dédup les sous-titres répétés sous deux sections différentes (cas option A / option B)", () => {
+		const md =
+			'## Option A\n### Avec Docker\n### Sans Docker\n## Option B\n### Avec Docker\n### Sans Docker';
+		const { toc } = parseMarkdown(md, BASE, 'test');
+		expect(toc.map((t) => t.anchor)).toEqual([
+			'option-a',
+			'avec-docker',
+			'sans-docker',
+			'option-b',
+			'avec-docker-1',
+			'sans-docker-1'
+		]);
+	});
+
+	it('respecte le compteur en présence d\'ancres custom Pandoc', () => {
+		const md = '## Foo {#bar}\n## Foo';
+		const { toc } = parseMarkdown(md, BASE, 'test');
+		// La première a l'ancre custom `bar` ; la seconde collision sur `foo` n'est
+		// pas en conflit avec `bar` donc n'est pas suffixée.
+		expect(toc.map((t) => t.anchor)).toEqual(['bar', 'foo']);
+	});
+});
+
 // ── parseMarkdown / syntaxe glossaire [[…]] ────────────────────
 
 describe('parseMarkdown — syntaxe glossaire [[slug]] / [[slug|texte]]', () => {

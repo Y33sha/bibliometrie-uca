@@ -50,11 +50,24 @@ function extractCustomAnchor(text: string): { anchor: string | null; cleaned: st
 	return { anchor: null, cleaned: text };
 }
 
+/**
+ * Dédup les ancres dans l'ordre d'apparition, convention GitHub : premier = `foo`, deuxième = `foo-1`, troisième = `foo-2`, … Renvoie une closure qui maintient son propre compteur — appeler `dedupe(baseAnchor)` à chaque heading rencontré.
+ */
+function makeAnchorDedupe(): (baseAnchor: string) => string {
+	const seen = new Map<string, number>();
+	return (baseAnchor: string) => {
+		const i = seen.get(baseAnchor) ?? 0;
+		seen.set(baseAnchor, i + 1);
+		return i === 0 ? baseAnchor : `${baseAnchor}-${i}`;
+	};
+}
+
 function extractHeadings(content: string): { title: string; toc: TocEntry[] } {
 	const inlineMarked = new Marked();
 	const toc: TocEntry[] = [];
 	let title = '';
 	let inCodeBlock = false;
+	const dedupe = makeAnchorDedupe();
 	for (const line of content.split(/\r?\n/)) {
 		if (/^```/.test(line)) {
 			inCodeBlock = !inCodeBlock;
@@ -65,11 +78,11 @@ function extractHeadings(content: string): { title: string; toc: TocEntry[] } {
 		if (!m) continue;
 		const level = m[1].length;
 		const { anchor: customAnchor, cleaned } = extractCustomAnchor(m[2].trim());
+		const anchor = dedupe(customAnchor ?? makeAnchor(cleaned));
 		if (level === 1 && !title) {
 			title = cleaned;
 		} else if (level === 2 || level === 3) {
 			const html = inlineMarked.parseInline(cleaned) as string;
-			const anchor = customAnchor ?? makeAnchor(cleaned);
 			toc.push({ level, html, anchor });
 		}
 	}
@@ -131,13 +144,18 @@ export function parseMarkdown(content: string, base: string, currentSlug: string
 	const { processed, refs } = extractGlossaryRefs(content);
 	const { title, toc } = extractHeadings(processed);
 
+	// Compteur indépendant pour le rendu HTML, qui suit la même logique de dédup
+	// qu'`extractHeadings` (cf. `makeAnchorDedupe`) — convention GitHub `-1`, `-2`, etc.
+	// pour les collisions d'ancres auto-générées.
+	const renderDedupe = makeAnchorDedupe();
+
 	const renderer: RendererObject = {
 		heading({ tokens, depth }) {
 			const inner = this.parser.parseInline(tokens);
 			const { anchor: customAnchor, cleaned } = extractCustomAnchor(inner);
-			const anchor =
-				customAnchor ??
-				makeAnchor(tokens.map((t) => ('text' in t ? t.text : '')).join(''));
+			const baseAnchor =
+				customAnchor ?? makeAnchor(tokens.map((t) => ('text' in t ? t.text : '')).join(''));
+			const anchor = renderDedupe(baseAnchor);
 			return `<h${depth} id="${anchor}">${cleaned}</h${depth}>`;
 		},
 		link({ href, title: linkTitle, tokens }) {
