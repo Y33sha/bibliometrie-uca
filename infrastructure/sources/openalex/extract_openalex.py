@@ -25,7 +25,7 @@ from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import (
     get_extraction_api_ids,
     get_openalex_api_key,
-    get_openalex_email,
+    get_polite_pool_email,
     get_years,
 )
 from infrastructure.sources.http_retry import http_request_with_retry
@@ -96,7 +96,7 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
 
     def load_config(self, conn: Connection) -> OpenalexExtractConfig:
         institution_ids = get_extraction_api_ids(conn, "openalex")
-        init_auth(api_key=get_openalex_api_key(conn), email=get_openalex_email(conn))
+        init_auth(api_key=get_openalex_api_key(conn), email=get_polite_pool_email(conn))
         return OpenalexExtractConfig(
             base_url=self._url,
             institution_ids=institution_ids,

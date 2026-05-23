@@ -44,7 +44,7 @@ from sqlalchemy import Connection, text
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.sources.config import get_openalex_email
+from infrastructure.sources.config import get_polite_pool_email
 
 log = setup_logger("doi_prefixes_spike", os.path.dirname(__file__))
 
@@ -559,7 +559,7 @@ def main() -> int:
 
     engine = get_sync_engine()
     with engine.connect() as conn:
-        user_agent = _user_agent(get_openalex_email(conn))
+        user_agent = _user_agent(get_polite_pool_email(conn))
         inventory: dict[str, Any] | None = None
         ra_cache: dict[str, str] = {}
         publisher_cache: dict[str, dict[str, Any]] = {}

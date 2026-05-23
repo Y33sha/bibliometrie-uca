@@ -30,7 +30,7 @@ from sqlalchemy import Connection, text
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.sources.config import get_openalex_email
+from infrastructure.sources.config import get_polite_pool_email
 
 log = setup_logger("datacite_vs_natives_spike", os.path.dirname(__file__))
 
@@ -236,7 +236,7 @@ def main() -> int:
     engine = get_sync_engine()
     pairs_by_repo: dict[str, dict[str, dict[str, Any]]] = {}
     with engine.connect() as conn:
-        user_agent = _user_agent(get_openalex_email(conn))
+        user_agent = _user_agent(get_polite_pool_email(conn))
         with httpx.Client(
             headers={"User-Agent": user_agent}, timeout=30.0, follow_redirects=True
         ) as client:

@@ -7,7 +7,7 @@ from application.pipeline.resolve_doi_prefixes import run_resolve_doi_prefixes
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import doi_prefix_repository, publisher_repository
-from infrastructure.sources.config import get_openalex_email
+from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.doi_prefixes.clients import (
     build_user_agent,
     fetch_crossref_prefix,
@@ -41,7 +41,7 @@ def main() -> None:
 
     conn = get_sync_engine().connect()
     try:
-        user_agent = build_user_agent(get_openalex_email(conn))
+        user_agent = build_user_agent(get_polite_pool_email(conn))
         metrics = run_resolve_doi_prefixes(
             logger,
             repo=doi_prefix_repository(conn),

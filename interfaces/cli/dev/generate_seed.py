@@ -43,7 +43,7 @@ TABLES: list[dict[str, Any]] = [
             "scanr_password": "VOTRE_MOT_DE_PASSE_SCANR",
             "scanr_username": "VOTRE_IDENTIFIANT_SCANR",
             "openalex_api_key": "VOTRE_CLE_OPENALEX",
-            "openalex_email": "votre@email.fr",
+            "polite_pool_email": "votre@email.fr",
         },
     },
     {

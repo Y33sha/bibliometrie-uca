@@ -167,20 +167,17 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
         return []
 
 
-def get_openalex_email(conn: Connection) -> str:
-    """Retourne l'email pour le polite pool OpenAlex (et fallback Crossref / Unpaywall).
+def get_polite_pool_email(conn: Connection) -> str:
+    """Retourne l'email envoyé en polite pool aux APIs externes (OpenAlex, HAL, Crossref, DataCite, Unpaywall, …).
 
-    Raise si la row `openalex_email` n'est pas configurée : un email
-    invalide envoyé à l'API peut entraîner un blacklist côté serveur,
-    donc on force la config explicite plutôt que de fallback sur un
-    email inventé.
+    Raise si la row `polite_pool_email` n'est pas configurée : un email invalide envoyé à l'API peut entraîner un blacklist côté serveur, donc on force la config explicite plutôt que de fallback sur un email inventé.
     """
-    val = _get_from_db(conn, "openalex_email")
+    val = _get_from_db(conn, "polite_pool_email")
     if val and isinstance(val, str):
         return val
     raise RuntimeError(
-        "openalex_email manquant dans la table `config` — requis pour le polite pool "
-        "des APIs (OpenAlex, Crossref, Unpaywall, etc.)."
+        "polite_pool_email manquant dans la table `config` — requis pour le polite pool "
+        "des APIs (OpenAlex, HAL, Crossref, DataCite, Unpaywall, etc.)."
     )
 
 
@@ -189,8 +186,8 @@ def get_crossref_email(conn: Connection) -> str:
     val = _get_from_db(conn, "crossref_email")
     if val and isinstance(val, str):
         return val
-    # Fallback partagé avec OpenAlex si la clé dédiée n'est pas configurée.
-    return get_openalex_email(conn)
+    # Fallback sur l'email polite pool partagé si la clé dédiée Crossref n'est pas configurée.
+    return get_polite_pool_email(conn)
 
 
 def get_wos_api_key(conn: Connection) -> str:

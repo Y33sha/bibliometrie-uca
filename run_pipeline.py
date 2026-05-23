@@ -256,7 +256,7 @@ def _run_resolve_doi_prefixes() -> PhaseMetrics:
     from application.pipeline.resolve_doi_prefixes import run_resolve_doi_prefixes
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.repositories import doi_prefix_repository, publisher_repository
-    from infrastructure.sources.config import get_openalex_email
+    from infrastructure.sources.config import get_polite_pool_email
     from infrastructure.sources.doi_prefixes.clients import (
         build_user_agent,
         fetch_crossref_prefix,
@@ -268,7 +268,7 @@ def _run_resolve_doi_prefixes() -> PhaseMetrics:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        user_agent = build_user_agent(get_openalex_email(conn))
+        user_agent = build_user_agent(get_polite_pool_email(conn))
         metrics = run_resolve_doi_prefixes(
             log,
             repo=doi_prefix_repository(conn),
@@ -698,7 +698,7 @@ def _run_enrich_oa_status() -> None:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import publication_repository
-    from infrastructure.sources.config import get_api_base_urls, get_openalex_email
+    from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
     from infrastructure.sources.unpaywall import fetch_oa_status
 
     log.info("▶ enrich_oa_status")
@@ -706,7 +706,7 @@ def _run_enrich_oa_status() -> None:
     conn = get_sync_engine().connect()
     try:
         base_url = get_api_base_urls(conn)["unpaywall"]
-        email = get_openalex_email(conn)
+        email = get_polite_pool_email(conn)
 
         async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
             return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)
@@ -734,7 +734,7 @@ def _run_enrich_journal_apc() -> None:
     from infrastructure.sources.config import (
         get_api_base_urls,
         get_openalex_api_key,
-        get_openalex_email,
+        get_polite_pool_email,
     )
 
     log.info("▶ enrich_journal_apc")
@@ -747,7 +747,7 @@ def _run_enrich_journal_apc() -> None:
             log,
             journal_repo=journal_repository(conn),
             api_key=get_openalex_api_key(conn),
-            mailto=get_openalex_email(conn),
+            mailto=get_polite_pool_email(conn),
             openalex_sources_api=get_api_base_urls(conn)["openalex_sources"],
             rate_delay=DOAJ_DELAY,
         )

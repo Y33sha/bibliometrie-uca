@@ -174,12 +174,12 @@
 <!-- ═══ API ═══ -->
 <h3 class="section-title">API</h3>
 <div class="config-grid">
-  {#each ["openalex_email", "openalex_api_key", "wos_api_key", "scanr_username", "scanr_password"] as key}
+  {#each ["polite_pool_email", "openalex_api_key", "wos_api_key", "scanr_username", "scanr_password"] as key}
     {@const isSecret = key === "wos_api_key" || key === "scanr_password" || key === "openalex_api_key"}
     {#if configByKey(key)}
       <div class="config-row">
         <span class="config-label"
-          >{key === "openalex_email"
+          >{key === "polite_pool_email"
             ? "Email polite pool"
             : key === "openalex_api_key"
               ? "OpenAlex — Clé API"

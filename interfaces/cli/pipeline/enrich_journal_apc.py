@@ -12,7 +12,7 @@ from infrastructure.sources.api_limits import DOAJ_DELAY
 from infrastructure.sources.config import (
     get_api_base_urls,
     get_openalex_api_key,
-    get_openalex_email,
+    get_polite_pool_email,
 )
 
 logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file__), "logs"))
@@ -39,7 +39,7 @@ def main() -> None:
             logger,
             journal_repo=journal_repository(conn),
             api_key=get_openalex_api_key(conn),
-            mailto=get_openalex_email(conn),
+            mailto=get_polite_pool_email(conn),
             openalex_sources_api=get_api_base_urls(conn)["openalex_sources"],
             limit=args.limit,
             dry_run=args.dry_run,

@@ -20,7 +20,7 @@ from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import (
     get_api_base_urls,
     get_openalex_api_key,
-    get_openalex_email,
+    get_polite_pool_email,
 )
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
@@ -52,7 +52,7 @@ class OpenalexFetchMissingDoiAdapter:
     base_url: str
 
     def configure(self, conn: Connection) -> None:
-        init_auth(api_key=get_openalex_api_key(conn), email=get_openalex_email(conn))
+        init_auth(api_key=get_openalex_api_key(conn), email=get_polite_pool_email(conn))
         self.base_url = get_api_base_urls(conn)["openalex"]
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
