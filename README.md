@@ -72,7 +72,7 @@ docker compose exec backend python run_pipeline.py
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Différences avec le compose de dev : un seul conteneur applicatif (backend + frontend buildé en SPA statique, plus de vite dev server), pas de volume code, port DB non exposé. Voir [docs/exploitation.md](docs/exploitation.md) pour les détails et les options de déploiement hors Docker.
+Différences avec le compose de dev : un seul conteneur applicatif (backend + frontend buildé en SPA statique, plus de vite dev server), pas de volume code, port DB non exposé. Voir [docs/exploitation/03-deploiement.md](docs/exploitation/03-deploiement.md) pour les détails et les options de déploiement hors Docker.
 
 ### Commandes utiles
 
@@ -157,7 +157,7 @@ cd interfaces/frontend && npm run dev -- --port 5176
 
 Deux voies au choix :
 
-- **Docker** (recommandé pour la prod) : `docker compose -f docker-compose.prod.yml up -d` — un conteneur applicatif autoportant (backend + frontend buildé en SPA statique) + un conteneur Postgres. Voir [docs/exploitation.md](docs/exploitation.md).
+- **Docker** (recommandé pour la prod) : `docker compose -f docker-compose.prod.yml up -d` — un conteneur applicatif autoportant (backend + frontend buildé en SPA statique) + un conteneur Postgres. Voir [docs/exploitation/03-deploiement.md](docs/exploitation/03-deploiement.md).
 - **Sans Docker** : build du frontend (`cd interfaces/frontend && npm run build` — la SPA est ensuite servie par l'API), puis lancement d'uvicorn avec le gestionnaire de process de votre choix (systemd, supervisor, pm2…). Exemple uvicorn nu : `uvicorn interfaces.api.app:app --host 0.0.0.0 --port 8003`.
 
 ## Pipeline de données
@@ -218,7 +218,7 @@ d'import entre couches (vérifiées par import-linter en pre-commit + CI).
 - [Modèle de données](docs/donnees.md) — schéma, domaines fonctionnels, relations
 - [Sources de données](docs/sources.md) — API, imports manuels, particularités par source
 - [Pipeline](docs/pipeline.md) — les 9 phases de traitement
-- [Guide d'exploitation](docs/exploitation.md) — lancement, reprise, supervision, déploiement
+- [Guide d'exploitation](docs/exploitation/) — initialisation, déploiement, lancement, supervision
 - [Guide utilisateur](docs/guide-utilisateur.md) — pages et fonctionnalités
 - [Glossaire](docs/glossaire.md) — définitions des termes métier
 
