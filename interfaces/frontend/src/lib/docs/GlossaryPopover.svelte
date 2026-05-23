@@ -42,7 +42,11 @@
 	}
 
 	$effect(() => {
-		function onClick(e: MouseEvent) {
+		// Intercepte en phase capture pour passer DEVANT SvelteKit, qui
+		// gère lui-même les clics sur les `<a>` internes (bubble phase).
+		// Sans ça, SvelteKit déclenche `goto()` avant que le popover puisse
+		// afficher (l'infobulle apparaît brièvement puis la page change).
+		function onClickCapture(e: MouseEvent) {
 			const target = e.target as HTMLElement | null;
 			if (!target) return;
 			const link = target.closest<HTMLAnchorElement>('a[data-glossary]');
@@ -50,11 +54,19 @@
 				const slug = link.getAttribute('data-glossary');
 				if (slug && open(link, slug)) {
 					e.preventDefault();
+					e.stopImmediatePropagation();
 					return;
 				}
 			}
+		}
+		function onClickBubble(e: MouseEvent) {
+			// Fermer le popover sur clic en dehors. En bubble phase pour ne pas
+			// se déclencher avant que l'ouverture (capture) ait positionné le popover.
+			const target = e.target as HTMLElement | null;
+			if (!target) return;
 			if (activeEntry && popoverEl && !popoverEl.contains(target)) {
-				close();
+				const onGlossLink = target.closest<HTMLAnchorElement>('a[data-glossary]');
+				if (!onGlossLink) close();
 			}
 		}
 		function onKeydown(e: KeyboardEvent) {
@@ -63,11 +75,13 @@
 		function onScroll() {
 			close();
 		}
-		window.addEventListener('click', onClick);
+		window.addEventListener('click', onClickCapture, true);
+		window.addEventListener('click', onClickBubble);
 		window.addEventListener('keydown', onKeydown);
 		window.addEventListener('scroll', onScroll, true);
 		return () => {
-			window.removeEventListener('click', onClick);
+			window.removeEventListener('click', onClickCapture, true);
+			window.removeEventListener('click', onClickBubble);
 			window.removeEventListener('keydown', onKeydown);
 			window.removeEventListener('scroll', onScroll, true);
 		};
