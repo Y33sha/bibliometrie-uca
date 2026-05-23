@@ -14,7 +14,7 @@ personnes et laboratoires.
 - **Architecture** : DDD en 4 couches (`domain/`, `application/`,
   `infrastructure/`, `interfaces/`) — voir
   [docs/architecture/](docs/architecture/) (archi logicielle) et
-  [docs/donnees.md](docs/donnees.md) (modèle de données)
+  [docs/donnees/](docs/donnees/) (modèle de données)
 
 ## Prérequis
 
@@ -215,7 +215,7 @@ d'import entre couches (vérifiées par import-linter en pre-commit + CI).
 ## Documentation
 
 - [Architecture logicielle](docs/architecture/) — couches DDD, ports/adapters, règles d'import
-- [Modèle de données](docs/donnees.md) — schéma, domaines fonctionnels, relations
+- [Modèle de données](docs/donnees/) — schéma, domaines fonctionnels, relations
 - [Sources de données](docs/sources/) — API, imports manuels, particularités par source
 - [Pipeline](docs/pipeline/) — les 9 phases de traitement
 - [Guide d'exploitation](docs/exploitation/) — initialisation, déploiement, lancement, supervision
