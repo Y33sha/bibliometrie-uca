@@ -11,6 +11,7 @@ from infrastructure.sources.config import get_openalex_email
 from infrastructure.sources.doi_prefixes.clients import (
     build_user_agent,
     fetch_crossref_prefix,
+    fetch_datacite_prefix,
     resolve_ra,
 )
 
@@ -47,6 +48,9 @@ def main() -> None:
             publisher_repo=publisher_repository(conn),
             resolve_ra_fn=lambda doi: resolve_ra(doi, user_agent=user_agent),
             fetch_crossref_prefix_fn=lambda prefix: fetch_crossref_prefix(
+                prefix, user_agent=user_agent
+            ),
+            fetch_datacite_prefix_fn=lambda prefix: fetch_datacite_prefix(
                 prefix, user_agent=user_agent
             ),
             n_samples=args.samples,

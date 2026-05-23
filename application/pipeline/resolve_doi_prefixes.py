@@ -1,43 +1,21 @@
-"""Phase pipeline : résolution préfixe DOI → Registration Agency + éditeur.
+"""Phase pipeline : résolution préfixe DOI → Registration Agency + éditeur/repository.
 
 Deux passes :
 
-**Passe 1 — nouveaux préfixes du staging.** Pour chaque préfixe DOI
-présent en staging mais absent de `doi_prefixes` :
+**Passe 1 — nouveaux préfixes du staging.** Pour chaque préfixe DOI présent en staging mais absent de `doi_prefixes` :
 
 1. Récupère jusqu'à `n_samples` DOI samples du staging pour ce préfixe.
-2. Interroge `doi.org/ra` dans l'ordre via `resolve_ra_fn`. Premier
-   sample qui renvoie une RA valide → on garde la valeur. Si tous les
-   samples échouent (DOI inexistant, erreur réseau), **on n'insère
-   pas** le préfixe : retry au prochain run.
-3. Si RA = `'Crossref'`, interroge `api.crossref.org/prefixes/<prefix>`
-   via `fetch_crossref_prefix_fn` pour récupérer `(name, member_id)`.
-   Normalise le nom via `normalize_text`, matche contre
-   `publisher_name_forms` pour rattacher un `publisher_id` existant.
-   **Si aucun match, crée le publisher** (+ son `publisher_name_form`)
-   plutôt que de laisser `publisher_id NULL`. Évite les préfixes
-   orphelins ; les doublons éventuels avec des publishers issus des
-   sources sont rattrapés via fusion manuelle côté admin.
-4. Insère la row `doi_prefixes`.
+2. Interroge `doi.org/ra` dans l'ordre via `resolve_ra_fn`. Premier sample qui renvoie une RA valide → on garde la valeur. Si tous les samples échouent (DOI inexistant, erreur réseau), **on n'insère pas** le préfixe : retry au prochain run.
+3. Si RA = `'Crossref'`, interroge `api.crossref.org/prefixes/<prefix>` via `fetch_crossref_prefix_fn` pour récupérer `(name, member_id)`. Le `name` (publisher Crossref) occupe les colonnes `publisher_*`. Normalisation via `normalize_text`, matching contre `publisher_name_forms` pour rattacher un `publisher_id` existant ; sinon création du publisher.
+4. Si RA = `'DataCite'`, interroge `api.datacite.org/prefixes/<prefix>` via `fetch_datacite_prefix_fn` pour récupérer `(provider_name, client_name, client_symbol)`. Le `provider_name` (organisation-mère DataCite) occupe les colonnes `publisher_*` (mêmes règles de match/création) ; le `client_name` et le `client_symbol` (= repository) vont dans les colonnes `client_*` et `datacite_client_symbol`.
+5. **Création de publisher plutôt que `publisher_id NULL`** : si aucun match, on crée le publisher (+ son `publisher_name_form`) plutôt que de laisser orphelin. Les doublons éventuels avec des publishers issus des sources sont rattrapés via fusion manuelle côté admin.
+6. Insère la row `doi_prefixes`.
 
-**Passe 2 — rattrapage des rows existantes.** Pour chaque row
-`doi_prefixes` connue de Crossref (`publisher_name_normalized` rempli)
-mais sans `publisher_id` :
+**Passe 2 — rattrapage des rows existantes.** Pour chaque row `doi_prefixes` avec `publisher_name_normalized` rempli mais sans `publisher_id` (Crossref ou DataCite) : retente le match contre `publisher_name_forms` (un nouveau publisher a peut-être été créé entre-temps), crée le publisher si toujours absent, `UPDATE doi_prefixes SET publisher_id = ...`.
 
-1. Retente le match contre `publisher_name_forms` (un nouveau publisher
-   a peut-être été créé entre-temps).
-2. Si toujours pas de match, crée le publisher.
-3. `UPDATE doi_prefixes SET publisher_id = ...`.
+Placée **après normalize** dans le pipeline : (a) `cross_imports` (en amont) peut introduire de nouveaux DOIs via `fetch_missing_hal_id` qu'il faut prendre en compte ; (b) `normalize` crée les `publishers` (via `find_or_create_publisher`), donc matcher après normalize permet un vrai match plutôt qu'un best-effort qui laisserait `publisher_id NULL`.
 
-Placée **après normalize** dans le pipeline : (a) `cross_imports` (en
-amont) peut introduire de nouveaux DOIs via `fetch_missing_hal_id` qu'il
-faut prendre en compte ; (b) `normalize` crée les `publishers` (via
-`find_or_create_publisher`), donc matcher après normalize permet un vrai
-match plutôt qu'un best-effort qui laisserait `publisher_id NULL`.
-
-Les clients HTTP (doi.org/ra, api.crossref.org/prefixes) sont injectés
-en tant que callables pour testabilité et étanchéité DDD (application
-ne dépend pas d'infrastructure).
+Les clients HTTP (doi.org/ra, api.crossref.org/prefixes, api.datacite.org/prefixes) sont injectés en tant que callables pour testabilité et étanchéité DDD (application ne dépend pas d'infrastructure).
 """
 
 from __future__ import annotations
@@ -56,6 +34,9 @@ ResolveRaFn = Callable[[str], str | None]
 FetchCrossrefPrefixFn = Callable[[str], tuple[str, int | None] | None]
 """Signature : `(prefix) -> (publisher_name, member_id) | None`."""
 
+FetchDataCitePrefixFn = Callable[[str], tuple[str, str, str] | None]
+"""Signature : `(prefix) -> (provider_name, client_name, client_symbol) | None`."""
+
 
 def run_resolve_doi_prefixes(
     log: logging.Logger,
@@ -64,6 +45,7 @@ def run_resolve_doi_prefixes(
     publisher_repo: PublisherRepository,
     resolve_ra_fn: ResolveRaFn,
     fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
+    fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
     n_samples: int = 3,
     dry_run: bool = False,
     limit: int | None = None,
@@ -75,18 +57,14 @@ def run_resolve_doi_prefixes(
         repo: port `DoiPrefixRepository`.
         publisher_repo: port `PublisherRepository` (match + création).
         resolve_ra_fn: callable interrogeant doi.org/ra.
-        fetch_crossref_prefix_fn: callable interrogeant
-            api.crossref.org/prefixes (uniquement pour RA=Crossref).
+        fetch_crossref_prefix_fn: callable interrogeant api.crossref.org/prefixes (uniquement pour RA=Crossref).
+        fetch_datacite_prefix_fn: callable interrogeant api.datacite.org/prefixes (uniquement pour RA=DataCite).
         n_samples: nombre max de DOI samples tentés par préfixe.
         dry_run: si True, log le plan sans rien insérer.
-        limit: nombre max de préfixes à traiter en passe 1 (passe 2 non
-            limitée — peu coûteuse, pas d'appel API).
+        limit: nombre max de préfixes à traiter en passe 1 (passe 2 non limitée — peu coûteuse, pas d'appel API).
 
     Returns:
-        `PhaseMetrics` : `total` = préfixes traités (passes 1+2), `new` =
-        rows `doi_prefixes` insérées (passe 1), `extras` = compteurs
-        détaillés (`resolved`, `unresolved`, `crossref_matched`,
-        `crossref_created`, `retried` pour la passe 2).
+        `PhaseMetrics` : `total` = préfixes traités (passes 1+2), `new` = rows `doi_prefixes` insérées (passe 1), `extras` = compteurs détaillés (`resolved`, `unresolved`, `publisher_matched`, `publisher_created`, `retried`).
     """
     metrics = PhaseMetrics()
     metrics.merge(
@@ -96,6 +74,7 @@ def run_resolve_doi_prefixes(
             publisher_repo=publisher_repo,
             resolve_ra_fn=resolve_ra_fn,
             fetch_crossref_prefix_fn=fetch_crossref_prefix_fn,
+            fetch_datacite_prefix_fn=fetch_datacite_prefix_fn,
             n_samples=n_samples,
             dry_run=dry_run,
             limit=limit,
@@ -124,6 +103,7 @@ def _pass_new_prefixes(
     publisher_repo: PublisherRepository,
     resolve_ra_fn: ResolveRaFn,
     fetch_crossref_prefix_fn: FetchCrossrefPrefixFn,
+    fetch_datacite_prefix_fn: FetchDataCitePrefixFn,
     n_samples: int,
     dry_run: bool,
     limit: int | None,
@@ -154,6 +134,9 @@ def _pass_new_prefixes(
         publisher_name_raw: str | None = None
         publisher_name_normalized: str | None = None
         crossref_member_id: int | None = None
+        client_name_raw: str | None = None
+        client_name_normalized: str | None = None
+        datacite_client_symbol: str | None = None
 
         if ra == "Crossref":
             crossref_info = fetch_crossref_prefix_fn(prefix)
@@ -166,7 +149,21 @@ def _pass_new_prefixes(
                         name_raw=publisher_name_raw,
                         name_normalized=publisher_name_normalized,
                     )
-                    metrics.add(**{"crossref_created" if created else "crossref_matched": 1})
+                    metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
+        elif ra == "DataCite":
+            datacite_info = fetch_datacite_prefix_fn(prefix)
+            if datacite_info is not None:
+                provider_name, client_name_raw, datacite_client_symbol = datacite_info
+                publisher_name_raw = provider_name
+                publisher_name_normalized = normalize_text(provider_name) or None
+                client_name_normalized = normalize_text(client_name_raw) or None
+                if publisher_name_normalized:
+                    publisher_id, created = _match_or_create_publisher(
+                        publisher_repo,
+                        name_raw=publisher_name_raw,
+                        name_normalized=publisher_name_normalized,
+                    )
+                    metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
 
         inserted = repo.insert_doi_prefix(
             prefix=prefix,
@@ -175,15 +172,19 @@ def _pass_new_prefixes(
             publisher_name_raw=publisher_name_raw,
             publisher_name_normalized=publisher_name_normalized,
             crossref_member_id=crossref_member_id,
+            client_name_raw=client_name_raw,
+            client_name_normalized=client_name_normalized,
+            datacite_client_symbol=datacite_client_symbol,
         )
         if inserted:
             metrics.add(new=1)
         log.info(
-            "  %s → %s%s%s",
+            "  %s → %s%s%s%s",
             prefix,
             ra,
             f" / publisher_id={publisher_id}" if publisher_id else "",
             f" / member={crossref_member_id}" if crossref_member_id else "",
+            f" / client={datacite_client_symbol}" if datacite_client_symbol else "",
         )
 
     return metrics
@@ -196,10 +197,10 @@ def _pass_retry_unmatched(
     publisher_repo: PublisherRepository,
     dry_run: bool,
 ) -> PhaseMetrics:
-    """Passe 2 : rattrape les rows `doi_prefixes` Crossref-connues sans publisher_id."""
+    """Passe 2 : rattrape les rows `doi_prefixes` sans publisher_id."""
     metrics = PhaseMetrics()
-    rows = repo.get_unmatched_crossref_prefixes()
-    log.info("Passe 2 — %d préfixes Crossref-connus sans publisher à rattraper", len(rows))
+    rows = repo.get_unmatched_prefixes()
+    log.info("Passe 2 — %d préfixes sans publisher à rattraper", len(rows))
 
     if dry_run:
         log.info("Dry-run — pas d'UPDATE")
@@ -214,7 +215,7 @@ def _pass_retry_unmatched(
             name_normalized=row.publisher_name_normalized,
         )
         repo.update_publisher_id(row.prefix, publisher_id)
-        metrics.add(**{"crossref_created" if created else "crossref_matched": 1})
+        metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
         log.info(
             "  %s → publisher_id=%d (%s)",
             row.prefix,
