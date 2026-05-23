@@ -192,4 +192,12 @@
 	.docs-toc.empty {
 		display: none;
 	}
+	@media (max-width: 1100px) {
+		.docs-layout {
+			grid-template-columns: 240px minmax(0, 1fr);
+		}
+		.docs-toc {
+			display: none;
+		}
+	}
 </style>
