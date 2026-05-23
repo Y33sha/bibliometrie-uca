@@ -170,11 +170,11 @@
 		margin-top: 6px;
 		padding-top: 6px;
 	}
-	/* Children d'une Section : indentés, plus petits, couleur texte normale. */
+	/* Children d'une Section : indentés, plus petits. Couleur héritée de
+	   `.docs-sidebar a` pour ne pas écraser `a.active` (qui passe en blanc). */
 	.docs-sidebar li.section > ul > li > a {
 		padding-left: 22px;
 		font-size: 0.88rem;
-		color: var(--text);
 		font-weight: 400;
 	}
 	.docs-toc {
