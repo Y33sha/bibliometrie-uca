@@ -6,7 +6,7 @@ CrossRef n'est pas une source de périmètre : aucune requête par institution /
 
 **Works API** (`https://api.crossref.org/works/{doi}`) — interrogation unitaire par DOI.
 
-- Polite pool obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (email lu via `get_crossref_email`, fallback `get_openalex_email`)
+- Polite pool obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (email lu via `get_crossref_email`, fallback `get_polite_pool_email`)
 - Limites observées par CrossRef pour le polite pool : 10 req/s + 3 concurrentes. L'adapter colle exactement à ces limites (`max_concurrent=3`, `request_delay_s=0.1`)
 - Les 404 sont matérialisés dans `staging` avec `not_found=TRUE` + `processed=TRUE` pour ne pas être réinterrogés à chaque run
 

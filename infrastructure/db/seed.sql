@@ -12,7 +12,7 @@ INSERT INTO config (key, value, description) VALUES ('api_base_urls', '{"hal": "
 INSERT INTO config (key, value, description) VALUES ('hal_extra_collections', '[]', 'Collections HAL à interroger en plus de celles dérivées des structures du périmètre');
 INSERT INTO config (key, value, description) VALUES ('hal_portals', '["clermont-univ"]', 'Portails HAL à interroger (en plus des collections labo)');
 INSERT INTO config (key, value, description) VALUES ('openalex_api_key', '"VOTRE_CLE_OPENALEX"', 'Clé API OpenAlex (remplace le polite pool par email)');
-INSERT INTO config (key, value, description) VALUES ('openalex_email', '"votre@email.fr"', 'Email pour le polite pool OpenAlex');
+INSERT INTO config (key, value, description) VALUES ('polite_pool_email', '"votre@email.fr"', 'Email envoyé en polite pool aux APIs externes (HAL, OpenAlex, Crossref, DataCite, Unpaywall, ...)');
 INSERT INTO config (key, value, description) VALUES ('perimeter_affiliations', '"uca_wide"', 'Périmètre pour la résolution des affiliations (structure_ids sur authorships sources)');
 INSERT INTO config (key, value, description) VALUES ('perimeter_extraction', '"uca_wide"', 'Périmètre pour déterminer les structures à interroger lors de l''extraction');
 INSERT INTO config (key, value, description) VALUES ('perimeter_persons', '"uca"', 'Périmètre pour la création des personnes (authorships is_uca)');
