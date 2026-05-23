@@ -104,25 +104,67 @@ Notable :
 - **Zenodo (10.5281) : 457 DOIs nouveaux.** Datasets, software, preprints UCA invisibles côté HAL/OpenAlex.
 - **Recherche Data Gouv (10.57745) : 240.** Plateforme nationale dataset, en croissance.
 
+## Discovery par affiliation côté Crossref (suite)
+
+Même question que pour DataCite, transposée à Crossref. Spike `interfaces/cli/oneshot/crossref_affiliation_discovery_spike.py`. Endpoint `api.crossref.org/works?query.affiliation=…` (substring/word match Elasticsearch). Filtre années 2020-2026.
+
+**NB** : diff mesuré sur la base locale de cette session, **pas la base de prod**. Le chiffre de « nouveaux candidats » est indicatif et doit être recalculé sur prod pour le vrai delta.
+
+### Volumes
+
+| Mesure | Valeur |
+|---|---:|
+| Total annoncé par Crossref (`meta.total-results`) pour la query + filtre | 237 847 |
+| Paginé pour le spike (cap 30 pages × 1 000) | 30 000 |
+| Déjà en base locale | 5 649 (18.8 %) |
+| Nouveaux candidats (base locale) | 24 351 (81.2 %) |
+
+### Top préfixes des nouveaux candidats (base locale)
+
+10.1080 (Taylor & Francis, 1 695), 10.1002 (Wiley, 1 595), 10.21203 (Research Square preprints, 1 401), 10.3390 (MDPI, 1 242), 10.7202 (Érudit Canada, 1 201), 10.1111 (Wiley, 1 068), 10.1093 (Oxford UP, 1 013), 10.1021 (ACS, 923), 10.1103 (APS, 891), …
+
+Plus un préfixe surprise `10.64628` avec 2 128 nouveaux candidats — à investiguer (peut-être un éditeur récent ou un préfixe à forte présence de faux positifs).
+
+### Lecture
+
+Crossref est exploitable affiliation-driven. **Mon assertion précédente (« on a peut-être conclu un peu vite ») était justifiée — c'est en effet exploitable, comme DataCite.**
+
+Deux nuances :
+
+1. **Volume gonflé par les faux positifs.** Crossref retourne 237 847 hits avec un ranking par pertinence. Le matching ES sur tokens (Université, Clermont, Auvergne) ramène très probablement des publis non-UCA (autres « Université », autres « Clermont », autres « Auvergne ») au fur et à mesure que la relevance baisse. Cap raisonnable à arbitrer.
+
+2. **L'overlap avec la base **chute** quand on plonge plus loin dans le ranking.** Sur le top 2 000 (sorted par relevance), 97.8 % d'overlap (déjà en base). Sur 30 000 paginés, overlap tombé à 18.8 %. Donc soit Crossref a beaucoup de matches que les autres sources (OpenAlex, HAL) n'ont pas captés, soit ce sont des faux positifs au-delà du top. À vérifier au lancement réel (échantillonnage qualité sur quelques DOIs de la queue).
+
+### Implications pour Phase 3
+
+- Crossref affiliation-driven est donc à mettre **en parallèle de DataCite affiliation-driven**, pas en alternative. Les deux sont complémentaires : Crossref couvre la littérature publiée chez les éditeurs classiques (Wiley, T&F, MDPI, Springer, etc.), DataCite couvre les datasets, preprints, theses, repositories.
+- Architecture cible : **deux extracteurs affiliation-driven supplémentaires** (`infrastructure/sources/crossref/` et `infrastructure/sources/datacite/`), exposant chacun un mode de fetch par affiliation analogue à `fetch_uca_publications` de HAL/OpenAlex.
+- La cible UI évoquée (icônes Crossref + DataCite comme registry du DOI à côté des sources d'extraction) devient particulièrement cohérente : 6 sources d'extraction (HAL, OpenAlex, scanR, WoS, Crossref, DataCite) + 2 registries du DOI (Crossref, DataCite) à distinguer dans la cellule « Sources ».
+
 ## Synthèse — décision à prendre
 
-Trois signaux nets, dont un qui change le paradigme initial.
+Le spike a réfuté **deux hypothèses cadres** du chantier initial :
 
-**Sur Zenodo** : DataCite est **au moins aussi riche que l'API native** sur les champs biblio. Écrire un extracteur Zenodo natif n'apporterait que les fichiers / stats détaillées, hors périmètre. **Pas de motif d'investir dans un extracteur Zenodo natif.**
+1. **Sur Zenodo** : DataCite est **au moins aussi riche que l'API native** sur les champs biblio. Écrire un extracteur Zenodo natif n'apporterait que les fichiers / stats détaillées, hors périmètre. Pas de motif d'investir dans un extracteur Zenodo natif.
 
-**Sur INRAE** : l'API « native » Dataverse n'est pas applicable au préfixe `inist.inra`. Les DOIs redirigent soit vers HAL-INRAE soit vers des revues OJS isolées. Pas d'API native unique à comparer. *Mais* (cf. ci-dessous), l'extracteur HAL n'attrape pas tout INRAE — la query DataCite par affiliation ramène 860 DOIs INRAE absents de la base.
+2. **Sur INRAE** : l'API « native » Dataverse n'est pas applicable au préfixe `inist.inra`. Les DOIs redirigent vers HAL-INRAE ou vers des revues OJS isolées. *Mais* (point 3 ci-dessous) l'extracteur HAL n'attrape pas tout INRAE — DataCite ramène 860 DOIs INRAE absents de la base.
 
-**Sur la discovery par affiliation** : **changement de paradigme**. L'hypothèse cadre initiale « DataCite reste DOI-driven » est fausse. L'API DataCite expose un index `creators.affiliation.name` exploitable en phrase query, qui ramène 2 298 publications UCA, dont 1 922 (84 %) absentes de la base. DataCite devient une **source d'extraction de plein droit**, pas un fallback.
+3. **DataCite est exploitable affiliation-driven** : `creators.affiliation.name:"Université Clermont Auvergne"` retourne 2 298 publications UCA, dont 1 922 (84 %) absentes de la base locale.
 
-**Implications pour Phase 3** : le périmètre originel (« extracteur DataCite DOI-driven via `fetch_missing_doi` ») doit être réécrit. L'extracteur DataCite cible est **affiliation-driven** (comme HAL, OpenAlex, scanR), pas DOI-driven. Architecturalement :
-- Une fonction de fetch initiale `fetch_uca_dois_from_datacite()` qui pagine `?query=creators.affiliation.name:"Université Clermont Auvergne"` et alimente staging.
-- Plus la branche DOI-driven existante via `fetch_missing_doi --target datacite` pour les DOIs apportés par d'autres sources mais dont DataCite enrichit la métadonnée (notamment les preprints/datasets référencés via `relatedIdentifiers` côté Crossref).
-- Le filtre `get_cross_import_dois("datacite")` reste pertinent pour le mode DOI-driven (avec ou sans exclusion `10.60692` — à arbitrer).
+4. **Crossref aussi est exploitable affiliation-driven** : `query.affiliation=Université Clermont Auvergne` (filtre 2020-2026) retourne 237 847 hits avec ranking par pertinence. Sur les 30 000 plus pertinents paginés, 24 351 absents de la base locale (81 %). Volume total à pondérer (faux positifs probables au-delà du top de la relevance).
 
-Trois points à arbitrer maintenant :
+**Implications pour Phase 3** : le périmètre originel (« extracteur DataCite DOI-driven via `fetch_missing_doi` ») doit être complètement réécrit. L'objectif devient **deux extracteurs affiliation-driven supplémentaires** — `infrastructure/sources/crossref/` et `infrastructure/sources/datacite/` — exposant chacun un fetch par affiliation analogue à `fetch_uca_publications` côté HAL/OpenAlex/scanR/WoS. Le mode DOI-driven existant côté Crossref (via `fetch_missing_doi`) reste utile en complément (un DOI apporté par une autre source mais que la query affiliation n'a pas attrapé).
 
-1. **Mode `creators.affiliation` seul ou union `creators + contributors` ?** `creators` = 2 298, `contributors` = 1 294, union probable ~2 500-2 800. Couvre-t-on uniquement les auteurs principaux ou aussi les contributeurs (techniques, méthodologiques) ?
+Points à arbitrer ouverts :
 
-2. **Stratégie d'ingestion** : full sweep périodique (comme HAL/OpenAlex aujourd'hui) ou incremental via `updated` date ? La query DataCite supporte `?query=… AND updated:[2026-05-01T00:00:00Z TO *]`.
+1. **Recalculer les deltas sur la base de prod**. Les 84 % (DataCite) et 81 % (Crossref) sont mesurés sur la base locale de cette session, qui n'est pas représentative. Le vrai signal métier sortira d'une rejouée sur prod.
 
-3. **`doc_type` mapping DataCite** : à finaliser au moment de coder le normalizer (cf. spike Phase 0 sur la distribution `resourceTypeGeneral`).
+2. **Crossref : où on cape la pagination ?** 237k hits totaux dont la queue est probablement bruyante (faux positifs token-match). Échantillonner la qualité sur les pages tardives avant de fixer un cap.
+
+3. **DataCite : `creators` seul ou `creators + contributors` ?** Volumes 2 298 vs union estimée ~2 500-2 800.
+
+4. **Stratégie d'ingestion** : full sweep périodique (comme HAL/OpenAlex) ou incremental via date `updated` ? DataCite et Crossref supportent tous deux le filtrage incrémental sur `updated`.
+
+5. **`doc_type` mapping DataCite** : à finaliser au moment de coder le normalizer.
+
+6. **Préfixe Crossref `10.64628`** (2 128 nouveaux candidats, top 1 de la longue traîne) : à investiguer — sans doute un éditeur ou une plateforme à identifier.
