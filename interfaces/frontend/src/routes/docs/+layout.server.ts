@@ -1,5 +1,7 @@
+import { base } from '$app/paths';
 import { NAV, isSection } from '$lib/docs/pages';
 import { readDocFile, extractFirstH1, listSectionSlugs } from '$lib/docs/filesystem.server';
+import { buildGlossary } from '$lib/docs/glossary.server';
 import type { LayoutServerLoad } from './$types';
 
 export type NavItem =
@@ -28,5 +30,6 @@ export const load: LayoutServerLoad = async () => {
 		}
 		return { kind: 'page', ...pageEntry(node.slug) };
 	});
-	return { nav };
+	const glossary = buildGlossary(base);
+	return { nav, glossary };
 };

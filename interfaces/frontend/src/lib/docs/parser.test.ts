@@ -80,6 +80,32 @@ describe('parseMarkdown — table des matières', () => {
 	});
 });
 
+// ── parseMarkdown / ancres custom (Pandoc {#slug}) ─────────────
+
+describe('parseMarkdown — ancres custom Pandoc {#slug}', () => {
+	it('utilise le slug Pandoc comme ancre prioritaire', () => {
+		const md = '## Mon titre {#mon-slug}';
+		const { toc, html } = parseMarkdown(md, BASE, 'test');
+		expect(toc[0].anchor).toBe('mon-slug');
+		expect(html).toContain('<h2 id="mon-slug">');
+	});
+
+	it('strippe le marqueur {#…} du texte affiché', () => {
+		const md = '## Texte visible {#x}';
+		const { toc, html } = parseMarkdown(md, BASE, 'test');
+		expect(toc[0].html).toBe('Texte visible');
+		expect(html).toContain('>Texte visible</h2>');
+		expect(html).not.toContain('{#');
+	});
+
+	it('le marqueur doit être en fin de heading', () => {
+		// Si {#x} est en milieu, ce n'est pas reconnu et l'ancre est auto-générée
+		const md = '## Foo {#x} bar';
+		const { toc } = parseMarkdown(md, BASE, 'test');
+		expect(toc[0].anchor).not.toBe('x');
+	});
+});
+
 // ── parseMarkdown / ancres custom (<span id="...">) ────────────
 
 describe('parseMarkdown — ancres custom via <span id>', () => {
@@ -116,6 +142,36 @@ describe('parseMarkdown — ancres custom via <span id>', () => {
 		const md = "## <span id='abc'></span>Foo";
 		const { toc } = parseMarkdown(md, BASE, 'test');
 		expect(toc[0].anchor).toBe('abc');
+	});
+});
+
+// ── parseMarkdown / syntaxe glossaire [[…]] ────────────────────
+
+describe('parseMarkdown — syntaxe glossaire [[slug]] / [[slug|texte]]', () => {
+	it('rend [[slug]] en lien gloss vers glossaire#slug avec slug comme texte', () => {
+		const { html } = parseMarkdown('Le [[doi]] est un identifiant.', BASE, 'test');
+		expect(html).toContain('class="gloss"');
+		expect(html).toContain('data-glossary="doi"');
+		expect(html).toContain('href="/bibliometrie/docs/glossaire#doi"');
+		expect(html).toContain('>doi</a>');
+	});
+
+	it('rend [[slug|texte]] avec texte affiché distinct du slug', () => {
+		const { html } = parseMarkdown('Voir [[doc-types|type de document]] ici.', BASE, 'test');
+		expect(html).toContain('data-glossary="doc-types"');
+		expect(html).toContain('href="/bibliometrie/docs/glossaire#doc-types"');
+		expect(html).toContain('>type de document</a>');
+	});
+
+	it('ne match pas les slugs avec espaces ou caractères spéciaux', () => {
+		const { html } = parseMarkdown('Pas un slug : [[un terme]].', BASE, 'test');
+		expect(html).not.toContain('class="gloss"');
+	});
+
+	it('échappe le texte affiché contre les injections HTML', () => {
+		const { html } = parseMarkdown('[[doi|<script>x</script>]]', BASE, 'test');
+		expect(html).not.toContain('<script>');
+		expect(html).toContain('&lt;script');
 	});
 });
 

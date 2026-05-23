@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
+	import GlossaryPopover from '$lib/docs/GlossaryPopover.svelte';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
@@ -90,6 +91,8 @@
 		{/if}
 	</aside>
 </div>
+
+<GlossaryPopover />
 
 <style>
 	.docs-layout {
@@ -191,6 +194,16 @@
 	}
 	.docs-toc.empty {
 		display: none;
+	}
+	/* Liens vers le glossaire : underline en pointillé pour signaler le popover. */
+	.doc-content :global(a[data-glossary]) {
+		color: inherit;
+		text-decoration: none;
+		border-bottom: 1px dotted var(--accent);
+		cursor: help;
+	}
+	.doc-content :global(a[data-glossary]:hover) {
+		color: var(--accent);
 	}
 	@media (max-width: 1100px) {
 		.docs-layout {

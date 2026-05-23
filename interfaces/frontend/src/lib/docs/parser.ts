@@ -1,4 +1,4 @@
-import { Marked, type RendererObject } from 'marked';
+import { Marked, type RendererObject, type TokenizerAndRendererExtension } from 'marked';
 import { resolveDocLink } from './links';
 
 export interface TocEntry {
@@ -26,15 +26,28 @@ export function makeAnchor(text: string): string {
 }
 
 /**
- * Détecte un `<span id="..."></span>` dans une ligne de heading.
- * Si présent : l'id devient l'ancre du heading et le span est strippé du texte.
- * Permet aux .md de définir des ancres courtes et stables, déconnectées du texte.
+ * Détecte une ancre custom dans une ligne de heading. Deux conventions reconnues :
+ *
+ * 1. **Pandoc** : `## Mon titre {#mon-ancre}` à la fin du heading. Convention
+ *    préférée pour les .md écrits à la main (concise, lisible).
+ * 2. **`<span id="..."></span>`** n'importe où dans le heading. Convention
+ *    legacy supportée pour compatibilité avec les .md existants.
+ *
+ * Si une ancre custom est trouvée, elle remplace l'ancre auto-générée (et le
+ * marqueur est strippé du texte affiché).
  */
 function extractCustomAnchor(text: string): { anchor: string | null; cleaned: string } {
-	const m = /<span\s+id=['"]([^'"]+)['"]\s*>\s*<\/span>\s*/.exec(text);
-	if (!m) return { anchor: null, cleaned: text };
-	const cleaned = (text.slice(0, m.index) + text.slice(m.index + m[0].length)).trim();
-	return { anchor: m[1], cleaned };
+	const pandoc = /\s*\{#([\w-]+)\}\s*$/.exec(text);
+	if (pandoc) {
+		const cleaned = text.slice(0, pandoc.index).trim();
+		return { anchor: pandoc[1], cleaned };
+	}
+	const span = /<span\s+id=['"]([^'"]+)['"]\s*>\s*<\/span>\s*/.exec(text);
+	if (span) {
+		const cleaned = (text.slice(0, span.index) + text.slice(span.index + span[0].length)).trim();
+		return { anchor: span[1], cleaned };
+	}
+	return { anchor: null, cleaned: text };
 }
 
 function extractHeadings(content: string): { title: string; toc: TocEntry[] } {
@@ -71,6 +84,44 @@ function escapeHtmlAttr(value: string): string {
 		.replace(/>/g, '&gt;');
 }
 
+/**
+ * Extension marked inline pour la syntaxe glossaire `[[slug]]` / `[[slug|texte affiché]]`.
+ *
+ * Génère un `<a class="gloss" data-glossary="slug" href="…glossaire#slug">texte</a>`. Le `href` reste valide pour dégradation gracieuse (JS désactivé, ctrl+click, lecteurs d'écran) ; le composant `<GlossaryPopover />` intercepte le clic standard pour afficher le popover.
+ *
+ * Convention : `[[slug]]` quand texte = slug, `[[slug|texte]]` sinon (style MediaWiki / Obsidian). Le slug doit être [\w-]+.
+ */
+function glossaryExtension(base: string): TokenizerAndRendererExtension {
+	return {
+		name: 'glossary',
+		level: 'inline',
+		start(src: string): number | undefined {
+			const idx = src.indexOf('[[');
+			return idx >= 0 ? idx : undefined;
+		},
+		tokenizer(src: string) {
+			const rule = /^\[\[([\w-]+)(?:\|([^\]]+))?\]\]/;
+			const match = rule.exec(src);
+			if (!match) return undefined;
+			const slug = match[1].trim();
+			const text = (match[2] ?? match[1]).trim();
+			return {
+				type: 'glossary',
+				raw: match[0],
+				slug,
+				text
+			};
+		},
+		renderer(token) {
+			const t = token as unknown as { slug: string; text: string };
+			const slugAttr = escapeHtmlAttr(t.slug);
+			const textHtml = escapeHtmlAttr(t.text);
+			const hrefAttr = escapeHtmlAttr(`${base}/docs/glossaire#${t.slug}`);
+			return `<a class="gloss" href="${hrefAttr}" data-glossary="${slugAttr}">${textHtml}</a>`;
+		}
+	};
+}
+
 export function parseMarkdown(content: string, base: string, currentSlug: string): ParsedDoc {
 	const { title, toc } = extractHeadings(content);
 
@@ -91,7 +142,7 @@ export function parseMarkdown(content: string, base: string, currentSlug: string
 		}
 	};
 
-	const marked = new Marked({ renderer });
+	const marked = new Marked({ renderer, extensions: [glossaryExtension(base)] });
 	const html = marked.parse(content) as string;
 	return { html, toc, title };
 }
