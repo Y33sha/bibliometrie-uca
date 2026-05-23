@@ -8,7 +8,7 @@ Guide opérationnel pour étendre bibliometrie-uca. Trois axes :
 2. [Ajouter une phase au pipeline](#ajouter-une-phase-au-pipeline)
 3. [Ajouter un endpoint API](#ajouter-un-endpoint-api)
 
-Prérequis : comprendre l'architecture DDD en 4 couches — voir [`docs/architecture/`](docs/architecture/). Le modèle de données est documenté dans [`docs/donnees.md`](docs/donnees.md) ; le pipeline complet dans [`docs/pipeline/`](docs/pipeline/).
+Prérequis : comprendre l'architecture DDD en 4 couches — voir [`docs/architecture/`](docs/architecture/). Le modèle de données est documenté dans [`docs/donnees/`](docs/donnees/) ; le pipeline complet dans [`docs/pipeline/`](docs/pipeline/).
 
 ## Conventions transverses
 
