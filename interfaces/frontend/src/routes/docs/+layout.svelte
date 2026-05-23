@@ -158,6 +158,12 @@
 	.docs-sidebar .section-title {
 		display: block;
 	}
+	/* Active sur un FlatPage top-level : la spécificité du sélecteur niveau 1
+	   ci-dessus bat `.docs-sidebar a.active` ; il faut donc re-spécifier la
+	   couleur blanche pour que le fond accent reste lisible. */
+	.docs-sidebar > ul > li:not(.section) > a.active {
+		color: white;
+	}
 	/* Trait de séparation entre items top-level. */
 	.docs-sidebar > ul > li + li {
 		border-top: 1px solid var(--border);
