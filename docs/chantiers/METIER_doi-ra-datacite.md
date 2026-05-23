@@ -128,13 +128,13 @@ extract → cross_imports (fetch_missing_hal_id + fetch_missing_doi) → normali
 - [x] Migration Alembic `drop_publishers_doi_prefix`.
 - **Livrable** : appels CrossRef ciblés, `doi_prefixes` peuplée, mapping prefix → publisher many-to-one en place, pas encore de DataCite ingérée.
 
-### Phase 2 — DataCite dans `resolve_doi_prefixes` [next]
+### Phase 2 — DataCite dans `resolve_doi_prefixes`
 
-- [ ] Migration Alembic : `ALTER TABLE doi_prefixes ADD COLUMN client_name_raw text, ADD COLUMN client_name_normalized text, ADD COLUMN datacite_client_symbol text` + index partiels.
-- [ ] Client `fetch_datacite_prefix(prefix) -> (provider_name, client_name, client_symbol) | None` dans `infrastructure/sources/doi_prefixes/clients.py` (httpx, retry via `http_request_with_retry`, parsing JSON:API).
-- [ ] Branche `ra='DataCite'` dans `application/pipeline/resolve_doi_prefixes.py` : appel `fetch_datacite_prefix`, matching `publisher_name_normalized` contre `publishers.name_normalized`, populate `client_name_*` + `datacite_client_symbol`.
-- [ ] Tests unitaires sur le parser DataCite + tests d'intégration sur la branche pipeline.
-- [ ] Re-run de `--only resolve_doi_prefixes` sur l'environnement de prod pour peupler les 105 rows DataCite existantes (les `client_*` actuels sont NULL).
+- [x] Migration Alembic `a4f7c1e8d2b6` : `ADD COLUMN client_name_raw, client_name_normalized, datacite_client_symbol` + index partiels.
+- [x] Client `fetch_datacite_prefix(prefix) -> (provider_name, client_name, client_symbol) | None` dans `infrastructure/sources/doi_prefixes/clients.py` (parser JSON:API isolé pour testabilité).
+- [x] Branche `ra='DataCite'` dans `application/pipeline/resolve_doi_prefixes.py` : provider en `publisher_*` (mêmes règles de match/création que Crossref), client en colonnes dédiées. Au passage : `UnmatchedCrossrefPrefix` → `UnmatchedPrefix` (agnostique RA), metrics `crossref_matched/crossref_created` → `publisher_matched/publisher_created`.
+- [x] Tests unitaires sur le parser DataCite + tests d'intégration sur la branche pipeline.
+- [x] Re-run de `--only resolve_doi_prefixes` (env de dev pour cette session). Note : sur prod, les rows DataCite existantes ont `client_*` et `datacite_client_symbol = NULL` — un rattrapage dédié sera nécessaire (one-shot ou extension passe 2) ; reporté ou couvert par un re-seed selon besoin.
 - **Livrable** : mapping préfixe → provider + client en place pour les deux RAs, sans nouvelle source ingérée.
 
 ### Phase 3 — Décision ingestion (spike comparatif puis arbitrage)
