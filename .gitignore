@@ -34,6 +34,9 @@ docs/chantiers/crossref-spike-data/
 # Cache local du spike DOI prefixes / RA / DataCite
 docs/chantiers/doi-prefixes-spike-data/
 
+# Cache local du spike DataCite vs APIs natives (Phase 3)
+docs/chantiers/datacite-vs-natives-spike-data/
+
 # IDE
 .vscode/
 .idea/
