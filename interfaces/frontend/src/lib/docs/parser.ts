@@ -1,4 +1,4 @@
-import { Marked, type RendererObject, type TokenizerAndRendererExtension } from 'marked';
+import { Marked, type RendererObject } from 'marked';
 import { resolveDocLink } from './links';
 
 export interface TocEntry {
@@ -85,45 +85,51 @@ function escapeHtmlAttr(value: string): string {
 }
 
 /**
- * Extension marked inline pour la syntaxe glossaire `[[slug]]` / `[[slug|texte affiché]]`.
+ * Syntaxe glossaire `[[slug]]` / `[[slug|texte affiché]]` — convention MediaWiki/Obsidian.
  *
- * Génère un `<a class="gloss" data-glossary="slug" href="…glossaire#slug">texte</a>`. Le `href` reste valide pour dégradation gracieuse (JS désactivé, ctrl+click, lecteurs d'écran) ; le composant `<GlossaryPopover />` intercepte le clic standard pour afficher le popover.
+ * Traitement par **pré-processing** (et non extension marked), parce que le séparateur `|` entre en conflit avec la syntaxe markdown des tables : un `[[apc|APC]]` dans une cellule serait coupé en deux cellules par marked avant qu'une extension inline puisse intervenir. On remplace donc chaque expression par un placeholder (caractères Unicode Private Use Area, invisibles côté markdown comme côté HTML), on parse le markdown, puis on réinjecte le HTML cible.
  *
- * Convention : `[[slug]]` quand texte = slug, `[[slug|texte]]` sinon (style MediaWiki / Obsidian). Le slug doit être [\w-]+.
+ * Le `href` reste valide pour dégradation gracieuse (JS désactivé, ctrl+click, lecteurs d'écran). `<GlossaryPopover />` intercepte le clic standard pour afficher le popover.
  */
-function glossaryExtension(base: string): TokenizerAndRendererExtension {
-	return {
-		name: 'glossary',
-		level: 'inline',
-		start(src: string): number | undefined {
-			const idx = src.indexOf('[[');
-			return idx >= 0 ? idx : undefined;
-		},
-		tokenizer(src: string) {
-			const rule = /^\[\[([\w-]+)(?:\|([^\]]+))?\]\]/;
-			const match = rule.exec(src);
-			if (!match) return undefined;
-			const slug = match[1].trim();
-			const text = (match[2] ?? match[1]).trim();
-			return {
-				type: 'glossary',
-				raw: match[0],
-				slug,
-				text
-			};
-		},
-		renderer(token) {
-			const t = token as unknown as { slug: string; text: string };
-			const slugAttr = escapeHtmlAttr(t.slug);
-			const textHtml = escapeHtmlAttr(t.text);
-			const hrefAttr = escapeHtmlAttr(`${base}/docs/glossaire#${t.slug}`);
-			return `<a class="gloss" href="${hrefAttr}" data-glossary="${slugAttr}">${textHtml}</a>`;
+const GLOSS_PLACEHOLDER_START = '';
+const GLOSS_PLACEHOLDER_END = '';
+const GLOSS_PLACEHOLDER_RE = new RegExp(
+	`${GLOSS_PLACEHOLDER_START}(\\d+)${GLOSS_PLACEHOLDER_END}`,
+	'g'
+);
+
+interface GlossaryRef {
+	slug: string;
+	text: string;
+}
+
+function extractGlossaryRefs(content: string): { processed: string; refs: GlossaryRef[] } {
+	const refs: GlossaryRef[] = [];
+	const processed = content.replace(
+		/\[\[([\w-]+)(?:\|([^\]]+))?\]\]/g,
+		(_match, slug: string, text?: string) => {
+			const idx = refs.length;
+			refs.push({ slug: slug.trim(), text: (text ?? slug).trim() });
+			return `${GLOSS_PLACEHOLDER_START}${idx}${GLOSS_PLACEHOLDER_END}`;
 		}
-	};
+	);
+	return { processed, refs };
+}
+
+function injectGlossaryRefs(html: string, refs: GlossaryRef[], base: string): string {
+	return html.replace(GLOSS_PLACEHOLDER_RE, (_match, idxStr: string) => {
+		const ref = refs[parseInt(idxStr, 10)];
+		if (!ref) return '';
+		const slugAttr = escapeHtmlAttr(ref.slug);
+		const textHtml = escapeHtmlAttr(ref.text);
+		const hrefAttr = escapeHtmlAttr(`${base}/docs/glossaire#${ref.slug}`);
+		return `<a class="gloss" href="${hrefAttr}" data-glossary="${slugAttr}">${textHtml}</a>`;
+	});
 }
 
 export function parseMarkdown(content: string, base: string, currentSlug: string): ParsedDoc {
-	const { title, toc } = extractHeadings(content);
+	const { processed, refs } = extractGlossaryRefs(content);
+	const { title, toc } = extractHeadings(processed);
 
 	const renderer: RendererObject = {
 		heading({ tokens, depth }) {
@@ -142,7 +148,8 @@ export function parseMarkdown(content: string, base: string, currentSlug: string
 		}
 	};
 
-	const marked = new Marked({ renderer, extensions: [glossaryExtension(base)] });
-	const html = marked.parse(content) as string;
+	const marked = new Marked({ renderer });
+	const rawHtml = marked.parse(processed) as string;
+	const html = injectGlossaryRefs(rawHtml, refs, base);
 	return { html, toc, title };
 }

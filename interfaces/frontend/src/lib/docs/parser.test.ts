@@ -173,6 +173,18 @@ describe('parseMarkdown — syntaxe glossaire [[slug]] / [[slug|texte]]', () => 
 		expect(html).not.toContain('<script>');
 		expect(html).toContain('&lt;script');
 	});
+
+	it("survit au pipe dans une cellule de tableau (régression bug 11-enrich.md ligne 8)", () => {
+		const md = '| Col1 | Col2 |\n|---|---|\n| Montant [[apc|APC]] payé | autre |';
+		const { html } = parseMarkdown(md, BASE, 'test');
+		// La cellule ne doit pas être coupée par le `|` interne du token glossaire.
+		expect(html).toContain('Montant');
+		expect(html).toContain('data-glossary="apc"');
+		expect(html).toContain('>APC</a>');
+		expect(html).toContain('payé');
+		// La 2e colonne doit rester sur sa propre cellule.
+		expect(html).toContain('autre');
+	});
 });
 
 // ── parseMarkdown / HTML ───────────────────────────────────────
