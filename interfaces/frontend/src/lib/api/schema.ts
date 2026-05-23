@@ -1803,66 +1803,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/docs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Docs
-         * @description Liste les pages de documentation disponibles.
-         */
-        get: operations["list_docs_api_docs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/docs/todos/all": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List All Todos
-         * @description Collecte tous les <!-- TODO: ... --> de tous les fichiers .md.
-         */
-        get: operations["list_all_todos_api_docs_todos_all_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/docs/{slug}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Doc
-         * @description Retourne le contenu markdown d'une page de documentation.
-         */
-        get: operations["get_doc_api_docs__slug__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/config": {
         parameters: {
             query?: never;
@@ -2031,8 +1971,9 @@ export interface paths {
          * @description Valeurs possibles de l'enum `publisher_type` avec leur label français.
          *
          *     Source de vérité côté Python : `domain.publishers.publisher.PUBLISHER_TYPES`
-         *     (test d'intégration `TestPublisherTypesEnum` vérifie la cohérence avec l'enum SQL).
-         *     Sert à alimenter le dropdown de la page admin éditeurs.
+         *     + `PUBLISHER_TYPE_LABELS_FR` (test d'intégration `TestPublisherTypesEnum`
+         *     vérifie la cohérence avec l'enum SQL). Sert à alimenter le dropdown de
+         *     la page admin éditeurs et la colonne « Type » des pages publiques.
          */
         get: operations["list_publisher_types_api_publisher_types_get"];
         put?: never;
@@ -2233,9 +2174,10 @@ export interface paths {
          * List Journal Types
          * @description Valeurs possibles de l'enum `journal_type` avec leur label français.
          *
-         *     Source de vérité côté Python : `domain.journals.journal.JOURNAL_TYPES`
-         *     (test d'intégration `TestJournalTypesEnum` vérifie la cohérence avec l'enum SQL).
-         *     Sert à alimenter le dropdown de la page admin revues.
+         *     Source de vérité côté Python : `domain.journals.journal.JOURNAL_TYPES` +
+         *     `JOURNAL_TYPE_LABELS_FR` (test d'intégration `TestJournalTypesEnum`
+         *     vérifie la cohérence avec l'enum SQL). Sert à alimenter le dropdown de
+         *     la page admin revues et la colonne « Type » des pages publiques.
          */
         get: operations["list_journal_types_api_journal_types_get"];
         put?: never;
@@ -2972,19 +2914,13 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
-         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
-         *     Permet au frontend de styler les inattendus en warning.
+         * @description Compteur de publications par `doc_type` pour un éditeur.
          */
         DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
         };
         /**
          * DoiPrefixInfo
@@ -3411,9 +3347,9 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["OaStatusCount"][];
+            oa_statuses: components["schemas"]["application__ports__api__journals_queries__OaStatusCount"][];
             /** Expected Doc Types */
             expected_doc_types: string[];
             /** Expected Oa Statuses */
@@ -3996,18 +3932,13 @@ export interface components {
         };
         /**
          * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour une revue.
-         *
-         *     `expected` est vrai si ce `oa_status` figure dans les valeurs attendues
-         *     pour le `oa_model` de la revue (cf. `domain.journals.expected`).
+         * @description Compteur de publications par `oa_status` pour un éditeur.
          */
         OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
         };
         /**
          * ObservablesPayload
@@ -4976,9 +4907,9 @@ export interface components {
             /** Journal Types */
             journal_types: components["schemas"]["JournalTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
+            oa_statuses: components["schemas"]["OaStatusCount"][];
         };
         /**
          * PublisherDetailResponse
@@ -5640,23 +5571,34 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour un éditeur.
+         * @description Compteur de publications par `doc_type` pour une revue.
+         *
+         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
+         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
+         *     Permet au frontend de styler les inattendus en warning.
          */
-        application__ports__api__publishers_queries__DocTypeCount: {
+        application__ports__api__journals_queries__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
+            /** Expected */
+            expected: boolean;
         };
         /**
          * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour un éditeur.
+         * @description Compteur de publications par `oa_status` pour une revue.
+         *
+         *     `expected` est vrai si ce `oa_status` figure dans les valeurs attendues
+         *     pour le `oa_model` de la revue (cf. `domain.journals.expected`).
          */
-        application__ports__api__publishers_queries__OaStatusCount: {
+        application__ports__api__journals_queries__OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */
             count: number;
+            /** Expected */
+            expected: boolean;
         };
     };
     responses: never;
@@ -8563,83 +8505,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HalAffiliationConflictsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_docs_api_docs_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: string;
-                    }[];
-                };
-            };
-        };
-    };
-    list_all_todos_api_docs_todos_all_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
-                };
-            };
-        };
-    };
-    get_doc_api_docs__slug__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
                 };
             };
             /** @description Validation Error */
