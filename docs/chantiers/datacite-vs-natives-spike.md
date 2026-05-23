@@ -60,20 +60,69 @@ Le client DataCite `inist.inra` ne distribue **pas de datasets Dataverse** sur c
 - Les publications de revues niches (Novae, etc.) sont **inaccessibles par API native** : OJS individualisé par revue, pas d'API biblio mutualisée. DataCite est la seule porte d'entrée centralisée.
 - Le préfixe `inist.inra` n'est donc pas un proxy d'un repository unique, c'est un **enregistreur de DOIs pour le périmètre INRA/INRAE**, hétérogène par construction.
 
+## Discovery par affiliation UCA (suite du spike)
+
+Spike complémentaire `interfaces/cli/oneshot/datacite_affiliation_discovery_spike.py`. Question : `api.datacite.org/dois?query=…` permet-il de retrouver des publications UCA via leur affiliation textuelle, indépendamment d'un DOI déjà en staging ? Hypothèse de cadrage initiale du chantier (*« DataCite n'a pas d'index affiliation/ROR exploitable »*) qu'on cherche à vérifier — c'était une assertion non-mesurée.
+
+### Variantes testées
+
+| Query | Total hits |
+|---|---:|
+| `creators.affiliation.name:"Université Clermont Auvergne"` | **2 298** |
+| `contributors.affiliation.name:"Université Clermont Auvergne"` | 1 294 |
+| Recherche libre `Université Clermont Auvergne` (tous champs) | 1 320 |
+
+`creators.affiliation.name` (phrase quoted) ressort comme la plus complète. Les phrase queries d'Elasticsearch matchent la sous-chaîne au sein d'affiliations composées (« Université Clermont Auvergne, CNRS, Institut Pascal, Clermont-Ferrand, France ») sans avoir besoin d'égalité stricte.
+
+### Diff avec la base de publications UCA
+
+- **2 298 DOIs DataCite trouvés** via `creators.affiliation.name`
+- **376 déjà en base** (16.4 %)
+- **1 922 nouveaux candidats** (83.6 %) — invisibles dans HAL / OpenAlex / WoS / scanR avec le périmètre actuel
+
+Distribution des 1 922 nouveaux candidats par préfixe (top 10) :
+
+| Préfixe | Client DataCite | Nouveaux |
+|---|---|---:|
+| 10.15454 | INRAE | 860 |
+| 10.5281 | Zenodo (CERN) | 457 |
+| 10.57745 | Recherche Data Gouv France | 240 |
+| 10.7910 | Harvard Dataverse | 140 |
+| 10.60692 | OpenAlex « Greater South Information System » | 44 |
+| 10.35003 | (à investiguer) | 23 |
+| 10.4230 | Schloss Dagstuhl | 22 |
+| 10.18145 | (à investiguer) | 20 |
+| 10.57837 | ACTRIS-ARES Data Portal | 17 |
+| 10.48579 | data.InDoRES | 16 |
+
+### Lecture
+
+L'hypothèse initiale « DataCite reste DOI-driven » est **fausse**. L'API expose un index affiliation exploitable, et le volume retourné (~2 300 publications UCA dont 84 % nouvelles pour nous) est largement significatif. DataCite devient une **source d'extraction de plein droit** — à mettre au même niveau que HAL, OpenAlex, scanR, WoS — pas un simple fallback DOI-driven.
+
+Notable :
+- **INRAE (10.15454) : 860 DOIs nouveaux.** Confirme que l'extracteur HAL n'attrape pas tout INRAE (contrairement à ce que suggérait le sample de 4 DOIs de la section précédente). L'apport biblio est massif.
+- **Zenodo (10.5281) : 457 DOIs nouveaux.** Datasets, software, preprints UCA invisibles côté HAL/OpenAlex.
+- **Recherche Data Gouv (10.57745) : 240.** Plateforme nationale dataset, en croissance.
+
 ## Synthèse — décision à prendre
 
-Le spike apporte deux signaux nets.
+Trois signaux nets, dont un qui change le paradigme initial.
 
 **Sur Zenodo** : DataCite est **au moins aussi riche que l'API native** sur les champs biblio. Écrire un extracteur Zenodo natif n'apporterait que les fichiers / stats détaillées, hors périmètre. **Pas de motif d'investir dans un extracteur Zenodo natif.**
 
-**Sur INRAE** : l'API « native » n'existe pas comme entité unique. Les DOIs `inist.inra` redirigent soit vers HAL (couvert), soit vers des revues OJS isolées (non couvert centralement). **Pas d'API native à comparer ; le débat se réduit à : DataCite pour ce qui n'est pas déjà dans HAL, ou rien.**
+**Sur INRAE** : l'API « native » Dataverse n'est pas applicable au préfixe `inist.inra`. Les DOIs redirigent soit vers HAL-INRAE soit vers des revues OJS isolées. Pas d'API native unique à comparer. *Mais* (cf. ci-dessous), l'extracteur HAL n'attrape pas tout INRAE — la query DataCite par affiliation ramène 860 DOIs INRAE absents de la base.
 
-Par extrapolation prudente aux 99 autres clients DataCite rencontrés sur le corpus UCA (longue traîne à 1 préfixe chacun, cf. spike Phase 0) : écrire un extracteur natif par repository est intenable, et la qualité DataCite démontrée sur Zenodo (le client le mieux outillé) est un bon indicateur de plafond.
+**Sur la discovery par affiliation** : **changement de paradigme**. L'hypothèse cadre initiale « DataCite reste DOI-driven » est fausse. L'API DataCite expose un index `creators.affiliation.name` exploitable en phrase query, qui ramène 2 298 publications UCA, dont 1 922 (84 %) absentes de la base. DataCite devient une **source d'extraction de plein droit**, pas un fallback.
 
-**Lecture pour la décision Phase 3** : option « DataCite seul » à favoriser. Reste à arbitrer :
+**Implications pour Phase 3** : le périmètre originel (« extracteur DataCite DOI-driven via `fetch_missing_doi` ») doit être réécrit. L'extracteur DataCite cible est **affiliation-driven** (comme HAL, OpenAlex, scanR), pas DOI-driven. Architecturalement :
+- Une fonction de fetch initiale `fetch_uca_dois_from_datacite()` qui pagine `?query=creators.affiliation.name:"Université Clermont Auvergne"` et alimente staging.
+- Plus la branche DOI-driven existante via `fetch_missing_doi --target datacite` pour les DOIs apportés par d'autres sources mais dont DataCite enrichit la métadonnée (notamment les preprints/datasets référencés via `relatedIdentifiers` côté Crossref).
+- Le filtre `get_cross_import_dois("datacite")` reste pertinent pour le mode DOI-driven (avec ou sans exclusion `10.60692` — à arbitrer).
 
-1. **Faut-il ingérer DataCite pour les DOIs déjà couverts par HAL ?** Soit (i) on filtre côté `get_cross_import_dois("datacite")` pour exclure les DOIs déjà présents en `source_publications` via la source `hal`, soit (ii) on ingère tout et la consolidation cross-source absorbe la redondance via `SOURCE_PRIORITY`. Option (ii) plus simple, option (i) plus économe en appels API.
+Trois points à arbitrer maintenant :
 
-2. **Exclusions explicites côté `get_cross_import_dois("datacite")`** : préfixe `10.60692` (DOIs OpenAlex synthétiques, déjà acté Phase 0). Faut-il en ajouter d'autres maintenant qu'on connaît mieux la longue traîne ?
+1. **Mode `creators.affiliation` seul ou union `creators + contributors` ?** `creators` = 2 298, `contributors` = 1 294, union probable ~2 500-2 800. Couvre-t-on uniquement les auteurs principaux ou aussi les contributeurs (techniques, méthodologiques) ?
 
-3. **Mapping `doc_type` DataCite** (déjà ouvert en fiche). À finaliser au moment de l'écriture du normalizer DataCite.
+2. **Stratégie d'ingestion** : full sweep périodique (comme HAL/OpenAlex aujourd'hui) ou incremental via `updated` date ? La query DataCite supporte `?query=… AND updated:[2026-05-01T00:00:00Z TO *]`.
+
+3. **`doc_type` mapping DataCite** : à finaliser au moment de coder le normalizer (cf. spike Phase 0 sur la distribution `resourceTypeGeneral`).
