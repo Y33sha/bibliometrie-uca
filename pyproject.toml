@@ -98,12 +98,9 @@ forbidden_modules = ["infrastructure"]
 allow_indirect_imports = "true"
 ignore_imports = [
     # Hors périmètre du chantier routers-di : status filesystem
-    # (relu dans le futur chantier observabilité pipeline) et chemin
-    # projet (en attendant la refonte du mode d'affichage de la doc).
-    # Ces 2 cas ne sont pas des queries / repos et ne dépendent pas
-    # d'une connexion DB.
+    # (relu dans le futur chantier observabilité pipeline). Pas
+    # une query / repo, ne dépend pas d'une connexion DB.
     "interfaces.api.routers.admin.pipeline_logs -> infrastructure.observability.pipeline_status",
-    "interfaces.api.routers.docs -> infrastructure",
 ]
 
 [[tool.importlinter.contracts]]
@@ -347,7 +344,6 @@ module = [
     "infrastructure.sources.*",
     "interfaces.api.app",
     "interfaces.api.models.*",
-    "interfaces.api.routers.docs",
     "interfaces.cli.dev.generate_seed",
     "interfaces.cli.imports.*",
     "interfaces.cli.maintenance.*",

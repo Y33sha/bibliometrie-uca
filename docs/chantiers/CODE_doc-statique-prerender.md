@@ -129,15 +129,12 @@ code highlighté, mermaid pré-rendu.
 
 ### Phase 5 — Retrait du backend doc et de la page TODOs
 
-- [ ] Supprimer `interfaces/api/routers/docs.py`
-- [ ] Retirer l'inclusion du router dans
-  [interfaces/api/app.py](interfaces/api/app.py)
-- [ ] Supprimer la route frontend `/docs/todos` et le lien correspondant
-  dans la sidebar
-  ([interfaces/frontend/src/routes/docs/+layout.svelte:71-76](interfaces/frontend/src/routes/docs/+layout.svelte#L71-L76))
-- [ ] Nettoyer les éventuels tests
-- [ ] Vérifier qu'aucun appel `api("/api/docs/...")` ne subsiste côté frontend
-- [ ] Vérifier qu'aucun lien externe ou bookmark ne pointe vers `/api/docs/...`
+- [x] Supprimer `interfaces/api/routers/docs.py`
+- [x] Retirer l'inclusion du router dans `interfaces/api/app.py` (import + `app.include_router`)
+- [x] Supprimer la route frontend `/docs/todos` et le lien correspondant dans la sidebar (déjà acquis lors de la réécriture du layout en Phase 3 — aucun fichier `routes/docs/todos/*` ni mention `todos` dans le layout actuel)
+- [x] Nettoyer les éventuels tests (aucun test ne référençait le router doc)
+- [x] Vérifier qu'aucun appel `api("/api/docs/...")` ne subsiste côté frontend (seul `src/lib/api/schema.ts` les listait, généré ; régénéré via `npm run types:gen` — les 3 entrées `/api/docs*` ont disparu)
+- [ ] Vérifier qu'aucun lien externe ou bookmark ne pointe vers `/api/docs/...` (hors scope code — vérification utilisateur)
 
 ## Questions ouvertes
 

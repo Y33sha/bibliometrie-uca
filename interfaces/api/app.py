@@ -50,7 +50,6 @@ configure_root_logging()
 
 from interfaces.api.routers import (  # noqa: E402
     auth,
-    docs,
     hal_problems,
     journals,
     laboratories,
@@ -360,7 +359,6 @@ app.include_router(admin_persons.router)
 app.include_router(admin_authorships.router)
 app.include_router(admin_person_duplicates.router)
 app.include_router(hal_problems.router)
-app.include_router(docs.router)
 app.include_router(admin_pipeline_config.router)
 app.include_router(admin_perimeters.router)
 app.include_router(publishers.router)
