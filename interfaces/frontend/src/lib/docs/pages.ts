@@ -22,6 +22,6 @@ export const NAV: NavNode[] = [
 	{ section: 'sources', title: 'Sources de données' },
 	{ section: 'pipeline', title: 'Pipeline de traitement' },
 	{ slug: 'donnees', title: 'Schéma de données' },
-	{ slug: 'architecture', title: 'Architecture logicielle' },
+	{ section: 'architecture', title: 'Architecture logicielle' },
 	{ slug: 'glossaire' }
 ];

@@ -13,7 +13,7 @@ personnes et laboratoires.
   `run_pipeline.py`), extracteurs dans `infrastructure/sources/`
 - **Architecture** : DDD en 4 couches (`domain/`, `application/`,
   `infrastructure/`, `interfaces/`) — voir
-  [docs/architecture.md](docs/architecture.md) (archi logicielle) et
+  [docs/architecture/](docs/architecture/) (archi logicielle) et
   [docs/donnees.md](docs/donnees.md) (modèle de données)
 
 ## Prérequis
@@ -209,15 +209,15 @@ bibliometrie-uca/
 └── docs/                Documentation
 ```
 
-Voir [docs/architecture.md](docs/architecture.md) pour les règles
+Voir [docs/architecture/](docs/architecture/) pour les règles
 d'import entre couches (vérifiées par import-linter en pre-commit + CI).
 
 ## Documentation
 
-- [Architecture logicielle](docs/architecture.md) — couches DDD, ports/adapters, règles d'import
+- [Architecture logicielle](docs/architecture/) — couches DDD, ports/adapters, règles d'import
 - [Modèle de données](docs/donnees.md) — schéma, domaines fonctionnels, relations
-- [Sources de données](docs/sources.md) — API, imports manuels, particularités par source
-- [Pipeline](docs/pipeline.md) — les 9 phases de traitement
+- [Sources de données](docs/sources/) — API, imports manuels, particularités par source
+- [Pipeline](docs/pipeline/) — les 9 phases de traitement
 - [Guide d'exploitation](docs/exploitation/) — initialisation, déploiement, lancement, supervision
 - [Guide utilisateur](docs/guide-utilisateur/) — pages publiques, pages admin, workflows
 - [Glossaire](docs/glossaire.md) — définitions des termes métier
