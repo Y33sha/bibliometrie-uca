@@ -219,7 +219,7 @@ d'import entre couches (vérifiées par import-linter en pre-commit + CI).
 - [Sources de données](docs/sources.md) — API, imports manuels, particularités par source
 - [Pipeline](docs/pipeline.md) — les 9 phases de traitement
 - [Guide d'exploitation](docs/exploitation/) — initialisation, déploiement, lancement, supervision
-- [Guide utilisateur](docs/guide-utilisateur.md) — pages et fonctionnalités
+- [Guide utilisateur](docs/guide-utilisateur/) — pages publiques, pages admin, workflows
 - [Glossaire](docs/glossaire.md) — définitions des termes métier
 
 ## Chantiers

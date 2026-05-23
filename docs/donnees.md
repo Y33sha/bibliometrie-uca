@@ -117,9 +117,9 @@ Tables associées :
 - `address_structures`: table de liaison. Les adresses proviennent des authorships sources (peuplées via `source_authorship_addresses` lors de la phase `normalize`, exploitées lors de la phase `affiliations`). Les structures identifiées sont ensuite propagées aux authorships sources.
 - `apc_payments`: données provenant d'un import CSV, voir [doc sources](sources/imports-manuels#donnees-apc).
 
-La page [**admin/structures**](guide-utilisateur#admin-structures) permet de gérer le CRUD des structures ainsi que leurs relations et formes de noms.
+La page [**admin/structures**](guide-utilisateur/pages-admin#admin-structures) permet de gérer le CRUD des structures ainsi que leurs relations et formes de noms.
 
-La page [**admin/config**](guide-utilisateur#admin-config) permet de gérer le CRUD des périmètres et quel périmètre est pris en compte à différentes étapes du *pipeline*.
+La page [**admin/config**](guide-utilisateur/pages-admin#admin-config) permet de gérer le CRUD des périmètres et quel périmètre est pris en compte à différentes étapes du *pipeline*.
 
 #### <span id="publications"></span>Domaine fonctionnel  `publications`
 
