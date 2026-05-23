@@ -76,8 +76,8 @@
 		{@render children()}
 	</main>
 
-	<aside class="docs-toc" class:empty={toc.length === 0}>
-		{#if toc.length > 0}
+	<aside class="docs-toc" class:empty={toc.length < 2}>
+		{#if toc.length > 1}
 			<h4>Sur cette page</h4>
 			<ul>
 				{#each toc as h}
