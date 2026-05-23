@@ -11,11 +11,16 @@ Usage :
     python -m interfaces.cli.oneshot.doi_prefixes_spike [--phase X] [--sample-size N]
 
 Phases (toutes par défaut, dans l'ordre) :
-    inventory        : SQL only — préfixes par publications, source_publications, staging
-    resolve-ra       : doi.org/ra pour chaque préfixe distinct (cache local)
-    publishers       : api.crossref.org/prefixes/{p} pour les préfixes RA=Crossref
-    coherence        : matrice doc_type × RA, anomalies
-    sample-datacite  : ~N DOIs DataCite via api.datacite.org/dois/{doi} (stratifié par doc_type)
+    inventory          : SQL only — préfixes par publications, source_publications, staging
+    resolve-ra         : doi.org/ra pour chaque préfixe distinct (cache local)
+    publishers         : api.crossref.org/prefixes/{p} pour les préfixes RA=Crossref
+    coherence          : matrice doc_type × RA, anomalies
+    sample-datacite    : ~N DOIs DataCite via api.datacite.org/dois/{doi} (stratifié par doc_type)
+    prefixes-datacite  : api.datacite.org/prefixes/{p} pour les préfixes DataCite déjà
+                         résolus en base (`doi_prefixes.ra='DataCite'`). Cible : voir si
+                         on peut récupérer un client/repository par préfixe (analogue
+                         CrossRef → publisher) et envisager l'intégration dans la phase
+                         pipeline `resolve_doi_prefixes`.
 
 Outputs : docs/chantiers/doi-prefixes-spike-data/*.json (gitignored).
 La note de synthèse `docs/chantiers/doi-prefixes-spike.md` est rédigée
@@ -46,10 +51,12 @@ log = setup_logger("doi_prefixes_spike", os.path.dirname(__file__))
 DATA_DIR = Path(__file__).resolve().parents[3] / "docs" / "chantiers" / "doi-prefixes-spike-data"
 RA_CACHE = DATA_DIR / "ra_cache.json"
 PUBLISHER_CACHE = DATA_DIR / "publisher_cache.json"
+DATACITE_PREFIX_CACHE = DATA_DIR / "datacite_prefix_cache.json"
 
 DOI_RA_URL = "https://doi.org/ra"
 CROSSREF_PREFIX_URL = "https://api.crossref.org/prefixes"
 DATACITE_DOI_URL = "https://api.datacite.org/dois"
+DATACITE_PREFIX_URL = "https://api.datacite.org/prefixes"
 SLEEP_BETWEEN_CALLS = 0.1
 
 
@@ -392,13 +399,152 @@ def phase_sample_datacite(
     return samples
 
 
+def phase_prefixes_datacite(conn: Connection, user_agent: str) -> dict[str, Any]:
+    """`api.datacite.org/prefixes/{p}` pour les préfixes DataCite en base.
+
+    Source = `doi_prefixes` (table de prod post-Phase 1), pas le cache
+    JSON de la phase 0. On veut voir, par préfixe, le ou les *clients*
+    DataCite associés (un client = un repository : Zenodo, figshare,
+    theses.fr, dépôt institutionnel…) ainsi que le *provider* (consortium
+    ou organisme parent). Cible : évaluer s'il y a un mapping propre
+    préfixe → client utilisable comme analogue du `name`/`member`
+    Crossref dans `resolve_doi_prefixes`.
+    """
+    log.info("▶ prefixes-datacite : api.datacite.org/prefixes/{p} pour préfixes DataCite en base")
+
+    rows = conn.execute(
+        text("SELECT prefix FROM doi_prefixes WHERE ra = 'DataCite' ORDER BY prefix")
+    ).fetchall()
+    datacite_prefixes = [r[0] for r in rows]
+    log.info(f"  {len(datacite_prefixes)} préfixes DataCite dans doi_prefixes")
+
+    if not datacite_prefixes:
+        log.warning("  aucun préfixe DataCite en base — phase 1 du chantier requise")
+        return {}
+
+    cache: dict[str, Any] = _load_json(DATACITE_PREFIX_CACHE, {})
+    todo = [p for p in datacite_prefixes if p not in cache]
+    log.info(f"  {len(cache)} en cache, {len(todo)} à résoudre")
+
+    with httpx.Client(
+        headers={"User-Agent": user_agent, "Accept": "application/vnd.api+json"},
+        timeout=15.0,
+    ) as client:
+        for i, prefix in enumerate(todo, 1):
+            try:
+                resp = client.get(
+                    f"{DATACITE_PREFIX_URL}/{prefix}",
+                    params={"include": "clients,providers"},
+                )
+                if resp.status_code != 200:
+                    log.warning(f"  [{i}/{len(todo)}] {prefix} : HTTP {resp.status_code}")
+                    cache[prefix] = {"status": resp.status_code}
+                else:
+                    cache[prefix] = {"status": 200, "data": resp.json()}
+                    log.info(f"  [{i}/{len(todo)}] {prefix} ✓")
+            except Exception as exc:
+                log.error(f"  [{i}/{len(todo)}] {prefix} : {exc!r}")
+                cache[prefix] = {"error": repr(exc)}
+
+            if i % 25 == 0:
+                _save_json(DATACITE_PREFIX_CACHE, cache)
+            time.sleep(SLEEP_BETWEEN_CALLS)
+
+    _save_json(DATACITE_PREFIX_CACHE, cache)
+
+    # Extraction client(s) + provider(s) par préfixe via la section `included`
+    # du JSON:API. Un préfixe peut techniquement avoir plusieurs clients (cas
+    # historiques de réallocation), on garde la liste pour audit.
+    client_distribution: Counter = Counter()
+    provider_distribution: Counter = Counter()
+    multi_client_prefixes: list[dict[str, Any]] = []
+    by_prefix: list[dict[str, Any]] = []
+    parse_errors: list[str] = []
+
+    for prefix, entry in cache.items():
+        if entry.get("status") != 200:
+            continue
+        payload = entry.get("data") or {}
+        try:
+            relationships = payload.get("data", {}).get("relationships", {}) or {}
+            client_ids = [
+                c.get("id") for c in (relationships.get("clients", {}) or {}).get("data", []) or []
+            ]
+            provider_ids = [
+                p.get("id")
+                for p in (relationships.get("providers", {}) or {}).get("data", []) or []
+            ]
+            included_index = {
+                (item.get("type"), item.get("id")): item
+                for item in payload.get("included", []) or []
+            }
+            client_names = [
+                (included_index.get(("clients", cid), {}).get("attributes", {}) or {}).get("name")
+                for cid in client_ids
+            ]
+            provider_names = [
+                (included_index.get(("providers", pid), {}).get("attributes", {}) or {}).get("name")
+                for pid in provider_ids
+            ]
+            client_distribution.update(n for n in client_names if n)
+            provider_distribution.update(n for n in provider_names if n)
+            entry_summary = {
+                "prefix": prefix,
+                "client_ids": client_ids,
+                "client_names": client_names,
+                "provider_ids": provider_ids,
+                "provider_names": provider_names,
+            }
+            by_prefix.append(entry_summary)
+            if len(client_ids) > 1:
+                multi_client_prefixes.append(entry_summary)
+        except Exception as exc:
+            parse_errors.append(f"{prefix}: {exc!r}")
+
+    by_prefix.sort(key=lambda r: r["prefix"])
+
+    summary = {
+        "by_prefix": by_prefix,
+        "client_distribution": dict(client_distribution.most_common()),
+        "provider_distribution": dict(provider_distribution.most_common()),
+        "multi_client_prefixes": multi_client_prefixes,
+        "parse_errors": parse_errors,
+        "stats": {
+            "prefixes_total": len(datacite_prefixes),
+            "prefixes_resolved": sum(1 for e in cache.values() if e.get("status") == 200),
+            "distinct_clients": len(client_distribution),
+            "distinct_providers": len(provider_distribution),
+            "multi_client_prefixes_n": len(multi_client_prefixes),
+        },
+    }
+    _save_json(DATA_DIR / "datacite_prefix_summary.json", summary)
+
+    log.info(f"  clients distincts : {len(client_distribution)}")
+    log.info(f"  providers distincts : {len(provider_distribution)}")
+    log.info(f"  préfixes multi-clients : {len(multi_client_prefixes)}")
+    log.info(f"  top clients : {client_distribution.most_common(15)}")
+    log.info(f"  top providers : {provider_distribution.most_common(15)}")
+    if parse_errors:
+        log.warning(f"  parse errors : {len(parse_errors)} (cf. summary.parse_errors)")
+
+    return summary
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "--phase",
-        choices=["inventory", "resolve-ra", "publishers", "coherence", "sample-datacite", "all"],
+        choices=[
+            "inventory",
+            "resolve-ra",
+            "publishers",
+            "coherence",
+            "sample-datacite",
+            "prefixes-datacite",
+            "all",
+        ],
         default="all",
     )
     parser.add_argument(
@@ -444,6 +590,9 @@ def main() -> int:
 
         if args.phase in ("sample-datacite", "all"):
             phase_sample_datacite(conn, ra_cache, args.sample_size, user_agent)
+
+        if args.phase in ("prefixes-datacite", "all"):
+            phase_prefixes_datacite(conn, user_agent)
 
     log.info(f"✓ outputs dans {DATA_DIR}")
     return 0

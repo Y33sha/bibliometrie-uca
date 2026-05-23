@@ -113,6 +113,80 @@ Zenodo (12), Classiques Garnier (7), arXiv (6), Academic Journal of Civil Engine
 
 Mix attendu pour un corpus universitaire français : dépôts institutionnels nationaux + grandes archives ouvertes + quelques éditeurs spécialisés.
 
+## Cartographie DataCite par préfixe (`api.datacite.org/prefixes/{p}`)
+
+Spike complémentaire ajouté à `doi_prefixes_spike.py` (phase `prefixes-datacite`). Source = `doi_prefixes` (table de prod post-Phase 1), filtre `ra='DataCite'`. Objectif : voir si DataCite expose un endpoint préfixe analogue à `api.crossref.org/prefixes/{p}` et envisager son intégration dans `resolve_doi_prefixes`.
+
+### Réponse de l'API
+
+| Métrique | Valeur |
+|---|---:|
+| Préfixes DataCite interrogés | 105 |
+| HTTP 200 | 105 (100 %) |
+| Préfixes multi-clients | 0 |
+| Clients distincts | 101 |
+| Providers distincts | 77 |
+
+Endpoint stable, JSON:API (`application/vnd.api+json`), un appel renvoie le préfixe + les relations `clients` et `providers` (avec `?include=clients,providers` les attributs sont embarqués dans `included`). **1 préfixe = 1 client** sur l'intégralité de l'échantillon UCA → granularité analogue à Crossref, mapping propre directement utilisable.
+
+### Hiérarchie DataCite observée
+
+- **provider** : organisation-mère / consortium qui détient l'allocation DataCite (ex. CERN, CNRS, NOAA, INRAE).
+- **client** : sous-unité responsable d'un repository ou d'une plateforme (ex. Zenodo, NAKALA, INRAE, arXiv, PANGAEA, Recherche Data Gouv).
+- **prefix** : alloué à un seul client, qui peut en détenir plusieurs (visible dans la relation `client.prefixes`, hors scope ici).
+
+Plusieurs clients peuvent être rattachés au même provider. Les colonnes pertinentes côté `client.attributes` : `name`, `symbol`, `clientType` (`repository`, `periodical`, …), `url`, `re3data`, `opendoar`, `issn`, `isActive`, `created`, `updated`. Côté `provider.attributes` : `name`, `displayName`, `region`, `country`, `memberType`.
+
+### Concentration par provider
+
+Top 9 providers (≥ 2 préfixes) :
+
+| Provider | Préfixes | Lecture |
+|---|---:|---|
+| French National Centre for Scientific Research (`jbru`) | 12 | Méta-provider CNRS pour les dépôts portés par Huma-Num, OpenEdition, IPGP, GEOgraphie de l'Environnement, etc. |
+| CNRS-Bucket (`vcob`) | 9 | Autre identifiant provider CNRS (legacy ou variante). Couvre IRD, INRAP, Normandie Université, Société Française de Thermique, etc. |
+| Institut national de recherche pour l'agriculture, l'alimentation et l'environnement | 3 | INRAE en tant que provider direct (3 préfixes, 1 client). |
+| CERN - European Organization for Nuclear Research | 3 | Englobe Zenodo, CERN Document Server, JACOW. |
+| Universitätsbibliothek Heidelberg | 2 | — |
+| CRUI Bucket | 2 | Consortium universités italiennes. |
+| Librairie Classiques Garnier | 2 | Éditeur académique français (2 clients distincts : "Classiques GARNIER" et "Classiques Garnier", potentiellement à dédoublonner). |
+| National Oceanic and Atmospheric Administration | 2 | Global Monitoring Laboratory × 2 préfixes. |
+| Centre National pour la Recherche Scientifique et Technique (CNRST) | 2 | Maroc. |
+
+**CNRS = 21 préfixes** (12 + 9) sur 105 = 20 %. Forte dépendance d'un seul provider — utile à savoir si on devait un jour interroger la fédération par provider.
+
+Les 96 préfixes restants se répartissent sur des providers à 1 préfixe : longue traîne quasi pure d'institutions et de portails.
+
+### Concentration par client
+
+Top 3 clients (≥ 2 préfixes) :
+
+| Client | Préfixes |
+|---|---:|
+| INRAE (`inist.inra`) | 3 |
+| University Library Heidelberg (`gesis.ubhd`) | 2 |
+| Global Monitoring Laboratory (`noaa.gmd`) | 2 |
+
+98 autres clients à 1 préfixe. Mutualisation par client quasi inexistante — chaque dépôt a typiquement son préfixe propre.
+
+### Échantillon de clients identifiés
+
+Pour mémoire : Zenodo, arXiv, figshare Academic Research System, NAKALA, OpenEdition Center, PANGAEA, DRYAD, Harvard Dataverse, Mendeley Data (Elsevier), Recherche Data Gouv France, Open Science Framework, CERN Document Server, IRD, Institut International du Froid, ResearchGate, Apollo (Cambridge), SEANOE (Ifremer), Stanford Digital Repository, ICPSR, Schloss Dagstuhl, theses.fr n'apparaît pas dans cet échantillon (corpus UCA pour mémoire — sans doute pas de DOI theses.fr en base au moment du spike).
+
+### Cas particulier 10.60692 (« OpenAlex generated DOIs »)
+
+DataCite renvoie `client = "Greater South Information System"` / `provider = "Organisation of Southern Cooperation (OSC)"`. **DataCite ne sait pas que ce sont des DOIs synthétiques OpenAlex.** Le rebranding « OSC » est opaque côté résolution. Conséquence : si on intègre DataCite à `resolve_doi_prefixes`, le préfixe 10.60692 sera enregistré comme client OSC, et le filtrage qui l'exclut côté pipeline ingestion DataCite doit rester applicatif (hardcodé ou via une row admin), pas data-driven.
+
+### Implications pour `resolve_doi_prefixes`
+
+Faisabilité directe : pour chaque préfixe `ra='DataCite'`, appel `api.datacite.org/prefixes/{prefix}?include=clients,providers`, extraction du nom du client (= repository) et éventuellement du provider, normalisation, matching contre `publishers.name_normalized`. Schéma : la structure `publishers` actuelle absorbe déjà certains repositories (Zenodo, figshare, BioRxiv, …) — on tente le matching sans toucher au schéma `doi_prefixes`. Les colonnes existantes `publisher_name_raw` / `publisher_name_normalized` / `publisher_id` s'appliquent symétriquement. Le mapping client/provider est à arbitrer : on peut soit stocker le nom du **client** (repository, plus précis), soit le **provider** (organisation, plus stable mais plus large), soit les deux. À trancher au moment du chantier d'implémentation, pas ici.
+
+### Implications pour la nature de DataCite comme « source »
+
+La dispersion observée (101 clients pour 105 préfixes, 77 providers) confirme : **DataCite n'est pas une source unique, c'est une fédération de repositories**. Il n'existe pas d'API DataCite institutionnelle au sens « toutes les publis UCA » — ni par affiliation (DataCite n'indexe pas correctement les affiliations), ni par ROR. L'option « DataCite comme source à part entière » du chantier original revient à interroger DOI-par-DOI (`api.datacite.org/dois/{doi}`) les ~2 900 préfixes DataCite déjà connus en staging crossref, ce qui correspond à ce qui a été spécifié dans la fiche initiale.
+
+L'option alternative (interroger chaque vrai repository par institution / ORCID) implique d'identifier les repositories qui (a) hébergent du contenu UCA en volume significatif et (b) exposent une API d'interrogation par affiliation. Cette analyse n'est pas dans le périmètre de ce spike — chantier dédié, à arbitrer après décision Phase 2.
+
 ## Décisions
 
 ### Phase 1 — filtre Crossref + retrait `publishers.doi_prefix` : **GO**
