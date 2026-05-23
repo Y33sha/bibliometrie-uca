@@ -239,16 +239,13 @@ def _vacuum_staging(full: bool = False) -> Any:
 
 
 def phase_resolve_doi_prefixes(**kw: Any) -> PhaseMetrics:
-    """Résolution préfixe DOI → Registration Agency + éditeur Crossref.
+    """Résolution préfixe DOI → Registration Agency + éditeur Crossref / repository DataCite.
 
-    Pour chaque préfixe DOI présent en staging mais absent de
-    `doi_prefixes`, interroge `doi.org/ra` puis (si Crossref)
-    `api.crossref.org/prefixes` pour rattacher le préfixe à un éditeur
-    existant.
+    Pour chaque préfixe DOI présent en staging mais absent de `doi_prefixes`, interroge `doi.org/ra` puis, selon la RA :
+    - Crossref → `api.crossref.org/prefixes` pour rattacher le préfixe à un publisher.
+    - DataCite → `api.datacite.org/prefixes?include=clients,providers` pour rattacher le préfixe à un provider (= publisher) + nom et symbole du client (= repository).
 
-    Placée **après normalize** : (a) `cross_imports` (en amont) peut
-    introduire de nouveaux DOIs via `fetch_missing_hal_id`, (b)
-    `normalize` crée les `publishers` qu'on veut matcher direct.
+    Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les `publishers` qu'on veut matcher direct.
 
     Idempotente : ne traite que les préfixes absents de `doi_prefixes`.
     """
@@ -263,6 +260,7 @@ def _run_resolve_doi_prefixes() -> PhaseMetrics:
     from infrastructure.sources.doi_prefixes.clients import (
         build_user_agent,
         fetch_crossref_prefix,
+        fetch_datacite_prefix,
         resolve_ra,
     )
 
@@ -277,6 +275,9 @@ def _run_resolve_doi_prefixes() -> PhaseMetrics:
             publisher_repo=publisher_repository(conn),
             resolve_ra_fn=lambda doi: resolve_ra(doi, user_agent=user_agent),
             fetch_crossref_prefix_fn=lambda prefix: fetch_crossref_prefix(
+                prefix, user_agent=user_agent
+            ),
+            fetch_datacite_prefix_fn=lambda prefix: fetch_datacite_prefix(
                 prefix, user_agent=user_agent
             ),
         )

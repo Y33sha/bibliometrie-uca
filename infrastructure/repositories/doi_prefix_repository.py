@@ -1,13 +1,11 @@
 """Adapter PostgreSQL pour la table `doi_prefixes`.
 
-Implémente `DoiPrefixRepository`. Sert la phase pipeline
-`resolve_doi_prefixes` : lecture des préfixes à résoudre + insertion
-des préfixes résolus.
+Implémente `DoiPrefixRepository`. Sert la phase pipeline `resolve_doi_prefixes` : lecture des préfixes à résoudre + insertion des préfixes résolus (Crossref ou DataCite).
 """
 
 from sqlalchemy import Connection, text
 
-from application.ports.repositories.doi_prefix_repository import UnmatchedCrossrefPrefix
+from application.ports.repositories.doi_prefix_repository import UnmatchedPrefix
 
 
 class PgDoiPrefixRepository:
@@ -19,11 +17,7 @@ class PgDoiPrefixRepository:
     def get_unresolved_prefixes_with_samples(
         self, *, n_samples_per_prefix: int
     ) -> list[tuple[str, list[str]]]:
-        """Renvoie `[(prefix, [doi1, doi2, ...]), ...]` pour chaque préfixe
-        DOI présent en staging mais absent de `doi_prefixes`. Au plus
-        `n_samples_per_prefix` DOIs par préfixe, ordonnés par longueur
-        croissante pour minimiser la complexité d'encodage URL côté
-        client doi.org/ra."""
+        """Renvoie `[(prefix, [doi1, doi2, ...]), ...]` pour chaque préfixe DOI présent en staging mais absent de `doi_prefixes`. Au plus `n_samples_per_prefix` DOIs par préfixe, ordonnés par longueur croissante pour minimiser la complexité d'encodage URL côté client doi.org/ra."""
         result = self._conn.execute(
             text(
                 """
@@ -69,21 +63,27 @@ class PgDoiPrefixRepository:
         publisher_name_raw: str | None,
         publisher_name_normalized: str | None,
         crossref_member_id: int | None,
+        client_name_raw: str | None,
+        client_name_normalized: str | None,
+        datacite_client_symbol: str | None,
     ) -> bool:
-        """Insère un préfixe résolu. Retourne True si inséré, False si
-        déjà présent (conflit sur la PK)."""
+        """Insère un préfixe résolu. Retourne True si inséré, False si déjà présent (conflit sur la PK)."""
         result = self._conn.execute(
             text(
                 """
                 INSERT INTO doi_prefixes (
                     prefix, ra, publisher_id,
                     publisher_name_raw, publisher_name_normalized,
-                    crossref_member_id
+                    crossref_member_id,
+                    client_name_raw, client_name_normalized,
+                    datacite_client_symbol
                 )
                 VALUES (
                     :prefix, :ra, :publisher_id,
                     :publisher_name_raw, :publisher_name_normalized,
-                    :crossref_member_id
+                    :crossref_member_id,
+                    :client_name_raw, :client_name_normalized,
+                    :datacite_client_symbol
                 )
                 ON CONFLICT (prefix) DO NOTHING
                 """
@@ -95,17 +95,19 @@ class PgDoiPrefixRepository:
                 "publisher_name_raw": publisher_name_raw,
                 "publisher_name_normalized": publisher_name_normalized,
                 "crossref_member_id": crossref_member_id,
+                "client_name_raw": client_name_raw,
+                "client_name_normalized": client_name_normalized,
+                "datacite_client_symbol": datacite_client_symbol,
             },
         )
         return result.rowcount > 0
 
-    def get_unmatched_crossref_prefixes(self) -> list[UnmatchedCrossrefPrefix]:
-        """Rows connues de Crossref mais sans publisher_id, ordre par prefix ASC."""
+    def get_unmatched_prefixes(self) -> list[UnmatchedPrefix]:
+        """Rows avec `publisher_name_normalized` rempli mais `publisher_id IS NULL`. Couvre Crossref et DataCite indifféremment. Ordre par prefix ASC."""
         result = self._conn.execute(
             text(
                 """
-                SELECT prefix, publisher_name_raw, publisher_name_normalized,
-                       crossref_member_id
+                SELECT prefix, publisher_name_raw, publisher_name_normalized
                 FROM doi_prefixes
                 WHERE publisher_id IS NULL
                   AND publisher_name_normalized IS NOT NULL
@@ -114,11 +116,10 @@ class PgDoiPrefixRepository:
             )
         )
         return [
-            UnmatchedCrossrefPrefix(
+            UnmatchedPrefix(
                 prefix=r.prefix,
                 publisher_name_raw=r.publisher_name_raw,
                 publisher_name_normalized=r.publisher_name_normalized,
-                crossref_member_id=r.crossref_member_id,
             )
             for r in result
         ]
