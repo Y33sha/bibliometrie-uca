@@ -36,8 +36,8 @@ L'absence d'identifiants ORCID/IdHAL en commun n'est pas un signal exploitable �
 
 2. **Architecture d'une règle figée** :
    - Un membre dans `MetadataDeduplicationCase` (domain), avec un commentaire détaillant les critères + le nom de la fonction d'implémentation.
-   - Une fonction `match_<cas>(...)` dans `application/pipeline/publications/metadata_deduplication_rules.py` qui retourne `(pub_id, case) | None`. Pré-fetchée par `match_or_create_publications.process_document` et passée à `decide_publication_match`.
-   - Une migration Alembic data (`alembic/versions/`) qui invoque le module de règles pour fusionner rétroactivement les couples détectés sur la base existante. Jouée automatiquement par `alembic upgrade head` en prod.
+   - Une fonction `match_<cas>(...)` dans `application/pipeline/publications/metadata_deduplication_rules.py` qui retourne `(pub_id, case) | None`. Pré-fetchée par `match_or_create_publications.process_document` et passée à `decide_publication_match`. C'est le matching à la création (pipeline).
+   - Une migration Alembic data dédiée (SQL pur, sans import de code applicatif) qui fusionne rétroactivement les couples détectés sur la base existante. Jouée automatiquement par `alembic upgrade head` en prod. La duplication du SQL d'inventaire entre la fiche et la migration est assumée — elle disparaîtra au prochain squash de schéma.
 
 3. **Branchement à `match_or_create_publications`.** La règle vit dans le helper de cascade, qui est déjà appelé dans la phase pipeline `match_or_create_publications`. Pas de phase pipeline additionnelle. Détails d'intégration (où exactement placer l'appel, comment pré-fetcher) à voir au moment de la première règle.
 

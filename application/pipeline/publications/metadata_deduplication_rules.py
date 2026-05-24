@@ -1,10 +1,10 @@
-"""Implémentations concrètes des règles de déduplication par métadonnées.
+"""Implémentations concrètes des règles de déduplication par métadonnées, pour la cascade à la création.
 
 Chaque fonction `match_<cas>` correspond à un membre de l'énumération `domain.publications.deduplication.MetadataDeduplicationCase`. Les fonctions prefetch les données nécessaires (via le port `PublicationsMatchOrCreateQueries` et le repo `PublicationRepository`) puis appliquent la règle, retournant `(publication_id, MetadataDeduplicationCase) | None`.
 
 Les règles métier elles-mêmes (critères énoncés en clair) sont documentées sur chaque membre de l'enum côté domain ; ce module porte uniquement l'implémentation (prefetch + matching).
 
-Les fonctions exposées ici sont consommées par `application.pipeline.publications.match_or_create_publications.process_document` (cascade à la création) et par les migrations Alembic data qui rattrapent rétroactivement les doublons existants sur le corpus.
+Le rattrapage rétroactif des doublons déjà en base est porté par une migration Alembic data dédiée par règle (SQL pur, indépendante de ce module).
 """
 
 from sqlalchemy import Connection
