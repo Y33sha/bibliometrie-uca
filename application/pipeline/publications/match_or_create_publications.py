@@ -16,6 +16,9 @@ from typing import Literal
 
 from sqlalchemy import Connection
 
+from application.pipeline.publications.metadata_deduplication_rules import (
+    match_thesis_by_title_year,
+)
 from application.ports.pipeline.publications_match_or_create import (
     PublicationsMatchOrCreateQueries,
     SourcePublicationRow,
@@ -38,7 +41,6 @@ from domain.publications.metadata import (
     clean_publication_title,
     has_minimal_publication_metadata,
 )
-from domain.sources.theses import thesis_authors_compatible
 
 _NATIVE_KIND_BY_SOURCE: dict[str, str] = {
     "hal": "hal_id",
@@ -141,7 +143,7 @@ def process_document(
     # Prefetch dédup spécifique thèse : title+year + compatibilité auteur sur le primary.
     metadata_match: tuple[int, MetadataDeduplicationCase] | None = None
     if doc_type == "thesis":
-        metadata_match = _match_thesis_by_title_year(
+        metadata_match = match_thesis_by_title_year(
             conn,
             queries=queries,
             source_publication_id=doc.id,
@@ -182,34 +184,6 @@ def process_document(
     refresh_from_sources(publication_id, repo=pub_repo, audit_repo=audit_repo)
 
     return outcome
-
-
-def _match_thesis_by_title_year(
-    conn: Connection,
-    *,
-    queries: PublicationsMatchOrCreateQueries,
-    source_publication_id: int,
-    title_normalized: str,
-    pub_year: int,
-    pub_repo: PublicationRepository,
-) -> tuple[int, MetadataDeduplicationCase] | None:
-    """Cherche une thèse canonique compatible par titre+année + auteur principal.
-
-    Pour chaque candidat retourné par `find_thesis_by_title`, vérifie la compatibilité de l'auteur primary (via `thesis_authors_compatible`). Si l'auteur du `source_publication` courant est inconnu, le candidat est accepté sans vérification (préserve le comportement historique de `normalize_theses.find_publication`).
-    """
-    if not title_normalized or not pub_year:
-        return None
-    candidate_ids = pub_repo.find_thesis_by_title(title_normalized, pub_year)
-    if not candidate_ids:
-        return None
-    author = queries.fetch_thesis_primary_author_from_source_publication(
-        conn, source_publication_id
-    )
-    for cand_id in candidate_ids:
-        primary = queries.fetch_thesis_primary_author(conn, cand_id)
-        if not author or thesis_authors_compatible(primary, author):
-            return (cand_id, MetadataDeduplicationCase.THESIS_TITLE_YEAR)
-    return None
 
 
 def run(

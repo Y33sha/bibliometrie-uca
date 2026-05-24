@@ -25,11 +25,16 @@ class DeduplicationKey(StrEnum):
 
 
 class MetadataDeduplicationCase(StrEnum):
-    """Cas de déduplication par métadonnées (algorithme de décision, pas identifiant unique).
+    """Cas de déduplication par métadonnées : combinaisons explicites de critères qui rendent deux publications considérées comme la même (pas un score, pas d'identifiant unique partagé).
 
-    Chaque cas correspond à une combinaison de critères qui rendent deux publications considérées comme la même. Un futur algorithme de dédup pourra ajouter de nouveaux cas (ex. `ARTICLE_TITLE_JOURNAL_YEAR`).
+    Chaque membre énonce sa règle métier dans le commentaire qui le précède. L'implémentation concrète (prefetch + matching) vit dans `application/pipeline/publications/metadata_deduplication_rules.py`, fonction `match_<nom_du_cas>`.
     """
 
+    # Thèse : même `title_normalized`, même `pub_year`, compatibilité de
+    # l'auteur primary (helper `thesis_authors_compatible`). Si l'auteur du
+    # `source_publication` courant est inconnu, le candidat est accepté
+    # sans vérification.
+    # Implémentation : `match_thesis_by_title_year`.
     THESIS_TITLE_YEAR = "thesis_title_year"
 
 

@@ -2,9 +2,10 @@
 
 Couvre :
 - `extract_known_identifiers` : helper pur (cf. `TestExtractKnownIdentifiers`).
-- `_match_thesis_by_title_year` : prefetch thèse + compatibilité auteur.
 - `process_document` : aiguillage DOI / NNT / HAL / thesis vers `decide_publication_match`.
 - `run` : boucle d'orchestration, commit/rollback, dry-run, exceptions.
+
+Les helpers de matching par métadonnées (cas thèse, etc.) sont testés dans `test_metadata_deduplication_rules.py`.
 
 Mocks : port `PublicationsMatchOrCreateQueries`, `PublicationRepository`, `AuditRepository`. `resolve_doi_conflict` et `refresh_from_sources` monkeypatchés dans le module pour isoler la logique d'aiguillage.
 """
@@ -19,13 +20,11 @@ import pytest
 
 from application.pipeline.publications import match_or_create_publications
 from application.pipeline.publications.match_or_create_publications import (
-    _match_thesis_by_title_year,
     extract_known_identifiers,
     process_document,
     run,
 )
 from application.ports.pipeline.publications_match_or_create import SourcePublicationRow
-from domain.publications.deduplication import MetadataDeduplicationCase
 
 
 class TestExtractKnownIdentifiers:
@@ -153,137 +152,6 @@ class _PubByDoiStub:
         self.id = id
         self.doc_type = doc_type
         self.title_normalized = title_normalized
-
-
-# ── _match_thesis_by_title_year ──────────────────────────────────
-
-
-class TestMatchThesisByTitleYear:
-    def test_empty_title_returns_none(self):
-        queries = MagicMock()
-        repo = MagicMock()
-
-        result = _match_thesis_by_title_year(
-            conn=None,
-            queries=queries,
-            source_publication_id=1,
-            title_normalized="",
-            pub_year=2024,
-            pub_repo=repo,
-        )
-
-        assert result is None
-        repo.find_thesis_by_title.assert_not_called()
-
-    def test_missing_pub_year_returns_none(self):
-        queries = MagicMock()
-        repo = MagicMock()
-
-        result = _match_thesis_by_title_year(
-            conn=None,
-            queries=queries,
-            source_publication_id=1,
-            title_normalized="some title",
-            pub_year=0,
-            pub_repo=repo,
-        )
-
-        assert result is None
-        repo.find_thesis_by_title.assert_not_called()
-
-    def test_no_candidates_returns_none(self):
-        queries = MagicMock()
-        repo = MagicMock()
-        repo.find_thesis_by_title.return_value = []
-
-        result = _match_thesis_by_title_year(
-            conn=None,
-            queries=queries,
-            source_publication_id=1,
-            title_normalized="title",
-            pub_year=2024,
-            pub_repo=repo,
-        )
-
-        assert result is None
-
-    def test_source_has_no_author_accepts_first_candidate(self):
-        """Quand l'auteur du source_publication est inconnu, le 1er candidat passe sans vérif (préserve le comportement historique)."""
-        queries = MagicMock()
-        repo = MagicMock()
-        repo.find_thesis_by_title.return_value = [42]
-        queries.fetch_thesis_primary_author_from_source_publication.return_value = None
-
-        result = _match_thesis_by_title_year(
-            conn=None,
-            queries=queries,
-            source_publication_id=1,
-            title_normalized="title",
-            pub_year=2024,
-            pub_repo=repo,
-        )
-
-        assert result == (42, MetadataDeduplicationCase.THESIS_TITLE_YEAR)
-        # fetch_thesis_primary_author est appelée mais sa valeur n'est pas comparée.
-        queries.fetch_thesis_primary_author.assert_called_once()
-
-    def test_first_incompatible_second_compatible(self, monkeypatch):
-        """Itère sur les candidats jusqu'à trouver un auteur compatible."""
-        queries = MagicMock()
-        repo = MagicMock()
-        repo.find_thesis_by_title.return_value = [10, 20]
-        queries.fetch_thesis_primary_author_from_source_publication.return_value = (
-            "Doe",
-            "Jane",
-        )
-        # 1er candidat : auteur incompatible. 2e : compatible.
-        queries.fetch_thesis_primary_author.side_effect = [
-            ("Smith", "John"),
-            ("Doe", "J"),
-        ]
-
-        # Stubber `thesis_authors_compatible` : False pour Smith, True pour Doe.
-        def fake_compat(a, b):
-            return a == ("Doe", "J")
-
-        monkeypatch.setattr(match_or_create_publications, "thesis_authors_compatible", fake_compat)
-
-        result = _match_thesis_by_title_year(
-            conn=None,
-            queries=queries,
-            source_publication_id=1,
-            title_normalized="title",
-            pub_year=2024,
-            pub_repo=repo,
-        )
-
-        assert result == (20, MetadataDeduplicationCase.THESIS_TITLE_YEAR)
-
-    def test_all_incompatible_returns_none(self, monkeypatch):
-        queries = MagicMock()
-        repo = MagicMock()
-        repo.find_thesis_by_title.return_value = [10, 20]
-        queries.fetch_thesis_primary_author_from_source_publication.return_value = (
-            "Doe",
-            "Jane",
-        )
-        queries.fetch_thesis_primary_author.side_effect = [("X", "Y"), ("Z", "W")]
-        monkeypatch.setattr(
-            match_or_create_publications,
-            "thesis_authors_compatible",
-            lambda a, b: False,
-        )
-
-        result = _match_thesis_by_title_year(
-            conn=None,
-            queries=queries,
-            source_publication_id=1,
-            title_normalized="title",
-            pub_year=2024,
-            pub_repo=repo,
-        )
-
-        assert result is None
 
 
 # ── process_document ─────────────────────────────────────────────
