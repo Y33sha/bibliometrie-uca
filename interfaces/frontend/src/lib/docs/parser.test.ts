@@ -229,6 +229,46 @@ describe('parseMarkdown — syntaxe glossaire [[slug]] / [[slug|texte]]', () => 
 	});
 });
 
+// ── parseMarkdown / liens glossaire en syntaxe markdown standard ───
+
+describe('parseMarkdown — liens markdown `[…](glossaire#slug)` traités comme liens glossaire', () => {
+	it('depuis une page racine : `[texte](glossaire#slug)` émet data-glossary', () => {
+		const { html } = parseMarkdown('Voir [le DOI](glossaire#doi)', BASE, 'test');
+		expect(html).toContain('class="gloss"');
+		expect(html).toContain('data-glossary="doi"');
+		expect(html).toContain('href="/bibliometrie/docs/glossaire#doi"');
+		expect(html).toContain('>le DOI</a>');
+	});
+
+	it('depuis une page de section : `[texte](../glossaire#slug)` émet data-glossary', () => {
+		const { html } = parseMarkdown('Voir [APC](../glossaire#apc)', BASE, 'sources/hal');
+		expect(html).toContain('data-glossary="apc"');
+		expect(html).toContain('href="/bibliometrie/docs/glossaire#apc"');
+	});
+
+	it('un lien vers le glossaire sans ancre ne déclenche pas le popover', () => {
+		const { html } = parseMarkdown('Voir [le glossaire](glossaire)', BASE, 'test');
+		expect(html).not.toContain('data-glossary');
+		expect(html).toContain('href="/bibliometrie/docs/glossaire"');
+	});
+
+	it('les autres liens internes ne sont pas affectés', () => {
+		const { html } = parseMarkdown('Voir [pipeline](pipeline)', BASE, 'test');
+		expect(html).not.toContain('data-glossary');
+		expect(html).not.toContain('class="gloss"');
+	});
+
+	it("le texte d'un lien glossaire markdown rend l'italique inline", () => {
+		const { html } = parseMarkdown(
+			'Voir [voie *open access*](glossaire#oa_status)',
+			BASE,
+			'test'
+		);
+		expect(html).toContain('data-glossary="oa_status"');
+		expect(html).toContain('<em>open access</em>');
+	});
+});
+
 // ── parseMarkdown / HTML ───────────────────────────────────────
 
 describe('parseMarkdown — HTML', () => {
