@@ -166,6 +166,16 @@ export function parseMarkdown(content: string, base: string, currentSlug: string
 			const resolved = resolveDocLink(href, base, currentSlug);
 			const text = this.parser.parseInline(tokens);
 			const titleAttr = linkTitle ? ` title="${escapeHtmlAttr(linkTitle)}"` : '';
+			// Lien vers le glossaire de la forme `…/docs/glossaire#slug` :
+			// émet `class="gloss" data-glossary="slug"` pour que
+			// <GlossaryPopover /> intercepte au clic. Si le slug n'existe pas
+			// dans la map glossaire, le composant laisse passer le clic et la
+			// navigation vers le glossaire se fait normalement.
+			const glossaryMatch = /\/docs\/glossaire#([\w-]+)$/.exec(resolved);
+			if (glossaryMatch) {
+				const slug = glossaryMatch[1];
+				return `<a class="gloss" href="${escapeHtmlAttr(resolved)}"${titleAttr} data-glossary="${escapeHtmlAttr(slug)}">${text}</a>`;
+			}
 			return `<a href="${escapeHtmlAttr(resolved)}"${titleAttr}>${text}</a>`;
 		}
 	};
