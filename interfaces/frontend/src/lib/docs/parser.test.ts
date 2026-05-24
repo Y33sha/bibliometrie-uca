@@ -269,6 +269,37 @@ describe('parseMarkdown — liens markdown `[…](glossaire#slug)` traités comm
 	});
 });
 
+// ── parseMarkdown / images de doc ──────────────────────────────
+
+describe('parseMarkdown — images de doc (réécriture vers /docs-screenshots/)', () => {
+	it('réécrit `![](../screenshots/foo.png)` depuis une page de section', () => {
+		const { html } = parseMarkdown(
+			'![Stats](../screenshots/stats_oa_status.png)',
+			BASE,
+			'guide-utilisateur/pages-publiques'
+		);
+		expect(html).toContain('<img src="/bibliometrie/docs-screenshots/stats_oa_status.png"');
+		expect(html).toContain('alt="Stats"');
+	});
+
+	it('réécrit `![](screenshots/foo.png)` depuis une page racine', () => {
+		const { html } = parseMarkdown('![](screenshots/foo.png)', BASE, 'test');
+		expect(html).toContain('<img src="/bibliometrie/docs-screenshots/foo.png"');
+	});
+
+	it('laisse intacts les liens absolus et externes', () => {
+		const ext = parseMarkdown('![ext](https://example.com/x.png)', BASE, 'test').html;
+		expect(ext).toContain('src="https://example.com/x.png"');
+		const abs = parseMarkdown('![abs](/static/x.png)', BASE, 'test').html;
+		expect(abs).toContain('src="/static/x.png"');
+	});
+
+	it('laisse intacts les chemins relatifs hors `screenshots/`', () => {
+		const { html } = parseMarkdown('![other](../assets/icon.svg)', BASE, 'sources/hal');
+		expect(html).toContain('src="../assets/icon.svg"');
+	});
+});
+
 // ── parseMarkdown / HTML ───────────────────────────────────────
 
 describe('parseMarkdown — HTML', () => {
