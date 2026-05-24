@@ -27,7 +27,7 @@ export const docTypeLabelsMap: Record<string, string> = {
 export const typeLabels: Record<string, string> = {
 	article: 'Article',
 	review: 'Review',
-	conference_paper: 'Conf.',
+	conference_paper: 'Communication',
 	proceedings: 'Conference paper',
 	book: 'Ouvrage',
 	book_chapter: 'Chapitre',
