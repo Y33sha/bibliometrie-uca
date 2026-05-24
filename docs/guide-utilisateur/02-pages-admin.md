@@ -2,38 +2,48 @@
 
 ## Pipeline
 
-### Configuration (`/admin/config`) {#admin-config}
+### Configuration {#admin-config}
 
-Paramètres des imports:
+`/admin/config`
+
+Configuration du [moissonnage](../pipeline/02-extract.md):
 - email (polite pool);
-- clé API WOS;
+- clés API;
 - années interrogées (modes weekly et full);
-- paramètres de requête par source;
 - définition et CRUD des périmètres (`uca`, `uca_wide`);
-- périmètres utilisés à différentes étapes du pipeline.
+- périmètre utilisé à différentes étapes du pipeline (extraction, détection des affiliations, création de personnes).
 
 ## Logs
 TODO: à compléter
 
 ## Référentiels
 
-### Structures (`/admin/structures`) {#admin-structures}
+### Structures {#admin-structures}
 
-Gère le CRUD sur l'ensemble des structures du périmètre UCA + les co-tutelles des laboratoires (ONR, écoles, autres universités) + le CHU.
+#### Liste `/admin/structures`
+
+Affiche la liste des structures.
+
+
+
+#### Détails `/admin/structures/{id}`
+
+Gestion du CRUD des structures, et de leurs relations et formes de noms.
 
 Pour chaque structure:
-- **Détails** (nom, acronyme, identifiant ROR, collection HAL);
+- **Détails** (nom, acronyme, identifiant ROR, collection HAL, identifiants dans les sources);
 - **Relations** (2 relations: tutelle, partenaire);
-- **Identification** dans les publications: Gestion des formes de nom (pour l'identification dans les adresses)
+- **Formes de noms** pour l'identification des structures dans les adresses.
 
+### Personnes
 
-### Gestion des personnes (`/admin/persons`)
+`/admin/persons`
 
 Gestion du référentiel de personnes :
 
 - **Édition du nom**.
 - **Rejet** : marquer une personne comme fausse entité (mauvais parsing, noms d'équipes de recherche…).
-- **Identifiants** : ORCID, idHAL, IdRef avec statut (en attente, confirmé, rejeté). Les boutons ✓ et ✗ permettent de confirmer ou rejeter. Ajout d'identifiants.
+- **Identifiants** : [ORCID](../glossaire.md#orcid), [idHAL](../glossaire.md#idhal), [IdRef](../glossaire.md#idref) avec statut (en attente, confirmé, rejeté). Les boutons ✓ et ✗ permettent de confirmer ou rejeter. Ajout d'identifiants.
 - **Formes de nom** : chaque personne a des formes de nom normalisées issues des sources. Un badge orange indique une forme **ambiguë** (partagée avec une autre personne). Cliquer sur une forme ouvre un modal permettant de consulter les authorships liées et de les détacher.
 - **Fusion** : le bouton "Fusionner" permet de chercher un doublon et de fusionner deux personnes. Bloqué si les deux ont une fiche RH.
 
@@ -55,29 +65,37 @@ TODO: à compléter
 
 ## Adresses
 
-### Contrôle des affiliations des adresses (`/admin/addresses`)
+### Affiliations des adresses
+
+`/admin/addresses`
 
 Contrôle des adresses d'affiliation résolues automatiquement par la phase `resolve_addresses` du pipeline.
 Confirmer ou rejeter manuellement les associations adresse → structure.
 
-#### Qualité de la détection (`/admin/feedback`)
+#### Qualité de la détection
 
-Fait ressortir les faux positifs et faux négatifs dans la détection de structures dans les adresses:
-- **faux négatifs**: affiliations adresse-structure non détectées par le script mais créées manuellement => repérer les formes de nom non détectées, et les ajouter dans admin/structures.
-- **faux positifs**: affiliations détectées par le script mais rejetées manuellement => supprimer une forme de nom trop permissive ou lui ajouter un contexte contraignant.
+`/admin/feedback`
 
-Les corrections seront prises en compte à la prochaine exécution du pipeline (phase `resolve_addresses`).
+Affiche les faux positifs et faux négatifs dans la détection de structures dans les adresses:
+- **faux négatifs**: affiliations adresse-structure non détectées par le script mais créées manuellement => action nécessaire: repérer les formes de nom non détectées et les ajouter dans `admin/structures/{id}`.
+- **faux positifs**: affiliations détectées par le script mais rejetées manuellement => action nécessaire: supprimer une forme de nom trop permissive ou lui ajouter un contexte plus contraignant.
 
-### Gestion des liens adresses-pays (`/admin/countries`)
+Les ajouts/suppressions de formes de noms seront prises en compte à la prochaine exécution du pipeline ([phase `affiliations`](../pipeline/04-affiliations.md)).
+
+### Liens adresses-pays
+
+`/admin/countries`
 
 Attribution et correction des pays liés aux adresses.
 Les corrections se propagent automatiquement aux publications liées, sans besoin de relancer le pipeline.
 
-## Interfaces de dédoublonnage
+## Dédoublonnage
 
-### Doublons de publications (`/admin/duplicates`)
+### Publications
 
-Paires de publications potentiellement identiques (titre normalisé identique, même type, même année).
+`/admin/duplicates`
+
+Paires de publications potentiellement identiques (logique de détection dans [infrastructure/queries/publication_duplicates.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/infrastructure/queries/publication_duplicates.py)).<!--TODO: à réviser et documenter-->
 
 Pour chaque paire, on peut :
 
@@ -85,7 +103,9 @@ Pour chaque paire, on peut :
 - **Marquer comme distinctes** : indiquer que ce n'est pas un doublon
 - **Passer** : reporter la décision
 
-### Doublons de personnes (`/admin/person-duplicates`)
+### Personnes
+
+`/admin/person-duplicates`
 
 Paires de personnes potentiellement identiques. Mêmes opérations que pour les doublons de publications.
 

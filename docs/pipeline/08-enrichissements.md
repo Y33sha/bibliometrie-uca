@@ -1,6 +1,6 @@
 #  Enrichissements
 
-## Pays des adresses
+## Pays des adresses {#countries}
 
 Phase `countries`: Associe des pays aux adresses pour permettre l'analyse des collaborations internationales. Trois étapes enchaînées :
 
@@ -10,7 +10,7 @@ Phase `countries`: Associe des pays aux adresses pour permettre l'analyse des co
 
 3. **`interfaces/cli/pipeline/refresh_publication_countries.py`** : recalcule `publications.countries` comme union des `source_publications.countries` de toutes les sources rattachées à chaque publication canonique.
 
-## Sujets associés aux publications
+## Sujets associés aux publications {#subjects}
 
 Phase `subjects`: deux étapes enchaînées :
 
@@ -26,11 +26,11 @@ Recalcule depuis `publication_subjects` (en excluant les liens `rejected`) :
 
 Idempotent : le résultat ne dépend que de l'état courant de `publication_subjects`.
 
-##  Statut open access, APC
+##  Statut open access, APC {#oa_status}
 
 Phase `enrich`: exécutée uniquement en mode `full` :
 
 | Script | Rôle |
 |--------|------|
-| `interfaces/cli/pipeline/enrich_oa_status.py` | Statut *open access* via API [Unpaywall](../glossaire#unpaywall) => souvent plus à jour que le statut renseigné dans les sources |
-| `interfaces/cli/pipeline/enrich_journal_apc.py` | Montant [[apc|APC]] par revue via API OpenAlex Sources => **ne sert à rien pour l'instant**, voir si on garde ou pas |
+| `interfaces/cli/pipeline/enrich_oa_status.py` | Statut *open access* via API [Unpaywall](../glossaire.md#unpaywall) => souvent plus à jour que le statut renseigné dans les sources |
+| `interfaces/cli/pipeline/enrich_journal_apc.py` | Montant [APC](../glossaire.md#apc) par revue via API OpenAlex Sources => **ne sert à rien pour l'instant**, voir si on garde ou pas |

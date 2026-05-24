@@ -51,9 +51,9 @@ Le contrat `layers` d'`import-linter` (voir `pyproject.toml`, section `[tool.imp
 ## Suite
 
 Détail couche par couche :
-- [`domain/`](domain) — noyau métier pur
-- [`application/`](application) — services, orchestrateurs, patterns d'injection
-- [`infrastructure/`](infrastructure) — adapters sortants, discipline transactionnelle
-- [`interfaces/`](interfaces) — adapters entrants, sync threadpool
-- [Composition roots](composition-roots) — qui a le droit d'importer quoi
-- [Tests](tests) — unit, intégration, coverage
+- [`domain/`](02-domain.md) — noyau métier pur
+- [`application/`](03-application.md) — services, orchestrateurs, patterns d'injection
+- [`infrastructure/`](04-infrastructure.md) — adapters sortants, discipline transactionnelle
+- [`interfaces/`](05-interfaces.md) — adapters entrants, sync threadpool
+- [Composition roots](06-composition-roots.md) — qui a le droit d'importer quoi
+- [Tests](07-tests.md) — unit, intégration, coverage

@@ -19,7 +19,7 @@ Sous-portail HAL agrégeant les publications d'une structure (i.e. les publicati
 
 Exemple: https://hal.science/PIAF
 
-La collection d'une structure tutelle agrège les publications de ses sous-structures. L'arborescence des structures est fournie par le référentiel [[aurehal|AuréHAL]].
+La collection d'une structure tutelle agrège les publications de ses sous-structures. L'arborescence des structures est fournie par le référentiel [AuréHAL](#aurehal).
 
 ## Crossref {#crossref}
 Agence d'enregistrement de DOI, principalement pour les publications.
@@ -40,7 +40,7 @@ https://doaj.org/
 ## HAL {#hal}
 Archive ouverte nationale française.
 
-Voir [détails](sources/hal) sur l'API et les données récupérées.
+Voir [détails](sources/02-hal.md) sur l'API et les données récupérées.
 
 ## idHAL {#idhal}
 Identifiant auteur dans HAL. Créé par le chercheur dans son profil HAL.
@@ -61,7 +61,7 @@ Numéro national de thèse. Identifiant unique pour les thèses.
 ## OpenAlex {#openalex}
 Base bibliographique ouverte (fondation OurResearch): https://openalex.org/
 
-Voir [détails](sources/openalex) sur l'API et les données récupérées.
+Voir [détails](sources/03-openalex.md) sur l'API et les données récupérées.
 
 ## OpenAPC {#openapc}
 
@@ -85,7 +85,7 @@ Portail ministériel de la recherche française.
 ## Thèses en ligne (TEL) {#tel}
 
 ## Unpaywall {#unpaywall}
-Service qui résout le statut *open access* de chaque publication à partir du DOI. API utilisée pour enrichir et corriger le champ `oa_status` des publications. Voir [détails](sources/unpaywall).
+Service qui résout le statut *open access* de chaque publication à partir du DOI. API utilisée pour enrichir et corriger le champ `oa_status` des publications. Voir [détails](sources/08-unpaywall.md).
 
 ## Voies *open access* {#oa_status}
 
@@ -96,13 +96,13 @@ On distingue plusieurs "voies" d'*open access* par des noms de couleur, selon le
 |-------|-----------|
 | **Green** | Publication déposée en archive ouverte (HAL, arXiv...), en général par l'auteur, parallèlement à sa publication dans une revue. La version déposée peut être un *preprint* ou un *postprint*. |
 | **Gold** | Publication en accès ouvert dans une revue entièrement OA. Généralement payant (APC). |
-| **Diamond** | Sous-catégorie du *gold* : Publication dans une revue OA sans paiement d’APC (financement institutionnel). Attention: [Unpaywall](sources/unpaywall) ne distingue pas *diamond* de *gold*. |
+| **Diamond** | Sous-catégorie du *gold* : Publication dans une revue OA sans paiement d’APC (financement institutionnel). Attention: [Unpaywall](sources/08-unpaywall.md) ne distingue pas *diamond* de *gold*. |
 | **Hybrid** | Publication en accès ouvert dans une revue sous abonnement payant. L'auteur paie un APC pour rendre son article accessible en OA. Généralement déconseillé (l'institution paye les APC + l'abonnement à la revue). |
 | **Bronze** | Publication accessible gratuitement sur le site de l'éditeur, sans licence OA explicite. *Open access* côté éditeur *de facto*, accès sans garantie de pérennité. |
 
 ## Web of Science (WoS) {#wos}
 Base bibliographique commerciale (*Clarivate*). Une des sources de données bibliographiques moissonnées (tant que l'UCA est abonnée).
-Voir [détails](sources/wos) sur l'API et les données récupérées.
+Voir [détails](sources/04-wos.md) sur l'API et les données récupérées.
 
 
 ## Autres, à déplacer ou supprimer

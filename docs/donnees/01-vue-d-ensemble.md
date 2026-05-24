@@ -53,20 +53,20 @@ flowchart LR
 > Les entités "personnes" et "structures" présentes dans les sources ne peuvent pas être mappées de la même manière aux entités "personnes" et "structures" canoniques, pour deux raisons:
 >
 > - fiabilité variable des affiliations selon les sources (soit pauvres (WOS: UCA identifiée mais pas toujours les labos), soit erratiques (OpenAlex: l'algo d'affiliation produit beaucoup de faux rattachements));
-> - entités "personnes" algorithmiques, peu fiables: soit saucissonnées à l'extrême, soit confondant des homonymes (WOS, OpenAlex), voire entités hétérogènes au sein d'une même source (HAL: personnes fiables avec `personId` *vs* auteurs réduits à une name_form quand ils n'ont pas pu être matchés à un compte HAL) (cf [documentation sources](../sources/vue-d-ensemble)).
+> - entités "personnes" algorithmiques, peu fiables: soit saucissonnées à l'extrême, soit confondant des homonymes (WOS, OpenAlex), voire entités hétérogènes au sein d'une même source (HAL: personnes fiables avec `personId` *vs* auteurs réduits à une name_form quand ils n'ont pas pu être matchés à un compte HAL) (cf [documentation sources](../sources/01-vue-d-ensemble.md)).
 >
 > Il a donc été décidé de ne pas conserver de tables `source_persons` et `source_structures`. Les informations servant au matching des personnes et des structures sont regroupées dans `source_authorships`:
 >
 > - pour les personnes: formes de nom brute et normalisée + identifiants présents dans la source (ORCID, idhal, idref, selon source);
 > - pour les structures: adresses (= *raw affiliation strings*).
 >
-> Le matching avec les structures et personnes canoniques est effectué dans les phases "affiliations" et "personnes" du pipeline (pour le détail de la logique, cf [doc pipeline](../pipeline/vue-d-ensemble)).
+> Le matching avec les structures et personnes canoniques est effectué dans les phases "affiliations" et "personnes" du pipeline (pour le détail de la logique, cf [doc pipeline](../pipeline/01-vue-d-ensemble.md)).
 
 ## Suite
 
 Détail par domaine fonctionnel :
 
-- [Structures](structures) — référentiel institutionnel + adresses + périmètres
-- [Publications](publications) — référentiel dédupliqué + journals + publishers + APC + sujets
-- [Personnes](personnes) — référentiel dédupliqué + identifiants + name forms + données RH
-- [Authorships et sources](authorships-et-sources) — table de liaison + tables source + staging
+- [Structures](02-structures.md) — référentiel institutionnel + adresses + périmètres
+- [Publications](03-publications.md) — référentiel dédupliqué + journals + publishers + APC + sujets
+- [Personnes](04-personnes.md) — référentiel dédupliqué + identifiants + name forms + données RH
+- [Authorships et sources](05-authorships-et-sources.md) — table de liaison + tables source + staging

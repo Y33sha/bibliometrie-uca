@@ -69,4 +69,4 @@ person_repository(conn)         # factory repository
 
 ### Batch commits dans le pipeline
 
-La règle générale est que les use-cases commitent (cf. [discipline transactionnelle](infrastructure#discipline-transactionnelle)). Côté pipeline, les phases qui traitent des dizaines de milliers d'items commitent **par batch** (toutes les N opérations) pour qu'un crash ne perde pas tout le travail déjà fait. Concerné : `create_publications.py`, `enrich_journal_apc.py`, `normalize/base.py`, `resolve_addresses.py`, `refetch_truncated.py`. Suppose des phases idempotentes (vrai par construction).
+La règle générale est que les use-cases commitent (cf. [discipline transactionnelle](04-infrastructure.md#discipline-transactionnelle)). Côté pipeline, les phases qui traitent des dizaines de milliers d'items commitent **par batch** (toutes les N opérations) pour qu'un crash ne perde pas tout le travail déjà fait. Concerné : `create_publications.py`, `enrich_journal_apc.py`, `normalize/base.py`, `resolve_addresses.py`, `refetch_truncated.py`. Suppose des phases idempotentes (vrai par construction).
