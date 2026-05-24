@@ -150,7 +150,16 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
             }
             for work in works
         ]
-        result = conn.execute(_INSERT_OA_BATCH_SQL, batch)
-        rows = result.all()
-        new_count = sum(1 for r in rows if r.inserted)
-        return BatchInsertCounts(new=new_count, updated=len(rows) - new_count)
+        # SQLAlchemy 2 + psycopg3 perdent `RETURNING` en executemany dès que
+        # le statement est un `INSERT ... ON CONFLICT DO UPDATE` (l'optimisation
+        # `insertmanyvalues` ne s'active pas pour les UPSERT, le fallback
+        # `cursor.executemany()` côté psycopg3 ne récupère pas les rows).
+        # Boucle row-par-row pour préserver `(xmax = 0)`.
+        new_count = 0
+        updated_count = 0
+        for item in batch:
+            if conn.execute(_INSERT_OA_BATCH_SQL, item).one().inserted:
+                new_count += 1
+            else:
+                updated_count += 1
+        return BatchInsertCounts(new=new_count, updated=updated_count)
