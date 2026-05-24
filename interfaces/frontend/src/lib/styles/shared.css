@@ -873,6 +873,13 @@ th.sorted .sort-arrow {
 	font-size: 0.85rem;
 	color: var(--muted);
 }
+.journal-cell a {
+	color: inherit;
+	text-decoration: none;
+}
+.journal-cell a:hover {
+	text-decoration: underline;
+}
 
 /* ── Info box (hal-problems, feedback) ── */
 .info-box {
