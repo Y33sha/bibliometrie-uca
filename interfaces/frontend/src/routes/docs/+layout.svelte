@@ -4,6 +4,7 @@
 	import type { Snippet } from 'svelte';
 	import type { LayoutData } from './$types';
 	import GlossaryPopover from '$lib/docs/GlossaryPopover.svelte';
+	import ImageLightbox from '$lib/docs/ImageLightbox.svelte';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
@@ -93,6 +94,7 @@
 </div>
 
 <GlossaryPopover />
+<ImageLightbox />
 
 <style>
 	.docs-layout {
@@ -221,6 +223,20 @@
 	}
 	.doc-content :global(a[data-glossary]:hover) {
 		color: var(--accent);
+	}
+	/* Images de doc : adaptation auto à la largeur du contenant + clic-pour-agrandir
+	   (lightbox géré par <ImageLightbox />). */
+	.doc-content :global(img) {
+		max-width: 100%;
+		height: auto;
+		cursor: zoom-in;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		display: block;
+		margin: 12px 0;
+	}
+	.doc-content :global(a img) {
+		cursor: pointer;
 	}
 	@media (max-width: 1100px) {
 		.docs-layout {
