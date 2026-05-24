@@ -21,3 +21,7 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Screenshots de doc copiés depuis docs/screenshots/ par scripts/copy-doc-screenshots.mjs
+# (sources versionnées dans docs/screenshots/, copie servie par SvelteKit).
+/static/docs-screenshots/

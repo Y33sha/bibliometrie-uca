@@ -89,6 +89,20 @@ function extractHeadings(content: string): { title: string; toc: TocEntry[] } {
 	return { title, toc };
 }
 
+/**
+ * Réécrit les URLs d'images de la doc :
+ *
+ * - Liens externes (`http://`, `https://`, `//`) ou absolus (`/`) : inchangés.
+ * - Liens relatifs pointant vers `[…/]screenshots/<nom>` (peu importe la profondeur de `../` en amont) : réécrits en `${base}/docs-screenshots/<nom>`. Côté source on garde la convention markdown standard (lisible sur GitHub) ; côté doc déployée, SvelteKit sert les fichiers depuis `static/docs-screenshots/` (copie alimentée par `scripts/copy-doc-screenshots.mjs`).
+ * - Tout autre lien relatif : inchangé.
+ */
+function resolveImageHref(href: string, base: string): string {
+	if (/^(https?:|\/\/|\/)/.test(href)) return href;
+	const m = /(?:^|\/)screenshots\/([\w.-]+)$/.exec(href);
+	if (m) return `${base}/docs-screenshots/${m[1]}`;
+	return href;
+}
+
 function escapeHtmlAttr(value: string): string {
 	return value
 		.replace(/&/g, '&amp;')
@@ -177,6 +191,17 @@ export function parseMarkdown(content: string, base: string, currentSlug: string
 				return `<a class="gloss" href="${escapeHtmlAttr(resolved)}"${titleAttr} data-glossary="${escapeHtmlAttr(slug)}">${text}</a>`;
 			}
 			return `<a href="${escapeHtmlAttr(resolved)}"${titleAttr}>${text}</a>`;
+		},
+		image({ href, title, text }) {
+			// Images de doc : source unique sous `docs/screenshots/`, lisible
+			// sur GitHub via chemin relatif (`![](../screenshots/foo.png)` depuis
+			// une page de section). Côté doc déployée, le script
+			// `scripts/copy-doc-screenshots.mjs` copie ces fichiers vers
+			// `static/docs-screenshots/`, et on réécrit ici l'URL relative en
+			// URL absolue préfixée par `${base}/docs-screenshots/`.
+			const resolved = resolveImageHref(href, base);
+			const titleAttr = title ? ` title="${escapeHtmlAttr(title)}"` : '';
+			return `<img src="${escapeHtmlAttr(resolved)}" alt="${escapeHtmlAttr(text)}"${titleAttr} />`;
 		}
 	};
 
