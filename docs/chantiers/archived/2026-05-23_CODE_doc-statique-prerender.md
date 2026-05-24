@@ -1,6 +1,7 @@
 # Chantier — Documentation HTML précompilée avec sommaire scrollable
 
 Commencé le 2026-05-22
+Terminé le 2026-05-23
 
 ## Contexte
 

@@ -34,7 +34,7 @@ Ou, installation sans Docker :
 cp .env.example .env
 ```
 
-Éditer `.env` avec vos valeurs (credentials DB, admin, clés API).
+Éditer `.env` avec vos valeurs (credentials DB, admin).
 
 ### 2. Lancement (dev)
 
