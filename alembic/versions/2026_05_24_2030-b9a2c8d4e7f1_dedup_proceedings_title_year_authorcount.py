@@ -36,12 +36,12 @@ def upgrade() -> None:
         """
         DO $$
         DECLARE
-            pair RECORD;
-            target_id INT;
-            source_id INT;
-            n_fused INT := 0;
+            v_pair RECORD;
+            v_target_id INT;
+            v_source_id INT;
+            v_n_fused INT := 0;
         BEGIN
-            FOR pair IN
+            FOR v_pair IN
                 WITH pub_author_counts AS (
                     SELECT sp.publication_id, MAX(c.n) AS max_n_auth
                     FROM source_publications sp
@@ -71,49 +71,49 @@ def upgrade() -> None:
                   )
                 ORDER BY p1.id
             LOOP
-                target_id := LEAST(pair.id_a, pair.id_b);
-                source_id := GREATEST(pair.id_a, pair.id_b);
+                v_target_id := LEAST(v_pair.id_a, v_pair.id_b);
+                v_source_id := GREATEST(v_pair.id_a, v_pair.id_b);
 
                 -- Résilience aux chaînes : si une pub a déjà été absorbée par
                 -- une fusion précédente dans cette même boucle, on saute.
-                IF NOT EXISTS (SELECT 1 FROM publications WHERE id = source_id)
-                   OR NOT EXISTS (SELECT 1 FROM publications WHERE id = target_id) THEN
+                IF NOT EXISTS (SELECT 1 FROM publications WHERE id = v_source_id)
+                   OR NOT EXISTS (SELECT 1 FROM publications WHERE id = v_target_id) THEN
                     CONTINUE;
                 END IF;
 
                 -- Transfert des source_publications vers la cible.
-                UPDATE source_publications SET publication_id = target_id
-                WHERE publication_id = source_id;
+                UPDATE source_publications SET publication_id = v_target_id
+                WHERE publication_id = v_source_id;
 
                 -- Transfert des authorships canoniques (dédup par person_id).
                 DELETE FROM authorships
-                WHERE publication_id = source_id
+                WHERE publication_id = v_source_id
                   AND person_id IN (
-                      SELECT person_id FROM authorships WHERE publication_id = target_id
+                      SELECT person_id FROM authorships WHERE publication_id = v_target_id
                   );
-                UPDATE authorships SET publication_id = target_id
-                WHERE publication_id = source_id;
+                UPDATE authorships SET publication_id = v_target_id
+                WHERE publication_id = v_source_id;
 
                 -- Cleanup distinct_publications impliquant la source.
                 DELETE FROM distinct_publications
-                WHERE pub_id_a = source_id OR pub_id_b = source_id;
+                WHERE pub_id_a = v_source_id OR pub_id_b = v_source_id;
 
                 -- Marque la cible stale pour que refresh_from_sources ré-agrège
                 -- les méta canoniques (DOI promu par SOURCE_PRIORITY, etc.)
                 -- au prochain run du pipeline.
                 UPDATE publications SET updated_at = 'epoch'::timestamptz
-                WHERE id = target_id;
+                WHERE id = v_target_id;
 
                 -- Suppression de la pub source (ON DELETE CASCADE sur
                 -- publication_subjects ; SET NULL sur apc_payments).
-                DELETE FROM publications WHERE id = source_id;
+                DELETE FROM publications WHERE id = v_source_id;
 
-                n_fused := n_fused + 1;
+                v_n_fused := v_n_fused + 1;
                 RAISE NOTICE 'PROCEEDINGS_TITLE_YEAR_AUTHORCOUNT : fused % <- %',
-                             target_id, source_id;
+                             v_target_id, v_source_id;
             END LOOP;
 
-            RAISE NOTICE 'Total couples fusionnés : %', n_fused;
+            RAISE NOTICE 'Total couples fusionnés : %', v_n_fused;
         END $$;
         """
     )
