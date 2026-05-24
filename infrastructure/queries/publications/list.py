@@ -177,6 +177,7 @@ def list_publications(
             SELECT
                 p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
                 p.oa_status::text AS oa_status,
+                j.id AS journal_id,
                 j.title AS journal_title,
                 pub.name AS publisher_name,
                 src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
@@ -258,6 +259,7 @@ def list_publications(
             "doi": r.doi,
             "doc_type": r.doc_type,
             "oa_status": r.oa_status,
+            "journal_id": r.journal_id,
             "journal": r.journal_title,
             "publisher": r.publisher_name,
             "hal_id": r.hal_id,

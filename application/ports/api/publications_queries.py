@@ -97,6 +97,7 @@ class PublicationListItem(BaseModel):
     doc_type: str
     oa_status: str
     journal: str | None
+    journal_id: int | None
     publisher: str | None
     hal_id: str | None
     openalex_id: str | None
