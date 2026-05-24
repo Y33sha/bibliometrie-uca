@@ -1,16 +1,10 @@
 """Constantes et helpers purs pour l'extraction theses.fr.
 
-Tout ce qui peut être consommé par l'orchestrateur applicatif sans
-toucher à `infrastructure` : timing de rate-limit, taille de page,
-construction de requête `q=...`, parsing des thèses.
-
-`resolve_statuses` agit sur un `Namespace` argparse — pratique mais sans
-dépendance externe, donc accepté côté domaine.
+Tout ce qui peut être consommé par l'orchestrateur applicatif sans toucher à `infrastructure` : timing de rate-limit, taille de page, construction de requête `q=...`, parsing des thèses.
 """
 
 from __future__ import annotations
 
-import argparse
 from typing import Any
 
 # ── Rate-limit / pagination ────────────────────────────────────────
@@ -25,16 +19,9 @@ THESES_PER_PAGE = 500
 # ── Requête ───────────────────────────────────────────────────────
 
 
-def build_query(ppn: str, status: str | None = None) -> str:
-    """Construit la chaîne de recherche pour l'API theses.fr.
-
-    Filtre par PPN d'établissement (`etabSoutenancePpn:(ppn)`) + statut
-    optionnel (`status:(soutenue|enCours)`).
-    """
-    q = f"etabSoutenancePpn:({ppn})"
-    if status:
-        q += f" AND status:({status})"
-    return q
+def build_query(ppn: str) -> str:
+    """Construit la chaîne de recherche pour l'API theses.fr (filtre par PPN d'établissement)."""
+    return f"etabSoutenancePpn:({ppn})"
 
 
 # ── Parsing de documents ───────────────────────────────────────────
@@ -43,9 +30,7 @@ def build_query(ppn: str, status: str | None = None) -> str:
 def extract_theses_id(these: dict[str, Any]) -> str:
     """Extrait l'identifiant unique d'une thèse (champ `id`).
 
-    Pour les thèses soutenues, c'est le NNT (ex: `2021UCFAC022`) ;
-    pour les thèses en cours, c'est un id theses.fr (ex: `s367812`).
-    Les deux vivent dans la même colonne `id` de l'API recherche.
+    Pour les thèses soutenues, c'est le NNT (ex: `2021UCFAC022`) ; pour les thèses en cours, c'est un id theses.fr (ex: `s367812`). Les deux vivent dans la même colonne `id` de l'API recherche.
     """
     return these.get("id", "")
 
@@ -56,18 +41,3 @@ def extract_doi(these: dict[str, Any]) -> str | None:
     if doi and isinstance(doi, str) and doi.strip():
         return doi.strip()
     return None
-
-
-def resolve_statuses(args: argparse.Namespace) -> list[str]:
-    """Détermine les statuts à extraire depuis les args CLI `--soutenues` / `--en-cours`.
-
-    Aucun des deux flags (ou les deux) → on extrait les deux statuts.
-    Un seul flag → on n'extrait que celui-ci.
-    """
-    if args.soutenues and args.en_cours:
-        return ["soutenue", "enCours"]
-    if args.soutenues:
-        return ["soutenue"]
-    if args.en_cours:
-        return ["enCours"]
-    return ["soutenue", "enCours"]
