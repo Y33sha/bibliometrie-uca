@@ -206,7 +206,7 @@
       { key: 'scanr', label: 'ScanR' },
       { key: 'theses', label: 'theses.fr' },
     ]}
-    bind:states={sourceStates} counts={facets.sourceCounts} onchange={() => onFilterChange()} />
+    bind:states={sourceStates} counts={facets.sourceCounts} staticPresentCount onchange={() => onFilterChange()} />
   <span class="count">{pubs.total} thèse{pubs.total > 1 ? 's' : ''}</span>
   <a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
