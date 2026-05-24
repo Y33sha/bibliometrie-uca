@@ -187,6 +187,43 @@ def fetch_thesis_primary_author_from_source_publication(
     return (last, first) if last else None
 
 
+def fetch_source_authorship_count(conn: Connection, source_publication_id: int) -> int:
+    """Compte les `source_authorships` non-excluded d'un `source_publication`."""
+    row = conn.execute(
+        text("""
+            SELECT COUNT(*) AS n
+            FROM source_authorships
+            WHERE source_publication_id = :spid AND NOT excluded
+        """),
+        {"spid": source_publication_id},
+    ).one()
+    return row.n
+
+
+def fetch_max_source_authorship_count_per_publication(conn: Connection, publication_id: int) -> int:
+    """Pour une publication canonique, retourne le `MAX` du nombre de
+    `source_authorships` non-excluded par source. Chaque source rapporte
+    sa propre liste d'auteurs ; on retient la plus complète comme
+    représentative du « vrai » nombre d'auteurs de la publication.
+
+    Retourne 0 si la publication n'a aucun `source_authorship`.
+    """
+    row = conn.execute(
+        text("""
+            SELECT COALESCE(MAX(n), 0) AS max_n
+            FROM (
+                SELECT COUNT(*) AS n
+                FROM source_publications sp
+                JOIN source_authorships sa ON sa.source_publication_id = sp.id
+                WHERE sp.publication_id = :pid AND NOT sa.excluded
+                GROUP BY sp.source
+            ) per_source
+        """),
+        {"pid": publication_id},
+    ).one()
+    return row.max_n
+
+
 class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.publications_match_or_create.PublicationsMatchOrCreateQueries`.
 
@@ -224,6 +261,14 @@ class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
         self, conn: Connection, source_publication_id: int
     ) -> tuple[str, str] | None:
         return fetch_thesis_primary_author_from_source_publication(conn, source_publication_id)
+
+    def fetch_source_authorship_count(self, conn: Connection, source_publication_id: int) -> int:
+        return fetch_source_authorship_count(conn, source_publication_id)
+
+    def fetch_max_source_authorship_count_per_publication(
+        self, conn: Connection, publication_id: int
+    ) -> int:
+        return fetch_max_source_authorship_count_per_publication(conn, publication_id)
 
     def fetch_stale_publication_ids(self, conn: Connection) -> list[int]:
         return fetch_stale_publication_ids(conn)

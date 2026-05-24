@@ -162,6 +162,30 @@ class PgPublicationRepository:
         )
         return [row.id for row in result]
 
+    def find_proceedings_by_title_year(
+        self,
+        title_normalized: str,
+        pub_year: int,
+    ) -> list[tuple[int, str | None]]:
+        """Cherche des proceedings par titre normalisé long (>30 car.) + année.
+
+        Retourne `(pub_id, doi)` pour chaque candidate. Le seuil de longueur
+        écarte les titres pauvres (« Foreword », « Welcome message ») qui
+        produiraient des faux positifs.
+        """
+        if not title_normalized or len(title_normalized) <= 30 or not pub_year:
+            return []
+        result = self._conn.execute(
+            text("""
+                SELECT id, doi FROM publications
+                WHERE title_normalized = :tn AND pub_year = :py
+                  AND doc_type = 'proceedings'
+                ORDER BY id
+            """),
+            {"tn": title_normalized, "py": pub_year},
+        )
+        return [(row.id, row.doi) for row in result]
+
     # ── Chargement / persistance de l'aggregate Publication ────────
 
     def find_by_id(self, pub_id: int) -> Publication | None:
