@@ -3,16 +3,32 @@
 *A compléter*
 
 ## Adresse {#adresse}
-Chaîne de caractères associée à une publication et signalant l'affiliation institutionnelle de chaque auteur. Fournie par chaque auteur à l'éditeur.
+Chaîne de caractères associée à une publication et signalant l'[affiliation](#affiliation) institutionnelle de chaque auteur. Fournie par chaque auteur à l'éditeur.
 Généralement appelée *address* ou *affiliation string* dans les métadonnées des publications, et *signature* dans le langage courant (côté auteur).
 
 https://www.uca.fr/recherche/science-ouverte-et-publication/politique-de-signature-des-publications
+
+## Affiliation {#affiliation}
+Information sur la ou les structure(s) de rattachement de chaque auteur d'une publication.
+
+Elle est liée à un couple personne-publication, et non à une personne en tant que telle.
 
 ## APC {#apc}
 *Article Processing Charges*. Frais de publication facturés par l'éditeur pour publier un article en accès ouvert. Peut aller de quelques centaines à plusieurs milliers d'euros selon la revue.
 
 ## AuréHAL {#aurehal}
 Référentiel d'entités HAL (auteurs, structures, revues).
+
+## Auteur correspondant {#auteur-correspondant}
+
+Auteur désigné comme contact principal de l'éditeur pour une publication à plusieurs auteurs. Il y en a parfois deux ou trois sur une même publication.
+
+Les [APC](#apc) (si présents) sont payés par la structure de rattachement de l'auteur correspondant.
+
+L'information "auteur correspondant" est inégalement renseignée dans les métadonnées des sources.
+
+## Authorship {#authorship}
+Couple personne-publication, représentant la contribution d'un auteur et portant une [affiliation](#affiliation) institutionnelle. Pas un terme métier mais notion présente dans les métadonnées sources et dans le code.
 
 ## Collection HAL {#collection-hal}
 Sous-portail HAL agrégeant les publications d'une structure (i.e. les publications déposées dans HAL et dont au moins un auteur a une affiliation à cette structure). Chaque collection porte un code, correspondant souvent (mais pas toujours) à l'acronyme du laboratoire.
@@ -111,7 +127,6 @@ Voir [détails](sources/04-wos.md) sur l'API et les données récupérées.
 |-------|-----------|
 | **Éditeur** (publisher) | Maison d'édition scientifique (Elsevier, Springer Nature, EDP Sciences...). |
 | **Revue** (journal) | Périodique scientifique identifié par un ou plusieurs ISSN. Rattaché à un éditeur. |
-| **Auteur correspondant** | Auteur désigné comme contact principal pour une publication. Il peut y en avoir plusieurs. |
 | **Premier auteur / dernier auteur** | Conventions de signature scientifique : le premier auteur a généralement fait le travail principal ; le dernier auteur est souvent le directeur de l'équipe. Notion pertinente dans les disciplines STEM. |
 
 | Terme | Définition |
@@ -126,5 +141,4 @@ Voir [détails](sources/04-wos.md) sur l'API et les données récupérées.
 
 | Terme | Définition |
 |-------|-----------|
-| **Authorship** | <span id="authorship"></span>Pas un terme métier mais omniprésent dans l'appli. Couple (publication, personne) représentant la contribution d'**un** auteur à **une** publication. Porte les informations d'affiliation (structures UCA), de position (rang dans la liste d'auteurs) et le flag `in_perimeter`. |
 | **Périmètre** | Ensemble de *n* structures, incluant leurs sous-structures. Deux périmètres sont définis: UCA (contient l'UCA et ses labos en tutelle directe), UCA élargi (contient le précédent + CHU + INP). |
