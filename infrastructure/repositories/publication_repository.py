@@ -147,7 +147,7 @@ class PgPublicationRepository:
 
         Retourne les ids de candidats pour déduplication thesis-specific
         (vérification ultérieure de la compatibilité auteur primary
-        dans `_match_thesis_by_title_year`).
+        dans `match_thesis_by_title_year` du module `metadata_deduplication_rules`).
         """
         if not title_normalized or not pub_year:
             return []
