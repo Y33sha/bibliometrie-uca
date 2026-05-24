@@ -12,7 +12,11 @@ import unicodedata
 
 # Caractères Unicode qui doivent être remplacés par leur équivalent ASCII
 # avant la suppression des non-ASCII (sinon ils disparaissent silencieusement
-# et collent les mots : "Abeywickrama‐Samarakoon" → "abeywickramasamarakoon")
+# et collent les mots : "Abeywickrama‐Samarakoon" → "abeywickramasamarakoon").
+# Les ligatures œ/æ sont avalées par NFKD + encode("ascii", "ignore") parce
+# qu'elles ne se décomposent pas (un seul caractère sans diacritique) : on
+# les expanse explicitement vers oe/ae. `str.maketrans` accepte les valeurs
+# multi-caractères quand on lui passe un dict.
 _UNICODE_TO_ASCII = str.maketrans(
     {
         "\u2010": "-",  # HYPHEN
@@ -28,6 +32,8 @@ _UNICODE_TO_ASCII = str.maketrans(
         "\u201d": '"',  # RIGHT DOUBLE QUOTATION MARK
         "\u2032": "'",  # PRIME
         "\u00ad": "-",  # SOFT HYPHEN
+        "\u0153": "oe",  # LATIN SMALL LIGATURE OE (\u0153)
+        "\u00e6": "ae",  # LATIN SMALL LIGATURE AE (\u00e6)
     }
 )
 
