@@ -90,5 +90,5 @@ Seulement si Phase 2 valide.
 ## Questions ouvertes
 
 - **Trigger ou refresh explicite ?** Trigger sur `perimeters` + `structure_relations` = automatique mais ajoute une couche d'invisible (debug compliqué). Refresh explicite = plus prévisible mais expose à l'oubli côté admin. **Reco initiale : refresh explicite côté repo perimeter (à chaque écriture sur les tables concernées) + sanity check en début de pipeline.**
-- **Plusieurs périmètres ?** Aujourd'hui le projet a 2 périmètres (`uca`, `apc`). La table matérialisée prévoit le multi-perimeter dès le départ.
+- **Plusieurs périmètres ?** Aujourd'hui le projet a 2 périmètres (`uca`, `uca_wide`). La table matérialisée prévoit le multi-perimeter dès le départ.
 - **Quand attaquer ?** Pas avant la fin du chantier M2M (`DATA_jointures-many-to-many.md`) — `perimeter_structures` matérialisée s'intègre mieux quand `authorship_structures` est en place (JOIN naturel via FK). Donc post-Phase 2+3 du M2M.

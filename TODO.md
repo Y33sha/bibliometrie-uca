@@ -23,13 +23,12 @@
 * [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects / idées:  phase_cross_imports expose sources_with_new; phase_subjects : restreindre à (extract_sources ∪ sources_with_new) / phase_countries (refresh_sa_countries_for_source) : laisser scanner toutes les sources (sécurité), mais on peut t'envisager un addresses.updated_at ciblage en option 2 plus tard
 * [ ] authorships: propagate_roles, propagate_is_corresponding, propagate_author_position: tout faire en une passe?
+* [ ] est-ce que les authorships détachées manuellement (donc orphelines) sont à nouveau rattachées au pipeline suivant? si oui => comportement indésirable, à corriger
 ## Code
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
 * page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis
-## Doc
-* documenter le workflow *dans* l'appli
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup de résultats ScanR sont rejetés en phase "affiliations" => auditer
@@ -112,6 +111,8 @@
 * Eric Beyssac pas reconnu par nom dans les authorships de thèses: voir où est le problème
 * Daniel Roux: 1 authorship hal, zéro publication sur sa page (ce n'est pas le seul)
 * bizarrerie dans l'import crossref: fetch_missing_doi: 10325 DOI manquants pour crossref 2026-05-14 09:15:18,898 [INFO] fetch_missing_doi: 100/10325 — 101 trouvés, 100 insérés 2026-05-14 09:15:27,004 [INFO] fetch_missing_doi: 200/10325 — 202 trouvés, 200 insérés / + 800/10325 — 800 trouvés, 732 inséré : pourquoi tout n'est pas inséré?
+* http://localhost:5176/bibliometrie/publications/133184 : 2 entrées "theses.fr", dont l'une redirige vers l'autre
+* sujets: cooccurrences calculées sur publications, ou sur source_publications? idem nombre d'occurrences (ex.: sujet vaches laitières, 10 occurrences annoncées, 2 publications affichées)
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
@@ -120,4 +121,4 @@
 * audit log: uniformiser les types d'action qui génèrent un log ou pas.
 
 # Pas nécessaire de le régler, du moment qu'on le documente
-* [ ] re-tester le circuit des imports RH, vérifier que la logique de déduplication est la même que pour les personnes générées par le pipeline (modulo l'interdiction de supprimer) => pas urgent, pas d'imports csv à terme en prod
+* [ ] re-tester le circuit des imports RH => pas urgent, pas d'imports csv à terme en prod

@@ -1,6 +1,6 @@
 # Roadmap des roadmaps
 
-*à compléter*
+*compléter et ajouter liens*
 
 ## DATA — Repenser la table `source_persons` (2026-04-28)
 
@@ -51,7 +51,7 @@ Nettoyage post-migration SQLAlchemy. De nombreuses fonctions déclarent un argum
 
 ## CODE — Pureté du module `domain/` (2026-05-12)
 
-Des fichiers du `domain/` importaient `pydantic` pour modéliser des colonnes JSONB qui sont en réalité de l'I/O, pas du métier. Déplacement des `BaseModel` vers `infrastructure/db/jsonb_models/`. Interdiction des imports de bibliothèques tierces, verrouillée par `import-linter`.
+Des fichiers du `domain/` importaient `pydantic` pour modéliser des colonnes JSONB qui sont en réalité de l'I/O, pas du métier. Déplacement des `BaseModel` vers `infrastructure/db/jsonb_models/`. Interdiction des imports de bibliothèques tierces par `domain/`, verrouillée par `import-linter`.
 
 ## DATA — Normalisation du schéma `person_name_forms` (2026-05-13)
 
