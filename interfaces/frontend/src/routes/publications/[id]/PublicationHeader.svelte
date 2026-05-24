@@ -57,7 +57,11 @@
 
   {#if pub.journal_title || pub.container_title}
     <div class="pub-journal-line">
-      <span class="journal-name">{pub.journal_title || pub.container_title}</span>
+      {#if pub.journal_id}
+        <a href="{base}/journals/{pub.journal_id}" class="journal-name">{pub.journal_title || pub.container_title}</a>
+      {:else}
+        <span class="journal-name">{pub.journal_title || pub.container_title}</span>
+      {/if}
       {#if pub.issn}
         <span class="issn">ISSN {pub.issn}</span>
       {/if}
@@ -166,6 +170,10 @@
   .journal-name {
     font-weight: 500;
     color: var(--text);
+    text-decoration: none;
+  }
+  a.journal-name:hover {
+    text-decoration: underline;
   }
   .issn {
     font-size: 0.85rem;
