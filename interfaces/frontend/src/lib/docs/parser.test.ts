@@ -209,6 +209,13 @@ describe('parseMarkdown — syntaxe glossaire [[slug]] / [[slug|texte]]', () => 
 		expect(html).toContain('&lt;script');
 	});
 
+	it('rend le markdown inline dans le texte affiché (italique, gras, code)', () => {
+		const { html } = parseMarkdown('[[oa_status|voie *open access*]]', BASE, 'test');
+		expect(html).toContain('data-glossary="oa_status"');
+		expect(html).toContain('<em>open access</em>');
+		expect(html).not.toContain('*open access*');
+	});
+
 	it("survit au pipe dans une cellule de tableau (régression bug 11-enrich.md ligne 8)", () => {
 		const md = '| Col1 | Col2 |\n|---|---|\n| Montant [[apc|APC]] payé | autre |';
 		const { html } = parseMarkdown(md, BASE, 'test');
