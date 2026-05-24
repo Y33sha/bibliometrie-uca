@@ -19,7 +19,7 @@ Facultatif, mais permet de perfectionner progressivement le repérage des struct
 - Confirmation/rejet manuel des liens adresse-structure, individuellement ou par batch;
 - Contrôle qualité: visualiser les divergences entre détection automatisée et contrôle manuel => permet de repérer les formes de nom non détectées (à ajouter) ou trop laxistes (à supprimer, ou ajouter contexte plus contraignant).
 
-Les ajouts ou suppressions de formes de noms deviennent effectifs au pipeline suivant. Les actions manuelles ne sont pas affectées par le pipeline.
+Les ajouts ou suppressions de formes de noms deviennent effectifs au pipeline suivant. Les actions manuelles ne sont pas écrasées par le *re-run* du pipeline.
 
 
 ### Gestion du référentiel de personnes
