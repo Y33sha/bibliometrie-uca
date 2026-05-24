@@ -22,7 +22,7 @@ FetchMissingDoiScope = Literal["unprocessed", "all"]
 class ModePolicy:
     extract_sources: frozenset[str]
     year_selection: YearSelection
-    refetch_truncated_oa: bool
+    refetch_truncated_oa: bool  # TODO: vraiment utile?
     fetch_missing_doi_sources: frozenset[str]
     fetch_missing_doi_scope: FetchMissingDoiScope
     vacuum_full: bool
@@ -34,8 +34,7 @@ class ModePolicy:
     # True = remet `addresses.suggested_countries` à NULL pour les adresses
     # déjà tentées sans succès (`= []`) avant la phase countries. Permet de
     # bénéficier d'éventuelles évolutions des heuristiques de matching ou
-    # d'un nouveau corpus d'adresses similaires. En mode incrémental, on
-    # garde le cache (pas de raison de retenter si l'algo est stable).
+    # d'un nouveau corpus d'adresses similaires.
     reset_country_suggestions: bool
 
 
@@ -50,7 +49,7 @@ MODES: dict[str, ModePolicy] = {
     "daily": ModePolicy(
         extract_sources=frozenset({"hal"}),
         year_selection="since_last",
-        refetch_truncated_oa=False,
+        refetch_truncated_oa=True,
         fetch_missing_doi_sources=_FETCH_MISSING_DOI_LIGHT,
         fetch_missing_doi_scope="unprocessed",
         vacuum_full=False,
