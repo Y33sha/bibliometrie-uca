@@ -130,11 +130,15 @@ function extractGlossaryRefs(content: string): { processed: string; refs: Glossa
 }
 
 function injectGlossaryRefs(html: string, refs: GlossaryRef[], base: string): string {
+	// Markdown inline rendu APRÈS escape HTML : permet `[[slug|voie *open access*]]`
+	// → `<em>open access</em>`, sans rouvrir une injection XSS (les `<` éventuels
+	// dans le texte ont déjà été échappés en `&lt;`, que marked passe tel quel).
+	const inlineMarked = new Marked();
 	return html.replace(GLOSS_PLACEHOLDER_RE, (_match, idxStr: string) => {
 		const ref = refs[parseInt(idxStr, 10)];
 		if (!ref) return '';
 		const slugAttr = escapeHtmlAttr(ref.slug);
-		const textHtml = escapeHtmlAttr(ref.text);
+		const textHtml = inlineMarked.parseInline(escapeHtmlAttr(ref.text)) as string;
 		const hrefAttr = escapeHtmlAttr(`${base}/docs/glossaire#${ref.slug}`);
 		return `<a class="gloss" href="${hrefAttr}" data-glossary="${slugAttr}">${textHtml}</a>`;
 	});
