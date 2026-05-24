@@ -37,6 +37,16 @@ class MetadataDeduplicationCase(StrEnum):
     # Implémentation : `match_thesis_by_title_year`.
     THESIS_TITLE_YEAR = "thesis_title_year"
 
+    # Proceedings : `doc_type = 'proceedings'`, même `title_normalized`
+    # (longueur > 30 pour exclure les titres pauvres type « Foreword »),
+    # même `pub_year`, même nombre d'auteurs non-excluded (count direct
+    # sur le SP courant comparé au `MAX` par source sur les SP de la pub
+    # canonique candidate), et au moins un des deux DOI null (la
+    # contrainte UNIQUE sur `lower(doi)` exclut l'égalité, donc deux DOI
+    # non-nuls = différents = conflit).
+    # Implémentation : `match_proceedings_by_title_year_authorcount`.
+    PROCEEDINGS_TITLE_YEAR_AUTHORCOUNT = "proceedings_title_year_authorcount"
+
 
 @dataclass(frozen=True, slots=True)
 class PublicationMatchDecision:

@@ -17,6 +17,7 @@ from typing import Literal
 from sqlalchemy import Connection
 
 from application.pipeline.publications.metadata_deduplication_rules import (
+    match_proceedings_by_title_year_authorcount,
     match_thesis_by_title_year,
 )
 from application.ports.pipeline.publications_match_or_create import (
@@ -140,7 +141,10 @@ def process_document(
     if hal_id:
         hal_id_match_id = pub_repo.find_by_hal_id(hal_id)
 
-    # Prefetch dédup spécifique thèse : title+year + compatibilité auteur sur le primary.
+    # Prefetch dédup par métadonnées : aiguillage par doc_type vers la
+    # règle correspondante. Les règles vivent dans
+    # `metadata_deduplication_rules.py` ; chaque membre de
+    # `MetadataDeduplicationCase` est documenté côté domain.
     metadata_match: tuple[int, MetadataDeduplicationCase] | None = None
     if doc_type == "thesis":
         metadata_match = match_thesis_by_title_year(
@@ -149,6 +153,16 @@ def process_document(
             source_publication_id=doc.id,
             title_normalized=title_normalized,
             pub_year=pub_year,
+            pub_repo=pub_repo,
+        )
+    elif doc_type == "proceedings":
+        metadata_match = match_proceedings_by_title_year_authorcount(
+            conn,
+            queries=queries,
+            source_publication_id=doc.id,
+            title_normalized=title_normalized,
+            pub_year=pub_year,
+            doi=doi,
             pub_repo=pub_repo,
         )
 
