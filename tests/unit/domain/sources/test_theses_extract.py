@@ -2,28 +2,16 @@
 
 from __future__ import annotations
 
-import argparse
-
 from domain.sources.theses_extract import (
     build_query,
     extract_doi,
     extract_theses_id,
-    resolve_statuses,
 )
 
 
 class TestBuildQuery:
-    def test_ppn_only(self):
+    def test_ppn(self):
         assert build_query(ppn="196200032") == "etabSoutenancePpn:(196200032)"
-
-    def test_ppn_with_status(self):
-        assert build_query(ppn="196200032", status="soutenue") == (
-            "etabSoutenancePpn:(196200032) AND status:(soutenue)"
-        )
-
-    def test_status_empty_string_treated_as_none(self):
-        # Branche `if status:` — chaîne vide n'ajoute pas de filtre.
-        assert build_query(ppn="X", status="") == "etabSoutenancePpn:(X)"
 
 
 class TestExtractThesesId:
@@ -56,21 +44,3 @@ class TestExtractDoi:
     def test_returns_none_when_not_string(self):
         # Cas anormal mais à pinner : `doi` non-str → None silencieux.
         assert extract_doi({"doi": 12345}) is None
-
-
-class TestResolveStatuses:
-    def test_both_flags(self):
-        args = argparse.Namespace(soutenues=True, en_cours=True)
-        assert resolve_statuses(args) == ["soutenue", "enCours"]
-
-    def test_neither_flag_defaults_to_both(self):
-        args = argparse.Namespace(soutenues=False, en_cours=False)
-        assert resolve_statuses(args) == ["soutenue", "enCours"]
-
-    def test_soutenues_only(self):
-        args = argparse.Namespace(soutenues=True, en_cours=False)
-        assert resolve_statuses(args) == ["soutenue"]
-
-    def test_en_cours_only(self):
-        args = argparse.Namespace(soutenues=False, en_cours=True)
-        assert resolve_statuses(args) == ["enCours"]

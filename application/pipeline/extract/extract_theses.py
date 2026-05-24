@@ -24,7 +24,6 @@ from domain.sources.theses_extract import (
     THESES_PER_PAGE,
     build_query,
     extract_theses_id,
-    resolve_statuses,
 )
 
 
@@ -35,24 +34,20 @@ def extract_ppn(
     existing_ids: set[str],
     logger: logging.Logger,
     *,
-    status: str | None = None,
     year: int | None = None,
     dry_run: bool = False,
 ) -> tuple[int, int, int]:
     """Extrait toutes les thèses d'un établissement (par PPN).
 
-    Si `year` est fourni, ne conserve que les thèses dont le NNT commence
-    par cette année (filtre post-fetch ; ne ramène pas les en-cours qui
-    n'ont pas d'année dans leur id).
+    Si `year` est fourni, ne conserve que les thèses dont le NNT commence par cette année (filtre post-fetch ; ne ramène pas les en-cours qui n'ont pas d'année dans leur id).
 
     Retourne (total, insérés, mis à jour).
     """
-    query = build_query(ppn, status)
-    status_label = status or "toutes"
+    query = build_query(ppn)
 
     data = adapter.fetch_page(query, debut=0, nombre=1)
     total = data["totalHits"]
-    logger.info(f"  PPN {ppn} ({status_label}) : {total} thèses")
+    logger.info(f"  PPN {ppn} : {total} thèses")
 
     if dry_run or total == 0:
         return total, 0, 0
@@ -112,8 +107,6 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
         self._adapter = adapter
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--soutenues", action="store_true", help="Thèses soutenues uniquement")
-        parser.add_argument("--en-cours", action="store_true", help="Thèses en cours uniquement")
         parser.add_argument(
             "--year",
             type=int,
@@ -137,7 +130,6 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
 
     def setup_logging(self, args: argparse.Namespace, config: ThesesExtractConfig) -> None:
         self.logger.info(f"Établissements PPN : {config.ppns}")
-        self.logger.info(f"Statuts : {resolve_statuses(args)}")
         if args.year is not None:
             self.logger.info(f"Filtre année (NNT préfixe) : {args.year}")
 
@@ -149,18 +141,16 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
     ) -> PhaseMetrics:
         stats = PhaseMetrics()
         for ppn in config.ppns:
-            for status in resolve_statuses(args):
-                total, inserted, updated = extract_ppn(
-                    self._adapter,
-                    self.conn,
-                    ppn,
-                    existing_ids,
-                    self.logger,
-                    status=status,
-                    year=args.year,
-                    dry_run=args.dry_run,
-                )
-                stats.add(new=inserted, updated=updated, total=total)
+            total, inserted, updated = extract_ppn(
+                self._adapter,
+                self.conn,
+                ppn,
+                existing_ids,
+                self.logger,
+                year=args.year,
+                dry_run=args.dry_run,
+            )
+            stats.add(new=inserted, updated=updated, total=total)
         return stats
 
     # log_summary : on hérite du défaut de SourceExtractor (`=== Terminé : as_summary ===`).
