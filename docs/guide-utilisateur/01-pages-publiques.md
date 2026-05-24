@@ -1,9 +1,13 @@
 # Pages publiques
 
-## Statistiques (`/stats`)
+*A compléter*
+
+## Statistiques
+
+`/stats`
 
 Tableaux de bord :
-- répartition par [[oa_status|voie *open access*]] par année (graphique exportable en png);
+- répartition par [voie *open access*](../glossaire.md#oa_status) par année (graphique exportable en png);
 - répartition par éditeur (liste);
 - répartition par revue (liste).
 
@@ -15,15 +19,21 @@ Filtrable par:
 
 Restreint aux publications de type article et *review*.<!--TODO: glossaire? et voir si d'autres types sont pertinents--> Quels que soient les filtres en place, un bouton "Voir les publications" donne accès à la liste complète des publications concernées.
 
-## Publications (`/publications`)
+![OA Stats](../screenshots/stats_oa_status.png)
+
+![Journal Stats](../screenshots/stats_journals.png)
+
+## Publications
+
+### Liste `/publications`
 
 Liste des publications filtrable par :
 - type de document,
 - année de publication,
 - laboratoires,
 - accès (ouvert/fermé),
-- [[oa_status|voie *open access*]],
-- paiement d'[[apc|APC]],
+- [voie *open access*](../glossaire.md#oa_status),
+- paiement d'[APC](../glossaire.md#apc),
 - pays des co-auteurs,
 - sources.
 
@@ -33,32 +43,38 @@ Export csv.
 
 Certaines colonnes+facettes sont masquées par défaut: un bouton permet de choisir les colonnes affichées.
 
-## Détails publication (`/publications/{id}`)
+![Publications](../screenshots/publications.png)
+
+### Détails `/publications/{id}`
 
 Vue détaillée : métadonnées, auteurs, sources contributrices.
 
 Vue alignée des auteurs par source pour détecter d'éventuelles incohérences.<!--TODO: à supprimer de l'UI publique, à réserver à une future page admin.-->
 
-## Thèses (`/theses`)
+## Thèses
+
+`/theses`
 
 TODO: à compléter
 
+![Theses](../screenshots/theses.png)
 
-## Sujets (`/subjects`)
+(La page "détails thèse" est la même que "détails publication".)
 
-TODO: à compléter
+## Personnes
 
-
-## Liste des personnes (`/persons`)
+### Liste `/persons`
 
 Liste des personnes avec leurs identifiants (ORCID, idHAL) et affiliations.
 Filtrable par:
-- présence ou non dans la [base RH](../sources/imports-manuels#donnees-rh),
+- présence ou non dans la [base RH](../sources/09-imports-manuels.md#donnees-rh),
 - données RH (rôle, affiliation),
 - identifiants (ORCID, idHAL).
 
+![Persons](../screenshots/persons.png)
 
-## Détails personne (`/persons/{id}`)
+
+### Détails `/persons/{id}`
 
 Vue détaillée d'un chercheur. Identifiants, données RH si existent.
 3 ou 4 onglets:
@@ -69,11 +85,17 @@ Vue détaillée d'un chercheur. Identifiants, données RH si existent.
 <!-- TODO: Distinguer les onglets visibles selon rôle utilisateur: les onglets "identités" et "adresses" sont des outils internes, sans intérêt pour le chercheur -->
 <!-- TODO: Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation? -->
 
-## Liste des laboratoires (`/laboratories`)
+![Person Details](../screenshots/persons_id_theses.png)
+
+## Laboratoires
+
+### Liste `/laboratories`
 
 Liste des laboratoires avec tutelles, identifiant ROR et lien vers collection HAL.
 
-## Détails laboratoire (`/laboratories/{id}`)
+![Laboratories](../screenshots/laboratories.png)
+
+### Détails `/laboratories/{id}`
 
 Vue détaillée d'un laboratoire.
 
@@ -84,25 +106,40 @@ Onglets:
 - Personnes: affiche les personnes liées à ce laboratoire via une publication (ne repose pas sur l'affiliation renseignée dans la base RH);
 - Adresses (adresses ayant permis la détection de ce laboratoire dans les publications).
 
-## Liste des revues (`/journals`)
+![Laboratory Details](../screenshots/laboratories_id_dashboard.png)
+
+## Revues
+
+### Liste `/journals`
 
 Liste des revues avec filtres : recherche par nom, type de revue, présence dans le DOAJ, modèle d'accès ouvert. Triable par nombre de publications.
 
-## Détails revue (`/journals/{id}`)
+### Détails `/journals/{id}`
 
 Vue détaillée d'une revue. Onglets : Dashboard, Publications.
 
-## Liste des éditeurs (`/publishers`)
+## Éditeurs
+
+### Liste `/publishers`
 
 Liste des éditeurs avec leurs revues associées et leur volume de publications.
 
-## Détails éditeur (`/publishers/{id}`)
+### Détails `/publishers/{id}`
 
 Vue détaillée d'un éditeur. Onglets : Dashboard, Revues, Publications.
 
-## Problèmes HAL (`/hal-problems/*`) {#problemes-hal}
+## Sujets
 
-Pages dédiées aux problèmes de qualité spécifiques à HAL :
+### Liste `/subjects`
+
+### Détails `/subjects/{id}`
+
+
+## Problèmes HAL {#problemes-hal}
+
+`/hal-problems/*`
+
+Pages dédiées à relever les problèmes de qualité spécifiques à HAL :
 
 - **Comptes en double** : auteurs HAL ayant plusieurs comptes
 - **Publications en double** : documents HAL doublonnés

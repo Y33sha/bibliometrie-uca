@@ -35,7 +35,7 @@ flowchart LR
 - **`journal_name_forms`** : formes de noms normalisées pour le matching journaux (parallèle à `person_name_forms` et `structure_name_forms`).
 - **`publishers`** : référentiel des éditeurs.
 - **`publisher_name_forms`** : formes de noms normalisées pour le matching éditeurs.
-- **`apc_payments`** : données issues d'un import CSV (cf. [doc sources](../sources/imports-manuels#donnees-apc)).
+- **`apc_payments`** : données issues d'un import CSV (cf. [doc sources](../sources/09-imports-manuels.md#donnees-apc)).
 - **`distinct_publications`** : paires de publications marquées comme **distinctes malgré un titre identique**, évite de les re-suggérer dans l'interface de dédoublonnage `admin/duplicates`.
 
 ## Sujets / mots-clés

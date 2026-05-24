@@ -28,7 +28,7 @@ https://developers.openalex.org/
 
 ## Enrichissement APC
 
-*En cours de retrait : sera remplacé par DOAJ (voir [Imports manuels](imports-manuels#doaj)).*
+*En cours de retrait : sera remplacé par DOAJ (voir [Imports manuels](09-imports-manuels.md#doaj)).*
 
 Script : [interfaces/cli/pipeline/enrich_journal_apc.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/pipeline/enrich_journal_apc.py) (orchestration dans [application/pipeline/enrich/enrich_journal_apc.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/application/pipeline/enrich/enrich_journal_apc.py)).
 

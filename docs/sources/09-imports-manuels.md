@@ -9,9 +9,9 @@ Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://gith
 
 Données fournies par la DPCG le 15/12/2025. La date est documentée dans la colonne `hr_export_date`. Cette extraction contient uniquement les **enseignants-chercheurs UCA**: pas les chercheurs CNRS, Inrae, etc., ni les personnels BIATSS UCA.
 
-L'**affiliation** renseignée dans cette source est une chaîne de caractères (`UFR Médecine Pr Paramédic`, `IUT Info 43`) qui ne permet pas un mapping avec les laboratoires. Elle est affichée pour information, mais ne sert pas à créer les liens personne-structure dans l'appli. Les **liens personne-structure** dépendent des [*authorships*](../glossaire#authorship).
+L'**affiliation** renseignée dans cette source est une chaîne de caractères (`UFR Médecine Pr Paramédic`, `IUT Info 43`) qui ne permet pas un mapping avec les laboratoires. Elle est affichée pour information, mais ne sert pas à créer les liens personne-structure dans l'appli. Les **liens personne-structure** dépendent des [*authorships*](../glossaire.md#authorship).
 
-La [création de personnes](../pipeline/persons) se fait via les authorships des publications, indépendamment de l'existence d'une entrée `person_rh`.
+La [création de personnes](../pipeline/06-persons.md) se fait via les authorships des publications, indépendamment de l'existence d'une entrée `person_rh`.
 La FK sur la table `person_rh` permet:
 - d'enrichir les données sur les personnes;
 - d'empêcher la suppression de ces personnes (lors de fusions ou de nettoyage en masse des personnes sans authorship UCA).

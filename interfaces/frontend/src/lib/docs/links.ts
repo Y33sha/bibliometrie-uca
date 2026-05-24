@@ -6,8 +6,12 @@
  * - Ancres pures (#section) : inchangées (la page courante)
  * - Sinon : lien interne vers une page de doc, résolu par rapport au
  *   slug courant (comme GitHub résout les liens relatifs d'un .md).
- *   `.md` final éventuellement strippé.
+ *   `.md` final et préfixes numériques `NN-` strippés sur chaque
+ *   segment pour matcher la convention de slug (cf.
+ *   `filesystem.server.ts::pathToSlug`).
  */
+const NUMERIC_PREFIX_REGEX = /^\d+-/;
+
 export function resolveDocLink(href: string, base: string, currentSlug: string): string {
 	if (/^(https?:|mailto:|\/\/|\/|#)/.test(href)) return href;
 
@@ -21,7 +25,7 @@ export function resolveDocLink(href: string, base: string, currentSlug: string):
 	for (const segment of cleanPath.split('/')) {
 		if (segment === '..') dirSegments.pop();
 		else if (segment === '.' || segment === '') continue;
-		else dirSegments.push(segment);
+		else dirSegments.push(segment.replace(NUMERIC_PREFIX_REGEX, ''));
 	}
 	return `${base}/docs/${dirSegments.join('/')}${hash}`;
 }
