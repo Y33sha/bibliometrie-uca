@@ -331,9 +331,7 @@ Dernière passe avant de remettre le dossier.
 Décisions actées avant cet audit, listées pour mémoire :
 
 - ~~Auth multi-user / mock CAS~~ : rewrite DSI assumé.
-- ~~Fusion des trois TODO~~ : Laura le fait dans Phase 4.
 - ~~Réécriture doc~~ : chantier dédié en Phase 4, n'agit pas avant.
 - ~~"Acter la fin du frontend"~~ : faux problème — le frontend
   survit comme outil interne, on continue d'investir dedans (tests
   composables, accessibilité, Playwright).
-- ~~Désigner un owner~~ : c'est Laura.

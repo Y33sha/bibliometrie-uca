@@ -59,9 +59,7 @@ Les préfixes DOI mappés aux `publishers` (et indirectement aux `journals`) ser
 
 6. **DataCite intégré à `resolve_doi_prefixes`** au même titre que Crossref. Endpoint `api.datacite.org/prefixes/{p}?include=clients,providers`, 1 préfixe = 1 client validé sur 105/105 sur l'échantillon UCA (cf. spike Phase 0).
 
-7. **Pas de table `clients` dédiée à ce stade**. Lien univoque depuis `doi_prefixes` uniquement vers le provider (via `publisher_id` → `publishers`). Le nom du client et le symbole DataCite sont dupliqués par préfixe pour les clients à plusieurs préfixes (INRAE×3, Heidelberg×2, etc.) — c'est exactement la même duplication que côté Crossref pour `publisher_name_*` quand un publisher détient plusieurs préfixes (Springer/Nature). Acceptable. Si un besoin de jointure univoque vers le client (analogue de la table `journals` côté Crossref pour le niveau 2) se présente plus tard, on ajoutera un `journal_id` / `client_id` à `doi_prefixes` à ce moment-là.
-
-8. **Décision sur l'ingestion DataCite comme source = post-spike comparatif** (cf. Phase 3). Le spike Phase 0 a montré une couverture DataCite décente (41 % ORCID, 67 % `relatedIdentifiers`, 59 % affiliation textuelle), mais avec dispersion forte (101 clients distincts pour 105 préfixes). Avant d'investir dans l'ingestion, on compare DataCite vs APIs natives sur 2 repositories phares (Zenodo + INRAE) pour arbitrer : DataCite seul, extracteurs natifs, ou mix.
+7. **Décision sur l'ingestion DataCite comme source = post-spike comparatif** (cf. Phase 3). Le spike Phase 0 a montré une couverture DataCite décente (41 % ORCID, 67 % `relatedIdentifiers`, 59 % affiliation textuelle), mais avec dispersion forte (101 clients distincts pour 105 préfixes). Avant d'investir dans l'ingestion, on compare DataCite vs APIs natives sur 2 repositories phares (Zenodo + INRAE) pour arbitrer : DataCite seul, extracteurs natifs, ou mix.
 
 ### Schéma
 

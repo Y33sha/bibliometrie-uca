@@ -13,7 +13,7 @@ flowchart LR
     class B new;
 ```
 
-## Moissonnage initial
+## Moissonnage initial {#extract}
 
 **Critères de requête**:
 - **années** de publication (configurables dans admin/config : *weekly* couvre les années n et n-1, *full* fait une repasse complète sur les années n-5 à n);
@@ -31,7 +31,7 @@ L'API OpenAlex limite les authorships à 100 par publication dans les requêtes 
 **`refetch_truncated.py`** — re-télécharge un par un les works OpenAlex tronqués à 100 auteurs. Pour éviter d'écraser la liste complète lors d'un bulk ultérieur, le refetch met à jour `raw_data` mais conserve `raw_hash` (hash du payload bulk initial) ; tant que le bulk renvoie le même payload, l'UPSERT bulk ne touche pas `raw_data`.
 
 
-## Imports croisés
+## Imports croisés {#cross-imports}
 
 Phase `cross_imports`: deux étapes enchaînées, chacune adressant un cas distinct de "doc visible dans une source mais absent d'une autre".
 
