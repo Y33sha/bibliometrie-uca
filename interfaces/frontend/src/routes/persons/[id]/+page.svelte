@@ -395,18 +395,18 @@
 					<table class="pub-table">
 						<thead>
 							<tr>
+								<th style="width:160px">Auteur</th>
 								<th>Titre</th>
 								<th style="width:100px">Labo</th>
-								<th style="width:160px">Auteur</th>
 								<th style="width:50px">Année</th>
 							</tr>
 						</thead>
 						<tbody>
 							{#each section.theses as t (t.id)}
 								<tr>
+									<td>{#if t.author_person_id}<a href="{base}/persons/{t.author_person_id}">{t.author_name}</a>{:else}{t.author_name ?? ''}{/if}</td>
 									<td><a href="{base}/publications/{t.id}">{t.title}</a></td>
 									<td>{#each t.structure_ids as sid}<a href="{base}/laboratories/{sid}" class="struct-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
-									<td>{#if t.author_person_id}<a href="{base}/persons/{t.author_person_id}">{t.author_name}</a>{:else}{t.author_name}{/if}</td>
 									<td>{t.pub_year ?? ''}</td>
 								</tr>
 							{/each}

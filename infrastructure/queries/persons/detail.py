@@ -150,20 +150,17 @@ def person_theses(conn: Connection, person_id: int) -> dict[str, Any]:
         text("""
             SELECT p.id, p.title, p.pub_year, p.doi,
                    a.roles,
-                   (SELECT sa2.raw_author_name
-                    FROM source_authorships sa2
-                    JOIN source_publications sd2 ON sd2.id = sa2.source_publication_id
-                    WHERE sd2.publication_id = p.id
-                      AND sa2.source = 'theses'
-                      AND sa2.roles && ARRAY['author']::text[]
+                   (SELECT pe2.first_name || ' ' || pe2.last_name
+                    FROM authorships a2
+                    JOIN persons pe2 ON pe2.id = a2.person_id
+                    WHERE a2.publication_id = p.id
+                      AND a2.roles && ARRAY['author']::text[]
                     LIMIT 1
                    ) AS author_name,
-                   (SELECT sa2.person_id
-                    FROM source_authorships sa2
-                    JOIN source_publications sd2 ON sd2.id = sa2.source_publication_id
-                    WHERE sd2.publication_id = p.id
-                      AND sa2.source = 'theses'
-                      AND sa2.roles && ARRAY['author']::text[]
+                   (SELECT a2.person_id
+                    FROM authorships a2
+                    WHERE a2.publication_id = p.id
+                      AND a2.roles && ARRAY['author']::text[]
                     LIMIT 1
                    ) AS author_person_id,
                    (SELECT ARRAY_AGG(DISTINCT aus.structure_id)
