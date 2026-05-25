@@ -63,7 +63,7 @@ def extract_hal_id(doc: dict) -> str | None:
 def get_title(doc: dict) -> str | None:
     title = doc.get("title")
     if isinstance(title, dict):
-        return title.get("default") or title.get("en") or title.get("fr")
+        return title.get("default")
     return title
 
 
@@ -164,10 +164,10 @@ def insert_scanr_document(
     external_ids = ext if ext else None
 
     summary = doc.get("summary") or {}
-    abstract = summary.get("default") or summary.get("en") or summary.get("fr")
+    abstract = summary.get("default")
 
     kw_raw = doc.get("keywords") or {}
-    kw_val = kw_raw.get("default") or kw_raw.get("en") or kw_raw.get("fr")
+    kw_val = kw_raw.get("default")
     if isinstance(kw_val, list):
         keywords = [str(k).strip() for k in kw_val if k] or None
     elif isinstance(kw_val, str) and kw_val:
