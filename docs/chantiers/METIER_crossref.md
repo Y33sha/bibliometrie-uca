@@ -163,17 +163,10 @@ Réouverture de la piste initialement écartée. Spike du 2026-05-23 (`docs/chan
    - Si le gain est nul ou marginal → la phase 4 est abandonnée.
    - Si le gain est significatif → ré-ouvrir la décision sur la politique d'ingestion (auto vs. validation manuelle).
 
-## Décisions à prendre (avant Phase 2 et au-delà)
-
-Aucune pour l'instant — toutes les décisions structurantes ont été tranchées. De nouvelles questions pourront émerger en phase 0 (mapping `doc_type` notamment).
-
 ## Risques & open questions
 
 - **Couverture ORCID inégale** : très bonne post-2018 chez les gros éditeurs commerciaux, médiocre avant. Si la phase 4 (discovery) est conservée à l'issue du gate exploratoire, le recall sera partiel — au mieux un filet de sécurité, jamais une source primaire.
 - **Mapping `doc_type` CrossRef ↔ canonique** : plusieurs cas non triviaux (`posted-content` peut être preprint ou commentary, `book-chapter` vs `monograph` vs `reference-entry`…). À concevoir avec exemples réels en phase 0.
-- **DataCite gap** : tous les DOI Zenodo, figshare, certains datasets ne sont **pas** dans CrossRef. Hors périmètre, mais à documenter clairement pour ne pas semer la confusion sur la couverture.
-- **Promotion d'ORCID erronée** (phase 3) : risque qu'un ORCID CrossRef incorrect (cas rare mais pas nul, surtout sur les vieilles publis où l'éditeur a pu rentrer un ORCID sans vérif) déclenche une promotion `pending → confirmed` injustifiée. Politique conservatrice : exiger que l'ORCID soit déjà connu côté UCA en `pending` ET attaché à la même personne que la `source_authorship` CrossRef.
-- **Volume requêtes** : à mesurer en phase 0 pour calibrer parallélisme et fréquence.
 
 ## Crossref absent de `build_authorships.all_sources`
 

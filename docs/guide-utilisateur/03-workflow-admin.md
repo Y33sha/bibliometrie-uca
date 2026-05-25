@@ -28,9 +28,9 @@
 
 > Si une forme de nom reste trop permissive, on peut **exclure** certaines expressions contenant une forme reconnue.
 >
-> Exemple: L'*UMR Territoires* peut être identifiée par le mot *territoires*, à condition que l'UCA soit reconnue dans l'adresse. Cela peut conduire à de fausses identifications si une autre structure contient ce mot.
+> Exemple: L'*UMR Territoires* peut être identifiée par le mot *territoires*, à condition que l'UCA soit reconnue dans l'adresse. Cela peut conduire à de fausses identifications si une autre structure contient ce mot très courant.
 >
-> La forme *territoires uranifères* est définie au niveau de l'UMR Territoires comme excluant l'identification :  ```Université Clermont Auvergne, CNRS, GEOLAB, Clermont-Ferrand 63000, France; LTSER "Zone Atelier Territoires Uranifères", Clermont-Ferrand, Aubière F-63000, France``` => pas de rattachement.
+> La forme *territoires uranifères* est définie au niveau de l'UMR Territoires comme excluant l'identification :  ```Université Clermont Auvergne, CNRS, GEOLAB, Clermont-Ferrand 63000, France; LTSER "Zone Atelier Territoires Uranifères", Clermont-Ferrand, Aubière F-63000, France``` => pas de rattachement malgré *territoires* + *UCA*.
 
 ### Configuration du pipeline
 
@@ -86,7 +86,7 @@ Il est nécessaire, en particulier apès les premiers runs, de **fusionner** les
 
 Un garde-fou empêche de fusionner ensemble deux personnes présentes dans l'[extraction RH](../sources/09-imports-manuels.md).
 
-Des scripts permettent d'accélérer le travail:
+Des scripts en ligne de commande permettent d'accélérer le travail:
 - [merge_duplicate_persons_by_publication](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/maintenance/merge_duplicate_persons_by_publication.py) : personnes distinctes figurant comme auteur de la même publication (repérée sur différentes sources), en même position auteur, avec des noms compatibles (au sens de la fonction [names_compatible](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/persons/name_matching.py))
 - [merge_person_duplicates_by_lab](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/maintenance/merge_person_duplicates_by_lab.py) : personnes distinctes ayant signé des publications pour le même laboratoire et portant un nom compatible<!--TODO: corriger le script pour qu'il utilise la fonction names_compatible et pas une identité stricte; accessoirement, harmoniser le nommage des deux scripts--> (validation requise au cas par cas)
 
@@ -116,7 +116,7 @@ Les PIDs sont stockés dans la table [`person_identifiers`](../donnees/04-person
 >
 > Conserver les PIDs rejetés garantit que s'ils réapparaissent dans les sources lors des prochains runs du pipeline, ils ne seront pas réaffectés à la même personne.
 >
-> Les PIDs rejetés n'apparaissent pas dans l'UI publique et sont exclus de tous les décomptes (facettes…).
+> Les PIDs rejetés n'apparaissent pas dans l'UI publique et sont exclus de toutes les *queries* (décomptes, facettes…).
 
 #### Correction du nom
 
