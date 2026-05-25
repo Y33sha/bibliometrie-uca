@@ -25,7 +25,10 @@ INTER_HAL_DOCS = [
             "journalTitle_s": "Geochemistry International",
             "journalIssn_s": "5555-6666",
             "journalPublisher_s": "Geochem Press",
-            "authFullName_s": ["Alice Dupont", "Bob Martin"],
+            "authFullNameFormIDPersonIDIDHal_fs": [
+                "Alice Dupont_FacetSep_0-0_FacetSep_",
+                "Bob Martin_FacetSep_0-0_FacetSep_",
+            ],
             "openAccess_bool": True,
         },
     },
@@ -37,7 +40,7 @@ INTER_HAL_DOCS = [
             "docType_s": "REPORT",
             "title_s": ["Un rapport sans DOI"],
             "producedDateY_i": 2024,
-            "authFullName_s": ["Alice Dupont"],
+            "authFullNameFormIDPersonIDIDHal_fs": ["Alice Dupont_FacetSep_0-0_FacetSep_"],
         },
     },
 ]

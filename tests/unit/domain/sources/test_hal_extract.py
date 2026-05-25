@@ -119,8 +119,8 @@ class TestChooseExtractionMode:
         # Beaucoup d'orphelins (collection essentiellement nouvelle) : full reste optimal.
         assert choose_extraction_mode(total_count=6000, n_orphans=5000, per_page=500) == "full"
 
-    def test_pres_uca_umbrella_chooses_incremental(self):
-        # Cas typique umbrella (PRES_UCA / PRES_CLERMONT) : 19 orphelins, 12 pages full.
+    def test_pres_clermont_umbrella_chooses_incremental(self):
+        # Cas typique umbrella (PRES_CLERMONT) : 19 orphelins, 12 pages full.
         # 19 < 10 × 12 = 120 → incremental. Avec l'ancien ratio 1:1, choisissait `full`
         # (catastrophique car HAL_FIELDS inclut label_xml × 500 docs/page).
         assert choose_extraction_mode(total_count=6000, n_orphans=19, per_page=500) == "incremental"

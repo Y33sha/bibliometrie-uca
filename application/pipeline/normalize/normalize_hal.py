@@ -398,16 +398,16 @@ def process_authors(
     # on repart d'une table blanche pour cette publi.
     queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
-    names = doc.get("authFullName_s") or []
     qualities = doc.get("authQuality_s") or []
     # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul
     # champ HAL qui les attache proprement à chaque position d'auteur.
     tei_ids = parse_tei_author_identifiers(doc.get("label_xml"))
 
     # authFullNameFormIDPersonIDIDHal_fs :
-    #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position
-    # C'est le champ le plus complet : on en extrait form_id, person_id et idhal
+    #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position.
+    # Présence validée par le caller ; on en extrait nom, form_id, person_id, idhal.
     composite = doc.get("authFullNameFormIDPersonIDIDHal_fs") or []
+    names = [entry.split("_FacetSep_", 1)[0] for entry in composite]
     form_id_by_pos: dict[int, int | None] = {}
     hal_person_id_by_pos: dict[int, int | None] = {}
     idhal_by_pos = {}
@@ -430,26 +430,6 @@ def process_authors(
                     pass
         if len(parts) >= 3 and parts[2].strip():
             idhal_by_pos[pos] = parts[2].strip()
-
-    # Fallback : si authFullNameFormIDPersonIDIDHal_fs est absent,
-    # on utilise les champs séparés (anciens documents)
-    if not composite:
-        name_idhal = doc.get("authFullNameIdHal_fs") or []
-        for pos, entry in enumerate(name_idhal):
-            parts = entry.split("_FacetSep_")
-            if len(parts) == 2 and parts[1].strip():
-                idhal_by_pos[pos] = parts[1].strip()
-
-        name_id = doc.get("authFullNameId_fs") or []
-        for pos, entry in enumerate(name_id):
-            parts = entry.split("_FacetSep_")
-            if len(parts) == 2 and parts[1].strip():
-                try:
-                    pid = int(parts[1].strip())
-                    if pid > 0:
-                        hal_person_id_by_pos[pos] = pid
-                except ValueError:
-                    pass
 
     # authIdHasPrimaryStructure_fs → {form_id: set of halId_s natifs (text)}
     # + mapping {halId_s: nom} local au document (pour construire les
@@ -546,6 +526,13 @@ def process_work(
         pub_year = doc.get("producedDateY_i")
         if not has_minimal_publication_metadata(title, pub_year):
             logger.warning(f"Impossible d'insérer {hal_id} — titre ou année manquant")
+            return False
+
+        if not doc.get("authFullNameFormIDPersonIDIDHal_fs"):
+            logger.error(
+                f"{hal_id} : champ authFullNameFormIDPersonIDIDHal_fs absent du payload "
+                "— doc HAL inutilisable, staging laissé processed=FALSE"
+            )
             return False
 
         raw_doi = clean_doi(as_str(doc.get("doiId_s")))

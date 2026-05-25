@@ -77,11 +77,7 @@ HAL_DOC_CLOSED = {
     "openAccess_bool": False,
     "language_s": ["fr"],
     "authIdHasStructure_fs": [],
-    "authFullName_s": ["Alice Dupont"],
-    "authIdForm_i": [[100, 200]],
-    "authIdHal_s": [None],
-    "authIdHal_i": [None],
-    "authOrcidIdExt_id": [None],
+    "authFullNameFormIDPersonIDIDHal_fs": ["Alice Dupont_FacetSep_0-0_FacetSep_"],
 }
 
 

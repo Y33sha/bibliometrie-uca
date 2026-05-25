@@ -115,10 +115,9 @@ def choose_extraction_mode(
       les documents.
 
     **Intention.** Éviter de re-full-fetch une collection umbrella
-    (typiquement `PRES_UCA`/`PRES_CLERMONT`) qui passe après les collections
-    labos : la plupart des documents sont déjà en staging via leur
-    collection labo, seuls quelques orphelins restent à récupérer
-    individuellement.
+    (typiquement `PRES_CLERMONT`) qui passe après les collections labos :
+    la plupart des documents sont déjà en staging via leur collection
+    labo, seuls quelques orphelins restent à récupérer individuellement.
     """
     if total_count == 0:
         return "skip"

@@ -415,59 +415,46 @@ class TestProcessAuthors:
         process_authors(
             MagicMock(),
             queries,
-            {"authFullName_s": ["", "Marie Dupont"]},
+            {
+                "authFullNameFormIDPersonIDIDHal_fs": [
+                    "_FacetSep_0-0_FacetSep_",
+                    "Marie Dupont_FacetSep_0-0_FacetSep_",
+                ]
+            },
             10,
             address_linker=_FakeAddressLinker(),
         )
         assert len(queries.upserted_authorships) == 1
         assert queries.upserted_authorships[0]["raw_author_name"] == "Marie Dupont"
 
-    def test_composite_solr_extracts_ids(self):
+    def test_composite_solr_extracts_name_and_ids(self):
         queries = _FakeQueries()
         doc = {
-            "authFullName_s": ["Marie Dupont"],
             "authFullNameFormIDPersonIDIDHal_fs": [
                 "Marie Dupont_FacetSep_49236-749496_FacetSep_marie-dupont"
             ],
         }
         process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
-        ids = queries.upserted_authorships[0]["person_identifiers"]
-        assert ids == {"idhal": "marie-dupont", "hal_person_id": 749496}
+        authorship = queries.upserted_authorships[0]
+        assert authorship["raw_author_name"] == "Marie Dupont"
+        assert authorship["person_identifiers"] == {
+            "idhal": "marie-dupont",
+            "hal_person_id": 749496,
+        }
 
     def test_composite_with_zero_person_id_filtered(self):
         """person_id == 0 = non identifié par HAL, on l'ignore."""
         queries = _FakeQueries()
         doc = {
-            "authFullName_s": ["X"],
             "authFullNameFormIDPersonIDIDHal_fs": ["X_FacetSep_49236-0_FacetSep_"],
         }
         process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
         # Sans hal_person_id ni idhal, person_identifiers est None.
         assert queries.upserted_authorships[0]["person_identifiers"] is None
 
-    def test_fallback_authFullNameIdHal_when_no_composite(self):
-        queries = _FakeQueries()
-        doc = {
-            "authFullName_s": ["X"],
-            "authFullNameIdHal_fs": ["X_FacetSep_marie-x"],
-        }
-        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
-        assert queries.upserted_authorships[0]["person_identifiers"] == {"idhal": "marie-x"}
-
-    def test_fallback_authFullNameId_when_no_composite(self):
-        queries = _FakeQueries()
-        doc = {
-            "authFullName_s": ["X"],
-            "authFullNameId_fs": ["X_FacetSep_12345"],
-        }
-        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
-        ids = queries.upserted_authorships[0]["person_identifiers"]
-        assert ids == {"hal_person_id": 12345}
-
     def test_form_struct_map_resolves_addr_parts(self):
         queries = _FakeQueries()
         doc = {
-            "authFullName_s": ["X"],
             "authFullNameFormIDPersonIDIDHal_fs": ["X_FacetSep_49236-749496_FacetSep_"],
             "authIdHasPrimaryStructure_fs": [
                 "49236-749496_FacetSep_X_JoinSep_300012_FacetSep_LIMOS"
@@ -482,7 +469,7 @@ class TestProcessAuthors:
         """`authQuality_s = 'dir'` est mappé en rôle via `map_role('hal', ...)` (cf. domain.publications.authorship_roles)."""
         queries = _FakeQueries()
         doc = {
-            "authFullName_s": ["Director"],
+            "authFullNameFormIDPersonIDIDHal_fs": ["Director_FacetSep_0-0_FacetSep_"],
             "authQuality_s": ["dir"],
         }
         process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
@@ -520,7 +507,11 @@ class TestProcessWork:
 
     def test_happy_path(self, stub_orchestration_deps):
         sq = _FakeStagingQueries()
-        raw = {"title_s": ["T"], "producedDateY_i": 2024}
+        raw = {
+            "title_s": ["T"],
+            "producedDateY_i": 2024,
+            "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
+        }
         row = _staging_row(staging_id=1, hal_id="hal-1", raw=raw)
         result = process_work(MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq))
         assert result is True
@@ -551,7 +542,12 @@ class TestProcessWork:
         queries = _FakeQueries()
         queries.staging_has_doi_returns = True
         sq = _FakeStagingQueries()
-        raw = {"title_s": ["T"], "producedDateY_i": 2024, "doiId_s": "10.5281/zenodo.1"}
+        raw = {
+            "title_s": ["T"],
+            "producedDateY_i": 2024,
+            "doiId_s": "10.5281/zenodo.1",
+            "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
+        }
         row = _staging_row(staging_id=42, raw=raw)
         result = process_work(
             MagicMock(),
@@ -575,7 +571,11 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_hal, "insert_hal_document", lambda *a, **kw: 555)
         monkeypatch.setattr(normalize_hal, "process_authors", lambda *a, **kw: None)
 
-        raw = {"title_s": ["T"], "producedDateY_i": 2024}
+        raw = {
+            "title_s": ["T"],
+            "producedDateY_i": 2024,
+            "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
+        }
         row = _staging_row(raw=raw)
         process_work(MagicMock(), staging_row=row, **self._kwargs())
         assert captured["called"] is False
@@ -587,7 +587,12 @@ class TestProcessWork:
         monkeypatch.setattr(normalize_hal, "upsert_publisher", boom)
         monkeypatch.setattr(normalize_hal, "upsert_journal", lambda d, p, **kw: 2)
 
-        raw = {"title_s": ["T"], "producedDateY_i": 2024, "journalPublisher_s": "Elsevier"}
+        raw = {
+            "title_s": ["T"],
+            "producedDateY_i": 2024,
+            "journalPublisher_s": "Elsevier",
+            "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
+        }
         row = _staging_row(hal_id="hal-x", raw=raw)
         with caplog.at_level(logging.ERROR), pytest.raises(RuntimeError):
             process_work(MagicMock(), staging_row=row, **self._kwargs())

@@ -7,21 +7,16 @@ de l'API.
 
 HAL_FIELDS = [
     "halId_s",
-    "docid",
     "doiId_s",
     "title_s",
     "subTitle_s",
-    "authFullName_s",
-    "authIdHal_s",
-    "authIdHal_i",
-    "authFullNameIdHal_fs",
-    "authFullNameId_fs",
     "authFullNameFormIDPersonIDIDHal_fs",
     "authQuality_s",
     "authIdHasStructure_fs",
     # label_xml (TEI) : seul champ qui attache ORCID/IdRef à chaque auteur
     # par position. Les listes `authORCIDIdExt_s` / `authIdRefIdExt_s`
-    # sont compactées (valeurs non-null seulement, pas d'alignement).
+    # sont compactées (valeurs non-null seulement, pas d'alignement) et
+    # ne sont donc pas demandées.
     "label_xml",
     "producedDateY_i",
     "publicationDate_s",
@@ -42,10 +37,6 @@ HAL_FIELDS = [
     "uri_s",
     "label_s",
     "collCode_s",
-    "structId_i",
-    "structName_s",
-    "structType_s",
-    "structAcronym_s",
     "nntId_s",
     "abstract_s",
     "keyword_s",
