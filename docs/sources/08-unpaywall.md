@@ -5,3 +5,5 @@ Script : [interfaces/cli/pipeline/enrich_oa_status.py](https://github.com/Y33sha
 Interroge l'API Unpaywall (`https://api.unpaywall.org/v2/{doi}`) pour chaque publication avec DOI. Met à jour `publications.oa_status`.
 
 Règle métier : ne remplace jamais un statut `diamond` par `gold` (Unpaywall ne distingue pas le diamond OA du gold).
+
+<!--TODO: possibilité d'utiliser pour le dédoublonnage publis? + récupérer un lien OA pour chaque publi?-->

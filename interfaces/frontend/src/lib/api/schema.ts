@@ -3389,7 +3389,7 @@ export interface components {
             /** Doc Types */
             doc_types: components["schemas"]["DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["OaStatusCount"][];
+            oa_statuses: components["schemas"]["application__ports__api__journals_queries__OaStatusCount"][];
             /** Expected Doc Types */
             expected_doc_types: string[];
             /** Expected Oa Statuses */
@@ -3972,18 +3972,13 @@ export interface components {
         };
         /**
          * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour une revue.
-         *
-         *     `expected` est vrai si ce `oa_status` figure dans les valeurs attendues
-         *     pour le `oa_model` de la revue (cf. `domain.journals.expected`).
+         * @description Compteur de publications par `oa_status` pour un éditeur.
          */
         OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
         };
         /**
          * ObservablesPayload
@@ -4959,7 +4954,7 @@ export interface components {
             /** Doc Types */
             doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
+            oa_statuses: components["schemas"]["OaStatusCount"][];
         };
         /**
          * PublisherDetailResponse
@@ -5620,22 +5615,27 @@ export interface components {
             no: number;
         };
         /**
+         * OaStatusCount
+         * @description Compteur de publications par `oa_status` pour une revue.
+         *
+         *     `expected` est vrai si ce `oa_status` figure dans les valeurs attendues
+         *     pour le `oa_model` de la revue (cf. `domain.journals.expected`).
+         */
+        application__ports__api__journals_queries__OaStatusCount: {
+            /** Oa Status */
+            oa_status: string | null;
+            /** Count */
+            count: number;
+            /** Expected */
+            expected: boolean;
+        };
+        /**
          * DocTypeCount
          * @description Compteur de publications par `doc_type` pour un éditeur.
          */
         application__ports__api__publishers_queries__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
-            /** Count */
-            count: number;
-        };
-        /**
-         * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour un éditeur.
-         */
-        application__ports__api__publishers_queries__OaStatusCount: {
-            /** Oa Status */
-            oa_status: string | null;
             /** Count */
             count: number;
         };

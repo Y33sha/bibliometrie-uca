@@ -2,7 +2,7 @@
 
 ```mermaid
 flowchart LR
-    A[source_authorships]-->B[persons]
+    A@{ shape: procs, label: "source_authorships"}-->B[persons]
     classDef new  fill:#bbf
     class B new;
 ```

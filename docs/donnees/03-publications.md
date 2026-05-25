@@ -29,6 +29,11 @@ flowchart LR
     class structures,publications,persons,authorships main
 ```
 
+Légende :
+- **vert** : tables peuplées manuellement
+- **orange** : imports CSV
+- **bleu** : tables peuplées automatiquement par le pipeline à partir des imports API
+
 ## Tables associées
 
 - **`journals`** : référentiel des revues.

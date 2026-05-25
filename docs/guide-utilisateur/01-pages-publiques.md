@@ -1,6 +1,6 @@
 # Pages publiques
 
-*A compléter*
+*A compléter.*
 
 ## Statistiques
 

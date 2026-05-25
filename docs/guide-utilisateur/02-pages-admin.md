@@ -1,5 +1,7 @@
 # Pages d'administration
 
+*A compléter.*
+
 ## Pipeline
 
 ### Configuration {#admin-config}

@@ -24,6 +24,11 @@ flowchart LR
     class structures,publications,persons,authorships main
 ```
 
+Légende :
+- **vert** : tables peuplées manuellement
+- **orange** : imports CSV
+- **bleu** : tables peuplées automatiquement par le pipeline à partir des imports API
+
 ## Tables associées
 
 - **`persons_rh`** : table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](../sources/09-imports-manuels.md#donnees-rh).
