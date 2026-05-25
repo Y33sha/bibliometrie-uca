@@ -1,5 +1,6 @@
 <script lang="ts">
   import { sanitizeTitle } from "$lib/utils";
+  import { sourceLabels } from "$lib/labels";
   import type { DetachModalState } from "./types";
 
   let {
@@ -61,11 +62,7 @@
             <label class="detach-item">
               <input type="checkbox" bind:checked={state.authorships[i].checked} />
               <span class="detach-source tag tag-source"
-                >{a.source === "openalex"
-                  ? "OA"
-                  : a.source === "hal"
-                    ? "HAL"
-                    : "WoS"}</span
+                >{sourceLabels[a.source] ?? a.source}</span
               >
               <span class="detach-year">{a.pub_year ?? "?"}</span>
               <span class="detach-title">{@html sanitizeTitle(a.title)}</span>
