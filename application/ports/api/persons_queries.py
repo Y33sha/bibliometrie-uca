@@ -43,9 +43,9 @@ class ListFilters:
     search: str = ""
     department: str = ""
     role: str = ""
-    linked: str = ""
     has_orcid: str = ""
     has_idhal: str = ""
+    has_idref: str = ""
     has_rh: str = ""
 
 
@@ -57,7 +57,6 @@ class FacetFilters:
     has_idhal: str = ""
     has_idref: str = ""
     has_rh: str = ""
-    linked: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +162,6 @@ class PersonsFacetsResponse(BaseModel):
     idhal: YesNoCount
     idref: YesNoCount
     rh: YesNoCount
-    linked: YesNoCount
 
 
 class DepartmentCount(BaseModel):

@@ -1,21 +1,21 @@
 <script lang="ts">
   import FacetDropdown from "$lib/components/FacetDropdown.svelte";
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
+  import PresenceFilterToggle from "$lib/components/PresenceFilterToggle.svelte";
+  import { IDENTIFIER_ITEMS } from "$lib/filterItems";
+
+  type IdState = "all" | "yes" | "no";
 
   let {
     search = $bindable(),
     selectedDepts = $bindable(),
     selectedRoles = $bindable(),
-    selectedLinked = $bindable(),
-    selectedOrcid = $bindable(),
-    selectedIdhal = $bindable(),
     selectedRh = $bindable(),
+    idStates = $bindable(),
     deptOptions,
     roleOptions,
-    linkedOptions,
-    orcidOptions,
-    idhalOptions,
     rhOptions,
+    idCounts,
     totalCount,
     onsearch,
     onfilterchange,
@@ -23,16 +23,12 @@
     search: string;
     selectedDepts: string[];
     selectedRoles: string[];
-    selectedLinked: string[];
-    selectedOrcid: string[];
-    selectedIdhal: string[];
     selectedRh: string[];
+    idStates: Record<string, IdState>;
     deptOptions: FacetOption[];
     roleOptions: FacetOption[];
-    linkedOptions: FacetOption[];
-    orcidOptions: FacetOption[];
-    idhalOptions: FacetOption[];
     rhOptions: FacetOption[];
+    idCounts: Record<string, { yes: number; no: number }>;
     totalCount: number;
     onsearch: () => void;
     onfilterchange: () => void;
@@ -42,9 +38,15 @@
 <div class="toolbar">
   <input
     type="text"
-    placeholder="Rechercher (nom, email, d&eacute;partement)…"
+    placeholder="Rechercher (nom, email)…"
     bind:value={search}
     oninput={onsearch}
+  />
+  <FacetDropdown
+    label="Base RH"
+    options={rhOptions}
+    bind:selected={selectedRh}
+    onchange={onfilterchange}
   />
   <FacetDropdown
     label="Département"
@@ -60,28 +62,11 @@
     bind:selected={selectedRoles}
     onchange={onfilterchange}
   />
-  <FacetDropdown
-    label="Rattachement"
-    options={linkedOptions}
-    bind:selected={selectedLinked}
-    onchange={onfilterchange}
-  />
-  <FacetDropdown
-    label="ORCID"
-    options={orcidOptions}
-    bind:selected={selectedOrcid}
-    onchange={onfilterchange}
-  />
-  <FacetDropdown
-    label="idHAL"
-    options={idhalOptions}
-    bind:selected={selectedIdhal}
-    onchange={onfilterchange}
-  />
-  <FacetDropdown
-    label="Base RH"
-    options={rhOptions}
-    bind:selected={selectedRh}
+  <PresenceFilterToggle
+    label="Identifiants"
+    items={IDENTIFIER_ITEMS}
+    bind:states={idStates}
+    counts={idCounts}
     onchange={onfilterchange}
   />
   <span class="count">{totalCount} personnes</span>

@@ -2934,13 +2934,19 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour un éditeur.
+         * @description Compteur de publications par `doc_type` pour une revue.
+         *
+         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
+         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
+         *     Permet au frontend de styler les inattendus en warning.
          */
         DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
+            /** Expected */
+            expected: boolean;
         };
         /** DocTypeLabel */
         DocTypeLabel: {
@@ -3381,7 +3387,7 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["OaStatusCount"][];
             /** Expected Doc Types */
@@ -4510,7 +4516,6 @@ export interface components {
             idhal: components["schemas"]["YesNoCount"];
             idref: components["schemas"]["YesNoCount"];
             rh: components["schemas"]["YesNoCount"];
-            linked: components["schemas"]["YesNoCount"];
         };
         /** PersonsStatsResponse */
         PersonsStatsResponse: {
@@ -4952,7 +4957,7 @@ export interface components {
             /** Journal Types */
             journal_types: components["schemas"]["JournalTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
         };
@@ -5616,19 +5621,13 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
-         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
-         *     Permet au frontend de styler les inattendus en warning.
+         * @description Compteur de publications par `doc_type` pour un éditeur.
          */
-        application__ports__api__journals_queries__DocTypeCount: {
+        application__ports__api__publishers_queries__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
         };
         /**
          * OaStatusCount
@@ -7419,9 +7418,9 @@ export interface operations {
                 search?: string;
                 department?: string;
                 role?: string;
-                linked?: string;
                 has_orcid?: string;
                 has_idhal?: string;
+                has_idref?: string;
                 has_rh?: string;
                 sort?: string;
             };
@@ -7460,7 +7459,6 @@ export interface operations {
                 has_idhal?: string;
                 has_idref?: string;
                 has_rh?: string;
-                linked?: string;
             };
             header?: never;
             path?: never;
