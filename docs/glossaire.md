@@ -3,7 +3,7 @@
 *A compléter*
 
 ## Adresse {#adresse}
-Chaîne de caractères associée à une publication et signalant l'[affiliation](#affiliation) institutionnelle de chaque auteur. Fournie par chaque auteur à l'éditeur.
+Chaîne de caractères associée à une publication et signalant l'[affiliation](glossaire.md#affiliation) institutionnelle de chaque auteur. Fournie par chaque auteur à l'éditeur.
 Généralement appelée *address* ou *affiliation string* dans les métadonnées des publications, et *signature* dans le langage courant (côté auteur).
 
 https://www.uca.fr/recherche/science-ouverte-et-publication/politique-de-signature-des-publications
@@ -14,7 +14,9 @@ Information sur la ou les structure(s) de rattachement de chaque auteur d'une pu
 Elle est liée à un couple personne-publication, et non à une personne en tant que telle.
 
 ## APC {#apc}
-*Article Processing Charges*. Frais de publication facturés par l'éditeur pour publier un article en accès ouvert. Peut aller de quelques centaines à plusieurs milliers d'euros selon la revue.
+*Article Processing Charges*. Frais de publication facturés par l'éditeur pour publier un article en accès ouvert. Peuvent aller de quelques centaines à plusieurs milliers d'euros selon la revue.
+
+Si la revue est *full open access*, on parle d'*open access gold*. Si la revue est sous abonnement, on parle de modèle hybride. Voir [voies *open access*](glossaire.md#oa_status).
 
 ## AuréHAL {#aurehal}
 Référentiel d'entités HAL (auteurs, structures, revues).
@@ -23,19 +25,19 @@ Référentiel d'entités HAL (auteurs, structures, revues).
 
 Auteur désigné comme contact principal de l'éditeur pour une publication à plusieurs auteurs. Il y en a parfois deux ou trois sur une même publication.
 
-Les [APC](#apc) (si présents) sont payés par la structure de rattachement de l'auteur correspondant.
+Les [APC](glossaire.md#apc) (si présents) sont payés par la structure de rattachement de l'auteur correspondant.
 
 L'information "auteur correspondant" est inégalement renseignée dans les métadonnées des sources.
 
 ## Authorship {#authorship}
-Couple personne-publication, représentant la contribution d'un auteur et portant une [affiliation](#affiliation) institutionnelle. Pas un terme métier mais notion présente dans les métadonnées sources et dans le code.
+Couple personne-publication, représentant la contribution d'un auteur et portant une [affiliation](glossaire.md#affiliation) institutionnelle. Pas un terme métier mais notion présente dans les métadonnées sources et dans le code.
 
 ## Collection HAL {#collection-hal}
 Sous-portail HAL agrégeant les publications d'une structure (i.e. les publications déposées dans HAL et dont au moins un auteur a une affiliation à cette structure). Chaque collection porte un code, correspondant souvent (mais pas toujours) à l'acronyme du laboratoire.
 
 Exemple: https://hal.science/PIAF
 
-La collection d'une structure tutelle agrège les publications de ses sous-structures. L'arborescence des structures est fournie par le référentiel [AuréHAL](#aurehal).
+La collection d'une structure tutelle agrège les publications de ses sous-structures. L'arborescence des structures est fournie par le référentiel [AuréHAL](glossaire.md#aurehal).
 
 ## Crossref {#crossref}
 Agence d'enregistrement de DOI, principalement pour les publications.
@@ -84,6 +86,16 @@ Voir [détails](sources/03-openalex.md) sur l'API et les données récupérées.
 ## ORCID {#orcid}
 Identifiant unique d'un chercheur (ex: `0000-0001-2345-6789`). Créé par le chercheur.
 
+## PID {#pid}
+
+*Persistent identifier*. Identifiant unique pour une entité donnée.
+|Entité|Exemples d'identifiants|
+|---|------|
+|Personne|[ORCID](glossaire.md#orcid), [IdRef](glossaire.md#idref)|
+|Structure|[ROR](glossaire.md#ror)|
+|Publication|[DOI](glossaire.md#doi)|
+|Revue|[ISSN](glossaire.md#issn)|
+
 ## Pmid {#pmid}
 
 ## Postprint {#postprint}
@@ -101,7 +113,7 @@ Portail ministériel de la recherche française.
 ## Thèses en ligne (TEL) {#tel}
 
 ## Unpaywall {#unpaywall}
-Service qui résout le statut *open access* de chaque publication à partir du DOI. API utilisée pour enrichir et corriger le champ `oa_status` des publications. Voir [détails](sources/08-unpaywall.md).
+Service permettant de trouver des versions *open access* de publications académiques identifiées par un DOI. API utilisée pour enrichir et corriger le champ `oa_status` des publications. Voir [détails](sources/08-unpaywall.md).
 
 ## Voies *open access* {#oa_status}
 

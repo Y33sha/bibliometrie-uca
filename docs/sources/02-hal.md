@@ -8,8 +8,9 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 
 ## API utilisée
 
-**Search API** (`https://api.archives-ouvertes.fr/search`) — moissonnage des publications.
-- Requête par [collection HAL](../glossaire.md#collection-hal)
+**Search API** (https://api.archives-ouvertes.fr/search) — moissonnage des publications.
+- Pas de credentials nécessaires.
+- Requête par [collection HAL](../glossaire.md#collection-hal) + année de publication
 - Champs Solr récupérés : voir [infrastructure/hal.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/infrastructure/hal.py) (`HAL_FIELDS`)
 - Pagination par offset, 500 résultats/page, 0.5s de délai entre requêtes
 

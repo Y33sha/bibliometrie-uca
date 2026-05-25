@@ -1,7 +1,7 @@
 # A régler avant transmission
 ## Schéma de données
 * [ ] peut-on remplacer certaines tables par des vues matérialisées? (source_authorship_structures, authorship_structures, authorships?)
-* ajouter created_at,updated_at partout
+* [ ] ajouter created_at,updated_at partout
 ## Pipeline de traitement
 ### Extraction
 * [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour ->> **DATA_cycle-vie-staging.md**
@@ -11,8 +11,7 @@
 * [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples)
 ### Normalisation
 * [ ] batcher pour améliorer la perf? / analyser pour comprendre pourquoi hal + lent
-* [ ] création publishers et journals: avant la phase publications du pipeline, pas en normalisation?
-* [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre)
+* [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre) ->> **DATA_cycle-vie-staging.md**
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
 * [ ] création erronée d'idhal numériques par normalize-hal: vérifier que le problème ne réapparaît pas
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
@@ -28,11 +27,13 @@
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
-* page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis
+* [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis
+* [ ] vérifier qu'il n'y a pas d'autres divergences Python↔SQL au-delà du œ (la docstring de normalize.py prétend l'alignement, le œ montre que c'est pas vrai).
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup de résultats ScanR sont rejetés en phase "affiliations" => auditer
 * [ ] normalisation des titres: supprimer les balises mml ou html
+* [ ] openalex raw_orcid
 ## Sujets
 * [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation manuelle des sujets? / ajouter seuil de score de pertinence? / algos pour évaluer pertinence (co-occurrences suspectes, NLP...)
 * [ ] enrichissement sujets: audit des publis sans sujet; sujets "attendus" par revue?
@@ -44,10 +45,9 @@
 * [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait tenter un matching de tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 ## Types de documents: algo de résolution de conflits
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger à la source
-* [ ] enum type doc à revoir: correction/erratum/corrigendum; compte-rendu (= autre sur HAL); review (= book review ou revue de la littérature?); posters (ne pas fusionner avec conf si même DOI?); data papers?
 * [ ] types wos "composites": étudier, voir si ça représente des types/sous-types comme dans HAL
 ## OA_status / embargos
-* preprints en accès gold selon OpenAlex: suspect
+* [ ] preprints en accès gold selon OpenAlex: suspect
 * [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] embargos (HAL, theses.fr): afficher dates dans l'UI (existent-elles dans le retour api? creuser)
@@ -89,18 +89,12 @@
 * [ ] afficher mémoires master et thèses en cours sur liste publications de la page personnes/id
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
 ## Général (interface)
-* [ ] Toujours mémoriser filtres et les rétablir au rechargement
-* [ ] Rendre tous les filtres sticky
-* [ ] Rendre tous les tableaux triables
-* [ ] différencier interfaces à usage interne vs externe (users, roles)
 * [ ] responsivité minimale de l'interface
 ## Détails d'affichage
-* [ ] décomptes sur les onglets: ne pas tenir compte des facettes en place
-* [ ] ordre des sources pour les thèses: harmoniser page laboratoire avec page thèses
-* [ ] admin/personnes, formes de nom: modal authorships: source affichée: default wos (ajouter les autres sources, et mettre default None)
-* [ ] colonne auteur sur la page thèses
-* [ ] sujets: layout différent des autres pages?
+* [ ] décomptes sur les onglets: incohérents (cf nb revues par éditeur): supprimer ou corriger?
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
+* [ ] remplacer tag DOAJ par lien
+* [ ] style barre facettes dans labos/thèses: pas homogène aux autres
 
 # Cas particuliers, bizarreries à élucider
 * openalex répète des auteurs : publi 77832
@@ -117,7 +111,6 @@
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
 * collaborations nationales et internationales: identification structures? compliqué, je pense que pour ça il vaut mieux réutiliser les sources directement: contrôler seulement cohérence entre sources et corriger quand incohérent?
-* [ ] brevets? INPI?
 * audit log: uniformiser les types d'action qui génèrent un log ou pas.
 
 # Pas nécessaire de le régler, du moment qu'on le documente

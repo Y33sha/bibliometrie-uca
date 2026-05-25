@@ -1,18 +1,8 @@
-"""Fonctions de comparaison et de parsing des signatures de personnes.
+"""Fonctions de comparaison et de parsing des noms de personnes.
 
 Utilisées par le pipeline (matching cross-source dans
 `domain/persons/matching.py`, création de personnes dans
-`application/pipeline/persons/create.py`) — contexte où un faux
-positif coûte cher (rattachement définitif sans validation).
-
-**Divergence assumée** avec les règles de pré-sélection des paires
-candidates côté admin (`infrastructure/queries/person_duplicates.py`,
-`PERSON_DUP_QUERIES` + `_tokens_match`) : ces dernières sont plus
-larges (gèrent par exemple « Jean Michel » vs « JM » via
-tokenization) parce qu'elles présentent une liste à valider
-manuellement — recall important, faux positifs filtrés à l'œil.
-Conserver les deux ensembles de règles séparés ; toute évolution de
-l'un doit considérer si l'autre doit suivre.
+`application/pipeline/persons/create.py`).
 """
 
 

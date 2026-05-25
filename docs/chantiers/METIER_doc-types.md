@@ -145,9 +145,15 @@ Autres patterns problématiques constatés :
 
 
 ## idées à intégrer
-- titre commençant par Erratum mais doc_type autre que erratum => corriger
-- book reviews: trouver critères titre pour détecter
+- book reviews: trouver critères titre pour détecter (ISBN; titre terminé par "année, nombre de pages")
 - type "media" ou "presse"
 - conf, conference paper, proceedings: clarifier
 - détecter les patterns d'incohérence les plus fréquents
 - type "données additionnelles?"
+
+## Règles à mettre en place
+* Toutes les revues contenant les mots "conference", "symposium", "proceedings", "lecture notes" sont de type "proceedings".
+* Toutes les publications dans une revue de type "proceedings" sont des "conference papers".
+* Toutes les publications dans une revue de type "media" sont des "interventions médias" (type à créer)
+* Toutes les publications commençant par "Interview" sont de type "intervention média" (? vérifier)
+* Toutes les publications commençant par "Erratum", "Errata", "Corrigendum" sont de type "erratum".
