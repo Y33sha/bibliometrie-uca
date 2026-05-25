@@ -11,7 +11,6 @@ from infrastructure.queries.filters import (
     assemble_where,
     person_has_identifier_clause,
     person_has_rh_clause,
-    person_linked_clause,
     persons_sort_clause,
 )
 
@@ -160,7 +159,6 @@ def list_persons(
                     unaccent(p.last_name) ILIKE unaccent(:search_pat)
                     OR unaccent(p.first_name) ILIKE unaccent(:search_pat)
                     OR prh.email ILIKE :search_pat
-                    OR unaccent(prh.department_name) ILIKE unaccent(:search_pat)
                 )""",
                 {"search_pat": f"%{filters.search}%"},
             )
@@ -173,9 +171,9 @@ def list_persons(
         )
     if filters.role:
         clauses.append(WhereClause("prh.role_title = :flt_role", {"flt_role": filters.role}))
-    clauses.append(person_linked_clause(filters.linked))
     clauses.append(person_has_identifier_clause("orcid", filters.has_orcid))
     clauses.append(person_has_identifier_clause("idhal", filters.has_idhal))
+    clauses.append(person_has_identifier_clause("idref", filters.has_idref))
     clauses.append(person_has_rh_clause(filters.has_rh))
 
     where_sql, binds = assemble_where(clauses)

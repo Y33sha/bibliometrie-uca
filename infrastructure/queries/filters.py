@@ -398,16 +398,6 @@ def person_has_identifier_clause(id_type: str, value: str) -> WhereClause | None
     )
 
 
-def person_linked_clause(value: str) -> WhereClause | None:
-    if value not in ("yes", "no"):
-        return None
-    negate = "NOT " if value == "no" else ""
-    return WhereClause(
-        f"{negate}EXISTS (SELECT 1 FROM authorships a WHERE a.person_id = p.id)",
-        {},
-    )
-
-
 def person_has_rh_clause(value: str) -> WhereClause | None:
     if value == "yes":
         return WhereClause("prh.id IS NOT NULL", {})

@@ -28,32 +28,31 @@
   let stats = $state<PersonStats | null>(null);
   let orphanCount = $state(0);
 
+  type IdState = "all" | "yes" | "no";
+
   let search = $state("");
   let selectedDepts: string[] = $state([]);
   let selectedRoles: string[] = $state([]);
-  let selectedLinked: string[] = $state([]);
-  let selectedOrcid: string[] = $state([]);
-  let selectedIdhal: string[] = $state([]);
   let selectedRh: string[] = $state([]);
+  let idStates = $state<Record<string, IdState>>({});
 
   let deptOptions: FacetOption[] = $state([]);
   let roleOptions: FacetOption[] = $state([]);
-  let linkedOptions: FacetOption[] = $state([
-    { value: "yes", text: "Rattachées" },
-    { value: "no", text: "Non rattachées" },
-  ]);
-  let orcidOptions: FacetOption[] = $state([
-    { value: "yes", text: "Avec ORCID" },
-    { value: "no", text: "Sans ORCID" },
-  ]);
-  let idhalOptions: FacetOption[] = $state([
-    { value: "yes", text: "Avec idHAL" },
-    { value: "no", text: "Sans idHAL" },
-  ]);
   let rhOptions: FacetOption[] = $state([
     { value: "yes", text: "Oui" },
     { value: "no", text: "Non" },
   ]);
+  let idCounts: Record<string, { yes: number; no: number }> = $state({
+    orcid: { yes: 0, no: 0 },
+    idhal: { yes: 0, no: 0 },
+    idref: { yes: 0, no: 0 },
+  });
+
+  const idQueryKey: Record<string, string> = {
+    orcid: "has_orcid",
+    idhal: "has_idhal",
+    idref: "has_idref",
+  };
 
   let currentPage = $state(1);
   let totalPages = $state(0);
@@ -88,9 +87,10 @@
     const params = new URLSearchParams();
     if (selectedDepts.length) params.set("department", selectedDepts.join(","));
     if (selectedRoles.length) params.set("role", selectedRoles.join(","));
-    if (selectedLinked.length === 1) params.set("linked", selectedLinked[0]);
-    if (selectedOrcid.length === 1) params.set("has_orcid", selectedOrcid[0]);
-    if (selectedIdhal.length === 1) params.set("has_idhal", selectedIdhal[0]);
+    for (const [key, qk] of Object.entries(idQueryKey)) {
+      const v = idStates[key];
+      if (v === "yes" || v === "no") params.set(qk, v);
+    }
     if (selectedRh.length === 1) params.set("has_rh", selectedRh[0]);
     return params;
   }
@@ -102,29 +102,20 @@
       roles: { value: string; count: number }[];
       orcid: { yes: number; no: number };
       idhal: { yes: number; no: number };
+      idref: { yes: number; no: number };
       rh: { yes: number; no: number };
-      linked: { yes: number; no: number } | null;
     }>("/api/persons/facets?" + params, { key: "persons-facets" });
     deptOptions = data.departments.map((d) => ({ value: d.value, text: d.value, count: d.count }));
     roleOptions = data.roles.map((r) => ({ value: r.value, text: r.value, count: r.count }));
-    orcidOptions = [
-      { value: "yes", text: "Avec ORCID", count: data.orcid.yes },
-      { value: "no", text: "Sans ORCID", count: data.orcid.no },
-    ];
-    idhalOptions = [
-      { value: "yes", text: "Avec idHAL", count: data.idhal.yes },
-      { value: "no", text: "Sans idHAL", count: data.idhal.no },
-    ];
     rhOptions = [
       { value: "yes", text: "Oui", count: data.rh.yes },
       { value: "no", text: "Non", count: data.rh.no },
     ];
-    if (data.linked) {
-      linkedOptions = [
-        { value: "yes", text: "Rattachées", count: data.linked.yes },
-        { value: "no", text: "Non rattachées", count: data.linked.no },
-      ];
-    }
+    idCounts = {
+      orcid: { yes: data.orcid.yes, no: data.orcid.no },
+      idhal: { yes: data.idhal.yes, no: data.idhal.no },
+      idref: { yes: data.idref.yes, no: data.idref.no },
+    };
   }
 
   async function loadTable() {
@@ -133,9 +124,10 @@
     if (search.trim()) params.set("search", search.trim());
     if (selectedDepts.length === 1) params.set("department", selectedDepts[0]);
     if (selectedRoles.length === 1) params.set("role", selectedRoles[0]);
-    if (selectedLinked.length === 1) params.set("linked", selectedLinked[0]);
-    if (selectedOrcid.length === 1) params.set("has_orcid", selectedOrcid[0]);
-    if (selectedIdhal.length === 1) params.set("has_idhal", selectedIdhal[0]);
+    for (const [key, qk] of Object.entries(idQueryKey)) {
+      const v = idStates[key];
+      if (v === "yes" || v === "no") params.set(qk, v);
+    }
     if (selectedRh.length === 1) params.set("has_rh", selectedRh[0]);
     params.set("sort", sortField);
 
@@ -174,10 +166,12 @@
     setOrDel("search", search);
     setOrDel("dept", selectedDepts.length === 1 ? selectedDepts[0] : "");
     setOrDel("role", selectedRoles.length === 1 ? selectedRoles[0] : "");
-    setOrDel("linked", selectedLinked.length === 1 ? selectedLinked[0] : "");
-    setOrDel("orcid", selectedOrcid.length === 1 ? selectedOrcid[0] : "");
-    setOrDel("idhal", selectedIdhal.length === 1 ? selectedIdhal[0] : "");
     setOrDel("rh", selectedRh.length === 1 ? selectedRh[0] : "");
+    const idFilter = Object.entries(idStates)
+      .filter(([, v]) => v === "yes" || v === "no")
+      .map(([k, v]) => `${k}_${v}`)
+      .join(",");
+    setOrDel("id_filter", idFilter);
     replaceState(url, {});
   }
 
@@ -187,10 +181,16 @@
     if (p.get("search")) search = p.get("search")!;
     if (p.get("dept")) selectedDepts = [p.get("dept")!];
     if (p.get("role")) selectedRoles = [p.get("role")!];
-    if (p.get("linked")) selectedLinked = [p.get("linked")!];
-    if (p.get("orcid")) selectedOrcid = [p.get("orcid")!];
-    if (p.get("idhal")) selectedIdhal = [p.get("idhal")!];
     if (p.get("rh")) selectedRh = [p.get("rh")!];
+    const idFilter = p.get("id_filter");
+    if (idFilter) {
+      const states: Record<string, IdState> = {};
+      for (const part of idFilter.split(",")) {
+        const m = part.match(/^(orcid|idhal|idref)_(yes|no)$/);
+        if (m) states[m[1]] = m[2] as IdState;
+      }
+      idStates = states;
+    }
   }
 
   /* ── Event handlers ── */
@@ -372,16 +372,12 @@
   bind:search
   bind:selectedDepts
   bind:selectedRoles
-  bind:selectedLinked
-  bind:selectedOrcid
-  bind:selectedIdhal
   bind:selectedRh
+  bind:idStates
   {deptOptions}
   {roleOptions}
-  {linkedOptions}
-  {orcidOptions}
-  {idhalOptions}
   {rhOptions}
+  {idCounts}
   {totalCount}
   onsearch={handleSearch}
   onfilterchange={handleFilterChange}

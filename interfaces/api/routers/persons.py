@@ -76,9 +76,9 @@ def list_persons(
     search: str = Query(""),
     department: str = Query(""),
     role: str = Query(""),
-    linked: str = Query(""),
     has_orcid: str = Query(""),
     has_idhal: str = Query(""),
+    has_idref: str = Query(""),
     has_rh: str = Query(""),
     sort: str = Query("name"),
     queries: PersonsQueries = Depends(persons_queries_sync),
@@ -88,9 +88,9 @@ def list_persons(
         search=search,
         department=department,
         role=role,
-        linked=linked,
         has_orcid=has_orcid,
         has_idhal=has_idhal,
+        has_idref=has_idref,
         has_rh=has_rh,
     )
     return queries.list_persons(filters=filters, page=page, per_page=per_page, sort=sort)
@@ -104,7 +104,6 @@ def persons_facets(
     has_idhal: str = Query(""),
     has_idref: str = Query(""),
     has_rh: str = Query(""),
-    linked: str = Query(""),
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> PersonsFacetsResponse:
     """Facettes dynamiques pour la page personnes."""
@@ -115,7 +114,6 @@ def persons_facets(
         has_idhal=has_idhal,
         has_idref=has_idref,
         has_rh=has_rh,
-        linked=linked,
     )
     return queries.persons_facets(filters=filters)
 

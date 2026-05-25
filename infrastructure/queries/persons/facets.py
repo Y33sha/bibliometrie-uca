@@ -10,7 +10,6 @@ from infrastructure.queries.filters import (
     assemble_where,
     person_has_identifier_clause,
     person_has_rh_clause,
-    person_linked_clause,
 )
 
 _BASE_FROM = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
@@ -38,8 +37,6 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
             out.append(person_has_identifier_clause("idref", filters.has_idref))
         if skip != "has_rh":
             out.append(person_has_rh_clause(filters.has_rh))
-        if skip != "linked":
-            out.append(person_linked_clause(filters.linked))
         return out
 
     # DÉPARTEMENTS
@@ -134,22 +131,6 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
         binds,
     ).one()
 
-    # LINKED
-    where_sql, binds = assemble_where(base_clauses(skip="linked"))
-    linked = conn.execute(
-        text(f"""
-            SELECT
-                COUNT(*) FILTER (WHERE EXISTS (
-                    SELECT 1 FROM authorships a WHERE a.person_id = p.id
-                )) AS yes,
-                COUNT(*) FILTER (WHERE NOT EXISTS (
-                    SELECT 1 FROM authorships a WHERE a.person_id = p.id
-                )) AS no
-            FROM {_BASE_FROM} WHERE {where_sql}
-        """),
-        binds,
-    ).one()
-
     return {
         "departments": dept_facets,
         "roles": role_facets,
@@ -157,7 +138,6 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
         "idhal": {"yes": idhal.yes, "no": idhal.no},
         "idref": {"yes": idref.yes, "no": idref.no},
         "rh": {"yes": rh.yes, "no": rh.no},
-        "linked": {"yes": linked.yes, "no": linked.no},
     }
 
 
