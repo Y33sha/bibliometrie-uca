@@ -2,6 +2,9 @@
 
 *A compléter*
 
+## ABES {#abes}
+*Agence bibliographique de l'Enseignement supérieur*
+
 ## Adresse {#adresse}
 Chaîne de caractères associée à une publication et signalant l'[affiliation](glossaire.md#affiliation) institutionnelle de chaque auteur. Fournie par chaque auteur à l'éditeur.
 Généralement appelée *address* ou *affiliation string* dans les métadonnées des publications, et *signature* dans le langage courant (côté auteur).
@@ -64,7 +67,9 @@ Voir [détails](sources/02-hal.md) sur l'API et les données récupérées.
 Identifiant auteur dans HAL. Créé par le chercheur dans son profil HAL.
 
 ## IdRef {#idref}
-Identifiant auteur créé et maintenu par l'ABES (Agence bibliographique de l'enseignement supérieur).
+**Id**entifiants et **Réf**érentiels pour l'Enseignement supérieur et la Recherche. Référentiel d'autorités (personnes, collectivités, etc.) développé et maintenu par l'ABES. https://documentation.abes.fr/aideidref/accueil/fr/index.html
+
+Par raccourci de langage on parle d'*identifiants IdRef* pour désigner les identifiant de ce référentiel. Officiellement on parle de *n° PPN*. Il est composé de 9 caractères (8 chiffres + 1 clé pouvant être un chiffre ou un 'X').
 
 ## ISSN {#issn}
 *International Standard Serial Number*. Identifiant d'une publication périodique (= revue). Il peut exister un ISSN *print* (pour la version imprimée), un eISSN (pour la version électronique) et un ISSN-L (de liaison: identifiant unique pour une publication multi-supports).
