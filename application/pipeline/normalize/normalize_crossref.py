@@ -17,9 +17,13 @@ Particularités CrossRef :
 - Affiliations purement textuelles et génériques (tutelles), pas de
   structures détaillées → stockées dans ``source_authorships.source_data``
   pour traçabilité, pas d'``addresses`` ni de ``source_authorship_addresses``.
-- ``doc_type`` stocké comme ``NULL`` à la normalisation ; le mapping
-  taxonomie CrossRef → enum canonique est appliqué plus tard via
-  ``_SOURCE_MAPS``.
+- ``doc_type`` stocké tel quel depuis ``msg["type"]`` ; le mapping
+  taxonomie CrossRef → enum canonique vit dans
+  ``domain.publications.doc_types._SOURCE_MAPS["crossref"]`` et est
+  appliqué par ``arbitrate_doc_type_with_article_subtype`` au moment
+  du refresh. Le cas ``journal-article`` indistinct est arbitré contre
+  les sous-types plus précis exposés par HAL/OA (review, conference_paper,
+  etc.) — cf. ``ARTICLE_SUBTYPES``.
 - ``oa_status`` non dérivé de CrossRef (pas fiable) ; laissé à NULL
   pour que les autres sources arbitrent via ``refresh_from_sources``.
 
@@ -330,7 +334,7 @@ def process_work(
         doi=doi,
         title=title,
         pub_year=pub_year,
-        doc_type=None,  # mapping CrossRef → enum canonique appliqué plus tard (cf. docs/chantiers/crossref.md)
+        doc_type=msg.get("type"),
         publication_id=None,
         staging_id=staging_id,
         external_ids=external_ids,
