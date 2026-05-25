@@ -3,7 +3,8 @@
 	import { base } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
-	import { typeLabels, oaLabelsMap } from '$lib/labels';
+	import { oaLabelsMap } from '$lib/labels';
+	import { docTypeSingular } from '$lib/stores/docTypes';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -206,7 +207,7 @@
 								<tbody>
 									{#each dashboard.doc_types as d (d.doc_type ?? '∅')}
 										<tr>
-											<td>{d.doc_type ? (typeLabels[d.doc_type] ?? d.doc_type) : '(non renseigné)'}</td>
+											<td>{d.doc_type ? ($docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)'}</td>
 											<td class="num">{d.count}</td>
 										</tr>
 									{/each}

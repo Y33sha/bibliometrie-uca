@@ -2485,6 +2485,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/doc-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Doc Types
+         * @description Liste les valeurs de l'enum `doc_type` avec leurs libellés FR (singulier, pluriel).
+         */
+        get: operations["list_doc_types_api_doc_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2914,19 +2934,27 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
-         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
-         *     Permet au frontend de styler les inattendus en warning.
+         * @description Compteur de publications par `doc_type` pour un éditeur.
          */
         DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
+        };
+        /** DocTypeLabel */
+        DocTypeLabel: {
+            /** Value */
+            value: string;
+            /** Singular */
+            singular: string;
+            /** Plural */
+            plural: string;
+        };
+        /** DocTypeListResponse */
+        DocTypeListResponse: {
+            /** Items */
+            items: components["schemas"]["DocTypeLabel"][];
         };
         /**
          * DoiPrefixInfo
@@ -3353,7 +3381,7 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["OaStatusCount"][];
             /** Expected Doc Types */
@@ -4920,7 +4948,7 @@ export interface components {
             /** Journal Types */
             journal_types: components["schemas"]["JournalTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
         };
@@ -5584,13 +5612,19 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour un éditeur.
+         * @description Compteur de publications par `doc_type` pour une revue.
+         *
+         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
+         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
+         *     Permet au frontend de styler les inattendus en warning.
          */
-        application__ports__api__publishers_queries__DocTypeCount: {
+        application__ports__api__journals_queries__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
+            /** Expected */
+            expected: boolean;
         };
         /**
          * OaStatusCount
@@ -9498,6 +9532,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_doc_types_api_doc_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocTypeListResponse"];
                 };
             };
         };

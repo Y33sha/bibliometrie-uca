@@ -1,7 +1,7 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { sanitizeTitle, halDocUrl, scanrPubUrl } from "$lib/utils";
-  import { typeLabels as baseTypeLabels } from "$lib/labels";
+  import { docTypeSingular } from "$lib/stores/docTypes";
   import type { PubDetail, Source } from "./types";
 
   // `sources` peut contenir plusieurs rows pour une même source (ex: deux
@@ -25,11 +25,6 @@
   // plus récente (la 1ère grâce au tri DESC côté API).
   const halCollections = $derived(halSources[0]?.hal_collections ?? []);
 
-  const typeLabels: Record<string, string> = {
-    ...baseTypeLabels,
-    conference_paper: "Communication",
-  };
-
   const langLabels: Record<string, string> = {
     en: "anglais",
     fr: "français",
@@ -45,7 +40,7 @@
   <div class="pub-meta">
     {#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
     {#if pub.doc_type}
-      <span class="meta-badge type-badge">{typeLabels[pub.doc_type] || pub.doc_type}</span>
+      <span class="meta-badge type-badge">{$docTypeSingular[pub.doc_type] || pub.doc_type}</span>
     {/if}
     {#if pub.oa_status && pub.oa_status !== "unknown"}
       <span class="oa-tag oa-{pub.oa_status}">{pub.oa_status}</span>
