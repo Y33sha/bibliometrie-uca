@@ -86,7 +86,7 @@ def _extract_incremental(
     Retourne `(new, updated)`. `new` = orphelins effectivement fetchés ; `updated` =
     rows existantes taguées avec cette collection (rowcount de l'UPDATE). Choisi par
     `extract_collection` quand la collection est majoritairement déjà en staging
-    (umbrella type PRES_UCA).
+    (umbrella type PRES_CLERMONT).
     """
     total_new = 0
     for i, hal_id in enumerate(orphans, 1):

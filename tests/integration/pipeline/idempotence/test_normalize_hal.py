@@ -12,7 +12,10 @@ HAL_STAGING_DOCS = [
             "doiId_s": "10.9999/hal-test-001",
             "journalTitle_s": "Journal of Tectonics",
             "journalPublisher_s": "Test Publisher HAL",
-            "authFullName_s": ["Eve Leroy", "Frank Moreau"],
+            "authFullNameFormIDPersonIDIDHal_fs": [
+                "Eve Leroy_FacetSep_0-0_FacetSep_",
+                "Frank Moreau_FacetSep_0-0_FacetSep_",
+            ],
             "openAccess_bool": True,
         },
     },
@@ -27,7 +30,7 @@ HAL_STAGING_DOCS = [
             "doiId_s": "10.9999/hal-test-002",
             "bookTitle_s": "Big Book of Science",
             "publisher_s": "Academic Press",
-            "authFullName_s": ["Eve Leroy"],
+            "authFullNameFormIDPersonIDIDHal_fs": ["Eve Leroy_FacetSep_0-0_FacetSep_"],
         },
     },
     {
@@ -38,7 +41,7 @@ HAL_STAGING_DOCS = [
             "docType_s": "THESE",
             "title_s": ["Une thèse sans DOI sur la géologie"],
             "producedDateY_i": 2024,
-            "authFullName_s": ["Grace Petit"],
+            "authFullNameFormIDPersonIDIDHal_fs": ["Grace Petit_FacetSep_0-0_FacetSep_"],
         },
     },
 ]
