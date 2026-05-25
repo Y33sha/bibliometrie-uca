@@ -9,9 +9,8 @@ https://scanr.enseignementsup-recherche.gouv.fr/docs/overview
 **Elasticsearch DataESR** (`https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search`) — moissonnage des publications du périmètre français de la recherche.
 
 - Login et mot de passe nécessaires : accordés gratuitement sur demande par mail: https://scanr.enseignementsup-recherche.gouv.fr/about/contact
-- Requête `bool` combinant un filtre `year` et un `should` sur `affiliations.id.keyword` (SIREN des structures déclarées dans le périmètre)
+- Requête : année + affiliation par identifiant SIREN
 - Pagination par `search_after` sur `id.keyword`, taille `SCANR_PER_PAGE`, délai `SCANR_DELAY` entre requêtes
-- Affiliation IDs dérivés du périmètre d'extraction (`structures.api_ids->'scanr'`)
 
 ## Données récupérées
 
@@ -127,12 +126,6 @@ L'`id` ScanR concatène le préfixe de source et l'identifiant natif de la publi
 | `hal`  | 42 % | `halhal-04244961` |
 | `nnt`  | 4 %  | `nnt2023clil0004` |
 | `pmid` | 0.2 %| `pmid36609465` |
-
-Pour les thèses (préfixe `nnt`), c'est le seul endroit du payload où on trouve le NNT — pas d'`externalIds` type `nnt` côté ScanR. D'où `extract_nnt_from_scanr_id`, qui isole ce cas pour permettre la réconciliation avec theses.fr. Pour les autres préfixes, les identifiants natifs sont déjà disponibles via `externalIds`, on ne les ré-extrait pas de l'`id`.
-
-### Champs multilingues : ordre de préférence pour la valeur retenue
-
-Les champs `title`, `summary`, `keywords` sont des dictionnaires `{langue: valeur}` (clés possibles : `default`, `en`, `fr`). Notre base n'étant pas multilingue, on stocke UNE valeur : la première trouvée dans l'ordre `default` → `en` → `fr`. `default` est typiquement la langue d'origine de la publication.
 
 ### Statut OA dérivé plutôt que pris brut
 
