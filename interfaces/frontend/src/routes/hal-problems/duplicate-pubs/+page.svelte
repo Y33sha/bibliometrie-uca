@@ -4,7 +4,7 @@
 	import { page as pageStore } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import { typeLabels } from '$lib/labels';
+	import { docTypeSingular } from '$lib/stores/docTypes';
 	import { sanitizeTitle, halDocUrl } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
 
@@ -116,7 +116,7 @@
 				<div class="doi-card">
 					<div class="pub-meta-line">
 						{#if pair.publication.pub_year}<span class="meta-badge">{pair.publication.pub_year}</span>{/if}
-						{#if pair.publication.doc_type}<span class="meta-badge type-badge">{typeLabels[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
+						{#if pair.publication.doc_type}<span class="meta-badge type-badge">{$docTypeSingular[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
 						<a href="{base}/publications/{pair.publication.id}" class="pub-link">{@html sanitizeTitle(pair.publication.title)}</a>
 					</div>
 					<div class="hal-list">
@@ -157,7 +157,7 @@
 								<a href="{base}/publications/{pub.id}" class="pub-link">{@html sanitizeTitle(pub.title)}</a>
 								<div class="pub-meta-line">
 									{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
-									{#if pub.doc_type}<span class="meta-badge type-badge">{typeLabels[pub.doc_type] || pub.doc_type}</span>{/if}
+									{#if pub.doc_type}<span class="meta-badge type-badge">{$docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 									{#if pub.doi}<span class="meta-badge">DOI</span>{/if}
 								</div>
 								<div class="hal-list">

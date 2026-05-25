@@ -56,11 +56,11 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "map": "other",
         "software": "software",
         "patent": "patent",
-        "note": "article",
+        "note": "other",
         "blog": "other",
         "notice": "other",
         "issue": "other",
-        "proceedings": "proceedings",
+        "proceedings": "conference_paper",
         "trad": "other",
         "reference-entry": "other",
     },
@@ -101,8 +101,8 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "retraction": "retraction",
         "news item": "other",
         "reprint": "other",
-        "note": "article",
-        "data paper": "dataset",
+        "note": "other",
+        "data paper": "data_paper",
         "early access": "article",
         "software review": "other",
         "discussion": "other",
@@ -129,7 +129,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "journal-article": "article",
         "book-chapter": "book_chapter",
         "book": "book",
-        "proceedings": "proceedings",
+        "proceedings": "conference_paper",
         "thesis": "thesis",
         "ongoing_thesis": "ongoing_thesis",
         "hdr": "hdr",
@@ -179,7 +179,6 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
         "review",
         "book_review",
         "data_paper",
-        "poster",
         "conference_paper",
         "editorial",
         "letter",
@@ -188,33 +187,39 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
     }
 )
 
-# Valeurs valides de l'enum doc_type (pour le fallback identity)
-_VALID_DOC_TYPES = {
-    "article",
-    "conference_paper",
-    "book",
-    "book_chapter",
-    "thesis",
-    "ongoing_thesis",
-    "preprint",
-    "review",
-    "editorial",
-    "report",
-    "peer_review",
-    "other",
-    "dataset",
-    "software",
-    "patent",
-    "hdr",
-    "memoir",
-    "poster",
-    "letter",
-    "erratum",
-    "retraction",
-    "book_review",
-    "data_paper",
-    "proceedings",
+# Libellés français (singulier, pluriel) pour chaque valeur de l'enum doc_type.
+# Source unique de vérité pour l'UI ; exposée via GET /api/doc-types.
+# Doit couvrir exactement les valeurs de l'enum PG `doc_type` (test garde-fou).
+DOC_TYPE_LABELS_FR: dict[str, tuple[str, str]] = {
+    "article": ("Article", "Articles"),
+    "conference_paper": ("Conference paper", "Conference papers"),
+    "book": ("Ouvrage", "Ouvrages"),
+    "book_chapter": ("Chapitre", "Chapitres"),
+    "thesis": ("Thèse", "Thèses"),
+    "ongoing_thesis": ("Thèse en cours", "Thèses en cours"),
+    "preprint": ("Preprint", "Preprints"),
+    "review": ("Review", "Reviews"),
+    "editorial": ("Éditorial", "Éditoriaux"),
+    "report": ("Rapport", "Rapports"),
+    "peer_review": ("Peer review", "Peer reviews"),
+    "other": ("Autre", "Autres"),
+    "dataset": ("Données", "Données"),
+    "software": ("Logiciel", "Logiciels"),
+    "patent": ("Brevet", "Brevets"),
+    "hdr": ("HDR", "HDR"),
+    "memoir": ("Mémoire", "Mémoires"),
+    "poster": ("Poster", "Posters"),
+    "letter": ("Letter", "Letters"),
+    "erratum": ("Erratum", "Errata"),
+    "retraction": ("Rétractation", "Rétractations"),
+    "book_review": ("Recension", "Recensions"),
+    "data_paper": ("Data paper", "Data papers"),
+    "proceedings": ("Proceedings", "Proceedings"),
 }
+
+# Valeurs valides de l'enum doc_type — dérivé des labels pour garantir
+# qu'aucune valeur ne soit ajoutée sans son libellé FR.
+_VALID_DOC_TYPES: frozenset[str] = frozenset(DOC_TYPE_LABELS_FR.keys())
 
 
 def map_doc_type(raw: str | None, source: str | None = None) -> str:
