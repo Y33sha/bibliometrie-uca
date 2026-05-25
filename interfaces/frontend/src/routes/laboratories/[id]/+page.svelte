@@ -3,7 +3,6 @@
 	import { base } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
-	import { sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
 	import { Chart, registerables } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
 	Chart.register(...registerables, ChartDataLabels);
@@ -14,6 +13,8 @@
 	import { IDENTIFIER_ITEMS } from '$lib/filterItems';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import TabNav from '$lib/components/TabNav.svelte';
+	import ThesesTable from '$lib/components/ThesesTable.svelte';
+	import type { ThesisRow } from '$lib/components/ThesesTable.svelte';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
@@ -73,19 +74,7 @@
 	let personsLoaded = $state(false);
 
 	// Theses tab
-	interface LabThesis {
-		id: number;
-		title: string;
-		pub_year: number | null;
-		doc_type: string | null;
-		hal_id: string | null;
-		theses_id: string | null;
-		scanr_id: string | null;
-		openalex_id: string | null;
-		oa_status: string | null;
-		date_soutenance: string | null;
-		date_inscription: string | null;
-	}
+	type LabThesis = ThesisRow;
 
 	let thesesSelectedYears: string[] = $state([]);
 	let thesesSelectedStatus: string[] = $state([]);
@@ -142,13 +131,6 @@
 		onThesesFilterChange();
 	}
 
-	const thesesSoutArrow = $derived(thesesSort === 'soutenance_asc' ? '↑' : thesesSort === 'soutenance_desc' ? '↓' : '');
-	const thesesSoutActive = $derived(thesesSort === 'soutenance_asc' || thesesSort === 'soutenance_desc');
-	const thesesInscrArrow = $derived(thesesSort === 'inscription_asc' ? '↑' : thesesSort === 'inscription_desc' ? '↓' : '');
-	const thesesInscrActive = $derived(thesesSort === 'inscription_asc' || thesesSort === 'inscription_desc');
-	const thesesTitleArrow = $derived(thesesSort === 'title' ? '↑' : thesesSort === 'title_desc' ? '↓' : '');
-	const thesesTitleActive = $derived(thesesSort === 'title' || thesesSort === 'title_desc');
-
 	// Addresses tab
 	let addresses: LabAddress[] = $state([]);
 	let addrTotal = $state(0);
@@ -172,13 +154,6 @@
 	let pieChart: Chart | null = null;
 	let collabChart: Chart | null = null;
 	let countriesChart: Chart | null = null;
-
-	const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-	function formatThesisDate(iso: string | null): string {
-		if (!iso) return '';
-		const [y, m] = iso.split('-');
-		return `${MONTHS[parseInt(m, 10) - 1] || ''} ${y}`;
-	}
 
 	const tutelles = $derived(parents.filter((p) => p.relation_type === 'est_tutelle_de'));
 	const partenaires = $derived(parents.filter((p) => p.relation_type === 'est_partenaire_de'));
@@ -642,82 +617,11 @@
 			{#if theses.items.length === 0 && theses.total === 0}
 				<div class="no-results">Aucune thèse</div>
 			{:else}
-				<table class="pub-table">
-					<thead>
-						<tr>
-							<th style="width:85px" class="sortable" class:active={thesesInscrActive} onclick={() => toggleThesesSort('inscription_asc', 'inscription_desc')}>Inscription {thesesInscrArrow}</th>
-							<th style="width:85px" class="sortable" class:active={thesesSoutActive} onclick={() => toggleThesesSort('soutenance_asc', 'soutenance_desc')}>Soutenance {thesesSoutArrow}</th>
-							<th class="sortable" class:active={thesesTitleActive} onclick={() => toggleThesesSort('title', 'title_desc')}>Titre {thesesTitleArrow}</th>
-							<th style="width:80px">Statut</th>
-							<th style="width:50px">OA</th>
-							<th style="width:110px">Sources</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each theses.items as t (t.id)}
-							<tr>
-								<td class="date-cell">{formatThesisDate(t.date_inscription)}</td>
-								<td class="date-cell">{formatThesisDate(t.date_soutenance)}</td>
-								<td><a href="{base}/publications/{t.id}">{@html sanitizeTitle(t.title)}</a></td>
-								<td>
-									{#if t.doc_type === 'thesis'}
-										<span class="status-badge soutenue">Soutenue</span>
-									{:else if t.doc_type === 'ongoing_thesis'}
-										<span class="status-badge en-cours">En cours</span>
-									{/if}
-								</td>
-								<td class="oa-lock-cell">
-									{#if t.doc_type === 'ongoing_thesis'}
-										<span class="oa-lock-badge oa-lock-ongoing">
-											<img src="{base}/hourglass.svg" alt="En cours" class="oa-lock" title="Thèse en cours" />
-											<span class="oa-lock-label">en cours</span>
-										</span>
-									{:else if t.oa_status && !['unknown', 'closed'].includes(t.oa_status)}
-										<span class="oa-lock-badge oa-lock-open">
-											<img src="{base}/lock-open.svg" alt="Open Access" class="oa-lock" title="Open Access ({t.oa_status})" />
-											<span class="oa-lock-label">ouvert</span>
-										</span>
-									{:else}
-										<span class="oa-lock-badge oa-lock-closed">
-											<img src="{base}/lock-closed.svg" alt="Closed" class="oa-lock" title="Accès fermé" />
-											<span class="oa-lock-label">fermé</span>
-										</span>
-									{/if}
-								</td>
-								<td class="links-cell">
-									{#if t.theses_id}
-										<a href="https://theses.fr/{t.theses_id}" target="_blank" rel="noopener" class="source-tag source-theses" title="theses.fr: {t.theses_id}">
-											<img src="https://theses.fr/favicon.ico" alt="theses.fr" />
-										</a>
-									{:else}
-										<span class="source-tag source-placeholder"></span>
-									{/if}
-									{#if t.hal_id}
-										<a href={halDocUrl(t.hal_id, t.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {t.hal_id}">
-											<img src="{base}/icons/hal.ico" alt="HAL" />
-										</a>
-									{:else}
-										<span class="source-tag source-placeholder"></span>
-									{/if}
-									{#if t.openalex_id}
-										<a href="https://openalex.org/{t.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {t.openalex_id}">
-											<img src="{base}/icons/openalex.png" alt="OA" />
-										</a>
-									{:else}
-										<span class="source-tag source-placeholder"></span>
-									{/if}
-									{#if t.scanr_id}
-										<a href={scanrPubUrl(t.scanr_id)} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {t.scanr_id}">
-											<img src="{base}/scanr-icon.svg" alt="ScanR" />
-										</a>
-									{:else}
-										<span class="source-tag source-placeholder"></span>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+				<ThesesTable
+					items={theses.items}
+					sort={thesesSort}
+					onToggleSort={toggleThesesSort}
+				/>
 				<Pagination page={theses.page} pages={theses.pages} onchange={(p) => theses.goToPage(p)} />
 			{/if}
 		</div>
@@ -879,9 +783,4 @@
 	}
 	.status-tag.confirmed { background: #e6f4ec; color: #2a7d4f; }
 	.status-tag.pending { background: #f0efec; color: var(--muted); }
-
-	.date-cell { font-size: 0.85rem; white-space: nowrap; color: var(--muted); }
-	.status-badge { font-size: 0.75rem; padding: 2px 6px; border-radius: 8px; }
-	.status-badge.soutenue { background: #e8f5e9; color: #2e7d32; }
-	.status-badge.en-cours { background: #fff3e0; color: #e65100; }
 </style>

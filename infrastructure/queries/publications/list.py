@@ -184,6 +184,21 @@ def list_publications(
                 src_ids.wos_id, src_ids.theses_id, src_ids.hal_collections,
                 p.meta->>'date_soutenance' AS date_soutenance,
                 p.meta->>'date_inscription' AS date_inscription,
+                (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
+                    (SELECT pe.first_name || ' ' || pe.last_name
+                     FROM authorships ath
+                     JOIN persons pe ON pe.id = ath.person_id
+                     WHERE ath.publication_id = p.id
+                       AND ath.roles && ARRAY['author']::text[]
+                     LIMIT 1)
+                 END) AS thesis_author_name,
+                (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
+                    (SELECT ath.person_id
+                     FROM authorships ath
+                     WHERE ath.publication_id = p.id
+                       AND ath.roles && ARRAY['author']::text[]
+                     LIMIT 1)
+                 END) AS thesis_author_person_id,
                 (SELECT a.is_corresponding FROM authorships a
                  WHERE a.publication_id = p.id AND a.person_id = :focus_person
                    AND NOT a.excluded
@@ -269,6 +284,8 @@ def list_publications(
             "theses_id": r.theses_id,
             "date_soutenance": r.date_soutenance,
             "date_inscription": r.date_inscription,
+            "thesis_author_name": r.thesis_author_name,
+            "thesis_author_person_id": r.thesis_author_person_id,
             "labs": r.labs,
             "lab_items": r.lab_items,
             "apc": r.apc_details,

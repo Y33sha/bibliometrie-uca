@@ -2,30 +2,16 @@
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { base } from "$app/paths";
-  import { sanitizeTitle, halDocUrl, scanrPubUrl } from "$lib/utils";
   import FacetDropdown from "$lib/components/FacetDropdown.svelte";
   import PresenceFilterToggle from "$lib/components/PresenceFilterToggle.svelte";
   import Pagination from "$lib/components/Pagination.svelte";
+  import ThesesTable from "$lib/components/ThesesTable.svelte";
+  import type { ThesisRow } from "$lib/components/ThesesTable.svelte";
   import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
   import { useFacets } from "$lib/composables/useFacets.svelte";
   import { useUrlFilters } from "$lib/composables/useUrlFilters.svelte";
 
-  interface Thesis {
-    id: number;
-    title: string;
-    pub_year: number | null;
-    doi: string | null;
-    doc_type: string | null;
-    labs: string | null;
-    lab_items: { id: number; label: string }[] | null;
-    hal_id: string | null;
-    openalex_id: string | null;
-    scanr_id: string | null;
-    theses_id: string | null;
-    oa_status: string | null;
-    date_soutenance: string | null;
-    date_inscription: string | null;
-  }
+  type Thesis = ThesisRow;
 
   let search = $state("");
   let currentSort = $state("soutenance_desc");
@@ -141,28 +127,6 @@
     return `${base}/api/publications/export-theses.csv?${params}`;
   }
 
-  const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
-
-  function formatDate(iso: string | null): { month: string; year: string } | null {
-    if (!iso) return null;
-    const [y, m] = iso.split('-');
-    return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
-  }
-
-  function sortArrow(asc: string, desc: string): string {
-    return currentSort === asc ? '↑' : currentSort === desc ? '↓' : '';
-  }
-  function sortActive(asc: string, desc: string): boolean {
-    return currentSort === asc || currentSort === desc;
-  }
-
-  const soutArrow = $derived(sortArrow("soutenance_asc", "soutenance_desc"));
-  const soutActive = $derived(sortActive("soutenance_asc", "soutenance_desc"));
-  const inscrArrow = $derived(sortArrow("inscription_asc", "inscription_desc"));
-  const inscrActive = $derived(sortActive("inscription_asc", "inscription_desc"));
-  const titleSortArrow = $derived(sortArrow("title", "title_desc"));
-  const titleSortActive = $derived(sortActive("title", "title_desc"));
-
   onMount(async () => {
     const restored = url.restoreFromUrl($page.url.searchParams);
     if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
@@ -211,88 +175,12 @@
   <a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
 
-<table class="data-table">
-  <thead>
-    <tr>
-      <th class="col-date sortable" class:active={inscrActive} onclick={() => toggleSort('inscription_asc', 'inscription_desc')}>Inscription {inscrArrow}</th>
-      <th class="col-date sortable" class:active={soutActive} onclick={() => toggleSort('soutenance_asc', 'soutenance_desc')}>Soutenance {soutArrow}</th>
-      <th class="col-title sortable" class:active={titleSortActive} onclick={() => toggleSort('title', 'title_desc')}>Titre {titleSortArrow}</th>
-      <th class="col-status">Statut</th>
-      <th class="col-labs">Laboratoire(s)</th>
-      <th class="col-oa">OA</th>
-      <th class="col-link">Sources</th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each pubs.items as pub (pub.id)}
-      <tr>
-        <td class="col-date">{@html (() => { const d = formatDate(pub.date_inscription); return d ? `<span class="date-month">${d.month}</span> ${d.year}` : ''; })()}</td>
-        <td class="col-date">{@html (() => { const d = formatDate(pub.date_soutenance); return d ? `<span class="date-month">${d.month}</span> ${d.year}` : ''; })()}</td>
-        <td class="col-title">
-          <a href="{base}/publications/{pub.id}">{@html sanitizeTitle(pub.title)}</a>
-        </td>
-        <td class="col-status">
-          <span class="status-badge" class:soutenue={pub.doc_type === "thesis"} class:en-cours={pub.doc_type === "ongoing_thesis"}>
-            {pub.doc_type === "thesis" ? "Soutenue" : pub.doc_type === "ongoing_thesis" ? "En cours" : ""}
-          </span>
-        </td>
-        <td class="col-labs">
-          {#each pub.lab_items || [] as lab}
-            <a href="{base}/laboratories/{lab.id}?tab=theses" class="lab-tag">{lab.label}</a>
-          {/each}
-        </td>
-        <td class="oa-lock-cell">
-          {#if pub.doc_type === 'ongoing_thesis'}
-            <span class="oa-lock-badge oa-lock-ongoing">
-              <img src="{base}/hourglass.svg" alt="En cours" class="oa-lock" title="Thèse en cours" />
-              <span class="oa-lock-label">en cours</span>
-            </span>
-          {:else if pub.oa_status && !['unknown', 'closed'].includes(pub.oa_status)}
-            <span class="oa-lock-badge oa-lock-open">
-              <img src="{base}/lock-open.svg" alt="Open Access" class="oa-lock" title="Open Access ({pub.oa_status})" />
-              <span class="oa-lock-label">ouvert</span>
-            </span>
-          {:else}
-            <span class="oa-lock-badge oa-lock-closed">
-              <img src="{base}/lock-closed.svg" alt="Closed" class="oa-lock" title="Accès fermé" />
-              <span class="oa-lock-label">fermé</span>
-            </span>
-          {/if}
-        </td>
-        <td class="links-cell">
-          {#if pub.hal_id}
-            <a href={halDocUrl(pub.hal_id, pub.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {pub.hal_id}">
-              <img src="{base}/icons/hal.ico" alt="HAL" />
-            </a>
-          {:else}
-            <span class="source-tag source-placeholder"></span>
-          {/if}
-          {#if pub.openalex_id}
-            <a href="https://openalex.org/{pub.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {pub.openalex_id}">
-              <img src="{base}/icons/openalex.png" alt="OA" />
-            </a>
-          {:else}
-            <span class="source-tag source-placeholder"></span>
-          {/if}
-          {#if pub.scanr_id}
-            <a href={scanrPubUrl(pub.scanr_id)} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {pub.scanr_id}">
-              <img src="{base}/scanr-icon.svg" alt="ScanR" />
-            </a>
-          {:else}
-            <span class="source-tag source-placeholder"></span>
-          {/if}
-          {#if pub.theses_id}
-            <a href="https://theses.fr/{pub.theses_id}" target="_blank" rel="noopener" class="source-tag source-theses" title="theses.fr: {pub.theses_id}">
-              <img src="https://theses.fr/favicon.ico" alt="theses.fr" />
-            </a>
-          {:else}
-            <span class="source-tag source-placeholder"></span>
-          {/if}
-        </td>
-      </tr>
-    {/each}
-  </tbody>
-</table>
+<ThesesTable
+  items={pubs.items}
+  sort={currentSort}
+  onToggleSort={toggleSort}
+  showLabsColumn
+/>
 
 <Pagination
   page={pubs.page}
@@ -306,83 +194,4 @@
 
 <style>
   .toolbar input[type="text"] { width: 280px; }
-
-  .data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
-  }
-  .data-table th {
-    text-align: left;
-    padding: 6px 8px;
-    border-bottom: 2px solid var(--border);
-    font-size: 0.8rem;
-    color: var(--muted);
-    text-transform: uppercase;
-  }
-  .data-table td {
-    padding: 5px 8px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: top;
-  }
-  .data-table tbody tr:hover {
-    background: var(--hover);
-  }
-
-  .col-date {
-    width: 85px;
-    text-align: center;
-    font-size: 0.85rem;
-    white-space: nowrap;
-  }
-  .col-date :global(.date-month) {
-    font-size: 0.75rem;
-    color: var(--muted);
-  }
-  .col-title {
-    min-width: 300px;
-  }
-  .col-title a {
-    color: var(--accent);
-    text-decoration: none;
-  }
-  .col-title a:hover {
-    text-decoration: underline;
-  }
-  .col-status {
-    width: 90px;
-    text-align: center;
-  }
-  .col-labs {
-    width: 180px;
-  }
-  .col-oa {
-    width: 75px;
-  }
-  .col-link {
-    width: 120px;
-    text-align: center;
-  }
-
-  .sortable {
-    cursor: pointer;
-    user-select: none;
-  }
-  .sortable.active {
-    color: var(--accent);
-  }
-
-  .status-badge {
-    font-size: 0.75rem;
-    padding: 2px 6px;
-    border-radius: 8px;
-  }
-  .status-badge.soutenue {
-    background: #e8f5e9;
-    color: #2e7d32;
-  }
-  .status-badge.en-cours {
-    background: #fff3e0;
-    color: #e65100;
-  }
 </style>
