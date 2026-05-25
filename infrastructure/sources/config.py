@@ -181,15 +181,6 @@ def get_polite_pool_email(conn: Connection) -> str:
     )
 
 
-def get_crossref_email(conn: Connection) -> str:
-    """Retourne l'email pour le polite pool CrossRef (envoyé via User-Agent)."""
-    val = _get_from_db(conn, "crossref_email")
-    if val and isinstance(val, str):
-        return val
-    # Fallback sur l'email polite pool partagé si la clé dédiée Crossref n'est pas configurée.
-    return get_polite_pool_email(conn)
-
-
 def get_wos_api_key(conn: Connection) -> str:
     """Retourne la clé API WoS."""
     val = _get_from_db(conn, "wos_api_key")

@@ -23,7 +23,7 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.sources.common import compute_hash
-from infrastructure.sources.config import get_api_base_urls, get_crossref_email
+from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
 _USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
@@ -61,7 +61,7 @@ class CrossrefFetchMissingDoiAdapter:
 
     def configure(self, conn: Connection) -> None:
         self.base_url = get_api_base_urls(conn).get("crossref", "https://api.crossref.org")
-        email = get_crossref_email(conn)
+        email = get_polite_pool_email(conn)
         self.headers = {"User-Agent": _USER_AGENT_TEMPLATE.format(email=email)}
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
