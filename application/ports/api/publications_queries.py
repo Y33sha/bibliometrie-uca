@@ -106,6 +106,8 @@ class PublicationListItem(BaseModel):
     theses_id: str | None
     date_soutenance: str | None
     date_inscription: str | None
+    thesis_author_name: str | None
+    thesis_author_person_id: int | None
     labs: str | None
     lab_items: list[PubLabItem] | None
     apc: list[PubApcPayment] | None

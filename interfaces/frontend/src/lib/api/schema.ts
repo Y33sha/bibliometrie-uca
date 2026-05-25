@@ -4871,6 +4871,10 @@ export interface components {
             date_soutenance: string | null;
             /** Date Inscription */
             date_inscription: string | null;
+            /** Thesis Author Name */
+            thesis_author_name: string | null;
+            /** Thesis Author Person Id */
+            thesis_author_person_id: number | null;
             /** Labs */
             labs: string | null;
             /** Lab Items */
