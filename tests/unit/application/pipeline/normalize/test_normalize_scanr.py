@@ -45,14 +45,13 @@ class TestInsertScanrDocumentBiblio:
         captured = self._call(_FakeQueries(), {"source": {"publisher": "Elsevier"}})
         assert captured["biblio"] == {"publisher": "Elsevier"}
 
-    def test_biblio_journal_built_from_title_issn_eissn(self):
+    def test_biblio_journal_built_from_title_and_journal_issns(self):
         captured = self._call(
             _FakeQueries(),
             {
                 "source": {
                     "title": "Journal of Physics",
-                    "issn": "0022-3727",
-                    "eissn": "1361-6463",
+                    "journalIssns": ["0022-3727", "1361-6463"],
                 }
             },
         )
@@ -71,7 +70,7 @@ class TestInsertScanrDocumentBiblio:
                 "source": {
                     "publisher": "Elsevier",
                     "title": "Journal of Physics",
-                    "issn": "0022-3727",
+                    "journalIssns": ["0022-3727"],
                 }
             },
         )

@@ -74,6 +74,19 @@ def upsert_publisher(doc: dict, *, publisher_repo: PublisherRepository) -> int |
     return find_or_create_publisher(publisher_name, repo=publisher_repo)
 
 
+def _extract_journal_issns(source: dict) -> tuple[str | None, str | None]:
+    """Extrait (issn, eissn) depuis `source.journalIssns` (array ScanR).
+
+    Heuristique : 1er = print/issn, 2e = electronic/eissn. Les éventuelles
+    entrées supplémentaires (alias, ISSN-L, variantes historiques) sont
+    ignorées. Cohérent avec ce qu'on fait pour OpenAlex.
+    """
+    issns = source.get("journalIssns") or []
+    issn = issns[0] if len(issns) >= 1 else None
+    eissn = issns[1] if len(issns) >= 2 else None
+    return issn, eissn
+
+
 def upsert_journal(
     doc: dict, publisher_id: int | None, *, journal_repo: JournalRepository
 ) -> int | None:
@@ -81,8 +94,7 @@ def upsert_journal(
     title = source.get("title")
     if not title:
         return None
-    issn = source.get("issn")
-    eissn = source.get("eissn")
+    issn, eissn = _extract_journal_issns(source)
     return find_or_create_journal(
         title,
         issn=issn,
@@ -201,9 +213,10 @@ def insert_scanr_document(
     journal_obj: dict[str, str] = {}
     if jt := source.get("title"):
         journal_obj["title"] = jt
-    if jissn := source.get("issn"):
+    jissn, jeissn = _extract_journal_issns(source)
+    if jissn:
         journal_obj["issn"] = jissn
-    if jeissn := source.get("eissn"):
+    if jeissn:
         journal_obj["eissn"] = jeissn
     if journal_obj:
         biblio["journal"] = journal_obj
