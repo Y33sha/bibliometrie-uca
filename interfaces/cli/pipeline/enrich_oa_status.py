@@ -6,7 +6,7 @@ import os
 
 import httpx
 
-from application.pipeline.enrich.enrich_oa_status import run_enrich
+from application.pipeline.oa_status.run import run_enrich_oa_status
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.enrich import PgEnrichQueries
@@ -34,7 +34,7 @@ def main() -> None:
             return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=logger)
 
         asyncio.run(
-            run_enrich(
+            run_enrich_oa_status(
                 conn,
                 PgEnrichQueries(),
                 logger,

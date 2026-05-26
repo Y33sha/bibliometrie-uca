@@ -238,22 +238,37 @@ def _vacuum_staging(full: bool = False) -> Any:
         conn.execute(text(sql))
 
 
-def phase_resolve_doi_prefixes(**kw: Any) -> PhaseMetrics:
-    """Résolution préfixe DOI → Registration Agency + éditeur Crossref / repository DataCite.
+def phase_publishers_journals(mode: Any = "full", **kw: Any) -> PhaseMetrics:
+    """Enrichissement des référentiels `publishers` et `journals`.
 
-    Pour chaque préfixe DOI présent en staging mais absent de `doi_prefixes`, interroge `doi.org/ra` puis, selon la RA :
-    - Crossref → `api.crossref.org/prefixes` pour rattacher le préfixe à un publisher.
-    - DataCite → `api.datacite.org/prefixes?include=clients,providers` pour rattacher le préfixe à un provider (= publisher) + nom et symbole du client (= repository).
+    Phase consolidée (cf. `docs/chantiers/METIER_pipeline-publishers-journals.md`),
+    positionnée entre `normalize` et `affiliations`. Sub-steps :
 
-    Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les `publishers` qu'on veut matcher direct.
+    1. `resolve_doi_prefixes` (toujours actif) : préfixe DOI → Registration
+       Agency + éditeur Crossref / repository DataCite.
+    2. `enrich_journals_from_openalex` (gated par `run_journal_enrichment`) :
+       OpenAlex Sources → APC + DOAJ flag + journal_type.
 
-    Idempotente : ne traite que les préfixes absents de `doi_prefixes`.
+    À étoffer avec OpenAlex Publishers, DOAJ via API, ROR (cf. roadmap).
+
+    Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les `publishers`/`journals` qu'on veut enrichir.
+
+    Idempotente : `resolve_doi_prefixes` ne traite que les préfixes absents
+    de `doi_prefixes` ; l'enrichissement journaux ne traite que les revues
+    sans APC renseigné (sauf `--reset`).
     """
-    return _run_resolve_doi_prefixes()
+    metrics = _run_resolve_doi_prefixes()
+    if MODES[mode].run_journal_enrichment:
+        _run_enrich_journals_from_openalex()
+    else:
+        log.info("Enrichissement journaux OpenAlex ignoré en mode %s", mode)
+    return metrics
 
 
 def _run_resolve_doi_prefixes() -> PhaseMetrics:
-    from application.pipeline.resolve_doi_prefixes import run_resolve_doi_prefixes
+    from application.pipeline.publishers_journals.resolve_doi_prefixes import (
+        run_resolve_doi_prefixes,
+    )
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.repositories import doi_prefix_repository, publisher_repository
     from infrastructure.sources.config import get_polite_pool_email
@@ -694,7 +709,7 @@ def _run_enrich_oa_status() -> None:
 
     import httpx
 
-    from application.pipeline.enrich.enrich_oa_status import run_enrich
+    from application.pipeline.oa_status.run import run_enrich_oa_status
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import publication_repository
@@ -712,7 +727,7 @@ def _run_enrich_oa_status() -> None:
             return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)
 
         asyncio.run(
-            run_enrich(
+            run_enrich_oa_status(
                 conn,
                 PgEnrichQueries(),
                 log,
@@ -725,8 +740,10 @@ def _run_enrich_oa_status() -> None:
     log.info("✓ enrich_oa_status terminé en %.1fs", time.time() - t0)
 
 
-def _run_enrich_journal_apc() -> None:
-    from application.pipeline.enrich.enrich_journal_apc import run_enrich
+def _run_enrich_journals_from_openalex() -> None:
+    from application.pipeline.publishers_journals.enrich_journals_from_openalex import (
+        run_enrich_journals_from_openalex,
+    )
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
@@ -737,11 +754,11 @@ def _run_enrich_journal_apc() -> None:
         get_polite_pool_email,
     )
 
-    log.info("▶ enrich_journal_apc")
+    log.info("▶ enrich_journals_from_openalex")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        run_enrich(
+        run_enrich_journals_from_openalex(
             conn,
             PgEnrichQueries(),
             log,
@@ -753,7 +770,7 @@ def _run_enrich_journal_apc() -> None:
         )
     finally:
         conn.close()
-    log.info("✓ enrich_journal_apc terminé en %.1fs", time.time() - t0)
+    log.info("✓ enrich_journals_from_openalex terminé en %.1fs", time.time() - t0)
 
 
 def _run_resolve_addresses(mode: str) -> None:
@@ -1108,16 +1125,19 @@ def _run_suggest_address_countries(*, reset_empty: bool = False) -> PhaseMetrics
     return metrics
 
 
-def phase_enrich(mode: Any = "full", **kw: Any) -> Any:
-    """Enrichissements optionnels (Unpaywall, APC revues).
+def phase_oa_status(mode: Any = "full", **kw: Any) -> Any:
+    """Enrichissement `publications.oa_status` via Unpaywall.
 
-    Gouverné par `ModePolicy.run_enrich` (cf. `domain/pipeline_modes.py`).
+    Renommée depuis `enrich` le 2026-05-26 : `enrich` était devenu un
+    misnomer une fois countries/subjects/publishers_journals enrichis
+    par ailleurs. Cette phase ne fait plus que l'Unpaywall (per-publication).
+
+    Gouverné par `ModePolicy.run_oa_status` (cf. `application/pipeline/modes.py`).
     """
-    if MODES[mode].run_enrich:
+    if MODES[mode].run_oa_status:
         _run_enrich_oa_status()
-        _run_enrich_journal_apc()
     else:
-        log.info("Enrichissements ignorés en mode %s", mode)
+        log.info("Phase oa_status ignorée en mode %s", mode)
 
 
 # Registre des phases, dans l'ordre
@@ -1125,14 +1145,14 @@ PHASES = [
     ("extract", phase_extract),
     ("cross_imports", phase_cross_imports),
     ("normalize", phase_normalize),
-    ("resolve_doi_prefixes", phase_resolve_doi_prefixes),
+    ("publishers_journals", phase_publishers_journals),
     ("affiliations", phase_affiliations),
     ("publications", phase_publications),
     ("persons", phase_persons),
     ("authorships", phase_authorships),
     ("countries", phase_countries),
     ("subjects", phase_subjects),
-    ("enrich", phase_enrich),
+    ("oa_status", phase_oa_status),
 ]
 
 PHASE_NAMES = [name for name, _ in PHASES]

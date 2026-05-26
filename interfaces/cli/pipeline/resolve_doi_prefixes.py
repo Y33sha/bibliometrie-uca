@@ -3,7 +3,9 @@
 import argparse
 import os
 
-from application.pipeline.resolve_doi_prefixes import run_resolve_doi_prefixes
+from application.pipeline.publishers_journals.resolve_doi_prefixes import (
+    run_resolve_doi_prefixes,
+)
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import doi_prefix_repository, publisher_repository

@@ -1,4 +1,4 @@
-"""Tests pour `application.pipeline.enrich.enrich_oa_status.run_enrich` (async).
+"""Tests pour `application.pipeline.oa_status.run.run_enrich_oa_status` (async).
 
 Couvre la version async via `httpx.AsyncClient` + `asyncio.Semaphore`,
 end-to-end avec le `fetcher` concret depuis `infrastructure.sources.unpaywall` :
@@ -23,7 +23,7 @@ import httpx
 import pytest
 import respx
 
-from application.pipeline.enrich import enrich_oa_status as module
+from application.pipeline.oa_status import run as module
 from infrastructure.sources.unpaywall import fetch_oa_status
 
 UNPAYWALL_BASE = "https://api.unpaywall.org/v2"
@@ -86,7 +86,7 @@ async def test_happy_path_updates_each_pub(logger):
     _route("10.1/c", status="bronze")
 
     repo = _FakeRepo()
-    await module.run_enrich(
+    await module.run_enrich_oa_status(
         MagicMock(),
         _FakeQueries(pubs),
         logger,
@@ -105,7 +105,7 @@ async def test_404_marks_as_not_found(logger):
     _route("10.1/x", http_status=404)
 
     repo = _FakeRepo()
-    await module.run_enrich(
+    await module.run_enrich_oa_status(
         MagicMock(),
         _FakeQueries(pubs),
         logger,
@@ -123,7 +123,7 @@ async def test_diamond_not_replaced_by_gold(logger):
     _route("10.1/diamond", status="gold")
 
     repo = _FakeRepo()
-    await module.run_enrich(
+    await module.run_enrich_oa_status(
         MagicMock(),
         _FakeQueries(pubs),
         logger,
@@ -141,7 +141,7 @@ async def test_diamond_replaced_by_other_status(logger):
     _route("10.1/diamond", status="bronze")
 
     repo = _FakeRepo()
-    await module.run_enrich(
+    await module.run_enrich_oa_status(
         MagicMock(),
         _FakeQueries(pubs),
         logger,
@@ -158,7 +158,7 @@ async def test_unchanged_status_skipped(logger):
     _route("10.1/same", status="gold")
 
     repo = _FakeRepo()
-    await module.run_enrich(
+    await module.run_enrich_oa_status(
         MagicMock(),
         _FakeQueries(pubs),
         logger,
@@ -176,7 +176,7 @@ async def test_dry_run_skips_db_writes(logger):
     _route("10.1/b", status="green")
 
     repo = _FakeRepo()
-    await module.run_enrich(
+    await module.run_enrich_oa_status(
         MagicMock(),
         _FakeQueries(pubs),
         logger,
@@ -199,7 +199,7 @@ async def test_429_retries_transparently(logger):
     )
 
     repo = _FakeRepo()
-    await module.run_enrich(
+    await module.run_enrich_oa_status(
         MagicMock(),
         _FakeQueries([(1, "10.1/r", "closed")]),
         logger,
@@ -229,7 +229,7 @@ async def test_semaphore_caps_concurrent_fetches(logger):
             in_flight -= 1
 
     pubs = [(i, f"10.1/{i}", "closed") for i in range(10)]
-    await module.run_enrich(
+    await module.run_enrich_oa_status(
         MagicMock(),
         _FakeQueries(pubs),
         logger,

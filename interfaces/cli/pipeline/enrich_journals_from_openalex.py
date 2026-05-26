@@ -3,7 +3,9 @@
 import argparse
 import os
 
-from application.pipeline.enrich.enrich_journal_apc import run_enrich
+from application.pipeline.publishers_journals.enrich_journals_from_openalex import (
+    run_enrich_journals_from_openalex,
+)
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.enrich import PgEnrichQueries
@@ -15,7 +17,9 @@ from infrastructure.sources.config import (
     get_polite_pool_email,
 )
 
-logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file__), "logs"))
+logger = setup_logger(
+    "enrich_journals_from_openalex", os.path.join(os.path.dirname(__file__), "logs")
+)
 
 
 def main() -> None:
@@ -33,7 +37,7 @@ def main() -> None:
 
     conn = get_sync_engine().connect()
     try:
-        run_enrich(
+        run_enrich_journals_from_openalex(
             conn,
             PgEnrichQueries(),
             logger,

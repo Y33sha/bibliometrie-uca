@@ -326,9 +326,10 @@ exclude = [
 module = [
     "application.persons",
     "application.structures",
-    "application.pipeline.enrich.*",
     "application.pipeline.extract.*",
     "application.pipeline.normalize.*",
+    "application.pipeline.oa_status.*",
+    "application.pipeline.publishers_journals.*",
     "application.pipeline.subjects._common",
     "application.ports.api.*",
     "application.ports.pipeline.extract.*",

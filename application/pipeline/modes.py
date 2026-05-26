@@ -26,7 +26,14 @@ class ModePolicy:
     fetch_missing_doi_sources: frozenset[str]
     fetch_missing_doi_scope: FetchMissingDoiScope
     vacuum_full: bool
-    run_enrich: bool
+    # Gate la phase `oa_status` (Unpaywall, per-publication). Renommé depuis
+    # `run_enrich` le 2026-05-26.
+    run_oa_status: bool
+    # Gate le sub-step `enrich_journals_from_openalex` dans la phase
+    # `publishers_journals` (OpenAlex Sources : APC + DOAJ flag + journal_type).
+    # `resolve_doi_prefixes` (l'autre sub-step de la phase) tourne dans tous
+    # les modes sans gate — il est rapide et alimente le matching publisher.
+    run_journal_enrichment: bool
     # True = purge complète des authorships canoniques avant rebuild
     # (TRUNCATE + UPDATE FK), pour garantir la convergence absolue.
     # En mode incrémental, le build idempotent suffit.
@@ -53,7 +60,8 @@ MODES: dict[str, ModePolicy] = {
         fetch_missing_doi_sources=_FETCH_MISSING_DOI_LIGHT,
         fetch_missing_doi_scope="unprocessed",
         vacuum_full=False,
-        run_enrich=False,
+        run_oa_status=False,
+        run_journal_enrichment=False,
         rebuild_authorships_full=False,
         reset_country_suggestions=False,
     ),
@@ -66,7 +74,8 @@ MODES: dict[str, ModePolicy] = {
         fetch_missing_doi_sources=_FETCH_MISSING_DOI_LIGHT,
         fetch_missing_doi_scope="unprocessed",
         vacuum_full=False,
-        run_enrich=False,
+        run_oa_status=False,
+        run_journal_enrichment=False,
         rebuild_authorships_full=False,
         reset_country_suggestions=False,
     ),
@@ -77,7 +86,8 @@ MODES: dict[str, ModePolicy] = {
         fetch_missing_doi_sources=DOI_SEARCHABLE_SOURCES_SET,
         fetch_missing_doi_scope="all",
         vacuum_full=True,
-        run_enrich=True,
+        run_oa_status=True,
+        run_journal_enrichment=True,
         rebuild_authorships_full=True,
         reset_country_suggestions=True,
     ),

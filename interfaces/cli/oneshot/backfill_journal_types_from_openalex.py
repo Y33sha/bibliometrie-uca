@@ -26,7 +26,7 @@ from collections import Counter
 
 from sqlalchemy import text
 
-from application.pipeline.enrich.enrich_journal_apc import (
+from application.pipeline.publishers_journals.enrich_journals_from_openalex import (
     BATCH_SIZE,
     fetch_sources_batch,
 )
