@@ -130,9 +130,51 @@ Livrée le 2026-05-26.
 
 ## Phase 7 — Audit APC OpenAlex vs DOAJ
 
-- [ ] **Script d'audit** (oneshot) : `SELECT j.id, j.title, j.apc_amount, j.doaj_payload->>'APC amount', j.doaj_payload->>'APC currency' FROM journals WHERE j.apc_amount IS NOT NULL AND j.doaj_payload IS NOT NULL`. Comparer écart absolu et relatif. Reporter la distribution.
-- [ ] **Décision à prendre selon résultats** : (a) garder OpenAlex comme source primaire APC, (b) basculer sur DOAJ, (c) garder les deux colonnes (`apc_amount_openalex`, `apc_amount_doaj`) et exposer les divergences en UI.
-- [ ] Le sub-step OpenAlex Sources actuel (`enrich_journals_from_openalex`) écrit déjà APC dans `apc_amount` — adapter selon la décision.
+Audit livré le 2026-05-26.
+
+- [x] **Script d'audit** : `interfaces/cli/oneshot/audit_apc_openalex_vs_doaj.py`, lecture pure. Parse les deux formats de payload DOAJ coexistant en base (format API Phase 4 : `{"APC amount": "2477", "APC currency": "USD"}` séparés ; format CSV récent : `{"APC amount": "3390 EUR; 4090 USD; 2990 GBP"}` composite multi-devises, plus de clé `APC currency`).
+
+### Rapport (run du 2026-05-26 après import CSV bootstrap, avant que Phase 4 ait tourné)
+
+Sur **1015 revues candidates** (APC OpenAlex non-null + payload DOAJ avec `APC amount`) :
+
+| Catégorie | N | % |
+|---|---|---|
+| `comparable` (devise OA présente côté DOAJ) | 908 | 89% |
+| `no_overlap` (devise OA absente des devises DOAJ) | 107 | 11% |
+| `doaj_unparseable` | 0 | 0% |
+
+Distribution des écarts relatifs (sur les 908 comparables, |OA − DOAJ| / max) :
+
+| Bucket | N | % cumulé |
+|---|---|---|
+| identical (=0%) | 132 | 14.6% |
+| ≤ 1% | +2 | 14.8% |
+| ≤ 5% | +42 | 19.4% |
+| ≤ 10% | +56 | 25.6% |
+| ≤ 20% | +206 | 48.3% |
+| ≤ 50% | +432 | 95.9% |
+| > 50% | +37 | 100% |
+
+Médiane = **20.8%**, p90 = 41.1%, p99 = 71.8%. Écart absolu moyen ≈ **566 €**.
+
+**Pattern net** : OpenAlex sous-estime systématiquement (top 10 divergences : OA = 1/4 à 1/5 du montant DOAJ). Exemples :
+
+- `Journal of Advanced Research` (Elsevier) : OA = 1200 USD vs DOAJ = 4400 USD
+- `Case Studies in Construction Materials` : OA = 600 USD vs DOAJ = 2990 USD
+- `Pharmacia` : OA = 100 EUR vs DOAJ = 800 EUR
+
+Hypothèse : OpenAlex Sources stocke des montants obsolètes ou catégoriels (correspondence vs research article).
+
+### Décision
+
+**OpenAlex Sources écarté comme source APC de confiance.** Cible visée : DOAJ prioritaire, fallback OpenAlex pour les ~2 300 revues hors-DOAJ qui ont un APC OA — solution **explicitement bancale** assumée à court terme.
+
+État actuel inchangé pour cette fiche : `journals.apc_amount` reste écrit par `enrich_journals_from_openalex`, le DTO le retourne tel quel. La bascule effective vers le fallback DOAJ et le retrait propre de l'APC OpenAlex sont reportés à un mini-chantier dédié (cascade complexe : adapter le sub-step OA, remplacer le filtre d'idempotence `apc_amount IS NULL` qui sert aujourd'hui à éviter le re-fetch perpétuel, gérer le wipe + repompage depuis `doaj_payload` des 3 309 valeurs déjà en base).
+
+### Question ouverte
+
+Trouver une source APC plus fiable que OpenAlex pour les revues **hors-DOAJ** (= ~2 300 revues couvertes uniquement par OA aujourd'hui). Pistes à explorer : OpenAPC (déjà utilisé pour les paiements UCA, cf. `docs/sources/09-imports-manuels.md`), CWTS Open APC, scraping des fee pages éditeur. Sans meilleure source, la bascule DOAJ-only sacrifierait cette couverture.
 
 ## Phase 8  — Documentation
 - [ ] **Documentation pipeline**: ajouter et documenter la phase publishers_journals.
