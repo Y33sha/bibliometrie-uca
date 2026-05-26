@@ -171,7 +171,15 @@
 							{#if j.is_predatory}<span class="badge-pred">prédatrice</span>{/if}
 						</td>
 						<td class="issn-cell">{formatIssns(j)}</td>
-						<td class="muted">{j.pub_name ?? ''}</td>
+						<td class="muted">
+							{#if j.pub_name}
+								{#if j.publisher_id}
+									<a href="{base}/publishers/{j.publisher_id}" class="publisher-link">{j.pub_name}</a>
+								{:else}
+									{j.pub_name}
+								{/if}
+							{/if}
+						</td>
 						<td class="num">{j.pub_count.toLocaleString('fr-FR')}</td>
 					</tr>
 				{/each}
@@ -229,6 +237,8 @@
 
 	.journal-link { color: var(--accent); text-decoration: none; font-weight: 500; }
 	.journal-link:hover { text-decoration: underline; }
+	.publisher-link { color: var(--muted); text-decoration: none; }
+	a.publisher-link:hover { text-decoration: underline; }
 	.badge-doaj {
 		font-size: 0.7rem; padding: 1px 5px; background: #2e7d32;
 		color: white; border-radius: 8px; margin-left: 6px;

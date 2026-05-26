@@ -61,7 +61,12 @@
         <span class="issn">ISSN {pub.issn}</span>
       {/if}
       {#if pub.publisher_name}
-        <span class="publisher-name">— {pub.publisher_name}</span>
+        <span class="publisher-sep">—</span>
+        {#if pub.publisher_id}
+          <a href="{base}/publishers/{pub.publisher_id}" class="publisher-name">{pub.publisher_name}</a>
+        {:else}
+          <span class="publisher-name">{pub.publisher_name}</span>
+        {/if}
       {/if}
       {#if pub.journal_predatory}
         <span class="predatory-badge">Revue prédatrice</span>
@@ -175,6 +180,14 @@
     color: var(--muted);
   }
   .publisher-name {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  a.publisher-name:hover {
+    text-decoration: underline;
+  }
+  .publisher-sep {
     font-size: 0.85rem;
     color: var(--muted);
   }

@@ -21,6 +21,7 @@
 
 	let journal = $state<JournalDetail | null>(null);
 	let error = $state(false);
+	let canGoBack = $state(false);
 
 	let dashboard = $state<JournalDashboard | null>(null);
 	let subjects = $state<SubjectFrequency[]>([]);
@@ -75,6 +76,9 @@
 	}
 
 	onMount(async () => {
+		canGoBack =
+			(window as any).navigation?.canGoBack ??
+			document.referrer.startsWith(window.location.origin);
 		const labelsP = api<EnumOption[]>('/api/journal-types').then((opts) => {
 			journalTypeLabels = Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
 		});
@@ -92,6 +96,11 @@
 <svelte:head>
 	<title>{journal?.title ?? 'Revue'} — Bibliométrie UCA</title>
 </svelte:head>
+
+{#if canGoBack}
+	<!-- svelte-ignore a11y_invalid_attribute -->
+	<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
+{/if}
 
 {#if error}
 	<div class="no-results">Revue introuvable</div>
@@ -131,7 +140,11 @@
 			<div class="meta-row">
 				{#if journal.pub_name}
 					<span class="meta-label">Éditeur</span>
-					<span class="pub-tag">{journal.pub_name}</span>
+					{#if journal.publisher_id}
+						<a href="{base}/publishers/{journal.publisher_id}" class="publisher-link">{journal.pub_name}</a>
+					{:else}
+						<span class="publisher-link">{journal.pub_name}</span>
+					{/if}
 				{/if}
 				{#if journal.journal_type}
 					<span class="meta-label">Type</span>
@@ -297,10 +310,10 @@
 		text-transform: uppercase; letter-spacing: 0.3px;
 	}
 	.id-badge { margin-right: 8px; }
-	.pub-tag {
-		background: #e8f0f8; color: var(--accent);
-		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
+	.publisher-link {
+		color: var(--muted); font-size: 0.95rem; text-decoration: none;
 	}
+	a.publisher-link:hover { text-decoration: underline; }
 	.type-tag {
 		background: #f0efec; color: var(--muted);
 		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
