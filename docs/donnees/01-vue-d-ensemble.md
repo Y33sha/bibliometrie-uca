@@ -73,6 +73,8 @@ flowchart LR
 >
 > Le *matching* avec les structures et personnes canoniques s'effectue dans les phases "affiliations" et "personnes" du pipeline.
 
+TODO: Ajouter ER-diagram du schéma entier
+
 ## Suite
 
 Détail par domaine fonctionnel :

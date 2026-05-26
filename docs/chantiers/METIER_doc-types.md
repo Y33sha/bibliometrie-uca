@@ -152,7 +152,8 @@ Autres patterns problématiques constatés :
 - type "données additionnelles?"
 
 ## Règles à mettre en place
-* Toutes les revues contenant les mots "conference", "symposium", "proceedings", "lecture notes" sont de type "proceedings".
+* Toutes les revues contenant les mots "conference", "symposium", "proceedings", "lecture notes" sont de type "proceedings". (voir si exceptions type PNAS)
+* Toutes les revues contenant le mot eBooks sont de type "collection de livres"
 * Toutes les publications dans une revue de type "proceedings" sont des "conference papers".
 * Toutes les publications dans une revue de type "media" sont des "interventions médias" (type à créer)
 * Toutes les publications commençant par "Interview" sont de type "intervention média" (? vérifier)

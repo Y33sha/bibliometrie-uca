@@ -34,6 +34,7 @@
 * [ ] beaucoup de résultats ScanR sont rejetés en phase "affiliations" => auditer
 * [ ] normalisation des titres: supprimer les balises mml ou html
 * [ ] openalex raw_orcid
+* [ ] données supplémentaires: peer-reviewed? publié?
 ## Sujets
 * [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation manuelle des sujets? / ajouter seuil de score de pertinence? / algos pour évaluer pertinence (co-occurrences suspectes, NLP...)
 * [ ] enrichissement sujets: audit des publis sans sujet; sujets "attendus" par revue?

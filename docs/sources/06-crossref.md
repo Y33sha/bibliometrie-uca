@@ -69,7 +69,7 @@ Document `10.1063/5.0056957` (2 auteurs en mécanique). Champs non consommés re
 
 ## Particularités
 
-### Affiliations textuelles, pas d'address linking
+### Affiliations pauvres
 
 ~29 % seulement des auteurs CrossRef portent une affiliation (sondage sur 1 000 payloads, à confirmer sur base complète). Couverture trop partielle vs HAL/OpenAlex/WoS pour intégrer CrossRef à l'address linking. Stockées dans `source_authorships.source_data` pour traçabilité, **pas** d'insertion dans `addresses` / `source_authorship_addresses`. Sujet à réexaminer.
 
