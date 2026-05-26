@@ -49,6 +49,9 @@ def to_short_id(full_id: str) -> str:
     return full_id
 
 
+_DEFAULT_SELECT = "id,apc_usd,apc_prices,is_in_doaj,type"
+
+
 def fetch_sources_batch(
     openalex_ids: list[str],
     logger: logging.Logger,
@@ -56,14 +59,20 @@ def fetch_sources_batch(
     openalex_sources_api: str,
     api_key: str | None,
     mailto: str,
+    select: str = _DEFAULT_SELECT,
 ) -> dict[str, dict]:
-    """Interroge l'API OpenAlex pour un lot d'IDs et retourne un dict short_id → données."""
+    """Interroge l'API OpenAlex pour un lot d'IDs et retourne un dict short_id → données.
+
+    Le paramètre `select` permet aux scripts d'audit oneshot de demander
+    des champs différents (ex. `id,host_organization`) sans dupliquer le
+    code de batching/retry.
+    """
     full_ids = [to_full_id(oid) for oid in openalex_ids]
     filter_value = "|".join(full_ids)
     params = {
         "filter": f"openalex:{filter_value}",
         "per_page": str(len(openalex_ids)),
-        "select": "id,apc_usd,apc_prices,is_in_doaj,type",
+        "select": select,
     }
     if api_key:
         params["api_key"] = api_key
