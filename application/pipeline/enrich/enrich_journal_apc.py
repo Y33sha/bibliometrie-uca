@@ -1,24 +1,29 @@
 """
-Enrichit les revues avec les données APC (Article Processing Charges) depuis OpenAlex.
+Enrichit les revues à partir de l'API OpenAlex Sources.
 
-Source des données : prix catalogue DOAJ, exposés via l'API OpenAlex Sources.
-Champs mis à jour : apc_amount, apc_currency, is_in_doaj.
+Champs mis à jour :
+- `apc_amount`, `apc_currency`, `is_in_doaj` (prix catalogue DOAJ exposés par OpenAlex)
+- `journal_type` (via `domain.journals.journal.map_openalex_source_type`), uniquement quand le mapping renvoie une valeur exploitable
 
 Utilise le filtre openalex avec pipe (|) pour interroger jusqu'à 50 sources par requête.
 
-L'orchestrateur dépend du port `EnrichQueries`. Le point d'entrée CLI est dans
-`interfaces/cli/pipeline/enrich_journal_apc.py`.
+L'orchestrateur dépend du port `EnrichQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/enrich_journal_apc.py`. Pour ré-interroger toutes les revues ayant un openalex_id (et pas seulement celles sans APC), utiliser le script `interfaces/cli/oneshot/backfill_journal_types_from_openalex.py`.
 """
 
 import logging
 import time
+from collections import Counter
 
 import requests
 from sqlalchemy import Connection
 
 from application.journals import reset_journal_apc, update_journal_apc
 from application.ports.pipeline.enrich import EnrichQueries
-from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.journal_repository import (
+    JournalRepository,
+    JournalUpdateFields,
+)
+from domain.journals.journal import map_openalex_source_type
 
 OPENALEX_PREFIX = "https://openalex.org/"
 BATCH_SIZE = 50  # max IDs par requête (API limit = 100, on reste prudent)
@@ -53,7 +58,7 @@ def fetch_sources_batch(
     params = {
         "filter": f"openalex:{filter_value}",
         "per_page": str(len(openalex_ids)),
-        "select": "id,apc_usd,apc_prices,is_in_doaj",
+        "select": "id,apc_usd,apc_prices,is_in_doaj,type",
     }
     if api_key:
         params["api_key"] = api_key
@@ -138,6 +143,8 @@ def run_enrich(
         doaj_count = 0
         with_apc = 0
         processed = 0
+        raw_type_counter: Counter[str] = Counter()
+        type_written = 0
 
         for i in range(0, total, BATCH_SIZE):
             batch = journals[i : i + BATCH_SIZE]
@@ -161,6 +168,10 @@ def run_enrich(
 
                 is_in_doaj = source.get("is_in_doaj", False) or False
                 apc_amount, apc_currency = extract_apc(source)
+                raw_type = source.get("type")
+                mapped_type = map_openalex_source_type(raw_type)
+                if raw_type:
+                    raw_type_counter[raw_type] += 1
 
                 if not dry_run:
                     update_journal_apc(
@@ -170,6 +181,16 @@ def run_enrich(
                         is_in_doaj=is_in_doaj,
                         repo=journal_repo,
                     )
+                    # journal_type : cadence régulière sur des revues fraîches
+                    # (fetch_journals_needing_apc filtre apc_amount IS NULL).
+                    # On écrase systématiquement quand le mapping renvoie une
+                    # valeur — la colonne est au défaut DB 'journal' à ce stade.
+                    if mapped_type is not None:
+                        journal_repo.update_journal_fields(
+                            journal_id,
+                            JournalUpdateFields(journal_type=mapped_type),
+                        )
+                        type_written += 1
 
                 updated += 1
                 if is_in_doaj:
@@ -182,7 +203,7 @@ def run_enrich(
                 conn.commit()
 
             logger.info(
-                f"  {min(i + BATCH_SIZE, total)}/{total} — {with_apc} avec APC, {doaj_count} DOAJ"
+                f"  {min(i + BATCH_SIZE, total)}/{total} — {with_apc} avec APC, {doaj_count} DOAJ, {type_written} types écrits"
             )
 
         if not dry_run:
@@ -190,8 +211,12 @@ def run_enrich(
 
         logger.info(
             f"Terminé : {updated}/{total} revues mises à jour, "
-            f"{with_apc} avec APC, {doaj_count} dans DOAJ."
+            f"{with_apc} avec APC, {doaj_count} dans DOAJ, "
+            f"{type_written} journal_type écrits."
         )
+        if raw_type_counter:
+            distrib = ", ".join(f"{t}={n}" for t, n in raw_type_counter.most_common())
+            logger.info(f"Distribution OpenAlex `type` : {distrib}")
 
     except KeyboardInterrupt:
         if not dry_run:
