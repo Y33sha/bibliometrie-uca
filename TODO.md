@@ -35,6 +35,7 @@
 * [ ] normalisation des titres: supprimer les balises mml ou html
 * [ ] openalex raw_orcid
 * [ ] données supplémentaires: peer-reviewed? publié?
+* [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
 ## Sujets
 * [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation manuelle des sujets? / ajouter seuil de score de pertinence? / algos pour évaluer pertinence (co-occurrences suspectes, NLP...)
 * [ ] enrichissement sujets: audit des publis sans sujet; sujets "attendus" par revue?
@@ -46,7 +47,7 @@
 * [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait tenter un matching de tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 ## Types de documents: algo de résolution de conflits
 * [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger à la source
-* [ ] types wos "composites": étudier, voir si ça représente des types/sous-types comme dans HAL
+* [ ] types wos "composites": étudier, voir si ça représente des types/sous-types comme dans HAL? A priori non: "article;book chapter" => auditer
 ## OA_status / embargos
 * [ ] preprints en accès gold selon OpenAlex: suspect
 * [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
