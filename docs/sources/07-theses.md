@@ -104,7 +104,7 @@ Une personne qui apparaît dans plusieurs champs est dédupliquée et porte plus
 
 ### Identifiants : PPN IdRef pour les personnes, NNT pour les thèses
 
-Le PPN [IdRef](../glossaire.md#idref) est stocké dans `source_authorships.person_identifiers->>'idref'` lorsque présent — c'est l'identifiant ABES, partagé avec d'autres sources. Sert de clé de matching forte dans la phase [persons](../pipeline/06-persons.md) du pipeline.
+Le PPN [IdRef](../glossaire.md#idref) est stocké dans `source_authorships.person_identifiers->>'idref'` lorsque présent — c'est l'identifiant ABES, partagé avec d'autres sources. Sert de clé de matching forte dans la phase [persons](../pipeline/07-persons.md) du pipeline.
 
 Le NNT (ex. `2022UCFAC034`) sert d'identifiant cross-source pour la thèse : exposé via `external_ids.nnt` côté `source_publications`, il permet le rattachement à des `source_publications` HAL/OpenAlex/ScanR qui exposent aussi le NNT.
 

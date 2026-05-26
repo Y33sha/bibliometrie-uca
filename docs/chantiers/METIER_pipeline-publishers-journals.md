@@ -97,13 +97,13 @@ Livrée le 2026-05-26.
 
 Livrée le 2026-05-26.
 
-- [x] **Décision format payload** : mapper API → format CSV (clés du dump historique) plutôt que stocker l'API brute. Choix non orthodoxe assumé (cf. [docs/sources/10-doaj.md](../sources/10-doaj.md)) — préserve le front (`READABLE_DOAJ_FIELDS` qui hardcode les clés CSV), l'audit Phase 7 (`doaj_payload->>'APC amount'`), et la cohérence avec le bootstrap CSV qui reste fonctionnel. Une seule clé ajoutée vs CSV : `"DOAJ id"` (pour reconstruire l'URL fiche en Phase 6). Divergences API/CSV conservées : `Country of publisher` reste l'ISO-2 brut, `Languages…` reste les codes ISO-639-1.
+- [x] **Décision format payload** : mapper API → format CSV (clés du dump historique) plutôt que stocker l'API brute. Choix non orthodoxe assumé (cf. [docs/sources/08-sources-supplementaires.md#doaj](../sources/08-sources-supplementaires.md#doaj)) — préserve le front (`READABLE_DOAJ_FIELDS` qui hardcode les clés CSV), l'audit Phase 7 (`doaj_payload->>'APC amount'`), et la cohérence avec le bootstrap CSV qui reste fonctionnel. Une seule clé ajoutée vs CSV : `"DOAJ id"` (pour reconstruire l'URL fiche en Phase 6). Divergences API/CSV conservées : `Country of publisher` reste l'ISO-2 brut, `Languages…` reste les codes ISO-639-1.
 - [x] **Extracteur API** : `infrastructure/sources/doaj/__init__.py` — `fetch_doaj_journal(issn, ...)` sur `GET https://doaj.org/api/search/journals/issn:{issn}` (wrapper `{total, results[]}`), polite pool via User-Agent (mailto). Mapper pur `to_csv_shape(record) → dict[str, str]`, tests unit dans `tests/unit/infrastructure/sources/test_doaj.py`.
 - [x] **Sub-step `enrich_journals_from_doaj`** : `application/pipeline/publishers_journals/enrich_journals_from_doaj.py`. Itère sur les revues avec au moins un ISSN, essai successif `issn` → `eissn` → `issnl` (dédup + skip NULL), 1 à 3 requêtes / revue. Fetcher + mapper injectés (étanchéité DDD).
 - [x] **Politique de rafraîchissement (stale-based)** : query `fetch_journals_needing_doaj_fetch(stale_days)` filtre `doaj_imported_at IS NULL OR doaj_imported_at < now() - make_interval(days => :stale_days)`. Défaut 30 j. Sur 404, `imported_at` est posé quand même (`payload=NULL`, `is_in_doaj=FALSE`) pour éviter de retenter les ~12 k revues hors-DOAJ à chaque pipeline. Pas de reset global (incrémental).
 - [x] **Branchement pipeline** : `phase_publishers_journals` appelle `_run_enrich_journals_from_doaj` après `_run_enrich_journals_from_openalex` (DOAJ direct surclasse le `is_in_doaj` posé par OpenAlex), avant les sub-steps publishers. Gated par `MODES[mode].run_journal_enrichment`.
 - [x] **CLI** : `interfaces/cli/pipeline/enrich_journals_from_doaj.py` (--limit / --stale-days / --dry-run).
-- [x] **Catch-up CSV** : `interfaces/cli/imports/import_doaj_csv.py` reste utilisable pour bootstrap. Même format de stockage → pas de conflit. Doc 09-imports-manuels.md mise à jour pour rediriger vers la nouvelle fiche 10-doaj.md.
+- [x] **Catch-up CSV** : `interfaces/cli/imports/import_doaj_csv.py` reste utilisable pour bootstrap. Même format de stockage → pas de conflit. Doc sources mise à jour (Phase 8) : fiche DOAJ consolidée dans `docs/sources/08-sources-supplementaires.md`.
 
 ## Phase 5 — Crossref Members (fallback country)
 
@@ -176,9 +176,12 @@ Hypothèse : OpenAlex Sources stocke des montants obsolètes ou catégoriels (co
 
 Trouver une source APC plus fiable que OpenAlex pour les revues **hors-DOAJ** (= ~2 300 revues couvertes uniquement par OA aujourd'hui). Pistes à explorer : OpenAPC (déjà utilisé pour les paiements UCA, cf. `docs/sources/09-imports-manuels.md`), CWTS Open APC, scraping des fee pages éditeur. Sans meilleure source, la bascule DOAJ-only sacrifierait cette couverture.
 
-## Phase 8  — Documentation
-- [ ] **Documentation pipeline**: ajouter et documenter la phase publishers_journals.
-- [ ] **Documentation sources**: ajouter les nouvelles sources moissonnées.
+## Phase 8 — Documentation
+
+Livrée le 2026-05-26.
+
+- [x] **Documentation pipeline** : nouvelle fiche `docs/pipeline/04-publishers-journals.md` (vue d'ensemble des 6 sub-steps + filtres d'idempotence). Renumérotation 04+ pour insérer la phase dans la séquence, TOC `01-vue-d-ensemble.md` mise à jour. Refonte de l'ex-`08-enrichissements.md` (devenu `09`) pour virer les mentions obsolètes (`phase enrich`, `enrich_journal_apc`) et pointer vers la nouvelle fiche.
+- [x] **Documentation sources** : nouvelle fiche groupée `docs/sources/08-sources-supplementaires.md` rassemblant les sources d'enrichissement non-bibliographiques (Unpaywall, DOAJ, ROR) — sources sans `staging`, sans `source_publications`. Mention de Crossref Members ajoutée à `06-crossref.md`, mention d'OpenAlex Publishers ajoutée à `03-openalex.md`. TOC `01-vue-d-ensemble.md` rafraîchie.
 
 ## Questions ouvertes
 

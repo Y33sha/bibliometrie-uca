@@ -11,7 +11,7 @@ Données fournies datées du 15/12/2025. La date est documentée dans la colonne
 
 L'**affiliation** renseignée dans cette source est une chaîne de caractères (`UFR Médecine Pr Paramédic`, `IUT Info 43`) qui ne permet pas un mapping avec les laboratoires. Elle est affichée pour information, mais ne sert pas à créer les liens personne-structure dans l'appli. Les **liens personne-structure** dépendent des [*authorships*](../glossaire.md#authorship).
 
-La [création de personnes](../pipeline/06-persons.md) se fait via les authorships des publications, indépendamment de l'existence d'une entrée `person_rh`.
+La [création de personnes](../pipeline/07-persons.md) se fait via les authorships des publications, indépendamment de l'existence d'une entrée `person_rh`.
 La FK sur la table `person_rh` permet:
 - d'enrichir les données sur les personnes;
 - d'empêcher la suppression de ces personnes lors de fusions de doublons.
@@ -32,7 +32,7 @@ https://treemaps.openapc.net/apcdata/clermont-u/
 
 ## <span id="doaj"></span>DOAJ — bootstrap CSV
 
-Le flux régulier passe par l'API DOAJ (cf. [10-doaj.md](10-doaj.md)). L'import CSV reste utilisable pour un bootstrap rapide depuis un dump complet (~21 k revues, plus rapide qu'un fetch unitaire).
+Le flux régulier passe par l'API DOAJ (cf. [08-sources-supplementaires.md#doaj](08-sources-supplementaires.md#doaj)). L'import CSV reste utilisable pour un bootstrap rapide depuis un dump complet (~21 k revues, plus rapide qu'un fetch unitaire).
 
 Dump téléchargé manuellement depuis https://doaj.org/csv puis importé via `python -m interfaces.cli.imports.import_doaj_csv data/doaj_journalcsv_*.csv`.
 
