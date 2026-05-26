@@ -102,8 +102,16 @@ Livrée le 2026-05-26.
 
 ## Phase 5 — Crossref Members (fallback country)
 
-- [ ] **Sub-step `enrich_publishers_from_crossref_members`** : itère sur `publishers WHERE country IS NULL AND EXISTS (SELECT 1 FROM doi_prefixes WHERE publisher_id = publishers.id AND crossref_member_id IS NOT NULL)`. Fetcher `https://api.crossref.org/members/{id}`. Parser `location` (texte libre) → ISO-2 via une regex ou un parser dédié.
-- [ ] **Petit utilitaire de parsing** `domain/publishers/crossref_location_parser.py` : tester sur un échantillon, prudence sur "United States" → US, "United Kingdom" → GB, etc. Cas dégénérés : skip si parsing échoue.
+Livrée le 2026-05-26.
+
+- [x] **Audit préalable** (`audit_crossref_member_countries`) sur 1219 publishers sans `country` après Phase 2 et avec un `doi_prefixes.crossref_member_id` : **1162 / 1219 = 95% mapped**. C'est plus du double de la couverture Phase 2 (568 countries via OpenAlex). 56 `no_match` correspondent à des locations dégénérées (Crossref n'inclut pas le pays au bout : "Yerevan, AM", "Patiala, Punjab") ou à des formes absentes de `country_name_forms` (`Hong Kong SAR China`).
+- [x] **Parseur domain** : `domain/publishers/crossref_location.py:parse_country_segment` (extraction du dernier segment de "City, State, Country"). Tests unit dans `tests/unit/domain/publishers/test_crossref_location.py`.
+- [x] **Fetcher infrastructure** : `infrastructure/sources/crossref/members.py:fetch_crossref_member`. Endpoint `api.crossref.org/members/{id}`, polite pool via header `User-Agent` (cohérent avec les autres clients Crossref du projet).
+- [x] **Sub-step `enrich_publishers_from_crossref_members`** : itère sur les candidats, fetche, parse, résout en ISO-2 via la table `country_name_forms` (chargée en bloc au démarrage). Politique « NULL only » garantie par le filtre côté query. Fetcher injecté pour respecter l'étanchéité DDD.
+- [x] **Port + query** : `EnrichQueries.fetch_publishers_needing_country_from_crossref` (publisher_id + min(crossref_member_id) ; déterministe en cas de plusieurs members par publisher).
+- [x] **Branchement pipeline** : `phase_publishers_journals` appelle `_run_enrich_publishers_from_crossref_members` après OpenAlex Publishers et avant le typage ROR. Gated par `MODES[mode].run_journal_enrichment`.
+- [x] **CLI** : `interfaces/cli/pipeline/enrich_publishers_from_crossref_members.py` (--limit / --dry-run).
+- [ ] **TODO connexe — enrichir `country_name_forms`** : 56 cas no_match dans l'audit (Hong Kong SAR China, Punjab, Yerevan, Dhaka, Nairobi, etc.). Soit ajouter les formes manquantes, soit améliorer le parseur (détecter les villes/régions sans pays). Hors-scope cette fiche, à juger selon le volume résiduel.
 
 ## Phase 6 — Front : badge DOAJ → lien vers la fiche DOAJ
 

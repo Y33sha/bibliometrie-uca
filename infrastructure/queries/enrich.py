@@ -149,6 +149,63 @@ def fetch_publishers_needing_publisher_type_from_ror(
     return [(r.id, r.ror) for r in rows]
 
 
+def fetch_publishers_needing_country_from_crossref(
+    conn: Connection, *, limit: int | None = None
+) -> list[tuple[int, int]]:
+    """Liste `(publisher_id, crossref_member_id)` pour le fallback country
+    via Crossref Members.
+
+    Utilisé par `enrich_publishers_from_crossref_members`. Filtre les
+    publishers sans country (après Phase 2 OpenAlex Publishers) et avec
+    au moins un `doi_prefixes.crossref_member_id`. Prend le plus petit
+    member_id par publisher (déterministe ; en pratique un publisher a
+    rarement plusieurs members Crossref distincts).
+    """
+    if limit and limit > 0:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    p.id AS publisher_id,
+                    (SELECT MIN(dp.crossref_member_id)
+                     FROM doi_prefixes dp
+                     WHERE dp.publisher_id = p.id
+                       AND dp.crossref_member_id IS NOT NULL
+                    ) AS member_id
+                FROM publishers p
+                WHERE p.country IS NULL
+                  AND EXISTS (
+                      SELECT 1 FROM doi_prefixes dp2
+                      WHERE dp2.publisher_id = p.id
+                        AND dp2.crossref_member_id IS NOT NULL
+                  )
+                ORDER BY p.id
+                LIMIT :lim
+            """),
+            {"lim": limit},
+        ).all()
+    else:
+        rows = conn.execute(
+            text("""
+                SELECT
+                    p.id AS publisher_id,
+                    (SELECT MIN(dp.crossref_member_id)
+                     FROM doi_prefixes dp
+                     WHERE dp.publisher_id = p.id
+                       AND dp.crossref_member_id IS NOT NULL
+                    ) AS member_id
+                FROM publishers p
+                WHERE p.country IS NULL
+                  AND EXISTS (
+                      SELECT 1 FROM doi_prefixes dp2
+                      WHERE dp2.publisher_id = p.id
+                        AND dp2.crossref_member_id IS NOT NULL
+                  )
+                ORDER BY p.id
+            """)
+        ).all()
+    return [(r.publisher_id, r.member_id) for r in rows]
+
+
 class PgEnrichQueries(EnrichQueries):
     """Adapter PostgreSQL pour `application.ports.enrich.EnrichQueries`."""
 
@@ -171,3 +228,8 @@ class PgEnrichQueries(EnrichQueries):
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]:
         return fetch_publishers_needing_publisher_type_from_ror(conn, limit=limit)
+
+    def fetch_publishers_needing_country_from_crossref(
+        self, conn: Connection, *, limit: int | None = None
+    ) -> list[tuple[int, int]]:
+        return fetch_publishers_needing_country_from_crossref(conn, limit=limit)
