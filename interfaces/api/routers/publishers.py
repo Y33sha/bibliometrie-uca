@@ -9,6 +9,7 @@ from application.ports.api.publishers_queries import (
     PublisherDetailResponse,
     PublisherListResponse,
     PublisherQueries,
+    PublishersFacetsResponse,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
@@ -23,6 +24,7 @@ from interfaces.api.deps import (
     publisher_queries_sync,
     publisher_repo_sync,
 )
+from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     EnumOption,
     MergeRequest,
@@ -47,15 +49,28 @@ def list_publisher_types() -> list[EnumOption]:
     return [EnumOption(value=v, label_fr=PUBLISHER_TYPE_LABELS_FR[v]) for v in PUBLISHER_TYPES]
 
 
-@router.get("/api/publishers/countries", response_model=list[str])
-def list_countries(
+@router.get("/api/publishers/facets", response_model=PublishersFacetsResponse)
+def publishers_facets(
+    search: str | None = None,
+    publisher_type: str = Query(""),
+    country: str = Query(""),
+    is_predatory: bool | None = None,
+    with_pubs: bool = False,
     queries: PublisherQueries = Depends(publisher_queries_sync),
-) -> list[str]:
-    """Valeurs distinctes de `country` observées en base, triées par fréquence.
+) -> PublishersFacetsResponse:
+    """Comptes par option pour les 3 facettes du listing éditeurs.
 
-    Sert à alimenter le filtre « Pays » de la page publique `/publishers`.
+    Convention identique à `/api/journals/facets` et
+    `/api/publications/facets` : chaque facette exclut sa propre
+    dimension de la condition WHERE.
     """
-    return queries.distinct_countries()
+    return queries.publishers_facets(
+        search=search,
+        publisher_types=parse_str_csv(publisher_type),
+        countries=parse_str_csv(country),
+        is_predatory=is_predatory,
+        with_pubs=with_pubs,
+    )
 
 
 @router.get("/api/publishers", response_model=PublisherListResponse)
@@ -63,8 +78,8 @@ def list_publishers(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     search: str | None = None,
-    publisher_type: str | None = None,
-    country: str | None = None,
+    publisher_type: str = Query(""),
+    country: str = Query(""),
     is_predatory: bool | None = None,
     with_pubs: bool = False,
     sort: str = "name",
@@ -75,7 +90,9 @@ def list_publishers(
     Filtres :
     - `search` : insensible à la casse sur le nom normalisé, ignorée si
       < 2 caractères.
-    - `publisher_type` / `country` : égalité stricte.
+    - `publisher_type` / `country` : CSV de valeurs (ex. `commercial,learned_society`).
+      Vide = pas de filtre. Aligné sur la convention multi-valeurs de
+      `/api/journals` et `/api/publications`.
     - `is_predatory` : booléen (true/false). Omettre = pas de filtre.
     - `with_pubs` : si true, n'expose que les éditeurs avec au moins 1
       publication rattachée (via leurs revues). Utilisé par la page
@@ -87,8 +104,8 @@ def list_publishers(
     """
     return queries.list_publishers(
         search=search,
-        publisher_type=publisher_type,
-        country=country,
+        publisher_types=parse_str_csv(publisher_type),
+        countries=parse_str_csv(country),
         is_predatory=is_predatory,
         with_pubs=with_pubs,
         sort=sort,

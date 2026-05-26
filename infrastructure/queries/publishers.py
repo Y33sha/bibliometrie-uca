@@ -14,10 +14,60 @@ from application.ports.api.publishers_queries import (
     PublisherListItem,
     PublisherListResponse,
     PublisherQueries,
+    PublishersFacetOption,
+    PublishersFacetsResponse,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.normalize import normalize_text
+from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from infrastructure.db.tables import publishers as t_publishers
+
+
+def _build_publisher_where(
+    *,
+    search: str | None,
+    publisher_types: list[str],
+    countries: list[str],
+    is_predatory: bool | None,
+    with_pubs: bool,
+    skip_publisher_types: bool = False,
+    skip_countries: bool = False,
+    skip_predatory: bool = False,
+) -> tuple[str, dict[str, Any]]:
+    """Construit la clause WHERE pour `list_publishers` et `publishers_facets`.
+
+    Les flags `skip_*` permettent à chaque facette d'exclure sa propre
+    dimension du filtrage — convention « comptes exclusifs » identique à
+    celle des facettes journals/publications.
+    """
+    binds: dict[str, Any] = {}
+    parts: list[str] = []
+    if search and len(search) >= 2:
+        normalized = normalize_text(search)
+        if normalized:
+            parts.append("p.name_normalized LIKE '%' || :search || '%'")
+            binds["search"] = normalized
+    if publisher_types and not skip_publisher_types:
+        # publisher_type est un enum Postgres → cast en text pour comparer
+        # à un array text[].
+        parts.append("p.publisher_type::text = ANY(:publisher_types)")
+        binds["publisher_types"] = publisher_types
+    if countries and not skip_countries:
+        parts.append("p.country = ANY(:countries)")
+        binds["countries"] = countries
+    if is_predatory is not None and not skip_predatory:
+        parts.append("p.is_predatory = :is_predatory")
+        binds["is_predatory"] = is_predatory
+    if with_pubs:
+        parts.append(
+            "EXISTS ("
+            " SELECT 1 FROM publications pub"
+            " JOIN journals j ON j.id = pub.journal_id"
+            " WHERE j.publisher_id = p.id"
+            ")"
+        )
+    return (" AND ".join(parts) if parts else "TRUE", binds)
+
 
 _SORT_MAP = {
     "name": "p.name ASC",
@@ -55,42 +105,21 @@ class PgPublisherQueries(PublisherQueries):
         self,
         *,
         search: str | None,
-        publisher_type: str | None,
-        country: str | None,
+        publisher_types: list[str],
+        countries: list[str],
         is_predatory: bool | None,
         with_pubs: bool,
         sort: str,
         page: int,
         per_page: int,
     ) -> PublisherListResponse:
-        binds: dict[str, Any] = {}
-        parts: list[str] = []
-        if search and len(search) >= 2:
-            # name_normalized passe par `normalize_text` à l'ingestion ; la
-            # query doit subir la même normalisation pour matcher les noms
-            # contenant ponctuation ou accents.
-            normalized = normalize_text(search)
-            if normalized:
-                parts.append("p.name_normalized LIKE '%' || :search || '%'")
-                binds["search"] = normalized
-        if publisher_type:
-            parts.append("p.publisher_type = :publisher_type")
-            binds["publisher_type"] = publisher_type
-        if country:
-            parts.append("p.country = :country")
-            binds["country"] = country
-        if is_predatory is not None:
-            parts.append("p.is_predatory = :is_predatory")
-            binds["is_predatory"] = is_predatory
-        if with_pubs:
-            parts.append(
-                "EXISTS ("
-                " SELECT 1 FROM publications pub"
-                " JOIN journals j ON j.id = pub.journal_id"
-                " WHERE j.publisher_id = p.id"
-                ")"
-            )
-        where = " AND ".join(parts) if parts else "TRUE"
+        where, binds = _build_publisher_where(
+            search=search,
+            publisher_types=publisher_types,
+            countries=countries,
+            is_predatory=is_predatory,
+            with_pubs=with_pubs,
+        )
 
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM publishers p WHERE {where}"),
@@ -135,6 +164,95 @@ class PgPublisherQueries(PublisherQueries):
                 )
                 for r in rows
             ],
+        )
+
+    def publishers_facets(
+        self,
+        *,
+        search: str | None,
+        publisher_types: list[str],
+        countries: list[str],
+        is_predatory: bool | None,
+        with_pubs: bool,
+    ) -> PublishersFacetsResponse:
+        where_pt, binds_pt = _build_publisher_where(
+            search=search,
+            publisher_types=publisher_types,
+            countries=countries,
+            is_predatory=is_predatory,
+            with_pubs=with_pubs,
+            skip_publisher_types=True,
+        )
+        pt_rows = self._conn.execute(
+            text(f"""
+                SELECT p.publisher_type::text AS value, COUNT(*) AS n
+                FROM publishers p
+                WHERE {where_pt}
+                GROUP BY p.publisher_type
+            """),
+            binds_pt,
+        ).all()
+        pt_counts = {r.value: r.n for r in pt_rows}
+        publisher_types_facet = [
+            PublishersFacetOption(
+                value=v,
+                label=PUBLISHER_TYPE_LABELS_FR[v],
+                count=pt_counts.get(v, 0),
+            )
+            for v in PUBLISHER_TYPES
+        ]
+
+        where_c, binds_c = _build_publisher_where(
+            search=search,
+            publisher_types=publisher_types,
+            countries=countries,
+            is_predatory=is_predatory,
+            with_pubs=with_pubs,
+            skip_countries=True,
+        )
+        country_rows = self._conn.execute(
+            text(f"""
+                SELECT p.country AS value, COUNT(*) AS n
+                FROM publishers p
+                WHERE {where_c} AND p.country IS NOT NULL
+                GROUP BY p.country
+                ORDER BY n DESC, p.country
+            """),
+            binds_c,
+        ).all()
+        # Pays : pas d'enum, on expose ce qui est observé (texte libre = code
+        # pays ISO en pratique). `label` = `value`.
+        countries_facet = [
+            PublishersFacetOption(value=r.value, label=r.value, count=r.n) for r in country_rows
+        ]
+
+        where_p, binds_p = _build_publisher_where(
+            search=search,
+            publisher_types=publisher_types,
+            countries=countries,
+            is_predatory=is_predatory,
+            with_pubs=with_pubs,
+            skip_predatory=True,
+        )
+        pred_rows = self._conn.execute(
+            text(f"""
+                SELECT p.is_predatory AS value, COUNT(*) AS n
+                FROM publishers p
+                WHERE {where_p}
+                GROUP BY p.is_predatory
+            """),
+            binds_p,
+        ).all()
+        pred_counts = {bool(r.value): r.n for r in pred_rows}
+        predatory_facet = [
+            PublishersFacetOption(value="true", label="Oui", count=pred_counts.get(True, 0)),
+            PublishersFacetOption(value="false", label="Non", count=pred_counts.get(False, 0)),
+        ]
+
+        return PublishersFacetsResponse(
+            publisher_types=publisher_types_facet,
+            countries=countries_facet,
+            predatory=predatory_facet,
         )
 
     def get_publisher_detail(self, publisher_id: int) -> PublisherDetailResponse | None:
@@ -254,14 +372,3 @@ class PgPublisherQueries(PublisherQueries):
             select(t_publishers.c.id).where(t_publishers.c.id.in_(publisher_ids))
         )
         return {row.id for row in result}
-
-    def distinct_countries(self) -> list[str]:
-        rows = self._conn.execute(
-            text("""
-                SELECT country FROM publishers
-                WHERE country IS NOT NULL
-                GROUP BY country
-                ORDER BY COUNT(*) DESC, country
-            """)
-        ).all()
-        return [r.country for r in rows]

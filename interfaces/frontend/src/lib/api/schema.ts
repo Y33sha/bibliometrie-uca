@@ -1984,7 +1984,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/publishers/countries": {
+    "/api/publishers/facets": {
         parameters: {
             query?: never;
             header?: never;
@@ -1992,12 +1992,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Countries
-         * @description Valeurs distinctes de `country` observées en base, triées par fréquence.
+         * Publishers Facets
+         * @description Comptes par option pour les 3 facettes du listing éditeurs.
          *
-         *     Sert à alimenter le filtre « Pays » de la page publique `/publishers`.
+         *     Convention identique à `/api/journals/facets` et
+         *     `/api/publications/facets` : chaque facette exclut sa propre
+         *     dimension de la condition WHERE.
          */
-        get: operations["list_countries_api_publishers_countries_get"];
+        get: operations["publishers_facets_api_publishers_facets_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2020,7 +2022,9 @@ export interface paths {
          *     Filtres :
          *     - `search` : insensible à la casse sur le nom normalisé, ignorée si
          *       < 2 caractères.
-         *     - `publisher_type` / `country` : égalité stricte.
+         *     - `publisher_type` / `country` : CSV de valeurs (ex. `commercial,learned_society`).
+         *       Vide = pas de filtre. Aligné sur la convention multi-valeurs de
+         *       `/api/journals` et `/api/publications`.
          *     - `is_predatory` : booléen (true/false). Omettre = pas de filtre.
          *     - `with_pubs` : si true, n'expose que les éditeurs avec au moins 1
          *       publication rattachée (via leurs revues). Utilisé par la page
@@ -2963,19 +2967,13 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
-         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
-         *     Permet au frontend de styler les inattendus en warning.
+         * @description Compteur de publications par `doc_type` pour un éditeur.
          */
         DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
         };
         /** DocTypeLabel */
         DocTypeLabel: {
@@ -3416,7 +3414,7 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["application__ports__api__journals_queries__OaStatusCount"][];
             /** Expected Doc Types */
@@ -5018,7 +5016,7 @@ export interface components {
             /** Journal Types */
             journal_types: components["schemas"]["JournalTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["OaStatusCount"][];
         };
@@ -5128,6 +5126,36 @@ export interface components {
             is_predatory?: boolean | null;
             /** Publisher Type */
             publisher_type?: string | null;
+        };
+        /**
+         * PublishersFacetOption
+         * @description Option d'une facette du listing éditeurs : valeur + label + compte.
+         *
+         *     Pour la facette `publisher_types`, `label` reprend
+         *     `PUBLISHER_TYPE_LABELS_FR`. Pour `countries` (texte libre observé en
+         *     base), `label` est égal à `value`. Pour `predatory`, on expose
+         *     `Oui` / `Non`. `count` est exclusif à la dimension (= filtre courant
+         *     moins cette facette), même convention que les facettes journals.
+         */
+        PublishersFacetOption: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
+        /**
+         * PublishersFacetsResponse
+         * @description Facettes dynamiques pour `/api/publishers` (3 dimensions).
+         */
+        PublishersFacetsResponse: {
+            /** Publisher Types */
+            publisher_types: components["schemas"]["PublishersFacetOption"][];
+            /** Countries */
+            countries: components["schemas"]["PublishersFacetOption"][];
+            /** Predatory */
+            predatory: components["schemas"]["PublishersFacetOption"][];
         };
         /** ReassignIdentifier */
         ReassignIdentifier: {
@@ -5681,6 +5709,22 @@ export interface components {
             no: number;
         };
         /**
+         * DocTypeCount
+         * @description Compteur de publications par `doc_type` pour une revue.
+         *
+         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
+         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
+         *     Permet au frontend de styler les inattendus en warning.
+         */
+        application__ports__api__journals_queries__DocTypeCount: {
+            /** Doc Type */
+            doc_type: string | null;
+            /** Count */
+            count: number;
+            /** Expected */
+            expected: boolean;
+        };
+        /**
          * OaStatusCount
          * @description Compteur de publications par `oa_status` pour une revue.
          *
@@ -5694,16 +5738,6 @@ export interface components {
             count: number;
             /** Expected */
             expected: boolean;
-        };
-        /**
-         * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour un éditeur.
-         */
-        application__ports__api__publishers_queries__DocTypeCount: {
-            /** Doc Type */
-            doc_type: string | null;
-            /** Count */
-            count: number;
         };
     };
     responses: never;
@@ -8903,9 +8937,15 @@ export interface operations {
             };
         };
     };
-    list_countries_api_publishers_countries_get: {
+    publishers_facets_api_publishers_facets_get: {
         parameters: {
-            query?: never;
+            query?: {
+                search?: string | null;
+                publisher_type?: string;
+                country?: string;
+                is_predatory?: boolean | null;
+                with_pubs?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8918,7 +8958,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": string[];
+                    "application/json": components["schemas"]["PublishersFacetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -8929,8 +8978,8 @@ export interface operations {
                 page?: number;
                 per_page?: number;
                 search?: string | null;
-                publisher_type?: string | null;
-                country?: string | null;
+                publisher_type?: string;
+                country?: string;
                 is_predatory?: boolean | null;
                 with_pubs?: boolean;
                 sort?: string;

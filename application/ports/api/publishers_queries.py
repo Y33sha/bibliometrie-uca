@@ -74,6 +74,29 @@ class OaStatusCount(BaseModel):
     count: int
 
 
+class PublishersFacetOption(BaseModel):
+    """Option d'une facette du listing éditeurs : valeur + label + compte.
+
+    Pour la facette `publisher_types`, `label` reprend
+    `PUBLISHER_TYPE_LABELS_FR`. Pour `countries` (texte libre observé en
+    base), `label` est égal à `value`. Pour `predatory`, on expose
+    `Oui` / `Non`. `count` est exclusif à la dimension (= filtre courant
+    moins cette facette), même convention que les facettes journals.
+    """
+
+    value: str
+    label: str
+    count: int
+
+
+class PublishersFacetsResponse(BaseModel):
+    """Facettes dynamiques pour `/api/publishers` (3 dimensions)."""
+
+    publisher_types: list[PublishersFacetOption]
+    countries: list[PublishersFacetOption]
+    predatory: list[PublishersFacetOption]
+
+
 class PublisherDashboardResponse(BaseModel):
     """GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
 
@@ -95,14 +118,24 @@ class PublisherQueries(Protocol):
         self,
         *,
         search: str | None,
-        publisher_type: str | None,
-        country: str | None,
+        publisher_types: list[str],
+        countries: list[str],
         is_predatory: bool | None,
         with_pubs: bool,
         sort: str,
         page: int,
         per_page: int,
     ) -> PublisherListResponse: ...
+
+    def publishers_facets(
+        self,
+        *,
+        search: str | None,
+        publisher_types: list[str],
+        countries: list[str],
+        is_predatory: bool | None,
+        with_pubs: bool,
+    ) -> PublishersFacetsResponse: ...
 
     def get_publisher_detail(self, publisher_id: int) -> PublisherDetailResponse | None: ...
 
@@ -113,5 +146,3 @@ class PublisherQueries(Protocol):
     ) -> list[SubjectFrequency]: ...
 
     def existing_publisher_ids(self, publisher_ids: tuple[int, ...]) -> set[int]: ...
-
-    def distinct_countries(self) -> list[str]: ...
