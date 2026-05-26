@@ -1,24 +1,21 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { base } from '$app/paths';
 	import { api, ApiError, journals as journalsApi } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
+	import JournalsListView from '$lib/components/JournalsListView.svelte';
 	import type { components } from '$lib/api/schema';
 
 	type Journal = components['schemas']['JournalOut'];
 	type JournalListResponse = components['schemas']['JournalListResponse'];
 	type EnumOption = components['schemas']['EnumOption'];
 
-	let journals: Journal[] = $state([]);
 	let journalTypes: EnumOption[] = $state([]);
-	let total = $state(0);
-	let page = $state(1);
-	let pages = $state(1);
-	let perPage = 50;
-	let search = $state('');
-	let sort = $state('-pubs');
-	let searchTimer: ReturnType<typeof setTimeout>;
+
+	// Clé d'API utilisée pour invalider le cache de JournalsListView après
+	// une édition ou fusion (force un reload via incrément).
+	let viewVersion = $state(0);
+	const apiKey = $derived(`admin-journals-${viewVersion}`);
+	function reload() { viewVersion += 1; }
 
 	// Merge state : recherche avec debounce + cible en cours de fusion
 	let mergeTargetId: number | null = $state(null);
@@ -31,31 +28,6 @@
 		},
 		transform: (results) => results.filter((j) => j.id !== mergeTargetId),
 	});
-
-	async function load() {
-		const params = new URLSearchParams({ page: String(page), per_page: String(perPage), sort });
-		if (search) params.set('search', search);
-		const data = await api<JournalListResponse>(`/api/journals?${params}`);
-		journals = data.journals;
-		total = data.total;
-		pages = data.pages;
-	}
-
-	function onSearch(value: string) {
-		search = value;
-		clearTimeout(searchTimer);
-		searchTimer = setTimeout(() => { page = 1; load(); }, 300);
-	}
-
-	function setSort(s: string) { sort = s; page = 1; load(); }
-
-	function formatIssns(j: Journal): string {
-		const parts = [];
-		if (j.issn) parts.push(j.issn);
-		if (j.eissn) parts.push(j.eissn);
-		if (j.issnl && j.issnl !== j.issn && j.issnl !== j.eissn) parts.push(`L:${j.issnl}`);
-		return parts.join(' / ');
-	}
 
 	// Modal édition
 	let editModal: {
@@ -94,7 +66,7 @@
 		try {
 			await journalsApi.update(editModal.id, body);
 			editModal = null;
-			await load();
+			reload();
 		} catch (e: any) {
 			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
 			alert('Erreur : ' + msg);
@@ -117,7 +89,7 @@
 		try {
 			await journalsApi.merge(mergeTargetId, sourceId);
 			closeMerge();
-			await load();
+			reload();
 		} catch (e: any) {
 			if (e instanceof ApiError) {
 				const detail = (e.detail as { detail?: string })?.detail;
@@ -130,88 +102,43 @@
 
 	onMount(async () => {
 		journalTypes = await api<EnumOption[]>('/api/journal-types');
-		await load();
 	});
 </script>
 
 <svelte:head><title>Revues — Bibliométrie UCA</title></svelte:head>
 
-<h2>Revues <span class="count">({total})</span></h2>
+<h2>Revues</h2>
 
-<div class="toolbar">
-	<input type="text" placeholder="Rechercher une revue…" value={search}
-		oninput={(e) => onSearch((e.target as HTMLInputElement).value)} class="search-input" />
-</div>
-
-<table class="data-table">
-	<thead>
-		<tr>
-			<th class="sortable" onclick={() => setSort(sort === 'title' ? '-title' : 'title')}>
-				Titre {sort === 'title' ? '▲' : sort === '-title' ? '▼' : ''}
-			</th>
-			<th>ISSN</th>
-			<th class="sortable" onclick={() => setSort(sort === 'publisher' ? '-publisher' : 'publisher')}>
-				Éditeur {sort === 'publisher' ? '▲' : sort === '-publisher' ? '▼' : ''}
-			</th>
-			<th class="sortable num" onclick={() => setSort(sort === '-pubs' ? 'pubs' : '-pubs')}>
-				Publis {sort === '-pubs' ? '▲' : sort === 'pubs' ? '▼' : ''}
-			</th>
-			<th></th>
-		</tr>
-	</thead>
-	<tbody>
-		{#each journals as j (j.id)}
-			<tr class:predatory={j.is_predatory}>
-				<td>
-					<a href="{base}/journals/{j.id}" class="journal-title">{j.title}</a>
-					{#if j.is_predatory}<span class="badge-pred">prédateur</span>{/if}
-					{#if j.is_in_doaj}<span class="badge-doaj">DOAJ</span>{/if}
-				</td>
-				<td class="issn-cell">{formatIssns(j)}</td>
-				<td class="muted">
-					{#if j.pub_name}
-						{#if j.publisher_id}
-							<a href="{base}/publishers/{j.publisher_id}" class="publisher-link">{j.pub_name}</a>
-						{:else}
-							{j.pub_name}
-						{/if}
-					{/if}
-				</td>
-				<td class="num">{j.pub_count}</td>
-				<td class="actions">
-					{#if mergeTargetId === j.id}
-						<div class="merge-search">
-							<input type="text" placeholder="Fusionner avec…" value={mergeSearch.query}
-								oninput={(e) => mergeSearch.setQuery((e.target as HTMLInputElement).value)}
-								class="merge-input" />
-							<button class="btn btn-sm" onclick={closeMerge}>Annuler</button>
-							{#if mergeSearch.loading}
-								<div class="merge-results"><span class="muted">Recherche…</span></div>
-							{:else if mergeSearch.results.length > 0}
-								<div class="merge-results">
-									{#each mergeSearch.results as r (r.id)}
-										<button class="merge-result" onclick={() => doMerge(r.id)}>
-											{r.title}
-											{#if r.pub_name}<span class="muted"> — {r.pub_name}</span>{/if}
-											<span class="muted"> ({r.pub_count} publis)</span>
-										</button>
-									{/each}
-								</div>
-							{:else if mergeSearch.query.length >= 2}
-								<div class="merge-results"><span class="muted">Aucun résultat</span></div>
-							{/if}
-						</div>
-					{:else}
-						<button class="btn btn-sm" onclick={() => openEdit(j)}>Modifier</button>
-						<button class="btn btn-sm btn-merge" onclick={() => openMerge(j.id)}>Fusionner…</button>
-					{/if}
-				</td>
-			</tr>
-		{/each}
-	</tbody>
-</table>
-
-<Pagination {page} {pages} onchange={(p) => { page = p; load(); }} />
+<JournalsListView {apiKey}>
+	{#snippet actionCell(j: Journal)}
+		{#if mergeTargetId === j.id}
+			<div class="merge-search">
+				<input type="text" placeholder="Fusionner avec…" value={mergeSearch.query}
+					oninput={(e) => mergeSearch.setQuery((e.target as HTMLInputElement).value)}
+					class="merge-input" />
+				<button class="btn btn-sm" onclick={closeMerge}>Annuler</button>
+				{#if mergeSearch.loading}
+					<div class="merge-results"><span class="muted">Recherche…</span></div>
+				{:else if mergeSearch.results.length > 0}
+					<div class="merge-results">
+						{#each mergeSearch.results as r (r.id)}
+							<button class="merge-result" onclick={() => doMerge(r.id)}>
+								{r.title}
+								{#if r.pub_name}<span class="muted"> — {r.pub_name}</span>{/if}
+								<span class="muted"> ({r.pub_count} publis)</span>
+							</button>
+						{/each}
+					</div>
+				{:else if mergeSearch.query.length >= 2}
+					<div class="merge-results"><span class="muted">Aucun résultat</span></div>
+				{/if}
+			</div>
+		{:else}
+			<button class="btn btn-sm" onclick={() => openEdit(j)}>Modifier</button>
+			<button class="btn btn-sm btn-merge" onclick={() => openMerge(j.id)}>Fusionner…</button>
+		{/if}
+	{/snippet}
+</JournalsListView>
 
 {#if editModal}
 <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
@@ -264,28 +191,7 @@
 
 <style>
 	h2 { font-size: 1.2rem; font-weight: 600; margin: 0 0 12px; }
-	.count { color: var(--muted); font-weight: 400; }
-	.toolbar { margin-bottom: 12px; }
-	.search-input { width: 300px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.9rem; font-family: inherit; }
 
-	.data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-	.data-table th { text-align: left; padding: 6px 10px; border-bottom: 2px solid var(--border); font-size: 0.8rem; color: var(--muted); text-transform: uppercase; }
-	.data-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-	.data-table .num { text-align: right; }
-	.sortable { cursor: pointer; user-select: none; }
-	.sortable:hover { color: var(--accent); }
-
-	.journal-title { font-weight: 500; color: var(--accent); text-decoration: none; }
-	.journal-title:hover { text-decoration: underline; }
-	.publisher-link { color: var(--muted); text-decoration: none; }
-	a.publisher-link:hover { text-decoration: underline; }
-	.issn-cell { font-family: "JetBrains Mono", monospace; font-size: 0.8rem; white-space: nowrap; }
-	.muted { color: var(--muted); font-size: 0.85rem; }
-	.predatory td { background: #fff0f0; }
-	.badge-pred { font-size: 0.7rem; padding: 1px 5px; background: #d32f2f; color: white; border-radius: 8px; margin-left: 6px; }
-	.badge-doaj { font-size: 0.7rem; padding: 1px 5px; background: #2e7d32; color: white; border-radius: 8px; margin-left: 6px; }
-
-	.actions { white-space: nowrap; position: relative; }
 	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; padding: 2px 8px; }
 	.btn-merge:hover { background: var(--accent-light); }
 
@@ -294,4 +200,5 @@
 	.merge-results { position: absolute; right: 0; top: 100%; z-index: 10; border: 1px solid var(--border); border-radius: 4px; margin-top: 2px; max-height: 200px; overflow-y: auto; background: white; min-width: 350px; max-width: 600px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
 	.merge-result { display: block; width: 100%; padding: 5px 8px; font-size: 0.85rem; cursor: pointer; background: none; border: none; text-align: left; font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 	.merge-result:hover { background: var(--warning-light, #fff3e0); }
+	.muted { color: var(--muted); }
 </style>
