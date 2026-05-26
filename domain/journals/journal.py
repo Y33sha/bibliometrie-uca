@@ -25,6 +25,7 @@ JournalType = Literal[
     "proceedings",
     "repository",
     "book_series",
+    "ebook_platform",
     "preprint_server",
     "media",
 ]
@@ -33,6 +34,7 @@ JOURNAL_TYPES: tuple[JournalType, ...] = (
     "proceedings",
     "repository",
     "book_series",
+    "ebook_platform",
     "preprint_server",
     "media",
 )
@@ -46,9 +48,34 @@ JOURNAL_TYPE_LABELS_FR: dict[JournalType, str] = {
     "proceedings": "Proceedings",
     "repository": "Archive / dépôt",
     "book_series": "Série d'ouvrages",
+    "ebook_platform": "Plateforme eBooks",
     "preprint_server": "Serveur de preprints",
     "media": "Média",
 }
+
+# Mapping OpenAlex Sources `type` → notre `journal_type`. Lu par la phase
+# enrich et par le script de backfill `backfill_journal_types_from_openalex`.
+# Skip (None) sur `metadata` et `other` : pas de signal exploitable.
+# `preprint_server` et `media` n'ont pas d'équivalent OpenAlex (les preprint
+# servers y sont catégorisés en `repository`) — restent purement manuels.
+_OPENALEX_SOURCE_TYPE_MAP: dict[str, JournalType] = {
+    "journal": "journal",
+    "repository": "repository",
+    "conference": "proceedings",
+    "book series": "book_series",
+    "ebook platform": "ebook_platform",
+}
+
+
+def map_openalex_source_type(raw: str | None) -> JournalType | None:
+    """Mappe un champ OpenAlex Sources `type` vers notre enum `journal_type`.
+
+    Renvoie ``None`` pour les types sans signal exploitable (`metadata`,
+    `other`) ou inconnus — le caller doit alors ne pas écrire.
+    """
+    if not raw:
+        return None
+    return _OPENALEX_SOURCE_TYPE_MAP.get(raw.lower())
 
 
 @dataclass(slots=True)
