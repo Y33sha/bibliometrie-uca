@@ -4,29 +4,11 @@
 
   let { subjects }: { subjects: Subject[] } = $props();
 
-  /** Ontologies considérées comme "généralistes" (badge gris discret).
-   *
-   * - openalex_topic level 0 : domain OpenAlex.
-   * - hal_domain top-level : tous les codes sans `.` (ex `phys`, `chim`).
-   * - wos_heading : grandes catégories WoS (Physical Sciences…). */
-  function isGeneral(s: Subject): boolean {
-    if (Object.keys(s.ontologies).length === 0) return false;
-    const oa = s.ontologies.openalex_topic;
-    if (oa && oa.level === 0) return true;
-    const hal = s.ontologies.hal_domain;
-    if (hal && hal.codes.every((c) => !c.includes("."))) return true;
-    if (s.ontologies.wos_heading) return true;
-    return false;
-  }
-
   function isFree(s: Subject): boolean {
     return Object.keys(s.ontologies).length === 0;
   }
 
-  const generalConcepts = $derived(subjects.filter(isGeneral));
-  const preciseConcepts = $derived(
-    subjects.filter((s) => !isGeneral(s) && !isFree(s)),
-  );
+  const concepts = $derived(subjects.filter((s) => !isFree(s)));
   const freeKeywords = $derived(subjects.filter(isFree));
 
   function tooltip(s: Subject): string {
@@ -38,28 +20,25 @@
   <div class="section subjects-section">
     <h2 class="section-title">Sujets</h2>
 
-    {#if generalConcepts.length > 0}
-      <div class="general">
-        {#each generalConcepts as s (s.id)}
-          <a href="{base}/subjects/{s.id}" class="chip" title={tooltip(s)}>{s.label}</a>
+    {#if concepts.length > 0}
+      <ul class="tags-list">
+        {#each concepts as s (s.id)}
+          <li>
+            <a href="{base}/subjects/{s.id}" title={tooltip(s)}>{s.label}</a>
+          </li>
         {/each}
-      </div>
-    {/if}
-
-    {#if preciseConcepts.length > 0}
-      <div class="badges">
-        {#each preciseConcepts as s (s.id)}
-          <a href="{base}/subjects/{s.id}" class="badge concept" title={tooltip(s)}>{s.label}</a>
-        {/each}
-      </div>
+      </ul>
     {/if}
 
     {#if freeKeywords.length > 0}
-      <div class="badges">
+      <h3 class="subsection-title">Mots-clés libres</h3>
+      <ul class="tags-list">
         {#each freeKeywords as s (s.id)}
-          <a href="{base}/subjects/{s.id}" class="badge free" title={tooltip(s)}>{s.label}</a>
+          <li>
+            <a href="{base}/subjects/{s.id}" title={tooltip(s)}>{s.label}</a>
+          </li>
         {/each}
-      </div>
+      </ul>
     {/if}
   </div>
 {/if}
@@ -77,52 +56,35 @@
     font-weight: 600;
     margin: 0 0 10px;
   }
-  .general {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-bottom: 10px;
-    padding-bottom: 10px;
-    border-bottom: 1px dashed var(--border);
-  }
-  .chip {
-    display: inline-block;
-    padding: 2px 8px;
-    font-size: 0.8rem;
-    color: var(--muted, #6b7280);
-    background: var(--bg-muted, #f3f4f6);
-    border-radius: 4px;
-    text-decoration: none;
-  }
-  .chip:hover {
-    text-decoration: none;
-  }
-  .badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .badges + .badges {
-    margin-top: 8px;
-  }
-  .badge {
-    display: inline-block;
-    padding: 3px 10px;
+  .subsection-title {
     font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin: 14px 0 8px;
+  }
+  .tags-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .tags-list li {
+    display: inline-flex;
+    align-items: center;
+    background: #f5f4f1;
+    padding: 4px 10px;
     border-radius: 12px;
+    font-size: 0.9rem;
+  }
+  .tags-list a {
+    color: var(--accent);
     text-decoration: none;
   }
-  .badge:hover {
-    text-decoration: none;
-  }
-  .badge.concept {
-    background: #e0f2fe;
-    color: #075985;
-    border: 1px solid #bae6fd;
-  }
-  .badge.free {
-    background: #fef3c7;
-    color: #92400e;
-    border: 1px solid #fde68a;
+  .tags-list a:hover {
+    text-decoration: underline;
   }
 </style>
