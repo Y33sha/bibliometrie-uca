@@ -30,16 +30,12 @@ Complété par une extraction des [raw data](https://github.com/OpenAPC/openapc-
 
 https://treemaps.openapc.net/apcdata/clermont-u/
 
-## <span id="doaj"></span>DOAJ
+## <span id="doaj"></span>DOAJ — bootstrap CSV
 
-Le [DOAJ](../glossaire.md#doaj) (Directory of Open Access Journals) maintient un dump CSV public de l'ensemble des journaux référencés (~21 k entrées). DOAJ expose aussi une API REST publique (https://doaj.org/api/v3), non utilisée pour l'instant.
+Le flux régulier passe par l'API DOAJ (cf. [10-doaj.md](10-doaj.md)). L'import CSV reste utilisable pour un bootstrap rapide depuis un dump complet (~21 k revues, plus rapide qu'un fetch unitaire).
 
 Dump téléchargé manuellement depuis https://doaj.org/csv puis importé via `python -m interfaces.cli.imports.import_doaj_csv data/doaj_journalcsv_*.csv`.
 
-Données récupérées : payload CSV row complète stockée tel quel dans `journals.doaj_payload` (JSONB), avec `journals.is_in_doaj = TRUE` et `journals.doaj_imported_at` daté. Matching avec nos `journals` par **ISSN print ou electronic** : le script préfetche tous nos ISSN (`issn`, `eissn`, `issnl`) et fait le match en O(1).
+Le format de stockage est identique au sub-step API → pas de conflit, les deux flux écrivent dans `journals.doaj_payload` aux mêmes clés CSV.
 
-Le CSV est **source de vérité** : à chaque import, `is_in_doaj` est d'abord remis à `FALSE` sur tous les journaux (un journal sorti du DOAJ entre deux dumps voit donc son flag basculer).
-
-Utilisé en aval pour le badge DOAJ affiché sur les pages journaux et publishers.
-
-*A compléter*
+Différence opérationnelle : l'import CSV fait un reset global `is_in_doaj=FALSE` avant de re-marquer (CSV = source de vérité à l'instant T) ; le sub-step API est incrémental.

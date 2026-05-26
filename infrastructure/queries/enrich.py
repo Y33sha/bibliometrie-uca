@@ -3,10 +3,8 @@
 `fetch_publications_with_doi` est consommée par la phase `oa_status`
 (`application/pipeline/oa_status/`).
 
-`fetch_journals_needing_apc` et `fetch_publishers_needing_enrichment`
-sont consommées par les sub-steps `enrich_journals_from_openalex` et
-`enrich_publishers_from_openalex` de la phase `publishers_journals`
-(`application/pipeline/publishers_journals/`).
+Les autres queries alimentent les sub-steps de la phase
+`publishers_journals` (`application/pipeline/publishers_journals/`).
 
 Le nom de fichier reste `enrich.py` (legacy) — un split par phase
 sera possible si d'autres queries d'enrichissement s'y ajoutent.
@@ -206,6 +204,40 @@ def fetch_publishers_needing_country_from_crossref(
     return [(r.publisher_id, r.member_id) for r in rows]
 
 
+def fetch_journals_needing_doaj_fetch(
+    conn: Connection,
+    *,
+    stale_days: int,
+    limit: int | None = None,
+) -> list[tuple[int, str | None, str | None, str | None]]:
+    """Liste `(id, issn, eissn, issnl)` des revues à interroger côté DOAJ API.
+
+    Filtre : revue avec au moins un ISSN renseigné ET dernier import DOAJ
+    absent ou plus vieux que ``stale_days`` jours. Les revues qui ont
+    répondu 404 à un fetch récent (et dont on a écrit `doaj_imported_at`
+    quand même) sortent donc de la file pour la fenêtre de stale — évite
+    de retenter les ~12k journaux pas dans DOAJ à chaque pipeline.
+    """
+    base_sql = """
+        SELECT id, issn, eissn, issnl
+        FROM journals
+        WHERE (issn IS NOT NULL OR eissn IS NOT NULL OR issnl IS NOT NULL)
+          AND (
+              doaj_imported_at IS NULL
+              OR doaj_imported_at < now() - make_interval(days => :stale_days)
+          )
+        ORDER BY id
+    """
+    if limit and limit > 0:
+        rows = conn.execute(
+            text(base_sql + " LIMIT :lim"),
+            {"stale_days": stale_days, "lim": limit},
+        ).all()
+    else:
+        rows = conn.execute(text(base_sql), {"stale_days": stale_days}).all()
+    return [(r.id, r.issn, r.eissn, r.issnl) for r in rows]
+
+
 class PgEnrichQueries(EnrichQueries):
     """Adapter PostgreSQL pour `application.ports.enrich.EnrichQueries`."""
 
@@ -233,3 +265,12 @@ class PgEnrichQueries(EnrichQueries):
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, int]]:
         return fetch_publishers_needing_country_from_crossref(conn, limit=limit)
+
+    def fetch_journals_needing_doaj_fetch(
+        self,
+        conn: Connection,
+        *,
+        stale_days: int,
+        limit: int | None = None,
+    ) -> list[tuple[int, str | None, str | None, str | None]]:
+        return fetch_journals_needing_doaj_fetch(conn, stale_days=stale_days, limit=limit)

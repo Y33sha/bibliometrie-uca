@@ -95,10 +95,15 @@ Livrée le 2026-05-26.
 
 ## Phase 4 — DOAJ via API
 
-- [ ] **Extracteur API** : module `infrastructure/sources/doaj/`. Endpoint `https://doaj.org/api/journals/issn/{issn}` (un par requête, pas de bulk dispo).
-- [ ] **Sub-step `enrich_journals_from_doaj`** : itère sur `journals.issn IS NOT NULL OR journals.eissn IS NOT NULL`. Throttle conformément à `DOAJ_DELAY`. Met à jour `doaj_payload` + `doaj_imported_at` + `is_in_doaj`.
-- [ ] **Catch-up CSV** : `interfaces/cli/imports/import_doaj_csv.py` reste utilisable pour un dump complet rapide. Doc à mettre à jour pour expliquer les 2 modes.
-- [ ] **Question ouverte** : fréquence de rafraîchissement (toutes les phases publishers_journals, ou un sous-flag) — DOAJ ne bouge pas si vite, refetch quotidien overkill.
+Livrée le 2026-05-26.
+
+- [x] **Décision format payload** : mapper API → format CSV (clés du dump historique) plutôt que stocker l'API brute. Choix non orthodoxe assumé (cf. [docs/sources/10-doaj.md](../sources/10-doaj.md)) — préserve le front (`READABLE_DOAJ_FIELDS` qui hardcode les clés CSV), l'audit Phase 7 (`doaj_payload->>'APC amount'`), et la cohérence avec le bootstrap CSV qui reste fonctionnel. Une seule clé ajoutée vs CSV : `"DOAJ id"` (pour reconstruire l'URL fiche en Phase 6). Divergences API/CSV conservées : `Country of publisher` reste l'ISO-2 brut, `Languages…` reste les codes ISO-639-1.
+- [x] **Extracteur API** : `infrastructure/sources/doaj/__init__.py` — `fetch_doaj_journal(issn, ...)` sur `GET https://doaj.org/api/search/journals/issn:{issn}` (wrapper `{total, results[]}`), polite pool via User-Agent (mailto). Mapper pur `to_csv_shape(record) → dict[str, str]`, tests unit dans `tests/unit/infrastructure/sources/test_doaj.py`.
+- [x] **Sub-step `enrich_journals_from_doaj`** : `application/pipeline/publishers_journals/enrich_journals_from_doaj.py`. Itère sur les revues avec au moins un ISSN, essai successif `issn` → `eissn` → `issnl` (dédup + skip NULL), 1 à 3 requêtes / revue. Fetcher + mapper injectés (étanchéité DDD).
+- [x] **Politique de rafraîchissement (stale-based)** : query `fetch_journals_needing_doaj_fetch(stale_days)` filtre `doaj_imported_at IS NULL OR doaj_imported_at < now() - make_interval(days => :stale_days)`. Défaut 30 j. Sur 404, `imported_at` est posé quand même (`payload=NULL`, `is_in_doaj=FALSE`) pour éviter de retenter les ~12 k revues hors-DOAJ à chaque pipeline. Pas de reset global (incrémental).
+- [x] **Branchement pipeline** : `phase_publishers_journals` appelle `_run_enrich_journals_from_doaj` après `_run_enrich_journals_from_openalex` (DOAJ direct surclasse le `is_in_doaj` posé par OpenAlex), avant les sub-steps publishers. Gated par `MODES[mode].run_journal_enrichment`.
+- [x] **CLI** : `interfaces/cli/pipeline/enrich_journals_from_doaj.py` (--limit / --stale-days / --dry-run).
+- [x] **Catch-up CSV** : `interfaces/cli/imports/import_doaj_csv.py` reste utilisable pour bootstrap. Même format de stockage → pas de conflit. Doc 09-imports-manuels.md mise à jour pour rediriger vers la nouvelle fiche 10-doaj.md.
 
 ## Phase 5 — Crossref Members (fallback country)
 

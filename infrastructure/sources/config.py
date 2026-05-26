@@ -117,6 +117,8 @@ _API_BASE_URLS_DEFAULTS: dict[str, str] = {
     "unpaywall": "https://api.unpaywall.org/v2",
     "zenodo": "https://zenodo.org/api/records",
     "ror": "https://api.ror.org/v2/organizations",
+    # DOAJ : racine de l'API, l'adapter compose `/search/journals/issn:{issn}`.
+    "doaj": "https://doaj.org/api",
 }
 
 
