@@ -2,7 +2,7 @@
 
 Couvre :
 - GET /api/publishers (liste + search + sort variants + filtres)
-- GET /api/publishers/countries (valeurs distinctes pour le filtre)
+- GET /api/publishers/facets (3 dimensions avec comptes exclusifs)
 - GET /api/publishers/{id} (detail enrichi, 404)
 - GET /api/publishers/{id}/dashboard (journal_types + doc_types + oa_statuses, 404)
 - GET /api/publishers/{id}/subjects (top sujets, exclusion sujets génériques)
@@ -211,18 +211,23 @@ class TestListPublishers:
         assert flags == {True}
 
 
-# ── GET /api/publishers/countries ────────────────────────────────
+# ── GET /api/publishers/facets ───────────────────────────────────
 
 
-class TestPublisherCountries:
-    def test_returns_distinct_values(self, client):
+class TestPublishersFacets:
+    def test_returns_3_dimensions(self, client):
         pid = _seed_publisher()
         country = _uniq("ZZ")[:5]
         with _pool() as cur:
             cur.execute("UPDATE publishers SET country = %s WHERE id = %s", (country, pid))
-        r = client.get("/api/publishers/countries")
+        r = client.get("/api/publishers/facets")
         assert r.status_code == 200
-        assert country in r.json()
+        body = r.json()
+        assert set(body) == {"publisher_types", "countries", "predatory"}
+        # Le pays seedé doit apparaître dans la facette countries.
+        assert any(opt["value"] == country for opt in body["countries"])
+        # `predatory` est un bool : 2 options Oui/Non.
+        assert sorted(o["value"] for o in body["predatory"]) == ["false", "true"]
 
 
 # ── GET /api/publishers/{id} ────────────────────────────────────
