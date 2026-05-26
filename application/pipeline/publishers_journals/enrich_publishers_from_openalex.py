@@ -150,9 +150,6 @@ def run_enrich_publishers_from_openalex(
         no_response = 0
         processed = 0
 
-        # On a besoin du state actuel (country/ror déjà posés ?) pour
-        # respecter la politique d'écrasement (NULL only). Charger en
-        # bloc par batch pour éviter N+1.
         for i in range(0, total, BATCH_SIZE):
             batch = publishers[i : i + BATCH_SIZE]
             oa_ids = [row[1] for row in batch]
@@ -202,7 +199,10 @@ def run_enrich_publishers_from_openalex(
                     updated += 1  # compté en dry-run aussi
                 processed += 1
 
-            if not dry_run and processed % COMMIT_EVERY < BATCH_SIZE:
+            # Commit chaque batch pour préserver la progression en cas
+            # d'interruption — l'enrich est par nature idempotent (re-skip
+            # les publishers déjà enrichis via le filtre `fetch_publishers_needing_enrichment`).
+            if not dry_run:
                 conn.commit()
 
             logger.info(
