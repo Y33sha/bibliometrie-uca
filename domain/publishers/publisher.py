@@ -44,6 +44,43 @@ PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
     "unknown": "Type inconnu",
 }
 
+# Mapping ROR `types` → notre `publisher_type`. ROR v2 expose `types`
+# comme une LISTE (ex. `['company', 'funder']`). On applique le mapping
+# par ordre de précédence : le premier ROR type qui a une correspondance
+# l'emporte. `funder` est volontairement absent — c'est presque toujours
+# un type secondaire qui bruite la liste (un éditeur qui finance aussi
+# de la recherche). Cf. audit Phase 3 (`audit_ror_types_for_publishers`).
+#
+# Décisions tranchées à l'audit :
+# - `government` exclu (ex. European Commission, CDC, Académies nationales
+#   — pas des academic_institution).
+# - `facility`, `other`, `healthcare` skip — bruit (INSEE, Sciences Po,
+#   Mathematical Society of America fourrent dans `other`/`facility`, à
+#   arbitrer manuellement via l'UI admin).
+# - `nonprofit` → `learned_society` : couvre les vraies sociétés savantes
+#   (American Meteorological Society…) ET les éditeurs nonprofit (eLife,
+#   BioOne). L'amalgame est assumé — on préfère un signal raisonnable à
+#   un skip.
+_ROR_TYPE_TO_PUBLISHER_TYPE: list[tuple[str, PublisherType]] = [
+    ("education", "academic_institution"),
+    ("archive", "repository"),
+    ("company", "commercial"),
+    ("nonprofit", "learned_society"),
+]
+
+
+def map_ror_types(ror_types: list[str]) -> PublisherType | None:
+    """Mappe une liste de ROR `types` vers notre enum `publisher_type`.
+
+    Renvoie ``None`` quand aucun ROR type de la liste n'a de mapping
+    défini (`government`, `facility`, `other`, `healthcare`, ou
+    seulement `funder`) — le caller doit alors ne pas écrire.
+    """
+    for ror_type, publisher_type in _ROR_TYPE_TO_PUBLISHER_TYPE:
+        if ror_type in ror_types:
+            return publisher_type
+    return None
+
 
 @dataclass(slots=True)
 class Publisher:

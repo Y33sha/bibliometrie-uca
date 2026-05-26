@@ -250,20 +250,24 @@ def phase_publishers_journals(mode: Any = "full", **kw: Any) -> PhaseMetrics:
        OpenAlex Sources → APC + DOAJ flag + journal_type.
     3. `enrich_publishers_from_openalex` (gated par `run_journal_enrichment`) :
        OpenAlex Publishers → country + ror.
+    4. `enrich_publishers_from_ror` (gated par `run_journal_enrichment`) :
+       ROR types → publisher_type. Consomme `publishers.ror` posé en 3.
 
-    À étoffer avec DOAJ via API, ROR → publisher_type (cf. roadmap).
+    À étoffer avec DOAJ via API (cf. roadmap).
 
     Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les `publishers`/`journals` qu'on veut enrichir.
 
     Idempotente : `resolve_doi_prefixes` ne traite que les préfixes absents
     de `doi_prefixes` ; l'enrichissement journaux ne traite que les revues
     sans APC renseigné (sauf `--reset`) ; l'enrichissement publishers ne
-    traite que ceux à qui il manque `country` ou `ror`.
+    traite que ceux à qui il manque `country` ou `ror` ; le typage ROR ne
+    touche que ceux à `publisher_type='unknown'`.
     """
     metrics = _run_resolve_doi_prefixes()
     if MODES[mode].run_journal_enrichment:
         _run_enrich_journals_from_openalex()
         _run_enrich_publishers_from_openalex()
+        _run_enrich_publishers_from_ror()
     else:
         log.info("Enrichissement journaux/publishers OpenAlex ignoré en mode %s", mode)
     return metrics
@@ -808,6 +812,41 @@ def _run_enrich_publishers_from_openalex() -> None:
     finally:
         conn.close()
     log.info("✓ enrich_publishers_from_openalex terminé en %.1fs", time.time() - t0)
+
+
+def _run_enrich_publishers_from_ror() -> None:
+    from application.pipeline.publishers_journals.enrich_publishers_from_ror import (
+        RorFetcher,
+        run_enrich_publishers_from_ror,
+    )
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.enrich import PgEnrichQueries
+    from infrastructure.repositories import publisher_repository
+    from infrastructure.sources.api_limits import ROR_DELAY
+    from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
+    from infrastructure.sources.ror import build_ror_user_agent, fetch_ror_record
+
+    log.info("▶ enrich_publishers_from_ror")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        base_url = get_api_base_urls(conn)["ror"]
+        user_agent = build_ror_user_agent(get_polite_pool_email(conn))
+        fetcher: RorFetcher = lambda ror: fetch_ror_record(  # noqa: E731
+            ror, base_url=base_url, user_agent=user_agent, logger=log
+        )
+
+        run_enrich_publishers_from_ror(
+            conn,
+            PgEnrichQueries(),
+            log,
+            publisher_repo=publisher_repository(conn),
+            fetcher=fetcher,
+            rate_delay=ROR_DELAY,
+        )
+    finally:
+        conn.close()
+    log.info("✓ enrich_publishers_from_ror terminé en %.1fs", time.time() - t0)
 
 
 def _run_resolve_addresses(mode: str) -> None:

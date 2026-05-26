@@ -115,6 +115,40 @@ def fetch_publishers_needing_enrichment(
     return [(r.id, r.openalex_id) for r in rows]
 
 
+def fetch_publishers_needing_publisher_type_from_ror(
+    conn: Connection, *, limit: int | None = None
+) -> list[tuple[int, str]]:
+    """Liste `(id, ror)` des publishers à typer via leur record ROR.
+
+    Utilisé par `enrich_publishers_from_ror`. Filtre les publishers avec
+    un `ror` non-NULL et un `publisher_type='unknown'` (= défaut DB, non
+    encore arbitré manuellement). Préserve les valeurs admin explicites.
+    """
+    if limit and limit > 0:
+        rows = conn.execute(
+            text("""
+                SELECT id, ror
+                FROM publishers
+                WHERE ror IS NOT NULL
+                  AND publisher_type = 'unknown'
+                ORDER BY id
+                LIMIT :lim
+            """),
+            {"lim": limit},
+        ).all()
+    else:
+        rows = conn.execute(
+            text("""
+                SELECT id, ror
+                FROM publishers
+                WHERE ror IS NOT NULL
+                  AND publisher_type = 'unknown'
+                ORDER BY id
+            """)
+        ).all()
+    return [(r.id, r.ror) for r in rows]
+
+
 class PgEnrichQueries(EnrichQueries):
     """Adapter PostgreSQL pour `application.ports.enrich.EnrichQueries`."""
 
@@ -132,3 +166,8 @@ class PgEnrichQueries(EnrichQueries):
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]:
         return fetch_publishers_needing_enrichment(conn, limit=limit)
+
+    def fetch_publishers_needing_publisher_type_from_ror(
+        self, conn: Connection, *, limit: int | None = None
+    ) -> list[tuple[int, str]]:
+        return fetch_publishers_needing_publisher_type_from_ror(conn, limit=limit)
