@@ -10,7 +10,7 @@ L'enrichissement des entités `publishers` et `journals` est aujourd'hui dispers
 - **`resolve_doi_prefixes`** (entre normalize et affiliations) renseigne `doi_prefixes` (avec son `ra` et son `crossref_member_id`) et lie `publisher_id` quand le nom Crossref matche `publisher_name_forms`. C'est de l'enrichissement de référentiel — mal rangé en phase top-level isolée.
 - **`enrich`** mélange `enrich_oa_status` (Unpaywall, **per-publication**) et `enrich_journal_apc` (OpenAlex Sources, **per-journal** : APC, `is_in_doaj` flag, `journal_type` depuis 2026-05-26). Le carpe-lapin nuit à la lisibilité.
 - **Import DOAJ CSV** vit comme script CLI manuel (`interfaces/cli/imports/import_doaj_csv.py`). Bootstrap-style, pas branché au pipeline régulier.
-- **Aucune source pour `publishers.country` ni `publishers.publisher_type`** — ces colonnes restent NULL / `'unknown'` faute de phase d'enrichissement, alors qu'OpenAlex Publishers fournit `country_codes` + `ids.ror` + `ids.wikidata` gratuitement et que ROR permet ensuite de dériver un `publisher_type`.
+- **Aucune source pour `publishers.country` ni `publishers.publisher_type`** — ces colonnes restent NULL / `'unknown'` faute de phase d'enrichissement, alors qu'OpenAlex Publishers fournit `country_codes` + `ids.ror` gratuitement et que ROR permet ensuite de dériver un `publisher_type`.
 
 **Objectif** : consolider tout l'enrichissement référentiel dans une unique phase pipeline `publishers_journals`, positionnée entre `normalize` et `affiliations`. Garder `enrich_oa_status` (Unpaywall) à sa place — c'est per-publication, hors-scope.
 
@@ -24,7 +24,7 @@ L'enrichissement des entités `publishers` et `journals` est aujourd'hui dispers
 
 4. **DOAJ — API ou CSV** — **tranché** : extracteur API pour intégrer dans la phase pipeline. Le CSV reste pour bootstrap / catch-up massif occasionnel mais sort du workflow régulier.
 
-5. **ROR / Wikidata — comment alimenter** — **tranché** : exclusivement via les `ids` retournés par OpenAlex Publishers (= identifiants déjà résolus par OpenAlex, fiables). **Pas de matching par nom** (trop fragile). Pour les publishers sans `openalex_id`, le ROR reste NULL et le typage reste manuel.
+5. **ROR — comment alimenter** — **tranché** : exclusivement via `ids.ror` retourné par OpenAlex Publishers (= identifiant déjà résolu par OpenAlex, fiable). **Pas de matching par nom** (trop fragile). Pour les publishers sans `openalex_id`, le ROR reste NULL et le typage reste manuel.
 
 6. **Mapping ROR `types` → notre `publisher_type`** — **à figer à l'audit** : proposition de départ ci-dessous, à valider sur l'échantillon réel (Phase 3).
    | ROR | publisher_type |
@@ -43,7 +43,7 @@ L'enrichissement des entités `publishers` et `journals` est aujourd'hui dispers
 Ordre par dépendance. Les phases 2, 3, 4, 5 sont indépendantes une fois la phase 1 livrée.
 
 - **Phase 1 — Refonte structurelle.** Créer la phase pipeline `publishers_journals`. Déplacer `resolve_doi_prefixes` et `enrich_journal_apc` dedans. `enrich_oa_status` (Unpaywall) reste dans la phase `enrich` (per-publication).
-- **Phase 2 — OpenAlex Publishers.** Nouveau sub-step. Lit `publishers.openalex_id`, fetche `/api/publishers/{id}`, pose `country`, `ror`, `wikidata` (nouvelles colonnes / déjà existantes selon le cas).
+- **Phase 2 — OpenAlex Publishers.** Nouveau sub-step. Lit `publishers.openalex_id`, fetche `/api/publishers/{id}`, pose `country` et `ror`.
 - **Phase 3 — ROR → `publisher_type`.** Pour chaque publisher avec `ror` non-NULL, lookup ROR API → `types[0]` → mapping (cf. décision 6). Audit préalable de la distribution.
 - **Phase 4 — DOAJ via API.** Extracteur DOAJ par ISSN. Stockage existant (`doaj_payload` JSONB, `doaj_imported_at`). Au passage : capturer l'URL de la fiche DOAJ du journal (typiquement `https://doaj.org/toc/{doaj_id}` ou équivalent à confirmer sur le payload API) pour le **lien depuis le badge DOAJ** (cf. Phase 6).
 - **Phase 5 — Crossref Members (fallback `country`).** Pour les publishers sans `openalex_id` mais avec `crossref_member_id` posé par `doi_prefixes`, fetcher `/members/{id}` → parser `location` → ISO-2.
@@ -66,8 +66,8 @@ Livrée le 2026-05-26 (commit `d003bb9e`).
 
 ## Phase 2 — OpenAlex Publishers
 
-- [ ] **Migration Alembic** : ajouter `publishers.country` (déjà présent), `publishers.ror text` (nouveau, `UNIQUE NULLS NOT DISTINCT`), `publishers.wikidata text` (nouveau). Index optionnels sur ror / wikidata.
-- [ ] **Sub-step `enrich_publishers_from_openalex`** : itère sur `publishers.openalex_id IS NOT NULL`, batch via filtre OpenAlex `openalex:|`. Écrit `country` (`country_codes[0]`), `ror` (`ids.ror` parsé), `wikidata` (`ids.wikidata` parsé). Politique d'écrasement standard (cf. décision 7).
+- [ ] **Migration Alembic** : `publishers.country` est déjà présent. Ajouter `publishers.ror text` (nouveau, `UNIQUE NULLS NOT DISTINCT`). Index optionnel.
+- [ ] **Sub-step `enrich_publishers_from_openalex`** : itère sur `publishers.openalex_id IS NOT NULL`, batch via filtre OpenAlex `openalex:|`. Écrit `country` (`country_codes[0]`) et `ror` (`ids.ror` parsé). Politique d'écrasement standard (cf. décision 7).
 - [ ] **Script oneshot** `interfaces/cli/oneshot/backfill_publishers_from_openalex.py` pour réinterroger l'historique (pattern reproductible depuis `backfill_journal_types_from_openalex.py`).
 - [ ] **Audit avant écriture** : combien de publishers ont `openalex_id` non-NULL ? Si < 50%, brancher d'abord une étape de matching (un autre chantier).
 
@@ -110,7 +110,6 @@ Livrée le 2026-05-26 (commit `d003bb9e`).
 
 - **`parent_publisher` d'OpenAlex** : faut-il consolider automatiquement les filiales sous le parent ? Risque de fusion abusive (BMC ≠ Springer Nature en pratique éditoriale). À reposer si on observe des problèmes de hiérarchie à l'usage.
 - **Sources `country` d'OpenAlex sur les journals** : OpenAlex Sources retourne aussi un `country_codes` pour les journals. Diverge parfois du publisher (revue éditée par filiale dans un pays différent). À exploiter ? Hors-scope cette fiche.
-- **Wikidata** : on stocke l'identifiant via OpenAlex (Phase 2), mais on ne s'en sert pour rien dans cette fiche. Réserve : lookup Wikidata pour metadata supplémentaires (sujets d'édition, périodes d'activité) — utile pour un futur chantier d'analyse historique des éditeurs.
 - **Mapping ROR `Nonprofit`** : à figer après audit Phase 3 (PLOS / eLife / Hindawi sont les cas litigieux).
 - ~~**Modes pipeline**~~ — **tranché Phase 1** : `phase_publishers_journals` tourne dans tous les modes (comme `resolve_doi_prefixes` historiquement). Le sub-step `enrich_journals_from_openalex` est gated par `MODES[mode].run_journal_enrichment` (True en `full` uniquement, comme l'était `run_enrich` historiquement pour le journal_apc).
 
