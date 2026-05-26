@@ -53,6 +53,20 @@ JOURNAL_TYPE_LABELS_FR: dict[JournalType, str] = {
     "media": "Média",
 }
 
+# Modèles OA observés en base (colonne `journals.oa_model`, text libre côté
+# schéma mais en pratique restreint à ce vocabulaire — fixé par le modal
+# d'édition admin et par les rares écritures pipeline).
+OaModel = Literal["subscription", "full_oa", "repository"]
+OA_MODELS: tuple[OaModel, ...] = ("subscription", "full_oa", "repository")
+
+# Labels FR exposés via `/api/journals/oa-models` (consommé par les
+# dropdowns/facettes côté UI, et par le modal d'édition admin).
+OA_MODEL_LABELS_FR: dict[OaModel, str] = {
+    "subscription": "Abonnement",
+    "full_oa": "Full OA (gold/diamond)",
+    "repository": "Archive / dépôt",
+}
+
 # Mapping OpenAlex Sources `type` → notre `journal_type`. Lu par la phase
 # enrich et par le script de backfill `backfill_journal_types_from_openalex`.
 # Skip (None) sur `metadata` et `other` : pas de signal exploitable.

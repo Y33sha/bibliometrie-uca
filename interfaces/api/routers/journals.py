@@ -11,16 +11,23 @@ from application.ports.api.journals_queries import (
     JournalDetailResponse,
     JournalListResponse,
     JournalQueries,
+    JournalsFacetsResponse,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
-from domain.journals.journal import JOURNAL_TYPE_LABELS_FR, JOURNAL_TYPES
+from domain.journals.journal import (
+    JOURNAL_TYPE_LABELS_FR,
+    JOURNAL_TYPES,
+    OA_MODEL_LABELS_FR,
+    OA_MODELS,
+)
 from interfaces.api.deps import (
     audit_repo_sync,
     journal_queries_sync,
     journal_repo_sync,
 )
+from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     EnumOption,
     JournalUpdate,
@@ -33,16 +40,15 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/api/journals/oa-models", response_model=list[str])
-def list_oa_models(
-    queries: JournalQueries = Depends(journal_queries_sync),
-) -> list[str]:
-    """Valeurs distinctes de `oa_model` observées en base, triées par fréquence.
+@router.get("/api/journals/oa-models", response_model=list[EnumOption])
+def list_oa_models() -> list[EnumOption]:
+    """Valeurs possibles de `oa_model` avec leur label français.
 
-    Sert à alimenter le filtre « Modèle OA » de la page publique `/journals`.
-    Pas d'enum SQL ici (texte libre historique) — on lit ce qui existe.
+    Source de vérité côté Python : `domain.journals.journal.OA_MODELS` +
+    `OA_MODEL_LABELS_FR`. Sert à alimenter les facettes « Modèle OA » des
+    listings de revues et le dropdown du modal d'édition admin.
     """
-    return queries.distinct_oa_models()
+    return [EnumOption(value=v, label_fr=OA_MODEL_LABELS_FR[v]) for v in OA_MODELS]
 
 
 @router.get("/api/journal-types", response_model=list[EnumOption])
@@ -57,15 +63,42 @@ def list_journal_types() -> list[EnumOption]:
     return [EnumOption(value=v, label_fr=JOURNAL_TYPE_LABELS_FR[v]) for v in JOURNAL_TYPES]
 
 
+@router.get("/api/journals/facets", response_model=JournalsFacetsResponse)
+def journals_facets(
+    search: str | None = None,
+    publisher_id: int | None = None,
+    journal_type: str = Query(""),
+    is_in_doaj: bool | None = None,
+    oa_model: str = Query(""),
+    with_pubs: bool = False,
+    queries: JournalQueries = Depends(journal_queries_sync),
+) -> JournalsFacetsResponse:
+    """Comptes par option pour les 3 facettes du listing revues.
+
+    Convention identique à `/api/publications/facets` : chaque facette
+    exclut sa propre dimension de la condition WHERE, ce qui permet
+    d'afficher le nombre de revues atteignables si l'option était
+    (dé)cochée.
+    """
+    return queries.journals_facets(
+        search=search,
+        publisher_id=publisher_id,
+        journal_types=parse_str_csv(journal_type),
+        is_in_doaj=is_in_doaj,
+        oa_models=parse_str_csv(oa_model),
+        with_pubs=with_pubs,
+    )
+
+
 @router.get("/api/journals", response_model=JournalListResponse)
 def list_journals(
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=1, le=200),
     search: str | None = None,
     publisher_id: int | None = None,
-    journal_type: str | None = None,
+    journal_type: str = Query(""),
     is_in_doaj: bool | None = None,
-    oa_model: str | None = None,
+    oa_model: str = Query(""),
     with_pubs: bool = False,
     sort: str = "title",
     queries: JournalQueries = Depends(journal_queries_sync),
@@ -75,7 +108,10 @@ def list_journals(
     Filtres :
     - `search` : insensible à la casse sur le titre normalisé, ignorée si
       < 2 caractères.
-    - `publisher_id` / `journal_type` / `oa_model` : égalité stricte.
+    - `publisher_id` : égalité stricte.
+    - `journal_type` / `oa_model` : CSV de valeurs (ex. `journal,proceedings`).
+      Vide = pas de filtre. Aligné sur la convention multi-valeurs de
+      `/api/publications`.
     - `is_in_doaj` : booléen (true/false). Omettre = pas de filtre.
     - `with_pubs` : si true, n'expose que les revues avec au moins 1
       publication rattachée. Utilisé par la page publique /journals pour
@@ -88,9 +124,9 @@ def list_journals(
     return queries.list_journals(
         search=search,
         publisher_id=publisher_id,
-        journal_type=journal_type,
+        journal_types=parse_str_csv(journal_type),
         is_in_doaj=is_in_doaj,
-        oa_model=oa_model,
+        oa_models=parse_str_csv(oa_model),
         with_pubs=with_pubs,
         sort=sort,
         page=page,

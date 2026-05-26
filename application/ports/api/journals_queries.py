@@ -101,6 +101,35 @@ class OaStatusCount(BaseModel):
     expected: bool
 
 
+class JournalsFacetOption(BaseModel):
+    """Option d'une facette du listing revues : valeur + label FR + compte.
+
+    `label_fr` reprend `JOURNAL_TYPE_LABELS_FR` / `OA_MODEL_LABELS_FR` côté
+    `journal_type` / `oa_model` ; pour la facette DOAJ on expose `Indexée`
+    / `Non indexée`. `count` est le nombre de revues qui matcheraient si
+    on ne sélectionnait que cette option, en appliquant tous les autres
+    filtres actifs (= compte exclusif à la dimension, comme les facettes
+    publications).
+    """
+
+    value: str
+    label_fr: str
+    count: int
+
+
+class JournalsFacetsResponse(BaseModel):
+    """Facettes dynamiques pour `/api/journals` (3 dimensions).
+
+    Chaque dimension exclut son propre filtre de la condition WHERE, ce
+    qui permet d'afficher le nombre de revues atteignables si l'option
+    était (dé)cochée.
+    """
+
+    journal_types: list[JournalsFacetOption]
+    oa_models: list[JournalsFacetOption]
+    doaj: list[JournalsFacetOption]
+
+
 class JournalDashboardResponse(BaseModel):
     """GET /api/journals/{id}/dashboard : agrégats de signalement pour l'exploration.
 
@@ -130,14 +159,25 @@ class JournalQueries(Protocol):
         *,
         search: str | None,
         publisher_id: int | None,
-        journal_type: str | None,
+        journal_types: list[str],
         is_in_doaj: bool | None,
-        oa_model: str | None,
+        oa_models: list[str],
         with_pubs: bool,
         sort: str,
         page: int,
         per_page: int,
     ) -> JournalListResponse: ...
+
+    def journals_facets(
+        self,
+        *,
+        search: str | None,
+        publisher_id: int | None,
+        journal_types: list[str],
+        is_in_doaj: bool | None,
+        oa_models: list[str],
+        with_pubs: bool,
+    ) -> JournalsFacetsResponse: ...
 
     def get_journal_detail(self, journal_id: int) -> JournalDetailResponse | None: ...
 
@@ -146,5 +186,3 @@ class JournalQueries(Protocol):
     def get_journal_subjects(self, journal_id: int, *, limit: int) -> list[SubjectFrequency]: ...
 
     def existing_journal_ids(self, journal_ids: tuple[int, ...]) -> set[int]: ...
-
-    def distinct_oa_models(self) -> list[str]: ...

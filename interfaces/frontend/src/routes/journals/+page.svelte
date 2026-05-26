@@ -21,7 +21,7 @@
 	let data = $state<JournalListResponse | null>(null);
 	let loading = $state(false);
 	let journalTypes: EnumOption[] = $state([]);
-	let oaModels: string[] = $state([]);
+	let oaModels: EnumOption[] = $state([]);
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
 	async function loadJournals() {
@@ -46,7 +46,7 @@
 	async function loadFacetOptions() {
 		const [types, models] = await Promise.all([
 			api<EnumOption[]>('/api/journal-types'),
-			api<string[]>('/api/journals/oa-models')
+			api<EnumOption[]>('/api/journals/oa-models')
 		]);
 		journalTypes = types;
 		oaModels = models;
@@ -135,8 +135,8 @@
 			Modèle OA
 			<select bind:value={oaModel} onchange={onFilterChange}>
 				<option value="">Tous</option>
-				{#each oaModels as m (m)}
-					<option value={m}>{m}</option>
+				{#each oaModels as m (m.value)}
+					<option value={m.value}>{m.label_fr}</option>
 				{/each}
 			</select>
 		</label>

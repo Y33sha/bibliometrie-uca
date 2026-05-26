@@ -429,21 +429,14 @@ class TestMergeJournals:
 
 
 class TestOaModels:
-    def test_returns_distinct_values_sorted_by_frequency(self, client):
-        # Seed deux journals full_oa + un subscription.
-        j1 = _seed_journal()
-        j2 = _seed_journal()
-        j3 = _seed_journal()
-        with _pool() as cur:
-            cur.execute("UPDATE journals SET oa_model = 'full_oa' WHERE id IN (%s, %s)", (j1, j2))
-            cur.execute("UPDATE journals SET oa_model = 'subscription' WHERE id = %s", (j3,))
+    def test_returns_enum_with_fr_labels(self, client):
         r = client.get("/api/journals/oa-models")
         assert r.status_code == 200
         models = r.json()
-        # 'full_oa' apparaît 2x → doit ressortir avant 'subscription'.
-        assert models[0] == "full_oa"
-        assert "subscription" in models
-        assert all(isinstance(m, str) for m in models)
+        # Source de vérité = domain.journals.journal.OA_MODELS / OA_MODEL_LABELS_FR.
+        values = [m["value"] for m in models]
+        assert values == ["subscription", "full_oa", "repository"]
+        assert all("label_fr" in m and m["label_fr"] for m in models)
 
 
 # ── GET /api/journal-types ──────────────────────────────────────
