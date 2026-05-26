@@ -1,9 +1,15 @@
 """
-Enrichissement du statut Open Access via l'API Unpaywall.
+Phase pipeline `oa_status` — enrichit `publications.oa_status` via Unpaywall.
 
 Pour les publications ayant un DOI, interroge Unpaywall et met à jour
 le statut OA. Écrase les valeurs existantes, SAUF : ne remplace jamais
 'diamond' par 'gold' (Unpaywall ne connaît pas le diamond OA).
+
+Cette phase ne contient qu'un seul sub-step (Unpaywall). Elle s'appelait
+`enrich` avant 2026-05-26, rebaptisée après l'extraction de la phase
+`publishers_journals` qui a absorbé `enrich_journal_apc`. Le nom `enrich`
+était devenu un misnomer (countries/subjects/publishers_journals
+enrichissent aussi).
 
 L'orchestrateur dépend du port `EnrichQueries` et reçoit en injection
 un `OaStatusFetcher` (le fetcher concret vit dans
@@ -32,7 +38,7 @@ BATCH_SIZE = 50
 MAX_CONCURRENT = 5
 
 
-async def run_enrich(
+async def run_enrich_oa_status(
     conn: Connection,
     queries: EnrichQueries,
     logger: logging.Logger,

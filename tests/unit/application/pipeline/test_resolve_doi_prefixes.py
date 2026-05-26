@@ -8,7 +8,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from application.pipeline.resolve_doi_prefixes import run_resolve_doi_prefixes
+from application.pipeline.publishers_journals.resolve_doi_prefixes import (
+    run_resolve_doi_prefixes,
+)
 from application.ports.repositories.doi_prefix_repository import UnmatchedPrefix
 
 

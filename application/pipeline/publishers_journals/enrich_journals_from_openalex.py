@@ -1,5 +1,6 @@
 """
-Enrichit les revues à partir de l'API OpenAlex Sources.
+Sub-step de la phase pipeline `publishers_journals` — enrichit les
+revues à partir de l'API OpenAlex Sources.
 
 Champs mis à jour :
 - `apc_amount`, `apc_currency`, `is_in_doaj` (prix catalogue DOAJ exposés par OpenAlex)
@@ -8,6 +9,10 @@ Champs mis à jour :
 Utilise le filtre openalex avec pipe (|) pour interroger jusqu'à 50 sources par requête.
 
 L'orchestrateur dépend du port `EnrichQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/enrich_journal_apc.py`. Pour ré-interroger toutes les revues ayant un openalex_id (et pas seulement celles sans APC), utiliser le script `interfaces/cli/oneshot/backfill_journal_types_from_openalex.py`.
+
+Module renommé depuis `application/pipeline/enrich/enrich_journal_apc.py`
+le 2026-05-26 dans le cadre de la refonte structurelle de la phase
+`publishers_journals` (cf. METIER_pipeline-publishers-journals.md).
 """
 
 import logging
@@ -112,7 +117,7 @@ def extract_apc(source: dict) -> tuple[float | None, str]:
     return None, "EUR"
 
 
-def run_enrich(
+def run_enrich_journals_from_openalex(
     conn: Connection,
     queries: EnrichQueries,
     logger: logging.Logger,

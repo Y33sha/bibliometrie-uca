@@ -1,7 +1,14 @@
 """Query service : lectures pour les scripts d'enrichissement pipeline.
 
-Appelé par `application/pipeline/enrich/*`. Chaque fonction renvoie la liste
-des publications/revues à traiter par le script d'enrichissement.
+`fetch_publications_with_doi` est consommée par la phase `oa_status`
+(`application/pipeline/oa_status/`).
+
+`fetch_journals_needing_apc` est consommée par le sub-step
+`enrich_journals_from_openalex` de la phase `publishers_journals`
+(`application/pipeline/publishers_journals/`).
+
+Le nom de fichier reste `enrich.py` (legacy) — un split par phase
+sera possible si d'autres queries d'enrichissement s'y ajoutent.
 """
 
 from sqlalchemy import Connection, text
