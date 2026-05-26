@@ -45,7 +45,7 @@ Ordre par dépendance. Les phases 2, 3, 4, 5 sont indépendantes une fois la pha
 - **Phase 1 — Refonte structurelle.** Créer la phase pipeline `publishers_journals`. Déplacer `resolve_doi_prefixes` et `enrich_journal_apc` dedans. `enrich_oa_status` (Unpaywall) reste dans la phase `enrich` (per-publication).
 - **Phase 2 — OpenAlex Publishers.** Nouveau sub-step. Lit `publishers.openalex_id`, fetche `/api/publishers/{id}`, pose `country`, `ror`, `wikidata` (nouvelles colonnes / déjà existantes selon le cas).
 - **Phase 3 — ROR → `publisher_type`.** Pour chaque publisher avec `ror` non-NULL, lookup ROR API → `types[0]` → mapping (cf. décision 6). Audit préalable de la distribution.
-- **Phase 4 — DOAJ via API.** Extracteur DOAJ par ISSN. Stockage existant (`doaj_payload` JSONB, `doaj_imported_at`). Au passage : extraire `homepage_url` pour permettre le **lien depuis le badge DOAJ** (cf. Phase 6).
+- **Phase 4 — DOAJ via API.** Extracteur DOAJ par ISSN. Stockage existant (`doaj_payload` JSONB, `doaj_imported_at`). Au passage : capturer l'URL de la fiche DOAJ du journal (typiquement `https://doaj.org/toc/{doaj_id}` ou équivalent à confirmer sur le payload API) pour le **lien depuis le badge DOAJ** (cf. Phase 6).
 - **Phase 5 — Crossref Members (fallback `country`).** Pour les publishers sans `openalex_id` mais avec `crossref_member_id` posé par `doi_prefixes`, fetcher `/members/{id}` → parser `location` → ISO-2.
 - **Phase 6 — Front : badge DOAJ → lien.** Substitue le badge passif par un lien vers `homepage_url` extrait du `doaj_payload` (Phase 4). Petit chantier UI.
 - **Phase 7 — Audit APC OpenAlex vs DOAJ.** Comparer les montants sur les revues présentes dans les 2 sources. Décider si on garde l'APC OpenAlex, on bascule sur DOAJ uniquement, ou on stocke les deux.
@@ -88,10 +88,10 @@ Ordre par dépendance. Les phases 2, 3, 4, 5 sont indépendantes une fois la pha
 - [ ] **Sub-step `enrich_publishers_from_crossref_members`** : itère sur `publishers WHERE country IS NULL AND EXISTS (SELECT 1 FROM doi_prefixes WHERE publisher_id = publishers.id AND crossref_member_id IS NOT NULL)`. Fetcher `https://api.crossref.org/members/{id}`. Parser `location` (texte libre) → ISO-2 via une regex ou un parser dédié.
 - [ ] **Petit utilitaire de parsing** `domain/publishers/crossref_location_parser.py` : tester sur un échantillon, prudence sur "United States" → US, "United Kingdom" → GB, etc. Cas dégénérés : skip si parsing échoue.
 
-## Phase 6 — Front : badge DOAJ → lien
+## Phase 6 — Front : badge DOAJ → lien vers la fiche DOAJ
 
-- [ ] Une fois `doaj_payload` enrichi (Phase 4), exposer `doaj_homepage_url` côté DTO `JournalDetailResponse` (et `JournalOut` ? à juger). Extrait depuis `doaj_payload["Journal URL"]` ou champ équivalent du payload.
-- [ ] Composant DOAJ badge cliquable : `<a href={url}>DOAJ</a>` au lieu de `<span>DOAJ</span>`. Style préservé.
+- [ ] Une fois `doaj_payload` enrichi (Phase 4), exposer l'URL de la fiche DOAJ côté DTO `JournalDetailResponse` (et `JournalOut` ? à juger). L'URL pointe vers la page DOAJ du journal (ex. `https://doaj.org/toc/{doaj_id}`) — pas vers la homepage de la revue. Champ exact du payload à confirmer (probablement reconstruit depuis l'`id` DOAJ ; au pire l'ISSN suffit).
+- [ ] Composant DOAJ badge cliquable : `<a href={url} target="_blank" rel="noopener">DOAJ</a>` au lieu de `<span>DOAJ</span>`. Style préservé.
 - [ ] Pages concernées : `journals/[id]` (header), `JournalsListView` (cellule titre), `admin/journals` (tableau).
 
 ## Phase 7 — Audit APC OpenAlex vs DOAJ
