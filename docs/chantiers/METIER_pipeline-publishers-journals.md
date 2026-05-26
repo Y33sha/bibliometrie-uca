@@ -78,10 +78,20 @@ Livrée le 2026-05-26.
 
 ## Phase 3 — ROR → publisher_type
 
-- [ ] **Audit préalable** : tirer 50 publishers avec `ror`, fetcher leurs ROR records, classer la distribution `types[0]`. Décider du mapping définitif (notamment pour `Nonprofit`).
-- [ ] **Sub-step `enrich_publishers_from_ror`** : itère sur `publishers.ror IS NOT NULL AND publisher_type IN ('unknown', NULL)`. Lookup ROR par batch (l'API ROR a un endpoint `/organizations/{id}`). Écrit `publisher_type` selon le mapping.
-- [ ] Rate-limit ROR : à vérifier (l'API publique est limitée mais correcte). Polite usage.
-- [ ] **Script oneshot** de backfill.
+Livrée le 2026-05-26.
+
+- [x] **Audit préalable** (`audit_ror_types_for_publishers`) sur 393 publishers avec ROR. Distribution :
+  - `education[+funder]` (182) → `academic_institution`
+  - `funder+nonprofit` (50) + `nonprofit` seul (21) → `learned_society` (amalgame assumé : sociétés savantes ACM/IEEE + éditeurs nonprofit eLife/BioOne)
+  - `company[+funder]` (39) → `commercial`
+  - `archive[+facility]` (5) → `repository`
+  - `government[+funder]` (14), `facility[+funder]` (34), `other[+funder]` (46), `healthcare[+funder]` (2) → **skip** (laissé `unknown` pour arbitrage manuel). `government` exclu car European Commission / CDC / Académies nationales ne sont pas des academic_institution.
+  - Couverture : ~76% (297/393).
+- [x] **Mapping figé côté domain** : `domain.publishers.publisher.map_ror_types`. Pas d'API ROR bulk endpoint (1 req par publisher), `ROR_DELAY=0.15` (= 6.66 req/s, sustained limit ROR).
+- [x] **Fetcher infrastructure** : `infrastructure.sources.ror.fetch_ror_record` + `build_ror_user_agent`. Endpoint `/v2/organizations/{ror}` ; pas de retry élaboré (audit + skip si fail).
+- [x] **Sub-step `enrich_publishers_from_ror`** : itère sur `publishers.ror IS NOT NULL AND publisher_type='unknown'`. Politique « unknown only » (préserve les valeurs admin explicites). Fetcher injecté pour respecter l'étanchéité DDD (application n'importe pas infrastructure).
+- [x] **Branchement** : `phase_publishers_journals` appelle `_run_enrich_publishers_from_ror` après `_run_enrich_publishers_from_openalex` (consomme `publishers.ror` posé en Phase 2). Gated par `MODES[mode].run_journal_enrichment`.
+- [x] **CLI** : `interfaces/cli/pipeline/enrich_publishers_from_ror.py` (--limit / --dry-run).
 
 ## Phase 4 — DOAJ via API
 

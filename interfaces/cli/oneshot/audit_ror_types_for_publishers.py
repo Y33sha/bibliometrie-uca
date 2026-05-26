@@ -3,11 +3,15 @@
 Audit (pure lecture) : pour les publishers locaux qui ont un `ror`
 non-NULL, fetcher leur enregistrement ROR et reporter la distribution
 des combinaisons de `types` (ROR v2 expose `types` comme une LISTE,
-ex. `['company', 'funder']`).
+ex. `['company', 'funder']`), en y appliquant le mapping figé dans
+`domain.publishers.publisher.map_ror_types` pour visualiser ce que le
+sub-step `enrich_publishers_from_ror` écrirait.
 
-Sert à figer le mapping ROR `types` → notre `publisher_type` (Phase 3
-de docs/chantiers/METIER_pipeline-publishers-journals.md), en particulier
-pour les cas litigieux (`nonprofit`, combinaisons multiples).
+Mapping initialement écrit ici pour permettre l'arbitrage à l'audit ;
+puis stabilisé côté domain et consommé par le sub-step pipeline. Ce
+script reste utile en oneshot pour re-vérifier la distribution si on
+veut éventuellement re-arbitrer le mapping (ex. `nonprofit` qui mélange
+sociétés savantes et éditeurs nonprofit).
 
 Ne fait AUCUNE écriture en base.
 
@@ -21,58 +25,17 @@ import argparse
 import os
 import time
 from collections import defaultdict
-from typing import Any
 
-import requests
 from sqlalchemy import text
 
+from domain.publishers.publisher import map_ror_types
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.sources.config import get_polite_pool_email
+from infrastructure.sources.api_limits import ROR_DELAY
+from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
+from infrastructure.sources.ror import build_ror_user_agent, fetch_ror_record
 
 log = setup_logger("audit_ror_types_for_publishers", os.path.dirname(__file__))
-
-ROR_API = "https://api.ror.org/v2/organizations/{ror}"
-RATE_DELAY = 0.1  # 10 req/s, bien sous la limite ROR (~6.66 req/s sustained)
-
-
-# Mapping candidat — à valider via l'audit. Ordre de précédence : le
-# premier match dans cet ordre l'emporte (un publisher ROR `['education',
-# 'funder']` matche `education` → academic_institution, pas funder).
-_CANDIDATE_MAPPING: list[tuple[str, str]] = [
-    ("education", "academic_institution"),
-    ("government", "academic_institution"),
-    ("archive", "repository"),
-    ("company", "commercial"),
-    ("nonprofit", "learned_society"),  # à arbitrer après audit
-    # `funder`, `healthcare`, `facility`, `other` → laissés non-mappés
-]
-
-
-def map_ror_types(ror_types: list[str]) -> str | None:
-    """Applique le mapping candidat. None = aucun match (= ne pas écrire)."""
-    for ror_type, publisher_type in _CANDIDATE_MAPPING:
-        if ror_type in ror_types:
-            return publisher_type
-    return None
-
-
-def fetch_ror_record(ror: str, *, user_agent: str) -> dict[str, Any] | None:
-    """GET sur l'API ROR v2. Retourne None sur 404 ou erreur. Pas de retry
-    élaboré — c'est un audit, pas un job critique."""
-    try:
-        resp = requests.get(
-            ROR_API.format(ror=ror),
-            headers={"User-Agent": user_agent},
-            timeout=15,
-        )
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
-        return resp.json()
-    except requests.RequestException as e:
-        log.warning("ROR fetch failed for %s : %s", ror, e)
-        return None
 
 
 def main() -> int:
@@ -87,8 +50,8 @@ def main() -> int:
 
     engine = get_sync_engine()
     with engine.connect() as conn:
-        email = get_polite_pool_email(conn)
-        user_agent = f"bibliometrie-uca-audit/1.0 (mailto:{email})"
+        user_agent = build_ror_user_agent(get_polite_pool_email(conn))
+        ror_base_url = get_api_base_urls(conn)["ror"]
 
         sql = """
             SELECT id, name, ror
@@ -112,8 +75,10 @@ def main() -> int:
         no_types = 0
 
         for i, row in enumerate(rows, 1):
-            record = fetch_ror_record(row.ror, user_agent=user_agent)
-            time.sleep(RATE_DELAY)
+            record = fetch_ror_record(
+                row.ror, base_url=ror_base_url, user_agent=user_agent, logger=log
+            )
+            time.sleep(ROR_DELAY)
             if record is None:
                 no_record += 1
                 continue

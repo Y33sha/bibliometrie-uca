@@ -57,3 +57,7 @@ ZENODO_DELAY = 0.5
 
 # DOAJ — courtoisie
 DOAJ_DELAY = 0.15
+
+# ROR — 2000 req / 5 min = 6.66 req/s sustained, 100 req / 10s en burst.
+# 150ms (~6.66 req/s) reste sous le seuil sustained sans burst.
+ROR_DELAY = 0.15

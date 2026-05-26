@@ -116,6 +116,7 @@ _API_BASE_URLS_DEFAULTS: dict[str, str] = {
     "openalex_publishers": "https://api.openalex.org/publishers",
     "unpaywall": "https://api.unpaywall.org/v2",
     "zenodo": "https://zenodo.org/api/records",
+    "ror": "https://api.ror.org/v2/organizations",
 }
 
 

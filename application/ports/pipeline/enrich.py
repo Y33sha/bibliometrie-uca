@@ -24,3 +24,7 @@ class EnrichQueries(Protocol):
     def fetch_publishers_needing_enrichment(
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]: ...
+
+    def fetch_publishers_needing_publisher_type_from_ror(
+        self, conn: Connection, *, limit: int | None = None
+    ) -> list[tuple[int, str]]: ...
