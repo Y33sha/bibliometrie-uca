@@ -168,7 +168,15 @@
 					{#if j.is_in_doaj}<span class="badge-doaj">DOAJ</span>{/if}
 				</td>
 				<td class="issn-cell">{formatIssns(j)}</td>
-				<td class="muted">{j.pub_name || ''}</td>
+				<td class="muted">
+					{#if j.pub_name}
+						{#if j.publisher_id}
+							<a href="{base}/publishers/{j.publisher_id}" class="publisher-link">{j.pub_name}</a>
+						{:else}
+							{j.pub_name}
+						{/if}
+					{/if}
+				</td>
 				<td class="num">{j.pub_count}</td>
 				<td class="actions">
 					{#if mergeTargetId === j.id}
@@ -269,6 +277,8 @@
 
 	.journal-title { font-weight: 500; color: var(--accent); text-decoration: none; }
 	.journal-title:hover { text-decoration: underline; }
+	.publisher-link { color: var(--muted); text-decoration: none; }
+	a.publisher-link:hover { text-decoration: underline; }
 	.issn-cell { font-family: "JetBrains Mono", monospace; font-size: 0.8rem; white-space: nowrap; }
 	.muted { color: var(--muted); font-size: 0.85rem; }
 	.predatory td { background: #fff0f0; }
