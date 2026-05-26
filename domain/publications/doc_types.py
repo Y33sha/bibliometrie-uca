@@ -12,6 +12,62 @@ Usage :
     canonical = map_doc_type("article")                    # → "article" (lookup global)
 """
 
+from typing import Literal
+
+DocType = Literal[
+    "article",
+    "conference_paper",
+    "book",
+    "book_chapter",
+    "thesis",
+    "ongoing_thesis",
+    "preprint",
+    "review",
+    "editorial",
+    "report",
+    "peer_review",
+    "other",
+    "dataset",
+    "software",
+    "patent",
+    "hdr",
+    "memoir",
+    "poster",
+    "letter",
+    "erratum",
+    "retraction",
+    "book_review",
+    "data_paper",
+    "proceedings",
+]
+DOC_TYPES: tuple[DocType, ...] = (
+    "article",
+    "conference_paper",
+    "book",
+    "book_chapter",
+    "thesis",
+    "ongoing_thesis",
+    "preprint",
+    "review",
+    "editorial",
+    "report",
+    "peer_review",
+    "other",
+    "dataset",
+    "software",
+    "patent",
+    "hdr",
+    "memoir",
+    "poster",
+    "letter",
+    "erratum",
+    "retraction",
+    "book_review",
+    "data_paper",
+    "proceedings",
+)
+DOC_TYPES_SET: frozenset[str] = frozenset(DOC_TYPES)
+
 # Mapping par source. Clés en minuscules pour le lookup.
 # Les valeurs sont des valeurs valides de l'enum doc_type.
 _SOURCE_MAPS: dict[str, dict[str, str]] = {
@@ -189,8 +245,9 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
 
 # Libellés français (singulier, pluriel) pour chaque valeur de l'enum doc_type.
 # Source unique de vérité pour l'UI ; exposée via GET /api/doc-types.
-# Doit couvrir exactement les valeurs de l'enum PG `doc_type` (test garde-fou).
-DOC_TYPE_LABELS_FR: dict[str, tuple[str, str]] = {
+# Le typage `dict[DocType, ...]` garantit qu'aucune clé ne dérive du Literal
+# (mypy attrape l'oubli si une valeur d'enum est ajoutée sans son label).
+DOC_TYPE_LABELS_FR: dict[DocType, tuple[str, str]] = {
     "article": ("Article", "Articles"),
     "conference_paper": ("Conference paper", "Conference papers"),
     "book": ("Ouvrage", "Ouvrages"),
@@ -216,10 +273,6 @@ DOC_TYPE_LABELS_FR: dict[str, tuple[str, str]] = {
     "data_paper": ("Data paper", "Data papers"),
     "proceedings": ("Proceedings", "Proceedings"),
 }
-
-# Valeurs valides de l'enum doc_type — dérivé des labels pour garantir
-# qu'aucune valeur ne soit ajoutée sans son libellé FR.
-_VALID_DOC_TYPES: frozenset[str] = frozenset(DOC_TYPE_LABELS_FR.keys())
 
 
 def map_doc_type(raw: str | None, source: str | None = None) -> str:
@@ -265,7 +318,7 @@ def map_doc_type(raw: str | None, source: str | None = None) -> str:
             return result
 
     # 3. Identity si déjà valide
-    if key in _VALID_DOC_TYPES:
+    if key in DOC_TYPES_SET:
         return key
 
     return "other"
