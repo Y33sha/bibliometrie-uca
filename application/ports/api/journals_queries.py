@@ -104,16 +104,18 @@ class OaStatusCount(BaseModel):
 class JournalsFacetOption(BaseModel):
     """Option d'une facette du listing revues : valeur + label FR + compte.
 
-    `label_fr` reprend `JOURNAL_TYPE_LABELS_FR` / `OA_MODEL_LABELS_FR` côté
+    `label` reprend `JOURNAL_TYPE_LABELS_FR` / `OA_MODEL_LABELS_FR` côté
     `journal_type` / `oa_model` ; pour la facette DOAJ on expose `Indexée`
-    / `Non indexée`. `count` est le nombre de revues qui matcheraient si
-    on ne sélectionnait que cette option, en appliquant tous les autres
-    filtres actifs (= compte exclusif à la dimension, comme les facettes
-    publications).
+    / `Non indexée`. Le champ s'appelle `label` (pas `label_fr`) pour
+    rester compatible avec le composable `useFacets` côté front
+    (convention partagée avec les facettes publications). `count` est le
+    nombre de revues qui matcheraient si on ne sélectionnait que cette
+    option, en appliquant tous les autres filtres actifs (= compte
+    exclusif à la dimension, comme les facettes publications).
     """
 
     value: str
-    label_fr: str
+    label: str
     count: int
 
 
