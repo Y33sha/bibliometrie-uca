@@ -36,7 +36,7 @@ L'information "auteur correspondant" est inégalement renseignée dans les méta
 Couple personne-publication, représentant la contribution d'un auteur et portant une [affiliation](glossaire.md#affiliation) institutionnelle. Pas un terme métier mais notion présente dans les métadonnées sources et dans le code.
 
 ## Collection HAL {#collection-hal}
-Sous-portail HAL agrégeant les publications d'une structure (i.e. les publications déposées dans HAL et dont au moins un auteur a une affiliation à cette structure). Chaque collection porte un code, correspondant souvent (mais pas toujours) à l'acronyme du laboratoire.
+Sous-portail HAL agrégeant les publications d'une structure (i.e. les publications déposées dans HAL et dont au moins un auteur a une affiliation à cette structure). Chaque collection porte un code, correspondant souvent à l'acronyme du laboratoire.
 
 Exemple: https://hal.science/PIAF
 

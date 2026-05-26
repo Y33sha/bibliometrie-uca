@@ -16,15 +16,17 @@ flowchart LR
     structures --- apc_payments
     apc_payments ---|DOI| publications
     source_publications-->|match_or_create|publications
+    publications---|publication_subjects|subjects
     publications---journals
     journals---publishers
+
 
     classDef manuel  fill:#8e5,stroke:#5a3
     class structures,structure_name_forms,perimeters,structure_relations manuel;
     classDef csv fill:#fa5
     class apc_payments csv
     classDef auto fill:#adf,stroke:#58c
-    class source_publications,publications,journals,publishers,authorships,persons auto
+    class source_publications,publications,journals,publishers,authorships,persons,subjects auto
     classDef main stroke-width:4px,font-weight:bold
     class structures,publications,persons,authorships main
 ```

@@ -8,10 +8,12 @@
 
 `/admin/config`
 
-Configuration du [moissonnage](../pipeline/02-extract.md):
-- email (polite pool);
+![Formes de nom](../screenshots/admin_config.png)
+
+Configuration du [moissonnage](../pipeline/02-extract.md) :
+- email (*polite pool*);
 - clés API;
-- années interrogées (modes weekly et full);
+- années interrogées (modes *weekly* et *full*);
 - définition et CRUD des périmètres (`uca`, `uca_wide`);
 - périmètre utilisé à différentes étapes du pipeline (extraction, détection des affiliations, création de personnes).
 

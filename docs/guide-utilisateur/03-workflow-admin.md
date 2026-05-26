@@ -138,10 +138,12 @@ La page `admin/orphan-authorships` permet de rattacher les authorships en questi
 
 ### Gestion des référentiels d'éditeurs et de revues
 
+*A compléter*
+
 - Doublons d'éditeurs: possibilité de fusionner ('Elsevier' vs 'Elsevier BV' selon source).
 - Doublons de revues: idem
 - Enrichissement des informations sur les éditeurs et revue ->> clarifier ce qui est fait automatiquement par le pipeline
 
 ### Legacy
 - Pages dédoublonnage (personne, publication): TODO: à améliorer ou supprimer
-- Page adresses/pays: worklow un peu clunky, à revoir (automatiser un max).
+- Page adresses/pays: workflow un peu clunky, à revoir (automatiser un max).

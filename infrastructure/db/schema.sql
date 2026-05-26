@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YKVNCMt822qyVa3txL0MffhWKFhkcK8mGNuOI4iEA9BvPInoqGEPiU1yXSvyyHo
+\restrict rIbwaeVxmbd4bcHfotGViDrOuMwDYsVeP34439UjWdtcjIe0HWNgwdR9oSavq6S
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
@@ -110,7 +110,8 @@ CREATE TYPE public.journal_type AS ENUM (
     'repository',
     'book_series',
     'preprint_server',
-    'media'
+    'media',
+    'ebook_platform'
 );
 
 
@@ -584,7 +585,10 @@ CREATE TABLE public.doi_prefixes (
     publisher_name_raw text,
     publisher_name_normalized text,
     crossref_member_id integer,
-    fetched_at timestamp with time zone DEFAULT now() NOT NULL
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL,
+    client_name_raw text,
+    client_name_normalized text,
+    datacite_client_symbol text
 );
 
 
@@ -865,7 +869,8 @@ CREATE TABLE public.publication_subjects (
     subject_id integer NOT NULL,
     source public.source_type NOT NULL,
     score real,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    rejected boolean DEFAULT false NOT NULL
 );
 
 
@@ -962,7 +967,8 @@ CREATE TABLE public.publishers (
     is_predatory boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
-    publisher_type public.publisher_type DEFAULT 'unknown'::public.publisher_type NOT NULL
+    publisher_type public.publisher_type DEFAULT 'unknown'::public.publisher_type NOT NULL,
+    ror text
 );
 
 
@@ -2132,6 +2138,20 @@ CREATE INDEX idx_distinct_pubs_b ON public.distinct_publications USING btree (pu
 
 
 --
+-- Name: idx_doi_prefixes_client_name_normalized; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_client_name_normalized ON public.doi_prefixes USING btree (client_name_normalized) WHERE (client_name_normalized IS NOT NULL);
+
+
+--
+-- Name: idx_doi_prefixes_datacite_client_symbol; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_datacite_client_symbol ON public.doi_prefixes USING btree (datacite_client_symbol) WHERE (datacite_client_symbol IS NOT NULL);
+
+
+--
 -- Name: idx_doi_prefixes_publisher; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2871,4 +2891,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YKVNCMt822qyVa3txL0MffhWKFhkcK8mGNuOI4iEA9BvPInoqGEPiU1yXSvyyHo
+\unrestrict rIbwaeVxmbd4bcHfotGViDrOuMwDYsVeP34439UjWdtcjIe0HWNgwdR9oSavq6S

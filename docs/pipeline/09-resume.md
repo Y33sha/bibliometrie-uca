@@ -18,7 +18,7 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    source_publications-->A
+    D@{ shape: procs, label: "source_publications"}-->A
 
     subgraph vérité
     direction LR
@@ -34,9 +34,9 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    source_publications-->A
-    source_authorships---source_publications
-    source_authorships-->C
+    D@{ shape: procs, label: "source_publications"}-->A
+    E@{ shape: procs, label: "source_authorships"}---D
+    E-->C
 
     subgraph vérité
     direction LR
@@ -54,9 +54,9 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    source_publications---A
-    source_authorships---source_publications
-    source_authorships---C
+     D@{ shape: procs, label: "source_publications"}---A
+    E@{ shape: procs, label: "source_authorships"}---D
+    E---C
 
     subgraph vérité
     direction LR
