@@ -248,20 +248,24 @@ def phase_publishers_journals(mode: Any = "full", **kw: Any) -> PhaseMetrics:
        Agency + éditeur Crossref / repository DataCite.
     2. `enrich_journals_from_openalex` (gated par `run_journal_enrichment`) :
        OpenAlex Sources → APC + DOAJ flag + journal_type.
+    3. `enrich_publishers_from_openalex` (gated par `run_journal_enrichment`) :
+       OpenAlex Publishers → country + ror.
 
-    À étoffer avec OpenAlex Publishers, DOAJ via API, ROR (cf. roadmap).
+    À étoffer avec DOAJ via API, ROR → publisher_type (cf. roadmap).
 
     Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les `publishers`/`journals` qu'on veut enrichir.
 
     Idempotente : `resolve_doi_prefixes` ne traite que les préfixes absents
     de `doi_prefixes` ; l'enrichissement journaux ne traite que les revues
-    sans APC renseigné (sauf `--reset`).
+    sans APC renseigné (sauf `--reset`) ; l'enrichissement publishers ne
+    traite que ceux à qui il manque `country` ou `ror`.
     """
     metrics = _run_resolve_doi_prefixes()
     if MODES[mode].run_journal_enrichment:
         _run_enrich_journals_from_openalex()
+        _run_enrich_publishers_from_openalex()
     else:
-        log.info("Enrichissement journaux OpenAlex ignoré en mode %s", mode)
+        log.info("Enrichissement journaux/publishers OpenAlex ignoré en mode %s", mode)
     return metrics
 
 
@@ -771,6 +775,39 @@ def _run_enrich_journals_from_openalex() -> None:
     finally:
         conn.close()
     log.info("✓ enrich_journals_from_openalex terminé en %.1fs", time.time() - t0)
+
+
+def _run_enrich_publishers_from_openalex() -> None:
+    from application.pipeline.publishers_journals.enrich_publishers_from_openalex import (
+        run_enrich_publishers_from_openalex,
+    )
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.enrich import PgEnrichQueries
+    from infrastructure.repositories import publisher_repository
+    from infrastructure.sources.api_limits import DOAJ_DELAY
+    from infrastructure.sources.config import (
+        get_api_base_urls,
+        get_openalex_api_key,
+        get_polite_pool_email,
+    )
+
+    log.info("▶ enrich_publishers_from_openalex")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run_enrich_publishers_from_openalex(
+            conn,
+            PgEnrichQueries(),
+            log,
+            publisher_repo=publisher_repository(conn),
+            api_key=get_openalex_api_key(conn),
+            mailto=get_polite_pool_email(conn),
+            openalex_publishers_api=get_api_base_urls(conn)["openalex_publishers"],
+            rate_delay=DOAJ_DELAY,
+        )
+    finally:
+        conn.close()
+    log.info("✓ enrich_publishers_from_openalex terminé en %.1fs", time.time() - t0)
 
 
 def _run_resolve_addresses(mode: str) -> None:
