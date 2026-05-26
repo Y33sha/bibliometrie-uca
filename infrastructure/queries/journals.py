@@ -205,7 +205,7 @@ class PgJournalQueries(JournalQueries):
         journal_types_facet = [
             JournalsFacetOption(
                 value=v,
-                label_fr=JOURNAL_TYPE_LABELS_FR[v],
+                label=JOURNAL_TYPE_LABELS_FR[v],
                 count=jt_counts.get(v, 0),
             )
             for v in JOURNAL_TYPES
@@ -233,7 +233,7 @@ class PgJournalQueries(JournalQueries):
         oa_models_facet = [
             JournalsFacetOption(
                 value=v,
-                label_fr=OA_MODEL_LABELS_FR[v],
+                label=OA_MODEL_LABELS_FR[v],
                 count=oa_counts.get(v, 0),
             )
             for v in OA_MODELS
@@ -259,9 +259,9 @@ class PgJournalQueries(JournalQueries):
         ).all()
         doaj_counts = {bool(r.value): r.n for r in doaj_rows}
         doaj_facet = [
-            JournalsFacetOption(value="true", label_fr="Indexée", count=doaj_counts.get(True, 0)),
+            JournalsFacetOption(value="true", label="Indexée", count=doaj_counts.get(True, 0)),
             JournalsFacetOption(
-                value="false", label_fr="Non indexée", count=doaj_counts.get(False, 0)
+                value="false", label="Non indexée", count=doaj_counts.get(False, 0)
             ),
         ]
 
