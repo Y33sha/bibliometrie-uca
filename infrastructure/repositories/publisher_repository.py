@@ -202,8 +202,9 @@ class PgPublisherRepository:
             {"t": target_id, "s": source_id},
         )
 
-        # Ordre : capture src → NULL-er openalex_id/ror src (libèrent les
-        # contraintes UNIQUE) → enrich target → delete source.
+        # Ordre : capture src → NULL-er openalex_id src (libère la contrainte
+        # UNIQUE — `ror` n'a pas de UNIQUE, plusieurs publishers peuvent
+        # légitimement le partager) → enrich target → delete source.
         src = self._conn.execute(
             select(
                 publishers.c.openalex_id,
@@ -213,9 +214,7 @@ class PgPublisherRepository:
             ).where(publishers.c.id == source_id)
         ).one()
         self._conn.execute(
-            update(publishers)
-            .where(publishers.c.id == source_id)
-            .values(openalex_id=None, ror=None)
+            update(publishers).where(publishers.c.id == source_id).values(openalex_id=None)
         )
         self._conn.execute(
             update(publishers)
