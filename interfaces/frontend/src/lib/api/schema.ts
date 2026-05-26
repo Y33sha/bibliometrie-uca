@@ -2149,10 +2149,11 @@ export interface paths {
         };
         /**
          * List Oa Models
-         * @description Valeurs distinctes de `oa_model` observées en base, triées par fréquence.
+         * @description Valeurs possibles de `oa_model` avec leur label français.
          *
-         *     Sert à alimenter le filtre « Modèle OA » de la page publique `/journals`.
-         *     Pas d'enum SQL ici (texte libre historique) — on lit ce qui existe.
+         *     Source de vérité côté Python : `domain.journals.journal.OA_MODELS` +
+         *     `OA_MODEL_LABELS_FR`. Sert à alimenter les facettes « Modèle OA » des
+         *     listings de revues et le dropdown du modal d'édition admin.
          */
         get: operations["list_oa_models_api_journals_oa_models_get"];
         put?: never;
@@ -2188,6 +2189,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/journals/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Journals Facets
+         * @description Comptes par option pour les 3 facettes du listing revues.
+         *
+         *     Convention identique à `/api/publications/facets` : chaque facette
+         *     exclut sa propre dimension de la condition WHERE, ce qui permet
+         *     d'afficher le nombre de revues atteignables si l'option était
+         *     (dé)cochée.
+         */
+        get: operations["journals_facets_api_journals_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/journals": {
         parameters: {
             query?: never;
@@ -2202,7 +2228,10 @@ export interface paths {
          *     Filtres :
          *     - `search` : insensible à la casse sur le titre normalisé, ignorée si
          *       < 2 caractères.
-         *     - `publisher_id` / `journal_type` / `oa_model` : égalité stricte.
+         *     - `publisher_id` : égalité stricte.
+         *     - `journal_type` / `oa_model` : CSV de valeurs (ex. `journal,proceedings`).
+         *       Vide = pas de filtre. Aligné sur la convention multi-valeurs de
+         *       `/api/publications`.
          *     - `is_in_doaj` : booléen (true/false). Omettre = pas de filtre.
          *     - `with_pubs` : si true, n'expose que les revues avec au moins 1
          *       publication rattachée. Utilisé par la page publique /journals pour
@@ -2934,19 +2963,13 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
-         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
-         *     Permet au frontend de styler les inattendus en warning.
+         * @description Compteur de publications par `doc_type` pour un éditeur.
          */
         DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
         };
         /** DocTypeLabel */
         DocTypeLabel: {
@@ -3387,7 +3410,7 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["application__ports__api__journals_queries__OaStatusCount"][];
             /** Expected Doc Types */
@@ -3582,6 +3605,41 @@ export interface components {
             is_in_doaj?: boolean | null;
             /** Apc Amount */
             apc_amount?: number | null;
+        };
+        /**
+         * JournalsFacetOption
+         * @description Option d'une facette du listing revues : valeur + label FR + compte.
+         *
+         *     `label_fr` reprend `JOURNAL_TYPE_LABELS_FR` / `OA_MODEL_LABELS_FR` côté
+         *     `journal_type` / `oa_model` ; pour la facette DOAJ on expose `Indexée`
+         *     / `Non indexée`. `count` est le nombre de revues qui matcheraient si
+         *     on ne sélectionnait que cette option, en appliquant tous les autres
+         *     filtres actifs (= compte exclusif à la dimension, comme les facettes
+         *     publications).
+         */
+        JournalsFacetOption: {
+            /** Value */
+            value: string;
+            /** Label Fr */
+            label_fr: string;
+            /** Count */
+            count: number;
+        };
+        /**
+         * JournalsFacetsResponse
+         * @description Facettes dynamiques pour `/api/journals` (3 dimensions).
+         *
+         *     Chaque dimension exclut son propre filtre de la condition WHERE, ce
+         *     qui permet d'afficher le nombre de revues atteignables si l'option
+         *     était (dé)cochée.
+         */
+        JournalsFacetsResponse: {
+            /** Journal Types */
+            journal_types: components["schemas"]["JournalsFacetOption"][];
+            /** Oa Models */
+            oa_models: components["schemas"]["JournalsFacetOption"][];
+            /** Doaj */
+            doaj: components["schemas"]["JournalsFacetOption"][];
         };
         /** LabAddressOut */
         LabAddressOut: {
@@ -4952,7 +5010,7 @@ export interface components {
             /** Journal Types */
             journal_types: components["schemas"]["JournalTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["OaStatusCount"][];
         };
@@ -5615,6 +5673,22 @@ export interface components {
             no: number;
         };
         /**
+         * DocTypeCount
+         * @description Compteur de publications par `doc_type` pour une revue.
+         *
+         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
+         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
+         *     Permet au frontend de styler les inattendus en warning.
+         */
+        application__ports__api__journals_queries__DocTypeCount: {
+            /** Doc Type */
+            doc_type: string | null;
+            /** Count */
+            count: number;
+            /** Expected */
+            expected: boolean;
+        };
+        /**
          * OaStatusCount
          * @description Compteur de publications par `oa_status` pour une revue.
          *
@@ -5628,16 +5702,6 @@ export interface components {
             count: number;
             /** Expected */
             expected: boolean;
-        };
-        /**
-         * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour un éditeur.
-         */
-        application__ports__api__publishers_queries__DocTypeCount: {
-            /** Doc Type */
-            doc_type: string | null;
-            /** Count */
-            count: number;
         };
     };
     responses: never;
@@ -9075,7 +9139,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": string[];
+                    "application/json": components["schemas"]["EnumOption"][];
                 };
             };
         };
@@ -9100,6 +9164,42 @@ export interface operations {
             };
         };
     };
+    journals_facets_api_journals_facets_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+                publisher_id?: number | null;
+                journal_type?: string;
+                is_in_doaj?: boolean | null;
+                oa_model?: string;
+                with_pubs?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalsFacetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_journals_api_journals_get: {
         parameters: {
             query?: {
@@ -9107,9 +9207,9 @@ export interface operations {
                 per_page?: number;
                 search?: string | null;
                 publisher_id?: number | null;
-                journal_type?: string | null;
+                journal_type?: string;
                 is_in_doaj?: boolean | null;
-                oa_model?: string | null;
+                oa_model?: string;
                 with_pubs?: boolean;
                 sort?: string;
             };

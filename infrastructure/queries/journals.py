@@ -11,6 +11,8 @@ from application.ports.api.journals_queries import (
     JournalListResponse,
     JournalOut,
     JournalQueries,
+    JournalsFacetOption,
+    JournalsFacetsResponse,
     OaStatusCount,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
@@ -20,8 +22,62 @@ from domain.journals.expected import (
     is_doc_type_expected,
     is_oa_status_expected,
 )
+from domain.journals.journal import (
+    JOURNAL_TYPE_LABELS_FR,
+    JOURNAL_TYPES,
+    OA_MODEL_LABELS_FR,
+    OA_MODELS,
+)
 from domain.normalize import normalize_text
 from infrastructure.db.tables import journals as t_journals
+
+
+def _build_journal_where(
+    *,
+    search: str | None,
+    publisher_id: int | None,
+    journal_types: list[str],
+    is_in_doaj: bool | None,
+    oa_models: list[str],
+    with_pubs: bool,
+    skip_journal_types: bool = False,
+    skip_doaj: bool = False,
+    skip_oa_models: bool = False,
+) -> tuple[str, dict[str, Any]]:
+    """Construit la clause WHERE pour `list_journals` et `journals_facets`.
+
+    Les flags `skip_*` permettent à chaque facette d'exclure sa propre
+    dimension du filtrage — convention « comptes exclusifs » identique à
+    celle des facettes publications.
+    """
+    binds: dict[str, Any] = {}
+    parts: list[str] = []
+    if search and len(search) >= 2:
+        # title_normalized passe par `normalize_text` à l'ingestion ; la
+        # query doit subir la même normalisation pour matcher les titres
+        # contenant ponctuation ou accents.
+        normalized = normalize_text(search)
+        if normalized:
+            parts.append("j.title_normalized LIKE '%' || :search || '%'")
+            binds["search"] = normalized
+    if publisher_id:
+        parts.append("j.publisher_id = :publisher_id")
+        binds["publisher_id"] = publisher_id
+    if journal_types and not skip_journal_types:
+        # journal_type est un enum Postgres → cast explicite en text pour
+        # comparer à un array text[].
+        parts.append("j.journal_type::text = ANY(:journal_types)")
+        binds["journal_types"] = journal_types
+    if is_in_doaj is not None and not skip_doaj:
+        parts.append("j.is_in_doaj = :is_in_doaj")
+        binds["is_in_doaj"] = is_in_doaj
+    if oa_models and not skip_oa_models:
+        parts.append("j.oa_model = ANY(:oa_models)")
+        binds["oa_models"] = oa_models
+    if with_pubs:
+        parts.append("EXISTS (SELECT 1 FROM publications pub WHERE pub.journal_id = j.id)")
+    return (" AND ".join(parts) if parts else "TRUE", binds)
+
 
 _SORT_MAP = {
     "title": "j.title ASC",
@@ -44,39 +100,22 @@ class PgJournalQueries(JournalQueries):
         *,
         search: str | None,
         publisher_id: int | None,
-        journal_type: str | None,
+        journal_types: list[str],
         is_in_doaj: bool | None,
-        oa_model: str | None,
+        oa_models: list[str],
         with_pubs: bool,
         sort: str,
         page: int,
         per_page: int,
     ) -> JournalListResponse:
-        binds: dict[str, Any] = {}
-        parts: list[str] = []
-        if search and len(search) >= 2:
-            # title_normalized passe par `normalize_text` à l'ingestion ; la
-            # query doit subir la même normalisation pour matcher les titres
-            # contenant ponctuation ou accents.
-            normalized = normalize_text(search)
-            if normalized:
-                parts.append("j.title_normalized LIKE '%' || :search || '%'")
-                binds["search"] = normalized
-        if publisher_id:
-            parts.append("j.publisher_id = :publisher_id")
-            binds["publisher_id"] = publisher_id
-        if journal_type:
-            parts.append("j.journal_type = :journal_type")
-            binds["journal_type"] = journal_type
-        if is_in_doaj is not None:
-            parts.append("j.is_in_doaj = :is_in_doaj")
-            binds["is_in_doaj"] = is_in_doaj
-        if oa_model:
-            parts.append("j.oa_model = :oa_model")
-            binds["oa_model"] = oa_model
-        if with_pubs:
-            parts.append("EXISTS (SELECT 1 FROM publications pub WHERE pub.journal_id = j.id)")
-        where = " AND ".join(parts) if parts else "TRUE"
+        where, binds = _build_journal_where(
+            search=search,
+            publisher_id=publisher_id,
+            journal_types=journal_types,
+            is_in_doaj=is_in_doaj,
+            oa_models=oa_models,
+            with_pubs=with_pubs,
+        )
 
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM journals j WHERE {where}"),
@@ -129,6 +168,107 @@ class PgJournalQueries(JournalQueries):
                 )
                 for r in rows
             ],
+        )
+
+    def journals_facets(
+        self,
+        *,
+        search: str | None,
+        publisher_id: int | None,
+        journal_types: list[str],
+        is_in_doaj: bool | None,
+        oa_models: list[str],
+        with_pubs: bool,
+    ) -> JournalsFacetsResponse:
+        where_jt, binds_jt = _build_journal_where(
+            search=search,
+            publisher_id=publisher_id,
+            journal_types=journal_types,
+            is_in_doaj=is_in_doaj,
+            oa_models=oa_models,
+            with_pubs=with_pubs,
+            skip_journal_types=True,
+        )
+        jt_rows = self._conn.execute(
+            text(f"""
+                SELECT j.journal_type::text AS value, COUNT(*) AS n
+                FROM journals j
+                WHERE {where_jt} AND j.journal_type IS NOT NULL
+                GROUP BY j.journal_type
+            """),
+            binds_jt,
+        ).all()
+        jt_counts = {r.value: r.n for r in jt_rows}
+        # On expose toutes les options de l'enum (count=0 si pas observé) — UX
+        # cohérente avec les facettes publications qui montrent les options
+        # connues, pas seulement celles présentes.
+        journal_types_facet = [
+            JournalsFacetOption(
+                value=v,
+                label_fr=JOURNAL_TYPE_LABELS_FR[v],
+                count=jt_counts.get(v, 0),
+            )
+            for v in JOURNAL_TYPES
+        ]
+
+        where_oa, binds_oa = _build_journal_where(
+            search=search,
+            publisher_id=publisher_id,
+            journal_types=journal_types,
+            is_in_doaj=is_in_doaj,
+            oa_models=oa_models,
+            with_pubs=with_pubs,
+            skip_oa_models=True,
+        )
+        oa_rows = self._conn.execute(
+            text(f"""
+                SELECT j.oa_model AS value, COUNT(*) AS n
+                FROM journals j
+                WHERE {where_oa} AND j.oa_model IS NOT NULL
+                GROUP BY j.oa_model
+            """),
+            binds_oa,
+        ).all()
+        oa_counts = {r.value: r.n for r in oa_rows}
+        oa_models_facet = [
+            JournalsFacetOption(
+                value=v,
+                label_fr=OA_MODEL_LABELS_FR[v],
+                count=oa_counts.get(v, 0),
+            )
+            for v in OA_MODELS
+        ]
+
+        where_d, binds_d = _build_journal_where(
+            search=search,
+            publisher_id=publisher_id,
+            journal_types=journal_types,
+            is_in_doaj=is_in_doaj,
+            oa_models=oa_models,
+            with_pubs=with_pubs,
+            skip_doaj=True,
+        )
+        doaj_rows = self._conn.execute(
+            text(f"""
+                SELECT j.is_in_doaj AS value, COUNT(*) AS n
+                FROM journals j
+                WHERE {where_d}
+                GROUP BY j.is_in_doaj
+            """),
+            binds_d,
+        ).all()
+        doaj_counts = {bool(r.value): r.n for r in doaj_rows}
+        doaj_facet = [
+            JournalsFacetOption(value="true", label_fr="Indexée", count=doaj_counts.get(True, 0)),
+            JournalsFacetOption(
+                value="false", label_fr="Non indexée", count=doaj_counts.get(False, 0)
+            ),
+        ]
+
+        return JournalsFacetsResponse(
+            journal_types=journal_types_facet,
+            oa_models=oa_models_facet,
+            doaj=doaj_facet,
         )
 
     def get_journal_detail(self, journal_id: int) -> JournalDetailResponse | None:
@@ -262,14 +402,3 @@ class PgJournalQueries(JournalQueries):
             return set()
         result = self._conn.execute(select(t_journals.c.id).where(t_journals.c.id.in_(journal_ids)))
         return {row.id for row in result}
-
-    def distinct_oa_models(self) -> list[str]:
-        rows = self._conn.execute(
-            text("""
-                SELECT oa_model FROM journals
-                WHERE oa_model IS NOT NULL
-                GROUP BY oa_model
-                ORDER BY COUNT(*) DESC
-            """)
-        ).all()
-        return [r.oa_model for r in rows]
