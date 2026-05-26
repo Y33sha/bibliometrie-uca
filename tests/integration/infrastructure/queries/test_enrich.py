@@ -1,9 +1,12 @@
 """Tests d'intégration pour `infrastructure.queries.enrich`."""
 
+from datetime import UTC, datetime, timedelta
+
 from sqlalchemy import text
 
 from infrastructure.queries.enrich import (
     fetch_journals_needing_apc,
+    fetch_journals_needing_doaj_fetch,
     fetch_publications_with_doi,
 )
 
@@ -104,4 +107,73 @@ class TestFetchJournalsNeedingApc:
         for i in range(3):
             _create_journal(sa_sync_conn, openalex_id=f"S{i}")
         rows = fetch_journals_needing_apc(sa_sync_conn, limit=2)
+        assert len(rows) == 2
+
+
+def _create_journal_with_issn(
+    conn,
+    *,
+    issn=None,
+    eissn=None,
+    issnl=None,
+    doaj_imported_at=None,
+):
+    return conn.execute(
+        text("""
+            INSERT INTO journals (title, title_normalized, issn, eissn, issnl, doaj_imported_at)
+            VALUES ('J', 'j', :issn, :eissn, :issnl, :imported_at)
+            RETURNING id
+        """),
+        {
+            "issn": issn,
+            "eissn": eissn,
+            "issnl": issnl,
+            "imported_at": doaj_imported_at,
+        },
+    ).scalar_one()
+
+
+class TestFetchJournalsNeedingDoajFetch:
+    def test_returns_tuples_of_id_and_issns(self, sa_sync_conn):
+        jid = _create_journal_with_issn(sa_sync_conn, issn="1111-1111", eissn="2222-2222")
+        rows = fetch_journals_needing_doaj_fetch(sa_sync_conn, stale_days=30)
+        ours = [r for r in rows if r[0] == jid]
+        assert ours == [(jid, "1111-1111", "2222-2222", None)]
+
+    def test_excludes_journals_with_no_issn(self, sa_sync_conn):
+        jid = _create_journal_with_issn(sa_sync_conn)  # tous NULL
+        rows = fetch_journals_needing_doaj_fetch(sa_sync_conn, stale_days=30)
+        assert jid not in [r[0] for r in rows]
+
+    def test_includes_when_imported_at_is_null(self, sa_sync_conn):
+        jid = _create_journal_with_issn(sa_sync_conn, issn="3333-3333")
+        rows = fetch_journals_needing_doaj_fetch(sa_sync_conn, stale_days=30)
+        assert jid in [r[0] for r in rows]
+
+    def test_excludes_recently_imported(self, sa_sync_conn):
+        recent = datetime.now(UTC) - timedelta(days=5)
+        jid = _create_journal_with_issn(sa_sync_conn, issn="4444-4444", doaj_imported_at=recent)
+        rows = fetch_journals_needing_doaj_fetch(sa_sync_conn, stale_days=30)
+        assert jid not in [r[0] for r in rows]
+
+    def test_includes_stale_beyond_window(self, sa_sync_conn):
+        old = datetime.now(UTC) - timedelta(days=45)
+        jid = _create_journal_with_issn(sa_sync_conn, issn="5555-5555", doaj_imported_at=old)
+        rows = fetch_journals_needing_doaj_fetch(sa_sync_conn, stale_days=30)
+        assert jid in [r[0] for r in rows]
+
+    def test_stale_days_is_configurable(self, sa_sync_conn):
+        recent = datetime.now(UTC) - timedelta(days=10)
+        jid = _create_journal_with_issn(sa_sync_conn, issn="6666-6666", doaj_imported_at=recent)
+        # Fenêtre 30j : exclu (récent)
+        rows30 = fetch_journals_needing_doaj_fetch(sa_sync_conn, stale_days=30)
+        assert jid not in [r[0] for r in rows30]
+        # Fenêtre 5j : inclus (10j > 5j → stale)
+        rows5 = fetch_journals_needing_doaj_fetch(sa_sync_conn, stale_days=5)
+        assert jid in [r[0] for r in rows5]
+
+    def test_respects_limit(self, sa_sync_conn):
+        for i in range(3):
+            _create_journal_with_issn(sa_sync_conn, issn=f"777{i}-000{i}")
+        rows = fetch_journals_needing_doaj_fetch(sa_sync_conn, stale_days=30, limit=2)
         assert len(rows) == 2

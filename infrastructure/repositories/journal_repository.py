@@ -6,8 +6,9 @@ Même contrat que les autres PgXxxRepository : exceptions du domaine,
 pas d'orchestration métier (qui reste dans `application/journals.py`).
 """
 
+from datetime import datetime
 from decimal import Decimal
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, case, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -272,6 +273,26 @@ class PgJournalRepository:
             .values(apc_amount=None, apc_currency="EUR", is_in_doaj=False)
         )
         return self._conn.execute(stmt).rowcount
+
+    def update_journal_doaj(
+        self,
+        journal_id: int,
+        *,
+        payload: dict[str, Any] | None,
+        imported_at: datetime,
+        is_in_doaj: bool,
+    ) -> None:
+        """Pose `doaj_payload`/`doaj_imported_at`/`is_in_doaj` en bloc."""
+        stmt = (
+            update(journals)
+            .where(journals.c.id == journal_id)
+            .values(
+                doaj_payload=payload,
+                doaj_imported_at=imported_at,
+                is_in_doaj=is_in_doaj,
+            )
+        )
+        self._conn.execute(stmt)
 
     # ── Fusion ─────────────────────────────────────────────────────
 

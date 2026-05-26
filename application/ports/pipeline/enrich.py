@@ -32,3 +32,11 @@ class EnrichQueries(Protocol):
     def fetch_publishers_needing_country_from_crossref(
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, int]]: ...
+
+    def fetch_journals_needing_doaj_fetch(
+        self,
+        conn: Connection,
+        *,
+        stale_days: int,
+        limit: int | None = None,
+    ) -> list[tuple[int, str | None, str | None, str | None]]: ...

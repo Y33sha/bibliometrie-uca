@@ -248,27 +248,32 @@ def phase_publishers_journals(mode: Any = "full", **kw: Any) -> PhaseMetrics:
        Agency + éditeur Crossref / repository DataCite.
     2. `enrich_journals_from_openalex` (gated par `run_journal_enrichment`) :
        OpenAlex Sources → APC + DOAJ flag + journal_type.
-    3. `enrich_publishers_from_openalex` (gated par `run_journal_enrichment`) :
+    3. `enrich_journals_from_doaj` (gated par `run_journal_enrichment`) :
+       API DOAJ par ISSN → `doaj_payload` (format CSV) + `is_in_doaj`.
+       Surclasse le `is_in_doaj` posé en 2 (DOAJ direct > OpenAlex stale).
+    4. `enrich_publishers_from_openalex` (gated par `run_journal_enrichment`) :
        OpenAlex Publishers → country + ror.
-    4. `enrich_publishers_from_crossref_members` (gated par `run_journal_enrichment`) :
+    5. `enrich_publishers_from_crossref_members` (gated par `run_journal_enrichment`) :
        fallback `country` via Crossref Members pour les publishers sans
-       country posé en 3 mais avec `doi_prefixes.crossref_member_id`.
-    5. `enrich_publishers_from_ror` (gated par `run_journal_enrichment`) :
-       ROR types → publisher_type. Consomme `publishers.ror` posé en 3.
-
-    À étoffer avec DOAJ via API (cf. roadmap).
+       country posé en 4 mais avec `doi_prefixes.crossref_member_id`.
+    6. `enrich_publishers_from_ror` (gated par `run_journal_enrichment`) :
+       ROR types → publisher_type. Consomme `publishers.ror` posé en 4.
 
     Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les `publishers`/`journals` qu'on veut enrichir.
 
     Idempotente : `resolve_doi_prefixes` ne traite que les préfixes absents
-    de `doi_prefixes` ; l'enrichissement journaux ne traite que les revues
-    sans APC renseigné (sauf `--reset`) ; l'enrichissement publishers ne
-    traite que ceux à qui il manque `country` ou `ror` ; le typage ROR ne
-    touche que ceux à `publisher_type='unknown'`.
+    de `doi_prefixes` ; l'enrichissement journaux OpenAlex ne traite que
+    les revues sans APC renseigné (sauf `--reset`) ; le fetch DOAJ ne
+    cible que les revues dont le dernier `doaj_imported_at` est null ou
+    plus vieux que la fenêtre de stale (30 j par défaut) ;
+    l'enrichissement publishers ne traite que ceux à qui il manque
+    `country` ou `ror` ; le typage ROR ne touche que ceux à
+    `publisher_type='unknown'`.
     """
     metrics = _run_resolve_doi_prefixes()
     if MODES[mode].run_journal_enrichment:
         _run_enrich_journals_from_openalex()
+        _run_enrich_journals_from_doaj()
         _run_enrich_publishers_from_openalex()
         _run_enrich_publishers_from_crossref_members()
         _run_enrich_publishers_from_ror()
@@ -783,6 +788,48 @@ def _run_enrich_journals_from_openalex() -> None:
     finally:
         conn.close()
     log.info("✓ enrich_journals_from_openalex terminé en %.1fs", time.time() - t0)
+
+
+def _run_enrich_journals_from_doaj() -> None:
+    from application.pipeline.publishers_journals.enrich_journals_from_doaj import (
+        DoajFetcher,
+        DoajShapeMapper,
+        run_enrich_journals_from_doaj,
+    )
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.enrich import PgEnrichQueries
+    from infrastructure.repositories import journal_repository
+    from infrastructure.sources.api_limits import DOAJ_DELAY
+    from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
+    from infrastructure.sources.doaj import (
+        build_doaj_user_agent,
+        fetch_doaj_journal,
+        to_csv_shape,
+    )
+
+    log.info("▶ enrich_journals_from_doaj")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        base_url = get_api_base_urls(conn)["doaj"]
+        user_agent = build_doaj_user_agent(get_polite_pool_email(conn))
+        fetcher: DoajFetcher = lambda issn: fetch_doaj_journal(  # noqa: E731
+            issn, base_url=base_url, user_agent=user_agent, logger=log
+        )
+        mapper: DoajShapeMapper = to_csv_shape
+
+        run_enrich_journals_from_doaj(
+            conn,
+            PgEnrichQueries(),
+            log,
+            journal_repo=journal_repository(conn),
+            fetcher=fetcher,
+            mapper=mapper,
+            rate_delay=DOAJ_DELAY,
+        )
+    finally:
+        conn.close()
+    log.info("✓ enrich_journals_from_doaj terminé en %.1fs", time.time() - t0)
 
 
 def _run_enrich_publishers_from_openalex() -> None:

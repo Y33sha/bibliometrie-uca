@@ -12,6 +12,7 @@ d'éditeurs pour détecter les conflits avant `merge_publisher_into`.
 Implémenté par `infrastructure/repositories/journal_repository.py`.
 """
 
+from datetime import datetime
 from typing import Any, Protocol, TypedDict
 
 from domain.journals.journal import Journal
@@ -114,6 +115,23 @@ class JournalRepository(Protocol):
     ) -> None: ...
 
     def reset_journal_apc(self) -> int: ...
+
+    def update_journal_doaj(
+        self,
+        journal_id: int,
+        *,
+        payload: dict[str, Any] | None,
+        imported_at: datetime,
+        is_in_doaj: bool,
+    ) -> None:
+        """Pose `doaj_payload`, `doaj_imported_at` et `is_in_doaj` en bloc.
+
+        Utilisé par le sub-step `enrich_journals_from_doaj`. Sur 404
+        DOAJ, ``payload=None`` + ``is_in_doaj=False`` : `imported_at`
+        est mis à jour quand même pour faire sortir la revue de la file
+        de stale et éviter de la retenter à chaque pipeline.
+        """
+        ...
 
     # ── Fusion ─────────────────────────────────────────────────────
 
