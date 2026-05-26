@@ -5133,9 +5133,9 @@ export interface components {
          *
          *     Pour la facette `publisher_types`, `label` reprend
          *     `PUBLISHER_TYPE_LABELS_FR`. Pour `countries` (texte libre observé en
-         *     base), `label` est égal à `value`. Pour `predatory`, on expose
-         *     `Oui` / `Non`. `count` est exclusif à la dimension (= filtre courant
-         *     moins cette facette), même convention que les facettes journals.
+         *     base), `label` est égal à `value`. `count` est exclusif à la
+         *     dimension (= filtre courant moins cette facette), même convention
+         *     que les facettes journals.
          */
         PublishersFacetOption: {
             /** Value */
@@ -5147,15 +5147,13 @@ export interface components {
         };
         /**
          * PublishersFacetsResponse
-         * @description Facettes dynamiques pour `/api/publishers` (3 dimensions).
+         * @description Facettes dynamiques pour `/api/publishers` (2 dimensions).
          */
         PublishersFacetsResponse: {
             /** Publisher Types */
             publisher_types: components["schemas"]["PublishersFacetOption"][];
             /** Countries */
             countries: components["schemas"]["PublishersFacetOption"][];
-            /** Predatory */
-            predatory: components["schemas"]["PublishersFacetOption"][];
         };
         /** ReassignIdentifier */
         ReassignIdentifier: {

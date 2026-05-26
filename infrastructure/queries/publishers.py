@@ -32,7 +32,6 @@ def _build_publisher_where(
     with_pubs: bool,
     skip_publisher_types: bool = False,
     skip_countries: bool = False,
-    skip_predatory: bool = False,
 ) -> tuple[str, dict[str, Any]]:
     """Construit la clause WHERE pour `list_publishers` et `publishers_facets`.
 
@@ -55,7 +54,7 @@ def _build_publisher_where(
     if countries and not skip_countries:
         parts.append("p.country = ANY(:countries)")
         binds["countries"] = countries
-    if is_predatory is not None and not skip_predatory:
+    if is_predatory is not None:
         parts.append("p.is_predatory = :is_predatory")
         binds["is_predatory"] = is_predatory
     if with_pubs:
@@ -226,33 +225,9 @@ class PgPublisherQueries(PublisherQueries):
             PublishersFacetOption(value=r.value, label=r.value, count=r.n) for r in country_rows
         ]
 
-        where_p, binds_p = _build_publisher_where(
-            search=search,
-            publisher_types=publisher_types,
-            countries=countries,
-            is_predatory=is_predatory,
-            with_pubs=with_pubs,
-            skip_predatory=True,
-        )
-        pred_rows = self._conn.execute(
-            text(f"""
-                SELECT p.is_predatory AS value, COUNT(*) AS n
-                FROM publishers p
-                WHERE {where_p}
-                GROUP BY p.is_predatory
-            """),
-            binds_p,
-        ).all()
-        pred_counts = {bool(r.value): r.n for r in pred_rows}
-        predatory_facet = [
-            PublishersFacetOption(value="true", label="Oui", count=pred_counts.get(True, 0)),
-            PublishersFacetOption(value="false", label="Non", count=pred_counts.get(False, 0)),
-        ]
-
         return PublishersFacetsResponse(
             publisher_types=publisher_types_facet,
             countries=countries_facet,
-            predatory=predatory_facet,
         )
 
     def get_publisher_detail(self, publisher_id: int) -> PublisherDetailResponse | None:

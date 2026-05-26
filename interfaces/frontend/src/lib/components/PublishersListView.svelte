@@ -44,7 +44,6 @@
 	let currentSort = $state('-pubs');
 	let selectedPublisherTypes: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
-	let selectedPredatory: string[] = $state([]); // 'true' / 'false'
 
 	$effect(() => {
 		if (onTotalChange) onTotalChange(publishers.total);
@@ -54,8 +53,6 @@
 		const params = new URLSearchParams();
 		if (selectedPublisherTypes.length) params.set('publisher_type', selectedPublisherTypes.join(','));
 		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
-		// Prédateur : un seul ['true'] / ['false'] interprétable côté API.
-		if (selectedPredatory.length === 1) params.set('is_predatory', selectedPredatory[0]);
 		if (withPubs) params.set('with_pubs', 'true');
 		return params;
 	}
@@ -81,7 +78,6 @@
 		facets: {
 			publisherTypes: { type: 'labeled', apiKey: 'publisher_types' },
 			countries: { type: 'labeled', apiKey: 'countries' },
-			predatory: { type: 'labeled', apiKey: 'predatory' },
 		},
 	});
 
@@ -90,7 +86,6 @@
 		filters: {
 			selectedPublisherTypes: { type: 'string_array', urlKey: 'publisher_type' },
 			selectedCountries: { type: 'string_array', urlKey: 'country' },
-			selectedPredatory: { type: 'string_array', urlKey: 'is_predatory' },
 			search: { type: 'single', urlKey: 'search' },
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: '-pubs' },
 			currentPage: { type: 'page', urlKey: 'page' },
@@ -102,7 +97,6 @@
 		url.syncUrl(() => ({
 			selectedPublisherTypes,
 			selectedCountries,
-			selectedPredatory,
 			search,
 			currentSort,
 			currentPage: publishers.page,
@@ -150,7 +144,6 @@
 			const restored = url.restoreFromUrl($page.url.searchParams);
 			if (restored.selectedPublisherTypes) selectedPublisherTypes = restored.selectedPublisherTypes as string[];
 			if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
-			if (restored.selectedPredatory) selectedPredatory = restored.selectedPredatory as string[];
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) publishers.page = restored.currentPage as number;
@@ -178,12 +171,6 @@
 		options={facets.options.countries}
 		searchable
 		bind:selected={selectedCountries}
-		onchange={onFilterChange}
-	/>
-	<FacetDropdown
-		label="Prédateur"
-		options={facets.options.predatory}
-		bind:selected={selectedPredatory}
 		onchange={onFilterChange}
 	/>
 	<span class="count">{publishers.total.toLocaleString('fr-FR')} éditeur{publishers.total > 1 ? 's' : ''}</span>

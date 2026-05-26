@@ -79,9 +79,9 @@ class PublishersFacetOption(BaseModel):
 
     Pour la facette `publisher_types`, `label` reprend
     `PUBLISHER_TYPE_LABELS_FR`. Pour `countries` (texte libre observé en
-    base), `label` est égal à `value`. Pour `predatory`, on expose
-    `Oui` / `Non`. `count` est exclusif à la dimension (= filtre courant
-    moins cette facette), même convention que les facettes journals.
+    base), `label` est égal à `value`. `count` est exclusif à la
+    dimension (= filtre courant moins cette facette), même convention
+    que les facettes journals.
     """
 
     value: str
@@ -90,11 +90,10 @@ class PublishersFacetOption(BaseModel):
 
 
 class PublishersFacetsResponse(BaseModel):
-    """Facettes dynamiques pour `/api/publishers` (3 dimensions)."""
+    """Facettes dynamiques pour `/api/publishers` (2 dimensions)."""
 
     publisher_types: list[PublishersFacetOption]
     countries: list[PublishersFacetOption]
-    predatory: list[PublishersFacetOption]
 
 
 class PublisherDashboardResponse(BaseModel):

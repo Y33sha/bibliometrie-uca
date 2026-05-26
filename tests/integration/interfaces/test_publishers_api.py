@@ -215,7 +215,7 @@ class TestListPublishers:
 
 
 class TestPublishersFacets:
-    def test_returns_3_dimensions(self, client):
+    def test_returns_2_dimensions(self, client):
         pid = _seed_publisher()
         country = _uniq("ZZ")[:5]
         with _pool() as cur:
@@ -223,11 +223,9 @@ class TestPublishersFacets:
         r = client.get("/api/publishers/facets")
         assert r.status_code == 200
         body = r.json()
-        assert set(body) == {"publisher_types", "countries", "predatory"}
+        assert set(body) == {"publisher_types", "countries"}
         # Le pays seedé doit apparaître dans la facette countries.
         assert any(opt["value"] == country for opt in body["countries"])
-        # `predatory` est un bool : 2 options Oui/Non.
-        assert sorted(o["value"] for o in body["predatory"]) == ["false", "true"]
 
 
 # ── GET /api/publishers/{id} ────────────────────────────────────
