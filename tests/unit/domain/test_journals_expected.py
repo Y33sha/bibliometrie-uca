@@ -118,11 +118,12 @@ class TestMappingCoverage:
         }
 
     def test_journal_type_keys_documented(self):
-        # Les 6 valeurs de l'enum journal_type.
+        # Les 7 valeurs de l'enum journal_type.
         assert set(EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE) == {
             "journal",
             "proceedings",
             "book_series",
+            "ebook_platform",
             "preprint_server",
             "repository",
             "media",
