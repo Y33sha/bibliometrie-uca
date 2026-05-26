@@ -26,11 +26,10 @@ Recalcule depuis `publication_subjects` (en excluant les liens `rejected`) :
 
 Idempotent : le résultat ne dépend que de l'état courant de `publication_subjects`.
 
-##  Statut open access, APC {#oa_status}
+##  Statut open access {#oa_status}
 
-Phase `enrich`: exécutée uniquement en mode `full` :
+Phase `oa_status`: exécutée uniquement en mode `full`. Interroge [Unpaywall](../glossaire.md#unpaywall) par DOI pour rafraîchir `publications.oa_status` — souvent plus à jour que le statut renseigné dans les sources. Préserve `diamond` qu'Unpaywall ne distingue pas du `gold`.
 
-| Script | Rôle |
-|--------|------|
-| `interfaces/cli/pipeline/enrich_oa_status.py` | Statut *open access* via API [Unpaywall](../glossaire.md#unpaywall) => souvent plus à jour que le statut renseigné dans les sources |
-| `interfaces/cli/pipeline/enrich_journal_apc.py` | Montant [APC](../glossaire.md#apc) par revue via API OpenAlex Sources => **ne sert à rien pour l'instant**, voir si on garde ou pas |
+Code : `application/pipeline/oa_status/run.py`, CLI : `interfaces/cli/pipeline/enrich_oa_status.py`.
+
+Les enrichissements sur les **revues** et **éditeurs** (APC, type, pays, etc.) sont rassemblés dans la phase distincte [`publishers_journals`](04-publishers-journals.md), positionnée beaucoup plus tôt dans le pipeline (entre normalize et affiliations).

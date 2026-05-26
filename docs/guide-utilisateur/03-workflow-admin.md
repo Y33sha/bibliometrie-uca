@@ -12,7 +12,7 @@
 
 ![Informations Structure](../screenshots/admin_structures_id_modifier.png)
 
-- Le repérage des affiliations (étape [affiliations](../pipeline/04-affiliations.md) du pipeline) nécessite des **formes de nom** à détecter dans les [adresses](../glossaire.md#adresse) des publications. On peut commencer par indiquer les plus évidentes (nom complet, acronyme, numéro d'UMR). Les contrôles post-pipeline permettent d'affiner en fonction des formes effectivement présentes dans les adresses liées aux publications.
+- Le repérage des affiliations (étape [affiliations](../pipeline/05-affiliations.md) du pipeline) nécessite des **formes de nom** à détecter dans les [adresses](../glossaire.md#adresse) des publications. On peut commencer par indiquer les plus évidentes (nom complet, acronyme, numéro d'UMR). Les contrôles post-pipeline permettent d'affiner en fonction des formes effectivement présentes dans les adresses liées aux publications.
 
 ![Formes de nom](../screenshots/admin_structures_id_nameforms_lmv.png)
 
@@ -77,7 +77,7 @@ Les ajouts ou suppressions de formes de noms deviennent effectifs au *run* suiva
 
 #### Fusion des doublons
 
-Lorsque les auteurs des publications ne sont pas identifiés par un [PID](../glossaire.md#pid), la phase de [matching personnes](../pipeline/06-persons.md) recourt aux formes de noms pour identifier les auteurs. Des formes de noms multiples pour la même personne conduiront donc à créer des doublons de personnes.
+Lorsque les auteurs des publications ne sont pas identifiés par un [PID](../glossaire.md#pid), la phase de [matching personnes](../pipeline/07-persons.md) recourt aux formes de noms pour identifier les auteurs. Des formes de noms multiples pour la même personne conduiront donc à créer des doublons de personnes.
 
 Il est nécessaire, en particulier apès les premiers runs, de **fusionner** les doublons de personnes. Une fusion de personnes entraîne:
 - le transfert des formes de noms vers la personne cible (tous les futurs matchs par forme de nom aboutiront à cette personne);
@@ -102,7 +102,7 @@ Pour réattribuer les authorships en question: cf [Authorships orphelines](#orph
 
 Travail au long cours.
 
-Les PIDs présents dans les publications sont rattachés aux personnes pendant la phase de [matching personnes](../pipeline/06-persons.md).
+Les PIDs présents dans les publications sont rattachés aux personnes pendant la phase de [matching personnes](../pipeline/07-persons.md).
 
 Un PID se définit par: un **type** (`orcid`, `idref`, `idhal`) et une **valeur**.
 
