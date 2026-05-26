@@ -1,6 +1,6 @@
 # Chantier — Pipeline : phase `publishers_journals` (référentiels enrichis)
 
-Commencé le 2026-05-26
+Commencé et terminé le 2026-05-26
 
 ## Contexte
 
