@@ -1,4 +1,4 @@
-"""Point d'entrée CLI : enrichissement APC/DOAJ des revues via OpenAlex."""
+"""Point d'entrée CLI : enrichissement APC/DOAJ et `journal_type` des revues via OpenAlex Sources."""
 
 import argparse
 import os
@@ -20,7 +20,7 @@ logger = setup_logger("enrich_journal_apc", os.path.join(os.path.dirname(__file_
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Enrichir les revues avec les APC depuis OpenAlex (prix catalogue DOAJ)"
+        description="Enrichir les revues via OpenAlex Sources (APC/DOAJ + journal_type)"
     )
     parser.add_argument(
         "--limit", type=int, default=0, help="Limiter le nombre de revues traitées (0 = toutes)"
