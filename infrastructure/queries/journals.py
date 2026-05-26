@@ -30,6 +30,7 @@ from domain.journals.journal import (
 )
 from domain.normalize import normalize_text
 from infrastructure.db.tables import journals as t_journals
+from infrastructure.sources.doaj import build_doaj_toc_url
 
 
 def _build_journal_where(
@@ -132,6 +133,7 @@ class PgJournalQueries(JournalQueries):
                        j.openalex_id, j.is_in_doaj, j.is_predatory,
                        j.apc_amount, j.apc_currency, j.oa_model,
                        j.journal_type, j.is_academic, j.doi_prefix,
+                       j.doaj_payload->>'DOAJ id' AS doaj_id,
                        (SELECT COUNT(*) FROM publications pub
                         WHERE pub.journal_id = j.id) AS pub_count
                 FROM journals j
@@ -165,6 +167,7 @@ class PgJournalQueries(JournalQueries):
                     is_academic=r.is_academic,
                     doi_prefix=r.doi_prefix,
                     pub_count=r.pub_count,
+                    doaj_url=build_doaj_toc_url(r.doaj_id),
                 )
                 for r in rows
             ],
@@ -280,6 +283,7 @@ class PgJournalQueries(JournalQueries):
                        j.apc_amount, j.apc_currency, j.oa_model,
                        j.journal_type, j.is_academic, j.doi_prefix,
                        j.doaj_payload, j.doaj_imported_at,
+                       j.doaj_payload->>'DOAJ id' AS doaj_id,
                        (SELECT COUNT(*) FROM publications pub
                         WHERE pub.journal_id = j.id) AS pub_count
                 FROM journals j
@@ -310,6 +314,7 @@ class PgJournalQueries(JournalQueries):
             pub_count=row.pub_count,
             doaj_payload=row.doaj_payload,
             doaj_imported_at=row.doaj_imported_at,
+            doaj_url=build_doaj_toc_url(row.doaj_id),
         )
 
     def get_journal_dashboard(self, journal_id: int) -> JournalDashboardResponse | None:

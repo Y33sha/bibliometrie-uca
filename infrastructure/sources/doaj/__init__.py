@@ -80,6 +80,22 @@ def build_doaj_user_agent(mailto: str) -> str:
     return f"bibliometrie-uca/1.0 (mailto:{mailto})"
 
 
+DOAJ_TOC_URL = "https://doaj.org/toc/{id}"
+"""URL canonique d'une fiche journal DOAJ (table des matières)."""
+
+
+def build_doaj_toc_url(doaj_id: str | None) -> str | None:
+    """Reconstruit l'URL de la fiche DOAJ à partir d'un `DOAJ id`.
+
+    Retourne ``None`` si l'id est absent — cas typique d'un journal
+    dont ``is_in_doaj`` a été posé par OpenAlex Sources ou par l'import
+    CSV bootstrap (ni l'un ni l'autre ne fournit l'id DOAJ).
+    """
+    if not doaj_id:
+        return None
+    return DOAJ_TOC_URL.format(id=doaj_id)
+
+
 # ── Mapping API → format CSV ────────────────────────────────────────
 
 

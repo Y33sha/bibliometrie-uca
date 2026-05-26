@@ -38,6 +38,7 @@ class JournalOut(BaseModel):
     is_academic: bool | None
     doi_prefix: str | None
     pub_count: int
+    doaj_url: str | None
 
 
 class JournalListResponse(BaseModel):
@@ -74,6 +75,7 @@ class JournalDetailResponse(BaseModel):
     pub_count: int
     doaj_payload: dict[str, Any] | None
     doaj_imported_at: datetime | None
+    doaj_url: str | None
 
 
 class DocTypeCount(BaseModel):

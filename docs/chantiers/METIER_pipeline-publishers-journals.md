@@ -120,9 +120,13 @@ Livrée le 2026-05-26.
 
 ## Phase 6 — Front : badge DOAJ → lien vers la fiche DOAJ
 
-- [ ] Une fois `doaj_payload` enrichi (Phase 4), exposer l'URL de la fiche DOAJ côté DTO `JournalDetailResponse` (et `JournalOut` ? à juger). L'URL pointe vers la page DOAJ du journal (ex. `https://doaj.org/toc/{doaj_id}`) — pas vers la homepage de la revue. Champ exact du payload à confirmer (probablement reconstruit depuis l'`id` DOAJ ; au pire l'ISSN suffit).
-- [ ] Composant DOAJ badge cliquable : `<a href={url} target="_blank" rel="noopener">DOAJ</a>` au lieu de `<span>DOAJ</span>`. Style préservé.
-- [ ] Pages concernées : `journals/[id]` (header), `JournalsListView` (cellule titre), `admin/journals` (tableau).
+Livrée le 2026-05-26.
+
+- [x] **Exposition côté DTO** : `doaj_url: str | None` ajouté à `JournalOut` ET `JournalDetailResponse` (les deux pages où le badge est affiché). Calculé côté backend via `infrastructure.sources.doaj.build_doaj_toc_url` à partir de `doaj_payload->>'DOAJ id'`. Null quand le payload n'a pas la clé (cas import CSV bootstrap, ou `is_in_doaj=TRUE` posé par OpenAlex Sources sans fetch DOAJ direct).
+- [x] **Format URL** : `https://doaj.org/toc/{id}` (la fiche DOAJ canonique), pas la homepage de la revue.
+- [x] **Badge cliquable + fallback** : `journals/[id]` (header) et `JournalsListView` (cellule titre). Quand `doaj_url` est posé : `<a class="badge-doaj" href={...} target="_blank" rel="noopener">` ; sinon fallback sur l'ancien `<span>` (badge non cliquable, infobulle « Indexée dans DOAJ »). Style préservé, ajout `text-decoration: none` + hover plus foncé.
+- [x] **Hors scope vs fiche initiale** : `admin/journals` n'a en réalité pas de badge DOAJ (juste une checkbox d'édition) — la fiche se trompait sur ce point, rien à patcher.
+- [x] **Tests** : 3 tests intégration dans `test_journals_api.py` (DOAJ id présent → URL ; payload sans la clé → null ; listing aussi exposé).
 
 ## Phase 7 — Audit APC OpenAlex vs DOAJ
 

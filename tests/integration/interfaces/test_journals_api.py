@@ -185,6 +185,19 @@ class TestListJournals:
         r = client.get("/api/journals", params={"per_page": 500})
         assert r.status_code == 422
 
+    def test_listing_exposes_doaj_url_from_payload(self, client):
+        jid = _seed_journal()
+        payload = {"DOAJ id": "abc123"}
+        with _pool() as cur:
+            cur.execute(
+                "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
+                (json.dumps(payload), jid),
+            )
+        r = client.get("/api/journals", params={"per_page": 200})
+        assert r.status_code == 200
+        mine = next(j for j in r.json()["journals"] if j["id"] == jid)
+        assert mine["doaj_url"] == "https://doaj.org/toc/abc123"
+
 
 class TestGetJournal:
     def test_404_when_unknown(self, client):
@@ -219,6 +232,32 @@ class TestGetJournal:
         body = r.json()
         assert body["is_in_doaj"] is True
         assert body["doaj_payload"] == payload
+
+    def test_doaj_url_null_when_no_doaj_id_in_payload(self, client):
+        """Payload sans clé `DOAJ id` (cas CSV bootstrap ou seed de test)
+        → `doaj_url` reste null pour que le front fallback sur `<span>`."""
+        jid = _seed_journal()
+        payload = {"License": "CC BY"}
+        with _pool() as cur:
+            cur.execute(
+                "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
+                (json.dumps(payload), jid),
+            )
+        r = client.get(f"/api/journals/{jid}")
+        assert r.status_code == 200
+        assert r.json()["doaj_url"] is None
+
+    def test_doaj_url_computed_when_doaj_id_present(self, client):
+        jid = _seed_journal()
+        payload = {"DOAJ id": "deadbeef1234"}
+        with _pool() as cur:
+            cur.execute(
+                "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
+                (json.dumps(payload), jid),
+            )
+        r = client.get(f"/api/journals/{jid}")
+        assert r.status_code == 200
+        assert r.json()["doaj_url"] == "https://doaj.org/toc/deadbeef1234"
 
 
 class TestJournalDashboard:

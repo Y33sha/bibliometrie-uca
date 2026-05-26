@@ -238,7 +238,13 @@
 			<tr>
 				<td>
 					<a href="{base}/journals/{j.id}" class="journal-link">{j.title}</a>
-					{#if j.is_in_doaj}<span class="badge-doaj">DOAJ</span>{/if}
+					{#if j.is_in_doaj}
+						{#if j.doaj_url}
+							<a class="badge-doaj" href={j.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
+						{:else}
+							<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
+						{/if}
+					{/if}
 					{#if j.is_predatory}<span class="badge-pred">prédatrice</span>{/if}
 				</td>
 				<td class="issn-cell">{formatIssns(j)}</td>
@@ -327,7 +333,9 @@
 		margin-left: 6px;
 		vertical-align: middle;
 		font-weight: 600;
+		text-decoration: none;
 	}
+	:global(a.badge-doaj:hover) { background: #256528; }
 	.badge-pred {
 		font-size: 0.7rem;
 		padding: 1px 5px;

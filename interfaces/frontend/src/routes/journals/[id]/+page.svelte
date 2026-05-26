@@ -112,7 +112,11 @@
 		<h1 class="j-title">
 			{journal.title}
 			{#if journal.is_in_doaj}
-				<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
+				{#if journal.doaj_url}
+					<a class="badge-doaj" href={journal.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
+				{:else}
+					<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
+				{/if}
 			{/if}
 			{#if journal.is_predatory}
 				<span class="badge-predatory" title="Revue prédatrice">Prédatrice</span>
@@ -322,7 +326,9 @@
 		font-size: 0.7rem; padding: 2px 6px; background: #2e7d32;
 		color: white; border-radius: 8px; margin-left: 8px;
 		vertical-align: middle; font-weight: 600; letter-spacing: 0.3px;
+		text-decoration: none;
 	}
+	a.badge-doaj:hover { background: #256528; }
 	.badge-predatory {
 		font-size: 0.7rem; padding: 2px 6px; background: #c0392b;
 		color: white; border-radius: 8px; margin-left: 6px;
