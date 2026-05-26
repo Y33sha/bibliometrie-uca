@@ -52,15 +52,17 @@ Ordre par dépendance. Les phases 2, 3, 4, 5 sont indépendantes une fois la pha
 
 ## Phase 1 — Refonte structurelle
 
-- [ ] Créer `application/pipeline/publishers_journals/` (orchestrateur + __init__).
-- [ ] Déplacer `application/pipeline/resolve_doi_prefixes.py` dedans (renommer en sub-step si pertinent).
-- [ ] Déplacer `application/pipeline/enrich/enrich_journal_apc.py` dedans. Renommer pour expliciter le scope (= « enrichissement journal depuis OpenAlex Sources », couvre désormais APC + DOAJ flag + journal_type). Proposition : `enrich_journals_from_openalex.py`.
-- [ ] Mettre à jour `run_pipeline.py` :
-  - Retirer la phase `resolve_doi_prefixes` du registre top-level.
-  - Insérer `publishers_journals` après `normalize`.
-  - Retirer l'appel à `enrich_journal_apc` dans `phase_enrich` (qui ne fait plus que `enrich_oa_status` Unpaywall).
-- [ ] Mettre à jour le CLI entry-point `interfaces/cli/pipeline/` correspondant.
-- [ ] Adapter `application/pipeline/modes.py` (le flag `run_enrich` couvre toujours Unpaywall ; ajouter un flag dédié si modes spécifiques pour `publishers_journals` — par défaut tourne dans tous les modes courants).
+Livrée le 2026-05-26 (commit `d003bb9e`).
+
+- [x] Créer `application/pipeline/publishers_journals/`.
+- [x] Déplacer `application/pipeline/resolve_doi_prefixes.py` dedans.
+- [x] Déplacer + renommer `enrich/enrich_journal_apc.py` → `publishers_journals/enrich_journals_from_openalex.py`. Fonction `run_enrich` renommée en `run_enrich_journals_from_openalex`.
+- [x] Renommer la phase `enrich` (devenue misnomer) en `oa_status`. Module déplacé `enrich/enrich_oa_status.py` → `oa_status/run.py`. Fonction `run_enrich` → `run_enrich_oa_status`.
+- [x] `run_pipeline.py` : registre PHASES mis à jour. `publishers_journals` remplace `resolve_doi_prefixes` au top-level ; `oa_status` remplace `enrich`. `phase_publishers_journals` orchestre les 2 sub-steps.
+- [x] Adapter `application/pipeline/modes.py` : `run_enrich: bool` → `run_oa_status: bool` (gate phase Unpaywall). Ajout `run_journal_enrichment: bool` (gate le sub-step OpenAlex Sources dans `publishers_journals`). `resolve_doi_prefixes` tourne sans gate dans tous les modes (comportement préservé).
+- [x] CLI entry-points synchronisés (`enrich_journal_apc.py` → `enrich_journals_from_openalex.py` ; imports updatés sur `enrich_oa_status.py` et `resolve_doi_prefixes.py`).
+- [x] Imports synchronisés sur le oneshot `backfill_journal_types_from_openalex.py` et les tests (`test_enrich_oa_status_async.py`, `test_resolve_doi_prefixes.py`).
+- [x] `pyproject.toml` : override mypy `application.pipeline.enrich.*` remplacé par les 2 nouveaux paths (tolérance JSON OpenAlex préservée).
 
 ## Phase 2 — OpenAlex Publishers
 
@@ -100,13 +102,17 @@ Ordre par dépendance. Les phases 2, 3, 4, 5 sont indépendantes une fois la pha
 - [ ] **Décision à prendre selon résultats** : (a) garder OpenAlex comme source primaire APC, (b) basculer sur DOAJ, (c) garder les deux colonnes (`apc_amount_openalex`, `apc_amount_doaj`) et exposer les divergences en UI.
 - [ ] Le sub-step OpenAlex Sources actuel (`enrich_journals_from_openalex`) écrit déjà APC dans `apc_amount` — adapter selon la décision.
 
+## Phase 8  — Documentation
+- [ ] **Documentation pipeline**: ajouter et documenter la phase publishers_journals.
+- [ ] **Documentation sources**: ajouter les nouvelles sources moissonnées.
+
 ## Questions ouvertes
 
 - **`parent_publisher` d'OpenAlex** : faut-il consolider automatiquement les filiales sous le parent ? Risque de fusion abusive (BMC ≠ Springer Nature en pratique éditoriale). À reposer si on observe des problèmes de hiérarchie à l'usage.
 - **Sources `country` d'OpenAlex sur les journals** : OpenAlex Sources retourne aussi un `country_codes` pour les journals. Diverge parfois du publisher (revue éditée par filiale dans un pays différent). À exploiter ? Hors-scope cette fiche.
 - **Wikidata** : on stocke l'identifiant via OpenAlex (Phase 2), mais on ne s'en sert pour rien dans cette fiche. Réserve : lookup Wikidata pour metadata supplémentaires (sujets d'édition, périodes d'activité) — utile pour un futur chantier d'analyse historique des éditeurs.
 - **Mapping ROR `Nonprofit`** : à figer après audit Phase 3 (PLOS / eLife / Hindawi sont les cas litigieux).
-- **Modes pipeline** : faut-il un flag dédié pour `publishers_journals` dans `ModePolicy` ? Aujourd'hui `resolve_doi_prefixes` tourne dans le mode `full` mais pas dans tous. La nouvelle phase suit-elle la même règle ? À trancher en Phase 1.
+- ~~**Modes pipeline**~~ — **tranché Phase 1** : `phase_publishers_journals` tourne dans tous les modes (comme `resolve_doi_prefixes` historiquement). Le sub-step `enrich_journals_from_openalex` est gated par `MODES[mode].run_journal_enrichment` (True en `full` uniquement, comme l'était `run_enrich` historiquement pour le journal_apc).
 
 ## Liens
 
