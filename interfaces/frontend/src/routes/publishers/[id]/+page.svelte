@@ -29,6 +29,7 @@
 
 	let publisher = $state<PublisherDetail | null>(null);
 	let error = $state(false);
+	let canGoBack = $state(false);
 
 	let dashboard = $state<PublisherDashboard | null>(null);
 	let subjects = $state<SubjectFrequency[]>([]);
@@ -106,6 +107,9 @@
 	}
 
 	onMount(async () => {
+		canGoBack =
+			(window as any).navigation?.canGoBack ??
+			document.referrer.startsWith(window.location.origin);
 		await Promise.all([loadPublisher(), loadTypeLabels()]);
 		if (activeTab === 'dashboard') loadDashboard();
 		if (activeTab === 'journals') loadJournals();
@@ -123,6 +127,11 @@
 <svelte:head>
 	<title>{publisher?.name ?? 'Éditeur'} — Bibliométrie UCA</title>
 </svelte:head>
+
+{#if canGoBack}
+	<!-- svelte-ignore a11y_invalid_attribute -->
+	<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
+{/if}
 
 {#if error}
 	<div class="no-results">Éditeur introuvable</div>
