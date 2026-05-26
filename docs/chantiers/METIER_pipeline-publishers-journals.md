@@ -66,10 +66,15 @@ Livrée le 2026-05-26 (commit `d003bb9e`).
 
 ## Phase 2 — OpenAlex Publishers
 
-- [ ] **Migration Alembic** : `publishers.country` est déjà présent. Ajouter `publishers.ror text` (nouveau, `UNIQUE NULLS NOT DISTINCT`). Index optionnel.
-- [ ] **Sub-step `enrich_publishers_from_openalex`** : itère sur `publishers.openalex_id IS NOT NULL`, batch via filtre OpenAlex `openalex:|`. Écrit `country` (`country_codes[0]`) et `ror` (`ids.ror` parsé). Politique d'écrasement standard (cf. décision 7).
-- [ ] **Script oneshot** `interfaces/cli/oneshot/backfill_publishers_from_openalex.py` pour réinterroger l'historique (pattern reproductible depuis `backfill_journal_types_from_openalex.py`).
-- [ ] **Audit avant écriture** : combien de publishers ont `openalex_id` non-NULL ? Si < 50%, brancher d'abord une étape de matching (un autre chantier).
+Livrée le 2026-05-26.
+
+- [x] **Audit avant écriture** : 13.6% des publishers ont `openalex_id` non-NULL (26.7% des publishers actifs). Sous le seuil de 50% qu'on s'était fixé. Tentative de raccourci via `host_organization` retourné par OpenAlex Sources sur les journals → **abandonnée** : sur 664 publishers candidats, seuls 19 `safe` (3%), 205 `conflict` (= doublons locaux à fusionner), 25 `multi_host`, 415 `no_host` (OpenAlex ne lie pas la source à un Publisher). Décision : exécuter Phase 2 sur l'existant (les ~1006 publishers déjà OA) et **ouvrir deux chantiers séparés à terme** :
+  - **Dédoublonnage publishers** : les 205 conflicts dévoilés par l'audit (script `interfaces/cli/oneshot/audit_publisher_openalex_via_journals.py`) sont une borne basse du nombre de doublons à fusionner via l'UI admin existante.
+  - **Matching openalex_id par nom** : pour les publishers sans openalex_id (et dont OpenAlex possède bien l'entité Publisher), via `/publishers?search=`. Pas dans le scope de cette fiche — chantier risqué (validation manuelle requise).
+- [x] **Migration Alembic** : `publishers.country` était déjà présent. Ajout de `publishers.ror text UNIQUE` (NULLs distincts, comportement Postgres par défaut) via `a1b3c7d9e2f4_publishers_add_ror.py`. Plumbing complet : `domain.Publisher` (dataclass), `PublisherUpdateFields` (TypedDict), `_PublisherRow`, `find_by_id`, `merge_publisher_into` (NULL la source pour libérer la contrainte UNIQUE comme pour `openalex_id`), DTOs `PublisherListItem` / `PublisherDetailResponse`.
+- [x] **Sub-step `enrich_publishers_from_openalex`** : `application/pipeline/publishers_journals/enrich_publishers_from_openalex.py`. Itère sur `publishers.openalex_id IS NOT NULL AND (country IS NULL OR ror IS NULL)`, batch via filtre OpenAlex `ids.openalex:|` (l'API Publishers n'accepte pas le filtre `openalex:` simple comme l'API Sources). Écrit `country` (depuis `country_codes[0]`) et `ror` (depuis `ids.ror` parsé en short form). Politique d'écrasement « NULL only » : préserve les valeurs admin explicites.
+- [x] **Branchement** : `phase_publishers_journals` appelle `_run_enrich_publishers_from_openalex` après `_run_enrich_journals_from_openalex`, gated par `MODES[mode].run_journal_enrichment` (= mode `full` uniquement, comme l'enrichissement journaux).
+- [x] **CLI** : `interfaces/cli/pipeline/enrich_publishers_from_openalex.py` (--limit / --dry-run). Pas de script oneshot de backfill jugé nécessaire — la condition d'éligibilité `country IS NULL OR ror IS NULL` couvre déjà tous les publishers en première run après migration, et les re-runs ciblent automatiquement ceux pour qui le fetch a échoué.
 
 ## Phase 3 — ROR → publisher_type
 
@@ -112,6 +117,13 @@ Livrée le 2026-05-26 (commit `d003bb9e`).
 - **Sources `country` d'OpenAlex sur les journals** : OpenAlex Sources retourne aussi un `country_codes` pour les journals. Diverge parfois du publisher (revue éditée par filiale dans un pays différent). À exploiter ? Hors-scope cette fiche.
 - **Mapping ROR `Nonprofit`** : à figer après audit Phase 3 (PLOS / eLife / Hindawi sont les cas litigieux).
 - ~~**Modes pipeline**~~ — **tranché Phase 1** : `phase_publishers_journals` tourne dans tous les modes (comme `resolve_doi_prefixes` historiquement). Le sub-step `enrich_journals_from_openalex` est gated par `MODES[mode].run_journal_enrichment` (True en `full` uniquement, comme l'était `run_enrich` historiquement pour le journal_apc).
+
+## Chantiers connexes à ouvrir
+
+Sortis du scope cette fiche après l'audit de Phase 2 :
+
+- **Dédoublonnage publishers** : l'audit `audit_publisher_openalex_via_journals` a révélé au moins 205 doublons potentiels (publishers locaux distincts dont les journaux pointent vers le même `host_organization` OpenAlex, déjà attribué à un autre publisher local OA-typé). À fusionner via l'UI admin existante.
+- **Matching openalex_id par nom** : pour les publishers actifs sans openalex_id (et dont OpenAlex Publishers possède bien l'entité), via `/publishers?search=<name>`. Validation manuelle requise — chantier risqué.
 
 ## Liens
 

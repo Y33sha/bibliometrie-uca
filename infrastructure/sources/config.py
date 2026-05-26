@@ -113,6 +113,7 @@ _API_BASE_URLS_DEFAULTS: dict[str, str] = {
     "crossref": "https://api.crossref.org",
     # Endpoints secondaires
     "openalex_sources": "https://api.openalex.org/sources",
+    "openalex_publishers": "https://api.openalex.org/publishers",
     "unpaywall": "https://api.unpaywall.org/v2",
     "zenodo": "https://zenodo.org/api/records",
 }

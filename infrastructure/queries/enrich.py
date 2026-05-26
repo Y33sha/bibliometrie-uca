@@ -3,8 +3,9 @@
 `fetch_publications_with_doi` est consommée par la phase `oa_status`
 (`application/pipeline/oa_status/`).
 
-`fetch_journals_needing_apc` est consommée par le sub-step
-`enrich_journals_from_openalex` de la phase `publishers_journals`
+`fetch_journals_needing_apc` et `fetch_publishers_needing_enrichment`
+sont consommées par les sub-steps `enrich_journals_from_openalex` et
+`enrich_publishers_from_openalex` de la phase `publishers_journals`
 (`application/pipeline/publishers_journals/`).
 
 Le nom de fichier reste `enrich.py` (legacy) — un split par phase
@@ -80,6 +81,40 @@ def fetch_journals_needing_apc(
     return [(r.id, r.openalex_id) for r in rows]
 
 
+def fetch_publishers_needing_enrichment(
+    conn: Connection, *, limit: int | None = None
+) -> list[tuple[int, str]]:
+    """Liste `(id, openalex_id)` des publishers à enrichir depuis OpenAlex Publishers.
+
+    Utilisé par `enrich_publishers_from_openalex`. Filtre les publishers
+    avec un `openalex_id` et auxquels il manque au moins `country` ou
+    `ror`. Tri par id pour batching stable.
+    """
+    if limit and limit > 0:
+        rows = conn.execute(
+            text("""
+                SELECT id, openalex_id
+                FROM publishers
+                WHERE openalex_id IS NOT NULL
+                  AND (country IS NULL OR ror IS NULL)
+                ORDER BY id
+                LIMIT :lim
+            """),
+            {"lim": limit},
+        ).all()
+    else:
+        rows = conn.execute(
+            text("""
+                SELECT id, openalex_id
+                FROM publishers
+                WHERE openalex_id IS NOT NULL
+                  AND (country IS NULL OR ror IS NULL)
+                ORDER BY id
+            """)
+        ).all()
+    return [(r.id, r.openalex_id) for r in rows]
+
+
 class PgEnrichQueries(EnrichQueries):
     """Adapter PostgreSQL pour `application.ports.enrich.EnrichQueries`."""
 
@@ -92,3 +127,8 @@ class PgEnrichQueries(EnrichQueries):
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]:
         return fetch_journals_needing_apc(conn, limit=limit)
+
+    def fetch_publishers_needing_enrichment(
+        self, conn: Connection, *, limit: int | None = None
+    ) -> list[tuple[int, str]]:
+        return fetch_publishers_needing_enrichment(conn, limit=limit)

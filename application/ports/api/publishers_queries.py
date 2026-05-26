@@ -24,6 +24,7 @@ class PublisherListItem(BaseModel):
     id: int
     name: str
     openalex_id: str | None
+    ror: str | None
     country: str | None
     doi_prefixes: list[DoiPrefixInfo]
     is_predatory: bool
@@ -45,6 +46,7 @@ class PublisherDetailResponse(BaseModel):
     id: int
     name: str
     openalex_id: str | None
+    ror: str | None
     country: str | None
     doi_prefixes: list[DoiPrefixInfo]
     is_predatory: bool

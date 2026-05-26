@@ -20,3 +20,7 @@ class EnrichQueries(Protocol):
     def fetch_journals_needing_apc(
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]: ...
+
+    def fetch_publishers_needing_enrichment(
+        self, conn: Connection, *, limit: int | None = None
+    ) -> list[tuple[int, str]]: ...
