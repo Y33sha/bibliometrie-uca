@@ -36,11 +36,11 @@
 
 Tout se passe dans `admin/config`.
 
-#### Credentials
+#### Credentials {#credentials}
 
 Certaines sources requièrent une clé API ([WoS](../sources/04-wos.md)) ou un couple d'identifiants ([ScanR](../sources/05-scanr.md)). D'autres requièrent une adresse mail pour le polite pool ([OpenAlex](../sources/03-openalex.md), [Crossref](../sources/06-crossref.md)). Voir la doc de chaque source pour l'obtention des *credentials*.
 
-#### Années
+#### Années {#years}
 
 Le pipeline a [trois modes](../pipeline/01-vue-d-ensemble.md): *daily*, *weekly*, *full*.
 
@@ -48,7 +48,7 @@ Par défaut le mode *weekly* interroge les sources depuis l'année *n*-1 (le cri
 
 On peut modifier cette plage temporelle dans `admin/config`.
 
-#### Périmètres
+#### Périmètres {#perimeters}
 
 *A compléter.*
 
