@@ -7,14 +7,12 @@
 	import { docTypeSingular } from '$lib/stores/docTypes';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
+	import JournalsListView from '$lib/components/JournalsListView.svelte';
 	import type { components } from '$lib/api/schema';
 
 	type PublisherDetail = components['schemas']['PublisherDetailResponse'];
 	type PublisherDashboard = components['schemas']['PublisherDashboardResponse'];
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
-	type JournalListResponse = components['schemas']['JournalListResponse'];
-	type Journal = components['schemas']['JournalOut'];
 	type EnumOption = components['schemas']['EnumOption'];
 
 	const publisherId = $derived(Number($page.params.id));
@@ -39,16 +37,13 @@
 	// PublicationsListView n'a pas remonté son total post-filtrage.
 	let pubsTotal = $state(0);
 
-	// Onglet Revues : tableau paginé des revues de l'éditeur.
-	let journals = $state<Journal[]>([]);
+	// Onglet Revues : alimente le compteur d'onglet via JournalsListView
+	// (qui gère lui-même chargement, facettes, pagination).
 	let journalsTotal = $state(0);
-	let journalsPage = $state(1);
-	let journalsPages = $state(1);
-	let journalsLoaded = $state(false);
-	const JOURNALS_PER_PAGE = 50;
 
-	// Labels FR des publisher_type / journal_type, alimentés par les endpoints
-	// /api/publisher-types et /api/journal-types (source de vérité côté domain).
+	// Labels FR des publisher_type / journal_type — alimentent les colonnes
+	// du dashboard. Le tableau de l'onglet Revues utilise JournalsListView
+	// qui fetch ses propres labels via /api/journal-types.
 	let publisherTypeLabels: Record<string, string> = $state({});
 	let journalTypeLabels: Record<string, string> = $state({});
 
@@ -85,25 +80,8 @@
 		dashboardLoaded = true;
 	}
 
-	async function loadJournals() {
-		const params = new URLSearchParams();
-		params.set('publisher_id', String(publisherId));
-		params.set('with_pubs', 'true');
-		params.set('sort', '-pubs');
-		params.set('page', String(journalsPage));
-		params.set('per_page', String(JOURNALS_PER_PAGE));
-		const resp = await api<JournalListResponse>(`/api/journals?${params}`, {
-			key: 'p-journals'
-		});
-		journals = resp.journals;
-		journalsTotal = resp.total;
-		journalsPages = resp.pages;
-		journalsLoaded = true;
-	}
-
 	function onTabSwitch(tab: string) {
 		if (tab === 'dashboard') loadDashboard();
-		if (tab === 'journals' && !journalsLoaded) loadJournals();
 	}
 
 	onMount(async () => {
@@ -112,16 +90,9 @@
 			document.referrer.startsWith(window.location.origin);
 		await Promise.all([loadPublisher(), loadTypeLabels()]);
 		if (activeTab === 'dashboard') loadDashboard();
-		if (activeTab === 'journals') loadJournals();
 		await tick();
 	});
 
-	function formatJournalIssns(j: Journal): string {
-		const parts: string[] = [];
-		if (j.issn) parts.push(j.issn);
-		if (j.eissn) parts.push(j.eissn);
-		return parts.join(' / ');
-	}
 </script>
 
 <svelte:head>
@@ -176,7 +147,7 @@
 	<TabNav
 		tabs={[
 			{ id: 'dashboard', label: 'Dashboard', showCount: false },
-			{ id: 'journals', label: 'Revues', count: journalsLoaded ? journalsTotal : publisher.journal_count },
+			{ id: 'journals', label: 'Revues', count: journalsTotal || publisher.journal_count },
 			{ id: 'publications', label: 'Publications', count: pubsTotal }
 		]}
 		onswitch={onTabSwitch}
@@ -266,41 +237,13 @@
 	<!-- Tab: Revues -->
 	{#if activeTab === 'journals'}
 		<div class="tab-content">
-			{#if !journalsLoaded}
-				<div class="loading">Chargement…</div>
-			{:else}
-				<table class="journals-table">
-					<thead>
-						<tr>
-							<th>Titre</th>
-							<th>ISSN</th>
-							<th>Type</th>
-							<th class="num">Publis</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each journals as j (j.id)}
-							<tr>
-								<td>
-									<a href="{base}/journals/{j.id}" class="journal-link">{j.title}</a>
-									{#if j.is_in_doaj}<span class="badge-doaj">DOAJ</span>{/if}
-								</td>
-								<td class="issn-cell">{formatJournalIssns(j)}</td>
-								<td class="muted">{j.journal_type ? (journalTypeLabels[j.journal_type] ?? j.journal_type) : ''}</td>
-								<td class="num">{j.pub_count.toLocaleString('fr-FR')}</td>
-							</tr>
-						{/each}
-						{#if journals.length === 0}
-							<tr><td colspan="4" class="no-results">Aucune revue rattachée à cet éditeur.</td></tr>
-						{/if}
-					</tbody>
-				</table>
-				<Pagination
-					page={journalsPage}
-					pages={journalsPages}
-					onchange={(p) => { journalsPage = p; loadJournals(); }}
-				/>
-			{/if}
+			<JournalsListView
+				apiKey={`publisher-${publisherId}-journals`}
+				externalFilters={{ publisherId }}
+				hidePublisherColumn
+				withPubs
+				onTotalChange={(t) => (journalsTotal = t)}
+			/>
 		</div>
 	{/if}
 
