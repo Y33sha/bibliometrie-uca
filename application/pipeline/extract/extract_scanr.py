@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import time
 
 from sqlalchemy import Connection
 
@@ -16,7 +15,6 @@ from application.pipeline.extract.base import ExtractionConfigError, SourceExtra
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
 from application.ports.pipeline.staging import StagingQueries
-from domain.sources.scanr_extract import SCANR_DELAY, build_query, extract_scanr_id
 
 
 def extract_year(
@@ -35,7 +33,7 @@ def extract_year(
     updated = 0
     seen = 0
 
-    query = build_query(year, affiliation_ids)
+    query = adapter.build_query(year, affiliation_ids)
     data = adapter.fetch_page(query)
     total = data["hits"]["total"]["value"]
     logger.info(f"  {year} : {total} publications")
@@ -44,7 +42,7 @@ def extract_year(
         return total, 0, 0
 
     while True:
-        query = build_query(year, affiliation_ids, search_after)
+        query = adapter.build_query(year, affiliation_ids, search_after)
         data = adapter.fetch_page(query)
         hits = data["hits"]["hits"]
         if not hits:
@@ -52,7 +50,7 @@ def extract_year(
 
         for hit in hits:
             doc = hit["_source"]
-            scanr_id = extract_scanr_id(doc)
+            scanr_id = adapter.extract_id(doc)
             if not scanr_id:
                 continue
 
@@ -70,8 +68,6 @@ def extract_year(
         if seen % 500 == 0:
             conn.commit()
             logger.info(f"    {seen}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
-
-        time.sleep(SCANR_DELAY)
 
     conn.commit()
     return total, inserted, updated

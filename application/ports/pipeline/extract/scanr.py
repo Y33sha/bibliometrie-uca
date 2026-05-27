@@ -23,13 +23,26 @@ class ScanrExtractConfig:
 
 
 class ScanrExtractAdapter(Protocol):
-    """Port ScanR : config, HTTP, SQL."""
+    """Port ScanR : config, parsing/requête, HTTP, SQL."""
 
     # ── Config ─────────────────────────────────────────────────
 
     def load_config(self, conn: Connection) -> ScanrExtractConfig: ...
 
     def get_years(self, conn: Connection, *, mode: str) -> list[int]: ...
+
+    # ── Parsing & requête (pur, sans I/O) ──────────────────────
+    # L'orchestrateur ne connaît ni la syntaxe Elasticsearch ni le format
+    # des hits ScanR : il délègue ces savoirs adapter au port.
+
+    def build_query(
+        self,
+        year: int,
+        affiliation_ids: list[str],
+        search_after: list[Any] | None = None,
+    ) -> dict[str, Any]: ...
+
+    def extract_id(self, doc: dict[str, Any]) -> str: ...
 
     # ── HTTP ───────────────────────────────────────────────────
 

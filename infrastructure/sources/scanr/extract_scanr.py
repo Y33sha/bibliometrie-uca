@@ -10,6 +10,7 @@ L'orchestration de la phase (boucle par année, pagination
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
@@ -19,7 +20,8 @@ from application.ports.pipeline.extract.scanr import (
     ScanrExtractAdapter,
     ScanrExtractConfig,
 )
-from domain.sources.scanr_extract import extract_doi, extract_scanr_id
+from domain.publications.identifiers import clean_doi
+from infrastructure.sources.api_limits import SCANR_DELAY, SCANR_PER_PAGE
 from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import (
     get_extraction_api_ids,
@@ -55,6 +57,31 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
     def __init__(self, base_url: str, credentials: tuple[str, str]) -> None:
         self._url = base_url
         self._auth = credentials
+        self._last_request_at: float | None = None
+
+    def _search(self, query: dict[str, Any]) -> dict[str, Any]:
+        """POST Elasticsearch, auto rate-limité : au moins `SCANR_DELAY` entre deux appels.
+
+        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur
+        n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête au
+        lieu de dormir systématiquement après coup : le temps de traitement entre
+        deux pages (upserts, commits intermédiaires) est déjà décompté du délai.
+        """
+        if self._last_request_at is not None:
+            wait = SCANR_DELAY - (time.monotonic() - self._last_request_at)
+            if wait > 0:
+                time.sleep(wait)
+        try:
+            return http_request_with_retry(
+                "POST",
+                self._url,
+                json_body=query,
+                auth=self._auth,
+                timeout=30,
+                label="ScanR search",
+            )
+        finally:
+            self._last_request_at = time.monotonic()
 
     # ── Config ─────────────────────────────────────────────────
 
@@ -68,18 +95,54 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
     def get_years(self, conn: Connection, *, mode: str) -> list[int]:
         return get_years(conn, mode=mode)
 
+    # ── Parsing & requête (pur, sans I/O) ──────────────────────
+
+    def build_query(
+        self,
+        year: int,
+        affiliation_ids: list[str],
+        search_after: list[Any] | None = None,
+    ) -> dict[str, Any]:
+        """Construit la requête Elasticsearch pour ScanR.
+
+        `bool.must` filtre l'année (term exact), `bool.should` matche au
+        moins une affiliation (clause OR via `minimum_should_match: 1`).
+        Le tri par `id.keyword` ASC permet la pagination `search_after`.
+        """
+        query: dict[str, Any] = {
+            "size": SCANR_PER_PAGE,
+            "track_total_hits": True,
+            "query": {
+                "bool": {
+                    "must": [{"term": {"year": year}}],
+                    "should": [
+                        {"term": {"affiliations.id.keyword": aid}} for aid in affiliation_ids
+                    ],
+                    "minimum_should_match": 1,
+                }
+            },
+            "sort": [{"id.keyword": "asc"}],
+        }
+        if search_after:
+            query["search_after"] = search_after
+        return query
+
+    def extract_id(self, doc: dict[str, Any]) -> str:
+        """Extrait l'identifiant ScanR (champ `id` du document)."""
+        return doc.get("id", "")
+
+    def extract_doi(self, doc: dict[str, Any]) -> str | None:
+        """Extrait le premier DOI nettoyé depuis `externalIds`."""
+        for ext in doc.get("externalIds") or []:
+            if ext.get("type") == "doi":
+                return clean_doi(ext.get("id"))
+        return None
+
     # ── HTTP ───────────────────────────────────────────────────
 
     def fetch_page(self, query: dict[str, Any]) -> dict[str, Any]:
         """Exécute une requête Elasticsearch (avec retry/backoff)."""
-        return http_request_with_retry(
-            "POST",
-            self._url,
-            json_body=query,
-            auth=self._auth,
-            timeout=30,
-            label="ScanR search",
-        )
+        return self._search(query)
 
     # ── SQL ────────────────────────────────────────────────────
 
@@ -90,8 +153,8 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
 
         Retourne `(inserted, updated)`. Au plus un des deux est `True`.
         """
-        scanr_id = extract_scanr_id(doc)
-        doi = extract_doi(doc)
+        scanr_id = self.extract_id(doc)
+        doi = self.extract_doi(doc)
         raw_hash = compute_hash(doc)
         params = {
             "source_id": scanr_id,
