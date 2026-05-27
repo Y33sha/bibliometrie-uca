@@ -77,20 +77,41 @@ def resolve_doi_conflict(
 
 
 def _apply_corrections(sp: SourcePublication) -> SourcePublication:
-    """Applique `effective_metadata` à une SP et renvoie une SP « effective » (originale si aucune correction, sinon copie avec les champs corrigés overridés).
+    """Applique `effective_metadata` à une SP et renvoie une SP « effective » : la SP inchangée si aucune correction ne modifie une valeur, sinon une copie avec les champs corrigés et un audit `meta.<field>_corrected_by` pour chaque champ effectivement changé.
 
-    Phase 1 du chantier METIER_metadata-correction : `effective_metadata` est un stub qui retourne toujours un `CorrectedFields` vide — cette fonction renvoie systématiquement la SP inchangée. Le branchement est en place pour que l'arrivée de la 1re règle ne demande aucune modification de surface.
-
-    Phase 3+ : ce caller fetchera les `Journal` / `Publisher` associés à la SP et les passera à `effective_metadata` ; l'audit (`meta.<field>_corrected_by`) sera également posé ici à ce moment-là.
+    L'audit n'est posé que quand la valeur change réellement : une règle qui « corrige » vers la valeur déjà présente (ex. une SP theses.fr native déjà en `thesis`) n'est pas tracée comme une correction.
     """
     corrected = effective_metadata(sp)
     if corrected.is_empty():
         return sp
+
+    meta = dict(sp.meta or {})
+    new_journal_id = sp.journal_id
+    new_doc_type = sp.doc_type
+    new_oa_status = sp.oa_status
+    changed = False
+
+    if corrected.journal_id is not None and corrected.journal_id.value != sp.journal_id:
+        new_journal_id = corrected.journal_id.value
+        meta["journal_id_corrected_by"] = corrected.journal_id.rule.value
+        changed = True
+    if corrected.doc_type is not None and corrected.doc_type.value != sp.doc_type:
+        new_doc_type = corrected.doc_type.value
+        meta["doc_type_corrected_by"] = corrected.doc_type.rule.value
+        changed = True
+    if corrected.oa_status is not None and corrected.oa_status.value != sp.oa_status:
+        new_oa_status = corrected.oa_status.value
+        meta["oa_status_corrected_by"] = corrected.oa_status.rule.value
+        changed = True
+
+    if not changed:
+        return sp
     return replace(
         sp,
-        journal_id=corrected.journal_id.value if corrected.journal_id else sp.journal_id,
-        doc_type=corrected.doc_type.value if corrected.doc_type else sp.doc_type,
-        oa_status=corrected.oa_status.value if corrected.oa_status else sp.oa_status,
+        journal_id=new_journal_id,
+        doc_type=new_doc_type,
+        oa_status=new_oa_status,
+        meta=meta,
     )
 
 

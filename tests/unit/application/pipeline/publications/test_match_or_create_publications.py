@@ -113,6 +113,7 @@ def _make_doc(**overrides: Any) -> SourcePublicationRow:
         "container_title": None,
         "source_id": "W123",
         "external_ids": None,
+        "urls": None,
         "in_perimeter": True,
     }
     base.update(overrides)

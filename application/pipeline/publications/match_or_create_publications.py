@@ -58,7 +58,7 @@ Outcome = Literal["created", "linked", "skipped_no_metadata", "skipped_no_perime
 def _sp_from_row(doc: SourcePublicationRow) -> SourcePublication:
     """Construit une `SourcePublication` minimale à partir d'une `SourcePublicationRow` pour passer à `effective_metadata`. La SP construite n'est jamais persistée ; elle sert d'input à la cascade de corrections.
 
-    Seuls les champs susceptibles d'être consommés par les règles de correction sont peuplés. Les autres (countries, urls, biblio, external_ids, …) restent à leur défaut. Quand une règle Phase 2+ aura besoin d'un nouveau champ, étendre `SourcePublicationRow` (et sa projection SQL) puis ce helper.
+    Seuls les champs consommés par les règles de correction sont peuplés. Les autres (countries, biblio, …) restent à leur défaut ; quand une règle aura besoin d'un nouveau champ, étendre `SourcePublicationRow` (et sa projection SQL) puis ce helper.
     """
     return SourcePublication(
         id=doc.id,
@@ -72,6 +72,7 @@ def _sp_from_row(doc: SourcePublicationRow) -> SourcePublication:
         oa_status=doc.oa_status,
         container_title=doc.container_title,
         language=doc.language,
+        urls=tuple(doc.urls or ()),
     )
 
 
@@ -125,8 +126,7 @@ def process_document(
     journal_id = doc.journal_id
     raw_oa_status = doc.oa_status
 
-    # Corrections cross-table appliquées à la SP entrante avant les queries de dedup metadata (cf. domain/publications/correction.py).
-    # Phase 1 du chantier METIER_metadata-correction : stub no-op, les overrides ne s'activent que quand une règle landera (Phase 2+).
+    # Corrections appliquées à la SP entrante avant les queries de dedup metadata, pour que le matching porte sur les valeurs corrigées (cf. domain/publications/correction.py).
     corrected = effective_metadata(_sp_from_row(doc))
     if corrected.doc_type is not None:
         raw_doc_type = corrected.doc_type.value

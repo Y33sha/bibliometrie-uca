@@ -29,7 +29,7 @@ def fetch_orphan_in_perimeter_source_publications(
         text("""
             SELECT sd.id, sd.source::text AS source, sd.source_id, sd.doi, sd.title, sd.pub_year,
                    sd.doc_type::text AS doc_type, sd.journal_id, sd.oa_status::text AS oa_status,
-                   sd.language, sd.container_title, sd.external_ids,
+                   sd.language, sd.container_title, sd.external_ids, sd.urls,
                    TRUE AS in_perimeter
             FROM source_publications sd
             WHERE sd.publication_id IS NULL
