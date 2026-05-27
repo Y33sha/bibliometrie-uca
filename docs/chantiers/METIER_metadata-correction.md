@@ -78,12 +78,12 @@ La phase se scinde donc en deux gestes distincts que l'ancien code mélangeait :
 1. **Suppression du dead code** (vrai no-op) : retrait de `correct_openalex_doc_type` + son appel + le plumbing `doc_type` orphelin dans `extract_pub_metadata`. Zéro changement de comportement, zéro écriture DB.
 2. **Activation des règles** (première règle réellement active) : les implémenter dans `effective_metadata`, c'est les rendre actives pour la 1re fois — donc audit `meta.doc_type_corrected_by` et re-run ciblé, exactement la mécanique réservée à Phase 3, **moins les hooks** (inputs NNT/URL non admin-éditables). « Comportement identique à l'existant » était faux : c'est un changement de comportement assumé qui corrige un bug silencieux.
 
-**Câblage des inputs** : une fois la règle dans `effective_metadata`, elle reçoit une `SourcePublication`, plus le `work` OpenAlex. Les signaux se reconstruisent depuis la SP persistée : theses.fr et dumas se détectent sur `sp.urls` (`theses.fr/`, `dumas.`). Or `_sp_from_row` ne peuple aujourd'hui ni `urls` ni `external_ids` — à ajouter à `SourcePublicationRow` + projection SQL + helper. La capture systématique des URL comme métadonnée vaut quelle que soit la source.
+**Câblage des inputs** : une fois la règle dans `effective_metadata`, elle reçoit une `SourcePublication`, plus le `work` OpenAlex. Les signaux se reconstruisent depuis la SP persistée : theses.fr et dumas se détectent sur `sp.urls` (`theses.fr/`, `dumas.`). Le côté `refresh` charge déjà `urls` ; côté match_or_create, `_sp_from_row` ne le peuplait pas — ajout de `urls` à `SourcePublicationRow` + projection SQL + helper. La capture systématique des URL comme métadonnée vaut quelle que soit la source.
 
-- [ ] Suppression du dead code `correct_openalex_doc_type` (fonction + appel + plumbing `doc_type` dans `extract_pub_metadata` + tests).
-- [ ] Câblage `urls` (+ `external_ids`) sur `SourcePublicationRow`, sa projection SQL et `_sp_from_row`.
-- [ ] Implémentation des règles `THESES_FR_URL_TO_THESIS` / `DUMAS_URL_TO_MEMOIR` dans `effective_metadata` + audit `meta.doc_type_corrected_by`.
-- [ ] Tests : les pubs theses.fr/dumas orphelines passent à `thesis` / `memoir` après refresh.
+- [x] Suppression du dead code `correct_openalex_doc_type` (fonction + appel + plumbing `doc_type` dans `extract_pub_metadata` + tests). `f24ddcac`
+- [x] Câblage `urls` sur `SourcePublicationRow`, sa projection SQL et `_sp_from_row`.
+- [x] Implémentation des règles `THESES_FR_URL_TO_THESIS` / `DUMAS_URL_TO_MEMOIR` dans `effective_metadata` + audit `meta.doc_type_corrected_by` (posé côté `refresh` seulement quand la valeur change réellement).
+- [x] Tests : règles `effective_metadata` + audit `_apply_corrections`.
 - [ ] Re-run ciblé `refresh_from_sources` sur le stock impacté (écriture DB).
 
 ### Phase 3 — Première règle admin-sensible + introduction des hooks

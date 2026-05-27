@@ -26,6 +26,7 @@ class SourcePublicationRow(NamedTuple):
     language: str | None
     container_title: str | None
     external_ids: dict[str, object] | None
+    urls: list[str] | None
     in_perimeter: bool
 
 
