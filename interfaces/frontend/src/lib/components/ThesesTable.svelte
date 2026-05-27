@@ -199,6 +199,9 @@
 	.theses-table {
 		width: 100%;
 		border-collapse: collapse;
+		background: var(--card);
+		border: 1px solid var(--border);
+		border-radius: 6px;
 		font-size: 0.9rem;
 	}
 	.theses-table th {
