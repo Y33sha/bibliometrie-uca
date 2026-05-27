@@ -17,8 +17,8 @@ class TestListDocTypes:
             assert item["singular"]
             assert item["plural"]
 
-    def test_conference_paper_label(self, client):
+    def test_thesis_label(self, client):
         r = client.get("/api/doc-types")
-        cp = next(it for it in r.json()["items"] if it["value"] == "conference_paper")
-        assert cp["singular"] == "Communication"
-        assert cp["plural"] == "Communications"
+        item = next(it for it in r.json()["items"] if it["value"] == "thesis")
+        assert item["singular"] == "Thèse"
+        assert item["plural"] == "Thèses"

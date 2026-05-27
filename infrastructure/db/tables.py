@@ -323,6 +323,9 @@ doi_prefixes = Table(
     Column("publisher_name_raw", Text),
     Column("publisher_name_normalized", Text),
     Column("crossref_member_id", Integer),
+    Column("client_name_raw", Text),
+    Column("client_name_normalized", Text),
+    Column("datacite_client_symbol", Text),
     Column("fetched_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Index("idx_doi_prefixes_ra", "ra"),
     Index(
@@ -334,6 +337,16 @@ doi_prefixes = Table(
         "idx_doi_prefixes_publisher_name_normalized",
         "publisher_name_normalized",
         postgresql_where=text("publisher_id IS NULL"),
+    ),
+    Index(
+        "idx_doi_prefixes_client_name_normalized",
+        "client_name_normalized",
+        postgresql_where=text("client_name_normalized IS NOT NULL"),
+    ),
+    Index(
+        "idx_doi_prefixes_datacite_client_symbol",
+        "datacite_client_symbol",
+        postgresql_where=text("datacite_client_symbol IS NOT NULL"),
     ),
 )
 
@@ -984,6 +997,7 @@ publication_subjects = Table(
     Column("subject_id", Integer, nullable=False),
     Column("source", source_type_enum, nullable=False),
     Column("score", REAL),
+    Column("rejected", Boolean, nullable=False, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     PrimaryKeyConstraint("publication_id", "subject_id", "source"),
     Index("publication_subjects_subject_idx", "subject_id"),
