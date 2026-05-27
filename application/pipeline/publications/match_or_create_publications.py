@@ -31,6 +31,7 @@ from application.publications import (
     resolve_doi_conflict,
 )
 from domain.normalize import normalize_text
+from domain.publications.correction import effective_metadata
 from domain.publications.deduplication import (
     MetadataDeduplicationCase,
     decide_publication_match,
@@ -42,6 +43,7 @@ from domain.publications.metadata import (
     clean_publication_title,
     has_minimal_publication_metadata,
 )
+from domain.source_publications.source_publication import SourcePublication
 
 _NATIVE_KIND_BY_SOURCE: dict[str, str] = {
     "hal": "hal_id",
@@ -51,6 +53,26 @@ _NATIVE_KIND_BY_SOURCE: dict[str, str] = {
 }
 
 Outcome = Literal["created", "linked", "skipped_no_metadata", "skipped_no_perimeter"]
+
+
+def _sp_from_row(doc: SourcePublicationRow) -> SourcePublication:
+    """Construit une `SourcePublication` minimale à partir d'une `SourcePublicationRow` pour passer à `effective_metadata`. La SP construite n'est jamais persistée ; elle sert d'input à la cascade de corrections.
+
+    Seuls les champs susceptibles d'être consommés par les règles de correction sont peuplés. Les autres (countries, urls, biblio, external_ids, …) restent à leur défaut. Quand une règle Phase 2+ aura besoin d'un nouveau champ, étendre `SourcePublicationRow` (et sa projection SQL) puis ce helper.
+    """
+    return SourcePublication(
+        id=doc.id,
+        source=doc.source,
+        source_id=doc.source_id,
+        title=doc.title or "",
+        pub_year=doc.pub_year,
+        doc_type=doc.doc_type,
+        doi=doc.doi,
+        journal_id=doc.journal_id,
+        oa_status=doc.oa_status,
+        container_title=doc.container_title,
+        language=doc.language,
+    )
 
 
 def extract_known_identifiers(
@@ -99,9 +121,22 @@ def process_document(
 
     doi = doc.doi
     source = doc.source
-    doc_type = map_doc_type(doc.doc_type, source) or "other"
+    raw_doc_type = doc.doc_type
     journal_id = doc.journal_id
-    oa_status = doc.oa_status or OA_STATUS_UNKNOWN_DEFAULT
+    raw_oa_status = doc.oa_status
+
+    # Corrections cross-table appliquées à la SP entrante avant les queries de dedup metadata (cf. domain/publications/correction.py).
+    # Phase 1 du chantier METIER_metadata-correction : stub no-op, les overrides ne s'activent que quand une règle landera (Phase 2+).
+    corrected = effective_metadata(_sp_from_row(doc))
+    if corrected.doc_type is not None:
+        raw_doc_type = corrected.doc_type.value
+    if corrected.journal_id is not None:
+        journal_id = corrected.journal_id.value
+    if corrected.oa_status is not None:
+        raw_oa_status = corrected.oa_status.value
+
+    doc_type = map_doc_type(raw_doc_type, source) or "other"
+    oa_status = raw_oa_status or OA_STATUS_UNKNOWN_DEFAULT
     language = doc.language
     container_title = doc.container_title
 

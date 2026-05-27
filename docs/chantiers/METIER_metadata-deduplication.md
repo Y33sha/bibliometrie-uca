@@ -117,3 +117,7 @@ Inventaire au moment du figeage : 6 couples remontés sans le filtre `LENGTH > 3
 ## Questions ouvertes
 
 - **Dashboard admin de non-régression données.** Idée : une vue qui rejoue les SQL d'inventaire de chaque règle figée et affiche le compteur. Tant qu'il vaut zéro, la cascade création tient ; un compteur non-nul signale un trou logique (cas qui réapparaît malgré la règle). À envisager une fois plusieurs règles figées.
+
+## Liens
+
+- [`METIER_metadata-correction.md`](METIER_metadata-correction.md) — les règles de dedup s'appuient sur le canonique corrigé par `effective_metadata` ; les inventaires SQL des règles figées lisent donc des `doc_type` qui peuvent avoir été corrigés (par exemple `journal.type=proceedings ⇒ doc_type=conference_paper`), ce qui élargit le périmètre détectable par chaque règle.

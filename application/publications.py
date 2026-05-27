@@ -4,6 +4,8 @@ Service Publications — accès exclusif en écriture à la table `publications`
 Toute création, mise à jour ou recherche de publication passe par ce module. Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions au lieu de faire du SQL direct.
 """
 
+from dataclasses import replace
+
 from application.audit import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PubByDoi, PublicationRepository
@@ -14,10 +16,12 @@ from domain.publications.aggregation import (
 from domain.publications.aggregation import (
     refresh_from_sources as _refresh_aggregate,
 )
+from domain.publications.correction import effective_metadata
 from domain.publications.deduplication import (
     resolve_doi_conflict as _domain_resolve_doi_conflict,
 )
 from domain.publications.identifiers import DOI
+from domain.source_publications.source_publication import SourcePublication
 from domain.sources import SOURCE_PRIORITY
 
 
@@ -72,6 +76,24 @@ def resolve_doi_conflict(
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
 
+def _apply_corrections(sp: SourcePublication) -> SourcePublication:
+    """Applique `effective_metadata` à une SP et renvoie une SP « effective » (originale si aucune correction, sinon copie avec les champs corrigés overridés).
+
+    Phase 1 du chantier METIER_metadata-correction : `effective_metadata` est un stub qui retourne toujours un `CorrectedFields` vide — cette fonction renvoie systématiquement la SP inchangée. Le branchement est en place pour que l'arrivée de la 1re règle ne demande aucune modification de surface.
+
+    Phase 3+ : ce caller fetchera les `Journal` / `Publisher` associés à la SP et les passera à `effective_metadata` ; l'audit (`meta.<field>_corrected_by`) sera également posé ici à ce moment-là.
+    """
+    corrected = effective_metadata(sp)
+    if corrected.is_empty():
+        return sp
+    return replace(
+        sp,
+        journal_id=corrected.journal_id.value if corrected.journal_id else sp.journal_id,
+        doc_type=corrected.doc_type.value if corrected.doc_type else sp.doc_type,
+        oa_status=corrected.oa_status.value if corrected.oa_status else sp.oa_status,
+    )
+
+
 def refresh_from_sources(
     pub_id: int,
     *,
@@ -119,7 +141,8 @@ def refresh_from_sources(
                 return
 
     previous_doi = pub.doi
-    _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY)
+    effective_sources = [_apply_corrections(s) for s in sources]
+    _refresh_aggregate(pub, effective_sources, source_priority=SOURCE_PRIORITY)
     repo.save(pub)
     repo.update_sources(pub_id)
 

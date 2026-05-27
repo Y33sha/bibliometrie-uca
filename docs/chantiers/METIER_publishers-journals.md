@@ -143,6 +143,7 @@ Routes publiques en anglais, cohérentes avec le reste du projet (`/laboratories
 
 ## Liens
 
+- [`METIER_metadata-correction.md`](METIER_metadata-correction.md) — point unique de matérialisation des corrections cross-table ; les règles issues de la Phase 4 (cohérence éditoriale → correction `doc_type` / `oa_status`) y sont implémentées.
 - [`METIER_doi-ra-datacite.md`](METIER_doi-ra-datacite.md) — table `doi_prefixes` utilisée pour l'attribution heuristique du `publisher_type` (Phase 1) et pour les contrôles DOI ↔ journal (Phase 4a).
 - [`METIER_doc-types.md`](METIER_doc-types.md) — mapping `doc_type` ↔ `journal_type` utilisé en Phase 4b.
 - TODO.md — l'item « création publishers et journals avant la phase publications » et plusieurs items connexes (`distinguer types d'entités`, `DOAJ pour contrôler oa_status`, `contrôler doc_type via DOI`, `Pages Éditeurs/Revues`) sont absorbés par cette fiche.
