@@ -1,76 +1,16 @@
-"""Tests unitaires de `domain/sources/hal_extract.py`.
+"""Tests des heuristiques d'orchestration HAL (`application/pipeline/extract/hal_helpers.py`).
 
-Couvre les pure functions du module HAL (build_query, extract_hal_id,
-extract_doi) et la décision d'aiguillage full-fetch / incrémental
-(choose_extraction_mode, count_full_fetch_pages).
-
-`build_url` est un helper infra (formatage d'URL Solr HAL) et reste
-dans `infrastructure/sources/hal/extract_hal.py`.
+Couvre la décision d'aiguillage full-fetch / incrémental
+(`choose_extraction_mode`, `count_full_fetch_pages`). Pas d'I/O, pas de
+format HAL : `per_page` est passé en paramètre.
 """
 
 from __future__ import annotations
 
-import pytest
-
-from domain.sources.hal_extract import (
-    build_query,
+from application.pipeline.extract.hal_helpers import (
     choose_extraction_mode,
     count_full_fetch_pages,
-    extract_doi,
-    extract_hal_id,
 )
-
-
-class TestBuildQuery:
-    def test_since_takes_precedence_over_years(self):
-        # `since` est fourni : on filtre par submittedDate_tdate, sans toucher aux années.
-        assert (
-            build_query(years=[2024], since="2026-05-01")
-            == "submittedDate_tdate:[2026-05-01T00:00:00Z TO *]"
-        )
-
-    def test_since_alone(self):
-        assert build_query(years=None, since="2025-12-31") == (
-            "submittedDate_tdate:[2025-12-31T00:00:00Z TO *]"
-        )
-
-    def test_years_single(self):
-        assert build_query(years=[2024]) == "producedDateY_i:[2024 TO 2024]"
-
-    def test_years_range_uses_min_and_max(self):
-        # L'ordre n'importe pas : min/max recalculent l'intervalle.
-        assert build_query(years=[2023, 2026, 2024]) == "producedDateY_i:[2023 TO 2026]"
-
-    def test_raises_when_no_filter(self):
-        with pytest.raises(ValueError):
-            build_query(years=None)
-
-    def test_raises_on_empty_years(self):
-        with pytest.raises(ValueError):
-            build_query(years=[])
-
-
-class TestExtractHalId:
-    def test_returns_field_value(self):
-        assert extract_hal_id({"halId_s": "hal-12345"}) == "hal-12345"
-
-    def test_returns_empty_string_when_missing(self):
-        assert extract_hal_id({}) == ""
-
-
-class TestExtractDoi:
-    def test_returns_cleaned_doi(self):
-        # `clean_doi` retire un éventuel préfixe URL.
-        assert extract_doi({"doiId_s": "https://doi.org/10.1000/abc"}) == "10.1000/abc"
-
-    def test_returns_bare_doi(self):
-        assert extract_doi({"doiId_s": "10.1000/abc"}) == "10.1000/abc"
-
-    def test_returns_none_when_missing(self):
-        assert extract_doi({}) is None
-
-    def test_returns_none_when_blank(self):
-        assert extract_doi({"doiId_s": ""}) is None
 
 
 class TestCountFullFetchPages:

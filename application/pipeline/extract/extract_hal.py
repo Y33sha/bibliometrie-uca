@@ -10,23 +10,17 @@ from __future__ import annotations
 
 import argparse
 import logging
-import time
 
 from sqlalchemy import Connection
 
 from application.pipeline.extract.base import SourceExtractor
+from application.pipeline.extract.hal_helpers import (
+    choose_extraction_mode,
+    count_full_fetch_pages,
+)
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from application.ports.pipeline.staging import StagingQueries
-from domain.sources.hal_extract import (
-    HAL_DELAY,
-    build_query,
-    choose_extraction_mode,
-    count_full_fetch_pages,
-    extract_doi,
-    extract_hal_id,
-    hal_per_page_for,
-)
 
 
 def _extract_full(
@@ -53,10 +47,10 @@ def _extract_full(
         new_in_page = 0
         updated_in_page = 0
         for doc in docs:
-            hal_id = extract_hal_id(doc)
+            hal_id = adapter.extract_id(doc)
             if not hal_id:
                 continue
-            doi = extract_doi(doc)
+            doi = adapter.extract_doi(doc)
             is_new = hal_id not in existing_ids
             adapter.upsert_work(conn, hal_id, doi, doc, collection_code)
             if is_new:
@@ -68,7 +62,6 @@ def _extract_full(
         total_new += new_in_page
         total_updated += updated_in_page
         start += len(docs)
-        time.sleep(HAL_DELAY)
     return total_new, total_updated
 
 
@@ -98,17 +91,16 @@ def _extract_incremental(
         if doc is None:
             logger.warning(f"Orphelin {hal_id} introuvable côté HAL")
             continue
-        actual_hal_id = extract_hal_id(doc)
+        actual_hal_id = adapter.extract_id(doc)
         if not actual_hal_id:
             continue
-        doi = extract_doi(doc)
+        doi = adapter.extract_doi(doc)
         adapter.upsert_work(conn, actual_hal_id, doi, doc, collection_code)
         conn.commit()
         existing_ids.add(actual_hal_id)
         total_new += 1
         if i % 100 == 0:
             logger.info(f"    Orphelins fetchés : {i}/{len(orphans)}")
-        time.sleep(HAL_DELAY)
     total_updated = adapter.tag_existing_with_collection(conn, known, collection_code)
     return total_new, total_updated
 
@@ -134,7 +126,7 @@ def extract_collection(
       3. Décision via `choose_extraction_mode` : compare le nb d'orphelins
          au nb de pages full-fetch.
     """
-    query = build_query(years=years, since=since)
+    query = adapter.build_query(years=years, since=since)
 
     # Phase 0 — preview IDs-only
     all_ids = adapter.fetch_collection_ids(query, collection_code)
@@ -146,7 +138,7 @@ def extract_collection(
 
     orphans = [hid for hid in all_ids if hid not in existing_ids]
     known = [hid for hid in all_ids if hid in existing_ids]
-    per_page = hal_per_page_for(collection_code)
+    per_page = adapter.per_page_for(collection_code)
     full_fetch_pages = count_full_fetch_pages(total_count, per_page)
     mode = choose_extraction_mode(total_count, len(orphans), per_page)
 

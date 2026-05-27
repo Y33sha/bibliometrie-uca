@@ -8,12 +8,15 @@ full/incremental, batch commits) vit côté
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
+from domain.publications.identifiers import clean_doi
+from infrastructure.sources.api_limits import HAL_DELAY, hal_per_page_for
 from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import (
     get_api_base_urls,
@@ -85,6 +88,24 @@ class PgHalExtractAdapter(HalExtractAdapter):
 
     def __init__(self, base_url: str) -> None:
         self._url = _build_url(base_url)
+        self._last_request_at: float | None = None
+
+    def _get(self, params: dict[str, Any], label: str) -> dict[str, Any]:
+        """GET Solr HAL, auto rate-limité : au moins `HAL_DELAY` entre deux appels.
+
+        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur
+        n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête au
+        lieu de dormir systématiquement après coup : le temps de traitement entre
+        deux fetchs (parsing, upsert, commit) est déjà décompté du délai.
+        """
+        if self._last_request_at is not None:
+            wait = HAL_DELAY - (time.monotonic() - self._last_request_at)
+            if wait > 0:
+                time.sleep(wait)
+        try:
+            return http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+        finally:
+            self._last_request_at = time.monotonic()
 
     # ── Config ─────────────────────────────────────────────────
 
@@ -105,16 +126,42 @@ class PgHalExtractAdapter(HalExtractAdapter):
     def get_years(self, conn: Connection, *, mode: str) -> list[int]:
         return get_years(conn, mode=mode)
 
+    # ── Parsing & requête (pur, sans I/O) ──────────────────────
+
+    def build_query(self, years: list[int] | None, since: str | None = None) -> str:
+        """Construit la requête Solr HAL (paramètre `q`).
+
+        Si `since` est fourni (format `YYYY-MM-DD`), filtre sur
+        `submittedDate_tdate` au lieu de filtrer par années. Sinon, encadre
+        `producedDateY_i` par `[min(years) TO max(years)]`. Au moins un des
+        deux doit être fourni.
+        """
+        if since:
+            return f"submittedDate_tdate:[{since}T00:00:00Z TO *]"
+        if not years:
+            raise ValueError("build_query requires either `since` or a non-empty `years` list")
+        return f"producedDateY_i:[{min(years)} TO {max(years)}]"
+
+    def per_page_for(self, collection_code: str | None) -> int:
+        """Taille de page Solr à utiliser pour une collection (cf. `api_limits`)."""
+        return hal_per_page_for(collection_code)
+
+    def extract_id(self, doc: dict[str, Any]) -> str:
+        """Extrait le halId depuis un document HAL (champ `halId_s`)."""
+        return doc.get("halId_s", "")
+
+    def extract_doi(self, doc: dict[str, Any]) -> str | None:
+        """Extrait le DOI nettoyé depuis un document HAL (champ `doiId_s`)."""
+        return clean_doi(doc.get("doiId_s"))
+
     # ── HTTP ───────────────────────────────────────────────────
 
     def fetch_page(self, query: str, collection_code: str, start: int) -> dict[str, Any]:
         """Récupère une page de résultats (full payload avec HAL_FIELDS)."""
-        from domain.sources.hal_extract import hal_per_page_for
-
         params = {
             "q": query,
             "fl": ",".join(HAL_FIELDS),
-            "rows": hal_per_page_for(collection_code),
+            "rows": self.per_page_for(collection_code),
             "start": start,
             "sort": "docid asc",
             "wt": "json",
@@ -122,14 +169,10 @@ class PgHalExtractAdapter(HalExtractAdapter):
         if collection_code:
             params["fq"] = f"collCode_s:{collection_code}"
         label = f"HAL coll={collection_code or '-'} start={start}"
-        return http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+        return self._get(params, label)
 
     def fetch_collection_ids(self, query: str, collection_code: str) -> list[str]:
         """Liste les halIds d'une collection via Solr `fl=halId_s` (payload minuscule)."""
-        import time
-
-        from domain.sources.hal_extract import HAL_DELAY
-
         all_ids: list[str] = []
         start = 0
         total_count: int | None = None
@@ -144,7 +187,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
                 "fq": f"collCode_s:{collection_code}",
             }
             label = f"HAL preview coll={collection_code} start={start}"
-            data = http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+            data = self._get(params, label)
             resp = data.get("response", {})
             if total_count is None:
                 total_count = int(resp.get("numFound", 0))
@@ -153,7 +196,6 @@ class PgHalExtractAdapter(HalExtractAdapter):
             start += len(docs)
             if start >= total_count or not docs:
                 break
-            time.sleep(HAL_DELAY)
         return all_ids
 
     def fetch_single_work(self, hal_id: str) -> dict[str, Any] | None:
@@ -165,7 +207,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
             "wt": "json",
         }
         label = f"HAL single halId={hal_id}"
-        data = http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+        data = self._get(params, label)
         docs = data.get("response", {}).get("docs", [])
         return docs[0] if docs else None
 

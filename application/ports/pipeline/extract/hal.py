@@ -29,13 +29,25 @@ class HalExtractConfig:
 
 
 class HalExtractAdapter(Protocol):
-    """Port HAL : config, HTTP, SQL."""
+    """Port HAL : config, parsing/requête, HTTP, SQL."""
 
     # ── Config ─────────────────────────────────────────────────
 
     def load_config(self, conn: Connection) -> HalExtractConfig: ...
 
     def get_years(self, conn: Connection, *, mode: str) -> list[int]: ...
+
+    # ── Parsing & requête (pur, sans I/O) ──────────────────────
+    # L'orchestrateur ne connaît ni la syntaxe Solr, ni les champs JSON
+    # HAL, ni la pagination : il délègue ces savoirs adapter au port.
+
+    def build_query(self, years: list[int] | None, since: str | None = None) -> str: ...
+
+    def per_page_for(self, collection_code: str | None) -> int: ...
+
+    def extract_id(self, doc: dict[str, Any]) -> str: ...
+
+    def extract_doi(self, doc: dict[str, Any]) -> str | None: ...
 
     # ── HTTP (l'adapter connaît la base_url via sa construction) ──
 

@@ -5,6 +5,10 @@ Stratégie : un fake `HalExtractAdapter` (MagicMock) injecté à
 `_extract_incremental` dans `application.pipeline.extract.extract_hal`
 pour observer lequel est choisi. On ne teste pas la plomberie HTTP/SQL
 (couverte par le helper retry + tests adapter dédiés).
+
+Le rate-limit est interne à l'adapter (cf. `PgHalExtractAdapter._get`) :
+l'orchestrateur n'appelle plus `time.sleep`, et les fakes MagicMock ne
+dorment pas — aucun monkeypatch du sleep n'est nécessaire ici.
 """
 
 from __future__ import annotations
@@ -17,12 +21,6 @@ from sqlalchemy import text
 
 from application.pipeline.extract import extract_hal
 from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
-
-
-@pytest.fixture
-def no_sleep(monkeypatch):
-    """Désactive HAL_DELAY pour rendre les tests instantanés."""
-    monkeypatch.setattr(extract_hal.time, "sleep", lambda *_: None)
 
 
 @pytest.fixture
@@ -50,14 +48,20 @@ def spies(monkeypatch):
 
 
 def _fake_adapter(preview_ids: list[str]) -> MagicMock:
-    """Construit un MagicMock du port HalExtractAdapter avec preview_ids fixé."""
+    """Construit un MagicMock du port HalExtractAdapter avec preview_ids fixé.
+
+    `per_page_for` doit renvoyer un int réel (consommé par le calcul de
+    pagination), et `build_query` une chaîne (passée telle quelle aux fetchs).
+    """
     a = MagicMock()
     a.fetch_collection_ids.return_value = preview_ids
+    a.per_page_for.return_value = 500
+    a.build_query.return_value = "q"
     return a
 
 
 class TestAdaptiveDispatch:
-    def test_incremental_mode_triggered_for_umbrella(self, no_sleep, spies):
+    def test_incremental_mode_triggered_for_umbrella(self, spies):
         """5000 papiers, 4995 connus, 5 orphelins.
         per_page=500 → full_fetch_pages=10. Seuil 10 × 10 = 100. 5 < 100 → INCRÉMENTAL.
         """
@@ -81,7 +85,7 @@ class TestAdaptiveDispatch:
         assert sorted(call["orphans"]) == [f"hal-{i}" for i in range(5)]
         assert len(call["known"]) == 4995
 
-    def test_full_fetch_mode_when_staging_empty(self, no_sleep, spies):
+    def test_full_fetch_mode_when_staging_empty(self, spies):
         """100 papiers, staging vide → 100 orphelins, full_fetch_pages=1.
         Seuil 10 × 1 = 10. 100 > 10 → FULL-FETCH."""
         preview_ids = [f"hal-{i}" for i in range(100)]
@@ -101,7 +105,7 @@ class TestAdaptiveDispatch:
         assert spies["full"][0]["collection"] == "FRESH"
         assert spies["full"][0]["total"] == 100
 
-    def test_boundary_orphans_at_threshold_picks_full(self, no_sleep, spies):
+    def test_boundary_orphans_at_threshold_picks_full(self, spies):
         """Borne : orphans == 10 × full_fetch_pages → full (règle `<` stricte).
         5000 papiers, 4900 connus, 100 orphelins. per_page=500 → pages=10. Seuil 100. 100 < 100 = False.
         """
@@ -121,7 +125,7 @@ class TestAdaptiveDispatch:
         assert total == 5000
         assert spies["full"] and not spies["incremental"]
 
-    def test_boundary_orphans_just_below_threshold_picks_incremental(self, no_sleep, spies):
+    def test_boundary_orphans_just_below_threshold_picks_incremental(self, spies):
         """Borne inverse : orphans == seuil - 1 → incrémental.
         5000 papiers, 4901 connus, 99 orphelins. per_page=500 → pages=10. Seuil 100. 99 < 100 = True.
         """
@@ -141,7 +145,7 @@ class TestAdaptiveDispatch:
         assert total == 5000
         assert spies["incremental"] and not spies["full"]
 
-    def test_dry_run_skips_both_paths(self, no_sleep, spies):
+    def test_dry_run_skips_both_paths(self, spies):
         preview_ids = [f"hal-{i}" for i in range(50)]
         adapter = _fake_adapter(preview_ids)
 
@@ -160,7 +164,7 @@ class TestAdaptiveDispatch:
         assert updated == 0
         assert not spies["full"] and not spies["incremental"]
 
-    def test_empty_collection_returns_zero(self, no_sleep, spies):
+    def test_empty_collection_returns_zero(self, spies):
         adapter = _fake_adapter([])
 
         total, new, updated = extract_hal.extract_collection(
@@ -181,7 +185,7 @@ class TestAdaptiveDispatch:
 class TestExtractFullSafeguard:
     """Tests du safeguard qui évite les boucles infinies sur `_extract_full`."""
 
-    def test_empty_docs_breaks_loop_even_if_start_below_total(self, no_sleep):
+    def test_empty_docs_breaks_loop_even_if_start_below_total(self):
         """Si l'API retourne une page vide alors que start < total_count
         (incohérence rare côté Solr), on sort du loop au lieu de spinner."""
         adapter = MagicMock()
