@@ -14,7 +14,6 @@ from typing import Any
 
 from domain.normalize import normalize_name
 from domain.persons.name_matching import names_compatible, parse_raw_author_name
-from domain.publications.doc_types import map_doc_type
 from domain.publications.identifiers import extract_hal_id_from_url, normalize_nnt
 
 # =============================================================
@@ -276,51 +275,3 @@ def keep_orcid_if_name_matches(
     ):
         return oa_orcid
     return None
-
-
-def correct_openalex_doc_type(
-    raw_type: str | None,
-    *,
-    is_theses_fr: bool,
-    landing_page_url: str | None,
-) -> str:
-    """Détermine le doc_type canonique d'une publication associée à un
-    work OpenAlex, en corrigeant les imprécisions OpenAlex à partir de
-    signaux source-spécifiques.
-
-    OpenAlex classe parfois de manière imprécise les ressources hébergées
-    par certaines sources canoniques (theses.fr, dumas, …). Cette fonction
-    applique les overrides connus avant de retomber sur le mapping
-    OpenAlex standard.
-
-    Cascade :
-      1. is_theses_fr → 'thesis' (theses.fr fait autorité sur les thèses
-         françaises, peu importe la classification OpenAlex)
-      2. raw_type=='dissertation' + URL en `dumas.*` → 'memoir'
-         (DUMAS héberge des mémoires de master, classés à tort en
-         'dissertation' par OpenAlex)
-      3. sinon → `map_doc_type(raw_type, 'openalex')` (mapping standard)
-
-    À noter : cette fonction sert à la **création/lookup de la table
-    canonique `publications`**. La colonne `source_publications.doc_type`
-    stocke quant à elle le raw OpenAlex sans correction, par convention
-    (`work.get("type")` lu directement dans `insert_openalex_document`).
-
-    À étendre avec le chantier suppléments : ajouter signaux DOI/title
-    pour reclasser les figshare/Zenodo « Additional file… » en `'other'`.
-
-    Note d'architecture : ces règles sont **conceptuellement
-    source-agnostiques** (« theses.fr fait toujours autorité sur les
-    thèses », « dumas → mémoire », « Zenodo supplément → other »).
-    En pratique seul OpenAlex provoque ces erreurs de doc_type
-    aujourd'hui (parce qu'il moissonne ces sources sans en respecter
-    la nomenclature), donc on garde la fonction ici. Si un jour une
-    autre source produit le même type d'imprécisions, on pourra
-    promouvoir la fonction (ou ses helpers) dans `domain/doc_types.py`.
-    """
-    if is_theses_fr:
-        return "thesis"
-    if (raw_type or "").lower() == "dissertation":
-        if landing_page_url and "dumas." in landing_page_url:
-            return "memoir"
-    return map_doc_type(raw_type, "openalex")

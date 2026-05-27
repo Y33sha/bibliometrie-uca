@@ -68,9 +68,23 @@ Sans ces hooks, le canonique se désynchronise des référentiels jusqu'au proch
 
 Première application réelle du patron. Les règles migrées (theses.fr / dumas) sont mono-source et déterministes, et leurs inputs (URL OpenAlex) ne sont pas admin-éditables — pas de hooks à introduire.
 
-- [ ] Migration des règles existantes (theses.fr → `thesis`, dumas → `memoir`) depuis `domain/sources/openalex.py:correct_openalex_doc_type` vers `effective_metadata`.
-- [ ] Suppression de l'appel dans `normalize_openalex`. Les nouvelles SPs OpenAlex stockent le `doc_type` brut renvoyé par la source. Rapatriement du brut historique sur les SPs existantes = hors chantier (à faire au besoin via `raw_hash=null` + réimport).
-- [ ] Tests : régression sur les publications theses.fr et dumas (canonique = `thesis` / `memoir` après refresh, comportement identique à l'existant).
+**Découverte qui requalifie cette phase** : `correct_openalex_doc_type` est du dead code. `extract_pub_metadata` calcule bien le `doc_type` corrigé, mais `insert_openalex_document` ne lit jamais ce champ de `pub_meta` — il recalcule `doc_type = work.get("type")` (brut) indépendamment. La sortie corrigée est calculée puis jetée. Conséquences :
+
+- La règle « `source_publications.doc_type` OpenAlex = brut » est *déjà* l'état de fait. La supprimer ne change rien à ce qui est persisté côté SP.
+- La correction theses.fr → `thesis` / dumas → `memoir` n'a en réalité **jamais tourné**. Le canonique des theses.fr/dumas orphelines (SP OpenAlex seule, sans SP theses.fr en parallèle) suit le `map_doc_type` du brut OpenAlex (`article` reste `article`, `dissertation` devient `thesis`). Seules les pubs ayant une SP theses.fr en parallèle obtiennent `thesis`, via la priorité de source à l'agrégation.
+
+La phase se scinde donc en deux gestes distincts que l'ancien code mélangeait :
+
+1. **Suppression du dead code** (vrai no-op) : retrait de `correct_openalex_doc_type` + son appel + le plumbing `doc_type` orphelin dans `extract_pub_metadata`. Zéro changement de comportement, zéro écriture DB.
+2. **Activation des règles** (première règle réellement active) : les implémenter dans `effective_metadata`, c'est les rendre actives pour la 1re fois — donc audit `meta.doc_type_corrected_by` et re-run ciblé, exactement la mécanique réservée à Phase 3, **moins les hooks** (inputs NNT/URL non admin-éditables). « Comportement identique à l'existant » était faux : c'est un changement de comportement assumé qui corrige un bug silencieux.
+
+**Câblage des inputs** : une fois la règle dans `effective_metadata`, elle reçoit une `SourcePublication`, plus le `work` OpenAlex. Les signaux se reconstruisent depuis la SP persistée : theses.fr et dumas se détectent sur `sp.urls` (`theses.fr/`, `dumas.`). Or `_sp_from_row` ne peuple aujourd'hui ni `urls` ni `external_ids` — à ajouter à `SourcePublicationRow` + projection SQL + helper. La capture systématique des URL comme métadonnée vaut quelle que soit la source.
+
+- [ ] Suppression du dead code `correct_openalex_doc_type` (fonction + appel + plumbing `doc_type` dans `extract_pub_metadata` + tests).
+- [ ] Câblage `urls` (+ `external_ids`) sur `SourcePublicationRow`, sa projection SQL et `_sp_from_row`.
+- [ ] Implémentation des règles `THESES_FR_URL_TO_THESIS` / `DUMAS_URL_TO_MEMOIR` dans `effective_metadata` + audit `meta.doc_type_corrected_by`.
+- [ ] Tests : les pubs theses.fr/dumas orphelines passent à `thesis` / `memoir` après refresh.
+- [ ] Re-run ciblé `refresh_from_sources` sur le stock impacté (écriture DB).
 
 ### Phase 3 — Première règle admin-sensible + introduction des hooks
 
@@ -103,3 +117,4 @@ Pipeline d'arrivée prévisible (non exhaustif, non contraignant) :
 - [`METIER_publishers-journals.md`](METIER_publishers-journals.md) — Phase 4 fournit les règles côté cohérence éditoriale.
 - [`METIER_doc-types.md`](METIER_doc-types.md) — fournit les règles côté types de documents ; ce chantier-ci absorbe la migration de `correct_openalex_doc_type`.
 - [`METIER_metadata-deduplication.md`](METIER_metadata-deduplication.md) — bénéficiaire : les règles de dedup matchent désormais sur le canonique corrigé.
+- [`CODE_normalizers-pub-meta-drift.md`](CODE_normalizers-pub-meta-drift.md) — chantier voisin : le dead code `correct_openalex_doc_type` est un symptôme d'une dérive plus large où `insert_*_document` recalcule les champs au lieu de consommer `pub_meta`.
