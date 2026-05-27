@@ -15,7 +15,6 @@ import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from domain.sources.openalex_extract import extract_doi, extract_openalex_id
 from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import (
     get_api_base_urls,
@@ -24,6 +23,7 @@ from infrastructure.sources.config import (
 )
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
+from infrastructure.sources.openalex.parsing import extract_doi, extract_openalex_id
 
 _INSERT_OA_SQL = text(
     """

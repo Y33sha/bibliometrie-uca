@@ -9,6 +9,7 @@ vit côté `application.pipeline.extract.extract_openalex`.
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
@@ -19,8 +20,7 @@ from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
 )
-from domain.sources.openalex_extract import extract_doi, extract_openalex_id
-from infrastructure.sources.api_limits import OPENALEX_PER_PAGE
+from infrastructure.sources.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
 from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import (
     get_extraction_api_ids,
@@ -30,6 +30,7 @@ from infrastructure.sources.config import (
 )
 from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
+from infrastructure.sources.openalex.parsing import extract_doi, extract_openalex_id
 
 _INSERT_OA_BATCH_SQL = text(
     """
@@ -91,6 +92,24 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
 
     def __init__(self, base_url: str) -> None:
         self._url = base_url
+        self._last_request_at: float | None = None
+
+    def _get(self, params: dict[str, Any], label: str) -> dict[str, Any]:
+        """GET `/works`, auto rate-limité : au moins `OPENALEX_DELAY` entre deux appels.
+
+        L'adapter se rate-limite seul, quel que soit l'appelant — l'orchestrateur
+        n'ordonnance aucun `sleep`. On mesure l'écart depuis la dernière requête au
+        lieu de dormir systématiquement après coup : le temps de traitement entre
+        deux pages (insert batch, commit) est déjà décompté du délai.
+        """
+        if self._last_request_at is not None:
+            wait = OPENALEX_DELAY - (time.monotonic() - self._last_request_at)
+            if wait > 0:
+                time.sleep(wait)
+        try:
+            return http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+        finally:
+            self._last_request_at = time.monotonic()
 
     # ── Config ─────────────────────────────────────────────────
 
@@ -105,6 +124,12 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
     def get_years(self, conn: Connection, *, mode: str) -> list[int]:
         return get_years(conn, mode=mode)
 
+    # ── Parsing (pur, sans I/O) ────────────────────────────────
+
+    def extract_id(self, work: dict[str, Any]) -> str:
+        """Extrait l'ID OpenAlex court (`W...`) d'un work (cf. `parsing`)."""
+        return extract_openalex_id(work)
+
     # ── HTTP ───────────────────────────────────────────────────
 
     def fetch_page(
@@ -117,7 +142,7 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
     ) -> dict[str, Any]:
         params = build_params(institution_ids, year=year, cursor=cursor, since=since)
         label = f"OpenAlex {since or year}"
-        return http_request_with_retry("GET", self._url, params=params, timeout=30, label=label)
+        return self._get(params, label)
 
     # ── SQL ────────────────────────────────────────────────────
 

@@ -34,7 +34,12 @@ L'orchestrateur applicatif appelle les méthodes du port (Protocol) au lieu d'im
 
 ### Phase 2 — Application aux 4 autres sources
 
-Même pattern, mécaniquement, sur OpenAlex / ScanR / theses / WoS. Une source = un commit.
+Même esprit que le pilote, une source = un commit. **Nuance constatée sur OpenAlex** : le parsing y est partagé par deux modules infra (l'adapter extract *et* `fetch_missing_doi`). Le transformer en méthodes d'adapter dupliquerait → il vit dans un module infra neutre (`infrastructure/sources/<source>/parsing.py`), et l'adapter n'expose via le port que ce que l'orchestrateur consomme réellement (ici `extract_id` seul ; `extract_doi` reste interne car aucun orchestrateur ne l'appelle). Vérifier le partage source par source avant de choisir « méthode d'adapter » vs « module partagé ».
+
+- [x] OpenAlex — `parsing.py` (extract_id/extract_doi partagés avec `fetch_missing_doi`), `extract_id` au port, rate-limit interne, `OPENALEX_DELAY` via `api_limits`.
+- [ ] ScanR
+- [ ] theses.fr
+- [ ] WoS
 
 ### Phase 3 — Nettoyage final
 
