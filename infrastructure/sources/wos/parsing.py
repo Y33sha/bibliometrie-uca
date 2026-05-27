@@ -1,28 +1,15 @@
-"""Constantes et helpers purs pour l'extraction WoS.
+"""Parsing pur de l'API WoS (sans I/O).
 
-Tout ce qui peut être consommé par l'orchestrateur applicatif sans
-toucher à `infrastructure` : timing de rate-limit, construction de
-requête WoS Advanced Search, parsing des records, filtrage des DOIs
-non indexés.
-
-L'adapter HTTP (`PgWosExtractAdapter`) importe ces helpers ; la
-constante `WOS_PER_PAGE` qui paramètre l'URL Solr reste côté
-`infrastructure.sources.api_limits`.
+Partagé par l'adapter d'extraction (`extract_wos`) et l'adapter
+fetch-missing-doi (`fetch_missing_doi`) : requête Advanced Search,
+extraction des records / UID / DOI depuis la réponse, filtrage des DOIs
+non indexés par WoS. Ne dépend que du format de l'API WoS.
 """
 
 from __future__ import annotations
 
 import re
 from typing import Any
-
-# ── Rate-limit ─────────────────────────────────────────────────────
-
-WOS_DELAY = 1.0
-"""Pause entre deux requêtes consécutives à WoS (s).
-
-API Clarivate instable : 1 req/s par marge de sécurité.
-"""
-
 
 # ── Requête WoS Advanced Search ───────────────────────────────────
 

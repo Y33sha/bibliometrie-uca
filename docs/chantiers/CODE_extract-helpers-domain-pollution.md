@@ -39,7 +39,7 @@ Même esprit que le pilote, une source = un commit. **Nuance constatée sur Open
 - [x] OpenAlex — `parsing.py` (extract_id/extract_doi partagés avec `fetch_missing_doi`), `extract_id` au port, rate-limit interne, `OPENALEX_DELAY` via `api_limits`.
 - [x] ScanR — `build_query`/`extract_id` au port (méthodes d'adapter, pas de consommateur infra tiers), rate-limit interne (`_search`), `SCANR_DELAY`/`SCANR_PER_PAGE` via `api_limits`.
 - [x] theses.fr — `build_query`/`extract_id`/`per_page` au port (l'orchestrateur passe `nombre=adapter.per_page()`), rate-limit interne (`_get`), `THESES_DELAY`/`THESES_PER_PAGE` via `api_limits`.
-- [ ] WoS
+- [x] WoS — parsing partagé (extract_ut/extract_doi/clean_doi_for_wos) dans `wos/parsing.py` (comme OpenAlex), `build_query`/`get_records`/`get_records_found` au port. Rate-limit interne (`_get`) : seul `WOS_DELAY` (politesse) internalisé ; les pauses breather/retry/inter-années restent de l'orchestration. `WOS_DELAY`/`WOS_PER_PAGE` via `api_limits`.
 
 ### Phase 3 — Nettoyage final
 

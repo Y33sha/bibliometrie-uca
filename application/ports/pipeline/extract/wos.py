@@ -25,13 +25,24 @@ class WosExtractConfig:
 
 
 class WosExtractAdapter(Protocol):
-    """Port WoS : config, HTTP, SQL."""
+    """Port WoS : config, parsing/requête, HTTP, SQL."""
 
     # ── Config ─────────────────────────────────────────────────
 
     def load_config(self, conn: Connection) -> WosExtractConfig: ...
 
     def get_years(self, conn: Connection, *, mode: str) -> list[int]: ...
+
+    # ── Parsing & requête (pur, sans I/O) ──────────────────────
+    # L'orchestrateur ne connaît ni la syntaxe Advanced Search ni la forme
+    # profonde de la réponse WoS : il délègue construction de requête et
+    # parsing du payload au port.
+
+    def build_query(self, year: int, affiliations: list[str]) -> str: ...
+
+    def get_records(self, data: dict[str, Any]) -> list[dict[str, Any]]: ...
+
+    def get_records_found(self, data: dict[str, Any]) -> int: ...
 
     # ── HTTP ───────────────────────────────────────────────────
 

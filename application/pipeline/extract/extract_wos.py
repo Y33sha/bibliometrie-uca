@@ -17,7 +17,6 @@ from application.pipeline.extract.base import ExtractionConfigError, SourceExtra
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
 from application.ports.pipeline.staging import StagingQueries
-from domain.sources.wos_extract import WOS_DELAY, build_query, get_records, get_records_found
 
 # Constantes techniques de l'orchestration (pas spécifiques à l'API).
 _BREATHER_EVERY = 10  # pause longue toutes les N pages
@@ -37,15 +36,14 @@ def extract_year(
     dry_run: bool = False,
 ) -> tuple[int, int]:
     """Extrait toutes les publications d'une année. Retourne `(new, updated)`."""
-    logger.info(f"Requête WoS : {build_query(year, affiliations)}")
+    logger.info(f"Requête WoS : {adapter.build_query(year, affiliations)}")
 
-    time.sleep(WOS_DELAY)
     data = adapter.fetch_page(year, 1, affiliations)
     if not data:
         logger.error(f"Impossible d'exécuter la requête pour {year}")
         return 0, 0
 
-    total_count = get_records_found(data)
+    total_count = adapter.get_records_found(data)
     logger.info(f"Année {year} : {total_count} records trouvés")
 
     if dry_run or total_count == 0:
@@ -59,10 +57,9 @@ def extract_year(
 
     while first_record <= total_count:
         if first_record > 1:
-            time.sleep(WOS_DELAY)
             data = adapter.fetch_page(year, first_record, affiliations)
 
-        records = get_records(data)
+        records = adapter.get_records(data)
         if not records:
             consecutive_failures += 1
             if consecutive_failures >= 3:
