@@ -84,7 +84,7 @@ La phase se scinde donc en deux gestes distincts que l'ancien code mélangeait :
 - [x] Câblage `urls` sur `SourcePublicationRow`, sa projection SQL et `_sp_from_row`.
 - [x] Implémentation des règles `THESES_FR_URL_TO_THESIS` / `DUMAS_URL_TO_MEMOIR` dans `effective_metadata` + audit `meta.doc_type_corrected_by` (posé côté `refresh` seulement quand la valeur change réellement).
 - [x] Tests : règles `effective_metadata` + audit `_apply_corrections`.
-- [ ] Re-run ciblé `refresh_from_sources` sur le stock impacté (écriture DB).
+- [x] Application au stock existant : pas de mécanisme dédié. Le prochain full rerun (`raw_hash = null` + réimport) rejoue normalizers → match_or_create → refresh et applique les corrections à tout le stock au passage.
 
 ### Phase 3 — Première règle admin-sensible + introduction des hooks
 

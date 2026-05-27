@@ -75,7 +75,8 @@ CREATE TYPE public.doc_type AS ENUM (
     'retraction',
     'book_review',
     'data_paper',
-    'proceedings'
+    'proceedings',
+    'media'
 );
 
 

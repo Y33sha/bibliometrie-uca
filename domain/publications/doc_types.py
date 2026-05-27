@@ -39,6 +39,7 @@ DocType = Literal[
     "book_review",
     "data_paper",
     "proceedings",
+    "media",
 ]
 DOC_TYPES: tuple[DocType, ...] = (
     "article",
@@ -65,6 +66,7 @@ DOC_TYPES: tuple[DocType, ...] = (
     "book_review",
     "data_paper",
     "proceedings",
+    "media",
 )
 DOC_TYPES_SET: frozenset[str] = frozenset(DOC_TYPES)
 
@@ -155,7 +157,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "book review": "book_review",
         "correction": "erratum",
         "retraction": "retraction",
-        "news item": "other",
+        "news item": "media",
         "reprint": "other",
         "note": "other",
         "data paper": "data_paper",
@@ -272,6 +274,7 @@ DOC_TYPE_LABELS_FR: dict[DocType, tuple[str, str]] = {
     "book_review": ("Recension", "Recensions"),
     "data_paper": ("Data paper", "Data papers"),
     "proceedings": ("Proceedings", "Proceedings"),
+    "media": ("Intervention média", "Interventions média"),
 }
 
 
