@@ -131,6 +131,10 @@ Autres patterns problématiques constatés :
 
 ## Liens
 
+- [METIER_metadata-correction.md](METIER_metadata-correction.md) — point
+  unique où les règles cross-table de ce chantier sont implémentées
+  (`effective_metadata`). Absorbe la liquidation de
+  `correct_openalex_doc_type` (Phase 2 du chantier-cible).
 - [regles-metier-domain.md](regles-metier-domain.md) — chantier parent
   (rapatriement des règles existantes vers `domain/`)
 - [doi-ra-datacite.md](doi-ra-datacite.md) — chantier jumeau,
