@@ -2,16 +2,17 @@
 
 ```mermaid
 flowchart LR
-    A[source_publications]-->B[publishers]
-    A-->C[journals]
-    D[doi_prefixes]-->B
-    E[OpenAlex Sources]-->C
-    F[OpenAlex Publishers]-->B
-    G[Crossref Members]-->B
-    H[ROR]-->B
-    I[DOAJ API]-->C
-    classDef ref  fill:#af5
-    class B,C ref;
+    source_publications-->journals
+    source_publications-->publishers
+    journals---publishers
+    D[doi_prefixes]-->publishers
+    E[OpenAlex Sources]-->|type,oa_status|journals
+    I[DOAJ API]-->|APC|journals
+    F[OpenAlex Publishers]-->|country|publishers
+    G[Crossref Members]-->|country|publishers
+    H[ROR]-->|type|publishers
+    classDef ref  fill:#bbf
+    class publishers,journals ref;
 ```
 
 Phase `publishers_journals` : enrichissement des **référentiels** `publishers` et `journals` après leur création initiale en phase [normalize](03-normalize.md). Positionnée entre `normalize` et [`affiliations`](05-affiliations.md). Six sub-steps enchaînés ; le 1er tourne dans tous les modes du pipeline, les 5 suivants sont gated par le mode `full`.
