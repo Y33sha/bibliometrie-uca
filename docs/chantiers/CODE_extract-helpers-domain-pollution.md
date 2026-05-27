@@ -13,7 +13,7 @@ C'est une réponse pragmatique à une contrainte réelle de l'archi en couches, 
 ## Pattern cible
 
 Les helpers vivent dans `infrastructure/sources/<source>/` :
-- **Constantes opérationnelles** (`DELAY`, `PER_PAGE`) : internes à l'adapter, jamais exposées. L'adapter se rate-limite tout seul entre deux appels HTTP — l'orchestrateur n'a aucune raison d'ordonnancer un `time.sleep`, c'est du savoir adapter qui n'a pas à fuiter. (Aujourd'hui les `time.sleep(DELAY)` vivent dans l'orchestrateur applicatif, ce qui est une seconde forme de pollution à corriger.)
+- **Constantes opérationnelles** (`DELAY`, `PER_PAGE`) : elles existent déjà dans le registre infra `infrastructure/sources/api_limits.py` (« centralise les rate limits pour éviter la dérive entre scripts »). L'adapter les consomme depuis là — pas de duplication, pas de copie privée dans le module adapter. « Jamais exposées » s'entend au sens fort : elles ne franchissent jamais la frontière vers `application/` (le port n'expose pas de `delay_s`). L'adapter se rate-limite tout seul entre deux appels HTTP — l'orchestrateur n'a aucune raison d'ordonnancer un `time.sleep`, c'est du savoir adapter qui n'a pas à fuiter. (Avant ce chantier, les `time.sleep(DELAY)` vivaient dans l'orchestrateur applicatif, seconde forme de pollution corrigée ici.)
 - **Parsing JSON et build_query** : méthodes de l'adapter (`adapter.extract_id(doc)`, `adapter.build_query(years, since)`), exposées via le port.
 
 Les heuristiques d'orchestration vont dans `application/pipeline/extract/<source>_helpers.py` (pas adapter knowledge, mais orchestrateur knowledge).
@@ -24,13 +24,13 @@ L'orchestrateur applicatif appelle les méthodes du port (Protocol) au lieu d'im
 
 ### Phase 1 — Pilote HAL
 
-- [ ] Ajouter méthodes au port `HalExtractAdapter` : `extract_id(doc)`, `extract_doi(doc)`, `build_query(years, since)`, `per_page_for(collection_code)`. Pas de `delay_s` exposé — l'adapter se rate-limite seul.
-- [ ] Implémenter ces méthodes dans `PgHalExtractAdapter` (`infrastructure/sources/hal/extract_hal.py`). Internaliser le `time.sleep(HAL_DELAY)` à l'intérieur de l'adapter (entre deux appels HTTP), retirer toute notion de delay côté orchestrateur.
-- [ ] Migrer `count_full_fetch_pages` et `choose_extraction_mode` vers `application/pipeline/extract/hal_helpers.py`.
-- [ ] Mettre à jour l'orchestrateur `application/pipeline/extract/extract_hal.py` : remplacer les imports depuis `domain/sources/hal_extract` par des appels à l'adapter (et à `hal_helpers`). Supprimer les `time.sleep(HAL_DELAY)`.
-- [ ] Migrer les tests `tests/unit/domain/sources/test_hal_extract.py` → tests d'infra et d'app selon ce qui a bougé.
-- [ ] Supprimer `domain/sources/hal_extract.py`.
-- [ ] Valider : mypy + lint-imports + tests.
+- [x] Ajouter méthodes au port `HalExtractAdapter` : `extract_id(doc)`, `extract_doi(doc)`, `build_query(years, since)`, `per_page_for(collection_code)`. Pas de `delay_s` exposé — l'adapter se rate-limite seul.
+- [x] Implémenter ces méthodes dans `PgHalExtractAdapter` (`infrastructure/sources/hal/extract_hal.py`). Rate-limit internalisé via `_get` (compteur monotonic, ≥ `HAL_DELAY` entre deux GET), `HAL_DELAY`/`hal_per_page_for` lus depuis `api_limits`.
+- [x] Migrer `count_full_fetch_pages` et `choose_extraction_mode` vers `application/pipeline/extract/hal_helpers.py`.
+- [x] Mettre à jour l'orchestrateur `application/pipeline/extract/extract_hal.py` : appels à l'adapter (et à `hal_helpers`), suppression de `import time` et des `time.sleep(HAL_DELAY)`.
+- [x] Migrer les tests `test_hal_extract.py` → `tests/unit/application/pipeline/extract/test_hal_helpers.py` (heuristiques) + `tests/unit/infrastructure/sources/hal/test_extract_hal.py` (parsing/requête/pagination). Fixture `no_sleep` supprimée du test d'intégration (devenue inutile).
+- [x] Supprimer `domain/sources/hal_extract.py`.
+- [x] Valider : mypy + lint-imports + tests (pre-commit).
 
 ### Phase 2 — Application aux 4 autres sources
 
