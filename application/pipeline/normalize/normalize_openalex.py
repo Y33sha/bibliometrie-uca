@@ -35,7 +35,6 @@ from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.publications.identifiers import clean_doi
 from domain.sources.openalex import (
-    correct_openalex_doc_type,
     extract_external_ids_from_urls,
     extract_nnt_from_location,
     is_theses_fr_location,
@@ -189,15 +188,9 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
     title = work.get("title") or work.get("display_name") or ""
     pub_year = work.get("publication_year")
 
-    raw_type = work.get("type") or "other"
     primary = parse_primary_location(work)
     theses_fr = primary is not None and is_theses_fr_location(primary)
     nnt = extract_nnt_from_location(primary) if theses_fr and primary else None
-    doc_type = correct_openalex_doc_type(
-        raw_type,
-        is_theses_fr=theses_fr,
-        landing_page_url=primary.landing_page_url if primary else None,
-    )
 
     oa_info = work.get("open_access") or {}
     oa_status = map_openalex_oa_status(oa_info.get("oa_status"))
@@ -209,7 +202,6 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
         title=title,
         title_normalized=normalize_text(title),
         pub_year=pub_year,
-        doc_type=doc_type,
         doi=doi,
         nnt=nnt,
         oa_status=oa_status,
