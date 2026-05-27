@@ -26,13 +26,19 @@ class OpenalexExtractConfig:
 
 
 class OpenalexExtractAdapter(Protocol):
-    """Port OpenAlex : config, HTTP, SQL."""
+    """Port OpenAlex : config, parsing, HTTP, SQL."""
 
     # ── Config ─────────────────────────────────────────────────
 
     def load_config(self, conn: Connection) -> OpenalexExtractConfig: ...
 
     def get_years(self, conn: Connection, *, mode: str) -> list[int]: ...
+
+    # ── Parsing (pur, sans I/O) ────────────────────────────────
+    # L'orchestrateur entretient `existing_ids` sans connaître le format
+    # de l'ID OpenAlex (URL complète à raboter) : il délègue au port.
+
+    def extract_id(self, work: dict[str, Any]) -> str: ...
 
     # ── HTTP (l'adapter connaît la base_url et l'auth via sa construction) ──
 

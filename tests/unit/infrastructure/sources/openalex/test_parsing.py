@@ -1,8 +1,8 @@
-"""Tests unitaires de `domain/sources/openalex_extract.py`."""
+"""Tests unitaires de `infrastructure/sources/openalex/parsing.py`."""
 
 from __future__ import annotations
 
-from domain.sources.openalex_extract import extract_doi, extract_openalex_id
+from infrastructure.sources.openalex.parsing import extract_doi, extract_openalex_id
 
 
 class TestExtractOpenalexId:

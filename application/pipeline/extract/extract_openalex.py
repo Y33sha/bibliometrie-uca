@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import time
 
 from sqlalchemy import Connection
 
@@ -20,10 +19,6 @@ from application.ports.pipeline.extract.openalex import (
     OpenalexExtractConfig,
 )
 from application.ports.pipeline.staging import StagingQueries
-from domain.sources.openalex_extract import (
-    OPENALEX_DELAY,
-    extract_openalex_id,
-)
 
 
 def extract_year(
@@ -70,7 +65,7 @@ def extract_year(
         # Maintenu pour cohérence avec les autres extracteurs : on entretient
         # `existing_ids` pour que les phases suivantes y aient accès.
         for work in results:
-            existing_ids.add(extract_openalex_id(work))
+            existing_ids.add(adapter.extract_id(work))
 
         counts = adapter.insert_batch(conn, list(results))
         conn.commit()
@@ -88,8 +83,6 @@ def extract_year(
         if not next_cursor:
             break
         cursor = next_cursor
-
-        time.sleep(OPENALEX_DELAY)
 
     logger.info(
         f"Année {year} terminée : {total_new} nouveaux, {total_updated} mis à jour "
