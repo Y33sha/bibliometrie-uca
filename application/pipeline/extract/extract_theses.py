@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import time
 
 from sqlalchemy import Connection
 
@@ -23,12 +22,6 @@ from application.ports.pipeline.extract.theses import (
     ThesesExtractConfig,
 )
 from application.ports.pipeline.staging import StagingQueries
-from domain.sources.theses_extract import (
-    THESES_DELAY,
-    THESES_PER_PAGE,
-    build_query,
-    extract_theses_id,
-)
 
 
 def extract_ppn(
@@ -47,7 +40,7 @@ def extract_ppn(
 
     Retourne (total, insérés, mis à jour).
     """
-    query = build_query(ppn)
+    query = adapter.build_query(ppn)
 
     data = adapter.fetch_page(query, debut=0, nombre=1)
     total = data["totalHits"]
@@ -61,14 +54,14 @@ def extract_ppn(
     debut = 0
 
     while debut < total:
-        data = adapter.fetch_page(query, debut=debut, nombre=THESES_PER_PAGE)
+        data = adapter.fetch_page(query, debut=debut, nombre=adapter.per_page())
         theses = data.get("theses", [])
 
         if not theses:
             break
 
         for these in theses:
-            theses_id = extract_theses_id(these)
+            theses_id = adapter.extract_id(these)
             if not theses_id:
                 continue
 
@@ -88,8 +81,6 @@ def extract_ppn(
 
         if debut % 1000 == 0 or debut >= total:
             logger.info(f"    {debut}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
-
-        time.sleep(THESES_DELAY)
 
     return total, inserted, updated
 
