@@ -23,11 +23,21 @@ class ThesesExtractConfig:
 
 
 class ThesesExtractAdapter(Protocol):
-    """Port theses.fr : config, HTTP, SQL."""
+    """Port theses.fr : config, parsing/requête, HTTP, SQL."""
 
     # ── Config ─────────────────────────────────────────────────
 
     def load_config(self, conn: Connection) -> ThesesExtractConfig: ...
+
+    # ── Parsing & requête (pur, sans I/O) ──────────────────────
+    # L'orchestrateur ne connaît ni la syntaxe `q=...` de theses.fr, ni le
+    # format des thèses, ni la taille de page : il délègue au port.
+
+    def build_query(self, ppn: str) -> str: ...
+
+    def per_page(self) -> int: ...
+
+    def extract_id(self, these: dict[str, Any]) -> str: ...
 
     # ── HTTP ───────────────────────────────────────────────────
 
