@@ -6,6 +6,8 @@ Le système intègre 6 sources bibliographiques principales, complétées par de
 
 > TODO: Documenter les modes d'interrogation possibles pour chaque source, celles qui sont utilisées ou non et pourquoi (par affiliation, par identifiant personne, par identifiant document)
 
+## Sources bibliographiques
+
 | Source | Type | Couverture | API | Credentials |
 |--------|------|-----------|-----|-----|
 | [HAL](02-hal.md) | Archive ouverte | Publications déposées par les chercheurs UCA | Solr (search) | aucun |
@@ -14,11 +16,7 @@ Le système intègre 6 sources bibliographiques principales, complétées par de
 | [ScanR](05-scanr.md) | Portail officiel du MESRE | Publications de l'écosystème français de la recherche | Elasticsearch (DataESR) | login et mot de passe sur demande (TODO: indiquer mail) |
 | [theses.fr](07-theses.md) | Portail officiel des thèses françaises | Thèses soutenues + en cours, rattachement par PPN d'établissement | REST (data.gouv.fr) | TODO: documenter |
 | [Crossref](06-crossref.md) | Agence d'enregistrement de DOI | Publications dotées d'un [DOI](../glossaire#doi) Crossref. Aussi consulté pour résoudre les préfixes DOI vers leur Member éditeur. | REST (works, prefixes, members) | *polite pool* via *mailto* |
-| [Unpaywall](08-sources-supplementaires.md#unpaywall) | Enrichissement OA | Statut Open Access par DOI | REST (gratuit, 100k req/jour) | *polite pool* via *mailto* |
-| [DOAJ](08-sources-supplementaires.md#doaj) | Annuaire des revues OA certifiées | Métadonnées qualifiées par revue (licence, APC, sujets…), interrogée par ISSN | REST + dump CSV bootstrap | *polite pool* via *mailto* |
-| [ROR](08-sources-supplementaires.md#ror) | Registry des organismes de recherche | Typage canonique des éditeurs (`publisher_type`) via le champ `types` du record ROR | REST v2 | *polite pool* via *mailto* |
-| [Base RH](09-imports-manuels.md#donnees-rh) | Import manuel | Personnel UCA (noms, départements, rôles) | Fichier CSV | |
-| [Données APC](09-imports-manuels.md#donnees-apc) | Import manuel | Paiements APC (montants, éditeurs) | Fichier CSV | |
+
 
 > **Sources envisagées mais pas exploitées actuellement**
 >
@@ -29,7 +27,7 @@ Le système intègre 6 sources bibliographiques principales, complétées par de
 > * brevets: INPI
 > * divers (enrichissement des entités personnes): ORCID, IdRef
 
-## Gestion des affiliations {#sources-affiliations}
+### Gestion des affiliations {#sources-affiliations}
 
 *A compléter*
 
@@ -39,7 +37,7 @@ Le système intègre 6 sources bibliographiques principales, complétées par de
 
 <!--TODO: Compléter avec les autres sources-->
 
-## Nature des entités auteurs {#entites-auteurs}
+### Nature des entités auteurs {#entites-auteurs}
 
 Deux cas de figure:
 
@@ -62,3 +60,13 @@ Deux cas de figure:
 | CrossRef | rien | ❌ | `orcid` (fiable, article-level) |
 
 Vu l'hétérogénéité des entités personnes selon les sources, il a été décidé de ne pas maintenir de table `source_persons`. Les informations récupérées depuis les sources (forme de nom, identifiants éventuels) sont portées par `source_authorships` (`raw_author_name` pour traçabilité, `author_name_normalized` pour matching par nom, `source_identifiers` JSONB pour les identifiants persistants associés (ORCID, IdRef, idHAL)). La déduplication / création des personnes canoniques se fait dans la [phase `persons`](../pipeline/07-persons.md) du pipeline à partir de ces éléments.
+
+## Sources complémentaires
+
+| Source | Type | Couverture | API | Credentials |
+|--------|------|-----------|-----|-----|
+| [Unpaywall](08-sources-supplementaires.md#unpaywall) | Enrichissement OA | Statut Open Access par DOI | REST (gratuit, 100k req/jour) | *polite pool* via *mailto* |
+| [DOAJ](08-sources-supplementaires.md#doaj) | Annuaire des revues OA certifiées | Métadonnées qualifiées par revue (licence, APC, sujets…), interrogée par ISSN | REST + dump CSV bootstrap | *polite pool* via *mailto* |
+| [ROR](08-sources-supplementaires.md#ror) | Registry des organismes de recherche | Typage canonique des éditeurs (`publisher_type`) via le champ `types` du record ROR | REST v2 | *polite pool* via *mailto* |
+| [Base RH](09-imports-manuels.md#donnees-rh) | Import manuel | Personnel UCA (noms, départements, rôles) | Fichier CSV | |
+| [Données APC](09-imports-manuels.md#donnees-apc) | Import manuel | Paiements APC (montants, éditeurs) | Fichier CSV | |
