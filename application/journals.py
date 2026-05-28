@@ -6,13 +6,18 @@ Les opérations sur l'agrégat Publisher vivent dans `application/publishers.py`
 Les routers FastAPI utilisent les mêmes repos que le pipeline (routes `def` exécutées dans le threadpool Starlette).
 """
 
+from dataclasses import replace
 from typing import cast
 
 from application.audit import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdateFields
+from application.ports.repositories.publication_repository import PublicationRepository
+from application.publications import apply_corrections, refresh_from_sources
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
+from domain.publications.aggregation import refresh_from_sources as _refresh_aggregate
+from domain.sources import SOURCE_PRIORITY
 from domain.types import JsonValue
 
 
@@ -162,3 +167,62 @@ def merge_journals(
 
     repo.merge_journal_into(target_id, source_id)
     emit_event(audit_repo, "journal.merged", "journal", target_id, {"source_id": source_id})
+
+
+# ── Requalification des publications d'un journal après changement d'un input éditable ──
+
+
+def requalify_publications_for_journal(
+    journal_id: int,
+    *,
+    prospective_journal_type: str | None,
+    dry_run: bool,
+    pub_repo: PublicationRepository,
+    audit_repo: AuditRepository | None = None,
+) -> int:
+    """Compte (et applique si `dry_run=False`) la requalification du `doc_type` des publications d'un journal suite au changement de son `journal_type`.
+
+    Modes :
+
+    - ``dry_run=True`` : simulation en mémoire. On charge chaque publication du journal et ses vues sources, on injecte `prospective_journal_type` sur les vues (le journal en base n'a pas encore changé) et on rejoue la cascade correction → agrégation dans une copie en mémoire. Retourne le nombre de publications dont le `doc_type` *changerait*. Aucune écriture DB. Sert au preview de la modale admin.
+
+    - ``dry_run=False`` : application. Précondition : le `journal.journal_type` a déjà été mis à jour à `prospective_journal_type` par le caller (typiquement dans la même transaction qu'un `update_journal`). On relance `refresh_from_sources` complet sur chaque publication du journal — ce qui passe par les garde-fous habituels (conflits DOI, audit `doi_changed`, orphelins). Retourne le nombre de publications dont le `doc_type` a effectivement changé. Émet l'audit `journal.type_requalified` en fin de boucle si > 0.
+
+    Le compte est calculé identiquement dans les deux modes (delta entre `pub.doc_type` avant / après), de sorte que le preview est honnête vis-à-vis de l'apply.
+    """
+    pub_ids = pub_repo.find_ids_by_journal_id(journal_id)
+    if not pub_ids:
+        return 0
+
+    changed = 0
+    for pub_id in pub_ids:
+        pub = pub_repo.find_by_id(pub_id)
+        if pub is None:
+            continue
+        original_doc_type = pub.doc_type
+
+        if dry_run:
+            sources = pub_repo.get_source_publications(pub_id)
+            if not sources:
+                continue
+            adjusted = [replace(s, journal_type=prospective_journal_type) for s in sources]
+            effective = [apply_corrections(s) for s in adjusted]
+            _refresh_aggregate(pub, effective, source_priority=SOURCE_PRIORITY)
+            new_doc_type = pub.doc_type
+        else:
+            refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
+            pub_after = pub_repo.find_by_id(pub_id)
+            new_doc_type = pub_after.doc_type if pub_after else None
+
+        if new_doc_type != original_doc_type:
+            changed += 1
+
+    if not dry_run and changed > 0:
+        emit_event(
+            audit_repo,
+            "journal.type_requalified",
+            "journal",
+            journal_id,
+            {"count": changed, "new_type": prospective_journal_type},
+        )
+    return changed

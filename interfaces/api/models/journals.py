@@ -21,3 +21,9 @@ class JournalUpdate(BaseModel):
     is_predatory: bool | None = None
     is_in_doaj: bool | None = None
     apc_amount: float | None = None
+
+
+class JournalTypeChangeImpact(BaseModel):
+    """Compte des publications dont le `doc_type` canonique changerait si le `journal_type` passait à la valeur prévue. Renvoyé par le preview de la modale admin avant confirmation de l'édition."""
+
+    count: int
