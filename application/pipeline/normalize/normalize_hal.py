@@ -181,9 +181,11 @@ def insert_hal_document(
 
     collections_array = sorted(collections) if collections else None
 
-    # NNT dans external_ids (thèses HAL)
+    # Clés de dédup cross-source dans external_ids. `hal_id` est redondant avec `source_id` côté identité, mais on le pose aussi ici pour que les queries de matching/linking (`find_by_hal_id`, `bulk_link_orphans_by_hal_id`) puissent traiter HAL comme toutes les autres sources — symétrie avec ce que theses fait déjà pour NNT.
     nnt = normalize_nnt(as_str(doc.get("nntId_s")))
-    external_ids = {"nnt": nnt} if nnt else None
+    external_ids: dict[str, JsonValue] = {"hal_id": hal_id}
+    if nnt:
+        external_ids["nnt"] = nnt
 
     # Métadonnées de publication (pour création différée)
     journal_id = pub_meta.get("journal_id") if pub_meta else None

@@ -97,8 +97,3 @@ class PgMergeQueries(MergeQueries):
 
     def fetch_hal_source_publications(self, conn: Connection) -> list[HalSourceRow]:
         return fetch_hal_source_publications(conn)
-
-    def link_source_publication_to_publication(
-        self, conn: Connection, source_publication_id: int, publication_id: int
-    ) -> None:
-        link_source_publication_to_publication(conn, source_publication_id, publication_id)

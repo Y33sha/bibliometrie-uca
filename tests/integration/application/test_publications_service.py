@@ -170,13 +170,19 @@ class TestFindByHalId:
         assert repo.find_by_hal_id(None) is None  # type: ignore[arg-type]
 
     def test_finds_via_hal_native_source(self, sa_sync_conn, repo):
-        """Path natif : `source='hal' AND source_id=hal_id`."""
+        """SP HAL native : `external_ids.hal_id` est posé par le normalizer au même titre que `source_id` (convention symétrique avec NNT côté theses)."""
         pub_id = _insert_publication(sa_sync_conn)
-        _insert_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-12345")
+        _insert_source_publication(
+            sa_sync_conn,
+            pub_id,
+            source="hal",
+            source_id="hal-12345",
+            external_ids={"hal_id": "hal-12345"},
+        )
         assert repo.find_by_hal_id("hal-12345") == pub_id
 
     def test_finds_via_external_ids_cross_source(self, sa_sync_conn, repo):
-        """Path cross-source : `external_ids->>'hal_id'=hal_id` (OpenAlex/ScanR)."""
+        """SP cross-source : `external_ids->>'hal_id'=hal_id` (OpenAlex/ScanR)."""
         pub_id = _insert_publication(sa_sync_conn)
         _insert_source_publication(
             sa_sync_conn,
@@ -192,7 +198,13 @@ class TestFindByHalId:
 
     def test_ignores_orphan_source_publications(self, sa_sync_conn, repo):
         """Un `source_publication` HAL sans `publication_id` ne doit pas être retourné."""
-        _insert_source_publication(sa_sync_conn, None, source="hal", source_id="hal-orphan")
+        _insert_source_publication(
+            sa_sync_conn,
+            None,
+            source="hal",
+            source_id="hal-orphan",
+            external_ids={"hal_id": "hal-orphan"},
+        )
         assert repo.find_by_hal_id("hal-orphan") is None
 
 
