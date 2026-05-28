@@ -1,160 +1,100 @@
 # Chantier — Types de documents : enum, mappings, règles suspects
 
-Issu de [`regles-metier-domain.md`](regles-metier-domain.md) (Phase 2
-historique) + items TODO_LAURA « Types de documents : fixer l'enum et
-le mapping, algo de résolution de conflits ».
+Issu de [`regles-metier-domain.md`](regles-metier-domain.md) (Phase 2 historique) + items TODO_LAURA « Types de documents : fixer l'enum et le mapping, algo de résolution de conflits ».
 
 ## Contexte
 
-Trigger initial : sondage 2026-05-05 sur les ~300 publis avec DOI
-figshare. **229 sont des « Additional file X of … »** (suppléments PDF
-figures/tableaux), classées « article » par OpenAlex donc remontées
-comme telles dans la BDD UCA. La règle qui aurait dû les écarter
-n'existe nulle part — il faut un endroit propre où l'écrire et la
-tester.
+Trigger initial : sondage 2026-05-05 sur les ~300 publis avec DOI figshare. **229 sont des « Additional file X of … »** (suppléments PDF figures/tableaux), classées « article » par OpenAlex donc remontées comme telles dans la BDD UCA. La règle qui aurait dû les écarter n'existait nulle part. Elle a depuis été écrite (`TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET`, cf. ci-dessous).
 
-Autres patterns problématiques constatés :
+Le chantier sert maintenant à finir de cartographier les types problématiques et à écrire les règles manquantes ou les audits préalables.
 
-- DOI figshare collection (`10.6084/m9.figshare.c.*`) : ce sont des
-  bundles, pas la publi canonique.
-- DOI Zenodo (`10.5281/zenodo.*`) + titre suspect (« Supplementary
-  materials… », « Données supplémentaires… »).
-- DOI DataCite (au sens RA) + `doc_type=article` mais titre suspect.
-- Publications de type « article » avec source OpenAlex et revue
-  inconnue : généralement des préprints sur des archives en ligne, à
-  corriger.
-- Enum `doc_type` à revoir : correction/erratum/corrigendum,
-  compte-rendu (= « autre » sur HAL), review (= book review ou revue
-  de la littérature ?), posters (ne pas fusionner avec conf si même
-  DOI ?), preprints en accès gold selon OpenAlex, data papers.
-- Types WoS « composites » : étudier, voir si ça représente des
-  types/sous-types comme dans HAL.
+## Fait
 
-145/229 cas figshare au 2026-05-05 sont des suppléments **orphelins**
-(le parent n'est pas en BDD).
+Règles de correction en place dans [`domain/publications/correction.py`](../../domain/publications/correction.py) :
 
-## Périmètre
+- `THESES_FR_URL_TO_THESIS` — URL theses.fr ⇒ `thesis`
+- `DUMAS_URL_TO_MEMOIR` — URL dumas + `dissertation` ⇒ `memoir`
+- `JOURNAL_TYPE_MEDIA_TO_MEDIA` — journal typé media ⇒ `media`
+- `JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER` — journal d'actes + `{article, book_chapter}` ⇒ `conference_paper`
+- `TITLE_MEDIA_PREFIX_TO_MEDIA` — titre `interview/reportage/podcast` ⇒ `media`
+- `TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET` — titre supplément (additional file, supplementary *, data from) ⇒ `dataset` (couvre figshare items, Zenodo, DataCite via le titre, plus large que des helpers DOI-préfixe envisagés au départ)
+- `TITLE_ERRATUM_PREFIX_TO_ERRATUM` — titre `erratum/errata/corrigendum` ⇒ `erratum`
+- `TITLE_RETRACTION_PREFIX_TO_RETRACTION` — titre `retraction notice/note` ⇒ `retraction`
 
-### Inclus
+Enum `doc_type` et mappings ([`domain/publications/doc_types.py`](../../domain/publications/doc_types.py)) :
 
-- **Helpers de détection** par préfixe DOI / pattern titre :
-  - `is_figshare_doi(doi)` (préfixe `10.6084/m9.figshare.*` et
-    collections `10.6084/m9.figshare.c.*`)
-  - `is_datacite_doi(doi)` (par préfixe — partiellement couvert par
-    `doi_prefixes` après chantier
-    [doi-ra-datacite](doi-ra-datacite.md), mais une fonction pure de
-    détection prefix → RA reste utile pour les règles qui s'appliquent
-    avant la table `doi_prefixes`)
-  - `is_supplement_title(title)` : pattern « Additional file X of … »,
-    « Supplementary material(s) for … », « Données supplémentaires
-    de … », « Supporting information for … ». Multi-langue (FR + EN),
-    regex compilées en module-level.
-- **Cascade `correct_openalex_doc_type`** étendue : aujourd'hui (cf.
-  [`domain/sources/openalex.py:272`](../../domain/sources/openalex.py))
-  elle gère theses.fr → `thesis` et dumas → `memoir`. À étendre avec
-  la cascade « DOI figshare/Zenodo/DataCite + titre supplément →
-  doc_type='other' ».
-- **Reclassement préprints article OA inconnu** : règle décisionnelle
-  pour repérer les préprints classés « article » par OpenAlex avec
-  une revue inconnue.
-- **Révision de l'enum `doc_type`** :
-  - correction/erratum/corrigendum
-  - compte-rendu (= « autre » sur HAL ?)
-  - review (= book review ou revue de la littérature ?)
-  - posters (ne pas fusionner avec conf si même DOI)
-  - preprints OA gold (cas suspect)
-  - data papers
-- **Types WoS composites** : étudier, voir si ça représente des
-  types/sous-types comme dans HAL.
-- **Détection des suppléments orphelins** (145 cas figshare au
-  2026-05-05 dont le parent n'est pas en BDD) → règle d'élimination
-  ou marqueur explicite (à arbitrer).
-- **Reclassement one-shot** des cas existants en fin de chantier
-  (SQL aligné sur les nouvelles règles + vérification au prochain
-  run pipeline).
+- Membres ajoutés : `erratum`, `retraction`, `book_review`, `data_paper`, `proceedings`, `media`, `poster`, `letter`, `peer_review`, `memoir`, `hdr`, `ongoing_thesis` — labels FR singulier/pluriel posés.
+- Mapping HAL : sous-types composites pris en compte (`art_artrev`→review, `art_bookreview`→book_review, `art_datapaper`→data_paper, `undefined_preprint`→preprint, `creport_resreport`→report, …).
+- Mapping WoS : `correction`→erratum, `news item`→media, `book review`→book_review, `data paper`→data_paper, `meeting abstract`→conference_paper.
+- Mapping CrossRef ajouté.
 
-### Exclus
+Playbook [`ajouter-une-regle-de-correction.md`](../playbooks/ajouter-une-regle-de-correction.md) posé. Documente la procédure complète (caractérisation, audit, implémentation, tests, hooks admin si éditable, rattrapage du stock).
 
-- L'ingestion DataCite proprement dite : couverte par
-  [doi-ra-datacite.md](doi-ra-datacite.md). Ce chantier-ci se contente
-  d'utiliser les helpers/données qui en sortent.
-- Modifications du schéma SQL au-delà de l'enum `doc_type` (ex. colonne
-  `publications.doc_type_overridden`) : décisions au cas par cas.
+## Reste à faire
 
-## Décisions actées (héritées)
+### Book reviews par titre
 
-1. **Détection figshare/Zenodo : hardcoded au démarrage, via
-   `doi_prefixes` quand le chantier
-   [doi-ra-datacite](doi-ra-datacite.md) aura abouti**. Helpers
-   `is_figshare_doi`/`is_zenodo_doi` à préfixe en dur (suffisant pour
-   les patterns connus). Si après doi-ra-datacite on constate que
-   `doi_prefixes` couvre l'intégralité des cas réels, on migrera
-   entièrement et on retirera les helpers préfixe. Pas de double
-   path à maintenir intentionnellement — la migration est un
-   objectif, pas un fallback permanent.
-2. **Reclassement one-shot des cas existants** en fin de chantier.
-   SQL aligné sur la nouvelle règle, suivi d'une passe de
-   vérification au prochain run pipeline pour s'assurer que la
-   cascade en `domain/` produirait le même résultat.
+`book_review` n'est attrapé que via HAL `art_bookreview` ou WoS `book review`. OpenAlex et CrossRef ne distinguent pas ⇒ règle manquante. Critères-candidats : ISBN dans le titre, titre terminé par « année, nombre de pages » (forme classique des recensions).
 
-## Open questions
+Étape suivante : audit SQL pour mesurer l'ampleur et valider la déterminance des patterns. Puis règle `TITLE_*_TO_BOOK_REVIEW` selon le playbook.
 
-- **Suppléments orphelins** (145 cas figshare au 2026-05-05 dont le
-  parent n'est pas en BDD) : à sonder au cas par cas. Hypothèses à
-  tester : (a) parent présent avec un titre légèrement différent
-  (matching à raffiner), (b) parent réellement absent et c'est
-  correct (publi non-UCA), (c) parent réellement absent à tort (à
-  retrouver). Cette question rejoint un futur chantier de
-  modélisation des **relations entre publications** (parent ↔
-  supplément, ouvrage ↔ chapitre, version ↔ révision, …) — à n'ouvrir
-  qu'une fois ce chantier-ci abouti.
+### Préprints article OA + revue inconnue
+
+Publications classées `article` par OpenAlex sur une revue inconnue : suspect, souvent un préprint déposé sur une archive en ligne. Pas de règle aujourd'hui.
+
+Étape suivante : audit. Combien de cas, sur quelles "revues", quels DOI-RA. Probablement croiser avec la liste des plateformes preprint connues (arXiv, bioRxiv, …) une fois les préfixes DOI typés (cf. [doi-ra-datacite](METIER_doi-ra-datacite.md)).
+
+### Types WoS composites — audit
+
+Aujourd'hui `map_doc_type` prend le **premier** type non-other quand WoS renvoie `"Article; Proceedings Paper"`. C'est arbitraire — sur des paires `Article; Book Chapter` le bon choix peut être le second. Pas un vrai mapping.
+
+Étape suivante : audit. Pour chaque paire observée (ex. `Article; Proceedings Paper`, `Article; Book Chapter`, `Review; Book Chapter`), compter les occurrences et sonder quelques cas pour décider de la règle (et si la règle doit dépendre du journal). Puis remplacer le `first non-other` par un arbitrage explicite par paire.
+
+### Review = poubelle — audit
+
+Le doc_type `review` amalgame plusieurs choses :
+
+- WoS `review` = review article (revue de la littérature) ⇒ `review`
+- HAL `art_artrev` = mappé vers `review` aujourd'hui
+- OpenAlex `review` = un peu de tout
+- Recensions d'ouvrages (book reviews) ⇒ devraient aller en `book_review` mais sont parfois en `review`
+
+Étape suivante : audit. Sonder les publications canoniques classées `review` et leur source, voir ce que ça recouvre vraiment. Ajuster les mappings et écrire une règle de désambiguïsation (titre, journal) si nécessaire. À mener avec book_review (mêmes cas observés probablement).
+
+### Figshare collections — audit
+
+DOI `10.6084/m9.figshare.c.*` (bundles de plusieurs items figshare). Non couvert par la règle titre supplément. Cas connu mais ampleur inconnue ; ne choque pas a priori d'être rattaché à un article.
+
+Étape suivante : audit. Combien, classés en quoi aujourd'hui, à quoi sont-ils rattachables.
+
+### Préprints OA gold — flag suspect
+
+Une publication marquée `preprint` par OpenAlex mais avec `oa_status=gold` est probablement un cas mal classé (un vrai preprint n'est pas en accès gold). À auditer puis décider d'une règle ou d'un flag de doute.
+
+### Posters / conférence avec même DOI
+
+Détection de doublons en dédup, pas une règle de correction. À traiter quand on touche la dédup, ou en marge si un cas saute pendant un audit.
+
+## Décisions actées
+
+1. **Détection figshare/Zenodo : pour les items, gérée par le titre** (`TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET`). Plus large que la détection par préfixe DOI envisagée au départ : couvre aussi Dryad/IFREMER, et reste valable même si un fichier supplément est posé sur un domaine autre. La détection RA via [doi-ra-datacite](METIER_doi-ra-datacite.md) reste utile pour d'autres règles (ex. figshare collections, qui ont des titres "normaux" et ne sont pas attrapées par le pattern titre).
+2. **Reclassement one-shot des cas existants** en fin de chantier. SQL aligné sur la nouvelle règle, suivi d'une passe de vérification au prochain run pipeline pour s'assurer que la cascade en `domain/` produirait le même résultat. Modèle : [`oneshot/refresh_publications_with_supplementary_content_title.py`](../../interfaces/cli/oneshot/refresh_publications_with_supplementary_content_title.py).
+
+## Hors scope
+
+- L'ingestion DataCite proprement dite : couverte par [METIER_doi-ra-datacite](METIER_doi-ra-datacite.md). Ce chantier-ci se contente d'utiliser les helpers/données qui en sortent.
+- Modifications du schéma SQL au-delà de l'enum `doc_type` : décisions au cas par cas.
+- **Suppléments figshare orphelins** (145 cas au 2026-05-05 dont le parent n'est pas en BDD) : déplacé dans [METIER_relations-publications](METIER_relations-publications.md). Rejoint un chantier de modélisation des relations entre publications.
 
 ## Risques
 
-- **Performance** : les regex de `is_supplement_title` doivent rester
-  O(1) par titre — patterns compilés en module-level.
-- **Coordination avec [doi-ra-datacite](doi-ra-datacite.md)** : la
-  détection RA peut bénéficier de `doi_prefixes` plutôt que d'un
-  hardcode Zenodo + figshare. À séquencer après doi-ra-datacite
-  phase 1, ou à mener en parallèle avec un fallback hardcodé.
-- **Compatibilité avec
-  [`refresh_from_sources`](../../application/publications.py)** :
-  cette fonction recalcule le `doc_type` canonique depuis les sources
-  (priorité theses.fr > ScanR > HAL > OpenAlex > WoS). Une nouvelle
-  règle « doc_type suspect → other » doit s'appliquer **après** la
-  sélection de la source prioritaire, ou être encodée dans le mapping
-  de chaque source. À choisir : règle au niveau source (chaque
-  normalizer corrige son propre `source_publications.doc_type`) ou
-  règle au niveau canonique (`refresh_from_sources` applique
-  l'override). Plus propre = au niveau source pour ne pas perdre
-  l'info brute.
+- **Performance** : les comparaisons sur titre passent par `normalize_text` + `startswith` / regex compilées module-level. Patterns compilés à l'import, pas à chaque appel.
+- **Coordination avec [doi-ra-datacite](METIER_doi-ra-datacite.md)** : la détection RA peut bénéficier de `doi_prefixes` plutôt que d'un hardcode. À séquencer après doi-ra-datacite phase 1, ou en parallèle avec un fallback hardcodé.
 
 ## Liens
 
-- [METIER_metadata-correction.md](METIER_metadata-correction.md) — point
-  unique où les règles cross-table de ce chantier sont implémentées
-  (`effective_metadata`). Absorbe la liquidation de
-  `correct_openalex_doc_type` (Phase 2 du chantier-cible).
-- [regles-metier-domain.md](regles-metier-domain.md) — chantier parent
-  (rapatriement des règles existantes vers `domain/`)
-- [doi-ra-datacite.md](doi-ra-datacite.md) — chantier jumeau,
-  prérequis pour détection RA via préfixe
-- [crossref.md](crossref.md) — architecture CrossRef ingest
-- État actuel : [`domain/sources/openalex.py`](../../domain/sources/openalex.py)
-  (`correct_openalex_doc_type`),
-  [`domain/doc_types.py`](../../domain/doc_types.py)
-  (`map_doc_type` + `_SOURCE_MAPS`),
-  [`application/publications.py`](../../application/publications.py)
-  (`refresh_from_sources`)
-
-
-## idées à intégrer
-- book reviews: trouver critères titre pour détecter (ISBN; titre terminé par "année, nombre de pages")
-- type "media" ou "presse"
-- conf, conference paper, proceedings: clarifier
-- détecter les patterns d'incohérence les plus fréquents
-- type "données additionnelles?"
-
-## Règles à mettre en place
-
-* Toutes les publications dans une revue de type "proceedings" sont des "conference papers".
+- [METIER_metadata-correction](METIER_metadata-correction.md) — patron architectural des règles de correction, point unique d'implémentation (`effective_metadata`).
+- [`ajouter-une-regle-de-correction.md`](../playbooks/ajouter-une-regle-de-correction.md) — playbook procédural.
+- [METIER_doi-ra-datacite](METIER_doi-ra-datacite.md) — détection RA via préfixe, prérequis pour les règles figshare collections et préprints article OA.
+- [METIER_relations-publications](METIER_relations-publications.md) — absorbe les orphelins figshare et tout ce qui touche aux liens sémantiques entre publications.
+- État actuel : [`domain/publications/correction.py`](../../domain/publications/correction.py), [`domain/publications/doc_types.py`](../../domain/publications/doc_types.py), [`application/publications.py`](../../application/publications.py) (`refresh_from_sources`).
