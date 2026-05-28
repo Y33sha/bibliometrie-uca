@@ -38,13 +38,6 @@
 		apc_amount: string;
 	} | null = $state(null);
 
-	// Libellé du doc_type cible pour chaque règle de requalification journal-dépendante.
-	// Sert au texte de la confirmation avant d'appliquer le changement de journal_type.
-	// Étendre quand de nouvelles règles produisent un doc_type sur changement de journal_type.
-	const REQUALIF_TARGET_LABEL: Record<string, string> = {
-		media: 'intervention média',
-	};
-
 	function openEdit(j: Journal) {
 		const jt = j.journal_type || 'journal';
 		editModal = {
@@ -62,13 +55,13 @@
 		if (!editModal) return;
 
 		// Si le journal_type change, prévisualiser l'impact et demander confirmation.
+		// Le message reste générique : le compte est exact (publications dont le doc_type change), mais la nouvelle valeur dépend de l'agrégation complète des sources de chaque publication, pas seulement du journal_type — on ne peut pas la prédire ici.
 		if (editModal.journal_type !== editModal.original_journal_type) {
 			try {
 				const impact = await journalsApi.typeChangeImpact(editModal.id, editModal.journal_type);
 				if (impact.count > 0) {
-					const target = REQUALIF_TARGET_LABEL[editModal.journal_type] ?? editModal.journal_type;
 					const plural = impact.count > 1 ? 's' : '';
-					const msg = `Ce changement entraînera la requalification de ${impact.count} publication${plural} en « ${target} ». Continuer ?`;
+					const msg = `Ce changement entraînera un recalcul de la métadonnée « type de document » sur ${impact.count} publication${plural}. Continuer ?`;
 					if (!confirm(msg)) return;
 				}
 			} catch (e: any) {

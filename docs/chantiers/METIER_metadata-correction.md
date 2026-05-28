@@ -90,11 +90,14 @@ La phase se scinde donc en deux gestes distincts que l'ancien code mélangeait :
 
 Première règle dont les inputs sont éditables côté admin (typiquement `journal.type` ou `journal.status`). C'est elle qui matérialise le besoin de hooks ; on les introduit à ce moment-là, calibrés sur les dépendances réelles de la règle.
 
-- [ ] Choix de la règle : à arbitrer au moment de Phase 3 selon ce qui aura mûri côté chantiers connexes (candidats probables : `JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER`, `JOURNAL_TYPE_MEDIA_TO_INTERVENTION_MEDIA`).
-- [ ] Implémentation de la règle dans `effective_metadata` + audit `meta.<field>_corrected_by`.
-- [ ] Introduction des hooks admin sur les inputs effectivement consommés par la règle (UPDATE `journal.type`, `merge_journals`, etc. selon les dépendances). Méthodes repo associées (`find_publication_ids_by_journal_id`, …).
-- [ ] Re-run ciblé sur le stock impacté.
-- [ ] Tests : régression sur la règle + couverture des hooks.
+Pour fournir le `Journal` à `effective_metadata` aux deux call-sites (refresh + match_or_create), choix d'enrichir la projection de lecture SP via le DTO `SourcePublicationWithJournalView` (`domain/source_publications/views.py`), qui embarque `journal_type` / `oa_model` / `apc_amount` par JOIN. L'agrégat `SourcePublication` reste pur. Alternative écartée : threader un `journal_repo` dans toutes les signatures (refresh, match_or_create, merges) — plus invasif sans bénéfice métier.
+
+- [x] Règle retenue : `JOURNAL_TYPE_MEDIA_TO_MEDIA`. Ordre dans la cascade `doc_type` : theses.fr > dumas > media (une thèse/mémoire rattachée à un journal media reste thèse/mémoire). Commit `59db89d9`.
+- [x] Implémentation dans `effective_metadata` + audit `meta.doc_type_corrected_by`. Commit `59db89d9`.
+- [x] Hooks admin : `requalify_publications_for_journal` côté `application/journals.py` (dry-run pour preview, apply après confirmation modale). Endpoints `GET /api/journals/{id}/type-change-impact` + `PUT /api/journals/{id}` qui déclenche la requalification synchrone. Repo : `PublicationRepository.find_ids_by_journal_id`. Commit `16b98985`.
+- [x] Modale frontend : preview du compte avant apply. Commit `49d22cd7` ; message rendu générique le 2026-05-28 (un recalcul du `doc_type` est annoncé, pas une valeur cible — la cible dépend de l'agrégation complète des sources, pas seulement du journal_type).
+- [x] Re-run ciblé sur le stock impacté : `interfaces/cli/maintenance/refresh_publications_for_journal_type.py` (paramétré par `--journal-type`, réutilisable pour les futures règles journal-dépendantes).
+- [x] Tests : règle media (`test_correction.py`), `apply_corrections` avec journal media (`test_publications.py`), service requalification dry-run + apply, endpoints API + PUT.
 
 ### Phase 4+ — Règles suivantes au fil de l'eau
 
