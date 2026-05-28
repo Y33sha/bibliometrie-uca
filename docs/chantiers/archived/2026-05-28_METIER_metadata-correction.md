@@ -2,6 +2,8 @@
 
 Commencé le 2026-05-27
 
+Terminé le 2026-05-28
+
 ## Contexte
 
 Trois chantiers actifs (`METIER_publishers-journals`, `METIER_metadata-deduplication`, `METIER_doc-types`) convergent sur un même besoin sans le nommer : un point unique où appliquer les règles de correction métadonnées qui s'appuient sur plusieurs tables référentielles (journal, publisher, doi_prefixes…). Faute de ce point, chaque chantier ré-invente sa propre stratégie et leurs ordonnancements respectifs se conditionnent.

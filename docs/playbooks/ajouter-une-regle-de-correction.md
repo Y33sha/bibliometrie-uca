@@ -127,7 +127,8 @@ Sauf si on prévoit un full rerun imminent du pipeline, écrire un script ciblé
 
 ### 8. Documentation
 
-- Cocher la règle dans [METIER_metadata-correction.md § Phase 4+](../chantiers/METIER_metadata-correction.md#phase-4--règles-suivantes-au-fil-de-leau) avec une ligne et le commit ref.
+Le catalogue vivant des règles actives est l'enum `MetadataCorrectionRule` (members + docstrings de cascade). Pas de duplication dans une fiche séparée.
+
 - Si la règle inaugure un nouveau **type de règle** (combinaison input/output non-encore-vue) : enrichir ce playbook avec un exemple concret en § Exemples ci-dessous.
 
 ## Exemples concrets
