@@ -147,3 +147,8 @@ Routes publiques en anglais, cohérentes avec le reste du projet (`/laboratories
 - [`METIER_doi-ra-datacite.md`](METIER_doi-ra-datacite.md) — table `doi_prefixes` utilisée pour l'attribution heuristique du `publisher_type` (Phase 1) et pour les contrôles DOI ↔ journal (Phase 4a).
 - [`METIER_doc-types.md`](METIER_doc-types.md) — mapping `doc_type` ↔ `journal_type` utilisé en Phase 4b.
 - TODO.md — l'item « création publishers et journals avant la phase publications » et plusieurs items connexes (`distinguer types d'entités`, `DOAJ pour contrôler oa_status`, `contrôler doc_type via DOI`, `Pages Éditeurs/Revues`) sont absorbés par cette fiche.
+
+## A intégrer
+
+* Toutes les revues contenant les mots "conference", "symposium", "proceedings", "lecture notes" sont de type "proceedings". (voir si exceptions type PNAS)
+* Toutes les revues contenant le mot eBooks sont de type "collection de livres"
