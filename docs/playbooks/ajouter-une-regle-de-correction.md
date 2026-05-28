@@ -143,15 +143,16 @@ Sauf si on prévoit un full rerun imminent du pipeline, écrire un script ciblé
 - Rattrapage : pas de script dédié, appliqué au full rerun pipeline
 - Référence : [correction.py:_correct_doc_type](../../domain/publications/correction.py) (cas 1)
 
-### Règle SP-intrinsèque multi-critères avec whitelist
+### Règle SP-intrinsèque multi-critères avec whitelist + set de signaux
 
-**`TITLE_ADDITIONAL_FILE_TO_DATASET`** — titre `'additional file…'` + `doc_type ∈ {article, other}` ⇒ `doc_type = dataset`.
+**`TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET`** — titre dans `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` (additional file, supplementary material/data/info/file/dataset, data from) + `doc_type ∈ {article, other}` ⇒ `doc_type = dataset`.
 
 - Inputs : `sp.title` (normalisé via `normalize_text`) + `sp.doc_type`
-- Whitelist : `_ADDITIONAL_FILE_APPLIES_TO = {"article", "other"}` — `dataset` est laissé tel quel (déjà adéquat) ; les autres types (`thesis`, `book_chapter`, …) sont épargnés (titre suspect mais on ne corrige pas aveuglément).
-- Audit ayant motivé la whitelist : sur 274 publications matchant le titre, 186 sont `article` (erreur, vraie correction), 46 sont `other` (sémantiquement moins informatif que `dataset`, gain marginal), 42 sont déjà `dataset` (correctes). 100 % DataCite ⇒ pas besoin de croiser avec le DOI-RA.
+- Whitelist : `_SUPPLEMENTARY_CONTENT_APPLIES_TO = {"article", "other"}` — `dataset` est laissé tel quel (déjà adéquat) ; les autres types (`thesis`, `book_chapter`, …) sont épargnés (titre suspect mais on ne corrige pas aveuglément).
+- Set de préfixes plutôt qu'un préfixe unique : pattern récurrent (fichiers complémentaires exposés par DataCite/Dryad/Zenodo/IFREMER comme entités à part entière). Le set est **ciblé**, pas large : on ne prend pas `'supplementary '` brut pour éviter de matcher par accident un vrai article du type "Supplementary roles of X". Ajouter un nouveau préfixe à `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` est de la maintenance courante, pas un nouveau chantier.
+- Audit ayant motivé la whitelist : 274 "additional file" (186 article + 46 other à reclasser, 42 dataset no-op) + 22 "supplementary …" + 7 "data from …" non-dataset. 100 % DataCite sur les cas observés ⇒ pas besoin de croiser avec le DOI-RA.
 - Hook admin : non
-- Rattrapage : [`oneshot/refresh_publications_with_additional_file_title.py`](../../interfaces/cli/oneshot/refresh_publications_with_additional_file_title.py)
+- Rattrapage : [`oneshot/refresh_publications_with_supplementary_content_title.py`](../../interfaces/cli/oneshot/refresh_publications_with_supplementary_content_title.py) — le pré-filtre SQL mirror la liste `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES`.
 - Référence : [correction.py:_correct_doc_type](../../domain/publications/correction.py) (cas 4)
 
 ### Règle journal-jointe + admin-éditable
