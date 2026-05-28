@@ -113,6 +113,7 @@
 * http://localhost:5176/bibliometrie/publications/133184 : 2 entrées "theses.fr", dont l'une redirige vers l'autre
 * sujets: cooccurrences calculées sur publications, ou sur source_publications? idem nombre d'occurrences (ex.: sujet vaches laitières, 10 occurrences annoncées, 2 publications affichées)
 * thèses 160226 et 132778 non fusionnées
+* filtre sources: ne tient pas compte des SP hors périmètre
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
