@@ -23,6 +23,7 @@
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects / idées:  phase_cross_imports expose sources_with_new; phase_subjects : restreindre à (extract_sources ∪ sources_with_new) / phase_countries (refresh_sa_countries_for_source) : laisser scanner toutes les sources (sécurité), mais on peut t'envisager un addresses.updated_at ciblage en option 2 plus tard
 * [ ] authorships: propagate_roles, propagate_is_corresponding, propagate_author_position: tout faire en une passe?
 * [ ] est-ce que les authorships détachées manuellement (donc orphelines) sont à nouveau rattachées au pipeline suivant? si oui => comportement indésirable, à corriger
+* [ ] matching personnes: si pid rejected, interrompre la cascade (ne pas fallback sur le name matching)
 ## Code
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
@@ -97,6 +98,8 @@
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
 * [ ] remplacer tag DOAJ par lien
 * [ ] style barre facettes dans labos/thèses: pas homogène aux autres
+* [ ] fusion revues ou modif revue: pas de mise à jour automatique de la page + (problème de la modale de validation qui indique le type journal au lieu du type article)
+* [ ] lien dashboard => publications: il faut que toutes les facettes actives soient affichées!
 
 # Cas particuliers, bizarreries à élucider
 * openalex répète des auteurs : publi 77832
@@ -109,6 +112,7 @@
 * bizarrerie dans l'import crossref: fetch_missing_doi: 10325 DOI manquants pour crossref 2026-05-14 09:15:18,898 [INFO] fetch_missing_doi: 100/10325 — 101 trouvés, 100 insérés 2026-05-14 09:15:27,004 [INFO] fetch_missing_doi: 200/10325 — 202 trouvés, 200 insérés / + 800/10325 — 800 trouvés, 732 inséré : pourquoi tout n'est pas inséré?
 * http://localhost:5176/bibliometrie/publications/133184 : 2 entrées "theses.fr", dont l'une redirige vers l'autre
 * sujets: cooccurrences calculées sur publications, ou sur source_publications? idem nombre d'occurrences (ex.: sujet vaches laitières, 10 occurrences annoncées, 2 publications affichées)
+* thèses 160226 et 132778 non fusionnées
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
