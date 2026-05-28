@@ -16,6 +16,7 @@ Règles de correction en place dans [`domain/publications/correction.py`](../../
 - `DUMAS_URL_TO_MEMOIR` — URL dumas + `dissertation` ⇒ `memoir`
 - `JOURNAL_TYPE_MEDIA_TO_MEDIA` — journal typé media ⇒ `media`
 - `JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER` — journal d'actes + `{article, book_chapter}` ⇒ `conference_paper`
+- `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` — serveur de preprints + `{article, other}` ⇒ `preprint`. Sans effet aujourd'hui (aucun journal typé `preprint_server` en base UCA, à faire côté admin) ; en place pour quand le typage sera posé.
 - `TITLE_MEDIA_PREFIX_TO_MEDIA` — titre `interview/reportage/podcast` ⇒ `media`
 - `TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET` — titre supplément (additional file, supplementary *, data from) ⇒ `dataset` (couvre figshare items, Zenodo, DataCite via le titre, plus large que des helpers DOI-préfixe envisagés au départ)
 - `TITLE_ERRATUM_PREFIX_TO_ERRATUM` — titre `erratum/errata/corrigendum` ⇒ `erratum`
@@ -38,11 +39,19 @@ Playbook [`ajouter-une-regle-de-correction.md`](../playbooks/ajouter-une-regle-d
 
 Étape suivante : audit SQL pour mesurer l'ampleur et valider la déterminance des patterns. Puis règle `TITLE_*_TO_BOOK_REVIEW` selon le playbook.
 
-### Préprints article OA + revue inconnue
+### Préprints article + journal_id inconnu
 
-Publications classées `article` par OpenAlex sur une revue inconnue : suspect, souvent un préprint déposé sur une archive en ligne. Pas de règle aujourd'hui.
+Audit 2026-05-28 sur les 744 publications canoniques `doc_type=article` + `journal_id IS NULL` (4.1% des articles). Le périmètre se décompose en au moins trois sous-cas qui ne sont **pas** tous des préprints :
 
-Étape suivante : audit. Combien de cas, sur quelles "revues", quels DOI-RA. Probablement croiser avec la liste des plateformes preprint connues (arXiv, bioRxiv, …) une fois les préfixes DOI typés (cf. [doi-ra-datacite](METIER_doi-ra-datacite.md)).
+- **162 WoS sans DOI, titres en majuscules** (ex. « MYCENAEAN PAINTING », « ARTWORKS IN CONTEXT The Historical Framework ») — `raw doc_type = 'article'` brut WoS (pas un composite). Plusieurs SPs WoS par publi (signe d'un import multiple). **Pas des préprints** — nature à investiguer (chapitres d'ouvrage WoS mal extraits ?). Hors-scope « préprints », à traiter dans un chantier dédié WoS.
+- **67 publis EGU/Copernicus** (DOI `10.5194/egusphere-*`) : mélange de deux familles distinguées par sous-pattern du DOI — `egusphere-egu<YY>-*` = abstracts de la conférence EGU General Assembly (→ `conference_paper`) vs `egusphere-<YYYY>-*` = preprints du serveur EGUsphere (→ `preprint`). Les SPs OA disent 212 `preprint` / 116 `article` / 61 `peer-review` mais l'arbitrage canonique les surclasse en `article` (cf. point ci-dessous sur `_first_doc_type`).
+- **Reste (~515 publis)** : à profiler en passe 2 — top container_titles renseignés (HAL, Zenodo, Figshare, SSRN, bioRxiv, arXiv, ZORA, SPIRE, ChemRxiv…) presque tous des plateformes de dépôt, donc candidats préprint sous réserve de sondage plateforme par plateforme.
+
+**Règle métier** : `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` codée (cf. section Fait), sans effet tant qu'aucun journal n'est typé `preprint_server` en base.
+
+**Bloquant rattachement journal_id** : la colonne `journals.doi_prefix` existe (singulière) mais n'est remplie pour aucun des 15 659 journaux. Pour Copernicus le préfixe DOI (`10.5194`) ne suffit pas — il faut un sous-pattern (`egusphere-egu*`, `acp-*`, …) pour distinguer plusieurs journaux d'un même préfixe. La mécanique de remplissage de `doi_prefix` et la question du sous-pattern relèvent d'un chantier dédié, hors-scope ici.
+
+**À creuser séparément** : l'arbitrage canonique du `doc_type` (`application/publications._first_doc_type`) qui surclasse `preprint` (brut OA) en `article` même quand 212 SPs sur 389 disent `preprint`. Comportement non-trivial à expliquer ou corriger.
 
 ### Types WoS composites — audit
 
