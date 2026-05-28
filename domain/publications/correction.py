@@ -1,6 +1,6 @@
 """Correction des métadonnées canoniques.
 
-Expose `effective_metadata`, fonction pure qui applique des règles de correction sur les valeurs d'une `SourcePublication`, à partir de la SP elle-même et d'entités référentielles fournies par le caller (journal, publisher).
+Expose `effective_metadata`, fonction pure qui applique des règles de correction sur les valeurs d'une publication source, à partir d'une vue de lecture `SourcePublicationWithJournalView` qui porte les champs de la SP **plus** des champs joints depuis `journals` (`journal_type`, `oa_model`, `apc_amount`). C'est cette vue qui rend la fonction capable d'appliquer aussi bien les règles SP-intrinsèques (URL) que les règles journal-dépendantes, sans threader de repo.
 
 Distincte de l'agrégation (`aggregation.py` arbitre entre sources) et du normalizer (qui ne mute pas `source_publications`, trace inviolable des sources). Les corrections s'appliquent sur le canonique via `refresh_from_sources` et sur la SP entrante au moment du matching, pour que la dédup matche sur les valeurs corrigées.
 
@@ -12,9 +12,7 @@ Chaque règle est une fonction pure renvoyant `Correction | None` : la valeur co
 from enum import StrEnum
 from typing import NamedTuple
 
-from domain.journals.journal import Journal
-from domain.publishers.publisher import Publisher
-from domain.source_publications.source_publication import SourcePublication
+from domain.source_publications.views import SourcePublicationWithJournalView
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -25,6 +23,7 @@ class MetadataCorrectionRule(StrEnum):
 
     THESES_FR_URL_TO_THESIS = "THESES_FR_URL_TO_THESIS"
     DUMAS_URL_TO_MEMOIR = "DUMAS_URL_TO_MEMOIR"
+    JOURNAL_TYPE_MEDIA_TO_MEDIA = "JOURNAL_TYPE_MEDIA_TO_MEDIA"
 
 
 class Correction[T](NamedTuple):
@@ -55,14 +54,15 @@ _THESES_FR_URL_MARKER = "theses.fr/"
 _DUMAS_URL_MARKER = "dumas."
 
 
-def _correct_doc_type(sp: SourcePublication) -> Correction[str] | None:
-    """Corrige le `doc_type` à partir de la source réelle du document, détectée sur ses URLs.
+def _correct_doc_type(sp: SourcePublicationWithJournalView) -> Correction[str] | None:
+    """Corrige le `doc_type` selon une cascade prioritaire.
 
-    Deux règles, dans l'ordre d'autorité :
+    Ordre :
     1. theses.fr fait autorité sur les thèses françaises : toute URL theses.fr ⇒ `thesis`, quel que soit le `doc_type` brut (OpenAlex classe parfois ces thèses en `article` ou `dissertation`).
     2. DUMAS héberge des mémoires de master qu'OpenAlex classe à tort en `dissertation` : `dissertation` brut + URL dumas ⇒ `memoir`.
+    3. Journal de type `media` ⇒ `media` : une publication rattachée à une revue typée media (typage manuel côté admin) est une intervention média.
 
-    Le déclencheur est l'URL (pas la source de la SP) : les règles restent source-agnostiques, conformément au contrat d'`effective_metadata`. Renvoie `None` si aucune ne s'applique.
+    Les deux premières règles sont SP-intrinsèques (lisent `sp.urls`/`sp.doc_type`) ; la troisième est journal-dépendante (lit `sp.journal_type`, champ joint sur la vue). Renvoie `None` si aucune ne s'applique.
     """
     urls = sp.urls
     if any(_THESES_FR_URL_MARKER in (u or "") for u in urls):
@@ -71,20 +71,15 @@ def _correct_doc_type(sp: SourcePublication) -> Correction[str] | None:
         _DUMAS_URL_MARKER in (u or "") for u in urls
     ):
         return Correction("memoir", MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR)
+    if sp.journal_type == "media":
+        return Correction("media", MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA)
     return None
 
 
-def effective_metadata(
-    sp: SourcePublication,
-    *,
-    journal: Journal | None = None,
-    publisher: Publisher | None = None,
-) -> CorrectedFields:
-    """Applique la cascade de corrections sur les champs d'une `SourcePublication`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
+def effective_metadata(sp: SourcePublicationWithJournalView) -> CorrectedFields:
+    """Applique la cascade de corrections sur les champs d'une `SourcePublicationWithJournalView`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
 
-    Fonction pure : aucune I/O, aucun effet de bord. Les entités référentielles (`journal`, `publisher`) sont passées par le caller, qui est responsable de leur fetch en amont.
-
-    Les paramètres `journal` et `publisher` sont keyword-only pour permettre l'ajout futur d'autres entités (`doi_prefix`, …) sans casser les callers.
+    Fonction pure : aucune I/O, aucun effet de bord. Les données journal/publisher consommées par les règles arrivent par la vue (champs joints à la lecture), pas via des entités passées en paramètre — c'est ce qui permet à la fonction de servir aussi bien la dédup (sur la SP entrante) que le refresh (sur les sources d'une publication).
 
     Cascade dans l'ordre des dépendances (`journal_id` → `doc_type` → `oa_status`) ; seul `doc_type` porte des règles à ce stade.
     """
