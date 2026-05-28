@@ -1,5 +1,9 @@
 # Plan — Requalification admin sur changement de `journal.type` (règle media)
 
+**Statut** : implémenté. Commits `59db89d9` (View + règle + refacto refresh), `16b98985` (service + endpoints API), `49d22cd7` (modale frontend). Test manuel restant : `bash start.sh`, admin journals, éditer un journal en `media`, vérifier la modale (compte) puis la requalif effective.
+
+**Décision A/B tranchée** : option B (DTO de lecture `SourcePublicationWithJournalView` dans `domain/source_publications/views.py`, l'agrégat `SourcePublication` reste pur). Les corrections refresh-side et l'agrégation opèrent sur la vue ; la dédup-entrée garde son chemin actuel via une vue à `journal_type=None` (TODO posé dans `_view_from_row` pour le jour où une règle journal-dépendante produirait un type routé).
+
 ## Context
 
 La règle de correction « journal de type `media` ⇒ publications en `doc_type = media` » est la première règle dont l'input (`journal.journal_type`) est **éditable côté admin**. Aujourd'hui `PUT /api/journals/{id}` écrit le champ sans aucune conséquence ([application/journals.py:107-127](application/journals.py)) : changer le type ne requalifie pas les publications du journal. On veut pouvoir éditer le type d'un journal dans l'admin et voir ses publications requalifiées, avec une **modale de confirmation** annonçant l'ampleur (« x publications seront requalifiées en *intervention média*. Continuer ? »).

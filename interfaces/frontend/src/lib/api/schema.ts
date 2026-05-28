@@ -2273,8 +2273,9 @@ export interface paths {
          * Update Journal
          * @description Met à jour une revue (modification sélective des champs fournis).
          *
-         *     Seuls les champs explicitement présents dans le body sont écrits
-         *     (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
+         *     Seuls les champs explicitement présents dans le body sont écrits (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
+         *
+         *     Si `journal_type` change effectivement de valeur, déclenche la requalification synchrone du `doc_type` des publications rattachées dans la même transaction — cf. `requalify_publications_for_journal` côté application. Le caller frontal aura typiquement appelé le preview (`type-change-impact`) en amont pour afficher l'ampleur à l'admin.
          */
         put: operations["update_journal_api_journals__journal_id__put"];
         post?: never;
@@ -2324,6 +2325,26 @@ export interface paths {
          *     publications taggées (pas de 404 pour rester idempotent à l'usage UI).
          */
         get: operations["get_journal_subjects_api_journals__journal_id__subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journals/{journal_id}/type-change-impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Type Change Impact
+         * @description Compte combien de publications du journal verraient leur `doc_type` changer si on passait `journal_type` à `new_type`. Dry-run pur, aucune écriture. Sert au preview de la modale admin avant confirmation du PUT.
+         */
+        get: operations["get_type_change_impact_api_journals__journal_id__type_change_impact_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2967,19 +2988,13 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
-         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
-         *     Permet au frontend de styler les inattendus en warning.
+         * @description Compteur de publications par `doc_type` pour un éditeur.
          */
         DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
         };
         /** DocTypeLabel */
         DocTypeLabel: {
@@ -3420,9 +3435,9 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["OaStatusCount"][];
+            oa_statuses: components["schemas"]["application__ports__api__journals_queries__OaStatusCount"][];
             /** Expected Doc Types */
             expected_doc_types: string[];
             /** Expected Oa Statuses */
@@ -3584,6 +3599,14 @@ export interface components {
             is_predatory: boolean;
             /** Apc Amount */
             apc_amount: number | null;
+        };
+        /**
+         * JournalTypeChangeImpact
+         * @description Compte des publications dont le `doc_type` canonique changerait si le `journal_type` passait à la valeur prévue. Renvoyé par le preview de la modale admin avant confirmation de l'édition.
+         */
+        JournalTypeChangeImpact: {
+            /** Count */
+            count: number;
         };
         /**
          * JournalTypeCount
@@ -4046,18 +4069,13 @@ export interface components {
         };
         /**
          * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour une revue.
-         *
-         *     `expected` est vrai si ce `oa_status` figure dans les valeurs attendues
-         *     pour le `oa_model` de la revue (cf. `domain.journals.expected`).
+         * @description Compteur de publications par `oa_status` pour un éditeur.
          */
         OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
         };
         /**
          * ObservablesPayload
@@ -5031,9 +5049,9 @@ export interface components {
             /** Journal Types */
             journal_types: components["schemas"]["JournalTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
+            oa_statuses: components["schemas"]["OaStatusCount"][];
         };
         /**
          * PublisherDetailResponse
@@ -5727,23 +5745,34 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour un éditeur.
+         * @description Compteur de publications par `doc_type` pour une revue.
+         *
+         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
+         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
+         *     Permet au frontend de styler les inattendus en warning.
          */
-        application__ports__api__publishers_queries__DocTypeCount: {
+        application__ports__api__journals_queries__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
+            /** Expected */
+            expected: boolean;
         };
         /**
          * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour un éditeur.
+         * @description Compteur de publications par `oa_status` pour une revue.
+         *
+         *     `expected` est vrai si ce `oa_status` figure dans les valeurs attendues
+         *     pour le `oa_model` de la revue (cf. `domain.journals.expected`).
          */
-        application__ports__api__publishers_queries__OaStatusCount: {
+        application__ports__api__journals_queries__OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */
             count: number;
+            /** Expected */
+            expected: boolean;
         };
     };
     responses: never;
@@ -9413,6 +9442,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubjectFrequency"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_type_change_impact_api_journals__journal_id__type_change_impact_get: {
+        parameters: {
+            query: {
+                new_type: string;
+            };
+            header?: never;
+            path: {
+                journal_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JournalTypeChangeImpact"];
                 };
             };
             /** @description Validation Error */
