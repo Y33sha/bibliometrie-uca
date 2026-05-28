@@ -32,17 +32,26 @@
 	// Modal édition
 	let editModal: {
 		id: number; title: string; issn: string; eissn: string; issnl: string;
-		doi_prefix: string; oa_model: string; journal_type: string;
+		doi_prefix: string; oa_model: string;
+		journal_type: string; original_journal_type: string;
 		is_academic: boolean; is_predatory: boolean; is_in_doaj: boolean;
 		apc_amount: string;
 	} | null = $state(null);
 
+	// Libellé du doc_type cible pour chaque règle de requalification journal-dépendante.
+	// Sert au texte de la confirmation avant d'appliquer le changement de journal_type.
+	// Étendre quand de nouvelles règles produisent un doc_type sur changement de journal_type.
+	const REQUALIF_TARGET_LABEL: Record<string, string> = {
+		media: 'intervention média',
+	};
+
 	function openEdit(j: Journal) {
+		const jt = j.journal_type || 'journal';
 		editModal = {
 			id: j.id, title: j.title,
 			issn: j.issn || '', eissn: j.eissn || '', issnl: j.issnl || '',
 			doi_prefix: j.doi_prefix || '', oa_model: j.oa_model || '',
-			journal_type: j.journal_type || 'journal',
+			journal_type: jt, original_journal_type: jt,
 			is_academic: j.is_academic ?? true,
 			is_predatory: j.is_predatory, is_in_doaj: j.is_in_doaj,
 			apc_amount: j.apc_amount ? String(j.apc_amount) : '',
@@ -51,6 +60,24 @@
 
 	async function saveEdit() {
 		if (!editModal) return;
+
+		// Si le journal_type change, prévisualiser l'impact et demander confirmation.
+		if (editModal.journal_type !== editModal.original_journal_type) {
+			try {
+				const impact = await journalsApi.typeChangeImpact(editModal.id, editModal.journal_type);
+				if (impact.count > 0) {
+					const target = REQUALIF_TARGET_LABEL[editModal.journal_type] ?? editModal.journal_type;
+					const plural = impact.count > 1 ? 's' : '';
+					const msg = `Ce changement entraînera la requalification de ${impact.count} publication${plural} en « ${target} ». Continuer ?`;
+					if (!confirm(msg)) return;
+				}
+			} catch (e: any) {
+				const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
+				alert('Erreur lors du calcul d\'impact : ' + msg);
+				return;
+			}
+		}
+
 		const body: Record<string, any> = {};
 		body.title = editModal.title.trim();
 		body.issn = editModal.issn.trim() || null;
