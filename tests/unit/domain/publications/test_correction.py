@@ -427,6 +427,137 @@ class TestTitleRetractionPrefixRule:
         assert effective_metadata(view).doc_type is None
 
 
+class TestTitleIsbnBookReviewRule:
+    def test_isbn_word_on_article_corrects(self):
+        view = _view(
+            doc_type="article",
+            title="Compte rendu de l'ouvrage X, Éditions Y, 2020, ISBN 978-2-12345-678-9",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "book_review"
+        assert corrected.rule == MetadataCorrectionRule.TITLE_ISBN_TO_BOOK_REVIEW
+
+    def test_isbn_13_naked_corrects(self):
+        # ISBN-13 nu sans le mot « ISBN ».
+        view = _view(doc_type="review", title="Recension d'un livre, PUF, 2021, 978-2-13-082345-6")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "book_review"
+
+    def test_isbn_on_other_corrects(self):
+        view = _view(doc_type="other", title="CR : Étude sur Z, isbn 9782070123456")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "book_review"
+
+    def test_isbn_on_book_is_spared(self):
+        # `book` hors whitelist : un livre peut légitimement porter son propre
+        # ISBN dans le titre (saisie HAL fréquente, faux positif sinon).
+        view = _view(doc_type="book", title="Un vrai livre, Éditions Y, ISBN 978-2-12345-678-9")
+        assert effective_metadata(view).doc_type is None
+
+    def test_isbn_on_book_chapter_is_spared(self):
+        view = _view(
+            doc_type="book_chapter",
+            title="Chapitre dans un ouvrage collectif ISBN 978-2-12345-678-9",
+        )
+        assert effective_metadata(view).doc_type is None
+
+    def test_isbn_on_book_review_is_noop(self):
+        view = _view(doc_type="book_review", title="Compte rendu, ISBN 978-2-12345-678-9")
+        assert effective_metadata(view).doc_type is None
+
+    def test_isbn_case_insensitive(self):
+        for raw in ("ISBN 978-2-12345-678-9", "Isbn 978...", "compte rendu isbn 9782070123456"):
+            view = _view(doc_type="article", title=raw)
+            corrected = effective_metadata(view).doc_type
+            assert corrected is not None and corrected.value == "book_review"
+
+    def test_unrelated_title_no_correction(self):
+        view = _view(doc_type="article", title="A regular article without book metadata")
+        assert effective_metadata(view).doc_type is None
+
+    def test_isbn_substring_not_matched(self):
+        # `isbn` doit être un mot entier — ne pas matcher "Isbnxyz" ou "disbn".
+        view = _view(doc_type="article", title="A study of Disbnophilia in laboratory mice")
+        assert effective_metadata(view).doc_type is None
+
+    def test_isbn_naked_requires_full_pattern(self):
+        # Un nombre commençant par 978 mais trop court n'est pas un ISBN.
+        view = _view(doc_type="article", title="Page 9785 of the journal")
+        assert effective_metadata(view).doc_type is None
+
+    def test_journal_type_media_wins_over_isbn_rule(self):
+        view = _view(
+            doc_type="article",
+            title="Recension d'un livre, ISBN 978-2-12345-678-9",
+            journal_type="media",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "media"
+
+
+class TestTitleYearPagesEndBookReviewRule:
+    def test_year_pages_end_on_article_corrects(self):
+        view = _view(
+            doc_type="article",
+            title="Auteur, Titre de l'ouvrage, Éditions Y, 2020, 244 p.",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "book_review"
+        assert corrected.rule == MetadataCorrectionRule.TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW
+
+    def test_year_pages_pages_form_corrects(self):
+        view = _view(doc_type="review", title="Auteur, Titre, PUF, 2019, 350 pages")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "book_review"
+
+    def test_year_pages_pp_form_corrects(self):
+        view = _view(doc_type="other", title="Auteur, Titre, Springer, 2021, 198 pp")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "book_review"
+
+    def test_year_pages_on_book_is_spared(self):
+        # `book` hors whitelist (vrais livres dont le titre porte leur propre
+        # référence biblio — cf. audit 2026-05-28).
+        view = _view(doc_type="book", title="Un vrai livre, Éditeur, 2020, 244 p")
+        assert effective_metadata(view).doc_type is None
+
+    def test_year_pages_on_book_review_is_noop(self):
+        view = _view(doc_type="book_review", title="Recension d'un livre, 2020, 244 p")
+        assert effective_metadata(view).doc_type is None
+
+    def test_year_pages_requires_end_anchor(self):
+        # Pattern « 2020, 244 p » au milieu d'un titre suivi d'autre chose
+        # n'est pas le marqueur attendu.
+        view = _view(
+            doc_type="article",
+            title="In 2020, 244 papers were published on the topic of climate change",
+        )
+        assert effective_metadata(view).doc_type is None
+
+    def test_year_pages_case_insensitive(self):
+        for suffix in ("2020, 244 P", "2020, 244 PAGES", "2020, 244 Pp"):
+            view = _view(doc_type="article", title=f"Titre, Éditeur, {suffix}")
+            corrected = effective_metadata(view).doc_type
+            assert corrected is not None and corrected.value == "book_review"
+
+    def test_isbn_wins_over_year_pages(self):
+        # Les deux patterns matchent ; ISBN passe d'abord dans la cascade,
+        # la règle ISBN posée gagne.
+        view = _view(
+            doc_type="article",
+            title="Titre, Éditeur, ISBN 978-2-12345-678-9, 2020, 244 p",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.rule == MetadataCorrectionRule.TITLE_ISBN_TO_BOOK_REVIEW
+
+    def test_unrelated_title_no_correction(self):
+        view = _view(doc_type="article", title="Effects of soil nitrogen on plant growth")
+        assert effective_metadata(view).doc_type is None
+
+
 class TestEffectiveMetadataScope:
     def test_no_signals_no_correction(self):
         assert effective_metadata(_view()).is_empty()

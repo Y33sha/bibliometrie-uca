@@ -9,6 +9,7 @@ Cascade déterministe, dans l'ordre des dépendances entre champs : `journal_id`
 Chaque règle est une fonction pure renvoyant `Correction | None` : la valeur corrigée et le membre de `MetadataCorrectionRule` qui l'a produite. Le caller inscrit ce membre dans `publications.meta.<field>_corrected_by` pour tracer la correction.
 """
 
+import re
 from enum import StrEnum
 from typing import NamedTuple
 
@@ -30,6 +31,8 @@ class MetadataCorrectionRule(StrEnum):
     TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET = "TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET"
     TITLE_ERRATUM_PREFIX_TO_ERRATUM = "TITLE_ERRATUM_PREFIX_TO_ERRATUM"
     TITLE_RETRACTION_PREFIX_TO_RETRACTION = "TITLE_RETRACTION_PREFIX_TO_RETRACTION"
+    TITLE_ISBN_TO_BOOK_REVIEW = "TITLE_ISBN_TO_BOOK_REVIEW"
+    TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW = "TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW"
 
 
 class Correction[T](NamedTuple):
@@ -96,6 +99,27 @@ _RETRACTION_TITLE_PREFIXES = ("retraction notice", "retraction note")
 # Whitelist `{article, other}` : seuls types où les normalizers (HAL/OpenAlex) classent à tort un avis de rétractation. Pattern aligné sur les règles `TITLE_*` SP-intrinsèques précédentes.
 _RETRACTION_APPLIES_TO = frozenset({"article", "other"})
 
+# Marqueurs de recension d'ouvrage (book review) détectés sur le titre brut.
+# Deux patterns indépendants compilés une fois à l'import.
+# `_ISBN_PATTERN` : mention textuelle « ISBN » (mot entier) ou préfixe ISBN-13
+# (97[89] suivi de 10–17 caractères chiffres/espaces/tirets). Signal très net.
+# `_YEAR_PAGES_END_PATTERN` : titre terminé par « (19|20)YY, N p[.|ages] »,
+# forme classique d'une référence biblio injectée dans le champ titre par
+# les saisisseurs HAL pour les comptes-rendus d'ouvrage. Plus bruité, d'où
+# la whitelist plus étroite (exclut `book` : un livre dont le titre porte
+# sa propre référence biblio matcherait à tort).
+_ISBN_PATTERN = re.compile(r"\bisbn\b|\b97[89][-\s0-9]{10,17}\b", re.IGNORECASE)
+_YEAR_PAGES_END_PATTERN = re.compile(
+    r"(19|20)\d{2}[\s,.]+\d{1,4}\s*(pp|pages?|p)\.?\s*$", re.IGNORECASE
+)
+
+# Whitelist `TITLE_ISBN_TO_BOOK_REVIEW` : recensions classées à tort dans ces
+# types. `book` est exclu car beaucoup d'ouvrages réels ont l'ISBN dans le
+# titre (auto-description) ; `book_chapter` aussi (un chapitre publié dans un
+# livre ISBN-é peut porter l'ISBN du livre dans son titre). `book_review`
+# est exclu (no-op naturel).
+_BOOK_REVIEW_APPLIES_TO = frozenset({"article", "review", "other"})
+
 
 def _correct_doc_type(sp: SourcePublicationWithJournalView) -> Correction[str] | None:
     """Corrige le `doc_type` selon une cascade prioritaire.
@@ -109,8 +133,10 @@ def _correct_doc_type(sp: SourcePublicationWithJournalView) -> Correction[str] |
     6. Titre commençant par un préfixe de `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` (additional file, supplementary material/data/info/file/dataset, data from) + `doc_type` dans `_SUPPLEMENTARY_CONTENT_APPLIES_TO` ⇒ `dataset` : DataCite et certaines plateformes (Dryad, Zenodo, IFREMER) exposent les fichiers complémentaires comme des entités à part entière, classées `article` (faux) ou `other` (vague) par les normalizers. Une publication déjà classée `dataset` est laissée telle quelle (classification correcte).
     7. Titre commençant par `erratum` / `errata` / `corrigendum` + `doc_type` dans `_ERRATUM_APPLIES_TO` ⇒ `erratum` : les sources (notamment OpenAlex) reclassent fréquemment les corrections en `article`/`preprint`/`data_paper`. Pattern textuel univoque (mot exact en tête de titre).
     8. Titre commençant par `retraction notice` / `retraction note` + `doc_type` dans `_RETRACTION_APPLIES_TO` ⇒ `retraction` : préfixes stricts pour éviter un faux positif sur un article *sur* la rétractation (« Retraction of consent in clinical trials »).
+    9. Mention textuelle « ISBN » ou numéro ISBN-13 nu dans le titre + `doc_type` dans `_BOOK_REVIEW_APPLIES_TO` ⇒ `book_review` : signal d'une référence biblio injectée dans le champ titre, forme classique d'une recension. `book` et `book_chapter` exclus de la whitelist (un ouvrage ou un chapitre peut légitimement porter son propre ISBN dans le titre — saisie HAL fréquente).
+    10. Titre se terminant par « (19|20)YY, N p[.|ages] » + `doc_type` dans `_BOOK_REVIEW_APPLIES_TO` ⇒ `book_review` : même logique que la règle 9, plus bruité (un livre dont le titre porte sa propre ref biblio matche aussi), d'où la whitelist excluant `book`/`book_chapter`. Évalué après la règle 9 : un titre porteur d'un ISBN explicite est attribué via la règle 9.
 
-    Les règles 1, 2, 5, 6, 7 et 8 sont SP-intrinsèques (lisent `sp.urls`/`sp.title`/`sp.doc_type`) ; 3 et 4 sont journal-dépendantes (lisent `sp.journal_type`, champ joint sur la vue). Renvoie `None` si aucune ne s'applique.
+    Les règles 1, 2, 5, 6, 7, 8, 9 et 10 sont SP-intrinsèques (lisent `sp.urls`/`sp.title`/`sp.doc_type`) ; 3 et 4 sont journal-dépendantes (lisent `sp.journal_type`, champ joint sur la vue). Renvoie `None` si aucune ne s'applique.
     """
     urls = sp.urls
     if any(_THESES_FR_URL_MARKER in (u or "") for u in urls):
@@ -146,6 +172,17 @@ def _correct_doc_type(sp: SourcePublicationWithJournalView) -> Correction[str] |
             return Correction(
                 "retraction", MetadataCorrectionRule.TITLE_RETRACTION_PREFIX_TO_RETRACTION
             )
+    return _correct_doc_type_book_review(sp)
+
+
+def _correct_doc_type_book_review(sp: SourcePublicationWithJournalView) -> Correction[str] | None:
+    """Règles 9 et 10 de la cascade `_correct_doc_type` : recensions d'ouvrage détectées par référence biblio injectée dans le titre. Extraite pour garder la cascade principale sous le seuil de complexité McCabe."""
+    if sp.doc_type not in _BOOK_REVIEW_APPLIES_TO or not sp.title:
+        return None
+    if _ISBN_PATTERN.search(sp.title):
+        return Correction("book_review", MetadataCorrectionRule.TITLE_ISBN_TO_BOOK_REVIEW)
+    if _YEAR_PAGES_END_PATTERN.search(sp.title):
+        return Correction("book_review", MetadataCorrectionRule.TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW)
     return None
 
 
