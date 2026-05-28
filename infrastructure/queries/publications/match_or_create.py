@@ -47,11 +47,14 @@ def bulk_link_orphans_by_doi(conn: Connection) -> int:
     """Rattache les orphelins par DOI (exact match contre `publications.doi`).
 
     Rapide grâce à `idx_source_pubs_doi` + index sur `publications.doi`.
+
+    Le bump de `sp.updated_at` est nécessaire pour que `fetch_stale_publication_ids` voie ces publications comme stale en Phase 2 et déclenche `refresh_from_sources` — sinon l'agrégation cross-source (oa_status, abstract, …) ne reflète jamais la SP nouvellement rattachée.
     """
     return conn.execute(
         text("""
             UPDATE source_publications sp
-            SET publication_id = p.id
+            SET publication_id = p.id,
+                updated_at = now()
             FROM publications p
             WHERE sp.publication_id IS NULL
               AND sp.doi IS NOT NULL
@@ -65,6 +68,8 @@ def bulk_link_orphans_by_nnt(conn: Connection) -> int:
     """Rattache les orphelins par NNT (stocké sur `source_publications.external_ids`).
 
     CTE de lookup `(nnt, publication_id)` matérialisée d'abord, puis JOIN avec les orphans — évite un self-join 11M × 11M en JSONB extraction qui mettait >10 min.
+
+    Le bump de `sp.updated_at` est nécessaire pour que `fetch_stale_publication_ids` voie ces publications comme stale en Phase 2 et déclenche `refresh_from_sources` — sinon l'agrégation cross-source (oa_status, abstract, …) ne reflète jamais la SP nouvellement rattachée.
     """
     return conn.execute(
         text("""
@@ -77,7 +82,8 @@ def bulk_link_orphans_by_nnt(conn: Connection) -> int:
                 GROUP BY (external_ids->>'nnt')
             )
             UPDATE source_publications sp
-            SET publication_id = nl.publication_id
+            SET publication_id = nl.publication_id,
+                updated_at = now()
             FROM nnt_lookup nl
             WHERE sp.publication_id IS NULL
               AND sp.external_ids ? 'nnt'
@@ -92,6 +98,8 @@ def bulk_link_orphans_by_hal_id(conn: Connection) -> int:
     Deux paths de donor (cf. `PublicationRepository.find_by_hal_id`) :
     SP HAL native via `source_id`, OU SP cross-source via
     `external_ids->>'hal_id'`. Unifiés dans une CTE de lookup matérialisée.
+
+    Le bump de `sp.updated_at` est nécessaire pour que `fetch_stale_publication_ids` voie ces publications comme stale en Phase 2 et déclenche `refresh_from_sources` — sinon l'agrégation cross-source (oa_status, abstract, …) ne reflète jamais la SP nouvellement rattachée.
     """
     return conn.execute(
         text("""
@@ -111,7 +119,8 @@ def bulk_link_orphans_by_hal_id(conn: Connection) -> int:
                 GROUP BY key
             )
             UPDATE source_publications sp
-            SET publication_id = hl.publication_id
+            SET publication_id = hl.publication_id,
+                updated_at = now()
             FROM hal_id_lookup hl
             WHERE sp.publication_id IS NULL
               AND sp.external_ids ? 'hal_id'
