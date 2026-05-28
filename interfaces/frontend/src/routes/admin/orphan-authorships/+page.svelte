@@ -29,6 +29,15 @@
 	const allSelected = $derived(orphans.length > 0 && orphans.every(o => selectedIds.has(`${o.source}-${o.authorship_id}`)));
 	let createModal: { lastName: string; firstName: string; items: OrphanAuthorship[] } | null = $state(null);
 
+	const SOURCE_LABELS: Record<string, string> = {
+		hal: 'HAL',
+		openalex: 'OA',
+		wos: 'WoS',
+		theses: 'Thèses',
+		scanr: 'ScanR',
+		crossref: 'CrossRef',
+	};
+
 	async function loadOrphans() {
 		const params = new URLSearchParams({ page: String(currentPage), per_page: '50' });
 		if (search.trim()) params.set('search', search.trim());
@@ -210,7 +219,7 @@
 			{#each orphans as o, i}
 				<tr>
 					<td><input type="checkbox" checked={selectedIds.has(`${o.source}-${o.authorship_id}`)} onchange={() => toggleSelect(o)} /></td>
-					<td><span class="tag tag-source">{o.source === 'openalex' ? 'OA' : o.source === 'hal' ? 'HAL' : 'WoS'}</span></td>
+					<td><span class="tag tag-source">{SOURCE_LABELS[o.source] ?? o.source}</span></td>
 					<td>{o.full_name}</td>
 					<td>
 						<a href="{base}/publications/{o.publication_id}" class="pub-link">

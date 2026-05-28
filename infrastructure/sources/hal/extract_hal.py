@@ -131,16 +131,23 @@ class PgHalExtractAdapter(HalExtractAdapter):
     def build_query(self, years: list[int] | None, since: str | None = None) -> str:
         """Construit la requête Solr HAL (paramètre `q`).
 
-        Si `since` est fourni (format `YYYY-MM-DD`), filtre sur
-        `submittedDate_tdate` au lieu de filtrer par années. Sinon, encadre
-        `producedDateY_i` par `[min(years) TO max(years)]`. Au moins un des
-        deux doit être fourni.
+        - `years` borne `producedDateY_i:[min TO max]` (année de publication).
+        - `since` (format `YYYY-MM-DD`) borne `submittedDate_tdate:[since TO *]`
+          (date de dépôt HAL).
+        Les deux filtres se combinent en AND : indispensable en mode daily,
+        où l'on ne veut que les dépôts HAL récents *qui concernent aussi*
+        la fenêtre d'années courante — sinon un dépôt tardif d'une vieille
+        publication passe le filtre et pollue la base.
+        Au moins un des deux paramètres doit être fourni.
         """
-        if since:
-            return f"submittedDate_tdate:[{since}T00:00:00Z TO *]"
-        if not years:
+        if not years and not since:
             raise ValueError("build_query requires either `since` or a non-empty `years` list")
-        return f"producedDateY_i:[{min(years)} TO {max(years)}]"
+        parts: list[str] = []
+        if years:
+            parts.append(f"producedDateY_i:[{min(years)} TO {max(years)}]")
+        if since:
+            parts.append(f"submittedDate_tdate:[{since}T00:00:00Z TO *]")
+        return " AND ".join(parts)
 
     def per_page_for(self, collection_code: str | None) -> int:
         """Taille de page Solr à utiliser pour une collection (cf. `api_limits`)."""
