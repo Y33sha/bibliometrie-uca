@@ -93,30 +93,21 @@ def bulk_link_orphans_by_nnt(conn: Connection) -> int:
 
 
 def bulk_link_orphans_by_hal_id(conn: Connection) -> int:
-    """Rattache les orphelins par hal_id.
+    """Rattache les orphelins par hal_id (stocké sur `source_publications.external_ids`).
 
-    Deux paths de donor (cf. `PublicationRepository.find_by_hal_id`) :
-    SP HAL native via `source_id`, OU SP cross-source via
-    `external_ids->>'hal_id'`. Unifiés dans une CTE de lookup matérialisée.
+    Symétrique avec `bulk_link_orphans_by_nnt` : la clé `hal_id` vit dans `external_ids` sur **toutes** les sources (HAL natif et cross-source) — le normalizer HAL pose `external_ids.hal_id = source_id` au moment de l'insertion.
 
     Le bump de `sp.updated_at` est nécessaire pour que `fetch_stale_publication_ids` voie ces publications comme stale en Phase 2 et déclenche `refresh_from_sources` — sinon l'agrégation cross-source (oa_status, abstract, …) ne reflète jamais la SP nouvellement rattachée.
     """
     return conn.execute(
         text("""
             WITH hal_id_lookup AS (
-                SELECT key, MIN(publication_id) AS publication_id
-                FROM (
-                    SELECT source_id AS key, publication_id
-                    FROM source_publications
-                    WHERE source = 'hal' AND publication_id IS NOT NULL
-                    UNION ALL
-                    SELECT external_ids->>'hal_id' AS key, publication_id
-                    FROM source_publications
-                    WHERE publication_id IS NOT NULL
-                      AND external_ids ? 'hal_id'
-                ) u
-                WHERE key IS NOT NULL
-                GROUP BY key
+                SELECT (external_ids->>'hal_id') AS hal_id,
+                       MIN(publication_id) AS publication_id
+                FROM source_publications
+                WHERE publication_id IS NOT NULL
+                  AND external_ids ? 'hal_id'
+                GROUP BY (external_ids->>'hal_id')
             )
             UPDATE source_publications sp
             SET publication_id = hl.publication_id,
@@ -124,7 +115,7 @@ def bulk_link_orphans_by_hal_id(conn: Connection) -> int:
             FROM hal_id_lookup hl
             WHERE sp.publication_id IS NULL
               AND sp.external_ids ? 'hal_id'
-              AND (sp.external_ids ->> 'hal_id') = hl.key
+              AND (sp.external_ids ->> 'hal_id') = hl.hal_id
         """)
     ).rowcount
 

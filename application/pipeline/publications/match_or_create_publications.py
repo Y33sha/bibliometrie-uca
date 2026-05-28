@@ -45,13 +45,6 @@ from domain.publications.metadata import (
 )
 from domain.source_publications.views import SourcePublicationWithJournalView
 
-_NATIVE_KIND_BY_SOURCE: dict[str, str] = {
-    "hal": "hal_id",
-    "openalex": "openalex_id",
-    "wos": "wos_id",
-    "scanr": "scanr_id",
-}
-
 Outcome = Literal["created", "linked", "skipped_no_metadata", "skipped_no_perimeter"]
 
 
@@ -88,24 +81,14 @@ def _view_from_row(doc: SourcePublicationRow) -> SourcePublicationWithJournalVie
     )
 
 
-def extract_known_identifiers(
-    source: str,
-    source_id: str | None,
-    external_ids: dict[str, object] | None,
-) -> dict[str, str]:
-    """Aplatit les identifiants connus d'un `source_publication`.
+def extract_known_identifiers(external_ids: dict[str, object] | None) -> dict[str, str]:
+    """Filtre `external_ids` aux valeurs `str` non vides.
 
-    Combine l'identifiant natif (interprété selon `source`, posé dans `source_publications.source_id`) avec les identifiants cross-source détectés (`external_ids`). Les valeurs `external_ids` priment en cas de collision — elles sont la forme canonique normalisée à la normalisation.
-
-    Renvoie un dict `{kind: value}` plat où `kind` est une clé canonique (`hal_id`, `nnt`, `pmid`, …). Seules les valeurs `str` non vides sont retenues.
+    Convention : toutes les clés de dédup cross-source (`hal_id`, `nnt`, `pmid`, …) vivent dans `external_ids`, y compris quand elles coïncident avec `source_id` (cas HAL : le normalizer pose `external_ids.hal_id = source_id`, cf. theses pour NNT). Pas de fallback sur `source_id` — la responsabilité est portée par les normalizers à l'écriture.
     """
-    ids: dict[str, str] = {}
-    if isinstance(external_ids, dict):
-        ids.update({k: v for k, v in external_ids.items() if isinstance(v, str) and v})
-    native_kind = _NATIVE_KIND_BY_SOURCE.get(source)
-    if native_kind and source_id:
-        ids.setdefault(native_kind, source_id)
-    return ids
+    if not isinstance(external_ids, dict):
+        return {}
+    return {k: v for k, v in external_ids.items() if isinstance(v, str) and v}
 
 
 def process_document(
@@ -158,7 +141,7 @@ def process_document(
         title = cleaned_title
     title_normalized = normalize_text(title)
 
-    known_ids = extract_known_identifiers(source, doc.source_id, doc.external_ids)
+    known_ids = extract_known_identifiers(doc.external_ids)
     nnt = known_ids.get("nnt")
     if nnt:
         nnt = normalize_nnt(nnt)
@@ -183,7 +166,7 @@ def process_document(
     if nnt:
         nnt_match_id = pub_repo.find_by_nnt(nnt)
 
-    # Prefetch HAL_ID (lookup cross-source : path natif HAL + external_ids posé par OpenAlex/ScanR)
+    # Prefetch HAL_ID (clé portée par `external_ids` sur toutes les sources, y compris HAL natif)
     hal_id_match_id: int | None = None
     if hal_id:
         hal_id_match_id = pub_repo.find_by_hal_id(hal_id)

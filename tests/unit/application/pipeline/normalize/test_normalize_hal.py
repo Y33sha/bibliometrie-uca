@@ -254,12 +254,13 @@ class TestInsertHalDocument:
     def test_nnt_goes_in_external_ids(self):
         queries = _FakeQueries()
         captured = self._call(queries, {"nntId_s": "2024CLFAC001"})
-        assert captured["external_ids"] == {"nnt": "2024CLFAC001"}
+        assert captured["external_ids"] == {"hal_id": "h1", "nnt": "2024CLFAC001"}
 
-    def test_no_nnt_no_external_ids(self):
+    def test_hal_id_always_in_external_ids(self):
+        """Le normalizer pose `external_ids.hal_id = source_id` même hors thèse, pour que les queries de dédup (`find_by_hal_id`, `bulk_link_orphans_by_hal_id`) traitent HAL comme les autres sources (symétrie avec ce que theses fait déjà pour NNT)."""
         queries = _FakeQueries()
         captured = self._call(queries, {})
-        assert captured["external_ids"] is None
+        assert captured["external_ids"] == {"hal_id": "h1"}
 
     def test_keywords_deduplicated(self):
         queries = _FakeQueries()
