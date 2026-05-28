@@ -12,6 +12,7 @@ Chaque règle est une fonction pure renvoyant `Correction | None` : la valeur co
 from enum import StrEnum
 from typing import NamedTuple
 
+from domain.normalize import normalize_text
 from domain.source_publications.views import SourcePublicationWithJournalView
 
 
@@ -24,6 +25,7 @@ class MetadataCorrectionRule(StrEnum):
     THESES_FR_URL_TO_THESIS = "THESES_FR_URL_TO_THESIS"
     DUMAS_URL_TO_MEMOIR = "DUMAS_URL_TO_MEMOIR"
     JOURNAL_TYPE_MEDIA_TO_MEDIA = "JOURNAL_TYPE_MEDIA_TO_MEDIA"
+    TITLE_ADDITIONAL_FILE_TO_DATASET = "TITLE_ADDITIONAL_FILE_TO_DATASET"
 
 
 class Correction[T](NamedTuple):
@@ -52,6 +54,10 @@ class CorrectedFields(NamedTuple):
 
 _THESES_FR_URL_MARKER = "theses.fr/"
 _DUMAS_URL_MARKER = "dumas."
+_ADDITIONAL_FILE_TITLE_PREFIX = "additional file"
+
+# Whitelist des `doc_type` bruts que la règle `TITLE_ADDITIONAL_FILE_TO_DATASET` reclasse en `dataset`. Les autres types restent inchangés (ni `thesis` ni `book_chapter` etc. ne sont concernés — un titre "additional file" sur un de ces types serait suspect mais on ne corrige pas aveuglément). `dataset` lui-même est exclu du set : la règle n'a rien à faire sur une publication déjà classée `dataset`.
+_ADDITIONAL_FILE_APPLIES_TO = frozenset({"article", "other"})
 
 
 def _correct_doc_type(sp: SourcePublicationWithJournalView) -> Correction[str] | None:
@@ -61,8 +67,9 @@ def _correct_doc_type(sp: SourcePublicationWithJournalView) -> Correction[str] |
     1. theses.fr fait autorité sur les thèses françaises : toute URL theses.fr ⇒ `thesis`, quel que soit le `doc_type` brut (OpenAlex classe parfois ces thèses en `article` ou `dissertation`).
     2. DUMAS héberge des mémoires de master qu'OpenAlex classe à tort en `dissertation` : `dissertation` brut + URL dumas ⇒ `memoir`.
     3. Journal de type `media` ⇒ `media` : une publication rattachée à une revue typée media (typage manuel côté admin) est une intervention média.
+    4. Titre commençant par "additional file" + `doc_type` dans `_ADDITIONAL_FILE_APPLIES_TO` ⇒ `dataset` : DataCite expose les fichiers complémentaires de Springer/BMC comme des entités à part entière, classées `article` (faux) ou `other` (vague) par les normalizers. Une publication déjà classée `dataset` est laissée telle quelle (classification correcte).
 
-    Les deux premières règles sont SP-intrinsèques (lisent `sp.urls`/`sp.doc_type`) ; la troisième est journal-dépendante (lit `sp.journal_type`, champ joint sur la vue). Renvoie `None` si aucune ne s'applique.
+    Les règles 1, 2 et 4 sont SP-intrinsèques (lisent `sp.urls`/`sp.title_normalized`/`sp.doc_type`) ; la 3 est journal-dépendante (lit `sp.journal_type`, champ joint sur la vue). Renvoie `None` si aucune ne s'applique.
     """
     urls = sp.urls
     if any(_THESES_FR_URL_MARKER in (u or "") for u in urls):
@@ -73,6 +80,10 @@ def _correct_doc_type(sp: SourcePublicationWithJournalView) -> Correction[str] |
         return Correction("memoir", MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR)
     if sp.journal_type == "media":
         return Correction("media", MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA)
+    if sp.doc_type in _ADDITIONAL_FILE_APPLIES_TO and normalize_text(sp.title).startswith(
+        _ADDITIONAL_FILE_TITLE_PREFIX
+    ):
+        return Correction("dataset", MetadataCorrectionRule.TITLE_ADDITIONAL_FILE_TO_DATASET)
     return None
 
 

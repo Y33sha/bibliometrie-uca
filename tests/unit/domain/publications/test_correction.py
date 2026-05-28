@@ -131,6 +131,60 @@ class TestJournalTypeMediaRule:
         assert corrected.value == "thesis"
 
 
+class TestTitleAdditionalFileRule:
+    def test_additional_file_on_article_corrects_to_dataset(self):
+        view = _view(doc_type="article", title="Additional file 1: Supplementary tables")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "dataset"
+        assert corrected.rule == MetadataCorrectionRule.TITLE_ADDITIONAL_FILE_TO_DATASET
+
+    def test_additional_file_on_other_corrects_to_dataset(self):
+        # `other` est moins informatif que `dataset` : la règle promeut.
+        view = _view(doc_type="other", title="Additional file 3: notes")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "dataset"
+
+    def test_additional_file_on_dataset_is_noop(self):
+        # Déjà classé `dataset` : rien à corriger.
+        view = _view(doc_type="dataset", title="Additional file 2: raw data")
+        assert effective_metadata(view).doc_type is None
+
+    def test_additional_file_on_unwhitelisted_type_is_spared(self):
+        # `thesis` n'est pas dans la whitelist : titre suspect mais on ne corrige pas aveuglément.
+        view = _view(doc_type="thesis", title="Additional file 1")
+        assert effective_metadata(view).doc_type is None
+
+    def test_non_additional_file_title_no_correction(self):
+        view = _view(doc_type="article", title="Some real article title")
+        assert effective_metadata(view).doc_type is None
+
+    def test_match_is_case_insensitive_and_diacritic_insensitive(self):
+        # `normalize_text` ramène à `lower()` + strip d'accents + collapse non-alphanum.
+        for raw_title in ("Additional File 1", "ADDITIONAL FILE 1", "additional file 1"):
+            view = _view(doc_type="article", title=raw_title)
+            corrected = effective_metadata(view).doc_type
+            assert corrected is not None and corrected.value == "dataset"
+
+    def test_match_requires_prefix_not_substring(self):
+        # Une publication dont le titre *contient* "additional file" en milieu de phrase n'est pas un fichier complémentaire (cas légitime improbable mais à protéger contre).
+        view = _view(doc_type="article", title="An article about additional file formats")
+        # `normalize_text(...)` ne commence pas par "additional file" → no-op.
+        assert effective_metadata(view).doc_type is None
+
+    def test_theses_fr_wins_over_additional_file(self):
+        # Combinaison improbable mais cascade-couverte : URL theses.fr autoritaire, additional_file ignoré.
+        view = _view(
+            doc_type="article",
+            title="Additional file 1",
+            urls=("https://theses.fr/s1",),
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "thesis"
+
+
 class TestEffectiveMetadataScope:
     def test_no_signals_no_correction(self):
         assert effective_metadata(_view()).is_empty()
