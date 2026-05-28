@@ -76,7 +76,7 @@ def resolve_doi_conflict(
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
 
-def _apply_corrections(sp: SourcePublicationWithJournalView) -> SourcePublicationWithJournalView:
+def apply_corrections(sp: SourcePublicationWithJournalView) -> SourcePublicationWithJournalView:
     """Applique `effective_metadata` à une vue de source publication et renvoie une vue « effective » : la vue inchangée si aucune correction ne modifie une valeur, sinon une copie avec les champs corrigés et un audit `meta.<field>_corrected_by` pour chaque champ effectivement changé.
 
     L'audit n'est posé que quand la valeur change réellement : une règle qui « corrige » vers la valeur déjà présente (ex. une SP theses.fr native déjà en `thesis`) n'est pas tracée comme une correction.
@@ -162,7 +162,7 @@ def refresh_from_sources(
                 return
 
     previous_doi = pub.doi
-    effective_sources = [_apply_corrections(s) for s in sources]
+    effective_sources = [apply_corrections(s) for s in sources]
     _refresh_aggregate(pub, effective_sources, source_priority=SOURCE_PRIORITY)
     repo.save(pub)
     repo.update_sources(pub_id)

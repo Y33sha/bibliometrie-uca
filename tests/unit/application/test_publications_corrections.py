@@ -1,6 +1,6 @@
-"""Tests de `_apply_corrections` : application des corrections + audit `meta.<field>_corrected_by` côté `refresh_from_sources`."""
+"""Tests de `apply_corrections` : application des corrections + audit `meta.<field>_corrected_by` côté `refresh_from_sources`."""
 
-from application.publications import _apply_corrections
+from application.publications import apply_corrections
 from domain.source_publications.views import SourcePublicationWithJournalView
 
 
@@ -35,14 +35,14 @@ def _view(**overrides: object) -> SourcePublicationWithJournalView:
 
 def test_correction_overrides_doc_type_and_stamps_audit():
     view = _view(doc_type="article", urls=("https://theses.fr/s123",))
-    effective = _apply_corrections(view)
+    effective = apply_corrections(view)
     assert effective.doc_type == "thesis"
     assert effective.meta == {"doc_type_corrected_by": "THESES_FR_URL_TO_THESIS"}
 
 
 def test_audit_preserves_existing_meta_keys():
     view = _view(doc_type="article", urls=("https://theses.fr/s123",), meta={"foo": "bar"})
-    effective = _apply_corrections(view)
+    effective = apply_corrections(view)
     assert effective.meta == {"foo": "bar", "doc_type_corrected_by": "THESES_FR_URL_TO_THESIS"}
 
 
@@ -50,18 +50,18 @@ def test_no_op_correction_returns_view_unchanged():
     # Vue déjà en `thesis` (ex. source theses.fr native) : la règle « corrige » vers
     # la valeur présente, donc pas de changement ni d'audit.
     view = _view(doc_type="thesis", urls=("https://theses.fr/s123",), meta=None)
-    effective = _apply_corrections(view)
+    effective = apply_corrections(view)
     assert effective is view
     assert effective.meta is None
 
 
 def test_no_applicable_rule_returns_view_unchanged():
     view = _view(doc_type="article", urls=("https://example.com/x",))
-    assert _apply_corrections(view) is view
+    assert apply_corrections(view) is view
 
 
 def test_journal_type_media_corrects_doc_type_and_stamps_audit():
     view = _view(doc_type="article", journal_type="media")
-    effective = _apply_corrections(view)
+    effective = apply_corrections(view)
     assert effective.doc_type == "media"
     assert effective.meta == {"doc_type_corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}

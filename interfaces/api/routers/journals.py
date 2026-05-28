@@ -4,7 +4,10 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.journals import merge_journals
+from application.journals import (
+    merge_journals,
+    requalify_publications_for_journal,
+)
 from application.journals import update_journal as _update_journal
 from application.ports.api.journals_queries import (
     JournalDashboardResponse,
@@ -16,9 +19,11 @@ from application.ports.api.journals_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.publication_repository import PublicationRepository
 from domain.journals.journal import (
     JOURNAL_TYPE_LABELS_FR,
     JOURNAL_TYPES,
+    JOURNAL_TYPES_SET,
     OA_MODEL_LABELS_FR,
     OA_MODELS,
 )
@@ -26,10 +31,12 @@ from interfaces.api.deps import (
     audit_repo_sync,
     journal_queries_sync,
     journal_repo_sync,
+    publication_repo_sync,
 )
 from interfaces.api.filters import parse_str_csv
 from interfaces.api.models import (
     EnumOption,
+    JournalTypeChangeImpact,
     JournalUpdate,
     MergeRequest,
     MergeResponse,
@@ -182,19 +189,60 @@ def get_journal_subjects(
     return queries.get_journal_subjects(journal_id, limit=limit)
 
 
+@router.get(
+    "/api/journals/{journal_id}/type-change-impact",
+    response_model=JournalTypeChangeImpact,
+)
+def get_type_change_impact(
+    journal_id: int,
+    new_type: str = Query(...),
+    pub_repo: PublicationRepository = Depends(publication_repo_sync),
+) -> JournalTypeChangeImpact:
+    """Compte combien de publications du journal verraient leur `doc_type` changer si on passait `journal_type` à `new_type`. Dry-run pur, aucune écriture. Sert au preview de la modale admin avant confirmation du PUT."""
+    if new_type not in JOURNAL_TYPES_SET:
+        raise HTTPException(status_code=400, detail=f"journal_type inconnu : {new_type}")
+    count = requalify_publications_for_journal(
+        journal_id,
+        prospective_journal_type=new_type,
+        dry_run=True,
+        pub_repo=pub_repo,
+    )
+    return JournalTypeChangeImpact(count=count)
+
+
 @router.put("/api/journals/{journal_id}", response_model=OkResponse)
 def update_journal(
     journal_id: int,
     body: JournalUpdate,
     repo: JournalRepository = Depends(journal_repo_sync),
+    pub_repo: PublicationRepository = Depends(publication_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> OkResponse:
     """Met à jour une revue (modification sélective des champs fournis).
 
-    Seuls les champs explicitement présents dans le body sont écrits
-    (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
+    Seuls les champs explicitement présents dans le body sont écrits (`exclude_unset=True`). Lève 404 si la revue n'existe pas.
+
+    Si `journal_type` change effectivement de valeur, déclenche la requalification synchrone du `doc_type` des publications rattachées dans la même transaction — cf. `requalify_publications_for_journal` côté application. Le caller frontal aura typiquement appelé le preview (`type-change-impact`) en amont pour afficher l'ampleur à l'admin.
     """
     fields = body.model_dump(exclude_unset=True)
+    new_type = fields.get("journal_type")
+
+    type_changed_to: str | None = None
+    if isinstance(new_type, str):
+        existing = repo.find_by_id(journal_id)
+        if existing is not None and existing.journal_type != new_type:
+            type_changed_to = new_type
+
     _update_journal(journal_id, fields=fields, repo=repo)
+
+    if type_changed_to is not None:
+        requalify_publications_for_journal(
+            journal_id,
+            prospective_journal_type=type_changed_to,
+            dry_run=False,
+            pub_repo=pub_repo,
+            audit_repo=audit,
+        )
     return OkResponse()
 
 

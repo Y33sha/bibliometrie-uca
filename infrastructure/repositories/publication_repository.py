@@ -135,6 +135,14 @@ class PgPublicationRepository:
         ).first()
         return row.publication_id if row else None
 
+    def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
+        """Ids des publications rattachées à ce journal."""
+        result = self._conn.execute(
+            text("SELECT id FROM publications WHERE journal_id = :jid ORDER BY id"),
+            {"jid": journal_id},
+        )
+        return [row.id for row in result]
+
     def find_thesis_by_title(
         self,
         title_normalized: str,
