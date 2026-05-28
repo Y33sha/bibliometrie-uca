@@ -39,3 +39,7 @@ Audit des cas connus avant toute modélisation. Au minimum :
 - Compter les orphelins figshare et sonder leurs titres (parent retrouvable par matching titre ?).
 - Compter les collections figshare et leur classification actuelle.
 - Compter les paires erratum/article qui partagent un préfixe DOI (heuristique faible mais informative).
+
+Audit des raw_data crossref sur le champ relations
+
+Serveurs de preprint qui indiquent le DOI de la version publiée: étudier possibilités d'exploitation

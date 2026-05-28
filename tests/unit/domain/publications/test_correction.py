@@ -256,6 +256,50 @@ class TestJournalTypeProceedingsRule:
         assert corrected is not None and corrected.value == "thesis"
 
 
+class TestJournalTypePreprintServerRule:
+    def test_journal_type_preprint_server_article_corrects(self):
+        view = _view(doc_type="article", journal_type="preprint_server")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "preprint"
+        assert corrected.rule == MetadataCorrectionRule.JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT
+
+    def test_journal_type_preprint_server_other_corrects(self):
+        view = _view(doc_type="other", journal_type="preprint_server")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "preprint"
+
+    def test_journal_type_preprint_server_already_preprint_is_noop(self):
+        view = _view(doc_type="preprint", journal_type="preprint_server")
+        assert effective_metadata(view).doc_type is None
+
+    def test_journal_type_preprint_server_dataset_is_spared(self):
+        # `dataset` hors whitelist : un dataset déposé sur arXiv/Zenodo reste dataset.
+        view = _view(doc_type="dataset", journal_type="preprint_server")
+        assert effective_metadata(view).doc_type is None
+
+    def test_journal_type_preprint_server_software_is_spared(self):
+        view = _view(doc_type="software", journal_type="preprint_server")
+        assert effective_metadata(view).doc_type is None
+
+    def test_journal_type_non_preprint_server_no_correction(self):
+        view = _view(doc_type="article", journal_type="journal")
+        assert effective_metadata(view).doc_type is None
+
+    def test_journal_type_none_no_correction(self):
+        view = _view(doc_type="article", journal_type=None)
+        assert effective_metadata(view).doc_type is None
+
+    def test_theses_fr_wins_over_journal_type_preprint_server(self):
+        view = _view(
+            doc_type="article",
+            urls=("https://theses.fr/s1",),
+            journal_type="preprint_server",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "thesis"
+
+
 class TestTitleMediaPrefixRule:
     def test_interview_prefix_on_other_corrects_to_media(self):
         view = _view(doc_type="other", title="Interview par France Inter sur l'agriculture")
