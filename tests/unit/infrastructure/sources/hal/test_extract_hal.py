@@ -19,11 +19,11 @@ def adapter() -> PgHalExtractAdapter:
 
 
 class TestBuildQuery:
-    def test_since_takes_precedence_over_years(self, adapter):
-        # `since` est fourni : on filtre par submittedDate_tdate, sans toucher aux années.
-        assert (
-            adapter.build_query(years=[2024], since="2026-05-01")
-            == "submittedDate_tdate:[2026-05-01T00:00:00Z TO *]"
+    def test_combines_years_and_since(self, adapter):
+        # Mode daily : on veut les dépôts HAL récents *dans* la fenêtre d'années,
+        # pour qu'un dépôt tardif d'une vieille pub ne pollue pas la base.
+        assert adapter.build_query(years=[2024, 2026], since="2026-05-01") == (
+            "producedDateY_i:[2024 TO 2026] AND submittedDate_tdate:[2026-05-01T00:00:00Z TO *]"
         )
 
     def test_since_alone(self, adapter):
@@ -42,7 +42,7 @@ class TestBuildQuery:
         with pytest.raises(ValueError):
             adapter.build_query(years=None)
 
-    def test_raises_on_empty_years(self, adapter):
+    def test_raises_on_empty_years_without_since(self, adapter):
         with pytest.raises(ValueError):
             adapter.build_query(years=[])
 

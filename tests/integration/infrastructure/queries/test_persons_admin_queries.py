@@ -56,13 +56,17 @@ def _create_sa(
     excluded=False,
     author_name_normalized=None,
     raw_author_name="X",
+    roles=None,
 ):
     row = conn.execute(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 person_id, in_perimeter, excluded, author_name_normalized, raw_author_name)
-            VALUES (:src, :sd, :pos, :pid, :inp, :excl, :anf, :raw) RETURNING id
+                 person_id, in_perimeter, excluded, author_name_normalized, raw_author_name,
+                 roles)
+            VALUES (:src, :sd, :pos, :pid, :inp, :excl, :anf, :raw,
+                    COALESCE(:roles, ARRAY['author']::text[]))
+            RETURNING id
         """),
         {
             "src": source,
@@ -73,6 +77,7 @@ def _create_sa(
             "excl": excluded,
             "anf": author_name_normalized,
             "raw": raw_author_name,
+            "roles": roles,
         },
     ).one()
     return row.id
@@ -100,6 +105,21 @@ class TestOrphanAuthorshipsCount:
         pub = _create_pub(sa_sync_conn, doc_type="memoir")
         sd = _create_sd(sa_sync_conn, pub)
         _create_sa(sa_sync_conn, sd, person_id=None)
+        count = orphan_authorships_count(sa_sync_conn)
+        assert count["total"] == 0
+
+    def test_excludes_non_author_roles(self, sa_sync_conn):
+        pub = _create_pub(sa_sync_conn)
+        sd = _create_sd(sa_sync_conn, pub, source="theses", source_id="t1")
+        _create_sa(sa_sync_conn, sd, source="theses", person_id=None, roles=["thesis_director"])
+        _create_sa(
+            sa_sync_conn,
+            sd,
+            source="theses",
+            author_position=1,
+            person_id=None,
+            roles=["jury_member"],
+        )
         count = orphan_authorships_count(sa_sync_conn)
         assert count["total"] == 0
 

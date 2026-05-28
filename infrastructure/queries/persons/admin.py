@@ -17,6 +17,7 @@ _ORPHAN_BASE = f"""
     sa.person_id IS NULL AND sa.in_perimeter = TRUE
     AND sa.source IN {AUTHOR_SOURCES_SQL}
     AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
+    AND 'author' = ANY(sa.roles)
 """
 
 
