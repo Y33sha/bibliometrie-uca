@@ -21,13 +21,13 @@ from domain.publications.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT, best_oa_status
 from domain.publications.publication import Publication
-from domain.source_publications.source_publication import SourcePublication
+from domain.source_publications.views import SourcePublicationWithJournalView
 from domain.types import JsonValue
 
 
 def refresh_from_sources(
     pub: Publication,
-    sources: list[SourcePublication],
+    sources: list[SourcePublicationWithJournalView],
     *,
     source_priority: tuple[str, ...],
 ) -> None:
@@ -70,7 +70,7 @@ def refresh_from_sources(
 # ── Helpers publics ────────────────────────────────────────────────
 
 
-def first_non_null(sources: list[SourcePublication], attr: str) -> Any:
+def first_non_null(sources: list[SourcePublicationWithJournalView], attr: str) -> Any:
     """Premier `getattr(source, attr)` non-null dans l'ordre des `sources`. None si tous absents.
 
     Retour `Any` justifié : type polymorphique selon `attr` (str pour
@@ -85,7 +85,9 @@ def first_non_null(sources: list[SourcePublication], attr: str) -> Any:
     return None
 
 
-def merge_lists_dedup_ci(sources: list[SourcePublication], attr: str) -> list[Any] | None:
+def merge_lists_dedup_ci(
+    sources: list[SourcePublicationWithJournalView], attr: str
+) -> list[Any] | None:
     """Union dédupliquée des listes `source.<attr>`. Déduplication case-insensitive pour les strings, sinon par valeur. Préserve l'ordre d'apparition. None si toutes vides/null.
 
     `list[Any]` justifié : les listes consommées sont `list[str]` (`keywords`,
@@ -103,7 +105,9 @@ def merge_lists_dedup_ci(sources: list[SourcePublication], attr: str) -> list[An
     return result or None
 
 
-def shallow_merge_jsonb(sources: list[SourcePublication], attr: str) -> dict[str, JsonValue] | None:
+def shallow_merge_jsonb(
+    sources: list[SourcePublicationWithJournalView], attr: str
+) -> dict[str, JsonValue] | None:
     """Fusion shallow par clé pour `meta` / `biblio`. La première source à fournir une clé l'emporte (cohérent avec « premier non-null ») ; les clés sont généralement orthogonales entre sources."""
     merged: dict[str, JsonValue] = {}
     for s in sources:
@@ -115,7 +119,9 @@ def shallow_merge_jsonb(sources: list[SourcePublication], attr: str) -> dict[str
     return merged or None
 
 
-def topics_by_source(sources: list[SourcePublication]) -> dict[str, JsonValue] | None:
+def topics_by_source(
+    sources: list[SourcePublicationWithJournalView],
+) -> dict[str, JsonValue] | None:
     """Indexe les `topics` par source. Schémas radicalement différents par source — chacun reste sous sa propre clé pour préserver la forme native (liste hiérarchique OpenAlex, dict ScanR, etc.)."""
     out: dict[str, JsonValue] = {}
     for s in sources:
@@ -124,7 +130,7 @@ def topics_by_source(sources: list[SourcePublication]) -> dict[str, JsonValue] |
     return out or None
 
 
-def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublication]) -> str:
+def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublicationWithJournalView]) -> str:
     """Choix du `doc_type` canonique : premier non-null dans l'ordre de priorité, avec exception pour les sous-types d'article.
 
     CrossRef (priorité 2) renvoie `journal-article` indistinctement pour tous les sous-types (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction). Si une source moins prioritaire propose un de ces sous-types plus précis, on le préfère pour ne pas perdre l'information.

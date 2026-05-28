@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from domain.publications.publication import Publication
-from domain.source_publications.source_publication import SourcePublication
+from domain.source_publications.views import SourcePublicationWithJournalView
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,7 +75,7 @@ class PublicationRepository(Protocol):
 
     # ── Agrégation depuis source_publications ──────────────────────
 
-    def get_source_publications(self, pub_id: int) -> list[SourcePublication]: ...
+    def get_source_publications(self, pub_id: int) -> list[SourcePublicationWithJournalView]: ...
 
     # ── Création ───────────────────────────────────────────────────
 

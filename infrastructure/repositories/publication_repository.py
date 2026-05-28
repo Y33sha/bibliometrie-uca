@@ -8,6 +8,7 @@ intriquées en casts enum (oa_type, doc_type, source_type) et opérations
 array pour gagner à passer par MetaData.
 """
 
+from decimal import Decimal
 from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, text
@@ -15,11 +16,11 @@ from sqlalchemy import Connection, text
 from application.ports.repositories.publication_repository import PubByDoi
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
-from domain.source_publications.source_publication import SourcePublication
+from domain.source_publications.views import SourcePublicationWithJournalView
 
 
-class _SourcePublicationRow(NamedTuple):
-    """Projection SQL `get_source_publications` sur `source_publications`."""
+class _SourcePublicationViewRow(NamedTuple):
+    """Projection SQL `get_source_publications` : colonnes de `source_publications` consommées par la correction (`effective_metadata`) et l'agrégation (`refresh_from_sources` côté domain) **plus** les champs joints depuis `journals` qui alimentent les règles journal-dépendantes."""
 
     id: int
     source: str
@@ -28,28 +29,26 @@ class _SourcePublicationRow(NamedTuple):
     pub_year: int | None
     doc_type: str | None
     doi: str | None
-    publication_id: int | None
-    staging_id: int | None
     journal_id: int | None
     container_title: str | None
     language: str | None
     oa_status: str | None
-    cited_by_count: int | None
     is_retracted: bool | None
     abstract: str | None
     countries: list[str] | None
-    hal_collections: list[str] | None
     urls: list[str] | None
     keywords: list[str] | None
-    external_ids: dict[str, Any] | None
     topics: dict[str, Any] | None
     biblio: dict[str, Any] | None
     meta: dict[str, Any] | None
+    journal_type: str | None
+    oa_model: str | None
+    apc_amount: Decimal | None
 
 
-def _source_publication_from_row(row: _SourcePublicationRow) -> SourcePublication:
-    """Mapping d'une row `source_publications` SQL vers le VO `SourcePublication`. Convertit les colonnes `text[]` Postgres en tuples immutables."""
-    return SourcePublication(
+def _view_from_row(row: _SourcePublicationViewRow) -> SourcePublicationWithJournalView:
+    """Mapping d'une row SQL `source_publications` ⨝ `journals` vers la vue de lecture. Convertit les `text[]` Postgres en tuples immutables."""
+    return SourcePublicationWithJournalView(
         id=row.id,
         source=row.source,
         source_id=row.source_id,
@@ -57,23 +56,21 @@ def _source_publication_from_row(row: _SourcePublicationRow) -> SourcePublicatio
         pub_year=row.pub_year,
         doc_type=row.doc_type,
         doi=row.doi,
-        publication_id=row.publication_id,
-        staging_id=row.staging_id,
         journal_id=row.journal_id,
         container_title=row.container_title,
         language=row.language,
         oa_status=row.oa_status,
-        cited_by_count=row.cited_by_count,
         is_retracted=row.is_retracted,
         abstract=row.abstract,
         countries=tuple(row.countries or ()),
-        hal_collections=tuple(row.hal_collections or ()),
         urls=tuple(row.urls or ()),
         keywords=tuple(row.keywords or ()),
-        external_ids=row.external_ids,
         topics=row.topics,
         biblio=row.biblio,
         meta=row.meta,
+        journal_type=row.journal_type,
+        oa_model=row.oa_model,
+        apc_amount=row.apc_amount,
     )
 
 
@@ -339,21 +336,27 @@ class PgPublicationRepository:
 
     # ── Agrégation depuis source_publications ──────────────────────
 
-    def get_source_publications(self, pub_id: int) -> list[SourcePublication]:
-        """Retourne les `SourcePublication` attachées à une publication canonique, hydratées pour l'agrégation (`refresh_from_sources` côté domain)."""
+    def get_source_publications(self, pub_id: int) -> list[SourcePublicationWithJournalView]:
+        """Retourne les vues `SourcePublicationWithJournalView` attachées à une publication canonique, enrichies par un LEFT JOIN sur `journals` pour porter les champs consommés par les règles journal-dépendantes (`journal_type`, `oa_model`, `apc_amount`).
+
+        Sortie consommée par la couche domaine pour la correction (`effective_metadata`) puis l'agrégation (`refresh_from_sources`) — d'où la dénormalisation des champs journal en lecture (cf. `domain/source_publications/views.py`).
+        """
         result = self._conn.execute(
             text("""
-                SELECT id, source, source_id, title, pub_year, doc_type, doi,
-                       publication_id, staging_id, journal_id, container_title,
-                       language, oa_status, cited_by_count, is_retracted, abstract,
-                       countries, hal_collections, urls, keywords,
-                       external_ids, topics, biblio, meta
-                FROM source_publications
-                WHERE publication_id = :id
+                SELECT sp.id, sp.source::text AS source, sp.source_id,
+                       sp.title, sp.pub_year, sp.doc_type::text AS doc_type, sp.doi,
+                       sp.journal_id, sp.container_title, sp.language,
+                       sp.oa_status::text AS oa_status, sp.is_retracted, sp.abstract,
+                       sp.countries, sp.urls, sp.keywords,
+                       sp.topics, sp.biblio, sp.meta,
+                       j.journal_type::text AS journal_type, j.oa_model, j.apc_amount
+                FROM source_publications sp
+                LEFT JOIN journals j ON j.id = sp.journal_id
+                WHERE sp.publication_id = :id
             """),
             {"id": pub_id},
         )
-        return [_source_publication_from_row(_SourcePublicationRow(*row)) for row in result]
+        return [_view_from_row(_SourcePublicationViewRow(*row)) for row in result]
 
     # ── Création ───────────────────────────────────────────────────
 

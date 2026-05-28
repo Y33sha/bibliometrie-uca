@@ -43,7 +43,7 @@ from domain.publications.metadata import (
     clean_publication_title,
     has_minimal_publication_metadata,
 )
-from domain.source_publications.source_publication import SourcePublication
+from domain.source_publications.views import SourcePublicationWithJournalView
 
 _NATIVE_KIND_BY_SOURCE: dict[str, str] = {
     "hal": "hal_id",
@@ -55,12 +55,14 @@ _NATIVE_KIND_BY_SOURCE: dict[str, str] = {
 Outcome = Literal["created", "linked", "skipped_no_metadata", "skipped_no_perimeter"]
 
 
-def _sp_from_row(doc: SourcePublicationRow) -> SourcePublication:
-    """Construit une `SourcePublication` minimale à partir d'une `SourcePublicationRow` pour passer à `effective_metadata`. La SP construite n'est jamais persistée ; elle sert d'input à la cascade de corrections.
+def _view_from_row(doc: SourcePublicationRow) -> SourcePublicationWithJournalView:
+    """Construit une `SourcePublicationWithJournalView` à partir d'une `SourcePublicationRow` pour passer à `effective_metadata`. La vue n'est jamais persistée ; elle sert d'input à la cascade de corrections à l'entrée match_or_create.
 
-    Seuls les champs consommés par les règles de correction sont peuplés. Les autres (countries, biblio, …) restent à leur défaut ; quand une règle aura besoin d'un nouveau champ, étendre `SourcePublicationRow` (et sa projection SQL) puis ce helper.
+    Les champs joints depuis `journals` (`journal_type`, `oa_model`, `apc_amount`) sont laissés à `None` : la projection `SourcePublicationRow` ne JOINe pas `journals` aujourd'hui. Conséquence : à l'entrée match_or_create, seules les règles SP-intrinsèques (URL theses.fr/dumas) peuvent firer ; les règles journal-dépendantes (`media`, …) s'appliqueront au refresh post-création où la vue est correctement enrichie (cf. `get_source_publications` côté repo).
+
+    # TODO: quand une règle journal-dépendante produira un `doc_type` routé par la dédup (`thesis`/`proceedings`), JOINer `journals` dans `fetch_orphan_in_perimeter_source_publications` et alimenter les champs ici — sinon la dédup-entrée passera à côté.
     """
-    return SourcePublication(
+    return SourcePublicationWithJournalView(
         id=doc.id,
         source=doc.source,
         source_id=doc.source_id,
@@ -69,10 +71,20 @@ def _sp_from_row(doc: SourcePublicationRow) -> SourcePublication:
         doc_type=doc.doc_type,
         doi=doc.doi,
         journal_id=doc.journal_id,
-        oa_status=doc.oa_status,
         container_title=doc.container_title,
         language=doc.language,
+        oa_status=doc.oa_status,
+        is_retracted=None,
+        abstract=None,
+        countries=(),
+        keywords=(),
         urls=tuple(doc.urls or ()),
+        topics=None,
+        biblio=None,
+        meta=None,
+        journal_type=None,
+        oa_model=None,
+        apc_amount=None,
     )
 
 
@@ -127,7 +139,7 @@ def process_document(
     raw_oa_status = doc.oa_status
 
     # Corrections appliquées à la SP entrante avant les queries de dedup metadata, pour que le matching porte sur les valeurs corrigées (cf. domain/publications/correction.py).
-    corrected = effective_metadata(_sp_from_row(doc))
+    corrected = effective_metadata(_view_from_row(doc))
     if corrected.doc_type is not None:
         raw_doc_type = corrected.doc_type.value
     if corrected.journal_id is not None:

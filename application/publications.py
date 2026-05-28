@@ -21,7 +21,7 @@ from domain.publications.deduplication import (
     resolve_doi_conflict as _domain_resolve_doi_conflict,
 )
 from domain.publications.identifiers import DOI
-from domain.source_publications.source_publication import SourcePublication
+from domain.source_publications.views import SourcePublicationWithJournalView
 from domain.sources import SOURCE_PRIORITY
 
 
@@ -76,8 +76,8 @@ def resolve_doi_conflict(
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
 
-def _apply_corrections(sp: SourcePublication) -> SourcePublication:
-    """Applique `effective_metadata` à une SP et renvoie une SP « effective » : la SP inchangée si aucune correction ne modifie une valeur, sinon une copie avec les champs corrigés et un audit `meta.<field>_corrected_by` pour chaque champ effectivement changé.
+def _apply_corrections(sp: SourcePublicationWithJournalView) -> SourcePublicationWithJournalView:
+    """Applique `effective_metadata` à une vue de source publication et renvoie une vue « effective » : la vue inchangée si aucune correction ne modifie une valeur, sinon une copie avec les champs corrigés et un audit `meta.<field>_corrected_by` pour chaque champ effectivement changé.
 
     L'audit n'est posé que quand la valeur change réellement : une règle qui « corrige » vers la valeur déjà présente (ex. une SP theses.fr native déjà en `thesis`) n'est pas tracée comme une correction.
     """

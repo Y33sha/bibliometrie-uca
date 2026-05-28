@@ -71,7 +71,7 @@ EXPECTED_DOC_TYPES_BY_JOURNAL_TYPE: dict[str, frozenset[str]] = {
             "other",
         }
     ),
-    "media": frozenset({"editorial", "other"}),
+    "media": frozenset({"media", "editorial", "other"}),
 }
 
 
