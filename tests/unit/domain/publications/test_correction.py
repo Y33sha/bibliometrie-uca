@@ -131,33 +131,63 @@ class TestJournalTypeMediaRule:
         assert corrected.value == "thesis"
 
 
-class TestTitleAdditionalFileRule:
+class TestTitleSupplementaryContentRule:
     def test_additional_file_on_article_corrects_to_dataset(self):
         view = _view(doc_type="article", title="Additional file 1: Supplementary tables")
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "dataset"
-        assert corrected.rule == MetadataCorrectionRule.TITLE_ADDITIONAL_FILE_TO_DATASET
+        assert corrected.rule == MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET
 
-    def test_additional_file_on_other_corrects_to_dataset(self):
-        # `other` est moins informatif que `dataset` : la règle promeut.
-        view = _view(doc_type="other", title="Additional file 3: notes")
+    def test_supplementary_material_corrects_to_dataset(self):
+        view = _view(doc_type="article", title="Supplementary material to seasonality of X")
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "dataset"
 
-    def test_additional_file_on_dataset_is_noop(self):
+    def test_supplementary_data_corrects_to_dataset(self):
+        view = _view(doc_type="other", title="Supplementary data for desi dr1")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "dataset"
+
+    def test_supplementary_information_corrects_to_dataset(self):
+        view = _view(doc_type="article", title="Supplementary information: petrogenesis of X")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "dataset"
+
+    def test_supplementary_file_plural_corrects_to_dataset(self):
+        # Préfixe "supplementary file" couvre "file" et "files".
+        view = _view(doc_type="other", title="Supplementary files from evolution of X")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "dataset"
+
+    def test_supplementary_dataset_plural_corrects_to_dataset(self):
+        view = _view(doc_type="other", title="Supplementary datasets for a major X")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "dataset"
+
+    def test_data_from_corrects_to_dataset(self):
+        view = _view(doc_type="article", title="Data from: Evolution of SARS-CoV-2 in Brazil")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "dataset"
+
+    def test_rule_on_dataset_is_noop(self):
         # Déjà classé `dataset` : rien à corriger.
         view = _view(doc_type="dataset", title="Additional file 2: raw data")
         assert effective_metadata(view).doc_type is None
 
-    def test_additional_file_on_unwhitelisted_type_is_spared(self):
+    def test_rule_on_unwhitelisted_type_is_spared(self):
         # `thesis` n'est pas dans la whitelist : titre suspect mais on ne corrige pas aveuglément.
         view = _view(doc_type="thesis", title="Additional file 1")
         assert effective_metadata(view).doc_type is None
 
-    def test_non_additional_file_title_no_correction(self):
+    def test_unrelated_title_no_correction(self):
         view = _view(doc_type="article", title="Some real article title")
+        assert effective_metadata(view).doc_type is None
+
+    def test_supplementary_without_specific_subprefix_no_correction(self):
+        # Le set est ciblé : "Supplementary roles of X" (vrai article hypothétique) ne matche aucun préfixe précis et reste tel quel.
+        view = _view(doc_type="article", title="Supplementary roles of microbiota in X")
         assert effective_metadata(view).doc_type is None
 
     def test_match_is_case_insensitive_and_diacritic_insensitive(self):
@@ -168,13 +198,12 @@ class TestTitleAdditionalFileRule:
             assert corrected is not None and corrected.value == "dataset"
 
     def test_match_requires_prefix_not_substring(self):
-        # Une publication dont le titre *contient* "additional file" en milieu de phrase n'est pas un fichier complémentaire (cas légitime improbable mais à protéger contre).
+        # Un titre qui *contient* "additional file" en milieu de phrase n'est pas un fichier complémentaire.
         view = _view(doc_type="article", title="An article about additional file formats")
-        # `normalize_text(...)` ne commence pas par "additional file" → no-op.
         assert effective_metadata(view).doc_type is None
 
-    def test_theses_fr_wins_over_additional_file(self):
-        # Combinaison improbable mais cascade-couverte : URL theses.fr autoritaire, additional_file ignoré.
+    def test_theses_fr_wins_over_supplementary_rule(self):
+        # Combinaison improbable mais cascade-couverte : URL theses.fr autoritaire.
         view = _view(
             doc_type="article",
             title="Additional file 1",

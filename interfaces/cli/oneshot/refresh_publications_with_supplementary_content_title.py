@@ -1,12 +1,12 @@
 # STATUS: oneshot (2026-05-28)
-"""Rejoue `refresh_from_sources` sur les publications candidates à la règle `TITLE_ADDITIONAL_FILE_TO_DATASET` (titre commençant par "additional file", `doc_type ∈ {article, other}`).
+"""Rejoue `refresh_from_sources` sur les publications candidates à la règle `TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET` (titre commençant par un préfixe de supplément, `doc_type ∈ {article, other}`).
 
-Sélection : pré-filtre SQL léger qui mirror la whitelist `_ADDITIONAL_FILE_APPLIES_TO` côté domain — la cascade `effective_metadata` fait foi côté correction. Le compte attendu au moment de l'écriture est 232 (186 `article` + 46 `other`, cf. audit du 2026-05-28).
+Sélection : pré-filtre SQL léger qui mirror la liste `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` côté domain — la cascade `effective_metadata` fait foi côté correction. Volume initial : 232 publications "additional file" déjà rattrapées au commit précédent, puis ~15 publications supplémentaires (supplementary material/data/etc., data from) au commit qui élargit la règle.
 
 Pas de mécanisme dédié, juste un loop refresh_from_sources : c'est le pattern « rattrapage du stock à l'arrivée d'une règle SP-intrinsèque sans hook admin ».
 
 Usage :
-    python -m interfaces.cli.oneshot.refresh_publications_with_additional_file_title [--dry-run]
+    python -m interfaces.cli.oneshot.refresh_publications_with_supplementary_content_title [--dry-run]
 """
 
 from __future__ import annotations
@@ -21,9 +21,22 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import audit_repository, publication_repository
 
-log = setup_logger("refresh_publications_with_additional_file_title", os.path.dirname(__file__))
+log = setup_logger(
+    "refresh_publications_with_supplementary_content_title", os.path.dirname(__file__)
+)
 
 BATCH_COMMIT = 500
+
+# Mirror de `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` côté domain. Sert au pré-filtre SQL ; la décision finale revient à `effective_metadata`.
+_TITLE_PREFIXES = (
+    "additional file%",
+    "supplementary material%",
+    "supplementary data%",
+    "supplementary information%",
+    "supplementary file%",
+    "supplementary dataset%",
+    "data from%",
+)
 
 
 def main() -> int:
@@ -42,16 +55,20 @@ def main() -> int:
                 text("""
                     SELECT id
                     FROM publications
-                    WHERE title_normalized LIKE 'additional file%'
+                    WHERE title_normalized LIKE ANY(:prefixes)
                       AND doc_type::text IN ('article', 'other')
                     ORDER BY id
-                """)
+                """),
+                {"prefixes": list(_TITLE_PREFIXES)},
             )
             .scalars()
             .all()
         )
         total = len(pub_ids)
-        log.info("%d publications candidates à la règle TITLE_ADDITIONAL_FILE_TO_DATASET.", total)
+        log.info(
+            "%d publications candidates à la règle TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET.",
+            total,
+        )
         if total == 0:
             return 0
 
