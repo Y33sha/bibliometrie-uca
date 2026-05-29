@@ -15,26 +15,33 @@ Enjeu : double extraction par source (deux fonctions à maintenir, qui peuvent d
 
 ## Décisions
 
-*(à confirmer — section questionnable)*
+- Direction retenue : aligner les 4 sources sur le patron theses.fr — `extract_pub_metadata` reste le point d'extraction unique, `insert_*_document` consomme tous ses champs, plus aucune ré-extraction depuis le record brut dans l'insert.
+- `pub_meta` devient obligatoire dans la signature `insert_*_document` (suppression du default `= None`). Le seul callsite production le passait déjà toujours.
+- `source_publications` stocke le brut par source ; `extract_pub_metadata` produit exactement ces valeurs brutes, pas une forme transformée. Toute transformation de cohérence relève de `effective_metadata` (cf. `METIER_metadata-correction`), pas de l'extraction.
 
-- Direction pressentie : aligner les 4 sources sur le patron theses.fr — `extract_pub_metadata` reste le point d'extraction unique, `insert_*_document` consomme tous ses champs, plus aucune ré-extraction depuis le record brut dans l'insert.
-- Préalable obligatoire avant de collapser : audit champ par champ, source par source, que la valeur de `pub_meta` *égale* celle recalculée par l'insert — sinon documenter et trancher l'écart. Le cas `doc_type` OpenAlex a montré qu'un écart peut exister (corrigé vs brut) ; il faut vérifier qu'il n'en reste pas d'autres (ex. `clean_doi` appliqué d'un côté pas de l'autre, `title` avec fallback `display_name`, `nnt` normalisé différemment).
-- `source_publications` stocke le brut par source ; `extract_pub_metadata` doit produire exactement ces valeurs brutes, pas une forme transformée. Toute transformation de cohérence relève de `effective_metadata` (cf. `METIER_metadata-correction`), pas de l'extraction.
+## Audit (dérives identifiées)
+
+| Source | Champ | Dérive | Tranchée |
+|---|---|---|---|
+| OpenAlex | `doc_type` | absent de `extract`, insert lit `work.get("type")` brut | ajouter à `extract`, insert consomme `pub_meta["doc_type"]` |
+| OpenAlex | `nnt` | `extract` le retourne, insert ré-extrait dans `location_ids` | insert consomme `pub_meta["nnt"]` et le merge dans `external_ids` |
+| HAL | `doc_type` | `extract` retourne dérivé (`derive_hal_doc_type`), insert stocke brut (concat `ART_review-article`) | `extract` retourne le brut concaténé (alignement règle « brut par source ») |
+| HAL | `nnt` | `extract` le retourne, insert ré-extrait dans `external_ids` | insert consomme `pub_meta["nnt"]` |
+| Scanr | `doc_type` | `extract` a `or "other"` fallback, insert non | `extract` retourne brut sans fallback (la colonne `source_publications.doc_type` est nullable text) |
+| Scanr | `language` | absent de `extract`, insert lit `pub_meta.get("language")` → toujours `None` | ajouter `language=None` à `extract` (l'API Scanr n'expose pas le champ) |
+| Scanr | `nnt` | `extract` le retourne, insert ré-extrait dans `ext` | insert consomme `pub_meta["nnt"]` |
+| WoS | (rien) | `extract` repackage `rec[*]`, insert lit `rec[*]` directement ; mêmes valeurs | insert consomme `pub_meta` pour homogénéité du patron |
 
 ## Phasage
 
-*(à confirmer)*
-
-1. Audit : tableau source × champ confrontant valeur `pub_meta` vs valeur recalculée dans `insert_*`. Identifier les écarts réels.
-2. Résorption des écarts documentés (chacun tranché explicitement : lequel est correct).
-3. Collapse : `insert_*_document` consomme `pub_meta` en entier, suppression de la ré-extraction. Une source par commit.
-4. Tests : non-régression sur ce qui est persisté dans `source_publications` pour chaque source.
-
-## Questions ouvertes
-
-- Direction confirmée (consommer `pub_meta` partout) ou l'inverse (supprimer les champs morts du dict en gardant la ré-extraction dans l'insert) ? La première unifie sur la source propre, la seconde est plus locale mais laisse deux extractions.
-- Y a-t-il des champs qui *doivent* légitimement différer entre l'extraction et l'insert ? Si oui, le collapse n'est pas total et il faut nommer l'exception.
-- Articulation avec `METIER_metadata-correction` : ce dernier retire déjà les corrections à l'ingestion. À faire après que la liquidation `correct_openalex_doc_type` soit posée pour ne pas se marcher dessus.
+- [x] Audit : tableau source × champ confrontant valeur `pub_meta` vs valeur recalculée dans `insert_*` (cf. section Audit ci-dessus).
+- [x] Résorption des écarts documentés (chacun tranché dans la colonne « Tranchée » de l'audit).
+- [x] Collapse : `insert_*_document` consomme `pub_meta` en entier. Une source par commit.
+  - `5fe2957d` — WoS
+  - `0390181e` — Scanr
+  - `3727d56f` — HAL
+  - `0b07b3b7` — OpenAlex
+- [x] Tests : non-régression — les tests unitaires des 4 sources passent à l'identique sur ce qui est persisté dans `source_publications`.
 
 ## Liens
 
