@@ -12,12 +12,13 @@ Hors-scope : les patterns détectables mais non corrigibles automatiquement (cf.
 
 ## Points fixes de l'architecture
 
-- **Source unique** : la règle vit dans `domain/publications/correction.py` (fonction pure, zéro I/O).
+- **Source unique** : la règle vit dans `domain/publications/correction.py` (fonction pure, zéro I/O), comme entrée du dict `_RULES`.
+- **Forme déclarative** : une règle = `{applies_to: {prédicats AND-és}, applies_correction: {champ: valeur cible}}`. Le moteur `_check_predicate` interprète chaque prédicat selon le TypedDict `_AppliesTo`. Pour une règle qui rentre dans les prédicats listés (`doc_type`, `journal_type`, `url_contains`, `title_prefix_normalized`, `title_regex`), on n'écrit que cette entrée — pas de logique supplémentaire.
 - **Audit** : chaque application réelle pose `publications.meta.<field>_corrected_by = <RULE_MEMBER>`.
 - **Deux call-sites** :
   - `application/publications.py::apply_corrections` au refresh — sur chaque SP agrégée
   - `application/pipeline/publications/match_or_create_publications.py::process_document` à l'entrée dédup — sur l'orphelin
-- **Cascade par champ** (ordre déterministe) : `journal_id` → `doc_type` → `oa_status`. Ajouter une nouvelle règle = ajouter une branche dans `_correct_<field>`. L'ordre intra-cascade traduit la spécificité du signal (cf. § 3 ci-dessous).
+- **Cascade par champ** (ordre des dépendances) : `journal_id` → `doc_type` → `oa_status`. `_correct_field(sp, "<field>")` parcourt `_RULES` dans l'ordre d'insertion et retourne la première règle qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent. L'ordre intra-cascade traduit la spécificité du signal (cf. § 3 ci-dessous).
 
 ## Procédure pas-à-pas
 
@@ -31,7 +32,7 @@ Avant d'ouvrir un fichier, expliciter (idéalement par écrit dans le commit ou 
 - **Origine de l'input** :
   - SP-intrinsèque (`title`, `urls`, `doc_type`, `doi`, …) → rien à câbler côté DTO.
   - Joint depuis une table déjà projetée (`journal_type`, `oa_model`, `apc_amount`) → idem.
-  - Joint depuis une table **pas encore** projetée (publisher, doi_prefixes, …) → étendre `SourcePublicationWithJournalView` + sa projection SQL (cf. § 4).
+  - Joint depuis une table **hors projection actuelle** (publisher, doi_prefixes, …) → étendre `SourcePublicationWithJournalView` + sa projection SQL (cf. § 4).
 - **Input admin-éditable ?** Détermine s'il faut un hook (cf. § 6).
 - **Output qui change le routage de la dédup ?** `doc_type=thesis` et `doc_type=proceedings` ont des branches dédiées dans `match_or_create.process_document` (matching par titre/année). Toute règle qui produit l'une de ces valeurs doit être vérifiée à l'entrée dédup, pas seulement au refresh — c'est déjà le cas via le double call-site, mais il faut tester explicitement le scénario.
 
@@ -56,12 +57,37 @@ Si l'audit révèle un faux-positif probable (un cas légitime qui matche la con
 Dans [`domain/publications/correction.py`](../../domain/publications/correction.py), ajouter un member à `MetadataCorrectionRule`.
 Convention de nommage : `INPUT_CONDITION_TO_OUTPUT` (ex. `THESES_FR_URL_TO_THESIS`, `JOURNAL_TYPE_MEDIA_TO_MEDIA`, `TITLE_ADDITIONAL_FILE_TO_OTHER`).
 
-#### 3.2 Branche dans la cascade
+#### 3.2 Entrée dans `_RULES`
 
-Dans la fonction `_correct_<field>` correspondante, ajouter la condition.
+Ajouter une entrée au dict `_RULES`, mappant le member créé à `{applies_to, applies_correction}`. Exemple :
 
-**Position dans la cascade** : par défaut **en fin**. La cascade renvoie sur le premier match, donc placer une règle plus tôt revient à lui donner priorité sur les suivantes.
-La priorité reflète la **spécificité du signal** :
+```python
+MetadataCorrectionRule.TITLE_ADDITIONAL_FILE_TO_DATASET: {
+    "applies_to": {
+        "doc_type": frozenset({"article", "other"}),
+        "title_prefix_normalized": ("additional file",),
+    },
+    "applies_correction": {"doc_type": "dataset"},
+},
+```
+
+Prédicats supportés dans `applies_to` (cf. TypedDict `_AppliesTo`) :
+
+| clé | valeur | sémantique |
+|---|---|---|
+| `doc_type` | `str` ou `frozenset[str]` | équivalence ou appartenance, comparaison case-insensitive |
+| `journal_type` | `str` | équivalence sur `sp.journal_type` |
+| `url_contains` | `str` | substring présente dans au moins une `sp.urls` |
+| `title_prefix_normalized` | `tuple[str, ...]` | `normalize_text(sp.title)` commence par un des préfixes |
+| `title_regex` | `re.Pattern[str]` | `pattern.search(sp.title)` matche |
+
+Si la règle a besoin d'un prédicat absent de la liste ci-dessus, étendre `_AppliesTo` + ajouter la branche correspondante dans `_check_predicate`. Préférer un prédicat réutilisable (qui capturera d'autres règles du même axe) à un prédicat sur-spécialisé à une seule règle.
+
+#### 3.3 Position dans le dict (priorité)
+
+`_RULES` est un dict ordonné : l'ordre d'insertion = la priorité de la cascade. `_correct_field` renvoie sur le premier match, donc placer une règle plus tôt lui donne priorité sur les suivantes.
+
+Par défaut **en fin**. La priorité reflète la **spécificité du signal** :
 
 - URL spécifique (`theses.fr/`, `dumas.`) : plus spécifique → haut de cascade
 - Type de revue admin-typé (`journal_type=media`) : moins spécifique → milieu
@@ -69,24 +95,28 @@ La priorité reflète la **spécificité du signal** :
 
 Si tu hésites, audit + 1-2 cas réels qui croisent deux règles concurrentes te diront ce qui est plus informatif.
 
-#### 3.3 Constantes locales
+#### 3.4 Constantes locales
 
-Pour les whitelists ou marqueurs textuels, déclarer des constantes module-level avec préfixe `_` :
+Pour les patterns (regex, tuples de préfixes) ou whitelists réutilisées par plusieurs règles, déclarer en module-level avec préfixe `_`, juste au-dessus du dict `_RULES`. Commenter brièvement *pourquoi* le set/pattern a la forme choisie (« set ciblé plutôt que `'supplementary '` large pour éviter les faux positifs »).
+
+Les whitelists triviales (`frozenset({"article", "book_chapter"})`) qui ne sont utilisées qu'une fois peuvent rester inline dans le dict — pas de constante de cérémonie.
+
+#### 3.5 Champ corrigeable absent de `_AppliesCorrection`
+
+Pour une règle qui corrige un champ absent de `_AppliesCorrection` (`oa_status`, `journal_id`…) : ajouter la clé dans `_AppliesCorrection`, puis brancher le champ dans `effective_metadata` :
 
 ```python
-_ADDITIONAL_FILE_TITLE_PREFIX = "additional file"
-_ADDITIONAL_FILE_DEMOTE_FROM = frozenset({"article"})
+return CorrectedFields(
+    doc_type=_correct_field(sp, "doc_type"),
+    oa_status=_correct_field(sp, "oa_status"),
+)
 ```
 
-Commenter brièvement *pourquoi* le set est étroit (« `dataset` est déjà adéquat, on l'épargne »).
-
-#### 3.4 Normalisation des inputs textuels
-
-Pour les comparaisons sur `title`, `container_title`, etc. : passer par `domain.normalize.normalize_text` plutôt que `str.lower()` — c'est ce que fait `publications.title_normalized` côté DB, donc les conditions Python alignées avec un éventuel pré-filtrage SQL.
+`_correct_field` est paramétrique sur le champ — aucune logique additionnelle.
 
 ### 4. Étendre la projection si nécessaire (rare)
 
-Si l'input nécessite un nouveau champ joint depuis une table pas encore projetée :
+Si l'input nécessite un champ joint depuis une table hors projection actuelle :
 
 1. Ajouter le champ à `SourcePublicationWithJournalView` ([domain/source_publications/views.py](../../domain/source_publications/views.py)).
 2. Ajouter le champ dans `_SourcePublicationViewRow` ([infrastructure/repositories/publication_repository.py](../../infrastructure/repositories/publication_repository.py)) + le JOIN dans `get_source_publications`.
@@ -127,9 +157,9 @@ Sauf si on prévoit un full rerun imminent du pipeline, écrire un script ciblé
 
 ### 8. Documentation
 
-Le catalogue vivant des règles actives est l'enum `MetadataCorrectionRule` (members + docstrings de cascade). Pas de duplication dans une fiche séparée.
+Le catalogue des règles actives est le dict `_RULES` (entrées + commentaire de motivation inline au-dessus de chaque entrée). Pas de duplication dans une fiche séparée.
 
-- Si la règle inaugure un nouveau **type de règle** (combinaison input/output non-encore-vue) : enrichir ce playbook avec un exemple concret en § Exemples ci-dessous.
+- Si la règle illustre une combinaison input/output non couverte par les exemples ci-dessous : compléter le § Exemples avec un cas concret.
 
 ## Exemples concrets
 
@@ -142,19 +172,19 @@ Le catalogue vivant des règles actives est l'enum `MetadataCorrectionRule` (mem
 - Whitelist : aucune (la règle est inconditionnelle sur le signal URL)
 - Hook admin : non (URL non éditable)
 - Rattrapage : pas de script dédié, appliqué au full rerun pipeline
-- Référence : [correction.py:_correct_doc_type](../../domain/publications/correction.py) (cas 1)
+- Référence : [`correction.py` — entrée `THESES_FR_URL_TO_THESIS`](../../domain/publications/correction.py)
 
 ### Règle SP-intrinsèque multi-critères avec whitelist + set de signaux
 
 **`TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET`** — titre dans `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` (additional file, supplementary material/data/info/file/dataset, data from) + `doc_type ∈ {article, other}` ⇒ `doc_type = dataset`.
 
-- Inputs : `sp.title` (normalisé via `normalize_text`) + `sp.doc_type`
-- Whitelist : `_SUPPLEMENTARY_CONTENT_APPLIES_TO = {"article", "other"}` — `dataset` est laissé tel quel (déjà adéquat) ; les autres types (`thesis`, `book_chapter`, …) sont épargnés (titre suspect mais on ne corrige pas aveuglément).
-- Set de préfixes plutôt qu'un préfixe unique : pattern récurrent (fichiers complémentaires exposés par DataCite/Dryad/Zenodo/IFREMER comme entités à part entière). Le set est **ciblé**, pas large : on ne prend pas `'supplementary '` brut pour éviter de matcher par accident un vrai article du type "Supplementary roles of X". Ajouter un nouveau préfixe à `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` est de la maintenance courante, pas un nouveau chantier.
+- Inputs : `sp.title` (via le prédicat `title_prefix_normalized`, qui normalise en interne) + `sp.doc_type`
+- Whitelist : `frozenset({"article", "other"})` inline dans l'entrée — `dataset` est laissé tel quel (déjà adéquat) ; les autres types (`thesis`, `book_chapter`, …) sont épargnés (titre suspect mais on ne corrige pas aveuglément).
+- Set de préfixes plutôt qu'un préfixe unique : pattern récurrent (fichiers complémentaires exposés par DataCite/Dryad/Zenodo/IFREMER comme entités à part entière). Le set est **ciblé**, pas large : on ne prend pas `'supplementary '` brut pour éviter de matcher par accident un vrai article du type "Supplementary roles of X". Ajouter un préfixe à `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` est de la maintenance courante, pas un chantier dédié.
 - Audit ayant motivé la whitelist : 274 "additional file" (186 article + 46 other à reclasser, 42 dataset no-op) + 22 "supplementary …" + 7 "data from …" non-dataset. 100 % DataCite sur les cas observés ⇒ pas besoin de croiser avec le DOI-RA.
 - Hook admin : non
 - Rattrapage : [`oneshot/refresh_publications_with_supplementary_content_title.py`](../../interfaces/cli/oneshot/refresh_publications_with_supplementary_content_title.py) — le pré-filtre SQL mirror la liste `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES`.
-- Référence : [correction.py:_correct_doc_type](../../domain/publications/correction.py) (cas 4)
+- Référence : [`correction.py` — entrée `TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET`](../../domain/publications/correction.py)
 
 ### Règle journal-jointe + admin-éditable
 
@@ -164,13 +194,13 @@ Le catalogue vivant des règles actives est l'enum `MetadataCorrectionRule` (mem
 - Whitelist : aucune (inconditionnel sur le signal journal)
 - Hook admin : oui — `journal_type` est éditable par l'admin. Service [`requalify_publications_for_journal`](../../application/journals.py), endpoint `GET /api/journals/{id}/type-change-impact`, requalification synchrone dans le `PUT`, modale frontend.
 - Rattrapage : [`maintenance/refresh_publications_for_journal_type.py --journal-type media`](../../interfaces/cli/maintenance/refresh_publications_for_journal_type.py)
-- Référence : [correction.py:_correct_doc_type](../../domain/publications/correction.py) (cas 3) + commits `59db89d9` + `16b98985` + `49d22cd7`
+- Référence : [`correction.py` — entrée `JOURNAL_TYPE_MEDIA_TO_MEDIA`](../../domain/publications/correction.py)
 
 ## Anti-patterns
 
 - **Muter `source_publications` à l'ingestion** (ex. dans le normalizer) : viole le principe d'inviolabilité, casse l'auditabilité. La correction doit toujours être une *dérivation* dans `correction.py`. Cf. [feedback `source_publications inviolable`](../../docs/chantiers/METIER_metadata-correction.md).
 - **Encoder la règle en SQL pur (vue, trigger, UPDATE one-shot non auditté)** : perd la trace `meta.X_corrected_by` et la réversibilité.
-- **Cascade implicite** : deux règles qui touchent le même champ sans ordre explicite ⇒ comportement non-déterministe. L'ordre des branches dans `_correct_<field>` est la convention.
+- **Cascade implicite** : deux règles qui touchent le même champ sans ordre explicite ⇒ comportement non-déterministe. L'ordre des entrées dans `_RULES` est la convention.
 - **Hook admin sans service** : déclencher `refresh_from_sources` directement depuis le router. Le service propriétaire (`application/<table>.py`) reste l'unique point d'écriture côté pubs (cf. [feedback `Propriété des services sur les tables`](../../docs/chantiers/METIER_metadata-correction.md)).
 
 ## Limites du périmètre
