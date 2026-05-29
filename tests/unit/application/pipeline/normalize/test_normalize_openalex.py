@@ -381,6 +381,11 @@ class TestExtractPubMetadata:
 
 class TestInsertOpenalexDocument:
     def _call(self, queries: _FakeQueries, work: dict, *, pub_meta: dict | None = None) -> dict:
+        # Par défaut, pub_meta est dérivé via extract_pub_metadata pour rester
+        # cohérent avec le flux réel (extract → insert). Tests qui veulent
+        # forcer une valeur passent un pub_meta explicite.
+        if pub_meta is None:
+            pub_meta = extract_pub_metadata(work, journal_id=None)
         insert_openalex_document(
             MagicMock(), queries, work, staging_id=1, publication_id=None, pub_meta=pub_meta
         )
@@ -461,7 +466,11 @@ class TestInsertOpenalexDocument:
 
     def test_biblio_skipped_when_primary_is_repository(self, monkeypatch):
         """Si should_skip_publisher_journal renvoie True, publisher/journal absents de biblio."""
-        monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: object())
+
+        class _PrimaryStub:
+            source_display_name = None
+
+        monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: _PrimaryStub())
         monkeypatch.setattr(normalize_openalex, "is_theses_fr_location", lambda p: False)
         monkeypatch.setattr(normalize_openalex, "should_skip_publisher_journal", lambda p: True)
         queries = _FakeQueries()
@@ -472,32 +481,23 @@ class TestInsertOpenalexDocument:
         captured = self._call(queries, work)
         assert captured["biblio"] is None
 
-    def test_theses_fr_nnt_extracted(self, monkeypatch):
-        """Si le primary_location est theses.fr, le nnt va dans external_ids."""
-
-        class _PrimaryStub:
-            landing_page_url = "https://theses.fr/2024CLFAC001"
-
-        monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: _PrimaryStub())
-        monkeypatch.setattr(normalize_openalex, "is_theses_fr_location", lambda p: True)
-        monkeypatch.setattr(
-            normalize_openalex, "extract_nnt_from_location", lambda p: "2024CLFAC001"
-        )
-        monkeypatch.setattr(normalize_openalex, "should_skip_publisher_journal", lambda p: True)
-
+    def test_pub_meta_nnt_passed_through_to_external_ids(self):
+        """insert lit pub_meta["nnt"] et le pose dans external_ids."""
         queries = _FakeQueries()
-        captured = self._call(queries, {"id": "https://openalex.org/W1"})
+        work = {"id": "https://openalex.org/W1"}
+        pub_meta = extract_pub_metadata(work, journal_id=None)
+        pub_meta["nnt"] = "2024CLFAC001"
+        captured = self._call(queries, work, pub_meta=pub_meta)
         assert captured["external_ids"] is not None
         assert captured["external_ids"]["nnt"] == "2024CLFAC001"
 
     def test_pub_meta_source_doi_passed_through(self):
         """Si `pub_meta` contient `source_doi`, il est repris dans external_ids."""
         queries = _FakeQueries()
-        captured = self._call(
-            queries,
-            {"id": "https://openalex.org/W1"},
-            pub_meta={"source_doi": "10.1234/abc"},
-        )
+        work = {"id": "https://openalex.org/W1"}
+        pub_meta = extract_pub_metadata(work, journal_id=None)
+        pub_meta["source_doi"] = "10.1234/abc"
+        captured = self._call(queries, work, pub_meta=pub_meta)
         assert captured["external_ids"]["source_doi"] == "10.1234/abc"
 
 

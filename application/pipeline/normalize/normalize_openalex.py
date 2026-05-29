@@ -182,32 +182,29 @@ def upsert_journal(
 def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
     """Extrait les métadonnées de publication d'un work OpenAlex.
 
-    Retourne un dict utilisable par find_or_create_publication.
+    Retourne un dict utilisable par ``insert_openalex_document``. Toutes les
+    valeurs sont brutes — pas de transformation de cohérence. ``doc_type``
+    est le ``work["type"]`` brut OpenAlex (mapping canonique en aval, dans
+    ``map_doc_type(source="openalex")``).
     """
-    doi = clean_doi(work.get("doi"))
     title = work.get("title") or work.get("display_name") or ""
-    pub_year = work.get("publication_year")
-
     primary = parse_primary_location(work)
     theses_fr = primary is not None and is_theses_fr_location(primary)
     nnt = extract_nnt_from_location(primary) if theses_fr and primary else None
-
     oa_info = work.get("open_access") or {}
-    oa_status = map_openalex_oa_status(oa_info.get("oa_status"))
-    language = work.get("language")
-
     container_title = primary.source_display_name if (primary and not journal_id) else None
 
     return dict(
         title=title,
         title_normalized=normalize_text(title),
-        pub_year=pub_year,
-        doi=doi,
+        pub_year=work.get("publication_year"),
+        doc_type=work.get("type"),
+        doi=clean_doi(work.get("doi")),
         nnt=nnt,
-        oa_status=oa_status,
+        oa_status=map_openalex_oa_status(oa_info.get("oa_status")),
         journal_id=journal_id,
         container_title=container_title,
-        language=language,
+        language=work.get("language"),
     )
 
 
@@ -222,31 +219,27 @@ def insert_openalex_document(
     work: dict,
     staging_id: int,
     publication_id: int | None,
-    pub_meta: dict | None = None,
+    pub_meta: dict,
 ) -> int:
-    """
-    Crée/retrouve l'entrée source_publications pour OpenAlex.
-    Retourne source_publications.id.
+    """Crée/retrouve l'entrée source_publications pour OpenAlex.
+
+    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
+    journal_id, oa_status, language, container_title) viennent toutes de
+    ``pub_meta``, construit en amont par ``extract_pub_metadata``. ``work``
+    ne sert ici que pour les extras OpenAlex-spécifiques (urls,
+    cited_by_count, is_retracted, biblio, publisher/journal bruts,
+    abstract, keywords, topics, location_ids).
     """
     openalex_id = extract_short_id(work["id"])
-    doi = clean_doi(work.get("doi"))
-    title = work.get("title") or work.get("display_name") or ""
-    pub_year = work.get("publication_year")
-    doc_type = work.get("type")
+    primary = parse_primary_location(work)
 
     # URLs et identifiants extraits des locations
     urls, location_ids = extract_locations_data(work)
-
-    # NNT depuis la structure du work (prioritaire sur celui extrait des URLs)
-    primary = parse_primary_location(work)
-    if primary and is_theses_fr_location(primary):
-        nnt = extract_nnt_from_location(primary)
-        if nnt:
-            location_ids["nnt"] = nnt
-
+    if nnt := pub_meta["nnt"]:
+        location_ids["nnt"] = nnt
     # Conserver le DOI original si retiré lors d'un conflit chapitre/ouvrage
-    if pub_meta and pub_meta.get("source_doi"):
-        location_ids["source_doi"] = pub_meta["source_doi"]
+    if source_doi := pub_meta.get("source_doi"):
+        location_ids["source_doi"] = source_doi
 
     external_ids = location_ids if location_ids else None
     cited_by_count = work.get("cited_by_count")
@@ -306,28 +299,22 @@ def insert_openalex_document(
     topics = extract_topics(work)
     topics_json = topics if topics else None
 
-    # Métadonnées de publication (pour création différée)
-    journal_id = pub_meta.get("journal_id") if pub_meta else None
-    oa_status = pub_meta.get("oa_status") if pub_meta else None
-    language = pub_meta.get("language") if pub_meta else None
-    container_title = pub_meta.get("container_title") if pub_meta else None
-
     return queries.upsert_openalex_source_publication(
         conn,
         openalex_id=openalex_id,
-        doi=doi,
-        title=title,
-        pub_year=pub_year,
-        doc_type=doc_type,
+        doi=pub_meta["doi"],
+        title=pub_meta["title"],
+        pub_year=pub_meta["pub_year"],
+        doc_type=pub_meta["doc_type"],
         publication_id=publication_id,
         staging_id=staging_id,
         external_ids=external_ids,
         urls=urls or None,
         cited_by_count=cited_by_count,
-        journal_id=journal_id,
-        oa_status=oa_status,
-        language=language,
-        container_title=container_title,
+        journal_id=pub_meta["journal_id"],
+        oa_status=pub_meta["oa_status"],
+        language=pub_meta["language"],
+        container_title=pub_meta["container_title"],
         is_retracted=is_retracted,
         biblio=biblio_json,
         abstract=abstract,
