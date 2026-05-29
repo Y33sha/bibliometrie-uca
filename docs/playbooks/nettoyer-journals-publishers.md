@@ -143,7 +143,7 @@ ORDER BY n_journals_matched_by_publis DESC;
 
 Cas par cas :
 
-- **Préfixe vraiment générique** (`10.1039/d`, `10.1017/s`) — pas de prefix plus long stable possible : `UPDATE journals SET doi_prefix = NULL` pour les journaux concernés. La cohérence Phase 4a se fera via `doi_prefixes.publisher_id` (vérification au niveau publisher).
+- **Préfixe vraiment générique** (`10.1039/d`, `10.1017/s`) — pas de prefix plus long stable possible : `UPDATE journals SET doi_prefix = NULL` pour les journaux concernés. Le contrôle de cohérence retombe sur le publisher (`doi_prefixes.publisher_id`).
 - **Préfixe générique mais journal-spécifique reconstructible** : ex. RSC encode parfois le code journal en lettres après le tiret (`10.1039/d4fo00346h` pour Food & Function). On peut écrire un préfixe enrichi `10.1039/d?fo` (regex) ou laisser NULL si le pattern n'est pas stable. La règle du script (`MIN_CHARS_AFTER_SLASH=1`) reste défensive — préférer NULL au préfixe trompeur.
 
 ## Cas 5 — Incohérences DOI ↔ journal résiduelles
