@@ -214,6 +214,11 @@ class TestExtractPubMetadata:
 
 class TestInsertHalDocument:
     def _call(self, queries, doc, *, hal_collections_staging=None, pub_meta=None) -> dict:
+        # Par défaut, pub_meta est dérivé via extract_pub_metadata pour rester
+        # cohérent avec le flux réel (extract → insert). Tests qui veulent
+        # forcer une valeur passent un pub_meta explicite.
+        if pub_meta is None:
+            pub_meta = extract_pub_metadata(doc, journal_id=None)
         insert_hal_document(
             MagicMock(),
             queries,
@@ -338,6 +343,12 @@ class TestInsertHalDocument:
             queries,
             {},
             pub_meta={
+                "doi": None,
+                "title": None,
+                "title_normalized": None,
+                "pub_year": None,
+                "doc_type": None,
+                "nnt": None,
                 "journal_id": 7,
                 "oa_status": "gold",
                 "language": "fr",
