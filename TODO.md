@@ -4,21 +4,17 @@
 * [ ] ajouter created_at,updated_at partout
 ## Pipeline de traitement
 ### Extraction
-* [ ] Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver?). + publis du cross-import: re-fetch régulier pour tenir les données à jour ->> **DATA_cycle-vie-staging.md**
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids?
 * [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] extraction par ORCID: vérifier faisabilité (quelles sources?)
 * [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples)
 ### Normalisation
 * [ ] batcher pour améliorer la perf? / analyser pour comprendre pourquoi hal + lent
-* [ ] conserver le json brut dans des fichiers: /data/raw/{source}/{source_id}.json.gz pour l'auditabilité des données brutes (et pouvoir faire l'économie du stockage des source_authorships hors périmètre) ->> **DATA_cycle-vie-staging.md**
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
 * [ ] création erronée d'idhal numériques par normalize-hal: vérifier que le problème ne réapparaît pas
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 ### Suite du traitement
 * [ ] Crossref: traiter comme n'importe quelle source, exploiter affiliation strings, même minimales.
-* [ ] in_perimeter BOOL: étudier l'intérêt de passer à perimeter_ids INT[] ? / voire supprimer cette colonne? ->> **DATA_perimeter-materialise.md**
-* [ ] algo de déduplication publications: faire un truc + chiadé et l'insérer après phase "création publications". / DOI identique mais type différent: garde-fou mis en place pour ouvrages + chapitres, voir si pertinent aussi pour conf + posters, ou autres cas: article + peer_review/erratum/preprint? ->> **METIER_metadata-deduplication.md**
 * [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects / idées:  phase_cross_imports expose sources_with_new; phase_subjects : restreindre à (extract_sources ∪ sources_with_new) / phase_countries (refresh_sa_countries_for_source) : laisser scanner toutes les sources (sécurité), mais on peut t'envisager un addresses.updated_at ciblage en option 2 plus tard
 * [ ] authorships: propagate_roles, propagate_is_corresponding, propagate_author_position: tout faire en une passe?
@@ -37,9 +33,7 @@
 * [ ] openalex raw_orcid
 * [ ] données supplémentaires: peer-reviewed? publié?
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
-## Sujets
-* [ ] sujets openalex souvent hors sujet: auditer; créer circuit de curation manuelle des sujets? / ajouter seuil de score de pertinence? / algos pour évaluer pertinence (co-occurrences suspectes, NLP...)
-* [ ] enrichissement sujets: audit des publis sans sujet; sujets "attendus" par revue?
+* [ ] re-seeder les doi_prefix journals
 ## Explorer autres sources possibles
 * [ ] Crossref: définir sa place dans le pipeline (actuellement: pas d'affiliations donc pas de matching possible)
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée? récupérer pmid dans api HAL
@@ -57,8 +51,6 @@
 ## Méga-papers et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap); en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
 * [ ] élucider pourquoi Openalex contient parfois beaucoup plus d'auteurs : ex. 21105 (OpenAlex semble résoudre les noms d'équipes en listes de noms de personnes, mais je ne sais pas comment)
-## Relations entre publications
-* [ ] relations entre publications (est traduction de, est preprint de..., fait partie de..., data paper décrit dataset, dataset référencé dans...) => nouveau chantier données à part entière (trouver sources de données: Crossref, dépôts de preprints; créer algo pour compléter; créer circuit manuel)
 ## Chantier des signatures institutionnelles
 ### Côté backend
 * [ ] pays des adresses: aller plus loin dans l'automatisation de la détection (GeoNames? index n-gram des adresses avec pays associés et degré de certitude?)
@@ -98,7 +90,7 @@
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
 * [ ] remplacer tag DOAJ par lien
 * [ ] style barre facettes dans labos/thèses: pas homogène aux autres
-* [ ] fusion revues ou modif revue: pas de mise à jour automatique de la page + (problème de la modale de validation qui indique le type journal au lieu du type article)
+* [ ] fusion revues ou modif revue: pas de mise à jour automatique de la page
 * [ ] lien dashboard => publications: il faut que toutes les facettes actives soient affichées!
 
 # Cas particuliers, bizarreries à élucider
