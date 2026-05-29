@@ -4,12 +4,13 @@ Expose `effective_metadata`, fonction pure qui applique des règles de correctio
 
 Distincte de l'agrégation (`aggregation.py` arbitre entre sources) et du normalizer (qui ne mute pas `source_publications`, trace inviolable des sources). Les corrections s'appliquent sur le canonique via `refresh_from_sources` et sur la SP entrante au moment du matching, pour que la dédup matche sur les valeurs corrigées.
 
-Cascade déterministe, dans l'ordre des dépendances entre champs : `journal_id` (une correction du journal devient l'input des règles suivantes), puis `doc_type`, puis `oa_status`.
+Architecture : chaque règle est une fonction pure `_<name>(sp) -> Correction[str] | None` locale à ce module. Les règles actives sont enregistrées dans une tuple par champ corrigé (`_DOC_TYPE_RULES` aujourd'hui ; futur `_OA_STATUS_RULES`, `_JOURNAL_ID_RULES` selon les chantiers). `_correct_<field>` parcourt sa tuple dans l'ordre et retourne la première correction qui s'applique — l'ordre du tuple traduit la priorité intra-champ (signaux forts d'abord : URL > journal_type > titre).
 
-Chaque règle est une fonction pure renvoyant `Correction | None` : la valeur corrigée et le membre de `MetadataCorrectionRule` qui l'a produite. Le caller inscrit ce membre dans `publications.meta.<field>_corrected_by` pour tracer la correction.
+Cascade entre champs (ordre des dépendances) : `journal_id` → `doc_type` → `oa_status`. Le membre `MetadataCorrectionRule` qui a produit la correction est inscrit dans `publications.meta.<field>_corrected_by` par le caller, pour tracer la correction.
 """
 
 import re
+from collections.abc import Callable
 from enum import StrEnum
 from typing import NamedTuple
 
@@ -58,18 +59,92 @@ class CorrectedFields(NamedTuple):
         return self.journal_id is None and self.doc_type is None and self.oa_status is None
 
 
-# ── Règles individuelles ───────────────────────────────────────────
+# ── Règles individuelles de `doc_type` ───────────────────────────────
+# Chaque règle = fonction pure `(SourcePublicationWithJournalView) -> Correction[str] | None`.
+# Constantes (préfixes, whitelists, patterns) regroupées juste au-dessus de la règle qui les consomme.
+# Le tuple `_DOC_TYPE_RULES` en bas de section fige l'ordre de la cascade.
+
 
 _THESES_FR_URL_MARKER = "theses.fr/"
+
+
+def _theses_fr_url_to_thesis(sp: SourcePublicationWithJournalView) -> Correction[str] | None:
+    """theses.fr fait autorité sur les thèses françaises. Inconditionnel sur le `doc_type` brut : OpenAlex classe parfois ces thèses en `article` ou `dissertation`."""
+    if any(_THESES_FR_URL_MARKER in (u or "") for u in sp.urls):
+        return Correction("thesis", MetadataCorrectionRule.THESES_FR_URL_TO_THESIS)
+    return None
+
+
 _DUMAS_URL_MARKER = "dumas."
 
-# Whitelist des `doc_type` bruts que la règle `JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER` reclasse. Restreinte à `{article, book_chapter}` par prudence : ce sont les classifications par défaut que les normalizers donnent aux papiers de conférence quand l'éditeur du journal d'actes est classique. `book` est exclu : un volume entier d'actes peut légitimement rester `book`.
+
+def _dumas_url_to_memoir(sp: SourcePublicationWithJournalView) -> Correction[str] | None:
+    """DUMAS héberge des mémoires de master qu'OpenAlex classe à tort en `dissertation`. Whitelist `dissertation` pour ne pas dégrader les rares cas DUMAS de vraies thèses."""
+    if (sp.doc_type or "").lower() == "dissertation" and any(
+        _DUMAS_URL_MARKER in (u or "") for u in sp.urls
+    ):
+        return Correction("memoir", MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR)
+    return None
+
+
+def _journal_type_media_to_media(
+    sp: SourcePublicationWithJournalView,
+) -> Correction[str] | None:
+    """Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type` brut."""
+    if sp.journal_type == "media":
+        return Correction("media", MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA)
+    return None
+
+
+# Whitelist restreinte à `{article, book_chapter}` : ce sont les classifications par défaut que les normalizers donnent aux papiers de conférence quand l'éditeur du journal d'actes est classique. `book` est exclu : un volume entier d'actes peut légitimement rester `book`.
 _PROCEEDINGS_JOURNAL_APPLIES_TO = frozenset({"article", "book_chapter"})
 
-# Whitelist `{article, other}` pour la règle `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` : les SPs OA/CrossRef d'une publi hébergée sur un serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) sont classées `article` (par mapping CrossRef `journal-article` ou par arbitrage canonique qui efface le `preprint` brut OA) ou `other`. Les types légitimes (`dataset`, `software`, `poster`) sont rares sur ces plateformes et restent inchangés si présents.
+
+def _journal_type_proceedings_to_conference_paper(
+    sp: SourcePublicationWithJournalView,
+) -> Correction[str] | None:
+    """Journal d'actes + `doc_type` ∈ `_PROCEEDINGS_JOURNAL_APPLIES_TO` ⇒ `conference_paper`."""
+    if sp.journal_type == "proceedings" and sp.doc_type in _PROCEEDINGS_JOURNAL_APPLIES_TO:
+        return Correction(
+            "conference_paper",
+            MetadataCorrectionRule.JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER,
+        )
+    return None
+
+
+# Whitelist `{article, other}` : les SPs OA/CrossRef d'une publi hébergée sur un serveur de preprints sont classées `article` (par mapping CrossRef `journal-article` ou par arbitrage canonique qui efface le `preprint` brut OA) ou `other`. Les types légitimes (`dataset`, `software`, `poster`) éventuellement présents sur ces plateformes restent inchangés.
 _PREPRINT_SERVER_JOURNAL_APPLIES_TO = frozenset({"article", "other"})
 
-# Préfixes (post-`normalize_text`) reconnus comme « contenu supplémentaire / données complémentaires ». Set ciblé plutôt que `'supplementary '` large pour éviter de matcher par accident un vrai article du type "Supplementary roles of X" — aucun cas en base aujourd'hui, mais on garde la marge.
+
+def _journal_type_preprint_server_to_preprint(
+    sp: SourcePublicationWithJournalView,
+) -> Correction[str] | None:
+    """Journal typé `preprint_server` (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + `doc_type` ∈ `_PREPRINT_SERVER_JOURNAL_APPLIES_TO` ⇒ `preprint`."""
+    if sp.journal_type == "preprint_server" and sp.doc_type in _PREPRINT_SERVER_JOURNAL_APPLIES_TO:
+        return Correction(
+            "preprint", MetadataCorrectionRule.JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT
+        )
+    return None
+
+
+# Patterns récurrents : « Interview … », « Podcast Émission radio … », « Reportage pour … ».
+_MEDIA_TITLE_PREFIXES = ("interview", "reportage", "podcast")
+# Whitelist étroite : ce sont les classifications par défaut des dépôts médias mal typés. Types-référents (thesis, book, …) épargnés ; `media` lui-même exclu (no-op naturel).
+_MEDIA_TITLE_APPLIES_TO = frozenset({"article", "other"})
+
+
+def _title_media_prefix_to_media(
+    sp: SourcePublicationWithJournalView,
+) -> Correction[str] | None:
+    """Titre commençant par `interview`/`reportage`/`podcast` + `doc_type` ∈ `_MEDIA_TITLE_APPLIES_TO` ⇒ `media`. Pattern univoque et récurrent dans le corpus UCA."""
+    if sp.doc_type not in _MEDIA_TITLE_APPLIES_TO:
+        return None
+    if any(normalize_text(sp.title).startswith(p) for p in _MEDIA_TITLE_PREFIXES):
+        return Correction("media", MetadataCorrectionRule.TITLE_MEDIA_PREFIX_TO_MEDIA)
+    return None
+
+
+# Préfixes (post-`normalize_text`) reconnus comme « contenu supplémentaire / données complémentaires ». Set ciblé plutôt que `'supplementary '` large pour éviter de matcher par accident un vrai article du type "Supplementary roles of X".
 _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES = (
     "additional file",
     "supplementary material",
@@ -79,119 +154,119 @@ _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES = (
     "supplementary dataset",  # couvre "dataset" et "datasets"
     "data from",
 )
-
-# Whitelist des `doc_type` bruts que la règle `TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET` reclasse en `dataset`. Les autres types restent inchangés (ni `thesis` ni `book_chapter` etc. ne sont concernés — un titre de supplément sur un de ces types serait suspect mais on ne corrige pas aveuglément). `dataset` lui-même est exclu du set : la règle n'a rien à faire sur une publication déjà classée `dataset`.
+# `dataset` exclu du set (no-op naturel sur une publi déjà classée correctement).
 _SUPPLEMENTARY_CONTENT_APPLIES_TO = frozenset({"article", "other"})
 
-# Préfixes (post-`normalize_text`) reconnus comme intervention média. Patterns récurrents : "Interview …", "Podcast Émission radio …", "Reportage pour …".
-_MEDIA_TITLE_PREFIXES = ("interview", "reportage", "podcast")
 
-# Whitelist des `doc_type` bruts que la règle `TITLE_MEDIA_PREFIX_TO_MEDIA` reclasse en `media`. Set étroit `{article, other}` : ce sont les classifications par défaut que les normalizers OpenAlex/HAL appliquent aux dépôts médias mal typés. Les types-référents (thesis, book, etc.) sont épargnés. `media` lui-même est exclu (no-op naturel) ; les cas couverts par `JOURNAL_TYPE_MEDIA_TO_MEDIA` (journal typé media) sont déjà attrapés en amont dans la cascade.
-_MEDIA_TITLE_APPLIES_TO = frozenset({"article", "other"})
+def _title_supplementary_content_to_dataset(
+    sp: SourcePublicationWithJournalView,
+) -> Correction[str] | None:
+    """Titre commençant par un préfixe de `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` + `doc_type` ∈ `_SUPPLEMENTARY_CONTENT_APPLIES_TO` ⇒ `dataset`. DataCite et certaines plateformes (Dryad, Zenodo, IFREMER) exposent les fichiers complémentaires comme entités à part, classées `article` (faux) ou `other` (vague)."""
+    if sp.doc_type not in _SUPPLEMENTARY_CONTENT_APPLIES_TO:
+        return None
+    if any(normalize_text(sp.title).startswith(p) for p in _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES):
+        return Correction("dataset", MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET)
+    return None
 
-# Préfixes (post-`normalize_text`) reconnus comme erratum. Pattern textuel très spécifique (mot exact en tête de titre, après normalisation), univoque dans les corpus observés.
+
+# Pattern textuel très spécifique (mot exact en tête de titre, après normalisation), univoque dans les corpus observés.
 _ERRATUM_TITLE_PREFIXES = ("erratum", "errata", "corrigendum")
-
-# Whitelist des `doc_type` bruts que la règle `TITLE_ERRATUM_PREFIX_TO_ERRATUM` reclasse en `erratum`. Restreinte aux types publication-like où un erratum est plausible (article, preprint, review, conference_paper, data_paper, letter, other). Les types-référents (thesis, book, book_chapter, memoir, hdr, dataset, …) sont épargnés : un titre erratum sur l'un d'eux serait suspect mais on ne corrige pas aveuglément. `erratum` lui-même est exclu (no-op naturel).
+# Whitelist restreinte aux types publication-like où un erratum est plausible. Les types-référents (thesis, book, book_chapter, memoir, hdr, dataset, …) sont épargnés.
 _ERRATUM_APPLIES_TO = frozenset(
     {"article", "preprint", "review", "conference_paper", "data_paper", "letter", "other"}
 )
 
-# Préfixes (post-`normalize_text`) reconnus comme avis de rétractation. Stricts : seuls « Retraction notice » et « Retraction note » (les formulations canoniques utilisées par les éditeurs). Pas « retraction » seul, qui matcherait par accident des titres comme « Retraction of consent in clinical trials ».
-_RETRACTION_TITLE_PREFIXES = ("retraction notice", "retraction note")
 
-# Whitelist `{article, other}` : seuls types où les normalizers (HAL/OpenAlex) classent à tort un avis de rétractation. Pattern aligné sur les règles `TITLE_*` SP-intrinsèques précédentes.
+def _title_erratum_prefix_to_erratum(
+    sp: SourcePublicationWithJournalView,
+) -> Correction[str] | None:
+    """Titre commençant par `erratum`/`errata`/`corrigendum` + `doc_type` ∈ `_ERRATUM_APPLIES_TO` ⇒ `erratum`. OpenAlex reclasse fréquemment ces corrections en `article`/`preprint`/`data_paper`."""
+    if sp.doc_type not in _ERRATUM_APPLIES_TO:
+        return None
+    if any(normalize_text(sp.title).startswith(p) for p in _ERRATUM_TITLE_PREFIXES):
+        return Correction("erratum", MetadataCorrectionRule.TITLE_ERRATUM_PREFIX_TO_ERRATUM)
+    return None
+
+
+# Préfixes stricts : seuls « Retraction notice » et « Retraction note » (formulations canoniques utilisées par les éditeurs). Pas « retraction » seul, qui matcherait des titres comme « Retraction of consent in clinical trials ».
+_RETRACTION_TITLE_PREFIXES = ("retraction notice", "retraction note")
 _RETRACTION_APPLIES_TO = frozenset({"article", "other"})
 
+
+def _title_retraction_prefix_to_retraction(
+    sp: SourcePublicationWithJournalView,
+) -> Correction[str] | None:
+    """Titre commençant par un préfixe de `_RETRACTION_TITLE_PREFIXES` + `doc_type` ∈ `_RETRACTION_APPLIES_TO` ⇒ `retraction`."""
+    if sp.doc_type not in _RETRACTION_APPLIES_TO:
+        return None
+    if any(normalize_text(sp.title).startswith(p) for p in _RETRACTION_TITLE_PREFIXES):
+        return Correction(
+            "retraction", MetadataCorrectionRule.TITLE_RETRACTION_PREFIX_TO_RETRACTION
+        )
+    return None
+
+
 # Marqueurs de recension d'ouvrage (book review) détectés sur le titre brut.
-# Deux patterns indépendants compilés une fois à l'import.
 # `_ISBN_PATTERN` : mention textuelle « ISBN » (mot entier) ou préfixe ISBN-13
 # (97[89] suivi de 10–17 caractères chiffres/espaces/tirets). Signal très net.
-# `_YEAR_PAGES_END_PATTERN` : titre terminé par « (19|20)YY, N p[.|ages] »,
-# forme classique d'une référence biblio injectée dans le champ titre par
-# les saisisseurs HAL pour les comptes-rendus d'ouvrage. Plus bruité, d'où
-# la whitelist plus étroite (exclut `book` : un livre dont le titre porte
-# sa propre référence biblio matcherait à tort).
 _ISBN_PATTERN = re.compile(r"\bisbn\b|\b97[89][-\s0-9]{10,17}\b", re.IGNORECASE)
+# `_YEAR_PAGES_END_PATTERN` : titre terminé par « (19|20)YY, N p[.|ages] »,
+# forme classique d'une référence biblio injectée dans le champ titre par les
+# saisisseurs HAL pour les comptes-rendus d'ouvrage. Plus bruité que ISBN.
 _YEAR_PAGES_END_PATTERN = re.compile(
     r"(19|20)\d{2}[\s,.]+\d{1,4}\s*(pp|pages?|p)\.?\s*$", re.IGNORECASE
 )
-
-# Whitelist `TITLE_ISBN_TO_BOOK_REVIEW` : recensions classées à tort dans ces
-# types. `book` est exclu car beaucoup d'ouvrages réels ont l'ISBN dans le
-# titre (auto-description) ; `book_chapter` aussi (un chapitre publié dans un
-# livre ISBN-é peut porter l'ISBN du livre dans son titre). `book_review`
-# est exclu (no-op naturel).
+# Whitelist : recensions classées à tort dans ces types. `book`/`book_chapter` exclus (un ouvrage ou un chapitre peut légitimement porter son propre ISBN ou sa propre ref biblio dans le titre — saisie HAL fréquente).
 _BOOK_REVIEW_APPLIES_TO = frozenset({"article", "review", "other"})
 
 
-def _correct_doc_type(sp: SourcePublicationWithJournalView) -> Correction[str] | None:
-    """Corrige le `doc_type` selon une cascade prioritaire.
-
-    Ordre :
-    1. theses.fr fait autorité sur les thèses françaises : toute URL theses.fr ⇒ `thesis`, quel que soit le `doc_type` brut (OpenAlex classe parfois ces thèses en `article` ou `dissertation`).
-    2. DUMAS héberge des mémoires de master qu'OpenAlex classe à tort en `dissertation` : `dissertation` brut + URL dumas ⇒ `memoir`.
-    3. Journal de type `media` ⇒ `media` : une publication rattachée à une revue typée media (typage manuel côté admin) est une intervention média.
-    4. Journal de type `proceedings` + `doc_type` dans `_PROCEEDINGS_JOURNAL_APPLIES_TO` ⇒ `conference_paper` : une publication dans un journal d'actes classée à tort `article` ou `book_chapter` par les sources. `book` est exclu (un volume entier d'actes peut légitimement rester `book`).
-    5. Journal de type `preprint_server` + `doc_type` dans `_PREPRINT_SERVER_JOURNAL_APPLIES_TO` ⇒ `preprint` : une publication hébergée sur un serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) doit être typée `preprint` même quand les sources la classent `article`. Whitelist `{article, other}` : les types légitimes (`dataset`, `software`, `poster`) éventuellement présents sur ces plateformes restent inchangés.
-    6. Titre commençant par `interview` / `reportage` / `podcast` + `doc_type` dans `_MEDIA_TITLE_APPLIES_TO` ⇒ `media` : les dépôts d'interventions média (radio, podcast, TV) sont fréquemment classés `other` par HAL ou `article` par OpenAlex. Pattern de titre univoque et récurrent dans le corpus UCA.
-    7. Titre commençant par un préfixe de `_SUPPLEMENTARY_CONTENT_TITLE_PREFIXES` (additional file, supplementary material/data/info/file/dataset, data from) + `doc_type` dans `_SUPPLEMENTARY_CONTENT_APPLIES_TO` ⇒ `dataset` : DataCite et certaines plateformes (Dryad, Zenodo, IFREMER) exposent les fichiers complémentaires comme des entités à part entière, classées `article` (faux) ou `other` (vague) par les normalizers. Une publication déjà classée `dataset` est laissée telle quelle (classification correcte).
-    8. Titre commençant par `erratum` / `errata` / `corrigendum` + `doc_type` dans `_ERRATUM_APPLIES_TO` ⇒ `erratum` : les sources (notamment OpenAlex) reclassent fréquemment les corrections en `article`/`preprint`/`data_paper`. Pattern textuel univoque (mot exact en tête de titre).
-    9. Titre commençant par `retraction notice` / `retraction note` + `doc_type` dans `_RETRACTION_APPLIES_TO` ⇒ `retraction` : préfixes stricts pour éviter un faux positif sur un article *sur* la rétractation (« Retraction of consent in clinical trials »).
-    10. Mention textuelle « ISBN » ou numéro ISBN-13 nu dans le titre + `doc_type` dans `_BOOK_REVIEW_APPLIES_TO` ⇒ `book_review` : signal d'une référence biblio injectée dans le champ titre, forme classique d'une recension. `book` et `book_chapter` exclus de la whitelist (un ouvrage ou un chapitre peut légitimement porter son propre ISBN dans le titre — saisie HAL fréquente).
-    11. Titre se terminant par « (19|20)YY, N p[.|ages] » + `doc_type` dans `_BOOK_REVIEW_APPLIES_TO` ⇒ `book_review` : même logique que la règle 10, plus bruité (un livre dont le titre porte sa propre ref biblio matche aussi), d'où la whitelist excluant `book`/`book_chapter`. Évalué après la règle 10 : un titre porteur d'un ISBN explicite est attribué via la règle 10.
-
-    Les règles 1, 2, 6, 7, 8, 9, 10 et 11 sont SP-intrinsèques (lisent `sp.urls`/`sp.title`/`sp.doc_type`) ; 3, 4 et 5 sont journal-dépendantes (lisent `sp.journal_type`, champ joint sur la vue). Renvoie `None` si aucune ne s'applique.
-    """
-    urls = sp.urls
-    if any(_THESES_FR_URL_MARKER in (u or "") for u in urls):
-        return Correction("thesis", MetadataCorrectionRule.THESES_FR_URL_TO_THESIS)
-    if (sp.doc_type or "").lower() == "dissertation" and any(
-        _DUMAS_URL_MARKER in (u or "") for u in urls
-    ):
-        return Correction("memoir", MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR)
-    if sp.journal_type == "media":
-        return Correction("media", MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA)
-    if sp.journal_type == "proceedings" and sp.doc_type in _PROCEEDINGS_JOURNAL_APPLIES_TO:
-        return Correction(
-            "conference_paper",
-            MetadataCorrectionRule.JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER,
-        )
-    if sp.journal_type == "preprint_server" and sp.doc_type in _PREPRINT_SERVER_JOURNAL_APPLIES_TO:
-        return Correction(
-            "preprint", MetadataCorrectionRule.JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT
-        )
-    if sp.doc_type in _MEDIA_TITLE_APPLIES_TO:
-        normalized_title = normalize_text(sp.title)
-        if any(normalized_title.startswith(p) for p in _MEDIA_TITLE_PREFIXES):
-            return Correction("media", MetadataCorrectionRule.TITLE_MEDIA_PREFIX_TO_MEDIA)
-    if sp.doc_type in _SUPPLEMENTARY_CONTENT_APPLIES_TO:
-        normalized_title = normalize_text(sp.title)
-        if any(normalized_title.startswith(p) for p in _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES):
-            return Correction(
-                "dataset", MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET
-            )
-    if sp.doc_type in _ERRATUM_APPLIES_TO:
-        normalized_title = normalize_text(sp.title)
-        if any(normalized_title.startswith(p) for p in _ERRATUM_TITLE_PREFIXES):
-            return Correction("erratum", MetadataCorrectionRule.TITLE_ERRATUM_PREFIX_TO_ERRATUM)
-    if sp.doc_type in _RETRACTION_APPLIES_TO:
-        normalized_title = normalize_text(sp.title)
-        if any(normalized_title.startswith(p) for p in _RETRACTION_TITLE_PREFIXES):
-            return Correction(
-                "retraction", MetadataCorrectionRule.TITLE_RETRACTION_PREFIX_TO_RETRACTION
-            )
-    return _correct_doc_type_book_review(sp)
-
-
-def _correct_doc_type_book_review(sp: SourcePublicationWithJournalView) -> Correction[str] | None:
-    """Règles 9 et 10 de la cascade `_correct_doc_type` : recensions d'ouvrage détectées par référence biblio injectée dans le titre. Extraite pour garder la cascade principale sous le seuil de complexité McCabe."""
+def _title_isbn_to_book_review(
+    sp: SourcePublicationWithJournalView,
+) -> Correction[str] | None:
+    """Mention textuelle « ISBN » ou ISBN-13 nu dans le titre + `doc_type` ∈ `_BOOK_REVIEW_APPLIES_TO` ⇒ `book_review`."""
     if sp.doc_type not in _BOOK_REVIEW_APPLIES_TO or not sp.title:
         return None
     if _ISBN_PATTERN.search(sp.title):
         return Correction("book_review", MetadataCorrectionRule.TITLE_ISBN_TO_BOOK_REVIEW)
+    return None
+
+
+def _title_year_pages_end_to_book_review(
+    sp: SourcePublicationWithJournalView,
+) -> Correction[str] | None:
+    """Titre se terminant par « (19|20)YY, N p[.|ages] » + `doc_type` ∈ `_BOOK_REVIEW_APPLIES_TO` ⇒ `book_review`. Évaluée après la règle ISBN (un titre porteur d'un ISBN explicite est attribué par celle-ci)."""
+    if sp.doc_type not in _BOOK_REVIEW_APPLIES_TO or not sp.title:
+        return None
     if _YEAR_PAGES_END_PATTERN.search(sp.title):
         return Correction("book_review", MetadataCorrectionRule.TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW)
+    return None
+
+
+# ── Cascade `doc_type` ──────────────────────────────────────────────
+# Ordre = priorité : URL (signal le plus fort) → journal_type → titre. Les whitelists `_*_APPLIES_TO` sont calibrées pour être quasi disjointes entre règles d'une même famille, donc l'ordre intra-famille importe peu en pratique. La règle ISBN évaluée avant la règle année-pages : un titre porteur d'un ISBN explicite est plus fiable.
+
+_DocTypeRule = Callable[[SourcePublicationWithJournalView], Correction[str] | None]
+
+_DOC_TYPE_RULES: tuple[_DocTypeRule, ...] = (
+    _theses_fr_url_to_thesis,
+    _dumas_url_to_memoir,
+    _journal_type_media_to_media,
+    _journal_type_proceedings_to_conference_paper,
+    _journal_type_preprint_server_to_preprint,
+    _title_media_prefix_to_media,
+    _title_supplementary_content_to_dataset,
+    _title_erratum_prefix_to_erratum,
+    _title_retraction_prefix_to_retraction,
+    _title_isbn_to_book_review,
+    _title_year_pages_end_to_book_review,
+)
+
+
+def _correct_doc_type(sp: SourcePublicationWithJournalView) -> Correction[str] | None:
+    """Applique les règles `_DOC_TYPE_RULES` dans l'ordre ; première qui matche gagne."""
+    for rule in _DOC_TYPE_RULES:
+        if (result := rule(sp)) is not None:
+            return result
     return None
 
 
