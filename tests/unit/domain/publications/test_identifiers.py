@@ -41,6 +41,12 @@ class TestDOIConstruction:
         """Un .v suivi de non-chiffre ne doit pas être strippé."""
         assert DOI("10.1234/journal.v12.issue3").value == "10.1234/journal.v12.issue3"
 
+    def test_strips_pdf_suffix(self):
+        """Suffixe `/pdf` parfois collé par une source qui expose l'URL de la
+        ressource PDF au lieu du DOI canonique."""
+        assert DOI("10.1234/test/pdf").value == "10.1234/test"
+        assert DOI("https://doi.org/10.1234/test/PDF").value == "10.1234/test"
+
     def test_lowercases(self):
         """Le DOI complet est normalisé en minuscules (le standard CrossRef
         traite le DOI en case-insensitive ; lowercase évite les faux doublons

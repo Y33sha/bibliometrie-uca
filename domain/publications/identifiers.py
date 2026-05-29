@@ -23,6 +23,9 @@ from domain.errors import ValidationError
 # techrxiv, opticaopen…). On normalise vers le DOI "concept" (sans version)
 # qui pointe toujours vers la dernière version.
 _DOI_VERSION_SUFFIX = re.compile(r"\.v\d+$", re.IGNORECASE)
+# Suffixe `/pdf` parfois collé au DOI quand une source expose l'URL de la
+# ressource PDF au lieu du DOI canonique — strip pour éviter les doublons.
+_DOI_PDF_SUFFIX = re.compile(r"/pdf$", re.IGNORECASE)
 _DOI_URL_PREFIXES = ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/")
 
 
@@ -45,6 +48,7 @@ def _normalize_doi(raw: str | None) -> str | None:
     if not s:
         return None
     s = _DOI_VERSION_SUFFIX.sub("", s)
+    s = _DOI_PDF_SUFFIX.sub("", s)
     return s or None
 
 
