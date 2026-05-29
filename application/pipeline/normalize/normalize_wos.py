@@ -420,42 +420,36 @@ def insert_wos_document(
     rec: dict,
     staging_id: int,
     publication_id: int | None,
-    pub_meta: dict | None = None,
+    pub_meta: dict,
 ) -> int:
-    """Crée/retrouve l'entrée source_publications pour WoS. Retourne source_publications.id."""
-    journal_id = pub_meta.get("journal_id") if pub_meta else None
-    oa_status = pub_meta.get("oa_status") if pub_meta else None
-    language = pub_meta.get("language") if pub_meta else None
-    container_title = pub_meta.get("container_title") if pub_meta else None
+    """Crée/retrouve l'entrée source_publications pour WoS.
 
-    abstract = rec.get("abstract")
-    cited_by_count = rec.get("cited_by_count")
-    biblio = rec.get("biblio")
-    keywords = rec.get("keywords")
-    topics = rec.get("topics")
-    urls = rec.get("urls")
-    external_ids = rec.get("external_ids")
-
+    Les métadonnées canoniques (doi, title, pub_year, doc_type, journal_id,
+    oa_status, language, container_title) viennent toutes de ``pub_meta``,
+    construit en amont par ``extract_pub_metadata``. ``rec`` ne sert ici
+    que pour les extras WoS-spécifiques (abstract, cited_by_count, biblio,
+    keywords, topics, urls, external_ids non canoniques).
+    """
     return queries.upsert_wos_source_publication(
         conn,
         ut=rec["ut"],
-        doi=rec["doi"],
-        title=rec["title"],
-        pub_year=rec["pub_year"],
-        doc_type=rec["doc_type"],
+        doi=pub_meta["doi"],
+        title=pub_meta["title"],
+        pub_year=pub_meta["pub_year"],
+        doc_type=pub_meta["doc_type"],
         publication_id=publication_id,
         staging_id=staging_id,
-        journal_id=journal_id,
-        oa_status=oa_status,
-        language=language,
-        container_title=container_title,
-        abstract=abstract,
-        cited_by_count=cited_by_count,
-        biblio=biblio,
-        keywords=keywords,
-        topics=topics,
-        urls=urls,
-        external_ids=external_ids,
+        journal_id=pub_meta["journal_id"],
+        oa_status=pub_meta["oa_status"],
+        language=pub_meta["language"],
+        container_title=pub_meta["container_title"],
+        abstract=rec.get("abstract"),
+        cited_by_count=rec.get("cited_by_count"),
+        biblio=rec.get("biblio"),
+        keywords=rec.get("keywords"),
+        topics=rec.get("topics"),
+        urls=rec.get("urls"),
+        external_ids=rec.get("external_ids"),
     )
 
 

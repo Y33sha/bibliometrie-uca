@@ -778,15 +778,11 @@ class TestUpsertWrappers:
 
 
 class TestInsertWosDocument:
-    def test_forwards_meta_and_rec_to_queries(self):
+    def test_forwards_pub_meta_and_rec_extras_to_queries(self):
         queries = MagicMock()
         queries.upsert_wos_source_publication.return_value = 555
         rec = {
             "ut": "WOS:1",
-            "doi": "10.1/x",
-            "title": "T",
-            "pub_year": 2024,
-            "doc_type": "article",
             "abstract": "abs",
             "cited_by_count": 9,
             "biblio": {"volume": "1"},
@@ -796,6 +792,10 @@ class TestInsertWosDocument:
             "external_ids": {"pmid": "12345"},
         }
         pub_meta = {
+            "doi": "10.1/x",
+            "title": "T",
+            "pub_year": 2024,
+            "doc_type": "article",
             "journal_id": 42,
             "oa_status": "gold",
             "language": "en",
@@ -810,28 +810,39 @@ class TestInsertWosDocument:
         kwargs = queries.upsert_wos_source_publication.call_args.kwargs
         assert kwargs["ut"] == "WOS:1"
         assert kwargs["doi"] == "10.1/x"
+        assert kwargs["title"] == "T"
+        assert kwargs["pub_year"] == 2024
+        assert kwargs["doc_type"] == "article"
         assert kwargs["journal_id"] == 42
         assert kwargs["oa_status"] == "gold"
+        assert kwargs["language"] == "en"
         assert kwargs["abstract"] == "abs"
         assert kwargs["cited_by_count"] == 9
         assert kwargs["staging_id"] == 10
         assert kwargs["publication_id"] is None
 
-    def test_pub_meta_none_keeps_journal_id_none(self):
+    def test_none_pub_meta_values_propagate(self):
         queries = MagicMock()
         queries.upsert_wos_source_publication.return_value = 1
-        rec = {
-            "ut": "WOS:1",
+        rec = {"ut": "WOS:1"}
+        pub_meta = {
             "doi": None,
             "title": "T",
             "pub_year": None,
             "doc_type": "other",
+            "journal_id": None,
+            "oa_status": None,
+            "language": None,
+            "container_title": None,
         }
-        insert_wos_document(None, queries, rec, staging_id=5, publication_id=None, pub_meta=None)
+        insert_wos_document(
+            None, queries, rec, staging_id=5, publication_id=None, pub_meta=pub_meta
+        )
 
         kwargs = queries.upsert_wos_source_publication.call_args.kwargs
         assert kwargs["journal_id"] is None
         assert kwargs["oa_status"] is None
+        assert kwargs["doi"] is None
 
 
 # ── _resolve_addresses_batch ─────────────────────────────────────
