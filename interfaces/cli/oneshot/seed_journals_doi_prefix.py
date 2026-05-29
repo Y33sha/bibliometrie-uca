@@ -29,6 +29,9 @@ Cas typiques bien gérés :
 Cas qui tombent en « ambigu » (écrits dans le CSV de sortie pour analyse manuelle) :
 - LCP s'effondre à `10.PUBLISHER/` (publisher-only) ou `10.` (multi-publisher persistant).
 - LCP avec moins de `MIN_CHARS_AFTER_SLASH` caractères après le `/`.
+- LCP ISBN-like (`/978...` ou `/979...`) : DOIs Springer/CUP qui encodent
+  l'ISBN-13 du livre — le fragment commun aux DOIs d'une série de livres
+  n'est PAS spécifique à la série, juste à un imprint éditeur.
 - Aucun DOI ne reste après filtrage outliers (journal qui *est* un serveur
   de preprints : bioRxiv, Research Square, Preprints.org, ...).
 
@@ -71,6 +74,10 @@ log = setup_logger("seed_journals_doi_prefix", os.path.dirname(__file__))
 # perte du code journal.
 _TRIM_DIGITS_RE = re.compile(r"[0-9]+$")
 _TRIM_SEPARATORS_RE = re.compile(r"[.\-_]+$")
+# Préfixe ISBN-13 (978/979) : les DOIs de chapitres Springer/CUP encodent
+# l'ISBN dans le chemin (`10.1007/978-3-030-XXXXX-X_n`). La LCP attrape
+# alors un fragment d'ISBN qui n'est pas spécifique au journal/série.
+_ISBN_PREFIX_RE = re.compile(r"^97[89]")
 
 MIN_CHARS_AFTER_SLASH = 1
 MIN_PUBS_PER_JOURNAL = 10
@@ -126,12 +133,19 @@ def is_ambiguous(trimmed_lcp: str) -> bool:
     - Moins de `MIN_CHARS_AFTER_SLASH` chars après le `/` → ambigu
       (préfixe publisher seul, ou journal-code de 1-2 lettres pas assez
       discriminant ; cf. note utilisatrice).
+    - Préfixe ISBN-like (`/978...` ou `/979...`) : DOIs Springer/CUP/etc.
+      qui embarquent l'ISBN-13 du livre dans le chemin. La LCP attrape un
+      fragment d'ISBN qui n'est PAS spécifique au journal/série. → ambigu.
     """
     slash_idx = trimmed_lcp.find("/")
     if slash_idx == -1:
         return True
     after = trimmed_lcp[slash_idx + 1 :]
-    return len(after) < MIN_CHARS_AFTER_SLASH
+    if len(after) < MIN_CHARS_AFTER_SLASH:
+        return True
+    if _ISBN_PREFIX_RE.match(after):
+        return True
+    return False
 
 
 def main() -> None:
