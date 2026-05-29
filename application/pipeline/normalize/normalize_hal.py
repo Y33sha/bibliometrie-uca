@@ -42,7 +42,7 @@ from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.publications.metadata import has_minimal_publication_metadata
-from domain.sources.hal import derive_hal_doc_type, derive_hal_oa_status
+from domain.sources.hal import derive_hal_oa_status
 from domain.sources.zenodo import ZenodoResolutionError, is_zenodo_doi
 from domain.types import JsonValue
 
@@ -105,37 +105,36 @@ def upsert_journal(
 def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     """Extrait les metadonnees de publication d'un document HAL.
 
-    Retourne un dict utilisable par find_or_create_publication.
+    Retourne un dict utilisable par ``insert_hal_document``. Toutes les
+    valeurs sont brutes — pas de transformation de cohérence. ``doc_type``
+    est le concat brut ``docType_s_docSubType_s`` (ex. ``ART_review-article``),
+    pas le mapping canonique de ``derive_hal_doc_type`` (qui relève du
+    canonique, pas du brut stocké dans ``source_publications``).
     """
-    doi = clean_doi(as_str(doc.get("doiId_s")))
     title = get_title(doc)
-    pub_year = doc.get("producedDateY_i")
-
-    doc_type = derive_hal_doc_type(doc.get("docType_s"), doc.get("docSubType_s"))
+    raw_type = doc.get("docType_s") or ""
+    raw_sub = doc.get("docSubType_s") or ""
+    doc_type = f"{raw_type}_{raw_sub}" if raw_sub else raw_type or None
 
     language_list = doc.get("language_s")
     language = language_list[0] if isinstance(language_list, list) and language_list else None
-
-    oa_status = derive_hal_oa_status(
-        doc.get("openAccess_bool"),
-        doc.get("fileMain_s"),
-        doc.get("linkExtId_s"),
-    )
 
     container_title = None
     if not journal_id:
         container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
 
-    nnt = normalize_nnt(as_str(doc.get("nntId_s")))
-
     return dict(
         title=title,
         title_normalized=normalize_text(title),
-        pub_year=pub_year,
+        pub_year=doc.get("producedDateY_i"),
         doc_type=doc_type,
-        doi=doi,
-        nnt=nnt,
-        oa_status=oa_status,
+        doi=clean_doi(as_str(doc.get("doiId_s"))),
+        nnt=normalize_nnt(as_str(doc.get("nntId_s"))),
+        oa_status=derive_hal_oa_status(
+            doc.get("openAccess_bool"),
+            doc.get("fileMain_s"),
+            doc.get("linkExtId_s"),
+        ),
         journal_id=journal_id,
         container_title=container_title,
         language=language,
@@ -155,22 +154,16 @@ def insert_hal_document(
     hal_id: str,
     hal_collections_staging: list | None,
     publication_id: int | None,
-    pub_meta: dict | None = None,
+    pub_meta: dict,
 ) -> int:
-    """
-    Crée/retrouve l'entrée source_publications pour HAL.
-    Le champ hal_collections agrège toutes les collections vues.
-    Retourne source_publications.id.
-    """
-    doi = clean_doi(as_str(doc.get("doiId_s")))
-    title = get_title(doc)
-    pub_year = doc.get("producedDateY_i")
+    """Crée/retrouve l'entrée source_publications pour HAL.
 
-    # Type + sous-type concaténés (ex: "ART_review-article")
-    raw_type = doc.get("docType_s") or ""
-    raw_sub = doc.get("docSubType_s") or ""
-    doc_type = f"{raw_type}_{raw_sub}" if raw_sub else raw_type
-
+    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
+    journal_id, oa_status, language, container_title) viennent toutes de
+    ``pub_meta``, construit en amont par ``extract_pub_metadata``. ``doc``
+    ne sert ici que pour les extras HAL-spécifiques (collections, abstract,
+    keywords, domaines, biblio, urls).
+    """
     # Collections : depuis le staging (text[]) + collCode_s du raw_data
     collections = set()
     if hal_collections_staging:
@@ -182,16 +175,9 @@ def insert_hal_document(
     collections_array = sorted(collections) if collections else None
 
     # Clés de dédup cross-source dans external_ids. `hal_id` est redondant avec `source_id` côté identité, mais on le pose aussi ici pour que les queries de matching/linking (`find_by_hal_id`, `bulk_link_orphans_by_hal_id`) puissent traiter HAL comme toutes les autres sources — symétrie avec ce que theses fait déjà pour NNT.
-    nnt = normalize_nnt(as_str(doc.get("nntId_s")))
     external_ids: dict[str, JsonValue] = {"hal_id": hal_id}
-    if nnt:
+    if nnt := pub_meta["nnt"]:
         external_ids["nnt"] = nnt
-
-    # Métadonnées de publication (pour création différée)
-    journal_id = pub_meta.get("journal_id") if pub_meta else None
-    oa_status = pub_meta.get("oa_status") if pub_meta else None
-    language = pub_meta.get("language") if pub_meta else None
-    container_title = pub_meta.get("container_title") if pub_meta else None
 
     # Abstract
     abstract = as_str(doc.get("abstract_s"))
@@ -240,18 +226,18 @@ def insert_hal_document(
     return queries.upsert_hal_source_publication(
         conn,
         hal_id=hal_id,
-        doi=doi,
-        title=title,
-        pub_year=pub_year,
-        doc_type=doc_type,
+        doi=pub_meta["doi"],
+        title=pub_meta["title"] or "",
+        pub_year=pub_meta["pub_year"],
+        doc_type=pub_meta["doc_type"],
         hal_collections=collections_array,
         publication_id=publication_id,
         staging_id=staging_id,
         external_ids=external_ids,
-        journal_id=journal_id,
-        oa_status=oa_status,
-        language=language,
-        container_title=container_title,
+        journal_id=pub_meta["journal_id"],
+        oa_status=pub_meta["oa_status"],
+        language=pub_meta["language"],
+        container_title=pub_meta["container_title"],
         abstract=abstract,
         keywords=keywords,
         topics=topics,
