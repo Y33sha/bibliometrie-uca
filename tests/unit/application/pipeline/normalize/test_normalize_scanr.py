@@ -24,6 +24,19 @@ class _FakeQueries:
         return 999
 
 
+_EMPTY_PUB_META: dict[str, Any] = {
+    "doi": None,
+    "title": None,
+    "pub_year": None,
+    "doc_type": None,
+    "nnt": None,
+    "journal_id": None,
+    "oa_status": None,
+    "language": None,
+    "container_title": None,
+}
+
+
 class TestInsertScanrDocumentBiblio:
     def _call(self, queries, doc) -> dict[str, Any]:
         insert_scanr_document(
@@ -33,7 +46,7 @@ class TestInsertScanrDocumentBiblio:
             staging_id=1,
             scanr_id="sc-1",
             publication_id=None,
-            pub_meta=None,
+            pub_meta=_EMPTY_PUB_META,
         )
         return queries.upserted_documents[-1]
 

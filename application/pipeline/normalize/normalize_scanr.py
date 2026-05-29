@@ -105,26 +105,30 @@ def upsert_journal(
 
 
 def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None = None) -> dict:
-    doi = extract_doi(doc)
+    """Extrait les métadonnées de publication d'un document ScanR.
+
+    Retourne un dict utilisable par ``insert_scanr_document``. Toutes les
+    valeurs sont brutes — pas de fallback (le brut de
+    ``source_publications.doc_type`` est nullable text) ni de transformation
+    de cohérence. ``language`` est posé à ``None`` : l'API ScanR ne l'expose
+    pas.
+    """
     title = get_title(doc)
-    pub_year = doc.get("year")
-    doc_type = doc.get("type") or "other"
-    oa_status = derive_scanr_oa_status(doc.get("isOa"), doc.get("oaEvidence"))
     container_title = None
     if not journal_id:
         source = doc.get("source") or {}
         container_title = source.get("title")
-    nnt = extract_nnt_from_scanr_id(scanr_id)
     return dict(
         title=title,
         title_normalized=normalize_text(title) if title else None,
-        pub_year=pub_year,
-        doc_type=doc_type,
-        doi=doi,
-        nnt=nnt,
-        oa_status=oa_status,
+        pub_year=doc.get("year"),
+        doc_type=doc.get("type"),
+        doi=extract_doi(doc),
+        nnt=extract_nnt_from_scanr_id(scanr_id),
+        oa_status=derive_scanr_oa_status(doc.get("isOa"), doc.get("oaEvidence")),
         journal_id=journal_id,
         container_title=container_title,
+        language=None,
     )
 
 
@@ -140,19 +144,20 @@ def insert_scanr_document(
     staging_id: int,
     scanr_id: str,
     publication_id: int | None,
-    pub_meta: dict | None = None,
+    pub_meta: dict,
 ) -> int:
-    doi = extract_doi(doc)
-    hal_id = extract_hal_id(doc)
-    title = get_title(doc) or ""
-    pub_year = doc.get("year")
-    doc_type = doc.get("type")
+    """Crée/retrouve l'entrée source_publications pour ScanR.
 
+    Les métadonnées canoniques (doi, title, pub_year, doc_type, nnt,
+    journal_id, oa_status, language, container_title) viennent toutes de
+    ``pub_meta``, construit en amont par ``extract_pub_metadata``. ``doc``
+    ne sert ici que pour les extras ScanR-spécifiques (hal_id, pmid,
+    abstract, biblio, keywords, topics, urls).
+    """
     ext: dict[str, JsonValue] = {}
-    if hal_id:
+    if hal_id := extract_hal_id(doc):
         ext["hal_id"] = hal_id
-    nnt = extract_nnt_from_scanr_id(scanr_id)
-    if nnt:
+    if nnt := pub_meta["nnt"]:
         ext["nnt"] = nnt
     for eid in doc.get("externalIds") or []:
         if isinstance(eid, dict) and eid.get("type") and eid.get("id"):
@@ -199,11 +204,6 @@ def insert_scanr_document(
             seen.add(u)
             urls.append(u)
 
-    journal_id = pub_meta.get("journal_id") if pub_meta else None
-    oa_status = pub_meta.get("oa_status") if pub_meta else None
-    language = pub_meta.get("language") if pub_meta else None
-    container_title = pub_meta.get("container_title") if pub_meta else None
-
     # Publisher + journal bruts (traçabilité du nom tel que vu par ScanR,
     # en parallèle des publishers/journals créés via find_or_create_*).
     source = doc.get("source") or {}
@@ -225,17 +225,17 @@ def insert_scanr_document(
     return queries.upsert_scanr_source_publication(
         conn,
         scanr_id=scanr_id,
-        doi=doi,
-        title=title,
-        pub_year=pub_year,
-        doc_type=doc_type,
+        doi=pub_meta["doi"],
+        title=pub_meta["title"] or "",
+        pub_year=pub_meta["pub_year"],
+        doc_type=pub_meta["doc_type"],
         publication_id=publication_id,
         staging_id=staging_id,
         external_ids=external_ids,
-        journal_id=journal_id,
-        oa_status=oa_status,
-        language=language,
-        container_title=container_title,
+        journal_id=pub_meta["journal_id"],
+        oa_status=pub_meta["oa_status"],
+        language=pub_meta["language"],
+        container_title=pub_meta["container_title"],
         abstract=abstract,
         keywords=keywords,
         topics=topics,
