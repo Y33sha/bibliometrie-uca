@@ -1,31 +1,49 @@
 # STATUS: oneshot (2026-05-22)
 """Seed `journals.doi_prefix` via la LCP (longest common prefix) des DOIs des publis rattachées.
 
-Pour chaque revue avec ≥10 publications avec DOI distinct, on calcule la
-plus longue chaîne commune en tête de leurs DOIs, on retire la queue
-variable (digits, ponctuation), et on écrit le résultat dans
-`journals.doi_prefix` si ce résultat est suffisamment spécifique
-(au moins 3 caractères après le `/`).
+Pour chaque revue avec ≥`MIN_PUBS_PER_JOURNAL` publications avec DOI
+distinct, on calcule la plus longue chaîne commune en tête de leurs DOIs,
+on retire la queue variable (digits, ponctuation), et on écrit le résultat
+dans `journals.doi_prefix` si ce résultat est suffisamment spécifique (au
+moins `MIN_CHARS_AFTER_SLASH` caractères après le `/`).
+
+Pré-filtrage outliers : on retire des DOIs d'entrée ceux qui correspondent
+à des préfixes preprint server / aggregateur connus (`OUTLIER_DOI_PREFIXES`).
+Sinon une publi avec un DOI bioRxiv `10.1101/...` posée sur Nature
+Communications effondrerait la LCP au niveau `10.`. Ces DOIs outliers sont
+précisément ce que la Phase 4a (cohérence DOI ↔ journal) doit flagger comme
+incohérence — ils n'ont pas vocation à entrer dans la définition du
+`doi_prefix` du journal.
+
+À terme, un filtre publisher (DOIs dont le préfixe résout vers le publisher
+du journal via `doi_prefixes`) serait plus robuste — pas implémenté car
+`journals.publisher_id` (issu des sources HAL/OA/WoS) et
+`doi_prefixes.publisher_id` (issu de Crossref) ne sont pas alignés tant que
+le dédoublonnage publishers n'a pas été fait sur cette base.
 
 Cas typiques bien gérés :
 - PLOS ONE : `10.1371/journal.pone.0271233`, `.0135715`, ... → LCP `10.1371/journal.pone.0` → trim → `10.1371/journal.pone`
 - JHEP : `10.1007/jhep04(2025)105`, `jhep05(2025)038`, ... → LCP `10.1007/jhep0` → trim → `10.1007/jhep`
-- Physics Letters B : `10.1016/j.physletb.<id>`, ... → trim → `10.1016/j.physletb`
+- Sensors : `10.3390/s2*` (MDPI code 1-char) → trim → `10.3390/s`
 
 Cas qui tombent en « ambigu » (écrits dans le CSV de sortie pour analyse manuelle) :
-- LCP s'effondre à `10.PUBLISHER/` ou `10.` parce qu'un outlier brise la chaîne commune.
-- LCP avec moins de 3 caractères après le `/` (préfixe trop court pour discriminer).
+- LCP s'effondre à `10.PUBLISHER/` (publisher-only) ou `10.` (multi-publisher persistant).
+- LCP avec moins de `MIN_CHARS_AFTER_SLASH` caractères après le `/`.
+- Aucun DOI ne reste après filtrage outliers (journal qui *est* un serveur
+  de preprints : bioRxiv, Research Square, Preprints.org, ...).
 
-Stratégie stricte (Phase A) : 1 outlier suffit à passer en ambigu. C'est
-intentionnel — on observe ce que ça donne, on ajustera (drop 5% outliers
-ou autre) si le ratio ambigu/seedé est trop défavorable.
+Stratégie C-stricte : on n'écrit pas de préfixe publisher-only (`10.1103/`,
+`10.4000/`, ...). Pour les revues sans subprefix journal-spécifique (APS new
+format, OpenEdition opaque IDs), `doi_prefix` reste NULL — la cohérence DOI
+↔ journal en Phase 4a se fera via `doi_prefixes.publisher_id`.
 
-Écrase systématiquement la valeur existante (très peu de données manuelles
-en base pour ce champ ; le script fait autorité pour son scope).
+Écrase systématiquement la valeur existante pour les journaux non-ambigus
+de l'échantillon analysé. Ne touche pas les ambigus (ancienne valeur conservée).
 
 Usage :
     python -m interfaces.cli.oneshot.seed_journals_doi_prefix
     python -m interfaces.cli.oneshot.seed_journals_doi_prefix --dry-run
+    python -m interfaces.cli.oneshot.seed_journals_doi_prefix --min-pubs 3
 """
 
 from __future__ import annotations
@@ -54,8 +72,29 @@ log = setup_logger("seed_journals_doi_prefix", os.path.dirname(__file__))
 _TRIM_DIGITS_RE = re.compile(r"[0-9]+$")
 _TRIM_SEPARATORS_RE = re.compile(r"[.\-_]+$")
 
-MIN_CHARS_AFTER_SLASH = 3
+MIN_CHARS_AFTER_SLASH = 1
 MIN_PUBS_PER_JOURNAL = 10
+
+# Préfixes ou sous-préfixes des serveurs de preprints et aggregateurs publics.
+# Un DOI commençant par l'un de ces motifs est retiré avant calcul de la LCP.
+# Pour `10.5194`, on filtre uniquement le sous-préfixe `egusphere-` (preprints
+# EGU) sans toucher aux journaux Copernicus légitimes (`acp-`, `bg-`, etc.).
+OUTLIER_DOI_PREFIXES: tuple[str, ...] = (
+    "10.1101/",  # bioRxiv / medRxiv (Cold Spring Harbor)
+    "10.48550/arxiv",  # arXiv
+    "10.2139/ssrn",  # SSRN
+    "10.5281/zenodo",  # Zenodo
+    "10.20944/preprints",  # MDPI Preprints
+    "10.5194/egusphere-",  # EGU sphere preprints (Copernicus)
+    "10.21203/rs.",  # Research Square
+    "10.22541/au.",  # Authorea preprints
+    "10.31223/",  # EarthArXiv
+)
+
+
+def is_outlier(doi: str) -> bool:
+    """Préfixe preprint / aggregateur connu : à exclure du calcul LCP."""
+    return any(doi.startswith(p) for p in OUTLIER_DOI_PREFIXES)
 
 
 def lcp(strings: list[str]) -> str:
@@ -109,29 +148,57 @@ def main() -> None:
         default="data/doi_prefix_seed_ambiguous.csv",
         help="Chemin du CSV pour les cas ambigus (relatif à la racine du repo).",
     )
+    parser.add_argument(
+        "--min-pubs",
+        type=int,
+        default=MIN_PUBS_PER_JOURNAL,
+        help=f"Nombre min de DOIs distincts par journal pour être analysé (défaut : {MIN_PUBS_PER_JOURNAL}).",
+    )
     args = parser.parse_args()
 
     engine = get_sync_engine()
     with engine.connect() as conn, conn.begin():
         rows = conn.execute(
-            text(f"""
+            text("""
                 SELECT j.id, j.title,
                        array_agg(DISTINCT p.doi ORDER BY p.doi) AS dois
                 FROM journals j
                 JOIN publications p ON p.journal_id = j.id
                 WHERE p.doi IS NOT NULL
                 GROUP BY j.id, j.title
-                HAVING COUNT(DISTINCT p.doi) >= {MIN_PUBS_PER_JOURNAL}
-            """)
+                HAVING COUNT(DISTINCT p.doi) >= :min_pubs
+            """),
+            {"min_pubs": args.min_pubs},
         ).all()
-        log.info("Journaux à analyser (≥%d publis DOI) : %d", MIN_PUBS_PER_JOURNAL, len(rows))
+        log.info("Journaux à analyser (≥%d publis DOI) : %d", args.min_pubs, len(rows))
 
         update_stmt = text("UPDATE journals SET doi_prefix = :p WHERE id = :id")
 
         seeded = 0
         ambiguous: list[dict] = []
+        empty_after_filter = 0
         for r in rows:
-            common = lcp(r.dois)
+            filtered_dois = [doi for doi in r.dois if not is_outlier(doi)]
+
+            if not filtered_dois:
+                # Tous les DOIs du journal sont des outliers preprint/aggregator
+                # — cas attendu pour bioRxiv, SSRN eux-mêmes, etc. On les
+                # remonte en ambigu pour traçabilité.
+                empty_after_filter += 1
+                ambiguous.append(
+                    {
+                        "journal_id": r.id,
+                        "title": r.title,
+                        "n_dois": len(r.dois),
+                        "n_filtered": 0,
+                        "lcp_raw": "",
+                        "lcp_trimmed": "",
+                        "sample_dois": json.dumps(r.dois[:5]),
+                    }
+                )
+                continue
+
+            common = lcp(filtered_dois)
             trimmed = trim_trailing_variable(common)
             if is_ambiguous(trimmed):
                 ambiguous.append(
@@ -139,9 +206,10 @@ def main() -> None:
                         "journal_id": r.id,
                         "title": r.title,
                         "n_dois": len(r.dois),
+                        "n_filtered": len(filtered_dois),
                         "lcp_raw": common,
                         "lcp_trimmed": trimmed,
-                        "sample_dois": json.dumps(r.dois[:5]),
+                        "sample_dois": json.dumps(filtered_dois[:5]),
                     }
                 )
                 continue
@@ -158,6 +226,7 @@ def main() -> None:
                         "journal_id",
                         "title",
                         "n_dois",
+                        "n_filtered",
                         "lcp_raw",
                         "lcp_trimmed",
                         "sample_dois",
@@ -167,11 +236,12 @@ def main() -> None:
                 writer.writerows(ambiguous)
 
         log.info("─── Seed terminé ───")
-        log.info("Total analysés       : %d", len(rows))
-        log.info("Seedés               : %d", seeded)
-        log.info("Ambigus (→ CSV)      : %d", len(ambiguous))
+        log.info("Total analysés                : %d", len(rows))
+        log.info("Seedés                        : %d", seeded)
+        log.info("Ambigus (→ CSV)               : %d", len(ambiguous))
+        log.info("  dont 100%% outliers          : %d", empty_after_filter)
         if ambiguous:
-            log.info("CSV ambigus          : %s", args.csv_out)
+            log.info("CSV ambigus                   : %s", args.csv_out)
         if args.dry_run:
             log.info("[DRY RUN] Aucune modification appliquée.")
 
