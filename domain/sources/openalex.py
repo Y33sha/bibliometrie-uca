@@ -12,8 +12,6 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from domain.normalize import normalize_name
-from domain.persons.name_matching import names_compatible, parse_raw_author_name
 from domain.publications.identifiers import extract_hal_id_from_url, normalize_nnt
 
 # =============================================================
@@ -234,44 +232,3 @@ def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]:
             if m:
                 external_ids["pmc"] = f"PMC{m.group(1)}"
     return external_ids
-
-
-def keep_orcid_if_name_matches(
-    raw_full_name: str,
-    oa_full_name: str | None,
-    oa_orcid: str | None,
-) -> str | None:
-    """Filtre l'ORCID porté par une entité auteur OpenAlex.
-
-    OpenAlex assigne à chaque ``authorship`` du work une entité auteur
-    (``author.id`` côté OpenAlex) à laquelle est rattaché un ORCID.
-    Cette assignation passe par leur propre matching nom × affiliation
-    et est régulièrement fautive : un mauvais auteur attribué à la
-    signature → on hérite de l'ORCID d'une autre personne.
-
-    Garde-fou : on ne conserve l'ORCID OpenAlex que si le nom de
-    l'entité auteur OpenAlex (``oa_full_name``) est compatible (au
-    sens de ``names_compatible``) avec le ``raw_author_name`` que
-    l'authorship porte côté source.
-
-    Renvoie ``oa_orcid`` si compatible. Renvoie ``None`` si :
-
-    - ``oa_orcid`` est ``None`` ou vide ;
-    - ``oa_full_name`` est ``None`` ou vide (cas où le payload OA
-      n'embarque pas le ``display_name`` de l'entité auteur — on ne
-      peut pas vérifier la compatibilité, donc on rejette par défaut
-      pour éviter d'introduire un faux positif) ;
-    - les deux noms sont incompatibles.
-    """
-    if not oa_orcid or not oa_full_name:
-        return None
-    src_ln, src_fn = parse_raw_author_name(raw_full_name)
-    oa_ln, oa_fn = parse_raw_author_name(oa_full_name)
-    if names_compatible(
-        normalize_name(src_ln),
-        normalize_name(src_fn),
-        normalize_name(oa_ln),
-        normalize_name(oa_fn),
-    ):
-        return oa_orcid
-    return None

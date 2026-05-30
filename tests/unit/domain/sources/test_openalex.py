@@ -5,73 +5,11 @@ from domain.sources.openalex import (
     is_hal_location,
     is_repository_location,
     is_theses_fr_location,
-    keep_orcid_if_name_matches,
     map_openalex_oa_status,
     parse_locations,
     parse_primary_location,
     should_skip_publisher_journal,
 )
-
-
-class TestKeepOrcidIfNameMatches:
-    def test_match_returns_orcid(self):
-        assert (
-            keep_orcid_if_name_matches(
-                raw_full_name="Dupont, Jean",
-                oa_full_name="Jean Dupont",
-                oa_orcid="0000-0001-2345-6789",
-            )
-            == "0000-0001-2345-6789"
-        )
-
-    def test_mismatch_returns_none(self):
-        """OpenAlex a assigné un mauvais auteur → ORCID rejeté."""
-        assert (
-            keep_orcid_if_name_matches(
-                raw_full_name="Dupont, Jean",
-                oa_full_name="Martin, Paul",
-                oa_orcid="0000-0001-2345-6789",
-            )
-            is None
-        )
-
-    def test_missing_orcid_returns_none(self):
-        assert (
-            keep_orcid_if_name_matches(
-                raw_full_name="Dupont, Jean",
-                oa_full_name="Jean Dupont",
-                oa_orcid=None,
-            )
-            is None
-        )
-
-    def test_empty_oa_full_name_returns_none(self):
-        """Sans nom OA, on ne peut pas vérifier la compatibilité → on rejette."""
-        assert (
-            keep_orcid_if_name_matches(
-                raw_full_name="Dupont, Jean",
-                oa_full_name="",
-                oa_orcid="0000-0001-2345-6789",
-            )
-            is None
-        )
-
-    def test_none_oa_full_name_returns_none(self):
-        """`display_name` absent du payload OA (cas `None`) → rejet par défaut.
-
-        Sans `display_name` on ne peut pas vérifier la compatibilité avec
-        le `raw_author_name`. Comportement défensif : on préfère perdre un
-        ORCID légitime plutôt que d'accepter un ORCID dont on ne peut pas
-        confirmer l'attribution.
-        """
-        assert (
-            keep_orcid_if_name_matches(
-                raw_full_name="Dupont, Jean",
-                oa_full_name=None,
-                oa_orcid="0000-0001-2345-6789",
-            )
-            is None
-        )
 
 
 class TestExtractExternalIdsFromUrls:

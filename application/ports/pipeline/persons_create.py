@@ -11,7 +11,7 @@ from sqlalchemy import Connection
 class BareUnlinkedAuthorship(NamedTuple):
     """Projection SQL brute : `source_authorships` UCA non rattaché à une personne.
 
-    `oa_display_name` est renseigné uniquement pour les rows OpenAlex (sert au filtre `keep_orcid_if_name_matches` côté caller). `None` pour les autres sources. `roles` non vide en pratique uniquement pour theses (auteur vs directeur).
+    `roles` non vide en pratique uniquement pour theses (auteur vs directeur).
     """
 
     authorship_id: int
@@ -20,7 +20,6 @@ class BareUnlinkedAuthorship(NamedTuple):
     author_name_normalized: str | None
     orcid: str | None
     idref: str | None
-    oa_display_name: str | None
     roles: list[str] | None
     publication_id: int | None
     author_position: int

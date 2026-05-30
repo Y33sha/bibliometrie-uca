@@ -82,36 +82,22 @@ def _insert_authorship(
     in_perimeter=True,
     person_id=None,
     identifiers=None,
-    source_data=None,
 ):
     """Insère une source_authorship.
 
     `identifiers` est un dict pour `person_identifiers` (JSONB) :
     ex. `{"orcid": "0000-...", "idref": "...", "hal_person_id": 42, ...}`.
-
-    `source_data` est un dict pour `source_data` (JSONB). Pour les rows
-    OpenAlex qui portent un ORCID, on attend en pratique
-    `{"display_name": ...}` (le filtre `keep_orcid_if_name_matches`
-    rejette l'ORCID sinon — cf. `domain/sources/openalex.py`). Pour les
-    helpers qui ne précisent rien, on défaut sur `display_name =
-    raw_author_name` quand `source == "openalex"` et qu'un ORCID est
-    fourni, pour reproduire le cas nominal où OA a correctement
-    matché l'entité auteur.
     """
-    if source_data is None and source == "openalex" and identifiers and identifiers.get("orcid"):
-        source_data = {"display_name": raw_author_name}
-
     stmt = text("""
         INSERT INTO source_authorships
             (source, source_publication_id, author_position,
              in_perimeter, person_id, raw_author_name, person_identifiers,
-             source_data, author_name_normalized)
+             author_name_normalized)
         VALUES (:src, :sd, :pos, :in_perim, :person_id,
-                :raw, :person_identifiers, :source_data, normalize_name_form(:raw))
+                :raw, :person_identifiers, normalize_name_form(:raw))
         RETURNING id
     """).bindparams(
         bindparam("person_identifiers", type_=JSONB),
-        bindparam("source_data", type_=JSONB),
     )
     return conn.execute(
         stmt,
@@ -123,7 +109,6 @@ def _insert_authorship(
             "person_id": person_id,
             "raw": raw_author_name,
             "person_identifiers": identifiers,
-            "source_data": source_data,
         },
     ).scalar_one()
 
@@ -223,6 +208,32 @@ class TestCascadeRun:
         # Pas le rattachement par ORCID rejected ; la cascade peut fallback sur
         # name_form qui ne match pas non plus → création (pas le person_id seedé).
         assert _get_person_id(sa_sync_conn, oa_as) != person_id
+
+    def test_wos_orcid_not_used_as_match_signal(self, sa_sync_conn):
+        """ORCID porté par une authorship WoS → ignoré comme signal de matching.
+
+        L'ORCID WoS (`PreferredORCID`) est attribué par le matching algorithmique
+        interne de Web of Science, régulièrement fautif. Même quand il pointe vers
+        un ORCID confirmé en base, il ne doit pas rattacher l'authorship (cf.
+        `ORCID_MATCH_SOURCES`). Le nom ne matchant pas non plus → pas de
+        rattachement à la personne seedée.
+        """
+        pub = _insert_publication(sa_sync_conn)
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
+        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
+
+        wos_sd = _insert_source_document(sa_sync_conn, "wos", "WOS:111", pub)
+        wos_as = _insert_authorship(
+            sa_sync_conn,
+            "wos",
+            wos_sd,
+            "Toto Inconnu",
+            identifiers={"orcid": "0000-0001-2345-6789"},
+        )
+
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, wos_as) != person_id
 
     def test_name_form_match_imports_identifiers(self, sa_sync_conn):
         """Match par name_form → identifiers importés en pending (pour vérification

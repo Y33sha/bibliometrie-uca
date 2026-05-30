@@ -19,8 +19,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
 
     Colonnes :
 
-    - `orcid`, `idref` : lus directement depuis `person_identifiers` (JSONB), sans filtre par source. Le caller décide ce qu'il en fait selon la source (cf. `keep_orcid_if_name_matches` pour OpenAlex).
-    - `oa_display_name` : nom de l'entité auteur OpenAlex (`source_data->>'display_name'`), renseigné uniquement pour les rows OpenAlex et seulement quand `display_name` était présent dans le payload. Sert au filtre `keep_orcid_if_name_matches` qui rejette un ORCID OA si le nom de l'entité auteur diverge du `raw_author_name` de la signature (OA assigne parfois une mauvaise entité auteur, on hérite alors d'un ORCID qui n'est pas celui de l'auteur). `None` pour les autres sources.
+    - `orcid`, `idref` : lus directement depuis `person_identifiers` (JSONB), sans filtre par source. La restriction de l'ORCID aux sources fiables (cf. `ORCID_MATCH_SOURCES`) est appliquée côté cascade de matching, pas ici.
     - `roles` : remonté tel quel ; en pratique non vide uniquement pour theses (distingue auteur vs directeur).
 
     Le nom (last/first) est parsé côté caller via `parse_raw_author_name(full_name)`.
@@ -35,9 +34,6 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
                    sa_auth.author_name_normalized,
                    sa_auth.person_identifiers->>'orcid' AS orcid,
                    sa_auth.person_identifiers->>'idref' AS idref,
-                   CASE WHEN sa_auth.source = 'openalex'
-                        THEN sa_auth.source_data->>'display_name'
-                        ELSE NULL::text END AS oa_display_name,
                    sa_auth.roles,
                    sd.publication_id,
                    sa_auth.author_position
@@ -58,7 +54,6 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
             author_name_normalized=r.author_name_normalized,
             orcid=r.orcid,
             idref=r.idref,
-            oa_display_name=r.oa_display_name,
             roles=r.roles,
             publication_id=r.publication_id,
             author_position=r.author_position,
