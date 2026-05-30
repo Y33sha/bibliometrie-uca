@@ -64,6 +64,12 @@ Deux manques persistants sur la production du pipeline, identifiés de longue da
 
 Le delta « nouvelles ambiguës insérées par le run » est dérivé du delta sur le count global vs snapshot précédent.
 
+**Observable candidat — doublons probables via conflits d'identifiant** (à ajouter, non livré) :
+
+Pendant la phase `persons`, l'ajout d'identifiants lève un `CannotAttributeConflict` ([`application/persons.py`](../../application/persons.py)) quand un identifiant porté par une authorship rattachée à la personne P est déjà détenu par une autre personne Q (statut `pending`/`confirmed`). Exemple : personne matchée par ORCID, mais l'`idref` de la même authorship appartient déjà à Q. C'est un signal fort que P et Q sont la même personne — un **doublon probable à fusionner**. Aujourd'hui le conflit est capté puis loggé en warning (`add_identifiers_from_authorships`), l'information est perdue.
+
+À capturer : collecter les paires `(P, Q, id_type, id_value)` pendant le run et les exposer dans le snapshot (famille « Qualité matching »), pour alimenter un check post-pipeline listant les doublons probables. Pré-requis : surfacer les deux `person_id` de façon structurée (le message d'exception les porte déjà en texte).
+
 #### Phase 2.2 — Persistance étendue + page admin (snapshot unique par run)
 
 **Décision 2026-05-21** : un seul snapshot par run, un seul livrable UI. Au lieu de séparer « checks » (état post-run de la BDD) et « métriques » (compteurs d'exécution), on persiste l'ensemble dans le même payload JSONB du même snapshot — c'est deux vues du même événement.

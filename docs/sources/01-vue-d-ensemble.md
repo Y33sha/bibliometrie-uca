@@ -41,7 +41,8 @@ Le système intègre 6 sources bibliographiques principales, complétées par de
 
 Deux cas de figure:
 
-- Dans **OpenAlex** et **WoS**, chaque auteur de chaque publication est identifié par une clé interne dans le référentiel personnes de la base. Ces entités auteurs sont algorithmiques et peu fiables (même personne fréquemment divisée en entités multiples, ou personnes distinctes confondues). La présence d'un identifiant ORCID sur ces sources ne prouve pas sa présence dans la publication: le rattachement peut provenir d'un *matching* par nom effectué par OpenAlex/WOS. Signal peu fiable.
+- Dans **OpenAlex** et **WoS**, chaque auteur de chaque publication est identifié par une clé interne dans le référentiel personnes de la base. Ces entités auteurs sont algorithmiques et peu fiables (même personne fréquemment divisée en entités multiples, ou personnes distinctes confondues). L'ORCID rattaché à *l'entité auteur* (`author.orcid` côté OpenAlex, `PreferredORCID` côté WoS) ne prouve pas sa présence dans la publication : le rattachement peut provenir d'un *matching* par nom effectué par la source. Signal peu fiable.
+    - **Nuance OpenAlex** : en plus de l'ORCID d'entité, OpenAlex expose un `raw_orcid` au **niveau de l'authorship**, recopié tel quel de la métadonnée brute de la source amont (Crossref pour l'essentiel des articles à éditeur) — déposé par l'auteur, donc fiable au même titre qu'un ORCID Crossref. C'est `raw_orcid` qu'on retient ; `author.orcid` est ignoré. WoS n'a pas d'équivalent (son `PreferredORCID` est l'ORCID algorithmique, ignoré).
 - Les autres sources (**HAL**, **ScanR**, **theses.fr**, **Crossref**) sont plus conservatrices: pas de tentative d'identification systématique des auteurs. Une même publication peut avoir des auteurs avec ou sans identifiants.
     - **Crossref**: l'identifiant est toujours ORCID. Présent sur une faible minorité d'*authorships* <!--TODO: chiffrer-->, mais signal excellent car la source est toujours l'auteur (circuit: auteur => éditeur => Crossref).
     - **HAL**: l'identifiant est un `personId` interne à HAL, qui identifie un compte HAL. Y sont parfois joints d'autres identifiants (`idHAL`, `IdRef`, `ORCID`) si l'auteur les a ajoutés à son profil HAL. Signal excellent à condition que le document soit rattaché au bon compte HAL (erreurs d'homonymie possibles sur les publis multi-auteurs avec identification automatisée des auteurs lors du dépôt).
@@ -55,7 +56,7 @@ Deux cas de figure:
 | ScanR sans idref | rien | ❌ | (aucun) |
 | theses.fr avec PPN | `ppn` (= `idref`) | ✅ | `idref` |
 | theses.fr sans PPN | rien | ❌ | (aucun) |
-| OpenAlex | `openalex_id` | ⚠️ entité algorithmique non fiable | `orcid` (peu fiable) |
+| OpenAlex | `openalex_id` | ⚠️ entité algorithmique non fiable | `raw_orcid` (fiable, article-level, retenu) ; `author.orcid` (peu fiable, ignoré) |
 | WoS | `daisng_id` | ⚠️ entité algorithmique non fiable | `orcid` (peu fiable), `researcher_id` |
 | CrossRef | rien | ❌ | `orcid` (fiable, article-level) |
 

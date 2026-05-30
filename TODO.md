@@ -11,15 +11,11 @@
 ### Normalisation
 * [ ] batcher pour améliorer la perf? / analyser pour comprendre pourquoi hal + lent
 * [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
-* [ ] création erronée d'idhal numériques par normalize-hal: vérifier que le problème ne réapparaît pas
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 ### Suite du traitement
-* [ ] Crossref: traiter comme n'importe quelle source, exploiter affiliation strings, même minimales.
-* [ ] DOI terminés par /pdf: doublons! ; DOI terminés par .1
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects / idées:  phase_cross_imports expose sources_with_new; phase_subjects : restreindre à (extract_sources ∪ sources_with_new) / phase_countries (refresh_sa_countries_for_source) : laisser scanner toutes les sources (sécurité), mais on peut t'envisager un addresses.updated_at ciblage en option 2 plus tard
 * [ ] authorships: propagate_roles, propagate_is_corresponding, propagate_author_position: tout faire en une passe?
 * [ ] est-ce que les authorships détachées manuellement (donc orphelines) sont à nouveau rattachées au pipeline suivant? si oui => comportement indésirable, à corriger
-* [ ] matching personnes: si pid rejected, interrompre la cascade (ne pas fallback sur le name matching)
 ## Code
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
@@ -35,16 +31,11 @@
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
 * [ ] re-seeder les doi_prefix journals
 ## Explorer autres sources possibles
-* [ ] Crossref: définir sa place dans le pipeline (actuellement: pas d'affiliations donc pas de matching possible)
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée? récupérer pmid dans api HAL
 * [ ] pour les jeux de données: DataCite, Zenodo, autres?
 * [ ] divers: ORCID, IdRef, DOAJ
 * [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait tenter un matching de tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
-## Types de documents: algo de résolution de conflits
-* [ ] publications de type "article" avec source OpenAlex et revue inconnue: généralement des préprints sur des archives en ligne: diagnostiquer et corriger à la source
-* [ ] types wos "composites": étudier, voir si ça représente des types/sous-types comme dans HAL? A priori non: "article;book chapter" => auditer
 ## OA_status / embargos
-* [ ] preprints en accès gold selon OpenAlex: suspect
 * [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] embargos (HAL, theses.fr): afficher dates dans l'UI (existent-elles dans le retour api? creuser)
@@ -69,9 +60,6 @@
 * [ ] quoi faire des entités fausses? a minima, rejeter leurs authorships et s'assurer qu'elles n'apparaissent pas dans orphan-authorships
 * [ ] si source erronée: rejeter authorship source + recalculer affiliations de l'authorship à partir des sources non rejetées / caveat: Clarifier la sémantique de `excluded` sur les authorships sources: est-ce l'authorship qui est fausse, ou son affiliation? (allons plus loin: pourrait-on déclarer fausses certaines colonnes et pas d'autres? via un champ jsonb par exemple)
 * [ ] date de dernière publication UCA? (permet de filtrer les auteurs "legacy" vs actifs)
-* [ ] exclure des orphan authorships celles qui ne me concernent pas (lié à thèse, rôle != auteur)
-### Publishers / Journals
-* [ ] Tri facettes
 ## Publique
 ### Personnes (public)
 * [ ] signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?)

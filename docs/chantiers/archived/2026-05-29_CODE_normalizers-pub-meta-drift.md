@@ -1,5 +1,7 @@
 # Chantier — Dérive `pub_meta` des normalizers
 
+Commencé et terminé le 2026-05-29
+
 ## Contexte
 
 Chaque normalizer expose une paire `extract_pub_metadata(record, journal_id) → dict` puis `insert_<source>_document(..., pub_meta)`. L'intention d'origine, trahie par le commentaire fossile répété partout (`# Métadonnées de publication (pour création différée)`), était que `extract_pub_metadata` porte les champs de la publication *canonique* pour sa création différée, et que `insert_*` les consomme.

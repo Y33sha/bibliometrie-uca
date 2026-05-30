@@ -21,6 +21,8 @@ Règles de correction en place dans [`domain/publications/correction.py`](../../
 - `TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET` — titre supplément (additional file, supplementary *, data from) ⇒ `dataset` (couvre figshare items, Zenodo, DataCite via le titre, plus large que des helpers DOI-préfixe envisagés au départ)
 - `TITLE_ERRATUM_PREFIX_TO_ERRATUM` — titre `erratum/errata/corrigendum` ⇒ `erratum`
 - `TITLE_RETRACTION_PREFIX_TO_RETRACTION` — titre `retraction notice/note` ⇒ `retraction`
+- `TITLE_ISBN_TO_BOOK_REVIEW` — ISBN ou ISBN-13 nu dans le titre + doc_type ∈ {article, review, other} ⇒ `book_review`
+- `TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW` — titre terminé par « (19|20)YY, N p[.|ages] » + mêmes whitelist ⇒ `book_review`
 
 Enum `doc_type` et mappings ([`domain/publications/doc_types.py`](../../domain/publications/doc_types.py)) :
 
@@ -33,19 +35,29 @@ Playbook [`ajouter-une-regle-de-correction.md`](../playbooks/ajouter-une-regle-d
 
 ## Reste à faire
 
-### Book reviews par titre
+Pris dans l'ordre :
 
-`book_review` n'est attrapé que via HAL `art_bookreview` ou WoS `book review`. OpenAlex et CrossRef ne distinguent pas ⇒ règle manquante. Critères-candidats : ISBN dans le titre, titre terminé par « année, nombre de pages » (forme classique des recensions).
-
-Étape suivante : audit SQL pour mesurer l'ampleur et valider la déterminance des patterns. Puis règle `TITLE_*_TO_BOOK_REVIEW` selon le playbook.
+- [x] Book reviews par titre — règles ISBN + année-pages posées (`27e7b1f7`)
+- [x] Préprints article + journal_id inconnu — audit fait, règle `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` posée (`c8be3409`)
+- [ ] Préprints OA gold — flag suspect ← **cible courante**
+- [ ] Types WoS composites — audit
+- [ ] Review = poubelle — audit (à coupler avec book_review une fois traité)
+- [ ] Figshare collections — audit
+- [ ] Posters / conférence avec même DOI — hors-scope correction, à traiter en dédup
+- [ ] Question des raw_type openalex: comparer avec le type affiché
 
 ### Préprints article + journal_id inconnu
 
 Audit 2026-05-28 sur les 744 publications canoniques `doc_type=article` + `journal_id IS NULL` (4.1% des articles). Le périmètre se décompose en au moins trois sous-cas qui ne sont **pas** tous des préprints :
 
-- **162 WoS sans DOI, titres en majuscules** (ex. « MYCENAEAN PAINTING », « ARTWORKS IN CONTEXT The Historical Framework ») — `raw doc_type = 'article'` brut WoS (pas un composite). Plusieurs SPs WoS par publi (signe d'un import multiple). **Pas des préprints** — nature à investiguer (chapitres d'ouvrage WoS mal extraits ?). Hors-scope « préprints », à traiter dans un chantier dédié WoS.
+- **162 WoS sans DOI, titres en majuscules** (ex. « MYCENAEAN PAINTING », « ARTWORKS IN CONTEXT The Historical Framework ») — `raw doc_type = 'article'` brut WoS (pas un composite). Plusieurs SPs WoS par publi (signe d'un import multiple). **Pas des préprints** — souvent les versions EN traduites de publis déjà présentes en base avec leur titre FR d'origine (autre source), ce qui rend la sim_titre cross-langue impossible. Laissé de côté pour ce chantier ; correction ponctuelle si remontée.
 - **67 publis EGU/Copernicus** (DOI `10.5194/egusphere-*`) : mélange de deux familles distinguées par sous-pattern du DOI — `egusphere-egu<YY>-*` = abstracts de la conférence EGU General Assembly (→ `conference_paper`) vs `egusphere-<YYYY>-*` = preprints du serveur EGUsphere (→ `preprint`). Les SPs OA disent 212 `preprint` / 116 `article` / 61 `peer-review` mais l'arbitrage canonique les surclasse en `article` (cf. point ci-dessous sur `_first_doc_type`).
-- **Reste (~515 publis)** : à profiler en passe 2 — top container_titles renseignés (HAL, Zenodo, Figshare, SSRN, bioRxiv, arXiv, ZORA, SPIRE, ChemRxiv…) presque tous des plateformes de dépôt, donc candidats préprint sous réserve de sondage plateforme par plateforme.
+- **335 avec `container_title` renseigné**, profilées en passe 2 (sondage par top container) :
+  - **~51 vrais preprint servers** (SSRN 30 + bioRxiv 14 + arXiv 5 + ChemRxiv 2) — DOI préfixes 10.2139/ssrn.*, 10.64898/*, 10.48550/arxiv.*, 10.26434/chemrxiv*. Éligibles à `journal_type=preprint_server` côté admin ; la règle se déclenchera au refresh.
+  - **~173 repositories institutionnels** (HAL 73, Zenodo 66, ZORA 21, SPIRE 13) — hétérogènes : preprints, articles peer-reviewed déposés en Green OA (cas vu sur ZORA : papier ATLAS/LHCb avec son vrai journal ailleurs), datasets, posters. **Pas de règle `JOURNAL_TYPE_REPOSITORY_TO_*`** envisageable : pas de mapping déterministe. Bon traitement = meilleur rattachement journal_id vers le journal de publication d'origine, relève du matching journal (hors-scope doc-types).
+  - **~78 datasets Figshare/Open MIND** (67 + 11) — DOI 10.6084/m9.figshare.* tous en « Additional file 1 of … ». `TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET` les couvre déjà ; stock à rattraper via [`oneshot/refresh_publications_with_supplementary_content_title.py`](../../interfaces/cli/oneshot/refresh_publications_with_supplementary_content_title.py).
+  - **~11 vrais journaux mal-rattachés** : AUGC 6 (Academic Journal of Civil Engineering, DOI 10.26168/ajce.*) et LIPIcs/Dagstuhl 5 (10.4230/lipics.*). Bug de matching journal, renvoyé vers [METIER_publishers-journals](METIER_publishers-journals.md).
+  - **~5 PubMed** — artefact normalizer OpenAlex (pose « PubMed » en host_venue quand l'info journal manque). À creuser séparément.
 
 **Règle métier** : `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` codée (cf. section Fait), sans effet tant qu'aucun journal n'est typé `preprint_server` en base.
 
@@ -88,6 +100,7 @@ Détection de doublons en dédup, pas une règle de correction. À traiter quand
 
 1. **Détection figshare/Zenodo : pour les items, gérée par le titre** (`TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET`). Plus large que la détection par préfixe DOI envisagée au départ : couvre aussi Dryad/IFREMER, et reste valable même si un fichier supplément est posé sur un domaine autre. La détection RA via [doi-ra-datacite](METIER_doi-ra-datacite.md) reste utile pour d'autres règles (ex. figshare collections, qui ont des titres "normaux" et ne sont pas attrapées par le pattern titre).
 2. **Reclassement one-shot des cas existants** en fin de chantier. SQL aligné sur la nouvelle règle, suivi d'une passe de vérification au prochain run pipeline pour s'assurer que la cascade en `domain/` produirait le même résultat. Modèle : [`oneshot/refresh_publications_with_supplementary_content_title.py`](../../interfaces/cli/oneshot/refresh_publications_with_supplementary_content_title.py).
+3. **Pas de règle `JOURNAL_TYPE_REPOSITORY_TO_*`**. Les repositoires institutionnels (HAL, Zenodo, ZORA, SPIRE…) hébergent indifféremment des preprints, des articles peer-reviewed en Green OA, des datasets et des posters — aucun mapping `doc_type` déterministe possible depuis le seul `journal_type=repository`. Le bon traitement des publis hébergées sur repository est un meilleur rattachement journal_id vers le journal de publication d'origine, pas un retypage.
 
 ## Hors scope
 
