@@ -170,11 +170,11 @@ def decide_match_by_identifier(
 class PersonMatchDecision:
     """Décision de la cascade de matching unifiée.
 
-    ``reason`` identifie le signal qui a tranché (``"cross_source"`` /
-    ``"idref"`` / ``"orcid"`` / ``"single_name"`` pour les ``match`` ;
-    ``"new"`` pour ``create`` ; ``"ambiguous_name_form"`` /
-    ``"creation_not_allowed"`` pour ``skip``). Utilisable côté logs et
-    stats par le caller.
+    ``reason`` identifie le signal qui a tranché (``"orcid"`` /
+    ``"hal_person_id"`` / ``"idref"`` / ``"cross_source"`` /
+    ``"single_name"`` pour les ``match`` ; ``"new"`` pour ``create`` ;
+    ``"ambiguous_name_form"`` / ``"creation_not_allowed"`` pour ``skip``).
+    Utilisable côté logs et stats par le caller.
     """
 
     action: Literal["match", "create", "skip"]
@@ -184,36 +184,43 @@ class PersonMatchDecision:
 
 def decide_person_match(
     *,
-    cross_source_match: int | None,
-    idref_match: int | None,
     orcid_match: int | None,
+    hal_match: int | None,
+    idref_match: int | None,
+    cross_source_match: int | None,
     name_form_outcome: NameFormDecision,
 ) -> PersonMatchDecision:
     """Cascade unifiée de matching personne, du signal le plus fiable au moins fiable.
 
-    Reproduit la hiérarchie actuelle de
-    ``application/pipeline/persons/create_persons_from_source_authorships.py`` :
+    Hiérarchie par fiabilité de provenance :
 
-    1. **Cross-source** (``cross_source_match``) — match par
+    1. **ORCID déposé par l'auteur** (``orcid_match``) — ORCID issu d'une
+       source à dépôt auteur (``ORCID_MATCH_SOURCES``), borné côté caller.
+    2. **`hal_person_id`** (``hal_match``) — compte HAL de l'auteur,
+       attaché à la signature dans le TEI HAL.
+    3. **IdRef** (``idref_match``).
+    4. **Cross-source** (``cross_source_match``) — match par
        ``(publication_id, author_position)`` avec une authorship d'une
-       autre source et nom compatible.
-    2. **IdRef** (``idref_match``).
-    3. **ORCID** (``orcid_match``).
-    4. **`person_name_forms`** (``name_form_outcome``) — délègue au
+       autre source et nom compatible. En dernier recours parmi les
+       signaux non-nominaux : inopérant au bootstrap (suppose des
+       matchings préexistants), il vient donc après les identifiants.
+    5. **`person_name_forms`** (``name_form_outcome``) — délègue au
        résultat de ``decide_name_form_outcome`` (match / create / skip
        selon ambiguïté et politique de création).
 
-    Pure, testable sans BDD : les 4 paramètres sont précalculés par le
+    Pure, testable sans BDD : les 5 paramètres sont précalculés par le
     caller via prefetch.
     """
+    if orcid_match is not None:
+        return PersonMatchDecision(action="match", person_id=orcid_match, reason="orcid")
+    if hal_match is not None:
+        return PersonMatchDecision(action="match", person_id=hal_match, reason="hal_person_id")
+    if idref_match is not None:
+        return PersonMatchDecision(action="match", person_id=idref_match, reason="idref")
     if cross_source_match is not None:
         return PersonMatchDecision(
             action="match", person_id=cross_source_match, reason="cross_source"
         )
-    if idref_match is not None:
-        return PersonMatchDecision(action="match", person_id=idref_match, reason="idref")
-    if orcid_match is not None:
-        return PersonMatchDecision(action="match", person_id=orcid_match, reason="orcid")
     if name_form_outcome.action == "match":
         return PersonMatchDecision(
             action="match",

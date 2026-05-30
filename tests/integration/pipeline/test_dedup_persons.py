@@ -188,6 +188,26 @@ class TestCascadeRun:
 
         assert _get_person_id(sa_sync_conn, oa_as) == person_id
 
+    def test_known_hal_person_id_links(self, sa_sync_conn):
+        """`hal_person_id` confirmé en base → matche la bonne personne, même nom
+        divergent (l'identifiant prime)."""
+        pub = _insert_publication(sa_sync_conn)
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
+        _seed_identifier(sa_sync_conn, person_id, "hal_person_id", "123456", "confirmed")
+
+        hal_sd = _insert_source_document(sa_sync_conn, "hal", "hal-200", pub)
+        hal_as = _insert_authorship(
+            sa_sync_conn,
+            "hal",
+            hal_sd,
+            "Toto Inconnu",
+            identifiers={"hal_person_id": "123456"},
+        )
+
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, hal_as) == person_id
+
     def test_rejected_orcid_ignored(self, sa_sync_conn):
         """ORCID `rejected` en base → ignoré par le matching."""
         pub = _insert_publication(sa_sync_conn)

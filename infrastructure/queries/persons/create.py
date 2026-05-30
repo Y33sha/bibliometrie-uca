@@ -19,7 +19,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
 
     Colonnes :
 
-    - `orcid`, `idref` : lus directement depuis `person_identifiers` (JSONB), sans filtre par source. La restriction de l'ORCID aux sources fiables (cf. `ORCID_MATCH_SOURCES`) est appliquée côté cascade de matching, pas ici.
+    - `orcid`, `hal_person_id`, `idref` : lus directement depuis `person_identifiers` (JSONB), sans filtre par source. `hal_person_id` n'est porté que par les authorships HAL. La restriction de l'ORCID aux sources fiables (cf. `ORCID_MATCH_SOURCES`) est appliquée côté cascade de matching, pas ici.
     - `roles` : remonté tel quel ; en pratique non vide uniquement pour theses (distingue auteur vs directeur).
 
     Le nom (last/first) est parsé côté caller via `parse_raw_author_name(full_name)`.
@@ -33,6 +33,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
                    sa_auth.raw_author_name AS full_name,
                    sa_auth.author_name_normalized,
                    sa_auth.person_identifiers->>'orcid' AS orcid,
+                   sa_auth.person_identifiers->>'hal_person_id' AS hal_person_id,
                    sa_auth.person_identifiers->>'idref' AS idref,
                    sa_auth.roles,
                    sd.publication_id,
@@ -53,6 +54,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
             full_name=r.full_name,
             author_name_normalized=r.author_name_normalized,
             orcid=r.orcid,
+            hal_person_id=r.hal_person_id,
             idref=r.idref,
             roles=r.roles,
             publication_id=r.publication_id,
@@ -117,6 +119,19 @@ def fetch_orcid_to_person_map(conn: Connection) -> dict[str, int]:
     return {r.id_value: r.person_id for r in rows}
 
 
+def fetch_hal_account_to_person_map(conn: Connection) -> dict[str, int]:
+    """`{hal_person_id: person_id}` pour les comptes HAL connus non rejetés."""
+    rows = conn.execute(
+        text("""
+            SELECT id_value, person_id
+            FROM person_identifiers
+            WHERE id_type = 'hal_person_id'
+              AND status != 'rejected'
+        """)
+    ).all()
+    return {r.id_value: r.person_id for r in rows}
+
+
 def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
     """Charge `person_name_forms` sous forme `{name_form: [person_id, ...]}`.
 
@@ -149,6 +164,9 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
 
     def fetch_orcid_to_person_map(self, conn: Connection) -> dict[str, int]:
         return fetch_orcid_to_person_map(conn)
+
+    def fetch_hal_account_to_person_map(self, conn: Connection) -> dict[str, int]:
+        return fetch_hal_account_to_person_map(conn)
 
     def fetch_name_form_map(self, conn: Connection) -> dict[str, list[int]]:
         return fetch_name_form_map(conn)

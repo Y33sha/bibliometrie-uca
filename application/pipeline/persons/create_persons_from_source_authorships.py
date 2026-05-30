@@ -1,20 +1,24 @@
 """
 Crée des entités Personnes à partir des authorships sources UCA non rattachées.
 
-Cascade unifiée — une seule boucle qui interroge 4 signaux en parallèle puis
-délègue la décision à `domain.persons.matching.decide_person_match` :
+Cascade unifiée — une seule boucle qui interroge 5 signaux en parallèle puis
+délègue la décision à `domain.persons.matching.decide_person_match`, du plus
+fiable au moins fiable :
 
-1. **Cross-source** par `(publication_id, author_position)` avec nom compatible.
-2. **IdRef** présent en base (status != rejected).
-3. **ORCID** présent en base (status != rejected), utilisé comme signal
+1. **ORCID** présent en base (status != rejected), utilisé comme signal
    uniquement quand l'authorship vient d'une source à ORCID déposé par
    l'auteur (`ORCID_MATCH_SOURCES` : crossref / openalex / hal). L'ORCID WoS,
    attribué algorithmiquement, n'est pas un signal de matching.
-4. **Lookup `person_name_forms`** : match unique / ambigu (skip) /
+2. **`hal_person_id`** présent en base (status != rejected) — compte HAL,
+   porté uniquement par les authorships HAL.
+3. **IdRef** présent en base (status != rejected).
+4. **Cross-source** par `(publication_id, author_position)` avec nom
+   compatible — après les identifiants (inopérant au bootstrap).
+5. **Lookup `person_name_forms`** : match unique / ambigu (skip) /
    inconnu (création si `allow_create`, skip sinon).
 
 L'effet est appliqué selon l'action de la décision :
-- Match (cross-source / idref / orcid / name_form) → `link + add_name_form
+- Match (orcid / hal_person_id / idref / cross-source / name_form) → `link + add_name_form
   + add_identifiers`. Les identifiants sont ajoutés en statut `pending`
   (cf. `application.persons.add_identifier`), vérifiables manuellement
   via l'admin si le matching par nom s'avère faux. Cohérent avec le
@@ -69,6 +73,7 @@ class EnrichedAuthorship(NamedTuple):
     full_name: str
     author_name_normalized: str | None
     orcid: str | None
+    hal_person_id: str | None
     idref: str | None
     roles: list[str] | None
     publication_id: int | None
@@ -98,6 +103,7 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
         full_name=row.full_name,
         author_name_normalized=row.author_name_normalized,
         orcid=row.orcid,
+        hal_person_id=row.hal_person_id,
         idref=row.idref,
         roles=row.roles,
         publication_id=row.publication_id,
@@ -186,6 +192,7 @@ def run(
     linked_index = load_linked_authorships_by_pub(conn, queries)
     idref_map = queries.fetch_idref_to_person_map(conn)
     orcid_map = queries.fetch_orcid_to_person_map(conn)
+    hal_account_map = queries.fetch_hal_account_to_person_map(conn)
     name_form_map = queries.fetch_name_form_map(conn)
     pub_max_authors = _max_authors_per_pub(all_authorships, linked_index)
 
@@ -210,6 +217,7 @@ def run(
                 )
 
         idref_match = decide_match_by_identifier(a.idref, idref_map)
+        hal_match = decide_match_by_identifier(a.hal_person_id, hal_account_map)
         # ORCID utilisé comme signal de matching uniquement quand il est
         # déposé par l'auteur (crossref / openalex raw_orcid / hal TEI) ;
         # l'ORCID WoS, attribué algorithmiquement, est ignoré ici (il reste
@@ -225,9 +233,10 @@ def run(
 
         # ── Décision unifiée ────────────────────────────────────────
         decision = decide_person_match(
-            cross_source_match=cross_source_match,
-            idref_match=idref_match,
             orcid_match=orcid_match,
+            hal_match=hal_match,
+            idref_match=idref_match,
+            cross_source_match=cross_source_match,
             name_form_outcome=name_form_outcome,
         )
 
@@ -289,9 +298,10 @@ def run(
     unlinked = len(all_authorships) - linked_total - created
 
     logger.info("\n=== Résumé ===")
-    logger.info(f"  Cross-source             : {matched_counts['cross_source']} rattachées")
-    logger.info(f"  IdRef                    : {matched_counts['idref']} rattachées")
     logger.info(f"  ORCID                    : {matched_counts['orcid']} rattachées")
+    logger.info(f"  hal_person_id            : {matched_counts['hal_person_id']} rattachées")
+    logger.info(f"  IdRef                    : {matched_counts['idref']} rattachées")
+    logger.info(f"  Cross-source             : {matched_counts['cross_source']} rattachées")
     logger.info(f"  Name form (single match) : {matched_counts['single_name']} rattachées")
     logger.info(f"  Créées                   : {created}")
     logger.info(

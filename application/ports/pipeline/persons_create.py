@@ -19,6 +19,7 @@ class BareUnlinkedAuthorship(NamedTuple):
     full_name: str
     author_name_normalized: str | None
     orcid: str | None
+    hal_person_id: str | None
     idref: str | None
     roles: list[str] | None
     publication_id: int | None
@@ -45,5 +46,7 @@ class PersonsCreateQueries(Protocol):
     def fetch_idref_to_person_map(self, conn: Connection) -> dict[str, int]: ...
 
     def fetch_orcid_to_person_map(self, conn: Connection) -> dict[str, int]: ...
+
+    def fetch_hal_account_to_person_map(self, conn: Connection) -> dict[str, int]: ...
 
     def fetch_name_form_map(self, conn: Connection) -> dict[str, list[int]]: ...
