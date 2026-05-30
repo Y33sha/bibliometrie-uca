@@ -24,14 +24,17 @@ Manque un décideur d'orchestration unique (`decide_person_match`) qui agrège l
 ## Décisions
 
 1. **Refactor pur avant peaufinage logique**. Phase 1 reproduit la logique actuelle (cross-source → IdRef → ORCID toute source → name_forms) en restructurant la cascade en un décideur pur + 1 boucle d'application. Phase 2 modifie la logique (hiérarchie cible).
-2. **Hiérarchie cible** (Phase 2) :
-   1. **ORCID déposé par l'auteur** (crossref ∪ openalex `raw_orcid` ∪ hal TEI — cf. décision 5). À ajouter en tête.
-   2. **Cross-source par publication × position auteur** (avec garde-fou méga-paper, état actuel).
-   3. **Identifiants : IdRef, hal_person_id**. ORCID WoS retiré du matching (attribué algorithmiquement par WoS, régulièrement fautif).
-   4. **Name matching**.
-5. **ORCID fiable = ORCID déposé par l'auteur, pas ORCID résolu par la source.** Audit `data/raw_store` + crossref live (27 doublets OA∩crossref, 48 paires d'auteurs avec ORCID des deux côtés) : OpenAlex porte deux ORCID par authorship — `raw_orcid` (niveau authorship, recopié de la métadonnée brute de la source amont, = ORCID Crossref pour les articles à éditeur) et `author.orcid` (entité désambiguïsée par le clustering OA, régulièrement fautif). Le `raw_orcid` coïncide à 100 % avec l'ORCID Crossref sur le recouvrement ; aucun désaccord. Conséquence : on traite crossref, le `raw_orcid` OpenAlex et l'ORCID HAL (TEI `label_xml`) au même niveau de fiabilité, regroupés dans `ORCID_MATCH_SOURCES`. WoS (`PreferredORCID`) en est exclu. La provenance n'est **pas** tracée sur `person_identifiers` (la restriction s'applique au signal de matching, pas à l'enregistrement de l'identifiant).
-3. **Seuil méga-paper conservé**. `MAX_AUTHORS_CROSS_SOURCE = 50` déjà implémenté dans `decide_cross_source_match`, cohérent avec `MAX_AUTHORS_CONFLICT = 50` côté admin.
-4. **Statuts `pending`/`confirmed`/`rejected` inchangés**. Un identifier `rejected` n'est jamais utilisé pour le matching (`fetch_*_to_person_map` filtre déjà `status != 'rejected'`). `pending` et `confirmed` restent utilisés indistinctement ; restreindre aux `confirmed` est différé.
+2. **Hiérarchie cible** (Phase 2), du signal le plus fiable au moins fiable :
+   1. **ORCID déposé par l'auteur** (`ORCID_MATCH_SOURCES` : crossref ∪ openalex `raw_orcid` ∪ hal — cf. décision 3).
+   2. **`hal_person_id`** (compte HAL).
+   3. **IdRef**.
+   4. **Cross-source par publication × position auteur** (avec garde-fou méga-paper). Reculé après les identifiants : inopérant au bootstrap (suppose des matchings préexistants).
+   5. **Name matching**.
+3. **ORCID fiable = ORCID déposé par l'auteur, pas ORCID résolu par la source.** Audit `data/raw_store` + crossref live (27 doublets OA∩crossref, 48 paires d'auteurs avec ORCID des deux côtés) : OpenAlex porte deux ORCID par authorship — `raw_orcid` (niveau authorship, recopié de la métadonnée brute de la source amont, = ORCID Crossref pour les articles à éditeur) et `author.orcid` (entité désambiguïsée par le clustering OA, régulièrement fautif). Le `raw_orcid` coïncide à 100 % avec l'ORCID Crossref sur le recouvrement ; aucun désaccord. Conséquence : on traite crossref, le `raw_orcid` OpenAlex et l'ORCID HAL (TEI `label_xml`) comme signal ORCID fiable, regroupés dans `ORCID_MATCH_SOURCES`. WoS (`PreferredORCID`) en est exclu. La provenance n'est **pas** tracée sur `person_identifiers` (la restriction s'applique au signal de matching, pas à l'enregistrement de l'identifiant).
+4. **Matching par identifiant, pas par source** (modèle « B »). Une `source_authorship` n'a qu'une source ; un sous-classement de l'ORCID par source (crossref-orcid > hal-orcid) ne vaut pas la complexité. La fiabilité-par-source est encodée par le gate de sources sur la phase ORCID (`ORCID_MATCH_SOURCES`) — seul cas mixte (idref et hal_person_id n'ont pas de source non fiable). Asymétrie connue et acceptée : un ORCID déposé via HAL hérite du risque d'attribution HAL mais reste traité au tiroir ORCID.
+5. **Tiroir HAL = `hal_person_id` seul.** `idhal ⊆ hal_person_id` : audit `raw_store/hal` (493 positions) → 0 authorship avec `idhal` sans `hal_person_id`, et `hal_person_id` en couvre 55 de plus. Matcher sur `idhal` est superflu (ce qui matche sur `idhal` aurait matché sur `hal_person_id`), et `idhal` n'apporte aucune garantie de fiabilité supplémentaire.
+6. **Seuil méga-paper conservé**. `MAX_AUTHORS_CROSS_SOURCE = 50` déjà implémenté dans `decide_cross_source_match`, cohérent avec `MAX_AUTHORS_CONFLICT = 50` côté admin.
+7. **Statuts `pending`/`confirmed`/`rejected` inchangés**. Un identifier `rejected` n'est jamais utilisé pour le matching (`fetch_*_to_person_map` filtre déjà `status != 'rejected'`). `pending` et `confirmed` restent utilisés indistinctement ; restreindre aux `confirmed` est différé.
 
 ## Phasage
 
@@ -64,13 +67,13 @@ Manque un décideur d'orchestration unique (`decide_person_match`) qui agrège l
 
 ### Phase 2 — Peaufinage hiérarchie (post-refactor)
 
-**Repenser la cascade par fiabilité de la source, pas par type d'identifiant.** Un même type d'identifiant peut avoir des fiabilités opposées selon sa provenance : un ORCID déposé par l'auteur (Crossref, `raw_orcid` OpenAlex, TEI HAL) est excellent, un ORCID résolu algorithmiquement par la source (`author.orcid` OpenAlex, `PreferredORCID` WoS) est peu fiable (cf. décision 5). Et le cross-source en tête est inopérant au bootstrap (n=0) puisqu'il suppose des matchings préexistants ; il devrait venir **après** les identifiers fiables, pas avant.
+**Réordonner la cascade par fiabilité du signal** (cf. décisions 2-5). Phases par type d'identifiant (modèle B), du plus fiable au moins fiable. Le cross-source recule après les identifiants : en tête il est inopérant au bootstrap (n=0, suppose des matchings préexistants).
 
-Hiérarchie cible par fiabilité de source :
+Ordre implémenté dans `decide_person_match` :
 
-1. **ORCID déposé par l'auteur** (`ORCID_MATCH_SOURCES` : crossref ∪ openalex `raw_orcid` ∪ hal).
-2. **Identifiers HAL** (hal_person_id, idhal, idref — extraits de `label_xml`).
-3. **IdRef ESR** (ScanR, theses.fr).
+1. **ORCID déposé par l'auteur** (`ORCID_MATCH_SOURCES` : crossref ∪ openalex `raw_orcid` ∪ hal ; WoS exclu).
+2. **`hal_person_id`** (compte HAL).
+3. **IdRef** (HAL TEI, ScanR, theses.fr).
 4. **Cross-source** par publication × position (avec garde-fou méga-paper).
 5. **Name matching**.
 
@@ -80,13 +83,12 @@ Hiérarchie cible par fiabilité de source :
 - [x] **Suppression du garde-fou par nom** (`keep_orcid_if_name_matches` + `source_data.display_name` OA) : inutile sur `raw_orcid`, qui est déposé par l'auteur. Code mort supprimé.
 - [x] **ORCID restreint aux sources à dépôt auteur** comme signal de matching (`ORCID_MATCH_SOURCES`, gate côté cascade). WoS exclu. L'enregistrement de l'identifiant reste agnostique.
 
+#### Réordonnancement de la cascade (fait)
+
+- [x] **ORCID en tête, cross-source reculé en position 4** (`decide_person_match` : orcid → hal_person_id → idref → cross_source → name_form).
+- [x] **Ajout `hal_person_id`** : map prefetch `fetch_hal_account_to_person_map` + argument `hal_match` au décideur. Sous-décision `decide_match_by_identifier` réutilisée telle quelle.
+
 > Effet sur le stock : ces changements modifient la normalisation OA (ORCID stocké) et la cascade. Le stock existant porte encore l'ancien `author.orcid` jusqu'au full rerun `raw_hash=null`.
-
-#### Réordonnancement de la cascade (reste)
-
-- [ ] **Mettre l'ORCID déposé auteur en tête** du décideur (avant cross-source).
-- [ ] **Reculer le cross-source** après les identifiers fiables (sinon inopérant au bootstrap).
-- [ ] **Ajout `hal_person_id`** au niveau des identifiants HAL. Sous-décision `decide_match_by_identifier(value, hal_account_map)` existe déjà — ajouter la map prefetch + l'argument au décideur.
 
 ## Questions ouvertes
 
