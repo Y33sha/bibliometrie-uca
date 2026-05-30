@@ -64,3 +64,40 @@ class TestLinkAddresses:
             {"sa_id": sa_id},
         ).scalar_one()
         assert addr_id == existing_id
+
+    def test_suggested_countries_written_when_unresolved(self, sa_sync_conn):
+        """`suggested_countries` est écrit sur une adresse sans pays ni suggestion,
+        sans toucher `countries` (autorité)."""
+        sa_id = _create_authorship_stub(sa_sync_conn)
+        linker = PgAddressLinker()
+        linker.link(sa_sync_conn, sa_id, ["Inst One, Some City"], suggested_countries=["FR"])
+        row = sa_sync_conn.execute(
+            text("""
+                SELECT a.countries, a.suggested_countries
+                FROM source_authorship_addresses saa
+                JOIN addresses a ON a.id = saa.address_id
+                WHERE saa.source_authorship_id = :sa_id
+            """),
+            {"sa_id": sa_id},
+        ).one()
+        assert row.countries is None
+        assert [c.strip() for c in row.suggested_countries] == ["FR"]
+
+    def test_suggested_countries_skipped_when_already_resolved(self, sa_sync_conn):
+        """Si l'adresse a déjà un `countries` (autorité), aucune suggestion n'est posée."""
+        sa_id = _create_authorship_stub(sa_sync_conn)
+        addr_id = sa_sync_conn.execute(
+            text("""
+                INSERT INTO addresses (raw_text, normalized_text, countries)
+                VALUES (:r, :n, ARRAY['US']::char(2)[]) RETURNING id
+            """),
+            {"r": "Resolved Place", "n": "resolved place"},
+        ).scalar_one()
+        linker = PgAddressLinker()
+        linker.link(sa_sync_conn, sa_id, ["Resolved Place"], suggested_countries=["FR"])
+        row = sa_sync_conn.execute(
+            text("SELECT countries, suggested_countries FROM addresses WHERE id = :id"),
+            {"id": addr_id},
+        ).one()
+        assert [c.strip() for c in row.countries] == ["US"]
+        assert row.suggested_countries is None
