@@ -1,8 +1,11 @@
 # Chantier — Exploitation de l'API CrossRef
 Commencé le 2026-04-27
-**En pause depuis 2026-04-28** — phases 1 et 2 livrées (ingestion + arbitrage `doc_type` avec gestion type / sous-type). Phases 3-5 (promotion ORCID, discovery, relations) reportées : sur l'échantillon CrossRef actuel (dominé par des méga-papers JAMA sans ORCID), l'utilité concrète est trop faible pour valider la logique. Reprise envisageable quand le corpus CrossRef sera plus représentatif (= cycles d'ingestion supplémentaires sur des DOIs non-mega) et qu'on pourra mesurer a priori l'impact de la promotion `pending → confirmed`.
+**État au 2026-05-30** — Phases 1 et 2 livrées (ingestion DOI-driven + arbitrage `doc_type` type / sous-type). Décisions de clôture du reste :
 
-**Mise à jour 2026-05-23** — la piste « discovery par affiliation » est **réouverte pour réévaluation**. Un spike montre que `query.affiliation` est plus exploitable qu'estimé initialement : 237 847 hits annoncés sur la query UCA filtrée 2020-2026, 81 % des 30 000 paginés absents de la base locale. Le delta réel n'est pas mesurable hors prod ; nouveau standby commun avec le chantier `METIER_doi-ra-datacite` jusqu'à pouvoir rejouer sur la vraie base. Voir `docs/chantiers/datacite-vs-natives-spike.md` et la nouvelle Phase 6 ci-dessous.
+- **Phase 3 (promotion ORCID `pending → confirmed`) : abandonnée.** La confirmation / le rejet des identifiants est une action admin manuelle, sans impact sur le pipeline (elle ne change que l'affichage UI). L'automatiser est risqué pour un gain nul côté traitement. Dossier fermé ; éventuellement rouvrable à un stade beaucoup plus mature du projet.
+- **Phase 4 (discovery par ORCID) : sortie du chantier, en pause.** Pas spécifique à Crossref — s'envisage sur plusieurs sources. Noté dans TODO ; candidate à un chantier dédié multi-source.
+- **Phase 5 (relations entre publications) : hors scope.** Couverte par [`METIER_relations-publications`](METIER_relations-publications.md), auquel Crossref contribuera pour une petite part.
+- **Phase 6 (discovery par affiliation) : évaluée sur dump prod le 2026-05-30, recall insuffisant pour une source primaire.** Détail ci-dessous.
 
 ## Contexte
 
@@ -16,27 +19,28 @@ Le chantier vise à exploiter CrossRef sur **trois axes complémentaires**, sans
 2. **Confirmation d'identité auteur via ORCID article-level** — un ORCID déposé par l'éditeur dans les métadonnées CrossRef est une preuve forte du lien auteur ↔ personne (contrairement à OpenAlex où l'ORCID est attaché à une entité auteur algorithmique, parfois fausse).
 3. **Relations entre publications** — preprint-of, version-of, translation-of, has-dataset, etc. Alimente le chantier « relations entre publications » (TODO_LAURA.md ligne 82).
 
+*Rôle 1 = cœur du chantier (livré, Phases 1-2). Rôle 2 abandonné (cf. en-tête, Phase 3). Rôle 3 déplacé vers [`METIER_relations-publications`](METIER_relations-publications.md).*
+
 ### Pistes écartées
 
-- ~~**CrossRef comme source de découverte par affiliation**~~ — **réouvert au 2026-05-23, cf. Phase 6.** Le constat initial (« `query.affiliation` trop bruité, ROR peu adopté, doublonnerait OpenAlex sans rien apporter ») n'avait pas été mesuré. Le spike `crossref_affiliation_discovery_spike.py` montre que la query renvoie un volume significatif (237 847 hits filtre 2020-2026 ; 24 351 nouveaux candidats sur les 30 000 plus pertinents paginés, soit 81 % vs base locale). « Doublonne OpenAlex » à mesurer sur prod, pas à supposer. Décision finale reportée à la rejouée sur prod.
+- **CrossRef comme source de découverte par affiliation** — réévalué puis **écarté comme source primaire** (cf. Phase 6, mesure du 2026-05-30 sur dump prod). La bonne requête (`query.affiliation=Clermont Auvergne`) ne ramène que 8 510 hits, dont seulement ~26 % de recall sur les publications Crossref UCA déjà connues : Crossref n'indexe l'affiliation que pour une minorité de ses dépôts. Reste exploitable comme filet d'appoint, à arbitrer.
 - **CrossRef pour enrichir les signatures (labos, équipes, services)** : les métadonnées CrossRef sont aplaties par les éditeurs vers la tutelle générique (« University Clermont Auvergne »), sans labo. Les signatures restent du ressort de HAL/OpenAlex/WoS.
 
 ## Périmètre fonctionnel
 
 ### Inclus
 
-- Ingestion CrossRef DOI-driven dans les tables `source_*` existantes (`source_publications` / `source_authorships`) avec `source='crossref'`, à partir des DOI déjà connus dans les autres sources.
-- Discovery secondaire driven-by-ORCID : interrogation par ORCID confirmé pour identifier d'éventuelles publis ratées par les autres sources. **Conditionnée à un travail exploratoire** (cf. phase 4) : abandonnée si le gain s'avère nul.
-- Insertion de `crossref` dans `SOURCE_PRIORITY` (2ᵉ position) → arbitrage automatique de toutes les métadonnées canoniques via `refresh_from_sources` existant.
-- Mapping de la taxonomie `doc_type` CrossRef vers l'enum canonique dans `domain/doc_types.py`.
-- Mécanisme de promotion d'ORCID `pending` → `confirmed` via les ORCIDs CrossRef.
-- Table `publication_relations` (à créer) alimentée par les `relation` CrossRef.
+- Ingestion CrossRef DOI-driven dans les tables `source_*` existantes (`source_publications` / `source_authorships`) avec `source='crossref'`, à partir des DOI déjà connus dans les autres sources. *(livré, Phases 1-2)*
+- Insertion de `crossref` dans `SOURCE_PRIORITY` (2ᵉ position) → arbitrage automatique de toutes les métadonnées canoniques via `refresh_from_sources` existant. *(livré)*
+- Mapping de la taxonomie `doc_type` CrossRef vers l'enum canonique dans `domain/doc_types.py`. *(livré)*
 
 ### Exclus
 
 - Aucune modification des signatures existantes (auteurs, affiliations, structures).
-- Aucune découverte par affiliation/ROR.
-- Aucune couverture des DOI DataCite (10.5281 Zenodo, 10.6084 figshare, etc.) — gap connu, à traiter séparément si besoin.
+- Promotion d'ORCID `pending → confirmed` (abandonnée, cf. en-tête / Phase 3).
+- Discovery par ORCID (sortie du chantier, multi-source — cf. Phase 4).
+- Relations entre publications (→ [`METIER_relations-publications`](METIER_relations-publications.md)).
+- Aucune couverture des DOI DataCite (10.5281 Zenodo, 10.6084 figshare, etc.) — cf. [`METIER_doi-ra-datacite`](METIER_doi-ra-datacite.md).
 - Aucune couverture des publis sans DOI (HAL collection-only, etc.).
 
 ## Architecture cible
@@ -47,13 +51,12 @@ CrossRef s'intègre dans l'architecture source-agnostique existante en tant que 
 
 - **`source_publications`** (existante) : insertion avec `source = 'crossref'`, `source_id = doi`. Les champs canoniques sont mappés directement (`doi`, `title`, `pub_year`, `doc_type`, `language`, `container_title`, `cited_by_count`, `oa_status`, `is_retracted`, `keywords`, `journal_id`, `external_ids`). Les spécificités CrossRef (license, funders, dates multiples issued/online/print, indexed-date pour l'idempotence) vont dans `meta jsonb`. La référence ISSN va dans `external_ids` ou `biblio` selon la convention en vigueur (à vérifier sur les autres extracteurs).
 - **`source_authorships`** (existante) : un row par auteur de la publi CrossRef, `source = 'crossref'`. Les chaînes d'affiliation brutes (déjà connues comme génériques/tronquées côté CrossRef) vont dans `source_data jsonb`. **À noter** : pas de `source_authorship_addresses` à alimenter pour CrossRef puisque les affiliations sont des chaînes plates sans adresse exploitable.
-- **`publication_relations`** (**à créer**) : `from_publication_id`, `to_publication_id` (ou DOI si la publi cible n'est pas connue), `relation_type` (preprint, version, translation, has-dataset…), `source` (crossref pour l'instant, extensible). C'est le seul vrai ajout de table — cross-source dès le départ pour ne pas refaire la migration plus tard.
+- **`publication_relations`** : hors scope de ce chantier — la modélisation des relations entre publications est traitée dans [`METIER_relations-publications`](METIER_relations-publications.md). Crossref (`relation`) y sera une source d'alimentation parmi d'autres (DataCite `relatedIdentifiers`, etc.).
 
 ### Code
 
 - **`infrastructure/sources/crossref/`** : client API (polite pool avec mailto, gestion 429, retry exponentiel), pagination cursor.
 - **`application/pipeline/normalize/normalize_crossref.py`** + ports + queries : normalizer CrossRef, sur le modèle des autres (cf. `normalize_scanr`, `normalize_theses`, etc.) — alimente `source_publications` / `source_authorships` avec `source='crossref'`.
-- **`application/pipeline/crossref_promote_orcids.py`** : phase de promotion d'ORCID `pending` → `confirmed`.
 - **Modifications dans `domain/`** :
   - `domain/sources.py` : ajouter `"crossref"` à `ALL_SOURCES` et à `SOURCE_PRIORITY` (2ᵉ position) ; ajout à l'enum `source_type` côté SQL via migration.
   - `domain/doc_types.py` : ajouter une entrée `"crossref"` dans `_SOURCE_MAPS`.
@@ -65,7 +68,6 @@ CrossRef s'insère comme **une nouvelle source au même titre que ScanR et these
 - **Phase d'extraction CrossRef** dans le pipeline d'imports (sur le modèle de l'extracteur theses.fr).
 - **Phase `normalize_crossref`** alimente `source_publications` / `source_authorships`.
 - **Phases existantes** (`build_authorships`, `refresh_from_sources` indirectement, etc.) consomment automatiquement la nouvelle source via `SOURCE_PRIORITY`.
-- **Phase additionnelle `crossref_promote_orcids`** spécifique à CrossRef (cf. phase 3).
 
 Intégration dans `run_pipeline.py` avec ses propres `--only` / `--from` et inclusion dans le filtrage `--sources`.
 
@@ -98,40 +100,47 @@ Découpage proposé (chaque phase = chantier autonome mergeable indépendamment)
 - [x] Tests unit : `TestCrossRefDocTypeMap` (couverture taxonomie) + `TestFirstDocTypeArbitration` (5 cas d'arbitrage).
 - **Pas de migration nécessaire** : `refresh_from_sources` consomme déjà `_first_doc_type`, le changement est transparent au prochain refresh des publis CrossRef-touchées.
 
-### Phase 3 — Promotion d'ORCID `pending` → `confirmed` ⏸ (en pause)
+### Phase 3 — Promotion d'ORCID `pending` → `confirmed` ❌ (abandonnée)
 
-Concept : pour chaque `source_authorship` CrossRef portant un ORCID, si cet ORCID figure dans `person_identifiers` en statut `pending` ET que l'authorship est rattachée à la même `person_id` (validée par cross-source ≠ tautologie via l'ORCID lui-même), alors on a une preuve article-level côté éditeur → promotion en `confirmed`.
+Décision 2026-05-30 : abandonnée. La confirmation / le rejet des identifiants est une fonction admin manuelle, sans impact sur le pipeline (seul l'affichage UI dépend du statut). Une promotion automatisée est risquée pour un bénéfice nul côté traitement. Rouvrable éventuellement à un stade beaucoup plus mature du projet.
 
-**Subtilité de logique identifiée** : le pipeline persons rattache via 4 étapes (HAL accounts, cross-source, IdRef/ORCID connu, name forms). Si l'ORCID pending est lui-même la clé de rattachement (Étape 2), la promotion devient circulaire. Pour valider la promotion il faut vérifier qu'une AUTRE source à la même position confirme la `person_id` indépendamment de l'ORCID. SQL d'exploration prêt (cf. discussion 2026-04-28).
+Pour mémoire, le concept était : pour une `source_authorship` Crossref portant un ORCID déjà présent en `pending` dans `person_identifiers` et rattachée à la même `person_id` (confirmée indépendamment de l'ORCID), promouvoir l'ORCID en `confirmed`. La circularité (si l'ORCID est lui-même la clé de rattachement) imposait de vérifier une confirmation par une autre source à la même position.
 
-**Mise en pause** : sur l'échantillon CrossRef actuel, 0 ORCID candidat trouvé (échantillon dominé par des méga-papers JAMA sans ORCID). Reprise quand le corpus CrossRef sera plus représentatif et que la mesure a priori sera fiable.
+### Phase 4 — Discovery via ORCID confirmé ➡ (sortie du chantier, en pause)
 
-### Phase 4 — Discovery via ORCID confirmé ⏸ (en pause)
+Décision 2026-05-30 : sortie de ce chantier. La découverte par ORCID n'est pas propre à Crossref — elle s'envisage sur plusieurs sources (DataCite, OpenAlex…). Notée dans TODO ; candidate à un chantier dédié multi-source. Non instruite ici.
 
-Gate exploratoire avant toute implémentation : pour un échantillon d'ORCIDs confirmés, interroger `filter=orcid:<ORCID>` sur CrossRef et confronter aux DOI déjà connus toutes sources confondues. Décision go/no-go selon le gain en DOI nouveaux.
+Pour mémoire, le gate exploratoire envisagé : pour un échantillon d'ORCIDs confirmés, interroger `filter=orcid:<ORCID>` et confronter aux DOI déjà connus toutes sources confondues, décision go/no-go selon le gain en DOI nouveaux.
 
-**Mise en pause** : reportée en attendant un volume CrossRef représentatif et un set d'ORCIDs UCA confirmés stable.
+### Phase 5 — Relations entre publications ➡ (hors scope)
 
-### Phase 5 — Relations entre publications ⏸ (en pause)
+Décision 2026-05-30 : hors scope de ce chantier. La modélisation est traitée dans [`METIER_relations-publications`](METIER_relations-publications.md) ; Crossref (`relation`) y contribuera pour une petite part, aux côtés de DataCite `relatedIdentifiers` et autres. Pour mémoire, sur l'échantillon spike la couverture `relation` n'était que de ~2 %.
 
-Migration : création de `publication_relations` (cross-source) + extraction du champ `relation` de CrossRef. Affichage UI à concevoir séparément (TODO_LAURA.md ligne 82).
+### Phase 6 — Discovery par affiliation 🔬 (évaluée le 2026-05-30 — recall insuffisant)
 
-**Mise en pause** : sur l'échantillon spike, ~2 % de couverture relations — bénéfice immédiat trop modeste pour prioriser. Reprise quand le corpus CrossRef sera plus volumineux ou si un besoin UI spécifique émerge.
+Mesure refaite sur un dump récent de la prod (quasi jumeau), avec la bonne requête. Le spike d'origine (237 847 hits, 81 % de nouveaux sur base locale) était trompeur : il interrogeait `query.affiliation=Université Clermont Auvergne`, dont le token « université » matche des centaines de milliers d'affiliations universitaires sans rapport, et comparait à une base non représentative.
 
-### Phase 6 — Discovery par affiliation ⏸ (en réévaluation)
+Requête correcte : `query.affiliation=Clermont Auvergne`. Le filtre est un match par tokens Elasticsearch — l'ordre des mots, le tiret et « Université »/« University » sont sans effet ; les deux tokens « Clermont » + « Auvergne » suffisent et évitent le bruit « université ».
 
-Réouverture de la piste initialement écartée. Spike du 2026-05-23 (`docs/chantiers/datacite-vs-natives-spike.md`, section Crossref) : `query.affiliation=Université Clermont Auvergne` + filtre `from-pub-date:2020,until-pub-date:2026` renvoie **237 847 hits annoncés** ; sur les 30 000 plus pertinents paginés, 24 351 (81 %) sont absents de la base locale. Top éditeurs nouveaux : Taylor & Francis, Wiley, MDPI, Research Square, Érudit, Oxford UP, ACS, APS.
+Résultats (filtre `from-pub-date:2020,until-pub-date:2026`) :
 
-**Inconnues à lever avant implémentation** :
-- [ ] **Rejouer le spike sur la base de prod** pour mesurer le vrai delta (la base locale n'est pas représentative). Si l'overlap monte fortement, l'apport marginal de Crossref affiliation vs OpenAlex peut redevenir faible.
-- [ ] **Échantillonner la qualité des hits tardifs** (pages 20+) : à 237 k résultats, la queue de la relevance contient probablement des faux positifs token-match (« Université de X », « Clermont… ailleurs »). Cap raisonnable à fixer.
-- [ ] **Tester `query.affiliation` vs `filter=ror-id:01x0gvm65`** (note : Laura indique que le ROR UCA est quasi jamais renseigné côté Crossref ; à confirmer).
-- [ ] **Cousin DataCite** : extracteur affiliation-driven sur le même mode côté DataCite, cf. `METIER_doi-ra-datacite.md` Phase 3. Architecture probablement à partager.
+| Mesure | Valeur |
+|---|---:|
+| Hits annoncés par Crossref | 8 510 |
+| DOIs paginés (cursor cassé sur 500 transitoire à ~82 %) | 7 000 |
+| Base — publis avec DOI Crossref 2020-2026 (dénominateur) | 20 231 |
+| Découvertes retrouvées dans ce sous-ensemble | 5 347 (**recall 26 %**) |
+| Nouveaux candidats (absents de la base) | 1 642 |
 
-**Implémentation cible (si réévaluation positive)** :
-- Module `infrastructure/sources/crossref/fetch_uca_publications.py` (affiliation-driven, analogue HAL/OpenAlex) en plus du `fetch_missing_doi.py` existant (DOI-driven).
-- Réutilisation du normalizer Crossref existant (Phase 1) — la structure du payload `/works/{doi}` et `/works?query.affiliation` est identique (juste un wrapper `items: [...]`).
-- Mode incrémental via `from-index-date` (déjà acté dans les considérations techniques).
+**Constat : recall faible (~26 %).** Crossref n'indexe la chaîne d'affiliation que pour une minorité de ses dépôts (beaucoup d'éditeurs ne la déposent pas) — la query est donc aveugle aux ~3/4 des publications Crossref UCA déjà connues. L'affiliation-driven Crossref **ne peut pas être une source de découverte primaire** ; au mieux un filet d'appoint ramenant ~1 600-2 000 nouveaux candidats, à valider en précision (le token-match « Clermont » + « Auvergne » peut capter du non-UCA : CHU, Sigma Clermont, INRAE Auvergne…).
+
+**Précision des nouveaux candidats** (échantillon de 50, métadonnées Crossref relues à l'œil) : **14 % d'UCA stricts** (affiliation nommant Université Clermont Auvergne / UCA / labos UCA), ~34 % si le CHU de Clermont-Ferrand est compté dans le périmètre. 16 % sont des institutions clermontoises non-UCA (SIGMA Clermont / Clermont INP, INRAE seul, Michelin), et **50 % du pur bruit de token** (« Clermont » en Floride/Kentucky/Ohio, « Auvergne » comme région ⇒ Lyon/Grenoble/Saint-Étienne). Histogramme des années : `2020:10 2021:8 2022:6 2023:4 2024:6 2025:13 2026:3` — léger sur-poids du récent (2025-26 = 32 %), confirmant pour la *fraction utile* l'hypothèse « Crossref sort avant les autres sources », mais le gros du nouveau n'est ni récent ni UCA.
+
+**Décision (2026-05-30) : no-go sur l'extracteur affiliation-driven Crossref.** Recall faible (26 %) **et** précision faible (~14-34 %) sur ce qu'il ajoute → rendement net ≈ 230-560 vraies publis UCA noyées dans ~2/3 de bruit, non ingérables sans filtre de précision. Coût disproportionné pour un filet d'appoint. Le DOI-driven (Phase 1, livré) reste le bon usage de Crossref. La piste « rattraper les publis récentes en avance sur une source » relève du re-fetch périodique ([`DATA_cycle-vie-staging`](DATA_cycle-vie-staging.md)), pas de ce chantier.
+
+Si l'apport est jugé suffisant, l'implémentation cible reste : module `infrastructure/sources/crossref/fetch_uca_publications.py` (affiliation-driven, analogue HAL/OpenAlex) réutilisant le normalizer Crossref existant (Phase 1), en pagination `offset` (8 510 < cap offset 10 000 — évite le cursor qui casse). Cousin DataCite affiliation-driven : cf. [`METIER_doi-ra-datacite`](METIER_doi-ra-datacite.md) Phase 3.
+
+Spike : [`interfaces/cli/oneshot/crossref_affiliation_discovery_spike.py`](../../interfaces/cli/oneshot/crossref_affiliation_discovery_spike.py).
 
 ## Considérations techniques
 
@@ -158,14 +167,10 @@ Réouverture de la piste initialement écartée. Spike du 2026-05-23 (`docs/chan
    - **Mode weekly** : interrogation uniquement des DOI **absents du staging CrossRef** (incrémental, pas de refetch des DOI déjà ingérés). Les métadonnées CrossRef qui nous intéressent bougent peu.
    - **Mode full** : ré-interrogation possible de l'ensemble du corpus et comparaison de hash pour détecter les changements. À mettre en place de manière conservative, et **à évaluer à l'usage** — peut-être pas pertinent en pratique si les variations s'avèrent négligeables.
 
-4. **Discovery via ORCID (Phase 4)** : on s'en tient au **matching DOI uniquement** dans un premier temps. Le matching par ORCID est conditionné à un travail exploratoire préalable.
-   - Avant toute décision d'ingestion, mesurer combien de DOI nouveaux (absents de toutes les sources actuelles) seraient remontés en interrogeant CrossRef avec les ORCIDs confirmés UCA.
-   - Si le gain est nul ou marginal → la phase 4 est abandonnée.
-   - Si le gain est significatif → ré-ouvrir la décision sur la politique d'ingestion (auto vs. validation manuelle).
+4. **Discovery via ORCID** : sortie de ce chantier (cf. Phase 4) — pas spécifique à Crossref, candidate à un chantier dédié multi-source.
 
 ## Risques & open questions
 
-- **Couverture ORCID inégale** : très bonne post-2018 chez les gros éditeurs commerciaux, médiocre avant. Si la phase 4 (discovery) est conservée à l'issue du gate exploratoire, le recall sera partiel — au mieux un filet de sécurité, jamais une source primaire.
 - **Mapping `doc_type` CrossRef ↔ canonique** : plusieurs cas non triviaux (`posted-content` peut être preprint ou commentary, `book-chapter` vs `monograph` vs `reference-entry`…). À concevoir avec exemples réels en phase 0.
 
 ## Crossref absent de `build_authorships.all_sources`
