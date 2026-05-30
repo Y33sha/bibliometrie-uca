@@ -14,6 +14,21 @@ from typing import Literal
 
 from domain.persons.name_matching import names_compatible
 
+ORCID_MATCH_SOURCES = frozenset({"crossref", "openalex", "hal"})
+"""Sources dont l'ORCID porté par une authorship est déposé par l'auteur,
+donc fiable comme signal de matching personne.
+
+- ``crossref`` : ORCID fourni par l'auteur à l'éditeur lors de la soumission.
+- ``openalex`` : ``raw_orcid`` recopié par OpenAlex de la métadonnée brute de
+  la source amont (cf. `_extract_openalex_orcid`) — même provenance que
+  Crossref.
+- ``hal`` : ORCID attaché à l'auteur dans le TEI HAL (``label_xml``).
+
+``wos`` est exclu : son ORCID (``PreferredORCID``) résulte du matching
+algorithmique interne de Web of Science, régulièrement fautif. L'ORCID WoS
+reste enregistré sur ``person_identifiers`` mais n'est pas utilisé comme
+signal de matching."""
+
 MAX_AUTHORS_CROSS_SOURCE = 50
 """Au-delà de ce seuil d'auteurs sur une publication, le matching
 cross-source est désactivé. Sur les méga-papers (consortiums avec

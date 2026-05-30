@@ -332,8 +332,22 @@ def insert_openalex_document(
 
 
 def _extract_openalex_orcid(authorship: dict) -> str | None:
-    """Extrait l'ORCID canonique de l'auteur OA (ou None)."""
-    return normalize_orcid((authorship.get("author") or {}).get("orcid"))
+    """Extrait l'ORCID déposé par l'auteur sur l'authorship (`raw_orcid`).
+
+    OpenAlex porte deux ORCID par authorship, de provenances opposées :
+
+    - ``raw_orcid`` (niveau authorship) : recopié tel quel de la métadonnée
+      brute du work telle qu'ingérée par OpenAlex depuis sa source amont
+      (Crossref pour l'essentiel des articles à éditeur). C'est l'ORCID
+      déposé par l'auteur à la soumission — fiable au même titre qu'un
+      ORCID Crossref.
+    - ``author.orcid`` (niveau entité auteur OpenAlex) : ORCID de l'entité
+      désambiguïsée par le clustering nom × affiliation d'OpenAlex,
+      régulièrement fautif.
+
+    On retient ``raw_orcid`` et on ignore ``author.orcid``.
+    """
+    return normalize_orcid(authorship.get("raw_orcid"))
 
 
 # =============================================================
@@ -393,16 +407,6 @@ def process_authorships(
         ids = compact_identifiers(orcid=orcid)
         identifiers = ids if ids else None
 
-        # `display_name` = nom de l'entité auteur OpenAlex (référentiel
-        # interne OA), à comparer avec `raw_author_name` (signature de
-        # la publi) côté pipeline `persons` pour valider que l'ORCID
-        # attribué par OA est bien celui de notre auteur — cf.
-        # `keep_orcid_if_name_matches`. Stocké uniquement s'il est
-        # présent ; le filtre traite `None` comme « non compatible ».
-        author = authorship.get("author") or {}
-        display_name = author.get("display_name")
-        source_data = {"display_name": display_name} if display_name else None
-
         sa_id = queries.upsert_openalex_source_authorship(
             conn,
             source_publication_id=source_publication_id,
@@ -411,7 +415,6 @@ def process_authorships(
             raw_author_name=raw_author_name,
             is_corresponding=is_corresponding,
             person_identifiers=identifiers,
-            source_data=source_data,
         )
 
         if addr_parts:

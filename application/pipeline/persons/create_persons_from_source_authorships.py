@@ -6,7 +6,10 @@ délègue la décision à `domain.persons.matching.decide_person_match` :
 
 1. **Cross-source** par `(publication_id, author_position)` avec nom compatible.
 2. **IdRef** présent en base (status != rejected).
-3. **ORCID** présent en base (status != rejected).
+3. **ORCID** présent en base (status != rejected), utilisé comme signal
+   uniquement quand l'authorship vient d'une source à ORCID déposé par
+   l'auteur (`ORCID_MATCH_SOURCES` : crossref / openalex / hal). L'ORCID WoS,
+   attribué algorithmiquement, n'est pas un signal de matching.
 4. **Lookup `person_name_forms`** : match unique / ambigu (skip) /
    inconnu (création si `allow_create`, skip sinon).
 
@@ -49,17 +52,17 @@ from application.ports.repositories.person_repository import PersonRepository
 from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
 from domain.persons.matching import (
+    ORCID_MATCH_SOURCES,
     decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
     decide_person_match,
 )
 from domain.persons.name_matching import parse_raw_author_name
-from domain.sources.openalex import keep_orcid_if_name_matches
 
 
 class EnrichedAuthorship(NamedTuple):
-    """`BareUnlinkedAuthorship` enrichie côté Python : nom parsé, normalisations, flag de création autorisée, ORCID filtré pour OpenAlex. Sans `oa_display_name` qui ne sert qu'à l'enrichissement."""
+    """`BareUnlinkedAuthorship` enrichie côté Python : nom parsé, normalisations, flag de création autorisée."""
 
     authorship_id: int
     source: str
@@ -83,36 +86,18 @@ class EnrichedAuthorship(NamedTuple):
 
 
 def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
-    """Parse le nom, normalise, et filtre l'ORCID OpenAlex contre `oa_display_name`.
-
-    OpenAlex assigne à chaque authorship une entité auteur de son
-    référentiel ; cette assignation peut être fautive, et l'ORCID
-    rattaché à l'entité auteur peut alors être celui d'une autre
-    personne. On confronte le nom de l'entité auteur OA
-    (`oa_display_name`) au `raw_author_name` de la signature : si
-    incompatibles ou si `display_name` est absent, on drop l'ORCID.
-    Les autres sources fournissent un ORCID lié directement à la
-    signature, pas de filtre nécessaire.
-    """
+    """Parse le nom, normalise, calcule le flag de création autorisée."""
     last_name, first_name = parse_raw_author_name(row.full_name)
     last_norm = normalize_name(last_name)
     first_norm = normalize_name(first_name)
     allow_create = allow_person_creation(row.source, row.roles or [])
-
-    orcid = row.orcid
-    if row.source == "openalex" and orcid:
-        orcid = keep_orcid_if_name_matches(
-            raw_full_name=row.full_name,
-            oa_full_name=row.oa_display_name,
-            oa_orcid=orcid,
-        )
 
     return EnrichedAuthorship(
         authorship_id=row.authorship_id,
         source=row.source,
         full_name=row.full_name,
         author_name_normalized=row.author_name_normalized,
-        orcid=orcid,
+        orcid=row.orcid,
         idref=row.idref,
         roles=row.roles,
         publication_id=row.publication_id,
@@ -129,7 +114,7 @@ def get_all_unlinked_authorships(
     conn: Connection, queries: PersonsCreateQueries
 ) -> list[EnrichedAuthorship]:
     """Charge les authorships UCA sans person_id (toutes sources) et les enrichit
-    (parsing noms, filtrage ORCID OpenAlex, flag allow_create)."""
+    (parsing noms, flag allow_create)."""
     return [_enrich(row) for row in queries.fetch_unlinked_authorships(conn)]
 
 
@@ -225,7 +210,12 @@ def run(
                 )
 
         idref_match = decide_match_by_identifier(a.idref, idref_map)
-        orcid_match = decide_match_by_identifier(a.orcid, orcid_map)
+        # ORCID utilisé comme signal de matching uniquement quand il est
+        # déposé par l'auteur (crossref / openalex raw_orcid / hal TEI) ;
+        # l'ORCID WoS, attribué algorithmiquement, est ignoré ici (il reste
+        # enregistré sur person_identifiers via add_identifiers).
+        orcid_signal = a.orcid if a.source in ORCID_MATCH_SOURCES else None
+        orcid_match = decide_match_by_identifier(orcid_signal, orcid_map)
 
         norm = a.author_name_normalized
         name_form_outcome = decide_name_form_outcome(

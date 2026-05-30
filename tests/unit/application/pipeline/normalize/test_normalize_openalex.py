@@ -203,18 +203,20 @@ class TestExtractShortId:
 
 
 class TestExtractOpenalexOrcid:
-    def test_no_author(self):
+    def test_empty_authorship(self):
         assert _extract_openalex_orcid({}) is None
 
-    def test_orcid_present(self):
-        # ORCID est normalisé (suppression du préfixe URL).
-        result = _extract_openalex_orcid(
-            {"author": {"orcid": "https://orcid.org/0000-0001-2345-6789"}}
-        )
+    def test_raw_orcid_present(self):
+        # On lit `raw_orcid` (déposé par l'auteur), normalisé (préfixe URL strippé).
+        result = _extract_openalex_orcid({"raw_orcid": "https://orcid.org/0000-0001-2345-6789"})
         assert result == "0000-0001-2345-6789"
 
-    def test_no_orcid(self):
-        assert _extract_openalex_orcid({"author": {}}) is None
+    def test_author_orcid_ignored(self):
+        """`author.orcid` (entité désambiguïsée OA) est ignoré au profit de `raw_orcid`."""
+        assert _extract_openalex_orcid({"author": {"orcid": "0000-0001-2345-6789"}}) is None
+
+    def test_no_raw_orcid(self):
+        assert _extract_openalex_orcid({"raw_orcid": None}) is None
 
 
 # ── upsert_publisher ─────────────────────────────────────────────
@@ -534,8 +536,10 @@ class TestProcessAuthorships:
             "authorships": [
                 {
                     "raw_author_name": "DUPONT Marie",
+                    "raw_orcid": "https://orcid.org/0000-0001-2345-6789",
                     "author": {
-                        "orcid": "https://orcid.org/0000-0001-2345-6789",
+                        # author.orcid divergent : doit être ignoré au profit de raw_orcid.
+                        "orcid": "https://orcid.org/9999-9999-9999-9999",
                         "display_name": "Marie Dupont",
                     },
                     "is_corresponding": True,
@@ -556,7 +560,6 @@ class TestProcessAuthorships:
         assert upserted["raw_author_name"] == "DUPONT Marie"
         assert upserted["is_corresponding"] is True
         assert upserted["person_identifiers"] == {"orcid": "0000-0001-2345-6789"}
-        assert upserted["source_data"] == {"display_name": "Marie Dupont"}
         # Linker appelé avec l'addresse brute.
         assert linker.links == [(101, ["Univ Clermont"])]
 
@@ -592,19 +595,6 @@ class TestProcessAuthorships:
             MagicMock(), queries, work, source_publication_id=10, address_linker=linker
         )
         assert linker.links == []
-
-    def test_author_no_display_name_no_source_data(self):
-        """Sans `author.display_name`, `source_data` reste None."""
-        queries = _FakeQueries()
-        work = {"authorships": [{"raw_author_name": "X", "institutions": [], "author": {}}]}
-        process_authorships(
-            MagicMock(),
-            queries,
-            work,
-            source_publication_id=10,
-            address_linker=_FakeAddressLinker(),
-        )
-        assert queries.upserted_authorships[0]["source_data"] is None
 
 
 # ── process_work (orchestrateur) ─────────────────────────────────
