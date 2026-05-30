@@ -44,9 +44,8 @@ Après filtre méga-papers (publis dont le max d'auteurs par source ≤ 50, alig
 ## Phasage
 
 - [x] **Phase 1 — Audit read-only consolidé** : oneshot [interfaces/cli/oneshot/audit_authorships_cross_source.py](../../interfaces/cli/oneshot/audit_authorships_cross_source.py) qui produit (a) les compteurs ci-dessus avec et sans filtre méga-papers, (b) un échantillon de ~20 cas par source (méga-papers exclus) à valider à l'œil (publi + position + nom de référence + nom orphelin).
-- [ ] **Phase 2 — Qualification sample** : revue manuelle de l'échantillon, en distinguant vrais positifs (à rattacher), homonymes (à ne pas rattacher), variantes de nom (à rattacher avec un critère plus tolérant). Calibre la suite.
-- [ ] **Phase 3 — Oneshot d'application** (si Phase 2 concluante) : étend la cascade `decide_person_match` étape 4 (cross-source par publi + position) aux SA `in_perimeter = FALSE` quand au moins une autre SA de la même publi est déjà reliée à un `person_id`. UPDATE de `source_authorships.person_id` + `authorship_id`. `source_authorships.in_perimeter` non modifié.
-- [ ] **Phase 4 — Élargissement WoS** : si le volume WoS justifie l'effort (13 k SA dont seulement 0,2 % de nom strictement identique), introduire un critère de matching tolérant aux initiales / casse pour cette source. À arbitrer en fin de Phase 3.
+- [ ] **Phase 2 — Oneshot d'application** : étend la cascade `decide_person_match` étape 4 (cross-source par publi + position) aux SA `in_perimeter = FALSE` quand au moins une autre SA de la même publi est déjà reliée à un `person_id`. UPDATE de `source_authorships.person_id` + `authorship_id`. `source_authorships.in_perimeter` non modifié.
+- [ ] **Phase 3 — Élargissement WoS** : si le volume WoS justifie l'effort (13 k SA dont seulement 0,2 % de nom strictement identique), introduire un critère de matching tolérant aux initiales / casse pour cette source. À arbitrer en fin de Phase 2.
 
 ## Questions ouvertes
 
