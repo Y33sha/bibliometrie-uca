@@ -51,6 +51,7 @@ class PgAddressLinker:
         authorship_id: int,
         addr_texts: list[str],
         countries: list[str] | None = None,
+        suggested_countries: list[str] | None = None,
     ) -> int:
         if not addr_texts:
             return 0
@@ -73,6 +74,19 @@ class PgAddressLinker:
                         WHERE id = :addr_id AND countries IS NULL
                     """),
                     {"countries": countries, "addr_id": addr_id},
+                )
+
+            # Suggestion de pays (OpenAlex country_code) : seulement si l'adresse
+            # n'a ni pays d'autorité ni suggestion. Jamais écrasée.
+            if suggested_countries:
+                conn.execute(
+                    text("""
+                        UPDATE addresses SET suggested_countries = :sc
+                        WHERE id = :addr_id
+                          AND countries IS NULL
+                          AND suggested_countries IS NULL
+                    """),
+                    {"sc": suggested_countries, "addr_id": addr_id},
                 )
 
             conn.execute(

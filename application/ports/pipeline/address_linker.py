@@ -20,11 +20,18 @@ class AddressLinker(Protocol):
         authorship_id: int,
         addr_texts: list[str],
         countries: list[str] | None = None,
+        suggested_countries: list[str] | None = None,
     ) -> int:
         """Crée les adresses (si absentes) et les liens pour une authorship.
 
-        `countries` : codes pays à propager sur les adresses créées, utilisés
-        par ScanR qui fournit les pays détectés.
+        `countries` : codes pays à propager sur `addresses.countries` (autorité),
+        utilisés par ScanR qui fournit les pays détectés dans le texte.
+
+        `suggested_countries` : codes pays à propager sur
+        `addresses.suggested_countries` (suggestion à valider, jamais autorité),
+        utilisés par OpenAlex dont le `country_code` provient de la structure
+        désambiguïsée algorithmiquement (faillible). Propagés uniquement sur les
+        adresses encore sans pays ni suggestion.
 
         Retourne le nombre de liens créés.
         """

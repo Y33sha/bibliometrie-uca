@@ -68,10 +68,19 @@ class _FakeQueries:
 class _FakeAddressLinker:
     def __init__(self) -> None:
         self.links: list[tuple[int, list[str]]] = []
+        self.suggested: list[list[str] | None] = []
         self.cleared = 0
 
-    def link(self, conn, sa_id: int, addr_parts: list[str]) -> None:
+    def link(
+        self,
+        conn,
+        sa_id: int,
+        addr_parts: list[str],
+        countries: list[str] | None = None,
+        suggested_countries: list[str] | None = None,
+    ) -> None:
         self.links.append((sa_id, addr_parts))
+        self.suggested.append(suggested_countries)
 
     def clear_cache(self) -> None:
         self.cleared += 1
@@ -595,6 +604,53 @@ class TestProcessAuthorships:
             MagicMock(), queries, work, source_publication_id=10, address_linker=linker
         )
         assert linker.links == []
+
+    def test_institution_country_code_to_suggested(self):
+        """`country_code` OpenAlex (structure désambiguïsée) → `suggested_countries`,
+        jamais `countries`. Union dédupliquée et en majuscules."""
+        queries = _FakeQueries()
+        work = {
+            "authorships": [
+                {
+                    "raw_author_name": "X",
+                    "raw_affiliation_strings": ["Some affiliation"],
+                    "institutions": [
+                        {
+                            "id": "https://openalex.org/I1",
+                            "display_name": "A",
+                            "country_code": "FR",
+                        },
+                        {
+                            "id": "https://openalex.org/I2",
+                            "display_name": "B",
+                            "country_code": "us",
+                        },
+                    ],
+                }
+            ]
+        }
+        linker = _FakeAddressLinker()
+        process_authorships(
+            MagicMock(), queries, work, source_publication_id=10, address_linker=linker
+        )
+        assert linker.suggested == [["FR", "US"]]
+
+    def test_no_country_code_no_suggestion(self):
+        queries = _FakeQueries()
+        work = {
+            "authorships": [
+                {
+                    "raw_author_name": "X",
+                    "raw_affiliation_strings": ["Some affiliation"],
+                    "institutions": [{"id": "https://openalex.org/I1", "display_name": "A"}],
+                }
+            ]
+        }
+        linker = _FakeAddressLinker()
+        process_authorships(
+            MagicMock(), queries, work, source_publication_id=10, address_linker=linker
+        )
+        assert linker.suggested == [None]
 
 
 # ── process_work (orchestrateur) ─────────────────────────────────

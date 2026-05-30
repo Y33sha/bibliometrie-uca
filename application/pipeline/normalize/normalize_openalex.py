@@ -396,6 +396,14 @@ def process_authorships(
             extract_short_id(inst["id"]) for inst in institutions if inst.get("id")
         ]
 
+        # country_code OpenAlex : rattaché à la structure désambiguïsée
+        # (algorithmique, faillible — ex. CH attribué à une adresse finissant par
+        # France). On ne l'écrit donc PAS dans `countries` (autorité) mais en
+        # `suggested_countries` (à valider à la main).
+        suggested_countries = sorted(
+            {inst["country_code"].upper() for inst in institutions if inst.get("country_code")}
+        )
+
         # Adresses individuelles pour link_addresses
         addr_parts = (
             raw_strings
@@ -418,7 +426,9 @@ def process_authorships(
         )
 
         if addr_parts:
-            address_linker.link(conn, sa_id, addr_parts)
+            address_linker.link(
+                conn, sa_id, addr_parts, suggested_countries=suggested_countries or None
+            )
 
 
 # =============================================================
