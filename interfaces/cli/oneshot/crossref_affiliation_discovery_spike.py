@@ -6,7 +6,9 @@ Spike Phase 3 (suite) — chantier METIER_doi-ra-datacite (volet Crossref).
 
 Filtre années 2020-2026 (périmètre des publications présentes en base actuelle).
 
-NOTE : le diff avec la base est mesuré sur la base locale de cette session, qui n'est pas la base de prod. Le nombre de « nouveaux candidats » est donc indicatif ; à refaire sur prod pour le vrai delta.
+NOTE : le diff est mesuré sur un dump récent de la prod (quasi jumeau), donc le nombre de « nouveaux candidats » est cette fois représentatif.
+
+Le filtre `query.affiliation` est un match par tokens Elasticsearch (pas une égalité de phrase) : l'ordre des mots et les tirets sont sans effet, seuls les tokens comptent. La chaîne retenue est « Clermont Auvergne » : deux tokens discriminants qui captent toutes les variantes (Université/University, avec ou sans tiret) ; ajouter « Université »/« University » ne ferait que ramener des affiliations « université … » sans rapport en queue de pertinence.
 
 Usage :
     python -m interfaces.cli.oneshot.crossref_affiliation_discovery_spike [--max-pages N]
@@ -35,7 +37,7 @@ DATA_DIR = (
 )
 
 CROSSREF_WORKS_URL = "https://api.crossref.org/works"
-UCA_NAME = "Université Clermont Auvergne"
+UCA_NAME = "Clermont Auvergne"
 YEAR_FROM = 2020
 YEAR_TO = 2026
 PAGE_SIZE = 1000
@@ -44,6 +46,35 @@ SLEEP_BETWEEN_PAGES = 0.3
 
 def _user_agent(email: str) -> str:
     return f"UCA-bibliometrie-spike/0.1 (mailto:{email})"
+
+
+def _get_with_retry(
+    client: httpx.Client, params: dict[str, Any], retries: int = 5
+) -> httpx.Response:
+    """GET avec retry sur 5xx + erreurs de transport. Crossref renvoie fréquemment des 500 transitoires en deep paging par cursor."""
+    last_exc: Exception | None = None
+    for attempt in range(retries):
+        try:
+            resp = client.get(CROSSREF_WORKS_URL, params=params)
+            if resp.status_code >= 500:
+                raise httpx.HTTPStatusError(
+                    f"{resp.status_code}", request=resp.request, response=resp
+                )
+            resp.raise_for_status()
+            return resp
+        except (httpx.HTTPStatusError, httpx.TransportError) as exc:
+            last_exc = exc
+            backoff = 2.0 * (attempt + 1)
+            log.warning(
+                "    requête échouée (essai %d/%d) : %s — retry dans %.0fs",
+                attempt + 1,
+                retries,
+                exc,
+                backoff,
+            )
+            time.sleep(backoff)
+    assert last_exc is not None
+    raise last_exc
 
 
 def _save_json(path: Path, payload: Any) -> None:
@@ -61,15 +92,14 @@ def get_known_uca_dois(conn: Connection) -> set[str]:
 
 def fetch_volume(client: httpx.Client) -> dict[str, Any]:
     """Page 1 (rows=5) pour mesurer le volume total et inspecter un échantillon."""
-    resp = client.get(
-        CROSSREF_WORKS_URL,
-        params={
+    resp = _get_with_retry(
+        client,
+        {
             "query.affiliation": UCA_NAME,
             "filter": f"from-pub-date:{YEAR_FROM},until-pub-date:{YEAR_TO}",
             "rows": 5,
         },
     )
-    resp.raise_for_status()
     return resp.json()
 
 
@@ -78,16 +108,15 @@ def paginate_dois(client: httpx.Client, max_pages: int) -> list[str]:
     dois: list[str] = []
     cursor: str | None = "*"
     for page in range(max_pages):
-        resp = client.get(
-            CROSSREF_WORKS_URL,
-            params={
+        resp = _get_with_retry(
+            client,
+            {
                 "query.affiliation": UCA_NAME,
                 "filter": f"from-pub-date:{YEAR_FROM},until-pub-date:{YEAR_TO}",
                 "rows": PAGE_SIZE,
                 "cursor": cursor,
             },
         )
-        resp.raise_for_status()
         msg = resp.json().get("message") or {}
         items = msg.get("items") or []
         page_dois = [(it.get("DOI") or "").lower() for it in items if it.get("DOI")]
@@ -124,7 +153,7 @@ def main() -> int:
     with engine.connect() as conn:
         user_agent = _user_agent(get_polite_pool_email(conn))
         known_dois = get_known_uca_dois(conn)
-        log.info("Base connue (locale, pas prod) : %d DOIs UCA en publications", len(known_dois))
+        log.info("Base connue (dump prod récent) : %d DOIs UCA en publications", len(known_dois))
 
         with httpx.Client(
             headers={"User-Agent": user_agent, "Accept": "application/json"}, timeout=30.0
@@ -178,7 +207,7 @@ def main() -> int:
                 100 * len(overlap) / max(1, len(discovered)),
             )
             log.info(
-                "  Nouveaux candidats : %d (%.1f %%) — sur base locale, non représentatif prod",
+                "  Nouveaux candidats : %d (%.1f %%)",
                 len(new),
                 100 * len(new) / max(1, len(discovered)),
             )
@@ -200,10 +229,7 @@ def main() -> int:
                     "new_candidates": len(new),
                     "new_by_prefix_top20": top_prefixes,
                     "sample_new_dois": sorted(new)[:50],
-                    "note": (
-                        "Base locale, pas prod. À refaire sur la vraie base "
-                        "pour mesurer le delta réel."
-                    ),
+                    "note": "Diff mesuré sur dump prod récent (quasi jumeau) — delta représentatif.",
                 },
             )
 
