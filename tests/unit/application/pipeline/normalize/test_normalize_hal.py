@@ -1,6 +1,6 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_hal`.
 
-Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), l'orchestrateur `process_authors` (composite + TEI + fallback), l'orchestrateur `process_work` (zenodo, métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, _row_factory, cleanup, on_error).
+Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), l'orchestrateur `process_authors` (composite + TEI), l'orchestrateur `process_work` (zenodo, métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, _row_factory, cleanup, on_error).
 
 Pattern : `_FakeQueries` + `_FakeAddressLinker` + `MagicMock`, pas de DB.
 """
@@ -439,7 +439,9 @@ class TestProcessAuthors:
         assert len(queries.upserted_authorships) == 1
         assert queries.upserted_authorships[0]["raw_author_name"] == "Marie Dupont"
 
-    def test_composite_solr_extracts_name_and_ids(self):
+    def test_composite_extracts_name_and_hal_person_id(self):
+        # Le composite fournit le nom et le hal_person_id (2e segment). L'idhal
+        # vient du TEI, pas du composite (cf. test suivant).
         queries = _FakeQueries()
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": [
@@ -449,9 +451,42 @@ class TestProcessAuthors:
         process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
         authorship = queries.upserted_authorships[0]
         assert authorship["raw_author_name"] == "Marie Dupont"
-        assert authorship["person_identifiers"] == {
+        # Pas de TEI → pas d'idhal (le 3e segment du composite est ignoré).
+        assert authorship["person_identifiers"] == {"hal_person_id": 749496}
+
+    def test_idhal_comes_from_tei(self):
+        # L'idhal slug vient du TEI (notation="string"), aligné par position.
+        queries = _FakeQueries()
+        label_xml = (
+            '<TEI xmlns="http://www.tei-c.org/ns/1.0"><biblFull><titleStmt>'
+            '<author><idno type="idhal" notation="string">marie-dupont</idno></author>'
+            "</titleStmt></biblFull></TEI>"
+        )
+        doc = {
+            "authFullNameFormIDPersonIDIDHal_fs": [
+                "Marie Dupont_FacetSep_49236-749496_FacetSep_marie-dupont"
+            ],
+            "label_xml": label_xml,
+        }
+        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
+        assert queries.upserted_authorships[0]["person_identifiers"] == {
             "idhal": "marie-dupont",
             "hal_person_id": 749496,
+        }
+
+    def test_composite_numeric_idhal_not_promoted(self):
+        # Régression : quand l'auteur n'a pas de slug, HAL recopie le person_id
+        # numérique dans le 3e segment du composite. Sans idhal TEI, on ne doit
+        # PAS créer d'idhal numérique (== hal_person_id) — seul hal_person_id reste.
+        queries = _FakeQueries()
+        doc = {
+            "authFullNameFormIDPersonIDIDHal_fs": [
+                "Christian Duale_FacetSep_106-921527_FacetSep_921527"
+            ],
+        }
+        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
+        assert queries.upserted_authorships[0]["person_identifiers"] == {
+            "hal_person_id": 921527,
         }
 
     def test_composite_with_zero_person_id_filtered(self):
