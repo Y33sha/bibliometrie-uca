@@ -7,32 +7,25 @@ flowchart LR
     class B new;
 ```
 Phase `persons`:
-`create_persons_from_source_authorships` — algorithme en 3 étapes :
+`create_persons_from_source_authorships` — cascade en 5 étapes, du signal le plus fiable au moins fiable (décideur pur `decide_person_match`) :
 
-> **Etape initiale à ajouter** : matching par ORCID attesté dans les métadonnées Crossref (= source auteur garantie => meilleur critère possible)
+1. **Identifiant ORCID déposé par l'auteur** : ORCID présent dans les métadonnées Crossref de la publication, dans le `raw_orcid` d'OpenAlex, ou dans le TEI HAL (`label_xml`) — soit les sources où l'ORCID est déposé par l'auteur (`ORCID_MATCH_SOURCES`). On ignore les ORCID ajoutés algorithmiquement par la source (`author.orcid` dans OpenAlex, distingué de `raw_orcid` ; dans WoS, pas de distinction possible — `PreferredORCID` ignoré en entier).
 
-1. **Même nom + même publication + même position auteur** : pour chaque authorship sans `person_id`, cherche sur la même publication (même position) une *authorship* d'une **autre source** déjà rattachée à une personne. Si le nom est compatible → rattacher. Approche conservatrice (requiert position identique dans la liste des auteurs. TODO : voir si cette condition peut être assouplie sans perte de qualité).
+2. **Compte HAL** : `hal_person_id` (compte HAL de l'auteur, attaché à la signature dans le TEI). Vient après l'ORCID déposé : le rattachement de la signature au compte peut être faux (identification automatisée au dépôt, homonymie sur les publis multi-auteurs), risque que le circuit ORCID-déposé n'a pas.
 
-> **Limité aux publications de 50 auteurs max** : les méga-papers (plusieurs centaines voire milliers d'auteurs) contiennent souvent des homonymes + l'initiale au lieu du prénom + de fréquents désalignements de position auteur entre sources, pouvant conduire à de faux rattachemements.
+3. **Identifiant IdRef** : PPN SUDOC (HAL TEI, ScanR, theses.fr), référentiel personnes de l'ESR.
 
-2. **Identifiant Idref/ORCID connu** : si l'authorship est liée à un ORCID ou un IdRef déjà présent en base (table `person_identifiers`, avec `status ≠ rejected`) → rattacher. Priorité aux IdRef. Les ORCID/IdRef sont lus depuis la colonne JSONB `source_authorships.person_identifiers`.
+4. **Même nom + même publication + même position auteur** (cross-source) : pour chaque authorship sans `person_id`, cherche sur la même publication (même position) une *authorship* d'une **autre source** déjà rattachée à une personne. Si le nom est compatible → rattacher. Placé après les identifiants : en tête il serait inopérant au bootstrap (suppose des rattachements préexistants). Approche conservatrice (requiert position identique dans la liste des auteurs. TODO: voir si cette condition peut être assouplie sans perte de qualité).
 
-> Les ORCID provenant de métadonnées OpenAlex ou WoS sont souvent douteux. Ils sont liés à l'entité du référentiel personnes propre à chaque base, mais ces entités sont peu fiables. L'ORCID est généralement absent de la publication : c'est donc un matching algorithmique qui a permis d'associer tel ORCID à tel auteur d'une publication. Étudier la pertinence de conserver cette étape du matching.
+> **Limité aux publications de 50 auteurs max** : les méga-papers (plusieurs centaines voire milliers d'auteurs) contiennent souvent des homonymes + l'initiale au lieu du prénom + de fréquents désalignements de position auteur entre sources, pouvant conduire à de faux rattachemements. On les ignore.
 
-3. **Recherche par nom** : lookup par nom normalisé dans `person_name_forms`.
+5. **Recherche par nom** : lookup par nom normalisé dans `person_name_forms`.
    - Nom mappé à 1 personne → rattacher
    - Nom mappé à >1 personnes → laisser orphelin (pour traitement manuel via `admin/orphan-authorships`)
    - **Nom inconnu → créer nouvelle personne**
 
 `populate_person_name_forms` — recalcule les formes de nom depuis les sources (HAL, OpenAlex, WoS, ScanR, theses, CrossRef).
 - Lors de la création d'une personne (ou d'une correction manuelle du nom/prénom) : génération automatique des variantes normalisées "prénom nom", "nom prénom", "initiales nom", "nom initiales".
-- Lors d'un rattachement d'authorship : les formes de nom liées sont ajoutées aux name_forms de cette personne.
+- Lors d'un rattachement d'authorship : les formes de nom liées sont ajoutées aux `person_name_forms` de cette personne et les identifiants présents dans les sources sont ajoutés aux `person_identifiers`.
 
-Fonctions de compatibilité de noms dans `domain/names.py`.
-
-**Identifiants par observation** : les identifiants normalisés
-(`orcid`, `idhal`, `idref`, `hal_person_id`, `researcher_id`) sont
-portés au niveau de chaque `source_authorships` dans la colonne
-JSONB `person_identifiers` — pas d'agrégation côté sources. Le
-référentiel canonique consolidé vit sur la table `person_identifiers`
-(alimentée par le pipeline personnes).
+TODO: ne pas importer les `person_identifiers` douteux de WoS et OpenAlex?

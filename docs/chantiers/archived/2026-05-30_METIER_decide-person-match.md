@@ -2,6 +2,8 @@
 
 Commencé le 2026-05-15
 
+Terminé le 2026-05-30
+
 ## Contexte
 
 Le pipeline persons (`application/pipeline/persons/create_persons_from_source_authorships.py`) exécute la cascade de matching personne en **4 boucles séquentielles indépendantes** sur `all_authorships`. Chaque étape skip ce qui est déjà rattaché par les précédentes ; la hiérarchie de fiabilité n'est pas exprimée comme une décision pure unique mais résulte implicitement de l'ordre des appels.
@@ -96,7 +98,7 @@ Ordre implémenté dans `decide_person_match` :
 
 - **Statuts `pending` vs `confirmed`** : aujourd'hui les deux sont utilisés indistinctement pour le matching. Restreindre aux `confirmed` réduirait le bruit mais fragiliserait la cascade sur des identifiers récents non encore validés. À reconsidérer plus tard.
 
-- **Invariants métier dans la cascade** : faut-il intégrer `check_can_merge_persons` (jamais de fusion auto entre deux persons avec `persons_rh` distincts) comme partie de la cascade, ou le garder en pré-check côté admin/scripts seulement ? À trancher si Phase 2 produit des cas où la cascade rattacherait deux personnes RH-distinctes par identifier.
+- **Doublons probables via conflits d'identifiant** : un `CannotAttributeConflict` lors de l'ajout d'identifiants (personne P matchée, mais un autre identifiant de l'authorship est déjà détenu par une personne Q) signale que P et Q sont probablement la même personne. Aujourd'hui le signal est loggé puis perdu. Le capturer pour un check post-pipeline relève de l'observabilité — porté par [`CODE_observabilite-robustesse-pipeline`](CODE_observabilite-robustesse-pipeline.md), pas par ce chantier. La cascade ne fusionne jamais deux personnes existantes, donc aucun garde-fou de fusion (`check_can_merge_persons`) n'est requis ici.
 
 ## Liens
 
