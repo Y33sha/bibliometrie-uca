@@ -1,4 +1,4 @@
-import { replaceState } from '$app/navigation';
+import { goto } from '$app/navigation';
 import { base } from '$app/paths';
 
 /**
@@ -102,7 +102,19 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 		}
 
 		const qs = p.toString();
-		replaceState(base + config.basePath + (qs ? '?' + qs : ''), {});
+		// `goto({ replaceState: true })` plutôt que le `replaceState` bas niveau
+		// de `$app/navigation` : `replaceState` ne mettait pas correctement à
+		// jour l'entrée d'historique du navigateur, et au back, le navigateur
+		// ramenait à l'URL d'origine (pré-modifications) tandis que le
+		// composant restauré depuis bfcache gardait son `$state` JS d'avant la
+		// navigation — désynchro URL bar ↔ UI. `goto` synchronise history,
+		// store `$page` et bfcache. `noScroll` + `keepFocus` évitent les sauts
+		// quand on coche/décoche un filtre.
+		void goto(base + config.basePath + (qs ? '?' + qs : ''), {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true,
+		});
 	}
 
 	function restoreFromUrl(urlParams: URLSearchParams): Record<string, unknown> {
