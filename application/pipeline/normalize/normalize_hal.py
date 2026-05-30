@@ -393,12 +393,15 @@ def process_authors(
 
     # authFullNameFormIDPersonIDIDHal_fs :
     #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position.
-    # Présence validée par le caller ; on en extrait nom, form_id, person_id, idhal.
+    # Présence validée par le caller ; on en extrait nom, form_id, person_id.
+    # Le 3e segment (idhal) est IGNORÉ : non fiable — quand l'auteur n'a pas de
+    # slug, HAL y recopie le person_id numérique, ce qui injectait de faux idhal
+    # numériques (== hal_person_id). L'idhal vient du seul TEI
+    # (`parse_tei_author_identifiers`, qui ne garde que notation="string").
     composite = doc.get("authFullNameFormIDPersonIDIDHal_fs") or []
     names = [entry.split("_FacetSep_", 1)[0] for entry in composite]
     form_id_by_pos: dict[int, int | None] = {}
     hal_person_id_by_pos: dict[int, int | None] = {}
-    idhal_by_pos = {}
 
     for pos, entry in enumerate(composite):
         parts = entry.split("_FacetSep_")
@@ -416,8 +419,6 @@ def process_authors(
                         hal_person_id_by_pos[pos] = pid
                 except ValueError:
                     pass
-        if len(parts) >= 3 and parts[2].strip():
-            idhal_by_pos[pos] = parts[2].strip()
 
     # authIdHasPrimaryStructure_fs → {form_id: set of halId_s natifs (text)}
     # + mapping {halId_s: nom} local au document (pour construire les
@@ -426,16 +427,13 @@ def process_authors(
     form_struct_map = parse_author_structures(doc, struct_name_by_hal_id=struct_name_by_hal_id)
 
     for position, name in enumerate(names):
-        idhal = idhal_by_pos.get(position)
         hal_person_id = hal_person_id_by_pos.get(position)
         form_id = form_id_by_pos.get(position)
 
         author_ids = tei_ids[position] if position < len(tei_ids) else {}
         orcid = author_ids.get("orcid")
         idref = author_ids.get("idref")
-        # Si le TEI ne fournit pas idhal mais le composite Solr oui,
-        # on garde celui-ci (composite Solr = fallback hors TEI).
-        idhal = author_ids.get("idhal") or idhal
+        idhal = author_ids.get("idhal")
 
         # authQuality_s : rôle de l'auteur (aut, crp, dir, edt, …)
         quality = qualities[position] if position < len(qualities) else None
