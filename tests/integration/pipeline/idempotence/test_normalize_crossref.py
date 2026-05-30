@@ -1,12 +1,15 @@
 """Idempotence : normalisation CrossRef.
 
 CrossRef est ingérée DOI-driven (cf. `fetch_missing_doi`) puis
-normalisée vers `source_publications` + `source_authorships`. Pas
-d'address linking (les affiliations CrossRef sont génériques et
-stockées sur `source_authorships.source_data`).
+normalisée vers `source_publications` + `source_authorships`. Les
+affiliations textuelles sont routées vers `addresses` /
+`source_authorship_addresses` via `AddressLinker` (comme les autres
+sources), ce qui permet à la phase `affiliations` de poser
+`in_perimeter` sur les SA crossref.
 
 Vérifie :
-- Le double passage `process_work` ne crée pas de doublons.
+- Le double passage `process_work` ne crée pas de doublons (y compris
+  sur les liens adresses).
 - Les branches d'erreur (DOI absent, titre absent, raw_data vide)
   marquent `processed=TRUE` et n'insèrent rien.
 """
@@ -94,9 +97,11 @@ def _run_normalize_crossref(conn):
         publication_repository,
         publisher_repository,
     )
+    from infrastructure.repositories.address_linker import PgAddressLinker
 
     queries = PgCrossrefNormalizeQueries()
     staging_queries = PgStagingQueries()
+    address_linker = PgAddressLinker()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(conn)
     publisher_repo = publisher_repository(conn)
@@ -122,6 +127,7 @@ def _run_normalize_crossref(conn):
             publisher_repo=publisher_repo,
             pub_repo=pub_repo,
             staging_queries=staging_queries,
+            address_linker=address_linker,
         ):
             processed += 1
     return processed
@@ -136,6 +142,14 @@ def _count_crossref(conn) -> dict[str, int]:
     ).scalar_one()
     counts["sa"] = conn.execute(
         text("SELECT COUNT(*) AS n FROM source_authorships WHERE source = 'crossref'")
+    ).scalar_one()
+    counts["saa"] = conn.execute(
+        text("""
+            SELECT COUNT(*) AS n
+            FROM source_authorship_addresses saa
+            JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+            WHERE sa.source = 'crossref'
+        """)
     ).scalar_one()
     counts["publications"] = conn.execute(
         text("SELECT COUNT(*) AS n FROM publications")
@@ -156,6 +170,8 @@ class TestNormalizeCrossrefIdempotence:
         assert counts_1["sp"] == 2
         # 2 auteurs sur le 1er record, 0 sur le 2nd → 2 source_authorships.
         assert counts_1["sa"] == 2
+        # 2 affiliations distinctes (UCA, CNRS) liées via address linker.
+        assert counts_1["saa"] == 2
 
         # Réinjecter le raw_data (le normaliseur peut le purger via VACUUM
         # post-pipeline ; ici on re-stage explicitement pour relancer).
@@ -184,16 +200,30 @@ class TestNormalizeCrossrefIdempotence:
         ).all()
         assert len(rows) == 2
 
-        # Premier auteur : ORCID + affiliations + sequence.
+        # Premier auteur : ORCID + sequence. L'affiliation n'est plus dans
+        # source_data (routée vers addresses), seul `sequence` y reste.
         assert rows[0].raw_author_name == "Alice Curie"
         assert rows[0].person_identifiers is not None
         assert rows[0].person_identifiers.get("orcid") == "0000-0002-1825-0097"
-        assert rows[0].source_data == {"affiliations": ["UCA"], "sequence": "first"}
+        assert rows[0].source_data == {"sequence": "first"}
 
-        # Deuxième auteur : pas d'ORCID, affiliation seule.
+        # Deuxième auteur : pas d'ORCID.
         assert rows[1].raw_author_name == "Bob Pasteur"
         assert rows[1].person_identifiers is None
-        assert rows[1].source_data == {"affiliations": ["CNRS"], "sequence": "additional"}
+        assert rows[1].source_data == {"sequence": "additional"}
+
+        # Les affiliations sont routées vers addresses + source_authorship_addresses.
+        addr_rows = sa_sync_conn.execute(
+            text("""
+                SELECT a.raw_text
+                FROM source_authorship_addresses saa
+                JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                JOIN addresses a ON a.id = saa.address_id
+                WHERE sa.source = 'crossref'
+                ORDER BY a.raw_text
+            """)
+        ).all()
+        assert [r.raw_text for r in addr_rows] == ["CNRS", "UCA"]
 
 
 class TestNormalizeCrossrefSkipBranches:

@@ -14,9 +14,13 @@ L'ORCID éventuel d'un auteur CrossRef vit sur
 côté auteur).
 
 Particularités CrossRef :
-- Affiliations purement textuelles et génériques (tutelles), pas de
-  structures détaillées → stockées dans ``source_authorships.source_data``
-  pour traçabilité, pas d'``addresses`` ni de ``source_authorship_addresses``.
+- Affiliations purement textuelles et génériques (tutelles), sans
+  structures détaillées. Elles sont routées vers ``addresses`` /
+  ``source_authorship_addresses`` via ``AddressLinker`` (comme HAL /
+  OpenAlex / ScanR / theses.fr) : la phase ``affiliations`` peut alors
+  poser ``in_perimeter`` sur les SA crossref, qui entrent ainsi dans la
+  cascade de matching personnes. Couverture partielle (~29 % des auteurs
+  CrossRef portent une affiliation), mais strictement mieux que rien.
 - ``doc_type`` stocké tel quel depuis ``msg["type"]`` ; le mapping
   taxonomie CrossRef → enum canonique vit dans
   ``domain.publications.doc_types._SOURCE_MAPS["crossref"]`` et est
@@ -40,6 +44,7 @@ from sqlalchemy import Connection
 
 from application.journals import find_or_create_journal
 from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.pipeline.address_linker import AddressLinker
 from application.ports.pipeline.normalize.crossref import CrossrefNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
@@ -242,12 +247,17 @@ def process_authors(
     msg: dict,
     doi: str,
     source_publication_id: int,
+    *,
+    address_linker: AddressLinker,
 ) -> None:
-    """Crée les ``source_authorships`` pour la publi.
+    """Crée les ``source_authorships`` pour la publi + les liens adresses.
 
     L'ORCID (seul identifiant exploitable côté CrossRef) vit sur
     `source_authorships.person_identifiers`. Les affiliations brutes
-    (génériques tutelle) sont stockées sur `source_data`.
+    (génériques tutelle) sont routées vers `addresses` /
+    `source_authorship_addresses` via `address_linker`, comme pour les
+    autres sources — c'est ce qui permet à la phase `affiliations` de
+    poser `in_perimeter` sur les SA crossref.
     """
     queries.clear_source_authorships_for_publication(conn, source_publication_id)
 
@@ -268,12 +278,10 @@ def process_authors(
 
         affiliations = _author_affiliation_strings(author)
         sd: dict[str, JsonValue] = {}
-        if affiliations:
-            sd["affiliations"] = affiliations
         if author.get("sequence"):
             sd["sequence"] = author["sequence"]
 
-        queries.upsert_crossref_source_authorship(
+        sa_id = queries.upsert_crossref_source_authorship(
             conn,
             source_publication_id=source_publication_id,
             author_position=position,
@@ -281,6 +289,9 @@ def process_authors(
             source_data=sd if sd else None,
             person_identifiers=ids if ids else None,
         )
+
+        if affiliations:
+            address_linker.link(conn, sa_id, affiliations)
 
 
 # =============================================================
@@ -298,6 +309,7 @@ def process_work(
     publisher_repo: PublisherRepository,
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
+    address_linker: AddressLinker,
 ) -> bool | None:
     staging_id = staging_row.id
     raw = staging_row.raw_data
@@ -349,7 +361,7 @@ def process_work(
         meta=meta,
     )
 
-    process_authors(conn, queries, msg, doi, source_publication_id)
+    process_authors(conn, queries, msg, doi, source_publication_id, address_linker=address_linker)
 
     staging_queries.mark_done(conn, staging_id)
     return True
@@ -368,6 +380,7 @@ class CrossrefNormalizer(SourceNormalizer):
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],
+        address_linker: AddressLinker,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -377,6 +390,7 @@ class CrossrefNormalizer(SourceNormalizer):
         self._publisher_repo: PublisherRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
+        self._address_linker = address_linker
 
     def preload_caches(self, conn: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(conn)
@@ -398,4 +412,14 @@ class CrossrefNormalizer(SourceNormalizer):
             publisher_repo=self._publisher_repo,
             pub_repo=self._pub_repo,
             staging_queries=self._staging,
+            address_linker=self._address_linker,
         )
+
+    def cleanup(self) -> None:
+        self._address_linker.clear_cache()
+
+    def on_error(self) -> None:
+        # Le cache d'adresses peut référencer des address_id insérés dans
+        # la transaction rollbackée — invalide-le pour éviter les FK
+        # violations sur les works suivants.
+        self._address_linker.clear_cache()

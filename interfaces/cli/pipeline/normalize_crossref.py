@@ -12,6 +12,7 @@ from infrastructure.repositories import (
     publication_repository,
     publisher_repository,
 )
+from infrastructure.repositories.address_linker import PgAddressLinker
 
 logger = setup_logger("normalize_crossref", os.path.join(os.path.dirname(__file__), "logs"))
 
@@ -26,6 +27,7 @@ def main() -> None:
         journal_repo_factory=journal_repository,
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
+        address_linker=PgAddressLinker(),
     ).run()
 
 

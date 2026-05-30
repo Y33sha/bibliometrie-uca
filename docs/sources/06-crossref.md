@@ -27,7 +27,7 @@ Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les aut
 
 ## Exemple de payload
 
-Document `10.1063/5.0056957` (2 auteurs en mécanique). Champs non consommés retirés : `URL`, `link` (PDF), `score`/`member`/`prefix`/`source` (métadonnées CrossRef internes), `relation` (chantier en pause), `reference` (souvent très volumineux), `indexed`/`deposited`/`issn-type`, `short-title`/`short-container-title`/`original-title`/`subtitle`/`journal-issue`/`update-policy`/`content-domain`, `references-count`/`reference-count`. Abstract tronqué.
+Document `10.1063/5.0056957` (2 auteurs en mécanique). Champs non consommés retirés : `URL`, `link` (PDF), `score`/`member`/`prefix`/`source` (métadonnées CrossRef internes), `relation` (hors scope — chantier relations entre publications), `reference` (souvent très volumineux), `indexed`/`deposited`/`issn-type`, `short-title`/`short-container-title`/`original-title`/`subtitle`/`journal-issue`/`update-policy`/`content-domain`, `references-count`/`reference-count`. Abstract tronqué.
 
 ```json
 {
@@ -73,9 +73,9 @@ Document `10.1063/5.0056957` (2 auteurs en mécanique). Champs non consommés re
 
 ## Particularités
 
-### Affiliations pauvres
+### Affiliations partielles
 
-~29 % seulement des auteurs CrossRef portent une affiliation (sondage sur 1 000 payloads, à confirmer sur base complète). Couverture trop partielle vs HAL/OpenAlex/WoS pour intégrer CrossRef à l'address linking. Stockées dans `source_authorships.source_data` pour traçabilité, **pas** d'insertion dans `addresses` / `source_authorship_addresses`. Sujet à réexaminer.
+~29 % seulement des auteurs CrossRef portent une affiliation (sondage sur 1 000 payloads, à confirmer sur base complète), et elles sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_authorship_addresses` via `AddressLinker`, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les `source_authorships` CrossRef dans la cascade de matching personnes (et CrossRef figure désormais dans `build_authorships.all_sources`). Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
 
 ### `doc_type` : `journal-article` indistinct, arbitré contre les sous-types
 
@@ -89,14 +89,16 @@ CrossRef n'expose pas un statut OA fiable. `oa_status` reste NULL côté CrossRe
 
 CrossRef expose plusieurs dates (`issued`, `published-print`, `published-online`, `created`). [`extract_crossref_pub_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/sources/crossref.py) choisit la plus pertinente avec un plafond `current_year + 1` (les éditeurs déposent parfois des années farfelues).
 
-## Statut — Work in Progress
+## Statut
 
-> Source incomplètement intégrée au pipeline. Voir la fiche chantier [`METIER_crossref`](https://github.com/Y33sha/bibliometrie-uca/blob/master/docs/chantiers/METIER_crossref.md) pour le détail.
->
-> **En place** :
-> - Ingestion DOI-driven (`fetch_missing_doi` + `normalize_crossref`)
-> - Arbitrage du `doc_type` contre les sous-types HAL/OpenAlex (`arbitrate_doc_type_with_article_subtype`)
->
-> **En réflexion** :
-> - **Discovery par affiliation** : piste écartée initialement, ré-ouverte le 2026-05-23 après un spike encourageant — `query.affiliation=Université Clermont Auvergne` filtré 2020-2026 renvoie 237 847 hits, dont 81 % absents de la base locale sur les 30 000 plus pertinents paginés. Décision pending sur une rejouée du spike en prod (la base locale n'est pas représentative) et la mesure du delta réel vs OpenAlex.
-> - Promotion d'ORCID `pending → confirmed` depuis les ORCID CrossRef article-level, discovery par ORCID confirmé, relations entre publications (preprint-of, version-of, etc.) : en pause en attendant un volume CrossRef plus représentatif.
+CrossRef est intégré en **DOI-driven uniquement** ; le périmètre est arrêté là (sujet clos le 2026-05-30). Voir la fiche chantier [`METIER_crossref`](https://github.com/Y33sha/bibliometrie-uca/blob/master/docs/chantiers/METIER_crossref.md).
+
+**En place** :
+- Ingestion DOI-driven (`fetch_missing_doi` + `normalize_crossref`)
+- Arbitrage du `doc_type` contre les sous-types HAL/OpenAlex (`arbitrate_doc_type_with_article_subtype`)
+
+**Écarté** (décisions 2026-05-30) :
+- **Discovery par affiliation** : évaluée sur dump prod via `query.affiliation=Clermont Auvergne` (2 tokens, sans le bruit « université » qui faussait le spike initial). Recall faible (~26 % des publis DOI-Crossref UCA déjà connues — CrossRef n'indexe l'affiliation que pour une minorité de ses dépôts) **et** précision faible (~14-34 % des nouveaux candidats réellement UCA, le reste = bruit de token : « Clermont » aux USA, « Auvergne » comme région ⇒ Lyon/Grenoble). Pas d'extracteur affiliation-driven.
+- **Promotion d'ORCID `pending → confirmed`** : abandonnée (action admin manuelle, sans impact pipeline).
+- **Discovery par ORCID confirmé** : sortie du chantier (non spécifique à CrossRef, éventuel chantier multi-source).
+- **Relations entre publications** (preprint-of, version-of, etc.) : hors scope → chantier `METIER_relations-publications`.
