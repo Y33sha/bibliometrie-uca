@@ -257,21 +257,23 @@ def _values_clause(rows: Sequence[tuple[str, ...]]) -> str:
 def _build_sql(*, dry_run: bool) -> str:
     arbitre_values = _values_clause(_ARBITRE_MAPPING)
     domain_values = _values_clause(_OA_DOMAIN_CODES)
+    # `to_reject` est une CTE du WITH initial, et le WITH ne couvre qu'un
+    # seul statement. L'UPDATE doit donc être encapsulé dans une CTE
+    # supplémentaire `RETURNING`, suivie d'un unique `SELECT COUNT(*)`.
     select_or_update = (
-        """
-        SELECT COUNT(*) AS n_liens_rejetes FROM to_reject;
-    """
+        "SELECT COUNT(*) AS n_liens_rejetes FROM to_reject;"
         if dry_run
-        else """
-        UPDATE publication_subjects ps
-        SET rejected = TRUE
-        FROM to_reject tr
-        WHERE ps.publication_id = tr.publication_id
-          AND ps.subject_id = tr.subject_id
-          AND ps.source = 'openalex';
-
-        SELECT COUNT(*) AS n_liens_rejetes FROM to_reject;
-    """
+        else """,
+applied AS (
+    UPDATE publication_subjects ps
+    SET rejected = TRUE
+    FROM to_reject tr
+    WHERE ps.publication_id = tr.publication_id
+      AND ps.subject_id = tr.subject_id
+      AND ps.source = 'openalex'
+    RETURNING 1
+)
+SELECT COUNT(*) AS n_liens_rejetes FROM applied;"""
     )
     return f"""
 WITH RECURSIVE arbitre_mapping(ontology, label, oa_domain) AS (
