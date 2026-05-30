@@ -705,6 +705,7 @@ def _run_normalize_crossref() -> None:
         publication_repository,
         publisher_repository,
     )
+    from infrastructure.repositories.address_linker import PgAddressLinker
 
     log.info("▶ normalize_crossref")
     t0 = time.time()
@@ -717,6 +718,7 @@ def _run_normalize_crossref() -> None:
         journal_repo_factory=journal_repository,
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
+        address_linker=PgAddressLinker(),
     ).run([])
     log.info("✓ normalize_crossref terminé en %.1fs", time.time() - t0)
 

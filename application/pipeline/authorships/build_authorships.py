@@ -41,6 +41,7 @@ def build(
         ("WoS", "wos"),
         ("ScanR", "scanr"),
         ("theses.fr", "theses"),
+        ("CrossRef", "crossref"),
     ]
     if sources:
         active_sources = [(n, v) for n, v in all_sources if v in sources]
