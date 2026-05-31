@@ -29,7 +29,15 @@ _INSERT_SCANR_SQL = text(
     """
     INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
     VALUES ('scanr', :source_id, :doi, :raw_data, :raw_hash)
-    ON CONFLICT (source, source_id) DO NOTHING
+    ON CONFLICT (source, source_id) DO UPDATE SET
+        raw_data = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN EXCLUDED.raw_data ELSE staging.raw_data END,
+        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
+        processed = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN FALSE ELSE staging.processed END,
+        last_seen_at = now()
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 

@@ -131,21 +131,19 @@ Aujourd'hui l'étape 2 (DOI) a une scope policy `unprocessed` vs `all` parce que
 - [x] Délai = 30 j, constante `DOI_LOOKUP_RETRY_DAYS` dans `infrastructure/sources/common.py`.
 - [x] Docs : `donnees/05-authorships-et-sources.md` (états + `doi_lookups`), `pipeline/02-extract.md` (backoff).
 
-### Phase 3 — Fraîcheur & disparition par refetch ciblé
+### Phase 3 — Fraîcheur & disparition par refetch ciblé ✓
 
-**Prérequis acté : `full` à fenêtre fixe (rétention cumulative).** Le mode `full` re-moissonne désormais tout l'historique depuis une année d'ancre absolue (`pipeline_start_year_full` = 2017) au lieu d'une fenêtre glissante. Conséquence sur cette phase : les **natifs** in-perimeter sont rafraîchis et leur disparition détectée gratuitement par le bulk (un natif dont `last_seen_at` n'est pas bumpé pendant un `full` couvrant son année = disparu). Le refetch ciblé individuel se réduit donc aux **cross-imports** (hors périmètre natif, jamais ramenés par le bulk). WoS n'est plus un obstacle (désabonnement probable, archivage du code à venir).
+**Critère unique : `last_seen_at` ancien — pas de filtre par type.** Le gap de `last_seen_at` après un `full` est un *signal* de disparition, pas une *confirmation* : un natif peut manquer à un batch de façon transitoire (hoquet API, requête d'affiliation qui ne le matche pas ce jour-là, déindexation temporaire). Le refetch individuel est l'étape de confirmation — trouvé = faux gap, on bumpe ; 404 = mort confirmée. Il tourne donc sur **toute** row stale, native comme cross-import.
 
-- [ ] Sélection : rows `staging` cross-import à `last_seen_at` ancien (seuil à définir).
-- [ ] Refetch par id natif (DOI pour Crossref / cross-imports) → succès : rafraîchit `raw_data` + bumpe `last_seen_at` ; 404 / absent : marque la disparition.
-- [ ] Action sur disparition à décider (cf. Questions ouvertes), propagée à `source_publications` et aux publications canoniques.
-- [ ] Probablement une nouvelle phase pipeline dédiée.
+**Prérequis acté : `full` à fenêtre fixe (rétention cumulative).** Le mode `full` re-moissonne tout l'historique depuis une ancre absolue (`pipeline_start_year_full` = 2017). Son rôle ici : le bulk **bumpe le `last_seen_at` de la plupart des natifs** encore présents à chaque `full`, donc le lot stale reste petit (natifs réellement non réapparus + cross-imports, que rien dans le bulk ne bumpe).
+
+- [x] Phase `refresh_stale` (`run_pipeline.py`), **à chaque run**, placée après `cross_imports` / avant `normalize`. Le seuil étale la charge (chaque passe ne ramasse que ce qui vient de franchir le délai) — pas de `LIMIT`/oldest-N.
+- [x] Sélection : `last_seen_at < now() - STALE_REFRESH_AFTER_DAYS` (90 j, `common.py`), `not_found_at`/`disappeared_at` NULL.
+- [x] Refetch **par DOI** via réutilisation des adapters `fetch_missing_doi` (`run_async` + `marker_handler`) : trouvé → bump `last_seen_at` + refresh `raw_data` ; 404 confirmé → `disappeared_at` ; erreur transitoire → laissé (retenté plus tard). Rows stale **sans DOI** → `disappeared_at` direct (`mark_undiscoverable_stale_disappeared`).
+- [x] **Pas de filtre par source** : sous cadence normale theses (permanent) et wos (re-vu en full) ne sont jamais stale ; wos désabonné → erreur (pas 404) → non marqué.
+- [x] Colonne `staging.disappeared_at` (migration `a7e3f1c9b5d2`). On **marque seulement** — aucune propagation/exclusion/suppression en aval tant que des cas concrets n'ont pas été observés (décision empirique bottom-up).
+- [x] Pré-requis corrigé : ScanR/theses bumpent `last_seen_at` sur re-vu inchangé (commit séparé `614db8f5`).
 
 ## Questions ouvertes
 
-**Phase 3 — Seuil « ancien » de `last_seen_at`.** À partir de quelle ancienneté une row entre dans le lot de refetch ? Granularité par source / par mode ? Impact sur les quotas API (notamment WoS).
-
-**Phase 3 — Faisabilité du refetch unitaire par source.** HAL (par halId/DOI), OpenAlex (par id/DOI), Crossref (par DOI) : OK. WoS : sous quota. ScanR : à vérifier.
-
-**Phase 3 — Action sur disparition.** DELETE cascade (perte historique), table archive `staging_archived` (conservation, complexité +1), ou flag `disappeared_at` sur `staging` (la row reste mais exclue des requêtes par défaut) ? Idem côté `source_publications` et publications canoniques.
-
-**Phase 3 — Cohabitation avec le statut OA Unpaywall.** `enrich_oa_status` rafraîchit déjà le statut OA depuis Unpaywall pour les publis sans statut. Le refetch ciblé pourrait le compléter (rafraîchir toutes les métadonnées) ou s'aligner sur la même fréquence pour limiter les appels API.
+**Cohabitation avec Unpaywall — décision : laisser tel quel.** `enrich_oa_status` interroge Unpaywall pour **tous** les DOI (`WHERE doi IS NOT NULL`, pas seulement « sans statut »), gated par `run_oa_status` (full). C'est une **API différente** (Unpaywall) de celles de `refresh_stale` (HAL/OpenAlex/ScanR/Crossref) → pas de conflit. On ne coordonne pas les deux. Note : comme le refetch périodique, ce balayage Unpaywall croît avec la rétention cumulative — même angle YAGNI que les quotas (cf. quota tokens OpenAlex), à surveiller sans agir.

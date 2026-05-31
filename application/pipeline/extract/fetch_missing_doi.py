@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 
 import httpx
 from sqlalchemy import Connection
@@ -41,10 +42,11 @@ async def run_async(
     log: logging.Logger,
     *,
     cross_import_dois_reader: CrossImportDoisReader,
+    marker_handler: Callable[[Connection, str], None] | None = None,
     dry_run: bool = False,
     limit: int | None = None,
 ) -> PhaseMetrics:
-    """Boucle principale : missing DOIs → fetch async → insert.
+    """Boucle principale : DOIs → fetch async → insert.
 
     Lance les fetchs HTTP en parallèle via `asyncio.gather`, bornés par
     un sémaphore `adapter.max_concurrent` pour respecter le rate-limit
@@ -53,17 +55,22 @@ async def run_async(
     `Connection` SA sync n'est pas thread-safe).
 
     Un DOI confirmé absent par la source (réponse vide / 404) revient
-    sous forme de sentinelle `not_found_marker` que `insert()` route vers
-    le backoff (`doi_lookups` pour les sources non natives, stub `staging`
-    pour Crossref). Ces sentinelles sont comptées séparément (`not_found`)
-    et exclues de `fetched`.
+    sous forme de sentinelle `not_found_marker`. Routage de la sentinelle :
+    - sans `marker_handler` (cross-import) : `insert()` la route vers le
+      backoff (`doi_lookups` / stub `staging` Crossref) ;
+    - avec `marker_handler` (refresh stale) : appelé `(conn, doi)` pour
+      marquer la disparition au lieu d'insérer.
+    Ces sentinelles sont comptées séparément (`not_found`) et exclues de
+    `fetched`.
 
     Args:
         conn: `Connection` SA ouverte.
         adapter: instance source-spécifique async.
         log: logger.
-        cross_import_dois_reader: callable qui lit en base les DOI
-            présents dans d'autres sources et absents de la cible.
+        cross_import_dois_reader: callable `(conn, source) -> list[doi]`.
+        marker_handler: optionnel ; si fourni, les sentinelles not-found y
+            sont routées (`(conn, doi)`, charge de committer) au lieu de
+            passer par `insert()`.
         dry_run: compte et log sans fetch ni insert.
         limit: nombre max de DOI à traiter.
 
@@ -119,9 +126,12 @@ async def run_async(
             for record in records:
                 try:
                     async with db_lock:
-                        inserted_one = await asyncio.to_thread(adapter.insert, conn, record)
-                    if inserted_one:
-                        progress["inserted"] += 1
+                        if marker_handler is not None and is_not_found_marker(record):
+                            await asyncio.to_thread(marker_handler, conn, record["_doi"])
+                        else:
+                            inserted_one = await asyncio.to_thread(adapter.insert, conn, record)
+                            if inserted_one:
+                                progress["inserted"] += 1
                 except Exception as e:
                     log.warning("Erreur insertion (%s) : %s", adapter.source_key, e)
 

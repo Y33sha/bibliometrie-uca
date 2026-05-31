@@ -44,7 +44,9 @@ Transitions valides :
 
 `not_found_at` ne porte que les miss **natifs** — un identifiant natif qui ne résout pas (hal-id 404, DOI 404 chez Crossref), toujours définitif. Les miss **cross-import** (un DOI absent d'une source non native) ne créent pas de row `staging` : ils vont dans `doi_lookups` avec backoff (cf. ci-dessous).
 
-`raw_data` vidé après normalisation pour libérer l'espace TOAST (le payload brut sera ré-introduit hors DB par le chantier `DATA_raw-data-store.md`). `last_seen_at` est mis à jour à chaque ré-extraction d'un même doc.
+`raw_data` vidé après normalisation pour libérer l'espace TOAST (le payload brut sera ré-introduit hors DB par le chantier `DATA_raw-data-store.md`). `last_seen_at` est mis à jour à chaque fois qu'un doc est re-vu (extraction bulk ou refetch).
+
+`disappeared_at` marque une row dont la source ne renvoie plus le document. Posé par la phase `refresh_stale` (à chaque run) : les rows à `last_seen_at` ancien (`> STALE_REFRESH_AFTER_DAYS`, 90 j) sont refetchées par id ; un 404 confirmé → `disappeared_at`, sinon `last_seen_at` est bumpé. Les rows stale **sans DOI** (non refetchables mais re-moissonnées par le bulk) sont marquées directement. Conservateur : on **marque seulement**, aucun effet aval (exclusion / suppression / propagation) pour l'instant.
 
 CHECK SQL `staging_not_found_at_implies_processed` : `not_found_at IS NULL OR processed`. Verrouille la transition impossible « non trouvée à re-traiter ». Les autres invariants (corrélation `processed` ↔ `raw_data` vidé) ne sont pas verrouillés en SQL — laissés en discipline pour ne pas bloquer les évolutions futures.
 

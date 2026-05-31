@@ -47,6 +47,19 @@ Vit ici (infrastructure) et non dans `domain/` : c'est une politique du
 pipeline d'extraction, pas une règle métier du domaine.
 """
 
+STALE_REFRESH_AFTER_DAYS = 90
+"""Âge (jours) de `staging.last_seen_at` au-delà duquel une row est refetchée.
+
+La phase « refresh stale » (fin de cross-import, à chaque run) refetche par id
+natif les rows dont `last_seen_at < now() - STALE_REFRESH_AFTER_DAYS` : trouvé
+→ bump `last_seen_at` + refresh `raw_data` ; 404 → `disappeared_at`. Tournant à
+chaque run, le seuil étale la charge (chaque passe ne ramasse que ce qui vient
+de franchir le délai) sans `LIMIT`.
+
+Même nature que [`DOI_LOOKUP_RETRY_DAYS`] : politique de fraîcheur du pipeline,
+pas une règle métier — d'où sa place ici et non dans `domain/`.
+"""
+
 _RECORD_DOI_NOT_FOUND_SQL = text(
     """
     INSERT INTO doi_lookups (source, doi, not_found_at, next_retry)
@@ -70,6 +83,75 @@ def record_doi_not_found(conn: Connection, source: str, doi: str) -> None:
         _RECORD_DOI_NOT_FOUND_SQL,
         {"source": source, "doi": doi, "days": DOI_LOOKUP_RETRY_DAYS},
     )
+
+
+_STALE_DOIS_SQL = text(
+    """
+    SELECT DISTINCT doi
+    FROM staging
+    WHERE source = CAST(:source AS source_type)
+      AND doi IS NOT NULL
+      AND not_found_at IS NULL
+      AND disappeared_at IS NULL
+      AND last_seen_at < now() - make_interval(days => :days)
+    ORDER BY doi
+    """
+)
+
+_SET_DISAPPEARED_SQL = text(
+    """
+    UPDATE staging SET disappeared_at = now()
+    WHERE source = CAST(:source AS source_type) AND doi = :doi
+      AND disappeared_at IS NULL AND not_found_at IS NULL
+    """
+)
+
+_MARK_UNDISCOVERABLE_STALE_SQL = text(
+    """
+    UPDATE staging SET disappeared_at = now()
+    WHERE doi IS NULL
+      AND not_found_at IS NULL
+      AND disappeared_at IS NULL
+      AND last_seen_at < now() - make_interval(days => :days)
+    """
+)
+
+
+def get_stale_dois(conn: Connection, source: str) -> list[str]:
+    """DOI des rows `source` à `last_seen_at` ancien (> STALE_REFRESH_AFTER_DAYS).
+
+    Sert de `reader` à `run_async` pour la phase refresh : ces DOI seront
+    refetchés par l'adapter de la source. Exclut les stubs not-found et les
+    rows déjà marquées disparues.
+    """
+    if source not in VALID_SOURCES:
+        raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
+    return list(
+        conn.execute(
+            _STALE_DOIS_SQL, {"source": source, "days": STALE_REFRESH_AFTER_DAYS}
+        ).scalars()
+    )
+
+
+def set_disappeared_by_doi(conn: Connection, source: str, doi: str) -> None:
+    """Marque `disappeared_at` sur la row `(source, doi)` confirmée absente.
+
+    Appelé par la phase refresh quand le refetch d'un DOI stale renvoie un
+    404 confirmé (sentinelle). Ne commit pas — l'appelant s'en charge.
+    """
+    conn.execute(_SET_DISAPPEARED_SQL, {"source": source, "doi": doi})
+
+
+def mark_undiscoverable_stale_disappeared(conn: Connection) -> int:
+    """Marque disparues les rows stale **sans DOI** (non refetchables).
+
+    Ces rows ne peuvent pas être refetchées par DOI ; comme leur source est
+    re-moissonnée par le bulk, rester stale > STALE_REFRESH_AFTER_DAYS signifie
+    qu'elles ont vraiment disparu. Retourne le nombre de rows marquées.
+    Ne commit pas — l'appelant s'en charge.
+    """
+    result = conn.execute(_MARK_UNDISCOVERABLE_STALE_SQL, {"days": STALE_REFRESH_AFTER_DAYS})
+    return result.rowcount
 
 
 def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
