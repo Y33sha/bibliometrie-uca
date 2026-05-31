@@ -602,6 +602,48 @@ class TestTitleYearPagesEndBookReviewRule:
         assert effective_metadata(view).doc_type is None
 
 
+class TestDoiFigshareCollectionRule:
+    COLL = "10.6084/m9.figshare.c.7654321"
+    ITEM = "10.6084/m9.figshare.1234567"
+
+    def test_collection_doi_corrects_to_dataset(self):
+        corrected = effective_metadata(_view(doc_type="other", doi=self.COLL)).doc_type
+        assert corrected is not None
+        assert corrected.value == "dataset"
+        assert corrected.rule == MetadataCorrectionRule.DOI_FIGSHARE_COLLECTION_TO_DATASET
+
+    def test_article_collection_corrected(self):
+        corrected = effective_metadata(_view(doc_type="article", doi=self.COLL)).doc_type
+        assert corrected is not None and corrected.value == "dataset"
+
+    def test_already_dataset_is_noop(self):
+        assert effective_metadata(_view(doc_type="dataset", doi=self.COLL)).doc_type is None
+
+    def test_figshare_item_not_matched(self):
+        # un item figshare (pas de `.c.`) ne doit PAS matcher
+        assert effective_metadata(_view(doc_type="other", doi=self.ITEM)).doc_type is None
+
+    def test_non_figshare_doi_not_matched(self):
+        assert (
+            effective_metadata(_view(doc_type="other", doi="10.1038/nature12345")).doc_type is None
+        )
+
+    def test_no_doi_not_matched(self):
+        assert effective_metadata(_view(doc_type="other", doi=None)).doc_type is None
+
+    def test_doc_type_outside_whitelist_noop(self):
+        # collection typée `book` (improbable) : pas corrigée aveuglément
+        assert effective_metadata(_view(doc_type="book", doi=self.COLL)).doc_type is None
+
+    def test_wins_over_title_supplement_rule(self):
+        # même output (dataset) mais la règle DOI, plus en amont, est créditée
+        corrected = effective_metadata(
+            _view(doc_type="other", doi=self.COLL, title="Additional file 1 of X")
+        ).doc_type
+        assert corrected is not None
+        assert corrected.rule == MetadataCorrectionRule.DOI_FIGSHARE_COLLECTION_TO_DATASET
+
+
 class TestEffectiveMetadataScope:
     def test_no_signals_no_correction(self):
         assert effective_metadata(_view()).is_empty()

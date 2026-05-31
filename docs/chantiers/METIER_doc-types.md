@@ -42,7 +42,7 @@ Pris dans l'ordre :
 - [ ] Préprints OA gold — flag suspect ← **cible courante**
 - [ ] Types WoS composites — audit
 - [x] Review = poubelle — audit fait : **pas une poubelle**, mappings sains ; seule action = libellé FR « Article de synthèse »
-- [ ] Figshare collections — audit
+- [x] Figshare collections — audit fait + règle `DOI_FIGSHARE_COLLECTION_TO_DATASET` ; dédup des sous-items → relations
 - [ ] Posters / conférence avec même DOI — hors-scope correction, à traiter en dédup
 - [ ] Question des raw_type openalex: comparer avec le type affiché
 
@@ -79,11 +79,15 @@ Audit (base de prod) : `review` = 1382 publis. Signal review par source : WoS `r
 
 **Seule action** : libellé FR `review` « Review » → « Article de synthèse » (terme standard, cf. HAL). Au passage `letter` « Letter » → « Lettre à l'éditeur » (audit : 266 publis, OpenAlex+WoS `letter`, majoritairement lettres à l'éditeur / correspondance).
 
-### Figshare collections — audit
+### Figshare collections — audit ✓
 
-DOI `10.6084/m9.figshare.c.*` (bundles de plusieurs items figshare). Non couvert par la règle titre supplément. Cas connu mais ampleur inconnue ; ne choque pas a priori d'être rattaché à un article.
+DOI `10.6084/m9.figshare.c.*` (bundles de suppléments ; le `.c.` distingue une collection d'un item `m9.figshare.<id>`). Une collection = bundle des suppléments d'un papier (l'article réel est ailleurs, sous son DOI de revue) ; figshare la nomme d'après le papier, donc titre « normal » → inattrapable par la règle titre supplément.
 
-Étape suivante : audit. Combien, classés en quoi aujourd'hui, à quoi sont-ils rattachables.
+Audit (base prod) : **73 collections**, classées **71 `other`** + 1 article + 1 dataset (OpenAlex `other`). Pas de mistype `article` comme pour les items.
+
+**Règle posée** : `DOI_FIGSHARE_COLLECTION_TO_DATASET` — `doi_contains 'm9.figshare.c.'` + doc_type ∈ {article, other} ⇒ `dataset` (nouveau prédicat réutilisable `doi_contains`). Fallback hardcodé ; RA DataCite généraliserait aux figshare institutionnels plus tard.
+
+**Renvoyé à [METIER_relations-publications](METIER_relations-publications.md)** : la **dédup des sous-items**. 273/281 items suivent « Additional file N of <T> », **212 matchent exactement** le titre d'une collection (70/73 collections ont ≥1 item) — le lien item→collection est donc fiable par titre. Mais supprimer les sous-items ne règle qu'à moitié (les collections restent des doublons du vrai article) ; le traitement complet (collection↔item **et** supplément↔article) se modélise dans le chantier relations.
 
 ### Préprints OA gold — flag suspect
 
