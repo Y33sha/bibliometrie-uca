@@ -19,6 +19,9 @@ Phases (dans l'ordre d'execution):
     cross_imports  Rattrapage cross-source : (1) docs HAL manquants par hal-id/NNT
                    (auto-borné, tourne toujours), puis (2) par DOI dans chaque source
                    cible (auto-borné par le backoff doi_lookups)
+    refresh_stale  Refetch des rows à last_seen_at ancien (> STALE_REFRESH_AFTER_DAYS) :
+                   trouvé -> bump last_seen_at + refresh ; 404 / sans DOI -> disappeared_at.
+                   Marque seulement, aucun effet aval.
     normalize      Normalisation staging -> tables sources (source_publications,
                    source_authorships). Rattachement aux publications existantes par DOI/NNT/
                    HAL-ID, mais PAS de creation de publications. Inclut enrichissement
@@ -48,7 +51,10 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
@@ -176,6 +182,44 @@ def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> P
         if target in effective:
             metrics.merge(_run_fetch_missing_doi(target))
 
+    return metrics
+
+
+def phase_refresh_stale(sources: Any = None, **kw: Any) -> PhaseMetrics:
+    """Rafraîchit les rows à `last_seen_at` ancien et marque les disparues.
+
+    Tourne à **chaque run** : le seuil `STALE_REFRESH_AFTER_DAYS` étale la
+    charge (chaque passe ne ramasse que ce qui vient de franchir le délai).
+
+    Pour chaque source DOI-queryable (hal, openalex, wos, scanr, crossref),
+    refetch des DOI stale → trouvé : bump `last_seen_at` + refresh `raw_data` ;
+    404 confirmé : `disappeared_at`. Puis marque disparues les rows stale
+    **sans DOI** (non refetchables, mais re-moissonnées par le bulk → rester
+    stale signifie disparu).
+
+    Conservateur : on **marque seulement** (`disappeared_at`), aucun effet
+    aval. Placée après `cross_imports` (qui a fini de peupler `staging` et
+    `last_seen_at`) et avant `normalize` (qui consomme le `raw_data` rafraîchi).
+    """
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.common import mark_undiscoverable_stale_disappeared
+
+    metrics = PhaseMetrics()
+    targets = [
+        t for t in ("hal", "openalex", "wos", "scanr", "crossref") if not sources or t in sources
+    ]
+    for target in targets:
+        metrics.merge(_run_refresh_stale_doi(target))
+
+    conn = get_sync_engine().connect()
+    try:
+        n_undiscoverable = mark_undiscoverable_stale_disappeared(conn)
+        conn.commit()
+    finally:
+        conn.close()
+    if n_undiscoverable:
+        log.info("✓ refresh_stale : %d rows sans DOI marquées disparues", n_undiscoverable)
+    metrics.add(disappeared=n_undiscoverable)
     return metrics
 
 
@@ -1194,15 +1238,17 @@ def _run_fetch_missing_hal_id(*, mode: str = "full") -> PhaseMetrics:
     return metrics
 
 
-def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
+def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter":
+    """Construit l'adapter `fetch_missing_doi` d'une source cible.
+
+    Partagé par le cross-import (`_run_fetch_missing_doi`) et le refresh
+    (`_run_refresh_stale_doi`), qui consomment les mêmes adapters.
+    """
     from typing import cast
 
-    from application.pipeline.extract.fetch_missing_doi import run_async
     from application.ports.pipeline.extract.fetch_missing_doi import (
         AsyncFetchMissingDoiAdapter,
     )
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.sources.common import get_cross_import_dois
     from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
     from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
     from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
@@ -1222,7 +1268,15 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
             "crossref": CrossrefFetchMissingDoiAdapter,
         },
     )
-    adapter = adapter_classes[target]()
+    return adapter_classes[target]()
+
+
+def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
+    from application.pipeline.extract.fetch_missing_doi import run_async
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.common import get_cross_import_dois
+
+    adapter = _make_fetch_missing_doi_adapter(target)
 
     log.info("▶ fetch_missing_doi --target %s", target)
     t0 = time.time()
@@ -1240,6 +1294,42 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
         conn.close()
     log.info(
         "✓ fetch_missing_doi (%s) terminé en %.1fs — %s",
+        target,
+        time.time() - t0,
+        metrics.as_summary(),
+    )
+    return metrics
+
+
+def _run_refresh_stale_doi(target: str) -> PhaseMetrics:
+    """Refetch des DOI stale d'une source : trouvé → bump, 404 → disappeared_at."""
+    from application.pipeline.extract.fetch_missing_doi import run_async
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.common import get_stale_dois, set_disappeared_by_doi
+
+    adapter = _make_fetch_missing_doi_adapter(target)
+
+    def _mark_disappeared(conn: Any, doi: str) -> None:
+        set_disappeared_by_doi(conn, target, doi)
+        conn.commit()
+
+    log.info("▶ refresh_stale --target %s", target)
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = asyncio.run(
+            run_async(
+                conn,
+                adapter,
+                log,
+                cross_import_dois_reader=get_stale_dois,
+                marker_handler=_mark_disappeared,
+            )
+        )
+    finally:
+        conn.close()
+    log.info(
+        "✓ refresh_stale (%s) terminé en %.1fs — %s",
         target,
         time.time() - t0,
         metrics.as_summary(),
@@ -1301,9 +1391,10 @@ def phase_oa_status(mode: Any = "full", **kw: Any) -> Any:
 
 
 # Registre des phases, dans l'ordre
-PHASES = [
+PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
     ("extract", phase_extract),
     ("cross_imports", phase_cross_imports),
+    ("refresh_stale", phase_refresh_stale),
     ("normalize", phase_normalize),
     ("publishers_journals", phase_publishers_journals),
     ("affiliations", phase_affiliations),

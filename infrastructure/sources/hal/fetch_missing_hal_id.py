@@ -54,7 +54,8 @@ _UPSERT_HAL_SQL = text(
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                 THEN FALSE
             ELSE staging.processed
-        END
+        END,
+        last_seen_at = now()
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
