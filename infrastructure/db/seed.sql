@@ -16,7 +16,7 @@ INSERT INTO config (key, value, description) VALUES ('polite_pool_email', '"votr
 INSERT INTO config (key, value, description) VALUES ('perimeter_affiliations', '"uca_wide"', 'Périmètre pour la résolution des affiliations (structure_ids sur authorships sources)');
 INSERT INTO config (key, value, description) VALUES ('perimeter_extraction', '"uca_wide"', 'Périmètre pour déterminer les structures à interroger lors de l''extraction');
 INSERT INTO config (key, value, description) VALUES ('perimeter_persons', '"uca"', 'Périmètre pour la création des personnes (authorships is_uca)');
-INSERT INTO config (key, value, description) VALUES ('pipeline_years_full', '6', 'Mode full/monthly : extraire depuis (année courante - N)');
+INSERT INTO config (key, value, description) VALUES ('pipeline_start_year_full', '2017', 'Mode full/monthly : extraire depuis cette année (incluse) jusqu''à l''année courante. Année absolue (ancre fixe), pas un offset — rétention cumulative.');
 INSERT INTO config (key, value, description) VALUES ('pipeline_years_weekly', '1', 'Mode weekly : extraire depuis (année courante - N)');
 INSERT INTO config (key, value, description) VALUES ('scanr_password', '"VOTRE_MOT_DE_PASSE_SCANR"', 'Mot de passe API ScanR');
 INSERT INTO config (key, value, description) VALUES ('scanr_username', '"VOTRE_IDENTIFIANT_SCANR"', 'Identifiant API ScanR (Elasticsearch)');

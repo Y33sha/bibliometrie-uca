@@ -124,6 +124,20 @@
     return Array.from({ length: offset + 1 }, (_, i) => y - offset + i).join(", ");
   }
 
+  function computeYearsFromStart(start: number): string {
+    const y = currentYear();
+    if (start > y) return String(start);
+    return Array.from({ length: y - start + 1 }, (_, i) => start + i).join(", ");
+  }
+
+  function yearsLabel(key: string, value: number): string {
+    if (key === "pipeline_start_year_full") {
+      return `Depuis ${value} → ${computeYearsFromStart(value)}`;
+    }
+    const suffix = value > 0 ? ` + ${value} an${value > 1 ? "s" : ""}` : "";
+    return `Année en cours${suffix} → ${computeYears(value)}`;
+  }
+
   function configByKey(key: string): ConfigItem | undefined {
     return configs.find((c) => c.key === key);
   }
@@ -224,11 +238,11 @@
 <!-- ═══ ANNÉES ═══ -->
 <h3 class="section-title">Années d'extraction</h3>
 <div class="config-grid">
-  {#each ["pipeline_years_full", "pipeline_years_weekly"] as key}
+  {#each ["pipeline_start_year_full", "pipeline_years_weekly"] as key}
     {@const item = configByKey(key)}
     {#if item}
       <div class="config-row">
-        <span class="config-label">{key === "pipeline_years_full" ? "Mode full / monthly" : "Mode weekly"}</span>
+        <span class="config-label">{key === "pipeline_start_year_full" ? "Mode full / monthly" : "Mode weekly"}</span>
         {#if editingKey === key}
           <input
             class="config-editor-inline"
@@ -249,7 +263,7 @@
           >
         {:else}
           <span class="config-value-inline"
-            >{typeof item.value === "number" ? `Année en cours${item.value > 0 ? ` + ${item.value} an${item.value > 1 ? "s" : ""}` : ""} → ${computeYears(item.value)}` : item.value}</span
+            >{typeof item.value === "number" ? yearsLabel(key, item.value) : item.value}</span
           >
           <button class="btn btn-sm" onclick={() => startEdit(key)}>Modifier</button>
         {/if}
