@@ -9,8 +9,10 @@ Polite pool obtenu via le header ``User-Agent`` qui inclut un mailto.
 Doc CrossRef : polite = 10 req/s + 3 concurrentes. On colle exactement à
 ces limites (max_concurrent=3, request_delay=0.1 s) pour éviter les 429.
 
-Les DOI introuvables (HTTP 404) sont stockés avec ``not_found=TRUE`` et
-``processed=TRUE`` pour ne pas être réinterrogés à chaque run.
+Les DOI introuvables (HTTP 404) sont stockés avec ``not_found_at`` et
+``processed=TRUE`` pour ne pas être réinterrogés à chaque run. Crossref
+est la source native du DOI : un 404 est définitif (DOI erroné ou non
+Crossref), donc le stub reste dans ``staging`` (pas de backoff).
 """
 
 from __future__ import annotations
@@ -22,6 +24,10 @@ import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.extract.fetch_missing_doi import (
+    is_not_found_marker,
+    not_found_marker,
+)
 from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
@@ -30,8 +36,8 @@ _USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
 
 _INSERT_NOT_FOUND_SQL = text(
     """
-    INSERT INTO staging (source, source_id, doi, raw_data, not_found, processed)
-    VALUES ('crossref', :doi, :doi, '{}'::jsonb, TRUE, TRUE)
+    INSERT INTO staging (source, source_id, doi, raw_data, not_found_at, processed)
+    VALUES ('crossref', :doi, :doi, '{}'::jsonb, now(), TRUE)
     ON CONFLICT (source, source_id) DO NOTHING
     """
 )
@@ -81,8 +87,9 @@ class CrossrefFetchMissingDoiAdapter:
             )
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
-                # Sentinelle : insert() insérera un stub not_found=TRUE.
-                return [{"_status": "not_found", "DOI": doi}]
+                # 404 = DOI confirmé absent de Crossref. Source native du DOI :
+                # le miss est définitif, insert() pose un stub `staging`.
+                return [not_found_marker(doi)]
             return []
         except httpx.RequestError:
             return []
@@ -93,17 +100,17 @@ class CrossrefFetchMissingDoiAdapter:
         return [message]
 
     def insert(self, conn: Connection, record: dict) -> bool:
+        if is_not_found_marker(record):
+            conn.execute(_INSERT_NOT_FOUND_SQL, {"doi": record["_doi"]})
+            conn.commit()
+            return False
+
         # DOI = identifiant CrossRef. On normalise en lowercase pour
         # rester cohérent avec les autres sources qui font de même.
         doi_raw = record.get("DOI", "")
         if not doi_raw:
             return False
         doi = doi_raw.lower()
-
-        if record.get("_status") == "not_found":
-            result = conn.execute(_INSERT_NOT_FOUND_SQL, {"doi": doi})
-            conn.commit()
-            return result.rowcount > 0
 
         result = conn.execute(
             _INSERT_CROSSREF_SQL,

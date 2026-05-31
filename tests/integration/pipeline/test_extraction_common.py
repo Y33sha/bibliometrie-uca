@@ -1,9 +1,15 @@
 """Tests pour extraction/common.py — fonctions partagées d'extraction."""
 
 import pytest
+from sqlalchemy import text
 
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.common import compute_hash, get_cross_import_dois, get_existing_ids
+from infrastructure.sources.common import (
+    compute_hash,
+    get_cross_import_dois,
+    get_existing_ids,
+    record_doi_not_found,
+)
 
 # ── compute_hash ─────────────────────────────────────────────────
 
@@ -172,3 +178,80 @@ class TestGetCrossImportDois:
         result = get_cross_import_dois(db.connection, "hal")
 
         assert result == ["10.5281/zenodo.1"]
+
+    def test_includes_processed_rows(self, db):
+        """Plus de filtre `processed` : un DOI d'une row normalisée jamais
+        cross-importé reste candidat (le backoff borne le pool, pas processed)."""
+        db.execute(
+            "INSERT INTO staging (source, source_id, doi, raw_data, processed) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("openalex", "W1", "10.1234/a", "{}", True),
+        )
+        result = get_cross_import_dois(db.connection, "hal")
+        assert result == ["10.1234/a"]
+
+    def test_excludes_dois_in_backoff(self, db):
+        """Un DOI en backoff `doi_lookups` (next_retry futur) sort du pool."""
+        for sid, doi in (("W1", "10.1234/a"), ("W2", "10.1234/b")):
+            db.execute(
+                "INSERT INTO staging (source, source_id, doi, raw_data, processed) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                ("openalex", sid, doi, "{}", False),
+            )
+        db.execute(
+            "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
+            "VALUES (%s, %s, now(), now() + interval '30 days')",
+            ("hal", "10.1234/a"),
+        )
+        result = get_cross_import_dois(db.connection, "hal")
+        assert result == ["10.1234/b"]
+
+    def test_retries_dois_with_expired_backoff(self, db):
+        """Backoff expiré (next_retry passé) → le DOI repasse dans le pool."""
+        db.execute(
+            "INSERT INTO staging (source, source_id, doi, raw_data, processed) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("openalex", "W1", "10.1234/a", "{}", False),
+        )
+        db.execute(
+            "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
+            "VALUES (%s, %s, now() - interval '60 days', now() - interval '1 day')",
+            ("hal", "10.1234/a"),
+        )
+        result = get_cross_import_dois(db.connection, "hal")
+        assert result == ["10.1234/a"]
+
+    def test_backoff_is_per_target_source(self, db):
+        """Le backoff d'un DOI sur `hal` n'affecte pas le pool de `openalex`."""
+        db.execute(
+            "INSERT INTO staging (source, source_id, doi, raw_data, processed) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("scanr", "S1", "10.1234/a", "{}", False),
+        )
+        db.execute(
+            "INSERT INTO doi_lookups (source, doi, not_found_at, next_retry) "
+            "VALUES (%s, %s, now(), now() + interval '30 days')",
+            ("hal", "10.1234/a"),
+        )
+        assert get_cross_import_dois(db.connection, "hal") == []
+        assert get_cross_import_dois(db.connection, "openalex") == ["10.1234/a"]
+
+
+class TestRecordDoiNotFound:
+    def test_inserts_pending_backoff_row(self, sa_sync_conn):
+        record_doi_not_found(sa_sync_conn, "hal", "10.1234/x")
+        row = sa_sync_conn.execute(
+            text(
+                "SELECT next_retry > now() AS pending FROM doi_lookups "
+                "WHERE source = 'hal' AND doi = '10.1234/x'"
+            )
+        ).one()
+        assert row.pending is True
+
+    def test_rearms_on_conflict_without_duplicate(self, sa_sync_conn):
+        record_doi_not_found(sa_sync_conn, "hal", "10.1234/x")
+        record_doi_not_found(sa_sync_conn, "hal", "10.1234/x")
+        count = sa_sync_conn.execute(
+            text("SELECT count(*) FROM doi_lookups WHERE source = 'hal' AND doi = '10.1234/x'")
+        ).scalar()
+        assert count == 1

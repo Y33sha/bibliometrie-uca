@@ -17,7 +17,11 @@ import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from infrastructure.sources.common import clean_doi, compute_hash
+from application.ports.pipeline.extract.fetch_missing_doi import (
+    is_not_found_marker,
+    not_found_marker,
+)
+from infrastructure.sources.common import clean_doi, compute_hash, record_doi_not_found
 from infrastructure.sources.config import get_api_base_urls, get_scanr_credentials
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
@@ -64,9 +68,25 @@ class ScanrFetchMissingDoiAdapter:
             )
         except (httpx.RequestError, httpx.HTTPStatusError):
             return []
-        return [hit["_source"] for hit in data.get("hits", {}).get("hits", [])]
+        records = [hit["_source"] for hit in data.get("hits", {}).get("hits", [])]
+        # Diff requêtés / trouvés : les DOI du lot sans hit sont confirmés
+        # absents de ScanR (réponse ES valide). Comparaison sur DOI nettoyé,
+        # cohérente avec les DOI lowercase de `get_cross_import_dois`.
+        found = {
+            clean_doi(ext.get("id"))
+            for rec in records
+            for ext in (rec.get("externalIds") or [])
+            if ext.get("type") == "doi"
+        }
+        missed = [not_found_marker(d) for d in dois if d not in found]
+        return records + missed
 
     def insert(self, conn: Connection, record: dict) -> bool:
+        if is_not_found_marker(record):
+            record_doi_not_found(conn, "scanr", record["_doi"])
+            conn.commit()
+            return False
+
         scanr_id = record.get("id", "")
         if not scanr_id:
             return False

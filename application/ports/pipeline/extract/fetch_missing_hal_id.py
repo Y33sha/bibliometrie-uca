@@ -72,7 +72,7 @@ class HalFetchMissingAdapter(Protocol):
     def insert_halid_result(
         self, conn: Connection, hal_id: str, doc: dict[str, Any] | None
     ) -> bool:
-        """Insère le doc, ou marque `not_found=TRUE` si `doc is None`.
+        """Insère le doc, ou marque `not_found_at` si `doc is None`.
 
         Retourne True si le doc a été trouvé (inséré ou existant).
         """

@@ -23,8 +23,12 @@ import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
+from application.ports.pipeline.extract.fetch_missing_doi import (
+    is_not_found_marker,
+    not_found_marker,
+)
 from infrastructure.sources.api_limits import WOS_DELAY, WOS_PER_PAGE
-from infrastructure.sources.common import compute_hash
+from infrastructure.sources.common import compute_hash, record_doi_not_found
 from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 from infrastructure.sources.wos.parsing import clean_doi_for_wos, extract_doi, extract_ut
@@ -69,14 +73,20 @@ class WosFetchMissingDoiAdapter:
         self.headers = {"X-ApiKey": get_wos_api_key(conn), "Accept": "application/json"}
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
-        clean = [d for d in (clean_doi_for_wos(x) for x in dois) if d]
-        if not clean:
-            return []
-        query = "DO=(" + " OR ".join(f'"{d}"' for d in clean) + ")"
+        # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI
+        # preprints filtrés (c=None) ne sont pas interrogeables, donc jamais
+        # enregistrés comme not-found (le filtre client les écarte gratuitement).
+        queried = [(d, clean_doi_for_wos(d)) for d in dois]
+        clean = [c for _, c in queried if c]
 
         records: list[dict] = []
+        # complete : a-t-on un résultat fiable pour calculer les not-found ?
+        # Mis à False sur tout arrêt prématuré (erreur réseau, corps vide,
+        # réponse mal formée) où l'absence d'un DOI ne prouve rien.
+        complete = True
         first_record = 1
-        while True:
+        while clean:
+            query = "DO=(" + " OR ".join(f'"{d}"' for d in clean) + ")"
             params = {
                 "databaseId": "WOS",
                 "usrQuery": query,
@@ -98,25 +108,31 @@ class WosFetchMissingDoiAdapter:
                     label=f"rec {first_record}",
                 )
             except httpx.HTTPStatusError as e:
-                # WoS 400 = requête mal formée ou lot sans correspondance : skip silencieux
+                # WoS 400 = lot sans correspondance : zéro match, le lot entier
+                # est confirmé absent (résultat fiable → on garde complete=True).
                 if e.response.status_code == 400:
                     log.warning("WoS 400 rec %d, lot ignoré", first_record)
-                    return records
+                    break
                 raise
             except httpx.RequestError:
+                complete = False
                 break
 
             if not data:
+                complete = False
                 break
             try:
                 recs_container = data.get("Data", {}).get("Records", {})
                 if not isinstance(recs_container, dict):
+                    complete = False
                     break
                 recs = recs_container.get("records", {})
                 if not isinstance(recs, dict):
+                    complete = False
                     break
                 recs = recs.get("REC", [])
             except (AttributeError, TypeError):
+                complete = False
                 break
             if isinstance(recs, dict):
                 recs = [recs]
@@ -130,9 +146,21 @@ class WosFetchMissingDoiAdapter:
             first_record += WOS_PER_PAGE
             await asyncio.sleep(WOS_DELAY)
 
-        return records
+        if not complete:
+            return records
+        # Lot complet : tout DOI interrogé sans record correspondant est
+        # confirmé absent de WoS. On enregistre le backoff sur le DOI d'origine
+        # (clé doi_lookups = doi staging lowercase).
+        found = {d.lower() for r in records if (d := extract_doi(r))}
+        missed = [not_found_marker(orig) for orig, c in queried if c and c.lower() not in found]
+        return records + missed
 
     def insert(self, conn: Connection, record: dict) -> bool:
+        if is_not_found_marker(record):
+            record_doi_not_found(conn, "wos", record["_doi"])
+            conn.commit()
+            return False
+
         result = conn.execute(
             _INSERT_WOS_SQL,
             {

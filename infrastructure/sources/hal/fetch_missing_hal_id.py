@@ -60,9 +60,9 @@ _UPSERT_HAL_SQL = text(
 
 _INSERT_NOT_FOUND_SQL = text(
     """
-    INSERT INTO staging (source, source_id, raw_data, not_found, processed)
-    VALUES ('hal', :source_id, '{}', TRUE, TRUE)
-    ON CONFLICT (source, source_id) DO UPDATE SET not_found = TRUE
+    INSERT INTO staging (source, source_id, raw_data, not_found_at, processed)
+    VALUES ('hal', :source_id, '{}', now(), TRUE)
+    ON CONFLICT (source, source_id) DO UPDATE SET not_found_at = now()
     """
 )
 

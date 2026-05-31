@@ -21,6 +21,7 @@ import respx
 
 from application.pipeline.extract.fetch_missing_doi import run_async
 from application.pipeline.metrics import PhaseMetrics
+from application.ports.pipeline.extract.fetch_missing_doi import is_not_found_marker
 from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
@@ -69,7 +70,7 @@ class _FakeAdapter:
 def _reader(dois: list[str]):
     """Fabrique un `cross_import_dois_reader` qui retourne une liste fixe."""
 
-    def _read(conn, target, all_staged):  # noqa: ARG001
+    def _read(conn, target):  # noqa: ARG001
         return dois
 
     return _read
@@ -88,7 +89,7 @@ class TestRunAsyncOrchestrator:
             logging.getLogger("test"),
             cross_import_dois_reader=_reader(["10.1/a", "10.1/b", "10.1/c"]),
         )
-        assert result == PhaseMetrics(total=3, new=3, extras={"fetched": 3})
+        assert result == PhaseMetrics(total=3, new=3, extras={"fetched": 3, "not_found": 0})
         assert len(adapter.inserted_records) == 3
 
     @pytest.mark.asyncio
@@ -271,7 +272,8 @@ class TestOpenalexFetchAsync:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_fetch_async_no_result_returns_empty(self):
+    async def test_fetch_async_no_result_emits_not_found(self):
+        """Réponse valide sans résultat → sentinelle not_found (backoff)."""
         respx.get("https://api.openalex.org/works").mock(
             return_value=httpx.Response(200, json={"results": []})
         )
@@ -280,7 +282,9 @@ class TestOpenalexFetchAsync:
 
         async with httpx.AsyncClient() as client:
             records = list(await adapter.fetch_async(client, ["10.1/missing"]))
-        assert records == []
+        assert len(records) == 1
+        assert is_not_found_marker(records[0])
+        assert records[0]["_doi"] == "10.1/missing"
 
     @pytest.mark.asyncio
     @respx.mock
@@ -319,7 +323,8 @@ class TestHalFetchAsync:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_fetch_async_no_result_returns_empty(self):
+    async def test_fetch_async_no_result_emits_not_found(self):
+        """Réponse Solr valide sans doc → sentinelle not_found (backoff)."""
         respx.get("https://api.archives-ouvertes.fr/search/").mock(
             return_value=httpx.Response(200, json={"response": {"docs": []}})
         )
@@ -328,7 +333,9 @@ class TestHalFetchAsync:
 
         async with httpx.AsyncClient() as client:
             docs = list(await adapter.fetch_async(client, ["10.1/missing"]))
-        assert docs == []
+        assert len(docs) == 1
+        assert is_not_found_marker(docs[0])
+        assert docs[0]["_doi"] == "10.1/missing"
 
 
 # ── adapter ScanR : fetch_async via respx ────────────────────────
@@ -363,6 +370,39 @@ class TestScanrFetchAsync:
             records = list(await adapter.fetch_async(client, ["10.1/a"]))
         assert len(records) == 1
         assert records[0]["id"] == "scanr-1"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fetch_async_batch_marks_unmatched_dois(self):
+        """Lot de 2 DOI, un seul hit : le DOI sans correspondance est marqué
+        not_found (diff requêtés / trouvés)."""
+        respx.post("https://scanr.example/_search").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "hits": {
+                        "hits": [
+                            {
+                                "_source": {
+                                    "id": "scanr-1",
+                                    "externalIds": [{"type": "doi", "id": "10.1/a"}],
+                                }
+                            }
+                        ]
+                    }
+                },
+            )
+        )
+        adapter = ScanrFetchMissingDoiAdapter()
+        adapter.url = "https://scanr.example/_search"
+        adapter.auth = ("u", "p")
+
+        async with httpx.AsyncClient() as client:
+            records = list(await adapter.fetch_async(client, ["10.1/a", "10.1/b"]))
+        real = [r for r in records if not is_not_found_marker(r)]
+        assert [r["id"] for r in real] == ["scanr-1"]
+        missed = {r["_doi"] for r in records if is_not_found_marker(r)}
+        assert missed == {"10.1/b"}
 
     @pytest.mark.asyncio
     @respx.mock
@@ -410,14 +450,37 @@ class TestWosFetchAsync:
 
         async with httpx.AsyncClient() as client:
             records = list(await adapter.fetch_async(client, ["10.1/a", "10.1/b"]))
-        assert [r["UID"] for r in records] == ["WOS:001", "WOS:002"]
+        # Les 2 records reviennent ; les mocks n'ont pas de DOI extractible,
+        # donc les 2 DOI interrogés sont aussi marqués not_found (lot complet).
+        real = [r for r in records if not is_not_found_marker(r)]
+        assert [r["UID"] for r in real] == ["WOS:001", "WOS:002"]
+        missed = {r["_doi"] for r in records if is_not_found_marker(r)}
+        assert missed == {"10.1/a", "10.1/b"}
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_fetch_async_400_skips_silently(self):
-        """WoS 400 = lot sans correspondance → retourne ce qui a été accumulé,
-        sans propager l'exception."""
+    async def test_fetch_async_400_marks_batch_not_found(self):
+        """WoS 400 = lot sans correspondance : zéro match, tout le lot est
+        confirmé absent → une sentinelle not_found par DOI interrogé."""
         respx.get("https://api.clarivate.com/api/wos").mock(return_value=httpx.Response(400))
+        adapter = WosFetchMissingDoiAdapter()
+        adapter.base_url = "https://api.clarivate.com/api/wos"
+        adapter.headers = {"X-ApiKey": "k", "Accept": "application/json"}
+
+        async with httpx.AsyncClient() as client:
+            records = list(await adapter.fetch_async(client, ["10.1/a"]))
+        assert len(records) == 1
+        assert is_not_found_marker(records[0])
+        assert records[0]["_doi"] == "10.1/a"
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fetch_async_network_error_no_false_not_found(self):
+        """Erreur réseau persistante = lot incomplet : on ne marque aucun DOI
+        not_found (l'absence ne prouve rien)."""
+        respx.get("https://api.clarivate.com/api/wos").mock(
+            side_effect=httpx.ConnectError("refused")
+        )
         adapter = WosFetchMissingDoiAdapter()
         adapter.base_url = "https://api.clarivate.com/api/wos"
         adapter.headers = {"X-ApiKey": "k", "Accept": "application/json"}

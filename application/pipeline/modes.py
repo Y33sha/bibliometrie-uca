@@ -15,7 +15,6 @@ from typing import Literal
 from domain.sources import DOI_SEARCHABLE_SOURCES_SET
 
 YearSelection = Literal["since_last", "weekly", "full"]
-FetchMissingDoiScope = Literal["unprocessed", "all"]
 
 
 @dataclass(frozen=True)
@@ -24,7 +23,6 @@ class ModePolicy:
     year_selection: YearSelection
     refetch_truncated_oa: bool  # TODO: vraiment utile?
     fetch_missing_doi_sources: frozenset[str]
-    fetch_missing_doi_scope: FetchMissingDoiScope
     vacuum_full: bool
     # Gate la phase `oa_status` (Unpaywall, per-publication). Renommé depuis
     # `run_enrich` le 2026-05-26.
@@ -58,7 +56,6 @@ MODES: dict[str, ModePolicy] = {
         year_selection="since_last",
         refetch_truncated_oa=True,
         fetch_missing_doi_sources=_FETCH_MISSING_DOI_LIGHT,
-        fetch_missing_doi_scope="unprocessed",
         vacuum_full=False,
         run_oa_status=False,
         run_journal_enrichment=False,
@@ -72,7 +69,6 @@ MODES: dict[str, ModePolicy] = {
         year_selection="weekly",
         refetch_truncated_oa=True,
         fetch_missing_doi_sources=_FETCH_MISSING_DOI_LIGHT,
-        fetch_missing_doi_scope="unprocessed",
         vacuum_full=False,
         run_oa_status=False,
         run_journal_enrichment=False,
@@ -84,7 +80,6 @@ MODES: dict[str, ModePolicy] = {
         year_selection="full",
         refetch_truncated_oa=True,
         fetch_missing_doi_sources=DOI_SEARCHABLE_SOURCES_SET,
-        fetch_missing_doi_scope="all",
         vacuum_full=True,
         run_oa_status=True,
         run_journal_enrichment=True,

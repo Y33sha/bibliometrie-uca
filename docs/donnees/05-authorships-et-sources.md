@@ -31,26 +31,33 @@ Toutes les sources partagent les mêmes tables, discriminées par la colonne `so
 
 Table d'ingestion par source. Cycle de vie en 3 états explicites :
 
-| État | `processed` | `not_found` | `raw_data` | Inséré par |
+| État | `processed` | `not_found_at` | `raw_data` | Inséré par |
 |---|---|---|---|---|
-| **À traiter** | FALSE | FALSE | plein (payload source) | extracteurs sources |
-| **Normalisée** | TRUE | FALSE | `{}` (vidé) | normalizers après traitement |
-| **Non trouvée** | TRUE | TRUE | `{}` (jamais peuplé) | `fetch_missing_hal_id` (hal-id 404), `crossref/fetch_missing_doi` (DOI 404 sur source native) |
+| **À traiter** | FALSE | NULL | plein (payload source) | extracteurs sources |
+| **Normalisée** | TRUE | NULL | `{}` (vidé) | normalizers après traitement |
+| **Non trouvée** | TRUE | timestamp | `{}` (jamais peuplé) | `fetch_missing_hal_id` (hal-id 404), `crossref/fetch_missing_doi` (DOI 404 sur source native) |
 
 Transitions valides :
 
 - `[INSERT extracteur]` → **À traiter** → (`normalize`) → **Normalisée**
-- `[INSERT fetch_missing_*]` → **Non trouvée** (état terminal direct, pas re-tenté)
+- `[INSERT fetch_missing_*]` → **Non trouvée** (état terminal : `not_found_at` posé, jamais re-tenté)
+
+`not_found_at` ne porte que les miss **natifs** — un identifiant natif qui ne résout pas (hal-id 404, DOI 404 chez Crossref), toujours définitif. Les miss **cross-import** (un DOI absent d'une source non native) ne créent pas de row `staging` : ils vont dans `doi_lookups` avec backoff (cf. ci-dessous).
 
 `raw_data` vidé après normalisation pour libérer l'espace TOAST (le payload brut sera ré-introduit hors DB par le chantier `DATA_raw-data-store.md`). `last_seen_at` est mis à jour à chaque ré-extraction d'un même doc.
 
-CHECK SQL `staging_not_found_implies_processed` (migration 0015) : `NOT not_found OR processed`. Verrouille la transition impossible « non trouvée à re-traiter ». Les autres invariants (corrélation `processed` ↔ `raw_data` vidé) ne sont pas verrouillés en SQL — laissés en discipline pour ne pas bloquer les évolutions futures.
+CHECK SQL `staging_not_found_at_implies_processed` : `not_found_at IS NULL OR processed`. Verrouille la transition impossible « non trouvée à re-traiter ». Les autres invariants (corrélation `processed` ↔ `raw_data` vidé) ne sont pas verrouillés en SQL — laissés en discipline pour ne pas bloquer les évolutions futures.
+
+## `doi_lookups` — backoff des miss cross-import
+
+Cache des tentatives négatives de cross-import DOI sur les sources **non natives** (hal, openalex, wos, scanr). Un DOI absent d'une de ces sources n'y est pas définitivement absent (elle peut l'indexer plus tard) : on l'enregistre dans `doi_lookups (source, doi, not_found_at, next_retry)` avec `next_retry = now() + 30 jours` (`DOI_LOOKUP_RETRY_DAYS`). `get_cross_import_dois` exclut les DOI dont `next_retry > now()`, ce qui borne le pool de re-tentatives — sans ce backoff, ces DOI seraient réinterrogés à chaque run (coût API non borné). Ce ne sont pas des `staging` : pas de payload, pas de cycle de normalisation. Le miss Crossref reste, lui, un stub `staging` (source native du DOI, donc définitif).
 
 ## Services propriétaires
 
 | Table | Propriétaire | Notes |
 |---|---|---|
 | `staging` | extracteurs (`infrastructure/sources/*/extract_*.py`, cross-imports) | table unique pour toutes les sources |
+| `doi_lookups` | cross-imports DOI (`infrastructure/sources/*/fetch_missing_doi.py`) | backoff des miss sur sources non natives |
 | `source_publications` | `application/pipeline/normalize/normalize_*.py` | un fichier par source |
 | `source_authorships` | `application/pipeline/normalize/normalize_*.py` | `person_id` écrit par `application/persons.py` et `application/authorships/assign_orphans.py` (rattachement) ; `in_perimeter` et `source_authorship_structures` écrits par `application/pipeline/affiliations/populate_affiliations.py` |
 | `source_authorship_addresses` | `application/pipeline/normalize/normalize_*.py` (via `infrastructure.repositories.address_linker.PgAddressLinker`) | — |

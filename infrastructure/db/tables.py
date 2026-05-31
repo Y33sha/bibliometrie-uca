@@ -944,22 +944,32 @@ staging = Table(
         ),
     ),
     Column("last_seen_at", DateTime(timezone=True), server_default=func.now()),
-    Column("not_found", Boolean, server_default="false"),
+    Column("not_found_at", DateTime(timezone=True)),
     Column("hal_collections", ARRAY(Text)),
     UniqueConstraint("source", "source_id", name="staging_source_source_id_key"),
     CheckConstraint(
-        "NOT not_found OR processed",
-        name="staging_not_found_implies_processed",
+        "not_found_at IS NULL OR processed",
+        name="staging_not_found_at_implies_processed",
     ),
     Index("idx_staging_doi", "doi", postgresql_where=text("doi IS NOT NULL")),
-    Index(
-        "idx_staging_not_found",
-        "source",
-        "source_id",
-        postgresql_where=text("not_found = true"),
-    ),
     Index("idx_staging_processed", "processed", postgresql_where=text("NOT processed")),
     Index("idx_staging_source", "source"),
+)
+
+
+# Cache des tentatives négatives de cross-import DOI sur les sources non
+# natives (hal, openalex, wos, scanr) : un DOI absent d'une de ces sources
+# n'y est pas définitivement absent, on le re-tente après `next_retry`. Tient
+# le pool `get_cross_import_dois` auto-borné. Distinct de `staging` : ce ne
+# sont pas des documents (pas de payload, pas de cycle de normalisation).
+doi_lookups = Table(
+    "doi_lookups",
+    metadata,
+    Column("source", source_type_enum, nullable=False),
+    Column("doi", Text, nullable=False),
+    Column("not_found_at", DateTime(timezone=True), nullable=False),
+    Column("next_retry", DateTime(timezone=True), nullable=False),
+    PrimaryKeyConstraint("source", "doi"),
 )
 
 

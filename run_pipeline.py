@@ -18,7 +18,7 @@ Phases (dans l'ordre d'execution):
     extract        Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
     cross_imports  Rattrapage cross-source : (1) docs HAL manquants par hal-id/NNT
                    (auto-borné, tourne toujours), puis (2) par DOI dans chaque source
-                   cible (scope policy)
+                   cible (auto-borné par le backoff doi_lookups)
     normalize      Normalisation staging -> tables sources (source_publications,
                    source_authorships). Rattachement aux publications existantes par DOI/NNT/
                    HAL-ID, mais PAS de creation de publications. Inclut enrichissement
@@ -149,18 +149,16 @@ def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> P
        Pour chaque hal-id ou NNT mentionné dans une autre source mais
        absent du staging HAL, on télécharge le document via l'API HAL.
        Auto-bornée : les hal-ids/NNT introuvables sont marqués
-       `not_found=TRUE` dans staging et ne sont jamais re-interrogés.
+       `not_found_at` dans staging et ne sont jamais re-interrogés.
        Tourne systématiquement (daily/weekly/full).
 
     2. **Cross-import par DOI** (`fetch_missing_doi`).
        Pour chaque source cible, on cherche les DOI vus dans les autres
        sources mais absents de la sienne, et on tente de les fetcher.
-       Sources cibles et scope (`unprocessed` vs `all`) viennent de la
-       policy du mode (cf. `domain/pipeline_modes.py`).
-
-    Le scope cross-import DOI évoluera avec le chantier
-    `DATA_cycle-vie-staging.md` (backoff `not_found_at` / `next_retry`
-    pour les sources non natives).
+       Sources cibles depuis la policy du mode (`application/pipeline/modes.py`).
+       Auto-bornée : les DOI absents d'une source non native reçoivent un
+       backoff dans `doi_lookups` (re-tenté après `DOI_LOOKUP_RETRY_DAYS`),
+       ceux absents de Crossref (source native) un stub `staging` définitif.
     """
     metrics = PhaseMetrics()
 
@@ -173,11 +171,10 @@ def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> P
     effective = (
         set(sources) if sources else set(policy.fetch_missing_doi_sources)
     ) & policy.fetch_missing_doi_sources
-    all_staged = policy.fetch_missing_doi_scope == "all"
 
     for target in ("hal", "openalex", "wos", "scanr", "crossref"):
         if target in effective:
-            metrics.merge(_run_fetch_missing_doi(target, all_staged=all_staged))
+            metrics.merge(_run_fetch_missing_doi(target))
 
     return metrics
 
@@ -1197,7 +1194,7 @@ def _run_fetch_missing_hal_id(*, mode: str = "full") -> PhaseMetrics:
     return metrics
 
 
-def _run_fetch_missing_doi(target: str, *, all_staged: bool) -> PhaseMetrics:
+def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     from typing import cast
 
     from application.pipeline.extract.fetch_missing_doi import run_async
@@ -1227,7 +1224,7 @@ def _run_fetch_missing_doi(target: str, *, all_staged: bool) -> PhaseMetrics:
     )
     adapter = adapter_classes[target]()
 
-    log.info("▶ fetch_missing_doi --target %s%s", target, " --all" if all_staged else "")
+    log.info("▶ fetch_missing_doi --target %s", target)
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
@@ -1237,7 +1234,6 @@ def _run_fetch_missing_doi(target: str, *, all_staged: bool) -> PhaseMetrics:
                 adapter,
                 log,
                 cross_import_dois_reader=get_cross_import_dois,
-                all_staged=all_staged,
             )
         )
     finally:
