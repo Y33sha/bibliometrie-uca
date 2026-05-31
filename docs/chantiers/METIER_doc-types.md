@@ -41,7 +41,7 @@ Pris dans l'ordre :
 - [x] Préprints article + journal_id inconnu — audit fait, règle `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` posée (`c8be3409`)
 - [ ] Préprints OA gold — flag suspect ← **cible courante**
 - [ ] Types WoS composites — audit
-- [ ] Review = poubelle — audit (à coupler avec book_review une fois traité)
+- [x] Review = poubelle — audit fait : **pas une poubelle**, mappings sains ; seule action = libellé FR « Article de synthèse »
 - [ ] Figshare collections — audit
 - [ ] Posters / conférence avec même DOI — hors-scope correction, à traiter en dédup
 - [ ] Question des raw_type openalex: comparer avec le type affiché
@@ -71,16 +71,13 @@ Aujourd'hui `map_doc_type` prend le **premier** type non-other quand WoS renvoie
 
 Étape suivante : audit. Pour chaque paire observée (ex. `Article; Proceedings Paper`, `Article; Book Chapter`, `Review; Book Chapter`), compter les occurrences et sonder quelques cas pour décider de la règle (et si la règle doit dépendre du journal). Puis remplacer le `first non-other` par un arbitrage explicite par paire.
 
-### Review = poubelle — audit
+### Review = poubelle — audit ✓
 
-Le doc_type `review` amalgame plusieurs choses :
+Audit (base de prod) : `review` = 1382 publis. Signal review par source : WoS `review` 1006, OpenAlex `review` 980, HAL `art_artrev` 299. **84 %** ont un signal WoS ou HAL-`art_artrev` (review articles certains) ; les **16 % « OpenAlex seul »** (227) sont, à l'échantillon, ~90 %+ de vrais review articles (systematic/narrative reviews, position papers, recommandations) — pas des recensions, pas du media.
 
-- WoS `review` = review article (revue de la littérature) ⇒ `review`
-- HAL `art_artrev` = mappé vers `review` aujourd'hui
-- OpenAlex `review` = un peu de tout
-- Recensions d'ouvrages (book reviews) ⇒ devraient aller en `book_review` mais sont parfois en `review`
+**Conclusion : `review` n'est pas une poubelle.** Type cohérent (review article / revue de littérature), alimenté légitimement par WoS, HAL `art_artrev` **et** OpenAlex (l'hypothèse « OA review = un peu de tout » ne tient pas). Pas de fuite de book reviews : HAL `art_bookreview` et WoS `book review` → `book_review`, et les règles titre (ISBN, année-pages) attrapent le reste ; l'échantillon OA-seul n'en montre aucune. **Aucun changement de mapping ni règle de désambiguïsation.** Seul bruit résiduel : une poignée de mistypes OA (ex. « Publisher Correction: … » = erratum classé review) — marginal, relève d'un trou de détection erratum côté OA.
 
-Étape suivante : audit. Sonder les publications canoniques classées `review` et leur source, voir ce que ça recouvre vraiment. Ajuster les mappings et écrire une règle de désambiguïsation (titre, journal) si nécessaire. À mener avec book_review (mêmes cas observés probablement).
+**Seule action** : libellé FR `review` « Review » → « Article de synthèse » (terme standard, cf. HAL). Au passage `letter` « Letter » → « Lettre à l'éditeur » (audit : 266 publis, OpenAlex+WoS `letter`, majoritairement lettres à l'éditeur / correspondance).
 
 ### Figshare collections — audit
 
