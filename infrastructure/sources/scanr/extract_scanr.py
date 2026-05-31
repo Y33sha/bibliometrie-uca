@@ -33,8 +33,11 @@ from infrastructure.sources.http_retry import http_request_with_retry
 _UPDATE_SCANR_SQL = text(
     """
     UPDATE staging
-    SET raw_data = :raw_data, doi = :doi, raw_hash = :raw_hash, last_seen_at = now()
-    WHERE source = 'scanr' AND source_id = :source_id AND (raw_hash IS DISTINCT FROM :raw_hash)
+    SET last_seen_at = now(),
+        raw_data = CASE WHEN raw_hash IS DISTINCT FROM :raw_hash THEN :raw_data ELSE raw_data END,
+        doi      = CASE WHEN raw_hash IS DISTINCT FROM :raw_hash THEN :doi ELSE doi END,
+        raw_hash = :raw_hash
+    WHERE source = 'scanr' AND source_id = :source_id
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
@@ -149,7 +152,11 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
     def upsert_doc(
         self, conn: Connection, doc: dict[str, Any], *, is_new: bool
     ) -> tuple[bool, bool]:
-        """INSERT pour les nouveaux, UPDATE conditionnel (sur raw_hash) sinon.
+        """INSERT pour les nouveaux, UPDATE sinon.
+
+        L'UPDATE bumpe toujours `last_seen_at` (le doc a été re-vu) et ne
+        réécrit `raw_data`/`doi` que si le `raw_hash` a changé. `updated`
+        compte donc les rows re-vues (« touchées »), comme OpenAlex/WoS.
 
         Retourne `(inserted, updated)`. Au plus un des deux est `True`.
         """

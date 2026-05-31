@@ -27,13 +27,12 @@ from infrastructure.sources.http_retry import http_request_with_retry
 _UPDATE_THESES_SQL = text(
     """
     UPDATE staging
-    SET raw_data = :raw_data, doi = :doi, raw_hash = :raw_hash, last_seen_at = now(),
-        processed = CASE
-            WHEN raw_hash IS DISTINCT FROM :raw_hash THEN FALSE
-            ELSE processed
-        END
+    SET last_seen_at = now(),
+        raw_data = CASE WHEN raw_hash IS DISTINCT FROM :raw_hash THEN :raw_data ELSE raw_data END,
+        doi      = CASE WHEN raw_hash IS DISTINCT FROM :raw_hash THEN :doi ELSE doi END,
+        processed = CASE WHEN raw_hash IS DISTINCT FROM :raw_hash THEN FALSE ELSE processed END,
+        raw_hash = :raw_hash
     WHERE source = 'theses' AND source_id = :source_id
-      AND (raw_hash IS DISTINCT FROM :raw_hash)
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
@@ -121,7 +120,12 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
     def upsert_these(
         self, conn: Connection, these: dict[str, Any], *, is_new: bool
     ) -> tuple[bool, bool]:
-        """INSERT pour les nouvelles, UPDATE conditionnel (sur raw_hash) sinon."""
+        """INSERT pour les nouvelles, UPDATE sinon.
+
+        L'UPDATE bumpe toujours `last_seen_at` (la thèse a été re-vue) et ne
+        réécrit `raw_data`/`doi`/`processed` que si le `raw_hash` a changé.
+        `updated` compte donc les rows re-vues (« touchées »), comme OpenAlex/WoS.
+        """
         theses_id = self.extract_id(these)
         doi = self.extract_doi(these)
         raw_hash = compute_hash(these)
