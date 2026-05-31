@@ -16,10 +16,21 @@ from infrastructure.observability.log import (
 )
 
 
+def canonical_json_bytes(raw_data: dict) -> bytes:
+    """Sérialise un payload en JSON canonique (clés triées, compact, UTF-8).
+
+    Forme unique partagée par `compute_hash` (empreinte du payload) et le raw
+    store (contenu écrit) : garantit `md5(canonical_json_bytes(d)) ==
+    compute_hash(d)`, donc le hash du contenu raw store égale `staging.raw_hash`.
+    """
+    return json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8"
+    )
+
+
 def compute_hash(raw_data: dict) -> str:
     """Calcule le hash MD5 du JSON canonique (clés triées, compact)."""
-    canonical = json.dumps(raw_data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.md5(canonical.encode("utf-8")).hexdigest()
+    return hashlib.md5(canonical_json_bytes(raw_data)).hexdigest()
 
 
 # Mapping `target source → RA attendue côté doi_prefixes`. Pour ces sources,

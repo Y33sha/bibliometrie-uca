@@ -41,6 +41,20 @@ def pytest_configure(config):
     _log_module.setup_logger = _test_setup_logger
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _isolate_raw_store(tmp_path_factory):
+    """Pointe le raw store vers un tmp de session.
+
+    `PgStagingQueries()` (donc la normalisation) écrit chaque payload au raw
+    store par défaut (`data/raw_store`) via `mark_done` ; sans isolation, les
+    tests pollueraient ce répertoire de travail.
+    """
+    from infrastructure.settings import settings
+
+    settings.biblio_raw_store_url = tmp_path_factory.mktemp("raw_store").as_uri()
+    yield
+
+
 @pytest.fixture(autouse=True)
 def _clear_caches():
     """Vide les caches module-level restants entre chaque test (rollback-safe).

@@ -46,11 +46,14 @@ Sauvegarde locale du contenu de `staging.raw_data` issu d'un extract récent, av
 - [x] Config `biblio_raw_store_url` dans `infrastructure/settings.py`.
 - [x] Tests unit `tmp_path` (`tests/unit/infrastructure/raw_store/`).
 
-### Phase 2 — Intégration dans les extracteurs
+### Phase 2 — Capture au point de vidange (`mark_done`) ✓
 
-- [ ] Au point d'insert dans `staging` (dans chaque `infrastructure/sources/{source}/extract_*.py`), appel `raw_store.put(...)` en parallèle.
-- [ ] Re-fetch : écrase l'objet raw existant, cohérent avec la convention de mise à jour.
-- [ ] Validation : après un run de pipeline, comparer les hashs (`staging.raw_hash` vs hash du contenu raw store) sur un échantillon, pour confirmer la fidélité de l'écriture.
+Plutôt qu'éparpiller l'écriture dans chaque extracteur, un **point unique** : `mark_done` ([`infrastructure/queries/staging.py`](../../infrastructure/queries/staging.py)) est la seule fonction qui vide `raw_data`, et **tout** ce qui doit être conservé y transite (bulk + cross-imports + refetch + refresh, puisque tout finit normalisé). La fiche d'origine scopait ça « dans les extracteurs » — c'était mal pensé.
+
+- [x] `mark_done` archive le `raw_data` au raw store **avant** de le vider, en une requête (`UPDATE … FROM (snapshot pré-update) … RETURNING old.*`). Best-effort : un échec de `put` logge un warning sans casser la normalisation (la BDD reste la source de vérité), `raw_data` est vidé dans tous les cas.
+- [x] Contenu = JSON canonique (`canonical_json_bytes`, factorisé avec `compute_hash`) → `md5(contenu raw store) == staging.raw_hash` **par construction**. La validation par comparaison de hashs est donc satisfaite d'office (exception connue : lignes OpenAlex `refetch_truncated`, dont `raw_hash` est volontairement désynchronisé du `raw_data`).
+- [x] Re-fetch / refresh : écrasent l'objet raw au prochain `mark_done` (convention « écraser », pas de versionnage).
+- [x] `PgStagingQueries(raw_store=...)` — défaut `get_raw_store()`, injectable pour les tests (isolation via un tmp de session dans `tests/conftest.py`).
 
 ## Plus tard
 

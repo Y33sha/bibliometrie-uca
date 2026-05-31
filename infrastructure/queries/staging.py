@@ -7,6 +7,8 @@ La table `staging` stocke les raw_data téléchargées par les extracteurs,
 avec un flag `processed` que les normalizers positionnent à TRUE.
 """
 
+import logging
+
 from sqlalchemy import Connection, Row, text
 
 from application.ports.pipeline.staging import (
@@ -14,6 +16,10 @@ from application.ports.pipeline.staging import (
     StagingQueries,
     StagingRow,
 )
+from infrastructure.raw_store import RawStore, get_raw_store
+from infrastructure.sources.common import canonical_json_bytes
+
+logger = logging.getLogger(__name__)
 
 # Colonnes communes (4) ; HAL ajoute `hal_collections`.
 _COMMON_COLUMNS = "id, source_id, doi, raw_data"
@@ -107,12 +113,40 @@ def fetch_staging_by_ids(
     return [_row_for(source, r) for r in rows]
 
 
-def mark_done(conn: Connection, staging_id: int) -> None:
-    """Marque un staging comme traité et vide le raw_data."""
-    conn.execute(
-        text("UPDATE staging SET processed = TRUE, raw_data = '{}'::jsonb WHERE id = :sid"),
-        {"sid": staging_id},
-    )
+_MARK_DONE_SQL = text(
+    """
+    UPDATE staging s
+    SET processed = TRUE, raw_data = '{}'::jsonb
+    FROM (
+        SELECT id, source::text AS source, source_id, raw_data
+        FROM staging WHERE id = :sid
+    ) old
+    WHERE s.id = old.id
+    RETURNING old.source AS source, old.source_id AS source_id, old.raw_data AS raw_data
+    """
+)
+
+
+def mark_done(conn: Connection, staging_id: int, raw_store: RawStore) -> None:
+    """Marque un staging comme traité, archive son `raw_data` au raw store, puis le vide.
+
+    La sous-requête `old` capture le payload AVANT vidange (snapshot pré-UPDATE),
+    écrit au raw store en best-effort (un échec ne casse pas la normalisation —
+    la BDD reste la source de vérité), puis `raw_data` est vidé dans le même
+    statement.
+    """
+    row = conn.execute(_MARK_DONE_SQL, {"sid": staging_id}).one_or_none()
+    if row is None or not row.raw_data:  # `{}` (stub not-found) → rien à archiver
+        return
+    try:
+        raw_store.put(row.source, row.source_id, canonical_json_bytes(row.raw_data))
+    except Exception:
+        logger.warning(
+            "raw_store.put a échoué pour %s/%s (payload non archivé)",
+            row.source,
+            row.source_id,
+            exc_info=True,
+        )
 
 
 def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
@@ -125,7 +159,15 @@ def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
 
 
 class PgStagingQueries(StagingQueries):
-    """Adapter PostgreSQL pour `application.ports.staging.StagingQueries`."""
+    """Adapter PostgreSQL pour `application.ports.staging.StagingQueries`.
+
+    `raw_store` (défaut : `get_raw_store()`) reçoit chaque payload `raw_data`
+    juste avant sa vidange par `mark_done` (archivage hors BDD). Injectable
+    pour les tests.
+    """
+
+    def __init__(self, raw_store: RawStore | None = None) -> None:
+        self._raw_store = raw_store if raw_store is not None else get_raw_store()
 
     def reset_processed_flag(self, conn: Connection, source: str) -> int:
         return reset_processed_flag(conn, source)
@@ -147,7 +189,7 @@ class PgStagingQueries(StagingQueries):
         return fetch_staging_by_ids(conn, staging_ids, source=source)
 
     def mark_done(self, conn: Connection, staging_id: int) -> None:
-        mark_done(conn, staging_id)
+        mark_done(conn, staging_id, self._raw_store)
 
     def fetch_existing_source_ids(self, conn: Connection, source: str) -> set[str]:
         return fetch_existing_source_ids(conn, source)
