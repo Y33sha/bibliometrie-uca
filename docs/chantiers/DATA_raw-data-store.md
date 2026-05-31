@@ -38,17 +38,13 @@ Sauvegarde locale du contenu de `staging.raw_data` issu d'un extract récent, av
 - [x] Script `interfaces/cli/oneshot/dump_staging_raw_to_local.py` : lit les rows `staging` avec `processed = FALSE` (= raw_data plein) et écrit chaque payload dans `data/raw_store/{source}/{source_id_encoded}.json.gz`. Écrase si existant.
 - [x] `data/raw_store/` ajouté à `.gitignore`.
 
-### Phase 1 — Abstraction `RawStore` + implémentation locale
+### Phase 1 — Abstraction `RawStore` + implémentation locale ✓
 
-- [ ] `infrastructure/raw_store/base.py` — Protocol `RawStore` :
-  - `put(source, source_id, payload_bytes) -> None`
-  - `get(source, source_id) -> bytes`
-  - `exists(source, source_id) -> bool`
-  - `iter_keys(source) -> Iterator[str]`
-- [ ] `infrastructure/raw_store/local.py` — `LocalFileRawStore(root_dir)`. URL-encoding des `source_id`, gzip à l'écriture, gunzip à la lecture.
-- [ ] `infrastructure/raw_store/factory.py` — sélection par variable d'env. Au démarrage, seule l'impl locale (`file://`) est supportée ; `s3://` reste un placeholder.
-- [ ] Config ajoutée dans `infrastructure/settings.py`.
-- [ ] Tests unit avec `tmp_path` pytest.
+- [x] `infrastructure/raw_store/base.py` — Protocol `RawStore` (`put` / `get` (lève `KeyError` si absent) / `exists` / `iter_keys` qui rend les `source_id` décodés). L'encodage de clé est un détail des impls, pas du contrat.
+- [x] `infrastructure/raw_store/local.py` — `LocalFileRawStore(root_dir)`. URL-encoding des `source_id` (`quote(safe="")`), gzip transparent (`put`/`get` manipulent les bytes JSON bruts).
+- [x] `infrastructure/raw_store/factory.py` — sélection par `BIBLIO_RAW_STORE_URL` ; non défini → store local par défaut (`data/raw_store`), `file://` supporté (résolution cross-platform via `url2pathname`), `s3://` → `NotImplementedError`.
+- [x] Config `biblio_raw_store_url` dans `infrastructure/settings.py`.
+- [x] Tests unit `tmp_path` (`tests/unit/infrastructure/raw_store/`).
 
 ### Phase 2 — Intégration dans les extracteurs
 

@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     db_pool_min: int = 2
     db_pool_max: int = 30
 
+    # ----- Raw store (payloads bruts hors BDD) -----
+    # Vide → store local par défaut (`data/raw_store`). Sinon `file:///chemin`
+    # ou `s3://bucket/prefix` (backend S3 pas encore implémenté).
+    biblio_raw_store_url: str = ""
+
     @property
     def db_args(self) -> dict[str, str | int]:
         """Arguments pour psycopg.connect()."""
