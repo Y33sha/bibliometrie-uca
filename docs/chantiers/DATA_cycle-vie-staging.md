@@ -133,7 +133,9 @@ Aujourd'hui l'étape 2 (DOI) a une scope policy `unprocessed` vs `all` parce que
 
 ### Phase 3 — Fraîcheur & disparition par refetch ciblé
 
-- [ ] Sélection : rows `staging` à `last_seen_at` ancien (seuil à définir).
+**Prérequis acté : `full` à fenêtre fixe (rétention cumulative).** Le mode `full` re-moissonne désormais tout l'historique depuis une année d'ancre absolue (`pipeline_start_year_full` = 2017) au lieu d'une fenêtre glissante. Conséquence sur cette phase : les **natifs** in-perimeter sont rafraîchis et leur disparition détectée gratuitement par le bulk (un natif dont `last_seen_at` n'est pas bumpé pendant un `full` couvrant son année = disparu). Le refetch ciblé individuel se réduit donc aux **cross-imports** (hors périmètre natif, jamais ramenés par le bulk). WoS n'est plus un obstacle (désabonnement probable, archivage du code à venir).
+
+- [ ] Sélection : rows `staging` cross-import à `last_seen_at` ancien (seuil à définir).
 - [ ] Refetch par id natif (DOI pour Crossref / cross-imports) → succès : rafraîchit `raw_data` + bumpe `last_seen_at` ; 404 / absent : marque la disparition.
 - [ ] Action sur disparition à décider (cf. Questions ouvertes), propagée à `source_publications` et aux publications canoniques.
 - [ ] Probablement une nouvelle phase pipeline dédiée.

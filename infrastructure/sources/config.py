@@ -29,25 +29,40 @@ def _get_from_db(conn: Connection, key: str) -> JsonValue:
         return None
 
 
+def _config_int(conn: Connection, key: str) -> int | None:
+    """Lit une valeur config et la contraint en `int`, ou `None` si absente/invalide."""
+    value = _get_from_db(conn, key)
+    if isinstance(value, (int, str, float)) and not isinstance(value, bool):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            pass
+    if value is not None:
+        logger.warning(f"Valeur invalide pour {key}: {value}")
+    return None
+
+
 def get_years(conn: Connection, mode: str = "full") -> list[int]:
     """Retourne la liste des années à extraire selon le mode.
 
-    Lit pipeline_years_full ou pipeline_years_weekly depuis la table config
-    (offset en nombre d'années depuis l'année courante).
+    - `weekly` : `pipeline_years_weekly` est un **offset** N → fenêtre récente
+      glissante `[année courante - N, année courante]`.
+    - `full` : `pipeline_start_year_full` est une **année absolue** (ancre
+      fixe) → rétention cumulative `[ancre, année courante]`.
+
+    Fallback `[année courante]` si la config est absente ou invalide.
     """
-    key = "pipeline_years_weekly" if mode == "weekly" else "pipeline_years_full"
-    offset = _get_from_db(conn, key)
     current_year = datetime.date.today().year
 
-    if isinstance(offset, (int, str, float)) and not isinstance(offset, bool):
-        try:
-            n = int(offset)
-            return list(range(current_year - n, current_year + 1))
-        except (ValueError, TypeError):
-            logger.warning(f"Valeur invalide pour {key}: {offset}")
-    elif offset is not None:
-        logger.warning(f"Valeur invalide pour {key}: {offset}")
+    if mode == "weekly":
+        offset = _config_int(conn, "pipeline_years_weekly")
+        if offset is not None:
+            return list(range(current_year - offset, current_year + 1))
+        return [current_year]
 
+    start_year = _config_int(conn, "pipeline_start_year_full")
+    if start_year is not None and start_year <= current_year:
+        return list(range(start_year, current_year + 1))
     return [current_year]
 
 

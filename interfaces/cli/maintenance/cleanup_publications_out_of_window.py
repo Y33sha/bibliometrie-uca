@@ -1,5 +1,5 @@
 # STATUS: oneshot (2026-05-28)
-"""Purge les publications dont `pub_year` est antérieur à la fenêtre live du pipeline (= `current_year - config.pipeline_years_full`), avec leurs source_publications, source_authorships et addresses orphelines.
+"""Purge les publications dont `pub_year` est antérieur à l'ancre du pipeline (= `config.pipeline_start_year_full`, année absolue), avec leurs source_publications, source_authorships et addresses orphelines.
 
 Contexte : fuite identifiée côté HAL daily (build_query posait `submittedDate_tdate:[since TO *]` sans borner `producedDateY_i` → dépôt HAL tardif d'une vieille publication passait le filtre). Fix appliqué côté extracteur (cf. `infrastructure/sources/hal/extract_hal.py::build_query`) ; ce script nettoie le stock accumulé.
 
@@ -44,8 +44,7 @@ def main() -> int:
     with engine.connect() as conn:
         cutoff = conn.execute(
             text("""
-                SELECT EXTRACT(YEAR FROM CURRENT_DATE)::int
-                     - (SELECT value::int FROM config WHERE key = 'pipeline_years_full')
+                SELECT (value #>> '{}')::int FROM config WHERE key = 'pipeline_start_year_full'
             """)
         ).scalar_one()
         log.info("Cutoff year : pub_year < %d", cutoff)
