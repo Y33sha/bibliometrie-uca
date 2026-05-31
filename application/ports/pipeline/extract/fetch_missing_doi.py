@@ -16,13 +16,33 @@ from typing import Any, Protocol
 import httpx
 from sqlalchemy import Connection
 
-CrossImportDoisReader = Callable[[Any, str, bool], list[str]]
-"""Signature : ``(conn, target, all_staged) -> list[doi]``.
+CrossImportDoisReader = Callable[[Any, str], list[str]]
+"""Signature : ``(conn, target) -> list[doi]``.
 
 Injecté dans `run_async` pour respecter l'étanchéité DDD : la couche
 application ne doit pas importer infrastructure pour lire la liste des
 DOI manquants.
 """
+
+_NOT_FOUND_STATUS = "not_found"
+
+
+def not_found_marker(doi: str) -> dict[str, Any]:
+    """Sentinelle « DOI introuvable » émise par `fetch_async`.
+
+    Un adapter émet ce marqueur (au lieu d'un record API) pour un DOI que
+    la source a **confirmé** absent (réponse vide ou 404), par opposition à
+    une erreur transitoire (réseau, timeout) où il retourne `[]` sans rien
+    émettre. `insert()` route le marqueur vers le backoff `doi_lookups`
+    (sources non natives) ou un stub `staging` (Crossref, source native).
+    L'orchestrateur l'exclut du compteur `fetched`.
+    """
+    return {"_status": _NOT_FOUND_STATUS, "_doi": doi}
+
+
+def is_not_found_marker(record: dict[str, Any]) -> bool:
+    """True si `record` est une sentinelle `not_found_marker`."""
+    return record.get("_status") == _NOT_FOUND_STATUS
 
 
 class AsyncFetchMissingDoiAdapter(Protocol):

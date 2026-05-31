@@ -15,12 +15,12 @@ Le cycle de vie d'une row dans `staging` (et des entités dérivées qu'elle ali
 Aucune colonne ne désigne directement l'état — il faut inférer la combinaison. Aucun CHECK SQL n'empêche les combinaisons invalides (ex. `not_found=TRUE` avec `processed=FALSE`, qui rétrograderait silencieusement un row terminal en "à re-traiter").
 
 **2. Backoff sur les `not_found` pour les cross-imports DOI.** Aujourd'hui `not_found=TRUE` est écrit à deux endroits :
-- [`hal/fetch_missing_hal_id.py`](../../infrastructure/sources/hal/fetch_missing_hal_id.py) — hal-id 404 dans HAL (source native) → **définitif** (HAL dédoublonne, le doc n'existe plus).
-- [`crossref/fetch_missing_doi.py`](../../infrastructure/sources/crossref/fetch_missing_doi.py) — DOI 404 chez Crossref (source native pour les DOI Crossref) → **définitif** (DOI erroné ou non Crossref).
+- [`hal/fetch_missing_hal_id.py`](../../infrastructure/sources/hal/fetch_missing_hal_id.py) — hal-id 404 dans HAL (source native) → **définitif** (HAL dédoublonne, le doc n'existe plus). `source_id` = le vrai hal-id.
+- [`crossref/fetch_missing_doi.py`](../../infrastructure/sources/crossref/fetch_missing_doi.py) — DOI 404 chez Crossref (source native pour les DOI Crossref) → **définitif** (DOI erroné ou non Crossref). `source_id` = le DOI, qui *est* l'id natif Crossref.
 
-Les 4 autres sources qui font du `fetch_missing_doi` (HAL, OpenAlex, WoS, ScanR) n'écrivent **rien** quand un DOI n'est pas trouvé. Conséquence : ces DOI sont retentés à chaque run (croissance non bornée du pool, coût API qui monte avec le temps).
+Les 4 autres sources qui font du `fetch_missing_doi` (HAL, OpenAlex, WoS, ScanR) n'écrivent **rien** quand un DOI n'est pas trouvé (l'adapter retourne `[]`, `insert` n'est jamais appelé). Conséquence : ces DOI sont retentés à chaque run (croissance non bornée du pool, coût API qui monte avec le temps).
 
-La sémantique correcte : un identifiant cherché sur sa **source native** + 404 = définitif ; cherché sur une **autre source** + 404 = à retenter après un délai (la source peut indexer plus tard).
+La sémantique correcte : un identifiant cherché sur sa **source native** + 404 = définitif ; un DOI cherché sur une **autre source** + 404 = à retenter après un délai (la source peut indexer plus tard).
 
 **3. Fraîcheur des données / publications disparues.** Item TODO existant : *"Mettre en place le process pour détecter les publications disparues et les nettoyer de la base (ou les archiver ?). + publis du cross-import : re-fetch régulier pour tenir les données à jour."*
 
@@ -30,119 +30,120 @@ Aujourd'hui :
 
 ## Décisions
 
-### Modélisation `not_found` : deux colonnes lisibles
+### Deux sémantiques de `not_found`, deux emplacements
 
-Remplacer le `not_found BOOL` par deux colonnes temporelles plus parlantes :
+Le point structurant : ce qu'on appelle aujourd'hui `not_found` recouvre deux faits de nature différente, qu'il faut séparer.
 
-| Colonne | Sémantique | Quand peuplée |
-|---|---|---|
-| `not_found_at TIMESTAMPTZ NULL` | Date de la dernière tentative négative | Toutes les rows non trouvées (définitives ou temporaires) |
-| `next_retry TIMESTAMPTZ NULL` | Date minimum de re-tentative ; NULL = définitif | Uniquement les rows temporaires (cross-imports non natifs) |
+| Fait | Clé | Verdict | Collision possible ? | Emplacement |
+|---|---|---|---|---|
+| Miss **natif** : un id natif ne résout pas (hal-id 404 dans `fetch_missing_hal_id` ; DOI 404 chez Crossref) | id natif (`source_id`) | définitif | Non — `source_id` natif, un vrai row futur fusionne via `ON CONFLICT (source, source_id)` | `staging.not_found_at` |
+| Miss **cross-import** : un DOI cherché sur HAL/OpenAlex/WoS/ScanR est absent | DOI (≠ id natif) | temporaire (backoff) | Oui si stocké dans `staging` (il faudrait un `source_id` synthétique qui cohabiterait avec le vrai row indexé plus tard) | table dédiée `doi_lookups` |
 
-`not_found_at IS NOT NULL` remplace fonctionnellement l'ancien `not_found=TRUE`. La nature définitive vs temporaire se lit sur `next_retry` :
-- `next_retry IS NULL` → définitif (source native ; jamais re-tenter)
+La collision que cette séparation évite : si un miss cross-import était stocké dans `staging` avec un `source_id` synthétique (`'doi:10.x/y'`), et que la source indexe ensuite le doc sous son id natif, on aurait **deux rows `staging`** pour le même `(source, doi)` — un stub fantôme (`raw_data = {}`, jamais normalisé, jamais nettoyé, faussant les comptages) et le vrai. En sortant ces miss vers `doi_lookups` (clé `(source, doi)`), le vrai doc arrive comme row `staging` normal et les deux ne coexistent jamais.
+
+### `staging` : `not_found` BOOL → `not_found_at TIMESTAMPTZ`
+
+Le seul `not_found` qui reste dans `staging` est le miss natif, **toujours définitif**. Donc une seule colonne suffit, pas de `next_retry` côté `staging` :
+
+| Colonne | Sémantique |
+|---|---|
+| `not_found_at TIMESTAMPTZ NULL` | Date du miss natif définitif ; `IS NOT NULL` remplace fonctionnellement l'ancien `not_found = TRUE` |
+
+États observables de `staging` :
+
+| État | `processed` | `not_found_at` | `raw_data` |
+|---|---|---|---|
+| À traiter | FALSE | NULL | plein |
+| Normalisée | TRUE | NULL | `{}` |
+| Non trouvée (natif, définitif) | TRUE | timestamp | `{}` |
+
+CHECK consolidé, minimal :
+
+```sql
+CHECK (not_found_at IS NULL OR processed)
+-- un miss natif est terminal : ne peut pas coexister avec processed = FALSE
+```
+
+### Nouvelle table `doi_lookups` (backoff cross-import)
+
+```sql
+CREATE TABLE doi_lookups (
+    source        source_type  NOT NULL,
+    doi           text         NOT NULL,
+    not_found_at  timestamptz  NOT NULL,  -- date de la dernière tentative négative
+    next_retry    timestamptz  NOT NULL,  -- date minimum de re-tentative
+    PRIMARY KEY (source, doi)
+);
+```
+
+Ces rows ne sont pas des stagings (pas de payload, pas de cycle de normalisation) : c'est un cache de tentatives négatives. Tous les miss cross-import sont temporaires (la source peut indexer plus tard), donc `next_retry` est toujours peuplé — pas de cas définitif ici. Lecture :
 - `next_retry > NOW()` → en attente
 - `next_retry <= NOW()` → à retenter au prochain run
 
-### États observables
+Sur chaque nouveau miss du même `(source, doi)`, la row est ré-armée (`not_found_at = NOW()`, `next_retry = NOW() + délai`) via `ON CONFLICT (source, doi) DO UPDATE`.
 
-| État | `processed` | `not_found_at` | `next_retry` | `raw_data` |
-|---|---|---|---|---|
-| À traiter | FALSE | NULL | NULL | plein |
-| Normalisée | TRUE | NULL | NULL | `{}` |
-| Non trouvée (définitif) | TRUE | timestamp | NULL | `{}` |
-| Non trouvée (backoff) | TRUE | timestamp | timestamp | `{}` |
+### `get_cross_import_dois` adaptée
 
-### CHECK SQL
-
-Minimal, ne verrouille que les combinaisons sémantiquement absurdes :
+Le pool exclut les DOI déjà présents dans `staging` côté cible **et** ceux en backoff dans `doi_lookups` :
 
 ```sql
-CHECK (
-    -- not_found_at terminal : ne peut pas coexister avec processed=FALSE
-    (not_found_at IS NULL OR processed)
-    AND
-    -- next_retry n'a de sens que si not_found_at peuplé
-    (next_retry IS NULL OR not_found_at IS NOT NULL)
-)
+SELECT DISTINCT s.doi
+FROM staging s
+WHERE s.source != :target AND s.doi IS NOT NULL          -- [+ filtre processed et préfixe RA inchangés]
+  AND NOT EXISTS (
+      SELECT 1 FROM staging t WHERE t.source = :target AND t.doi = s.doi
+  )
+  AND NOT EXISTS (
+      SELECT 1 FROM doi_lookups l
+      WHERE l.source = :target AND l.doi = s.doi AND l.next_retry > NOW()
+  )
+ORDER BY s.doi
 ```
 
-### Politique de fraîcheur (esquisse, à affiner en Phase 3)
+Le filtre RA sur `doi_prefixes` (cible Crossref) et le filtre `processed` restent inchangés.
 
-- **Disparition** : une publication n'a pas eu de `last_seen_at` mis à jour depuis N runs successifs du mode où elle aurait dû apparaître → marquée `disappeared_at`. À décider : N, granularité (par mode ?), action (DELETE, archive en table dédiée, ou simple flag).
-- **Re-fetch périodique** : les publications anciennes (notamment celles obtenues via cross-import qui ne reviennent jamais dans une moisson native) doivent être re-fetchées régulièrement pour rafraîchir les métadonnées. Stratégie possible : re-fetch toutes les publis dont `updated_at < NOW() - X mois` en mode `full`.
+### Disparition par refetch ciblé (fusion des ex-phases 3 et 4)
+
+La détection des publications disparues et le re-fetch périodique des métadonnées ne sont **pas** deux mécanismes : c'est le même. L'inférence par périmètre (« un doc qui aurait dû réapparaître dans une moisson native n'est pas revenu → disparu ») ne peut structurellement pas couvrir les cross-imports : un cross-import est hors périmètre natif de la source, donc une moisson native ne rebumpe jamais son `last_seen_at` — il serait flaggé disparu à tort.
+
+Le seul signal correct, valable pour les natifs **comme** pour les cross-imports : un **refetch ciblé par id** des rows à `last_seen_at` ancien. Succès → on rafraîchit `raw_data` (les UPSERT existants remettent `processed = FALSE` si le hash change) et on bumpe `last_seen_at`. 404 / absent → signal de disparition → action à décider. Une seule phase, double emploi (fraîcheur + disparition).
+
+### Conséquence sur la scope policy `cross_imports`
+
+Aujourd'hui l'étape 2 (DOI) a une scope policy `unprocessed` vs `all` parce que son pool n'est pas borné (les 404 chez HAL/OpenAlex/WoS/ScanR ne sont pas tracés → retentés à chaque run). Avec le backoff `doi_lookups`, le pool devient auto-borné et convergent : 1er pass tente tout, les 404 reçoivent `next_retry`, les passes suivantes ne retentent que ceux dont `next_retry <= NOW()`. L'asymétrie avec l'étape 1 (hal-id, déjà auto-bornée) disparaît, et la scope policy perd sa raison d'être.
+
+À traiter en Phase 2 : retirer le champ `fetch_missing_doi_scope` de `ModePolicy` et le flag `--all` du CLI [`interfaces/cli/pipeline/fetch_missing_doi.py`](../../interfaces/cli/pipeline/fetch_missing_doi.py), simplifier `phase_cross_imports`. La distinction sources (`fetch_missing_doi_sources`, qui exclut WoS hors `full` pour son quota API) reste pertinente — critère orthogonal au backoff.
 
 ## Phasage
 
-### Phase 1 — Machine à états documentée + CHECK minimal
+### Phase 1 — Machine à états documentée + CHECK minimal ✓
 
-Avant tout le reste, formaliser l'existant.
+- [x] Migration `staging_not_found_implies_processed CHECK (NOT not_found OR processed)` — migration 0015.
+- [x] `donnees` : section "Cycle de vie d'une row `staging`" (cf. [donnees/05-authorships-et-sources.md](../donnees/05-authorships-et-sources.md)).
 
-- [x] Migration : `ALTER TABLE staging ADD CONSTRAINT staging_not_found_implies_processed CHECK (NOT not_found OR processed)` (état actuel, 3 colonnes) — posée par migration 0015.
-- [x] `donnees.md` : section "Cycle de vie d'une row `staging`" avec le tableau des 3 états (cf. [donnees.md:230-257](../donnees.md#L230)).
+### Phase 2 — Backoff `not_found_at` (staging) + `doi_lookups` ✓
 
-### Phase 2 — Backoff `not_found_at` / `next_retry`
+- [x] Migration `d4e8a1f6c3b7` : `staging.not_found` → `not_found_at` (CHECK consolidé `not_found_at IS NULL OR processed`, retrait de l'index partiel `idx_staging_not_found`) ; création de `doi_lookups (source, doi, not_found_at, next_retry)`.
+- [x] Adapters natifs (`hal/fetch_missing_hal_id`, `crossref/fetch_missing_doi`) : `not_found_at` à la place de `not_found` (miss natif définitif, reste sur `staging`).
+- [x] Adapters non natifs (hal/openalex/wos/scanr `fetch_missing_doi`) : sur miss confirmé, écriture `doi_lookups` via la sentinelle partagée `not_found_marker` (port `fetch_missing_doi`) routée par `insert()` → `record_doi_not_found`. WoS ne marque que sur lot complet (pas de faux miss sur erreur transitoire ou pagination interrompue).
+- [x] `get_cross_import_dois` : exclusion `doi_lookups` (`next_retry > now()`) + retrait du filtre `processed` (pool désormais borné par le backoff, plus par `processed`).
+- [x] Retrait de `fetch_missing_doi_scope` (`ModePolicy`) et `--all` (CLI) ; simplification de `phase_cross_imports`. `tables.py` synchronisé (cible autogenerate).
+- [x] Délai = 30 j, constante `DOI_LOOKUP_RETRY_DAYS` dans `infrastructure/sources/common.py`.
+- [x] Docs : `donnees/05-authorships-et-sources.md` (états + `doi_lookups`), `pipeline/02-extract.md` (backoff).
 
-- Migration :
-  - `ADD COLUMN not_found_at TIMESTAMPTZ NULL`, `ADD COLUMN next_retry TIMESTAMPTZ NULL`
-  - Backfill : `UPDATE staging SET not_found_at = imported_at WHERE not_found = TRUE` (rows existantes traitées comme définitives, ce qu'elles sont vu la sémantique actuelle Crossref + hal-id)
-  - `DROP COLUMN not_found`
-  - Nouveau CHECK consolidé (cf. ci-dessus)
-- Code :
-  - `hal/fetch_missing_hal_id.py` : `not_found_at=NOW()`, `next_retry=NULL` (définitif)
-  - `crossref/fetch_missing_doi.py` : idem (Crossref = source native pour DOI Crossref, donc définitif)
-  - **Nouveaux INSERTs** dans `hal/fetch_missing_doi.py`, `openalex/fetch_missing_doi.py`, `wos/fetch_missing_doi.py`, `scanr/fetch_missing_doi.py` : `not_found_at=NOW(), next_retry=NOW() + INTERVAL '30 days'` (à valider : 30 jours)
-  - Adaptation de `infrastructure/sources/common.py:get_cross_import_dois` : inclure dans le pool à retenter les DOI avec `next_retry <= NOW()` (cf. requête ci-dessous)
-- Doc `pipeline.md` : clarifier le comportement du cross-import DOI avec backoff.
+### Phase 3 — Fraîcheur & disparition par refetch ciblé
 
-Requête `get_cross_import_dois` adaptée :
-
-```sql
-SELECT DISTINCT s.doi FROM staging s
-WHERE s.source != :target AND s.doi IS NOT NULL [AND s.processed = FALSE]
-  AND NOT EXISTS (
-      SELECT 1 FROM staging t
-      WHERE t.source = :target AND t.doi = s.doi
-        AND (t.not_found_at IS NULL OR t.next_retry IS NULL OR t.next_retry > NOW())
-        -- présent ET (trouvé OU définitif OU pas encore l'heure)
-  )
-```
-
-**Conséquence sur la scope policy `cross_imports`.** Aujourd'hui, l'étape 2 (DOI) a une scope policy `unprocessed` vs `all` parce que le pool de DOI à re-tenter n'est pas borné (les 404 chez HAL/OpenAlex/WoS/ScanR ne sont pas tracés → retentés à chaque run). L'étape 1 (hal-id) tourne *auto-bornée* parce que son pool est fini par construction (hal-id 404 → sort définitivement via `not_found=TRUE`).
-
-Avec le backoff de cette phase, le pool DOI devient lui aussi auto-borné et convergent : 1er pass tente tout, les 404 reçoivent `next_retry`, les passes suivantes ne retentent que ceux dont `next_retry <= NOW()`. L'asymétrie disparaît : les deux étapes deviennent auto-bornées, et la scope policy `unprocessed` vs `all` perd sa raison d'être.
-
-À traiter dans cette phase : retirer le champ `fetch_missing_doi_scope` de `ModePolicy` et le flag `--all` du CLI `interfaces/cli/pipeline/fetch_missing_doi.py`, simplifier `phase_cross_imports` en conséquence. Note : la distinction sources (`fetch_missing_doi_sources`, qui exclut WoS hors `full` pour son quota API) reste pertinente — c'est un critère orthogonal au backoff.
-
-### Phase 3 — Détection des publications disparues
-
-- Définir la politique : N runs ? N jours ? Action ?
-- Mécanisme : phase pipeline qui détecte les `staging` avec `last_seen_at` ancien sur le périmètre attendu (les modes `full`/`weekly` couvrent une plage d'années connue, donc une absence est détectable).
-- Action : à décider entre DELETE cascade, ARCHIVE (table dédiée), ou flag `disappeared_at` qui les exclut des requêtes API par défaut.
-
-### Phase 4 — Re-fetch périodique
-
-- Identifier les publications "anciennes" (cross-import non rafraîchi, métadonnées vieillissantes).
-- Stratégie de re-fetch : sur quelle clé (DOI / source_id natif) ? À quelle fréquence ? En quel mode ?
-- Probablement une nouvelle phase pipeline ou une option du fetch_missing_*.
+- [ ] Sélection : rows `staging` à `last_seen_at` ancien (seuil à définir).
+- [ ] Refetch par id natif (DOI pour Crossref / cross-imports) → succès : rafraîchit `raw_data` + bumpe `last_seen_at` ; 404 / absent : marque la disparition.
+- [ ] Action sur disparition à décider (cf. Questions ouvertes), propagée à `source_publications` et aux publications canoniques.
+- [ ] Probablement une nouvelle phase pipeline dédiée.
 
 ## Questions ouvertes
 
-**Phase 2 — `source_id` pour les not_found des cross-imports non natifs.**
-Quand HAL/OA/WoS/ScanR `fetch_missing_doi.py` insère un stub not_found pour un DOI, il faut un `source_id` (UNIQUE `(source, source_id)`). Le DOI n'est pas l'id natif de ces sources. Trois options :
-- **Préfixe convention** : `source_id = 'doi:10.1234/foo'` pour les stubs not_found. Lisible, pas de collision, à documenter.
-- **Table séparée `doi_lookups (source, doi, not_found_at, next_retry)`** : sémantiquement plus propre (ce ne sont pas vraiment des stagings — pas de payload, pas de cycle de normalisation). Un objet de plus à maintenir.
-- **Accepter la collision potentielle** : utiliser le DOI tel quel. Si plus tard la source indexe le doc sous un id natif différent, on aurait deux rows dans staging. `ON CONFLICT` ne déclenche pas (clés différentes). Nettoyage possible à la marge.
+**Phase 3 — Seuil « ancien » de `last_seen_at`.** À partir de quelle ancienneté une row entre dans le lot de refetch ? Granularité par source / par mode ? Impact sur les quotas API (notamment WoS).
 
-**Phase 2 — Délai de backoff (le `N` du `NOW() + N days`).** Le TODO original suggère 30 jours. À confirmer ou paramétrer (env var ? table `config` ?).
+**Phase 3 — Faisabilité du refetch unitaire par source.** HAL (par halId/DOI), OpenAlex (par id/DOI), Crossref (par DOI) : OK. WoS : sous quota. ScanR : à vérifier.
 
-**Phase 3 — Critère de disparition.** N runs successifs sans mise à jour de `last_seen_at` ? Période minimum en jours ? Granularité par mode (un doc visible en `full` mais pas en `weekly` n'est pas "disparu") ?
+**Phase 3 — Action sur disparition.** DELETE cascade (perte historique), table archive `staging_archived` (conservation, complexité +1), ou flag `disappeared_at` sur `staging` (la row reste mais exclue des requêtes par défaut) ? Idem côté `source_publications` et publications canoniques.
 
-**Phase 3 — Action sur disparition.** DELETE cascade (perte historique), table archive `staging_archived` (conservation, complexité +1), flag `disappeared_at` sur staging (la row reste mais exclue des requêtes par défaut) ? Idem côté `source_publications` et publications canoniques.
-
-**Phase 4 — Stratégie de re-fetch.** Re-fetch tous les K mois ? Re-fetch quand `last_seen_at` est ancien ? Quel impact sur les quotas API (notamment WoS) ?
-
-**Cohabitation avec le statut OA via Unpaywall.** Aujourd'hui `enrich_oa_status` rafraîchit le statut OA depuis Unpaywall pour les publis sans statut. Le re-fetch périodique pourrait soit le compléter (re-fetch toutes les métadonnées en plus du statut OA), soit s'aligner sur la même fréquence pour limiter les appels API.
-
-Note extraite du chantier "couverture-tests":
-- **Fonction de coût de l'aiguillage HAL `extract_collection`.** Une fois la branche choisie pinée par test (Phase 1, décision 1bis), l'heuristique actuelle (`len(orphans) < full_fetch_pages`) reste insatisfaisante : elle compte les requêtes mais ignore la taille de payload, ce qui sur les requêtes umbrella (PRES_UCA) inverse le bon choix. Pistes à arbitrer : (a) borne dure sur les orphelins (« si `orphans < N`, toujours individuel »), (b) cost function pondérée payload (poids par source via `hal_per_page_for`), (c) compteur empirique sur les derniers runs. Décision distincte de l'extraction `parsing.py`, à ouvrir une fois les tests posés.
+**Phase 3 — Cohabitation avec le statut OA Unpaywall.** `enrich_oa_status` rafraîchit déjà le statut OA depuis Unpaywall pour les publis sans statut. Le refetch ciblé pourrait le compléter (rafraîchir toutes les métadonnées) ou s'aligner sur la même fréquence pour limiter les appels API.

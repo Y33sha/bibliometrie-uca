@@ -29,6 +29,7 @@ from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.fetch_missing_doi import (
     AsyncFetchMissingDoiAdapter,
     CrossImportDoisReader,
+    is_not_found_marker,
 )
 
 __all__ = ["AsyncFetchMissingDoiAdapter", "CrossImportDoisReader", "run_async"]
@@ -40,7 +41,6 @@ async def run_async(
     log: logging.Logger,
     *,
     cross_import_dois_reader: CrossImportDoisReader,
-    all_staged: bool = False,
     dry_run: bool = False,
     limit: int | None = None,
 ) -> PhaseMetrics:
@@ -52,24 +52,29 @@ async def run_async(
     `asyncio.to_thread` et sérialisés par un `asyncio.Lock` (la
     `Connection` SA sync n'est pas thread-safe).
 
+    Un DOI confirmé absent par la source (réponse vide / 404) revient
+    sous forme de sentinelle `not_found_marker` que `insert()` route vers
+    le backoff (`doi_lookups` pour les sources non natives, stub `staging`
+    pour Crossref). Ces sentinelles sont comptées séparément (`not_found`)
+    et exclues de `fetched`.
+
     Args:
         conn: `Connection` SA ouverte.
         adapter: instance source-spécifique async.
         log: logger.
         cross_import_dois_reader: callable qui lit en base les DOI
             présents dans d'autres sources et absents de la cible.
-        all_staged: si False, ne considère que les DOI issus de rows
-            `processed=FALSE` dans les autres sources.
         dry_run: compte et log sans fetch ni insert.
         limit: nombre max de DOI à traiter.
 
     Returns:
         `PhaseMetrics` : `total` = DOI traités, `new` = inserts effectifs,
-        `extras["fetched"]` = records reçus de l'API.
+        `extras["fetched"]` = records reçus de l'API, `extras["not_found"]`
+        = DOI confirmés absents (backoff enregistré).
     """
     adapter.configure(conn)
 
-    dois = cross_import_dois_reader(conn, adapter.source_key, all_staged)
+    dois = cross_import_dois_reader(conn, adapter.source_key)
     log.info("%d DOI manquants pour %s", len(dois), adapter.source_key)
 
     if limit:
@@ -90,7 +95,7 @@ async def run_async(
     # Sérialise les inserts : la `Connection` SA sync n'est pas thread-safe,
     # or `asyncio.to_thread` exécute dans un ThreadPoolExecutor partagé.
     db_lock = asyncio.Lock()
-    progress = {"processed": 0, "fetched": 0, "inserted": 0}
+    progress = {"processed": 0, "fetched": 0, "inserted": 0, "not_found": 0}
 
     async with httpx.AsyncClient() as client:
         request_delay = getattr(adapter, "request_delay_s", 0.0)
@@ -105,7 +110,12 @@ async def run_async(
                 if request_delay:
                     await asyncio.sleep(request_delay)
 
-            progress["fetched"] += len(records)
+            # Les sentinelles `not_found` ne sont pas des records API : on les
+            # compte à part, mais on les `insert()` quand même (l'adapter les
+            # route vers le backoff `doi_lookups` / le stub `staging`).
+            real = [r for r in records if not is_not_found_marker(r)]
+            progress["fetched"] += len(real)
+            progress["not_found"] += len(records) - len(real)
             for record in records:
                 try:
                     async with db_lock:
@@ -119,25 +129,30 @@ async def run_async(
             if progress["processed"] % 100 == 0 or progress["processed"] >= total:
                 duplicates = progress["fetched"] - progress["inserted"]
                 log.info(
-                    "  %d/%d — %d records (%d nouveaux, %d doublons)",
+                    "  %d/%d — %d records (%d nouveaux, %d doublons, %d not-found)",
                     progress["processed"],
                     total,
                     progress["fetched"],
                     progress["inserted"],
                     duplicates,
+                    progress["not_found"],
                 )
 
         await asyncio.gather(*(process_batch(b, i) for i, b in enumerate(batches)))
 
     duplicates = progress["fetched"] - progress["inserted"]
     log.info(
-        "Terminé %s : %d DOI interrogés, %d records (%d nouveaux, %d doublons déjà en staging)",
+        "Terminé %s : %d DOI interrogés, %d records (%d nouveaux, %d doublons déjà en staging),"
+        " %d not-found (backoff)",
         adapter.source_key,
         total,
         progress["fetched"],
         progress["inserted"],
         duplicates,
+        progress["not_found"],
     )
     return PhaseMetrics(
-        total=total, new=progress["inserted"], extras={"fetched": progress["fetched"]}
+        total=total,
+        new=progress["inserted"],
+        extras={"fetched": progress["fetched"], "not_found": progress["not_found"]},
     )

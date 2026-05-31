@@ -15,7 +15,11 @@ import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from infrastructure.sources.common import compute_hash
+from application.ports.pipeline.extract.fetch_missing_doi import (
+    is_not_found_marker,
+    not_found_marker,
+)
+from infrastructure.sources.common import compute_hash, record_doi_not_found
 from infrastructure.sources.config import (
     get_api_base_urls,
     get_openalex_api_key,
@@ -73,9 +77,18 @@ class OpenalexFetchMissingDoiAdapter:
             )
         except httpx.RequestError:
             return []
-        return data.get("results", [])[:1]
+        results = data.get("results", [])
+        if not results:
+            # Réponse OpenAlex valide, zéro résultat : DOI confirmé absent.
+            return [not_found_marker(doi)]
+        return results[:1]
 
     def insert(self, conn: Connection, record: dict) -> bool:
+        if is_not_found_marker(record):
+            record_doi_not_found(conn, "openalex", record["_doi"])
+            conn.commit()
+            return False
+
         result = conn.execute(
             _INSERT_OA_SQL,
             {

@@ -10,7 +10,7 @@ client + bursts).
 
 Usage :
     python -m interfaces.cli.pipeline.fetch_missing_doi --target hal
-    python -m interfaces.cli.pipeline.fetch_missing_doi --target openalex --all
+    python -m interfaces.cli.pipeline.fetch_missing_doi --target openalex
     python -m interfaces.cli.pipeline.fetch_missing_doi --target wos --dry-run
     python -m interfaces.cli.pipeline.fetch_missing_doi --target scanr --limit 100
 """
@@ -55,11 +55,6 @@ ADAPTERS: dict[str, type[AsyncFetchMissingDoiAdapter]] = cast(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch des DOI manquants dans une source cible")
     parser.add_argument("--target", choices=sorted(ADAPTERS.keys()), required=True)
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Considérer tout le staging (sinon, uniquement processed=FALSE)",
-    )
     parser.add_argument("--dry-run", action="store_true", help="Compter sans fetch/insert")
     parser.add_argument("--limit", type=int, help="Nombre max de DOI à traiter")
     args = parser.parse_args()
@@ -73,7 +68,6 @@ def main() -> None:
                 adapter,
                 logger,
                 cross_import_dois_reader=get_cross_import_dois,
-                all_staged=args.all,
                 dry_run=args.dry_run,
                 limit=args.limit,
             )

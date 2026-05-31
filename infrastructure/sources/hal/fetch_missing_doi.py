@@ -16,7 +16,11 @@ import httpx
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from infrastructure.sources.common import compute_hash
+from application.ports.pipeline.extract.fetch_missing_doi import (
+    is_not_found_marker,
+    not_found_marker,
+)
+from infrastructure.sources.common import compute_hash, record_doi_not_found
 from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
@@ -79,9 +83,17 @@ class HalFetchMissingDoiAdapter:
         except (httpx.RequestError, httpx.HTTPStatusError):
             return []
         docs = data.get("response", {}).get("docs", [])
+        if not docs:
+            # Réponse Solr valide, zéro doc : DOI confirmé absent de HAL.
+            return [not_found_marker(doi)]
         return docs[:1]
 
     def insert(self, conn: Connection, record: dict) -> bool:
+        if is_not_found_marker(record):
+            record_doi_not_found(conn, "hal", record["_doi"])
+            conn.commit()
+            return False
+
         hal_id = record.get("halId_s")
         if isinstance(hal_id, list):
             hal_id = hal_id[0] if hal_id else None
