@@ -1,5 +1,7 @@
 # Stockage des données brutes (raw store)
 
+Terminé le 2026-05-31
+
 ## Objectif
 
 Conserver les payloads JSON bruts renvoyés par les APIs sources (HAL, OpenAlex, WoS, ScanR, theses.fr, Crossref) dans un store externe à la BDD, pour :

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict rIbwaeVxmbd4bcHfotGViDrOuMwDYsVeP34439UjWdtcjIe0HWNgwdR9oSavq6S
+\restrict uqe6EbVFxuPNuDxpRd0Rk8MrKQKxxSd0xX6PkwH9n8tWhUqEnuoiqDqh19mcCYd
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped from database version 18.1
+-- Dumped by pg_dump version 18.1
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -573,6 +573,18 @@ CREATE SEQUENCE public.distinct_publications_id_seq
 --
 
 ALTER SEQUENCE public.distinct_publications_id_seq OWNED BY public.distinct_publications.id;
+
+
+--
+-- Name: doi_lookups; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.doi_lookups (
+    source public.source_type NOT NULL,
+    doi text NOT NULL,
+    not_found_at timestamp with time zone NOT NULL,
+    next_retry timestamp with time zone NOT NULL
+);
 
 
 --
@@ -1147,9 +1159,10 @@ CREATE TABLE public.staging (
     imported_at timestamp with time zone DEFAULT now(),
     raw_hash text,
     last_seen_at timestamp with time zone DEFAULT now(),
-    not_found boolean DEFAULT false,
     hal_collections text[],
-    CONSTRAINT staging_not_found_implies_processed CHECK (((NOT not_found) OR processed))
+    not_found_at timestamp with time zone,
+    disappeared_at timestamp with time zone,
+    CONSTRAINT staging_not_found_at_implies_processed CHECK (((not_found_at IS NULL) OR processed))
 );
 
 
@@ -1658,6 +1671,14 @@ ALTER TABLE ONLY public.distinct_publications
 
 ALTER TABLE ONLY public.distinct_publications
     ADD CONSTRAINT distinct_publications_pub_id_a_pub_id_b_key UNIQUE (pub_id_a, pub_id_b);
+
+
+--
+-- Name: doi_lookups doi_lookups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.doi_lookups
+    ADD CONSTRAINT doi_lookups_pkey PRIMARY KEY (source, doi);
 
 
 --
@@ -2447,13 +2468,6 @@ CREATE INDEX idx_staging_doi ON public.staging USING btree (doi) WHERE (doi IS N
 
 
 --
--- Name: idx_staging_not_found; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_staging_not_found ON public.staging USING btree (source, source_id) WHERE (not_found = true);
-
-
---
 -- Name: idx_staging_processed; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2493,6 +2507,13 @@ CREATE INDEX idx_structure_name_forms_structure ON public.structure_name_forms U
 --
 
 CREATE INDEX idx_structures_type ON public.structures USING btree (structure_type);
+
+
+--
+-- Name: idx_subjects_oa_label_lower; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_subjects_oa_label_lower ON public.subjects USING btree (lower(label)) WHERE (ontologies ? 'openalex_topic'::text);
 
 
 --
@@ -2892,4 +2913,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict rIbwaeVxmbd4bcHfotGViDrOuMwDYsVeP34439UjWdtcjIe0HWNgwdR9oSavq6S
+\unrestrict uqe6EbVFxuPNuDxpRd0Rk8MrKQKxxSd0xX6PkwH9n8tWhUqEnuoiqDqh19mcCYd

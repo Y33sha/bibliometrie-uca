@@ -1,6 +1,6 @@
 # Vue d'ensemble
 
-*Document à jour au 2026-05-26.*
+*Document à jour au 2026-05-31.*
 
 Ce fichier présente la logique du pipeline de traitement. Pour les modalités d'exécution, voir [Guide d'exploitation](../exploitation/04-pipeline.md).
 
@@ -10,6 +10,7 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 
 - [Moissonnage initial](02-extract.md) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
 - [Imports croisés](02-extract.md#cross-imports) : deux mécanismes de rattrapage cross-source enchaînés — (1) docs HAL manquants repérés par hal-id ou NNT dans d'autres sources, (2) recherche par DOI des records absents d'une source mais présents dans une autre.
+- [Refresh & disparitions](02-extract.md#refresh-stale) : refetch des documents à `last_seen_at` ancien (> 90 j) — rafraîchit les métadonnées vieillissantes et marque (`disappeared_at`) ceux qui ont disparu de leur source.
 
 ## Normalisation
 
