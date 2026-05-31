@@ -21,12 +21,11 @@
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis
-* [ ] vérifier qu'il n'y a pas d'autres divergences Python↔SQL au-delà du œ (la docstring de normalize.py prétend l'alignement, le œ montre que c'est pas vrai).
+* [ ] vérifier qu'il n'y a pas d'autres divergences Python↔SQL au-delà du œ (fonction normalize text).
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup de résultats ScanR sont rejetés en phase "affiliations" => auditer
 * [ ] normalisation des titres: supprimer les balises mml ou html
-* [ ] openalex raw_orcid
 * [ ] données supplémentaires: peer-reviewed? publié?
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
 * [ ] re-seeder les doi_prefix journals
@@ -65,9 +64,7 @@
 * [ ] signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?)
 * [ ] publications: indiquer si premier/dernier auteur
 ### Publications
-* [ ] filtre langue? (y a-t-il un code langue unique trans-sources? sinon, faire une table langues)
-* [ ] ajouter une facette DOI
-* [ ] ajouter filtre corresponding_is_uca?
+* [ ] Filtres supplémentaires possibles: langue; has_doi; corresponding_is_in_perimeter; (peer_reviewed? suppose de posséder la donnée ou de pouvoir la déduire des sources)
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
 * [ ] afficher mémoires master et thèses en cours sur liste publications de la page personnes/id
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
@@ -93,7 +90,6 @@
 * http://localhost:5176/bibliometrie/publications/133184 : 2 entrées "theses.fr", dont l'une redirige vers l'autre
 * sujets: cooccurrences calculées sur publications, ou sur source_publications? idem nombre d'occurrences (ex.: sujet vaches laitières, 10 occurrences annoncées, 2 publications affichées)
 * thèses 160226 et 132778 non fusionnées
-* filtre sources: ne tient pas compte des SP hors périmètre
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier

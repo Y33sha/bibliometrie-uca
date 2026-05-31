@@ -21,8 +21,8 @@ flowchart LR
 
 **Gestion des changements**:
 - Chaque *record* est hashé (MD5) pour détecter les changements lors des réexécutions. Une publication dont les métadonnées ont changé sera ré-importée et re-traitée.
-- Même sans changement, la colonne `last_seen_at` documente la dernière date où une publication a été détectée par le script d'import.
-> En cas de disparition d'une publication dans les sources (par ex. dédoublonnage dans HAL), cette colonne permettra de détecter les suppressions et de nettoyer la base. Rien n'est en place pour l'instant. Chantier en cours: `DATA_cycle-vie-staging.md`
+- Même sans changement, la colonne `last_seen_at` est bumpée à chaque fois qu'un doc est re-vu (moisson bulk ou refetch).
+> Une publication qui cesse d'apparaître dans sa source (par ex. dédoublonnage dans HAL) est détectée puis confirmée par la phase [Refresh & disparitions](#refresh-stale), qui pose un marqueur `disappeared_at`.
 
 **Cas particulier**:
 
@@ -43,3 +43,14 @@ Pour chaque source cible (OpenAlex, HAL, WoS, ScanR, Crossref), recherche par DO
 <!--TODO: nommage incohérent: fetch_missing_hal_id cherche nnt-->
 
 **Les deux étapes sont auto-bornées et convergentes.** Le pool de hal-ids/NNT à re-tenter est fini par construction (un hal-id 404 sort définitivement via `not_found_at`, HAL étant source native). Le pool de DOI l'est aussi grâce au backoff : un DOI absent d'une source *non native* (HAL/OpenAlex/WoS/ScanR) est enregistré dans `doi_lookups` avec `next_retry = now() + 30 jours` ; `get_cross_import_dois` ne le ressort qu'une fois ce délai écoulé. Le 1er pass tente tout, les passes suivantes ne reprennent que les nouveaux DOI et ceux dont le backoff a expiré.
+
+
+## Refresh & disparitions {#refresh-stale}
+
+Phase `refresh_stale`, enchaînée après les imports croisés, **à chaque run**. Elle rafraîchit les documents dont la dernière vue (`last_seen_at`) dépasse `STALE_REFRESH_AFTER_DAYS` (90 j) et détecte les disparitions.
+
+Pour chaque DOI stale, refetch via l'adapter `fetch_missing_doi` de sa source : trouvé → `raw_data` rafraîchi (re-traité si le hash a changé) + `last_seen_at` bumpé ; 404 confirmé → `disappeared_at` posé ; erreur transitoire → laissé, re-tenté plus tard. Les rows stale **sans DOI** (non refetchables, mais re-moissonnées par le bulk) sont marquées disparues directement.
+
+Tournant à chaque run, le seuil étale la charge : une passe ne ramasse que ce qui vient de franchir 90 j. La fenêtre fixe du mode `full` (rétention cumulative) garde la plupart des natifs frais via le bulk, donc le lot stale reste petit (cross-imports + natifs réellement disparus). Pas de filtre par source : sous cadence normale theses et wos ne deviennent jamais stale.
+
+`disappeared_at` est pour l'instant un **marqueur seul** — aucune suppression / exclusion / propagation en aval (à décider plus tard sur cas concrets).

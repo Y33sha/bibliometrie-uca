@@ -1,5 +1,7 @@
 # Cycle de vie des rows `staging` : machine à états, backoff, fraîcheur
 
+Terminé le 2026-05-31
+
 ## Contexte
 
 Le cycle de vie d'une row dans `staging` (et des entités dérivées qu'elle alimente, `source_publications` + `source_authorships`) est aujourd'hui implicite : plusieurs mécanismes ad-hoc, sans doctrine unifiée. Trois préoccupations connectées sont apparues dans l'audit de modélisation :
