@@ -38,6 +38,7 @@ class MetadataCorrectionRule(StrEnum):
     TITLE_RETRACTION_PREFIX_TO_RETRACTION = "TITLE_RETRACTION_PREFIX_TO_RETRACTION"
     TITLE_ISBN_TO_BOOK_REVIEW = "TITLE_ISBN_TO_BOOK_REVIEW"
     TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW = "TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW"
+    DOI_FIGSHARE_COLLECTION_TO_DATASET = "DOI_FIGSHARE_COLLECTION_TO_DATASET"
 
 
 class Correction[T](NamedTuple):
@@ -104,6 +105,7 @@ class _AppliesTo(TypedDict, total=False):
     - ``doc_type`` : `str` (équivalence après lowercase) ou `frozenset[str]` (appartenance après lowercase). Whitelist : limite la règle aux types bruts plausibles, épargne les types-référents (thesis, book, …).
     - ``journal_type`` : `str` — équivalence sur `sp.journal_type` (champ joint depuis `journals`).
     - ``url_contains`` : `str` — substring présente dans au moins une des `sp.urls`.
+    - ``doi_contains`` : `str` — substring présente dans `sp.doi` (DOIs stockés en minuscules).
     - ``title_prefix_normalized`` : `tuple[str, ...]` — `normalize_text(sp.title)` commence par au moins un préfixe du tuple.
     - ``title_regex`` : `re.Pattern[str]` — `pattern.search(sp.title)` matche.
 
@@ -113,6 +115,7 @@ class _AppliesTo(TypedDict, total=False):
     doc_type: str | frozenset[str]
     journal_type: str
     url_contains: str
+    doi_contains: str
     title_prefix_normalized: tuple[str, ...]
     title_regex: re.Pattern[str]
 
@@ -172,6 +175,14 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
             "title_prefix_normalized": _MEDIA_TITLE_PREFIXES,
         },
         "applies_correction": {"doc_type": "media"},
+    },
+    # Collection figshare (`10.6084/m9.figshare.c.<id>` — le `.c.` marque un bundle de suppléments, vs un item `m9.figshare.<id>`) + doc_type ∈ {article, other} ⇒ `dataset`. Le titre d'une collection = le titre du papier parent, donc inattrapable par la règle titre supplément → discrimination par DOI. Fallback hardcodé ; une détection RA DataCite (figshare-as-client) généraliserait aux instances figshare sous d'autres préfixes.
+    MetadataCorrectionRule.DOI_FIGSHARE_COLLECTION_TO_DATASET: {
+        "applies_to": {
+            "doc_type": frozenset({"article", "other"}),
+            "doi_contains": "m9.figshare.c.",
+        },
+        "applies_correction": {"doc_type": "dataset"},
     },
     # Titre suppléments / données complémentaires + doc_type ∈ {article, other} ⇒ `dataset`. DataCite et certaines plateformes (Dryad, Zenodo, IFREMER) exposent les fichiers complémentaires comme entités à part. `dataset` lui-même exclu (no-op naturel).
     MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET: {
@@ -241,6 +252,9 @@ def _check_predicate(sp: SourcePublicationWithJournalView, key: str, value: obje
     if key == "url_contains":
         assert isinstance(value, str)
         return any(value in (u or "") for u in sp.urls)
+    if key == "doi_contains":
+        assert isinstance(value, str)
+        return value in (sp.doi or "")
     if key == "title_prefix_normalized":
         assert isinstance(value, tuple)
         if not sp.title:
