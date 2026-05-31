@@ -10,16 +10,14 @@ en attente de normalisation) et écrit chaque payload sous
 de fichiers (`/` dans les IDs ScanR, `:` dans les IDs WoS). Le décodage
 est trivial via `urllib.parse.unquote`.
 
-Écrase systématiquement si le fichier cible existe (cohérent avec la
-décision du chantier DATA_raw-data-store : pas de versionnage).
+Écrase systématiquement si le fichier cible existe (pas de versionnage).
 
 Usage :
-    python -m interfaces.cli.oneshot.dump_staging_raw_to_local [--dry-run]
+    python -m interfaces.cli.maintenance.dump_staging_raw_to_local [--dry-run]
 
 Lancement attendu : une fois, juste après un `extract` et avant un
-`normalize` (qui vide `raw_data`). Une fois l'intégration `RawStore`
-côté extracteurs en place (Phase 4 du chantier), ce script devient
-obsolète.
+`normalize` (qui vide `raw_data`). Devient obsolète quand l'écriture vers
+le raw store sera intégrée aux extracteurs.
 """
 
 from __future__ import annotations
