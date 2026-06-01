@@ -39,11 +39,12 @@ Une partie de la valeur est la **maintenabilité** : aujourd'hui beaucoup de **c
 
 ## Phasage
 
-### Phase 1 — Inventaire classifié (le livrable principal)
+### Phase 1 — Inventaire classifié
 
-Lister **tout** le dérivé (tables et colonnes), et pour chacun remplir : source (dérivé de quoi), pur ou +natif, coût on-read, chaleur, verdict provisoire, à-benchmarker (oui/non).
+- [x] Balayage et classification A/B/C des 36 tables du schéma
+- [x] Alignement `normalize_name_form` SQL ↔ `normalize_text` Python — préalable pour instruire le verdict `GENERATED` sur les `*_normalized` (cf. migration `b2d4e7a1c8f3` + filet de non-régression [`tests/integration/test_normalize_alignment_python_sql.py`](../../tests/integration/test_normalize_alignment_python_sql.py))
 
-Inventaire (balayage des 36 tables du schéma à jour), en trois catégories. Verdicts **provisoires** ; les « nature » sont déduites du schéma + de la connaissance du pipeline, quelques-unes restent à confirmer dans le code populateur.
+Inventaire en trois catégories. Pour chaque artefact : source (dérivé de quoi), pur ou +natif, coût on-read, chaleur, verdict. Les verdicts orientent les sous-chantiers de Phase 2, ils ne sont pas figés.
 
 **A. Dérivé interne — candidats vue / vue matérialisée** (purement dérivé de nos propres données) :
 
@@ -65,7 +66,7 @@ Inventaire (balayage des 36 tables du schéma à jour), en trois catégories. Ve
 | `source_authorship_structures` | dérivation = **matching adresse→structure** (coûteux), pas un JOIN |
 | `*.in_perimeter` (`authorships`, `source_authorships`) | chemin chaud (filtrage listings/facettes/stats) → **sous-chantier perimeter** |
 | `source_authorships.{person_id, authorship_id}` | colonnes bolt-on (résultats de matching) sur une table source |
-| colonnes `*_normalized` (`publications.title`, `persons.*`, `journals.title`, `publishers.name`, `source_authorships.author_name`, `addresses.normalized_text`) | peuplées par `normalize_text` (**Python**) à l'INSERT/UPDATE. `normalize_name_form` SQL est alignée sur Python ; `GENERATED ALWAYS AS (normalize_name_form(...))` est désormais techniquement possible. Tradeoff à instruire par sous-chantier : statu quo (Python = souplesse d'évolution) vs `GENERATED` (cohérence garantie, simplifie le pipeline) |
+| colonnes `*_normalized` (`publications.title`, `persons.*`, `journals.title`, `publishers.name`, `source_authorships.author_name`, `addresses.normalized_text`) | peuplées par `normalize_text` (**Python**) à l'INSERT/UPDATE. `normalize_name_form` SQL est alignée sur Python ; `GENERATED ALWAYS AS (normalize_name_form(...))` est techniquement possible. Tradeoff à instruire par sous-chantier : statu quo (Python = souplesse d'évolution) vs `GENERATED` (cohérence garantie, simplifie le pipeline) |
 
 **C. Hors scope** (pas du dérivé interne dupliquant nos données) :
 
@@ -73,13 +74,16 @@ Inventaire (balayage des 36 tables du schéma à jour), en trois catégories. Ve
 - **Config de matching** : `structure_name_forms` (`is_excluding`, `requires_context_of` = règles admin), `journal_name_forms` / `publisher_name_forms` (formes observées, semi-dérivées), `country_name_forms` (seed).
 - **État natif / décisions manuelles** (jamais dérivé — ce sont des **inputs**) : `distinct_persons`, `distinct_publications`, `*.excluded`, `*.rejected`, `person_identifiers.status`, `address_structures.is_confirmed`, `persons_rh`, `apc_payments`, `config`, `perimeters`, `staging`, `source_publications`/`source_authorships` (trace source inviolable).
 
-**Conclusion de l'inventaire** : l'opportunité « vue/matview » est **étroite**, concentrée sur les **agrégats purs** (catégorie A — surtout `subject_cooccurrences` et les `count`). Le gros du dérivé doit rester matérialisé pour de bonnes raisons (état natif inséparable, dérivation = matching coûteux, ou chemin chaud). Ça **confirme qu'il ne faut pas présupposer « vue = mieux »**. Conversions à vrai gain net à instruire en priorité : (1) `subject_cooccurrences` + `subjects.usage_count` en matview (retire du code de recalcul, agrégats peu coûteux à rafraîchir) ; (2) le cas périmètre (sous-chantier dédié, conditionné au benchmark). Le reste : statu quo assumé.
+**Synthèse** : l'opportunité « vue/matview » est **étroite**, concentrée sur les **agrégats purs** (catégorie A — surtout `subject_cooccurrences` et les `count`). Le gros du dérivé reste matérialisé pour de bonnes raisons (état natif inséparable, dérivation = matching coûteux, ou chemin chaud). Pas de présupposé « vue = mieux ».
 
 ### Phase 2 — Conversions ciblées (sous-chantiers)
 
-Seulement là où le gain est net. Chaque conversion = un sous-chantier dédié (migration + adaptation des call-sites + tests + éventuel hook de refresh). Les cas perf-sensibles passent par un **benchmark sur la vraie base** d'abord.
+Chaque conversion = un sous-chantier dédié (migration + adaptation des call-sites + tests + éventuel hook de refresh). Les cas perf-sensibles passent par un **benchmark sur la vraie base** d'abord.
 
-- [`DATA_perimeter-materialise`](DATA_perimeter-materialise.md) en **standby** : réactivable comme sous-chantier si l'audit valide la matérialisation de `perimeter_structures` et/ou la suppression de `in_perimeter`.
+- [ ] Matview `subject_cooccurrences` + recompute déclaratif de `subjects.usage_count` — cas le plus net (agrégats purs, retire le code impératif de la phase `cooccurrences`, peu coûteux à rafraîchir)
+- [ ] Verdict `GENERATED` vs Python pour les colonnes `*_normalized` — peser cohérence garantie (SQL) contre souplesse d'évolution (Python). Prérequis levé.
+- [ ] Benchmark `authorship_structures` en vue vs colonne maintenue — chemin chaud filtrage périmètre, à mesurer avant tranche
+- [ ] [`DATA_perimeter-materialise`](DATA_perimeter-materialise.md) — réactivable comme sous-chantier si l'audit valide la matérialisation de `perimeter_structures` et/ou la suppression de `in_perimeter`
 
 ## Questions ouvertes
 
