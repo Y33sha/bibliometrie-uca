@@ -33,20 +33,11 @@ class BatchAssignOrphanAuthorships(BaseModel):
     person_id: int
 
 
-class ExcludeSourceAuthorship(BaseModel):
-    excluded: bool = True
-
-
 # ----- Réponses mutations (construites par le router) -----
 
 
 class AuthorshipExcludeResponse(BaseModel):
     id: int
-    excluded: bool
-
-
-class ExcludeSourceAuthorshipResponse(BaseModel):
-    ok: bool
     excluded: bool
 
 

@@ -53,7 +53,6 @@ def _create_sa(
     author_position=0,
     person_id=None,
     in_perimeter=True,
-    excluded=False,
     author_name_normalized=None,
     raw_author_name="X",
     roles=None,
@@ -62,9 +61,9 @@ def _create_sa(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 person_id, in_perimeter, excluded, author_name_normalized, raw_author_name,
+                 person_id, in_perimeter, author_name_normalized, raw_author_name,
                  roles)
-            VALUES (:src, :sd, :pos, :pid, :inp, :excl, :anf, :raw,
+            VALUES (:src, :sd, :pos, :pid, :inp, :anf, :raw,
                     COALESCE(:roles, ARRAY['author']::text[]))
             RETURNING id
         """),
@@ -74,7 +73,6 @@ def _create_sa(
             "pos": author_position,
             "pid": person_id,
             "inp": in_perimeter,
-            "excl": excluded,
             "anf": author_name_normalized,
             "raw": raw_author_name,
             "roles": roles,

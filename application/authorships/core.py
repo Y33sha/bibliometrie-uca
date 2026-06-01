@@ -15,8 +15,7 @@ from application.audit import emit_event
 from application.ports.pipeline.perimeter import PerimeterQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
-from domain.errors import NotFoundError, ValidationError
-from domain.sources import ALL_SOURCES_SET as VALID_SOURCES
+from domain.errors import NotFoundError
 from domain.types import JsonValue
 
 
@@ -51,62 +50,6 @@ def exclude_authorship(
         {"person_id": person_id},
     )
     return result
-
-
-def set_source_authorship_excluded(
-    source_authorship_id: int,
-    source: str,
-    excluded: bool,
-    *,
-    repo: AuthorshipRepository,
-    audit_repo: AuditRepository | None = None,
-) -> None:
-    """Marque ou démarque une authorship source comme exclue.
-
-    Si `excluded=True`, détache aussi la FK vers l'authorship canonique et
-    supprime cette dernière si plus aucune source non-exclue ne l'atteste.
-
-    Lève ValidationError si la source n'est pas reconnue.
-    Lève NotFoundError si l'authorship source n'existe pas.
-    """
-    if source not in VALID_SOURCES:
-        raise ValidationError(f"Source inconnue : {source}")
-
-    if not repo.set_source_authorship_excluded(source_authorship_id, source, excluded):
-        raise NotFoundError(f"Authorship source {source}:{source_authorship_id} introuvable")
-
-    if excluded:
-        detach_source(source_authorship_id, source, repo=repo)
-
-    emit_event(
-        audit_repo,
-        "source_authorship.excluded",
-        "source_authorship",
-        source_authorship_id,
-        {"source": source, "excluded": excluded},
-    )
-
-
-def detach_source(source_authorship_id: int, source: str, *, repo: AuthorshipRepository) -> bool:
-    """Détache une authorship source de son authorship canonique.
-    Si plus aucune source ne l'atteste, supprime l'authorship canonique.
-
-    Retourne True si l'authorship canonique a été supprimée, False sinon.
-    Lève ValidationError si la source n'est pas reconnue.
-    """
-    if source not in VALID_SOURCES:
-        raise ValidationError(f"Source inconnue : {source}")
-
-    authorship_id = repo.get_authorship_id_for_source(source_authorship_id, source)
-    if not authorship_id:
-        return False
-
-    repo.clear_source_authorship_fk(source_authorship_id, source)
-
-    if not repo.has_active_source_attestation(authorship_id):
-        repo.delete_authorship(authorship_id)
-        return True
-    return False
 
 
 def propagate_uca_for_addresses(

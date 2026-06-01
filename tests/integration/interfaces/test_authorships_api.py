@@ -2,7 +2,6 @@
 
 Couvre :
 - PATCH /api/authorships/{id}/exclude
-- POST /api/source-authorships/{src}/{id}/exclude
 - GET / POST /api/admin/orphan-authorships/*
 
 Stratégie : seed minimal via un pool dédié (hors pool API), ids uniques par
@@ -146,23 +145,6 @@ class TestToggleAuthorshipExcluded:
         r = auth_client.patch(f"/api/authorships/{aid}/exclude")
         assert r.status_code == 200
         assert "excluded" in r.json()
-
-
-# ── POST /api/source-authorships/{src}/{id}/exclude ─────────────
-
-
-class TestExcludeSourceAuthorship:
-    def test_requires_admin(self, client):
-        r = client.post("/api/source-authorships/hal/1/exclude", json={"excluded": True})
-        assert r.status_code == 401
-
-    def test_ok(self, auth_client):
-        sa = _seed_source_authorship(source="hal")
-        r = auth_client.post(f"/api/source-authorships/hal/{sa}/exclude", json={"excluded": True})
-        assert r.status_code == 200
-        body = r.json()
-        assert body["ok"] is True
-        assert body["excluded"] is True
 
 
 # ── Orphan authorships ──────────────────────────────────────────

@@ -67,15 +67,15 @@ class PublicationsMatchOrCreateQueries(Protocol):
     ) -> tuple[str, str] | None: ...
 
     def fetch_source_authorship_count(self, conn: Connection, source_publication_id: int) -> int:
-        """Compte les `source_authorships` non-excluded d'un `source_publication`."""
+        """Compte les `source_authorships` d'un `source_publication`."""
         ...
 
     def fetch_max_source_authorship_count_per_publication(
         self, conn: Connection, publication_id: int
     ) -> int:
         """Pour une publication canonique, retourne le `MAX` du nombre de
-        `source_authorships` non-excluded par source (chaque source rapporte
-        sa propre liste ; on retient la plus complète).
+        `source_authorships` par source (chaque source rapporte sa propre
+        liste ; on retient la plus complète).
         """
         ...
 

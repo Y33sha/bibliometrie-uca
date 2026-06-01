@@ -64,7 +64,6 @@ def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
             FROM source_authorships sa
             WHERE sa.source = 'hal'
               AND sa.person_id = :pid
-              AND NOT sa.excluded
               AND sa.person_identifiers->>'hal_person_id' IS NOT NULL
             GROUP BY sa.person_identifiers->>'hal_person_id'
         """),

@@ -242,7 +242,6 @@ class SourceAuthorshipOut(BaseModel):
     in_perimeter: bool
     structure_ids: list[int] | None
     raw_affiliation: str | None = None
-    excluded: bool
     countries: list[str] | None
 
 

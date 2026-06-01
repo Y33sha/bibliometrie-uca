@@ -38,7 +38,6 @@ class SourceAuthorship:
     raw_author_name: str | None = None
     author_name_normalized: str | None = None
     in_perimeter: bool = False
-    excluded: bool = False
     is_corresponding: bool = False
     roles: tuple[str, ...] = ("author",)
     structure_ids: tuple[int, ...] = ()

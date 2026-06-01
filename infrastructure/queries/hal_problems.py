@@ -49,8 +49,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                        sd.doc_type AS hal_doc_type,
                        sd.pub_year AS hal_pub_year, sd.title AS hal_title,
                        (SELECT COUNT(*) FROM source_authorships sa2
-                        WHERE sa2.source = 'hal' AND sa2.source_publication_id = sd.id
-                          AND NOT sa2.excluded) AS author_count
+                        WHERE sa2.source = 'hal' AND sa2.source_publication_id = sd.id) AS author_count
                 FROM source_publications sd
                 WHERE sd.publication_id = :pid AND sd.source = 'hal'
             """),
@@ -219,11 +218,9 @@ class PgHalProblemsQueries(HalProblemsQueries):
                        AND LOWER(p1.doi) <> LOWER(p2.doi))
               AND ABS(
                   (SELECT COUNT(*) FROM source_authorships sa1
-                   WHERE sa1.source = 'hal' AND sa1.source_publication_id = hd1.id
-                     AND NOT sa1.excluded)
+                   WHERE sa1.source = 'hal' AND sa1.source_publication_id = hd1.id)
                   - (SELECT COUNT(*) FROM source_authorships sa2
-                     WHERE sa2.source = 'hal' AND sa2.source_publication_id = hd2.id
-                       AND NOT sa2.excluded)
+                     WHERE sa2.source = 'hal' AND sa2.source_publication_id = hd2.id)
               ) <= 2
               AND NOT EXISTS (SELECT 1 FROM distinct_publications dp
                               WHERE dp.pub_id_a = LEAST(p1.id, p2.id)

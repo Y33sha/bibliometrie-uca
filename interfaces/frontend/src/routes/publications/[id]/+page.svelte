@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { api, auth } from "$lib/api";
+  import { api } from "$lib/api";
   import { sanitizeTitle } from "$lib/utils";
   import type { PubResponse, SourceAuthorship, SourceRow } from "./types";
   import PublicationHeader from "./PublicationHeader.svelte";
@@ -15,7 +15,6 @@
 
   let data = $state<PubResponse | null>(null);
   let error = $state(false);
-  let isAdmin = $state(false);
 
   const pub = $derived(data?.publication);
   const hasTruthTable = $derived((data?.authorships.length ?? 0) > 0);
@@ -55,42 +54,25 @@
       const wos = wosMap.get(pos) ?? null;
       const scanr = scanrMap.get(pos) ?? null;
       const entries = [hal, oa, wos, scanr].filter((x): x is SourceAuthorship => x !== null);
-      const activeEntries = entries.filter((e) => !e.excluded);
 
       let conflict = false;
       // Conflit : auteur UCA dans une source mais absent d'une autre source présente
-      const ucaEntries = activeEntries.filter((e) => e.in_perimeter);
+      const ucaEntries = entries.filter((e) => e.in_perimeter);
       if (ucaEntries.length > 0) {
-        if (
-          (hal === null || hal.excluded) &&
-          data.hal_authorships.some((a) => !a.excluded)
-        )
-          conflict = true;
-        if (
-          (oa === null || oa.excluded) &&
-          data.openalex_authorships.some((a) => !a.excluded)
-        )
-          conflict = true;
-        if (
-          (wos === null || wos.excluded) &&
-          data.wos_authorships.some((a) => !a.excluded)
-        )
-          conflict = true;
-        if (
-          (scanr === null || scanr.excluded) &&
-          data.scanr_authorships.some((a) => !a.excluded)
-        )
-          conflict = true;
+        if (hal === null && data.hal_authorships.length > 0) conflict = true;
+        if (oa === null && data.openalex_authorships.length > 0) conflict = true;
+        if (wos === null && data.wos_authorships.length > 0) conflict = true;
+        if (scanr === null && data.scanr_authorships.length > 0) conflict = true;
       }
       // Conflit : deux personnes résolues différentes
-      const personIds = activeEntries
+      const personIds = entries
         .filter((e) => e.person_id !== null)
         .map((e) => e.person_id!);
       if (new Set(personIds).size > 1) conflict = true;
       // Conflit : auteur UCA résolu aligné avec auteur non résolu
       if (
         ucaEntries.some((e) => e.person_id !== null) &&
-        activeEntries.some((e) => e.person_id === null)
+        entries.some((e) => e.person_id === null)
       )
         conflict = true;
 
@@ -109,12 +91,6 @@
     canGoBack =
       (window as any).navigation?.canGoBack ??
       document.referrer.startsWith(window.location.origin);
-    auth
-      .check()
-      .then((d) => {
-        isAdmin = !!d.authenticated;
-      })
-      .catch(() => {});
     try {
       await loadData();
     } catch {
@@ -183,8 +159,6 @@
     {wosSource}
     {scanrSource}
     structures={data!.structures}
-    {isAdmin}
-    onChange={loadData}
   />
 {/if}
 

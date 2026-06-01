@@ -33,32 +33,7 @@ class AuthorshipRepository(Protocol):
         person_id: int,
     ) -> None: ...
 
-    def delete_authorship(self, authorship_id: int) -> None: ...
-
     def delete_orphan_authorships_for_person(self, person_id: int) -> int: ...
-
-    # ── source_authorships ─────────────────────────────────────────
-
-    def set_source_authorship_excluded(
-        self,
-        source_authorship_id: int,
-        source: str,
-        excluded: bool,
-    ) -> bool: ...
-
-    def get_authorship_id_for_source(
-        self,
-        source_authorship_id: int,
-        source: str,
-    ) -> int | None: ...
-
-    def clear_source_authorship_fk(
-        self,
-        source_authorship_id: int,
-        source: str,
-    ) -> None: ...
-
-    def has_active_source_attestation(self, authorship_id: int) -> bool: ...
 
     # ── Propagation UCA depuis les adresses ────────────────────────
 

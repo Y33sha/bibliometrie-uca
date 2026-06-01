@@ -19,7 +19,7 @@ def insert_missing_authorships(conn: Connection) -> int:
     """Étape 1 : crée les `authorships` manquantes à partir des sources.
 
     Insère les paires `(publication_id, person_id)` présentes dans
-    `source_authorships` (avec `person_id` et non `excluded`) et dont
+    `source_authorships` (avec `person_id`) et dont
     la publication est active, si elles n'existent pas déjà. Retourne le rowcount.
     """
     return conn.execute(
@@ -29,7 +29,7 @@ def insert_missing_authorships(conn: Connection) -> int:
                 FROM source_authorships sa
                 JOIN source_publications sd ON sd.id = sa.source_publication_id
                 JOIN v_active_publications vap ON vap.id = sd.publication_id
-                WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
+                WHERE sa.person_id IS NOT NULL
             )
             INSERT INTO authorships (publication_id, person_id)
             SELECT ap.publication_id, ap.person_id
@@ -58,7 +58,6 @@ def link_source_authorships_to_authorship_for(conn: Connection, source: str) -> 
               AND sa.source = :source
               AND sa.person_id IS NOT NULL
               AND a.person_id = sa.person_id
-              AND NOT sa.excluded
               AND sa.authorship_id IS NULL
         """),
         {"source": source},
@@ -80,7 +79,6 @@ def propagate_author_position(conn: Connection) -> int:
                 FROM source_authorships sa
                 WHERE sa.authorship_id IS NOT NULL
                   AND sa.author_position IS NOT NULL
-                  AND NOT sa.excluded
                 GROUP BY sa.authorship_id
             ) sub
             WHERE a.id = sub.authorship_id
@@ -105,7 +103,6 @@ def propagate_is_corresponding(conn: Connection) -> int:
                 FROM source_authorships sa
                 WHERE sa.authorship_id IS NOT NULL
                   AND sa.is_corresponding IS NOT NULL
-                  AND NOT sa.excluded
                 GROUP BY sa.authorship_id
             ) sub
             WHERE a.id = sub.authorship_id
@@ -178,7 +175,6 @@ def propagate_perimeter_and_structures_from(conn: Connection, source: str) -> in
             WHERE sa.source = :source
               AND sa.in_perimeter = TRUE
               AND sa.person_id IS NOT NULL
-              AND NOT sa.excluded
               AND a.id = sa.authorship_id
               AND a.in_perimeter = FALSE
         """),
@@ -194,7 +190,6 @@ def propagate_perimeter_and_structures_from(conn: Connection, source: str) -> in
             JOIN v_active_publications vap ON vap.id = sd.publication_id
             WHERE sa.source = :source
               AND sa.person_id IS NOT NULL
-              AND NOT sa.excluded
               AND sa.authorship_id IS NOT NULL
             ON CONFLICT DO NOTHING
         """),

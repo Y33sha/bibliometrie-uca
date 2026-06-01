@@ -37,14 +37,14 @@ def assign_orphan_sa(
 ) -> dict | None:
     """Tente de poser person_id sur une source_authorship orpheline.
 
-    Retourne un dict {excluded, author_name_normalized} si l'UPDATE a
-    touché une ligne, None si déjà attribuée à une autre personne.
+    Retourne un dict {author_name_normalized} si l'UPDATE a touché une
+    ligne, None si déjà attribuée à une autre personne.
     """
     row = conn.execute(
         text("""
             UPDATE source_authorships SET person_id = :pid
             WHERE id = :aid AND source = :src AND person_id IS NULL
-            RETURNING excluded, author_name_normalized
+            RETURNING author_name_normalized
         """),
         {"pid": person_id, "aid": authorship_id, "src": source},
     ).first()
@@ -158,8 +158,7 @@ def link_source_authorships_to_authorships(
 def get_distinct_name_forms_from_source_authorships(
     conn: Connection, sa_ids: list[int]
 ) -> list[str]:
-    """Retourne les `author_name_normalized` distincts observés dans le
-    lot, hors authorships exclues."""
+    """Retourne les `author_name_normalized` distincts observés dans le lot."""
     if not sa_ids:
         return []
     rows = conn.execute(
@@ -168,7 +167,6 @@ def get_distinct_name_forms_from_source_authorships(
             FROM source_authorships
             WHERE id = ANY(:ids)
               AND author_name_normalized IS NOT NULL
-              AND NOT excluded
         """),
         {"ids": sa_ids},
     ).all()
@@ -207,7 +205,7 @@ def link_source_authorships_to_authorship_for_pair(
     conn: Connection, publication_id: int, person_id: int
 ) -> None:
     """Pose `source_authorships.authorship_id` pour la paire (publication,
-    person), sur toutes les sa actives (non exclues) encore non liées."""
+    person), sur toutes les sa encore non liées."""
     conn.execute(
         text("""
             UPDATE source_authorships sa
@@ -218,7 +216,6 @@ def link_source_authorships_to_authorship_for_pair(
               AND a.person_id = sa.person_id
               AND sd.publication_id = :pub
               AND sa.person_id = :pid
-              AND NOT sa.excluded
               AND sa.authorship_id IS NULL
         """),
         {"pub": publication_id, "pid": person_id},
@@ -248,7 +245,7 @@ def recompute_authorship_author_position_and_corresponding(
                            {source_case_sql(is_corresponding_priority)}
                        ))[1] AS corr
                 FROM source_authorships sa
-                WHERE sa.authorship_id IS NOT NULL AND NOT sa.excluded
+                WHERE sa.authorship_id IS NOT NULL
                 GROUP BY sa.authorship_id
             ) sub
             WHERE a.id = sub.authorship_id
@@ -277,7 +274,6 @@ def recompute_authorship_in_perimeter_and_structures(
                     WHERE sa.source IN {sources_sql}
                       AND sd.publication_id = :pub
                       AND sa.person_id = :pid
-                      AND NOT sa.excluded
                 ), FALSE),
                 updated_at = now()
             WHERE a.publication_id = :pub AND a.person_id = :pid
@@ -302,7 +298,6 @@ def recompute_authorship_in_perimeter_and_structures(
             JOIN source_authorships sa ON sa.source_publication_id = sd.id
                                        AND sa.person_id = a.person_id
                                        AND sa.source IN {sources_sql}
-                                       AND NOT sa.excluded
             JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id
             WHERE a.publication_id = :pub AND a.person_id = :pid
         """),

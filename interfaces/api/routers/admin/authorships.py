@@ -1,6 +1,6 @@
-"""Authorships admin router : exclusion source / consolidée, gestion des orphelines.
+"""Authorships admin router : exclusion consolidée, gestion des orphelines.
 
-- Excludes : `POST /api/source-authorships/{src}/{id}/exclude` (niveau source) et `PATCH /api/authorships/{id}/exclude` (niveau consolidé).
+- Exclude : `PATCH /api/authorships/{id}/exclude` (niveau consolidé).
 - Orphelines : `/api/admin/orphan-authorships/*` — listage et assignation des authorships UCA sans `person_id`.
 """
 
@@ -16,9 +16,6 @@ from application.authorships.assign_orphans import (
 )
 from application.authorships.core import (
     exclude_authorship,
-)
-from application.authorships.core import (
-    set_source_authorship_excluded as _set_source_authorship_excluded,
 )
 from application.persons import create_person as _create_person
 from application.ports.api.persons_queries import (
@@ -40,8 +37,6 @@ from interfaces.api.models import (
     AssignOrphanAuthorship,
     AuthorshipExcludeResponse,
     BatchAssignOrphanAuthorships,
-    ExcludeSourceAuthorship,
-    ExcludeSourceAuthorshipResponse,
     OrphanAssignResponse,
     OrphanBatchAssignResponse,
 )
@@ -51,27 +46,6 @@ logger = logging.getLogger(__name__)
 
 
 # ── Exclusion d'authorships ──────────────────────────────────────
-
-
-@router.post(
-    "/api/source-authorships/{source}/{authorship_id}/exclude",
-    response_model=ExcludeSourceAuthorshipResponse,
-)
-def exclude_source_authorship(
-    source: str,
-    authorship_id: int,
-    body: ExcludeSourceAuthorship = ExcludeSourceAuthorship(),
-    repo: AuthorshipRepository = Depends(authorship_repo_sync),
-    audit: AuditRepository = Depends(audit_repo_sync),
-) -> ExcludeSourceAuthorshipResponse:
-    """Marque/démarque une authorship source comme fausse.
-
-    Si aucune source non exclue n'atteste plus l'authorship consolidée, celle-ci est supprimée.
-    """
-    _set_source_authorship_excluded(
-        authorship_id, source, body.excluded, repo=repo, audit_repo=audit
-    )
-    return ExcludeSourceAuthorshipResponse(ok=True, excluded=body.excluded)
 
 
 @router.patch("/api/authorships/{authorship_id}/exclude", response_model=AuthorshipExcludeResponse)

@@ -554,7 +554,6 @@ source_authorships = Table(
     Column("source_publication_id", Integer, nullable=False),
     Column("author_position", SmallInteger),
     Column("in_perimeter", Boolean, server_default="false"),
-    Column("excluded", Boolean, server_default="false"),
     Column("source_structures", ARRAY(Text)),
     Column("countries", ARRAY(Text)),
     Column("person_id", Integer),
@@ -579,7 +578,6 @@ source_authorships = Table(
         "authorship_id",
         postgresql_where=text("authorship_id IS NOT NULL"),
     ),
-    Index("idx_sa_excluded", "excluded", postgresql_where=text("excluded = true")),
     Index(
         "idx_sa_nonhal_outscope",
         "source_publication_id",
