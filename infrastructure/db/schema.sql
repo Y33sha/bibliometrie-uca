@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 3JyDjU9DqyAi0Ip02fbnQwPz4Tj3NbvejQQfIN6ZlW4Exq4dYbpO9ehQuXRPstc
+\restrict boqEcyxBI0IFKEtqOGXW7hQOD4w2KH2ys3DNBrcno2CkoG2Wb2HHofQ0Wm5Iicz
 
--- Dumped from database version 18.1
--- Dumped by pg_dump version 18.1
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -179,18 +179,52 @@ CREATE TYPE public.structure_type AS ENUM (
 -- Name: normalize_name_form(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.normalize_name_form(text) RETURNS text
-    LANGUAGE sql IMMUTABLE
+CREATE FUNCTION public.normalize_name_form(input text) RETURNS text
+    LANGUAGE plpgsql IMMUTABLE
     SET search_path TO 'public', 'pg_temp'
-    AS $_$
-  SELECT trim(regexp_replace(
-    unaccent(lower(trim(
-      translate($1,
-        E'\u2010\u2011\u2012\u2013\u2014\u2015\u00AD\u2018\u2019\u201A\u2032\u201C\u201D',
-        E'---------\x27\x27\x27\x27""')
-    ))),
-    '[^a-z0-9]+', ' ', 'g'));
-$_$;
+    AS $$
+DECLARE
+    s text := input;
+BEGIN
+    IF s IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    s := replace(s, E'¼', '14');
+    s := replace(s, E'½', '12');
+    s := replace(s, E'¾', '34');
+    s := replace(s, E'⅐', '17');
+    s := replace(s, E'⅑', '19');
+    s := replace(s, E'⅒', '110');
+    s := replace(s, E'⅓', '13');
+    s := replace(s, E'⅔', '23');
+    s := replace(s, E'⅕', '15');
+    s := replace(s, E'⅖', '25');
+    s := replace(s, E'⅗', '35');
+    s := replace(s, E'⅘', '45');
+    s := replace(s, E'⅙', '16');
+    s := replace(s, E'⅚', '56');
+    s := replace(s, E'⅛', '18');
+    s := replace(s, E'⅜', '38');
+    s := replace(s, E'⅝', '58');
+    s := replace(s, E'⅞', '78');
+
+    s := translate(s,
+        E'‐‑‒–—―­‘’‚′“”',
+        E'-------\x27\x27\x27\x27""'
+    );
+
+    s := translate(s,
+        E'⁰¹²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉⁻',
+        '01234567890123456789'
+    );
+
+    RETURN trim(regexp_replace(
+        unaccent(lower(trim(s))),
+        '[^a-z0-9]+', ' ', 'g'
+    ));
+END;
+$$;
 
 
 SET default_tablespace = '';
@@ -2913,4 +2947,4 @@ ALTER TABLE ONLY public.subject_cooccurrences
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 3JyDjU9DqyAi0Ip02fbnQwPz4Tj3NbvejQQfIN6ZlW4Exq4dYbpO9ehQuXRPstc
+\unrestrict boqEcyxBI0IFKEtqOGXW7hQOD4w2KH2ys3DNBrcno2CkoG2Wb2HHofQ0Wm5Iicz

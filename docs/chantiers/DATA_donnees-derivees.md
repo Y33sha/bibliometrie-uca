@@ -65,7 +65,7 @@ Inventaire (balayage des 36 tables du schéma à jour), en trois catégories. Ve
 | `source_authorship_structures` | dérivation = **matching adresse→structure** (coûteux), pas un JOIN |
 | `*.in_perimeter` (`authorships`, `source_authorships`) | chemin chaud (filtrage listings/facettes/stats) → **sous-chantier perimeter** |
 | `source_authorships.{person_id, authorship_id}` | colonnes bolt-on (résultats de matching) sur une table source |
-| colonnes `*_normalized` (`publications.title`, `persons.*`, `journals.title`, `publishers.name`, `source_authorships.author_name`, `addresses.normalized_text`) | peuplées par `normalize_text` (**Python**). `GENERATED` possible **seulement** si `normalize_text` est réductible à du SQL immutable (`unaccent`+`lower`+trim) — à vérifier ; sinon reste impératif |
+| colonnes `*_normalized` (`publications.title`, `persons.*`, `journals.title`, `publishers.name`, `source_authorships.author_name`, `addresses.normalized_text`) | peuplées par `normalize_text` (**Python**) à l'INSERT/UPDATE. `normalize_name_form` SQL est alignée sur Python ; `GENERATED ALWAYS AS (normalize_name_form(...))` est désormais techniquement possible. Tradeoff à instruire par sous-chantier : statu quo (Python = souplesse d'évolution) vs `GENERATED` (cohérence garantie, simplifie le pipeline) |
 
 **C. Hors scope** (pas du dérivé interne dupliquant nos données) :
 
