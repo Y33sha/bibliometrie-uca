@@ -83,7 +83,6 @@ def lab_clause(lab_ids: list[int]) -> WhereClause | None:
             JOIN authorship_structures aus ON aus.authorship_id = a.id
             WHERE a.publication_id = p.id
               AND aus.structure_id = ANY(:flt_lab_ids)
-              AND NOT a.excluded
         )""",
         {"flt_lab_ids": lab_ids},
     )
@@ -166,7 +165,6 @@ def person_clause(person_id: int) -> WhereClause:
     return WhereClause(
         """EXISTS (SELECT 1 FROM authorships a
                 WHERE a.publication_id = p.id AND a.person_id = :flt_person_id
-                  AND NOT a.excluded
                   AND a.roles && ARRAY['author']::text[])""",
         {"flt_person_id": person_id},
     )
@@ -179,14 +177,14 @@ def corresponding_clause(person_id: int, corr_filter: str) -> WhereClause | None
         return WhereClause(
             """EXISTS (SELECT 1 FROM authorships a
                     WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
-                      AND a.is_corresponding = TRUE AND NOT a.excluded)""",
+                      AND a.is_corresponding = TRUE)""",
             {"flt_corr_person": person_id},
         )
     if corr_filter == "no":
         return WhereClause(
             """NOT EXISTS (SELECT 1 FROM authorships a
                     WHERE a.publication_id = p.id AND a.person_id = :flt_corr_person
-                      AND a.is_corresponding = TRUE AND NOT a.excluded)""",
+                      AND a.is_corresponding = TRUE)""",
             {"flt_corr_person": person_id},
         )
     return None
@@ -322,7 +320,7 @@ def in_perimeter_person_clause(in_perimeter: str, person_id: int | None) -> Wher
     return WhereClause(
         f"""{negate}EXISTS (SELECT 1 FROM authorships a
                 WHERE a.publication_id = p.id AND a.person_id = :flt_in_per_person
-                  AND a.in_perimeter = TRUE AND NOT a.excluded)""",
+                  AND a.in_perimeter = TRUE)""",
         {"flt_in_per_person": person_id},
     )
 
@@ -334,7 +332,6 @@ def no_lab_clause() -> WhereClause:
             JOIN authorship_structures aus ON aus.authorship_id = a.id
             JOIN structures s ON s.id = aus.structure_id
             WHERE a.publication_id = p.id
-              AND NOT a.excluded
               AND s.structure_type = 'labo'
         )""",
         {},

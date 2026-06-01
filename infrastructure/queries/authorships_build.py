@@ -19,8 +19,9 @@ def insert_missing_authorships(conn: Connection) -> int:
     """Étape 1 : crée les `authorships` manquantes à partir des sources.
 
     Insère les paires `(publication_id, person_id)` présentes dans
-    `source_authorships` (avec `person_id`) et dont
-    la publication est active, si elles n'existent pas déjà. Retourne le rowcount.
+    `source_authorships` (avec `person_id`) et dont la publication est
+    active, si elles n'existent pas déjà **et ne sont pas rejetées**
+    (anti-join sur `rejected_authorships`). Retourne le rowcount.
     """
     return conn.execute(
         text("""
@@ -38,6 +39,11 @@ def insert_missing_authorships(conn: Connection) -> int:
                 SELECT 1 FROM authorships a
                 WHERE a.publication_id = ap.publication_id
                   AND a.person_id = ap.person_id
+            )
+              AND NOT EXISTS (
+                SELECT 1 FROM rejected_authorships rj
+                WHERE rj.publication_id = ap.publication_id
+                  AND rj.person_id = ap.person_id
             )
         """)
     ).rowcount

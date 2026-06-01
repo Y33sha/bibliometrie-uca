@@ -1,5 +1,8 @@
 # Chantier — Données dérivées : audit + cadre de décision (matérialisation vs vue)
 
+Commencé le 2026-06-01
+
+
 ## Contexte
 
 Beaucoup de tables et colonnes du schéma sont **dérivées** : précalculées et stockées (maintenues par du code impératif du pipeline) pour l'efficience des requêtes, au prix d'une duplication d'information. La même question revient pour chacune : faut-il **garder la matérialisation**, ou la remplacer par une **vue** (calcul à la lecture) ou une **vue matérialisée** (précalcul déclaratif + refresh) ?
@@ -61,7 +64,7 @@ Inventaire en trois catégories. Pour chaque artefact : source (dérivé de quoi
 | Artefact | Pourquoi garder |
 |---|---|
 | `publications` (table) | arbitrage multi-source coûteux + **état natif** (`meta` corrections) + chemin ultra-chaud |
-| `authorships` (table) | rebuild consolidé. Natif **dissoluble** : `source_manual` est vestigial (jamais écrit `TRUE` en prod, aucune query dessus → à dropper), `excluded` extractible en sidecar `rejected_authorships(person_id, publication_id)`. Donc pas de blocage de fond. Reste chemin chaud + consolidation → **candidat matview** (cf. Phase 2), pas un « garder » définitif |
+| `authorships` (table) | rebuild consolidé. **Natif dissous** (migration `f3b6d9c1a8e2`) : `source_manual` (vestigial) droppé, `excluded` extrait en store `rejected_authorships(publication_id, person_id)`. La table est désormais **entièrement dérivée** → **candidat matview** (cf. Phase 2), reste chemin chaud + consolidation |
 | `persons` (table) | matching identités + **état natif** (`rejected`, fusions via `distinct_persons`) |
 | `source_authorship_structures` | dérivation = **matching adresse→structure** (coûteux), pas un JOIN |
 | `*.in_perimeter` (`authorships`, `source_authorships`) | chemin chaud (filtrage listings/facettes/stats) → **sous-chantier perimeter** |
@@ -83,7 +86,7 @@ Chaque conversion = un sous-chantier dédié (migration + adaptation des call-si
 - [x] Matview `subject_cooccurrences` — table 100% dérivée remplacée par `MATERIALIZED VIEW` (migration `c8a3f2e5b4d7`, seuil `count >= 2` figé). `subjects.usage_count` reste une colonne maintenue — verdict **assumé sur l'ergonomie/perf**, pas « hors scope » : c'est une colonne sur l'entité `subjects` (très jointe), le recompute est cheap, et la sortir en matview forcerait un JOIN partout où on lit/trie sur `usage_count`.
 - [ ] Verdict `GENERATED` vs Python pour les colonnes `*_normalized` — peser cohérence garantie (SQL) contre souplesse d'évolution (Python). Prérequis levé.
 - [x] **Retrait de `source_authorships.excluded`** (migration `e1f4b8c2a6d9`). C'était une fonctionnalité morte : une croix admin « marquer comme faux » dans la grille des sources (page publication) jamais utilisée — 0 ligne à `TRUE` en prod. Colonne + index `idx_sa_excluded` + endpoint `POST /api/source-authorships/.../exclude` + service/repo associés + filtres `NOT sa.excluded` supprimés.
-- [ ] **Extraire `authorships.excluded` en sidecar** (valeur propre + prérequis du matview ci-dessous). Reste sur `authorships` la colonne `excluded` = le rejet canonique réel (« cette personne n'est PAS l'auteur »), posée par `PATCH /api/authorships/{id}/exclude`. Cible : un store `rejected_authorships(person_id, publication_id)` ; le rebuild lit le sidecar pour skipper les paires rejetées, les filtres `NOT a.excluded` deviennent un anti-join. Dropper aussi `source_manual` (vestigial).
+- [x] **Extraire `authorships.excluded` en sidecar** → [`DATA_rejected-authorships-sidecar`](DATA_rejected-authorships-sidecar.md) (migration `f3b6d9c1a8e2`). Store `rejected_authorships(publication_id, person_id)` lu en anti-join par les sites de création ; modèle skip-at-build (la paire rejetée n'a aucune row, les filtres `NOT a.excluded` disparaissent). `source_manual` (vestigial) droppé dans la foulée. `authorships` est désormais entièrement dérivée → débloque le matview ci-dessous.
 - [ ] `authorships` en matview — **après** le point ci-dessus (natif dissous). Remplacer le rebuild impératif `build_authorships` par une `MATERIALIZED VIEW` **si la consolidation est exprimable en SQL**. Perf-neutre (matérialisé des deux côtés) ; couplé au périmètre (la matview porte `in_perimeter`).
 - [ ] Benchmark `authorship_structures` en vue vs colonne maintenue — chemin chaud filtrage périmètre, à mesurer avant tranche
 - [ ] [`DATA_perimeter-materialise`](DATA_perimeter-materialise.md) — réactivable comme sous-chantier si l'audit valide la matérialisation de `perimeter_structures` et/ou la suppression de `in_perimeter`

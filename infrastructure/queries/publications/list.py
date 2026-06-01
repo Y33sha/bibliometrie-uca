@@ -201,11 +201,9 @@ def list_publications(
                  END) AS thesis_author_person_id,
                 (SELECT a.is_corresponding FROM authorships a
                  WHERE a.publication_id = p.id AND a.person_id = :focus_person
-                   AND NOT a.excluded
                  LIMIT 1) AS is_corresponding,
                 (SELECT a.id FROM authorships a
                  WHERE a.publication_id = p.id AND a.person_id = :focus_person
-                   AND NOT a.excluded
                  LIMIT 1) AS authorship_id,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))

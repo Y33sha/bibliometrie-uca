@@ -110,8 +110,12 @@ def create_authorships_from_sources(
         text("""
             INSERT INTO authorships (publication_id, person_id,
                 author_position, in_perimeter, is_corresponding)
-            SELECT publication_id, :pid, author_position, in_perimeter, is_corresponding
-            FROM _chosen_sa
+            SELECT cs.publication_id, :pid, cs.author_position, cs.in_perimeter, cs.is_corresponding
+            FROM _chosen_sa cs
+            WHERE NOT EXISTS (
+                SELECT 1 FROM rejected_authorships rj
+                WHERE rj.publication_id = cs.publication_id AND rj.person_id = :pid
+            )
             ON CONFLICT (publication_id, person_id) DO NOTHING
         """),
         {"pid": person_id},
@@ -190,11 +194,18 @@ def find_publication_id_for_source_authorship(
 
 
 def insert_authorship_if_missing(conn: Connection, publication_id: int, person_id: int) -> None:
-    """INSERT ... ON CONFLICT DO NOTHING dans `authorships` pour la paire."""
+    """INSERT ... ON CONFLICT DO NOTHING dans `authorships` pour la paire.
+
+    Skippe les paires présentes dans `rejected_authorships` (rejet canonique).
+    """
     conn.execute(
         text("""
             INSERT INTO authorships (publication_id, person_id)
-            VALUES (:pub, :pid)
+            SELECT :pub, :pid
+            WHERE NOT EXISTS (
+                SELECT 1 FROM rejected_authorships rj
+                WHERE rj.publication_id = :pub AND rj.person_id = :pid
+            )
             ON CONFLICT (publication_id, person_id) DO NOTHING
         """),
         {"pub": publication_id, "pid": person_id},

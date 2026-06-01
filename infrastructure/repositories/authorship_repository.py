@@ -15,8 +15,6 @@ class _AuthorshipRow(NamedTuple):
     person_id: int | None
     author_position: int | None
     in_perimeter: bool | None
-    source_manual: bool | None
-    excluded: bool | None
     is_corresponding: bool | None
     roles: list[str] | None
     structure_ids: list[int]
@@ -25,9 +23,8 @@ class _AuthorshipRow(NamedTuple):
 def _authorship_from_row(row: _AuthorshipRow) -> Authorship:
     """Mapping d'une row `authorships` SQL vers l'entité fille `Authorship`.
 
-    Les colonnes nullable avec DEFAULT côté DB (`in_perimeter`,
-    `source_manual`, `excluded`) sont coerces vers leur default si NULL,
-    pour préserver la sémantique de l'aggregate.
+    La colonne nullable avec DEFAULT côté DB (`in_perimeter`) est coercée
+    vers son default si NULL, pour préserver la sémantique de l'aggregate.
     """
     return Authorship(
         id=row.id,
@@ -35,8 +32,6 @@ def _authorship_from_row(row: _AuthorshipRow) -> Authorship:
         person_id=row.person_id,
         author_position=row.author_position,
         in_perimeter=row.in_perimeter if row.in_perimeter is not None else False,
-        source_manual=row.source_manual if row.source_manual is not None else False,
-        excluded=row.excluded if row.excluded is not None else False,
         is_corresponding=row.is_corresponding,
         roles=tuple(row.roles or ()),
         structure_ids=tuple(row.structure_ids or ()),
@@ -57,8 +52,7 @@ class PgAuthorshipRepository:
         result = self._conn.execute(
             text("""
                 SELECT a.id, a.publication_id, a.person_id, a.author_position,
-                       a.in_perimeter, a.source_manual, a.excluded,
-                       a.is_corresponding, a.roles,
+                       a.in_perimeter, a.is_corresponding, a.roles,
                        COALESCE(
                            (SELECT array_agg(structure_id ORDER BY structure_id)
                             FROM authorship_structures aus
@@ -77,34 +71,27 @@ class PgAuthorshipRepository:
 
     def get_authorship_person(self, authorship_id: int) -> dict | None:
         result = self._conn.execute(
-            text("SELECT id, person_id FROM authorships WHERE id = :id"),
+            text("SELECT id, person_id, publication_id FROM authorships WHERE id = :id"),
             {"id": authorship_id},
         )
         row = result.first()
         return dict(row._mapping) if row else None
 
-    def mark_authorship_excluded(self, authorship_id: int) -> dict:
-        result = self._conn.execute(
-            text(
-                "UPDATE authorships SET excluded = TRUE, updated_at = now() "
-                "WHERE id = :id RETURNING id, excluded"
-            ),
-            {"id": authorship_id},
-        )
-        return dict(result.one()._mapping)
-
-    def detach_source_authorships_for_person(
-        self,
-        authorship_id: int,
-        person_id: int,
-    ) -> None:
+    def reject_authorship(self, publication_id: int, person_id: int) -> None:
+        """Enregistre le rejet d'une paire (publication, personne) dans le
+        store `rejected_authorships`. Idempotent."""
         self._conn.execute(
-            text("""
-                UPDATE source_authorships
-                SET person_id = NULL, authorship_id = NULL
-                WHERE authorship_id = :auth AND person_id = :pid
-            """),
-            {"auth": authorship_id, "pid": person_id},
+            text(
+                "INSERT INTO rejected_authorships (publication_id, person_id) "
+                "VALUES (:pub, :pid) ON CONFLICT DO NOTHING"
+            ),
+            {"pub": publication_id, "pid": person_id},
+        )
+
+    def delete_authorship(self, authorship_id: int) -> None:
+        self._conn.execute(
+            text("DELETE FROM authorships WHERE id = :id"),
+            {"id": authorship_id},
         )
 
     def delete_orphan_authorships_for_person(self, person_id: int) -> int:

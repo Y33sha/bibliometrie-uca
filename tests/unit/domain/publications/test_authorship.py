@@ -10,8 +10,6 @@ class TestAuthorshipConstruction:
         assert a.publication_id == 42
         assert a.person_id is None
         assert a.in_perimeter is False
-        assert a.source_manual is False
-        assert a.excluded is False
         assert a.roles == ()
         assert a.structure_ids == ()
 
@@ -22,8 +20,6 @@ class TestAuthorshipConstruction:
             person_id=7,
             author_position=2,
             in_perimeter=True,
-            source_manual=True,
-            excluded=False,
             is_corresponding=True,
             roles=("author", "thesis_director"),
             structure_ids=(10, 20),

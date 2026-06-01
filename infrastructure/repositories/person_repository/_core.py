@@ -131,7 +131,7 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
 
     Séquence complète en une transaction :
     1. Transfert source_authorships
-    2. Dédoublonnage + transfert authorships vérité
+    2. Dédoublonnage + transfert authorships vérité (+ rejected_authorships)
     3. Dédoublonnage + transfert identifiants
     4. Transfert conditionnel fiche RH
     5. person_name_forms : remplacement source_id → target_id
@@ -160,6 +160,22 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     )
     conn.execute(
         text("UPDATE authorships SET person_id = :t WHERE person_id = :s"),
+        {"t": target_id, "s": source_id},
+    )
+    # rejected_authorships : même motif dédup-puis-transfert. L'identité étant
+    # la même après fusion, un rejet sur l'absorbée vaut pour l'absorbante.
+    conn.execute(
+        text("""
+            DELETE FROM rejected_authorships
+            WHERE person_id = :s
+              AND publication_id IN (
+                  SELECT publication_id FROM rejected_authorships WHERE person_id = :t
+              )
+        """),
+        {"s": source_id, "t": target_id},
+    )
+    conn.execute(
+        text("UPDATE rejected_authorships SET person_id = :t WHERE person_id = :s"),
         {"t": target_id, "s": source_id},
     )
     conn.execute(

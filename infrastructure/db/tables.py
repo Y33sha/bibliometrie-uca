@@ -505,8 +505,6 @@ authorships = Table(
     Column("person_id", Integer),
     Column("author_position", SmallInteger),
     Column("in_perimeter", Boolean, server_default="false"),
-    Column("source_manual", Boolean, server_default="false"),
-    Column("excluded", Boolean, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     Column("is_corresponding", Boolean),
@@ -543,6 +541,16 @@ authorship_structures = Table(
     Column("structure_id", Integer, nullable=False),
     PrimaryKeyConstraint("authorship_id", "structure_id", name="authorship_structures_pkey"),
     Index("idx_authorship_structures_structure_id", "structure_id"),
+)
+
+
+rejected_authorships = Table(
+    "rejected_authorships",
+    metadata,
+    Column("publication_id", Integer, nullable=False),
+    Column("person_id", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    PrimaryKeyConstraint("publication_id", "person_id", name="rejected_authorships_pkey"),
 )
 
 

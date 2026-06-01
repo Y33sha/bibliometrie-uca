@@ -154,7 +154,6 @@ class _PublicationFacetsBuilder:
                       JOIN authorship_structures aus ON aus.authorship_id = a.id
                       JOIN structures s ON s.id = aus.structure_id
                       WHERE a.publication_id = p.id
-                        AND NOT a.excluded
                         AND s.structure_type = 'labo'
                   )
             """),
@@ -218,12 +217,12 @@ class _PublicationFacetsBuilder:
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM authorships a
                         WHERE a.publication_id = p.id AND a.person_id = :corr_pid
-                          AND a.is_corresponding = TRUE AND NOT a.excluded
+                          AND a.is_corresponding = TRUE
                     )) AS yes_count,
                     COUNT(*) FILTER (WHERE NOT EXISTS (
                         SELECT 1 FROM authorships a
                         WHERE a.publication_id = p.id AND a.person_id = :corr_pid
-                          AND a.is_corresponding = TRUE AND NOT a.excluded
+                          AND a.is_corresponding = TRUE
                     )) AS no_count
                 FROM publications p
                 WHERE {where_sql}
@@ -449,12 +448,12 @@ class _PublicationFacetsBuilder:
                     COUNT(*) FILTER (WHERE EXISTS (
                         SELECT 1 FROM authorships a
                         WHERE a.publication_id = p.id AND a.person_id = :inp_pid
-                          AND a.in_perimeter = TRUE AND NOT a.excluded
+                          AND a.in_perimeter = TRUE
                     )) AS yes,
                     COUNT(*) FILTER (WHERE NOT EXISTS (
                         SELECT 1 FROM authorships a
                         WHERE a.publication_id = p.id AND a.person_id = :inp_pid
-                          AND a.in_perimeter = TRUE AND NOT a.excluded
+                          AND a.in_perimeter = TRUE
                     )) AS no
                 FROM publications p
                 WHERE {where_sql}
