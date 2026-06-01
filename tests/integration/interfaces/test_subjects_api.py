@@ -55,22 +55,35 @@ def _seed_subject(
 
 
 def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None:
-    """Insère une paire de co-occurrence. La contrainte CHECK impose
-    `subject_a_id < subject_b_id` : on normalise."""
+    """Crée `count` publications liées aux deux sujets puis rafraîchit la
+    matview pour produire la paire (a, b) avec ce count. Seuil de la matview
+    `count >= 2` : passer un count < 2 ne fera pas apparaître la paire."""
     a, b = sorted([subject_a_id, subject_b_id])
     with _pool() as cur:
-        cur.execute(
-            "INSERT INTO subject_cooccurrences (subject_a_id, subject_b_id, count) "
-            "VALUES (%s, %s, %s)",
-            (a, b, count),
-        )
+        for _ in range(count):
+            cur.execute(
+                "INSERT INTO publications (title, pub_year, doc_type) "
+                "VALUES ('cooc-seed', 2024, 'article') RETURNING id"
+            )
+            pub_id = cur.fetchone()["id"]
+            for s in (a, b):
+                cur.execute(
+                    "INSERT INTO publication_subjects (publication_id, subject_id, source) "
+                    "VALUES (%s, %s, 'hal')",
+                    (pub_id, s),
+                )
+        cur.execute("REFRESH MATERIALIZED VIEW subject_cooccurrences")
 
 
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     yield
     with _pool() as cur:
-        cur.execute("TRUNCATE TABLE subjects, subject_cooccurrences RESTART IDENTITY CASCADE")
+        # Cascade vide publication_subjects ; publications 'cooc-seed' du
+        # helper `_seed_cooccurrence` sont nettoyées explicitement.
+        cur.execute("TRUNCATE TABLE subjects RESTART IDENTITY CASCADE")
+        cur.execute("DELETE FROM publications WHERE title = 'cooc-seed'")
+        cur.execute("REFRESH MATERIALIZED VIEW subject_cooccurrences")
 
 
 class TestListSubjects:

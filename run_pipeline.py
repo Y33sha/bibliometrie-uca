@@ -36,7 +36,7 @@ Phases (dans l'ordre d'execution):
     authorships    Reconstruction authorships canoniques (table de verite) + propagation UCA
     countries      Detection pays des adresses + recalcul pays des publications
     subjects       Sujets/mots-clés : ingestion source_publications → subjects + publication_subjects,
-                   puis recalcul subjects.usage_count + subject_cooccurrences
+                   puis recalcul subjects.usage_count et refresh de la matview subject_cooccurrences
     enrich         Enrichissements optionnels (statut OA via Unpaywall, APC revues)
 """
 
@@ -441,9 +441,9 @@ def phase_subjects(**kw: Any) -> Any:
        `keywords` et `topics` des `source_publications` et alimente les
        tables canoniques.
 
-    2. **Co-occurrences** (`subjects.usage_count` + `subject_cooccurrences`)
-       — recalcule l'usage de chaque sujet et les paires de sujets
-       co-présents sur une même publication.
+    2. **Co-occurrences** (`subjects.usage_count` + matview `subject_cooccurrences`)
+       — recalcule l'usage de chaque sujet et rafraîchit la matview des
+       paires de sujets co-présents sur une même publication.
 
     Phase source-agnostique : `--sources` n'est pas propagé. Les topics
     peuvent évoluer côté `source_publications` par d'autres voies (re-

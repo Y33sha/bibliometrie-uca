@@ -1,5 +1,5 @@
 """Tests d'intégration de la phase `cooccurrences` (recompute usage_count
-+ table subject_cooccurrences)."""
++ refresh matview subject_cooccurrences)."""
 
 import logging
 
@@ -8,8 +8,8 @@ from sqlalchemy import text
 from application.pipeline.cooccurrences.run import run
 from infrastructure.queries.subjects import (
     PgSubjectsQueries,
-    recompute_cooccurrences,
     recompute_usage_counts,
+    refresh_cooccurrences,
 )
 
 
@@ -72,7 +72,7 @@ class TestRecomputeUsageCounts:
         assert usage == 0
 
 
-class TestRecomputeCooccurrences:
+class TestRefreshCooccurrences:
     def test_pairs_with_min_count(self, sa_sync_conn):
         a = _create_subject(sa_sync_conn, label="a")
         b = _create_subject(sa_sync_conn, label="b")
@@ -85,8 +85,8 @@ class TestRecomputeCooccurrences:
         for s in (a, b, c):
             _link(sa_sync_conn, pub_id=p2, subject_id=s)
 
-        n = recompute_cooccurrences(sa_sync_conn, min_count=2)
-        assert n == 1  # Seule la paire (a,b) avec count=2 passe le filtre.
+        n = refresh_cooccurrences(sa_sync_conn)
+        assert n == 1  # Seule la paire (a,b) avec count=2 passe le seuil de la matview.
 
         row = sa_sync_conn.execute(
             text("SELECT subject_a_id, subject_b_id, count FROM subject_cooccurrences")
@@ -97,25 +97,28 @@ class TestRecomputeCooccurrences:
         assert {row.subject_a_id, row.subject_b_id} == {a, b}
 
     def test_self_pairs_excluded(self, sa_sync_conn):
-        # Un sujet ne co-occurre pas avec lui-même même s'il apparaît
-        # plusieurs fois (deux sources sur la même publi).
+        # Un sujet ne co-occurre pas avec lui-même même s'il apparaît dans
+        # 2+ publications (deux pubs nécessaires pour que le seuil count >= 2
+        # ne masque pas l'effet du filtre `subject_id < subject_id`).
         s = _create_subject(sa_sync_conn, label="solo")
-        p = _create_pub(sa_sync_conn)
-        _link(sa_sync_conn, pub_id=p, subject_id=s, source="hal")
-        _link(sa_sync_conn, pub_id=p, subject_id=s, source="openalex")
+        p1 = _create_pub(sa_sync_conn, "p1")
+        p2 = _create_pub(sa_sync_conn, "p2")
+        _link(sa_sync_conn, pub_id=p1, subject_id=s, source="hal")
+        _link(sa_sync_conn, pub_id=p2, subject_id=s, source="hal")
 
-        n = recompute_cooccurrences(sa_sync_conn, min_count=1)
+        n = refresh_cooccurrences(sa_sync_conn)
         assert n == 0
 
     def test_idempotent(self, sa_sync_conn):
         a = _create_subject(sa_sync_conn, label="a")
         b = _create_subject(sa_sync_conn, label="b")
-        p = _create_pub(sa_sync_conn)
-        _link(sa_sync_conn, pub_id=p, subject_id=a)
-        _link(sa_sync_conn, pub_id=p, subject_id=b)
-        # Une seule co-occurrence (a,b)=1 ; min=1 pour avoir 1 ligne.
-        recompute_cooccurrences(sa_sync_conn, min_count=1)
-        recompute_cooccurrences(sa_sync_conn, min_count=1)
+        p1 = _create_pub(sa_sync_conn, "p1")
+        p2 = _create_pub(sa_sync_conn, "p2")
+        for p in (p1, p2):
+            _link(sa_sync_conn, pub_id=p, subject_id=a)
+            _link(sa_sync_conn, pub_id=p, subject_id=b)
+        refresh_cooccurrences(sa_sync_conn)
+        refresh_cooccurrences(sa_sync_conn)
         n = sa_sync_conn.execute(
             text("SELECT count(*) AS n FROM subject_cooccurrences")
         ).scalar_one()

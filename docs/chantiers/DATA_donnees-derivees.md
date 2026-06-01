@@ -80,7 +80,7 @@ Inventaire en trois catégories. Pour chaque artefact : source (dérivé de quoi
 
 Chaque conversion = un sous-chantier dédié (migration + adaptation des call-sites + tests + éventuel hook de refresh). Les cas perf-sensibles passent par un **benchmark sur la vraie base** d'abord.
 
-- [ ] Matview `subject_cooccurrences` + recompute déclaratif de `subjects.usage_count` — cas le plus net (agrégats purs, retire le code impératif de la phase `cooccurrences`, peu coûteux à rafraîchir)
+- [x] Matview `subject_cooccurrences` — table 100% dérivée remplacée par `MATERIALIZED VIEW` (migration `c8a3f2e5b4d7`, seuil `count >= 2` figé). Le recompute de `subjects.usage_count` reste une colonne maintenue (hors scope : refactorer demanderait de toucher les queries UI qui filtrent dessus).
 - [ ] Verdict `GENERATED` vs Python pour les colonnes `*_normalized` — peser cohérence garantie (SQL) contre souplesse d'évolution (Python). Prérequis levé.
 - [ ] Benchmark `authorship_structures` en vue vs colonne maintenue — chemin chaud filtrage périmètre, à mesurer avant tranche
 - [ ] [`DATA_perimeter-materialise`](DATA_perimeter-materialise.md) — réactivable comme sous-chantier si l'audit valide la matérialisation de `perimeter_structures` et/ou la suppression de `in_perimeter`
