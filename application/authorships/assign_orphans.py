@@ -32,7 +32,7 @@ def assign_orphan_authorship(
 
     1. Valide la source
     2. Met person_id sur l'authorship source (seulement si elle est orpheline)
-    3. Ajoute la forme de nom (si authorship non exclue)
+    3. Ajoute la forme de nom
     4. Crée/met à jour l'authorship canonique + FK source
 
     Retourne True si l'authorship a été attribuée, False sinon.
@@ -44,8 +44,8 @@ def assign_orphan_authorship(
     if not row:
         return False
 
-    # Ajouter la forme de nom (sauf si authorship exclue)
-    if row["author_name_normalized"] and not row.get("excluded"):
+    # Ajouter la forme de nom
+    if row["author_name_normalized"]:
         repo.add_name_form(person_id, row["author_name_normalized"], source=source)
 
     # Recomposer l'authorship canonique pour la paire (pub, person)

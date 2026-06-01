@@ -130,7 +130,7 @@ WITH pub_author_counts AS (
     SELECT publication_id, MAX(cnt) AS max_authors FROM (
         SELECT sd.publication_id, COUNT(*) AS cnt
         FROM source_publications sd JOIN source_authorships sa ON sa.source_publication_id = sd.id
-        WHERE NOT sa.excluded GROUP BY sd.publication_id, sa.source
+        GROUP BY sd.publication_id, sa.source
     ) sub GROUP BY publication_id
 ),
 author_positions AS (
@@ -138,7 +138,7 @@ author_positions AS (
     FROM source_publications sd
     JOIN source_authorships sa ON sa.source_publication_id = sd.id
     JOIN pub_author_counts pac ON pac.publication_id = sd.publication_id
-    WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
+    WHERE sa.person_id IS NOT NULL
       AND pac.max_authors <= {MAX_AUTHORS_CONFLICT}
 )
 SELECT LEAST(a1.person_id, a2.person_id) AS id_a,

@@ -107,12 +107,6 @@ class PgAuthorshipRepository:
             {"auth": authorship_id, "pid": person_id},
         )
 
-    def delete_authorship(self, authorship_id: int) -> None:
-        self._conn.execute(
-            text("DELETE FROM authorships WHERE id = :id"),
-            {"id": authorship_id},
-        )
-
     def delete_orphan_authorships_for_person(self, person_id: int) -> int:
         result = self._conn.execute(
             text("""
@@ -122,63 +116,11 @@ class PgAuthorshipRepository:
                       SELECT 1 FROM source_authorships sa
                       JOIN source_publications sd ON sd.id = sa.source_publication_id
                       WHERE sa.person_id = :pid AND sd.publication_id = a.publication_id
-                        AND NOT sa.excluded
                   )
             """),
             {"pid": person_id},
         )
         return result.rowcount
-
-    # ── source_authorships ─────────────────────────────────────────
-
-    def set_source_authorship_excluded(
-        self,
-        source_authorship_id: int,
-        source: str,
-        excluded: bool,
-    ) -> bool:
-        result = self._conn.execute(
-            text(
-                "UPDATE source_authorships SET excluded = :ex "
-                "WHERE id = :id AND source = :src RETURNING id"
-            ),
-            {"ex": excluded, "id": source_authorship_id, "src": source},
-        )
-        return result.first() is not None
-
-    def get_authorship_id_for_source(
-        self,
-        source_authorship_id: int,
-        source: str,
-    ) -> int | None:
-        result = self._conn.execute(
-            text("SELECT authorship_id FROM source_authorships WHERE id = :id AND source = :src"),
-            {"id": source_authorship_id, "src": source},
-        )
-        return result.scalar_one_or_none()
-
-    def clear_source_authorship_fk(
-        self,
-        source_authorship_id: int,
-        source: str,
-    ) -> None:
-        self._conn.execute(
-            text(
-                "UPDATE source_authorships SET authorship_id = NULL "
-                "WHERE id = :id AND source = :src"
-            ),
-            {"id": source_authorship_id, "src": source},
-        )
-
-    def has_active_source_attestation(self, authorship_id: int) -> bool:
-        result = self._conn.execute(
-            text(
-                "SELECT 1 FROM source_authorships "
-                "WHERE authorship_id = :id AND NOT excluded LIMIT 1"
-            ),
-            {"id": authorship_id},
-        )
-        return result.first() is not None
 
     # ── Propagation périmètre UCA depuis les adresses ──────────────
 
@@ -278,7 +220,6 @@ class PgAuthorshipRepository:
                                        AND sa.source = sd.source
             JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id
             WHERE sa.in_perimeter = TRUE
-              AND NOT sa.excluded
         """)
         )
 
@@ -292,7 +233,6 @@ class PgAuthorshipRepository:
                                               AND sa.source = sd.source
                     WHERE sd.publication_id = a.publication_id
                       AND sa.in_perimeter = TRUE
-                      AND NOT sa.excluded
                 ),
                 updated_at = now()
             FROM _affected_authorships af

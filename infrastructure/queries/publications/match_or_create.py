@@ -188,12 +188,12 @@ def fetch_thesis_primary_author_from_source_publication(
 
 
 def fetch_source_authorship_count(conn: Connection, source_publication_id: int) -> int:
-    """Compte les `source_authorships` non-excluded d'un `source_publication`."""
+    """Compte les `source_authorships` d'un `source_publication`."""
     row = conn.execute(
         text("""
             SELECT COUNT(*) AS n
             FROM source_authorships
-            WHERE source_publication_id = :spid AND NOT excluded
+            WHERE source_publication_id = :spid
         """),
         {"spid": source_publication_id},
     ).one()
@@ -202,7 +202,7 @@ def fetch_source_authorship_count(conn: Connection, source_publication_id: int) 
 
 def fetch_max_source_authorship_count_per_publication(conn: Connection, publication_id: int) -> int:
     """Pour une publication canonique, retourne le `MAX` du nombre de
-    `source_authorships` non-excluded par source. Chaque source rapporte
+    `source_authorships` par source. Chaque source rapporte
     sa propre liste d'auteurs ; on retient la plus complète comme
     représentative du « vrai » nombre d'auteurs de la publication.
 
@@ -215,7 +215,7 @@ def fetch_max_source_authorship_count_per_publication(conn: Connection, publicat
                 SELECT COUNT(*) AS n
                 FROM source_publications sp
                 JOIN source_authorships sa ON sa.source_publication_id = sp.id
-                WHERE sp.publication_id = :pid AND NOT sa.excluded
+                WHERE sp.publication_id = :pid
                 GROUP BY sp.source
             ) per_source
         """),

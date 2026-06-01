@@ -57,7 +57,7 @@ def match_proceedings_by_title_year_authorcount(
 ) -> tuple[int, MetadataDeduplicationCase] | None:
     """Cherche une publication canonique de type proceedings compatible avec
     le `source_publication` courant : même titre normalisé long, même année,
-    même nombre d'auteurs non-excluded, pas de DOI conflictuel.
+    même nombre d'auteurs, pas de DOI conflictuel.
 
     Le compteur d'auteurs côté pub canonique candidate est le `MAX` par
     source (la source la plus exhaustive représente le « vrai » nombre),

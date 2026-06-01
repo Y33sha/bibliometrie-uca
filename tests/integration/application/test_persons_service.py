@@ -87,14 +87,13 @@ def _insert_source_authorship(
     author_position=0,
     person_id=None,
     author_name_normalized="jean dupont",
-    excluded=False,
 ):
     return conn.execute(
         text(
             "INSERT INTO source_authorships (source, source_publication_id, "
             "                                author_position, person_id, "
-            "                                author_name_normalized, excluded) "
-            "VALUES (:s, :spid, :pos, :pid, :anf, :ex) RETURNING id"
+            "                                author_name_normalized) "
+            "VALUES (:s, :spid, :pos, :pid, :anf) RETURNING id"
         ),
         {
             "s": source,
@@ -102,7 +101,6 @@ def _insert_source_authorship(
             "pos": author_position,
             "pid": person_id,
             "anf": author_name_normalized,
-            "ex": excluded,
         },
     ).scalar_one()
 
@@ -635,23 +633,3 @@ class TestAssignOrphanAuthorship:
             {"pub": pub_id, "pid": person_id},
         ).first()
         assert row is not None
-
-    def test_skips_name_form_if_excluded(self, sa_sync_conn, repo):
-        """Si la source authorship est excluded, pas d'ajout de name_form."""
-        _setup_uca(sa_sync_conn)
-        person_id = _insert_person(sa_sync_conn, "Zzz", "Zzz")
-        pub_id = _insert_publication(sa_sync_conn)
-        sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        sa_id = _insert_source_authorship(
-            sa_sync_conn,
-            sp_id,
-            author_name_normalized="other name",
-            excluded=True,
-        )
-
-        assign_orphan_authorship(person_id, "hal", sa_id, repo=repo)
-
-        row = sa_sync_conn.execute(
-            text("SELECT 1 FROM person_name_forms WHERE name_form = 'other name'")
-        ).first()
-        assert row is None

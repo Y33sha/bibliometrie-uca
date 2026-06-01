@@ -11,12 +11,10 @@ from sqlalchemy import text
 
 from application.authorships.core import (
     delete_orphan_authorships,
-    detach_source,
     exclude_authorship,
     propagate_uca_for_addresses,
-    set_source_authorship_excluded,
 )
-from domain.errors import NotFoundError, ValidationError
+from domain.errors import NotFoundError
 from infrastructure.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import authorship_repository
 
@@ -81,7 +79,6 @@ def _create_source_authorship(
     author_position=0,
     person_id=None,
     authorship_id=None,
-    excluded=False,
     in_perimeter=False,
     structure_ids=None,
 ):
@@ -89,9 +86,8 @@ def _create_source_authorship(
         text(
             "INSERT INTO source_authorships (source, source_publication_id, "
             "                                author_position, person_id, "
-            "                                authorship_id, excluded, "
-            "                                in_perimeter) "
-            "VALUES (:s, :spid, :pos, :pid, :aid, :ex, :ip) RETURNING id"
+            "                                authorship_id, in_perimeter) "
+            "VALUES (:s, :spid, :pos, :pid, :aid, :ip) RETURNING id"
         ),
         {
             "s": source,
@@ -99,7 +95,6 @@ def _create_source_authorship(
             "pos": author_position,
             "pid": person_id,
             "aid": authorship_id,
-            "ex": excluded,
             "ip": in_perimeter,
         },
     ).one()
@@ -312,110 +307,6 @@ class TestExcludeAuthorship:
         assert row2.person_id == p2
 
 
-# ── detach_source ─────────────────────────────────────────────
-
-
-class TestDetachSource:
-    """detach_source retire le lien FK d'une source_authorship vers
-    l'authorship vérité. Supprime l'authorship vérité si plus aucune source
-    ne l'atteste."""
-
-    def test_raises_on_invalid_source(self, sa_sync_conn, repo):
-        with pytest.raises(ValidationError, match="Source inconnue"):
-            detach_source(1, "invalid_source", repo=repo)
-
-    def test_returns_false_if_no_authorship_linked(self, sa_sync_conn, repo):
-        pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        # source_authorship sans authorship_id
-        sa_id = _create_source_authorship(sa_sync_conn, sp_id)
-
-        assert detach_source(sa_id, "hal", repo=repo) is False
-
-    def test_deletes_authorship_when_last_source_removed(self, sa_sync_conn, repo):
-        """Une seule source atteste l'authorship → le détacher supprime l'authorship."""
-        person_id = _create_person(sa_sync_conn)
-        pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        sa_id = _create_source_authorship(
-            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
-        )
-
-        assert detach_source(sa_id, "hal", repo=repo) is True
-
-        row = sa_sync_conn.execute(
-            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
-        ).first()
-        assert row is None
-
-    def test_keeps_authorship_when_other_sources_remain(self, sa_sync_conn, repo):
-        """Deux sources attestent l'authorship → détacher une garde l'authorship."""
-        person_id = _create_person(sa_sync_conn)
-        pub_id = _create_publication(sa_sync_conn)
-        sp_hal = _create_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-1")
-        sp_oa = _create_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="W1")
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        sa_hal = _create_source_authorship(
-            sa_sync_conn,
-            sp_hal,
-            source="hal",
-            person_id=person_id,
-            authorship_id=authorship_id,
-        )
-        _create_source_authorship(
-            sa_sync_conn,
-            sp_oa,
-            source="openalex",
-            person_id=person_id,
-            authorship_id=authorship_id,
-        )
-
-        assert detach_source(sa_hal, "hal", repo=repo) is False
-
-        # Authorship toujours présente
-        row = sa_sync_conn.execute(
-            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
-        ).first()
-        assert row is not None
-        # sa_hal détachée
-        row_sa = sa_sync_conn.execute(
-            text("SELECT authorship_id FROM source_authorships WHERE id = :id"),
-            {"id": sa_hal},
-        ).one()
-        assert row_sa.authorship_id is None
-
-    def test_excluded_sources_do_not_keep_authorship_alive(self, sa_sync_conn, repo):
-        """Si les autres sources sont marquées excluded, l'authorship doit être supprimée."""
-        person_id = _create_person(sa_sync_conn)
-        pub_id = _create_publication(sa_sync_conn)
-        sp_hal = _create_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-1")
-        sp_oa = _create_source_publication(sa_sync_conn, pub_id, source="openalex", source_id="W1")
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        sa_hal = _create_source_authorship(
-            sa_sync_conn,
-            sp_hal,
-            source="hal",
-            person_id=person_id,
-            authorship_id=authorship_id,
-        )
-        _create_source_authorship(
-            sa_sync_conn,
-            sp_oa,
-            source="openalex",
-            person_id=person_id,
-            authorship_id=authorship_id,
-            excluded=True,
-        )
-
-        assert detach_source(sa_hal, "hal", repo=repo) is True
-
-        row = sa_sync_conn.execute(
-            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
-        ).first()
-        assert row is None
-
-
 # ── delete_orphan_authorships ─────────────────────────────────
 
 
@@ -452,24 +343,6 @@ class TestDeleteOrphanAuthorships:
             text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
         ).first()
         assert row is not None
-
-    def test_ignores_excluded_sources(self, sa_sync_conn, repo):
-        """Si la seule source attestante est excluded, l'authorship est orpheline."""
-        person_id = _create_person(sa_sync_conn)
-        pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        _create_source_authorship(
-            sa_sync_conn,
-            sp_id,
-            person_id=person_id,
-            authorship_id=authorship_id,
-            excluded=True,
-        )
-
-        n = delete_orphan_authorships(person_id, repo=repo)
-
-        assert n == 1
 
     def test_returns_zero_when_no_authorships(self, sa_sync_conn, repo):
         person_id = _create_person(sa_sync_conn)
@@ -602,70 +475,3 @@ class TestPropagateUcaForAddresses:
         ).one()
         assert sa.in_perimeter is False
         assert sa.structure_ids is None
-
-
-# ── set_source_authorship_excluded ───────────────────────────
-
-
-class TestSetSourceAuthorshipExcluded:
-    def test_raises_on_invalid_source(self, sa_sync_conn, repo):
-        with pytest.raises(ValidationError, match="Source inconnue"):
-            set_source_authorship_excluded(1, "invalid", True, repo=repo)
-
-    def test_raises_not_found(self, sa_sync_conn, repo):
-        with pytest.raises(NotFoundError):
-            set_source_authorship_excluded(999999, "hal", True, repo=repo)
-
-    def test_marks_excluded(self, sa_sync_conn, repo):
-        person_id = _create_person(sa_sync_conn)
-        pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        sa_id = _create_source_authorship(sa_sync_conn, sp_id, person_id=person_id)
-
-        set_source_authorship_excluded(sa_id, "hal", True, repo=repo)
-
-        row = sa_sync_conn.execute(
-            text("SELECT excluded FROM source_authorships WHERE id = :id"), {"id": sa_id}
-        ).one()
-        assert row.excluded is True
-
-    def test_unmark_excluded_does_not_touch_authorship(self, sa_sync_conn, repo):
-        """Remettre excluded=False ne doit pas toucher à l'authorship vérité."""
-        person_id = _create_person(sa_sync_conn)
-        pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        sa_id = _create_source_authorship(
-            sa_sync_conn,
-            sp_id,
-            person_id=person_id,
-            authorship_id=authorship_id,
-            excluded=True,
-        )
-
-        set_source_authorship_excluded(sa_id, "hal", False, repo=repo)
-
-        row = sa_sync_conn.execute(
-            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
-        ).first()
-        assert row is not None  # authorship vérité toujours là
-
-    def test_exclude_triggers_detach_source(self, sa_sync_conn, repo):
-        """Exclure la seule source attestante doit supprimer l'authorship vérité."""
-        person_id = _create_person(sa_sync_conn)
-        pub_id = _create_publication(sa_sync_conn)
-        sp_id = _create_source_publication(sa_sync_conn, pub_id)
-        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
-        sa_id = _create_source_authorship(
-            sa_sync_conn,
-            sp_id,
-            person_id=person_id,
-            authorship_id=authorship_id,
-        )
-
-        set_source_authorship_excluded(sa_id, "hal", True, repo=repo)
-
-        row = sa_sync_conn.execute(
-            text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
-        ).first()
-        assert row is None  # authorship vérité supprimée

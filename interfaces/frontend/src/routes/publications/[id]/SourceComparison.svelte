@@ -1,6 +1,5 @@
 <script lang="ts">
   import { base } from "$app/paths";
-  import { publications } from "$lib/api";
   import Tooltip from "$lib/components/Tooltip.svelte";
   import {
     structIsLabo,
@@ -22,8 +21,6 @@
     wosSource,
     scanrSource,
     structures,
-    isAdmin,
-    onChange,
   }: {
     data: PubResponse;
     sourceRows: SourceRow[];
@@ -33,15 +30,7 @@
     wosSource: Source | undefined;
     scanrSource: Source | undefined;
     structures: Record<string, StructInfo>;
-    isAdmin: boolean;
-    onChange: () => void | Promise<void>;
   } = $props();
-
-  async function toggleExclude(source: string, a: SourceAuthorship) {
-    const newExcluded = !a.excluded;
-    await publications.excludeSourceAuthorship(source, a.id, { excluded: newExcluded });
-    await onChange();
-  }
 
   const sourceCount = $derived(
     (data.hal_authorships.length ? 1 : 0) +
@@ -50,9 +39,6 @@
       (data.scanr_authorships.length ? 1 : 0),
   );
 
-  const singleSource = $derived<"hal" | "openalex" | "wos" | "scanr">(
-    halSource ? "hal" : oaSource ? "openalex" : wosSource ? "wos" : "scanr",
-  );
   const singleRows = $derived<SourceAuthorship[]>(
     halSource
       ? data.hal_authorships
@@ -137,14 +123,8 @@
             <tr class:conflict-row={row.conflict}>
               {#if halSource}
                 <td class="sg-pos-cell">{#if row.hal}{row.position + 1}{/if}</td>
-                <td class="sg-name-cell" class:sg-excluded={row.hal?.excluded}>
+                <td class="sg-name-cell">
                   {#if row.hal}
-                    {#if isAdmin}<button
-                        class="exclude-btn"
-                        title={row.hal.excluded ? "Rétablir" : "Marquer comme faux"}
-                        onclick={() => toggleExclude("hal", row.hal!)}
-                        >{row.hal.excluded ? "↩" : "×"}</button
-                      >{/if}
                     {#if row.hal.person_id}
                       <a
                         href="{base}/persons/{row.hal.person_id}"
@@ -173,14 +153,8 @@
               {/if}
               {#if oaSource}
                 <td class="sg-pos-cell">{#if row.oa}{row.position + 1}{/if}</td>
-                <td class="sg-name-cell" class:sg-excluded={row.oa?.excluded}>
+                <td class="sg-name-cell">
                   {#if row.oa}
-                    {#if isAdmin}<button
-                        class="exclude-btn"
-                        title={row.oa.excluded ? "Rétablir" : "Marquer comme faux"}
-                        onclick={() => toggleExclude("openalex", row.oa!)}
-                        >{row.oa.excluded ? "↩" : "×"}</button
-                      >{/if}
                     {#if row.oa.person_id}
                       <a
                         href="{base}/persons/{row.oa.person_id}"
@@ -209,14 +183,8 @@
               {/if}
               {#if wosSource}
                 <td class="sg-pos-cell">{#if row.wos}{row.position + 1}{/if}</td>
-                <td class="sg-name-cell" class:sg-excluded={row.wos?.excluded}>
+                <td class="sg-name-cell">
                   {#if row.wos}
-                    {#if isAdmin}<button
-                        class="exclude-btn"
-                        title={row.wos.excluded ? "Rétablir" : "Marquer comme faux"}
-                        onclick={() => toggleExclude("wos", row.wos!)}
-                        >{row.wos.excluded ? "↩" : "×"}</button
-                      >{/if}
                     {#if row.wos.person_id}
                       <a
                         href="{base}/persons/{row.wos.person_id}"
@@ -245,14 +213,8 @@
               {/if}
               {#if scanrSource}
                 <td class="sg-pos-cell">{#if row.scanr}{row.position + 1}{/if}</td>
-                <td class="sg-name-cell" class:sg-excluded={row.scanr?.excluded}>
+                <td class="sg-name-cell">
                   {#if row.scanr}
-                    {#if isAdmin}<button
-                        class="exclude-btn"
-                        title={row.scanr.excluded ? "Rétablir" : "Marquer comme faux"}
-                        onclick={() => toggleExclude("scanr", row.scanr!)}
-                        >{row.scanr.excluded ? "↩" : "×"}</button
-                      >{/if}
                     {#if row.scanr.person_id}
                       <a
                         href="{base}/persons/{row.scanr.person_id}"
@@ -288,7 +250,7 @@
 {:else if sourceCount === 1}
   <div class="section">
     <h2 class="section-title">
-      Auteurs — source {singleLabel} ({singleRows.filter((a) => !a.excluded).length})
+      Auteurs — source {singleLabel} ({singleRows.length})
     </h2>
     {#if singleSourceData?.countries?.length}
       <div class="countries-cell" style="margin-bottom: 8px;">
@@ -306,18 +268,9 @@
       </thead>
       <tbody>
         {#each singleRows as a}
-          <tr
-            class:uca-row={a.in_perimeter && !a.excluded}
-            class:sg-excluded={a.excluded}
-          >
+          <tr class:uca-row={a.in_perimeter}>
             <td class="pos-cell">{(a.author_position ?? 0) + 1}</td>
             <td>
-              {#if isAdmin}<button
-                  class="exclude-btn"
-                  title={a.excluded ? "Rétablir" : "Marquer comme faux"}
-                  onclick={() => toggleExclude(singleSource, a)}
-                  >{a.excluded ? "↩" : "×"}</button
-                >{/if}
               {#if a.person_id}
                 <a href="{base}/persons/{a.person_id}" class="author-link">
                   {a.full_name}
@@ -489,26 +442,6 @@
   }
   .sg-uca {
     font-weight: 600;
-  }
-  .sg-excluded {
-    opacity: 0.4;
-  }
-  .sg-excluded a,
-  .sg-excluded span {
-    text-decoration: line-through;
-  }
-  .exclude-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0 4px 0 0;
-    font-size: 0.85rem;
-    line-height: 1;
-    color: #999;
-    vertical-align: middle;
-  }
-  .exclude-btn:hover {
-    color: #c0392b;
   }
   .conflict-row {
     background: #fff8f0;

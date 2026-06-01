@@ -14,7 +14,6 @@ class TestSourceAuthorshipConstruction:
         assert sa.roles == ("author",)
         assert sa.is_corresponding is False
         assert sa.in_perimeter is False
-        assert sa.excluded is False
 
     def test_accepts_full_args(self):
         sa = SourceAuthorship(

@@ -39,15 +39,14 @@ def _create_sa(
     author_position=0,
     person_id=None,
     author_name_normalized=None,
-    excluded=False,
     source="hal",
 ):
     return conn.execute(
         text("""
             INSERT INTO source_authorships
                 (source, source_publication_id, author_position,
-                 person_id, author_name_normalized, excluded)
-            VALUES (:source, :sd, :pos, :person_id, :anf, :excluded) RETURNING id
+                 person_id, author_name_normalized)
+            VALUES (:source, :sd, :pos, :person_id, :anf) RETURNING id
         """),
         {
             "source": source,
@@ -55,7 +54,6 @@ def _create_sa(
             "pos": author_position,
             "person_id": person_id,
             "anf": author_name_normalized,
-            "excluded": excluded,
         },
     ).scalar_one()
 
@@ -178,22 +176,3 @@ class TestSyncFromRawForms:
         assert updated >= 1
         rows = _fetch_pnf_for(sa_sync_conn, pid)
         assert ("dupond j", ["openalex"]) in rows
-
-    def test_excluded_authorships_ignored(self, sa_sync_conn):
-        """Les `source_authorships` excluded ne contribuent pas à l'attendu."""
-        pid = _create_person(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn)
-        _create_sa(
-            sa_sync_conn,
-            sd,
-            person_id=pid,
-            author_name_normalized="ghost",
-            excluded=True,
-        )
-
-        create_temp_raw_forms_table(sa_sync_conn)
-        sync_from_raw_forms(sa_sync_conn)
-        drop_temp_raw_forms_table(sa_sync_conn)
-
-        rows = _fetch_pnf_for(sa_sync_conn, pid)
-        assert not any(nf == "ghost" for nf, _ in rows)

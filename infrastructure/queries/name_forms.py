@@ -90,7 +90,7 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
                 SELECT sa.author_name_normalized AS name_form,
                        sa.person_id, sa.source::text AS source
                 FROM source_authorships sa
-                WHERE sa.person_id IS NOT NULL AND NOT sa.excluded
+                WHERE sa.person_id IS NOT NULL
                   AND sa.author_name_normalized IS NOT NULL
                   AND sa.author_name_normalized != ''
             )

@@ -50,7 +50,6 @@ _ORPHANS_CTE = """
             SELECT sp.publication_id, sp.source, COUNT(*) AS per_source_count
             FROM source_publications sp
             JOIN source_authorships sa ON sa.source_publication_id = sp.id
-            WHERE NOT sa.excluded
             GROUP BY sp.publication_id, sp.source
         ) per_source
         GROUP BY publication_id

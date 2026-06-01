@@ -33,7 +33,6 @@ def _fetch_biblio_source_authorships(
                     FROM source_authorship_addresses saa2
                     JOIN addresses addr ON addr.id = saa2.address_id
                     WHERE saa2.source_authorship_id = sa.id) AS raw_affiliation,
-                   sa.excluded,
                    sa.countries
             FROM source_authorships sa
             WHERE sa.source_publication_id = (

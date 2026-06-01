@@ -14,7 +14,6 @@ export { api, post, put, patch, del, ApiError } from './client';
 
 export * as auth from './auth';
 export * as persons from './persons';
-export * as publications from './publications';
 export * as authorships from './authorships';
 export * as journals from './journals';
 export * as publishers from './publishers';

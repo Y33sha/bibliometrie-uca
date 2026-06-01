@@ -1449,28 +1449,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/source-authorships/{source}/{authorship_id}/exclude": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Exclude Source Authorship
-         * @description Marque/démarque une authorship source comme fausse.
-         *
-         *     Si aucune source non exclue n'atteste plus l'authorship consolidée, celle-ci est supprimée.
-         */
-        post: operations["exclude_source_authorship_api_source_authorships__source___authorship_id__exclude_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/authorships/{authorship_id}/exclude": {
         parameters: {
             query?: never;
@@ -2988,19 +2966,13 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
-         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
-         *     Permet au frontend de styler les inattendus en warning.
+         * @description Compteur de publications par `doc_type` pour un éditeur.
          */
         DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
             count: number;
-            /** Expected */
-            expected: boolean;
         };
         /** DocTypeLabel */
         DocTypeLabel: {
@@ -3058,21 +3030,6 @@ export interface components {
             value: string;
             /** Label Fr */
             label_fr: string;
-        };
-        /** ExcludeSourceAuthorship */
-        ExcludeSourceAuthorship: {
-            /**
-             * Excluded
-             * @default true
-             */
-            excluded: boolean;
-        };
-        /** ExcludeSourceAuthorshipResponse */
-        ExcludeSourceAuthorshipResponse: {
-            /** Ok */
-            ok: boolean;
-            /** Excluded */
-            excluded: boolean;
         };
         /** FacetValueCount */
         FacetValueCount: {
@@ -3441,9 +3398,9 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__api__journals_queries__OaStatusCount"][];
+            oa_statuses: components["schemas"]["OaStatusCount"][];
             /** Expected Doc Types */
             expected_doc_types: string[];
             /** Expected Oa Statuses */
@@ -4075,13 +4032,18 @@ export interface components {
         };
         /**
          * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour un éditeur.
+         * @description Compteur de publications par `oa_status` pour une revue.
+         *
+         *     `expected` est vrai si ce `oa_status` figure dans les valeurs attendues
+         *     pour le `oa_model` de la revue (cf. `domain.journals.expected`).
          */
         OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */
             count: number;
+            /** Expected */
+            expected: boolean;
         };
         /**
          * ObservablesPayload
@@ -5055,9 +5017,9 @@ export interface components {
             /** Journal Types */
             journal_types: components["schemas"]["JournalTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["OaStatusCount"][];
+            oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
         };
         /**
          * PublisherDetailResponse
@@ -5309,8 +5271,6 @@ export interface components {
             structure_ids: number[] | null;
             /** Raw Affiliation */
             raw_affiliation?: string | null;
-            /** Excluded */
-            excluded: boolean;
             /** Countries */
             countries: string[] | null;
         };
@@ -5750,27 +5710,28 @@ export interface components {
             no: number;
         };
         /**
-         * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour une revue.
+         * DocTypeCount
+         * @description Compteur de publications par `doc_type` pour une revue.
          *
-         *     `expected` est vrai si ce `oa_status` figure dans les valeurs attendues
-         *     pour le `oa_model` de la revue (cf. `domain.journals.expected`).
+         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
+         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
+         *     Permet au frontend de styler les inattendus en warning.
          */
-        application__ports__api__journals_queries__OaStatusCount: {
-            /** Oa Status */
-            oa_status: string | null;
+        application__ports__api__journals_queries__DocTypeCount: {
+            /** Doc Type */
+            doc_type: string | null;
             /** Count */
             count: number;
             /** Expected */
             expected: boolean;
         };
         /**
-         * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour un éditeur.
+         * OaStatusCount
+         * @description Compteur de publications par `oa_status` pour un éditeur.
          */
-        application__ports__api__publishers_queries__DocTypeCount: {
-            /** Doc Type */
-            doc_type: string | null;
+        application__ports__api__publishers_queries__OaStatusCount: {
+            /** Oa Status */
+            oa_status: string | null;
             /** Count */
             count: number;
         };
@@ -8174,42 +8135,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetachedResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    exclude_source_authorship_api_source_authorships__source___authorship_id__exclude_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                source: string;
-                authorship_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: {
-            content: {
-                "application/json": components["schemas"]["ExcludeSourceAuthorship"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ExcludeSourceAuthorshipResponse"];
                 };
             };
             /** @description Validation Error */
