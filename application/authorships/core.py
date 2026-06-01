@@ -25,11 +25,15 @@ def exclude_authorship(
     repo: AuthorshipRepository,
     audit_repo: AuditRepository | None = None,
 ) -> dict[str, JsonValue]:
-    """Marque une authorship comme exclue et détache les authorships sources.
+    """Rejette une authorship canonique : « cette personne n'est PAS l'auteur ».
 
-    1. Marque l'authorship excluded = TRUE
-    2. Met person_id = NULL sur les authorships sources liées
-       (pour que build_authorships ne recrée pas le lien)
+    1. Enregistre la paire (publication, personne) dans `rejected_authorships`
+       — store univoque qui survit aux rebuilds (les sites de création
+       d'authorships anti-joignent ce store).
+    2. Supprime la row `authorships` (les FK nettoient `authorship_structures`
+       et délient `source_authorships.authorship_id`).
+
+    La vérité source (`source_authorships.person_id`) n'est pas touchée.
 
     Lève NotFoundError si l'authorship n'existe pas.
     """
@@ -38,18 +42,19 @@ def exclude_authorship(
         raise NotFoundError(f"Authorship {authorship_id} introuvable")
 
     person_id = row["person_id"]
-    result = repo.mark_authorship_excluded(authorship_id)
-    if person_id:
-        repo.detach_source_authorships_for_person(authorship_id, person_id)
+    publication_id = row["publication_id"]
+    if person_id is not None:
+        repo.reject_authorship(publication_id, person_id)
+    repo.delete_authorship(authorship_id)
 
     emit_event(
         audit_repo,
-        "authorship.excluded",
+        "authorship.rejected",
         "authorship",
         authorship_id,
-        {"person_id": person_id},
+        {"person_id": person_id, "publication_id": publication_id},
     )
-    return result
+    return {"id": authorship_id, "person_id": person_id, "publication_id": publication_id}
 
 
 def propagate_uca_for_addresses(

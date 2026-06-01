@@ -49,17 +49,18 @@ logger = logging.getLogger(__name__)
 
 
 @router.patch("/api/authorships/{authorship_id}/exclude", response_model=AuthorshipExcludeResponse)
-def toggle_authorship_excluded(
+def exclude_authorship_endpoint(
     authorship_id: int,
     repo: AuthorshipRepository = Depends(authorship_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> AuthorshipExcludeResponse:
-    """Marque un authorship consolidée comme exclu."""
-    row = exclude_authorship(authorship_id, repo=repo, audit_repo=audit)
-    row_id = row["id"]
-    row_excluded = row["excluded"]
-    assert isinstance(row_id, int) and isinstance(row_excluded, bool)
-    return AuthorshipExcludeResponse(id=row_id, excluded=row_excluded)
+    """Rejette une authorship canonique (« cette personne n'est pas l'auteur »).
+
+    Enregistre la paire dans `rejected_authorships` et supprime la row ;
+    le rebuild ne la recrée pas (anti-join sur le store). One-way.
+    """
+    exclude_authorship(authorship_id, repo=repo, audit_repo=audit)
+    return AuthorshipExcludeResponse(ok=True)
 
 
 # ── Authorships orphelines ───────────────────────────────────────

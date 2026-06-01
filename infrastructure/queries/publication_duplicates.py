@@ -83,7 +83,7 @@ class PgPublicationDuplicatesQueries(PublicationDuplicatesQueries):
                        ON sa_oa.authorship_id = a.id AND sa_oa.source = 'openalex'
                 LEFT JOIN source_authorships sa_wos
                        ON sa_wos.authorship_id = a.id AND sa_wos.source = 'wos'
-                WHERE a.publication_id = :pid AND NOT a.excluded
+                WHERE a.publication_id = :pid
                 ORDER BY a.author_position NULLS LAST
             """),
             {"pid": pub_id},

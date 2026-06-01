@@ -203,9 +203,8 @@ class TestFindByPublicationId:
         assert auths[0].author_position == 1
         assert auths[1].person_id == p2
         assert auths[1].author_position == 2
-        # Vérification des defaults bool.
+        # Vérification du default bool.
         assert auths[0].in_perimeter is False
-        assert auths[0].excluded is False
 
     def test_hydrates_full_authorship(self, sa_sync_conn, repo):
         pub_id = _create_publication(sa_sync_conn)
@@ -216,9 +215,8 @@ class TestFindByPublicationId:
             text("""
                 INSERT INTO authorships
                     (publication_id, person_id, author_position, in_perimeter,
-                     source_manual, excluded, is_corresponding, roles)
-                VALUES (:p, :pid, 3, TRUE, TRUE, FALSE, TRUE,
-                        CAST(:roles AS text[]))
+                     is_corresponding, roles)
+                VALUES (:p, :pid, 3, TRUE, TRUE, CAST(:roles AS text[]))
                 RETURNING id
             """),
             {"p": pub_id, "pid": person_id, "roles": ["author"]},
@@ -238,7 +236,6 @@ class TestFindByPublicationId:
         assert a.person_id == person_id
         assert a.author_position == 3
         assert a.in_perimeter is True
-        assert a.source_manual is True
         assert a.is_corresponding is True
         assert a.roles == ("author",)
         assert a.structure_ids == (s42, s43)
@@ -248,10 +245,10 @@ class TestFindByPublicationId:
 
 
 class TestExcludeAuthorship:
-    """exclude_authorship marque l'authorship vérité comme excluded et
-    détache les source_authorships qui y référaient."""
+    """exclude_authorship enregistre le rejet dans `rejected_authorships` et
+    supprime la row `authorships`, sans toucher à la vérité source."""
 
-    def test_marks_excluded_and_detaches_sources(self, sa_sync_conn, repo):
+    def test_rejects_and_deletes_row_preserving_source(self, sa_sync_conn, repo):
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
@@ -260,25 +257,63 @@ class TestExcludeAuthorship:
             sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
         )
 
-        result = exclude_authorship(authorship_id, repo=repo)
+        exclude_authorship(authorship_id, repo=repo)
 
-        assert result is not None
-        assert result["excluded"] is True
-
-        # Source détachée : person_id et authorship_id remis à NULL
+        # Row authorships supprimée
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
+            ).first()
+            is None
+        )
+        # Rejet enregistré dans le sidecar
+        assert (
+            sa_sync_conn.execute(
+                text(
+                    "SELECT 1 FROM rejected_authorships "
+                    "WHERE publication_id = :pub AND person_id = :pid"
+                ),
+                {"pub": pub_id, "pid": person_id},
+            ).first()
+            is not None
+        )
+        # Vérité source préservée (person_id non détaché)
         row = sa_sync_conn.execute(
-            text("SELECT person_id, authorship_id FROM source_authorships WHERE id = :id"),
+            text("SELECT person_id FROM source_authorships WHERE id = :id"),
             {"id": sa_id},
         ).one()
-        assert row.person_id is None
-        assert row.authorship_id is None
+        assert row.person_id == person_id
+
+    def test_rebuild_does_not_recreate_rejected_pair(self, sa_sync_conn, repo):
+        """Après rejet, l'insertion canonique re-skippe la paire (anti-join)."""
+        from infrastructure.queries.authorships_build import insert_missing_authorships
+
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        _create_source_authorship(
+            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
+        )
+
+        exclude_authorship(authorship_id, repo=repo)
+        # La source garde son person_id → insert_missing tenterait de recréer la paire.
+        insert_missing_authorships(sa_sync_conn)
+
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT id FROM authorships WHERE publication_id = :p AND person_id = :pid"),
+                {"p": pub_id, "pid": person_id},
+            ).first()
+            is None
+        )
 
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
             exclude_authorship(999999, repo=repo)
 
-    def test_does_not_detach_unrelated_sources(self, sa_sync_conn, repo):
-        """Les sources d'autres personnes sur la même pub ne sont pas touchées."""
+    def test_does_not_touch_other_authorships(self, sa_sync_conn, repo):
+        """Rejeter une authorship ne touche ni les autres paires ni leurs sources."""
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
 
@@ -286,7 +321,7 @@ class TestExcludeAuthorship:
         p2 = _create_person(sa_sync_conn, "Martin", "Sophie")
         a1 = _create_authorship(sa_sync_conn, pub_id, p1)
         a2 = _create_authorship(sa_sync_conn, pub_id, p2)
-        sa1 = _create_source_authorship(
+        _create_source_authorship(
             sa_sync_conn, sp_id, author_position=0, person_id=p1, authorship_id=a1
         )
         sa2 = _create_source_authorship(
@@ -295,11 +330,13 @@ class TestExcludeAuthorship:
 
         exclude_authorship(a1, repo=repo)
 
-        # sa1 détachée
-        row1 = sa_sync_conn.execute(
-            text("SELECT person_id FROM source_authorships WHERE id = :id"), {"id": sa1}
-        ).one()
-        assert row1.person_id is None
+        # a2 toujours là
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT id FROM authorships WHERE id = :id"), {"id": a2}
+            ).first()
+            is not None
+        )
         # sa2 intacte
         row2 = sa_sync_conn.execute(
             text("SELECT person_id FROM source_authorships WHERE id = :id"), {"id": sa2}

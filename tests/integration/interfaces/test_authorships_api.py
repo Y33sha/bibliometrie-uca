@@ -133,7 +133,7 @@ def _seed_orphan_authorship(raw_author_name: str) -> int:
 # ── PATCH /api/authorships/{id}/exclude ─────────────────────────
 
 
-class TestToggleAuthorshipExcluded:
+class TestExcludeAuthorship:
     def test_requires_admin(self, client):
         r = client.patch("/api/authorships/1/exclude")
         assert r.status_code == 401
@@ -144,7 +144,7 @@ class TestToggleAuthorshipExcluded:
         aid = _seed_authorship(pub, person_id=pid)
         r = auth_client.patch(f"/api/authorships/{aid}/exclude")
         assert r.status_code == 200
-        assert "excluded" in r.json()
+        assert r.json()["ok"] is True
 
 
 # ── Orphan authorships ──────────────────────────────────────────

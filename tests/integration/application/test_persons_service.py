@@ -24,6 +24,7 @@ from application.persons import (
     detach_name_form,
     link_authorship,
     mark_distinct,
+    merge_person,
     reassign_identifier,
     remove_identifier,
     set_rejected,
@@ -633,3 +634,39 @@ class TestAssignOrphanAuthorship:
             {"pub": pub_id, "pid": person_id},
         ).first()
         assert row is not None
+
+
+class TestMergePersonRejectedAuthorships:
+    """La fusion transfère les rejets de l'absorbée vers l'absorbante (identité
+    identique), avec dédoublonnage sur conflit de PK."""
+
+    def test_transfers_and_dedups(self, sa_sync_conn, repo):
+        target = _insert_person(sa_sync_conn, "Cible", "T")
+        source = _insert_person(sa_sync_conn, "Source", "S")
+        pub_shared = _insert_publication(sa_sync_conn, "Shared")
+        pub_source_only = _insert_publication(sa_sync_conn, "SourceOnly")
+
+        def _reject(person_id, publication_id):
+            sa_sync_conn.execute(
+                text(
+                    "INSERT INTO rejected_authorships (publication_id, person_id) "
+                    "VALUES (:pub, :pid)"
+                ),
+                {"pub": publication_id, "pid": person_id},
+            )
+
+        _reject(target, pub_shared)  # conflit : déjà rejeté côté cible
+        _reject(source, pub_shared)  # doit être dédoublonné
+        _reject(source, pub_source_only)  # doit migrer vers la cible
+
+        merge_person(target, source, repo=repo)
+
+        rows = sa_sync_conn.execute(
+            text(
+                "SELECT publication_id, person_id FROM rejected_authorships ORDER BY publication_id"
+            )
+        ).all()
+        assert {(r.publication_id, r.person_id) for r in rows} == {
+            (pub_shared, target),
+            (pub_source_only, target),
+        }

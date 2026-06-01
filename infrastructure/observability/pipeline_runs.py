@@ -143,7 +143,7 @@ def _q_volumes(conn: Connection) -> dict[str, int]:
     return {
         "publications": _scalar(conn, "SELECT COUNT(*) FROM publications"),
         "persons": _scalar(conn, "SELECT COUNT(*) FROM persons WHERE NOT rejected"),
-        "authorships": _scalar(conn, "SELECT COUNT(*) FROM authorships WHERE NOT excluded"),
+        "authorships": _scalar(conn, "SELECT COUNT(*) FROM authorships"),
         "addresses": _scalar(conn, "SELECT COUNT(*) FROM addresses"),
         "person_identifiers": _scalar(
             conn, "SELECT COUNT(*) FROM person_identifiers WHERE status <> 'rejected'"
@@ -159,7 +159,7 @@ def _q_orphans(conn: Connection) -> dict[str, int]:
         SELECT COUNT(*) FROM publications p
         WHERE NOT EXISTS (
             SELECT 1 FROM authorships a
-            WHERE a.publication_id = p.id AND NOT a.excluded
+            WHERE a.publication_id = p.id
         )
         """,
     )
@@ -169,7 +169,7 @@ def _q_orphans(conn: Connection) -> dict[str, int]:
         SELECT COUNT(*) FROM persons p
         WHERE NOT p.rejected AND NOT EXISTS (
             SELECT 1 FROM authorships a
-            WHERE a.person_id = p.id AND NOT a.excluded
+            WHERE a.person_id = p.id
         )
         """,
     )

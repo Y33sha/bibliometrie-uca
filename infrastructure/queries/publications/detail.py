@@ -102,7 +102,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
                    pe.id AS person_id, pe.last_name, pe.first_name
             FROM authorships a
             JOIN persons pe ON pe.id = a.person_id
-            WHERE a.publication_id = :pid AND NOT a.excluded
+            WHERE a.publication_id = :pid
             ORDER BY a.author_position
         """),
         {"pid": pub_id},

@@ -13,11 +13,14 @@ Colonnes notables :
 - `author_position` : position dans la liste d'auteurs
 - `is_corresponding` : auteur correspondant
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
-- `excluded` : authorship rejetée manuellement
 
 La table de jointure `authorship_structures (authorship_id, structure_id)` porte les affiliations résolues — FK `ON DELETE CASCADE` des deux côtés, PK composite.
 
-**Cohérence avec les sources** : la table est **dérivée** des `source_authorships` — `in_perimeter`, les liens via `authorship_structures`, `is_corresponding`, `author_position`, `roles` sont des consolidations (union ou priorité par source) des authorships sources. Le build (`application/pipeline/authorships/build_authorships.py`) est idempotent en mode incrémental ; le mode pipeline `full` exécute en plus une purge complète + rebuild from scratch (TRUNCATE + reset des FK), pour garantir la convergence absolue à intervalle mensuel. Le champ `excluded`, lui, est métier natif (rejet manuel via l'admin) et survit au rebuild — le build ne le touche pas.
+**Cohérence avec les sources** : la table est **entièrement dérivée** des `source_authorships` — `in_perimeter`, les liens via `authorship_structures`, `is_corresponding`, `author_position`, `roles` sont des consolidations (union ou priorité par source) des authorships sources. Le build (`application/pipeline/authorships/build_authorships.py`) est idempotent en mode incrémental ; le mode pipeline `full` exécute en plus une purge complète + rebuild from scratch (TRUNCATE + reset des FK), pour garantir la convergence absolue à intervalle mensuel. Aucun état natif sur la table : le rejet manuel d'une paire (« cette personne n'est pas l'auteur ») vit dans le store `rejected_authorships`, lu en anti-join par les sites de création pour ne jamais recréer la paire.
+
+### `rejected_authorships` — rejets de contributions
+
+Store univoque `(publication_id, person_id, created_at)`, PK composite, FK `ON DELETE CASCADE` vers `publications` et `persons`. Écrit par l'exclusion canonique (croix de la page personne → `PATCH /api/authorships/{id}/exclude`), qui y insère la paire et supprime la row `authorships`. Tous les sites de création d'`authorships` (build + assignation d'orphelins) anti-joignent ce store, de sorte que le rejet survit aux rebuilds — contrairement à un drapeau sur la table dérivée, purgé en mode `full`. Une fusion de personnes transfère les rejets de l'absorbée vers l'absorbante (dédoublonnage sur conflit de PK).
 
 ## Tables sources
 

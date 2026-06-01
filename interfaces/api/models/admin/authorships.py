@@ -37,8 +37,7 @@ class BatchAssignOrphanAuthorships(BaseModel):
 
 
 class AuthorshipExcludeResponse(BaseModel):
-    id: int
-    excluded: bool
+    ok: bool
 
 
 class OrphanAssignResponse(BaseModel):

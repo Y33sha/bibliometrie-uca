@@ -15,7 +15,7 @@ flowchart LR
 
 Phase `authorships`: `build_authorships` construit la table `authorships` en 4 étapes :
 
-1. **Insertion** des paires (publication_id, person_id) manquantes, depuis les `source_authorships` (toutes sources : HAL, OpenAlex, WoS, ScanR, theses, CrossRef)
+1. **Insertion** des paires (publication_id, person_id) manquantes, depuis les `source_authorships` (toutes sources : HAL, OpenAlex, WoS, ScanR, theses, CrossRef), **sauf** les paires présentes dans `rejected_authorships` (rejet manuel, anti-join)
 2. **FK** : rattache chaque `source_authorships` à son authorship canonique via `source_authorships.authorship_id`
 3. **Métadonnées** : propage `author_position` et `is_corresponding` selon `SOURCE_PRIORITY` (theses > CrossRef > ScanR > HAL > OpenAlex > WoS)
 4. **UCA** : propage `in_perimeter` et `structure_ids` depuis toutes les sources (union, déjà calculées dans la phase [affiliations](05-affiliations.md))

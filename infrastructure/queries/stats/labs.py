@@ -30,7 +30,6 @@ _STRUCTS_CTE = """
         FROM authorships a
         JOIN authorship_structures aus ON aus.authorship_id = a.id
         WHERE a.in_perimeter = TRUE
-          AND NOT a.excluded
     )
 """
 

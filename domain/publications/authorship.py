@@ -6,7 +6,9 @@ root, accès via le root). La FK `authorships.publication_id NOT NULL`
 verrouille ce lien côté schéma.
 
 La logique métier touchant aux authorships canoniques (assignation
-person↔publication, scope de périmètre, exclusion, rôles) vit ici.
+person↔publication, scope de périmètre, rôles) vit ici. Le rejet d'une
+paire (« cette personne n'est pas l'auteur ») n'est pas un attribut de
+l'entité : il vit dans le store `rejected_authorships`.
 """
 
 from dataclasses import dataclass
@@ -25,8 +27,6 @@ class Authorship:
     person_id: int | None = None
     author_position: int | None = None
     in_perimeter: bool = False
-    source_manual: bool = False
-    excluded: bool = False
     is_corresponding: bool | None = None
     roles: tuple[str, ...] = ()
     structure_ids: tuple[int, ...] = ()

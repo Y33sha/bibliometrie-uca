@@ -238,7 +238,7 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
                        ) AS sources
                 FROM authorships a
                 JOIN publications pub ON pub.id = a.publication_id
-                WHERE a.person_id = :pid AND NOT a.excluded
+                WHERE a.person_id = :pid
                 ORDER BY pub.pub_year DESC NULLS LAST, pub.id DESC
             """),
             {"pid": person_id},
