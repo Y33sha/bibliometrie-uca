@@ -24,14 +24,29 @@ def _create_subject(conn, *, label, usage_count=0, **kwargs):
 
 
 def _link_cooccurrence(conn, a_id, b_id, count):
+    """Crée `count` publications liées aux deux sujets, de sorte que la matview
+    `subject_cooccurrences` produira (a, b) avec ce count au prochain refresh.
+    Ne rafraîchit pas la matview — appeler `_refresh()` à la fin du setup."""
     a, b = sorted([a_id, b_id])
-    conn.execute(
-        text(
-            "INSERT INTO subject_cooccurrences (subject_a_id, subject_b_id, count) "
-            "VALUES (:a, :b, :c)"
-        ),
-        {"a": a, "b": b, "c": count},
-    )
+    for _ in range(count):
+        pub_id = conn.execute(
+            text(
+                "INSERT INTO publications (title, pub_year, doc_type) "
+                "VALUES ('cooc-seed', 2024, 'article') RETURNING id"
+            )
+        ).scalar_one()
+        for s in (a, b):
+            conn.execute(
+                text(
+                    "INSERT INTO publication_subjects (publication_id, subject_id, source) "
+                    "VALUES (:p, :s, 'hal')"
+                ),
+                {"p": pub_id, "s": s},
+            )
+
+
+def _refresh(conn):
+    conn.execute(text("REFRESH MATERIALIZED VIEW subject_cooccurrences"))
 
 
 class TestListSubjects:
@@ -101,6 +116,7 @@ class TestGetSubjectNeighbors:
         right = _create_subject(sa_sync_conn, label="right", usage_count=5)
         _link_cooccurrence(sa_sync_conn, center, left, 5)
         _link_cooccurrence(sa_sync_conn, center, right, 3)
+        _refresh(sa_sync_conn)
         neighbors = _q(sa_sync_conn).get_subject_neighbors(center, limit=20, min_count=2)
         labels = {n.label for n in neighbors}
         assert labels == {"left", "right"}
@@ -111,6 +127,7 @@ class TestGetSubjectNeighbors:
         n2 = _create_subject(sa_sync_conn, label="strong", usage_count=10)
         _link_cooccurrence(sa_sync_conn, c, n1, 2)
         _link_cooccurrence(sa_sync_conn, c, n2, 50)
+        _refresh(sa_sync_conn)
         neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=20, min_count=1)
         assert neighbors[0].label == "strong"
         assert neighbors[0].cooccurrence_count == 50
@@ -120,7 +137,10 @@ class TestGetSubjectNeighbors:
         keep = _create_subject(sa_sync_conn, label="keep", usage_count=10)
         skip = _create_subject(sa_sync_conn, label="skip", usage_count=10)
         _link_cooccurrence(sa_sync_conn, c, keep, 5)
+        # count=1 ne franchit pas le seuil de la matview (>= 2) — la paire
+        # (c, skip) n'apparaît pas indépendamment du filtre min_count à la lecture.
         _link_cooccurrence(sa_sync_conn, c, skip, 1)
+        _refresh(sa_sync_conn)
         neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=20, min_count=3)
         labels = {n.label for n in neighbors}
         assert labels == {"keep"}
@@ -130,5 +150,6 @@ class TestGetSubjectNeighbors:
         for i in range(5):
             n = _create_subject(sa_sync_conn, label=f"n{i}", usage_count=10)
             _link_cooccurrence(sa_sync_conn, c, n, 10 - i)
+        _refresh(sa_sync_conn)
         neighbors = _q(sa_sync_conn).get_subject_neighbors(c, limit=2, min_count=2)
         assert len(neighbors) == 2

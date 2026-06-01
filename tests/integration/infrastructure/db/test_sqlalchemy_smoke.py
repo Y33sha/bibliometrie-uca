@@ -82,10 +82,11 @@ class TestMetaDataConsistency:
     """
 
     def test_all_metadata_tables_exist_in_db(self, sa_sync_conn: Connection):
-        db_tables = inspect(sa_sync_conn).get_table_names()
+        insp = inspect(sa_sync_conn)
+        db_relations = set(insp.get_table_names()) | set(insp.get_materialized_view_names())
         for table in metadata.tables.values():
-            assert table.name in db_tables, (
-                f"Table `{table.name}` déclarée dans MetaData absente de la DB"
+            assert table.name in db_relations, (
+                f"Table/matview `{table.name}` déclarée dans MetaData absente de la DB"
             )
 
     def test_all_metadata_columns_exist_in_db(self, sa_sync_conn: Connection):

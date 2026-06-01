@@ -82,6 +82,7 @@ class SubjectsQueries(Protocol):
         """Recalcule `subjects.usage_count` depuis `publication_subjects`."""
         ...
 
-    def recompute_cooccurrences(self, conn: Connection, *, min_count: int = 2) -> int:
-        """Recalcule la table `subject_cooccurrences` (TRUNCATE + INSERT)."""
+    def refresh_cooccurrences(self, conn: Connection) -> int:
+        """Rafraîchit la matview `subject_cooccurrences`. Retourne le nombre
+        de paires après refresh (seuil `count >= 2` figé dans la matview)."""
         ...

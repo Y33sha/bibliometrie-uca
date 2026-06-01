@@ -1015,6 +1015,9 @@ publication_subjects = Table(
 )
 
 
+# `subject_cooccurrences` est une MATERIALIZED VIEW (alembic
+# `c8a3f2e5b4d7`). La projection SA Core ci-dessous sert uniquement aux
+# SELECT côté queries — les contraintes/indexes vivent en migration.
 subject_cooccurrences = Table(
     "subject_cooccurrences",
     metadata,
@@ -1022,7 +1025,5 @@ subject_cooccurrences = Table(
     Column("subject_b_id", Integer, nullable=False),
     Column("count", Integer, nullable=False),
     PrimaryKeyConstraint("subject_a_id", "subject_b_id"),
-    CheckConstraint("subject_a_id < subject_b_id", name="subject_cooccurrences_ordered"),
-    Index("subject_cooccurrences_b_idx", "subject_b_id"),
-    Index("subject_cooccurrences_count_idx", text("count DESC")),
+    info={"is_view": True},
 )

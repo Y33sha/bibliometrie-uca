@@ -238,32 +238,14 @@ def recompute_usage_counts(conn: Connection) -> int:
     return n_reset + n_updated
 
 
-def recompute_cooccurrences(conn: Connection, *, min_count: int = 2) -> int:
-    """Recalcule `subject_cooccurrences` depuis `publication_subjects`.
+def refresh_cooccurrences(conn: Connection) -> int:
+    """Rafraîchit la matview `subject_cooccurrences` depuis `publication_subjects`.
 
-    TRUNCATE puis INSERT en bloc, filtré par count >= min_count. Retourne
-    le nombre de paires insérées.
+    Seuil `count >= 2` figé dans la définition de la matview. Retourne
+    le nombre de paires dans la vue après refresh.
     """
-    conn.execute(text("TRUNCATE subject_cooccurrences"))
-    return conn.execute(
-        text(
-            """
-            INSERT INTO subject_cooccurrences (subject_a_id, subject_b_id, count)
-            SELECT
-                ps1.subject_id AS a_id,
-                ps2.subject_id AS b_id,
-                COUNT(DISTINCT ps1.publication_id) AS n
-            FROM publication_subjects ps1
-            JOIN publication_subjects ps2
-              ON ps1.publication_id = ps2.publication_id
-             AND ps1.subject_id < ps2.subject_id
-            WHERE NOT ps1.rejected AND NOT ps2.rejected
-            GROUP BY ps1.subject_id, ps2.subject_id
-            HAVING COUNT(DISTINCT ps1.publication_id) >= :min_count
-            """
-        ),
-        {"min_count": min_count},
-    ).rowcount
+    conn.execute(text("REFRESH MATERIALIZED VIEW subject_cooccurrences"))
+    return conn.execute(text("SELECT COUNT(*) FROM subject_cooccurrences")).scalar_one()
 
 
 # ── Lectures (consommées par les routes API) ─────────────────────
@@ -406,5 +388,5 @@ class PgSubjectsQueries(SubjectsQueries):
     def recompute_usage_counts(self, conn: Connection) -> int:
         return recompute_usage_counts(conn)
 
-    def recompute_cooccurrences(self, conn: Connection, *, min_count: int = 2) -> int:
-        return recompute_cooccurrences(conn, min_count=min_count)
+    def refresh_cooccurrences(self, conn: Connection) -> int:
+        return refresh_cooccurrences(conn)

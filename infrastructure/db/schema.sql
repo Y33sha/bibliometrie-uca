@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict boqEcyxBI0IFKEtqOGXW7hQOD4w2KH2ys3DNBrcno2CkoG2Wb2HHofQ0Wm5Iicz
+\restrict y3Qlbvdg1Rzm5MSGYxBiBFgLyV7rqT5GQCwlYYpiBOwlAd11G7QpHPhOcPCIKir
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
@@ -1334,15 +1334,19 @@ ALTER SEQUENCE public.structures_id_seq OWNED BY public.structures.id;
 
 
 --
--- Name: subject_cooccurrences; Type: TABLE; Schema: public; Owner: -
+-- Name: subject_cooccurrences; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
-CREATE TABLE public.subject_cooccurrences (
-    subject_a_id integer NOT NULL,
-    subject_b_id integer NOT NULL,
-    count integer NOT NULL,
-    CONSTRAINT subject_cooccurrences_ordered CHECK ((subject_a_id < subject_b_id))
-);
+CREATE MATERIALIZED VIEW public.subject_cooccurrences AS
+ SELECT ps1.subject_id AS subject_a_id,
+    ps2.subject_id AS subject_b_id,
+    (count(DISTINCT ps1.publication_id))::integer AS count
+   FROM (public.publication_subjects ps1
+     JOIN public.publication_subjects ps2 ON (((ps1.publication_id = ps2.publication_id) AND (ps1.subject_id < ps2.subject_id))))
+  WHERE ((NOT ps1.rejected) AND (NOT ps2.rejected))
+  GROUP BY ps1.subject_id, ps2.subject_id
+ HAVING (count(DISTINCT ps1.publication_id) >= 2)
+  WITH NO DATA;
 
 
 --
@@ -1980,14 +1984,6 @@ ALTER TABLE ONLY public.structures
 
 
 --
--- Name: subject_cooccurrences subject_cooccurrences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.subject_cooccurrences
-    ADD CONSTRAINT subject_cooccurrences_pkey PRIMARY KEY (subject_a_id, subject_b_id);
-
-
---
 -- Name: subjects subjects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2579,6 +2575,13 @@ CREATE INDEX subject_cooccurrences_count_idx ON public.subject_cooccurrences USI
 
 
 --
+-- Name: subject_cooccurrences_pkey; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX subject_cooccurrences_pkey ON public.subject_cooccurrences USING btree (subject_a_id, subject_b_id);
+
+
+--
 -- Name: subjects_label_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2928,23 +2931,7 @@ ALTER TABLE ONLY public.structure_relations
 
 
 --
--- Name: subject_cooccurrences subject_cooccurrences_subject_a_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.subject_cooccurrences
-    ADD CONSTRAINT subject_cooccurrences_subject_a_id_fkey FOREIGN KEY (subject_a_id) REFERENCES public.subjects(id) ON DELETE CASCADE;
-
-
---
--- Name: subject_cooccurrences subject_cooccurrences_subject_b_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.subject_cooccurrences
-    ADD CONSTRAINT subject_cooccurrences_subject_b_id_fkey FOREIGN KEY (subject_b_id) REFERENCES public.subjects(id) ON DELETE CASCADE;
-
-
---
 -- PostgreSQL database dump complete
 --
 
-\unrestrict boqEcyxBI0IFKEtqOGXW7hQOD4w2KH2ys3DNBrcno2CkoG2Wb2HHofQ0Wm5Iicz
+\unrestrict y3Qlbvdg1Rzm5MSGYxBiBFgLyV7rqT5GQCwlYYpiBOwlAd11G7QpHPhOcPCIKir
