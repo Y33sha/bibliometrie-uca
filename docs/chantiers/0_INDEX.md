@@ -14,10 +14,11 @@
 - [DOI Registration Agencies & DataCite](METIER_doi-ra-datacite.md)
 - [Stockage des données brutes (raw store)](DATA_raw-data-store.md)
 - [Cycle de vie des rows `staging` : machine à états, backoff, fraîcheur](DATA_cycle-vie-staging.md)
+- [Matérialiser le périmètre](DATA_perimeter-materialise.md) — standby, absorbé par `DATA_donnees-derivees`
 
 ### Non commencé
 
-- [Matérialiser le périmètre : table `perimeter_structures` + suppression `in_perimeter`](DATA_perimeter-materialise.md)
+- [Données dérivées : audit + cadre de décision (matérialisation vs vue)](DATA_donnees-derivees.md)
 - [Background jobs pour les endpoints longs](CODE_background-jobs.md)
 - [Relations entre publications](METIER_relations-publications.md)
 

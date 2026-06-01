@@ -1,5 +1,7 @@
 # Chantier — Matérialiser le périmètre : table `perimeter_structures` + suppression `in_perimeter`
 
+> **Standby.** Ce chantier est un cas particulier de la question générale traitée par [`DATA_donnees-derivees`](DATA_donnees-derivees.md) (audit du dérivé + cadre de décision). En attente du verdict de cet audit : si la matérialisation de `perimeter_structures` et/ou la suppression de `in_perimeter` sont retenues, cette fiche sert de sous-chantier ; sinon elle est abandonnée.
+
 ## Contexte
 
 Aujourd'hui, l'appartenance d'une authorship au périmètre UCA est portée par une colonne booléenne dérivée :

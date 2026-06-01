@@ -44,7 +44,6 @@ Pris dans l'ordre :
 - [x] Review = poubelle — audit fait : **pas une poubelle**, mappings sains ; seule action = libellé FR « Article de synthèse »
 - [x] Figshare collections — audit fait + règle `DOI_FIGSHARE_COLLECTION_TO_DATASET` ; dédup des sous-items → relations
 - [ ] Posters / conférence avec même DOI — hors-scope correction, à traiter en dédup
-- [ ] Question des raw_type openalex: comparer avec le type affiché
 
 ### Préprints article + journal_id inconnu
 
