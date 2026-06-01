@@ -7,6 +7,7 @@
 - [Matching cross-source des authorships](METIER_authorships-cross-source-matching.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
+- [Données dérivées : audit + cadre de décision (matérialisation vs vue)](DATA_donnees-derivees.md) — Phase 1 (inventaire + alignement Python↔SQL) faite, sous-chantiers Phase 2 à ouvrir
 
 ### En pause
 
@@ -18,7 +19,6 @@
 
 ### Non commencé
 
-- [Données dérivées : audit + cadre de décision (matérialisation vs vue)](DATA_donnees-derivees.md)
 - [Background jobs pour les endpoints longs](CODE_background-jobs.md)
 - [Relations entre publications](METIER_relations-publications.md)
 
