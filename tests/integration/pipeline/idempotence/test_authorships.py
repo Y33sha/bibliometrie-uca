@@ -87,3 +87,75 @@ class TestBuildAuthorshipsRebuildFull:
             f"rebuild_full doit converger vers le même état !\n"
             f"  avant : {counts_before}\n  après : {counts_after}"
         )
+
+
+def _snapshot_authorships_content(conn) -> list[tuple]:
+    """Contenu d'`authorships` hors identité (id) : ce qui doit être identique
+    entre un build incrémental et un rebuild full."""
+    from sqlalchemy import text
+
+    return [
+        tuple(r)
+        for r in conn.execute(
+            text("""
+                SELECT publication_id, person_id, author_position, is_corresponding,
+                       in_perimeter, roles
+                FROM authorships
+                ORDER BY publication_id, person_id
+            """)
+        ).all()
+    ]
+
+
+class TestIncrementalEqualsFull:
+    """Après une mutation des sources, le build incrémental (add + prune +
+    recompute convergent) produit le même contenu que le rebuild full — seuls
+    les `id` diffèrent (le full les renumérote). Garde-fou : c'est ce qui permet
+    de retirer la purge du pipeline routinier."""
+
+    def test_incremental_matches_full_after_mutation(self, sa_sync_conn):
+        from sqlalchemy import text
+
+        setup_persons_test_data(sa_sync_conn)
+        run_create_persons(sa_sync_conn)
+        _run_build_authorships(sa_sync_conn)
+
+        # Mutation des sources : inverse un is_corresponding (divergence d'attribut)
+        # et supprime une source_authorship (modifie l'ensemble des paires).
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_authorships SET is_corresponding = NOT is_corresponding "
+                "WHERE id = (SELECT min(id) FROM source_authorships "
+                "            WHERE authorship_id IS NOT NULL)"
+            )
+        )
+        sa_sync_conn.execute(
+            text(
+                "DELETE FROM source_authorships "
+                "WHERE id = (SELECT max(id) FROM source_authorships "
+                "            WHERE authorship_id IS NOT NULL)"
+            )
+        )
+
+        # Build incrémental après mutation → snapshot.
+        _run_build_authorships(sa_sync_conn)
+        incremental = _snapshot_authorships_content(sa_sync_conn)
+
+        # Rebuild full (purge + reconstruction) sur le même état source → snapshot.
+        import logging
+
+        from application.pipeline.authorships.build_authorships import build
+        from infrastructure.queries.authorships_build import PgAuthorshipsBuildQueries
+
+        build(
+            sa_sync_conn,
+            PgAuthorshipsBuildQueries(),
+            logging.getLogger("test"),
+            rebuild_full=True,
+        )
+        full = _snapshot_authorships_content(sa_sync_conn)
+
+        assert incremental == full, (
+            "Le build incrémental doit produire le même contenu que le full.\n"
+            f"  incrémental : {incremental}\n  full : {full}"
+        )
