@@ -37,21 +37,4 @@ class HalNormalizeQueries(Protocol):
         urls: list[str] | None,
     ) -> int: ...
 
-    def upsert_hal_source_authorship(
-        self,
-        conn: Connection,
-        *,
-        source_publication_id: int,
-        author_position: int,
-        source_structures: list[str] | None,
-        raw_author_name: str,
-        is_corresponding: bool,
-        roles: list[str] | None,
-        person_identifiers: JsonValue,
-    ) -> int: ...
-
     def staging_has_hal_doi(self, conn: Connection, doi: str) -> bool: ...
-
-    def clear_source_authorships_for_publication(
-        self, conn: Connection, source_publication_id: int
-    ) -> None: ...
