@@ -27,7 +27,7 @@ def _step_address_source(
     logger: logging.Logger,
     source: str,
     perimeter_ids: set[int],
-    wide_ids: set[int],
+    affiliation_structure_ids: set[int],
     daily: bool = False,
 ) -> None:
     """Étape : source avec adresses — calculer in_perimeter + structure_ids."""
@@ -43,7 +43,7 @@ def _step_address_source(
     logger.info(f"  {label} in_perimeter = TRUE : {n} authorships")
 
     n = queries.set_structure_ids_from_addresses(
-        conn, source=source, wide_ids=list(wide_ids), daily=daily
+        conn, source=source, affiliation_structure_ids=list(affiliation_structure_ids), daily=daily
     )
     logger.info(f"  {label} structure_ids : {n} authorships")
 
@@ -68,7 +68,7 @@ def run_populate(
     queries: AffiliationsQueries,
     logger: logging.Logger,
     perimeter_ids: set[int],
-    wide_ids: set[int],
+    affiliation_structure_ids: set[int],
     *,
     mode: str = "full",
 ) -> None:
@@ -84,12 +84,14 @@ def run_populate(
     t0 = time.perf_counter()
 
     logger.info(f"Périmètre restreint : {len(perimeter_ids)} structures")
-    logger.info(f"Périmètre large     : {len(wide_ids)} structures")
+    logger.info(f"Périmètre large     : {len(affiliation_structure_ids)} structures")
     if daily:
         logger.info("Mode daily : traitement des authorships récentes uniquement")
 
     for source in ALL_SOURCES:
-        _step_address_source(conn, queries, logger, source, perimeter_ids, wide_ids, daily=daily)
+        _step_address_source(
+            conn, queries, logger, source, perimeter_ids, affiliation_structure_ids, daily=daily
+        )
 
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")

@@ -77,7 +77,7 @@ def set_in_perimeter_from_addresses(
 
 
 def set_structure_ids_from_addresses(
-    conn: Connection, *, source: str, wide_ids: list[int], daily: bool
+    conn: Connection, *, source: str, affiliation_structure_ids: list[int], daily: bool
 ) -> int:
     """Alimente `source_authorship_structures` via le périmètre large.
 
@@ -95,11 +95,11 @@ def set_structure_ids_from_addresses(
             JOIN source_authorships sa2 ON sa2.id = saa.source_authorship_id
             {daily_filter}
             WHERE sa2.source = :source
-              AND ast.structure_id = ANY(:wide_ids)
+              AND ast.structure_id = ANY(:affiliation_structure_ids)
               AND ast.is_confirmed IS DISTINCT FROM FALSE
             ON CONFLICT DO NOTHING
         """),
-        {"source": source, "wide_ids": wide_ids},
+        {"source": source, "affiliation_structure_ids": affiliation_structure_ids},
     ).rowcount
 
 
@@ -142,9 +142,11 @@ class PgAffiliationsQueries(AffiliationsQueries):
         )
 
     def set_structure_ids_from_addresses(
-        self, conn: Connection, *, source: str, wide_ids: list[int], daily: bool
+        self, conn: Connection, *, source: str, affiliation_structure_ids: list[int], daily: bool
     ) -> int:
-        return set_structure_ids_from_addresses(conn, source=source, wide_ids=wide_ids, daily=daily)
+        return set_structure_ids_from_addresses(
+            conn, source=source, affiliation_structure_ids=affiliation_structure_ids, daily=daily
+        )
 
     def count_source_authorships_stats(self, conn: Connection, source: str) -> tuple[int, int, int]:
         return count_source_authorships_stats(conn, source)
