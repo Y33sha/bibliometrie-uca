@@ -248,6 +248,10 @@ def phase_normalize(**kw: Any) -> Any:
         _run_normalize_openalex()
     if "wos" in sources:
         _run_normalize_wos()
+    # `source_authorship_addresses` vient d'être (re)peuplée : rafraîchir le
+    # décompte dérivé `addresses.pub_count` ici, pas dans une phase ultérieure
+    # (un run `--only normalize` doit suffire à le tenir à jour).
+    _run_recompute_address_pub_count()
     mode = kw.get("mode", "full")
     policy = MODES[mode]
     # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
@@ -257,6 +261,21 @@ def phase_normalize(**kw: Any) -> Any:
     else:
         log.info("VACUUM staging...")
         _vacuum_staging(full=False)
+
+
+def _run_recompute_address_pub_count() -> None:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.repositories.address_linker import recompute_pub_count
+
+    log.info("▶ recompute addresses.pub_count")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        n = recompute_pub_count(conn)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ addresses.pub_count : %d rows mises à jour en %.1fs", n, time.time() - t0)
 
 
 def _vacuum_staging(full: bool = False) -> Any:

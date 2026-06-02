@@ -8,6 +8,42 @@ from sqlalchemy import Connection, text
 from domain.normalize import normalize_text
 
 
+def recompute_pub_count(conn: Connection) -> int:
+    """Recalcule `addresses.pub_count` = nb de publications canoniques distinctes
+    liées à l'adresse via `source_authorship_addresses`.
+
+    Recompute global idempotent (guard `IS DISTINCT FROM`) couvrant **toutes**
+    les adresses : celles qui ont perdu tous leurs liens repassent à 0. Lancé
+    en fin de phase `normalize`, dès que `source_authorship_addresses` est
+    peuplée — un run `--only normalize` suffit à tenir le décompte à jour, sans
+    attendre une phase ultérieure. Reflète les publications déjà rattachées
+    (`publication_id` posé par bulk-link sur les existantes) ; les publications
+    créées en phase `publications` convergent au prochain `normalize`.
+
+    Ne committe pas (le caller orchestre). Retourne le nombre de rows modifiées.
+    """
+    return conn.execute(
+        text("""
+            UPDATE addresses a
+            SET pub_count = COALESCE(sub.cnt, 0)
+            FROM (
+                SELECT a2.id AS address_id, agg.cnt
+                FROM addresses a2
+                LEFT JOIN (
+                    SELECT saa.address_id, COUNT(DISTINCT sd.publication_id) AS cnt
+                    FROM source_authorship_addresses saa
+                    JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                    JOIN source_publications sd ON sd.id = sa.source_publication_id
+                    WHERE sd.publication_id IS NOT NULL
+                    GROUP BY saa.address_id
+                ) agg ON agg.address_id = a2.id
+            ) sub
+            WHERE a.id = sub.address_id
+              AND a.pub_count IS DISTINCT FROM COALESCE(sub.cnt, 0)
+        """)
+    ).rowcount
+
+
 class PgAddressLinker:
     """Adapter PostgreSQL pour `application.ports.address_linker.AddressLinker`."""
 
