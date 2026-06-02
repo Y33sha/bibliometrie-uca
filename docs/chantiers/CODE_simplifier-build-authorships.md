@@ -32,15 +32,14 @@ Le pruning des orphelines (commit `556b0819`) a fermé le gap sur *l'ensemble de
 ## Phasage
 
 - [x] Passe ensembliste unique côté queries : `propagate_authorship_attributes` fusionne position / is_corresponding / roles / in_perimeter en un agrégat convergent ; linking étape 2 en un `UPDATE` global (`link_source_authorships_to_authorships`).
-- [ ] Drop `SOURCE_PRIORITY_IS_CORRESPONDING` (`domain/sources/__init__.py`) + ajuster les tests qui s'y réfèrent.
+- [x] Drop `SOURCE_PRIORITY_IS_CORRESPONDING` (`domain/sources/__init__.py`) + test associé.
 - [x] Simplifier `build()` : signature `sources` et gating `full_run` retirés ; purge conservée sous `rebuild_full`. CLI `--sources` supprimée.
-- [ ] Harmoniser le chemin admin temps-réel `propagate_uca_for_addresses` / `propagate_in_perimeter_to_authorships` avec le modèle `bool_or` (sans casser la réactivité de la review d'adresse) + renommer `link_source_authorships_to_authorship_for_pair` → `…_to_authorship`.
+- [x] Harmoniser le chemin admin sur le modèle `bool_or` : `assign_orphans` (`recompute_authorship_author_position_and_corresponding` → bool_or, plus de param priorité) + renommage `link_source_authorships_to_authorship_for_pair` → `…_to_authorship`. L'autre chemin (`propagate_uca_for_addresses` → `propagate_in_perimeter_to_authorships`) était déjà convergent (`in_perimeter = EXISTS(...)`, gère la démotion).
 - [x] `JOIN v_active_publications` de la propagation périmètre vérifié redondant (0 SA `in_perimeter=TRUE` sur publi inactive) — retiré.
 - [x] Tests : idempotence (inchangée) + convergence (`is_corresponding` bool_or ; TRUE / rôle / périmètre périmés retombent). Caractérisation position par priorité couverte par l'idempotence.
-- [ ] (hors de ce code) One-shot prod pour recomputer les ~3384 lignes divergentes — relève du chantier qualité prod.
+- [x] Pas de one-shot prod nécessaire : la passe convergente recompute *tous* les authorships liés à chaque build (le `IS DISTINCT FROM` n'évite que les écritures inutiles), donc la prochaine exécution de la phase `authorships` — même incrémentale — corrige les ~3384 divergences, prune les orphelines et nettoie les rôles périmés automatiquement.
+- [ ] **Remplacer le `full` par l'incrémental** : l'incrémental est désormais content-équivalent au full (mêmes paires, mêmes attributs) ; le full ne fait en plus que renuméroter les `id` (indésirable — handle externe durable) et re-linker de zéro (ne rattrape que des corruptions hors flux normaux). Retirer `rebuild_authorships_full` des modes pipeline (plus de purge routinière) ; conserver `rebuild_full` en option CLI de récupération manuelle. Test d'équivalence : muter les sources → build incrémental → snapshot, build full → snapshot, assert égalité (modulo `id`).
 
 ## Questions ouvertes
 
 - `author_position` : garder le pick par priorité, ou un `min()` suffirait-il comme approximation ? (la priorité est gratuite dans la passe, on la garde sauf objection.)
-- `propagate_uca_for_addresses` en `bool_or` temps réel : implique-t-il de relire toutes les SA d'une authorship à chaque review d'adresse ? Coût à vérifier (probablement négligeable au volume UCA).
-- Une fois la convergence totale acquise, `rebuild_full` / purge reste-t-il utile, ou devient-il du folklore ? Le garder tant que son inutilité n'est pas prouvée.
