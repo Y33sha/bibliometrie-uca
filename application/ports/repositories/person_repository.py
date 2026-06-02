@@ -127,12 +127,16 @@ class PersonRepository(Protocol):
         is_corresponding_priority: tuple[str, ...],
     ) -> None: ...
 
-    def recompute_authorship_in_perimeter_and_structures(
+    def recompute_authorship_in_perimeter(
         self,
         publication_id: int,
         person_id: int,
         sources: tuple[str, ...],
     ) -> None: ...
+
+    def refresh_authorship_structures(self) -> None:
+        """Rafraîchit la matview `authorship_structures` (`REFRESH … CONCURRENTLY`)."""
+        ...
 
     def count_authorships_with_name_form(
         self,

@@ -7,7 +7,7 @@
 Aujourd'hui, l'appartenance d'une authorship au périmètre UCA est portée par une colonne booléenne dérivée :
 
 - `authorships.in_perimeter boolean` et `source_authorships.in_perimeter boolean`
-- Calculée par `build_authorships.propagate_perimeter_and_structures_from` à partir des `structure_ids[]` (Phase 2/3 du chantier M2M : passera en table de jointure `authorship_structures` / `source_authorship_structures`).
+- Calculée par `build_authorships.propagate_perimeter_from` (OR depuis `source_authorships.in_perimeter`). Les structures rattachées sont, elles, dans la matview `authorship_structures` (dérivée de `source_authorship_structures`), distincte de la question `in_perimeter`.
 - Le périmètre lui-même : `perimeters.structure_ids integer[]` (racines), et la résolution récursive descend dans `structure_relations` via une CTE — cf. `infrastructure/perimeter.py:get_perimeter_structure_ids`.
 
 `in_perimeter` est donc un **cache dérivable** :

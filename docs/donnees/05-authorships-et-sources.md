@@ -2,7 +2,7 @@
 
 ## `authorships` — table de vérité des contributions
 
-Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la table de jointure `authorship_structures`). Construite par `application/pipeline/authorships/build_authorships.py` à partir des *authorships* sources.
+Table de liaison recensant les contributions individuelles aux publications. Chaque entrée référence **1 personne**, **1 publication**, *n* structures (via la matview `authorship_structures`). Construite par `application/pipeline/authorships/build_authorships.py` à partir des *authorships* sources.
 
 **Couverture partielle assumée** : la table ne contient des entrées que pour les signataires ayant une `person_id` (cf. [périmètre des persons](04-personnes.md#périmètre)). Les co-auteurs externes des publications UCA n'apparaissent pas ici ; pour obtenir la liste exhaustive des auteurs d'une publication (incluant les externes), passer par `source_authorships`.
 
@@ -14,7 +14,7 @@ Colonnes notables :
 - `is_corresponding` : auteur correspondant
 - `roles` (text[]) : rôles (auteur, directeur, rapporteur — pour theses.fr)
 
-La table de jointure `authorship_structures (authorship_id, structure_id)` porte les affiliations résolues — FK `ON DELETE CASCADE` des deux côtés, PK composite.
+`authorship_structures (authorship_id, structure_id)` porte les affiliations résolues. C'est une **`MATERIALIZED VIEW`** (pas une table) : union des `source_authorship_structures` des `source_authorships` reliées à l'authorship, rafraîchie (`REFRESH … CONCURRENTLY`) en fin de phase `authorships` et après les recompute admin (review adresse↔structure, assign orphelin). Index unique `(authorship_id, structure_id)` + index `(structure_id)` ; pas de FK (le nettoyage d'une authorship supprimée se fait au refresh).
 
 **Cohérence avec les sources** : la table est **entièrement dérivée** des `source_authorships` — `in_perimeter`, les liens via `authorship_structures`, `is_corresponding`, `author_position`, `roles` sont des consolidations (union ou priorité par source) des authorships sources. Le build (`application/pipeline/authorships/build_authorships.py`) est idempotent en mode incrémental ; le mode pipeline `full` exécute en plus une purge complète + rebuild from scratch (TRUNCATE + reset des FK), pour garantir la convergence absolue à intervalle mensuel. Aucun état natif sur la table : le rejet manuel d'une paire (« cette personne n'est pas l'auteur ») vit dans le store `rejected_authorships`, lu en anti-join par les sites de création pour ne jamais recréer la paire.
 

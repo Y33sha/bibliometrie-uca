@@ -52,6 +52,8 @@ def assign_orphan_authorship(
     publication_id = repo.find_publication_id_for_source_authorship(source, authorship_id)
     if publication_id is not None:
         _refresh_authorship_from_sources(person_id, publication_id, repo=repo)
+        # Les structures dérivées vivent dans la matview `authorship_structures`.
+        repo.refresh_authorship_structures()
     return True
 
 
@@ -76,6 +78,8 @@ def batch_assign_orphan_authorships(
     for name_form in repo.get_distinct_name_forms_from_source_authorships(sa_ids):
         repo.add_name_form(person_id, name_form)
 
+    # Les structures dérivées vivent dans la matview `authorship_structures`.
+    repo.refresh_authorship_structures()
     return assigned
 
 
@@ -92,7 +96,8 @@ def _refresh_authorship_from_sources(
     1. INSERT IF MISSING dans authorships
     2. Pose la FK source_authorships.authorship_id (sources non exclues)
     3. Recalcule author_position et is_corresponding (par priorité de source)
-    4. Recalcule in_perimeter et structure_ids (agrégation OR/union)
+    4. Recalcule in_perimeter (agrégation OR ; les structures dérivées vivent
+       dans la matview `authorship_structures`, rafraîchie par le caller)
     """
     repo.insert_authorship_if_missing(publication_id, person_id)
     repo.link_source_authorships_to_authorship_for_pair(publication_id, person_id)
@@ -102,4 +107,4 @@ def _refresh_authorship_from_sources(
         SOURCE_PRIORITY,
         SOURCE_PRIORITY_IS_CORRESPONDING,
     )
-    repo.recompute_authorship_in_perimeter_and_structures(publication_id, person_id, AUTHOR_SOURCES)
+    repo.recompute_authorship_in_perimeter(publication_id, person_id, AUTHOR_SOURCES)

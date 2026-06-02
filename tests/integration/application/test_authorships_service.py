@@ -17,6 +17,7 @@ from application.authorships.core import (
 from domain.errors import NotFoundError
 from infrastructure.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import authorship_repository
+from tests.integration.helpers.structures import add_authorship_structure
 
 
 @pytest.fixture
@@ -222,13 +223,7 @@ class TestFindByPublicationId:
             {"p": pub_id, "pid": person_id, "roles": ["author"]},
         ).scalar_one()
         for sid in (s42, s43):
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO authorship_structures (authorship_id, structure_id) "
-                    "VALUES (:a, :s)"
-                ),
-                {"a": aid, "s": sid},
-            )
+            add_authorship_structure(sa_sync_conn, aid, sid)
         auths = repo.find_by_publication_id(pub_id)
         assert len(auths) == 1
         a = auths[0]

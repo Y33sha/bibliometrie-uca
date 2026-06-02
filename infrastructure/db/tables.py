@@ -534,14 +534,11 @@ authorships = Table(
 )
 
 
-authorship_structures = Table(
-    "authorship_structures",
-    metadata,
-    Column("authorship_id", Integer, nullable=False),
-    Column("structure_id", Integer, nullable=False),
-    PrimaryKeyConstraint("authorship_id", "structure_id", name="authorship_structures_pkey"),
-    Index("idx_authorship_structures_structure_id", "structure_id"),
-)
+# `authorship_structures` est une MATERIALIZED VIEW (DDL via migration
+# a2c6e4f8b1d7), pas une table : dérivée des `source_authorship_structures` des
+# `source_authorships` reliées à une authorship. Pas modélisée dans le metadata
+# SQLAlchemy — tous les accès se font en SQL brut par nom (lectures) ou via
+# REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer en table.
 
 
 rejected_authorships = Table(

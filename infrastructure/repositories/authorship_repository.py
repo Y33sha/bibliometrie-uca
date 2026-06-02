@@ -169,9 +169,10 @@ class PgAuthorshipRepository:
         source_authorship_ids: list[int],
     ) -> None:
         # Identifie les (publication_id, person_id) impactées par les
-        # source_authorships modifiées, puis resync les authorships
-        # correspondantes : DELETE de leurs liens existants, INSERT depuis
-        # `source_authorship_structures`, UPDATE du booléen `in_perimeter`.
+        # source_authorships modifiées, puis resync le booléen `in_perimeter`
+        # sur les authorships correspondantes. Les structures dérivées vivent
+        # dans la matview `authorship_structures` : le caller la rafraîchit
+        # (`refresh_authorship_structures`) après cette propagation.
         self._conn.execute(
             text("""
             CREATE TEMP TABLE _affected_authorships AS
@@ -185,29 +186,6 @@ class PgAuthorshipRepository:
               AND sa.person_id IS NOT NULL
         """),
             {"ids": source_authorship_ids},
-        )
-
-        self._conn.execute(
-            text("""
-            DELETE FROM authorship_structures aus
-            USING _affected_authorships af
-            WHERE aus.authorship_id = af.authorship_id
-        """)
-        )
-
-        self._conn.execute(
-            text("""
-            INSERT INTO authorship_structures (authorship_id, structure_id)
-            SELECT DISTINCT a.id, sas.structure_id
-            FROM _affected_authorships af
-            JOIN authorships a ON a.id = af.authorship_id
-            JOIN source_publications sd ON sd.publication_id = a.publication_id
-            JOIN source_authorships sa ON sa.source_publication_id = sd.id
-                                       AND sa.person_id = a.person_id
-                                       AND sa.source = sd.source
-            JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id
-            WHERE sa.in_perimeter = TRUE
-        """)
         )
 
         self._conn.execute(
@@ -228,3 +206,9 @@ class PgAuthorshipRepository:
         )
 
         self._conn.execute(text("DROP TABLE _affected_authorships"))
+
+    def refresh_authorship_structures(self) -> None:
+        """Rafraîchit la matview `authorship_structures` après une propagation
+        ciblée d'`in_perimeter` (le caller admin l'appelle une fois en fin
+        d'opération). `CONCURRENTLY` pour ne pas bloquer les lectures labo."""
+        self._conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY authorship_structures"))

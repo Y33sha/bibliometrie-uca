@@ -87,9 +87,9 @@ def create_authorships_from_sources(
 
     Pour chaque `publication_id` distinct du lot, insère une row dans
     `authorships` en prenant les colonnes (author_position, in_perimeter,
-    is_corresponding) et les structures depuis la source de plus haute
-    priorité (paramétrée par le use case). Les structures sont insérées
-    dans la table de jointure `authorship_structures`.
+    is_corresponding) de la source de plus haute priorité (paramétrée par le
+    use case). Les structures dérivées vivent dans la matview
+    `authorship_structures`, rafraîchie par le caller après l'assignation.
     """
     if not sa_ids:
         return
@@ -117,18 +117,6 @@ def create_authorships_from_sources(
                 WHERE rj.publication_id = cs.publication_id AND rj.person_id = :pid
             )
             ON CONFLICT (publication_id, person_id) DO NOTHING
-        """),
-        {"pid": person_id},
-    )
-    conn.execute(
-        text("""
-            INSERT INTO authorship_structures (authorship_id, structure_id)
-            SELECT DISTINCT a.id, sas.structure_id
-            FROM _chosen_sa cs
-            JOIN authorships a ON a.publication_id = cs.publication_id
-                              AND a.person_id = :pid
-            JOIN source_authorship_structures sas ON sas.source_authorship_id = cs.sa_id
-            ON CONFLICT DO NOTHING
         """),
         {"pid": person_id},
     )
@@ -266,14 +254,17 @@ def recompute_authorship_author_position_and_corresponding(
     )
 
 
-def recompute_authorship_in_perimeter_and_structures(
+def recompute_authorship_in_perimeter(
     conn: Connection,
     publication_id: int,
     person_id: int,
     sources: tuple[str, ...],
 ) -> None:
-    """Réagrège `authorships.in_perimeter` (OR-bool des sources) et resync
-    `authorship_structures` (union des structures cross-source) pour la paire."""
+    """Réagrège `authorships.in_perimeter` (OR-bool des sources) pour la paire.
+
+    Les structures dérivées vivent dans la matview `authorship_structures`,
+    rafraîchie par le caller après l'opération.
+    """
     sources_sql = "(" + ", ".join(f"'{s}'" for s in sources) + ")"
     conn.execute(
         text(f"""
@@ -287,29 +278,6 @@ def recompute_authorship_in_perimeter_and_structures(
                       AND sa.person_id = :pid
                 ), FALSE),
                 updated_at = now()
-            WHERE a.publication_id = :pub AND a.person_id = :pid
-        """),
-        {"pub": publication_id, "pid": person_id},
-    )
-    conn.execute(
-        text("""
-            DELETE FROM authorship_structures aus
-            USING authorships a
-            WHERE aus.authorship_id = a.id
-              AND a.publication_id = :pub AND a.person_id = :pid
-        """),
-        {"pub": publication_id, "pid": person_id},
-    )
-    conn.execute(
-        text(f"""
-            INSERT INTO authorship_structures (authorship_id, structure_id)
-            SELECT DISTINCT a.id, sas.structure_id
-            FROM authorships a
-            JOIN source_publications sd ON sd.publication_id = a.publication_id
-            JOIN source_authorships sa ON sa.source_publication_id = sd.id
-                                       AND sa.person_id = a.person_id
-                                       AND sa.source IN {sources_sql}
-            JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id
             WHERE a.publication_id = :pub AND a.person_id = :pid
         """),
         {"pub": publication_id, "pid": person_id},

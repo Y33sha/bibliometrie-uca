@@ -5,6 +5,7 @@ import json
 from sqlalchemy import text
 
 from infrastructure.queries.hal_problems import PgHalProblemsQueries
+from tests.integration.helpers.structures import add_authorship_structure
 
 
 def _q(conn) -> PgHalProblemsQueries:
@@ -188,10 +189,7 @@ def _create_authorship_uca(conn, pub_id, lab_id, position=0):
         """),
         {"p": pub_id, "pos": position},
     ).one()
-    conn.execute(
-        text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
-        {"a": row.id, "s": lab_id},
-    )
+    add_authorship_structure(conn, row.id, lab_id)
     return row.id
 
 
