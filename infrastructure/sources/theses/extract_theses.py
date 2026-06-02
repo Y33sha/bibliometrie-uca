@@ -26,13 +26,17 @@ from infrastructure.sources.http_retry import http_request_with_retry
 
 _UPDATE_THESES_SQL = text(
     """
-    UPDATE staging
+    UPDATE staging s
     SET last_seen_at = now(),
-        raw_data = CASE WHEN raw_hash IS DISTINCT FROM :raw_hash THEN :raw_data ELSE raw_data END,
-        doi      = CASE WHEN raw_hash IS DISTINCT FROM :raw_hash THEN :doi ELSE doi END,
-        processed = CASE WHEN raw_hash IS DISTINCT FROM :raw_hash THEN FALSE ELSE processed END,
+        raw_data = CASE WHEN s.raw_hash IS DISTINCT FROM :raw_hash THEN :raw_data ELSE s.raw_data END,
+        doi      = CASE WHEN s.raw_hash IS DISTINCT FROM :raw_hash THEN :doi ELSE s.doi END,
+        processed = CASE WHEN s.raw_hash IS DISTINCT FROM :raw_hash THEN FALSE ELSE s.processed END,
         raw_hash = :raw_hash
-    WHERE source = 'theses' AND source_id = :source_id
+    FROM (
+        SELECT raw_hash AS old_hash FROM staging WHERE source = 'theses' AND source_id = :source_id
+    ) old
+    WHERE s.source = 'theses' AND s.source_id = :source_id
+    RETURNING (old.old_hash IS DISTINCT FROM :raw_hash) AS changed
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
@@ -119,24 +123,24 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
 
     def upsert_these(
         self, conn: Connection, these: dict[str, Any], *, is_new: bool
-    ) -> tuple[bool, bool]:
+    ) -> tuple[bool, bool, bool]:
         """INSERT pour les nouvelles, UPDATE sinon.
 
-        L'UPDATE bumpe toujours `last_seen_at` (la thèse a été re-vue) et ne
-        réécrit `raw_data`/`doi`/`processed` que si le `raw_hash` a changé.
-        `updated` compte donc les rows re-vues (« touchées »), comme OpenAlex/WoS.
+        L'UPDATE bumpe toujours `last_seen_at` (la thèse a été re-vue) mais ne
+        réécrit `raw_data`/`doi`/`processed` que si le `raw_hash` a changé ; le
+        `RETURNING` compare l'ancien hash au nouveau pour distinguer `updated`
+        (contenu réécrit) d'`unchanged` (re-vu identique).
+
+        Retourne `(new, updated, unchanged)` — exactement un `True`.
         """
-        theses_id = self.extract_id(these)
-        doi = self.extract_doi(these)
         raw_hash = compute_hash(these)
         params = {
-            "source_id": theses_id,
-            "doi": doi,
+            "source_id": self.extract_id(these),
+            "doi": self.extract_doi(these),
             "raw_data": these,
             "raw_hash": raw_hash,
         }
         if is_new:
-            result = conn.execute(_INSERT_THESES_SQL, params)
-            return (bool(result.rowcount), False)
-        result = conn.execute(_UPDATE_THESES_SQL, params)
-        return (False, bool(result.rowcount))
+            return (bool(conn.execute(_INSERT_THESES_SQL, params).rowcount), False, False)
+        changed = bool(conn.execute(_UPDATE_THESES_SQL, params).one().changed)
+        return (False, changed, not changed)

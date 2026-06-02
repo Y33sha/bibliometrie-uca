@@ -30,7 +30,7 @@ def spies(monkeypatch):
 
     def fake_full(adapter, query, collection_code, conn, existing_ids, total_count, logger):
         calls["full"].append({"collection": collection_code, "total": total_count})
-        return 0, 0  # (new, updated)
+        return 0, 0, 0  # (new, updated, unchanged)
 
     def fake_incremental(adapter, collection_code, orphans, known, conn, existing_ids, logger):
         calls["incremental"].append(
@@ -40,7 +40,11 @@ def spies(monkeypatch):
                 "known": list(known),
             }
         )
-        return len(orphans), len(known)  # (new, updated)
+        return (
+            len(orphans),
+            0,
+            len(known),
+        )  # (new, updated, unchanged) : connus = taggés (inchangés)
 
     monkeypatch.setattr(extract_hal, "_extract_full", fake_full)
     monkeypatch.setattr(extract_hal, "_extract_incremental", fake_incremental)
@@ -69,7 +73,7 @@ class TestAdaptiveDispatch:
         adapter = _fake_adapter(preview_ids)
         existing = {f"hal-{i}" for i in range(5, 5000)}
 
-        total, _new, _updated = extract_hal.extract_collection(
+        total, _new, _updated, _unchanged = extract_hal.extract_collection(
             collection_code="UMBRELLA",
             collection_label="Umbrella",
             conn=MagicMock(),
@@ -91,7 +95,7 @@ class TestAdaptiveDispatch:
         preview_ids = [f"hal-{i}" for i in range(100)]
         adapter = _fake_adapter(preview_ids)
 
-        total, _new, _updated = extract_hal.extract_collection(
+        total, _new, _updated, _unchanged = extract_hal.extract_collection(
             collection_code="FRESH",
             collection_label="Fresh",
             conn=MagicMock(),
@@ -113,7 +117,7 @@ class TestAdaptiveDispatch:
         adapter = _fake_adapter(preview_ids)
         existing = {f"hal-{i}" for i in range(100, 5000)}
 
-        total, _new, _updated = extract_hal.extract_collection(
+        total, _new, _updated, _unchanged = extract_hal.extract_collection(
             collection_code="BOUNDARY",
             collection_label="Boundary",
             conn=MagicMock(),
@@ -133,7 +137,7 @@ class TestAdaptiveDispatch:
         adapter = _fake_adapter(preview_ids)
         existing = {f"hal-{i}" for i in range(99, 5000)}
 
-        total, _new, _updated = extract_hal.extract_collection(
+        total, _new, _updated, _unchanged = extract_hal.extract_collection(
             collection_code="JUSTBELOW",
             collection_label="JustBelow",
             conn=MagicMock(),
@@ -149,7 +153,7 @@ class TestAdaptiveDispatch:
         preview_ids = [f"hal-{i}" for i in range(50)]
         adapter = _fake_adapter(preview_ids)
 
-        total, new, updated = extract_hal.extract_collection(
+        total, new, updated, unchanged = extract_hal.extract_collection(
             collection_code="DRY",
             collection_label="Dry",
             conn=MagicMock(),
@@ -160,14 +164,13 @@ class TestAdaptiveDispatch:
             dry_run=True,
         )
         assert total == 50
-        assert new == 0
-        assert updated == 0
+        assert (new, updated, unchanged) == (0, 0, 0)
         assert not spies["full"] and not spies["incremental"]
 
     def test_empty_collection_returns_zero(self, spies):
         adapter = _fake_adapter([])
 
-        total, new, updated = extract_hal.extract_collection(
+        total, new, updated, unchanged = extract_hal.extract_collection(
             collection_code="EMPTY",
             collection_label="Empty",
             conn=MagicMock(),
@@ -177,8 +180,7 @@ class TestAdaptiveDispatch:
             years=[2025],
         )
         assert total == 0
-        assert new == 0
-        assert updated == 0
+        assert (new, updated, unchanged) == (0, 0, 0)
         assert not spies["full"] and not spies["incremental"]
 
 
@@ -192,7 +194,7 @@ class TestExtractFullSafeguard:
         adapter.fetch_page.return_value = {"response": {"numFound": 1000, "docs": []}}
 
         conn = MagicMock()
-        total_new, total_updated = extract_hal._extract_full(
+        total_new, total_updated, total_unchanged = extract_hal._extract_full(
             adapter=adapter,
             query="q",
             collection_code="C",
@@ -201,7 +203,7 @@ class TestExtractFullSafeguard:
             total_count=1000,
             logger=logging.getLogger("test"),
         )
-        assert (total_new, total_updated) == (0, 0)  # sortie propre
+        assert (total_new, total_updated, total_unchanged) == (0, 0, 0)  # sortie propre
         adapter.upsert_work.assert_not_called()
 
 

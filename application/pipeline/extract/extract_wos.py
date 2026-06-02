@@ -34,23 +34,26 @@ def extract_year(
     logger: logging.Logger,
     *,
     dry_run: bool = False,
-) -> tuple[int, int]:
-    """Extrait toutes les publications d'une année. Retourne `(new, updated)`."""
+) -> tuple[int, int, int]:
+    """Extrait toutes les publications d'une année.
+
+    Retourne `(new, updated, unchanged)`."""
     logger.info(f"Requête WoS : {adapter.build_query(year, affiliations)}")
 
     data = adapter.fetch_page(year, 1, affiliations)
     if not data:
         logger.error(f"Impossible d'exécuter la requête pour {year}")
-        return 0, 0
+        return 0, 0, 0
 
     total_count = adapter.get_records_found(data)
     logger.info(f"Année {year} : {total_count} records trouvés")
 
     if dry_run or total_count == 0:
-        return 0, 0
+        return 0, 0, 0
 
     total_new = 0
     total_updated = 0
+    total_unchanged = 0
     first_record = 1
     page_num = 0
     consecutive_failures = 0
@@ -86,10 +89,11 @@ def extract_year(
                     existing_uts.add(ut)
             total_new += counts.new
             total_updated += counts.updated
+            total_unchanged += counts.unchanged
 
         logger.info(
             f"  Page {page_num} : {len(records)} records, "
-            f"{counts.new} nouveaux, {counts.updated} mis à jour "
+            f"{counts.new} nouveaux, {counts.updated} mis à jour, {counts.unchanged} inchangés "
             f"({min(first_record + len(records) - 1, total_count)}/{total_count})"
         )
 
@@ -108,10 +112,10 @@ def extract_year(
             break
 
     logger.info(
-        f"Année {year} terminée : {total_new} nouveaux, "
-        f"{total_updated} mis à jour sur {total_count} trouvés"
+        f"Année {year} terminée : {total_new} nouveaux, {total_updated} mis à jour, "
+        f"{total_unchanged} inchangés sur {total_count} trouvés"
     )
-    return total_new, total_updated
+    return total_new, total_updated, total_unchanged
 
 
 class WosExtractor(SourceExtractor[WosExtractConfig]):
@@ -168,7 +172,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
         stats = PhaseMetrics()
         for i, year in enumerate(years):
             try:
-                new, updated = extract_year(
+                new, updated, unchanged = extract_year(
                     self._adapter,
                     self.conn,
                     year,
@@ -177,7 +181,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
                     self.logger,
                     dry_run=args.dry_run,
                 )
-                stats.add(new=new, updated=updated)
+                stats.add(new=new, updated=updated, unchanged=unchanged)
             except Exception as e:
                 self.logger.error(f"Erreur sur l'année {year} : {e} — passage à la suivante")
             if i < len(years) - 1:

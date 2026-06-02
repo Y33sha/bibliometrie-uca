@@ -66,7 +66,10 @@ class HalExtractAdapter(Protocol):
         doi: str | None,
         raw_data: dict[str, Any],
         collection: str,
-    ) -> None: ...
+    ) -> tuple[bool, bool]:
+        """UPSERT staging. Retourne `(inserted, changed)` : insertion réelle
+        (`xmax = 0`) et contenu réécrit (hash distinct de l'ancien)."""
+        ...
 
     def tag_existing_with_collection(
         self, conn: Connection, hal_ids: list[str], collection_code: str

@@ -31,11 +31,15 @@ def _extract_full(
     existing_ids: set[str],
     total_count: int,
     logger: logging.Logger,
-) -> tuple[int, int]:
-    """Full-fetch : paginate tous les papiers d'une collection. Retourne `(new, updated)`."""
+) -> tuple[int, int, int]:
+    """Full-fetch : paginate tous les papiers d'une collection.
+
+    Retourne `(new, updated, unchanged)` (insertion / contenu réécrit / re-vu
+    identique), ventilé via le `(inserted, changed)` de l'UPSERT."""
     start = 0
     total_new = 0
     total_updated = 0
+    total_unchanged = 0
     while start < total_count:
         data = adapter.fetch_page(query, collection_code, start)
         docs = data["response"]["docs"]
@@ -46,23 +50,26 @@ def _extract_full(
             break
         new_in_page = 0
         updated_in_page = 0
+        unchanged_in_page = 0
         for doc in docs:
             hal_id = adapter.extract_id(doc)
             if not hal_id:
                 continue
             doi = adapter.extract_doi(doc)
-            is_new = hal_id not in existing_ids
-            adapter.upsert_work(conn, hal_id, doi, doc, collection_code)
-            if is_new:
+            inserted, changed = adapter.upsert_work(conn, hal_id, doi, doc, collection_code)
+            if inserted:
                 existing_ids.add(hal_id)
                 new_in_page += 1
-            else:
+            elif changed:
                 updated_in_page += 1
+            else:
+                unchanged_in_page += 1
         conn.commit()
         total_new += new_in_page
         total_updated += updated_in_page
+        total_unchanged += unchanged_in_page
         start += len(docs)
-    return total_new, total_updated
+    return total_new, total_updated, total_unchanged
 
 
 def _extract_incremental(
@@ -73,15 +80,19 @@ def _extract_incremental(
     conn: Connection,
     existing_ids: set[str],
     logger: logging.Logger,
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     """Fetch individuel des orphelins + UPDATE SQL pour les connus.
 
-    Retourne `(new, updated)`. `new` = orphelins effectivement fetchés ; `updated` =
-    rows existantes taguées avec cette collection (rowcount de l'UPDATE). Choisi par
-    `extract_collection` quand la collection est majoritairement déjà en staging
-    (umbrella type PRES_CLERMONT).
+    Retourne `(new, updated, unchanged)`. Les orphelins fetchés sont ventilés
+    via le `(inserted, changed)` de l'UPSERT (quasi tous `new`). Les rows déjà
+    en staging sont taguées avec cette collection sans réécrire `raw_data` →
+    comptées **inchangées** (le tag est du bookkeeping, pas un re-import de
+    contenu). Choisi par `extract_collection` quand la collection est
+    majoritairement déjà en staging (umbrella type PRES_CLERMONT).
     """
     total_new = 0
+    total_updated = 0
+    total_unchanged = 0
     for i, hal_id in enumerate(orphans, 1):
         try:
             doc = adapter.fetch_single_work(hal_id)
@@ -95,14 +106,19 @@ def _extract_incremental(
         if not actual_hal_id:
             continue
         doi = adapter.extract_doi(doc)
-        adapter.upsert_work(conn, actual_hal_id, doi, doc, collection_code)
+        inserted, changed = adapter.upsert_work(conn, actual_hal_id, doi, doc, collection_code)
         conn.commit()
         existing_ids.add(actual_hal_id)
-        total_new += 1
+        if inserted:
+            total_new += 1
+        elif changed:
+            total_updated += 1
+        else:
+            total_unchanged += 1
         if i % 100 == 0:
             logger.info(f"    Orphelins fetchés : {i}/{len(orphans)}")
-    total_updated = adapter.tag_existing_with_collection(conn, known, collection_code)
-    return total_new, total_updated
+    total_unchanged += adapter.tag_existing_with_collection(conn, known, collection_code)
+    return total_new, total_updated, total_unchanged
 
 
 def extract_collection(
@@ -116,8 +132,8 @@ def extract_collection(
     years: list[int] | None = None,
     since: str | None = None,
     dry_run: bool = False,
-) -> tuple[int, int, int]:
-    """Extrait tous les works d'une collection. Retourne `(total, new, updated)`.
+) -> tuple[int, int, int, int]:
+    """Extrait tous les works d'une collection. Retourne `(total, new, updated, unchanged)`.
 
     Stratégie adaptative :
       1. Preview : liste des halIds de la collection via Solr `fl=halId_s`
@@ -134,7 +150,7 @@ def extract_collection(
     logger.info(f"  {collection_code} ({collection_label}) : {total_count} docs")
 
     if dry_run or total_count == 0:
-        return total_count, 0, 0
+        return total_count, 0, 0, 0
 
     orphans = [hid for hid in all_ids if hid not in existing_ids]
     known = [hid for hid in all_ids if hid in existing_ids]
@@ -154,15 +170,15 @@ def extract_collection(
 
     if mode == "incremental":
         logger.info(f"    {len(known)} déjà en staging (UPDATE SQL pour les tagger)")
-        total_new, total_updated = _extract_incremental(
+        total_new, total_updated, total_unchanged = _extract_incremental(
             adapter, collection_code, orphans, known, conn, existing_ids, logger
         )
     else:  # mode == "full"
-        total_new, total_updated = _extract_full(
+        total_new, total_updated, total_unchanged = _extract_full(
             adapter, query, collection_code, conn, existing_ids, total_count, logger
         )
 
-    return total_count, total_new, total_updated
+    return total_count, total_new, total_updated, total_unchanged
 
 
 class HalExtractor(SourceExtractor[HalExtractConfig]):
@@ -216,7 +232,7 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
 
         stats = PhaseMetrics()
         for code, label in config.all_collections.items():
-            total, new, updated = extract_collection(
+            total, new, updated, unchanged = extract_collection(
                 code,
                 label,
                 self.conn,
@@ -227,9 +243,11 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
                 since=args.since,
                 dry_run=args.dry_run,
             )
-            stats.add(new=new, updated=updated, total=total)
-            if not args.dry_run and (new > 0 or updated > 0):
-                self.logger.info(f"    → {new} nouveaux, {updated} mis à jour")
+            stats.add(new=new, updated=updated, unchanged=unchanged, total=total)
+            if not args.dry_run and (new > 0 or updated > 0 or unchanged > 0):
+                self.logger.info(
+                    f"    → {new} nouveaux, {updated} mis à jour, {unchanged} inchangés"
+                )
         return stats
 
 

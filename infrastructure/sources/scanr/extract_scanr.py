@@ -32,12 +32,16 @@ from infrastructure.sources.http_retry import http_request_with_retry
 
 _UPDATE_SCANR_SQL = text(
     """
-    UPDATE staging
+    UPDATE staging s
     SET last_seen_at = now(),
-        raw_data = CASE WHEN raw_hash IS DISTINCT FROM :raw_hash THEN :raw_data ELSE raw_data END,
-        doi      = CASE WHEN raw_hash IS DISTINCT FROM :raw_hash THEN :doi ELSE doi END,
+        raw_data = CASE WHEN s.raw_hash IS DISTINCT FROM :raw_hash THEN :raw_data ELSE s.raw_data END,
+        doi      = CASE WHEN s.raw_hash IS DISTINCT FROM :raw_hash THEN :doi ELSE s.doi END,
         raw_hash = :raw_hash
-    WHERE source = 'scanr' AND source_id = :source_id
+    FROM (
+        SELECT raw_hash AS old_hash FROM staging WHERE source = 'scanr' AND source_id = :source_id
+    ) old
+    WHERE s.source = 'scanr' AND s.source_id = :source_id
+    RETURNING (old.old_hash IS DISTINCT FROM :raw_hash) AS changed
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
@@ -151,29 +155,27 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
 
     def upsert_doc(
         self, conn: Connection, doc: dict[str, Any], *, is_new: bool
-    ) -> tuple[bool, bool]:
+    ) -> tuple[bool, bool, bool]:
         """INSERT pour les nouveaux, UPDATE sinon.
 
-        L'UPDATE bumpe toujours `last_seen_at` (le doc a été re-vu) et ne
-        réécrit `raw_data`/`doi` que si le `raw_hash` a changé. `updated`
-        compte donc les rows re-vues (« touchées »), comme OpenAlex/WoS.
+        L'UPDATE bumpe toujours `last_seen_at` (le doc a été re-vu) mais ne
+        réécrit `raw_data`/`doi` que si le `raw_hash` a changé ; le `RETURNING`
+        compare l'ancien hash au nouveau pour distinguer `updated` (contenu
+        réécrit) d'`unchanged` (re-vu identique).
 
-        Retourne `(inserted, updated)`. Au plus un des deux est `True`.
+        Retourne `(new, updated, unchanged)` — exactement un `True`.
         """
-        scanr_id = self.extract_id(doc)
-        doi = self.extract_doi(doc)
         raw_hash = compute_hash(doc)
         params = {
-            "source_id": scanr_id,
-            "doi": doi,
+            "source_id": self.extract_id(doc),
+            "doi": self.extract_doi(doc),
             "raw_data": doc,
             "raw_hash": raw_hash,
         }
         if is_new:
-            result = conn.execute(_INSERT_SCANR_SQL, params)
-            return (bool(result.rowcount), False)
-        result = conn.execute(_UPDATE_SCANR_SQL, params)
-        return (False, bool(result.rowcount))
+            return (bool(conn.execute(_INSERT_SCANR_SQL, params).rowcount), False, False)
+        changed = bool(conn.execute(_UPDATE_SCANR_SQL, params).one().changed)
+        return (False, changed, not changed)
 
 
 def get_scanr_credentials_from_db(conn: Connection) -> tuple[str, str]:

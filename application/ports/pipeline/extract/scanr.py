@@ -52,10 +52,10 @@ class ScanrExtractAdapter(Protocol):
 
     def upsert_doc(
         self, conn: Connection, doc: dict[str, Any], *, is_new: bool
-    ) -> tuple[bool, bool]:
+    ) -> tuple[bool, bool, bool]:
         """UPSERT staging d'un document ScanR.
 
-        Retourne `(inserted, updated)` où l'un des deux est `True`
-        (ou les deux à `False` si rien n'a changé).
+        Retourne `(new, updated, unchanged)` — exactement un `True`.
+        `updated` = contenu réécrit (hash changé) ; `unchanged` = re-vu identique.
         """
         ...
