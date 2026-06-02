@@ -142,9 +142,12 @@ def run_enrich_journals_from_doaj(
         )
 
     except KeyboardInterrupt:
-        if not dry_run:
-            conn.commit()
-        logger.warning("Interruption — données déjà traitées conservées.")
+        # Ctrl+C peut frapper en plein execute (transaction avortée → `commit()`
+        # lèverait `PendingRollbackError`) : on rollback le batch en cours et on
+        # re-raise pour laisser `run_pipeline` arrêter proprement le pipeline.
+        conn.rollback()
+        logger.warning("Interruption — batches déjà committés conservés.")
+        raise
     except Exception as e:
         conn.rollback()
         logger.error(f"Erreur fatale : {e}")
