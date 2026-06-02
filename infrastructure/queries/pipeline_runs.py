@@ -79,6 +79,11 @@ class PgPipelineRunsQueries(PipelineRunsQueries):
         ).first()
         if row is None:
             return None
+        # Snapshots antérieurs au split du compteur extract n'ont pas `unchanged`
+        # dans leurs métriques par phase : on le défaute à 0 à la lecture (la
+        # colonne du TypedDict reste requise pour les snapshots à venir).
+        for pm in row.payload.get("metrics_per_phase", {}).values():
+            pm.setdefault("unchanged", 0)
         payload = cast(RunSnapshotPayload, row.payload)
         previous_observables = fetch_previous_observables(
             self._conn, mode=row.mode, before_ran_at=row.ran_at

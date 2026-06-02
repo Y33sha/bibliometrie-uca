@@ -373,6 +373,7 @@
                   <th class="col-num">Durée</th>
                   <th class="col-num">Nouveaux</th>
                   <th class="col-num">Mis à jour</th>
+                  <th class="col-num">Inchangés</th>
                   <th class="col-num">Total</th>
                   <th class="col-num">Erreurs</th>
                 </tr>
@@ -384,6 +385,7 @@
                     <td class="col-num">{fmtDuration(row.duration_s)}</td>
                     <td class="col-num">{row.new}</td>
                     <td class="col-num">{row.updated}</td>
+                    <td class="col-num">{row.unchanged}</td>
                     <td class="col-num">{row.total}</td>
                     <td class="col-num" class:error-cell={row.errors > 0}>{row.errors}</td>
                   </tr>

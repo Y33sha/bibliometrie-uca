@@ -43,6 +43,7 @@ class PhaseMetricsPayload(TypedDict):
 
     new: int
     updated: int
+    unchanged: int
     total: int
     errors: int
     extras: dict[str, int]
