@@ -1,5 +1,7 @@
 # Chantier — Exploitation de l'API CrossRef
+
 Commencé le 2026-04-27
+
 **État au 2026-05-30** — Phases 1 et 2 livrées (ingestion DOI-driven + arbitrage `doc_type` type / sous-type). Décisions de clôture du reste :
 
 - **Phase 3 (promotion ORCID `pending → confirmed`) : abandonnée.** La confirmation / le rejet des identifiants est une action admin manuelle, sans impact sur le pipeline (elle ne change que l'affichage UI). L'automatiser est risqué pour un gain nul côté traitement. Dossier fermé ; éventuellement rouvrable à un stade beaucoup plus mature du projet.
@@ -20,11 +22,6 @@ Le chantier vise à exploiter CrossRef sur **trois axes complémentaires**, sans
 3. **Relations entre publications** — preprint-of, version-of, translation-of, has-dataset, etc. Alimente le chantier « relations entre publications » (TODO_LAURA.md ligne 82).
 
 *Rôle 1 = cœur du chantier (livré, Phases 1-2). Rôle 2 abandonné (cf. en-tête, Phase 3). Rôle 3 déplacé vers [`METIER_relations-publications`](METIER_relations-publications.md).*
-
-### Pistes écartées
-
-- **CrossRef comme source de découverte par affiliation** — réévalué puis **écarté comme source primaire** (cf. Phase 6, mesure du 2026-05-30 sur dump prod). La bonne requête (`query.affiliation=Clermont Auvergne`) ne ramène que 8 510 hits, dont seulement ~26 % de recall sur les publications Crossref UCA déjà connues : Crossref n'indexe l'affiliation que pour une minorité de ses dépôts. Reste exploitable comme filet d'appoint, à arbitrer.
-- **CrossRef pour enrichir les signatures (labos, équipes, services)** : les métadonnées CrossRef sont aplaties par les éditeurs vers la tutelle générique (« University Clermont Auvergne »), sans labo. Les signatures restent du ressort de HAL/OpenAlex/WoS.
 
 ## Périmètre fonctionnel
 

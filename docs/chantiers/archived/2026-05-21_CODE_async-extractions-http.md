@@ -1,7 +1,8 @@
 # Chantier — Parallélisation des extractions HTTP pipeline
 
-Commencé le 2026-05-18.
-Terminé le 2026-05-21.
+Commencé le 2026-05-18
+
+Terminé le 2026-05-21
 
 ## Contexte
 

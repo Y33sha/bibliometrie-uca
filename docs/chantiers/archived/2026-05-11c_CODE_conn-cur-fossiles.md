@@ -8,20 +8,14 @@ Dette héritée du chantier SQLAlchemy : nombreuses fonctions de
 `application/` (et probablement `infrastructure/sources/`,
 `interfaces/api/routers/`, tests) déclarent un argument
 `conn: Connection` ou `cur: Connection` qu'elles n'utilisent **pas**.
-Vestige du pattern psycopg où le curseur servait à `cur.execute(...)`
-directement. Avec `repo` qui encapsule la connexion, l'argument est
-devenu un fossile sur les signatures.
+Vestige du pattern psycopg où le curseur servait à `cur.execute(...)` directement. Avec `repo` qui encapsule la connexion, l'argument est devenu un fossile sur les signatures.
 
-Audit initial dans `application/persons.py` : 13 fonctions sur 16
-avec un argument fossile. Présomption d'une situation similaire dans
-les autres modules `application/*`.
+Audit initial dans `application/persons.py` : 13 fonctions sur 16 avec un argument fossile. Présomption d'une situation similaire dans les autres modules `application/*`.
 
 ## Cascade
 
 Beaucoup de `conn`/`cur` *utilisés* le sont uniquement pour les
-transmettre à une autre fonction qui ne l'utilise pas non plus. En
-supprimant les feuilles, on libère les remontées. Le chantier est
-itératif : sweep, propage, re-sweep.
+transmettre à une autre fonction qui ne l'utilise pas non plus. En supprimant les feuilles, on libère les remontées. Le chantier est itératif : sweep, propage, re-sweep.
 
 ## Stratégie
 

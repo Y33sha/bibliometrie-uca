@@ -1,57 +1,31 @@
 # Chantier — Formalisation des règles métier dans `domain/`
 
 Commencé le 2026-05-05
+
 Terminé le 2026-05-08
 
 ## Contexte
 
-Plusieurs règles métier étaient dispersées dans les scripts du pipeline
-(`application/pipeline/normalize/*.py`), parfois dupliquées, parfois
-conditionnelles à un détail d'extraction d'une source précise.
+Plusieurs règles métier étaient dispersées dans les scripts du pipeline (`application/pipeline/normalize/*.py`), parfois dupliquées, parfois conditionnelles à un détail d'extraction d'une source précise.
 Exemples :
 
-- `doc_type = "thesis"` si la `source = theses.fr`, indépendamment du
-  type prétendu par OpenAlex
-- `doc_type = "memoir"` si OpenAlex annonce `dissertation` et l'URL
-  est `dumas.*`
-- `doc_type = "thesis" if dateSoutenance else "ongoing_thesis"` —
-  dupliqué deux fois dans `normalize_theses.py`
+- `doc_type = "thesis"` si la `source = theses.fr`, indépendamment du type prétendu par OpenAlex
+- `doc_type = "memoir"` si OpenAlex annonce `dissertation` et l'URL est `dumas.*`
+- `doc_type = "thesis" if dateSoutenance else "ongoing_thesis"` — dupliqué deux fois dans `normalize_theses.py`
 - Détection de la source figshare/Zenodo via DOI : éparpillée
-- Logique de rattachement personnes (matching ORCID/idHAL/idref →
-  persons, gestion des conflits) : éclatée entre `application/persons.py`,
-  les normalizers et les queries
-- Règles de déduplication publications (matching DOI / NNT / titre) :
-  partagées entre `find_or_create_publication`, `try_merge_by_doi` et
-  les normalizers source par source
+- Logique de rattachement personnes (matching ORCID/idHAL/idref → persons, gestion des conflits) : éclatée entre `application/persons.py`, les normalizers et les queries
+- Règles de déduplication publications (matching DOI / NNT / titre) : partagées entre `find_or_create_publication`, `try_merge_by_doi` et les normalizers source par source
 
-Le risque : règles invisibles aux tests unitaires de domaine (qui ne
-voient que les fonctions pures relocalisées), divergences silencieuses
-entre sources (ex. règle de doc_type différente selon le normalizer qui
-écrit la publi en premier), évolutions difficiles (ajouter une règle
-oblige à toucher N normalizers).
+Le risque : règles invisibles aux tests unitaires de domaine (qui ne voient que les fonctions pures relocalisées), divergences silencieuses entre sources (ex. règle de doc_type différente selon le normalizer qui écrit la publi en premier), évolutions difficiles (ajouter une règle oblige à toucher N normalizers).
 
 ## Objectif
 
 Rassembler dans `domain/` la logique métier pure existante,
-indépendante des sources et de l'infrastructure. L'enrichissement
-de la logique métier par de nouvelles règles (suppléments figshare,
-Zenodo, DataCite suspects, révision de l'enum `doc_type`, etc.)
-fait l'objet d'un chantier dédié [doc-types.md](doc-types.md).
+indépendante des sources et de l'infrastructure. L'enrichissement de la logique métier par de nouvelles règles (suppléments figshare, Zenodo, révision de l'enum `doc_type`, etc.) fait l'objet d'un chantier dédié [doc-types.md](doc-types.md).
 
-**Définition de « pur »** : une fonction qui prend en arguments tout
-ce dont elle a besoin (y compris les résultats de lookups SQL faits
-par la couche application) et qui renvoie une décision (souvent un
-value object). Les algorithmes de matching personnes, de
-déduplication publications, d'arbitrage doc_type relèvent tous de ce
-modèle — l'arbre de décision est pur, ce sont les SELECT en amont et
-les INSERT/UPDATE en aval qui sont impurs et restent en
-`application/`. Pattern déjà éprouvé sur
-[`resolve_doi_conflict`](../../domain/publication.py).
+**Définition de « pur »** : une fonction qui prend en arguments tout ce dont elle a besoin (y compris les résultats de lookups SQL faits par la couche application) et qui renvoie une décision (souvent un value object). Les algorithmes de matching personnes, de déduplication publications, d'arbitrage doc_type relèvent tous de ce modèle — l'arbre de décision est pur, ce sont les SELECT en amont et les INSERT/UPDATE en aval qui sont impurs et restent en `application/`. Pattern déjà éprouvé sur [`resolve_doi_conflict`](../../domain/publication.py).
 
-Hypothèse de travail : les règles vivent dans `domain/` sous forme de
-fonctions pures + dataclasses immuables, testées en unit pur (sans
-BDD). Les normalizers et services applicatifs consomment ces fonctions
-au lieu d'inliner les conditions.
+Hypothèse de travail : les règles vivent dans `domain/` sous forme de fonctions pures + dataclasses immuables, testées en unit pur (sans BDD). Les normalizers et services applicatifs consomment ces fonctions au lieu d'inliner les conditions.
 
 ## Périmètre fonctionnel
 

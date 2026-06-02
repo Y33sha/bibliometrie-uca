@@ -5,20 +5,11 @@ Terminé le 2026-05-21
 
 ## Contexte
 
-Audit fait le 2026-05-11 sur les 10 repositories de
-`infrastructure/repositories/`. Plusieurs exposent des méthodes qui
-font de l'orchestration applicative : règles métier encodées en SQL,
-synchronisation cross-agrégat, scoring, fusion. Ces méthodes ont leur
-place dans `application/`, pas en infra.
+Audit fait le 2026-05-11 sur les 10 repositories de `infrastructure/repositories/`. Plusieurs exposent des méthodes qui font de l'orchestration applicative : règles métier encodées en SQL, synchronisation cross-agrégat, scoring, fusion. Ces méthodes ont leur place dans `application/`, pas en infra.
 
-Audit transactionnel en parallèle : aucun `.commit()` dans les
-repositories (✓ Cosmic Python compatible). Les commits vivent dans
-`application/pipeline/*` avec rollback dans les `except`. Le
-`_savepoint.py` (`begin_nested()` SA) est idiomatique. Quelques
-nuances mineures à nettoyer.
+Audit transactionnel en parallèle : aucun `.commit()` dans les repositories (✓ Cosmic Python compatible). Les commits vivent dans `application/pipeline/*` avec rollback dans les `except`. Le `_savepoint.py` (`begin_nested()` SA) est idiomatique. Quelques nuances mineures à nettoyer.
 
-Ce chantier couvre les deux volets : **(A) extraction de l'orchestration
-hors des repositories** et **(B) polish de la discipline transactionnelle**.
+Ce chantier couvre les deux volets : **(A) extraction de l'orchestration hors des repositories** et **(B) polish de la discipline transactionnelle**.
 
 ## Audit — Volet A : orchestration applicative dans les repositories
 

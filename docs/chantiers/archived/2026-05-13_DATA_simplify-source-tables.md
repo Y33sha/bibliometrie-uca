@@ -5,31 +5,18 @@ Terminé le 2026-05-13.
 
 ## Contexte
 
-Les tables sources (`source_publications`, `source_authorships`,
-`source_persons`, `source_structures`) reproduisent par mimétisme le
-schéma des tables canoniques (entités publication, personne,
-structure + pivot authorship). Cette symétrie est délibérée côté
-canonique mais largement superflue côté source : la dimension
-canonique est portée directement par `source_authorships.person_id`
-et `source_authorships.structure_ids`, et la résolution des liens
-canoniques se fait via les adresses, pas via les tables `source_persons`
-et `source_structures`.
+Les tables sources (`source_publications`, `source_authorships`, `source_persons`, `source_structures`) reproduisent par mimétisme le schéma des tables canoniques (entités publication, personne, structure + pivot authorship). Cette symétrie est délibérée côté canonique mais largement superflue côté source : la dimension canonique est portée directement par `source_authorships.person_id` et `source_authorships.structure_ids`, et la résolution des liens
+canoniques se fait via les adresses, pas via les tables `source_persons` et `source_structures`.
 
 Audit (cf. discussion architecturale 2026-05-11) :
-- `source_persons` : 4 usages réels, tous résolubles autrement (cf
-  plan ci-dessous).
-- `source_structures` : 1 usage réel (propagation pays HAL), facile
-  à déplacer.
+- `source_persons` : 4 usages réels, tous résolubles autrement (cf plan ci-dessous).
+- `source_structures` : 1 usage réel (propagation pays HAL), facile à déplacer.
 
-→ Suppression des deux tables, migration des données utiles vers
-`person_identifiers` (côté persons) et nouvelles colonnes
-`source_authorships.source_structures` et
-`source_authorships.countries` (côté structures).
+→ Suppression des deux tables, migration des données utiles vers `person_identifiers` (côté persons) et nouvelles colonnes `source_authorships.source_structures` et `source_authorships.countries` (côté structures).
 
 ## Décisions
 
-1. **`source_persons` supprimée**. Distinction sémantique fondatrice
-   à respecter :
+1. **`source_persons` supprimée**. Distinction sémantique fondatrice à respecter :
    - **`source_authorships.person_identifiers`** (JSONB, à renommer
      depuis `identifiers`) = observation par-authorship des
      identifiants vus sur cette signature spécifique. Cible naturelle

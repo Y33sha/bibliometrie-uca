@@ -5,11 +5,7 @@ Terminé le 2026-05-15
 
 ## Contexte
 
-`disallow_untyped_defs = true` est configuré dans `pyproject.toml`,
-mais neutralisé en pratique par 748 occurrences de `Any` dans 133
-fichiers du code applicatif (`grep -rn ": Any\b\|-> Any\b"`). mypy
-strict ne vérifie quasi rien dans les couches haute. C'est de la
-décoration de discipline.
+`disallow_untyped_defs = true` est configuré dans `pyproject.toml`, mais neutralisé en pratique par 748 occurrences de `Any` dans 133 fichiers du code applicatif (`grep -rn ": Any\b\|-> Any\b"`). mypy strict ne vérifie quasi rien dans les couches hautes. C'est de la décoration de discipline.
 
 Distribution :
 - `domain/` : 4 (déjà clean)
@@ -18,35 +14,20 @@ Distribution :
 - `interfaces/` : 170
 
 Patterns dominants :
-- `conn: Any` → 265 occurrences (35 %). Hérité du chantier SQLA où
-  le dispatch psycopg/SA imposait `Any`. Maintenant tout-SA, c'est
-  `Connection` partout.
+- `conn: Any` → 265 occurrences (35 %). Hérité du chantier SQLA où le dispatch psycopg/SA imposait `Any`. Maintenant tout-SA, c'est `Connection` partout.
 - `logger: Any` → 41 → `logging.Logger`.
 - `row: Any` → 12 (au cas par cas : `Row` SA ou `dict`).
-- Reste ~430 `Any` dispersés : ports (`Protocol`), helpers,
-  signatures FastAPI, types ad-hoc.
+- Reste ~430 `Any` dispersés : ports (`Protocol`), helpers,  signatures FastAPI, types ad-hoc.
 
 ## Décisions
 
 1. **Tolérance** : zéro par défaut. `Any` admis seulement avec
-   justification expresse dans une docstring ou un `# noqa` parlant
-   (ex. mock `MagicMock` dans les tests, frontière dynamique avec
-   une lib externe non typée).
-2. **Activation strict** : module incrémental via
-   `[[tool.mypy.overrides]]` dans `pyproject.toml`. Chaque module
-   nettoyé bascule en `disallow_any_explicit = true` localement,
-   verrouille la régression. Pas de bigbang en fin de chantier.
-3. **Ordre d'attaque** : par pattern d'abord (`conn`, `logger`,
-   `row` → 318 occ. ≈ 42 % en mécanique), puis par couche sur le
-   reste (`domain` déjà propre, `application` → `infrastructure` →
-   `interfaces`).
+   justification expresse dans une docstring ou un `# noqa` parlant (ex. mock `MagicMock` dans les tests, frontière dynamique avec une lib externe non typée).
+2. **Activation strict** : module incrémental via `[[tool.mypy.overrides]]` dans `pyproject.toml`. Chaque module nettoyé bascule en `disallow_any_explicit = true` localement, verrouille la régression. Pas de bigbang en fin de chantier.
+3. **Ordre d'attaque** : par pattern d'abord (`conn`, `logger`, `row` → 318 occ. ≈ 42 % en mécanique), puis par couche sur le reste (`domain` déjà propre, `application` → `infrastructure` → `interfaces`).
 4. **Périmètre** :
-   - `infrastructure/db/migrate.py` migré avec le reste (~141 lignes,
-     trivial).
-   - Tests : signatures alignées sur les fonctions testées (un test
-     d'une fonction `(conn: Connection)` reçoit la fixture
-     `sa_sync_conn`, pas besoin d'`Any`). `Any` toléré pour les
-     `MagicMock`.
+   - `infrastructure/db/migrate.py` migré avec le reste (~141 lignes, trivial).
+   - Tests : signatures alignées sur les fonctions testées (un test d'une fonction `(conn: Connection)` reçoit la fixture `sa_sync_conn`, pas besoin d'`Any`). `Any` toléré pour les `MagicMock`.
 
 ## Phasage
 
