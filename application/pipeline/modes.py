@@ -32,10 +32,6 @@ class ModePolicy:
     # `resolve_doi_prefixes` (l'autre sub-step de la phase) tourne dans tous
     # les modes sans gate — il est rapide et alimente le matching publisher.
     run_journal_enrichment: bool
-    # True = purge complète des authorships canoniques avant rebuild
-    # (TRUNCATE + UPDATE FK), pour garantir la convergence absolue.
-    # En mode incrémental, le build idempotent suffit.
-    rebuild_authorships_full: bool
     # True = remet `addresses.suggested_countries` à NULL pour les adresses
     # déjà tentées sans succès (`= []`) avant la phase countries. Permet de
     # bénéficier d'éventuelles évolutions des heuristiques de matching ou
@@ -59,7 +55,6 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=False,
         run_oa_status=False,
         run_journal_enrichment=False,
-        rebuild_authorships_full=False,
         reset_country_suggestions=False,
     ),
     "weekly": ModePolicy(
@@ -72,7 +67,6 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=False,
         run_oa_status=False,
         run_journal_enrichment=False,
-        rebuild_authorships_full=False,
         reset_country_suggestions=False,
     ),
     "full": ModePolicy(
@@ -83,7 +77,6 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=True,
         run_oa_status=True,
         run_journal_enrichment=True,
-        rebuild_authorships_full=True,
         reset_country_suggestions=True,
     ),
 }

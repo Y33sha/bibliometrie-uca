@@ -434,12 +434,12 @@ def phase_authorships(**kw: Any) -> Any:
     normalisation (re-population d'affiliations, refresh_from_sources,
     etc.) — toutes les sources doivent etre reconsolidees a chaque run.
 
-    En mode `full` (`policy.rebuild_authorships_full = True`), la table
-    est purgée avant rebuild pour garantir la convergence absolue.
+    Le build est incrémental et convergent dans tous les modes (add +
+    prune + recompute des attributs en une passe) : aucune purge routinière.
+    La purge complète reste disponible en récupération manuelle via la CLI
+    `build_authorships --rebuild-full`.
     """
-    mode = kw.get("mode", "full")
-    rebuild_full = MODES[mode].rebuild_authorships_full
-    _run_build_authorships(rebuild_full=rebuild_full)
+    _run_build_authorships()
 
 
 def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
@@ -519,16 +519,16 @@ def _run_create_persons() -> None:
     log.info("✓ create_persons_from_source_authorships terminé en %.1fs", time.time() - t0)
 
 
-def _run_build_authorships(*, rebuild_full: bool = False) -> None:
+def _run_build_authorships() -> None:
     from application.pipeline.authorships.build_authorships import build
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.authorships_build import PgAuthorshipsBuildQueries
 
-    log.info("▶ build_authorships%s", " (rebuild_full)" if rebuild_full else "")
+    log.info("▶ build_authorships")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        build(conn, PgAuthorshipsBuildQueries(), log, rebuild_full=rebuild_full)
+        build(conn, PgAuthorshipsBuildQueries(), log)
         conn.commit()
     finally:
         conn.close()

@@ -14,11 +14,17 @@ logger = setup_logger("build_authorships", os.path.join(os.path.dirname(__file__
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="Simuler sans modifier la base")
+    parser.add_argument(
+        "--rebuild-full",
+        action="store_true",
+        help="Récupération manuelle : purge complète des authorships avant rebuild "
+        "(renumérote les id). Inutile en régime nominal — le build est convergent.",
+    )
     args = parser.parse_args()
 
     conn = get_sync_engine().connect()
     try:
-        build(conn, PgAuthorshipsBuildQueries(), logger)
+        build(conn, PgAuthorshipsBuildQueries(), logger, rebuild_full=args.rebuild_full)
 
         if args.dry_run:
             conn.rollback()
