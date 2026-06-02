@@ -18,7 +18,7 @@ import time
 from sqlalchemy import Connection
 
 from application.ports.pipeline.countries import CountryQueries
-from domain.sources import ALL_SOURCES
+from domain.sources.registry import ALL_SOURCES
 
 
 def refresh(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> int:

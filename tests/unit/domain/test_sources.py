@@ -1,7 +1,7 @@
 """Tests des constantes et helpers de `domain/sources.py` — registre
 des sources et ordres de priorité."""
 
-from domain.sources import (
+from domain.sources.registry import (
     ALL_SOURCES,
     DOI_SEARCHABLE_SOURCES,
     SOURCE_PRIORITY,

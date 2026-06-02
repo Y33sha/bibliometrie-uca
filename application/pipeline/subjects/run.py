@@ -31,7 +31,7 @@ from application.pipeline.subjects import (
 )
 from application.pipeline.subjects._common import SubjectCache
 from application.ports.pipeline.subjects import SubjectsQueries
-from domain.sources import ALL_SOURCES
+from domain.sources.registry import ALL_SOURCES
 from domain.types import JsonValue
 
 

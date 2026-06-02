@@ -18,7 +18,7 @@ import time
 from sqlalchemy import Connection
 
 from application.ports.pipeline.affiliations import AffiliationsQueries
-from domain.sources import ALL_SOURCES
+from domain.sources.registry import ALL_SOURCES
 
 
 def _step_address_source(

@@ -22,7 +22,7 @@ from domain.publications.deduplication import (
 )
 from domain.publications.identifiers import DOI
 from domain.source_publications.views import SourcePublicationWithJournalView
-from domain.sources import SOURCE_PRIORITY
+from domain.sources.registry import SOURCE_PRIORITY
 
 
 def find_by_doi(doi: str, *, repo: PublicationRepository) -> PubByDoi | None:

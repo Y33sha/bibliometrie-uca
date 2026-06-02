@@ -26,7 +26,7 @@ from application.ports.api.persons_queries import (
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
-from domain.sources import ALL_SOURCES_SET
+from domain.sources.registry import ALL_SOURCES_SET
 from interfaces.api.deps import (
     audit_repo_sync,
     authorship_repo_sync,

@@ -58,7 +58,7 @@ if TYPE_CHECKING:
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
-from domain.sources import ALL_SOURCES_SET
+from domain.sources.registry import ALL_SOURCES_SET
 from infrastructure.observability.log import setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock

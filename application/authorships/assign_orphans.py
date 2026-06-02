@@ -13,7 +13,7 @@ paire (publication, person) depuis ses source_authorships.
 
 from application.ports.repositories.person_repository import PersonRepository
 from domain.errors import ValidationError
-from domain.sources import (
+from domain.sources.registry import (
     ALL_SOURCES_SET,
     AUTHOR_SOURCES,
     SOURCE_PRIORITY,

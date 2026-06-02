@@ -103,7 +103,7 @@ def _run_populate_affiliations(conn):
     import logging
 
     from application.pipeline.affiliations.populate_affiliations import _step_address_source
-    from domain.sources import ALL_SOURCES
+    from domain.sources.registry import ALL_SOURCES
     from infrastructure.queries.affiliations import PgAffiliationsQueries
     from infrastructure.queries.perimeter import (
         get_affiliations_structure_ids,

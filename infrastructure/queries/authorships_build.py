@@ -8,7 +8,7 @@ Appelé par `application/pipeline/build/build_authorships.py`. Regroupe les
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
-from domain.sources import SOURCE_PRIORITY, source_case_sql
+from domain.sources.registry import SOURCE_PRIORITY, source_case_sql
 
 
 def insert_missing_authorships(conn: Connection) -> int:
