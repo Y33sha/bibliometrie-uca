@@ -11,7 +11,9 @@
 ### Normalisation
 * [ ] batcher pour améliorer la perf? / analyser pour comprendre pourquoi hal + lent
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
+* [ ] vérifier espace disque avant vacuum full
 ### Suite du traitement
+* [ ] addresses.pub_count: après phase publications, pas après normalisation.
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects / idées:  phase_cross_imports expose sources_with_new; phase_subjects : restreindre à (extract_sources ∪ sources_with_new) / phase_countries (refresh_sa_countries_for_source) : laisser scanner toutes les sources (sécurité), mais on peut envisager un addresses.updated_at en option 2 plus tard
 * [ ] est-ce que les authorships détachées manuellement (donc orphelines) sont à nouveau rattachées au pipeline suivant? si oui => comportement indésirable, à corriger (ajouter rejected_authorship quand on clique sur détacher)
 ## Code
