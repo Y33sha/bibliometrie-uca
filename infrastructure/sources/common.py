@@ -10,7 +10,7 @@ from sqlalchemy import Connection, text
 from domain.publications.identifiers import (
     clean_doi,  # noqa: F401 — réexporté pour les scripts d'extraction
 )
-from domain.sources import ALL_SOURCES_SET as VALID_SOURCES
+from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 from infrastructure.observability.log import (
     setup_logger,  # noqa: F401 — réexporté pour les scripts d'extraction
 )

@@ -17,7 +17,7 @@ from application.publications import apply_corrections, refresh_from_sources
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.publications.aggregation import refresh_from_sources as _refresh_aggregate
-from domain.sources import SOURCE_PRIORITY
+from domain.sources.registry import SOURCE_PRIORITY
 from domain.types import JsonValue
 
 

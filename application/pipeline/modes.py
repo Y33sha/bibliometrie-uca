@@ -12,7 +12,7 @@ des CLI qui acceptent `--mode`).
 from dataclasses import dataclass
 from typing import Literal
 
-from domain.sources import DOI_SEARCHABLE_SOURCES_SET
+from domain.sources.registry import DOI_SEARCHABLE_SOURCES_SET
 
 YearSelection = Literal["since_last", "weekly", "full"]
 

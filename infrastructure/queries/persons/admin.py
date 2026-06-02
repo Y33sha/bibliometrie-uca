@@ -7,7 +7,7 @@ from sqlalchemy import Connection, text
 
 from domain.persons.name_matching import parse_raw_author_name
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
-from domain.sources import AUTHOR_SOURCES_SQL
+from domain.sources.registry import AUTHOR_SOURCES_SQL
 
 # ── Orphan authorships ───────────────────────────────────────────
 

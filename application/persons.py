@@ -14,7 +14,7 @@ from domain.errors import CannotAttributeConflict, NotFoundError
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person_identifier import PersonIdentifier
-from domain.sources import ALL_SOURCES_SET
+from domain.sources.registry import ALL_SOURCES_SET
 
 logger = logging.getLogger(__name__)
 

@@ -231,7 +231,7 @@ class TestPublicationService:
 class TestSourcesEnum:
     def test_python_matches_db(self, sa_sync_conn):
         """utils.sources.ALL_SOURCES doit correspondre à l'enum source_type en base."""
-        from domain.sources import ALL_SOURCES_SET
+        from domain.sources.registry import ALL_SOURCES_SET
 
         db_sources = set(
             sa_sync_conn.execute(
