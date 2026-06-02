@@ -28,6 +28,10 @@ from infrastructure.sources.wos import parsing
 
 _INSERT_WOS_BATCH_SQL = text(
     """
+    WITH old AS (
+        SELECT raw_hash AS old_hash FROM staging
+        WHERE source = 'wos' AND source_id = :source_id
+    )
     INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
     VALUES ('wos', :source_id, :doi, :raw_data, :raw_hash)
     ON CONFLICT (source, source_id) DO UPDATE SET
@@ -39,7 +43,8 @@ _INSERT_WOS_BATCH_SQL = text(
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
             THEN FALSE ELSE staging.processed END,
         last_seen_at = now()
-    RETURNING (xmax = 0) AS inserted
+    RETURNING (xmax = 0) AS inserted,
+              ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
@@ -157,7 +162,7 @@ class PgWosExtractAdapter(WosExtractAdapter):
         Le caller est responsable du `conn.commit()` après cette méthode.
         """
         if not records:
-            return BatchInsertCounts(new=0, updated=0)
+            return BatchInsertCounts(new=0, updated=0, unchanged=0)
         batch = [
             {
                 "source_id": parsing.extract_ut(rec),
@@ -171,12 +176,16 @@ class PgWosExtractAdapter(WosExtractAdapter):
         # le statement est un `INSERT ... ON CONFLICT DO UPDATE` (l'optimisation
         # `insertmanyvalues` ne s'active pas pour les UPSERT, le fallback
         # `cursor.executemany()` côté psycopg3 ne récupère pas les rows).
-        # Boucle row-par-row pour préserver `(xmax = 0)`.
+        # Boucle row-par-row pour préserver `(xmax = 0)` et le flag `changed`.
         new_count = 0
         updated_count = 0
+        unchanged_count = 0
         for item in batch:
-            if conn.execute(_INSERT_WOS_BATCH_SQL, item).one().inserted:
+            row = conn.execute(_INSERT_WOS_BATCH_SQL, item).one()
+            if row.inserted:
                 new_count += 1
-            else:
+            elif row.changed:
                 updated_count += 1
-        return BatchInsertCounts(new=new_count, updated=updated_count)
+            else:
+                unchanged_count += 1
+        return BatchInsertCounts(new=new_count, updated=updated_count, unchanged=unchanged_count)

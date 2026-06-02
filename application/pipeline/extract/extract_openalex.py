@@ -31,15 +31,17 @@ def extract_year(
     year: int | None = None,
     since: str | None = None,
     dry_run: bool = False,
-) -> tuple[int, int]:
+) -> tuple[int, int, int]:
     """Extrait des publications OpenAlex par année ou par date de modification.
 
-    Retourne (nouveaux, mis_a_jour) — ventilation calculée par l'adapter via `xmax`.
+    Retourne (nouveaux, mis_a_jour, inchangés) — ventilation calculée par
+    l'adapter via `xmax` (insert) + comparaison de hash (changed).
     """
     cursor = "*"
     total_fetched = 0
     total_new = 0
     total_updated = 0
+    total_unchanged = 0
     page_num = 0
 
     first_page = adapter.fetch_page(institution_ids, year=year, cursor=cursor, since=since)
@@ -48,7 +50,7 @@ def extract_year(
     logger.info(f"{label} : {total_count} works trouvés sur OpenAlex")
 
     if dry_run:
-        return 0, 0
+        return 0, 0, 0
 
     while True:
         page_num += 1
@@ -71,11 +73,12 @@ def extract_year(
         conn.commit()
         total_new += counts.new
         total_updated += counts.updated
+        total_unchanged += counts.unchanged
 
         total_fetched += len(results)
         logger.info(
             f"  Page {page_num} : {len(results)} works — "
-            f"{counts.new} nouveaux, {counts.updated} mis à jour "
+            f"{counts.new} nouveaux, {counts.updated} mis à jour, {counts.unchanged} inchangés "
             f"({total_fetched}/{total_count})"
         )
 
@@ -85,10 +88,10 @@ def extract_year(
         cursor = next_cursor
 
     logger.info(
-        f"Année {year} terminée : {total_new} nouveaux, {total_updated} mis à jour "
-        f"(sur {total_fetched} récupérés, {total_count} sur OpenAlex)"
+        f"Année {year} terminée : {total_new} nouveaux, {total_updated} mis à jour, "
+        f"{total_unchanged} inchangés (sur {total_fetched} récupérés, {total_count} sur OpenAlex)"
     )
-    return total_new, total_updated
+    return total_new, total_updated, total_unchanged
 
 
 class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
@@ -146,7 +149,7 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
 
         stats = PhaseMetrics()
         if args.since:
-            year_new, year_updated = extract_year(
+            year_new, year_updated, year_unchanged = extract_year(
                 self._adapter,
                 self.conn,
                 existing_ids,
@@ -155,10 +158,10 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
                 since=args.since,
                 dry_run=args.dry_run,
             )
-            stats.add(new=year_new, updated=year_updated)
+            stats.add(new=year_new, updated=year_updated, unchanged=year_unchanged)
         else:
             for year in years:
-                year_new, year_updated = extract_year(
+                year_new, year_updated, year_unchanged = extract_year(
                     self._adapter,
                     self.conn,
                     existing_ids,
@@ -167,7 +170,7 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
                     year=year,
                     dry_run=args.dry_run,
                 )
-                stats.add(new=year_new, updated=year_updated)
+                stats.add(new=year_new, updated=year_updated, unchanged=year_unchanged)
         return stats
 
 

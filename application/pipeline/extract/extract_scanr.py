@@ -26,11 +26,14 @@ def extract_year(
     logger: logging.Logger,
     *,
     dry_run: bool = False,
-) -> tuple[int, int, int]:
-    """Extrait toutes les publications d'une année. Retourne (total, insérés, mis à jour)."""
+) -> tuple[int, int, int, int]:
+    """Extrait toutes les publications d'une année.
+
+    Retourne (total, nouveaux, mis à jour, inchangés)."""
     search_after: list | None = None
     inserted = 0
     updated = 0
+    unchanged = 0
     seen = 0
 
     query = adapter.build_query(year, affiliation_ids)
@@ -39,7 +42,7 @@ def extract_year(
     logger.info(f"  {year} : {total} publications")
 
     if dry_run:
-        return total, 0, 0
+        return total, 0, 0, 0
 
     while True:
         query = adapter.build_query(year, affiliation_ids, search_after)
@@ -56,21 +59,26 @@ def extract_year(
 
             seen += 1
             is_new = scanr_id not in existing_ids
-            was_inserted, was_updated = adapter.upsert_doc(conn, doc, is_new=is_new)
-            if was_inserted:
+            was_new, was_updated, was_unchanged = adapter.upsert_doc(conn, doc, is_new=is_new)
+            if was_new:
                 inserted += 1
                 existing_ids.add(scanr_id)
             elif was_updated:
                 updated += 1
+            elif was_unchanged:
+                unchanged += 1
 
         search_after = hits[-1]["sort"]
 
         if seen % 500 == 0:
             conn.commit()
-            logger.info(f"    {seen}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
+            logger.info(
+                f"    {seen}/{total} traités "
+                f"({inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés)"
+            )
 
     conn.commit()
-    return total, inserted, updated
+    return total, inserted, updated, unchanged
 
 
 class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
@@ -118,7 +126,7 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
         self.logger.info(f"Années : {years}")
         stats = PhaseMetrics()
         for year in years:
-            total, inserted, updated = extract_year(
+            total, inserted, updated, unchanged = extract_year(
                 self._adapter,
                 self.conn,
                 year,
@@ -127,8 +135,11 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
                 self.logger,
                 dry_run=args.dry_run,
             )
-            stats.add(new=inserted, updated=updated, total=total)
-            self.logger.info(f"  {year} terminé : {inserted} nouveaux, {updated} mis à jour")
+            stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
+            self.logger.info(
+                f"  {year} terminé : {inserted} nouveaux, {updated} mis à jour, "
+                f"{unchanged} inchangés"
+            )
         return stats
 
     # log_summary : on hérite du défaut de SourceExtractor (`=== Terminé : as_summary ===`)

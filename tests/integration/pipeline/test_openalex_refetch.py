@@ -121,10 +121,10 @@ class TestRawHashUpsert:
 
         row = _get_staging(sa_sync_conn, "W002")
         assert row.processed is True
-        # Pas d'insertion (déjà connu) ; `updated=1` car le ON CONFLICT est déclenché
-        # même si le CASE WHEN ne touche pas raw_data — la sémantique « row inchangée »
-        # est testée par les assertions ci-dessus (raw_data + processed).
+        # Hash identique → ni insertion ni réécriture : compté `unchanged`.
         assert counts.new == 0
+        assert counts.updated == 0
+        assert counts.unchanged == 1
 
     def test_bulk_changed_replaces(self, sa_sync_conn):
         """Bulk modifié → raw_data remplacé, processed=FALSE."""
@@ -162,9 +162,9 @@ class TestRefetchPreservation:
         row = _get_staging(sa_sync_conn, "W100")
         assert len(row.raw_data["authorships"]) == 150
         assert row.processed is True
-        # Pas d'insertion (déjà refetchée). L'invariance de `raw_data` (150 auteurs
-        # préservés) et de `processed` au-dessus suffit à valider le no-op.
+        # Hash identique → no-op : compté `unchanged`, raw_data (150 auteurs) préservé.
         assert counts.new == 0
+        assert counts.unchanged == 1
 
     def test_refetched_bulk_changed_overwrites(self, sa_sync_conn):
         """Bulk modifié sur ligne refetchée → écrasement par la version tronquée

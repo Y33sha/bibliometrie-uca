@@ -12,16 +12,19 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class BatchInsertCounts:
-    """Résultat d'un `insert_batch` : combien de rows réellement insérées vs mises à jour.
+    """Résultat d'un `insert_batch`, ventilé en trois.
 
-    Pour les SQL `ON CONFLICT DO UPDATE`, le distinguo est obtenu via
-    `RETURNING (xmax = 0) AS inserted` (xmax=0 → vraie insertion, sinon update
-    par ON CONFLICT).
+    - `new` : vraie insertion (`RETURNING (xmax = 0)`).
+    - `updated` : row existante dont le **contenu a changé** (`raw_data` réécrit,
+      `raw_hash` distinct de l'ancien — capté via une CTE qui lit l'ancien hash
+      avant l'UPSERT, comparé au nouveau dans le `RETURNING`).
+    - `unchanged` : row re-vue à contenu identique (seul `last_seen_at` bumpé).
     """
 
     new: int
     updated: int
+    unchanged: int
 
     @property
     def total(self) -> int:
-        return self.new + self.updated
+        return self.new + self.updated + self.unchanged

@@ -33,12 +33,12 @@ def extract_ppn(
     *,
     year: int | None = None,
     dry_run: bool = False,
-) -> tuple[int, int, int]:
+) -> tuple[int, int, int, int]:
     """Extrait toutes les thèses d'un établissement (par PPN).
 
     Si `year` est fourni, ne conserve que les thèses dont le NNT commence par cette année (filtre post-fetch ; ne ramène pas les en-cours qui n'ont pas d'année dans leur id).
 
-    Retourne (total, insérés, mis à jour).
+    Retourne (total, nouveaux, mis à jour, inchangés).
     """
     query = adapter.build_query(ppn)
 
@@ -47,10 +47,11 @@ def extract_ppn(
     logger.info(f"  PPN {ppn} : {total} thèses")
 
     if dry_run or total == 0:
-        return total, 0, 0
+        return total, 0, 0, 0
 
     inserted = 0
     updated = 0
+    unchanged = 0
     debut = 0
 
     while debut < total:
@@ -69,20 +70,25 @@ def extract_ppn(
                 continue
 
             is_new = theses_id not in existing_ids
-            was_inserted, was_updated = adapter.upsert_these(conn, these, is_new=is_new)
-            if was_inserted:
+            was_new, was_updated, was_unchanged = adapter.upsert_these(conn, these, is_new=is_new)
+            if was_new:
                 inserted += 1
                 existing_ids.add(theses_id)
             elif was_updated:
                 updated += 1
+            elif was_unchanged:
+                unchanged += 1
 
         conn.commit()
         debut += len(theses)
 
         if debut % 1000 == 0 or debut >= total:
-            logger.info(f"    {debut}/{total} traités ({inserted} nouveaux, {updated} mis à jour)")
+            logger.info(
+                f"    {debut}/{total} traités "
+                f"({inserted} nouveaux, {updated} mis à jour, {unchanged} inchangés)"
+            )
 
-    return total, inserted, updated
+    return total, inserted, updated, unchanged
 
 
 class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
@@ -136,7 +142,7 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
     ) -> PhaseMetrics:
         stats = PhaseMetrics()
         for ppn in config.ppns:
-            total, inserted, updated = extract_ppn(
+            total, inserted, updated, unchanged = extract_ppn(
                 self._adapter,
                 self.conn,
                 ppn,
@@ -145,7 +151,7 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
                 year=args.year,
                 dry_run=args.dry_run,
             )
-            stats.add(new=inserted, updated=updated, total=total)
+            stats.add(new=inserted, updated=updated, unchanged=unchanged, total=total)
         return stats
 
     # log_summary : on hérite du défaut de SourceExtractor (`=== Terminé : as_summary ===`).

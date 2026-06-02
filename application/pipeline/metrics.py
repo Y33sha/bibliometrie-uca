@@ -15,15 +15,17 @@ from dataclasses import dataclass, field
 class PhaseMetrics:
     """Compteurs d'une exécution de phase pipeline.
 
-    `new`, `updated`, `total`, `errors` couvrent les cas standards
-    (insert, update, ignoré, erreur). `extras` accueille les compteurs
-    spécifiques à une phase quand ils ne rentrent pas dans le cadre
-    générique : `already_complete` pour `refetch_truncated`, `tagged`
+    `new`, `updated`, `unchanged`, `total`, `errors` couvrent les cas
+    standards. `updated` = contenu réécrit (hash changé) ; `unchanged` =
+    re-vu à contenu identique (seul `last_seen_at` bumpé). `extras` accueille
+    les compteurs spécifiques à une phase quand ils ne rentrent pas dans le
+    cadre générique : `already_complete` pour `refetch_truncated`, `tagged`
     pour `extract_hal`, `not_found` pour les fetchers HAL, etc.
     """
 
     new: int = 0
     updated: int = 0
+    unchanged: int = 0
     total: int = 0
     errors: int = 0
     extras: dict[str, int] = field(default_factory=dict)
@@ -33,6 +35,7 @@ class PhaseMetrics:
         *,
         new: int = 0,
         updated: int = 0,
+        unchanged: int = 0,
         total: int = 0,
         errors: int = 0,
         **extras: int,
@@ -40,6 +43,7 @@ class PhaseMetrics:
         """Incrémente les compteurs en place."""
         self.new += new
         self.updated += updated
+        self.unchanged += unchanged
         self.total += total
         self.errors += errors
         for k, v in extras.items():
@@ -53,6 +57,7 @@ class PhaseMetrics:
         """
         self.new += other.new
         self.updated += other.updated
+        self.unchanged += other.unchanged
         self.total += other.total
         self.errors += other.errors
         for k, v in other.extras.items():
@@ -65,6 +70,8 @@ class PhaseMetrics:
             parts.append(f"{self.new} new")
         if self.updated:
             parts.append(f"{self.updated} updated")
+        if self.unchanged:
+            parts.append(f"{self.unchanged} unchanged")
         if self.errors:
             parts.append(f"{self.errors} errors")
         for k, v in self.extras.items():

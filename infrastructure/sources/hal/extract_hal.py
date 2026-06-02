@@ -47,6 +47,10 @@ _TAG_COLLECTION_SQL = text(
 
 _UPSERT_HAL_SQL = text(
     """
+    WITH old AS (
+        SELECT raw_hash AS old_hash FROM staging
+        WHERE source = 'hal' AND source_id = :hal_id
+    )
     INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, raw_hash)
     VALUES ('hal', :hal_id, :doi, :raw_data, ARRAY[:collection], :raw_hash)
     ON CONFLICT (source, source_id) DO UPDATE SET
@@ -68,6 +72,8 @@ _UPSERT_HAL_SQL = text(
             ELSE staging.processed
         END,
         last_seen_at = now()
+    RETURNING (xmax = 0) AS inserted,
+              ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
@@ -227,9 +233,15 @@ class PgHalExtractAdapter(HalExtractAdapter):
         doi: str | None,
         raw_data: dict[str, Any],
         collection: str,
-    ) -> None:
-        """UPSERT staging : ajoute la collection, met à jour raw_data si hash changé."""
-        conn.execute(
+    ) -> tuple[bool, bool]:
+        """UPSERT staging : ajoute la collection, met à jour raw_data si hash changé.
+
+        Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`),
+        `changed` = contenu réécrit (hash distinct de l'ancien). Pour une row
+        re-vue à hash identique, `(False, False)` (seul `last_seen_at`/la
+        collection sont bumpés).
+        """
+        row = conn.execute(
             _UPSERT_HAL_SQL,
             {
                 "hal_id": hal_id,
@@ -238,7 +250,8 @@ class PgHalExtractAdapter(HalExtractAdapter):
                 "collection": collection,
                 "raw_hash": compute_hash(raw_data),
             },
-        )
+        ).one()
+        return (bool(row.inserted), bool(row.changed))
 
     def tag_existing_with_collection(
         self, conn: Connection, hal_ids: list[str], collection_code: str
