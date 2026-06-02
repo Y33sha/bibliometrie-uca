@@ -19,21 +19,13 @@ constructions SQL :
   list[str]` et une `params: list` en parallèle, puis assembler la
   requête finale.
 
-Ce pattern « muter deux listes en parallèle » est un mini-framework
-maison déguisé. Il marche mais introduit une classe d'erreurs
-runtime (désalignement string ↔ params) et n'est pas composable :
-chaque builder est ad hoc. ROADMAP §1.4 anticipait précisément ce
-piège.
+Ce pattern « muter deux listes en parallèle » est un mini-framework maison déguisé. Il marche mais introduit une classe d'erreurs runtime (désalignement string ↔ params) et n'est pas composable : chaque builder est ad hoc. ROADMAP §1.4 anticipait précisément ce piège.
 
-SQLAlchemy Core remplace ce pattern par le standard de l'écosystème
-Python, sans rien renvoyer côté ORM.
+SQLAlchemy Core remplace ce pattern par le standard de l'écosystème Python, sans rien renvoyer côté ORM.
 
 ## Décision retenue
 
-**Adopter SQLAlchemy Core** (pas l'ORM) comme query builder de
-référence pour les queries dynamiques, en coexistence pragmatique
-avec du SQL brut là où c'est plus lisible (CTE complexes, opérations
-JSON spécifiques à PostgreSQL).
+**Adopter SQLAlchemy Core** (pas l'ORM) comme query builder de référence pour les queries dynamiques, en coexistence pragmatique avec du SQL brut là où c'est plus lisible (CTE complexes, opérations JSON spécifiques à PostgreSQL).
 
 ## Périmètre du chantier
 

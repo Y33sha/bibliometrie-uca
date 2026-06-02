@@ -4,28 +4,14 @@ Commencé et terminé le 2026-05-11
 
 ## Contexte
 
-Suite du chantier `sqlalchemy-core-adoption.md` (Phase 5). SQLAlchemy
-Core est désormais adopté dans tout le code applicatif, et la MetaData
-explicite vit dans `infrastructure/db/tables.py` (25 tables). Le coût
-d'adoption d'Alembic est donc minime — Alembic se branche
-naturellement sur cette MetaData.
+Suite du chantier `sqlalchemy-core-adoption.md` (Phase 5). SQLAlchemy Core est désormais adopté dans tout le code applicatif, et la MetaData explicite vit dans `infrastructure/db/tables.py` (25 tables). Le coût d'adoption d'Alembic est donc minime — Alembic se branche naturellement sur cette MetaData.
 
-L'enjeu : remplacer le système maison
-(`infrastructure/db/migrate.py` + 23 fichiers SQL versionnés +
-table `schema_migrations`) par Alembic, et bénéficier de
-`alembic revision --autogenerate` pour les migrations futures.
+L'enjeu : remplacer le système maison (`infrastructure/db/migrate.py` + 23 fichiers SQL versionnés + table `schema_migrations`) par Alembic, et bénéficier de `alembic revision --autogenerate` pour les migrations futures.
 
 ## Décisions de cadrage
 
-- **Baseline = `op.execute(schema.sql)`** : la première migration
-  Alembic copie le contenu de `schema.sql` (snapshot pg_dump
-  exhaustif) dans son `upgrade()`. Garantit qu'une base bootstrappée
-  via `alembic upgrade head` est identique à la prod (vues, triggers,
-  enums, fonctions inclus — ce que la MetaData seule ne couvre pas).
-- **Décommissionnement complet de `migrate.py`** : suppression du
-  fichier, des 23 migrations SQL, de la table `schema_migrations`.
-  Le `--dump-schema` est extrait dans un script dédié
-  `infrastructure/db/dump_schema.py`.
+- **Baseline = `op.execute(schema.sql)`** : la première migration Alembic copie le contenu de `schema.sql` (snapshot pg_dump exhaustif) dans son `upgrade()`. Garantit qu'une base bootstrappée via `alembic upgrade head` est identique à la prod (vues, triggers, enums, fonctions inclus — ce que la MetaData seule ne couvre pas).
+- **Décommissionnement complet de `migrate.py`** : suppression du fichier, des 23 migrations SQL, de la table `schema_migrations`. Le `--dump-schema` est extrait dans un script dédié `infrastructure/db/dump_schema.py`.
 - **Pas de branche dédiée** : commits directs sur master en ff.
 
 ## Phase 1 — Préparation

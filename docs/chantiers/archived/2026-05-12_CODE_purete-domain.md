@@ -4,10 +4,7 @@ Commencé et terminé le 2026-05-12.
 
 ## Contexte
 
-Découverte en cours du chantier `chasse-aux-any` (tranche normalize
-JSONB) : `domain/` n'est pas pur. Trois fichiers importent `pydantic`
-pour modéliser des colonnes JSONB qui sont en réalité de l'I/O, pas
-du métier.
+Découverte en cours du chantier `chasse-aux-any` (tranche normalize JSONB) : `domain/` n'est pas pur. Trois fichiers importent `pydantic` pour modéliser des colonnes JSONB qui sont en réalité de l'I/O, pas du métier.
 
 ```
 domain/structure.py:17:        from pydantic import BaseModel, ConfigDict, field_validator
@@ -15,14 +12,9 @@ domain/persons/source_ids.py:12: from pydantic import BaseModel, ConfigDict, fie
 domain/publication.py:28:        from pydantic import BaseModel, ConfigDict, field_validator
 ```
 
-Aucun contrat `import-linter` n'enforçait cette pureté : le contrat
-`type = "layers"` régule uniquement l'ordre entre les 4 couches DDD
-(`interfaces > [infrastructure | application] > domain`). Aucune
-règle n'interdit les libs externes (`pydantic`, `sqlalchemy`,
-`fastapi`, `starlette`, `psycopg`) dans `domain/`.
+Aucun contrat `import-linter` n'enforçait cette pureté : le contrat `type = "layers"` régule uniquement l'ordre entre les 4 couches DDD (`interfaces > [infrastructure | application] > domain`). Aucune règle n'interdit les libs externes (`pydantic`, `sqlalchemy`, `fastapi`, `starlette`, `psycopg`) dans `domain/`.
 
-Bonne nouvelle : seul `pydantic` contamine actuellement (vérifié par
-grep). Pas de `sqlalchemy`, pas de `fastapi`, pas de `psycopg`.
+Bonne nouvelle : seul `pydantic` contamine actuellement (vérifié par grep). Pas de `sqlalchemy`, pas de `fastapi`, pas de `psycopg`.
 
 ## Constat — ce qui n'est pas du métier dans `domain/`
 
@@ -41,50 +33,22 @@ grep). Pas de `sqlalchemy`, pas de `fastapi`, pas de `psycopg`.
 | `ThesesTopics` | `domain/publication.py` | Sous-modèle `topics.theses` |
 | `PublicationTopics` | `domain/publication.py` | Colonne `*.topics` |
 
-Ces classes valident la forme d'un dict et le sérialisent — ce n'est
-pas du comportement métier. Le métier qui pourrait émerger sur ces
-concepts (et qui aujourd'hui n'existe pas) :
-
-- Un `Enum SourceCode` (`HAL`, `OPENALEX`, `WOS`, `THESES`, `SCANR`,
-  `CROSSREF`) avec règles associées.
-- Un `Enum PersonSourceIdentifierType` + règle « `hal_person_id ≤ 0`
-  est sentinelle non-identifié » (actuellement implicite dans une
-  docstring de `PersonSourceIds`).
+Ces classes valident la forme d'un dict et le sérialisent — ce n'est pas du comportement métier.
 
 ## Référence — Cosmic Python
 
 Trois principes pertinents :
 
-1. **Le domaine ne dépend de rien.** Pas de SQLAlchemy, pas de
-   Pydantic, pas de framework. Critère empirique : si on supprime
-   toutes les libs tierces du projet, `domain/` doit encore se
-   charger et ses tests passer.
-2. **Pas d'anaemic domain model.** Le domaine porte le **comportement métier** (règles, invariants, transitions d'état), pas seulement
-   des structures de données. Un `BaseModel` qui ne fait que valider
-   un dict est par définition de l'I/O — sa place est ailleurs.
-3. **Schemas Pydantic = anti-corruption layer côté adapter.** Pydantic
-   valide à la frontière entre le monde extérieur (HTTP request,
-   payload API, ligne DB) et le domaine. Sa place naturelle est dans
-   les `infrastructure/` (adapters) et `interfaces/` (entrypoints),
-   jamais au cœur.
+1. **Le domaine ne dépend de rien.** Pas de SQLAlchemy, pas de Pydantic, pas de framework. Critère empirique : si on supprime toutes les libs tierces du projet, `domain/` doit encore se charger et ses tests passer.
+2. **Pas d'anaemic domain model.** Le domaine porte le **comportement métier** (règles, invariants, transitions d'état), pas seulement des structures de données. Un `BaseModel` qui ne fait que valider un dict est par définition de l'I/O — sa place est ailleurs.
+3. **Schemas Pydantic = anti-corruption layer côté adapter.** Pydantic valide à la frontière entre le monde extérieur (HTTP request, payload API, ligne DB) et le domaine. Sa place naturelle est dans les `infrastructure/` (adapters) et `interfaces/` (entrypoints), jamais au cœur.
 
 ## Décisions
 
-1. **Cible architecturale** : les 10 `BaseModel` vivront dans
-   `infrastructure/db/jsonb_models/` (cohérent : ils décrivent les
-   colonnes JSONB de la base, c'est un détail de l'adapter DB).
-2. **Pas de duplication source/DB pour cette première passe.** Si
-   plus tard on dédouble les schemas (un côté source HAL pour parser
-   le payload, un côté DB pour stocker), ce sera un chantier de
-   suite. Aujourd'hui un même `ExternalIds` couvre les deux usages.
-3. **Les normalizers (couche `application`) manipulent des `dict` /
-   `JsonValue`** quand ils construisent ces payloads, pas des
-   `BaseModel`. La validation pydantic se fait à l'entrée du query
-   service (`infrastructure`). Cohérent avec la règle layered
-   (`application → infrastructure` interdit) : le caller passe un
-   dict, l'adapter le valide en interne.
-4. **Garde-fou import-linter** ajouté pour interdire pydantic +
-   sqlalchemy + fastapi + starlette + psycopg dans `domain.*`.
+1. **Cible architecturale** : les 10 `BaseModel` vivront dans `infrastructure/db/jsonb_models/` (cohérent : ils décrivent les colonnes JSONB de la base, c'est un détail de l'adapter DB).
+2. **Pas de duplication source/DB pour cette première passe.** Si plus tard on dédouble les schemas (un côté source HAL pour parser le payload, un côté DB pour stocker), ce sera un chantier de suite. Aujourd'hui un même `ExternalIds` couvre les deux usages.
+3. **Les normalizers (couche `application`) manipulent des `dict` / `JsonValue`** quand ils construisent ces payloads, pas des `BaseModel`. La validation pydantic se fait à l'entrée du query service (`infrastructure`). Cohérent avec la règle layered (`application → infrastructure` interdit) : le caller passe un dict, l'adapter le valide en interne.
+4. **Garde-fou import-linter** ajouté pour interdire pydantic + sqlalchemy + fastapi + starlette + psycopg dans `domain.*`.
 
 ## Phasage
 

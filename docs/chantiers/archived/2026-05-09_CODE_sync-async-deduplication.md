@@ -5,19 +5,11 @@ Terminé le 2026-05-09
 ## Contexte
 
 L'API FastAPI et le pipeline maintiennent **deux familles de
-repositories quasi identiques** : variantes sync (utilisées par le
-pipeline et les CLI) et variantes async (utilisées par les routes
-FastAPI). Pour le seul agrégat `Person`, la duplication représente
-~1425 lignes (sync 743 + async 682).
+repositories quasi identiques** : variantes sync (utilisées par le pipeline et les CLI) et variantes async (utilisées par les routes FastAPI). Pour le seul agrégat `Person`, la duplication représente ~1425 lignes (sync 743 + async 682).
 
-7 agrégats × 2 variantes = 14 fichiers de repositories qui
-parallèlent presque ligne pour ligne. Tout ajout de méthode ou
-modification de signature doit être fait dans les deux variantes,
-avec un risque de drift silencieux.
+7 agrégats × 2 variantes = 14 fichiers de repositories qui parallèlent presque ligne pour ligne. Tout ajout de méthode ou modification de signature doit être fait dans les deux variantes, avec un risque de drift silencieux.
 
-L'origine historique est une migration FastAPI sync → async (ancien
-chantier §2.12) appliquée par réflexe « FastAPI moderne = async » sans
-interroger le profil d'usage réel de l'application.
+L'origine historique est une migration FastAPI sync → async (ancien chantier §2.12) appliquée par réflexe « FastAPI moderne = async » sans interroger le profil d'usage réel de l'application.
 
 ## Cadrage du besoin réel
 

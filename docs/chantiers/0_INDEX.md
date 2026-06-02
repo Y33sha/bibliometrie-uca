@@ -79,12 +79,6 @@
 
   18 routers sur 20 importaient depuis `/infrastructure`, malgré l'interdiction documentée mais non enforcée. Mise en conformité et règle verrouillée par `import-linter`.
 
-- 2026-05-06 — [Nettoyage des ports `domain/ports/`](archived/2026-05-06_CODE_ports-cleanup.md)
-
-  Répartition des ports entre `domain/ports/` et `application/ports/` en fonction de règles explicites.
-
-  *NB*. Obsolète: tous les ports ont par la suite été centralisés dans `application/ports/` et les règles supprimées.
-
 - 2026-05-05 — [DRY publications tables](archived/2026-05-05_CODE_dry-publications-tables.md)
 
   Le composant `<PublicationsListView>` sert désormais pour 4 pages partageant le même tableau de publications avec filtres à facettes.

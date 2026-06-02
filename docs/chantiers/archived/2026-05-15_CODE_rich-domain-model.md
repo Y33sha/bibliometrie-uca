@@ -5,15 +5,11 @@ Terminé le 2026-05-15
 
 ## Contexte
 
-Le chantier `2026-05-12_CODE_purete-domain.md` a nettoyé la moitié du
-diagnostic : `domain/` ne dépend plus de pydantic, les 10 `BaseModel`
-sont exfiltrés vers `infrastructure/db/jsonb_models/`. Reste l'autre
-moitié : **pas d'entités au sens DDD dans `domain/`**.
+Le chantier `2026-05-12_CODE_purete-domain.md` a nettoyé la moitié du diagnostic : `domain/` ne dépend plus de pydantic, les 10 `BaseModel` sont exfiltrés vers `infrastructure/db/jsonb_models/`. Reste l'autre moitié : **pas d'entités au sens DDD dans `domain/`**.
 
 Inventaire actuel :
 
-- **Value Objects** : `DOI`, `HALId`, `NNT` (`domain/publication.py`),
-  `ORCID`, `IdHAL`, `IdRef` (`domain/persons/identifiers.py`).
+- **Value Objects** : `DOI`, `HALId`, `NNT` (`domain/publication.py`), `ORCID`, `IdHAL`, `IdRef` (`domain/persons/identifiers.py`).
 - **Règles isolées** : `resolve_doi_conflict`, `best_oa_status`,
   `clean_publication_title` (`domain/publication.py`) ;
   `check_can_merge_persons` (`domain/persons/merge.py`) ;
@@ -22,37 +18,17 @@ Inventaire actuel :
   `allow_person_creation` (`domain/persons/creation.py`) ;
   `names_compatible`, `compute_person_name_forms` (`domain/names.py`) ;
   `has_minimal_publication_metadata` (`domain/publications/metadata.py`).
-- **Dataclasses de résultat de requête** : `PubByDoi`, `PubByNnt`,
-  `PubByTitle`, `PubThesisCandidate` (`domain/publication.py`).
-- **Zéro entité avec identité + comportement.** `domain/structure.py`
-  est vide (commentaire d'amorce seulement).
+- **Dataclasses de résultat de requête** : `PubByDoi`, `PubByNnt`, `PubByTitle`, `PubThesisCandidate` (`domain/publication.py`).
+- **Zéro entité avec identité + comportement.** `domain/structure.py` est vide (commentaire d'amorce seulement).
 
-Le schéma de base est bâti autour de **3 entités métier clairement
-identifiables** (`publications`, `persons`, `structures`), mais aucune
-classe ne les documente côté `domain/`. Architecture DDD bâtarde :
-orientée métier dans la structure de dossiers, anaemic dans le
-contenu — en deçà du standard "anaemic domain model = miroir de la
-base" critiqué par Cosmic Python, qui aurait au moins ces classes
-vides comme point d'appui.
+Le schéma de base est bâti autour de **3 entités métier clairement identifiables** (`publications`, `persons`, `structures`), mais aucune classe ne les documente côté `domain/`. Architecture DDD bâtarde : orientée métier dans la structure de dossiers, anaemic dans le contenu — en deçà du standard "anaemic domain model = miroir de la base" critiqué par Cosmic Python, qui aurait au moins ces classes vides comme point d'appui.
 
 **Conséquences observables :**
 
-1. Le code applicatif manipule des `dict[str, Any]` et des `int`
-   (cf. `application/pipeline/persons/create_persons_from_source_authorships.py`,
-   `application/publications.py`).
-2. Les invariants métier sont enforcés ponctuellement et de façon
-   éparse (ex. `check_can_merge_persons` uniquement appelé avant la
-   fusion ; `add_identifier` accepte silencieusement les doublons selon
-   le statut, cf. `application/persons.py:125-141`).
-3. Des effets de bord cachés vivent dans des fonctions applicatives
-   (ex. `refresh_from_sources` qui fusionne des publications sur
-   collision DOI sans le signaler dans son retour, cf.
-   `application/publications.py:348-353`).
-4. Plusieurs chantiers METIER_* à venir (`decide-person-match`,
-   `dedup-fusion-publications`, `doc-types`, `crossref`,
-   `doi-ra-datacite`) vont déposer de la logique métier — sans
-   entités, elle atterrira dans `application/` ou comme fonctions
-   libres dans `domain/`, perpétuant la dispersion.
+1. Le code applicatif manipule des `dict[str, Any]` et des `int` (cf. `application/pipeline/persons/create_persons_from_source_authorships.py`, `application/publications.py`).
+2. Les invariants métier sont enforcés ponctuellement et de façon éparse (ex. `check_can_merge_persons` uniquement appelé avant la fusion ; `add_identifier` accepte silencieusement les doublons selon le statut, cf. `application/persons.py:125-141`).
+3. Des effets de bord cachés vivent dans des fonctions applicatives (ex. `refresh_from_sources` qui fusionne des publications sur collision DOI sans le signaler dans son retour, cf. `application/publications.py:348-353`).
+4. Plusieurs chantiers METIER_* à venir (`decide-person-match`, `dedup-fusion-publications`, `doc-types`, `crossref`, `doi-ra-datacite`) vont déposer de la logique métier — sans entités, elle atterrira dans `application/` ou comme fonctions libres dans `domain/`, perpétuant la dispersion.
 
 ## Décisions
 

@@ -1,6 +1,7 @@
 # Chantier — Documentation HTML précompilée avec sommaire scrollable
 
 Commencé le 2026-05-22
+
 Terminé le 2026-05-23
 
 ## Contexte
@@ -23,52 +24,33 @@ depuis `docs/` (liste hardcodée de 7 pages : `architecture`, `donnees`,
 `sources`, `pipeline`, `exploitation`, `guide-utilisateur`, `glossaire`).
 Les fiches `docs/chantiers/*.md` ne sont pas exposées en ligne.
 
-Référence visuelle : `svelte.dev/docs/kit` — sidebar gauche scrollable avec
-sections imbriquées, contenu central, TOC à droite sticky avec scrollspy,
-code highlighté, mermaid pré-rendu.
+Référence visuelle : `svelte.dev/docs/kit` — sidebar gauche scrollable avec sections imbriquées, contenu central, TOC à droite sticky avec scrollspy, code highlighté, mermaid pré-rendu.
 
 ## Décisions
 
-- **Compilation au build SvelteKit, pas au runtime** : un `+page.server.ts`
-  lit chaque `.md` au filesystem, parse en HTML + extrait la TOC, et la
-  route est marquée `prerender = true`. La sortie est du HTML statique
-  servi par l'adapter Node existant.
+- **Compilation au build SvelteKit, pas au runtime** : un `+page.server.ts` lit chaque `.md` au filesystem, parse en HTML + extrait la TOC, et la route est marquée `prerender = true`. La sortie est du HTML statique servi par l'adapter Node existant.
 
-- **Le backend FastAPI ne sert plus la doc** : suppression de
-  `interfaces/api/routers/docs.py` et de son enregistrement dans
-  `interfaces/api/app.py`. Conséquence : un changement de doc nécessite
-  un rebuild frontend (équivalent au cycle code → commit → déploiement
-  déjà en place).
+- **Le backend FastAPI ne sert plus la doc** : suppression de `interfaces/api/routers/docs.py` et de son enregistrement dans `interfaces/api/app.py`. Conséquence : un changement de doc nécessite un rebuild frontend (équivalent au cycle code → commit → déploiement déjà en place).
 
 - **Périmètre figé aux 7 pages actuelles** (`architecture`, `donnees`, `sources`, `pipeline`, `exploitation`, `guide-utilisateur`, `glossaire`). Extensions possibles à terme, hors scope de ce chantier : indexation des fiches `docs/chantiers/*.md`, ajout de pages « workflow admin », pages par agrégat (schéma + pipeline + UI pour chaque entité).
 
 - **Sidebar hiérarchique à 2 niveaux et éclatement par sous-dossiers** : les pages longues sont scindées en plusieurs `.md` regroupés dans un dossier (`docs/sources/01-vue-d-ensemble.md`, `docs/sources/02-hal.md`, …). Le dossier devient un en-tête non cliquable dans la sidebar, ses fichiers les liens. Préfixe numérique `NN-` pour l'ordre, strippé du slug. Premières pages éclatées : `sources/`, `pipeline/`. À terme, tout est éclaté sauf `glossaire`.
 
-- **Glossaire transformé à terme en liste alphabétique unique** (page non éclatée), avec popovers informatifs au survol des termes du glossaire dans les autres pages de doc. Hors scope de ce chantier — à reporter dans une roadmap ou un chantier dédié.
+- **Glossaire transformé en liste alphabétique unique** (page non éclatée), avec popovers informatifs au survol des termes du glossaire dans les autres pages de doc.
 
-- **Intégration d'images (schémas, screenshots) à terme** : convention de stockage dans `docs/images/` ou similaire, copie au bundle au build, résolution des liens `![alt](path)`. Hors scope de ce chantier.
+- **Intégration d'images (schémas, screenshots)** : convention de stockage dans `docs/images/` ou similaire, copie au bundle au build, résolution des liens `![alt](path)`.
 
 - **Stack de parsing minimale** : `marked` côté Node (déjà connu du projet) avec un renderer custom pour les ancres et les liens internes. Pas de syntax highlighting dans un premier temps (peu de blocs de code dans la doc actuelle). Mermaid reste client-side comme aujourd'hui — le léger délai de chargement est acceptable.
 
-- **Extraction de la TOC par le parser, pas par le DOM** : le renderer
-  collecte les `h2`/`h3` et leurs ancres pendant le parse. Plus de
-  `MutationObserver`, plus de `tick()`.
+- **Extraction de la TOC par le parser, pas par le DOM** : le renderer collecte les `h2`/`h3` et leurs ancres pendant le parse. Plus de `MutationObserver`, plus de `tick()`.
 
-- **Liens internes résolus au build** : `[texte](glossaire#terme)` →
-  `<a href="/bibliometrie/docs/glossaire#terme">` directement dans le
-  HTML pré-rendu. Plus de regex au runtime.
+- **Liens internes résolus au build** : `[texte](glossaire#terme)` → `<a href="/bibliometrie/docs/glossaire#terme">` directement dans le HTML pré-rendu. Plus de regex au runtime.
 
-- **Le TODO collector est retiré** : la page `/docs/todos` et l'endpoint
-  `/api/docs/todos/all` disparaissent avec la migration. Un fichier de
-  changelog viendra plus tard.
+- **Le TODO collector est retiré** : la page `/docs/todos` et l'endpoint `/api/docs/todos/all` disparaissent avec la migration. Un fichier de changelog viendra plus tard.
 
-- **Titre de page = premier `h1` du `.md`** : pas de duplication avec une
-  liste maintenue à part. Le parser l'extrait pendant le parse.
+- **Titre de page = premier `h1` du `.md`** : pas de duplication avec une liste maintenue à part. Le parser l'extrait pendant le parse.
 
-- **Ordre des pages dans la sidebar = `interfaces/frontend/src/lib/docs/pages.ts`** :
-  un module qui exporte la liste ordonnée des slugs
-  (`architecture`, `donnees`, `sources`, `pipeline`, `exploitation`,
-  `guide-utilisateur`, `glossaire`). Court, typé, facile à éditer.
+- **Ordre des pages dans la sidebar = `interfaces/frontend/src/lib/docs/pages.ts`** : un module qui exporte la liste ordonnée des slugs (`architecture`, `donnees`, `sources`, `pipeline`, `exploitation`, `guide-utilisateur`, `glossaire`). Court, typé, facile à éditer.
 
 - **Le layout reprend les codes svelte.dev** :
   - sidebar gauche avec arborescence (sections imbriquées si besoin),

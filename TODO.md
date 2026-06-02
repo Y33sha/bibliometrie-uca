@@ -1,3 +1,4 @@
+* [ ] re-seeder les doi_prefix journals
 # A régler avant transmission
 ## Schéma de données
 * [ ] ajouter created_at,updated_at partout
@@ -9,25 +10,20 @@
 * [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples)
 ### Normalisation
 * [ ] batcher pour améliorer la perf? / analyser pour comprendre pourquoi hal + lent
-* [ ] quid des changements d'authorships quand réimport avec hash différent? vérifier qu'elles sont bien supprimées avant recréation => oui, mais pas authorships canoniques. Pruning dans build_authorships?
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 ### Suite du traitement
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects / idées:  phase_cross_imports expose sources_with_new; phase_subjects : restreindre à (extract_sources ∪ sources_with_new) / phase_countries (refresh_sa_countries_for_source) : laisser scanner toutes les sources (sécurité), mais on peut envisager un addresses.updated_at en option 2 plus tard
-* [ ] authorships: propagate_roles, propagate_is_corresponding, propagate_author_position: tout faire en une passe?
-* [ ] est-ce que les authorships détachées manuellement (donc orphelines) sont à nouveau rattachées au pipeline suivant? si oui => comportement indésirable, à corriger
+* [ ] est-ce que les authorships détachées manuellement (donc orphelines) sont à nouveau rattachées au pipeline suivant? si oui => comportement indésirable, à corriger (ajouter rejected_authorship quand on clique sur détacher)
 ## Code
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis
-* [ ] vérifier qu'il n'y a pas d'autres divergences Python↔SQL au-delà du œ (fonction normalize text).
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup de résultats ScanR sont rejetés en phase "affiliations" => auditer
 * [ ] normalisation des titres: supprimer les balises mml ou html
-* [ ] données supplémentaires: peer-reviewed? publié?
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
-* [ ] re-seeder les doi_prefix journals
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée? récupérer pmid dans api HAL
 * [ ] pour les jeux de données: DataCite, Zenodo, autres?

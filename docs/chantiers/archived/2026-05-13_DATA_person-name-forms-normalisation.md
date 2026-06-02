@@ -4,10 +4,9 @@ Commencé et terminé le 2026-05-13.
 
 ## Contexte
 
-Schéma actuel : `person_name_forms(name_form, person_ids integer[], sources text[])` — deux arrays parallèles non-corrélés. Pour une forme liée à plusieurs personnes via plusieurs sources, on ne sait pas quel `(person_id, source)` est responsable de quoi.
+Schéma actuel : `person_name_forms(name_form, person_ids integer[], sources text[])` — deux arrays parallèles non-corrélés. Pour une forme de nom liée à plusieurs personnes via plusieurs sources, on ne sait pas quel `(person_id, source)` est responsable de quoi.
 
-Exemple problématique : forme `"j dupont"` reliée à person 1 (Jérôme
-Dupont) via `persons` et à person 2 (Jeanne Dupont-Martin) via `openalex` — finit avec `person_ids=[1,2], sources=['persons','openalex']`, zéro moyen de tracer `1↔persons` et `2↔openalex` sans recalculer depuis les sources.
+Exemple problématique : forme `"j dupont"` reliée à person 1 (Jérôme Dupont) via `persons` et à person 2 (Jeanne Dupont-Martin) via `openalex` — finit avec `person_ids=[1,2], sources=['persons','openalex']`, zéro moyen de tracer `1↔persons` et `2↔openalex` sans recalculer depuis les sources.
 
 C'est cette faiblesse qui justifie la **recalculation systématique batch** dans `populate_person_name_forms` : on ne peut pas faire d'update incrémental (`source_authorships` modifié → mise à jour ciblée de la contribution correspondante) parce qu'on ne sait pas quelles contributions viennent de qui.
 
@@ -26,8 +25,7 @@ pour 53 381 formes (97.6 %), le couplage est trivial (1 seul person_id).
 
 ### Options structurelles considérées
 
-- **Table de liaison** `(name_form, person_id, sources text[])`,
-  FK sur `person_id`, UNIQUE composite. +1 table, ~56k rows, queries SQL standards, FK possible. La colonne `source` reste un array car il n'y a pas de table `sources` qui justifierait de la sortir en row-per-source (la valeur est juste un libellé, pas un agrégat FK).
+- **Table de liaison** `(name_form, person_id, sources text[])`, FK sur `person_id`, UNIQUE composite. +1 table, ~56k rows, queries SQL standards, FK possible. La colonne `source` reste un array car il n'y a pas de table `sources` qui justifierait de la sortir en row-per-source (la valeur est juste un libellé, pas un agrégat FK).
 - **JSONB sur la table existante** : remplacer `person_ids[] + sources[]`   par une seule colonne `persons jsonb` au format `{ "<person_id>": ["src1", "src2"], ... }`. Pas de table ajoutée, suppression d'une colonne, 1 row par name_form (54k inchangé). Pas de FK (mais pas de perte vs aujourd'hui : impossible sur arrays).
 
 ## Décisions
