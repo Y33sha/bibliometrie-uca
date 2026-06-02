@@ -35,13 +35,13 @@ def main() -> None:
             return
 
         perimeter_ids = get_persons_structure_ids(conn)
-        wide_ids = get_affiliations_structure_ids(conn)
+        affiliation_structure_ids = get_affiliations_structure_ids(conn)
         run_populate(
             conn,
             queries,
             logger,
             perimeter_ids,
-            wide_ids,
+            affiliation_structure_ids,
             mode=args.mode,
         )
         conn.commit()

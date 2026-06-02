@@ -18,7 +18,7 @@ class AffiliationsQueries(Protocol):
     ) -> int: ...
 
     def set_structure_ids_from_addresses(
-        self, conn: Connection, *, source: str, wide_ids: list[int], daily: bool
+        self, conn: Connection, *, source: str, affiliation_structure_ids: list[int], daily: bool
     ) -> int: ...
 
     def count_source_authorships_stats(

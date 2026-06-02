@@ -30,12 +30,12 @@ class TestSetInPerimeterFromAddressesDailyClause:
 class TestSetStructureIdsFromAddressesDailyClause:
     def test_daily_true_does_not_raise(self, sa_sync_conn):
         n = set_structure_ids_from_addresses(
-            sa_sync_conn, source="openalex", wide_ids=[1, 2, 3], daily=True
+            sa_sync_conn, source="openalex", affiliation_structure_ids=[1, 2, 3], daily=True
         )
         assert n == 0
 
     def test_daily_false_does_not_raise(self, sa_sync_conn):
         n = set_structure_ids_from_addresses(
-            sa_sync_conn, source="openalex", wide_ids=[1, 2, 3], daily=False
+            sa_sync_conn, source="openalex", affiliation_structure_ids=[1, 2, 3], daily=False
         )
         assert n == 0

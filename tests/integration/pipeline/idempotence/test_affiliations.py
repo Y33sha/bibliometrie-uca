@@ -111,12 +111,14 @@ def _run_populate_affiliations(conn):
     )
 
     perimeter_ids = get_persons_structure_ids(conn)
-    wide_ids = get_affiliations_structure_ids(conn)
+    affiliation_structure_ids = get_affiliations_structure_ids(conn)
     queries = PgAffiliationsQueries()
     logger = logging.getLogger("test")
 
     for source in ALL_SOURCES:
-        _step_address_source(conn, queries, logger, source, perimeter_ids, wide_ids)
+        _step_address_source(
+            conn, queries, logger, source, perimeter_ids, affiliation_structure_ids
+        )
 
 
 def _count_affiliations(conn) -> dict:
