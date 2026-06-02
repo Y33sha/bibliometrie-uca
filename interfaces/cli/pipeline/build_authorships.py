@@ -14,14 +14,11 @@ logger = setup_logger("build_authorships", os.path.join(os.path.dirname(__file__
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="Simuler sans modifier la base")
-    parser.add_argument("--sources", default=None, help="Sources à traiter (défaut: toutes)")
     args = parser.parse_args()
-
-    sources = set(s.strip() for s in args.sources.split(",") if s.strip()) if args.sources else None
 
     conn = get_sync_engine().connect()
     try:
-        build(conn, PgAuthorshipsBuildQueries(), logger, sources=sources)
+        build(conn, PgAuthorshipsBuildQueries(), logger)
 
         if args.dry_run:
             conn.rollback()
