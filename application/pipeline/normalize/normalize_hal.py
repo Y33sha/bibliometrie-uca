@@ -28,8 +28,13 @@ from collections.abc import Callable
 from sqlalchemy import Connection
 
 from application.journals import find_or_create_journal
+from application.pipeline.normalize._authorships_batch import (
+    AddressRecord,
+    AuthorRecord,
+    write_source_authorships,
+)
 from application.pipeline.normalize.base import SourceNormalizer
-from application.ports.pipeline.address_linker import AddressLinker
+from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.hal import HalNormalizeQueries
 from application.ports.pipeline.staging import HalStagingRow, StagingQueries, StagingRow
 from application.ports.pipeline.zenodo_resolver import ZenodoResolver
@@ -366,26 +371,15 @@ def parse_author_structures(
     return form_structs
 
 
-def process_authors(
-    conn: Connection,
-    queries: HalNormalizeQueries,
-    doc: dict,
-    source_publication_id: int,
-    *,
-    address_linker: AddressLinker,
-) -> None:
-    """
-    Traite les auteurs d'un document HAL :
+def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
+    """Parse les auteurs d'un document HAL en `AuthorRecord` (sans I/O).
+
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasPrimaryStructure_fs pour les affiliations (clé = form_id)
-    - Crée les source_authorships (source='hal') avec `source_structures`
-      (TEXT[] des halId_s natifs) et `person_identifiers` (JSONB des
-      orcid/idref/idhal/hal_person_id quand présents).
+    - Produit pour chaque auteur les `source_structures` (TEXT[] des halId_s
+      natifs), `person_identifiers` (orcid/idref/idhal/hal_person_id quand
+      présents) et `addresses` (noms de structures).
     """
-    # Pré-nettoyage : un re-traitement peut changer les auteurs/positions,
-    # on repart d'une table blanche pour cette publi.
-    queries.clear_source_authorships_for_publication(conn, source_publication_id)
-
     qualities = doc.get("authQuality_s") or []
     # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul
     # champ HAL qui les attache proprement à chaque position d'auteur.
@@ -426,6 +420,7 @@ def process_authors(
     struct_name_by_hal_id: dict[str, str] = {}
     form_struct_map = parse_author_structures(doc, struct_name_by_hal_id=struct_name_by_hal_id)
 
+    records: list[AuthorRecord] = []
     for position, name in enumerate(names):
         hal_person_id = hal_person_id_by_pos.get(position)
         form_id = form_id_by_pos.get(position)
@@ -464,19 +459,30 @@ def process_authors(
                 if hid in struct_name_by_hal_id and struct_name_by_hal_id[hid].strip()
             ]
 
-        sa_id = queries.upsert_hal_source_authorship(
-            conn,
-            source_publication_id=source_publication_id,
-            author_position=position,
-            source_structures=source_structures,
-            raw_author_name=name,
-            is_corresponding=is_corresponding,
-            roles=roles or None,
-            person_identifiers=identifiers,
+        records.append(
+            AuthorRecord(
+                position=position,
+                raw_name=name,
+                is_corresponding=is_corresponding,
+                roles=roles or None,
+                source_structures=source_structures,
+                person_identifiers=identifiers,
+                addresses=[AddressRecord(text=part) for part in addr_parts],
+            )
         )
 
-        if addr_parts:
-            address_linker.link(conn, sa_id, addr_parts)
+    return records
+
+
+def process_authors(
+    conn: Connection,
+    authorship_queries: AuthorshipsBatchQueries,
+    doc: dict,
+    source_publication_id: int,
+) -> None:
+    """Parse les auteurs HAL puis écrit les authorships en batch."""
+    records = build_hal_author_records(doc)
+    write_source_authorships(conn, authorship_queries, "hal", source_publication_id, records)
 
 
 # =============================================================
@@ -495,7 +501,7 @@ def process_work(
     pub_repo: PublicationRepository,
     zenodo_resolver: ZenodoResolver,
     staging_queries: StagingQueries,
-    address_linker: AddressLinker,
+    authorship_queries: AuthorshipsBatchQueries,
 ) -> bool | None:
     """Traite un work du staging HAL."""
     from application.pipeline.timings import StepTimer
@@ -560,13 +566,7 @@ def process_work(
         )
         t.mark("hal_doc")
 
-        process_authors(
-            conn,
-            queries,
-            doc,
-            source_publication_id,
-            address_linker=address_linker,
-        )
+        process_authors(conn, authorship_queries, doc, source_publication_id)
         t.mark("authors")
 
         staging_queries.mark_done(conn, staging_id)
@@ -594,7 +594,7 @@ class HalNormalizer(SourceNormalizer):
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],
         zenodo_resolver: ZenodoResolver,
-        address_linker: AddressLinker,
+        authorship_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -605,7 +605,7 @@ class HalNormalizer(SourceNormalizer):
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
         self._zenodo_resolver = zenodo_resolver
-        self._address_linker = address_linker
+        self._authorship_queries = authorship_queries
 
     def preload_caches(self, conn: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(conn)
@@ -630,14 +630,5 @@ class HalNormalizer(SourceNormalizer):
             pub_repo=self._pub_repo,
             zenodo_resolver=self._zenodo_resolver,
             staging_queries=self._staging,
-            address_linker=self._address_linker,
+            authorship_queries=self._authorship_queries,
         )
-
-    def cleanup(self) -> None:
-        self._address_linker.clear_cache()
-
-    def on_error(self) -> None:
-        # Le cache adresse peut contenir des IDs insérés dans la
-        # transaction qui vient d'être rollbackée — l'invalider évite
-        # les FK violations sur les works suivants.
-        self._address_linker.clear_cache()

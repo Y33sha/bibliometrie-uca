@@ -584,12 +584,6 @@ source_authorships = Table(
         postgresql_where=text("authorship_id IS NOT NULL"),
     ),
     Index(
-        "idx_sa_nonhal_outscope",
-        "source_publication_id",
-        "author_position",
-        postgresql_where=text("source <> 'hal' AND in_perimeter = false"),
-    ),
-    Index(
         "idx_sa_in_perimeter",
         "source_publication_id",
         postgresql_where=text("in_perimeter = TRUE"),

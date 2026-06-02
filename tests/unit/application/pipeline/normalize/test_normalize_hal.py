@@ -1,8 +1,8 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_hal`.
 
-Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), l'orchestrateur `process_authors` (composite + TEI), l'orchestrateur `process_work` (zenodo, métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, _row_factory, cleanup, on_error).
+Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (zenodo, métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
 
-Pattern : `_FakeQueries` + `_FakeAddressLinker` + `MagicMock`, pas de DB.
+Pattern : `_FakeQueries` + `_FakeAuthorshipQueries` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
@@ -17,11 +17,11 @@ from application.pipeline.normalize import normalize_hal
 from application.pipeline.normalize.normalize_hal import (
     HalNormalizer,
     as_str,
+    build_hal_author_records,
     extract_pub_metadata,
     get_title,
     insert_hal_document,
     parse_author_structures,
-    process_authors,
     process_work,
     upsert_journal,
     upsert_publisher,
@@ -44,8 +44,6 @@ def _staging_row(staging_id=1, hal_id="hal-1", doi=None, raw=None, collections=N
 
 class _FakeQueries:
     def __init__(self) -> None:
-        self.cleared_for: list[int] = []
-        self.upserted_authorships: list[dict[str, Any]] = []
         self.upserted_documents: list[dict[str, Any]] = []
         self.staging_has_doi_returns = False
 
@@ -53,27 +51,34 @@ class _FakeQueries:
         self.upserted_documents.append(kw)
         return 999
 
-    def upsert_hal_source_authorship(self, conn, **kw) -> int:
-        self.upserted_authorships.append(kw)
-        return 100 + len(self.upserted_authorships)
-
     def staging_has_hal_doi(self, conn, doi: str) -> bool:
         return self.staging_has_doi_returns
+
+
+class _FakeAuthorshipQueries:
+    """Stub du port batch partagé — enregistre les appels du writer."""
+
+    def __init__(self) -> None:
+        self.cleared_for: list[int] = []
 
     def clear_source_authorships_for_publication(self, conn, source_publication_id: int) -> None:
         self.cleared_for.append(source_publication_id)
 
+    def upsert_source_authorships_batch(self, conn, values) -> None: ...
 
-class _FakeAddressLinker:
-    def __init__(self) -> None:
-        self.links: list[tuple[int, list[str]]] = []
-        self.cleared = 0
+    def fetch_source_authorship_ids_by_position(self, conn, **kw) -> dict[int, int]:
+        return {}
 
-    def link(self, conn, sa_id: int, addr_parts: list[str]) -> None:
-        self.links.append((sa_id, addr_parts))
+    def upsert_addresses_batch(self, conn, values) -> None: ...
 
-    def clear_cache(self) -> None:
-        self.cleared += 1
+    def fetch_address_ids_by_raw_text(self, conn, raw_texts) -> dict[str, int]:
+        return {}
+
+    def apply_address_countries_batch(self, conn, values) -> None: ...
+
+    def apply_address_suggested_countries_batch(self, conn, values) -> None: ...
+
+    def insert_source_authorship_addresses_batch(self, conn, values) -> None: ...
 
 
 class _FakeStagingQueries:
@@ -412,51 +417,40 @@ class TestParseAuthorStructures:
         assert result == {100: {"111", "222"}}
 
 
-# ── process_authors ──────────────────────────────────────────────
+# ── build_hal_author_records (parsing pur) ───────────────────────
 
 
-class TestProcessAuthors:
+class TestBuildHalAuthorRecords:
     def test_no_authors(self):
-        queries = _FakeQueries()
-        process_authors(MagicMock(), queries, {}, 10, address_linker=_FakeAddressLinker())
-        assert queries.cleared_for == [10]
-        assert queries.upserted_authorships == []
+        assert build_hal_author_records({}) == []
 
     def test_skip_empty_name(self):
-        queries = _FakeQueries()
-        process_authors(
-            MagicMock(),
-            queries,
+        records = build_hal_author_records(
             {
                 "authFullNameFormIDPersonIDIDHal_fs": [
                     "_FacetSep_0-0_FacetSep_",
                     "Marie Dupont_FacetSep_0-0_FacetSep_",
                 ]
-            },
-            10,
-            address_linker=_FakeAddressLinker(),
+            }
         )
-        assert len(queries.upserted_authorships) == 1
-        assert queries.upserted_authorships[0]["raw_author_name"] == "Marie Dupont"
+        assert len(records) == 1
+        assert records[0].raw_name == "Marie Dupont"
 
     def test_composite_extracts_name_and_hal_person_id(self):
         # Le composite fournit le nom et le hal_person_id (2e segment). L'idhal
         # vient du TEI, pas du composite (cf. test suivant).
-        queries = _FakeQueries()
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": [
                 "Marie Dupont_FacetSep_49236-749496_FacetSep_marie-dupont"
             ],
         }
-        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
-        authorship = queries.upserted_authorships[0]
-        assert authorship["raw_author_name"] == "Marie Dupont"
+        record = build_hal_author_records(doc)[0]
+        assert record.raw_name == "Marie Dupont"
         # Pas de TEI → pas d'idhal (le 3e segment du composite est ignoré).
-        assert authorship["person_identifiers"] == {"hal_person_id": 749496}
+        assert record.person_identifiers == {"hal_person_id": 749496}
 
     def test_idhal_comes_from_tei(self):
         # L'idhal slug vient du TEI (notation="string"), aligné par position.
-        queries = _FakeQueries()
         label_xml = (
             '<TEI xmlns="http://www.tei-c.org/ns/1.0"><biblFull><titleStmt>'
             '<author><idno type="idhal" notation="string">marie-dupont</idno></author>'
@@ -468,8 +462,7 @@ class TestProcessAuthors:
             ],
             "label_xml": label_xml,
         }
-        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
-        assert queries.upserted_authorships[0]["person_identifiers"] == {
+        assert build_hal_author_records(doc)[0].person_identifiers == {
             "idhal": "marie-dupont",
             "hal_person_id": 749496,
         }
@@ -478,52 +471,52 @@ class TestProcessAuthors:
         # Régression : quand l'auteur n'a pas de slug, HAL recopie le person_id
         # numérique dans le 3e segment du composite. Sans idhal TEI, on ne doit
         # PAS créer d'idhal numérique (== hal_person_id) — seul hal_person_id reste.
-        queries = _FakeQueries()
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": [
                 "Christian Duale_FacetSep_106-921527_FacetSep_921527"
             ],
         }
-        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
-        assert queries.upserted_authorships[0]["person_identifiers"] == {
+        assert build_hal_author_records(doc)[0].person_identifiers == {
             "hal_person_id": 921527,
         }
 
     def test_composite_with_zero_person_id_filtered(self):
         """person_id == 0 = non identifié par HAL, on l'ignore."""
-        queries = _FakeQueries()
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": ["X_FacetSep_49236-0_FacetSep_"],
         }
-        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
         # Sans hal_person_id ni idhal, person_identifiers est None.
-        assert queries.upserted_authorships[0]["person_identifiers"] is None
+        assert build_hal_author_records(doc)[0].person_identifiers is None
 
     def test_form_struct_map_resolves_addr_parts(self):
-        queries = _FakeQueries()
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": ["X_FacetSep_49236-749496_FacetSep_"],
             "authIdHasPrimaryStructure_fs": [
                 "49236-749496_FacetSep_X_JoinSep_300012_FacetSep_LIMOS"
             ],
         }
-        linker = _FakeAddressLinker()
-        process_authors(MagicMock(), queries, doc, 10, address_linker=linker)
-        assert queries.upserted_authorships[0]["source_structures"] == ["300012"]
-        assert linker.links == [(101, ["LIMOS"])]
+        record = build_hal_author_records(doc)[0]
+        assert record.source_structures == ["300012"]
+        assert [a.text for a in record.addresses] == ["LIMOS"]
 
     def test_quality_maps_to_roles(self):
         """`authQuality_s = 'dir'` est mappé en rôle via `map_role('hal', ...)` (cf. domain.publications.authorship_roles)."""
-        queries = _FakeQueries()
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": ["Director_FacetSep_0-0_FacetSep_"],
             "authQuality_s": ["dir"],
         }
-        process_authors(MagicMock(), queries, doc, 10, address_linker=_FakeAddressLinker())
-        upsert = queries.upserted_authorships[0]
+        record = build_hal_author_records(doc)[0]
         # On valide juste que map_role a été appelé et a produit une liste non-vide.
-        assert upsert["roles"] is not None
-        assert len(upsert["roles"]) > 0
+        assert record.roles is not None
+        assert len(record.roles) > 0
+
+
+class TestProcessAuthors:
+    def test_clears_then_writes_even_when_empty(self):
+        authorship_queries = _FakeAuthorshipQueries()
+        normalize_hal.process_authors(MagicMock(), authorship_queries, {}, 10)
+        # Le writer clear toujours, même sans auteur (re-traitement → table blanche).
+        assert authorship_queries.cleared_for == [10]
 
 
 # ── process_work ─────────────────────────────────────────────────
@@ -549,7 +542,7 @@ class TestProcessWork:
             "pub_repo": MagicMock(),
             "zenodo_resolver": zenodo or MagicMock(),
             "staging_queries": staging_queries or _FakeStagingQueries(),
-            "address_linker": _FakeAddressLinker(),
+            "authorship_queries": _FakeAuthorshipQueries(),
         }
 
     def test_happy_path(self, stub_orchestration_deps):
@@ -659,7 +652,7 @@ def _make_normalizer():
         publisher_repo_factory=lambda c: MagicMock(),
         pub_repo_factory=lambda c: MagicMock(),
         zenodo_resolver=MagicMock(),
-        address_linker=_FakeAddressLinker(),
+        authorship_queries=_FakeAuthorshipQueries(),
     )
 
 
@@ -677,13 +670,3 @@ class TestHalNormalizerClass:
         monkeypatch.setattr(normalize_hal, "process_work", lambda *a, **kw: True)
         result = norm.process_work(MagicMock(), _staging_row())
         assert result is True
-
-    def test_cleanup_clears_address_linker_cache(self):
-        norm = _make_normalizer()
-        norm.cleanup()
-        assert norm._address_linker.cleared == 1  # type: ignore[attr-defined]
-
-    def test_on_error_clears_address_linker_cache(self):
-        norm = _make_normalizer()
-        norm.on_error()
-        assert norm._address_linker.cleared == 1  # type: ignore[attr-defined]
