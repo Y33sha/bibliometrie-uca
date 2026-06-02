@@ -1620,6 +1620,7 @@ def main() -> None:  # noqa: C901 â€” orchestrateur CLI : refactor en helpers sÃ
                 metrics_payload[name] = {
                     "new": pm.new,
                     "updated": pm.updated,
+                    "unchanged": pm.unchanged,
                     "total": pm.total,
                     "errors": pm.errors,
                     "extras": dict(pm.extras),
