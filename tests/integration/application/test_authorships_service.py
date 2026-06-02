@@ -398,6 +398,74 @@ class TestDeleteOrphanAuthorships:
         assert row is not None
 
 
+# ── prune_orphan_authorships (build, global) ──────────────────
+
+
+class TestPruneOrphanAuthorships:
+    """`prune_orphan_authorships` (étape 1bis du build) supprime, toutes
+    personnes confondues, les authorships canoniques que plus aucune
+    source_authorship n'atteste — inverse d'`insert_missing_authorships`."""
+
+    def test_deletes_orphan(self, sa_sync_conn):
+        from infrastructure.queries.authorships_build import prune_orphan_authorships
+
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        _create_authorship(sa_sync_conn, pub_id, person_id)
+
+        n = prune_orphan_authorships(sa_sync_conn)
+
+        assert n == 1
+        assert sa_sync_conn.execute(text("SELECT id FROM authorships")).first() is None
+
+    def test_keeps_attested_pair(self, sa_sync_conn):
+        from infrastructure.queries.authorships_build import prune_orphan_authorships
+
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        _create_source_authorship(
+            sa_sync_conn, sp_id, person_id=person_id, authorship_id=authorship_id
+        )
+
+        n = prune_orphan_authorships(sa_sync_conn)
+
+        assert n == 0
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT id FROM authorships WHERE id = :id"), {"id": authorship_id}
+            ).first()
+            is not None
+        )
+
+    def test_global_scope_across_persons(self, sa_sync_conn):
+        """Prune toutes les orphelines, pas seulement celles d'une personne ;
+        une authorship attestée (autre personne, même pub) est préservée."""
+        from infrastructure.queries.authorships_build import prune_orphan_authorships
+
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        p_attested = _create_person(sa_sync_conn, "Martin", "Sophie")
+        p_orphan1 = _create_person(sa_sync_conn, "Dupont", "Jean")
+        p_orphan2 = _create_person(sa_sync_conn, "Durand", "Alice")
+
+        a_attested = _create_authorship(sa_sync_conn, pub_id, p_attested)
+        _create_source_authorship(
+            sa_sync_conn, sp_id, person_id=p_attested, authorship_id=a_attested
+        )
+        # Deux orphelines sur deux personnes distinctes (aucune source ne les atteste).
+        _create_authorship(sa_sync_conn, pub_id, p_orphan1)
+        pub2 = _create_publication(sa_sync_conn, title="Autre")
+        _create_authorship(sa_sync_conn, pub2, p_orphan2)
+
+        n = prune_orphan_authorships(sa_sync_conn)
+
+        assert n == 2
+        rows = sa_sync_conn.execute(text("SELECT person_id FROM authorships")).all()
+        assert [r.person_id for r in rows] == [p_attested]
+
+
 # ── propagate_uca_for_addresses ───────────────────────────────
 
 

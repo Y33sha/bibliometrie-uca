@@ -2,6 +2,7 @@
 Construit la table authorships (table de vérité) à partir des authorships sources.
 
 Étape 1 : Insérer les authorships manquantes (paires publication_id, person_id)
+Étape 1bis : Pruner les authorships orphelines (paires que plus aucune source n'atteste)
 Étape 2 : Peupler les FK (source_authorships.authorship_id → authorships.id)
 Étape 3 : Propager author_position et is_corresponding
 Étape 4 : Propager in_perimeter (union des sources)
@@ -62,6 +63,12 @@ def build(
     logger.info("Étape 1 : insertion des authorships manquantes...")
     inserted = queries.insert_missing_authorships(conn)
     logger.info(f"  {inserted} authorships créées")
+
+    # Étape 1bis : prune des orphelines (paires que plus aucune source n'atteste).
+    # Le build incrémental est add-only ; sans ce prune une authorship dont l'auteur
+    # a été retiré de toutes les sources survivrait jusqu'au rebuild `full`.
+    pruned = queries.prune_orphan_authorships(conn)
+    logger.info(f"  {pruned} authorships orphelines supprimées")
 
     # ANALYZE après l'INSERT massif : sinon les stats Postgres restent à zéro sur les colonnes fraîchement insérées (`is_corresponding`, `roles`), et les UPDATE de l'étape 3 partent en Nested Loop catastrophique (estimate `rows=1` au lieu de `rows=100_000+`).
     if rebuild_full:

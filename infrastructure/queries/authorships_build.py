@@ -49,6 +49,34 @@ def insert_missing_authorships(conn: Connection) -> int:
     ).rowcount
 
 
+def prune_orphan_authorships(conn: Connection) -> int:
+    """Étape 1bis : supprime les `authorships` que plus aucune source n'atteste.
+
+    Inverse exact d'`insert_missing_authorships` : une authorship `(publication_id,
+    person_id)` dont la paire n'existe plus dans `source_authorships` (auteur retiré
+    de toutes les sources lors d'un réimport) est orpheline et doit disparaître. Le
+    build incrémental (modes daily/weekly) étant add-only, sans ce prune une telle
+    orpheline survivrait jusqu'au prochain rebuild `full`. Tourne donc à chaque build.
+
+    Version globale de `delete_orphan_authorships_for_person` (chemin admin detach),
+    sans le filtre personne. Le DELETE délie `source_authorships.authorship_id` (FK
+    ON DELETE SET NULL) — inerte ici, une orpheline n'ayant par définition aucun
+    `source_authorship` lié. Retourne le nombre d'authorships purgées.
+    """
+    return conn.execute(
+        text("""
+            DELETE FROM authorships a
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM source_authorships sa
+                JOIN source_publications sd ON sd.id = sa.source_publication_id
+                WHERE sa.person_id = a.person_id
+                  AND sd.publication_id = a.publication_id
+            )
+        """)
+    ).rowcount
+
+
 def link_source_authorships_to_authorship_for(conn: Connection, source: str) -> int:
     """Étape 2 : peuple `source_authorships.authorship_id` pour une source donnée.
 
@@ -211,6 +239,9 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
 
     def insert_missing_authorships(self, conn: Connection) -> int:
         return insert_missing_authorships(conn)
+
+    def prune_orphan_authorships(self, conn: Connection) -> int:
+        return prune_orphan_authorships(conn)
 
     def analyze_authorships(self, conn: Connection) -> None:
         # ANALYZE intra-transaction est valide : Postgres met à jour pg_statistic immédiatement, et le planner relit ces stats au moment où il prépare chaque requête suivante de la même session. Sans ça, les UPDATE de l'étape 3 (`propagate_is_corresponding`, `propagate_roles`) partaient en Nested Loop sur estimate `rows=1` au lieu de Hash Join, bloquant le pipeline pendant des heures sur ~100 k authorships fraîchement insérées (null_frac obsolète à 0).
