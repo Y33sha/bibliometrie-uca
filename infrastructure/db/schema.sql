@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict y3Qlbvdg1Rzm5MSGYxBiBFgLyV7rqT5GQCwlYYpiBOwlAd11G7QpHPhOcPCIKir
+\restrict fkzLgYfJ7RTgEgFf0U8VUyBNtVXPKmbUc3aUlrgLoImhmocmI7QkAMQTZDV6cQX
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped from database version 18.1
+-- Dumped by pg_dump version 18.1
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -460,8 +460,6 @@ CREATE TABLE public.authorships (
     person_id integer,
     author_position smallint,
     in_perimeter boolean DEFAULT false,
-    source_manual boolean DEFAULT false,
-    excluded boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     is_corresponding boolean,
@@ -1040,6 +1038,17 @@ ALTER SEQUENCE public.publishers_id_seq OWNED BY public.publishers.id;
 
 
 --
+-- Name: rejected_authorships; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.rejected_authorships (
+    publication_id integer NOT NULL,
+    person_id integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: source_authorship_addresses; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1090,7 +1099,6 @@ CREATE TABLE public.source_authorships (
     source_publication_id integer NOT NULL,
     author_position smallint,
     in_perimeter boolean DEFAULT false,
-    excluded boolean DEFAULT false,
     countries text[],
     person_id integer,
     author_name_normalized text,
@@ -1872,6 +1880,14 @@ ALTER TABLE ONLY public.publishers
 
 
 --
+-- Name: rejected_authorships rejected_authorships_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rejected_authorships
+    ADD CONSTRAINT rejected_authorships_pkey PRIMARY KEY (publication_id, person_id);
+
+
+--
 -- Name: source_authorship_addresses source_authorship_addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2407,13 +2423,6 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 
 
 --
--- Name: idx_sa_excluded; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sa_excluded ON public.source_authorships USING btree (excluded) WHERE (excluded = true);
-
-
---
 -- Name: idx_sa_in_perimeter; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2827,6 +2836,22 @@ ALTER TABLE ONLY public.publisher_name_forms
 
 
 --
+-- Name: rejected_authorships rejected_authorships_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rejected_authorships
+    ADD CONSTRAINT rejected_authorships_person_id_fkey FOREIGN KEY (person_id) REFERENCES public.persons(id) ON DELETE CASCADE;
+
+
+--
+-- Name: rejected_authorships rejected_authorships_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rejected_authorships
+    ADD CONSTRAINT rejected_authorships_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE CASCADE;
+
+
+--
 -- Name: source_authorship_addresses source_authorship_addresses_address_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2934,4 +2959,4 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict y3Qlbvdg1Rzm5MSGYxBiBFgLyV7rqT5GQCwlYYpiBOwlAd11G7QpHPhOcPCIKir
+\unrestrict fkzLgYfJ7RTgEgFf0U8VUyBNtVXPKmbUc3aUlrgLoImhmocmI7QkAMQTZDV6cQX

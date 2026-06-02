@@ -1,6 +1,6 @@
 # Chantier — Sidecar `rejected_authorships` (extraire `authorships.excluded`)
 
-Commencé le 2026-06-01
+Commencé et terminé le 2026-06-01
 
 Sous-chantier de [`DATA_donnees-derivees`](DATA_donnees-derivees.md) (Phase 2). Prérequis de la conversion de `authorships` en `MATERIALIZED VIEW` : dissoudre le dernier îlot d'état natif de la table.
 
@@ -64,10 +64,12 @@ Sites recensés : `insert_missing_authorships` (build principal) et le chemin d'
 
 ## Phasage
 
-1. **Migration + schéma + domaine** : créer `rejected_authorships` ; backfill depuis `authorships WHERE excluded AND person_id IS NOT NULL` (0 row en prod, idempotent) ; `DROP COLUMN excluded`, `DROP COLUMN source_manual`. `tables.py`, `domain/publications/authorship.py`, projection `_AuthorshipRow`.
-2. **Écriture** : `exclude_authorship` → sidecar + DELETE row. Port/repo : `mark_authorship_excluded` → `reject_authorship(publication_id, person_id)` ; anti-join sidecar dans les sites d'INSERT ; transfert du rejet dans `merge_into`.
-3. **Lecture** : retrait des `NOT a.excluded`.
-4. **Tests + doc** (08-authorships, 05-authorships-et-sources, 10-resume ; roadmap parent cochée).
+Livré en un commit (`84b2dc83`, migration `f3b6d9c1a8e2`).
+
+- [x] **Migration + schéma + domaine** : créer `rejected_authorships` ; backfill depuis `authorships WHERE excluded AND person_id IS NOT NULL` (0 row en prod, idempotent) ; `DROP COLUMN excluded`, `DROP COLUMN source_manual`. `tables.py`, `domain/publications/authorship.py`, projection `_AuthorshipRow`.
+- [x] **Écriture** : `exclude_authorship` → sidecar + DELETE row. Port/repo : `mark_authorship_excluded` → `reject_authorship(publication_id, person_id)` + `delete_authorship` ; anti-join sidecar dans les 3 sites d'INSERT ; transfert du rejet dans `merge_into`.
+- [x] **Lecture** : retrait des `NOT a.excluded`.
+- [x] **Tests + doc** (08-authorships, 05-authorships-et-sources, 10-resume ; roadmap parent cochée).
 
 ## Questions ouvertes
 
