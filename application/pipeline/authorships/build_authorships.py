@@ -4,7 +4,8 @@ Construit la table authorships (table de vérité) à partir des authorships sou
 Étape 1 : Insérer les authorships manquantes (paires publication_id, person_id)
 Étape 2 : Peupler les FK (source_authorships.authorship_id → authorships.id)
 Étape 3 : Propager author_position et is_corresponding
-Étape 4 : Propager in_perimeter et structure_ids (union des sources)
+Étape 4 : Propager in_perimeter (union des sources)
+Étape 5 : Rafraîchir la matview authorship_structures (union dérivée des sources)
 
 L'orchestrateur dépend du port `AuthorshipsBuildQueries`. Le point d'entrée
 CLI est dans `interfaces/cli/pipeline/build_authorships.py`.
@@ -77,19 +78,22 @@ def build(
     logger.info(f"  {queries.propagate_is_corresponding(conn)} is_corresponding mises à jour")
     logger.info(f"  {queries.propagate_roles(conn)} roles mises à jour")
 
-    logger.info("Étape 4 : propagation in_perimeter et structure_ids...")
+    logger.info("Étape 4 : propagation in_perimeter...")
     if full_run:
-        reset = queries.reset_authorships_perimeter_and_structures(conn)
+        reset = queries.reset_authorships_perimeter(conn)
         logger.info(f"  Reset {reset} authorships")
     else:
         logger.info("  Pas de reset (run partiel)")
 
     for source_name, source_value in active_sources:
-        n = queries.propagate_perimeter_and_structures_from(conn, source_value)
+        n = queries.propagate_perimeter_from(conn, source_value)
         logger.info(f"  {source_name} : {n} authorships mises à jour")
 
     total_uca = queries.count_authorships_in_perimeter(conn)
     logger.info(f"  Total authorships in_perimeter=TRUE : {total_uca}")
+
+    logger.info("Étape 5 : refresh matview authorship_structures...")
+    queries.refresh_authorship_structures(conn)
 
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")

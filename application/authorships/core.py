@@ -83,6 +83,9 @@ def propagate_uca_for_addresses(
 
     repo.recompute_in_perimeter_on_source_authorships(affected_sa_ids, perimeter_ids)
     repo.propagate_in_perimeter_to_authorships(affected_sa_ids)
+    # Les structures dérivées vivent dans la matview `authorship_structures` :
+    # un refresh global la réaligne après la propagation ciblée (~2 s).
+    repo.refresh_authorship_structures()
 
 
 def delete_orphan_authorships(person_id: int, *, repo: AuthorshipRepository) -> int:

@@ -8,6 +8,7 @@ from infrastructure.queries.publications.detail import (
     get_publication_detail,
     get_publication_subjects,
 )
+from tests.integration.helpers.structures import add_authorship_structure
 
 
 def _create_pub(conn, title="T", pub_year=2024, doc_type="article", doi=None):
@@ -170,10 +171,7 @@ class TestGetPublicationDetail:
             """),
             {"pub": pub, "pid": pid},
         ).scalar_one()
-        sa_sync_conn.execute(
-            text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
-            {"a": aid, "s": lab_id},
-        )
+        add_authorship_structure(sa_sync_conn, aid, lab_id)
 
         detail = get_publication_detail(sa_sync_conn, pub)
         assert str(lab_id) in detail["structures"]

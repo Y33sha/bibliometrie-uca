@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from application.ports.api.publications_queries import ListFilters
 from infrastructure.queries.publications.list import list_publications
+from tests.integration.helpers.structures import add_authorship_structure
 
 
 def _create_pub(conn, title="T"):
@@ -30,9 +31,8 @@ def _create_lab(conn):
 
 
 def _attach(conn, pub_id, lab_id):
-    """Authorship reliant la publi à un labo via authorship_structures.
-    Évite source_authorships : `lab_ids` filter ne s'appuie que sur
-    authorships, pas de besoin d'enregistrement source côté."""
+    """Authorship reliant la publi à un labo via la matview authorship_structures
+    (semée par la chaîne source minimale)."""
     aid = conn.execute(
         text(
             "INSERT INTO authorships (publication_id, in_perimeter, roles) "
@@ -40,10 +40,7 @@ def _attach(conn, pub_id, lab_id):
         ),
         {"pid": pub_id},
     ).scalar_one()
-    conn.execute(
-        text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
-        {"a": aid, "s": lab_id},
-    )
+    add_authorship_structure(conn, aid, lab_id)
 
 
 def _create_subject(conn, label):

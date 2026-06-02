@@ -138,11 +138,11 @@ def propagate_roles(conn: Connection) -> int:
     ).rowcount
 
 
-def reset_authorships_perimeter_and_structures(conn: Connection) -> int:
-    """Étape 4 (full run) : remet `in_perimeter = FALSE` et purge `authorship_structures`."""
-    n = conn.execute(text("UPDATE authorships SET in_perimeter = FALSE")).rowcount
-    conn.execute(text("TRUNCATE TABLE authorship_structures"))
-    return n
+def reset_authorships_perimeter(conn: Connection) -> int:
+    """Étape 4 (full run) : remet `in_perimeter = FALSE` sur toutes les
+    authorships avant re-propagation. Les structures vivent dans la matview
+    `authorship_structures` (refresh en fin de build), aucun reset ici."""
+    return conn.execute(text("UPDATE authorships SET in_perimeter = FALSE")).rowcount
 
 
 def purge_authorships(conn: Connection) -> int:
@@ -161,17 +161,15 @@ def purge_authorships(conn: Connection) -> int:
     return n
 
 
-def propagate_perimeter_and_structures_from(conn: Connection, source: str) -> int:
-    """Étape 4 : propage `in_perimeter` (OR) et les structures (UPSERT) depuis une source.
+def propagate_perimeter_from(conn: Connection, source: str) -> int:
+    """Étape 4 : propage `in_perimeter` (OR) depuis une source.
 
-    Lit `source_authorships.in_perimeter` + `source_authorship_structures` (déjà
-    posés par `populate_affiliations`). Met à jour le booléen `in_perimeter`
-    sur `authorships` et insère les liens manquants dans `authorship_structures`
-    (ON CONFLICT DO NOTHING pour cumuler avec les sources précédentes).
-
-    Retourne la somme des deux rowcounts, à titre indicatif pour le log.
+    Lit `source_authorships.in_perimeter` (posé par `populate_affiliations`) et
+    met `in_perimeter = TRUE` sur les authorships correspondantes. Les structures
+    dérivées vivent dans la matview `authorship_structures`, rafraîchie en fin de
+    build par `refresh_authorship_structures`. Retourne le rowcount.
     """
-    n_perim = conn.execute(
+    return conn.execute(
         text("""
             UPDATE authorships a
             SET in_perimeter = TRUE, updated_at = now()
@@ -186,22 +184,16 @@ def propagate_perimeter_and_structures_from(conn: Connection, source: str) -> in
         """),
         {"source": source},
     ).rowcount
-    n_struct = conn.execute(
-        text("""
-            INSERT INTO authorship_structures (authorship_id, structure_id)
-            SELECT DISTINCT sa.authorship_id, sas.structure_id
-            FROM source_authorships sa
-            JOIN source_authorship_structures sas ON sas.source_authorship_id = sa.id
-            JOIN source_publications sd ON sd.id = sa.source_publication_id
-            JOIN v_active_publications vap ON vap.id = sd.publication_id
-            WHERE sa.source = :source
-              AND sa.person_id IS NOT NULL
-              AND sa.authorship_id IS NOT NULL
-            ON CONFLICT DO NOTHING
-        """),
-        {"source": source},
-    ).rowcount
-    return n_perim + n_struct
+
+
+def refresh_authorship_structures(conn: Connection) -> None:
+    """Rafraîchit la matview `authorship_structures` (`CONCURRENTLY` pour ne pas
+    bloquer les lectures labo ; requiert l'index unique `(authorship_id, structure_id)`).
+
+    À appeler après que `source_authorships.authorship_id` (étape 2 du build) et
+    `source_authorship_structures` (phase `affiliations`) sont posés.
+    """
+    conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY authorship_structures"))
 
 
 def count_authorships_in_perimeter(conn: Connection) -> int:
@@ -236,11 +228,14 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
     def propagate_roles(self, conn: Connection) -> int:
         return propagate_roles(conn)
 
-    def reset_authorships_perimeter_and_structures(self, conn: Connection) -> int:
-        return reset_authorships_perimeter_and_structures(conn)
+    def reset_authorships_perimeter(self, conn: Connection) -> int:
+        return reset_authorships_perimeter(conn)
 
-    def propagate_perimeter_and_structures_from(self, conn: Connection, source: str) -> int:
-        return propagate_perimeter_and_structures_from(conn, source)
+    def propagate_perimeter_from(self, conn: Connection, source: str) -> int:
+        return propagate_perimeter_from(conn, source)
+
+    def refresh_authorship_structures(self, conn: Connection) -> None:
+        refresh_authorship_structures(conn)
 
     def count_authorships_in_perimeter(self, conn: Connection) -> int:
         return count_authorships_in_perimeter(conn)

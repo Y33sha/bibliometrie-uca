@@ -12,7 +12,7 @@ Usage :
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Connection
+from sqlalchemy import Connection, text
 
 from infrastructure.repositories.person_repository import (
     _authorships,
@@ -148,15 +148,18 @@ class PgPersonRepository:
             is_corresponding_priority,
         )
 
-    def recompute_authorship_in_perimeter_and_structures(
+    def recompute_authorship_in_perimeter(
         self,
         publication_id: int,
         person_id: int,
         sources: tuple[str, ...],
     ) -> None:
-        _authorships.recompute_authorship_in_perimeter_and_structures(
+        _authorships.recompute_authorship_in_perimeter(
             self._conn, publication_id, person_id, sources
         )
+
+    def refresh_authorship_structures(self) -> None:
+        self._conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY authorship_structures"))
 
     def count_authorships_with_name_form(self, person_id: int, name_form: str) -> int:
         return _authorships.count_authorships_with_name_form(self._conn, person_id, name_form)

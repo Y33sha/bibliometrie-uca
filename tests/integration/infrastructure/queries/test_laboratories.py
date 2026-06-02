@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from application.ports.api.laboratories_queries import LabPersonsFilters
 from infrastructure.queries.laboratories import PgLaboratoriesQueries
+from tests.integration.helpers.structures import add_authorship_structure
 
 
 def _create_structure(conn, code, name=None, type_="labo", hal_collection=None):
@@ -72,10 +73,7 @@ def _create_pub_with_authorship(
         ),
         {"pid": pub_id, "perid": person_id, "inp": in_perimeter},
     ).scalar_one()
-    conn.execute(
-        text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
-        {"a": aid, "s": lab_id},
-    )
+    add_authorship_structure(conn, aid, lab_id)
     return pub_id
 
 
@@ -157,10 +155,7 @@ class TestGetLaboratoryPersons:
             ),
             {"pid": pub},
         ).scalar_one()
-        sa_sync_conn.execute(
-            text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
-            {"a": aid, "s": lab},
-        )
+        add_authorship_structure(sa_sync_conn, aid, lab)
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_persons(
             lab, filters=LabPersonsFilters(), page=1, per_page=50, sort="name"
@@ -232,10 +227,7 @@ class TestGetLaboratoryDashboard:
             ),
             {"pid": pub_id, "perid": pid},
         ).scalar_one()
-        sa_sync_conn.execute(
-            text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
-            {"a": aid, "s": lab},
-        )
+        add_authorship_structure(sa_sync_conn, aid, lab)
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_dashboard(lab)
         assert res.oa.open_access == 1
@@ -261,10 +253,7 @@ class TestGetLaboratoryDashboard:
             ),
             {"pid": pub_id, "perid": pid},
         ).scalar_one()
-        sa_sync_conn.execute(
-            text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
-            {"a": aid, "s": lab},
-        )
+        add_authorship_structure(sa_sync_conn, aid, lab)
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_dashboard(lab)
         assert res.collab.total_articles == 1
@@ -313,13 +302,7 @@ class TestGetLaboratorySubjects:
                 ),
                 {"p": pub_id},
             ).scalar_one()
-            sa_sync_conn.execute(
-                text(
-                    "INSERT INTO authorship_structures (authorship_id, structure_id) "
-                    "VALUES (:a, :s)"
-                ),
-                {"a": aid, "s": lab},
-            )
+            add_authorship_structure(sa_sync_conn, aid, lab)
 
         p1 = _create_pub("p1")
         p2 = _create_pub("p2")
@@ -359,10 +342,7 @@ class TestGetLaboratorySubjects:
             ),
             {"p": excluded_pub},
         ).scalar_one()
-        sa_sync_conn.execute(
-            text("INSERT INTO authorship_structures (authorship_id, structure_id) VALUES (:a, :s)"),
-            {"a": aid, "s": lab},
-        )
+        add_authorship_structure(sa_sync_conn, aid, lab)
         sid = sa_sync_conn.execute(
             text("INSERT INTO subjects (label, ontologies) VALUES ('X', :o) RETURNING id"),
             {"o": json.dumps({})},
