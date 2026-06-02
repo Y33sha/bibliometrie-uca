@@ -200,10 +200,10 @@ def insert_authorship_if_missing(conn: Connection, publication_id: int, person_i
     )
 
 
-def link_source_authorships_to_authorship_for_pair(
+def link_source_authorships_to_authorship(
     conn: Connection, publication_id: int, person_id: int
 ) -> None:
-    """Pose `source_authorships.authorship_id` pour la paire (publication,
+    """Pose `source_authorships.authorship_id` pour l'authorship (publication,
     person), sur toutes les sa encore non liées."""
     conn.execute(
         text("""
@@ -226,23 +226,26 @@ def recompute_authorship_author_position_and_corresponding(
     publication_id: int,
     person_id: int,
     source_priority: tuple[str, ...],
-    is_corresponding_priority: tuple[str, ...],
 ) -> None:
-    """Réagrège `authorships.author_position` et `is_corresponding` pour la
-    paire, depuis les sources actives, selon les priorités fournies."""
+    """Réagrège `authorships.author_position` et `is_corresponding` pour
+    l'authorship, depuis les sources actives.
+
+    Aligné sur le build (`propagate_authorship_attributes`) : position par
+    priorité de source, `is_corresponding` en `bool_or` (vrai si une source
+    l'atteste — pas de priorité, le FALSE des sources étant une absence de
+    signal).
+    """
     conn.execute(
         text(f"""
             UPDATE authorships a
             SET author_position = sub.pos,
-                is_corresponding = COALESCE(a.is_corresponding, sub.corr)
+                is_corresponding = sub.is_corr
             FROM (
                 SELECT sa.authorship_id,
                        (array_agg(sa.author_position ORDER BY
-                           {source_case_sql(source_priority)}
-                       ))[1] AS pos,
-                       (array_agg(sa.is_corresponding ORDER BY
-                           {source_case_sql(is_corresponding_priority)}
-                       ))[1] AS corr
+                           {source_case_sql(source_priority)})
+                           FILTER (WHERE sa.author_position IS NOT NULL))[1] AS pos,
+                       bool_or(sa.is_corresponding) AS is_corr
                 FROM source_authorships sa
                 WHERE sa.authorship_id IS NOT NULL
                 GROUP BY sa.authorship_id

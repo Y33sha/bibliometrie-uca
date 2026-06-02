@@ -5,7 +5,6 @@ from domain.sources import (
     ALL_SOURCES,
     DOI_SEARCHABLE_SOURCES,
     SOURCE_PRIORITY,
-    SOURCE_PRIORITY_IS_CORRESPONDING,
     source_case_sql,
 )
 
@@ -19,18 +18,6 @@ class TestSourcePriority:
 
     def test_contains_all_sources(self):
         assert set(SOURCE_PRIORITY) == set(ALL_SOURCES)
-
-
-class TestSourcePriorityIsCorresponding:
-    def test_wos_first(self):
-        """WoS a le marqueur reprint_author le plus fiable."""
-        assert SOURCE_PRIORITY_IS_CORRESPONDING[0] == "wos"
-
-    def test_only_sources_that_alim_the_field(self):
-        """Seules les sources qui alimentent `is_corresponding` sont présentes.
-        theses (pas de corresponding author sur une thèse) et scanr (ne
-        renseigne pas) sont exclus."""
-        assert set(SOURCE_PRIORITY_IS_CORRESPONDING) == {"wos", "openalex", "hal"}
 
 
 class TestSourceCaseSql:

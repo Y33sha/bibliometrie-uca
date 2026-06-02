@@ -60,16 +60,11 @@ SOURCE_PRIORITY: tuple[str, ...] = ("theses", "crossref", "scanr", "hal", "opena
 STRUCTURE_API_SOURCES: tuple[str, ...] = ("openalex", "wos", "scanr", "theses", "hal")
 STRUCTURE_API_SOURCES_SET: frozenset[str] = frozenset(STRUCTURE_API_SOURCES)
 
-# Ordre spécifique pour le marqueur `is_corresponding`. Inversé par
-# rapport à `SOURCE_PRIORITY` : WoS marque explicitement le
-# "reprint_author" dans ses métadonnées, OpenAlex l'infère, HAL
-# repose sur un code MARC `crp` peu systématiquement rempli. Priorité
-# à la source la plus fiable sur *ce champ précis*.
-#
-# Theses et ScanR sont absents : ils n'alimentent pas ce champ
-# (pas de notion de corresponding author pour une thèse, ScanR ne
-# renseigne pas).
-SOURCE_PRIORITY_IS_CORRESPONDING: tuple[str, ...] = ("wos", "openalex", "hal")
+# `is_corresponding` n'a pas d'ordre de priorité : il s'agrège en `bool_or`
+# (vrai si au moins une source l'atteste). Audit prod : le FALSE des sources est
+# une absence de signal (champ booléen défaut FALSE), pas une non-correspondance
+# explicite — aucune source n'émet de FALSE à écraser, donc l'union ne risque
+# pas de « true indu ».
 
 
 def source_case_sql(priorities: tuple[str, ...], col: str = "sa.source") -> str:

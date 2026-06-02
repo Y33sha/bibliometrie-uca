@@ -17,7 +17,6 @@ from domain.sources import (
     ALL_SOURCES_SET,
     AUTHOR_SOURCES,
     SOURCE_PRIORITY,
-    SOURCE_PRIORITY_IS_CORRESPONDING,
 )
 
 
@@ -95,16 +94,16 @@ def _refresh_authorship_from_sources(
     Chaîne :
     1. INSERT IF MISSING dans authorships
     2. Pose la FK source_authorships.authorship_id (sources non exclues)
-    3. Recalcule author_position et is_corresponding (par priorité de source)
+    3. Recalcule author_position (par priorité de source) et is_corresponding
+       (bool_or)
     4. Recalcule in_perimeter (agrégation OR ; les structures dérivées vivent
        dans la matview `authorship_structures`, rafraîchie par le caller)
     """
     repo.insert_authorship_if_missing(publication_id, person_id)
-    repo.link_source_authorships_to_authorship_for_pair(publication_id, person_id)
+    repo.link_source_authorships_to_authorship(publication_id, person_id)
     repo.recompute_authorship_author_position_and_corresponding(
         publication_id,
         person_id,
         SOURCE_PRIORITY,
-        SOURCE_PRIORITY_IS_CORRESPONDING,
     )
     repo.recompute_authorship_in_perimeter(publication_id, person_id, AUTHOR_SOURCES)

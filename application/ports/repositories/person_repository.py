@@ -113,7 +113,7 @@ class PersonRepository(Protocol):
 
     def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None: ...
 
-    def link_source_authorships_to_authorship_for_pair(
+    def link_source_authorships_to_authorship(
         self,
         publication_id: int,
         person_id: int,
@@ -124,7 +124,6 @@ class PersonRepository(Protocol):
         publication_id: int,
         person_id: int,
         source_priority: tuple[str, ...],
-        is_corresponding_priority: tuple[str, ...],
     ) -> None: ...
 
     def recompute_authorship_in_perimeter(

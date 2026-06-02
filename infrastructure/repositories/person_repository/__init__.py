@@ -126,26 +126,20 @@ class PgPersonRepository:
     def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:
         _authorships.insert_authorship_if_missing(self._conn, publication_id, person_id)
 
-    def link_source_authorships_to_authorship_for_pair(
-        self, publication_id: int, person_id: int
-    ) -> None:
-        _authorships.link_source_authorships_to_authorship_for_pair(
-            self._conn, publication_id, person_id
-        )
+    def link_source_authorships_to_authorship(self, publication_id: int, person_id: int) -> None:
+        _authorships.link_source_authorships_to_authorship(self._conn, publication_id, person_id)
 
     def recompute_authorship_author_position_and_corresponding(
         self,
         publication_id: int,
         person_id: int,
         source_priority: tuple[str, ...],
-        is_corresponding_priority: tuple[str, ...],
     ) -> None:
         _authorships.recompute_authorship_author_position_and_corresponding(
             self._conn,
             publication_id,
             person_id,
             source_priority,
-            is_corresponding_priority,
         )
 
     def recompute_authorship_in_perimeter(
