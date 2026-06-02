@@ -15,6 +15,8 @@ class AuthorshipsBuildQueries(Protocol):
 
     def insert_missing_authorships(self, conn: Connection) -> int: ...
 
+    def prune_orphan_authorships(self, conn: Connection) -> int: ...
+
     def analyze_authorships(self, conn: Connection) -> None:
         """Met à jour les stats Postgres sur `authorships`.
 
