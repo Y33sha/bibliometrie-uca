@@ -196,8 +196,16 @@ class SourceNormalizer(ABC):
                 self.logger.info(line)
 
         except KeyboardInterrupt:
-            self.conn.commit()
-            self.logger.warning("Interruption — données déjà traitées conservées.")
+            # Ctrl+C frappe souvent en plein `conn.execute()` : la transaction est
+            # alors avortée et `commit()` lèverait `PendingRollbackError`. On
+            # rollback (le batch en cours, incomplet, est jeté ; les batches
+            # committés tous les `batch_size` sont durables) puis on re-raise pour
+            # laisser `run_pipeline.main()` faire l'arrêt propre (rapport partiel +
+            # exit 130). Sans le `raise`, la phase « réussirait » et le pipeline
+            # enchaînerait sur la source suivante.
+            self.conn.rollback()
+            self.logger.warning("Interruption — batches déjà committés conservés.")
+            raise
         except Exception as e:
             self.conn.rollback()
             self.logger.error(f"Erreur fatale : {e}")

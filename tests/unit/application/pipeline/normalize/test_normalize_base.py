@@ -5,7 +5,7 @@ Couvre la template method `run()` et ses chemins :
 - `total == 0` (rien à faire)
 - happy path (success / skip / error mélangés, batch commit, summary)
 - exception dans `process_work` sans SAVEPOINT (rollback + on_error)
-- `KeyboardInterrupt` (commit pour préserver le travail)
+- `KeyboardInterrupt` (rollback du batch en cours + re-raise pour arrêt propre)
 - exception fatale en dehors de la boucle (rollback + relève)
 - `_iter_rows` mode `FETCH_SUB_BATCH` (chargement par sous-lots)
 
@@ -232,7 +232,7 @@ class TestRunExceptionWithoutSavepoint:
 
 
 class TestRunKeyboardInterrupt:
-    def test_commit_and_warning(self, caplog):
+    def test_rollback_and_reraise(self, caplog):
         staging = _FakeStaging()
         staging.count_returns = 1
         staging.pending_rows = [_row("a")]
@@ -242,10 +242,15 @@ class TestRunKeyboardInterrupt:
                 raise KeyboardInterrupt
 
         norm = _Kb(staging, results=[True])
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.WARNING), pytest.raises(KeyboardInterrupt):
             norm.run(argv=[])
-        # KeyboardInterrupt n'est pas re-levé — un commit final est fait.
+        # Le batch en cours est rollbacké (la transaction est avortée par le Ctrl+C ;
+        # `commit()` lèverait `PendingRollbackError`), et le KeyboardInterrupt est
+        # re-levé pour que `run_pipeline` arrête proprement (les batches committés
+        # restent durables).
         assert "Interruption" in caplog.text
+        norm.conn.rollback.assert_called()
+        norm.conn.close.assert_called()
 
 
 # ── Exception fatale ──────────────────────────────────────────────
