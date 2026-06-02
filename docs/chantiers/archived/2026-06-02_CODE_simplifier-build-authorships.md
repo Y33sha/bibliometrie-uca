@@ -42,4 +42,4 @@ Le pruning des orphelines (commit `556b0819`) a fermé le gap sur *l'ensemble de
 
 ## Questions ouvertes
 
-- `author_position` : garder le pick par priorité, ou un `min()` suffirait-il comme approximation ? (la priorité est gratuite dans la passe, on la garde sauf objection.)
+(aucune — `author_position` garde le pick par priorité : l'ordre des auteurs est arbitraire entre sources, il faut bien trancher, et la priorité est gratuite dans la passe.)

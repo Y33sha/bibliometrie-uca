@@ -1,21 +1,15 @@
 # Audit "DSI qui reprend le projet"
 
 Commencé le 2026-05-05
+
 Terminé le 2026-05-17
 
-Vue extérieure du projet, comme si une DSI d'université le récupérait
-sans contexte. Constats classés en 4 sections (confusion, scalabilité,
-choix qu'on regrettera, dette cachée), puis transformés en chantiers
-phasés.
+Vue extérieure du projet, comme si une DSI d'université le récupérait sans contexte. Constats classés en 4 sections (confusion, scalabilité, choix qu'on regrettera, dette cachée), puis transformés en chantiers phasés.
 
 **Cadre de la transmission** :
-- la reprise DSI n'est pas imminente, un chantier "réécriture
-  intégrale de la doc" est prévu en dernière étape ;
-- le frontend actuel **survivra** comme outil de gestion interne
-  (la DSI réécrira un frontend public exposé dans le SID/ENT) ;
-- l'app est mono-utilisateur de bout en bout par choix : la couche
-  auth/permissions sera réécrite par la DSI, pas étendue à partir de
-  l'existant.
+- la reprise DSI n'est pas imminente, un chantier "réécriture intégrale de la doc" est prévu en dernière étape ;
+- le frontend actuel **survivra** comme outil de gestion interne (la DSI réécrira un frontend public exposé dans le SID/ENT) ;
+- l'app est mono-utilisateur de bout en bout par choix : la couche auth/permissions sera réécrite par la DSI, pas étendue à partir de l'existant.
 
 Ces points sortent donc du périmètre des chantiers ci-dessous.
 
