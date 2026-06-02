@@ -466,6 +466,98 @@ class TestPruneOrphanAuthorships:
         assert [r.person_id for r in rows] == [p_attested]
 
 
+# ── propagate_authorship_attributes (build, passe convergente) ─
+
+
+class TestPropagateAuthorshipAttributes:
+    """La passe unique recompose les attributs depuis les sources et CONVERGE :
+    une valeur que plus aucune source n'atteste retombe (le garde `IS NULL`
+    historique la figeait). `is_corresponding` est un `bool_or`, sans priorité."""
+
+    @staticmethod
+    def _attrs(conn, aid):
+        return conn.execute(
+            text("SELECT is_corresponding, in_perimeter, roles FROM authorships WHERE id = :id"),
+            {"id": aid},
+        ).one()
+
+    def test_is_corresponding_is_bool_or(self, sa_sync_conn):
+        from infrastructure.queries.authorships_build import propagate_authorship_attributes
+
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        aid = _create_authorship(sa_sync_conn, pub_id, person_id)
+        # Une source dit TRUE (wos), une dit FALSE (hal) → bool_or = TRUE,
+        # quelle que soit la « priorité » des sources.
+        sa_wos = _create_source_authorship(
+            sa_sync_conn,
+            sp_id,
+            source="wos",
+            author_position=0,
+            person_id=person_id,
+            authorship_id=aid,
+        )
+        sa_hal = _create_source_authorship(
+            sa_sync_conn,
+            sp_id,
+            source="hal",
+            author_position=1,
+            person_id=person_id,
+            authorship_id=aid,
+        )
+        sa_sync_conn.execute(
+            text("UPDATE source_authorships SET is_corresponding = (id = :w) WHERE id IN (:w, :h)"),
+            {"w": sa_wos, "h": sa_hal},
+        )
+
+        propagate_authorship_attributes(sa_sync_conn)
+        assert self._attrs(sa_sync_conn, aid).is_corresponding is True
+
+    def test_converges_when_sources_drop_signal(self, sa_sync_conn):
+        from infrastructure.queries.authorships_build import propagate_authorship_attributes
+
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        aid = _create_authorship(sa_sync_conn, pub_id, person_id)
+        sa_id = _create_source_authorship(
+            sa_sync_conn, sp_id, person_id=person_id, authorship_id=aid, in_perimeter=True
+        )
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_authorships "
+                "SET is_corresponding = TRUE, roles = ARRAY['author', 'editor'] WHERE id = :id"
+            ),
+            {"id": sa_id},
+        )
+
+        propagate_authorship_attributes(sa_sync_conn)
+        before = self._attrs(sa_sync_conn, aid)
+        assert (before.is_corresponding, before.in_perimeter, before.roles) == (
+            True,
+            True,
+            ["author", "editor"],
+        )
+
+        # Réimport : la source retire corresponding, le périmètre et le rôle editor.
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_authorships SET is_corresponding = FALSE, in_perimeter = FALSE, "
+                "roles = ARRAY['author'] WHERE id = :id"
+            ),
+            {"id": sa_id},
+        )
+        propagate_authorship_attributes(sa_sync_conn)
+        after = self._attrs(sa_sync_conn, aid)
+        # Convergence : tout retombe (le garde `IS NULL` historique figeait ces valeurs).
+        assert (after.is_corresponding, after.in_perimeter, after.roles) == (
+            False,
+            False,
+            ["author"],
+        )
+
+
 # ── propagate_uca_for_addresses ───────────────────────────────
 
 
