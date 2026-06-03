@@ -10,9 +10,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.scanr import ScanrNormalizeQueries
 from domain.types import JsonValue
-from infrastructure.queries.source_authorships import (
-    clear_source_authorships_for_publication,
-)
 
 
 def upsert_scanr_source_publication(
@@ -102,46 +99,6 @@ def upsert_scanr_source_publication(
     return row.id
 
 
-def upsert_scanr_source_authorship(
-    conn: Connection,
-    *,
-    source_publication_id: int,
-    author_position: int,
-    roles: list[str] | None,
-    raw_author_name: str | None,
-    person_identifiers: JsonValue,
-) -> int:
-    """UPSERT d'une `source_authorships` ScanR. Retourne l'id.
-
-    Les identifiants (`orcid`, `idref`) vivent sur `person_identifiers`
-    (JSONB).
-    """
-    stmt = text("""
-        INSERT INTO source_authorships
-            (source, source_publication_id, author_position, roles,
-             author_name_normalized, raw_author_name, person_identifiers)
-        VALUES ('scanr', :spid, :pos, :roles,
-                normalize_name_form(:raw_author_name), :raw_author_name, :person_identifiers)
-        ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
-            author_name_normalized = EXCLUDED.author_name_normalized,
-            roles = EXCLUDED.roles,
-            raw_author_name = EXCLUDED.raw_author_name,
-            person_identifiers = EXCLUDED.person_identifiers
-        RETURNING id
-    """).bindparams(bindparam("person_identifiers", type_=JSONB))
-    row = conn.execute(
-        stmt,
-        {
-            "spid": source_publication_id,
-            "pos": author_position,
-            "roles": roles,
-            "raw_author_name": raw_author_name,
-            "person_identifiers": person_identifiers,
-        },
-    ).one()
-    return row.id
-
-
 class PgScanrNormalizeQueries(ScanrNormalizeQueries):
     """Adapter PostgreSQL pour `application.ports.normalize_scanr.ScanrNormalizeQueries`."""
 
@@ -189,27 +146,3 @@ class PgScanrNormalizeQueries(ScanrNormalizeQueries):
             urls=urls,
             biblio=biblio,
         )
-
-    def upsert_scanr_source_authorship(
-        self,
-        conn: Connection,
-        *,
-        source_publication_id: int,
-        author_position: int,
-        roles: list[str] | None,
-        raw_author_name: str | None,
-        person_identifiers: JsonValue,
-    ) -> int:
-        return upsert_scanr_source_authorship(
-            conn,
-            source_publication_id=source_publication_id,
-            author_position=author_position,
-            roles=roles,
-            raw_author_name=raw_author_name,
-            person_identifiers=person_identifiers,
-        )
-
-    def clear_source_authorships_for_publication(
-        self, conn: Connection, source_publication_id: int
-    ) -> None:
-        clear_source_authorships_for_publication(conn, source_publication_id)
