@@ -38,22 +38,6 @@ class OpenalexNormalizeQueries(Protocol):
         topics_json: JsonValue,
     ) -> int: ...
 
-    def upsert_openalex_source_authorship(
-        self,
-        conn: Connection,
-        *,
-        source_publication_id: int,
-        author_position: int,
-        source_structures: list[str] | None,
-        raw_author_name: str | None,
-        is_corresponding: bool,
-        person_identifiers: JsonValue,
-    ) -> int: ...
-
     def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool: ...
 
     def count_openalex_table(self, conn: Connection, table: str) -> int: ...
-
-    def clear_source_authorships_for_publication(
-        self, conn: Connection, source_publication_id: int
-    ) -> None: ...

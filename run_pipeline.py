@@ -674,6 +674,7 @@ def _run_normalize_wos() -> None:
 def _run_normalize_openalex() -> None:
     from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
     from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -681,7 +682,6 @@ def _run_normalize_openalex() -> None:
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.repositories.address_linker import PgAddressLinker
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.zenodo import HttpZenodoResolver
 
@@ -700,7 +700,7 @@ def _run_normalize_openalex() -> None:
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
         zenodo_resolver=HttpZenodoResolver(api_base=zenodo_api),
-        address_linker=PgAddressLinker(),
+        authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
     log.info("✓ normalize_openalex terminé en %.1fs", time.time() - t0)
 
