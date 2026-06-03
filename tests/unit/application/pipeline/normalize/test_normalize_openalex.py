@@ -1,8 +1,8 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_openalex`.
 
-Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics, extract_short_id), les branches de `upsert_journal` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work` (avec ses cas Zenodo), et la classe `OpenalexNormalizer` (preload_caches / process_work wrapper / summary_stats).
+Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics, extract_short_id), les branches de `upsert_journal` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work`, et la classe `OpenalexNormalizer` (preload_caches / process_work wrapper / summary_stats).
 
-Pattern : `_FakeQueries` + `MagicMock` pour repos / zenodo_resolver / authorship_queries. Pas de DB.
+Pattern : `_FakeQueries` + `MagicMock` pour repos / authorship_queries. Pas de DB.
 """
 
 from __future__ import annotations
@@ -28,7 +28,6 @@ from application.pipeline.normalize.normalize_openalex import (
     upsert_journal,
 )
 from application.ports.pipeline.staging import StagingRow
-from domain.sources.zenodo import ZenodoResolutionError
 
 # ── Helpers de fabrication de données de test ────────────────────
 
@@ -42,15 +41,11 @@ class _FakeQueries:
 
     def __init__(self) -> None:
         self.upserted_documents: list[dict[str, Any]] = []
-        self.staging_has_doi_returns = False
         self.count_table_returns = 0
 
     def upsert_openalex_source_publication(self, conn, **kw) -> int:
         self.upserted_documents.append(kw)
         return 999
-
-    def staging_has_openalex_doi(self, conn, doi: str) -> bool:
-        return self.staging_has_doi_returns
 
     def count_openalex_table(self, conn, table: str) -> int:
         return self.count_table_returns
@@ -598,14 +593,13 @@ def stub_orchestration_deps(monkeypatch):
 
 
 class TestProcessWork:
-    def _kwargs(self, queries=None, staging_queries=None, logger_=None, zenodo=None):
+    def _kwargs(self, queries=None, staging_queries=None, logger_=None):
         return {
             "queries": queries or _FakeQueries(),
             "logger": logger_ or logging.getLogger("test"),
             "journal_repo": MagicMock(),
             "publisher_repo": MagicMock(),
             "pub_repo": MagicMock(),
-            "zenodo_resolver": zenodo or MagicMock(),
             "staging_queries": staging_queries or _FakeStagingQueries(),
             "authorship_queries": MagicMock(),
         }
@@ -618,54 +612,6 @@ class TestProcessWork:
         )
         kw = self._kwargs(queries=queries, staging_queries=sq)
         result = process_work(MagicMock(), staging_row=row, **kw)
-        assert result is True
-        assert sq.marked_done == [1]
-
-    def test_zenodo_resolution_error_returns_none(self, stub_orchestration_deps, monkeypatch):
-        monkeypatch.setattr(normalize_openalex, "is_zenodo_doi", lambda d: True)
-        zenodo = MagicMock()
-        zenodo.resolve.side_effect = ZenodoResolutionError("zenodo boom")
-        sq = _FakeStagingQueries()
-        row = _staging_row(doi="10.5281/zenodo.1")
-        result = process_work(
-            MagicMock(), staging_row=row, **self._kwargs(staging_queries=sq, zenodo=zenodo)
-        )
-        assert result is None
-        # Pas de mark_done : on retentera plus tard.
-        assert sq.marked_done == []
-
-    def test_zenodo_concept_already_in_staging_skipped(self, stub_orchestration_deps, monkeypatch):
-        monkeypatch.setattr(normalize_openalex, "is_zenodo_doi", lambda d: True)
-        zenodo = MagicMock()
-        zenodo.resolve.return_value = "10.5281/zenodo.2"
-        queries = _FakeQueries()
-        queries.staging_has_doi_returns = True  # version DOI déjà en staging
-        sq = _FakeStagingQueries()
-        row = _staging_row(staging_id=42, doi="10.5281/zenodo.1")
-        result = process_work(
-            MagicMock(),
-            staging_row=row,
-            **self._kwargs(queries=queries, staging_queries=sq, zenodo=zenodo),
-        )
-        assert result is None
-        assert sq.marked_done == [42]  # marqué fait pour ne pas re-tenter
-
-    def test_zenodo_version_resolved_but_not_in_staging_continues(
-        self, stub_orchestration_deps, monkeypatch
-    ):
-        """Le DOI Zenodo est résolu mais la version n'est pas en staging — on continue le traitement nominal."""
-        monkeypatch.setattr(normalize_openalex, "is_zenodo_doi", lambda d: True)
-        zenodo = MagicMock()
-        zenodo.resolve.return_value = "10.5281/zenodo.2"
-        queries = _FakeQueries()
-        queries.staging_has_doi_returns = False
-        sq = _FakeStagingQueries()
-        row = _staging_row(staging_id=1, doi="10.5281/zenodo.1")
-        result = process_work(
-            MagicMock(),
-            staging_row=row,
-            **self._kwargs(queries=queries, staging_queries=sq, zenodo=zenodo),
-        )
         assert result is True
         assert sq.marked_done == [1]
 
@@ -710,7 +656,6 @@ def _make_normalizer():
         journal_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         pub_repo_factory=lambda c: MagicMock(),
-        zenodo_resolver=MagicMock(),
         authorship_queries=MagicMock(),
     )
 
@@ -740,7 +685,6 @@ class TestOpenalexNormalizerClass:
             "journal_repo",
             "publisher_repo",
             "pub_repo",
-            "zenodo_resolver",
             "staging_queries",
             "authorship_queries",
         }

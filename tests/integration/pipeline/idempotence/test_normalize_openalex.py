@@ -118,12 +118,10 @@ def run_normalize_oa(conn):
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.sources.zenodo import HttpZenodoResolver
 
     queries = PgOpenalexNormalizeQueries()
     staging_queries = PgStagingQueries()
     authorship_queries = PgAuthorshipsBatchQueries()
-    zenodo_resolver = HttpZenodoResolver(api_base="https://zenodo.org/api/records")
     logger = logging.getLogger("test")
     journal_repo = journal_repository(conn)
     publisher_repo = publisher_repository(conn)
@@ -148,7 +146,6 @@ def run_normalize_oa(conn):
             journal_repo=journal_repo,
             publisher_repo=publisher_repo,
             pub_repo=pub_repo,
-            zenodo_resolver=zenodo_resolver,
             staging_queries=staging_queries,
             authorship_queries=authorship_queries,
         ):

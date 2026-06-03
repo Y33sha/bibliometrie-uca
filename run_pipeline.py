@@ -622,15 +622,10 @@ def _run_normalize_hal() -> None:
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.sources.config import get_api_base_urls
-    from infrastructure.sources.zenodo import HttpZenodoResolver
 
     log.info("▶ normalize_hal")
     t0 = time.time()
-    engine = get_sync_engine()
-    with engine.connect() as bootstrap:
-        zenodo_api = get_api_base_urls(bootstrap)["zenodo"]
-    conn = engine.connect()
+    conn = get_sync_engine().connect()
     HalNormalizer(
         conn,
         log,
@@ -639,7 +634,6 @@ def _run_normalize_hal() -> None:
         journal_repo_factory=journal_repository,
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
-        zenodo_resolver=HttpZenodoResolver(api_base=zenodo_api),
         authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
     log.info("✓ normalize_hal terminé en %.1fs", time.time() - t0)
@@ -684,15 +678,10 @@ def _run_normalize_openalex() -> None:
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.sources.config import get_api_base_urls
-    from infrastructure.sources.zenodo import HttpZenodoResolver
 
     log.info("▶ normalize_openalex")
     t0 = time.time()
-    engine = get_sync_engine()
-    with engine.connect() as bootstrap:
-        zenodo_api = get_api_base_urls(bootstrap)["zenodo"]
-    conn = engine.connect()
+    conn = get_sync_engine().connect()
     OpenalexNormalizer(
         conn,
         log,
@@ -701,7 +690,6 @@ def _run_normalize_openalex() -> None:
         journal_repo_factory=journal_repository,
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
-        zenodo_resolver=HttpZenodoResolver(api_base=zenodo_api),
         authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
     log.info("✓ normalize_openalex terminé en %.1fs", time.time() - t0)

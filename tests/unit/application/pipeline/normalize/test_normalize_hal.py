@@ -1,6 +1,6 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_hal`.
 
-Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (zenodo, métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
+Couvre les helpers (as_str, get_title, upsert_journal, extract_pub_metadata), `insert_hal_document` (collections, biblio, keywords, NNT, topics), le parsing TEI (`parse_tei_author_identifiers`), `parse_author_structures` (format `_FacetSep_`/`_JoinSep_`), le parsing auteurs `build_hal_author_records` (composite + TEI), l'orchestrateur `process_work` (métadonnées minimales, happy path), et la classe `HalNormalizer` (preload, délégation).
 
 Pattern : `_FakeQueries` + `_FakeAuthorshipQueries` + `MagicMock`, pas de DB.
 """
@@ -27,7 +27,6 @@ from application.pipeline.normalize.normalize_hal import (
     upsert_publisher,
 )
 from application.ports.pipeline.staging import HalStagingRow
-from domain.sources.zenodo import ZenodoResolutionError
 
 # ── Stubs ────────────────────────────────────────────────────────
 
@@ -45,14 +44,10 @@ def _staging_row(staging_id=1, hal_id="hal-1", doi=None, raw=None, collections=N
 class _FakeQueries:
     def __init__(self) -> None:
         self.upserted_documents: list[dict[str, Any]] = []
-        self.staging_has_doi_returns = False
 
     def upsert_hal_source_publication(self, conn, **kw) -> int:
         self.upserted_documents.append(kw)
         return 999
-
-    def staging_has_hal_doi(self, conn, doi: str) -> bool:
-        return self.staging_has_doi_returns
 
 
 class _FakeAuthorshipQueries:
@@ -533,14 +528,13 @@ def stub_orchestration_deps(monkeypatch):
 
 
 class TestProcessWork:
-    def _kwargs(self, queries=None, staging_queries=None, zenodo=None):
+    def _kwargs(self, queries=None, staging_queries=None):
         return {
             "queries": queries or _FakeQueries(),
             "logger": logging.getLogger("test"),
             "journal_repo": MagicMock(),
             "publisher_repo": MagicMock(),
             "pub_repo": MagicMock(),
-            "zenodo_resolver": zenodo or MagicMock(),
             "staging_queries": staging_queries or _FakeStagingQueries(),
             "authorship_queries": _FakeAuthorshipQueries(),
         }
@@ -563,39 +557,6 @@ class TestProcessWork:
             result = process_work(MagicMock(), staging_row=row, **self._kwargs())
         assert result is False
         assert "manquant" in caplog.text
-
-    def test_zenodo_error_returns_false(self, stub_orchestration_deps, monkeypatch):
-        monkeypatch.setattr(normalize_hal, "is_zenodo_doi", lambda d: True)
-        zenodo = MagicMock()
-        zenodo.resolve.side_effect = ZenodoResolutionError("zenodo boom")
-        raw = {"title_s": ["T"], "producedDateY_i": 2024, "doiId_s": "10.5281/zenodo.1"}
-        row = _staging_row(raw=raw)
-        result = process_work(MagicMock(), staging_row=row, **self._kwargs(zenodo=zenodo))
-        assert (
-            result is False
-        )  # contrairement à OpenAlex, HAL retourne False (pas None) sur erreur Zenodo
-
-    def test_zenodo_concept_skipped(self, stub_orchestration_deps, monkeypatch):
-        monkeypatch.setattr(normalize_hal, "is_zenodo_doi", lambda d: True)
-        zenodo = MagicMock()
-        zenodo.resolve.return_value = "10.5281/zenodo.2"
-        queries = _FakeQueries()
-        queries.staging_has_doi_returns = True
-        sq = _FakeStagingQueries()
-        raw = {
-            "title_s": ["T"],
-            "producedDateY_i": 2024,
-            "doiId_s": "10.5281/zenodo.1",
-            "authFullNameFormIDPersonIDIDHal_fs": ["T_FacetSep_0-0_FacetSep_"],
-        }
-        row = _staging_row(staging_id=42, raw=raw)
-        result = process_work(
-            MagicMock(),
-            staging_row=row,
-            **self._kwargs(queries=queries, staging_queries=sq, zenodo=zenodo),
-        )
-        assert result is None
-        assert sq.marked_done == [42]
 
     def test_no_publisher_name_no_upsert(self, monkeypatch):
         """Si ni journalPublisher_s ni publisher_s n'est présent, upsert_publisher n'est pas appelé."""
@@ -651,7 +612,6 @@ def _make_normalizer():
         journal_repo_factory=lambda c: MagicMock(),
         publisher_repo_factory=lambda c: MagicMock(),
         pub_repo_factory=lambda c: MagicMock(),
-        zenodo_resolver=MagicMock(),
         authorship_queries=_FakeAuthorshipQueries(),
     )
 
