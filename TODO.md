@@ -1,4 +1,3 @@
-* [ ] re-seeder les doi_prefix journals
 # A régler avant transmission
 ## Schéma de données
 * [ ] ajouter created_at,updated_at partout
@@ -64,8 +63,6 @@
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
 * [ ] afficher mémoires master et thèses en cours sur liste publications de la page personnes/id
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
-## Général (interface)
-* [ ] responsivité minimale de l'interface
 ## Détails d'affichage
 * [ ] décomptes sur les onglets: incohérents (cf nb revues par éditeur): supprimer ou corriger?
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
