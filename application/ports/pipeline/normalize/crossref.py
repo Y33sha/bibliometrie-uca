@@ -34,18 +34,3 @@ class CrossrefNormalizeQueries(Protocol):
         biblio: JsonValue,
         meta: JsonValue,
     ) -> int: ...
-
-    def upsert_crossref_source_authorship(
-        self,
-        conn: Connection,
-        *,
-        source_publication_id: int,
-        author_position: int,
-        raw_author_name: str | None,
-        source_data: JsonValue,
-        person_identifiers: JsonValue,
-    ) -> int: ...
-
-    def clear_source_authorships_for_publication(
-        self, conn: Connection, source_publication_id: int
-    ) -> None: ...

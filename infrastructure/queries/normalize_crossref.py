@@ -14,9 +14,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.crossref import CrossrefNormalizeQueries
 from domain.types import JsonValue
-from infrastructure.queries.source_authorships import (
-    clear_source_authorships_for_publication,
-)
 
 
 def upsert_crossref_source_publication(
@@ -102,49 +99,6 @@ def upsert_crossref_source_publication(
     return row.id
 
 
-def upsert_crossref_source_authorship(
-    conn: Connection,
-    *,
-    source_publication_id: int,
-    author_position: int,
-    raw_author_name: str | None,
-    source_data: JsonValue,
-    person_identifiers: JsonValue,
-) -> int:
-    """UPSERT d'une ``source_authorships`` CrossRef. Retourne l'id.
-
-    L'ORCID, seul identifiant exploitable pour CrossRef, vit sur
-    `person_identifiers`.
-    """
-    stmt = text("""
-        INSERT INTO source_authorships
-            (source, source_publication_id, author_position,
-             author_name_normalized, raw_author_name, source_data, person_identifiers)
-        VALUES ('crossref', :spid, :pos, normalize_name_form(:raw_name),
-                :raw_name, :source_data, :person_identifiers)
-        ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
-            author_name_normalized = EXCLUDED.author_name_normalized,
-            raw_author_name = EXCLUDED.raw_author_name,
-            source_data = EXCLUDED.source_data,
-            person_identifiers = EXCLUDED.person_identifiers
-        RETURNING id
-    """).bindparams(
-        bindparam("source_data", type_=JSONB),
-        bindparam("person_identifiers", type_=JSONB),
-    )
-    row = conn.execute(
-        stmt,
-        {
-            "spid": source_publication_id,
-            "pos": author_position,
-            "raw_name": raw_author_name,
-            "source_data": source_data,
-            "person_identifiers": person_identifiers,
-        },
-    ).one()
-    return row.id
-
-
 class PgCrossrefNormalizeQueries(CrossrefNormalizeQueries):
     """Adapter PostgreSQL pour ``application.ports.normalize_crossref.CrossrefNormalizeQueries``."""
 
@@ -188,27 +142,3 @@ class PgCrossrefNormalizeQueries(CrossrefNormalizeQueries):
             biblio=biblio,
             meta=meta,
         )
-
-    def upsert_crossref_source_authorship(
-        self,
-        conn: Connection,
-        *,
-        source_publication_id: int,
-        author_position: int,
-        raw_author_name: str | None,
-        source_data: JsonValue,
-        person_identifiers: JsonValue,
-    ) -> int:
-        return upsert_crossref_source_authorship(
-            conn,
-            source_publication_id=source_publication_id,
-            author_position=author_position,
-            raw_author_name=raw_author_name,
-            source_data=source_data,
-            person_identifiers=person_identifiers,
-        )
-
-    def clear_source_authorships_for_publication(
-        self, conn: Connection, source_publication_id: int
-    ) -> None:
-        clear_source_authorships_for_publication(conn, source_publication_id)
