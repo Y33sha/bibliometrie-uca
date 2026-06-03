@@ -1,12 +1,10 @@
 # A régler avant transmission
-## Schéma de données
-* [ ] ajouter created_at,updated_at partout
 ## Pipeline de traitement
 ### Extraction
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids?
 * [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] extraction par ORCID: vérifier faisabilité (quelles sources?)
-* [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples)
+* [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples) (compliqué; auditer d'abord pour voir si ça touche bcp de docts)
 ### Normalisation
 * [ ] batcher pour améliorer la perf? / analyser pour comprendre pourquoi hal + lent
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
@@ -18,11 +16,11 @@
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
-* [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis
+* [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
-* [ ] beaucoup de résultats ScanR sont rejetés en phase "affiliations" => auditer
-* [ ] normalisation des titres: supprimer les balises mml ou html
+* [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi
+* [ ] normalisation des titres: supprimer les balises mml/html
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée? récupérer pmid dans api HAL
@@ -34,14 +32,13 @@
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
 * [ ] embargos (HAL, theses.fr): afficher dates dans l'UI (existent-elles dans le retour api? creuser)
 ## Méga-papers et alignement inter-sources
-* [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. Approche envisagée: table `authorship_alignments` (publication_id, hal_authorship_id, oa_authorship_id, wos_authorship_id) + algorithme d'alignement par matching de noms (person_id commun → sûr, sinon Levenshtein/token overlap); en attendant, le mode "conflit de sources" dans la dédup personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`)
+* [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. En attendant une solution, le mode "conflit de sources" dans la déduplication manuelle des personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`) (chantier chiant, à enterrer le plus proprement possible)
 ## Chantier des signatures institutionnelles
 ### Côté backend
 * [ ] pays des adresses: aller plus loin dans l'automatisation de la détection (GeoNames? index n-gram des adresses avec pays associés et degré de certitude?)
 * [ ] distinguer adresses correctes/incorrectes pour affichage %age par labo/personne
 ### Côté interface admin
-* [ ] interface de repérage des adresses: ajouter filtres sur la base des autres structures reconnues dans l'adresse
-* [ ] interface pour gérer les noms de pays? (actuellement table statique, rien n'y écrit)
+* [ ] interface de repérage des adresses: ajouter filtres sur la base des autres structures reconnues dans l'adresse => ça aidera au repérage des faux négatifs
 ### Côté interface publique
 * [ ] Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation?
 
