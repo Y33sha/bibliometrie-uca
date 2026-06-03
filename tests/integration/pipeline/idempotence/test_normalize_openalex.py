@@ -110,6 +110,7 @@ def run_normalize_oa(conn):
 
     from application.pipeline.normalize.normalize_openalex import process_work
     from application.ports.pipeline.staging import StagingRow
+    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.normalize_openalex import PgOpenalexNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -117,12 +118,11 @@ def run_normalize_oa(conn):
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.repositories.address_linker import PgAddressLinker
     from infrastructure.sources.zenodo import HttpZenodoResolver
 
     queries = PgOpenalexNormalizeQueries()
     staging_queries = PgStagingQueries()
-    address_linker = PgAddressLinker()
+    authorship_queries = PgAuthorshipsBatchQueries()
     zenodo_resolver = HttpZenodoResolver(api_base="https://zenodo.org/api/records")
     logger = logging.getLogger("test")
     journal_repo = journal_repository(conn)
@@ -150,7 +150,7 @@ def run_normalize_oa(conn):
             pub_repo=pub_repo,
             zenodo_resolver=zenodo_resolver,
             staging_queries=staging_queries,
-            address_linker=address_linker,
+            authorship_queries=authorship_queries,
         ):
             processed += 1
     return processed
