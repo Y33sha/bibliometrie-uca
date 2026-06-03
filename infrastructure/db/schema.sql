@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict sFOFfVJ2XOHj9Irdec2qmjLu4ppEvzp54AVtDVBXp47XFD3xMlKMlyjif0S9pIo
+\restrict cHrecqSD6MGkai7CJUU7zbclEcLV94gDhqWaSvpSGKj8rYeRSWjP19dlm2UrMn2
 
--- Dumped from database version 18.1
--- Dumped by pg_dump version 18.1
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2432,13 +2432,6 @@ CREATE INDEX idx_sa_in_perimeter ON public.source_authorships USING btree (sourc
 
 
 --
--- Name: idx_sa_nonhal_outscope; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_sa_nonhal_outscope ON public.source_authorships USING btree (source_publication_id, author_position) WHERE ((source <> 'hal'::public.source_type) AND (in_perimeter = false));
-
-
---
 -- Name: idx_sa_person; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2945,4 +2938,4 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict sFOFfVJ2XOHj9Irdec2qmjLu4ppEvzp54AVtDVBXp47XFD3xMlKMlyjif0S9pIo
+\unrestrict cHrecqSD6MGkai7CJUU7zbclEcLV94gDhqWaSvpSGKj8rYeRSWjP19dlm2UrMn2
