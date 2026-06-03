@@ -1,4 +1,4 @@
-# Chantier — Normalize : abstraire le batching des authorships (harmoniser les sources)
+# Chantier — Normalize : batcher l'insertion des authorships
 
 Commencé le 2026-06-02
 

@@ -4,18 +4,17 @@
 
 ### En cours
 
-- [Matching cross-source des authorships](METIER_authorships-cross-source-matching.md)
-- [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
-- [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
 - [Données dérivées : audit + cadre de décision (matérialisation vs vue)](DATA_donnees-derivees.md) — Phase 1 (inventaire + alignement Python↔SQL) faite, sous-chantiers Phase 2 à ouvrir
+- [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
+- [Normalize : batcher l'insertion des authorships](CODE_batcher-normalize-authorships.md)
 
 ### En pause
 
 - [Observabilité et robustesse du pipeline](CODE_observabilite-robustesse-pipeline.md)
 - [DOI Registration Agencies & DataCite](METIER_doi-ra-datacite.md)
-- [Stockage des données brutes (raw store)](DATA_raw-data-store.md)
-- [Cycle de vie des rows `staging` : machine à états, backoff, fraîcheur](DATA_cycle-vie-staging.md)
-- [Matérialiser le périmètre](DATA_perimeter-materialise.md) — standby, absorbé par `DATA_donnees-derivees`
+- [Matérialiser perimeter_structures](DATA_perimeter-materialise.md) — standby, absorbé par `DATA_donnees-derivees`
+- [Matching cross-source des authorships](METIER_authorships-cross-source-matching.md)
+- [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 
 ### Non commencé
 
@@ -24,7 +23,11 @@
 
 ## Chantiers archivés
 
-- 2026-05-30 — [Exploitation de l'API CrossRef](METIER_crossref.md)
+- 2026-06-02 — [Authorships : build source-agnostique en une passe convergente](archived/2026-06-02_CODE_simplifier-build-authorships.md)
+- 2026-06-01 — [Sidecar `rejected_authorships` (extraire `authorships.excluded`)](archived/2026-06-01_DATA_rejected-authorships-sidecar.md)
+- 2026-05-31 — [Stockage des données brutes (raw store)](archived/2026-05-31_DATA_raw-data-store.md)
+- 2026-05-31 — [Cycle de vie des rows `staging` : machine à états, backoff, fraîcheur](archived/2026-05-31_DATA_cycle-vie-staging.md)
+- 2026-05-30 — [Exploitation de l'API CrossRef](archived/2026-05-30_METIER_crossref.md)
 - 2026-05-30 — [Cascade unifiée de matching personnes (`decide_person_match`)](archived/2026-05-30_METIER_decide-person-match.md)
 - 2026-05-29 — [Publishers & Journals : typage, pipeline, cohérence, UI](archived/2026-05-29_METIER_publishers-journals.md)
 - 2026-05-29 — [Dérive `pub_meta` des normalizers](archived/2026-05-29_CODE_normalizers-pub-meta-drift.md)
