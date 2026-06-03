@@ -46,9 +46,12 @@ services:
     build:
       context: ./interfaces/frontend
     restart: unless-stopped
+    working_dir: /repo/interfaces/frontend
+    # Monte tout le repo (pas seulement le frontend) : la route /docs lit les
+    # markdown de `docs/` via un glob Vite remontant à la racine du repo.
     volumes:
-      - ./interfaces/frontend:/app
-      - /app/node_modules   # garde les node_modules du conteneur
+      - .:/repo
+      - /repo/interfaces/frontend/node_modules   # garde les node_modules du conteneur
     ports:
       - "5176:5173"
     environment:

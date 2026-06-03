@@ -68,3 +68,35 @@ describe('resolveDocLink — depuis une page de section', () => {
 		);
 	});
 });
+
+describe('resolveDocLink — liens vers le code source (sortie de docs/)', () => {
+	const REPO = 'https://github.com/Y33sha/bibliometrie-uca/blob/master';
+
+	it('réécrit un lien fichier qui sort de docs/ vers GitHub', () => {
+		expect(
+			resolveDocLink('../../domain/publications/deduplication.py', BASE, 'playbooks/dedup')
+		).toBe(`${REPO}/domain/publications/deduplication.py`);
+	});
+
+	it('réécrit un lien dossier qui sort de docs/ vers GitHub', () => {
+		expect(resolveDocLink('../../infrastructure/raw_store/', BASE, 'pipeline/normalize')).toBe(
+			`${REPO}/infrastructure/raw_store`
+		);
+	});
+
+	it('conserve les préfixes NN- et extensions du chemin source', () => {
+		expect(
+			resolveDocLink(
+				'../../alembic/versions/2026_05_24_2030-b9a2c8d4e7f1_x.py',
+				BASE,
+				'playbooks/dedup'
+			)
+		).toBe(`${REPO}/alembic/versions/2026_05_24_2030-b9a2c8d4e7f1_x.py`);
+	});
+
+	it('reste interne tant que le lien ne sort pas de docs/', () => {
+		expect(resolveDocLink('../guide-utilisateur', BASE, 'sources/hal')).toBe(
+			'/bibliometrie/docs/guide-utilisateur'
+		);
+	});
+});
