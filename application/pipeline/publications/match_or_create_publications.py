@@ -147,6 +147,13 @@ def process_document(
         nnt = normalize_nnt(nnt)
     hal_id = known_ids.get("hal_id")
 
+    # Pour les œuvres Zenodo, le DOI canonique est le concept DOI (résolu en
+    # amont par `resolve_zenodo_concept`) : concept + versions partagent ce DOI
+    # effectif et convergent vers une publication unique via le chemin DOI.
+    zenodo_concept_doi = known_ids.get("zenodo_concept_doi")
+    if zenodo_concept_doi:
+        doi = zenodo_concept_doi
+
     # Prefetch DOI : résolution du conflit éventuel (chapter/book) qui peut invalider le DOI ou poser un id de fusion.
     doi_merge_with_id: int | None = None
     if doi:
