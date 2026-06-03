@@ -648,6 +648,7 @@ def _run_normalize_hal() -> None:
 def _run_normalize_wos() -> None:
     from application.pipeline.normalize.normalize_wos import WosNormalizer
     from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.normalize_wos import PgWosNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -667,6 +668,7 @@ def _run_normalize_wos() -> None:
         journal_repo_factory=journal_repository,
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
+        authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
     log.info("✓ normalize_wos terminé en %.1fs", time.time() - t0)
 
