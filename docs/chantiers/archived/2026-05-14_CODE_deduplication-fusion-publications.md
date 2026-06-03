@@ -1,6 +1,6 @@
 # Chantier — Rationalisation du matching/fusion de publications.
 
-Commencé et terminé le 2026-05-14.
+Commencé et terminé le 2026-05-14
 
 ## Contexte
 

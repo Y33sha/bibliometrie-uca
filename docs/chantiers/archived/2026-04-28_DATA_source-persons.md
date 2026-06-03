@@ -1,4 +1,5 @@
 # Chantier — Repenser `source_persons`
+
 Commencé et terminé le 2026-04-28
 
 ## Contexte

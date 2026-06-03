@@ -1,8 +1,6 @@
 # Chantier — Cascade unifiée de matching personnes (`decide_person_match`)
 
-Commencé le 2026-05-15
-
-Terminé le 2026-05-30
+Commencé le 2026-05-15 - Terminé le 2026-05-30
 
 ## Contexte
 

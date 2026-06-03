@@ -6,9 +6,7 @@ Commencé et terminé le 2026-05-06.
 
 `docs/architecture.md` règle 4 dit :
 
-> Les routers FastAPI et scripts CLI [...] **ne doivent pas** importer
-> `infrastructure/` directement. Ils pilotent des use-cases applicatifs
-> et reçoivent leurs dépendances ; ils ne les construisent pas.
+> Les routers FastAPI et scripts CLI [...] **ne doivent pas** importer `infrastructure/` directement. Ils pilotent des use-cases applicatifs et reçoivent leurs dépendances ; ils ne les construisent pas.
 
 État actuel : 18 routers sur 20 importent `infrastructure/`
 directement (33 imports au total). La règle est documentée mais non
@@ -29,8 +27,7 @@ on reste majoritairement en intégration end-to-end.
 
 ## Pattern cible
 
-Précédent : `PgAsyncPerimeterQueries` (`infrastructure/db/queries/
-perimeter.py`) implémente le port `AsyncPerimeterQueries`
+Précédent : `PgAsyncPerimeterQueries` (`infrastructure/db/queries/perimeter.py`) implémente le port `AsyncPerimeterQueries`
 (`application/ports/perimeter.py`) ; la factory `get_perimeter_queries`
 vit dans `async_deps.py` (composition root légitime).
 

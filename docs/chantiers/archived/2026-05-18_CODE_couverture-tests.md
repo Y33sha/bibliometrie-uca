@@ -1,8 +1,8 @@
 # Chantier — Couverture de tests : viser 80 %
 
-Commencé le 2026-05-17
+Commencé le 2026-05-17 - Terminé le 2026-05-18
 
-Terminé le 2026-05-18: cible dépassée (85% de couverture); 3 fichiers ont été laissés (auth + 2 extracteurs que je ne suis pas sûre de garder)
+Cible dépassée (85% de couverture); 3 fichiers ont été laissés (auth + 2 extracteurs que je ne suis pas sûre de garder)
 
 ## Contexte
 

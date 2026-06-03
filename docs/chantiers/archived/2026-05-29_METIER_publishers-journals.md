@@ -1,8 +1,6 @@
 # Chantier — Publishers & Journals : typage, pipeline, cohérence, UI
 
-Commencé le 2026-05-21
-
-Terminé le 2026-05-29
+Commencé le 2026-05-21 - Terminé le 2026-05-29
 
 ## Contexte
 

@@ -1,8 +1,6 @@
 # Chantier — Repositories → use cases (orchestration en application)
 
-Commencé le 2026-05-11
-
-Terminé le 2026-05-21
+Commencé le 2026-05-11 - Terminé le 2026-05-21
 
 ## Contexte
 

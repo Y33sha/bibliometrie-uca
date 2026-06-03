@@ -1,8 +1,6 @@
 # Audit "DSI qui reprend le projet"
 
-Commencé le 2026-05-05
-
-Terminé le 2026-05-17
+Commencé le 2026-05-05 - Terminé le 2026-05-17
 
 Vue extérieure du projet, comme si une DSI d'université le récupérait sans contexte. Constats classés en 4 sections (confusion, scalabilité, choix qu'on regrettera, dette cachée), puis transformés en chantiers phasés.
 

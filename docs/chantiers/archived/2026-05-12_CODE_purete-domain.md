@@ -1,6 +1,6 @@
 # Chantier — Pureté du domaine
 
-Commencé et terminé le 2026-05-12.
+Commencé et terminé le 2026-05-12
 
 ## Contexte
 
