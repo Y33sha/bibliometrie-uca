@@ -27,12 +27,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Préfixe de déploiement (vide = racine). Définir ROOT_PATH dans .env
+      # pour servir sous un sous-chemin derrière un reverse-proxy. La valeur
+      # doit être identique au build (frontend) et au runtime (uvicorn).
+      args:
+        ROOT_PATH: ${ROOT_PATH:-}
     restart: unless-stopped
     ports:
       - "8003:8000"
     env_file: .env
     environment:
       DB_HOST: db
+      ROOT_PATH: ${ROOT_PATH:-}
     depends_on:
       db:
         condition: service_healthy

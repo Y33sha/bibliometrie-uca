@@ -6,11 +6,13 @@
 # Préfixe de déploiement (URL sous laquelle l'appli est servie) :
 # - BASE_PATH consommé au BUILD par SvelteKit (URL générées en dur)
 # - ROOT_PATH consommé au RUNTIME par uvicorn (`--root-path`)
-# Les deux doivent matcher. Surchargeables :
+# Les deux doivent matcher. Vide par défaut → app servie à la racine (accès
+# direct sans reverse-proxy). Définir un sous-chemin pour un déploiement
+# derrière un proxy qui transmet ce préfixe :
 #   docker build --build-arg ROOT_PATH=/foo ...
 #   docker run -e ROOT_PATH=/foo ...
 
-ARG ROOT_PATH=/bibliometrie
+ARG ROOT_PATH=
 
 # ---- Étape 1 : build du frontend ----
 FROM node:22-slim AS frontend-build

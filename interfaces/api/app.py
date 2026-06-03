@@ -20,7 +20,7 @@ from typing import Any, cast
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.pool import QueuePool
 from starlette.middleware.base import RequestResponseEndpoint
@@ -42,7 +42,7 @@ from infrastructure.db.engine import (
     set_sync_engine,
 )
 from infrastructure.observability.log import configure_root_logging
-from interfaces.api.deps import _verify_token
+from interfaces.api.deps import BUILD_DIR, SPAStaticFiles, _verify_token
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
 # À faire AVANT l'import des routers qui peuvent créer leur propre logger.
@@ -336,14 +336,6 @@ def metrics() -> dict[str, Any]:
     }
 
 
-# ----- Root redirect -----
-
-
-@app.get("/")
-async def root() -> RedirectResponse:
-    return RedirectResponse("/bibliometrie/stats")
-
-
 # ----- Include routers -----
 
 app.include_router(auth.router)
@@ -366,6 +358,16 @@ app.include_router(journals.router)
 app.include_router(admin_pipeline_logs.router)
 app.include_router(admin_pipeline_runs.router)
 app.include_router(subjects.router)
+
+
+# ----- Frontend SPA (prod) -----
+#
+# En prod, le frontend buildé (adapter-static) est servi par FastAPI : la SPA
+# (ssr=false) et les docs prérendues vivent dans interfaces/frontend/build.
+# Monté en dernier — catch-all — pour que les routes /api/* matchent d'abord.
+# Absent en dev (vite sert le frontend) : on ne monte que si le build existe.
+if os.path.isdir(BUILD_DIR):
+    app.mount("/", SPAStaticFiles(directory=BUILD_DIR, html=True), name="spa")
 
 
 if __name__ == "__main__":

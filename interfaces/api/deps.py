@@ -78,17 +78,30 @@ from infrastructure.settings import settings
 
 # ----- SPA Static Files -----
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BUILD_DIR = os.path.join(PROJECT_ROOT, "interfaces", "frontend", "build")
 
 
 class SPAStaticFiles(StaticFiles):
-    """Sert les fichiers statiques avec fallback index.html pour le routage SPA."""
+    """Sert le build SvelteKit (adapter-static).
+
+    Deux particularités du format prérendu :
+    - les pages prérendues sont écrites en `<route>.html` (ex.
+      `docs/glossaire.html`) : on retente avec l'extension `.html` quand le
+      chemin nu est introuvable ;
+    - les routes purement client-side (ssr=false, non prérendues) retombent
+      sur `index.html` (routage SPA côté client).
+    """
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         try:
             return await super().get_response(path, scope)
         except Exception:
+            if not path.endswith(".html"):
+                try:
+                    return await super().get_response(f"{path}.html", scope)
+                except Exception:
+                    pass
             return await super().get_response("index.html", scope)
 
 
