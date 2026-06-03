@@ -1,5 +1,7 @@
 # Enrichissement des référentiels publishers et journals
 
+*TODO: Prose claudienne à traduire en normal-speak*
+
 ```mermaid
 flowchart LR
     source_publications-->journals
