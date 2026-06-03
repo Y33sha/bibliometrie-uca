@@ -542,6 +542,11 @@ def process_work(
                     )
                     staging_queries.mark_done(conn, staging_id)
                     return None
+            # `resolve()` ci-dessus est un appel HTTP (~1 s de latence). On l'isole
+            # dans son propre mark : sinon il s'impute au mark `publisher+journal`
+            # (qui mesure depuis le début du work) et fausse le diagnostic. Posé
+            # uniquement ici, dans la branche Zenodo — pas de `zenodo:0s` ailleurs.
+            t.mark("zenodo")
 
         publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
         publisher_id = (
