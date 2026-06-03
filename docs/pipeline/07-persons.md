@@ -15,7 +15,7 @@ Phase `persons`:
 
 3. **Identifiant IdRef** : PPN SUDOC (HAL TEI, ScanR, theses.fr), référentiel personnes de l'ESR.
 
-4. **Même nom + même publication + même position auteur** (cross-source) : pour chaque authorship sans `person_id`, cherche sur la même publication (même position) une *authorship* d'une **autre source** déjà rattachée à une personne. Si le nom est compatible → rattacher. Placé après les identifiants : en tête il serait inopérant au bootstrap (suppose des rattachements préexistants). Approche conservatrice (requiert position identique dans la liste des auteurs. TODO: voir si cette condition peut être assouplie sans perte de qualité).
+4. **Même publication + même position auteur + nom similaire** (cross-source) : pour chaque authorship sans `person_id`, cherche sur la même publication (même position) une *authorship* d'une **autre source** déjà rattachée à une personne. Si le nom est compatible → rattacher. Placé après les identifiants : en tête il serait inopérant au bootstrap (suppose des rattachements préexistants). Approche conservatrice (requiert position identique dans la liste des auteurs. TODO: voir si cette condition peut être assouplie sans perte de qualité).
 
 > **Limité aux publications de 50 auteurs max** : les méga-papers (plusieurs centaines voire milliers d'auteurs) contiennent souvent des homonymes + l'initiale au lieu du prénom + de fréquents désalignements de position auteur entre sources, pouvant conduire à de faux rattachemements. On les ignore.
 

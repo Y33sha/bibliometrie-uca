@@ -18,11 +18,11 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 
 ## Enrichissement des référentiels publishers et journals
 
-- [Publishers & journals](04-publishers-journals.md) : enrichit les référentiels créés en normalisation à partir de sources externes — DOI prefixes (Crossref + DataCite), APC et type des revues (OpenAlex Sources, DOAJ API), pays et ROR des éditeurs (OpenAlex Publishers, fallback Crossref Members), typage des éditeurs (ROR).
+- [Publishers & journals](04-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), montant d'APC et type des revues (sources: OpenAlex Sources, DOAJ API), pays et ROR des éditeurs (sources: OpenAlex Publishers, fallback Crossref Members), type d'éditeur  (commercial, académique, société savante…) (source: ROR).
 
 ## Repérage des affiliations
 
-- [Affiliations](05-affiliations.md) : résout les adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` et `structure_ids` sur les [authorships](../glossaire.md#authorship) sources.
+- [Affiliations](05-affiliations.md) : résout les liens adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` et `structure_ids` sur les [authorships](../glossaire.md#authorship) sources.
 
 ## Création/rattachement des publications
 
@@ -35,6 +35,6 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 
 ## Enrichissements
 
-- [Pays](09-enrichissements.md) : détection automatisée des pays des adresses. Utile pour interroger les collaborations internationales.
+- [Pays](09-enrichissements.md) : détection automatisée des pays des adresses. Sert à interroger les collaborations internationales.
 - [Sujets](09-enrichissements.md#subjects) : deux étapes enchaînées — (1) ingestion des sujets/mots-clés des `source_publications` vers les tables canoniques `subjects` et `publication_subjects`, (2) recalcul de `subjects.usage_count` + table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
-- [Statut open access](09-enrichissements.md#oa_status) : statut OA par publication via Unpaywall (plus à jour que les sources).
+- [Statut open access](09-enrichissements.md#oa_status) : statut OA par publication via Unpaywall (souvent plus à jour que les sources).
