@@ -17,7 +17,9 @@ flowchart LR
     class publishers,journals ref;
 ```
 
-Phase `publishers_journals` : enrichissement des **référentiels** `publishers` et `journals` après leur création initiale en phase [normalize](03-normalize.md). Positionnée entre `normalize` et [`affiliations`](05-affiliations.md). Six sub-steps enchaînés ; le 1er tourne dans tous les modes du pipeline, les 5 suivants sont gated par le mode `full`.
+Phase `publishers_journals` : enrichissement des **référentiels** `publishers` et `journals` après leur création initiale en phase [normalize](03-normalize.md).
+
+Six sub-steps enchaînés ; le 1er tourne dans tous les modes du pipeline, les 5 suivants sont gated par le mode `full`.
 
 | Sub-step | Source | Cible | Mode |
 |---|---|---|---|

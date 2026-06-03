@@ -16,7 +16,7 @@ Hors-scope : les patterns détectables mais non corrigibles automatiquement (cf.
 - **Forme déclarative** : une règle = `{applies_to: {prédicats AND-és}, applies_correction: {champ: valeur cible}}`. Le moteur `_check_predicate` interprète chaque prédicat selon le TypedDict `_AppliesTo`. Pour une règle qui rentre dans les prédicats listés (`doc_type`, `journal_type`, `url_contains`, `title_prefix_normalized`, `title_regex`), on n'écrit que cette entrée — pas de logique supplémentaire.
 - **Audit** : chaque application réelle pose `publications.meta.<field>_corrected_by = <RULE_MEMBER>`.
 - **Deux call-sites** :
-  - `application/publications.py::apply_corrections` au refresh — sur chaque SP agrégée
+  - `application/publications.py::apply_corrections` au refresh — sur chaque `source_publication` agrégée
   - `application/pipeline/publications/match_or_create_publications.py::process_document` à l'entrée dédup — sur l'orphelin
 - **Cascade par champ** (ordre des dépendances) : `journal_id` → `doc_type` → `oa_status`. `_correct_field(sp, "<field>")` parcourt `_RULES` dans l'ordre d'insertion et retourne la première règle qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent. L'ordre intra-cascade traduit la spécificité du signal (cf. § 3 ci-dessous).
 
@@ -30,7 +30,7 @@ Avant d'ouvrir un fichier, expliciter (idéalement par écrit dans le commit ou 
 - **Inputs lus** : quels champs de `SourcePublicationWithJournalView` ? Mono-critère ou multi-critères ?
 - **Condition** : whitelist (acte sur un set fini de valeurs d'input) ou inconditionnelle ? La whitelist est presque toujours plus défensive.
 - **Origine de l'input** :
-  - SP-intrinsèque (`title`, `urls`, `doc_type`, `doi`, …) → rien à câbler côté DTO.
+  - Intrinsèque à la publication (`title`, `urls`, `doc_type`, `doi`, …) → rien à câbler côté DTO.
   - Joint depuis une table déjà projetée (`journal_type`, `oa_model`, `apc_amount`) → idem.
   - Joint depuis une table **hors projection actuelle** (publisher, doi_prefixes, …) → étendre `SourcePublicationWithJournalView` + sa projection SQL (cf. § 4).
 - **Input admin-éditable ?** Détermine s'il faut un hook (cf. § 6).
@@ -86,14 +86,6 @@ Si la règle a besoin d'un prédicat absent de la liste ci-dessus, étendre `_Ap
 #### 3.3 Position dans le dict (priorité)
 
 `_RULES` est un dict ordonné : l'ordre d'insertion = la priorité de la cascade. `_correct_field` renvoie sur le premier match, donc placer une règle plus tôt lui donne priorité sur les suivantes.
-
-Par défaut **en fin**. La priorité reflète la **spécificité du signal** :
-
-- URL spécifique (`theses.fr/`, `dumas.`) : plus spécifique → haut de cascade
-- Type de revue admin-typé (`journal_type=media`) : moins spécifique → milieu
-- Préfixe de titre générique (`additional file`) : moins spécifique → bas
-
-Si tu hésites, audit + 1-2 cas réels qui croisent deux règles concurrentes te diront ce qui est plus informatif.
 
 #### 3.4 Constantes locales
 
@@ -152,7 +144,7 @@ Si la règle consomme un champ que l'admin peut modifier en base via l'UI (`jour
 
 Sauf si on prévoit un full rerun imminent du pipeline, écrire un script ciblé pour reclasser le stock existant.
 
-- **Règle SP-intrinsèque** (input non éditable) : one-shot dans [`interfaces/cli/oneshot/`](../../interfaces/cli/oneshot/), nommé d'après la règle. Pré-filtre SQL léger + loop `refresh_from_sources`, commit par batch. Modèle : [`refresh_publications_with_additional_file_title.py`](../../interfaces/cli/oneshot/refresh_publications_with_additional_file_title.py).
+- **Règle intrinsèque aux métadonnées de la publication** (input non éditable) : one-shot dans [`interfaces/cli/oneshot/`](../../interfaces/cli/oneshot/), nommé d'après la règle. Pré-filtre SQL léger + loop `refresh_from_sources`, commit par batch. Modèle : [`refresh_publications_with_additional_file_title.py`](../../interfaces/cli/oneshot/refresh_publications_with_additional_file_title.py).
 - **Règle admin-éditable** : si la règle débarque alors que des inputs ont déjà été posés en base sans hook (cas typique : `journal_type=media` typé avant l'existence de la règle), réutiliser [`maintenance/refresh_publications_for_journal_type.py`](../../interfaces/cli/maintenance/refresh_publications_for_journal_type.py). Cet outil est paramétrable et survit aux règles futures du même axe.
 
 ### 8. Documentation
