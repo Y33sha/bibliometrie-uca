@@ -4,7 +4,7 @@
 	import { page as pageStore } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import { docTypeSingular } from '$lib/stores/docTypes';
+	import { docTypeSingular } from '$lib/labels';
 	import { sanitizeTitle, halDocUrl } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
 
@@ -71,7 +71,7 @@
 			<div class="pub-card">
 				<div class="pub-meta-line">
 					{#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
-					{#if pub.doc_type}<span class="meta-badge type-badge">{$docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 					{#if pub.labs}<span class="meta-badge lab-badge">{pub.labs}</span>{/if}
 					<a href="{base}/publications/{pub.id}" class="pub-link">{@html sanitizeTitle(pub.title)}</a>
 				</div>
