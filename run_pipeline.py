@@ -391,6 +391,7 @@ def phase_affiliations(**kw: Any) -> Any:
     `structure_ids` après la résolution d'une nouvelle adresse.
     """
     mode = kw.get("mode", "full")
+    _run_refresh_perimeter_structures()
     _run_resolve_addresses(mode)
     _run_populate_affiliations(mode=mode)
 
@@ -558,6 +559,21 @@ def _run_build_authorships() -> None:
     finally:
         conn.close()
     log.info("✓ build_authorships terminé en %.1fs", time.time() - t0)
+
+
+def _run_refresh_perimeter_structures() -> None:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.perimeter import refresh_perimeter_structures
+
+    log.info("▶ refresh perimeter_structures")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        n = refresh_perimeter_structures(conn)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ perimeter_structures : %d liens en %.1fs", n, time.time() - t0)
 
 
 def _run_populate_affiliations(*, mode: str) -> None:

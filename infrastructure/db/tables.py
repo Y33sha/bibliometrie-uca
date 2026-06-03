@@ -133,6 +133,23 @@ perimeters = Table(
 )
 
 
+# Clôture transitive (est_tutelle_de) du périmètre, matérialisée et maintenue
+# par `refresh_perimeter_structures`. FK CASCADE des deux côtés (déclarées en
+# migration, omises ici comme pour les autres tables de jointure).
+perimeter_structures = Table(
+    "perimeter_structures",
+    metadata,
+    Column("perimeter_id", Integer, nullable=False),
+    Column("structure_id", Integer, nullable=False),
+    PrimaryKeyConstraint(
+        "perimeter_id",
+        "structure_id",
+        name="perimeter_structures_pkey",
+    ),
+    Index("idx_ps_structure_id", "structure_id"),
+)
+
+
 # Enum Postgres `structure_type` — déclaré tel quel côté SA pour que les
 # inserts produisent un cast typé (sinon Postgres rejette VARCHAR ↛ enum).
 # `create_type=False` : l'enum est créé par les migrations SQL, pas par SA.

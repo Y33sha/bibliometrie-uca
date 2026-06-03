@@ -51,6 +51,36 @@ def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[in
     return {row.id for row in result}
 
 
+def refresh_perimeter_structures(conn: Connection) -> int:
+    """Recompute la table matérialisée `perimeter_structures` : clôture récursive
+    (`est_tutelle_de`) de chaque `perimeters.structure_ids`. Idempotent (DELETE +
+    réinsertion complète). Retourne le nombre de liens. Commit laissé au caller.
+
+    Reproduit la CTE de `get_perimeter_structure_ids` (mêmes racines, même
+    relation) à l'échelle de tous les périmètres en une passe. À rejouer à chaque
+    édition de `perimeters.structure_ids` ou `structure_relations`.
+    """
+    conn.execute(text("DELETE FROM perimeter_structures"))
+    return conn.execute(
+        text("""
+            INSERT INTO perimeter_structures (perimeter_id, structure_id)
+            WITH RECURSIVE descendants AS (
+                SELECT p.id AS perimeter_id, s.structure_id
+                FROM perimeters p
+                CROSS JOIN LATERAL unnest(p.structure_ids) AS s(structure_id)
+                UNION
+                SELECT d.perimeter_id, sr.child_id
+                FROM descendants d
+                JOIN structure_relations sr ON sr.parent_id = d.structure_id
+                WHERE sr.relation_type = 'est_tutelle_de'
+            )
+            SELECT DISTINCT d.perimeter_id, d.structure_id
+            FROM descendants d
+            WHERE EXISTS (SELECT 1 FROM structures st WHERE st.id = d.structure_id)
+        """)
+    ).rowcount
+
+
 def _config_perimeter_code(conn: Connection, config_key: str, default: str) -> str:
     """Lit un code périmètre depuis la table config."""
     try:
