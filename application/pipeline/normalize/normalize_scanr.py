@@ -21,8 +21,13 @@ from collections.abc import Callable
 from sqlalchemy import Connection
 
 from application.journals import find_or_create_journal
+from application.pipeline.normalize._authorships_batch import (
+    AddressRecord,
+    AuthorRecord,
+    write_source_authorships,
+)
 from application.pipeline.normalize.base import SourceNormalizer
-from application.ports.pipeline.address_linker import AddressLinker
+from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.scanr import ScanrNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
@@ -255,20 +260,16 @@ def insert_scanr_document(
 # =============================================================
 
 
-def process_authors(
-    conn: Connection,
-    queries: ScanrNormalizeQueries,
-    doc: dict,
-    source_publication_id: int,
-    *,
-    address_linker: AddressLinker,
-) -> None:
-    # Pré-nettoyage : re-traitement → table blanche pour cette publi.
-    queries.clear_source_authorships_for_publication(conn, source_publication_id)
+def build_scanr_author_records(doc: dict) -> list[AuthorRecord]:
+    """Parse les auteurs d'un document ScanR en `AuthorRecord` (sans I/O).
 
-    authors = doc.get("authors") or []
-
-    for position, author_data in enumerate(authors):
+    - identifiants `orcid`/`idref` (sous `denormalized`) ;
+    - `roles` via `map_role('scanr', role)` ;
+    - affiliations feuilles → adresses, avec `detected_countries` en `countries`
+      (pays d'autorité détectés dans le texte de l'affiliation).
+    """
+    records: list[AuthorRecord] = []
+    for position, author_data in enumerate(doc.get("authors") or []):
         author_full_name = author_data.get("fullName")
         if not author_full_name:
             continue
@@ -278,34 +279,38 @@ def process_authors(
             orcid=normalize_orcid(denorm.get("orcid")),
             idref=denorm.get("idref"),
         )
-        identifiers = ids if ids else None
+        roles, _ = map_role("scanr", author_data.get("role"))
 
-        raw_role = author_data.get("role")
-        roles, _ = map_role("scanr", raw_role)
-
-        author_affiliations = author_data.get("affiliations") or []
-        kept_affiliations = select_leaf_affiliations(author_affiliations)
-
-        addr_parts = []
+        addr_parts: list[str] = []
         detected_countries: set[str] = set()
-
-        for aff in kept_affiliations:
+        for aff in select_leaf_affiliations(author_data.get("affiliations") or []):
             name = (aff.get("name") or "").strip()
             if name:
                 addr_parts.append(name)
             detected_countries.update(aff.get("detected_countries") or [])
+        countries = sorted(detected_countries) or None
 
-        sa_id = queries.upsert_scanr_source_authorship(
-            conn,
-            source_publication_id=source_publication_id,
-            author_position=position,
-            roles=roles or None,
-            raw_author_name=author_full_name,
-            person_identifiers=identifiers,
+        records.append(
+            AuthorRecord(
+                position=position,
+                raw_name=author_full_name,
+                roles=roles or None,
+                person_identifiers=ids if ids else None,
+                addresses=[AddressRecord(text=part, countries=countries) for part in addr_parts],
+            )
         )
+    return records
 
-        if addr_parts:
-            address_linker.link(conn, sa_id, addr_parts, countries=list(detected_countries) or None)
+
+def process_authors(
+    conn: Connection,
+    authorship_queries: AuthorshipsBatchQueries,
+    doc: dict,
+    source_publication_id: int,
+) -> None:
+    """Parse les auteurs ScanR puis écrit les authorships en batch."""
+    records = build_scanr_author_records(doc)
+    write_source_authorships(conn, authorship_queries, "scanr", source_publication_id, records)
 
 
 # =============================================================
@@ -323,7 +328,7 @@ def process_work(
     publisher_repo: PublisherRepository,
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
-    address_linker: AddressLinker,
+    authorship_queries: AuthorshipsBatchQueries,
 ) -> bool:
     staging_id = staging_row.id
     scanr_id = staging_row.source_id
@@ -355,7 +360,7 @@ def process_work(
         timings["scanr_doc"] = time.perf_counter() - t0
 
         t0 = time.perf_counter()
-        process_authors(conn, queries, doc, source_publication_id, address_linker=address_linker)
+        process_authors(conn, authorship_queries, doc, source_publication_id)
         timings["authors"] = time.perf_counter() - t0
 
         staging_queries.mark_done(conn, staging_id)
@@ -387,7 +392,7 @@ class ScanrNormalizer(SourceNormalizer):
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],
-        address_linker: AddressLinker,
+        authorship_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -397,7 +402,7 @@ class ScanrNormalizer(SourceNormalizer):
         self._publisher_repo: PublisherRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
-        self._address_linker = address_linker
+        self._authorship_queries = authorship_queries
 
     def preload_caches(self, conn: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(conn)
@@ -419,14 +424,5 @@ class ScanrNormalizer(SourceNormalizer):
             publisher_repo=self._publisher_repo,
             pub_repo=self._pub_repo,
             staging_queries=self._staging,
-            address_linker=self._address_linker,
+            authorship_queries=self._authorship_queries,
         )
-
-    def cleanup(self) -> None:
-        self._address_linker.clear_cache()
-
-    def on_error(self) -> None:
-        # Le cache peut contenir des address_id insérés dans la transaction
-        # qui vient d'être rollbackée — invalide-le pour éviter les FK
-        # violations sur les works suivants.
-        self._address_linker.clear_cache()

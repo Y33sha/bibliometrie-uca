@@ -708,6 +708,7 @@ def _run_normalize_openalex() -> None:
 def _run_normalize_scanr() -> None:
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
     from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -715,7 +716,6 @@ def _run_normalize_scanr() -> None:
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.repositories.address_linker import PgAddressLinker
 
     log.info("▶ normalize_scanr")
     t0 = time.time()
@@ -728,7 +728,7 @@ def _run_normalize_scanr() -> None:
         journal_repo_factory=journal_repository,
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
-        address_linker=PgAddressLinker(),
+        authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
     log.info("✓ normalize_scanr terminé en %.1fs", time.time() - t0)
 

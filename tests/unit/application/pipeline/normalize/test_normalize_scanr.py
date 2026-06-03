@@ -1,8 +1,8 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_scanr`.
 
-Couvre la construction de `biblio` (publisher + journal bruts ajoutés en
-parallèle des `find_or_create_*` pour traçabilité) dans
-`insert_scanr_document`.
+Couvre la construction de `biblio` dans `insert_scanr_document` et le parsing
+auteurs pur `build_scanr_author_records` (orcid/idref, roles, affiliations →
+adresses + pays détectés).
 
 Pattern : `_FakeQueries` + `MagicMock`, pas de DB.
 """
@@ -12,7 +12,10 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock
 
-from application.pipeline.normalize.normalize_scanr import insert_scanr_document
+from application.pipeline.normalize.normalize_scanr import (
+    build_scanr_author_records,
+    insert_scanr_document,
+)
 
 
 class _FakeQueries:
@@ -95,3 +98,47 @@ class TestInsertScanrDocumentBiblio:
     def test_biblio_journal_title_only(self):
         captured = self._call(_FakeQueries(), {"source": {"title": "J. Phys."}})
         assert captured["biblio"] == {"journal": {"title": "J. Phys."}}
+
+
+# ── build_scanr_author_records (parsing pur) ─────────────────────
+
+
+class TestBuildScanrAuthorRecords:
+    def test_no_authors(self):
+        assert build_scanr_author_records({}) == []
+
+    def test_skip_without_full_name(self):
+        assert build_scanr_author_records({"authors": [{"role": "author"}]}) == []
+
+    def test_identifiers_and_role(self):
+        doc = {
+            "authors": [
+                {
+                    "fullName": "Marie Dupont",
+                    "role": "author",
+                    "denormalized": {
+                        "orcid": "https://orcid.org/0000-0001-2345-6789",
+                        "idref": "123456789",
+                    },
+                }
+            ]
+        }
+        rec = build_scanr_author_records(doc)[0]
+        assert rec.raw_name == "Marie Dupont"
+        assert rec.person_identifiers == {"orcid": "0000-0001-2345-6789", "idref": "123456789"}
+        assert rec.roles == ["author"]
+
+    def test_affiliation_becomes_address_with_detected_countries(self):
+        doc = {
+            "authors": [
+                {
+                    "fullName": "X",
+                    "affiliations": [{"name": "Lab A", "detected_countries": ["FR", "BE"]}],
+                }
+            ]
+        }
+        rec = build_scanr_author_records(doc)[0]
+        assert [a.text for a in rec.addresses] == ["Lab A"]
+        # detected_countries = pays d'autorité (dédupliqués, triés), jamais suggested.
+        assert rec.addresses[0].countries == ["BE", "FR"]
+        assert rec.addresses[0].suggested_countries is None

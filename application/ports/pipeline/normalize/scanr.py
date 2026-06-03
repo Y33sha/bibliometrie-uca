@@ -36,18 +36,3 @@ class ScanrNormalizeQueries(Protocol):
         urls: list[str] | None,
         biblio: JsonValue,
     ) -> int: ...
-
-    def upsert_scanr_source_authorship(
-        self,
-        conn: Connection,
-        *,
-        source_publication_id: int,
-        author_position: int,
-        roles: list[str] | None,
-        raw_author_name: str | None,
-        person_identifiers: JsonValue,
-    ) -> int: ...
-
-    def clear_source_authorships_for_publication(
-        self, conn: Connection, source_publication_id: int
-    ) -> None: ...
