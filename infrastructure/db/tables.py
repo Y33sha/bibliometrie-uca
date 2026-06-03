@@ -111,7 +111,7 @@ config = Table(
     Column("key", Text, primary_key=True),
     Column("value", JSONB, nullable=False),
     Column("description", Text),
-    Column("updated_at", DateTime(timezone=True), server_default=func.now()),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
 )
 
 
@@ -197,6 +197,7 @@ structure_relations = Table(
     Column("parent_id", Integer, nullable=False),
     Column("child_id", Integer, nullable=False),
     Column("relation_type", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint(
         "parent_id",
         "child_id",
@@ -240,7 +241,6 @@ journals = Table(
     Column("apc_currency", Text, server_default="EUR"),
     Column("oa_model", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     Column("journal_type", journal_type_enum, server_default="journal"),
     Column("is_academic", Boolean, server_default="true"),
     Column("doi_prefix", Text),
@@ -284,7 +284,6 @@ publishers = Table(
     Column("ror", Text),
     Column("is_predatory", Boolean, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     Column(
         "publisher_type",
         publisher_type_enum,
@@ -506,7 +505,6 @@ authorships = Table(
     Column("author_position", SmallInteger),
     Column("in_perimeter", Boolean, server_default="false"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     Column("is_corresponding", Boolean),
     Column("roles", ARRAY(Text)),
     UniqueConstraint("publication_id", "person_id", name="authorships_publication_person_uq"),
@@ -573,6 +571,7 @@ source_authorships = Table(
     # (référentiel personne) qui est alimentée par promotion via le
     # pipeline personnes (`add_identifiers_from_authorships`).
     Column("person_identifiers", JSONB),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint(
         "source_publication_id",
         "author_position",
@@ -633,7 +632,6 @@ persons = Table(
     Column("last_name_normalized", Text, nullable=False),
     Column("first_name_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     Column("rejected", Boolean, server_default="false"),
     Index("idx_persons_name", "last_name_normalized", "first_name_normalized"),
 )
@@ -652,7 +650,6 @@ persons_rh = Table(
     Column("end_date", Date),
     Column("hr_export_date", Date),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("updated_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("person_id", name="persons_rh_person_id_key"),
     Index("idx_persons_rh_department", "department_name"),
     Index("idx_persons_rh_person_id", "person_id"),
@@ -681,6 +678,7 @@ person_name_forms = Table(
     Column("name_form", Text, nullable=False),
     Column("person_id", Integer, nullable=False),
     Column("sources", ARRAY(Text), nullable=False, server_default="{}"),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
     PrimaryKeyConstraint("name_form", "person_id", name="person_name_forms_pkey"),
     Index("idx_pnf_person_id", "person_id"),
 )

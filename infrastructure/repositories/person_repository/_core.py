@@ -94,8 +94,8 @@ def update_name(conn: Connection, person_id: int, last_name: str, first_name: st
     conn.execute(
         text(
             "UPDATE persons SET last_name = :ln, first_name = :fn, "
-            "last_name_normalized = :lnn, first_name_normalized = :fnn, "
-            "updated_at = now() WHERE id = :id"
+            "last_name_normalized = :lnn, first_name_normalized = :fnn "
+            "WHERE id = :id"
         ),
         {
             "ln": last_name,
@@ -109,7 +109,7 @@ def update_name(conn: Connection, person_id: int, last_name: str, first_name: st
 
 def set_rejected(conn: Connection, person_id: int, rejected: bool) -> None:
     result = conn.execute(
-        text("UPDATE persons SET rejected = :r, updated_at = now() WHERE id = :id"),
+        text("UPDATE persons SET rejected = :r WHERE id = :id"),
         {"r": rejected, "id": person_id},
     )
     if result.rowcount == 0:

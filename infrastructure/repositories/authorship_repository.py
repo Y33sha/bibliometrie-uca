@@ -198,8 +198,7 @@ class PgAuthorshipRepository:
                                               AND sa.source = sd.source
                     WHERE sd.publication_id = a.publication_id
                       AND sa.in_perimeter = TRUE
-                ),
-                updated_at = now()
+                )
             FROM _affected_authorships af
             WHERE a.id = af.authorship_id
         """)

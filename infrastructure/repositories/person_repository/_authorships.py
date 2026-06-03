@@ -279,8 +279,7 @@ def recompute_authorship_in_perimeter(
                     WHERE sa.source IN {sources_sql}
                       AND sd.publication_id = :pub
                       AND sa.person_id = :pid
-                ), FALSE),
-                updated_at = now()
+                ), FALSE)
             WHERE a.publication_id = :pub AND a.person_id = :pid
         """),
         {"pub": publication_id, "pid": person_id},

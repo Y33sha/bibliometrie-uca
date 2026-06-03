@@ -137,11 +137,7 @@ class PgPublisherRepository:
 
     def update_publisher_fields(self, publisher_id: int, fields: PublisherUpdateFields) -> None:
         """UPDATE dynamique sur publishers."""
-        stmt = (
-            update(publishers)
-            .where(publishers.c.id == publisher_id)
-            .values(**fields, updated_at=func.now())
-        )
+        stmt = update(publishers).where(publishers.c.id == publisher_id).values(**fields)
         self._conn.execute(stmt)
 
     # ── Fusion ─────────────────────────────────────────────────────
@@ -224,7 +220,6 @@ class PgPublisherRepository:
                 ror=func.coalesce(publishers.c.ror, src.ror),
                 country=func.coalesce(publishers.c.country, src.country),
                 is_predatory=publishers.c.is_predatory | src.is_predatory,
-                updated_at=func.now(),
             )
         )
 

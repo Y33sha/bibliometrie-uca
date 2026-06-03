@@ -253,11 +253,7 @@ class PgJournalRepository:
     def update_journal_fields(self, journal_id: int, fields: JournalUpdateFields) -> None:
         """UPDATE dynamique sur journals. Pas de validation ici (l'existence
         et la non-vacuité des fields sont vérifiées par le service)."""
-        stmt = (
-            update(journals)
-            .where(journals.c.id == journal_id)
-            .values(**fields, updated_at=func.now())
-        )
+        stmt = update(journals).where(journals.c.id == journal_id).values(**fields)
         self._conn.execute(stmt)
 
     # ── APC / DOAJ ─────────────────────────────────────────────────
@@ -426,7 +422,6 @@ class PgJournalRepository:
                 apc_amount=func.coalesce(journals.c.apc_amount, src.apc_amount),
                 apc_currency=func.coalesce(journals.c.apc_currency, src.apc_currency),
                 oa_model=func.coalesce(journals.c.oa_model, src.oa_model),
-                updated_at=func.now(),
             )
         )
 
