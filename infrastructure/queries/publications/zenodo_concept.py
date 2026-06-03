@@ -26,11 +26,15 @@ def fetch_zenodo_source_publications_without_concept(
 
 
 def set_concept_doi(conn: Connection, source_publication_id: int, concept_doi: str) -> None:
+    # `updated_at` est bumpé pour qu'une SP déjà rattachée à une publication
+    # redevienne stale : `match_or_create` re-promeut alors le DOI canonique
+    # vers le concept et fusionne les doublons concept/version (cas inter-run).
     conn.execute(
         text("""
             UPDATE source_publications
             SET external_ids = external_ids
-                || jsonb_build_object('zenodo_concept_doi', :concept_doi)
+                || jsonb_build_object('zenodo_concept_doi', :concept_doi),
+                updated_at = now()
             WHERE id = :id
         """),
         {"concept_doi": concept_doi, "id": source_publication_id},

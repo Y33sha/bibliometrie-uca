@@ -48,6 +48,10 @@ def bulk_link_orphans_by_doi(conn: Connection) -> int:
 
     Rapide grâce à `idx_source_pubs_doi` + index sur `publications.doi`.
 
+    Le DOI confronté est le DOI effectif : pour une SP Zenodo, le concept DOI
+    (`external_ids.zenodo_concept_doi`, résolu en amont) prime sur le DOI version,
+    de sorte que concept + versions rattachent à la même publication canonique.
+
     Le bump de `sp.updated_at` est nécessaire pour que `fetch_stale_publication_ids` voie ces publications comme stale en Phase 2 et déclenche `refresh_from_sources` — sinon l'agrégation cross-source (oa_status, abstract, …) ne reflète jamais la SP nouvellement rattachée.
     """
     return conn.execute(
@@ -57,9 +61,8 @@ def bulk_link_orphans_by_doi(conn: Connection) -> int:
                 updated_at = now()
             FROM publications p
             WHERE sp.publication_id IS NULL
-              AND sp.doi IS NOT NULL
               AND p.doi IS NOT NULL
-              AND sp.doi = p.doi
+              AND COALESCE(sp.external_ids ->> 'zenodo_concept_doi', sp.doi) = p.doi
         """)
     ).rowcount
 

@@ -345,11 +345,14 @@ class PgPublicationRepository:
         """Retourne les vues `SourcePublicationWithJournalView` attachées à une publication canonique, enrichies par un LEFT JOIN sur `journals` pour porter les champs consommés par les règles journal-dépendantes (`journal_type`, `oa_model`, `apc_amount`).
 
         Sortie consommée par la couche domaine pour la correction (`effective_metadata`) puis l'agrégation (`refresh_from_sources`) — d'où la dénormalisation des champs journal en lecture (cf. `domain/source_publications/views.py`).
+
+        Le `doi` projeté est le DOI effectif : pour une SP Zenodo, le concept DOI (`external_ids.zenodo_concept_doi`) prime sur le DOI version, de sorte que l'agrégation promeut le concept comme DOI canonique (concept + versions → une publication au DOI concept).
         """
         result = self._conn.execute(
             text("""
                 SELECT sp.id, sp.source::text AS source, sp.source_id,
-                       sp.title, sp.pub_year, sp.doc_type::text AS doc_type, sp.doi,
+                       sp.title, sp.pub_year, sp.doc_type::text AS doc_type,
+                       COALESCE(sp.external_ids ->> 'zenodo_concept_doi', sp.doi) AS doi,
                        sp.journal_id, sp.container_title, sp.language,
                        sp.oa_status::text AS oa_status, sp.is_retracted, sp.abstract,
                        sp.countries, sp.urls, sp.keywords,
