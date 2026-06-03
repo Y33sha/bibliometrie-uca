@@ -17,6 +17,7 @@ from __future__ import annotations
 from application.pipeline.normalize.normalize_crossref import (
     _author_affiliation_strings,
     _author_full_name,
+    build_crossref_author_records,
     get_abstract,
     get_biblio,
     get_cited_by_count,
@@ -342,3 +343,44 @@ class TestAuthorAffiliationStrings:
         # ou absent ; un truc autre que list passe quand même par la boucle
         # (qui ne yield rien si pas itérable comme dict).
         assert _author_affiliation_strings({"affiliation": None}) == []
+
+
+# ── build_crossref_author_records (parsing pur) ──────────────────
+
+
+class TestBuildCrossrefAuthorRecords:
+    def test_no_authors(self):
+        assert build_crossref_author_records({}) == []
+
+    def test_author_not_list(self):
+        assert build_crossref_author_records({"author": "nope"}) == []
+
+    def test_skip_without_name(self):
+        assert build_crossref_author_records({"author": [{}]}) == []
+
+    def test_full_record(self):
+        msg = {
+            "author": [
+                {
+                    "given": "Jean",
+                    "family": "Dupont",
+                    "ORCID": "https://orcid.org/0000-0001-2345-6789",
+                    "sequence": "first",
+                    "affiliation": [{"name": "UCA"}],
+                }
+            ]
+        }
+        rec = build_crossref_author_records(msg)[0]
+        assert rec.raw_name == "Jean Dupont"
+        # roles posé explicitement (reproduit l'ancien défaut DB ARRAY['author']).
+        assert rec.roles == ["author"]
+        assert rec.person_identifiers == {"orcid": "0000-0001-2345-6789"}
+        # `sequence` conservé en source_data.
+        assert rec.source_data == {"sequence": "first"}
+        assert [a.text for a in rec.addresses] == ["UCA"]
+        assert rec.addresses[0].countries is None
+
+    def test_no_sequence_no_source_data(self):
+        rec = build_crossref_author_records({"author": [{"family": "Dupont"}]})[0]
+        assert rec.source_data is None
+        assert rec.person_identifiers is None
