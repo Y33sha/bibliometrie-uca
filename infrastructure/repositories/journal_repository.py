@@ -180,10 +180,28 @@ class PgJournalRepository:
         oa_model: str | None = None,
     ) -> None:
         """Enrichit un journal existant avec les champs non null fournis
-        (COALESCE sur chaque champ : ne downgrade jamais)."""
+        (COALESCE sur chaque champ : ne downgrade jamais).
+
+        Garde anti-bloat : l'UPDATE n'est émis que si au moins une colonne
+        actuellement NULL recevrait une valeur. Sans ce filtre, chaque match de
+        journal (fréquent — un journal populaire est partagé par des milliers de
+        publis) réécrivait la ligne inutilement (COALESCE vers la même valeur),
+        générant un tuple mort à chaque appel → bloat de `journals` et lookups
+        de plus en plus lents au fil du run normalize.
+        """
+        fillable = (
+            (journals.c.issn, issn),
+            (journals.c.eissn, eissn),
+            (journals.c.publisher_id, publisher_id),
+            (journals.c.openalex_id, openalex_id),
+            (journals.c.oa_model, oa_model),
+        )
+        null_targets = [col.is_(None) for col, value in fillable if value is not None]
+        if not null_targets:
+            return
         stmt = (
             update(journals)
-            .where(journals.c.id == journal_id)
+            .where(journals.c.id == journal_id, or_(*null_targets))
             .values(
                 issn=func.coalesce(journals.c.issn, issn),
                 eissn=func.coalesce(journals.c.eissn, eissn),
