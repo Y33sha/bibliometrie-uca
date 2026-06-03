@@ -1,4 +1,4 @@
-"""Adapter HTTP pour `application.ports.zenodo_resolver.ZenodoResolver`.
+"""Adapter HTTP pour `application.ports.pipeline.zenodo_resolver.ZenodoResolver`.
 
 Le format des DOI Zenodo et l'erreur du contrat sont dans `domain.sources.zenodo`.
 """
@@ -20,7 +20,7 @@ _last_request_time = 0.0
 
 
 class HttpZenodoResolver:
-    """Adapter HTTP pour `application.ports.zenodo_resolver.ZenodoResolver`.
+    """Adapter HTTP pour `application.ports.pipeline.zenodo_resolver.ZenodoResolver`.
 
     L'URL de base de l'API est injectée au constructeur (12-factor : les
     backing services sont paramétrés par config, pas par constante en
@@ -31,18 +31,18 @@ class HttpZenodoResolver:
     def __init__(self, api_base: str) -> None:
         self._api_base = api_base
 
-    def resolve(self, doi: str) -> str | None:
-        return resolve_zenodo_doi(doi, api_base=self._api_base)
+    def resolve_concept_doi(self, doi: str) -> str | None:
+        return resolve_zenodo_concept_doi(doi, api_base=self._api_base)
 
 
-def resolve_zenodo_doi(doi: str, *, api_base: str) -> str | None:
-    """Résout un DOI Zenodo vers le DOI de la version concrète.
+def _fetch_zenodo_record(doi: str, *, api_base: str) -> dict[str, object] | None:
+    """Récupère le record JSON de l'API Zenodo pour un DOI.
 
-    - Si le DOI est déjà un version DOI, retourne None (rien à changer).
-    - Si le DOI est un concept DOI, retourne le version DOI réel.
-    - Lève ZenodoResolutionError en cas d'erreur temporaire (429, timeout)
-      pour que l'appelant puisse décider de ne pas marquer processed.
-    - Retry avec backoff exponentiel en cas de 429 (rate limit).
+    Retourne `None` si le DOI n'est pas un DOI Zenodo ou si le record est
+    introuvable/supprimé (404, 410). Lève `ZenodoResolutionError` en cas
+    d'erreur temporaire (429 épuisé, timeout, autre statut), pour que
+    l'appelant puisse décider de retenter plus tard. Délai de politesse +
+    retry avec backoff exponentiel sur 429.
     """
     match = ZENODO_DOI_RE.search(doi)
     if not match:
@@ -54,7 +54,6 @@ def resolve_zenodo_doi(doi: str, *, api_base: str) -> str | None:
     global _last_request_time
     for attempt in range(_MAX_RETRIES):
         try:
-            # Délai de politesse
             elapsed = time.time() - _last_request_time
             if elapsed < ZENODO_DELAY:
                 time.sleep(ZENODO_DELAY - elapsed)
@@ -68,7 +67,6 @@ def resolve_zenodo_doi(doi: str, *, api_base: str) -> str | None:
                 continue
 
             if resp.status_code in (410, 404):
-                # Document supprimé ou introuvable — pas temporaire
                 logger.warning(f"Zenodo API {resp.status_code} pour {doi}")
                 return None
 
@@ -76,11 +74,7 @@ def resolve_zenodo_doi(doi: str, *, api_base: str) -> str | None:
                 logger.warning(f"Zenodo API {resp.status_code} pour {doi}")
                 raise ZenodoResolutionError(f"HTTP {resp.status_code}")
 
-            data = resp.json()
-            real_doi = data.get("doi")
-            if real_doi and real_doi.lower() != doi.lower():
-                return real_doi
-            return None
+            return resp.json()
 
         except requests.exceptions.RequestException as e:
             logger.warning(f"Erreur API Zenodo pour {doi}: {e}")
@@ -88,3 +82,18 @@ def resolve_zenodo_doi(doi: str, *, api_base: str) -> str | None:
 
     logger.warning(f"Zenodo API : abandon après {_MAX_RETRIES} tentatives pour {doi}")
     raise ZenodoResolutionError(f"rate-limited après {_MAX_RETRIES} tentatives")
+
+
+def resolve_zenodo_concept_doi(doi: str, *, api_base: str) -> str | None:
+    """Résout un DOI Zenodo (concept ou version) vers son concept DOI.
+
+    Lit le champ `conceptdoi` du record (l'identifiant stable, agnostique aux
+    versions). Retourne `None` si le record n'expose pas de concept DOI (dépôt
+    non versionné) ou si le DOI n'est pas un DOI Zenodo. Lève
+    `ZenodoResolutionError` en cas d'erreur temporaire (rate-limit, timeout).
+    """
+    data = _fetch_zenodo_record(doi, api_base=api_base)
+    if data is None:
+        return None
+    concept = data.get("conceptdoi")
+    return concept if isinstance(concept, str) and concept else None
