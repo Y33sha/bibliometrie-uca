@@ -1,6 +1,6 @@
 # Chantier — Matérialiser le périmètre : table `perimeter_structures` + suppression `in_perimeter`
 
-> **Standby.** Ce chantier est un cas particulier de la question générale traitée par [`DATA_donnees-derivees`](DATA_donnees-derivees.md) (audit du dérivé + cadre de décision). En attente du verdict de cet audit : si la matérialisation de `perimeter_structures` et/ou la suppression de `in_perimeter` sont retenues, cette fiche sert de sous-chantier ; sinon elle est abandonnée.
+> **Phase 1 activée comme sous-chantier de [`DATA_donnees-derivees`](DATA_donnees-derivees.md).** La matérialisation de `perimeter_structures` (Phase 1) se justifie en soi par le déblocage de la matview `source_authorship_structures` (cf. Contexte), indépendamment de `in_perimeter`. Les Phases 2-3 (suppression de `in_perimeter`) restent conditionnées aux benchmarks de lecture.
 
 ## Contexte
 
@@ -17,6 +17,14 @@ Aujourd'hui, l'appartenance d'une authorship au périmètre UCA est portée par 
 Question soulevée le 2026-05-16 : avec les FK natives du chantier M2M, le recalcul à la volée devient un JOIN trivial. Faut-il **supprimer `in_perimeter`** et résoudre l'appartenance au périmètre à la lecture, via une table matérialisée `perimeter_structures (perimeter_id, structure_id)` qui sert aussi d'autres usages (UI listant les structures d'un périmètre, analyses cross-périmètre) ? "D'une pierre deux coups."
 
 **Volume des call-sites** : 233 occurrences de `in_perimeter` sur 61 fichiers. Toutes les queries de listing publications, facettes, agrégats stats, filtrage admin passent par cette colonne. Refactoring d'ampleur significative.
+
+### Deuxième motivation, indépendante de `in_perimeter` : débloquer la matview `source_authorship_structures`
+
+`source_authorship_structures` (SAS) est aujourd'hui une table de jointure maintenue impérativement en phase `affiliations` : `set_structure_ids_from_addresses` y INSERT `source_authorship_addresses ⋈ address_structures` filtré par `ast.structure_id = ANY(:affiliation_structure_ids)`, où `affiliation_structure_ids` est la **clôture récursive du périmètre calculée en Python** (`get_perimeter_structure_ids`) et passée en paramètre. Ce paramètre runtime est précisément ce qui interdit d'en faire une matview (déclarative, sans paramètre) : il faut que la clôture soit une **relation joignable**. Matérialiser `perimeter_structures` la fournit. SAS ne porte aucun état natif (feuille pure) — pas d'obstacle de faisabilité une fois la clôture disponible.
+
+Une fois SAS en matview, on retire toute sa maintenance impérative — l'INSERT `ON CONFLICT` d'`affiliations`, le purge full-mode `reset_source_authorships_for`, et la cascade `ON DELETE` depuis `source_authorships` en normalize — au profit d'un `REFRESH` toujours exact. Le sens du troc est bon : la clôture périmètre change rarement (édition admin de `perimeters.structure_ids` / `structure_relations`), SAS churne à chaque run sur des millions de rows — on matérialise le petit-rare pour rendre le gros-fréquent déclaratif. Réserve : SAS alimente déjà la matview `authorship_structures`, d'où une chaîne `perimeter_structures → SAS → authorship_structures` à rafraîchir dans l'ordre. Le bénéfice est architectural (déclaratif, exact, moins de code de rebuild), pas une perf de normalize — la cascade retirée n'est que du cleanup peu coûteux.
+
+Cette motivation ne justifie que la **Phase 1** (table `perimeter_structures` matérialisée + conversion SAS), sans toucher aux 233 call-sites de `in_perimeter`. Elle suffit à activer la Phase 1 comme sous-chantier de [`DATA_donnees-derivees`](DATA_donnees-derivees.md) — qui subordonnait justement le verdict matview de SAS à la matérialisation du périmètre.
 
 ## Décisions (à trancher au démarrage)
 
@@ -57,13 +65,14 @@ Vs aujourd'hui `WHERE a.in_perimeter = TRUE` (index lookup direct).
 
 ### Phase 1 — Table `perimeter_structures` matérialisée (autonome)
 
-- [ ] Migration Alembic : créer la table avec FK CASCADE des deux côtés.
-- [ ] Job de remplissage : adapter `infrastructure/perimeter.py:get_perimeter_structure_ids` pour aussi écrire dans `perimeter_structures` (ou via un script CLI dédié).
-- [ ] Hook dans le pipeline (phase `affiliations` ou dédiée) pour refresh à chaque run.
-- [ ] Hook côté API admin : refresh quand `perimeters.structure_ids` ou `structure_relations` change.
-- [ ] Tests : invariants de cohérence (cardinalité, clôture transitive correcte).
+- [x] Migration Alembic : créer la table avec FK CASCADE des deux côtés. (83a1fae9)
+- [x] Job de remplissage : `refresh_perimeter_structures` (CTE récursive `est_tutelle_de`, idempotent). (83a1fae9)
+- [x] Hook dans le pipeline (tête de phase `affiliations`) pour refresh à chaque run. (83a1fae9)
+- [ ] Hook côté API admin : refresh quand `perimeters.structure_ids` ou `structure_relations` change. **Reporté** : le refresh pipeline couvre fonctionnellement (staleness bornée à un run entre deux éditions admin du périmètre, très rares) ; à câbler si gênant.
+- [x] Tests : invariants de cohérence (clôture `est_tutelle_de`, pas `est_partenaire_de` ; idempotence). (83a1fae9)
+- [x] Convertir `source_authorship_structures` en matview (`source_authorship_addresses ⋈ address_structures ⋈ perimeter_structures`, filtre `is_confirmed` embarqué). Maintenance impérative retirée (`set_structure_ids_from_addresses`, purge SAS de `reset_source_authorships_for`, resync chirurgical admin, FK `ON DELETE CASCADE`). Refresh réordonné `perimeter_structures → source_authorship_structures → authorship_structures` (pipeline + chemin admin). (176bae4f)
 
-À ce stade, `in_perimeter` reste en base. La nouvelle table est juste un index supplémentaire utilisable pour des projections UI ou des audits.
+À ce stade, `in_perimeter` reste en base. `perimeter_structures` sert d'index supplémentaire (projections UI « structures d'un périmètre », audits) **et** de relation joignable qui déclarativise `source_authorship_structures`.
 
 ### Phase 2 — Évaluation : supprimer `in_perimeter` ou pas ?
 
@@ -84,6 +93,7 @@ Seulement si Phase 2 valide.
 
 ## Bénéfices attendus
 
+- **Déclarativise `source_authorship_structures`** (Phase 1, court terme) : la clôture en relation joignable permet la matview SAS et retire l'INSERT/purge/cascade impératifs (cf. Contexte). Bénéfice acquis sans toucher à `in_perimeter`.
 - **Cohérence** : plus de stale possible sur l'appartenance au périmètre — la source unique est la table matérialisée, mise à jour explicitement.
 - **Simplification pipeline** : `build_authorships` n'a plus à propager `in_perimeter` à chaque run.
 - **Nouvel usage** : `perimeter_structures` est utilisable directement par l'UI admin (lister les structures du périmètre courant), les analyses (combien de structures dans le périmètre UCA ?), etc.
@@ -93,4 +103,4 @@ Seulement si Phase 2 valide.
 
 - **Trigger ou refresh explicite ?** Trigger sur `perimeters` + `structure_relations` = automatique mais ajoute une couche d'invisible (debug compliqué). Refresh explicite = plus prévisible mais expose à l'oubli côté admin. **Reco initiale : refresh explicite côté repo perimeter (à chaque écriture sur les tables concernées) + sanity check en début de pipeline.**
 - **Plusieurs périmètres ?** Aujourd'hui le projet a 2 périmètres (`uca`, `uca_wide`). La table matérialisée prévoit le multi-perimeter dès le départ.
-- **Quand attaquer ?** Pas avant la fin du chantier M2M (`DATA_jointures-many-to-many.md`) — `perimeter_structures` matérialisée s'intègre mieux quand `authorship_structures` est en place (JOIN naturel via FK). Donc post-Phase 2+3 du M2M.
+- **Quand attaquer ?** Le chantier M2M (`DATA_jointures-many-to-many.md`) est terminé (`authorship_structures` et `source_authorship_structures` en place) — le verrou de séquencement est levé, la Phase 1 est activable.

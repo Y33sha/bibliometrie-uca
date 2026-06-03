@@ -1,6 +1,6 @@
 # Chantier — Normalize : batcher l'insertion des authorships
 
-Commencé le 2026-06-02
+Commencé le 2026-06-02 - Terminé le 2026-06-03
 
 ## Contexte
 
@@ -44,7 +44,7 @@ Commencé le 2026-06-02
 - **theses : exclu.** `aggregate_thesis_persons` pose `author_position = NULL` pour les non-auteurs (directeurs/jury) ; or le writer est **clé = position** (la dédup `setdefault(position)` collapse tous les NULL en un seul, et `fetch_…_by_position` ne remappe pas NULL pour lier leurs adresses). theses garde donc son upsert per-auteur — c'est la plus petite source (2537 pubs, ~5,7 personnes/pub), gain négligeable.
 - [x] WoS : `build_wos_author_records` + writer ; queries dédiées (`upsert_wos_source_authorships_batch`, `_resolve_addresses_batch`, etc.) + 3 TypedDicts supprimés. **Étude cross-work : WoS n'était PAS cross-work** — il traitait un record à la fois (base `run()` per-row), batchait seulement les auteurs d'un record, sans cache cross-record (les mentions « préchargements de caches » des docstrings étaient périmées). Bonus : son upsert dédié était un `executemany` (O(N) requêtes) ; le writer partagé (`jsonb_to_recordset`, O(1)) le rend donc **plus rapide**, pas seulement harmonisé.
 - **Cache cross-work : à étudier séparément** (orthogonal au batch par-work). Le seul vrai cache cross-work existant était `address_linker._cache` (texte→id d'adresse, vidé au rollback), perdu pour les 5 sources migrées. Cibles si on le veut : cache d'adresses dans le writer (regérer l'invalidation rollback) et/ou cache journal/publisher (find_or_create tape la base à chaque work — couplé au bloat `enrich_journal` déjà corrigé).
-- [ ] Tests : caractérisation par source (mêmes `source_authorships` + liens adresses qu'avant le refactor) + non-régression du writer partagé.
+- [x] Tests : caractérisation par source = unit `build_<source>_author_records` (5 sources, parsing pur) + intégration idempotence par source (`tests/integration/pipeline/idempotence/test_normalize_*`), qui lancent le **vrai writer** (`PgAuthorshipsBatchQueries`) via `process_work` et vérifient `source_authorships` (contenu + dédup, ex. scanr idref), les **liens adresses** (`source_authorship_addresses`, ex. crossref) et l'idempotence double-run. Writer couvert end-to-end pour les 5 sources.
 
 ## Mesures (corrigent le diagnostic initial)
 

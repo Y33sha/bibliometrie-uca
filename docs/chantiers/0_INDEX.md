@@ -6,14 +6,13 @@
 
 - [Données dérivées : audit + cadre de décision (matérialisation vs vue)](DATA_donnees-derivees.md) — Phase 1 (inventaire + alignement Python↔SQL) faite, sous-chantiers Phase 2 à ouvrir
 - [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
-- [Normalize : batcher l'insertion des authorships](CODE_batcher-normalize-authorships.md)
+- [Matérialiser perimeter_structures](DATA_perimeter-materialise.md) — standby, absorbé par `DATA_donnees-derivees`
 
 ### En pause
 
+- [Matching cross-source des authorships](METIER_authorships-cross-source-matching.md)
 - [Observabilité et robustesse du pipeline](CODE_observabilite-robustesse-pipeline.md)
 - [DOI Registration Agencies & DataCite](METIER_doi-ra-datacite.md)
-- [Matérialiser perimeter_structures](DATA_perimeter-materialise.md) — standby, absorbé par `DATA_donnees-derivees`
-- [Matching cross-source des authorships](METIER_authorships-cross-source-matching.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 
 ### Non commencé
@@ -23,6 +22,7 @@
 
 ## Chantiers archivés
 
+- 2026-06-03 — [Normalize : batcher l'insertion des authorships](CODE_batcher-normalize-authorships.md)
 - 2026-06-02 — [Authorships : build source-agnostique en une passe convergente](archived/2026-06-02_CODE_simplifier-build-authorships.md)
 - 2026-06-01 — [Sidecar `rejected_authorships` (extraire `authorships.excluded`)](archived/2026-06-01_DATA_rejected-authorships-sidecar.md)
 - 2026-05-31 — [Stockage des données brutes (raw store)](archived/2026-05-31_DATA_raw-data-store.md)
