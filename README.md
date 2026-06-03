@@ -18,7 +18,11 @@ personnes et laboratoires.
 
 ## Prérequis
 
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (recommandé)
+Docker, selon le système d'exploitation :
+
+- **Linux** : Docker Engine + plugin Compose via le [dépôt officiel](https://docs.docker.com/engine/install/) — **pas** Docker Desktop, qui y tourne dans une VM (plus lourd, compte requis). Sur une distribution dérivée (Linux Mint, Pop!_OS…), forcer dans le dépôt le codename Ubuntu sous-jacent et non celui de la distribution (ex. `jammy` pour Mint 21.x, exposé dans `/etc/os-release` via `UBUNTU_CODENAME`), car Docker ne publie pas de paquets pour ces distributions. Penser à `sudo usermod -aG docker $USER` puis se reconnecter pour utiliser `docker` sans `sudo`.
+- **macOS** : [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+- **Windows** : [Docker Desktop](https://www.docker.com/products/docker-desktop/) avec le backend WSL2.
 
 Ou, installation sans Docker :
 - Python 3.12+
