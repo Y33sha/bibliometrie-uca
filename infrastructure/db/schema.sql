@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict cHrecqSD6MGkai7CJUU7zbclEcLV94gDhqWaSvpSGKj8rYeRSWjP19dlm2UrMn2
+\restrict EDKs2baG7lsMx9o7N5jdSKbKMf2gK1vTalWczXlUnuVwccYtMcuUy4Y0QQiuW0o
 
 -- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 -- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
@@ -469,7 +469,8 @@ CREATE TABLE public.source_authorships (
     authorship_id integer,
     raw_author_name text,
     person_identifiers jsonb,
-    source_structures text[]
+    source_structures text[],
+    created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -497,7 +498,6 @@ CREATE TABLE public.authorships (
     author_position smallint,
     in_perimeter boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
     is_corresponding boolean,
     roles text[]
 );
@@ -531,7 +531,7 @@ CREATE TABLE public.config (
     key text NOT NULL,
     value jsonb NOT NULL,
     description text,
-    updated_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -725,7 +725,6 @@ CREATE TABLE public.journals (
     apc_currency text DEFAULT 'EUR'::text,
     oa_model text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
     journal_type public.journal_type DEFAULT 'journal'::public.journal_type,
     is_academic boolean DEFAULT true,
     doi_prefix text,
@@ -830,7 +829,8 @@ ALTER SEQUENCE public.person_identifiers_id_seq OWNED BY public.person_identifie
 CREATE TABLE public.person_name_forms (
     name_form text NOT NULL,
     person_id integer NOT NULL,
-    sources text[] DEFAULT '{}'::text[] NOT NULL
+    sources text[] DEFAULT '{}'::text[] NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -845,7 +845,6 @@ CREATE TABLE public.persons (
     last_name_normalized text NOT NULL,
     first_name_normalized text NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
     rejected boolean DEFAULT false
 );
 
@@ -884,8 +883,7 @@ CREATE TABLE public.persons_rh (
     start_date date,
     end_date date,
     hr_export_date date,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -1047,7 +1045,6 @@ CREATE TABLE public.publishers (
     country text,
     is_predatory boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
     publisher_type public.publisher_type DEFAULT 'unknown'::public.publisher_type NOT NULL,
     ror text
 );
@@ -1282,6 +1279,7 @@ CREATE TABLE public.structure_relations (
     parent_id integer NOT NULL,
     child_id integer NOT NULL,
     relation_type text NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT structure_relations_no_self_reference CHECK ((parent_id <> child_id))
 );
 
@@ -2938,4 +2936,4 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict cHrecqSD6MGkai7CJUU7zbclEcLV94gDhqWaSvpSGKj8rYeRSWjP19dlm2UrMn2
+\unrestrict EDKs2baG7lsMx9o7N5jdSKbKMf2gK1vTalWczXlUnuVwccYtMcuUy4Y0QQiuW0o
