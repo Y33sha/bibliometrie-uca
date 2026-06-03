@@ -623,18 +623,12 @@ source_authorship_addresses = Table(
 )
 
 
-source_authorship_structures = Table(
-    "source_authorship_structures",
-    metadata,
-    Column("source_authorship_id", Integer, nullable=False),
-    Column("structure_id", Integer, nullable=False),
-    PrimaryKeyConstraint(
-        "source_authorship_id",
-        "structure_id",
-        name="source_authorship_structures_pkey",
-    ),
-    Index("idx_source_authorship_structures_structure_id", "structure_id"),
-)
+# `source_authorship_structures` est une MATERIALIZED VIEW (DDL via migration
+# e8f1a3c5d7b9), pas une table : dérivée de `source_authorship_addresses ⋈
+# address_structures ⋈ perimeter_structures` (périmètre d'affiliation). Non
+# modélisée dans le metadata SQLAlchemy — accès en SQL brut par nom (lectures)
+# ou via REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer
+# en table.
 
 
 # ── Personnes ─────────────────────────────────────────────────────

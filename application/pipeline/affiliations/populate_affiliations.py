@@ -1,12 +1,10 @@
 """
 Résolution des affiliations sur les authorships sources.
 
-Peuple in_perimeter et structure_ids sur source_authorships en utilisant
-les adresses résolues (address_structures) et les périmètres configurés.
-
-Deux périmètres :
-  - restreint : UCA + labos tutellés → sert pour in_perimeter
-  - large : restreint + partenaires (CHU, INP…) → sert pour structure_ids
+Pose in_perimeter sur source_authorships via les adresses résolues
+(address_structures) et le périmètre restreint, puis rafraîchit la matview
+source_authorship_structures (dérivée des adresses + perimeter_structures, sur
+le périmètre d'affiliation).
 
 L'orchestrateur dépend du port `AffiliationsQueries`. Le point d'entrée CLI
 est dans `interfaces/cli/pipeline/populate_affiliations.py`.
@@ -27,10 +25,9 @@ def _step_address_source(
     logger: logging.Logger,
     source: str,
     perimeter_ids: set[int],
-    affiliation_structure_ids: set[int],
     daily: bool = False,
 ) -> None:
-    """Étape : source avec adresses — calculer in_perimeter + structure_ids."""
+    """Étape : source avec adresses — (re)poser in_perimeter."""
     label = source.capitalize() if source != "openalex" else "OA"
 
     if not daily:
@@ -41,11 +38,6 @@ def _step_address_source(
         conn, source=source, perimeter_ids=list(perimeter_ids), daily=daily
     )
     logger.info(f"  {label} in_perimeter = TRUE : {n} authorships")
-
-    n = queries.set_structure_ids_from_addresses(
-        conn, source=source, affiliation_structure_ids=list(affiliation_structure_ids), daily=daily
-    )
-    logger.info(f"  {label} structure_ids : {n} authorships")
 
 
 def show_stats(conn: Connection, queries: AffiliationsQueries, logger: logging.Logger) -> None:
@@ -68,7 +60,6 @@ def run_populate(
     queries: AffiliationsQueries,
     logger: logging.Logger,
     perimeter_ids: set[int],
-    affiliation_structure_ids: set[int],
     *,
     mode: str = "full",
 ) -> None:
@@ -77,21 +68,25 @@ def run_populate(
     `resolve_addresses` (en amont) résout les adresses indépendamment des
     sources, donc cette propagation doit l'être aussi — sinon les
     `source_authorships` d'une source non listée restent bloquées sans
-    `structure_ids` malgré une adresse résolue.
+    `in_perimeter` malgré une adresse résolue.
     """
     daily = mode == "daily"
 
     t0 = time.perf_counter()
 
     logger.info(f"Périmètre restreint : {len(perimeter_ids)} structures")
-    logger.info(f"Périmètre large     : {len(affiliation_structure_ids)} structures")
     if daily:
         logger.info("Mode daily : traitement des authorships récentes uniquement")
 
     for source in ALL_SOURCES:
-        _step_address_source(
-            conn, queries, logger, source, perimeter_ids, affiliation_structure_ids, daily=daily
-        )
+        _step_address_source(conn, queries, logger, source, perimeter_ids, daily=daily)
+
+    # `source_authorship_structures` est une matview globale (périmètre
+    # d'affiliation) : un refresh unique après que toutes les sources ont
+    # réaligné leurs adresses/in_perimeter, en amont du refresh de
+    # `authorship_structures` (phase authorships).
+    logger.info("Refresh matview source_authorship_structures...")
+    queries.refresh_source_authorship_structures(conn)
 
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")

@@ -17,9 +17,7 @@ class AffiliationsQueries(Protocol):
         self, conn: Connection, *, source: str, perimeter_ids: list[int], daily: bool
     ) -> int: ...
 
-    def set_structure_ids_from_addresses(
-        self, conn: Connection, *, source: str, affiliation_structure_ids: list[int], daily: bool
-    ) -> int: ...
+    def refresh_source_authorship_structures(self, conn: Connection) -> None: ...
 
     def count_source_authorships_stats(
         self, conn: Connection, source: str

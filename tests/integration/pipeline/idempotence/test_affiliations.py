@@ -97,28 +97,27 @@ def _setup_affiliations_test_data(conn):
         """)
     )
 
+    # `source_authorship_structures` (matview) filtre par `perimeter_structures` :
+    # peupler la clôture du périmètre depuis les perimeters/relations semés.
+    from infrastructure.queries.perimeter import refresh_perimeter_structures
+
+    refresh_perimeter_structures(conn)
+
 
 def _run_populate_affiliations(conn):
     """Exécute populate_affiliations sur la Connection SA de test."""
     import logging
 
-    from application.pipeline.affiliations.populate_affiliations import _step_address_source
-    from domain.sources.registry import ALL_SOURCES
+    from application.pipeline.affiliations.populate_affiliations import run_populate
     from infrastructure.queries.affiliations import PgAffiliationsQueries
-    from infrastructure.queries.perimeter import (
-        get_affiliations_structure_ids,
-        get_persons_structure_ids,
+    from infrastructure.queries.perimeter import get_persons_structure_ids
+
+    run_populate(
+        conn,
+        PgAffiliationsQueries(),
+        logging.getLogger("test"),
+        get_persons_structure_ids(conn),
     )
-
-    perimeter_ids = get_persons_structure_ids(conn)
-    affiliation_structure_ids = get_affiliations_structure_ids(conn)
-    queries = PgAffiliationsQueries()
-    logger = logging.getLogger("test")
-
-    for source in ALL_SOURCES:
-        _step_address_source(
-            conn, queries, logger, source, perimeter_ids, affiliation_structure_ids
-        )
 
 
 def _count_affiliations(conn) -> dict:
@@ -183,10 +182,7 @@ class TestPopulateAffiliationsIdempotence:
 
         from application.pipeline.affiliations.populate_affiliations import run_populate
         from infrastructure.queries.affiliations import PgAffiliationsQueries
-        from infrastructure.queries.perimeter import (
-            get_affiliations_structure_ids,
-            get_persons_structure_ids,
-        )
+        from infrastructure.queries.perimeter import get_persons_structure_ids
 
         _setup_affiliations_test_data(sa_sync_conn)
 
@@ -195,7 +191,6 @@ class TestPopulateAffiliationsIdempotence:
             PgAffiliationsQueries(),
             logging.getLogger("test"),
             get_persons_structure_ids(sa_sync_conn),
-            get_affiliations_structure_ids(sa_sync_conn),
         )
 
         row = sa_sync_conn.execute(

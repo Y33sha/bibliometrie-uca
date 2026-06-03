@@ -49,6 +49,11 @@ class AuthorshipRepository(Protocol):
         source_authorship_ids: list[int],
     ) -> None: ...
 
+    def refresh_source_authorship_structures(self) -> None:
+        """Rafraîchit la matview `source_authorship_structures` (`REFRESH … CONCURRENTLY`),
+        en amont de `refresh_authorship_structures`."""
+        ...
+
     def refresh_authorship_structures(self) -> None:
         """Rafraîchit la matview `authorship_structures` (`REFRESH … CONCURRENTLY`)."""
         ...

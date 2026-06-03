@@ -130,38 +130,26 @@ class PgAuthorshipRepository:
         source_authorship_ids: list[int],
         perimeter_structure_ids: list[int],
     ) -> None:
-        # Resync `source_authorship_structures` pour les sa donnés : on
-        # repart de zéro (DELETE) puis on insère les liens dérivés des
-        # adresses résolues filtrées par le périmètre.
-        self._conn.execute(
-            text(
-                "DELETE FROM source_authorship_structures WHERE source_authorship_id = ANY(:sa_ids)"
-            ),
-            {"sa_ids": source_authorship_ids},
-        )
-        self._conn.execute(
-            text("""
-                INSERT INTO source_authorship_structures (source_authorship_id, structure_id)
-                SELECT DISTINCT saa.source_authorship_id, ast.structure_id
-                FROM source_authorship_addresses saa
-                JOIN address_structures ast ON ast.address_id = saa.address_id
-                WHERE saa.source_authorship_id = ANY(:sa_ids)
-                  AND ast.structure_id = ANY(:struct_ids)
-                  AND ast.is_confirmed IS DISTINCT FROM FALSE
-                ON CONFLICT DO NOTHING
-            """),
-            {"sa_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},
-        )
+        # `source_authorship_structures` est une matview (réalignée par
+        # refresh_source_authorship_structures) : on ne l'écrit plus ici. On
+        # recalcule in_perimeter directement depuis les adresses résolues
+        # filtrées par le périmètre restreint, pour les sa donnés — équivalent
+        # à l'ancien EXISTS sur la table de jointure construite avec le même
+        # filtre.
         self._conn.execute(
             text("""
                 UPDATE source_authorships sa
                 SET in_perimeter = EXISTS (
-                    SELECT 1 FROM source_authorship_structures sas
-                    WHERE sas.source_authorship_id = sa.id
+                    SELECT 1
+                    FROM source_authorship_addresses saa
+                    JOIN address_structures ast ON ast.address_id = saa.address_id
+                    WHERE saa.source_authorship_id = sa.id
+                      AND ast.structure_id = ANY(:struct_ids)
+                      AND ast.is_confirmed IS DISTINCT FROM FALSE
                 )
                 WHERE sa.id = ANY(:sa_ids)
             """),
-            {"sa_ids": source_authorship_ids},
+            {"sa_ids": source_authorship_ids, "struct_ids": perimeter_structure_ids},
         )
 
     def propagate_in_perimeter_to_authorships(
@@ -205,6 +193,14 @@ class PgAuthorshipRepository:
         )
 
         self._conn.execute(text("DROP TABLE _affected_authorships"))
+
+    def refresh_source_authorship_structures(self) -> None:
+        """Rafraîchit la matview `source_authorship_structures` après un
+        changement d'`address_structures` (review admin). À appeler avant
+        `refresh_authorship_structures` (matview-sur-matview)."""
+        self._conn.execute(
+            text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_authorship_structures")
+        )
 
     def refresh_authorship_structures(self) -> None:
         """Rafraîchit la matview `authorship_structures` après une propagation

@@ -1,9 +1,6 @@
 """Tests d'intégration pour `infrastructure.queries.affiliations`."""
 
-from infrastructure.queries.affiliations import (
-    set_in_perimeter_from_addresses,
-    set_structure_ids_from_addresses,
-)
+from infrastructure.queries.affiliations import set_in_perimeter_from_addresses
 
 
 class TestSetInPerimeterFromAddressesDailyClause:
@@ -23,19 +20,5 @@ class TestSetInPerimeterFromAddressesDailyClause:
     def test_daily_false_does_not_raise(self, sa_sync_conn):
         n = set_in_perimeter_from_addresses(
             sa_sync_conn, source="openalex", perimeter_ids=[1, 2, 3], daily=False
-        )
-        assert n == 0
-
-
-class TestSetStructureIdsFromAddressesDailyClause:
-    def test_daily_true_does_not_raise(self, sa_sync_conn):
-        n = set_structure_ids_from_addresses(
-            sa_sync_conn, source="openalex", affiliation_structure_ids=[1, 2, 3], daily=True
-        )
-        assert n == 0
-
-    def test_daily_false_does_not_raise(self, sa_sync_conn):
-        n = set_structure_ids_from_addresses(
-            sa_sync_conn, source="openalex", affiliation_structure_ids=[1, 2, 3], daily=False
         )
         assert n == 0

@@ -1,41 +1,21 @@
 """Query service : résolution des affiliations sur `source_authorships`.
 
 Appelé par `application/pipeline/affiliations/populate_affiliations.py`.
-Pose `in_perimeter` sur `source_authorships` et alimente
-`source_authorship_structures` (table de jointure) via les adresses
-résolues (`address_structures`) et les périmètres configurés.
+Pose `in_perimeter` sur `source_authorships` via les adresses résolues
+(`address_structures`) et le périmètre restreint, et rafraîchit la matview
+`source_authorship_structures` (dérivée des adresses + `perimeter_structures`).
 """
 
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.affiliations import AffiliationsQueries
 
-# Filtre temporel daily : source_publications créés dans les dernières 24h.
-# Variante CTE (alias `sa2`) : utilisée dans les SELECT internes des CTE,
-# où le JOIN est syntaxiquement valide. Le pendant pour UPDATE direct
-# vit en EXISTS dans `set_in_perimeter_from_addresses` (PostgreSQL
-# n'autorise pas un JOIN directement après SET).
-_DAILY_JOIN_SA2 = """
-    JOIN source_publications sd ON sd.id = sa2.source_publication_id
-     AND sd.created_at >= NOW() - INTERVAL '24 hours'
-"""
-
 
 def reset_source_authorships_for(conn: Connection, source: str) -> int:
-    """Remet `in_perimeter = FALSE` et purge `source_authorship_structures`
-    pour une source donnée. Utilisé en mode full uniquement (pas daily).
-
-    Retourne le rowcount de l'UPDATE in_perimeter (les rows de la table de
-    jointure supprimées en parallèle ne sont pas comptées séparément).
-    """
-    conn.execute(
-        text("""
-            DELETE FROM source_authorship_structures sas
-            USING source_authorships sa
-            WHERE sa.id = sas.source_authorship_id AND sa.source = :source
-        """),
-        {"source": source},
-    )
+    """Remet `in_perimeter = FALSE` pour une source donnée (mode full uniquement,
+    pas daily) avant la repropagation. `source_authorship_structures` est une
+    matview : elle est réalignée par `refresh_source_authorship_structures`, pas
+    purgée ici. Retourne le rowcount de l'UPDATE."""
     return conn.execute(
         text("UPDATE source_authorships SET in_perimeter = FALSE WHERE source = :source"),
         {"source": source},
@@ -76,31 +56,13 @@ def set_in_perimeter_from_addresses(
     ).rowcount
 
 
-def set_structure_ids_from_addresses(
-    conn: Connection, *, source: str, affiliation_structure_ids: list[int], daily: bool
-) -> int:
-    """Alimente `source_authorship_structures` via le périmètre large.
-
-    Insère un couple `(source_authorship_id, structure_id)` par adresse
-    résolue dans le périmètre large. ON CONFLICT DO NOTHING pour préserver
-    l'idempotence cross-run.
-    """
-    daily_filter = _DAILY_JOIN_SA2 if daily else ""
-    return conn.execute(
-        text(f"""
-            INSERT INTO source_authorship_structures (source_authorship_id, structure_id)
-            SELECT DISTINCT saa.source_authorship_id, ast.structure_id
-            FROM source_authorship_addresses saa
-            JOIN address_structures ast ON ast.address_id = saa.address_id
-            JOIN source_authorships sa2 ON sa2.id = saa.source_authorship_id
-            {daily_filter}
-            WHERE sa2.source = :source
-              AND ast.structure_id = ANY(:affiliation_structure_ids)
-              AND ast.is_confirmed IS DISTINCT FROM FALSE
-            ON CONFLICT DO NOTHING
-        """),
-        {"source": source, "affiliation_structure_ids": affiliation_structure_ids},
-    ).rowcount
+def refresh_source_authorship_structures(conn: Connection) -> None:
+    """Rafraîchit la matview `source_authorship_structures` (dérivée de
+    `source_authorship_addresses ⋈ address_structures ⋈ perimeter_structures`,
+    périmètre d'affiliation). `CONCURRENTLY` pour ne pas bloquer les lectures.
+    À appeler après `perimeter_structures` et la résolution des adresses, avant
+    le refresh de `authorship_structures` (matview-sur-matview)."""
+    conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_authorship_structures"))
 
 
 def count_source_authorships_stats(conn: Connection, source: str) -> tuple[int, int, int]:
@@ -141,12 +103,8 @@ class PgAffiliationsQueries(AffiliationsQueries):
             conn, source=source, perimeter_ids=perimeter_ids, daily=daily
         )
 
-    def set_structure_ids_from_addresses(
-        self, conn: Connection, *, source: str, affiliation_structure_ids: list[int], daily: bool
-    ) -> int:
-        return set_structure_ids_from_addresses(
-            conn, source=source, affiliation_structure_ids=affiliation_structure_ids, daily=daily
-        )
+    def refresh_source_authorship_structures(self, conn: Connection) -> None:
+        refresh_source_authorship_structures(conn)
 
     def count_source_authorships_stats(self, conn: Connection, source: str) -> tuple[int, int, int]:
         return count_source_authorships_stats(conn, source)
