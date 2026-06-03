@@ -1,4 +1,5 @@
 # A régler avant transmission
+* [ ] Pb CI: version Starlette 0.50.0
 ## Pipeline de traitement
 ### Extraction
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids?
@@ -6,9 +7,9 @@
 * [ ] extraction par ORCID: vérifier faisabilité (quelles sources?)
 * [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples) (compliqué; auditer d'abord pour voir si ça touche bcp de docts)
 ### Normalisation
-* [ ] batcher pour améliorer la perf? / analyser pour comprendre pourquoi hal + lent
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 * [ ] vérifier espace disque avant vacuum full
+*
 ### Suite du traitement
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects
 * [ ] est-ce que les authorships détachées manuellement (donc orphelines) sont à nouveau rattachées au pipeline suivant? si oui => comportement indésirable, à corriger (ajouter rejected_authorship quand on clique sur détacher)
@@ -17,11 +18,13 @@
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
+* [ ] auditer tests bizarres (integration/helpers/publications par ex.)
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi
 * [ ] normalisation des titres: supprimer les balises mml/html
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
+* [ ] vacuum full journals sur base de prod
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée? récupérer pmid dans api HAL
 * [ ] pour les jeux de données: DataCite, Zenodo, autres?
@@ -30,7 +33,7 @@
 ## OA_status / embargos
 * [ ] https://hal.science/hal-03874894 , https://hal.science/hal-04111614 => lien OA vers *autre* archive ouverte que HAL: en tenir compte pour le statut green
 * [ ] fichiers HAL sous embargo: est-ce qu'à la fin de l'embargo le statut va se mettre à jour tout seul? (est-ce que le hash change au réimport quand l'embargo prend fin?) - je pense que oui; trouver un exemple d'embargo qui se termine prochainement et voir ce qui se passe.
-* [ ] embargos (HAL, theses.fr): afficher dates dans l'UI (existent-elles dans le retour api? creuser)
+* [ ] embargos (HAL, theses.fr): afficher dates dans l'UI (existent-elles dans le payload api? creuser)
 ## Méga-papers et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. En attendant une solution, le mode "conflit de sources" dans la déduplication manuelle des personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`) (chantier chiant, à enterrer le plus proprement possible)
 ## Chantier des signatures institutionnelles

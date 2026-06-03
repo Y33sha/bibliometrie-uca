@@ -40,5 +40,11 @@ Livrable audit : tableau par endpoint avec volume max observable,
 temps moyen, temps P99, décision (sync / seuil + bg task / toujours
 bg task).
 
+## Refresh des matviews `source_authorship_structures` / `authorship_structures` sur action admin
+
+Depuis le passage de `source_authorship_structures` (SAS) en matview (cf. `DATA_perimeter-materialise`), toute action admin qui touche une affiliation (`review_structure_link`, assign orphelin, etc.) déclenche un `REFRESH` **complet** de la chaîne `SAS → authorship_structures` : ~3-4 s pour SAS (SELECT ~2,3 s sur 8,3 M `source_authorship_addresses`) + ~2 s pour `authorship_structures`, soit ~5-8 s par action — alors que le changement peut être minuscule (une seule adresse modifiée, une seule publication liée, et tout se recalcule globalement). Le refresh full est massivement disproportionné au delta.
+
+Candidat background-jobs / debounce : décorréler le refresh de la réponse admin (réactivité immédiate, matview rattrape en async). Fallback de repli déjà acté : si gênant, supprimer le refresh sur action admin et laisser **seul le pipeline** maintenir ces matviews (staleness bornée entre deux runs, acceptable pour ces dérivées).
+
 ## Idées à intégrer
 Cleanup explicite des idle in transaction côté API (BG tasks notamment) : vérifier qu'aucune BackgroundTasks ne laisse une transaction ouverte si elle plante.
