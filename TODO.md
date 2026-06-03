@@ -12,7 +12,6 @@
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 * [ ] vérifier espace disque avant vacuum full
 ### Suite du traitement
-* [ ] addresses.pub_count: après phase publications, pas après normalisation.
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects
 * [ ] est-ce que les authorships détachées manuellement (donc orphelines) sont à nouveau rattachées au pipeline suivant? si oui => comportement indésirable, à corriger (ajouter rejected_authorship quand on clique sur détacher)
 ## Code

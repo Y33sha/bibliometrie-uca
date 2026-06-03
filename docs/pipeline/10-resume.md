@@ -50,7 +50,7 @@ flowchart LR
 
 4. Les **authorships** canoniques sont déduites à partir des sources dans la phase [`authorships`](08-authorships.md). L'information (`person_id`, `structure_ids`) présente dans les *authorships* sources est donc répliquée dans la table *authorships* canonique, pour deux raisons :
     - optimiser les requêtes;
-    - servir de source d'autorité ultime en cas d'erreur dans une des sources (une paire (personne, publication) peut être rejetée manuellement via le store `rejected_authorships`, indépendamment des sources).
+    - servir de source d'autorité ultime en cas d'erreur dans une des sources (une `authorship` peut être rejetée (table `rejected_authorships`), ce qui garantit qu'elle ne sera pas recréée à partir des sources).
 
 ```mermaid
 flowchart LR
