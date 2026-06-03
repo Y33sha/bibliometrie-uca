@@ -2,7 +2,7 @@
 
 Appelé par `application/pipeline/normalize/normalize_openalex.py`.
 Regroupe les UPSERT sur `source_publications` et `source_authorships`,
-ainsi que les lectures d'idempotence et les déduplications Zenodo.
+ainsi que les lectures d'idempotence.
 """
 
 from sqlalchemy import Connection, bindparam, text
@@ -102,17 +102,6 @@ def upsert_openalex_source_publication(
     return row.id
 
 
-def staging_has_openalex_doi(conn: Connection, doi: str) -> bool:
-    """Vrai si le DOI est déjà présent dans `staging` pour `source='openalex'`."""
-    return (
-        conn.execute(
-            text("SELECT id FROM staging WHERE source = 'openalex' AND lower(doi) = lower(:doi)"),
-            {"doi": doi},
-        ).first()
-        is not None
-    )
-
-
 def count_openalex_table(conn: Connection, table: str) -> int:
     """Compte les lignes d'une table avec `source = 'openalex'` (liste blanche)."""
     if table not in ("source_publications", "source_authorships"):
@@ -171,9 +160,6 @@ class PgOpenalexNormalizeQueries(OpenalexNormalizeQueries):
             keywords=keywords,
             topics_json=topics_json,
         )
-
-    def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool:
-        return staging_has_openalex_doi(conn, doi)
 
     def count_openalex_table(self, conn: Connection, table: str) -> int:
         return count_openalex_table(conn, table)

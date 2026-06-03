@@ -106,17 +106,6 @@ def upsert_hal_source_publication(
     return row.id
 
 
-def staging_has_hal_doi(conn: Connection, doi: str) -> bool:
-    """Vrai si le DOI est déjà présent dans `staging` pour `source='hal'` (dédup Zenodo)."""
-    return (
-        conn.execute(
-            text("SELECT id FROM staging WHERE source = 'hal' AND lower(doi) = lower(:doi)"),
-            {"doi": doi},
-        ).first()
-        is not None
-    )
-
-
 class PgHalNormalizeQueries(HalNormalizeQueries):
     """Adapter PostgreSQL pour `application.ports.normalize_hal.HalNormalizeQueries`."""
 
@@ -164,6 +153,3 @@ class PgHalNormalizeQueries(HalNormalizeQueries):
             biblio=biblio,
             urls=urls,
         )
-
-    def staging_has_hal_doi(self, conn: Connection, doi: str) -> bool:
-        return staging_has_hal_doi(conn, doi)

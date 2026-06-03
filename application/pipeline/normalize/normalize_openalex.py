@@ -31,7 +31,6 @@ from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.openalex import OpenalexNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
-from application.ports.pipeline.zenodo_resolver import ZenodoResolver
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
@@ -47,7 +46,6 @@ from domain.sources.openalex import (
     parse_primary_location,
     should_skip_publisher_journal,
 )
-from domain.sources.zenodo import ZenodoResolutionError, is_zenodo_doi
 from domain.types import JsonValue
 
 # =============================================================
@@ -436,33 +434,15 @@ def process_work(
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
     pub_repo: PublicationRepository,
-    zenodo_resolver: ZenodoResolver,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
     staging_id = staging_row.id
     openalex_id = staging_row.source_id
-    doi = staging_row.doi
     work = staging_row.raw_data
 
     try:
-        raw_doi = clean_doi(doi)
-        if raw_doi and is_zenodo_doi(raw_doi):
-            try:
-                version_doi = zenodo_resolver.resolve(raw_doi)
-            except ZenodoResolutionError as e:
-                logger.warning(f"  {openalex_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
-                return None
-            if version_doi:
-                if queries.staging_has_openalex_doi(conn, version_doi):
-                    logger.info(
-                        f"  {openalex_id} concept DOI Zenodo {raw_doi} -> "
-                        f"version {version_doi} deja en staging, skip"
-                    )
-                    staging_queries.mark_done(conn, staging_id)
-                    return None
-
         primary = parse_primary_location(work)
 
         if should_skip_publisher_journal(primary):
@@ -501,7 +481,6 @@ class OpenalexNormalizer(SourceNormalizer):
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],
-        zenodo_resolver: ZenodoResolver,
         authorship_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
@@ -512,7 +491,6 @@ class OpenalexNormalizer(SourceNormalizer):
         self._publisher_repo: PublisherRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
-        self._zenodo_resolver = zenodo_resolver
         self._authorship_queries = authorship_queries
 
     def preload_caches(self, conn: Connection) -> None:
@@ -534,7 +512,6 @@ class OpenalexNormalizer(SourceNormalizer):
             journal_repo=self._journal_repo,
             publisher_repo=self._publisher_repo,
             pub_repo=self._pub_repo,
-            zenodo_resolver=self._zenodo_resolver,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
         )

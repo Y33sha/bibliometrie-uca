@@ -13,17 +13,12 @@ from infrastructure.repositories import (
     publication_repository,
     publisher_repository,
 )
-from infrastructure.sources.config import get_api_base_urls
-from infrastructure.sources.zenodo import HttpZenodoResolver
 
 logger = setup_logger("normalize_openalex", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 def main() -> None:
-    engine = get_sync_engine()
-    with engine.connect() as bootstrap:
-        zenodo_api = get_api_base_urls(bootstrap)["zenodo"]
-    conn = engine.connect()
+    conn = get_sync_engine().connect()
     OpenalexNormalizer(
         conn,
         logger,
@@ -32,7 +27,6 @@ def main() -> None:
         journal_repo_factory=journal_repository,
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
-        zenodo_resolver=HttpZenodoResolver(api_base=zenodo_api),
         authorship_queries=PgAuthorshipsBatchQueries(),
     ).run()
 

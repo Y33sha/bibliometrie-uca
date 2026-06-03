@@ -37,7 +37,6 @@ from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.hal import HalNormalizeQueries
 from application.ports.pipeline.staging import HalStagingRow, StagingQueries, StagingRow
-from application.ports.pipeline.zenodo_resolver import ZenodoResolver
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
@@ -48,7 +47,6 @@ from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.hal import derive_hal_oa_status
-from domain.sources.zenodo import ZenodoResolutionError, is_zenodo_doi
 from domain.types import JsonValue
 
 # =============================================================
@@ -499,7 +497,6 @@ def process_work(
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
     pub_repo: PublicationRepository,
-    zenodo_resolver: ZenodoResolver,
     staging_queries: StagingQueries,
     authorship_queries: AuthorshipsBatchQueries,
 ) -> bool | None:
@@ -526,27 +523,6 @@ def process_work(
                 "— doc HAL inutilisable, staging laissé processed=FALSE"
             )
             return False
-
-        raw_doi = clean_doi(as_str(doc.get("doiId_s")))
-        if raw_doi and is_zenodo_doi(raw_doi):
-            try:
-                version_doi = zenodo_resolver.resolve(raw_doi)
-            except ZenodoResolutionError as e:
-                logger.warning(f"  {hal_id} Zenodo {raw_doi} : {e} — retenté au prochain run")
-                return False
-            if version_doi:
-                if queries.staging_has_hal_doi(conn, version_doi):
-                    logger.info(
-                        f"  {hal_id} concept DOI Zenodo {raw_doi} -> "
-                        f"version {version_doi} deja en staging, skip"
-                    )
-                    staging_queries.mark_done(conn, staging_id)
-                    return None
-            # `resolve()` ci-dessus est un appel HTTP (~1 s de latence). On l'isole
-            # dans son propre mark : sinon il s'impute au mark `publisher+journal`
-            # (qui mesure depuis le début du work) et fausse le diagnostic. Posé
-            # uniquement ici, dans la branche Zenodo — pas de `zenodo:0s` ailleurs.
-            t.mark("zenodo")
 
         publisher_name = as_str(doc.get("journalPublisher_s")) or as_str(doc.get("publisher_s"))
         publisher_id = (
@@ -598,7 +574,6 @@ class HalNormalizer(SourceNormalizer):
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],
-        zenodo_resolver: ZenodoResolver,
         authorship_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
@@ -609,7 +584,6 @@ class HalNormalizer(SourceNormalizer):
         self._publisher_repo: PublisherRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
-        self._zenodo_resolver = zenodo_resolver
         self._authorship_queries = authorship_queries
 
     def preload_caches(self, conn: Connection) -> None:
@@ -633,7 +607,6 @@ class HalNormalizer(SourceNormalizer):
             journal_repo=self._journal_repo,
             publisher_repo=self._publisher_repo,
             pub_repo=self._pub_repo,
-            zenodo_resolver=self._zenodo_resolver,
             staging_queries=self._staging,
             authorship_queries=self._authorship_queries,
         )
