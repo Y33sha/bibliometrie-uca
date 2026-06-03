@@ -7,7 +7,6 @@ Implémenté par `infrastructure.queries.config.PgConfigQueries`.
 Co-localise le DTO `ConfigItem` (retourné par `list_config`). Cf. chantier `CODE_typage-projections-strict` Phase 4.
 """
 
-from datetime import datetime
 from typing import Any, Protocol
 
 from pydantic import BaseModel
@@ -24,7 +23,6 @@ class ConfigItem(BaseModel):
     # ce que TypeScript refuse d'instancier. Frontière JSONB libre côté API.
     value: Any
     description: str | None
-    updated_at: datetime
 
 
 class ConfigQueries(Protocol):

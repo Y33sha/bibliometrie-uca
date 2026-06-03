@@ -8,7 +8,7 @@ que l'adapter du port `application.ports.config.ConfigStore`.
 
 import logging
 
-from sqlalchemy import Connection, func, select, text, update
+from sqlalchemy import Connection, select, text, update
 
 from application.ports.api.config_queries import ConfigItem, ConfigQueries
 from application.ports.config import ConfigStore
@@ -27,14 +27,9 @@ class PgConfigQueries(ConfigQueries):
     def list_config(self) -> list[ConfigItem]:
         """Tous les paramètres applicatifs triés par clé."""
         result = self._conn.execute(
-            select(
-                config.c.key, config.c.value, config.c.description, config.c.updated_at
-            ).order_by(config.c.key)
+            select(config.c.key, config.c.value, config.c.description).order_by(config.c.key)
         )
-        return [
-            ConfigItem(key=r.key, value=r.value, description=r.description, updated_at=r.updated_at)
-            for r in result
-        ]
+        return [ConfigItem(key=r.key, value=r.value, description=r.description) for r in result]
 
     def get_hal_collections(self) -> dict[str, str]:
         """Collections HAL {code: label} dérivées des structures du périmètre.
@@ -95,8 +90,8 @@ class PgConfig(ConfigStore):
         stmt = (
             update(config)
             .where(config.c.key == key)
-            .values(value=value, updated_at=func.now())
-            .returning(config.c.key, config.c.value, config.c.description, config.c.updated_at)
+            .values(value=value)
+            .returning(config.c.key, config.c.value, config.c.description)
         )
         result = self._conn.execute(stmt)
         return dict(result.one()._mapping)

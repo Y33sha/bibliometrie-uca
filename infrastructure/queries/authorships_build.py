@@ -136,8 +136,7 @@ def propagate_authorship_attributes(conn: Connection) -> int:
             SET author_position = scal.pos,
                 is_corresponding = scal.is_corr,
                 in_perimeter     = scal.in_perim,
-                roles            = rol.roles,
-                updated_at       = now()
+                roles            = rol.roles
             FROM scal LEFT JOIN rol ON rol.aid = scal.aid
             WHERE a.id = scal.aid
               AND (a.author_position, a.is_corresponding, a.in_perimeter, a.roles)
