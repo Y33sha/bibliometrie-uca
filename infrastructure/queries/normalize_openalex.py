@@ -10,9 +10,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.openalex import OpenalexNormalizeQueries
 from domain.types import JsonValue
-from infrastructure.queries.source_authorships import (
-    clear_source_authorships_for_publication,
-)
 
 
 def upsert_openalex_source_publication(
@@ -105,57 +102,6 @@ def upsert_openalex_source_publication(
     return row.id
 
 
-def upsert_openalex_source_authorship(
-    conn: Connection,
-    *,
-    source_publication_id: int,
-    author_position: int,
-    source_structures: list[str] | None,
-    raw_author_name: str | None,
-    is_corresponding: bool,
-    person_identifiers: JsonValue,
-) -> int:
-    """UPSERT d'une `source_authorships` OpenAlex.
-
-    Les identifiants normalisés (orcid) vivent sur `person_identifiers`
-    (entités auteurs OpenAlex algorithmiques non fiables).
-
-    `source_structures` (TEXT[]) stocke les `openalex_id` natifs des
-    institutions référencées.
-    """
-    stmt = text("""
-        INSERT INTO source_authorships
-            (source, source_publication_id, author_position,
-             source_structures,
-             author_name_normalized, is_corresponding, raw_author_name,
-             person_identifiers)
-        VALUES ('openalex', :spid, :pos, :source_structures,
-                normalize_name_form(:raw_author_name), :is_corresponding,
-                :raw_author_name, :person_identifiers)
-        ON CONFLICT (source_publication_id, author_position) DO UPDATE SET
-            author_name_normalized = EXCLUDED.author_name_normalized,
-            is_corresponding = EXCLUDED.is_corresponding,
-            raw_author_name = EXCLUDED.raw_author_name,
-            source_structures = EXCLUDED.source_structures,
-            person_identifiers = EXCLUDED.person_identifiers
-        RETURNING id
-    """).bindparams(
-        bindparam("person_identifiers", type_=JSONB),
-    )
-    row = conn.execute(
-        stmt,
-        {
-            "spid": source_publication_id,
-            "pos": author_position,
-            "source_structures": source_structures,
-            "raw_author_name": raw_author_name,
-            "is_corresponding": is_corresponding,
-            "person_identifiers": person_identifiers,
-        },
-    ).one()
-    return row.id
-
-
 def staging_has_openalex_doi(conn: Connection, doi: str) -> bool:
     """Vrai si le DOI est déjà présent dans `staging` pour `source='openalex'`."""
     return (
@@ -226,34 +172,8 @@ class PgOpenalexNormalizeQueries(OpenalexNormalizeQueries):
             topics_json=topics_json,
         )
 
-    def upsert_openalex_source_authorship(
-        self,
-        conn: Connection,
-        *,
-        source_publication_id: int,
-        author_position: int,
-        source_structures: list[str] | None,
-        raw_author_name: str | None,
-        is_corresponding: bool,
-        person_identifiers: JsonValue,
-    ) -> int:
-        return upsert_openalex_source_authorship(
-            conn,
-            source_publication_id=source_publication_id,
-            author_position=author_position,
-            source_structures=source_structures,
-            raw_author_name=raw_author_name,
-            is_corresponding=is_corresponding,
-            person_identifiers=person_identifiers,
-        )
-
     def staging_has_openalex_doi(self, conn: Connection, doi: str) -> bool:
         return staging_has_openalex_doi(conn, doi)
 
     def count_openalex_table(self, conn: Connection, table: str) -> int:
         return count_openalex_table(conn, table)
-
-    def clear_source_authorships_for_publication(
-        self, conn: Connection, source_publication_id: int
-    ) -> None:
-        clear_source_authorships_for_publication(conn, source_publication_id)

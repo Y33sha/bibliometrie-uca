@@ -22,8 +22,13 @@ from collections.abc import Callable
 from sqlalchemy import Connection
 
 from application.journals import find_or_create_journal
+from application.pipeline.normalize._authorships_batch import (
+    AddressRecord,
+    AuthorRecord,
+    write_source_authorships,
+)
 from application.pipeline.normalize.base import SourceNormalizer
-from application.ports.pipeline.address_linker import AddressLinker
+from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.openalex import OpenalexNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.pipeline.zenodo_resolver import ZenodoResolver
@@ -355,80 +360,66 @@ def _extract_openalex_orcid(authorship: dict) -> str | None:
 # =============================================================
 
 
-def process_authorships(
-    conn: Connection,
-    queries: OpenalexNormalizeQueries,
-    work: dict,
-    source_publication_id: int,
-    *,
-    address_linker: AddressLinker,
-) -> None:
-    """
-    Traite les authorships d'un work OpenAlex :
-    - Crée les liens source_authorships (source='openalex')
-    - Stocke l'ORCID dans `sa.person_identifiers` quand présent
-    - Stocke les `openalex_id` natifs des institutions dans
-      `sa.source_structures` (TEXT[])
-    """
-    authorships = work.get("authorships") or []
+def build_openalex_author_records(work: dict) -> list[AuthorRecord]:
+    """Parse les authorships d'un work OpenAlex en `AuthorRecord` (sans I/O).
 
-    # Pré-nettoyage : un re-traitement peut changer les auteurs/positions,
-    # on repart d'une table blanche pour cette publi.
-    queries.clear_source_authorships_for_publication(conn, source_publication_id)
-
-    for position, authorship in enumerate(authorships):
-        # Nom brut de l'auteur (fiable, contrairement à author.display_name)
+    - nom brut (`raw_author_name`, fiable contrairement à `author.display_name`) ;
+    - ORCID déposé (`raw_orcid`) sur `person_identifiers` ;
+    - `openalex_id` natifs des institutions sur `source_structures` ;
+    - `country_code` OpenAlex (rattaché à la structure désambiguïsée,
+      algorithmique et faillible) en `suggested_countries` (à valider), jamais
+      en `countries` (autorité) ;
+    - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles ; on
+      reproduit l'ancien défaut DB `ARRAY['author']`).
+    """
+    records: list[AuthorRecord] = []
+    for position, authorship in enumerate(work.get("authorships") or []):
         raw_author_name = authorship.get("raw_author_name")
         if not raw_author_name:
-            # Sans nom, l'authorship est inexploitable pour le matching
-            # personnes — on skip.
+            # Sans nom, l'authorship est inexploitable pour le matching personnes.
             continue
 
-        # Corresponding author
-        is_corresponding = authorship.get("is_corresponding", False)
-
-        # Affiliations brutes
-        raw_strings = authorship.get("raw_affiliation_strings") or []
         institutions = authorship.get("institutions") or []
-
-        # Institutions OpenAlex → openalex_id natifs (TEXT[])
         source_structures = [
             extract_short_id(inst["id"]) for inst in institutions if inst.get("id")
         ]
-
-        # country_code OpenAlex : rattaché à la structure désambiguïsée
-        # (algorithmique, faillible — ex. CH attribué à une adresse finissant par
-        # France). On ne l'écrit donc PAS dans `countries` (autorité) mais en
-        # `suggested_countries` (à valider à la main).
         suggested_countries = sorted(
             {inst["country_code"].upper() for inst in institutions if inst.get("country_code")}
         )
-
-        # Adresses individuelles pour link_addresses
+        raw_strings = authorship.get("raw_affiliation_strings") or []
         addr_parts = (
             raw_strings
             if raw_strings
             else [n for n in (i.get("display_name") for i in institutions) if n]
         )
 
-        orcid = _extract_openalex_orcid(authorship)
-        ids = compact_identifiers(orcid=orcid)
-        identifiers = ids if ids else None
-
-        sa_id = queries.upsert_openalex_source_authorship(
-            conn,
-            source_publication_id=source_publication_id,
-            author_position=position,
-            source_structures=source_structures or None,
-            raw_author_name=raw_author_name,
-            is_corresponding=is_corresponding,
-            person_identifiers=identifiers,
-        )
-
-        if addr_parts:
-            address_linker.link(
-                conn, sa_id, addr_parts, suggested_countries=suggested_countries or None
+        ids = compact_identifiers(orcid=_extract_openalex_orcid(authorship))
+        records.append(
+            AuthorRecord(
+                position=position,
+                raw_name=raw_author_name,
+                is_corresponding=authorship.get("is_corresponding", False),
+                roles=["author"],
+                source_structures=source_structures or None,
+                person_identifiers=ids if ids else None,
+                addresses=[
+                    AddressRecord(text=part, suggested_countries=suggested_countries or None)
+                    for part in addr_parts
+                ],
             )
+        )
+    return records
+
+
+def process_authorships(
+    conn: Connection,
+    authorship_queries: AuthorshipsBatchQueries,
+    work: dict,
+    source_publication_id: int,
+) -> None:
+    """Parse les authorships OpenAlex puis écrit les authorships en batch."""
+    records = build_openalex_author_records(work)
+    write_source_authorships(conn, authorship_queries, "openalex", source_publication_id, records)
 
 
 # =============================================================
@@ -447,7 +438,7 @@ def process_work(
     pub_repo: PublicationRepository,
     zenodo_resolver: ZenodoResolver,
     staging_queries: StagingQueries,
-    address_linker: AddressLinker,
+    authorship_queries: AuthorshipsBatchQueries,
 ) -> bool | None:
     """Traite un work du staging OpenAlex."""
     staging_id = staging_row.id
@@ -487,9 +478,7 @@ def process_work(
             conn, queries, work, staging_id, None, pub_meta
         )
 
-        process_authorships(
-            conn, queries, work, source_publication_id, address_linker=address_linker
-        )
+        process_authorships(conn, authorship_queries, work, source_publication_id)
 
         staging_queries.mark_done(conn, staging_id)
         return True
@@ -513,7 +502,7 @@ class OpenalexNormalizer(SourceNormalizer):
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],
         zenodo_resolver: ZenodoResolver,
-        address_linker: AddressLinker,
+        authorship_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -524,7 +513,7 @@ class OpenalexNormalizer(SourceNormalizer):
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
         self._zenodo_resolver = zenodo_resolver
-        self._address_linker = address_linker
+        self._authorship_queries = authorship_queries
 
     def preload_caches(self, conn: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(conn)
@@ -547,17 +536,8 @@ class OpenalexNormalizer(SourceNormalizer):
             pub_repo=self._pub_repo,
             zenodo_resolver=self._zenodo_resolver,
             staging_queries=self._staging,
-            address_linker=self._address_linker,
+            authorship_queries=self._authorship_queries,
         )
-
-    def cleanup(self) -> None:
-        self._address_linker.clear_cache()
-
-    def on_error(self) -> None:
-        # Le cache peut contenir des address_id insérés dans la transaction
-        # qui vient d'être rollbackée — invalide-le pour éviter les FK
-        # violations sur les works suivants.
-        self._address_linker.clear_cache()
 
     def summary_stats(self, conn: Connection) -> list[str]:
         return [

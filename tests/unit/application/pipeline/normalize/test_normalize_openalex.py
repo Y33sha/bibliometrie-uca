@@ -1,8 +1,8 @@
 """Tests unitaires de `application.pipeline.normalize.normalize_openalex`.
 
-Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics, extract_short_id), les branches de `upsert_journal` / `insert_openalex_document`, l'orchestrateur `process_authorships`, l'orchestrateur `process_work` (avec ses cas Zenodo), et la classe `OpenalexNormalizer` (preload_caches / _row_factory / process_work wrapper / cleanup / on_error / summary_stats).
+Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics, extract_short_id), les branches de `upsert_journal` / `insert_openalex_document`, le parsing auteurs `build_openalex_author_records`, l'orchestrateur `process_work` (avec ses cas Zenodo), et la classe `OpenalexNormalizer` (preload_caches / process_work wrapper / summary_stats).
 
-Pattern : `_FakeQueries` + `_FakeAddressLinker` + `MagicMock` pour repos / zenodo_resolver. Pas de DB.
+Pattern : `_FakeQueries` + `MagicMock` pour repos / zenodo_resolver / authorship_queries. Pas de DB.
 """
 
 from __future__ import annotations
@@ -17,12 +17,12 @@ from application.pipeline.normalize import normalize_openalex
 from application.pipeline.normalize.normalize_openalex import (
     OpenalexNormalizer,
     _extract_openalex_orcid,
+    build_openalex_author_records,
     extract_locations_data,
     extract_pub_metadata,
     extract_short_id,
     extract_topics,
     insert_openalex_document,
-    process_authorships,
     process_work,
     reconstruct_abstract,
     upsert_journal,
@@ -41,8 +41,6 @@ class _FakeQueries:
     """Stub minimal du port `OpenalexNormalizeQueries`."""
 
     def __init__(self) -> None:
-        self.cleared_for: list[int] = []
-        self.upserted_authorships: list[dict[str, Any]] = []
         self.upserted_documents: list[dict[str, Any]] = []
         self.staging_has_doi_returns = False
         self.count_table_returns = 0
@@ -51,39 +49,11 @@ class _FakeQueries:
         self.upserted_documents.append(kw)
         return 999
 
-    def upsert_openalex_source_authorship(self, conn, **kw) -> int:
-        self.upserted_authorships.append(kw)
-        return 100 + len(self.upserted_authorships)
-
     def staging_has_openalex_doi(self, conn, doi: str) -> bool:
         return self.staging_has_doi_returns
 
     def count_openalex_table(self, conn, table: str) -> int:
         return self.count_table_returns
-
-    def clear_source_authorships_for_publication(self, conn, source_publication_id: int) -> None:
-        self.cleared_for.append(source_publication_id)
-
-
-class _FakeAddressLinker:
-    def __init__(self) -> None:
-        self.links: list[tuple[int, list[str]]] = []
-        self.suggested: list[list[str] | None] = []
-        self.cleared = 0
-
-    def link(
-        self,
-        conn,
-        sa_id: int,
-        addr_parts: list[str],
-        countries: list[str] | None = None,
-        suggested_countries: list[str] | None = None,
-    ) -> None:
-        self.links.append((sa_id, addr_parts))
-        self.suggested.append(suggested_countries)
-
-    def clear_cache(self) -> None:
-        self.cleared += 1
 
 
 class _FakeStagingQueries:
@@ -512,69 +482,44 @@ class TestInsertOpenalexDocument:
         assert captured["external_ids"]["source_doi"] == "10.1234/abc"
 
 
-# ── process_authorships ──────────────────────────────────────────
+# ── build_openalex_author_records (parsing pur) ──────────────────
 
 
-class TestProcessAuthorships:
+class TestBuildOpenalexAuthorRecords:
     def test_no_authorships(self):
-        queries = _FakeQueries()
-        process_authorships(
-            MagicMock(),
-            queries,
-            work={"authorships": []},
-            source_publication_id=10,
-            address_linker=_FakeAddressLinker(),
-        )
-        assert queries.cleared_for == [10]
-        assert queries.upserted_authorships == []
+        assert build_openalex_author_records({"authorships": []}) == []
 
-    def test_authorship_without_raw_name_skipped(self):
-        queries = _FakeQueries()
-        process_authorships(
-            MagicMock(),
-            queries,
-            work={"authorships": [{"author": {"display_name": "X"}}]},  # pas de raw_author_name
-            source_publication_id=10,
-            address_linker=_FakeAddressLinker(),
+    def test_skip_without_raw_name(self):
+        # Sans raw_author_name → authorship inexploitable, ignorée.
+        records = build_openalex_author_records(
+            {"authorships": [{"author": {"display_name": "X"}}]}
         )
-        assert queries.upserted_authorships == []
+        assert records == []
 
-    def test_authorship_with_orcid(self):
-        queries = _FakeQueries()
+    def test_orcid_corresponding_and_roles(self):
         work = {
             "authorships": [
                 {
                     "raw_author_name": "DUPONT Marie",
                     "raw_orcid": "https://orcid.org/0000-0001-2345-6789",
-                    "author": {
-                        # author.orcid divergent : doit être ignoré au profit de raw_orcid.
-                        "orcid": "https://orcid.org/9999-9999-9999-9999",
-                        "display_name": "Marie Dupont",
-                    },
+                    # author.orcid divergent : doit être ignoré au profit de raw_orcid.
+                    "author": {"orcid": "https://orcid.org/9999-9999-9999-9999"},
                     "is_corresponding": True,
                     "raw_affiliation_strings": ["Univ Clermont"],
                     "institutions": [],
                 }
             ]
         }
-        linker = _FakeAddressLinker()
-        process_authorships(
-            MagicMock(),
-            queries,
-            work=work,
-            source_publication_id=10,
-            address_linker=linker,
-        )
-        upserted = queries.upserted_authorships[0]
-        assert upserted["raw_author_name"] == "DUPONT Marie"
-        assert upserted["is_corresponding"] is True
-        assert upserted["person_identifiers"] == {"orcid": "0000-0001-2345-6789"}
-        # Linker appelé avec l'addresse brute.
-        assert linker.links == [(101, ["Univ Clermont"])]
+        rec = build_openalex_author_records(work)[0]
+        assert rec.raw_name == "DUPONT Marie"
+        assert rec.is_corresponding is True
+        # roles posé explicitement (reproduit l'ancien défaut DB ARRAY['author']).
+        assert rec.roles == ["author"]
+        assert rec.person_identifiers == {"orcid": "0000-0001-2345-6789"}
+        assert [a.text for a in rec.addresses] == ["Univ Clermont"]
 
-    def test_authorship_institutions_as_addr_fallback(self):
+    def test_institutions_as_addr_fallback(self):
         """Sans raw_affiliation_strings, on tombe sur les institutions display_name."""
-        queries = _FakeQueries()
         work = {
             "authorships": [
                 {
@@ -586,29 +531,18 @@ class TestProcessAuthorships:
                 }
             ]
         }
-        linker = _FakeAddressLinker()
-        process_authorships(
-            MagicMock(), queries, work, source_publication_id=10, address_linker=linker
-        )
-        upserted = queries.upserted_authorships[0]
-        # source_structures est rempli depuis les openalex_id natifs des institutions.
-        assert upserted["source_structures"] == ["I1", "I2"]
-        # addr_parts = display_names des institutions (raw_strings vide).
-        assert linker.links == [(101, ["Inst One", "Inst Two"])]
+        rec = build_openalex_author_records(work)[0]
+        # source_structures = openalex_id natifs des institutions.
+        assert rec.source_structures == ["I1", "I2"]
+        assert [a.text for a in rec.addresses] == ["Inst One", "Inst Two"]
 
-    def test_authorship_no_addr_no_linker_call(self):
-        queries = _FakeQueries()
+    def test_no_addr_when_no_affiliation(self):
         work = {"authorships": [{"raw_author_name": "X", "institutions": []}]}
-        linker = _FakeAddressLinker()
-        process_authorships(
-            MagicMock(), queries, work, source_publication_id=10, address_linker=linker
-        )
-        assert linker.links == []
+        assert build_openalex_author_records(work)[0].addresses == []
 
-    def test_institution_country_code_to_suggested(self):
-        """`country_code` OpenAlex (structure désambiguïsée) → `suggested_countries`,
-        jamais `countries`. Union dédupliquée et en majuscules."""
-        queries = _FakeQueries()
+    def test_country_code_to_suggested(self):
+        """`country_code` OpenAlex (structure désambiguïsée) → `suggested_countries`
+        sur l'adresse, jamais `countries`. Union dédupliquée et en majuscules."""
         work = {
             "authorships": [
                 {
@@ -629,14 +563,11 @@ class TestProcessAuthorships:
                 }
             ]
         }
-        linker = _FakeAddressLinker()
-        process_authorships(
-            MagicMock(), queries, work, source_publication_id=10, address_linker=linker
-        )
-        assert linker.suggested == [["FR", "US"]]
+        addr = build_openalex_author_records(work)[0].addresses[0]
+        assert addr.suggested_countries == ["FR", "US"]
+        assert addr.countries is None
 
     def test_no_country_code_no_suggestion(self):
-        queries = _FakeQueries()
         work = {
             "authorships": [
                 {
@@ -646,11 +577,7 @@ class TestProcessAuthorships:
                 }
             ]
         }
-        linker = _FakeAddressLinker()
-        process_authorships(
-            MagicMock(), queries, work, source_publication_id=10, address_linker=linker
-        )
-        assert linker.suggested == [None]
+        assert build_openalex_author_records(work)[0].addresses[0].suggested_countries is None
 
 
 # ── process_work (orchestrateur) ─────────────────────────────────
@@ -680,7 +607,7 @@ class TestProcessWork:
             "pub_repo": MagicMock(),
             "zenodo_resolver": zenodo or MagicMock(),
             "staging_queries": staging_queries or _FakeStagingQueries(),
-            "address_linker": _FakeAddressLinker(),
+            "authorship_queries": MagicMock(),
         }
 
     def test_happy_path(self, stub_orchestration_deps):
@@ -784,7 +711,7 @@ def _make_normalizer():
         publisher_repo_factory=lambda c: MagicMock(),
         pub_repo_factory=lambda c: MagicMock(),
         zenodo_resolver=MagicMock(),
-        address_linker=_FakeAddressLinker(),
+        authorship_queries=MagicMock(),
     )
 
 
@@ -815,18 +742,8 @@ class TestOpenalexNormalizerClass:
             "pub_repo",
             "zenodo_resolver",
             "staging_queries",
-            "address_linker",
+            "authorship_queries",
         }
-
-    def test_cleanup_clears_address_linker_cache(self):
-        norm = _make_normalizer()
-        norm.cleanup()
-        assert norm._address_linker.cleared == 1  # type: ignore[attr-defined]
-
-    def test_on_error_clears_address_linker_cache(self):
-        norm = _make_normalizer()
-        norm.on_error()
-        assert norm._address_linker.cleared == 1  # type: ignore[attr-defined]
 
     def test_summary_stats_calls_count_table(self):
         norm = _make_normalizer()

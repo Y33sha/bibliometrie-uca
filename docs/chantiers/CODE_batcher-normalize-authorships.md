@@ -38,8 +38,9 @@ Commencé le 2026-06-02
 
 - [x] Module partagé `application/pipeline/normalize/_authorships_batch.py` : DTO `AuthorRecord`/`AddressRecord` + writer + port `AuthorshipsBatchQueries` + impl `PgAuthorshipsBatchQueries`.
 - [x] HAL : `build_hal_author_records` (parsing pur) + `process_authors` qui appelle le writer ; `address_linker` retiré de HAL.
-- [ ] WoS : bascule sur le writer commun (supprime `upsert_wos_source_authorships_batch` & co. dédiées).
-- [ ] OpenAlex, ScanR, theses, crossref : idem, un par un.
+- [x] OpenAlex : `build_openalex_author_records` (parsing pur) + writer ; `address_linker` retiré, `upsert_openalex_source_authorship` + clear morts supprimés. `roles=['author']` posé explicitement (reproduit l'ancien défaut DB).
+- [ ] ScanR, theses, crossref : idem, un par un.
+- [ ] **WoS : reporté.** Il batche déjà *plusieurs works ensemble* (cross-work), pas seulement par-work. Une fois les 4 autres migrés (par-work), étudier son approche cross-work et voir si elle bénéficie aux autres **avant** de basculer WoS sur le writer commun.
 - [ ] Tests : caractérisation par source (mêmes `source_authorships` + liens adresses qu'avant le refactor) + non-régression du writer partagé.
 
 ## Mesures (corrigent le diagnostic initial)
