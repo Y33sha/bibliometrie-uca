@@ -2,9 +2,9 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
 
 // Doit matcher `paths.base` dans svelte.config.js (même env var `BASE_PATH`).
-// En dev, vite strip ce préfixe avant de proxyfier vers le backend
-// (qui tourne sans `--root-path` en dev local).
-const basePath = process.env.BASE_PATH ?? '/bibliometrie';
+// Vide par défaut (app à la racine) ; en dev, vite strip ce préfixe avant de
+// proxyfier vers le backend (qui tourne sans `--root-path` en dev local).
+const basePath = process.env.BASE_PATH ?? '';
 
 export default defineConfig({
 	plugins: [sveltekit()],

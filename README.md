@@ -46,7 +46,7 @@ cp .env.example .env
 docker compose up
 ```
 
-- Frontend : http://localhost:5176/bibliometrie
+- Frontend : http://localhost:5176/
 - API : http://localhost:8003
 
 Le code est monté en volume : hot reload backend + frontend.
@@ -76,7 +76,9 @@ docker compose exec backend python run_pipeline.py
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Différences avec le compose de dev : un seul conteneur applicatif (backend + frontend buildé en SPA statique, plus de vite dev server), pas de volume code, port DB non exposé. Voir [docs/exploitation/03-deploiement.md](docs/exploitation/03-deploiement.md) pour les détails et les options de déploiement hors Docker.
+Application servie sur http://localhost:8003/ (un seul conteneur sert l'API et le frontend buildé en SPA statique).
+
+Différences avec le compose de dev : un seul conteneur applicatif (backend + frontend statique, plus de vite dev server), pas de volume code, port DB non exposé. Pour un déploiement derrière un reverse-proxy sur un sous-chemin (ex. `/bibliometrie`), définir `ROOT_PATH=/bibliometrie` dans `.env` (consommé au build du frontend et au runtime uvicorn). Voir [docs/exploitation/03-deploiement.md](docs/exploitation/03-deploiement.md) pour les détails et les options de déploiement hors Docker.
 
 ### Commandes utiles
 
