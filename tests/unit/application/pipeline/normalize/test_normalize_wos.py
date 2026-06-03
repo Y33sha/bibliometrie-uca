@@ -3,8 +3,8 @@
 Couvre :
 - Helpers purs (`_safe_list`, `_get_api_title`, `_parse_api_authors`, `_get_api_doi`, `_get_api_issn`).
 - `extract_from_api` : extraction depuis la structure WoS Expanded API (static_data/dynamic_data imbriqués) avec ses nombreuses branches (dict vs list, doctypes, biblio, abstract, keywords, topics, citations).
-- `extract_pub_metadata`, `upsert_publisher`, `upsert_journal`, `insert_wos_document`, `_resolve_addresses_batch` : wiring + propagation des champs.
-- `process_authorships` : cleanup, filtre `is_wos_author_exploitable`, batch upsert, déduplication par position, résolution d'adresses, log warning si tout rejeté.
+- `extract_pub_metadata`, `upsert_publisher`, `upsert_journal`, `insert_wos_document` : wiring + propagation des champs.
+- `build_wos_author_records` : filtre `is_wos_author_exploitable`, construction des `AuthorRecord` (organisations → source_structures, orcid+researcher_id, adresses), warning si tout rejeté. L'écriture (clear + batch) passe par le writer partagé, testée séparément.
 - `process_record` : orchestration (cascade publisher → journal → document → authorships), staging mark_done.
 - `WosNormalizer.preload_caches` / `process_work` : wiring de la classe.
 
@@ -26,12 +26,11 @@ from application.pipeline.normalize.normalize_wos import (
     _get_api_issn,
     _get_api_title,
     _parse_api_authors,
-    _resolve_addresses_batch,
     _safe_list,
+    build_wos_author_records,
     extract_from_api,
     extract_pub_metadata,
     insert_wos_document,
-    process_authorships,
     process_record,
     upsert_journal,
     upsert_publisher,
@@ -845,54 +844,25 @@ class TestInsertWosDocument:
         assert kwargs["doi"] is None
 
 
-# ── _resolve_addresses_batch ─────────────────────────────────────
+# ── build_wos_author_records (parsing pur) ───────────────────────
 
 
-class TestResolveAddressesBatch:
-    def test_empty_returns_empty(self):
-        queries = MagicMock()
-        assert _resolve_addresses_batch(None, queries, set()) == {}
-        queries.upsert_addresses_batch.assert_not_called()
-
-    def test_calls_upsert_then_fetch(self):
-        queries = MagicMock()
-        queries.fetch_address_ids_by_raw_text.return_value = {"a": 1, "b": 2}
-        result = _resolve_addresses_batch(None, queries, {"a", "b"})
-        assert result == {"a": 1, "b": 2}
-        queries.upsert_addresses_batch.assert_called_once()
-        # values dans upsert_addresses_batch : {raw, norm} pour chaque texte
-        values = queries.upsert_addresses_batch.call_args.args[1]
-        assert {v["raw"] for v in values} == {"a", "b"}
-
-
-# ── process_authorships ──────────────────────────────────────────
-
-
-class TestProcessAuthorships:
-    def test_no_authors_returns_silently(self, logger):
-        queries = MagicMock()
-        rec = {"ut": "WOS:1", "authors": []}
-        process_authorships(None, queries, logger, rec, source_publication_id=10)
-        queries.clear_source_authorships_for_publication.assert_called_once_with(None, 10)
-        queries.upsert_wos_source_authorships_batch.assert_not_called()
+class TestBuildWosAuthorRecords:
+    def test_no_authors_returns_empty(self, logger):
+        assert build_wos_author_records({"ut": "WOS:1", "authors": []}, logger) == []
 
     def test_all_authors_filtered_logs_warning(self, logger, caplog):
-        """Auteurs présents mais aucun n'a `daisng_id` + `full_name` → warning logué."""
-        queries = MagicMock()
+        """Auteurs présents mais aucun exploitable (filtre is_wos_author_exploitable) → warning."""
         rec = {
             "ut": "WOS:42",
-            "authors": [
-                {"position": 0, "full_name": "Mystery", "daisng_id": None},
-            ],
+            "authors": [{"position": 0, "full_name": "Mystery", "daisng_id": None}],
         }
         with caplog.at_level(logging.WARNING, logger=logger.name):
-            process_authorships(None, queries, logger, rec, source_publication_id=10)
-
-        queries.upsert_wos_source_authorships_batch.assert_not_called()
+            records = build_wos_author_records(rec, logger)
+        assert records == []
         assert any("aucun exploitable" in r.getMessage() for r in caplog.records)
 
-    def test_upserts_filtered_authors(self, logger):
-        queries = MagicMock()
+    def test_builds_record_fields(self, logger):
         rec = {
             "ut": "WOS:1",
             "authors": [
@@ -903,58 +873,23 @@ class TestProcessAuthorships:
                     "orcid": "0000-0001-2345-6789",
                     "researcher_id": "R-1",
                     "is_corresponding": True,
-                    "addresses": [],
+                    "addresses": ["addr-X"],
                     "organizations": [{"name": "ICCF"}, {"name": "UCA"}],
                     "roles": ["author"],
                 },
             ],
         }
-        process_authorships(None, queries, logger, rec, source_publication_id=10)
+        rec0 = build_wos_author_records(rec, logger)[0]
+        assert rec0.position == 0
+        assert rec0.raw_name == "Jane Doe"
+        assert rec0.is_corresponding is True
+        assert rec0.roles == ["author"]
+        # Noms d'organisations WoS → source_structures (seul identifiant côté WoS).
+        assert rec0.source_structures == ["ICCF", "UCA"]
+        assert rec0.person_identifiers  # orcid + researcher_id, dict non vide
+        assert [a.text for a in rec0.addresses] == ["addr-X"]
 
-        upsert_args = queries.upsert_wos_source_authorships_batch.call_args.args[1]
-        assert len(upsert_args) == 1
-        sa = upsert_args[0]
-        assert sa["author_position"] == 0
-        assert sa["is_corresponding"] is True
-        assert sa["source_structures"] == ["ICCF", "UCA"]
-        assert sa["person_identifiers"]  # compact dict non vide
-        assert sa["raw_author_name"] == "Jane Doe"
-
-    def test_deduplicates_authors_by_position(self, logger):
-        """Si deux entrées partagent la même position, la 2e est ignorée."""
-        queries = MagicMock()
-        rec = {
-            "ut": "WOS:1",
-            "authors": [
-                {
-                    "position": 0,
-                    "full_name": "First",
-                    "daisng_id": "D-1",
-                    "is_corresponding": False,
-                    "organizations": [],
-                    "addresses": [],
-                },
-                {
-                    "position": 0,
-                    "full_name": "Duplicate",
-                    "daisng_id": "D-2",
-                    "is_corresponding": False,
-                    "organizations": [],
-                    "addresses": [],
-                },
-            ],
-        }
-        process_authorships(None, queries, logger, rec, source_publication_id=10)
-
-        upsert_args = queries.upsert_wos_source_authorships_batch.call_args.args[1]
-        assert len(upsert_args) == 1
-        assert upsert_args[0]["raw_author_name"] == "First"
-
-    def test_addresses_resolved_and_linked(self, logger):
-        queries = MagicMock()
-        queries.fetch_address_ids_by_raw_text.return_value = {"addr-X": 100}
-        queries.fetch_source_authorship_ids_by_position.return_value = {0: 999}
-
+    def test_no_organizations_no_addresses(self, logger):
         rec = {
             "ut": "WOS:1",
             "authors": [
@@ -964,43 +899,13 @@ class TestProcessAuthorships:
                     "daisng_id": "D-1",
                     "is_corresponding": False,
                     "organizations": [],
-                    "addresses": ["addr-X"],
+                    "addresses": [],
                 },
             ],
         }
-        process_authorships(None, queries, logger, rec, source_publication_id=10)
-
-        # Adresses upsert + map fetched, et liens insérés.
-        queries.upsert_addresses_batch.assert_called_once()
-        queries.fetch_source_authorship_ids_by_position.assert_called_once()
-        queries.insert_source_authorship_addresses_batch.assert_called_once()
-        addr_values = queries.insert_source_authorship_addresses_batch.call_args.args[1]
-        assert addr_values == [{"sa_id": 999, "addr_id": 100}]
-
-    def test_address_link_skipped_if_sa_id_missing(self, logger):
-        """Si fetch_source_authorship_ids ne renvoie pas l'auteur, on skip son lien."""
-        queries = MagicMock()
-        queries.fetch_address_ids_by_raw_text.return_value = {"addr-X": 100}
-        queries.fetch_source_authorship_ids_by_position.return_value = {}  # aucun matched
-
-        rec = {
-            "ut": "WOS:1",
-            "authors": [
-                {
-                    "position": 0,
-                    "full_name": "Jane",
-                    "daisng_id": "D-1",
-                    "is_corresponding": False,
-                    "organizations": [],
-                    "addresses": ["addr-X"],
-                },
-            ],
-        }
-        process_authorships(None, queries, logger, rec, source_publication_id=10)
-
-        # Le batch d'addresses est appelé mais avec une liste vide.
-        addr_values = queries.insert_source_authorship_addresses_batch.call_args.args[1]
-        assert addr_values == []
+        rec0 = build_wos_author_records(rec, logger)[0]
+        assert rec0.source_structures is None
+        assert rec0.addresses == []
 
 
 # ── process_record ───────────────────────────────────────────────
@@ -1047,6 +952,7 @@ class TestProcessRecord:
         queries = MagicMock()
         queries.upsert_wos_source_publication.return_value = 555
         staging_queries = MagicMock()
+        authorship_queries = MagicMock()
 
         row = _staging_row(staging_id=1, ut="WOS:1", doi="10.1/x")
         result = process_record(
@@ -1058,11 +964,12 @@ class TestProcessRecord:
             publisher_repo=MagicMock(),
             pub_repo=MagicMock(),
             staging_queries=staging_queries,
+            authorship_queries=authorship_queries,
         )
 
         assert result is True
-        # Cleanup avant insert.
-        queries.clear_source_authorships_for_publication.assert_called_once()
+        # Cleanup (via le writer partagé) avant insert.
+        authorship_queries.clear_source_authorships_for_publication.assert_called_once()
         # `mark_done` appelée avec le bon staging_id.
         staging_queries.mark_done.assert_called_once_with(None, 1)
 
@@ -1108,6 +1015,7 @@ class TestProcessRecord:
             publisher_repo=MagicMock(),
             pub_repo=MagicMock(),
             staging_queries=MagicMock(),
+            authorship_queries=MagicMock(),
         )
 
         assert captured["ut"] == "WOS:fallback"
@@ -1131,6 +1039,7 @@ class TestProcessRecord:
                     publisher_repo=MagicMock(),
                     pub_repo=MagicMock(),
                     staging_queries=MagicMock(),
+                    authorship_queries=MagicMock(),
                 )
 
         assert any("Erreur sur WOS:err" in r.getMessage() for r in caplog.records)
@@ -1152,6 +1061,7 @@ class TestWosNormalizer:
             journal_repo_factory=journal_factory,
             publisher_repo_factory=publisher_factory,
             pub_repo_factory=pub_factory,
+            authorship_queries=MagicMock(),
         )
 
         conn2 = MagicMock()
@@ -1173,6 +1083,7 @@ class TestWosNormalizer:
             journal_repo_factory=lambda c: MagicMock(),
             publisher_repo_factory=lambda c: MagicMock(),
             pub_repo_factory=lambda c: MagicMock(),
+            authorship_queries=MagicMock(),
         )
         norm.preload_caches(MagicMock())
 
@@ -1196,4 +1107,5 @@ class TestWosNormalizer:
             "publisher_repo",
             "pub_repo",
             "staging_queries",
+            "authorship_queries",
         }

@@ -26,13 +26,14 @@ from collections.abc import Callable
 from sqlalchemy import Connection
 
 from application.journals import find_or_create_journal
-from application.pipeline.normalize.base import SourceNormalizer
-from application.ports.pipeline.normalize.wos import (
-    WosAddressBatchItem,
-    WosAuthorshipAddressItem,
-    WosAuthorshipBatchItem,
-    WosNormalizeQueries,
+from application.pipeline.normalize._authorships_batch import (
+    AddressRecord,
+    AuthorRecord,
+    write_source_authorships,
 )
+from application.pipeline.normalize.base import SourceNormalizer
+from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
+from application.ports.pipeline.normalize.wos import WosNormalizeQueries
 from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -461,38 +462,16 @@ def insert_wos_document(
 # cross-source — vit sur source_authorships.person_identifiers.
 
 
-def _resolve_addresses_batch(
-    conn: Connection, queries: WosNormalizeQueries, raw_texts: set
-) -> dict[str, int]:
-    """Résout un ensemble d'adresses en batch. Retourne {raw_text: id}."""
-    if not raw_texts:
-        return {}
-    values: list[WosAddressBatchItem] = [{"raw": t, "norm": normalize_text(t)} for t in raw_texts]
-    queries.upsert_addresses_batch(conn, values)
-    return queries.fetch_address_ids_by_raw_text(conn, list(raw_texts))
+def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRecord]:
+    """Parse les authorships d'un record WoS en `AuthorRecord` (sans I/O).
 
-
-def process_authorships(
-    conn: Connection,
-    queries: WosNormalizeQueries,
-    logger: logging.Logger,
-    rec: dict,
-    source_publication_id: int,
-) -> None:
-    """Traite les authorships d'un record WoS + crée les liens adresses.
-
-    Chaque authorship porte un dict `person_identifiers` (orcid +
-    researcher_id) et `source_structures` (TEXT[] des noms d'organisations
-    WoS — seul identifiant stable disponible côté WoS).
+    Filtre les auteurs via `is_wos_author_exploitable` ; si aucun n'est
+    exploitable alors que le record en porte, logge un warning (détecte une
+    dérive éventuelle de l'API WoS — perte silencieuse de records sinon).
+    Chaque auteur porte `source_structures` (noms d'organisations WoS, seul
+    identifiant stable côté WoS), `person_identifiers` (orcid + researcher_id)
+    et ses adresses brutes. La dédup par position est faite par le writer.
     """
-    # Pré-nettoyage : re-traitement → table blanche pour cette publi.
-    queries.clear_source_authorships_for_publication(conn, source_publication_id)
-
-    # Filtrer les auteurs exploitables (cf. `is_wos_author_exploitable`
-    # pour la sémantique du filtre). Si tous les auteurs échouent au
-    # filtre, le record est jeté sans authorships : on logge pour
-    # détecter une dérive éventuelle de l'API WoS (perte silencieuse
-    # de records sinon ; cf. audit `is_wos_author_exploitable`).
     raw_authors = rec.get("authors", [])
     authors_kept = [a for a in raw_authors if is_wos_author_exploitable(a)]
     if not authors_kept:
@@ -503,69 +482,43 @@ def process_authorships(
                 rec.get("ut", "?"),
                 len(raw_authors),
             )
-        return
+        return []
 
-    # Batch INSERT source_authorships (person_identifiers JSONB,
-    # source_structures TEXT[]).
-    from domain.normalize import normalize_name_form
-
-    values: dict[int, WosAuthorshipBatchItem] = {}  # clé = author_position, dédupliqué
+    records: list[AuthorRecord] = []
     for author in authors_kept:
-        position = author["position"]
-        if position in values:
-            continue  # même position déjà traitée
-
-        # Noms des institutions WoS comme identifiants natifs (TEXT[]).
-        # Pas d'ID stable côté WoS — le nom sert d'identifiant.
+        # Noms des institutions WoS comme identifiants natifs (pas d'ID stable
+        # côté WoS — le nom sert d'identifiant).
         institution_names = [
             org["name"] for org in author.get("organizations", []) if org.get("name")
         ]
-
-        name_norm = normalize_name_form(author["full_name"])
         ids = compact_identifiers(
             orcid=author.get("orcid"),
             researcher_id=author.get("researcher_id"),
         )
-
-        values[position] = {
-            "spid": source_publication_id,
-            "author_position": position,
-            "is_corresponding": author["is_corresponding"],
-            "author_name_normalized": name_norm,
-            "source_structures": institution_names or None,
-            "roles": author.get("roles"),
-            "raw_author_name": author["full_name"],
-            "person_identifiers": ids if ids else None,
-        }
-
-    queries.upsert_wos_source_authorships_batch(conn, list(values.values()))
-
-    # Phase 3 : batch adresses — pivot par author_position.
-    authors_with_addrs = [a for a in authors_kept if a.get("addresses")]
-    if authors_with_addrs:
-        # Collecter toutes les adresses uniques du document
-        all_addr_texts = set()
-        for author in authors_with_addrs:
-            all_addr_texts.update(author["addresses"])
-
-        addr_id_map = _resolve_addresses_batch(conn, queries, all_addr_texts)
-
-        positions_needed = [a["position"] for a in authors_with_addrs]
-        sa_id_map = queries.fetch_source_authorship_ids_by_position(
-            conn, source_publication_id=source_publication_id, positions=positions_needed
+        records.append(
+            AuthorRecord(
+                position=author["position"],
+                raw_name=author["full_name"],
+                is_corresponding=author["is_corresponding"],
+                roles=author.get("roles"),
+                source_structures=institution_names or None,
+                person_identifiers=ids if ids else None,
+                addresses=[AddressRecord(text=addr) for addr in (author.get("addresses") or [])],
+            )
         )
+    return records
 
-        addr_values: list[WosAuthorshipAddressItem] = []
-        for author in authors_with_addrs:
-            sa_id = sa_id_map.get(author["position"])
-            if not sa_id:
-                continue
-            for addr_text in author["addresses"]:
-                addr_id = addr_id_map.get(addr_text)
-                if addr_id:
-                    addr_values.append({"sa_id": sa_id, "addr_id": addr_id})
 
-        queries.insert_source_authorship_addresses_batch(conn, addr_values)
+def process_authorships(
+    conn: Connection,
+    authorship_queries: AuthorshipsBatchQueries,
+    logger: logging.Logger,
+    rec: dict,
+    source_publication_id: int,
+) -> None:
+    """Parse les authorships WoS puis écrit en batch via le writer partagé."""
+    records = build_wos_author_records(rec, logger)
+    write_source_authorships(conn, authorship_queries, "wos", source_publication_id, records)
 
 
 # =============================================================
@@ -583,6 +536,7 @@ def process_record(
     publisher_repo: PublisherRepository,
     pub_repo: PublicationRepository,
     staging_queries: StagingQueries,
+    authorship_queries: AuthorshipsBatchQueries,
 ) -> bool:
     """Traite un record du staging WoS. Retourne True si succès."""
     from application.pipeline.timings import StepTimer
@@ -608,7 +562,7 @@ def process_record(
         source_publication_id = insert_wos_document(conn, queries, rec, staging_id, None, pub_meta)
         t.mark("wos_doc")
 
-        process_authorships(conn, queries, logger, rec, source_publication_id)
+        process_authorships(conn, authorship_queries, logger, rec, source_publication_id)
         t.mark("authors")
 
         staging_queries.mark_done(conn, staging_id)
@@ -634,6 +588,7 @@ class WosNormalizer(SourceNormalizer):
         journal_repo_factory: Callable[[Connection], JournalRepository],
         publisher_repo_factory: Callable[[Connection], PublisherRepository],
         pub_repo_factory: Callable[[Connection], PublicationRepository],
+        authorship_queries: AuthorshipsBatchQueries,
     ) -> None:
         super().__init__(conn, logger, staging_queries)
         self._queries = queries
@@ -643,6 +598,7 @@ class WosNormalizer(SourceNormalizer):
         self._publisher_repo: PublisherRepository | None = None
         self._pub_repo_factory = pub_repo_factory
         self._pub_repo: PublicationRepository | None = None
+        self._authorship_queries = authorship_queries
 
     def preload_caches(self, conn: Connection) -> None:
         self._journal_repo = self._journal_repo_factory(conn)
@@ -664,4 +620,5 @@ class WosNormalizer(SourceNormalizer):
             publisher_repo=self._publisher_repo,
             pub_repo=self._pub_repo,
             staging_queries=self._staging,
+            authorship_queries=self._authorship_queries,
         )

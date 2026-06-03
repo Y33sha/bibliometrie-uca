@@ -5,6 +5,7 @@ import os
 from application.pipeline.normalize.normalize_wos import WosNormalizer
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
 from infrastructure.queries.normalize_wos import PgWosNormalizeQueries
 from infrastructure.queries.staging import PgStagingQueries
 from infrastructure.repositories import (
@@ -26,6 +27,7 @@ def main() -> None:
         journal_repo_factory=journal_repository,
         publisher_repo_factory=publisher_repository,
         pub_repo_factory=publication_repository,
+        authorship_queries=PgAuthorshipsBatchQueries(),
     ).run()
 
 
