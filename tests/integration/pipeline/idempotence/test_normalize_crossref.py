@@ -2,10 +2,9 @@
 
 CrossRef est ingérée DOI-driven (cf. `fetch_missing_doi`) puis
 normalisée vers `source_publications` + `source_authorships`. Les
-affiliations textuelles sont routées vers `addresses` /
-`source_authorship_addresses` via `AddressLinker` (comme les autres
-sources), ce qui permet à la phase `affiliations` de poser
-`in_perimeter` sur les SA crossref.
+affiliations textuelles alimentent `addresses` /
+`source_authorship_addresses`, ce qui permet à la phase `affiliations`
+de poser `in_perimeter` sur les SA crossref.
 
 Vérifie :
 - Le double passage `process_work` ne crée pas de doublons (y compris
@@ -90,6 +89,7 @@ def _run_normalize_crossref(conn):
 
     from application.pipeline.normalize.normalize_crossref import process_work
     from application.ports.pipeline.staging import StagingRow
+    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.normalize_crossref import PgCrossrefNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -97,11 +97,10 @@ def _run_normalize_crossref(conn):
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.repositories.address_linker import PgAddressLinker
 
     queries = PgCrossrefNormalizeQueries()
     staging_queries = PgStagingQueries()
-    address_linker = PgAddressLinker()
+    authorship_queries = PgAuthorshipsBatchQueries()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(conn)
     publisher_repo = publisher_repository(conn)
@@ -127,7 +126,7 @@ def _run_normalize_crossref(conn):
             publisher_repo=publisher_repo,
             pub_repo=pub_repo,
             staging_queries=staging_queries,
-            address_linker=address_linker,
+            authorship_queries=authorship_queries,
         ):
             processed += 1
     return processed

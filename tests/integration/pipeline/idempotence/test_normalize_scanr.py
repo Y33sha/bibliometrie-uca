@@ -164,6 +164,7 @@ def run_normalize_scanr(conn):
 
     from application.pipeline.normalize.normalize_scanr import process_work
     from application.ports.pipeline.staging import StagingRow
+    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.normalize_scanr import PgScanrNormalizeQueries
     from infrastructure.queries.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -171,11 +172,10 @@ def run_normalize_scanr(conn):
         publication_repository,
         publisher_repository,
     )
-    from infrastructure.repositories.address_linker import PgAddressLinker
 
     queries = PgScanrNormalizeQueries()
     staging_queries = PgStagingQueries()
-    address_linker = PgAddressLinker()
+    authorship_queries = PgAuthorshipsBatchQueries()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(conn)
     publisher_repo = publisher_repository(conn)
@@ -203,7 +203,7 @@ def run_normalize_scanr(conn):
             publisher_repo=publisher_repo,
             pub_repo=pub_repo,
             staging_queries=staging_queries,
-            address_linker=address_linker,
+            authorship_queries=authorship_queries,
         ):
             processed += 1
     return processed
