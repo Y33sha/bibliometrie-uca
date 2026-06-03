@@ -81,7 +81,6 @@ def _create_source_authorship(
     person_id=None,
     authorship_id=None,
     in_perimeter=False,
-    structure_ids=None,
 ):
     row = conn.execute(
         text(
@@ -99,14 +98,6 @@ def _create_source_authorship(
             "ip": in_perimeter,
         },
     ).one()
-    for sid in structure_ids or []:
-        conn.execute(
-            text(
-                "INSERT INTO source_authorship_structures (source_authorship_id, structure_id) "
-                "VALUES (:sa, :s)"
-            ),
-            {"sa": row.id, "s": sid},
-        )
     return row.id
 
 
@@ -567,10 +558,18 @@ class TestPropagateUcaForAddresses:
     après une modification sur address_structures."""
 
     def _setup_uca(self, conn):
-        """Monte un périmètre UCA minimal + config perimeter_persons."""
+        """Monte un périmètre UCA minimal + config perimeter_persons/affiliations.
+
+        `perimeter_affiliations` + `perimeter_structures` sont requis pour que la
+        matview `source_authorship_structures` rattache les structures du périmètre.
+        """
+        from infrastructure.queries.perimeter import refresh_perimeter_structures
+
         uca_id = _create_structure(conn, code="UCA", name="UCA")
         _create_perimeter(conn, "uca", "UCA", [uca_id])
         _set_config(conn, "perimeter_persons", "uca")
+        _set_config(conn, "perimeter_affiliations", "uca")
+        refresh_perimeter_structures(conn)
         return uca_id
 
     def test_noop_on_empty_address_ids(self, sa_sync_conn, repo, perimeter_queries):
@@ -645,7 +644,6 @@ class TestPropagateUcaForAddresses:
             person_id=person_id,
             authorship_id=authorship_id,
             in_perimeter=True,
-            structure_ids=[uca_id],
         )
         addr_id = _create_address(sa_sync_conn)
         _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=False)

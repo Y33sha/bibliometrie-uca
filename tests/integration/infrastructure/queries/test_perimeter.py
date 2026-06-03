@@ -10,7 +10,7 @@ from sqlalchemy import text
 from infrastructure.queries.perimeter import refresh_perimeter_structures
 
 
-def _structure(conn, code: str, stype: str = "laboratoire") -> int:
+def _structure(conn, code: str, stype: str = "labo") -> int:
     return conn.execute(
         text(
             "INSERT INTO structures (code, name, structure_type) "

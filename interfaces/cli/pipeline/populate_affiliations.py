@@ -1,4 +1,4 @@
-"""Point d'entrée CLI : peuplement `in_perimeter`/`structure_ids`."""
+"""Point d'entrée CLI : peuplement `in_perimeter` + refresh matview structures."""
 
 import argparse
 import os
@@ -7,16 +7,13 @@ from application.pipeline.affiliations.populate_affiliations import run_populate
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.affiliations import PgAffiliationsQueries
-from infrastructure.queries.perimeter import (
-    get_affiliations_structure_ids,
-    get_persons_structure_ids,
-)
+from infrastructure.queries.perimeter import get_persons_structure_ids
 
 logger = setup_logger("populate_affiliations", os.path.join(os.path.dirname(__file__), "logs"))
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Peuplement in_perimeter et structure_ids")
+    parser = argparse.ArgumentParser(description="Peuplement in_perimeter + refresh structures")
     parser.add_argument("--stats", action="store_true", help="Stats uniquement")
     parser.add_argument(
         "--mode",
@@ -35,13 +32,11 @@ def main() -> None:
             return
 
         perimeter_ids = get_persons_structure_ids(conn)
-        affiliation_structure_ids = get_affiliations_structure_ids(conn)
         run_populate(
             conn,
             queries,
             logger,
             perimeter_ids,
-            affiliation_structure_ids,
             mode=args.mode,
         )
         conn.commit()

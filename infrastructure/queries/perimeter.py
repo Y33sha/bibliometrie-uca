@@ -96,12 +96,6 @@ def _config_perimeter_code(conn: Connection, config_key: str, default: str) -> s
     return default
 
 
-def get_affiliations_structure_ids(conn: Connection) -> set[int]:
-    """Périmètre pour la résolution des affiliations (`structure_ids`)."""
-    code = _config_perimeter_code(conn, "perimeter_affiliations", "uca_wide")
-    return get_perimeter_structure_ids(conn, code)
-
-
 def get_persons_structure_ids(conn: Connection) -> set[int]:
     """Périmètre pour la création des personnes (`in_perimeter`)."""
     code = _config_perimeter_code(conn, "perimeter_persons", "uca")

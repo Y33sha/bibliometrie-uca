@@ -83,8 +83,10 @@ def propagate_uca_for_addresses(
 
     repo.recompute_in_perimeter_on_source_authorships(affected_sa_ids, perimeter_ids)
     repo.propagate_in_perimeter_to_authorships(affected_sa_ids)
-    # Les structures dérivées vivent dans la matview `authorship_structures` :
-    # un refresh global la réaligne après la propagation ciblée (~2 s).
+    # Les structures dérivées vivent dans les matviews `source_authorship_structures`
+    # (dépend d'`address_structures`, modifiée par la review) puis
+    # `authorship_structures` (dépend de la précédente) : refresh dans l'ordre.
+    repo.refresh_source_authorship_structures()
     repo.refresh_authorship_structures()
 
 

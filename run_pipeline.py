@@ -580,23 +580,18 @@ def _run_populate_affiliations(*, mode: str) -> None:
     from application.pipeline.affiliations.populate_affiliations import run_populate
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.affiliations import PgAffiliationsQueries
-    from infrastructure.queries.perimeter import (
-        get_affiliations_structure_ids,
-        get_persons_structure_ids,
-    )
+    from infrastructure.queries.perimeter import get_persons_structure_ids
 
     log.info("▶ populate_affiliations --mode %s", mode)
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
         perimeter_ids = get_persons_structure_ids(conn)
-        wide_ids = get_affiliations_structure_ids(conn)
         run_populate(
             conn,
             PgAffiliationsQueries(),
             log,
             perimeter_ids,
-            wide_ids,
             mode=mode,
         )
         conn.commit()

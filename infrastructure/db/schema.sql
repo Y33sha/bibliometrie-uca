@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict EDKs2baG7lsMx9o7N5jdSKbKMf2gK1vTalWczXlUnuVwccYtMcuUy4Y0QQiuW0o
+\restrict HCBk7UpPmXRZApTPQtEgOIRnXdte9ssT0Gu3ZG35p6ryXgGrErFS8twGXuq8nie
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped from database version 18.1
+-- Dumped by pg_dump version 18.1
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -441,13 +441,68 @@ ALTER SEQUENCE public.audit_log_id_seq OWNED BY public.audit_log.id;
 
 
 --
--- Name: source_authorship_structures; Type: TABLE; Schema: public; Owner: -
+-- Name: config; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.source_authorship_structures (
-    source_authorship_id integer NOT NULL,
+CREATE TABLE public.config (
+    key text NOT NULL,
+    value jsonb NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: perimeter_structures; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.perimeter_structures (
+    perimeter_id integer NOT NULL,
     structure_id integer NOT NULL
 );
+
+
+--
+-- Name: perimeters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.perimeters (
+    id integer NOT NULL,
+    code text NOT NULL,
+    name text NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT now(),
+    structure_ids integer[] DEFAULT '{}'::integer[] NOT NULL
+);
+
+
+--
+-- Name: source_authorship_addresses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_authorship_addresses (
+    id integer NOT NULL,
+    source_authorship_id integer NOT NULL,
+    address_id integer NOT NULL
+);
+
+
+--
+-- Name: source_authorship_structures; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.source_authorship_structures AS
+ SELECT DISTINCT saa.source_authorship_id,
+    ps.structure_id
+   FROM ((public.source_authorship_addresses saa
+     JOIN public.address_structures ast ON ((ast.address_id = saa.address_id)))
+     JOIN public.perimeter_structures ps ON ((ps.structure_id = ast.structure_id)))
+  WHERE ((ast.is_confirmed IS DISTINCT FROM false) AND (ps.perimeter_id = ( SELECT perimeters.id
+           FROM public.perimeters
+          WHERE (perimeters.code = ( SELECT (config.value #>> '{}'::text[])
+                   FROM public.config
+                  WHERE (config.key = 'perimeter_affiliations'::text))))))
+  WITH NO DATA;
 
 
 --
@@ -521,18 +576,6 @@ CREATE SEQUENCE public.authorships_id_seq
 --
 
 ALTER SEQUENCE public.authorships_id_seq OWNED BY public.authorships.id;
-
-
---
--- Name: config; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.config (
-    key text NOT NULL,
-    value jsonb NOT NULL,
-    description text,
-    created_at timestamp with time zone DEFAULT now()
-);
 
 
 --
@@ -751,20 +794,6 @@ CREATE SEQUENCE public.journals_id_seq
 --
 
 ALTER SEQUENCE public.journals_id_seq OWNED BY public.journals.id;
-
-
---
--- Name: perimeters; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.perimeters (
-    id integer NOT NULL,
-    code text NOT NULL,
-    name text NOT NULL,
-    description text,
-    created_at timestamp with time zone DEFAULT now(),
-    structure_ids integer[] DEFAULT '{}'::integer[] NOT NULL
-);
 
 
 --
@@ -1078,17 +1107,6 @@ CREATE TABLE public.rejected_authorships (
     publication_id integer NOT NULL,
     person_id integer NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: source_authorship_addresses; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.source_authorship_addresses (
-    id integer NOT NULL,
-    source_authorship_id integer NOT NULL,
-    address_id integer NOT NULL
 );
 
 
@@ -1753,6 +1771,14 @@ ALTER TABLE ONLY public.journals
 
 
 --
+-- Name: perimeter_structures perimeter_structures_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.perimeter_structures
+    ADD CONSTRAINT perimeter_structures_pkey PRIMARY KEY (perimeter_id, structure_id);
+
+
+--
 -- Name: perimeters perimeters_code_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1894,14 +1920,6 @@ ALTER TABLE ONLY public.source_authorship_addresses
 
 ALTER TABLE ONLY public.source_authorship_addresses
     ADD CONSTRAINT source_authorship_addresses_source_authorship_id_address_id_key UNIQUE (source_authorship_id, address_id);
-
-
---
--- Name: source_authorship_structures source_authorship_structures_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_authorship_structures
-    ADD CONSTRAINT source_authorship_structures_pkey PRIMARY KEY (source_authorship_id, structure_id);
 
 
 --
@@ -2339,6 +2357,13 @@ CREATE INDEX idx_pnf_person_id ON public.person_name_forms USING btree (person_i
 
 
 --
+-- Name: idx_ps_structure_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ps_structure_id ON public.perimeter_structures USING btree (structure_id);
+
+
+--
 -- Name: idx_pub_countries; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2563,6 +2588,13 @@ CREATE UNIQUE INDEX publications_doi_lower_key ON public.publications USING btre
 
 
 --
+-- Name: source_authorship_structures_pkey; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX source_authorship_structures_pkey ON public.source_authorship_structures USING btree (source_authorship_id, structure_id);
+
+
+--
 -- Name: subject_cooccurrences_b_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2749,6 +2781,22 @@ ALTER TABLE ONLY public.journals
 
 
 --
+-- Name: perimeter_structures perimeter_structures_perimeter_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.perimeter_structures
+    ADD CONSTRAINT perimeter_structures_perimeter_id_fkey FOREIGN KEY (perimeter_id) REFERENCES public.perimeters(id) ON DELETE CASCADE;
+
+
+--
+-- Name: perimeter_structures perimeter_structures_structure_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.perimeter_structures
+    ADD CONSTRAINT perimeter_structures_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES public.structures(id) ON DELETE CASCADE;
+
+
+--
 -- Name: person_identifiers person_identifiers_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2845,22 +2893,6 @@ ALTER TABLE ONLY public.source_authorship_addresses
 
 
 --
--- Name: source_authorship_structures source_authorship_structures_source_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_authorship_structures
-    ADD CONSTRAINT source_authorship_structures_source_authorship_id_fkey FOREIGN KEY (source_authorship_id) REFERENCES public.source_authorships(id) ON DELETE CASCADE;
-
-
---
--- Name: source_authorship_structures source_authorship_structures_structure_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.source_authorship_structures
-    ADD CONSTRAINT source_authorship_structures_structure_id_fkey FOREIGN KEY (structure_id) REFERENCES public.structures(id) ON DELETE CASCADE;
-
-
---
 -- Name: source_authorships source_authorships_authorship_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2936,4 +2968,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict EDKs2baG7lsMx9o7N5jdSKbKMf2gK1vTalWczXlUnuVwccYtMcuUy4Y0QQiuW0o
+\unrestrict HCBk7UpPmXRZApTPQtEgOIRnXdte9ssT0Gu3ZG35p6ryXgGrErFS8twGXuq8nie
+
