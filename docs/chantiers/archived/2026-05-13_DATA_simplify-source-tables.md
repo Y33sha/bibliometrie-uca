@@ -1,8 +1,6 @@
 # Chantier — Simplification des tables sources
 
-Commencé le 2026-05-12
-
-Terminé le 2026-05-13
+Commencé le 2026-05-12 - Terminé le 2026-05-13
 
 ## Contexte
 

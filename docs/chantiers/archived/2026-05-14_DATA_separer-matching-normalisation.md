@@ -1,6 +1,6 @@
 # Chantier — Séparer le matching de la normalisation
 
-Commencé le 2026-05-14
+Commencé et terminé le 2026-05-14
 
 ## Contexte
 

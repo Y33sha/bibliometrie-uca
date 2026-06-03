@@ -1,8 +1,6 @@
 # Chantier — Correction des métadonnées canoniques
 
-Commencé le 2026-05-27
-
-Terminé le 2026-05-28
+Commencé le 2026-05-27 - Terminé le 2026-05-28
 
 ## Contexte
 

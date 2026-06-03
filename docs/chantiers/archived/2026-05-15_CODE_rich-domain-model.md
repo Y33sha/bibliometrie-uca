@@ -1,7 +1,6 @@
 # Chantier — Domaine riche (entités métier)
 
-Commencé le 2026-05-12
-Terminé le 2026-05-15
+Commencé le 2026-05-12 - Terminé le 2026-05-15
 
 ## Contexte
 

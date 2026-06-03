@@ -1,7 +1,6 @@
 # Chantier — Adoption SQLAlchemy Core
 
-Commencé le 2026-05-06
-Terminé le 2026-05-11
+Commencé le 2026-05-06 - Terminé le 2026-05-11
 
 ## Contexte
 

@@ -1,6 +1,6 @@
 # Chantier — Normalisation du schéma `person_name_forms`
 
-Commencé et terminé le 2026-05-13.
+Commencé et terminé le 2026-05-13
 
 ## Contexte
 

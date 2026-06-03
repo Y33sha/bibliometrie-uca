@@ -1,26 +1,21 @@
 # Chantier — DRY publications tables
+
 Commencé et terminé le 2026-05-05
 
 ## État : terminé ✅
 
-Migration de `/laboratories/[id]` et `/persons/[id]` vers
-`<PublicationsListView>` réalisée. Les quatre points d'usage du tableau
-de publications partagent désormais le même composant :
+Migration de `/laboratories/[id]` et `/persons/[id]` vers `<PublicationsListView>` réalisée. Les quatre points d'usage du tableau de publications partagent désormais le même composant :
 
 - `/publications` (mode autonome, sync URL complète)
 - `/subjects/[id]?tab=publications` (filtre `subject_id` fixe)
 - `/laboratories/[id]?tab=publications` (filtre `lab_id` + Statut HAL)
 - `/persons/[id]?tab=publications` (filtre `person_id` + Corresp./UCA)
 
-Bilan code : ~570 lignes de duplication retirées (lab + person), tableau,
-toolbar, facets, composables et handlers tous mutualisés.
+Bilan code : ~570 lignes de duplication retirées (lab + person), tableau, toolbar, facets, composables et handlers tous mutualisés.
 
 ## Contexte initial
 
-Le tableau de publications avec ses filtres facets (années, labos, types,
-accès, OA, APC, pays, sources) et son tri (titre, année, APC) était répété
-à plusieurs endroits du frontend, chaque implémentation re-déclarant le
-markup, les composables et les handlers avec des variations mineures.
+Le tableau de publications avec ses filtres facets (années, labos, types, accès, OA, APC, pays, sources) et son tri (titre, année, APC) était répété à plusieurs endroits du frontend, chaque implémentation re-déclarant le markup, les composables et les handlers avec des variations mineures.
 
 ## Travail réalisé
 

@@ -1,7 +1,6 @@
 # Chantier — Chasse aux `Any`
 
-Commencé le 2026-05-10
-Terminé le 2026-05-15
+Commencé le 2026-05-10 - Terminé le 2026-05-15
 
 ## Contexte
 
