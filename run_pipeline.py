@@ -401,7 +401,12 @@ def phase_publications(**kw: Any) -> Any:
     Ne cree des publications que pour les source_publications ayant au moins
     une source_authorship in_perimeter (evite de creer des publications
     hors perimetre). Applique ensuite les merges inter-sources (HAL-ID, NNT).
+
+    En amont du matching, resout le concept DOI des source_publications Zenodo
+    (champ `external_ids.zenodo_concept_doi`) pour que la dedup concept/version
+    porte dessus.
     """
+    _run_resolve_zenodo_concept()
     _run_match_or_create_publications()
     _run_merge_pubs_by_hal_id()
     _run_merge_pubs_by_nnt()
@@ -471,6 +476,26 @@ def phase_subjects(**kw: Any) -> Any:
     """
     _run_ingest_subjects()
     _run_cooccurrences()
+
+
+def _run_resolve_zenodo_concept() -> None:
+    from application.pipeline.publications.resolve_zenodo_concept import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.publications.zenodo_concept import PgZenodoConceptQueries
+    from infrastructure.sources.config import get_api_base_urls
+    from infrastructure.sources.zenodo import HttpZenodoResolver
+
+    log.info("▶ resolve_zenodo_concept")
+    t0 = time.time()
+    engine = get_sync_engine()
+    with engine.connect() as bootstrap:
+        zenodo_api = get_api_base_urls(bootstrap)["zenodo"]
+    conn = engine.connect()
+    try:
+        run(conn, PgZenodoConceptQueries(), HttpZenodoResolver(api_base=zenodo_api), log)
+    finally:
+        conn.close()
+    log.info("✓ resolve_zenodo_concept terminé en %.1fs", time.time() - t0)
 
 
 def _run_match_or_create_publications() -> None:
