@@ -168,7 +168,7 @@
 	const url = useUrlFilters({
 		basePath: `/laboratories/${labId}`,
 		filters: {
-			tab:              { type: 'single',        urlKey: 'tab', defaultValue: 'publications' },
+			tab:              { type: 'single',        urlKey: 'tab', defaultValue: 'dashboard' },
 			personsSort:      { type: 'single',        urlKey: 'psort', defaultValue: 'name' },
 			selectedDepts:    { type: 'string_array',  urlKey: 'pdept' },
 			selectedRoles:    { type: 'string_array',  urlKey: 'prole' },
