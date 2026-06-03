@@ -245,38 +245,6 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
     }
 )
 
-# Libellés français (singulier, pluriel) pour chaque valeur de l'enum doc_type.
-# Source unique de vérité pour l'UI ; exposée via GET /api/doc-types.
-# Le typage `dict[DocType, ...]` garantit qu'aucune clé ne dérive du Literal
-# (mypy attrape l'oubli si une valeur d'enum est ajoutée sans son label).
-DOC_TYPE_LABELS_FR: dict[DocType, tuple[str, str]] = {
-    "article": ("Article", "Articles"),
-    "conference_paper": ("Conference paper", "Conference papers"),
-    "book": ("Ouvrage", "Ouvrages"),
-    "book_chapter": ("Chapitre", "Chapitres"),
-    "thesis": ("Thèse", "Thèses"),
-    "ongoing_thesis": ("Thèse en cours", "Thèses en cours"),
-    "preprint": ("Preprint", "Preprints"),
-    "review": ("Article de synthèse", "Articles de synthèse"),
-    "editorial": ("Éditorial", "Éditoriaux"),
-    "report": ("Rapport", "Rapports"),
-    "peer_review": ("Peer review", "Peer reviews"),
-    "other": ("Autre", "Autres"),
-    "dataset": ("Données", "Données"),
-    "software": ("Logiciel", "Logiciels"),
-    "patent": ("Brevet", "Brevets"),
-    "hdr": ("HDR", "HDR"),
-    "memoir": ("Mémoire", "Mémoires"),
-    "poster": ("Poster", "Posters"),
-    "letter": ("Lettre à l'éditeur", "Lettres à l'éditeur"),
-    "erratum": ("Erratum", "Errata"),
-    "retraction": ("Rétractation", "Rétractations"),
-    "book_review": ("Recension", "Recensions"),
-    "data_paper": ("Data paper", "Data papers"),
-    "proceedings": ("Proceedings", "Proceedings"),
-    "media": ("Intervention média", "Interventions média"),
-}
-
 
 def map_doc_type(raw: str | None, source: str | None = None) -> str:
     """Convertit un doc_type source en valeur canonique de l'enum doc_type.

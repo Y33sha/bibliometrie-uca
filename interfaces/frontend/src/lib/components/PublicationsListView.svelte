@@ -8,7 +8,7 @@
 	import { SOURCE_ITEMS } from '$lib/filterItems';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { oaLabelsMap } from '$lib/labels';
-	import { docTypeSingular, docTypePlural } from '$lib/stores/docTypes';
+	import { docTypeSingular, docTypePlural } from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
@@ -262,7 +262,7 @@
 		facets: {
 			years:         { type: 'simple',      apiKey: 'years' },
 			labs:          { type: 'labeled',     apiKey: 'labs' },
-			docTypes:      { type: 'label_map',   apiKey: 'doc_types',   labels: $docTypePlural },
+			docTypes:      { type: 'label_map',   apiKey: 'doc_types',   labels: docTypePlural },
 			access:        { type: 'passthrough', apiKey: 'access' },
 			oa:            { type: 'label_map',   apiKey: 'oa_statuses', labels: oaLabelsMap },
 			apc:           { type: 'passthrough', apiKey: 'apc' },
@@ -483,7 +483,7 @@
 						</td>
 					{/if}
 					{#if col('type')}<td>
-						<span class="type-label">{$docTypeSingular[p.doc_type || ''] || p.doc_type || ''}</span>
+						<span class="type-label">{docTypeSingular[p.doc_type || ''] || p.doc_type || ''}</span>
 					</td>{/if}
 					{#if col('year')}<td>{p.pub_year || ''}</td>{/if}
 					<td><a href="{base}/publications/{p.id}" class="pub-title">{@html sanitizeTitle(p.title)}</a></td>

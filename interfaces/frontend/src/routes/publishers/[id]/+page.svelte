@@ -4,7 +4,7 @@
 	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
 	import { oaLabelsMap } from '$lib/labels';
-	import { docTypeSingular } from '$lib/stores/docTypes';
+	import { docTypeSingular } from '$lib/labels';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
 	import JournalsListView from '$lib/components/JournalsListView.svelte';
@@ -187,7 +187,7 @@
 								<tbody>
 									{#each dashboard.doc_types as d (d.doc_type ?? '∅')}
 										<tr>
-											<td>{d.doc_type ? ($docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)'}</td>
+											<td>{d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)'}</td>
 											<td class="num">{d.count}</td>
 										</tr>
 									{/each}

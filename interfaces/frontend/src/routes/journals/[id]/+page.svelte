@@ -4,7 +4,7 @@
 	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
 	import { oaLabelsMap } from '$lib/labels';
-	import { docTypeSingular } from '$lib/stores/docTypes';
+	import { docTypeSingular } from '$lib/labels';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
 	import type { components } from '$lib/api/schema';
@@ -190,7 +190,7 @@
 							<div class="expected-row">
 								<span class="expected-label">Attendus&nbsp;:</span>
 								{#each dashboard.expected_doc_types as t (t)}
-									<span class="expected-tag">{$docTypeSingular[t] ?? t}</span>
+									<span class="expected-tag">{docTypeSingular[t] ?? t}</span>
 								{/each}
 							</div>
 						{/if}
@@ -201,7 +201,7 @@
 								<tbody>
 									{#each dashboard.doc_types as d (d.doc_type ?? '∅')}
 										<tr class:warning={!d.expected}>
-											<td>{d.doc_type ? ($docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)'}</td>
+											<td>{d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)'}</td>
 											<td class="num">{d.count}</td>
 										</tr>
 									{/each}

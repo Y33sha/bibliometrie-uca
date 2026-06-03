@@ -1,7 +1,7 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { sanitizeTitle, halDocUrl, scanrPubUrl } from "$lib/utils";
-  import { docTypeSingular } from "$lib/stores/docTypes";
+  import { docTypeSingular } from "$lib/labels";
   import type { PubDetail, Source } from "./types";
 
   // `sources` peut contenir plusieurs rows pour une même source (ex: deux
@@ -40,7 +40,7 @@
   <div class="pub-meta">
     {#if pub.pub_year}<span class="meta-badge">{pub.pub_year}</span>{/if}
     {#if pub.doc_type}
-      <span class="meta-badge type-badge">{$docTypeSingular[pub.doc_type] || pub.doc_type}</span>
+      <span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>
     {/if}
     {#if pub.oa_status && pub.oa_status !== "unknown"}
       <span class="oa-tag oa-{pub.oa_status}">{pub.oa_status}</span>

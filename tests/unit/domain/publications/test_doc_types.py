@@ -1,12 +1,13 @@
-"""Tests du mapping doc_types et des libellés FR."""
+"""Tests du mapping doc_types et cohérence des libellés FR frontend."""
 
 import re
 from pathlib import Path
 
-from domain.publications.doc_types import DOC_TYPE_LABELS_FR, map_doc_type
+from domain.publications.doc_types import DOC_TYPES_SET, map_doc_type
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SCHEMA_PATH = PROJECT_ROOT / "infrastructure" / "db" / "schema.sql"
+LABELS_PATH = PROJECT_ROOT / "interfaces" / "frontend" / "src" / "lib" / "labels.ts"
 
 
 def _read_pg_doc_type_enum() -> set[str]:
@@ -19,16 +20,42 @@ def _read_pg_doc_type_enum() -> set[str]:
     return {m.group(1) for m in re.finditer(r"'([^']+)'", match.group(1))}
 
 
-class TestDocTypeLabelsFr:
-    def test_couvre_exactement_l_enum_pg(self):
-        """Garde-fou : tout ajout/suppression dans l'enum PG doit être
-        répercuté dans DOC_TYPE_LABELS_FR (et inversement)."""
-        assert set(DOC_TYPE_LABELS_FR.keys()) == _read_pg_doc_type_enum()
+def _read_ts_label_map(var_name: str) -> dict[str, str]:
+    """Extrait `export const <var_name>: Record<...> = { ... }` de labels.ts.
 
-    def test_singulier_et_pluriel_non_vides(self):
-        for value, (singular, plural) in DOC_TYPE_LABELS_FR.items():
-            assert singular, f"Singulier vide pour {value}"
-            assert plural, f"Pluriel vide pour {value}"
+    Même approche que la lecture de l'enum dans schema.sql : on parse le
+    fichier frontend pour vérifier que les libellés codés en dur restent
+    alignés sur l'enum PG / `DOC_TYPES` sans devoir exécuter le frontend.
+    """
+    ts = LABELS_PATH.read_text(encoding="utf-8")
+    block = re.search(
+        rf"export const {var_name}: Record<string, string> = \{{(.*?)\}};",
+        ts,
+        re.DOTALL,
+    )
+    assert block, f"Map {var_name} introuvable dans labels.ts"
+    return {m.group(1): m.group(3) for m in re.finditer(r"(\w+):\s*(['\"])(.*?)\2", block.group(1))}
+
+
+class TestDocTypeEnum:
+    def test_doc_types_couvre_exactement_l_enum_pg(self):
+        """Garde-fou : `DOC_TYPES` doit refléter exactement l'enum PG."""
+        assert DOC_TYPES_SET == _read_pg_doc_type_enum()
+
+
+class TestDocTypeLabelsFrontend:
+    def test_singulier_couvre_exactement_les_doc_types(self):
+        """Tout doc_type doit avoir son libellé singulier côté frontend."""
+        assert set(_read_ts_label_map("docTypeSingular").keys()) == DOC_TYPES_SET
+
+    def test_pluriel_couvre_exactement_les_doc_types(self):
+        """Tout doc_type doit avoir son libellé pluriel côté frontend."""
+        assert set(_read_ts_label_map("docTypePlural").keys()) == DOC_TYPES_SET
+
+    def test_libelles_non_vides(self):
+        for var_name in ("docTypeSingular", "docTypePlural"):
+            for value, label in _read_ts_label_map(var_name).items():
+                assert label, f"Libellé vide pour {value} dans {var_name}"
 
 
 class TestMapDocType:
