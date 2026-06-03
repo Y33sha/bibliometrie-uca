@@ -248,10 +248,6 @@ def phase_normalize(**kw: Any) -> Any:
         _run_normalize_openalex()
     if "wos" in sources:
         _run_normalize_wos()
-    # `source_authorship_addresses` vient d'être (re)peuplée : rafraîchir le
-    # décompte dérivé `addresses.pub_count` ici, pas dans une phase ultérieure
-    # (un run `--only normalize` doit suffire à le tenir à jour).
-    _run_recompute_address_pub_count()
     mode = kw.get("mode", "full")
     policy = MODES[mode]
     # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
@@ -409,6 +405,10 @@ def phase_publications(**kw: Any) -> Any:
     _run_match_or_create_publications()
     _run_merge_pubs_by_hal_id()
     _run_merge_pubs_by_nnt()
+    # `addresses.pub_count` compte les publications par adresse : recalcul ici,
+    # une fois les publications créées et fusionnées — il n'y a rien à compter
+    # au stade `normalize`. Un run `--only publications` suffit à le tenir à jour.
+    _run_recompute_address_pub_count()
 
 
 def phase_persons(**kw: Any) -> Any:
