@@ -12,8 +12,8 @@ dependencies = [
     "psycopg[binary]==3.3.3",     # driver Postgres pour SQLAlchemy ; import symbolique dans infrastructure/db/engine.py
     "sqlalchemy==2.0.43",        # query builder Core (chantier sqlalchemy-core-adoption.md)
     "alembic==1.18.0",           # migrations DB (chantier alembic-adoption.md)
-    "fastapi==0.128.2",
-    "starlette==0.50.0",         # importé directement (Response, Scope, RequestResponseEndpoint) — épinglé sur la version embarquée par fastapi
+    "fastapi==0.136.3",
+    "starlette==1.2.1",          # importé directement (Response, Scope, RequestResponseEndpoint) ; ≥1.0.1 corrige BadHost / CVE-2026-48710
     "uvicorn==0.40.0",
     "bcrypt==5.0.0",
     "python-dotenv==1.2.2",      # requis par pydantic-settings pour env_file ; CVE-2026-28684 fixed
