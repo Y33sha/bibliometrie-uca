@@ -36,12 +36,6 @@ from application.pipeline.normalize.normalize_wos import (
     upsert_publisher,
 )
 
-
-@pytest.fixture
-def logger() -> logging.Logger:
-    return logging.getLogger("test_normalize_wos")
-
-
 # ── _safe_list ───────────────────────────────────────────────────
 
 

@@ -59,11 +59,6 @@ class _FakeStagingQueries:
         self.marked_done.append(staging_id)
 
 
-@pytest.fixture
-def logger() -> logging.Logger:
-    return logging.getLogger("test_normalize_openalex")
-
-
 # ── extract_locations_data ───────────────────────────────────────
 
 
