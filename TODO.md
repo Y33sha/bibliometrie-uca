@@ -9,10 +9,8 @@
 ### Normalisation
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 * [ ] vérifier espace disque avant vacuum full
-*
 ### Suite du traitement
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects
-* [ ] est-ce que les authorships détachées manuellement (donc orphelines) sont à nouveau rattachées au pipeline suivant? si oui => comportement indésirable, à corriger (ajouter rejected_authorship quand on clique sur détacher)
 ## Code
 * [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
@@ -40,9 +38,8 @@
 ### Côté backend
 * [ ] pays des adresses: aller plus loin dans l'automatisation de la détection (GeoNames? index n-gram des adresses avec pays associés et degré de certitude?)
 * [ ] distinguer adresses correctes/incorrectes pour affichage %age par labo/personne
-### Côté interface admin
+### Côté UI
 * [ ] interface de repérage des adresses: ajouter filtres sur la base des autres structures reconnues dans l'adresse => ça aidera au repérage des faux négatifs
-### Côté interface publique
 * [ ] Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation?
 
 # Détails à régler au fil de l'eau (interface)
