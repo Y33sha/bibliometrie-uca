@@ -24,6 +24,8 @@ Phase `persons`:
    - Nom mappé à >1 personnes → laisser orphelin (pour traitement manuel via `admin/orphan-authorships`)
    - **Nom inconnu → créer nouvelle personne**
 
+> **Garde de rejet.** À chaque signal, les personnes rejetées pour la publication (paires `(publication, personne)` du store `rejected_authorships`, posées par un détachement ou la croix de rejet) sont **éliminées des candidats** : un match — par identifiant, cross-source ou nom — ne peut pas recréer une paire rejetée. L'élimination peut aussi **désambiguïser** une recherche par nom : si une forme ambiguë correspond à 2 personnes dont l'une est rejetée pour cette publication, il ne reste qu'une candidate et le rattachement devient univoque.
+
 `populate_person_name_forms` — recalcule les formes de nom depuis les sources (HAL, OpenAlex, WoS, ScanR, theses, CrossRef).
 - Lors de la création d'une personne (ou d'une correction manuelle du nom/prénom) : génération automatique des variantes normalisées "prénom nom", "nom prénom", "initiales nom", "nom initiales".
 - Lors d'un rattachement d'authorship : les formes de nom liées sont ajoutées aux `person_name_forms` de cette personne et les identifiants présents dans les sources sont ajoutés aux `person_identifiers`.

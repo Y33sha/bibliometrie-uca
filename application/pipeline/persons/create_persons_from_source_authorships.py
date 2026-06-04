@@ -17,6 +17,12 @@ fiable au moins fiable :
 5. **Lookup `person_name_forms`** : match unique / ambigu (skip) /
    inconnu (création si `allow_create`, skip sinon).
 
+Garde de rejet : les personnes rejetées pour la publication (store
+`rejected_authorships`, préfetché par publication) sont éliminées des
+candidats à chaque signal — un match ne peut pas recréer une paire
+rejetée, et l'élimination peut désambiguïser un name form (2 candidats
+dont 1 rejeté → match univoque).
+
 L'effet est appliqué selon l'action de la décision :
 - Match (orcid / hal_person_id / idref / cross-source / name_form) → `link + add_name_form
   + add_identifiers`. Les identifiants sont ajoutés en statut `pending`
@@ -194,6 +200,7 @@ def run(
     orcid_map = queries.fetch_orcid_to_person_map(conn)
     hal_account_map = queries.fetch_hal_account_to_person_map(conn)
     name_form_map = queries.fetch_name_form_map(conn)
+    rejected_by_pub = queries.fetch_rejected_person_ids_by_pub(conn)
     pub_max_authors = _max_authors_per_pub(all_authorships, linked_index)
 
     matched_counts: dict[str, int] = defaultdict(int)
@@ -225,10 +232,17 @@ def run(
         orcid_signal = a.orcid if a.source in ORCID_MATCH_SOURCES else None
         orcid_match = decide_match_by_identifier(orcid_signal, orcid_map)
 
+        # Garde de rejet : personnes rejetées pour cette publication, à
+        # éliminer des candidats (matchs annulés, name form désambiguïsé).
+        rejected_for_pub = (
+            rejected_by_pub.get(pub_id, frozenset()) if pub_id is not None else frozenset()
+        )
+
         norm = a.author_name_normalized
         name_form_outcome = decide_name_form_outcome(
             name_form_map.get(norm) if norm else None,
             a.allow_create,
+            rejected_person_ids=rejected_for_pub,
         )
 
         # ── Décision unifiée ────────────────────────────────────────
@@ -238,6 +252,7 @@ def run(
             idref_match=idref_match,
             cross_source_match=cross_source_match,
             name_form_outcome=name_form_outcome,
+            rejected_person_ids=rejected_for_pub,
         )
 
         # ── Effets ─────────────────────────────────────────────────

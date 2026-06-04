@@ -150,6 +150,24 @@ def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
     return {r.name_form: r.person_ids for r in rows}
 
 
+def fetch_rejected_person_ids_by_pub(conn: Connection) -> dict[int, frozenset[int]]:
+    """Charge `rejected_authorships` sous forme `{publication_id: {person_id, ...}}`.
+
+    Garde de matching : une paire `(publication, personne)` rejetée ne doit
+    jamais être re-rattachée par la cascade. Le caller élimine ces personnes
+    des candidats (cf. `domain.persons.matching.decide_person_match` et
+    `decide_name_form_outcome`).
+    """
+    rows = conn.execute(
+        text("""
+            SELECT publication_id, array_agg(person_id) AS person_ids
+            FROM rejected_authorships
+            GROUP BY publication_id
+        """)
+    ).all()
+    return {r.publication_id: frozenset(r.person_ids) for r in rows}
+
+
 class PgPersonsCreateQueries(PersonsCreateQueries):
     """Adapter PostgreSQL pour `application.ports.persons_create.PersonsCreateQueries`."""
 
@@ -170,3 +188,6 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
 
     def fetch_name_form_map(self, conn: Connection) -> dict[str, list[int]]:
         return fetch_name_form_map(conn)
+
+    def fetch_rejected_person_ids_by_pub(self, conn: Connection) -> dict[int, frozenset[int]]:
+        return fetch_rejected_person_ids_by_pub(conn)

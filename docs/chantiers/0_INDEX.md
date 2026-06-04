@@ -19,6 +19,7 @@
 
 - [Background jobs pour les endpoints longs](CODE_background-jobs.md)
 - [Relations entre publications](METIER_relations-publications.md)
+- [Rejet durable d'une paire (publication, personne) : garde matching, détachement, réassignation](METIER_detachement-rejet-durable.md)
 
 ## Chantiers archivés
 

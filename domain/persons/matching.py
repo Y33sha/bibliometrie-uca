@@ -119,17 +119,29 @@ class NameFormDecision:
 def decide_name_form_outcome(
     person_ids: list[int] | None,
     allow_create: bool,
+    rejected_person_ids: frozenset[int] = frozenset(),
 ) -> NameFormDecision:
     """Arbitre la décision de matching après lookup dans
     ``person_name_forms``.
 
-    Cascade :
+    ``rejected_person_ids`` : personnes déjà rejetées pour la publication
+    de l'authorship traitée (store ``rejected_authorships``). Elles sont
+    **éliminées** de la liste des candidats avant arbitrage : une paire
+    ``(publication, personne)`` rejetée ne doit jamais être recréée par le
+    matching. L'élimination peut désambiguïser — si 2 personnes partagent
+    la forme de nom mais qu'une est rejetée, il ne reste qu'une candidate
+    et l'``ambiguous_name_form`` devient un ``match`` univoque.
 
-    - 1 ``person_id`` → ``match`` (rattachement direct).
-    - N ``person_ids`` → ``skip`` avec ``reason="ambiguous_name_form"``
+    Cascade (sur les candidats restants après élimination) :
+
+    - 1 candidat → ``match`` (rattachement direct).
+    - N candidats → ``skip`` avec ``reason="ambiguous_name_form"``
       (homonymes en BDD, on laisse le traitement manuel trancher).
-    - 0 ``person_ids`` (forme inconnue) + ``allow_create`` → ``create``.
-    - 0 ``person_ids`` + pas ``allow_create`` → ``skip`` avec
+    - 0 candidat alors que la forme était connue (tous rejetés) → ``skip``
+      ``ambiguous_name_form`` : on laisse orphelin, on ne crée pas.
+    - 0 ``person_ids`` en entrée (forme inconnue) + ``allow_create`` →
+      ``create``.
+    - Forme inconnue + pas ``allow_create`` → ``skip`` avec
       ``reason="creation_not_allowed"`` (typiquement les rôles
       non-auteur des thèses, cf.
       ``domain.persons.creation.allow_person_creation``).
@@ -138,8 +150,9 @@ def decide_name_form_outcome(
         if allow_create:
             return NameFormDecision(action="create")
         return NameFormDecision(action="skip", reason="creation_not_allowed")
-    if len(person_ids) == 1:
-        return NameFormDecision(action="match", person_id=person_ids[0])
+    candidates = [pid for pid in person_ids if pid not in rejected_person_ids]
+    if len(candidates) == 1:
+        return NameFormDecision(action="match", person_id=candidates[0])
     return NameFormDecision(action="skip", reason="ambiguous_name_form")
 
 
@@ -189,6 +202,7 @@ def decide_person_match(
     idref_match: int | None,
     cross_source_match: int | None,
     name_form_outcome: NameFormDecision,
+    rejected_person_ids: frozenset[int] = frozenset(),
 ) -> PersonMatchDecision:
     """Cascade unifiée de matching personne, du signal le plus fiable au moins fiable.
 
@@ -208,16 +222,24 @@ def decide_person_match(
        résultat de ``decide_name_form_outcome`` (match / create / skip
        selon ambiguïté et politique de création).
 
-    Pure, testable sans BDD : les 5 paramètres sont précalculés par le
+    ``rejected_person_ids`` : personnes déjà rejetées pour la publication
+    de l'authorship (store ``rejected_authorships``). Un match d'identifiant
+    ou cross-source pointant vers une personne rejetée est **annulé** — la
+    cascade retombe au signal suivant, et faute de mieux laisse l'authorship
+    orpheline plutôt que de recréer le lien rejeté. Le tiroir name form est
+    déjà gardé en amont : ``name_form_outcome`` doit être calculé avec le
+    même ``rejected_person_ids`` (cf. ``decide_name_form_outcome``).
+
+    Pure, testable sans BDD : les paramètres sont précalculés par le
     caller via prefetch.
     """
-    if orcid_match is not None:
+    if orcid_match is not None and orcid_match not in rejected_person_ids:
         return PersonMatchDecision(action="match", person_id=orcid_match, reason="orcid")
-    if hal_match is not None:
+    if hal_match is not None and hal_match not in rejected_person_ids:
         return PersonMatchDecision(action="match", person_id=hal_match, reason="hal_person_id")
-    if idref_match is not None:
+    if idref_match is not None and idref_match not in rejected_person_ids:
         return PersonMatchDecision(action="match", person_id=idref_match, reason="idref")
-    if cross_source_match is not None:
+    if cross_source_match is not None and cross_source_match not in rejected_person_ids:
         return PersonMatchDecision(
             action="match", person_id=cross_source_match, reason="cross_source"
         )
