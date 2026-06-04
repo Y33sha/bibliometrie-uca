@@ -39,8 +39,8 @@ Pris dans l'ordre :
 
 - [x] Book reviews par titre — règles ISBN + année-pages posées (`27e7b1f7`)
 - [x] Préprints article + journal_id inconnu — audit fait, règle `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` posée (`c8be3409`)
-- [ ] Préprints OA gold — flag suspect ← **cible courante**
-- [ ] Types WoS composites — audit
+- [x] Préprints OA gold — audit fait : `gold` est une mauvaise lentille ; signal réel = `preprint + journal_id` (215 publis), cause = arbitrage canonique. Résolution non tranchée (cf. section)
+- [x] Types WoS composites — audit fait (sur raw store) : 388 composites ; réduction `doctype_list[0]` au normalize ; `Data Paper` perdu, `Book Chapter`/`Proceedings Paper` à trancher (cf. section)
 - [x] Review = poubelle — audit fait : **pas une poubelle**, mappings sains ; seule action = libellé FR « Article de synthèse »
 - [x] Figshare collections — audit fait + règle `DOI_FIGSHARE_COLLECTION_TO_DATASET` ; dédup des sous-items → relations
 - [ ] Posters / conférence avec même DOI — hors-scope correction, à traiter en dédup
@@ -64,11 +64,24 @@ Audit 2026-05-28 sur les 744 publications canoniques `doc_type=article` + `journ
 
 **À creuser séparément** : l'arbitrage canonique du `doc_type` (`application/publications._first_doc_type`) qui surclasse `preprint` (brut OA) en `article` même quand 212 SPs sur 389 disent `preprint`. Comportement non-trivial à expliquer ou corriger.
 
-### Types WoS composites — audit
+### Types WoS composites — audit ✓
 
-Aujourd'hui `map_doc_type` prend le **premier** type non-other quand WoS renvoie `"Article; Proceedings Paper"`. C'est arbitraire — sur des paires `Article; Book Chapter` le bon choix peut être le second. Pas un vrai mapping.
+Correction d'une hypothèse de la fiche : ce n'est **pas** `map_doc_type` qui réduit le composite (son découpage « ; » est du code mort pour WoS). La réduction se fait bien plus tôt, au normalize : [`application/pipeline/normalize/normalize_wos.py`](../../application/pipeline/normalize/normalize_wos.py) prend `doctype_list[0]` (premier élément) et jette le reste. `source_publications.doc_type` ne contient donc jamais de composite — d'où 0 composite en base alors que le brut en a.
 
-Étape suivante : audit. Pour chaque paire observée (ex. `Article; Proceedings Paper`, `Article; Book Chapter`, `Review; Book Chapter`), compter les occurrences et sonder quelques cas pour décider de la règle (et si la règle doit dépendre du journal). Puis remplacer le `first non-other` par un arbitrage explicite par paire.
+Audit 2026-06-04 sur le **raw store** (`data/raw_store/wos/`, 15 276 fichiers ; champ brut `static_data.summary.doctypes.doctype`, liste si `count > 1`) : **388 composites** (2,5 %).
+
+| Paire WoS | n | Verdict |
+|---|---|---|
+| `*; Early Access` (Article 143, Review 17, Editorial 11, Letter 5, Correction 1) | 177 | « Early Access » = stade de publication, pas un type. La réduction « premier » est **correcte** (le vrai type est en tête). À garder. |
+| `Article; Book Chapter` | 131 | À trancher (article en série d'ouvrage vs `book_chapter`). Sonder. |
+| `Article; Proceedings Paper` | 37 | Probable `conference_paper` (le second porte l'info). À trancher. |
+| `Article; Data Paper` | 25 | **Mistypage** : `data_paper` (sous-type informatif) est perdu → devrait gagner. |
+| `Editorial Material; Book Chapter` | 14 | À trancher. |
+| `Review; Book Chapter` | 3 | À trancher. |
+| `Correction; Early Access` | 1 | → `erratum`. |
+| `Article; Publication with Expression of Concern` | 1 | Edge. |
+
+**Conclusion.** Le « premier élément » est bon pour les paires `*; Early Access` (3/4 des composites) mais mistype les paires où le second terme est le type réel/informatif (`Data Paper` sûr ; `Proceedings Paper`, `Book Chapter` à trancher). Fix = remplacer `doctype_list[0]` dans `normalize_wos` par une réduction qui (a) ignore les tokens de stade (`Early Access`), (b) préfère le sous-type le plus spécifique. Décisions par paire `Book Chapter` / `Proceedings Paper` non tranchées.
 
 ### Review = poubelle — audit ✓
 
@@ -88,9 +101,23 @@ Audit (base prod) : **73 collections**, classées **71 `other`** + 1 article + 1
 
 **Renvoyé à [METIER_relations-publications](METIER_relations-publications.md)** : la **dédup des sous-items**. 273/281 items suivent « Additional file N of <T> », **212 matchent exactement** le titre d'une collection (70/73 collections ont ≥1 item) — le lien item→collection est donc fiable par titre. Mais supprimer les sous-items ne règle qu'à moitié (les collections restent des doublons du vrai article) ; le traitement complet (collection↔item **et** supplément↔article) se modélise dans le chantier relations.
 
-### Préprints OA gold — flag suspect
+### Préprints OA gold — audit ✓
 
-Une publication marquée `preprint` par OpenAlex mais avec `oa_status=gold` est probablement un cas mal classé (un vrai preprint n'est pas en accès gold). À auditer puis décider d'une règle ou d'un flag de doute.
+`gold` (publié dans une revue intégralement OA) est en principe incompatible avec `preprint` — un préprint en repository est `green`, pas `gold`. Audit 2026-06-04 (base prod) : 125 publis `doc_type=preprint` + `oa_status=gold`. Décomposition :
+
+- **~118 sans `journal_id`** : vrais préprints sur serveurs ouverts (ESSOAr `10.1002/essoar`, PsyArXiv/SocArXiv/EarthArXiv `osf.io`, EGUsphere `egusphere-YYYY`, Authorea, Research Square) et *Discussions* Copernicus (acpd/nhessd/amtd). `doc_type=preprint` est correct ; c'est `oa_status=gold` qui est sur-étiqueté par OpenAlex (il associe la revue-mère gold au DOI de discussion). Le champ erroné est `oa_status`, rapporté par la source → non corrigé ici. **Pas une erreur de doc_type.**
+- **~24 abstracts de conférence** (EGU `egusphere-egu*`, EPSC `epsc-dps*`, workshops) → devraient être `conference_paper`. Sous-pattern DOI Copernicus déjà identifié et **parké** (bloqué sur `journals.doi_prefix` + sous-pattern, hors-scope).
+- **7 avec un `journal_id` réel** = les vraies contradictions (Physics Letters B, Scientific Reports ×2, JHEP, F1000, eLife ×2).
+
+**`gold` n'est qu'une lentille étroite.** Le signal propre est `doc_type=preprint` **+ `journal_id IS NOT NULL`** : **215 publis** (toutes `oa_status`). Un préprint rattaché à une vraie revue est la contradiction.
+
+**Cause racine — l'arbitrage canonique.** `arbitrate_doc_type_with_article_subtype` (`domain/publications/aggregation.py`) retourne le `doc_type` de la première source par `SOURCE_PRIORITY`, avec pour seule finesse le raffinement article→sous-type. Il ne tranche jamais **preprint vs publié** : quand une source indexe à la fois le preprint et la version publiée (OpenAlex, ScanR), si le SP `preprint` est rencontré en premier, `preprint` gagne — même contre 4 sources disant Article + revue + gold (cas Scientific Reports). `preprint` n'étant pas un sous-type d'article, l'exception ne joue pas.
+
+**Réserves.**
+- eLife / F1000Research sont des revues **gold OA** à workflow « publier puis réviser » (*reviewed preprints*) : leur DOI sort légitimement preprint + gold. Les basculer en `article` est défendable mais reste un choix.
+- Certains `journal_id` sont eux-mêmes faux (vu : `egusphere-egu24-197` rattaché à « BioRxiv ») — basculer aveuglément en `article` propagerait une revue erronée. Bug de matching journal en amont.
+
+**Piste de résolution (non tranchée).** Pas une règle titre/DOI mais un fix d'arbitrage : *une publication avec une revue résolue ne doit jamais être canoniquement `preprint`* (`preprint` perd face à un signal Article/Review adossé à un `journal_id`). Couvre les 215, laisse les préprints-serveurs sans revue intacts, cohérence garantie au rebuild. À décider : fix arbitrage vs règle de correction vs flag suspect ; et traitement eLife/F1000.
 
 ### Posters / conférence avec même DOI
 
