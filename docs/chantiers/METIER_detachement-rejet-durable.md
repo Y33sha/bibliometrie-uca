@@ -2,9 +2,9 @@
 
 ## Contexte
 
-Il existe deux façons de casser un lien personne ↔ publication, et elles ne se comportent pas pareil face aux rebuilds du pipeline.
+Il existe deux façons de casser un lien personne ↔ publication, et elles ne se comportent pas de la même manière face aux rebuilds du pipeline.
 
-**Rejet canonique** — la croix one-way sur la fiche personne (`PATCH /api/authorships/{id}/exclude` → `exclude_authorship`). Elle écrit la paire `(publication_id, person_id)` dans `rejected_authorships` puis supprime la row `authorships`. Les sites qui insèrent dans `authorships` anti-joignent ce store, donc le rejet survit aux rebuilds (mécanique posée par le chantier `archived/2026-06-01_DATA_rejected-authorships-sidecar`).
+**Rejet canonique** — le bouton de suppression (croix) sur la fiche personne (`PATCH /api/authorships/{id}/exclude` → `exclude_authorship`). Il écrit la paire `(publication_id, person_id)` dans `rejected_authorships` puis supprime la row `authorships`. Les sites qui insèrent dans `authorships` anti-joignent ce store, donc le rejet survit aux rebuilds (mécanique posée par le chantier `archived/2026-06-01_DATA_rejected-authorships-sidecar`).
 
 **Détachement source** — « Détacher *n* authorships » depuis `admin/persons` (`POST /api/persons/{id}/detach-authorships` → `detach_authorships`). Il nulle `person_id` sur les `source_authorships` sélectionnées et supprime les `authorships` canoniques devenues orphelines. **Il n'écrit pas dans `rejected_authorships`.**
 
