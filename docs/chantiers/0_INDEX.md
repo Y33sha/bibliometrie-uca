@@ -6,7 +6,6 @@
 
 - [Données dérivées : audit + cadre de décision (matérialisation vs vue)](DATA_donnees-derivees.md) — Phase 1 (inventaire + alignement Python↔SQL) faite, sous-chantiers Phase 2 à ouvrir
 - [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
-- [Matérialiser perimeter_structures](DATA_perimeter-materialise.md) — standby, absorbé par `DATA_donnees-derivees`
 
 ### En pause
 
@@ -22,6 +21,7 @@
 
 ## Chantiers archivés
 
+- 2026-06-04 — [Matérialiser le périmètre (`perimeter_structures`) — audit `in_perimeter` : conservé](archived/2026-06-04_DATA_perimeter-materialise.md)
 - 2026-06-04 — [Rejet durable d'une paire (publication, personne) : garde matching, détachement, réassignation](archived/2026-06-04_METIER_detachement-rejet-durable.md)
 - 2026-06-03 — [Normalize : batcher l'insertion des authorships](CODE_batcher-normalize-authorships.md)
 - 2026-06-02 — [Authorships : build source-agnostique en une passe convergente](archived/2026-06-02_CODE_simplifier-build-authorships.md)
