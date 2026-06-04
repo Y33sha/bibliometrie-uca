@@ -49,13 +49,13 @@ Deux points d'entrée convergent sur ce cœur :
 - **Détachement** (`detach_authorships`) : résout l'ensemble distinct des `publication_id` des authorships sélectionnées et applique `reject_pair` à chaque paire. Le rejet porte sur la publication entière — les sources référencent la même publi, donc « cette personne n'est pas l'auteur de cette publication » vaut pour toutes ses sources.
 - **Croix canonique** (`exclude_authorship`) : aujourd'hui écrit le store + supprime la canonique mais **laisse** `person_id` sur les sources (le chantier sidecar avait abandonné le détachement source, jugé non durable et inutile vu l'anti-join). La garde (phase 1) renverse cette prémisse : le détachement source devient durable et utile (supprime le zombie, stoppe l'attribution erronée de forme de nom). La croix gagne donc l'étape 2 — elle applique le même `reject_pair`.
 
-- [ ] Op repo `unlink_all_source_authorships_for_pair(publication_id, person_id)` (port + impl) : nulle `person_id` sur toutes les sa dont `source_publication.publication_id = pub` et `person_id = pid`.
-- [ ] Cœur `reject_pair(publication_id, person_id)` : store + détacher toutes les sources + supprimer la canonique + audit.
-- [ ] `detach_authorships` réécrit : résoudre les `publication_id` distincts, appliquer `reject_pair` par paire ; conserver le nettoyage `name_form`.
-- [ ] `exclude_authorship` : appliquer le détachement source (étape 2) via `reject_pair`.
-- [ ] Tests d'intégration : store peuplé, toutes les sources de la paire détachées, canonique supprimée, non recréée au rerun.
+- [x] Op repo `unlink_all_source_authorships_for_pair(publication_id, person_id)` (port + impl) : nulle `person_id` sur toutes les sa dont `source_publication.publication_id = pub` et `person_id = pid`.
+- [x] Cœur `reject_pair(publication_id, person_id)` : store + détacher toutes les sources + supprimer la canonique + audit.
+- [x] `detach_authorships` réécrit : résoudre les `publication_id` distincts, appliquer `reject_pair` par paire ; conserver le nettoyage `name_form`.
+- [x] `exclude_authorship` : appliquer le détachement source (étape 2) via `reject_pair`.
+- [x] Tests d'intégration : store peuplé, toutes les sources de la paire détachées, canonique supprimée, non recréée au rerun.
 - [ ] Frontend : ajustement éventuel de la modale de détachement (cf. questions ouvertes — grain par publication).
-- [ ] Doc `guide-utilisateur/03-workflow-admin`, `donnees/05-authorships-et-sources`, `pipeline/08-authorships`.
+- [x] Doc `guide-utilisateur/03-workflow-admin`, `donnees/05-authorships-et-sources`, `pipeline/08-authorships`.
 
 ### Phase 3 — Réassigner une paire rejetée : recréation garantie + modale + un-reject
 
