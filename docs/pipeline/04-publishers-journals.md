@@ -2,21 +2,6 @@
 
 *TODO: Prose claudienne à traduire en normal-speak*
 
-```mermaid
-flowchart LR
-    source_publications-->journals
-    source_publications-->publishers
-    journals---publishers
-    D[doi_prefixes]-->publishers
-    E[OpenAlex Sources]-->|type,oa_status|journals
-    I[DOAJ API]-->|APC|journals
-    F[OpenAlex Publishers]-->|country|publishers
-    G[Crossref Members]-->|country|publishers
-    H[ROR]-->|type|publishers
-    classDef ref  fill:#bbf
-    class publishers,journals ref;
-```
-
 Phase `publishers_journals` : enrichissement des **référentiels** `publishers` et `journals` après leur création initiale en phase [normalize](03-normalize.md).
 
 Six sub-steps enchaînés ; le 1er tourne dans tous les modes du pipeline, les 5 suivants sont gated par le mode `full`.
