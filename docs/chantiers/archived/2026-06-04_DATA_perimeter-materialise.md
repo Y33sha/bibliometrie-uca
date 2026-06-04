@@ -1,5 +1,7 @@
 # Chantier — Matérialiser le périmètre : table `perimeter_structures` + suppression `in_perimeter`
 
+Terminé le 2026-06-04
+
 > **Phase 1 activée comme sous-chantier de [`DATA_donnees-derivees`](DATA_donnees-derivees.md).** La matérialisation de `perimeter_structures` (Phase 1) se justifie en soi par le déblocage de la matview `source_authorship_structures` (cf. Contexte), indépendamment de `in_perimeter`. Les Phases 2-3 (suppression de `in_perimeter`) restent conditionnées aux benchmarks de lecture.
 
 ## Contexte
@@ -74,22 +76,23 @@ Vs aujourd'hui `WHERE a.in_perimeter = TRUE` (index lookup direct).
 
 À ce stade, `in_perimeter` reste en base. `perimeter_structures` sert d'index supplémentaire (projections UI « structures d'un périmètre », audits) **et** de relation joignable qui déclarativise `source_authorship_structures`.
 
-### Phase 2 — Évaluation : supprimer `in_perimeter` ou pas ?
+### Phase 2 — Évaluation : supprimer `in_perimeter` ou pas ? — VERDICT : conserver
 
-Décision conditionnée à des mesures :
+Audit du 2026-06-04, EXPLAIN ANALYZE sur la base réelle (109 308 authorships, 9 472 136 source_authorships, 2 périmètres).
 
-- [ ] Benchmarker les queries chaudes (listing publications, facettes, stats) avec le filtre par `perimeter_structures` vs `in_perimeter`. Cible : différence < ~30 % en p95.
-- [ ] Identifier les queries non remplaçables (ex. agrégats par périmètre cross-perimetres ?) qui rendraient `in_perimeter` indispensable.
-- [ ] Si le benchmark passe → Phase 3. Sinon → on conserve `in_perimeter` comme cache de lecture, et `perimeter_structures` reste utile pour les autres usages (UI, analyses).
+- [x] Équivalence sémantique vérifiée : `authorships.in_perimeter = TRUE` ⟺ `EXISTS(authorship_structures ⋈ perimeter_structures, perimeter_id = uca)` — diff symétrique nulle (106 842 = 106 842). Le remplacement par JOIN est correct (le périmètre restreint `uca`, pas `uca_wide` qui sert aux affiliations).
+- [x] Colonne générée : **impossible**. Une colonne `GENERATED` Postgres doit être immuable et ne référencer que des colonnes de la même row (ni sous-requête ni JOIN). `in_perimeter` dépend d'un JOIN vers `perimeter_structures` → exclu d'office.
+- [x] Benchmarks (warm cache, médiane) :
+  - Count plein du périmètre : `in_perimeter` ~60 ms vs JOIN ~115 ms (**+90 %**).
+  - Listing paginé (LIMIT 25) : ~38 ms vs ~40-60 ms (comparable).
+  - Orphelines au niveau `source_authorships` (9,4 M lignes) : `in_perimeter` ~770 ms vs JOIN `source_authorship_structures` ~5 700 ms (**×7,4**).
+- [x] Queries non remplaçables proprement : `hal_affiliation_conflicts` (comparaison cross-source HAL vs WoS/OA), agrégats `COUNT(*) FILTER (in_perimeter)` par compte source (persons/detail).
 
-### Phase 3 — Suppression `in_perimeter` (conditionnelle)
+Conclusion. Au niveau canonique (`authorships`, 109 k) le JOIN reste tenable. Au niveau `source_authorships` (9,4 M), l'index partiel sur le booléen est irremplaçable : ×7,4 sur les orphelines, très au-delà de la cible <30 %. On **conserve `in_perimeter`** comme cache de lecture. `perimeter_structures` garde toute sa valeur (déblocage des matviews — Phase 1 — et usages UI/analyses).
 
-Seulement si Phase 2 valide.
+### Phase 3 — Suppression `in_perimeter` — ABANDONNÉE
 
-- [ ] Migration Alembic : DROP `authorships.in_perimeter` + `source_authorships.in_perimeter`.
-- [ ] Adapter les 233 call-sites pour passer par le JOIN `perimeter_structures`.
-- [ ] Simplifier `build_authorships` : retirer la propagation de `in_perimeter` (la cohérence est garantie par la table matérialisée à la lecture).
-- [ ] Adapter les tests qui utilisent `in_perimeter=TRUE` dans des fixtures.
+Non justifiée : la Phase 2 conclut au maintien de `in_perimeter` (régression ×7,4 sur `source_authorships`). `perimeter_structures` et `in_perimeter` coexistent pour des usages distincts (matérialisation joignable vs cache de lecture rapide).
 
 ## Bénéfices attendus
 
