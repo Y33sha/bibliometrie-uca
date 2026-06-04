@@ -64,6 +64,7 @@ def run_normalize_wos(conn):
     import logging
 
     from application.pipeline.normalize.normalize_wos import process_record
+    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.pipeline.normalize.wos import PgWosNormalizeQueries
     from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
@@ -74,6 +75,7 @@ def run_normalize_wos(conn):
 
     queries = PgWosNormalizeQueries()
     staging_queries = PgStagingQueries()
+    authorship_queries = PgAuthorshipsBatchQueries()
     logger = logging.getLogger("test")
     journal_repo = journal_repository(conn)
     publisher_repo = publisher_repository(conn)
@@ -91,6 +93,7 @@ def run_normalize_wos(conn):
             publisher_repo=publisher_repo,
             pub_repo=pub_repo,
             staging_queries=staging_queries,
+            authorship_queries=authorship_queries,
         ):
             processed += 1
     return processed
