@@ -26,11 +26,13 @@ class AssignOrphanAuthorship(BaseModel):
     authorship_id: int
     person_id: int | None = None
     create_person: CreatePersonName | None = None
+    force: bool = False
 
 
 class BatchAssignOrphanAuthorships(BaseModel):
     authorships: list[SourceAuthorshipRef]
     person_id: int
+    force: bool = False
 
 
 # ----- Réponses mutations (construites par le router) -----

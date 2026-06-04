@@ -130,6 +130,32 @@ def _seed_orphan_authorship(raw_author_name: str) -> int:
         return cur.fetchone()["id"]
 
 
+def _seed_orphan_with_pub(raw_author_name: str = "Reject Me") -> tuple[int, int]:
+    """source_authorship orpheline rattachée à une publication.
+
+    Renvoie (sa_id, publication_id) pour pouvoir rejeter la paire."""
+    pub_id = _seed_publication(title=_uniq("Pub"))
+    with _pool() as cur:
+        cur.execute(
+            "INSERT INTO source_publications (source, source_id, title, pub_year, publication_id) "
+            "VALUES ('hal', %s, 'T', 2024, %s) RETURNING id",
+            (_uniq("sid"), pub_id),
+        )
+        sp_id = cur.fetchone()["id"]
+    sa_id = _seed_source_authorship(
+        source="hal", source_pub_id=sp_id, raw_author_name=raw_author_name
+    )
+    return sa_id, pub_id
+
+
+def _reject_pair(publication_id: int, person_id: int) -> None:
+    with _pool() as cur:
+        cur.execute(
+            "INSERT INTO rejected_authorships (publication_id, person_id) VALUES (%s, %s)",
+            (publication_id, person_id),
+        )
+
+
 # ── PATCH /api/authorships/{id}/exclude ─────────────────────────
 
 
@@ -257,6 +283,31 @@ class TestAssignOrphanAuthorship:
         assert r.status_code == 200
         assert r.json()["ok"] is True
 
+    def test_blocked_when_pair_rejected(self, auth_client):
+        pid = _seed_person()
+        sa, pub = _seed_orphan_with_pub()
+        _reject_pair(pub, pid)
+        r = auth_client.post(
+            "/api/admin/orphan-authorships/assign",
+            json={"source": "hal", "authorship_id": sa, "person_id": pid},
+        )
+        assert r.status_code == 409
+        pair = r.json()["rejected_pairs"][0]
+        assert pair["publication_id"] == pub
+        assert pair["person_id"] == pid
+        assert pair["rejected_at"]
+
+    def test_forced_unrejects_and_assigns(self, auth_client):
+        pid = _seed_person()
+        sa, pub = _seed_orphan_with_pub()
+        _reject_pair(pub, pid)
+        r = auth_client.post(
+            "/api/admin/orphan-authorships/assign",
+            json={"source": "hal", "authorship_id": sa, "person_id": pid, "force": True},
+        )
+        assert r.status_code == 200
+        assert r.json()["person_id"] == pid
+
 
 class TestBatchAssignOrphanAuthorships:
     def test_requires_admin(self, client):
@@ -314,3 +365,29 @@ class TestBatchAssignOrphanAuthorships:
         )
         assert r.status_code == 200
         assert r.json()["assigned"] >= 0
+
+    def test_blocked_when_pair_rejected(self, auth_client):
+        pid = _seed_person()
+        sa, pub = _seed_orphan_with_pub()
+        _reject_pair(pub, pid)
+        r = auth_client.post(
+            "/api/admin/orphan-authorships/batch-assign",
+            json={"authorships": [{"source": "hal", "authorship_id": sa}], "person_id": pid},
+        )
+        assert r.status_code == 409
+        assert r.json()["rejected_pairs"][0]["publication_id"] == pub
+
+    def test_forced_unrejects_and_assigns(self, auth_client):
+        pid = _seed_person()
+        sa, pub = _seed_orphan_with_pub()
+        _reject_pair(pub, pid)
+        r = auth_client.post(
+            "/api/admin/orphan-authorships/batch-assign",
+            json={
+                "authorships": [{"source": "hal", "authorship_id": sa}],
+                "person_id": pid,
+                "force": True,
+            },
+        )
+        assert r.status_code == 200
+        assert r.json()["assigned"] == 1

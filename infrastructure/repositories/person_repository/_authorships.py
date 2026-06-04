@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from domain.sources.registry import AUTHOR_SOURCES_SQL, source_case_sql
+from domain.sources.registry import source_case_sql
 
 
 def link_authorship(
@@ -181,6 +181,21 @@ def find_publication_id_for_source_authorship(
     ).scalar_one_or_none()
 
 
+def find_publication_ids_for_source_authorships(conn: Connection, sa_ids: list[int]) -> list[int]:
+    """Les `publication_id` distincts couverts par un lot de source_authorships."""
+    if not sa_ids:
+        return []
+    rows = conn.execute(
+        text("""
+            SELECT DISTINCT d.publication_id FROM source_authorships sa
+            JOIN source_publications d ON d.id = sa.source_publication_id
+            WHERE sa.id = ANY(:ids) AND d.publication_id IS NOT NULL
+        """),
+        {"ids": sa_ids},
+    ).all()
+    return [row.publication_id for row in rows]
+
+
 def insert_authorship_if_missing(conn: Connection, publication_id: int, person_id: int) -> None:
     """INSERT ... ON CONFLICT DO NOTHING dans `authorships` pour la paire.
 
@@ -284,17 +299,3 @@ def recompute_authorship_in_perimeter(
         """),
         {"pub": publication_id, "pid": person_id},
     )
-
-
-def count_authorships_with_name_form(conn: Connection, person_id: int, name_form: str) -> int:
-    """Compte les source_authorships actives d'une personne portant une
-    forme de nom donnée. Utilisé par detach_authorships pour décider
-    de nettoyer la name_form ou pas."""
-    return conn.execute(
-        text(f"""
-            SELECT COUNT(*) AS n FROM source_authorships sa
-            WHERE sa.person_id = :pid AND sa.author_name_normalized = :nf
-              AND sa.source IN {AUTHOR_SOURCES_SQL}
-        """),
-        {"pid": person_id, "nf": name_form},
-    ).scalar_one()

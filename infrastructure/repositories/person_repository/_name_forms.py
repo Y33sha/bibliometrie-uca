@@ -13,6 +13,7 @@ DB).
 from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_name
+from domain.sources.registry import AUTHOR_SOURCES_SQL
 
 
 def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
@@ -69,6 +70,33 @@ def detach_name_form(conn: Connection, person_id: int, name_form: str) -> None:
         text("DELETE FROM person_name_forms WHERE name_form = :nf AND person_id = :pid"),
         {"nf": name_form, "pid": person_id},
     )
+
+
+def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int:
+    """Supprime les formes de nom d'une personne qui proviennent des sources
+    mais ne sont plus portées par aucune `source_authorship` active.
+
+    Appelé après un rejet de contribution : détacher les sources d'une paire
+    peut laisser une forme de nom que plus aucune source n'atteste. Les formes
+    calculées à partir du nom de la personne (source ``'persons'``) sont
+    conservées : elles ne dépendent pas des sources.
+
+    Retourne le nombre de formes supprimées."""
+    result = conn.execute(
+        text(f"""
+            DELETE FROM person_name_forms pnf
+            WHERE pnf.person_id = :pid
+              AND NOT ('persons' = ANY(pnf.sources))
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_authorships sa
+                  WHERE sa.person_id = :pid
+                    AND sa.author_name_normalized = pnf.name_form
+                    AND sa.source IN {AUTHOR_SOURCES_SQL}
+              )
+        """),
+        {"pid": person_id},
+    )
+    return result.rowcount
 
 
 def add_person_source(

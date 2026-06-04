@@ -15,27 +15,67 @@ from application.audit import emit_event
 from application.ports.pipeline.perimeter import PerimeterQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
+from application.ports.repositories.person_repository import PersonRepository
 from domain.errors import NotFoundError
 from domain.types import JsonValue
+
+
+def reject_pair(
+    publication_id: int,
+    person_id: int,
+    *,
+    repo: AuthorshipRepository,
+    audit_repo: AuditRepository | None = None,
+) -> dict[str, int]:
+    """Rejette durablement une paire (publication, personne) : enregistre que
+    cette personne n'est pas l'auteur de cette publication.
+
+    Opération unique partagée par les deux façons de rejeter une contribution
+    (depuis la fiche personne et depuis la fiche publication). Trois effets :
+
+    1. Enregistre la paire dans `rejected_authorships`. Ce registre est
+       consulté par le matching des personnes et par le rebuild des
+       `authorships`, qui ne recréent jamais une paire rejetée — le rejet
+       survit donc aux exécutions suivantes du pipeline.
+    2. Met à NULL le `person_id` de toutes les `source_authorships` de la paire,
+       sur toutes les sources : le lien disparaît côté données sources, et la
+       personne ne se verra plus attribuer la forme de nom correspondante.
+    3. Supprime la ligne consolidée dans `authorships`, qui n'est plus attestée
+       par aucune source.
+
+    Retourne {"detached": N, "deleted_authorships": M}.
+    """
+    repo.reject_authorship(publication_id, person_id)
+    detached = repo.unlink_all_source_authorships_for_pair(publication_id, person_id)
+    deleted = repo.delete_orphan_authorships_for_person(person_id)
+
+    emit_event(
+        audit_repo,
+        "authorship.rejected",
+        "publication",
+        publication_id,
+        {"person_id": person_id},
+    )
+    return {"detached": detached, "deleted_authorships": deleted}
 
 
 def exclude_authorship(
     authorship_id: int,
     *,
     repo: AuthorshipRepository,
+    person_repo: PersonRepository | None = None,
     audit_repo: AuditRepository | None = None,
 ) -> dict[str, JsonValue]:
-    """Rejette une authorship canonique : « cette personne n'est PAS l'auteur ».
+    """Rejette une contribution à partir de sa ligne consolidée (`authorships`).
 
-    1. Enregistre la paire (publication, personne) dans `rejected_authorships`
-       — store univoque qui survit aux rebuilds (les sites de création
-       d'authorships anti-joignent ce store).
-    2. Supprime la row `authorships` (les FK nettoient `authorship_structures`
-       et délient `source_authorships.authorship_id`).
+    Retrouve la paire (publication, personne) à partir de l'`authorship_id`
+    puis applique `reject_pair`. Si `person_repo` est fourni, supprime ensuite
+    les formes de nom de la personne que plus aucune source n'atteste.
 
-    La vérité source (`source_authorships.person_id`) n'est pas touchée.
+    Si la ligne n'a pas de `person_id`, il n'y a pas de paire à rejeter : on se
+    contente de supprimer la ligne.
 
-    Lève NotFoundError si l'authorship n'existe pas.
+    Lève NotFoundError si la ligne n'existe pas.
     """
     row = repo.get_authorship_person(authorship_id)
     if not row:
@@ -43,17 +83,13 @@ def exclude_authorship(
 
     person_id = row["person_id"]
     publication_id = row["publication_id"]
-    if person_id is not None:
-        repo.reject_authorship(publication_id, person_id)
-    repo.delete_authorship(authorship_id)
+    if person_id is None:
+        repo.delete_authorship(authorship_id)
+        return {"id": authorship_id, "person_id": None, "publication_id": publication_id}
 
-    emit_event(
-        audit_repo,
-        "authorship.rejected",
-        "authorship",
-        authorship_id,
-        {"person_id": person_id, "publication_id": publication_id},
-    )
+    reject_pair(publication_id, person_id, repo=repo, audit_repo=audit_repo)
+    if person_repo is not None:
+        person_repo.delete_orphan_name_forms_for_person(person_id)
     return {"id": authorship_id, "person_id": person_id, "publication_id": publication_id}
 
 

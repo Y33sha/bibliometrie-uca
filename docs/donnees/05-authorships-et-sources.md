@@ -20,11 +20,7 @@ Colonnes notables :
 
 ### `rejected_authorships` — rejets de contributions
 
-Store univoque `(publication_id, person_id, created_at)`, PK composite, FK `ON DELETE CASCADE` vers `publications` et `persons`.
-
-**Rejeter une paire est une opération unique** (`reject_pair`, `application/authorships/core.py`), quel que soit le point d'entrée — croix canonique de la page personne (`PATCH /api/authorships/{id}/exclude`) ou détachement de sources (`POST /api/persons/{id}/detach-authorships`). Le cœur fait trois choses : insère la paire dans le store, nulle `person_id` sur **toutes** les `source_authorships` de cette personne pour cette publication, et supprime la canonique devenue orpheline. Le détachement porte sur la publication entière : « cette personne n'est pas l'auteur de cette publication » vaut pour toutes ses sources.
-
-La durabilité est garantie **en amont, dans le matching personnes** : la cascade anti-joint `rejected_authorships` et ne re-pose jamais `person_id` sur une source rejetée (cf. [pipeline/07-persons](../pipeline/07-persons.md)). Les sites de création d'`authorships` (build + assignation d'orphelins) anti-joignent aussi le store en dernier rempart, de sorte que le rejet survit aux rebuilds — contrairement à un drapeau sur la table dérivée, purgé en mode `full`. Une fusion de personnes transfère les rejets de l'absorbée vers l'absorbante (dédoublonnage sur conflit de PK).
+Store univoque `(publication_id, person_id, created_at)`, PK composite, FK `ON DELETE CASCADE` vers `publications` et `persons`. Écrit par l'exclusion canonique (croix de la page personne → `PATCH /api/authorships/{id}/exclude`), qui y insère la paire et supprime la row `authorships`. Tous les sites de création d'`authorships` (build + assignation d'orphelins) anti-joignent ce store, de sorte que le rejet survit aux rebuilds — contrairement à un drapeau sur la table dérivée, purgé en mode `full`. Une fusion de personnes transfère les rejets de l'absorbée vers l'absorbante (dédoublonnage sur conflit de PK).
 
 ## Tables sources
 

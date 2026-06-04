@@ -17,9 +17,20 @@ export type OtherPerson = components["schemas"]["OtherPersonOut"];
 export type PersonSearchResult = components["schemas"]["PersonSearchResult"];
 
 // ── Extensions UI (champs ajoutés côté front) ──
-export type DetachAuthorship = components["schemas"]["NameFormAuthorshipRef"] & {
+type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];
+
+/**
+ * Publication regroupant toutes ses sources observées sous une même forme de
+ * nom. Le rejet porte sur la publication entière (toutes ses sources), donc la
+ * modale affiche une ligne par publication, pas par source.
+ */
+export interface DetachPublication {
+  pub_id: number;
+  title: string;
+  pub_year: number | null;
+  sources: Pick<NameFormAuthorshipRef, "source" | "authorship_id">[];
   checked: boolean;
-};
+}
 
 // ── États UI locaux ──
 export interface EditNameState {
@@ -32,7 +43,7 @@ export interface EditNameState {
 export interface DetachModalState {
   personId: number;
   nameForm: string;
-  authorships: DetachAuthorship[];
+  publications: DetachPublication[];
   otherPersons: OtherPerson[];
   loading: boolean;
 }

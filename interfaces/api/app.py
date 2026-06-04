@@ -32,6 +32,7 @@ from domain.errors import (
     DomainError,
     NotFoundError,
     PublisherMergeBlockedError,
+    RejectedPairError,
     UnauthorizedError,
     ValidationError,
 )
@@ -142,6 +143,14 @@ async def publisher_merge_blocked_handler(
     return JSONResponse(
         status_code=409,
         content={"detail": str(exc), "blocking_journals": exc.blocking_journals},
+    )
+
+
+@app.exception_handler(RejectedPairError)
+async def rejected_pair_handler(request: Request, exc: RejectedPairError) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={"detail": str(exc), "rejected_pairs": exc.rejected_pairs},
     )
 
 

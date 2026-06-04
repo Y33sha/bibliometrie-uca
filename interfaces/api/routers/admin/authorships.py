@@ -52,14 +52,16 @@ logger = logging.getLogger(__name__)
 def exclude_authorship_endpoint(
     authorship_id: int,
     repo: AuthorshipRepository = Depends(authorship_repo_sync),
+    person_repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> AuthorshipExcludeResponse:
-    """Rejette une authorship canonique (« cette personne n'est pas l'auteur »).
+    """Rejette une contribution (« cette personne n'est pas l'auteur »).
 
-    Enregistre la paire dans `rejected_authorships` et supprime la row ;
-    le rebuild ne la recrée pas (anti-join sur le store). One-way.
+    Enregistre la paire (publication, personne) dans `rejected_authorships`,
+    détache les sources et supprime la row consolidée ; le rebuild ne la
+    recrée pas. Action à sens unique.
     """
-    exclude_authorship(authorship_id, repo=repo, audit_repo=audit)
+    exclude_authorship(authorship_id, repo=repo, person_repo=person_repo, audit_repo=audit)
     return AuthorshipExcludeResponse(ok=True)
 
 
@@ -90,8 +92,14 @@ def assign_orphan_authorship_endpoint(
     body: AssignOrphanAuthorship,
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
+    authorship_repo: AuthorshipRepository = Depends(authorship_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> OrphanAssignResponse:
-    """Attribue une authorship orpheline à une personne."""
+    """Attribue une authorship orpheline à une personne.
+
+    Renvoie 409 (`RejectedPairError`) si la paire a déjà été rejetée et que
+    `force` est faux ; avec `force`, le rejet est d'abord levé.
+    """
     if body.source not in ALL_SOURCES_SET:
         raise HTTPException(status_code=400, detail=f"Source inconnue: {body.source}")
 
@@ -106,7 +114,15 @@ def assign_orphan_authorship_endpoint(
         raise HTTPException(status_code=400, detail="person_id ou create_person requis")
     if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
-    _assign_orphan(person_id, body.source, body.authorship_id, repo=repo)
+    _assign_orphan(
+        person_id,
+        body.source,
+        body.authorship_id,
+        repo=repo,
+        authorship_repo=authorship_repo,
+        audit_repo=audit,
+        force=body.force,
+    )
     return OrphanAssignResponse(person_id=person_id)
 
 
@@ -115,8 +131,14 @@ def batch_assign_orphan_authorships(
     body: BatchAssignOrphanAuthorships,
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
+    authorship_repo: AuthorshipRepository = Depends(authorship_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> OrphanBatchAssignResponse:
-    """Attribue plusieurs authorships orphelines à une même personne."""
+    """Attribue plusieurs authorships orphelines à une même personne.
+
+    Renvoie 409 (`RejectedPairError`) si au moins une paire a déjà été rejetée
+    et que `force` est faux ; avec `force`, les rejets sont d'abord levés.
+    """
     person_id = body.person_id
     sa_ids = [a.authorship_id for a in body.authorships if a.source in ALL_SOURCES_SET]
     if not sa_ids:
@@ -124,5 +146,12 @@ def batch_assign_orphan_authorships(
 
     if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
-    assigned = _batch_assign_orphan(person_id, sa_ids, repo=repo)
+    assigned = _batch_assign_orphan(
+        person_id,
+        sa_ids,
+        repo=repo,
+        authorship_repo=authorship_repo,
+        audit_repo=audit,
+        force=body.force,
+    )
     return OrphanBatchAssignResponse(assigned=assigned)

@@ -48,7 +48,6 @@ class MarkPersonsDistinct(BaseModel):
 
 class DetachAuthorships(BaseModel):
     authorships: list[SourceAuthorshipRef]
-    name_form: str = ""
 
 
 class DetachNameForm(BaseModel):
@@ -88,4 +87,4 @@ class IdentifierReassignResponse(BaseModel):
 class DetachAuthorshipsResponse(BaseModel):
     detached: int
     deleted_authorships: int
-    cleaned_form: bool
+    cleaned_forms: int

@@ -19,10 +19,10 @@
 
 - [Background jobs pour les endpoints longs](CODE_background-jobs.md)
 - [Relations entre publications](METIER_relations-publications.md)
-- [Rejet durable d'une paire (publication, personne) : garde matching, détachement, réassignation](METIER_detachement-rejet-durable.md)
 
 ## Chantiers archivés
 
+- 2026-06-04 — [Rejet durable d'une paire (publication, personne) : garde matching, détachement, réassignation](archived/2026-06-04_METIER_detachement-rejet-durable.md)
 - 2026-06-03 — [Normalize : batcher l'insertion des authorships](CODE_batcher-normalize-authorships.md)
 - 2026-06-02 — [Authorships : build source-agnostique en une passe convergente](archived/2026-06-02_CODE_simplifier-build-authorships.md)
 - 2026-06-01 — [Sidecar `rejected_authorships` (extraire `authorships.excluded`)](archived/2026-06-01_DATA_rejected-authorships-sidecar.md)

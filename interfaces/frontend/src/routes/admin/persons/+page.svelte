@@ -9,6 +9,7 @@
   import Pagination from "$lib/components/Pagination.svelte";
   import type {
     DetachModalState,
+    DetachPublication,
     EditNameState,
     IdFormState,
     OtherPerson,
@@ -17,6 +18,8 @@
     PersonSearchResult,
     PersonStats,
   } from "./types";
+  import type { components } from "$lib/api/schema";
+  type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];
   import PersonsToolbar from "./PersonsToolbar.svelte";
   import EditNameModal from "./EditNameModal.svelte";
   import DetachNameFormModal from "./DetachNameFormModal.svelte";
@@ -289,29 +292,41 @@
   /* ── Detach modal ── */
 
   async function openDetachModal(personId: number, nameForm: string) {
-    detachModal = { personId, nameForm, authorships: [], otherPersons: [], loading: true };
-    const data = await api<{ authorships: any[]; other_persons: OtherPerson[] }>(
+    detachModal = { personId, nameForm, publications: [], otherPersons: [], loading: true };
+    const data = await api<{ authorships: NameFormAuthorshipRef[]; other_persons: OtherPerson[] }>(
       `/api/persons/${personId}/name-form-authorships?name_form=${encodeURIComponent(nameForm)}`,
     );
+    // Le rejet porte sur la publication entière : on regroupe les sources par
+    // publication pour n'afficher qu'une ligne par publi.
+    const byPub = new Map<number, DetachPublication>();
+    for (const r of data.authorships) {
+      let pub = byPub.get(r.pub_id);
+      if (!pub) {
+        pub = { pub_id: r.pub_id, title: r.title, pub_year: r.pub_year, sources: [], checked: true };
+        byPub.set(r.pub_id, pub);
+      }
+      pub.sources.push({ source: r.source, authorship_id: r.authorship_id });
+    }
     detachModal = {
       personId,
       nameForm,
       loading: false,
-      authorships: data.authorships.map((r) => ({ ...r, checked: true })),
+      publications: [...byPub.values()],
       otherPersons: data.other_persons,
     };
   }
 
   async function confirmDetach() {
     if (!detachModal) return;
-    const toDetach = detachModal.authorships.filter((a) => a.checked);
+    const toDetach = detachModal.publications.filter((p) => p.checked);
     if (toDetach.length === 0) {
       detachModal = null;
       return;
     }
+    // Une référence de source par publication suffit : le backend détache
+    // toutes les sources de la publication.
     await personsApi.detachAuthorships(detachModal.personId, {
-      authorships: toDetach.map((a) => ({ source: a.source, authorship_id: a.authorship_id })),
-      name_form: detachModal.nameForm,
+      authorships: toDetach.map((p) => p.sources[0]),
     });
     detachModal = null;
     loadStats();

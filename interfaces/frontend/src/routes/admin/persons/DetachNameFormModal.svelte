@@ -47,8 +47,8 @@
           </div>
         </div>
       {/if}
-      {#if state.authorships.length === 0}
-        <p>Aucune authorship liée.</p>
+      {#if state.publications.length === 0}
+        <p>Aucune publication liée.</p>
         <div class="modal-actions">
           <button class="btn" onclick={onclose}>Annuler</button>
           <button class="btn btn-danger" onclick={ondetachNameForm}>
@@ -56,24 +56,26 @@
           </button>
         </div>
       {:else}
-        <p>Cochez les authorships à détacher de cette personne :</p>
+        <p>Cochez les publications à détacher de cette personne :</p>
         <div class="detach-list">
-          {#each state.authorships as a, i}
+          {#each state.publications as p, i}
             <label class="detach-item">
-              <input type="checkbox" bind:checked={state.authorships[i].checked} />
-              <span class="detach-source tag tag-source"
-                >{sourceLabels[a.source] ?? a.source}</span
-              >
-              <span class="detach-year">{a.pub_year ?? "?"}</span>
-              <span class="detach-title">{@html sanitizeTitle(a.title)}</span>
+              <input type="checkbox" bind:checked={state.publications[i].checked} />
+              <span class="detach-year">{p.pub_year ?? "?"}</span>
+              <span class="detach-title">{@html sanitizeTitle(p.title)}</span>
+              <span class="detach-sources">
+                {#each p.sources as s}
+                  <span class="tag tag-source">{sourceLabels[s.source] ?? s.source}</span>
+                {/each}
+              </span>
             </label>
           {/each}
         </div>
         <div class="modal-actions">
           <button class="btn" onclick={onclose}>Annuler</button>
           <button class="btn btn-danger" onclick={onconfirmDetach}>
-            Détacher {state.authorships.filter((a) => a.checked).length} authorship{state.authorships.filter(
-              (a) => a.checked,
+            Détacher {state.publications.filter((p) => p.checked).length} publication{state.publications.filter(
+              (p) => p.checked,
             ).length > 1
               ? "s"
               : ""}

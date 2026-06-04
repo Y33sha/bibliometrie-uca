@@ -41,8 +41,9 @@ La garde en place, rejeter une paire `(publication_id, person_id)` est une seule
 1. `reject_authorship` (INSERT sidecar `ON CONFLICT DO NOTHING`).
 2. Nuller `person_id` sur **toutes** les `source_authorships` de cette personne pour cette publication (op repo `unlink_all_source_authorships_for_pair`).
 3. Supprimer la canonique (`delete_orphan_authorships_for_person`, devenue orpheline — invariant du sidecar préservé).
-4. Nettoyage de la forme de nom (`name_form`) : inchangé, quand fourni.
-5. Événement d'audit.
+4. Événement d'audit.
+
+Nettoyage des formes de nom (décidé en cours de chantier) : après le rejet, on supprime **toutes** les formes de nom de la personne que plus aucune source n'atteste (`delete_orphan_name_forms_for_person`), pas seulement celle d'entrée. Les formes calculées depuis le nom de la personne (source `persons`) sont préservées. Appelé par `detach_authorships` (une fois après la boucle) et par `exclude_authorship` (quand `person_repo` est fourni). L'ancien `count_authorships_with_name_form` devient mort et est supprimé. Le paramètre `name_form` disparaît du contrat de détachement, et la réponse expose `cleaned_forms: int`.
 
 Deux points d'entrée convergent sur ce cœur :
 
@@ -51,10 +52,11 @@ Deux points d'entrée convergent sur ce cœur :
 
 - [x] Op repo `unlink_all_source_authorships_for_pair(publication_id, person_id)` (port + impl) : nulle `person_id` sur toutes les sa dont `source_publication.publication_id = pub` et `person_id = pid`.
 - [x] Cœur `reject_pair(publication_id, person_id)` : store + détacher toutes les sources + supprimer la canonique + audit.
-- [x] `detach_authorships` réécrit : résoudre les `publication_id` distincts, appliquer `reject_pair` par paire ; conserver le nettoyage `name_form`.
-- [x] `exclude_authorship` : appliquer le détachement source (étape 2) via `reject_pair`.
-- [x] Tests d'intégration : store peuplé, toutes les sources de la paire détachées, canonique supprimée, non recréée au rerun.
-- [ ] Frontend : ajustement éventuel de la modale de détachement (cf. questions ouvertes — grain par publication).
+- [x] `detach_authorships` réécrit : résoudre les `publication_id` distincts, appliquer `reject_pair` par paire ; nettoyage en masse des formes de nom orphelines (drop du paramètre `name_form`).
+- [x] `exclude_authorship` : appliquer le détachement source (étape 2) via `reject_pair` + nettoyage des formes de nom orphelines.
+- [x] Op repo `delete_orphan_name_forms_for_person` (port + impl) ; suppression du mort `count_authorships_with_name_form`.
+- [x] Tests d'intégration : store peuplé, toutes les sources de la paire détachées, canonique supprimée, non recréée au rerun ; nettoyage des formes orphelines (forme source orpheline supprimée, forme calculée préservée, forme encore attestée conservée).
+- [x] Frontend : modale de détachement regroupée par publication (une ligne par publi, sources en tags), envoi d'une référence de source par publi, `name_form` retiré du body. Schéma OpenAPI régénéré.
 - [x] Doc `guide-utilisateur/03-workflow-admin`, `donnees/05-authorships-et-sources`, `pipeline/08-authorships`.
 
 ### Phase 3 — Réassigner une paire rejetée : recréation garantie + modale + un-reject
@@ -65,17 +67,17 @@ Deux points d'entrée convergent sur ce cœur :
 
 **(b) Pré-check + modale + un-reject.** Avant d'assigner : résoudre `publication_id`, interroger le store ; si la paire est rejetée et la requête non forcée, renvoyer un signal « bloqué » avec la `created_at` ; sur confirmation (`force=true`), un-reject puis assignation normale (la garde laisse passer, la canonique se recrée).
 
-- [ ] Vérifier (test) qu'aucun chemin de pose de `person_id` ne laisse la canonique non recomposée.
-- [ ] Ops repo `find_rejected_authorship(publication_id, person_id) -> created_at | None` et `delete_rejected_authorship(publication_id, person_id)` (port + impl).
-- [ ] `force: bool = False` sur `AssignOrphanAuthorship` / `BatchAssignOrphanAuthorships` + endpoints.
-- [ ] Réponse « bloqué » avec `created_at` (unitaire + batch — pour le batch, liste des paires rejetées).
-- [ ] un-reject sur `force=true` + événement d'audit.
-- [ ] Frontend : modale de réassignation (orphan-authorships, unitaire + batch), câblage du `force`.
-- [ ] Tests d'intégration : assign bloqué sur paire rejetée ; assign forcé → un-reject + canonique recréée.
+- [x] Vérifier (test) qu'aucun chemin de pose de `person_id` ne laisse la canonique non recomposée (assign forcé → canonique recréée).
+- [x] Ops repo `find_rejected_authorship(publication_id, person_id) -> created_at | None` et `delete_rejected_authorship(publication_id, person_id)` (port + impl) ; `find_publication_ids_for_source_authorships` pour le pré-contrôle batch.
+- [x] `force: bool = False` sur `AssignOrphanAuthorship` / `BatchAssignOrphanAuthorships` + endpoints (injection `authorship_repo` + `audit`).
+- [x] Réponse « bloqué » : domaine `RejectedPairError` (sous-classe `ConflictError`) + handler 409 `{detail, rejected_pairs:[{publication_id, person_id, rejected_at}]}` (unitaire + batch).
+- [x] un-reject sur `force=true` (helper `_resolve_rejection`) + événement d'audit `authorship.unrejected`.
+- [x] Frontend : modale de confirmation (orphan-authorships, unitaire + batch) interceptant le 409 et rejouant en `force=true` (helper `withRejectGuard`).
+- [x] Tests d'intégration : assign/batch bloqués sur paire rejetée ; assign/batch forcés → un-reject + canonique recréée (application + API).
 
 ## Questions ouvertes
 
-- **Grain de la modale de détachement.** Elle liste aujourd'hui une ligne par `source_authorship` (source + titre), donc une publi multi-source apparaît plusieurs fois. Comme le rejet porte sur la publication entière, faut-il regrouper l'affichage par publication (et détacher la publi en un clic) plutôt que par source ? La sélection partielle d'une source d'une même publi n'a plus de sens sous la phase 2.
-- **Forme de la réponse « bloqué ».** 409 avec payload structuré, ou 200 avec un flag `{blocked, rejected_at}` ? À aligner sur le reste de l'API.
-- **Modale batch.** Lister chaque paire rejetée, ou un message agrégé (« N liens déjà rejetés, le plus récent le X ») ?
+- **Grain de la modale de détachement.** _Résolu :_ regroupement par publication (une ligne par publi, sources en tags), plus nettoyage en masse des formes de nom orphelines. L'entrée reste par forme de nom ; une même publi peut apparaître sous plusieurs tags de forme de nom, c'est assumé (le détachement opère de toute façon sur la publication entière).
+- **Forme de la réponse « bloqué ».** _Résolu :_ 409 avec payload structuré (`created_at` de la paire rejetée).
+- **Modale batch.** _Résolu :_ même modale que l'unitaire, listant chaque paire rejetée (publication + date) ; le payload 409 `rejected_pairs` couvre les deux cas.
 - **Stock existant.** La garde ne joue qu'aux runs futurs ; une paire rejetée avant la garde peut porter un `person_id` source ressuscité. Un full rerun `raw_hash=null` ré-applique la cascade gardée et nettoie — pas de backfill dédié.
