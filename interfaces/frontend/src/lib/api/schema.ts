@@ -48,23 +48,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Root */
-        get: operations["root__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -1420,7 +1403,8 @@ export interface paths {
         put?: never;
         /**
          * Detach Authorships
-         * @description Détache des authorships sources d'une personne et nettoie les formes de noms.
+         * @description Rejette durablement les paires (publication, personne) des authorships
+         *     sources sélectionnées et nettoie les formes de noms.
          */
         post: operations["detach_authorships_api_persons__person_id__detach_authorships_post"];
         delete?: never;
@@ -1464,10 +1448,11 @@ export interface paths {
         head?: never;
         /**
          * Exclude Authorship Endpoint
-         * @description Rejette une authorship canonique (« cette personne n'est pas l'auteur »).
+         * @description Rejette une contribution (« cette personne n'est pas l'auteur »).
          *
-         *     Enregistre la paire dans `rejected_authorships` et supprime la row ;
-         *     le rebuild ne la recrée pas (anti-join sur le store). One-way.
+         *     Enregistre la paire (publication, personne) dans `rejected_authorships`,
+         *     détache les sources et supprime la row consolidée ; le rebuild ne la
+         *     recrée pas. Action à sens unique.
          */
         patch: operations["exclude_authorship_endpoint_api_authorships__authorship_id__exclude_patch"];
         trace?: never;
@@ -1524,6 +1509,9 @@ export interface paths {
         /**
          * Assign Orphan Authorship Endpoint
          * @description Attribue une authorship orpheline à une personne.
+         *
+         *     Renvoie 409 (`RejectedPairError`) si la paire a déjà été rejetée et que
+         *     `force` est faux ; avec `force`, le rejet est d'abord levé.
          */
         post: operations["assign_orphan_authorship_endpoint_api_admin_orphan_authorships_assign_post"];
         delete?: never;
@@ -1544,6 +1532,9 @@ export interface paths {
         /**
          * Batch Assign Orphan Authorships
          * @description Attribue plusieurs authorships orphelines à une même personne.
+         *
+         *     Renvoie 409 (`RejectedPairError`) si au moins une paire a déjà été rejetée
+         *     et que `force` est faux ; avec `force`, les rejets sont d'abord levés.
          */
         post: operations["batch_assign_orphan_authorships_api_admin_orphan_authorships_batch_assign_post"];
         delete?: never;
@@ -2520,26 +2511,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/doc-types": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Doc Types
-         * @description Liste les valeurs de l'enum `doc_type` avec leurs libellés FR (singulier, pluriel).
-         */
-        get: operations["list_doc_types_api_doc_types_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2743,6 +2714,11 @@ export interface components {
             /** Person Id */
             person_id?: number | null;
             create_person?: components["schemas"]["CreatePersonName"] | null;
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
         };
         /** AuthCheckResponse */
         AuthCheckResponse: {
@@ -2760,6 +2736,11 @@ export interface components {
             authorships: components["schemas"]["SourceAuthorshipRef"][];
             /** Person Id */
             person_id: number;
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
         };
         /**
          * BatchCountryResponse
@@ -2823,11 +2804,6 @@ export interface components {
             value: unknown;
             /** Description */
             description: string | null;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
         };
         /**
          * ConfigValueUpdate
@@ -2937,11 +2913,6 @@ export interface components {
         DetachAuthorships: {
             /** Authorships */
             authorships: components["schemas"]["SourceAuthorshipRef"][];
-            /**
-             * Name Form
-             * @default
-             */
-            name_form: string;
         };
         /** DetachAuthorshipsResponse */
         DetachAuthorshipsResponse: {
@@ -2949,8 +2920,8 @@ export interface components {
             detached: number;
             /** Deleted Authorships */
             deleted_authorships: number;
-            /** Cleaned Form */
-            cleaned_form: boolean;
+            /** Cleaned Forms */
+            cleaned_forms: number;
         };
         /** DetachNameForm */
         DetachNameForm: {
@@ -2980,20 +2951,6 @@ export interface components {
             count: number;
             /** Expected */
             expected: boolean;
-        };
-        /** DocTypeLabel */
-        DocTypeLabel: {
-            /** Value */
-            value: string;
-            /** Singular */
-            singular: string;
-            /** Plural */
-            plural: string;
-        };
-        /** DocTypeListResponse */
-        DocTypeListResponse: {
-            /** Items */
-            items: components["schemas"]["DocTypeLabel"][];
         };
         /**
          * DoiPrefixInfo
@@ -5785,26 +5742,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
-                };
-            };
-        };
-    };
-    root__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
                 };
             };
         };
@@ -9681,26 +9618,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    list_doc_types_api_doc_types_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DocTypeListResponse"];
                 };
             };
         };

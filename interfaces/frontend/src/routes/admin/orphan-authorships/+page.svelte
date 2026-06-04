@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { base } from '$app/paths';
 	import { replaceState } from '$app/navigation';
-	import { api, orphanAuthorships } from '$lib/api';
+	import { api, ApiError, orphanAuthorships } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import { titleCase } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
@@ -11,6 +11,7 @@
 	type PersonResult = components['schemas']['PersonSearchResult'];
 	type OrphanAuthorship = components['schemas']['OrphanAuthorshipOut'];
 	type OrphansResponse = components['schemas']['OrphanAuthorshipsResponse'];
+	type RejectedPair = { publication_id: number; person_id: number; rejected_at: string };
 
 	async function searchPersons(q: string): Promise<PersonResult[]> {
 		return api<PersonResult[]>(`/api/persons/search?q=${encodeURIComponent(q)}`);
@@ -28,6 +29,37 @@
 	const batchSearch = useDebouncedSearch<PersonResult>({ search: searchPersons });
 	const allSelected = $derived(orphans.length > 0 && orphans.every(o => selectedIds.has(`${o.source}-${o.authorship_id}`)));
 	let createModal: { lastName: string; firstName: string; items: OrphanAuthorship[] } | null = $state(null);
+	// Modale de confirmation quand la réassignation porte sur une paire déjà rejetée (409).
+	let rejectModal: { detail: string; pairs: RejectedPair[]; retry: () => Promise<void> } | null =
+		$state(null);
+
+	/**
+	 * Exécute une réassignation en interceptant le 409 « paire déjà rejetée » :
+	 * ouvre la modale de confirmation avec une closure qui rejoue l'opération
+	 * en `force=true` (lève le rejet puis réassigne). Les autres erreurs
+	 * remontent normalement.
+	 */
+	async function withRejectGuard(run: (force: boolean) => Promise<void>) {
+		try {
+			await run(false);
+		} catch (e) {
+			if (e instanceof ApiError && e.status === 409) {
+				const body = e.detail as { detail?: string; rejected_pairs?: RejectedPair[] };
+				if (body?.rejected_pairs?.length) {
+					rejectModal = { detail: body.detail ?? '', pairs: body.rejected_pairs, retry: () => run(true) };
+					return;
+				}
+			}
+			throw e;
+		}
+	}
+
+	async function confirmReassign() {
+		if (!rejectModal) return;
+		const retry = rejectModal.retry;
+		rejectModal = null;
+		await retry();
+	}
 
 	const SOURCE_LABELS: Record<string, string> = {
 		hal: 'HAL',
@@ -61,13 +93,16 @@
 	}
 
 	async function assign(orphan: any, personId: number) {
-		await orphanAuthorships.assign({
-			source: orphan.source,
-			authorship_id: orphan.authorship_id,
-			person_id: personId,
+		await withRejectGuard(async (force) => {
+			await orphanAuthorships.assign({
+				source: orphan.source,
+				authorship_id: orphan.authorship_id,
+				person_id: personId,
+				force,
+			});
+			closeAssign();
+			loadOrphans();
 		});
-		closeAssign();
-		loadOrphans();
 	}
 
 	function createAndAssign(orphan: OrphanAuthorship) {
@@ -96,13 +131,16 @@
 
 	async function batchAssign(personId: number) {
 		const items = orphans.filter(o => selectedIds.has(`${o.source}-${o.authorship_id}`));
-		await orphanAuthorships.batchAssign({
-			person_id: personId,
-			authorships: items.map(o => ({ source: o.source, authorship_id: o.authorship_id })),
+		await withRejectGuard(async (force) => {
+			await orphanAuthorships.batchAssign({
+				person_id: personId,
+				authorships: items.map(o => ({ source: o.source, authorship_id: o.authorship_id })),
+				force,
+			});
+			selectedIds = new Set();
+			batchSearch.clear();
+			loadOrphans();
 		});
-		selectedIds = new Set();
-		batchSearch.clear();
-		loadOrphans();
 	}
 
 	function openCreateModal() {
@@ -291,6 +329,35 @@
 	</div>
 {/if}
 
+{#if rejectModal}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="modal-overlay" onclick={() => { rejectModal = null; }}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+			<h3>Réassignation déjà rejetée</h3>
+			<p class="reject-detail">{rejectModal.detail}</p>
+			<p class="reject-muted">
+				Cette personne a été détachée de {rejectModal.pairs.length > 1 ? 'ces publications' : 'cette publication'} manuellement.
+				Confirmer lèvera le rejet et recréera le lien.
+			</p>
+			<ul class="reject-list">
+				{#each rejectModal.pairs as p (p.publication_id)}
+					<li>
+						<a href="{base}/publications/{p.publication_id}" target="_blank" rel="noopener">
+							Publication #{p.publication_id}
+						</a>
+						<span class="reject-muted">— rejetée le {new Date(p.rejected_at).toLocaleDateString('fr-FR')}</span>
+					</li>
+				{/each}
+			</ul>
+			<div class="modal-actions">
+				<button class="btn" onclick={() => { rejectModal = null; }}>Annuler</button>
+				<button class="btn btn-confirm" onclick={confirmReassign}>Réassigner quand même</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
 <style>
 	.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 	.header h1 { margin: 0; font-size: 1.2rem; }
@@ -337,4 +404,7 @@
 	.create-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 	.create-form label { display: flex; flex-direction: column; gap: 3px; font-size: 0.85rem; font-weight: 500; }
 	.create-form input { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+	.reject-detail { font-weight: 600; margin: 8px 0; }
+	.reject-muted { color: #888; font-size: 0.85rem; }
+	.reject-list { margin: 10px 0; padding-left: 18px; font-size: 0.85rem; }
 </style>

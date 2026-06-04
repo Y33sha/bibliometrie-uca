@@ -1,5 +1,6 @@
 """Adapter PostgreSQL sync pour les authorships et source_authorships."""
 
+from datetime import datetime
 from typing import NamedTuple
 
 from sqlalchemy import Connection, text
@@ -87,6 +88,49 @@ class PgAuthorshipRepository:
             ),
             {"pub": publication_id, "pid": person_id},
         )
+
+    def find_rejected_authorship(self, publication_id: int, person_id: int) -> datetime | None:
+        """Date du rejet de la paire dans `rejected_authorships`, ou None."""
+        return self._conn.execute(
+            text(
+                "SELECT created_at FROM rejected_authorships "
+                "WHERE publication_id = :pub AND person_id = :pid"
+            ),
+            {"pub": publication_id, "pid": person_id},
+        ).scalar_one_or_none()
+
+    def delete_rejected_authorship(self, publication_id: int, person_id: int) -> None:
+        """Retire la paire de `rejected_authorships` (lève le rejet). Idempotent."""
+        self._conn.execute(
+            text(
+                "DELETE FROM rejected_authorships WHERE publication_id = :pub AND person_id = :pid"
+            ),
+            {"pub": publication_id, "pid": person_id},
+        )
+
+    def unlink_all_source_authorships_for_pair(
+        self,
+        publication_id: int,
+        person_id: int,
+    ) -> int:
+        """Nulle `person_id` sur toutes les `source_authorships` de cette
+        personne dont la `source_publication` pointe sur cette publication.
+
+        Détache la vérité source de la paire entière : « cette personne n'est
+        pas l'auteur de cette publication » vaut pour toutes ses sources.
+        Retourne le nombre de rows détachées."""
+        result = self._conn.execute(
+            text("""
+                UPDATE source_authorships sa
+                SET person_id = NULL
+                FROM source_publications sp
+                WHERE sa.source_publication_id = sp.id
+                  AND sp.publication_id = :pub
+                  AND sa.person_id = :pid
+            """),
+            {"pub": publication_id, "pid": person_id},
+        )
+        return result.rowcount
 
     def delete_authorship(self, authorship_id: int) -> None:
         self._conn.execute(

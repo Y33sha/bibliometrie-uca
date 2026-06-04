@@ -62,3 +62,30 @@ class PublisherMergeBlockedError(ConflictError):
 
 class UnauthorizedError(DomainError):
     """Accès refusé : session invalide ou permissions insuffisantes (→ HTTP 401)."""
+
+
+class RejectedPair(TypedDict):
+    """Paire (publication, personne) figurant dans le registre des rejets,
+    qui bloque une réassignation (cf. `RejectedPairError`)."""
+
+    publication_id: int
+    person_id: int
+    rejected_at: str  # ISO 8601
+
+
+class RejectedPairError(ConflictError):
+    """Réassignation refusée : une ou plusieurs paires (publication, personne)
+    ont déjà été rejetées et figurent dans `rejected_authorships`. Réassigner
+    recréerait un lien explicitement rejeté ; l'utilisatrice doit confirmer
+    pour lever le rejet (`force=true`).
+
+    `rejected_pairs` énumère les paires concernées (avec la date du rejet) pour
+    que l'UI les affiche avant de demander confirmation."""
+
+    def __init__(self, rejected_pairs: list[RejectedPair]) -> None:
+        self.rejected_pairs = rejected_pairs
+        n = len(rejected_pairs)
+        super().__init__(
+            f"{n} paire{'s' if n > 1 else ''} (publication, personne) "
+            f"déjà rejetée{'s' if n > 1 else ''}"
+        )

@@ -96,7 +96,7 @@ Quand on repère une publication attribuée au mauvais auteur, on peut détacher
 
 ![Détacher authorships](../screenshots/admin_persons_detacher.png)
 
-Le détachement est un **rejet durable** de la paire (publication, personne) : il porte sur la publication entière (toutes ses sources) et survit aux runs suivants du pipeline — le matching ne re-rattachera pas la personne à cette publication (cf. [`rejected_authorships`](../donnees/05-authorships-et-sources.md)). C'est la même opération que la croix de rejet sur une contribution. Pour réattribuer malgré tout la paire ensuite, cf [Authorships orphelines](#orphan-authorships).
+Pour réattribuer les authorships en question: cf [Authorships orphelines](#orphan-authorships)
 
 #### Vérification des identifiants de personne
 

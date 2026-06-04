@@ -123,6 +123,9 @@ class PgPersonRepository:
             self._conn, source, authorship_id
         )
 
+    def find_publication_ids_for_source_authorships(self, sa_ids: list[int]) -> list[int]:
+        return _authorships.find_publication_ids_for_source_authorships(self._conn, sa_ids)
+
     def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:
         _authorships.insert_authorship_if_missing(self._conn, publication_id, person_id)
 
@@ -155,9 +158,6 @@ class PgPersonRepository:
     def refresh_authorship_structures(self) -> None:
         self._conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY authorship_structures"))
 
-    def count_authorships_with_name_form(self, person_id: int, name_form: str) -> int:
-        return _authorships.count_authorships_with_name_form(self._conn, person_id, name_form)
-
     # ── person_name_forms ──────────────────────────────────────────
 
     def refresh_name_forms(self, person_id: int, forms: set[str]) -> None:
@@ -168,3 +168,6 @@ class PgPersonRepository:
 
     def detach_name_form(self, person_id: int, name_form: str) -> None:
         _name_forms.detach_name_form(self._conn, person_id, name_form)
+
+    def delete_orphan_name_forms_for_person(self, person_id: int) -> int:
+        return _name_forms.delete_orphan_name_forms_for_person(self._conn, person_id)

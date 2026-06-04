@@ -13,6 +13,7 @@ from application.authorships.core import (
     delete_orphan_authorships,
     exclude_authorship,
     propagate_uca_for_addresses,
+    reject_pair,
 )
 from domain.errors import NotFoundError
 from infrastructure.queries.perimeter import PgPerimeterQueries
@@ -231,10 +232,11 @@ class TestFindByPublicationId:
 
 
 class TestExcludeAuthorship:
-    """exclude_authorship enregistre le rejet dans `rejected_authorships` et
-    supprime la row `authorships`, sans toucher à la vérité source."""
+    """exclude_authorship enregistre le rejet dans `rejected_authorships`,
+    détache toutes les sources de la paire et supprime la canonique orpheline
+    (cœur partagé `reject_pair`)."""
 
-    def test_rejects_and_deletes_row_preserving_source(self, sa_sync_conn, repo):
+    def test_rejects_deletes_row_and_detaches_source(self, sa_sync_conn, repo):
         person_id = _create_person(sa_sync_conn)
         pub_id = _create_publication(sa_sync_conn)
         sp_id = _create_source_publication(sa_sync_conn, pub_id)
@@ -263,12 +265,12 @@ class TestExcludeAuthorship:
             ).first()
             is not None
         )
-        # Vérité source préservée (person_id non détaché)
+        # Vérité source détachée (zombie supprimé) — durabilité en amont
         row = sa_sync_conn.execute(
             text("SELECT person_id FROM source_authorships WHERE id = :id"),
             {"id": sa_id},
         ).one()
-        assert row.person_id == person_id
+        assert row.person_id is None
 
     def test_rebuild_does_not_recreate_rejected_pair(self, sa_sync_conn, repo):
         """Après rejet, l'insertion canonique re-skippe la paire (anti-join)."""
@@ -283,7 +285,7 @@ class TestExcludeAuthorship:
         )
 
         exclude_authorship(authorship_id, repo=repo)
-        # La source garde son person_id → insert_missing tenterait de recréer la paire.
+        # La source est détachée, mais même réattribuée l'anti-join skippe l'INSERT.
         insert_missing_authorships(sa_sync_conn)
 
         assert (
@@ -328,6 +330,109 @@ class TestExcludeAuthorship:
             text("SELECT person_id FROM source_authorships WHERE id = :id"), {"id": sa2}
         ).one()
         assert row2.person_id == p2
+
+
+# ── reject_pair ───────────────────────────────────────────────
+
+
+class TestRejectPair:
+    """reject_pair : cœur partagé — store peuplé, TOUTES les sources de la
+    paire détachées, canonique orpheline supprimée, non recréée au rerun."""
+
+    def test_detaches_all_sources_of_pair_and_deletes_canonical(self, sa_sync_conn, repo):
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        authorship_id = _create_authorship(sa_sync_conn, pub_id, person_id)
+        # Deux sources (hal + openalex) attestent la même paire.
+        sp_hal = _create_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-1")
+        sp_oa = _create_source_publication(
+            sa_sync_conn, pub_id, source="openalex", source_id="oa-1"
+        )
+        sa_hal = _create_source_authorship(
+            sa_sync_conn, sp_hal, source="hal", person_id=person_id, authorship_id=authorship_id
+        )
+        sa_oa = _create_source_authorship(
+            sa_sync_conn, sp_oa, source="openalex", person_id=person_id, authorship_id=authorship_id
+        )
+
+        result = reject_pair(pub_id, person_id, repo=repo)
+
+        assert result["detached"] == 2
+        assert result["deleted_authorships"] == 1
+        # Store peuplé
+        assert (
+            sa_sync_conn.execute(
+                text(
+                    "SELECT 1 FROM rejected_authorships "
+                    "WHERE publication_id = :pub AND person_id = :pid"
+                ),
+                {"pub": pub_id, "pid": person_id},
+            ).first()
+            is not None
+        )
+        # Toutes les sources détachées
+        for sa_id in (sa_hal, sa_oa):
+            assert (
+                sa_sync_conn.execute(
+                    text("SELECT person_id FROM source_authorships WHERE id = :i"), {"i": sa_id}
+                ).scalar_one()
+                is None
+            )
+        # Canonique supprimée
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT id FROM authorships WHERE id = :i"), {"i": authorship_id}
+            ).first()
+            is None
+        )
+
+    def test_not_recreated_on_rerun(self, sa_sync_conn, repo):
+        """Même si une source ressuscite person_id, l'anti-join skippe l'INSERT."""
+        from infrastructure.queries.authorships_build import insert_missing_authorships
+
+        person_id = _create_person(sa_sync_conn)
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        sa_id = _create_source_authorship(sa_sync_conn, sp_id, person_id=person_id)
+
+        reject_pair(pub_id, person_id, repo=repo)
+        # Resurrection simulée du lien source (matching non gardé d'un run antérieur).
+        sa_sync_conn.execute(
+            text("UPDATE source_authorships SET person_id = :pid WHERE id = :i"),
+            {"pid": person_id, "i": sa_id},
+        )
+        insert_missing_authorships(sa_sync_conn)
+
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT id FROM authorships WHERE publication_id = :p AND person_id = :pid"),
+                {"p": pub_id, "pid": person_id},
+            ).first()
+            is None
+        )
+
+    def test_does_not_touch_other_persons_sources(self, sa_sync_conn, repo):
+        pub_id = _create_publication(sa_sync_conn)
+        sp_id = _create_source_publication(sa_sync_conn, pub_id)
+        p1 = _create_person(sa_sync_conn, "Dupont", "Jean")
+        p2 = _create_person(sa_sync_conn, "Martin", "Sophie")
+        sa1 = _create_source_authorship(sa_sync_conn, sp_id, author_position=0, person_id=p1)
+        sa2 = _create_source_authorship(sa_sync_conn, sp_id, author_position=1, person_id=p2)
+
+        reject_pair(pub_id, p1, repo=repo)
+
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT person_id FROM source_authorships WHERE id = :i"), {"i": sa1}
+            ).scalar_one()
+            is None
+        )
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT person_id FROM source_authorships WHERE id = :i"), {"i": sa2}
+            ).scalar_one()
+            == p2
+        )
 
 
 # ── delete_orphan_authorships ─────────────────────────────────

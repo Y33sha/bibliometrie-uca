@@ -262,17 +262,19 @@ def detach_authorships(
     body: DetachAuthorships,
     person_repo_: PersonRepository = Depends(person_repo_sync),
     auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
 ) -> DetachAuthorshipsResponse:
-    """Détache des authorships sources d'une personne et nettoie les formes de noms."""
+    """Rejette durablement les paires (publication, personne) des authorships
+    sources sélectionnées et nettoie les formes de noms."""
     return DetachAuthorshipsResponse.model_validate(
         _detach_authorships_service(
             person_id,
             authorships=[
                 {"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships
             ],
-            name_form=body.name_form,
             repo=person_repo_,
             authorship_repo=auth_repo,
+            audit_repo=audit,
         )
     )
 

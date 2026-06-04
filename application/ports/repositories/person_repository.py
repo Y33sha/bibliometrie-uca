@@ -111,6 +111,14 @@ class PersonRepository(Protocol):
         authorship_id: int,
     ) -> int | None: ...
 
+    def find_publication_ids_for_source_authorships(
+        self,
+        sa_ids: list[int],
+    ) -> list[int]:
+        """Les `publication_id` distincts couverts par un lot de
+        `source_authorships`. Sert au pré-contrôle de rejet en batch."""
+        ...
+
     def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None: ...
 
     def link_source_authorships_to_authorship(
@@ -137,12 +145,6 @@ class PersonRepository(Protocol):
         """Rafraîchit la matview `authorship_structures` (`REFRESH … CONCURRENTLY`)."""
         ...
 
-    def count_authorships_with_name_form(
-        self,
-        person_id: int,
-        name_form: str,
-    ) -> int: ...
-
     # ── person_name_forms ──────────────────────────────────────────
 
     def refresh_name_forms(self, person_id: int, forms: set[str]) -> None: ...
@@ -155,3 +157,9 @@ class PersonRepository(Protocol):
     ) -> None: ...
 
     def detach_name_form(self, person_id: int, name_form: str) -> None: ...
+
+    def delete_orphan_name_forms_for_person(self, person_id: int) -> int:
+        """Supprime les formes de nom attestées par une source qui ne sont plus
+        portées par aucune `source_authorship` active de la personne (les
+        formes calculées, source `persons`, sont préservées)."""
+        ...

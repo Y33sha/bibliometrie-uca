@@ -483,7 +483,7 @@ class TestDetachAuthorships:
     def test_requires_admin(self, client):
         r = client.post(
             "/api/persons/1/detach-authorships",
-            json={"authorships": [], "name_form": ""},
+            json={"authorships": []},
         )
         assert r.status_code == 401
 
@@ -491,7 +491,7 @@ class TestDetachAuthorships:
         pid = _seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/detach-authorships",
-            json={"authorships": [], "name_form": ""},
+            json={"authorships": []},
         )
         assert r.status_code == 200
 

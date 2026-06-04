@@ -32,7 +32,7 @@ from application.persons import (
     update_identifier_status,
     update_name,
 )
-from domain.errors import NotFoundError, ValidationError
+from domain.errors import NotFoundError, RejectedPairError, ValidationError
 from infrastructure.repositories import (
     authorship_repository,
     person_repository,
@@ -384,12 +384,17 @@ class TestUpdateName:
 
 
 class TestBatchAssignOrphanAuthorships:
-    def test_empty_list_returns_zero(self, sa_sync_conn, repo):
+    def test_empty_list_returns_zero(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
-        assert batch_assign_orphan_authorships(person_id, [], repo=repo) == 0
+        assert (
+            batch_assign_orphan_authorships(
+                person_id, [], repo=repo, authorship_repo=authorship_repo
+            )
+            == 0
+        )
 
-    def test_assigns_and_creates_authorship(self, sa_sync_conn, repo):
+    def test_assigns_and_creates_authorship(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
@@ -405,7 +410,9 @@ class TestBatchAssignOrphanAuthorships:
             author_name_normalized="jean dupont",
         )
 
-        assigned = batch_assign_orphan_authorships(person_id, [sa1, sa2], repo=repo)
+        assigned = batch_assign_orphan_authorships(
+            person_id, [sa1, sa2], repo=repo, authorship_repo=authorship_repo
+        )
 
         assert assigned == 2
         row = sa_sync_conn.execute(
@@ -419,7 +426,7 @@ class TestBatchAssignOrphanAuthorships:
         ).all()
         assert all(r.authorship_id is not None for r in rows)
 
-    def test_skips_already_assigned(self, sa_sync_conn, repo):
+    def test_skips_already_assigned(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
         p1 = _insert_person(sa_sync_conn, "A", "A")
         p2 = _insert_person(sa_sync_conn, "B", "B")
@@ -427,7 +434,9 @@ class TestBatchAssignOrphanAuthorships:
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa1 = _insert_source_authorship(sa_sync_conn, sp_id, person_id=p1)
 
-        assigned = batch_assign_orphan_authorships(p2, [sa1], repo=repo)
+        assigned = batch_assign_orphan_authorships(
+            p2, [sa1], repo=repo, authorship_repo=authorship_repo
+        )
 
         assert assigned == 0
         assert (
@@ -471,49 +480,133 @@ class TestDetachAuthorships:
         ).first()
         assert row is None
 
-    def test_cleans_name_form_when_no_remaining(self, sa_sync_conn, repo, authorship_repo):
-        person_id = create_person("Dupont", "Jean", repo=repo)
-
-        result = detach_authorships(
-            person_id,
-            authorships=[],
-            name_form="dupont jean",
-            repo=repo,
-            authorship_repo=authorship_repo,
-        )
-        assert result["cleaned_form"] is True
-
-        row = sa_sync_conn.execute(
-            text(
-                "SELECT 1 FROM person_name_forms "
-                "WHERE name_form = 'dupont jean' AND person_id = :pid"
-            ),
-            {"pid": person_id},
-        ).first()
-        assert row is None
-
-    def test_keeps_name_form_if_another_authorship_uses_it(
+    def test_detaches_all_sources_of_publication_from_single_ref(
         self, sa_sync_conn, repo, authorship_repo
     ):
-        person_id = create_person("Dupont", "Jean", repo=repo)
+        """Le rejet porte sur la publication entière : sélectionner une source
+        détache toutes les sources de la même paire et peuple le store."""
+        person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
-        sp_id = _insert_source_publication(sa_sync_conn, pub_id)
-        _insert_source_authorship(
-            sa_sync_conn,
-            sp_id,
-            person_id=person_id,
-            author_name_normalized="dupont jean",
+        auth_id = sa_sync_conn.execute(
+            text(
+                "INSERT INTO authorships (publication_id, person_id) "
+                "VALUES (:pub, :pid) RETURNING id"
+            ),
+            {"pub": pub_id, "pid": person_id},
+        ).scalar_one()
+        sp_hal = _insert_source_publication(sa_sync_conn, pub_id, source="hal", source_id="hal-1")
+        sp_oa = _insert_source_publication(
+            sa_sync_conn, pub_id, source="openalex", source_id="oa-1"
+        )
+        sa_hal = _insert_source_authorship(sa_sync_conn, sp_hal, source="hal", person_id=person_id)
+        sa_oa = _insert_source_authorship(
+            sa_sync_conn, sp_oa, source="openalex", person_id=person_id
         )
 
+        # Une seule source sélectionnée (la hal).
         result = detach_authorships(
             person_id,
-            authorships=[],
-            name_form="dupont jean",
+            authorships=[{"source": "hal", "authorship_id": sa_hal}],
             repo=repo,
             authorship_repo=authorship_repo,
         )
 
-        assert result["cleaned_form"] is False
+        assert result["detached"] == 2
+        assert result["deleted_authorships"] == 1
+        for sa_id in (sa_hal, sa_oa):
+            assert (
+                _scalar(
+                    sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id
+                )
+                is None
+            )
+        assert _scalar(sa_sync_conn, "SELECT id FROM authorships WHERE id = :i", i=auth_id) is None
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT 1 FROM rejected_authorships WHERE publication_id = :p AND person_id = :pid",
+                p=pub_id,
+                pid=person_id,
+            )
+            == 1
+        )
+
+    def test_cleans_orphan_source_name_form(self, sa_sync_conn, repo, authorship_repo):
+        """Une forme de nom attestée par une source, devenue sans aucune source
+        active après détachement, est supprimée."""
+        person_id = _insert_person(sa_sync_conn)
+        pub_id = _insert_publication(sa_sync_conn)
+        sp_id = _insert_source_publication(sa_sync_conn, pub_id)
+        sa_id = _insert_source_authorship(
+            sa_sync_conn, sp_id, person_id=person_id, author_name_normalized="dupont jean"
+        )
+        repo.add_name_form(person_id, "Dupont Jean", source="hal")
+
+        result = detach_authorships(
+            person_id,
+            authorships=[{"source": "hal", "authorship_id": sa_id}],
+            repo=repo,
+            authorship_repo=authorship_repo,
+        )
+        assert result["cleaned_forms"] == 1
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT 1 FROM person_name_forms WHERE name_form='dupont jean' AND person_id=:p",
+                p=person_id,
+            )
+            is None
+        )
+
+    def test_preserves_computed_name_form(self, sa_sync_conn, repo, authorship_repo):
+        """Les formes calculées depuis le nom de la personne (source `persons`)
+        ne dépendent d'aucune source et survivent au détachement."""
+        person_id = create_person("Dupont", "Jean", repo=repo)
+
+        result = detach_authorships(
+            person_id, authorships=[], repo=repo, authorship_repo=authorship_repo
+        )
+        assert result["cleaned_forms"] == 0
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT 1 FROM person_name_forms WHERE name_form='dupont jean' AND person_id=:p",
+                p=person_id,
+            )
+            == 1
+        )
+
+    def test_keeps_source_name_form_still_backed(self, sa_sync_conn, repo, authorship_repo):
+        """Une forme encore attestée par une source d'une autre publication
+        n'est pas supprimée quand on détache une seule publication."""
+        person_id = _insert_person(sa_sync_conn)
+        pub1 = _insert_publication(sa_sync_conn, "P1")
+        pub2 = _insert_publication(sa_sync_conn, "P2")
+        sp1 = _insert_source_publication(sa_sync_conn, pub1, source_id="hal-1")
+        sp2 = _insert_source_publication(sa_sync_conn, pub2, source_id="hal-2")
+        sa1 = _insert_source_authorship(
+            sa_sync_conn, sp1, person_id=person_id, author_name_normalized="dupont jean"
+        )
+        _insert_source_authorship(
+            sa_sync_conn, sp2, person_id=person_id, author_name_normalized="dupont jean"
+        )
+        repo.add_name_form(person_id, "Dupont Jean", source="hal")
+
+        result = detach_authorships(
+            person_id,
+            authorships=[{"source": "hal", "authorship_id": sa1}],
+            repo=repo,
+            authorship_repo=authorship_repo,
+        )
+        assert result["cleaned_forms"] == 0
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT 1 FROM person_name_forms WHERE name_form='dupont jean' AND person_id=:p",
+                p=person_id,
+            )
+            == 1
+        )
 
 
 class TestMarkDistinctPersons:
@@ -597,11 +690,11 @@ class TestDetachNameForm:
 
 
 class TestAssignOrphanAuthorship:
-    def test_raises_on_invalid_source(self, sa_sync_conn, repo):
+    def test_raises_on_invalid_source(self, sa_sync_conn, repo, authorship_repo):
         with pytest.raises(ValidationError, match="Source inconnue"):
-            assign_orphan_authorship(1, "invalid", 1, repo=repo)
+            assign_orphan_authorship(1, "invalid", 1, repo=repo, authorship_repo=authorship_repo)
 
-    def test_returns_false_if_already_assigned(self, sa_sync_conn, repo):
+    def test_returns_false_if_already_assigned(self, sa_sync_conn, repo, authorship_repo):
         """Si l'authorship a déjà un person_id, l'UPDATE ne matche pas."""
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
@@ -610,16 +703,23 @@ class TestAssignOrphanAuthorship:
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id, person_id=other_id)
 
-        assert assign_orphan_authorship(person_id, "hal", sa_id, repo=repo) is False
+        assert (
+            assign_orphan_authorship(
+                person_id, "hal", sa_id, repo=repo, authorship_repo=authorship_repo
+            )
+            is False
+        )
 
-    def test_assigns_and_creates_authorship(self, sa_sync_conn, repo):
+    def test_assigns_and_creates_authorship(self, sa_sync_conn, repo, authorship_repo):
         _setup_uca(sa_sync_conn)
         person_id = _insert_person(sa_sync_conn)
         pub_id = _insert_publication(sa_sync_conn)
         sp_id = _insert_source_publication(sa_sync_conn, pub_id)
         sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
 
-        result = assign_orphan_authorship(person_id, "hal", sa_id, repo=repo)
+        result = assign_orphan_authorship(
+            person_id, "hal", sa_id, repo=repo, authorship_repo=authorship_repo
+        )
 
         assert result is True
         row = sa_sync_conn.execute(
@@ -634,6 +734,136 @@ class TestAssignOrphanAuthorship:
             {"pub": pub_id, "pid": person_id},
         ).first()
         assert row is not None
+
+
+def _reject_pair(conn, pub_id, person_id):
+    conn.execute(
+        text("INSERT INTO rejected_authorships (publication_id, person_id) VALUES (:p, :pid)"),
+        {"p": pub_id, "pid": person_id},
+    )
+
+
+class TestReassignRejectedPairUnit:
+    """Pré-contrôle de rejet sur les chemins de réassignation orphan-authorships."""
+
+    def test_assign_blocked_when_rejected(self, sa_sync_conn, repo, authorship_repo):
+        _setup_uca(sa_sync_conn)
+        person_id = _insert_person(sa_sync_conn)
+        pub_id = _insert_publication(sa_sync_conn)
+        sp_id = _insert_source_publication(sa_sync_conn, pub_id)
+        sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
+        _reject_pair(sa_sync_conn, pub_id, person_id)
+
+        with pytest.raises(RejectedPairError) as exc:
+            assign_orphan_authorship(
+                person_id, "hal", sa_id, repo=repo, authorship_repo=authorship_repo
+            )
+        pair = exc.value.rejected_pairs[0]
+        assert pair["publication_id"] == pub_id
+        assert pair["person_id"] == person_id
+        assert pair["rejected_at"]
+        # Source non assignée : on a levé avant la pose de person_id.
+        assert (
+            _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
+            is None
+        )
+
+    def test_assign_forced_unrejects_and_recreates_canonical(
+        self, sa_sync_conn, repo, authorship_repo
+    ):
+        _setup_uca(sa_sync_conn)
+        person_id = _insert_person(sa_sync_conn)
+        pub_id = _insert_publication(sa_sync_conn)
+        sp_id = _insert_source_publication(sa_sync_conn, pub_id)
+        sa_id = _insert_source_authorship(sa_sync_conn, sp_id)
+        _reject_pair(sa_sync_conn, pub_id, person_id)
+
+        result = assign_orphan_authorship(
+            person_id, "hal", sa_id, repo=repo, authorship_repo=authorship_repo, force=True
+        )
+
+        assert result is True
+        # Rejet levé
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT 1 FROM rejected_authorships WHERE publication_id = :p AND person_id = :pid",
+                p=pub_id,
+                pid=person_id,
+            )
+            is None
+        )
+        # Source assignée et canonique recréée
+        assert (
+            _scalar(sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id)
+            == person_id
+        )
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT id FROM authorships WHERE publication_id = :p AND person_id = :pid",
+                p=pub_id,
+                pid=person_id,
+            )
+            is not None
+        )
+
+    def test_batch_blocked_lists_all_rejected(self, sa_sync_conn, repo, authorship_repo):
+        _setup_uca(sa_sync_conn)
+        person_id = _insert_person(sa_sync_conn)
+        pub1 = _insert_publication(sa_sync_conn, "P1")
+        pub2 = _insert_publication(sa_sync_conn, "P2")
+        sp1 = _insert_source_publication(sa_sync_conn, pub1, source_id="h-1")
+        sp2 = _insert_source_publication(sa_sync_conn, pub2, source_id="h-2")
+        sa1 = _insert_source_authorship(sa_sync_conn, sp1)
+        sa2 = _insert_source_authorship(sa_sync_conn, sp2)
+        _reject_pair(sa_sync_conn, pub1, person_id)
+
+        with pytest.raises(RejectedPairError) as exc:
+            batch_assign_orphan_authorships(
+                person_id, [sa1, sa2], repo=repo, authorship_repo=authorship_repo
+            )
+        assert {p["publication_id"] for p in exc.value.rejected_pairs} == {pub1}
+        # Rien d'assigné : on a levé avant la pose.
+        for sa_id in (sa1, sa2):
+            assert (
+                _scalar(
+                    sa_sync_conn, "SELECT person_id FROM source_authorships WHERE id = :i", i=sa_id
+                )
+                is None
+            )
+
+    def test_batch_forced_unrejects_all(self, sa_sync_conn, repo, authorship_repo):
+        _setup_uca(sa_sync_conn)
+        person_id = _insert_person(sa_sync_conn)
+        pub1 = _insert_publication(sa_sync_conn, "P1")
+        sp1 = _insert_source_publication(sa_sync_conn, pub1, source_id="h-1")
+        sa1 = _insert_source_authorship(sa_sync_conn, sp1)
+        _reject_pair(sa_sync_conn, pub1, person_id)
+
+        assigned = batch_assign_orphan_authorships(
+            person_id, [sa1], repo=repo, authorship_repo=authorship_repo, force=True
+        )
+
+        assert assigned == 1
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT 1 FROM rejected_authorships WHERE publication_id = :p AND person_id = :pid",
+                p=pub1,
+                pid=person_id,
+            )
+            is None
+        )
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT id FROM authorships WHERE publication_id = :p AND person_id = :pid",
+                p=pub1,
+                pid=person_id,
+            )
+            is not None
+        )
 
 
 class TestMergePersonRejectedAuthorships:

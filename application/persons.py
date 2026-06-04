@@ -6,7 +6,7 @@ Gère aussi le rattachement/détachement des authorships sources (`source_author
 import logging
 
 from application.audit import emit_event
-from application.authorships.core import delete_orphan_authorships
+from application.authorships.core import reject_pair
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -304,34 +304,42 @@ def detach_name_form(person_id: int, name_form: str, *, repo: PersonRepository) 
 def detach_authorships(
     person_id: int,
     authorships: list[dict],
-    name_form: str | None = None,
     *,
     repo: PersonRepository,
     authorship_repo: AuthorshipRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> dict:
-    """Détache un lot d'authorships sources d'une personne et nettoie les
-    authorships vérité devenues orphelines.
+    """Rejette durablement les paires (publication, personne) couvertes par un
+    lot d'authorships sources sélectionnées.
 
-    Si `name_form` est fourni, supprime aussi la forme de nom de la personne
-    lorsque plus aucune authorship ne la porte.
+    Le rejet porte sur la publication entière : on résout l'ensemble distinct
+    des `publication_id` des sources sélectionnées et on applique `reject_pair`
+    à chaque paire (enregistrement du rejet, détachement de toutes les sources
+    de la paire, suppression de la ligne consolidée). Puis on supprime les
+    formes de nom de la personne que plus aucune source n'atteste.
 
-    Retourne {"detached": N, "deleted_authorships": M, "cleaned_form": bool}.
+    Retourne {"detached": N, "deleted_authorships": M, "cleaned_forms": K}.
     """
+    publication_ids: set[int] = set()
     for a in authorships:
         if a["source"] in ALL_SOURCES_SET:
-            repo.unlink_authorship(person_id, a["source"], a["authorship_id"])
+            pub_id = repo.find_publication_id_for_source_authorship(a["source"], a["authorship_id"])
+            if pub_id is not None:
+                publication_ids.add(pub_id)
 
-    deleted = delete_orphan_authorships(person_id, repo=authorship_repo)
+    detached = 0
+    deleted = 0
+    for pub_id in publication_ids:
+        result = reject_pair(pub_id, person_id, repo=authorship_repo, audit_repo=audit_repo)
+        detached += result["detached"]
+        deleted += result["deleted_authorships"]
 
-    cleaned_form = False
-    if name_form and repo.count_authorships_with_name_form(person_id, name_form) == 0:
-        repo.detach_name_form(person_id, name_form)
-        cleaned_form = True
+    cleaned_forms = repo.delete_orphan_name_forms_for_person(person_id)
 
     return {
-        "detached": len(authorships),
+        "detached": detached,
         "deleted_authorships": deleted,
-        "cleaned_form": cleaned_form,
+        "cleaned_forms": cleaned_forms,
     }
 
 
