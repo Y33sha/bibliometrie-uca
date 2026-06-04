@@ -45,39 +45,38 @@ class TestStructureConstruction:
 
 
 class TestRorId:
-    def test_accepts_short_form(self):
-        assert RorId("02feahw73").value == "02feahw73"
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("02feahw73", "02feahw73"),  # forme courte
+            ("https://ror.org/02feahw73", "02feahw73"),  # strip https
+            ("http://ror.org/02feahw73", "02feahw73"),  # strip http
+            ("ror.org/02feahw73", "02feahw73"),  # strip préfixe nu
+            ("02FEAHW73", "02feahw73"),  # lowercase
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert RorId(raw).value == expected
 
-    def test_accepts_url_form(self):
-        assert RorId("https://ror.org/02feahw73").value == "02feahw73"
-        assert RorId("http://ror.org/02feahw73").value == "02feahw73"
-        assert RorId("ror.org/02feahw73").value == "02feahw73"
-
-    def test_normalizes_case(self):
-        assert RorId("02FEAHW73").value == "02feahw73"
-
-    def test_rejects_invalid_alphabet(self):
-        # ROR alphabet exclut i/l/o/u
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "02feai073",  # 'i' interdit (alphabet ROR exclut i/l/o/u)
+            "02feal073",  # 'l' interdit
+            "02feahw7",  # 8 chars
+            "02feahw733",  # 10 chars
+            "12feahw73",  # mauvais préfixe (tous les ROR commencent par '0')
+        ],
+    )
+    def test_raises_on_invalid(self, raw):
         with pytest.raises(ValidationError):
-            RorId("02feai073")  # 'i' interdit
-        with pytest.raises(ValidationError):
-            RorId("02feal073")  # 'l' interdit
+            RorId(raw)
 
-    def test_rejects_wrong_length(self):
-        with pytest.raises(ValidationError):
-            RorId("02feahw7")  # 8 chars
-        with pytest.raises(ValidationError):
-            RorId("02feahw733")  # 10 chars
+    @pytest.mark.parametrize("raw", [None, "", "garbage"])
+    def test_try_parse_returns_none_on_invalid(self, raw):
+        assert RorId.try_parse(raw) is None
 
-    def test_rejects_wrong_prefix(self):
-        # Tous les ROR commencent par '0' (jusqu'à présent)
-        with pytest.raises(ValidationError):
-            RorId("12feahw73")
-
-    def test_try_parse_returns_none_on_invalid(self):
-        assert RorId.try_parse(None) is None
-        assert RorId.try_parse("") is None
-        assert RorId.try_parse("garbage") is None
+    def test_try_parse_valid(self):
         assert RorId.try_parse("02feahw73").value == "02feahw73"
 
     def test_str_returns_canonical(self):
@@ -85,34 +84,35 @@ class TestRorId:
 
 
 class TestHalCollection:
-    def test_accepts_simple_code(self):
-        assert HalCollection("LIMOS").value == "LIMOS"
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("LIMOS", "LIMOS"),  # code simple
+            ("INSTITUT_PASCAL", "INSTITUT_PASCAL"),  # underscore
+            ("LPC-CLERMONT", "LPC-CLERMONT"),  # tiret
+            ("  limos  ", "LIMOS"),  # case + whitespace
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert HalCollection(raw).value == expected
 
-    def test_accepts_underscore(self):
-        assert HalCollection("INSTITUT_PASCAL").value == "INSTITUT_PASCAL"
-
-    def test_accepts_hyphen(self):
-        assert HalCollection("LPC-CLERMONT").value == "LPC-CLERMONT"
-
-    def test_normalizes_case_and_whitespace(self):
-        assert HalCollection("  limos  ").value == "LIMOS"
-
-    def test_rejects_empty(self):
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "",  # vide
+            "   ",  # whitespace seul
+            "LAB X",  # espace interne
+            "LABO.X",  # point
+            "ÉCOLE",  # accent
+        ],
+    )
+    def test_raises_on_invalid(self, raw):
         with pytest.raises(ValidationError):
-            HalCollection("")
-        with pytest.raises(ValidationError):
-            HalCollection("   ")
+            HalCollection(raw)
 
-    def test_rejects_invalid_chars(self):
-        with pytest.raises(ValidationError):
-            HalCollection("LAB X")  # espace interne
-        with pytest.raises(ValidationError):
-            HalCollection("LABO.X")  # point
-        with pytest.raises(ValidationError):
-            HalCollection("ÉCOLE")  # accent
+    @pytest.mark.parametrize("raw", [None, "", "LAB X"])
+    def test_try_parse_returns_none_on_invalid(self, raw):
+        assert HalCollection.try_parse(raw) is None
 
-    def test_try_parse_returns_none_on_invalid(self):
-        assert HalCollection.try_parse(None) is None
-        assert HalCollection.try_parse("") is None
-        assert HalCollection.try_parse("LAB X") is None
+    def test_try_parse_valid(self):
         assert HalCollection.try_parse("LIMOS").value == "LIMOS"
