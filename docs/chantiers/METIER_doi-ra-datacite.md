@@ -2,7 +2,7 @@
 
 Commencé le 2026-04-28
 
-**Phases 0-2 livrées. Phase 3 en standby au 2026-05-23** — le spike comparatif et le spike affiliation-driven ont changé la nature de la Phase 3 : DataCite est exploitable comme source affiliation-driven (analogue HAL / OpenAlex), pas seulement comme fallback DOI-driven. Standby commun avec `METIER_crossref.md` Phase 6, en attendant de pouvoir rejouer les deux spikes sur la base de prod pour mesurer le vrai delta.
+**Phases 0-2 livrées. Phase 3 en standby au 2026-05-23** — le spike comparatif et le spike affiliation-driven ont changé la nature de la Phase 3 : DataCite est exploitable comme source affiliation-driven (analogue HAL / OpenAlex), pas seulement comme fallback DOI-driven.
 
 ## Contexte
 

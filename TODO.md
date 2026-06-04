@@ -1,5 +1,4 @@
 # A régler avant transmission
-* [ ] Pb CI: version Starlette 0.50.0
 ## Pipeline de traitement
 ### Extraction
 * [ ] hal-id non trouvé dans hal en cross-import => ajouter une phase qui supprime les hal-id erronés des external_ids?
@@ -12,11 +11,9 @@
 ### Suite du traitement
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? idem subjects
 ## Code
-* [ ] organiser le dossier queries
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
-* [ ] tests: grouper les mocks au lieu de les dupliquer d'un test à l'autre?
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
-* [ ] auditer tests bizarres (integration/helpers/publications par ex.)
+* [ ] DRY upsert_source_publication? (au lieu d'une fonction par source)
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi
@@ -57,7 +54,7 @@
 * [ ] Filtres supplémentaires possibles: langue; has_doi; corresponding_is_in_perimeter; (peer_reviewed? suppose de posséder la donnée ou de pouvoir la déduire des sources)
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
 * [ ] afficher mémoires master et thèses en cours sur liste publications de la page personnes/id
-* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?) => ou cacher si pas de source theses.fr?
+* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
 ## Détails d'affichage
 * [ ] décomptes sur les onglets: incohérents (cf nb revues par éditeur): supprimer ou corriger?
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
