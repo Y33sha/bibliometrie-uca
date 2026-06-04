@@ -1,6 +1,6 @@
 """Port : SQL du peuplement de `person_name_forms`.
 
-Implémenté par `infrastructure.queries.name_forms.PgNameFormsQueries`.
+Implémenté par `infrastructure.queries.pipeline.name_forms.PgNameFormsQueries`.
 
 Workflow attendu : l'orchestrateur peuple une table temp `_raw_forms`
 avec les formes calculées depuis `persons` (compute_person_name_forms),

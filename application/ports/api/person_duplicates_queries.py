@@ -1,6 +1,6 @@
 """Port : lectures pour /api/admin/person-duplicates/*.
 
-Implémenté par `infrastructure.queries.person_duplicates.PgPersonDuplicatesQueries`.
+Implémenté par `infrastructure.queries.api.person_duplicates.PgPersonDuplicatesQueries`.
 
 Co-localise les DTOs Pydantic retournés par ce port. Cf. chantier `CODE_typage-projections-strict` Phase 4.
 """

@@ -1,6 +1,6 @@
 """Port : SQL du normaliseur Web of Science.
 
-Implémenté par `infrastructure.queries.normalize_wos.PgWosNormalizeQueries`.
+Implémenté par `infrastructure.queries.pipeline.normalize.wos.PgWosNormalizeQueries`.
 """
 
 from typing import Protocol

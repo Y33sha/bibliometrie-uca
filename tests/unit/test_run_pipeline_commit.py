@@ -20,7 +20,7 @@ def test_run_create_persons_commits_before_close():
         patch(
             "application.pipeline.persons.create_persons_from_source_authorships.run"
         ) as mock_run,
-        patch("infrastructure.queries.persons.create.PgPersonsCreateQueries"),
+        patch("infrastructure.queries.pipeline.persons_create.PgPersonsCreateQueries"),
         patch("infrastructure.repositories.person_repository"),
     ):
         from run_pipeline import _run_create_persons

@@ -1,9 +1,9 @@
-"""Tests d'intégration pour `infrastructure.queries.normalize_theses`."""
+"""Tests d'intégration pour `infrastructure.queries.pipeline.normalize.theses`."""
 
 import pytest
 from sqlalchemy import Connection, text
 
-from infrastructure.queries.normalize_theses import (
+from infrastructure.queries.pipeline.normalize.theses import (
     count_theses_table,
     upsert_theses_source_authorship,
     upsert_theses_source_publication,

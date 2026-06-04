@@ -1,6 +1,6 @@
 """Port : SQL de la sous-étape de résolution du concept DOI Zenodo.
 
-Implémenté par `infrastructure.queries.publications.zenodo_concept.PgZenodoConceptQueries`.
+Implémenté par `infrastructure.queries.pipeline.zenodo_concept.PgZenodoConceptQueries`.
 """
 
 from typing import NamedTuple, Protocol

@@ -5,7 +5,7 @@ import os
 from application.pipeline.extract.extract_theses import ThesesExtractor
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.staging import PgStagingQueries
+from infrastructure.queries.pipeline.staging import PgStagingQueries
 from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.theses.extract_theses import PgThesesExtractAdapter
 

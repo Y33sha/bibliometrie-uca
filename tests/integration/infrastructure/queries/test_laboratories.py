@@ -1,11 +1,11 @@
-"""Tests d'intégration pour `infrastructure.queries.laboratories`."""
+"""Tests d'intégration pour `infrastructure.queries.api.laboratories`."""
 
 import json
 
 from sqlalchemy import text
 
 from application.ports.api.laboratories_queries import LabPersonsFilters
-from infrastructure.queries.laboratories import PgLaboratoriesQueries
+from infrastructure.queries.api.laboratories import PgLaboratoriesQueries
 from tests.integration.helpers.structures import add_authorship_structure
 
 

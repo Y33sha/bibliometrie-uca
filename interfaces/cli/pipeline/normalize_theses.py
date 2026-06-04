@@ -5,8 +5,8 @@ import os
 from application.pipeline.normalize.normalize_theses import ThesesNormalizer
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.normalize_theses import PgThesesNormalizeQueries
-from infrastructure.queries.staging import PgStagingQueries
+from infrastructure.queries.pipeline.normalize.theses import PgThesesNormalizeQueries
+from infrastructure.queries.pipeline.staging import PgStagingQueries
 from infrastructure.repositories import publication_repository
 from infrastructure.repositories.address_linker import PgAddressLinker
 

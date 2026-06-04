@@ -15,7 +15,7 @@ import pytest
 from sqlalchemy import text
 
 from application.pipeline.countries.refresh_publication_countries import refresh
-from infrastructure.queries.countries import PgCountryQueries
+from infrastructure.queries.pipeline.countries import PgCountryQueries
 
 
 def _insert_publication(conn, title: str = "Test pub", year: int = 2024) -> int:

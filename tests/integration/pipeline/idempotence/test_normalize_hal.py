@@ -76,9 +76,9 @@ def run_normalize_hal(conn):
 
     from application.pipeline.normalize.normalize_hal import process_work
     from application.ports.pipeline.staging import HalStagingRow
-    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.normalize_hal import PgHalNormalizeQueries
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.queries.pipeline.normalize.hal import PgHalNormalizeQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,

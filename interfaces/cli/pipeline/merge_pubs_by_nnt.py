@@ -6,7 +6,7 @@ import os
 from application.pipeline.publications.merge_pubs_by_nnt import run_merge
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.merge import PgMergeQueries
+from infrastructure.queries.pipeline.merge import PgMergeQueries
 from infrastructure.repositories import publication_repository
 
 logger = setup_logger("merge_pubs_by_nnt", os.path.join(os.path.dirname(__file__), "logs"))

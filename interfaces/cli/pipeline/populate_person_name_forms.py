@@ -5,7 +5,7 @@ import os
 from application.pipeline.persons.populate_person_name_forms import populate
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.name_forms import PgNameFormsQueries
+from infrastructure.queries.pipeline.name_forms import PgNameFormsQueries
 
 logger = setup_logger("populate_person_name_forms", os.path.join(os.path.dirname(__file__), "logs"))
 

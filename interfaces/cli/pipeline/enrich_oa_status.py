@@ -9,7 +9,7 @@ import httpx
 from application.pipeline.oa_status.run import run_enrich_oa_status
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.enrich import PgEnrichQueries
+from infrastructure.queries.pipeline.enrich import PgEnrichQueries
 from infrastructure.repositories import publication_repository
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
 from infrastructure.sources.unpaywall import fetch_oa_status

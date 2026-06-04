@@ -4,15 +4,15 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from infrastructure.queries.api.stats._shared import (
+    paginated,
+    stats_apc_clause,
+)
 from infrastructure.queries.filters import (
     WhereClause,
     assemble_where,
     oa_clause,
     year_clause,
-)
-from infrastructure.queries.stats._shared import (
-    paginated,
-    stats_apc_clause,
 )
 
 _LAB_SORT_MAP = {

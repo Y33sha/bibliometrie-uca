@@ -16,8 +16,8 @@ import os
 from application.pipeline.affiliations.resolve_addresses import run_resolution
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.address_resolution import PgAddressResolutionQueries
 from infrastructure.queries.perimeter import get_persons_structure_ids
+from infrastructure.queries.pipeline.address_resolution import PgAddressResolutionQueries
 
 logger = setup_logger("resolve_addresses", os.path.join(os.path.dirname(__file__), "logs"))
 

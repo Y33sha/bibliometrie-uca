@@ -2,7 +2,7 @@
 
 Les DTOs Pydantic sont co-localisés avec le `Protocol` (cf. décision 3
 du chantier typage-projections-strict). Implémenté par
-`infrastructure.queries.laboratories.PgLaboratoriesQueries`.
+`infrastructure.queries.api.laboratories.PgLaboratoriesQueries`.
 """
 
 from dataclasses import dataclass, field

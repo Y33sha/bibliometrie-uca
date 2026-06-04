@@ -28,7 +28,7 @@ from sqlalchemy import Connection, text
 from application.pipeline.metrics import PhaseMetrics
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.countries import suggest_addresses_countries_batch
+from infrastructure.queries.pipeline.countries import suggest_addresses_countries_batch
 
 logger = setup_logger("suggest_countries", "processing/logs")
 

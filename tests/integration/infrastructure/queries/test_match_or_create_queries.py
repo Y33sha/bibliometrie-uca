@@ -1,11 +1,11 @@
-"""Tests d'intégration pour `infrastructure.queries.publications.match_or_create`.
+"""Tests d'intégration pour `infrastructure.queries.pipeline.publications_match_or_create`.
 
 Couvre en particulier le contrat de **staleness** : les trois rattachements bulk (`bulk_link_orphans_by_doi`, `bulk_link_orphans_by_nnt`, `bulk_link_orphans_by_hal_id`) doivent bumper `source_publications.updated_at` pour que `fetch_stale_publication_ids` voie la publication comme stale et déclenche `refresh_from_sources` en Phase 2 — sinon l'agrégation cross-source (oa_status, abstract, …) ne reflète jamais la SP nouvellement rattachée.
 """
 
 from sqlalchemy import text
 
-from infrastructure.queries.publications.match_or_create import (
+from infrastructure.queries.pipeline.publications_match_or_create import (
     bulk_link_orphans_by_doi,
     bulk_link_orphans_by_hal_id,
     bulk_link_orphans_by_nnt,

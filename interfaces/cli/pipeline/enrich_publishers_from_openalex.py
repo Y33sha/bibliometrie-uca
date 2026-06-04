@@ -8,7 +8,7 @@ from application.pipeline.publishers_journals.enrich_publishers_from_openalex im
 )
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.enrich import PgEnrichQueries
+from infrastructure.queries.pipeline.enrich import PgEnrichQueries
 from infrastructure.repositories import publisher_repository
 from infrastructure.sources.api_limits import DOAJ_DELAY
 from infrastructure.sources.config import (

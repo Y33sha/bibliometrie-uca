@@ -1,11 +1,11 @@
-"""Tests d'intégration pour `infrastructure.queries.publications.list`."""
+"""Tests d'intégration pour `infrastructure.queries.api.publications.list`."""
 
 import json
 
 from sqlalchemy import text
 
 from application.ports.api.publications_queries import ListFilters
-from infrastructure.queries.publications.list import list_publications
+from infrastructure.queries.api.publications.list import list_publications
 from tests.integration.helpers.structures import add_authorship_structure
 
 

@@ -23,7 +23,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.persons import add_name_form, create_person
 from application.pipeline.persons.create_persons_from_source_authorships import run
-from infrastructure.queries.persons.create import PgPersonsCreateQueries
+from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 
 _queries = PgPersonsCreateQueries()

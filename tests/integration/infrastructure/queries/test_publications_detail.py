@@ -1,10 +1,10 @@
-"""Tests d'intégration pour `infrastructure.queries.publications.detail`."""
+"""Tests d'intégration pour `infrastructure.queries.api.publications.detail`."""
 
 import json
 
 from sqlalchemy import text
 
-from infrastructure.queries.publications.detail import (
+from infrastructure.queries.api.publications.detail import (
     get_publication_detail,
     get_publication_subjects,
 )

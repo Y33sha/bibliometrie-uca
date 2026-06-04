@@ -1,6 +1,6 @@
 """Port : recalcul des caches dénormalisés de pays.
 
-Implémenté par `infrastructure.queries.countries.PgCountryQueries`.
+Implémenté par `infrastructure.queries.pipeline.countries.PgCountryQueries`.
 Utilisé par `application.pipeline.countries.refresh_publication_countries`.
 """
 

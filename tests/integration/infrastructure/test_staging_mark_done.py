@@ -5,7 +5,7 @@ import json
 
 from sqlalchemy import text
 
-from infrastructure.queries.staging import PgStagingQueries
+from infrastructure.queries.pipeline.staging import PgStagingQueries
 from infrastructure.raw_store.local import LocalFileRawStore
 from infrastructure.sources.common import canonical_json_bytes, compute_hash
 

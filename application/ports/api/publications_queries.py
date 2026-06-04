@@ -2,7 +2,7 @@
 
 Les DTOs Pydantic sont co-localisés avec le `Protocol` (cf. décision 3
 du chantier typage-projections-strict). Implémenté par
-`infrastructure.queries.publications.PgPublicationsQueries`.
+`infrastructure.queries.api.publications.PgPublicationsQueries`.
 
 Les dataclasses `FacetFilters` et `ListFilters` vivent ici (source de
 vérité) ; les fonctions infra les importent depuis ce module pour typer

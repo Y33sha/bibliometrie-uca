@@ -1,10 +1,10 @@
-"""Tests d'intégration pour `infrastructure.queries.hal_problems`."""
+"""Tests d'intégration pour `infrastructure.queries.api.hal_problems`."""
 
 import json
 
 from sqlalchemy import text
 
-from infrastructure.queries.hal_problems import PgHalProblemsQueries
+from infrastructure.queries.api.hal_problems import PgHalProblemsQueries
 from tests.integration.helpers.structures import add_authorship_structure
 
 

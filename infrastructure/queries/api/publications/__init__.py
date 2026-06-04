@@ -1,11 +1,12 @@
-"""Query services autour des publications.
+"""Query services de lecture autour des publications (router publications).
 
 Le package est organisé par thème :
 - `list` : `list_publications`, `export_publications_csv`, `export_theses_csv`
 - `facets` : `publications_facets`
 - `detail` : `get_publication_detail`
-- `match_or_create` : `PgPublicationsMatchOrCreateQueries` (adapter du port
-  `application.ports.pipeline.publications_match_or_create`, sync, consommé par le pipeline)
+
+Les adapters d'écriture pipeline (`pipeline.publications_match_or_create`,
+`pipeline.zenodo_concept`) vivent côté `infrastructure/queries/pipeline/`.
 
 `PgPublicationsQueries` agrège les 5 fonctions de lecture sous le port
 `application.ports.api.publications_queries.PublicationsQueries`. Les fonctions
@@ -28,23 +29,20 @@ from application.ports.api.publications_queries import (
     PublicationsFacetsResponse,
     PublicationsQueries,
 )
-from infrastructure.queries.publications.detail import (
+from infrastructure.queries.api.publications.detail import (
     get_publication_detail as _get_publication_detail,
 )
-from infrastructure.queries.publications.facets import (
+from infrastructure.queries.api.publications.facets import (
     publications_facets as _publications_facets,
 )
-from infrastructure.queries.publications.list import (
+from infrastructure.queries.api.publications.list import (
     export_publications_csv as _export_publications_csv,
 )
-from infrastructure.queries.publications.list import (
+from infrastructure.queries.api.publications.list import (
     export_theses_csv as _export_theses_csv,
 )
-from infrastructure.queries.publications.list import (
+from infrastructure.queries.api.publications.list import (
     list_publications as _list_publications,
-)
-from infrastructure.queries.publications.match_or_create import (
-    PgPublicationsMatchOrCreateQueries,
 )
 
 
@@ -102,4 +100,4 @@ class PgPublicationsQueries(PublicationsQueries):
         return PublicationDetailResponse.model_validate(data)
 
 
-__all__ = ["PgPublicationsMatchOrCreateQueries", "PgPublicationsQueries"]
+__all__ = ["PgPublicationsQueries"]

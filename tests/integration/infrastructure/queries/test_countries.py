@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.queries.countries`."""
+"""Tests d'intégration pour `infrastructure.queries.pipeline.countries`."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.countries import (
+from infrastructure.queries.pipeline.countries import (
     refresh_address_source_countries,
     refresh_publication_countries,
     suggest_addresses_countries_batch,

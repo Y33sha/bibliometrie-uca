@@ -1,6 +1,6 @@
 """Port : SQL de construction de la table `authorships`.
 
-Implémenté par `infrastructure.queries.authorships_build.PgAuthorshipsBuildQueries`.
+Implémenté par `infrastructure.queries.pipeline.authorships_build.PgAuthorshipsBuildQueries`.
 """
 
 from typing import Protocol

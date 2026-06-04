@@ -60,7 +60,7 @@ Les orchestrateurs dans `application/pipeline/*` ne peuvent pas importer `infras
 Exemple depuis `run_pipeline.py` :
 
 ```python
-from infrastructure.queries.persons_create import PgPersonsCreateQueries
+from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
 from infrastructure.repositories import person_repository
 
 PgPersonsCreateQueries()        # adapter query service

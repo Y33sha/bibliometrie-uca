@@ -1,6 +1,6 @@
 """Port : lectures sur les structures (consommé par le router structures).
 
-Implémenté par `infrastructure.queries.structures.PgStructuresQueries`.
+Implémenté par `infrastructure.queries.api.structures.PgStructuresQueries`.
 
 Co-localise les DTOs Pydantic retournés par ce port. Cf. chantier `CODE_typage-projections-strict` Phase 4. `StructureOut` et `NameFormOut` sont aussi utilisés par le router pour valider les retours dict des services applicatifs (`create_structure`, `update_structure`, `create_name_form`…) — l'import depuis le port est légitime côté router.
 """

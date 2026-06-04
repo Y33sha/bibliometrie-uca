@@ -6,7 +6,7 @@ import os
 from application.pipeline.publications.match_or_create_publications import run
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.publications.match_or_create import (
+from infrastructure.queries.pipeline.publications_match_or_create import (
     PgPublicationsMatchOrCreateQueries,
 )
 from infrastructure.repositories import audit_repository, publication_repository

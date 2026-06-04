@@ -9,7 +9,7 @@ from application.pipeline.publishers_journals.enrich_publishers_from_ror import 
 )
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.enrich import PgEnrichQueries
+from infrastructure.queries.pipeline.enrich import PgEnrichQueries
 from infrastructure.repositories import publisher_repository
 from infrastructure.sources.api_limits import ROR_DELAY
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email

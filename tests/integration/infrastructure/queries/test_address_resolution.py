@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.queries.address_resolution`."""
+"""Tests d'intégration pour `infrastructure.queries.pipeline.address_resolution`."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.address_resolution import (
+from infrastructure.queries.pipeline.address_resolution import (
     delete_obsolete_detections,
     fetch_addresses_to_resolve,
     load_name_forms,

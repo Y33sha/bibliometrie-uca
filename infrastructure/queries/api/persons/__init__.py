@@ -1,4 +1,4 @@
-"""Query services autour des personnes.
+"""Query services de lecture autour des personnes (router persons).
 
 Le package est organisé par thème :
 - `list` : `persons_directory`, `search_persons`, `list_persons`
@@ -6,8 +6,9 @@ Le package est organisé par thème :
 - `detail` : `person_profile`, `person_theses`, `person_addresses`,
   `person_dashboard`, `person_subjects`
 - `admin` : `person_exists`, orphan authorships, name-form authorships
-- `create` : `PgPersonsCreateQueries` (adapter sync du port
-  `application.ports.persons_create`, consommé par le pipeline)
+
+L'adapter d'écriture pipeline (`pipeline.persons_create`) vit côté
+`infrastructure/queries/pipeline/`.
 
 `PgPersonsQueries` agrège l'ensemble des fonctions de lecture + admin
 sous le port `application.ports.api.persons_queries.PersonsQueries`. Les
@@ -43,56 +44,55 @@ from application.ports.api.persons_queries import (
     RoleCount,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
-from infrastructure.queries.persons.admin import (
+from infrastructure.queries.api.persons.admin import (
     list_orphan_authorships as _list_orphan_authorships,
 )
-from infrastructure.queries.persons.admin import (
+from infrastructure.queries.api.persons.admin import (
     name_form_authorships as _name_form_authorships,
 )
-from infrastructure.queries.persons.admin import (
+from infrastructure.queries.api.persons.admin import (
     name_form_remaining_authorships as _name_form_remaining_authorships,
 )
-from infrastructure.queries.persons.admin import (
+from infrastructure.queries.api.persons.admin import (
     orphan_authorships_count as _orphan_authorships_count,
 )
-from infrastructure.queries.persons.admin import (
+from infrastructure.queries.api.persons.admin import (
     person_exists as _person_exists,
 )
-from infrastructure.queries.persons.create import PgPersonsCreateQueries
-from infrastructure.queries.persons.detail import (
+from infrastructure.queries.api.persons.detail import (
     person_addresses as _person_addresses,
 )
-from infrastructure.queries.persons.detail import (
+from infrastructure.queries.api.persons.detail import (
     person_dashboard as _person_dashboard,
 )
-from infrastructure.queries.persons.detail import (
+from infrastructure.queries.api.persons.detail import (
     person_profile as _person_profile,
 )
-from infrastructure.queries.persons.detail import (
+from infrastructure.queries.api.persons.detail import (
     person_subjects as _person_subjects,
 )
-from infrastructure.queries.persons.detail import (
+from infrastructure.queries.api.persons.detail import (
     person_theses as _person_theses,
 )
-from infrastructure.queries.persons.facets import (
+from infrastructure.queries.api.persons.facets import (
     list_departments as _list_departments,
 )
-from infrastructure.queries.persons.facets import (
+from infrastructure.queries.api.persons.facets import (
     list_roles as _list_roles,
 )
-from infrastructure.queries.persons.facets import (
+from infrastructure.queries.api.persons.facets import (
     persons_facets as _persons_facets,
 )
-from infrastructure.queries.persons.facets import (
+from infrastructure.queries.api.persons.facets import (
     persons_stats as _persons_stats,
 )
-from infrastructure.queries.persons.list import (
+from infrastructure.queries.api.persons.list import (
     list_persons as _list_persons,
 )
-from infrastructure.queries.persons.list import (
+from infrastructure.queries.api.persons.list import (
     persons_directory as _persons_directory,
 )
-from infrastructure.queries.persons.list import (
+from infrastructure.queries.api.persons.list import (
     search_persons as _search_persons,
 )
 
@@ -190,4 +190,4 @@ class PgPersonsQueries(PersonsQueries):
         return _name_form_remaining_authorships(self._conn, person_id, name_form)
 
 
-__all__ = ["PgPersonsCreateQueries", "PgPersonsQueries"]
+__all__ = ["PgPersonsQueries"]

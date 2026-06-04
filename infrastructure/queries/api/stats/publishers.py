@@ -1,9 +1,14 @@
-"""Stats agrégées par revue."""
+"""Stats agrégées par éditeur."""
 
 from typing import Any
 
 from sqlalchemy import Connection, text
 
+from infrastructure.queries.api.stats._shared import (
+    APC_SUM_SA,
+    paginated,
+    stats_apc_clause,
+)
 from infrastructure.queries.filters import (
     PUB_IS_UCA,
     assemble_where,
@@ -11,15 +16,10 @@ from infrastructure.queries.filters import (
     oa_clause,
     year_clause,
 )
-from infrastructure.queries.stats._shared import (
-    APC_SUM_SA,
-    paginated,
-    stats_apc_clause,
-)
 
-_JOURNAL_SORT_MAP = {
-    "name": "j.title ASC",
-    "-name": "j.title DESC",
+_PUBLISHER_SORT_MAP = {
+    "name": "pub.name ASC",
+    "-name": "pub.name DESC",
     "pubs": "COUNT(DISTINCT p.id) ASC",
     "-pubs": "COUNT(DISTINCT p.id) DESC",
     "apc": "apc_uca ASC NULLS FIRST",
@@ -27,12 +27,11 @@ _JOURNAL_SORT_MAP = {
 }
 
 
-def _build_journal_stats_sql(
+def _build_publisher_stats_sql(
     *,
     apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
-    publisher_id: int | None,
     oa_status: str,
     has_apc: str,
     search: str,
@@ -45,7 +44,6 @@ def _build_journal_stats_sql(
     static_clauses = " AND ".join(
         [
             PUB_IS_UCA,
-            "j.id IS NOT NULL",
             "p.doc_type IN ('article', 'review')",
             "j.oa_model IS DISTINCT FROM 'repository'",
         ]
@@ -59,29 +57,23 @@ def _build_journal_stats_sql(
         ]
     )
     where = f"{static_clauses} AND {dyn_where}"
-    if publisher_id:
-        where += " AND j.publisher_id = :flt_publisher_id"
-        where_binds["flt_publisher_id"] = publisher_id
     if search:
-        where += " AND unaccent(j.title) ILIKE unaccent(:search_pat)"
+        where += " AND unaccent(pub.name) ILIKE unaccent(:search_pat)"
         where_binds["search_pat"] = f"%{search}%"
 
     count_sql = f"""
-        SELECT COUNT(DISTINCT j.id) AS total
+        SELECT COUNT(DISTINCT pub.id) AS total
         FROM publications p
         JOIN journals j ON j.id = p.journal_id
+        JOIN publishers pub ON pub.id = j.publisher_id
         WHERE {where}
     """
-    order = _JOURNAL_SORT_MAP.get(sort, "COUNT(DISTINCT p.id) DESC")
+    order = _PUBLISHER_SORT_MAP.get(sort, "COUNT(DISTINCT p.id) DESC")
     rows_sql = f"""
         SELECT
-            j.id AS journal_id,
-            j.title AS journal_title,
-            j.issn,
-            j.eissn,
+            pub.id AS publisher_id,
             pub.name AS publisher_name,
-            j.is_predatory,
-            j.apc_amount,
+            COUNT(DISTINCT j.id) AS journal_count,
             COUNT(DISTINCT p.id) AS pub_count,
             SUM({APC_SUM_SA})::numeric(12,2) AS apc_uca,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
@@ -93,9 +85,9 @@ def _build_journal_stats_sql(
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown
         FROM publications p
         JOIN journals j ON j.id = p.journal_id
-        LEFT JOIN publishers pub ON pub.id = j.publisher_id
+        JOIN publishers pub ON pub.id = j.publisher_id
         WHERE {where}
-        GROUP BY j.id, j.title, j.issn, j.eissn, pub.name, j.is_predatory, j.apc_amount
+        GROUP BY pub.id, pub.name
         ORDER BY {order}
         LIMIT :pg_limit OFFSET :pg_offset
     """
@@ -108,13 +100,12 @@ def _build_journal_stats_sql(
     return count_sql, rows_sql, binds
 
 
-def journal_stats(
+def publisher_stats(
     conn: Connection,
     *,
     apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
-    publisher_id: int | None,
     oa_status: str,
     has_apc: str,
     search: str,
@@ -122,13 +113,12 @@ def journal_stats(
     per_page: int,
     sort: str,
 ) -> dict[str, Any]:
-    """Stats agrégées par revue, paginées."""
+    """Stats agrégées par éditeur, paginées."""
     conn.execute(text("SET LOCAL jit = off"))
-    count_sql, rows_sql, binds = _build_journal_stats_sql(
+    count_sql, rows_sql, binds = _build_publisher_stats_sql(
         apc_structure_ids=apc_structure_ids,
         lab_ids=lab_ids,
         years=years,
-        publisher_id=publisher_id,
         oa_status=oa_status,
         has_apc=has_apc,
         search=search,
@@ -138,4 +128,4 @@ def journal_stats(
     )
     total = conn.execute(text(count_sql), binds).one().total
     rows = conn.execute(text(rows_sql), binds).all()
-    return paginated(total, page, per_page, "journals", [dict(r._mapping) for r in rows])
+    return paginated(total, page, per_page, "publishers", [dict(r._mapping) for r in rows])

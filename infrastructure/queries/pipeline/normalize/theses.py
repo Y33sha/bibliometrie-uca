@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.theses import ThesesNormalizeQueries
 from domain.types import JsonValue
-from infrastructure.queries.source_authorships import (
+from infrastructure.queries.pipeline.source_authorships import (
     clear_source_authorships_for_publication,
 )
 

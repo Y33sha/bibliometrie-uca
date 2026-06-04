@@ -5,7 +5,7 @@ import os
 from application.pipeline.publications.resolve_zenodo_concept import run
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.publications.zenodo_concept import PgZenodoConceptQueries
+from infrastructure.queries.pipeline.zenodo_concept import PgZenodoConceptQueries
 from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.zenodo import HttpZenodoResolver
 

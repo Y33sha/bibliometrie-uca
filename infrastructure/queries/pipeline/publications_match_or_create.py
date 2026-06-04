@@ -6,7 +6,7 @@ Appelé par `application/pipeline/publications/match_or_create_publications.py`.
 2. **Phase B — UPDATEs bulk hors-périmètre** (`bulk_link_remaining_orphans`) : 3 UPDATEs SQL set-based qui rattachent les orphelins restants par DOI, NNT, hal_id. Pas de création. Bénéficie naturellement des publications créées en Phase A.
 3. **SELECT publications stale** (`fetch_stale_publication_ids`) pour ré-agrégation des méta canoniques.
 
-L'attachement d'un `source_publications` à un `publications` est mutualisé avec le script de fusion (voir `queries.merge.link_source_publication_to_publication`).
+L'attachement d'un `source_publications` à un `publications` est mutualisé avec le script de fusion (voir `queries.pipeline.merge.link_source_publication_to_publication`).
 """
 
 from sqlalchemy import Connection, text
@@ -231,7 +231,7 @@ class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.publications_match_or_create.PublicationsMatchOrCreateQueries`.
 
     Délègue `link_source_publication_to_publication` à
-    `infrastructure.queries.merge` (même SQL).
+    `infrastructure.queries.pipeline.merge` (même SQL).
     """
 
     def fetch_orphan_in_perimeter_source_publications(
@@ -251,7 +251,7 @@ class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int
     ) -> None:
-        from infrastructure.queries.merge import link_source_publication_to_publication
+        from infrastructure.queries.pipeline.merge import link_source_publication_to_publication
 
         link_source_publication_to_publication(conn, source_publication_id, publication_id)
 

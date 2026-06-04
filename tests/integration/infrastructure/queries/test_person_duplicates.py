@@ -1,9 +1,9 @@
-"""Tests d'intégration pour `infrastructure.queries.person_duplicates`."""
+"""Tests d'intégration pour `infrastructure.queries.api.person_duplicates`."""
 
 from sqlalchemy import text
 
 from application.ports.api.person_duplicates_queries import parse_skip_pairs
-from infrastructure.queries.person_duplicates import PgPersonDuplicatesQueries
+from infrastructure.queries.api.person_duplicates import PgPersonDuplicatesQueries
 
 
 def _q(conn) -> PgPersonDuplicatesQueries:

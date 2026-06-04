@@ -1,8 +1,8 @@
-"""Tests d'intégration pour `infrastructure.queries.persons.admin`."""
+"""Tests d'intégration pour `infrastructure.queries.api.persons.admin`."""
 
 from sqlalchemy import text
 
-from infrastructure.queries.persons.admin import (
+from infrastructure.queries.api.persons.admin import (
     list_orphan_authorships,
     name_form_authorships,
     name_form_remaining_authorships,

@@ -54,7 +54,7 @@ def run_create_persons(conn):
     from sqlalchemy import text
 
     from application.pipeline.persons.create_persons_from_source_authorships import run
-    from infrastructure.queries.persons.create import PgPersonsCreateQueries
+    from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
 
     queries = PgPersonsCreateQueries()
