@@ -8,148 +8,115 @@ from domain.persons.identifiers import ORCID, IdHAL, IdRef, compact_identifiers
 # ── ORCID ──────────────────────────────────────────────────────────
 
 
-class TestORCIDConstruction:
-    def test_accepts_canonical_form(self):
-        o = ORCID("0000-0001-2345-6789")
-        assert o.value == "0000-0001-2345-6789"
+class TestORCID:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("0000-0001-2345-6789", "0000-0001-2345-6789"),  # canonique
+            ("0000-0001-2345-678X", "0000-0001-2345-678X"),  # checksum X
+            ("0000-0001-2345-678x", "0000-0001-2345-678X"),  # x minuscule → X
+            ("https://orcid.org/0000-0001-2345-6789", "0000-0001-2345-6789"),  # strip https
+            ("http://orcid.org/0000-0001-2345-6789", "0000-0001-2345-6789"),  # strip http
+            ("orcid.org/0000-0001-2345-6789", "0000-0001-2345-6789"),  # strip préfixe nu
+            ("0000000123456789", "0000-0001-2345-6789"),  # ajoute les tirets
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert ORCID(raw).value == expected
 
-    def test_accepts_with_checksum_X(self):
-        o = ORCID("0000-0001-2345-678X")
-        assert o.value == "0000-0001-2345-678X"
-
-    def test_lowercases_x_to_uppercase(self):
-        assert ORCID("0000-0001-2345-678x").value == "0000-0001-2345-678X"
-
-    def test_strips_https_prefix(self):
-        assert ORCID("https://orcid.org/0000-0001-2345-6789").value == "0000-0001-2345-6789"
-
-    def test_strips_http_prefix(self):
-        assert ORCID("http://orcid.org/0000-0001-2345-6789").value == "0000-0001-2345-6789"
-
-    def test_strips_bare_orcid_org_prefix(self):
-        assert ORCID("orcid.org/0000-0001-2345-6789").value == "0000-0001-2345-6789"
-
-    def test_adds_hyphens_if_missing(self):
-        assert ORCID("0000000123456789").value == "0000-0001-2345-6789"
-
-
-class TestORCIDInvalid:
-    def test_raises_on_empty(self):
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "",  # vide
+            "0000-0001-2345",  # trop court
+            "0000-000A-2345-6789",  # corps non numérique
+            "garbage",  # forme invalide
+        ],
+    )
+    def test_raises_on_invalid(self, raw):
         with pytest.raises(ValidationError):
-            ORCID("")
+            ORCID(raw)
 
-    def test_raises_on_too_short(self):
-        with pytest.raises(ValidationError):
-            ORCID("0000-0001-2345")
-
-    def test_raises_on_non_numeric_body(self):
-        with pytest.raises(ValidationError):
-            ORCID("0000-000A-2345-6789")
-
-    def test_raises_on_wrong_shape(self):
-        with pytest.raises(ValidationError):
-            ORCID("garbage")
-
-
-class TestORCIDTryParse:
-    def test_none(self):
+    def test_try_parse_none(self):
         assert ORCID.try_parse(None) is None
 
-    def test_invalid(self):
+    def test_try_parse_invalid(self):
         assert ORCID.try_parse("not an orcid") is None
 
-    def test_valid(self):
+    def test_try_parse_valid(self):
         assert ORCID.try_parse("0000-0001-2345-6789") is not None
 
 
 # ── IdHAL ──────────────────────────────────────────────────────────
 
 
-class TestIdHALConstruction:
-    def test_accepts_slug(self):
-        assert IdHAL("jean-dupont").value == "jean-dupont"
+class TestIdHAL:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("jean-dupont", "jean-dupont"),  # slug
+            ("jdupont", "jdupont"),  # slug court
+            ("123456", "123456"),  # legacy numérique (idHal_i)
+            ("Jean-Dupont", "jean-dupont"),  # minuscules
+            ("  jean-dupont  ", "jean-dupont"),  # strip whitespace
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert IdHAL(raw).value == expected
 
-    def test_accepts_short_slug(self):
-        assert IdHAL("jdupont").value == "jdupont"
-
-    def test_accepts_numeric_legacy(self):
-        """Les anciens comptes HAL ont des IdHAL numériques (idHal_i)."""
-        assert IdHAL("123456").value == "123456"
-
-    def test_lowercases(self):
-        assert IdHAL("Jean-Dupont").value == "jean-dupont"
-
-    def test_strips_whitespace(self):
-        assert IdHAL("  jean-dupont  ").value == "jean-dupont"
-
-
-class TestIdHALInvalid:
-    def test_raises_on_empty(self):
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "",  # vide
+            "j",  # trop court
+            "-jean-dupont",  # tiret en tête
+            "jean_dupont",  # underscore
+            "jean.dupont",  # caractère spécial
+        ],
+    )
+    def test_raises_on_invalid(self, raw):
         with pytest.raises(ValidationError):
-            IdHAL("")
+            IdHAL(raw)
 
-    def test_raises_on_too_short(self):
-        with pytest.raises(ValidationError):
-            IdHAL("j")
-
-    def test_raises_on_leading_hyphen(self):
-        with pytest.raises(ValidationError):
-            IdHAL("-jean-dupont")
-
-    def test_raises_on_underscore(self):
-        with pytest.raises(ValidationError):
-            IdHAL("jean_dupont")
-
-    def test_raises_on_special_chars(self):
-        with pytest.raises(ValidationError):
-            IdHAL("jean.dupont")
-
-
-class TestIdHALTryParse:
-    def test_none(self):
+    def test_try_parse_none(self):
         assert IdHAL.try_parse(None) is None
 
-    def test_invalid(self):
+    def test_try_parse_invalid(self):
         assert IdHAL.try_parse("j") is None
 
-    def test_valid(self):
+    def test_try_parse_valid(self):
         assert IdHAL.try_parse("jean-dupont") is not None
 
 
 # ── IdRef ──────────────────────────────────────────────────────────
 
 
-class TestIdRefConstruction:
-    def test_accepts_canonical_ppn(self):
-        assert IdRef("252404955").value == "252404955"
+class TestIdRef:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("252404955", "252404955"),  # PPN canonique
+            ("05547854X", "05547854X"),  # PPN avec clé X
+            ("05547854x", "05547854X"),  # x minuscule → X
+            ("https://www.idref.fr/252404955/id", "252404955"),  # strip URL
+            ("idref.fr/252404955", "252404955"),  # strip préfixe nu
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert IdRef(raw).value == expected
 
-    def test_accepts_ppn_with_X(self):
-        assert IdRef("05547854X").value == "05547854X"
-
-    def test_lowercases_x_to_uppercase(self):
-        assert IdRef("05547854x").value == "05547854X"
-
-    def test_strips_idref_url(self):
-        assert IdRef("https://www.idref.fr/252404955/id").value == "252404955"
-        assert IdRef("idref.fr/252404955").value == "252404955"
-
-
-class TestIdRefInvalid:
-    def test_raises_on_empty(self):
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "",  # vide
+            "12345678",  # 8 chiffres, il manque la clé
+            "1234567890",  # trop long
+            "12A456789",  # lettre dans le corps
+        ],
+    )
+    def test_raises_on_invalid(self, raw):
         with pytest.raises(ValidationError):
-            IdRef("")
-
-    def test_raises_on_too_short(self):
-        with pytest.raises(ValidationError):
-            IdRef("12345678")  # 8 chiffres, il manque la clé
-
-    def test_raises_on_too_long(self):
-        with pytest.raises(ValidationError):
-            IdRef("1234567890")
-
-    def test_raises_on_letters_in_body(self):
-        with pytest.raises(ValidationError):
-            IdRef("12A456789")
+            IdRef(raw)
 
 
 # ── compact_identifiers ─────────────────────────────────────────────

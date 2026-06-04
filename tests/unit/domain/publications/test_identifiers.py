@@ -16,69 +16,52 @@ from domain.publications.identifiers import (
 
 
 class TestDOIConstruction:
-    def test_accepts_plain_doi(self):
-        d = DOI("10.1234/test")
-        assert d.value == "10.1234/test"
-        assert str(d) == "10.1234/test"
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("10.1234/test", "10.1234/test"),  # DOI nu
+            ("https://doi.org/10.1234/test", "10.1234/test"),  # strip https
+            ("http://doi.org/10.1234/test", "10.1234/test"),  # strip http
+            ("https://dx.doi.org/10.1234/test", "10.1234/test"),  # strip dx.doi.org
+            ("  10.1234/test  ", "10.1234/test"),  # strip whitespace
+            ("10.6084/m9.figshare.31023197.v1", "10.6084/m9.figshare.31023197"),  # suffixe .vN
+            ("10.36227/techrxiv.19754971.v2", "10.36227/techrxiv.19754971"),  # suffixe .v2
+            ("10.1234/test/pdf", "10.1234/test"),  # suffixe /pdf
+            ("https://doi.org/10.1234/test/PDF", "10.1234/test"),  # /PDF + strip url
+            # Lowercase : CrossRef traite le DOI en case-insensitive ; lowercase
+            # évite les faux doublons cross-sources.
+            ("10.1038/Nature", "10.1038/nature"),
+            ("10.1038/NATURE", "10.1038/nature"),
+            ("https://doi.org/10.1038/NATURE", "10.1038/nature"),
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert DOI(raw).value == expected
 
-    def test_strips_https_prefix(self):
-        assert DOI("https://doi.org/10.1234/test").value == "10.1234/test"
-
-    def test_strips_http_prefix(self):
-        assert DOI("http://doi.org/10.1234/test").value == "10.1234/test"
-
-    def test_strips_dx_prefix(self):
-        assert DOI("https://dx.doi.org/10.1234/test").value == "10.1234/test"
-
-    def test_strips_whitespace(self):
-        assert DOI("  10.1234/test  ").value == "10.1234/test"
-
-    def test_normalizes_version_suffix(self):
-        assert DOI("10.6084/m9.figshare.31023197.v1").value == "10.6084/m9.figshare.31023197"
-        assert DOI("10.36227/techrxiv.19754971.v2").value == "10.36227/techrxiv.19754971"
+    def test_str_returns_value(self):
+        assert str(DOI("10.1234/test")) == "10.1234/test"
 
     def test_does_not_strip_v_not_followed_by_digit(self):
         """Un .v suivi de non-chiffre ne doit pas être strippé."""
         assert DOI("10.1234/journal.v12.issue3").value == "10.1234/journal.v12.issue3"
 
-    def test_strips_pdf_suffix(self):
-        """Suffixe `/pdf` parfois collé par une source qui expose l'URL de la
-        ressource PDF au lieu du DOI canonique."""
-        assert DOI("10.1234/test/pdf").value == "10.1234/test"
-        assert DOI("https://doi.org/10.1234/test/PDF").value == "10.1234/test"
-
-    def test_lowercases(self):
-        """Le DOI complet est normalisé en minuscules (le standard CrossRef
-        traite le DOI en case-insensitive ; lowercase évite les faux doublons
-        cross-sources)."""
-        assert DOI("10.1038/Nature").value == "10.1038/nature"
-        assert DOI("10.1038/NATURE").value == "10.1038/nature"
-        assert DOI("https://doi.org/10.1038/NATURE").value == "10.1038/nature"
-
-
-class TestDOIInvalid:
-    def test_raises_on_empty(self):
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "",  # vide
+            "   ",  # whitespace seul
+            "https://doi.org/",  # préfixe URL sans DOI
+        ],
+    )
+    def test_raises_on_invalid(self, raw):
         with pytest.raises(ValidationError):
-            DOI("")
-
-    def test_raises_on_whitespace_only(self):
-        with pytest.raises(ValidationError):
-            DOI("   ")
-
-    def test_raises_on_url_prefix_only(self):
-        with pytest.raises(ValidationError):
-            DOI("https://doi.org/")
+            DOI(raw)
 
 
 class TestDOITryParse:
-    def test_returns_none_on_none(self):
-        assert DOI.try_parse(None) is None
-
-    def test_returns_none_on_empty(self):
-        assert DOI.try_parse("") is None
-
-    def test_returns_none_on_whitespace(self):
-        assert DOI.try_parse("   ") is None
+    @pytest.mark.parametrize("raw", [None, "", "   "])
+    def test_returns_none_on_blank(self, raw):
+        assert DOI.try_parse(raw) is None
 
     def test_returns_doi_on_valid(self):
         d = DOI.try_parse("10.1234/test")
@@ -113,41 +96,37 @@ class TestDOIImmutable:
 
 
 class TestHALIdConstruction:
-    def test_accepts_plain_hal_id(self):
-        assert HALId("hal-04123456").value == "hal-04123456"
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("hal-04123456", "hal-04123456"),  # portail HAL
+            ("tel-02345678", "tel-02345678"),  # autres portails
+            ("halshs-01234567", "halshs-01234567"),
+            ("inserm-09876543", "inserm-09876543"),
+            ("pasteur-11111111", "pasteur-11111111"),
+            ("cea-22222222", "cea-22222222"),
+            ("ineris-33333333", "ineris-33333333"),
+            ("hal-04123456v2", "hal-04123456"),  # strip suffixe version
+            ("HAL-04123456", "hal-04123456"),  # lowercase
+            ("https://hal.science/hal-04123456", "hal-04123456"),  # strip URL
+            ("https://hal.science/hal-04123456v2", "hal-04123456"),  # URL + version
+            ("https://tel.archives-ouvertes.fr/tel-02345678", "tel-02345678"),  # URL autre portail
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert HALId(raw).value == expected
 
-    def test_accepts_other_portals(self):
-        assert HALId("tel-02345678").value == "tel-02345678"
-        assert HALId("halshs-01234567").value == "halshs-01234567"
-        assert HALId("inserm-09876543").value == "inserm-09876543"
-        assert HALId("pasteur-11111111").value == "pasteur-11111111"
-        assert HALId("cea-22222222").value == "cea-22222222"
-        assert HALId("ineris-33333333").value == "ineris-33333333"
-
-    def test_strips_version_suffix(self):
-        assert HALId("hal-04123456v2").value == "hal-04123456"
-
-    def test_lowercases(self):
-        assert HALId("HAL-04123456").value == "hal-04123456"
-
-    def test_accepts_url(self):
-        assert HALId("https://hal.science/hal-04123456").value == "hal-04123456"
-        assert HALId("https://hal.science/hal-04123456v2").value == "hal-04123456"
-        assert HALId("https://tel.archives-ouvertes.fr/tel-02345678").value == "tel-02345678"
-
-
-class TestHALIdInvalid:
-    def test_raises_on_empty(self):
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "",  # vide
+            "other-12345",  # préfixe inconnu
+            "hal-",  # aucun chiffre
+        ],
+    )
+    def test_raises_on_invalid(self, raw):
         with pytest.raises(ValidationError):
-            HALId("")
-
-    def test_raises_on_unknown_prefix(self):
-        with pytest.raises(ValidationError):
-            HALId("other-12345")
-
-    def test_raises_on_no_digits(self):
-        with pytest.raises(ValidationError):
-            HALId("hal-")
+            HALId(raw)
 
 
 class TestHALIdTryParse:
@@ -165,23 +144,27 @@ class TestHALIdTryParse:
 
 
 class TestNNT:
-    def test_uppercases(self):
-        assert NNT("2021clfa0030").value == "2021CLFA0030"
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("2021clfa0030", "2021CLFA0030"),  # uppercase
+            ("  2021CLFA0030  ", "2021CLFA0030"),  # strip whitespace
+        ],
+    )
+    def test_normalizes(self, raw, expected):
+        assert NNT(raw).value == expected
 
-    def test_strips_whitespace(self):
-        assert NNT("  2021CLFA0030  ").value == "2021CLFA0030"
-
-    def test_raises_on_empty(self):
+    @pytest.mark.parametrize(
+        "raw",
+        [
+            "",  # vide
+            "   ",  # whitespace seul
+            "2021-CLFA-0030",  # non alphanumérique
+        ],
+    )
+    def test_raises_on_invalid(self, raw):
         with pytest.raises(ValidationError):
-            NNT("")
-
-    def test_raises_on_whitespace(self):
-        with pytest.raises(ValidationError):
-            NNT("   ")
-
-    def test_raises_on_non_alnum(self):
-        with pytest.raises(ValidationError):
-            NNT("2021-CLFA-0030")
+            NNT(raw)
 
     def test_try_parse_none(self):
         assert NNT.try_parse(None) is None
