@@ -109,9 +109,9 @@ def _run_normalize_hal(conn):
 
     from application.pipeline.normalize.normalize_hal import process_work
     from application.ports.pipeline.staging import HalStagingRow
-    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.normalize_hal import PgHalNormalizeQueries
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.queries.pipeline.normalize.hal import PgHalNormalizeQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -177,7 +177,7 @@ def _refresh_stale_publications(conn):
     Reproduit la 2e passe de la phase publications (`match_or_create_publications.run`) : SELECT des pubs stale via comparaison `source_publications.updated_at > publications.updated_at` et `refresh_from_sources` sur chacune.
     """
     from application.publications import refresh_from_sources
-    from infrastructure.queries.publications.match_or_create import (
+    from infrastructure.queries.pipeline.publications_match_or_create import (
         fetch_stale_publication_ids,
     )
     from infrastructure.repositories import publication_repository

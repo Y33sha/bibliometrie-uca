@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `infrastructure.queries.addresses`."""
+"""Tests d'intégration pour `infrastructure.queries.api.addresses`."""
 
 from sqlalchemy import text
 
@@ -6,7 +6,7 @@ from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
     AddressListFilters,
 )
-from infrastructure.queries.addresses import PgAddressesQueries
+from infrastructure.queries.api.addresses import PgAddressesQueries
 
 
 def _q(conn) -> PgAddressesQueries:

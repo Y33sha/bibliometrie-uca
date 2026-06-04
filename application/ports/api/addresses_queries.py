@@ -1,6 +1,6 @@
 """Port : lectures sur les adresses (consommé par le router addresses).
 
-Implémenté par `infrastructure.queries.addresses.PgAddressesQueries`.
+Implémenté par `infrastructure.queries.api.addresses.PgAddressesQueries`.
 
 Co-localise les DTOs Pydantic retournés par ce port. Cf. chantier `CODE_typage-projections-strict` Phase 4.
 """

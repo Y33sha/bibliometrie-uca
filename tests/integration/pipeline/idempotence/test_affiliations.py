@@ -109,8 +109,8 @@ def _run_populate_affiliations(conn):
     import logging
 
     from application.pipeline.affiliations.populate_affiliations import run_populate
-    from infrastructure.queries.affiliations import PgAffiliationsQueries
     from infrastructure.queries.perimeter import get_persons_structure_ids
+    from infrastructure.queries.pipeline.affiliations import PgAffiliationsQueries
 
     run_populate(
         conn,
@@ -181,8 +181,8 @@ class TestPopulateAffiliationsIdempotence:
         from sqlalchemy import text
 
         from application.pipeline.affiliations.populate_affiliations import run_populate
-        from infrastructure.queries.affiliations import PgAffiliationsQueries
         from infrastructure.queries.perimeter import get_persons_structure_ids
+        from infrastructure.queries.pipeline.affiliations import PgAffiliationsQueries
 
         _setup_affiliations_test_data(sa_sync_conn)
 

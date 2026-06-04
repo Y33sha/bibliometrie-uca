@@ -2,7 +2,7 @@
 
 Appelé par `application/pipeline/normalize/normalize_wos.py`. Porte l'UPSERT de
 `source_publications` ; l'écriture des authorships / adresses passe par le writer
-batch partagé (`infrastructure.queries.normalize_authorships`).
+batch partagé (`infrastructure.queries.pipeline.normalize.authorships`).
 """
 
 from sqlalchemy import Connection, bindparam, text

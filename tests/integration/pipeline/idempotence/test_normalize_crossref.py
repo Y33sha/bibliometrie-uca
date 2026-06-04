@@ -89,9 +89,9 @@ def _run_normalize_crossref(conn):
 
     from application.pipeline.normalize.normalize_crossref import process_work
     from application.ports.pipeline.staging import StagingRow
-    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.normalize_crossref import PgCrossrefNormalizeQueries
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.queries.pipeline.normalize.crossref import PgCrossrefNormalizeQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,

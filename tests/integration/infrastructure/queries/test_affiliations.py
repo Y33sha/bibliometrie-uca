@@ -1,6 +1,6 @@
-"""Tests d'intégration pour `infrastructure.queries.affiliations`."""
+"""Tests d'intégration pour `infrastructure.queries.pipeline.affiliations`."""
 
-from infrastructure.queries.affiliations import set_in_perimeter_from_addresses
+from infrastructure.queries.pipeline.affiliations import set_in_perimeter_from_addresses
 
 
 class TestSetInPerimeterFromAddressesDailyClause:

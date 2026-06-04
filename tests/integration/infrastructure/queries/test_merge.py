@@ -1,9 +1,9 @@
-"""Tests d'intégration pour `infrastructure.queries.merge`."""
+"""Tests d'intégration pour `infrastructure.queries.pipeline.merge`."""
 
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from infrastructure.queries.merge import (
+from infrastructure.queries.pipeline.merge import (
     fetch_hal_source_publications,
     fetch_source_publications_with_hal_external_id,
     find_nnt_duplicates,

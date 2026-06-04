@@ -1,10 +1,10 @@
-"""Tests d'intégration pour `infrastructure.queries.enrich`."""
+"""Tests d'intégration pour `infrastructure.queries.pipeline.enrich`."""
 
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
 
-from infrastructure.queries.enrich import (
+from infrastructure.queries.pipeline.enrich import (
     fetch_journals_needing_apc,
     fetch_journals_needing_doaj_fetch,
     fetch_publications_with_doi,

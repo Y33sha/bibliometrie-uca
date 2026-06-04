@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy import Connection, Row, text
 
+from infrastructure.queries.api.stats._shared import stats_apc_clause
 from infrastructure.queries.filters import (
     PUB_IS_UCA,
     WhereClause,
@@ -13,7 +14,6 @@ from infrastructure.queries.filters import (
     oa_clause,
     year_clause,
 )
-from infrastructure.queries.stats._shared import stats_apc_clause
 
 _BASE_CLAUSES = " AND ".join(
     [

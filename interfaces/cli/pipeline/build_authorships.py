@@ -6,7 +6,7 @@ import os
 from application.pipeline.authorships.build_authorships import build
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.authorships_build import PgAuthorshipsBuildQueries
+from infrastructure.queries.pipeline.authorships_build import PgAuthorshipsBuildQueries
 
 logger = setup_logger("build_authorships", os.path.join(os.path.dirname(__file__), "logs"))
 

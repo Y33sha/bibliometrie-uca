@@ -64,8 +64,8 @@ def run_normalize_wos(conn):
     import logging
 
     from application.pipeline.normalize.normalize_wos import process_record
-    from infrastructure.queries.normalize_wos import PgWosNormalizeQueries
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.wos import PgWosNormalizeQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,

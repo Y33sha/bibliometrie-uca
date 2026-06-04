@@ -5,7 +5,7 @@ import os
 from application.pipeline.extract.extract_wos import WosExtractor
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.staging import PgStagingQueries
+from infrastructure.queries.pipeline.staging import PgStagingQueries
 from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
 from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
 

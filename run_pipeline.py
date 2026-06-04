@@ -482,7 +482,7 @@ def phase_subjects(**kw: Any) -> Any:
 def _run_resolve_zenodo_concept() -> None:
     from application.pipeline.publications.resolve_zenodo_concept import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.publications.zenodo_concept import PgZenodoConceptQueries
+    from infrastructure.queries.pipeline.zenodo_concept import PgZenodoConceptQueries
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.zenodo import HttpZenodoResolver
 
@@ -502,7 +502,7 @@ def _run_resolve_zenodo_concept() -> None:
 def _run_match_or_create_publications() -> None:
     from application.pipeline.publications.match_or_create_publications import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.publications.match_or_create import (
+    from infrastructure.queries.pipeline.publications_match_or_create import (
         PgPublicationsMatchOrCreateQueries,
     )
     from infrastructure.repositories import audit_repository, publication_repository
@@ -526,7 +526,7 @@ def _run_match_or_create_publications() -> None:
 def _run_create_persons() -> None:
     from application.pipeline.persons.create_persons_from_source_authorships import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.persons.create import PgPersonsCreateQueries
+    from infrastructure.queries.pipeline.persons_create import PgPersonsCreateQueries
     from infrastructure.repositories import person_repository
 
     log.info("▶ create_persons_from_source_authorships")
@@ -548,7 +548,7 @@ def _run_create_persons() -> None:
 def _run_build_authorships() -> None:
     from application.pipeline.authorships.build_authorships import build
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.authorships_build import PgAuthorshipsBuildQueries
+    from infrastructure.queries.pipeline.authorships_build import PgAuthorshipsBuildQueries
 
     log.info("▶ build_authorships")
     t0 = time.time()
@@ -579,8 +579,8 @@ def _run_refresh_perimeter_structures() -> None:
 def _run_populate_affiliations(*, mode: str) -> None:
     from application.pipeline.affiliations.populate_affiliations import run_populate
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.affiliations import PgAffiliationsQueries
     from infrastructure.queries.perimeter import get_persons_structure_ids
+    from infrastructure.queries.pipeline.affiliations import PgAffiliationsQueries
 
     log.info("▶ populate_affiliations --mode %s", mode)
     t0 = time.time()
@@ -603,7 +603,7 @@ def _run_populate_affiliations(*, mode: str) -> None:
 def _run_populate_person_name_forms() -> None:
     from application.pipeline.persons.populate_person_name_forms import populate
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.name_forms import PgNameFormsQueries
+    from infrastructure.queries.pipeline.name_forms import PgNameFormsQueries
 
     log.info("▶ populate_person_name_forms")
     t0 = time.time()
@@ -618,7 +618,7 @@ def _run_populate_person_name_forms() -> None:
 def _run_merge_pubs_by_nnt() -> None:
     from application.pipeline.publications.merge_pubs_by_nnt import run_merge
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.merge import PgMergeQueries
+    from infrastructure.queries.pipeline.merge import PgMergeQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ merge_pubs_by_nnt")
@@ -634,7 +634,7 @@ def _run_merge_pubs_by_nnt() -> None:
 def _run_merge_pubs_by_hal_id() -> None:
     from application.pipeline.publications.merge_pubs_by_hal_id import run_merge
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.merge import PgMergeQueries
+    from infrastructure.queries.pipeline.merge import PgMergeQueries
     from infrastructure.repositories import publication_repository
 
     log.info("▶ merge_pubs_by_hal_id")
@@ -650,9 +650,9 @@ def _run_merge_pubs_by_hal_id() -> None:
 def _run_normalize_hal() -> None:
     from application.pipeline.normalize.normalize_hal import HalNormalizer
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.normalize_hal import PgHalNormalizeQueries
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.queries.pipeline.normalize.hal import PgHalNormalizeQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -678,9 +678,9 @@ def _run_normalize_hal() -> None:
 def _run_normalize_wos() -> None:
     from application.pipeline.normalize.normalize_wos import WosNormalizer
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.normalize_wos import PgWosNormalizeQueries
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.queries.pipeline.normalize.wos import PgWosNormalizeQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -706,9 +706,9 @@ def _run_normalize_wos() -> None:
 def _run_normalize_openalex() -> None:
     from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.normalize_openalex import PgOpenalexNormalizeQueries
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.queries.pipeline.normalize.openalex import PgOpenalexNormalizeQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -734,9 +734,9 @@ def _run_normalize_openalex() -> None:
 def _run_normalize_scanr() -> None:
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.normalize_scanr import PgScanrNormalizeQueries
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.queries.pipeline.normalize.scanr import PgScanrNormalizeQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -762,8 +762,8 @@ def _run_normalize_scanr() -> None:
 def _run_normalize_theses() -> None:
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.normalize_theses import PgThesesNormalizeQueries
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.theses import PgThesesNormalizeQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import publication_repository
     from infrastructure.repositories.address_linker import PgAddressLinker
 
@@ -784,9 +784,9 @@ def _run_normalize_theses() -> None:
 def _run_normalize_crossref() -> None:
     from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
-    from infrastructure.queries.normalize_crossref import PgCrossrefNormalizeQueries
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+    from infrastructure.queries.pipeline.normalize.crossref import PgCrossrefNormalizeQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
         publication_repository,
@@ -816,7 +816,7 @@ def _run_enrich_oa_status() -> None:
 
     from application.pipeline.oa_status.run import run_enrich_oa_status
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.enrich import PgEnrichQueries
+    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import publication_repository
     from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
     from infrastructure.sources.unpaywall import fetch_oa_status
@@ -850,7 +850,7 @@ def _run_enrich_journals_from_openalex() -> None:
         run_enrich_journals_from_openalex,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.enrich import PgEnrichQueries
+    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
     from infrastructure.sources.api_limits import DOAJ_DELAY
     from infrastructure.sources.config import (
@@ -885,7 +885,7 @@ def _run_enrich_journals_from_doaj() -> None:
         run_enrich_journals_from_doaj,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.enrich import PgEnrichQueries
+    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
     from infrastructure.sources.api_limits import DOAJ_DELAY
     from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
@@ -925,7 +925,7 @@ def _run_enrich_publishers_from_openalex() -> None:
         run_enrich_publishers_from_openalex,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.enrich import PgEnrichQueries
+    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import publisher_repository
     from infrastructure.sources.api_limits import DOAJ_DELAY
     from infrastructure.sources.config import (
@@ -959,7 +959,7 @@ def _run_enrich_publishers_from_crossref_members() -> None:
         run_enrich_publishers_from_crossref_members,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.enrich import PgEnrichQueries
+    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import publisher_repository
     from infrastructure.sources.api_limits import CROSSREF_DELAY
     from infrastructure.sources.config import get_polite_pool_email
@@ -994,7 +994,7 @@ def _run_enrich_publishers_from_ror() -> None:
         run_enrich_publishers_from_ror,
     )
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.enrich import PgEnrichQueries
+    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import publisher_repository
     from infrastructure.sources.api_limits import ROR_DELAY
     from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
@@ -1026,8 +1026,8 @@ def _run_enrich_publishers_from_ror() -> None:
 def _run_resolve_addresses(mode: str) -> None:
     from application.pipeline.affiliations.resolve_addresses import run_resolution
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.address_resolution import PgAddressResolutionQueries
     from infrastructure.queries.perimeter import get_persons_structure_ids
+    from infrastructure.queries.pipeline.address_resolution import PgAddressResolutionQueries
 
     log.info("▶ resolve_addresses --mode %s", mode)
     t0 = time.time()
@@ -1043,7 +1043,7 @@ def _run_resolve_addresses(mode: str) -> None:
 def _run_refresh_publication_countries() -> None:
     from application.pipeline.countries.refresh_publication_countries import refresh
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.countries import PgCountryQueries
+    from infrastructure.queries.pipeline.countries import PgCountryQueries
 
     log.info("▶ refresh_publication_countries")
     t0 = time.time()
@@ -1107,7 +1107,7 @@ def _run_extract_hal(
 ) -> PhaseMetrics:
     from application.pipeline.extract.extract_hal import HalExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
 
@@ -1136,7 +1136,7 @@ def _run_extract_openalex(
 ) -> PhaseMetrics:
     from application.pipeline.extract.extract_openalex import OpenalexExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
 
@@ -1161,7 +1161,7 @@ def _run_extract_openalex(
 def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
     from application.pipeline.extract.extract_wos import WosExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
     from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
 
@@ -1187,7 +1187,7 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
 def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
     from application.pipeline.extract.extract_scanr import ScanrExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.scanr.extract_scanr import (
         PgScanrExtractAdapter,
@@ -1219,7 +1219,7 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
 def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
     from application.pipeline.extract.extract_theses import ThesesExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.staging import PgStagingQueries
+    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.theses.extract_theses import PgThesesExtractAdapter
 

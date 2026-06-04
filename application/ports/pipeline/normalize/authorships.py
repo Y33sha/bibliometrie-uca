@@ -1,6 +1,6 @@
 """Port : SQL batch partagé pour l'écriture des `source_authorships`.
 
-Implémenté par `infrastructure.queries.normalize_authorships.PgAuthorshipsBatchQueries`.
+Implémenté par `infrastructure.queries.pipeline.normalize.authorships.PgAuthorshipsBatchQueries`.
 
 Les colonnes de `source_authorships` / `addresses` / `source_authorship_addresses`
 sont identiques pour toutes les sources : seul le *parsing* du payload diffère.

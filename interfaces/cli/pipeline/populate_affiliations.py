@@ -6,8 +6,8 @@ import os
 from application.pipeline.affiliations.populate_affiliations import run_populate, show_stats
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.affiliations import PgAffiliationsQueries
 from infrastructure.queries.perimeter import get_persons_structure_ids
+from infrastructure.queries.pipeline.affiliations import PgAffiliationsQueries
 
 logger = setup_logger("populate_affiliations", os.path.join(os.path.dirname(__file__), "logs"))
 

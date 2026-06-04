@@ -1,6 +1,6 @@
 """Port : lectures pour les scripts d'enrichissement pipeline.
 
-Implémenté par `infrastructure.queries.enrich.PgEnrichQueries`. Consommé
+Implémenté par `infrastructure.queries.pipeline.enrich.PgEnrichQueries`. Consommé
 par les phases `oa_status` (Unpaywall) et `publishers_journals`
 (sub-step `enrich_journals_from_openalex`).
 """

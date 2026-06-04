@@ -5,9 +5,9 @@ import os
 from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.normalize_authorships import PgAuthorshipsBatchQueries
-from infrastructure.queries.normalize_scanr import PgScanrNormalizeQueries
-from infrastructure.queries.staging import PgStagingQueries
+from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
+from infrastructure.queries.pipeline.normalize.scanr import PgScanrNormalizeQueries
+from infrastructure.queries.pipeline.staging import PgStagingQueries
 from infrastructure.repositories import (
     journal_repository,
     publication_repository,

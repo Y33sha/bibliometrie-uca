@@ -1,6 +1,6 @@
 """Port : lectures pour `create_persons_from_source_authorships`.
 
-Implémenté par `infrastructure.queries.persons.create.PgPersonsCreateQueries`.
+Implémenté par `infrastructure.queries.pipeline.persons_create.PgPersonsCreateQueries`.
 """
 
 from typing import NamedTuple, Protocol

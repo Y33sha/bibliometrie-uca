@@ -28,19 +28,19 @@ from application.ports.api.stats_queries import (
     YearFacet,
     YearStatsRow,
 )
-from infrastructure.queries.stats.journals import journal_stats as _journal_stats
-from infrastructure.queries.stats.labs import stats_labs as _stats_labs
-from infrastructure.queries.stats.publishers import publisher_stats as _publisher_stats
-from infrastructure.queries.stats.summary import (
+from infrastructure.queries.api.stats.journals import journal_stats as _journal_stats
+from infrastructure.queries.api.stats.labs import stats_labs as _stats_labs
+from infrastructure.queries.api.stats.publishers import publisher_stats as _publisher_stats
+from infrastructure.queries.api.stats.summary import (
     available_years as _available_years,
 )
-from infrastructure.queries.stats.summary import (
+from infrastructure.queries.api.stats.summary import (
     stats_by_year as _stats_by_year,
 )
-from infrastructure.queries.stats.summary import (
+from infrastructure.queries.api.stats.summary import (
     stats_facets as _stats_facets,
 )
-from infrastructure.queries.stats.summary import (
+from infrastructure.queries.api.stats.summary import (
     stats_summary as _stats_summary,
 )
 
