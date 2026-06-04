@@ -50,6 +50,17 @@ def _seed_identifier(conn, person_id, id_type, id_value, status, source="auto"):
     )
 
 
+def _reject_pair(conn, publication_id, person_id):
+    """Seed une paire rejetée dans `rejected_authorships`."""
+    conn.execute(
+        text(
+            "INSERT INTO rejected_authorships (publication_id, person_id) "
+            "VALUES (:pub, :pid) ON CONFLICT DO NOTHING"
+        ),
+        {"pub": publication_id, "pid": person_id},
+    )
+
+
 def _insert_publication(conn, title="Test Pub", pub_year=2024):
     from domain.normalize import normalize_text
 
@@ -293,6 +304,46 @@ class TestCascadeRun:
         _run_cascade(sa_sync_conn)
 
         assert _get_person_id(sa_sync_conn, oa_as) is None
+
+    def test_rejected_pair_blocks_identifier_match(self, sa_sync_conn):
+        """Paire (publi, personne) dans `rejected_authorships` → un match par
+        identifiant vers cette personne est annulé. La cascade ne ré-attache
+        pas le `person_id` rejeté à la `source_authorship`."""
+        pub = _insert_publication(sa_sync_conn)
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
+        _seed_identifier(sa_sync_conn, person_id, "orcid", "0000-0001-2345-6789", "confirmed")
+        _reject_pair(sa_sync_conn, pub, person_id)
+
+        oa_sd = _insert_source_document(sa_sync_conn, "openalex", "W999", pub)
+        oa_as = _insert_authorship(
+            sa_sync_conn,
+            "openalex",
+            oa_sd,
+            "Toto Inconnu",
+            identifiers={"orcid": "0000-0001-2345-6789"},
+        )
+
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, oa_as) != person_id
+
+    def test_rejected_candidate_disambiguates_ambiguous_name_form(self, sa_sync_conn):
+        """2 homonymes partagent la forme de nom ; l'un est rejeté pour la publi
+        → l'élimination ne laisse qu'une candidate → match univoque vers l'autre
+        (désambiguïsation par élimination)."""
+        pub = _insert_publication(sa_sync_conn)
+        pid1 = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
+        pid2 = create_person("Dupont", "Jacques", repo=person_repository(sa_sync_conn))
+        add_name_form(pid1, "J Dupont", repo=person_repository(sa_sync_conn))
+        add_name_form(pid2, "J Dupont", repo=person_repository(sa_sync_conn))
+        _reject_pair(sa_sync_conn, pub, pid1)
+
+        oa_sd = _insert_source_document(sa_sync_conn, "openalex", "W778", pub)
+        oa_as = _insert_authorship(sa_sync_conn, "openalex", oa_sd, "J Dupont")
+
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, oa_as) == pid2
 
     def test_unknown_name_creates_person_with_identifiers(self, sa_sync_conn):
         """Forme inconnue + authorship-auteur → crée la personne et importe ses

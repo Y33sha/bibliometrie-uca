@@ -151,6 +151,30 @@ class TestDecideNameFormOutcome:
         assert decision.action == "skip"
         assert decision.reason == "ambiguous_name_form"
 
+    def test_rejected_candidate_eliminated_disambiguates(self):
+        """2 candidats dont 1 rejeté pour la publi → l'élimination ne laisse
+        qu'une candidate → match univoque (désambiguïsation par élimination)."""
+        decision = decide_name_form_outcome(
+            [42, 17], allow_create=True, rejected_person_ids=frozenset({17})
+        )
+        assert decision == NameFormDecision(action="match", person_id=42)
+
+    def test_single_rejected_candidate_skips(self):
+        """Unique candidate rejetée pour la publi → orpheline, pas de match,
+        pas de création (on ne crée pas une personne pour une paire rejetée)."""
+        decision = decide_name_form_outcome(
+            [42], allow_create=True, rejected_person_ids=frozenset({42})
+        )
+        assert decision.action == "skip"
+        assert decision.reason == "ambiguous_name_form"
+
+    def test_all_candidates_rejected_skips(self):
+        decision = decide_name_form_outcome(
+            [42, 17], allow_create=True, rejected_person_ids=frozenset({42, 17})
+        )
+        assert decision.action == "skip"
+        assert decision.reason == "ambiguous_name_form"
+
 
 class TestDecideMatchByIdentifier:
     def test_value_present_returns_person_id(self):
@@ -284,3 +308,42 @@ class TestDecidePersonMatch:
             name_form_outcome=self._skip(),
         )
         assert decision == PersonMatchDecision(action="match", person_id=17, reason="idref")
+
+    def test_rejected_orcid_match_falls_through_to_next_signal(self):
+        """Un match ORCID vers une personne rejetée pour la publi est annulé ;
+        la cascade retombe sur le hal_person_id."""
+        decision = decide_person_match(
+            orcid_match=99,
+            hal_match=88,
+            idref_match=17,
+            cross_source_match=42,
+            name_form_outcome=NameFormDecision(action="match", person_id=7),
+            rejected_person_ids=frozenset({99}),
+        )
+        assert decision == PersonMatchDecision(action="match", person_id=88, reason="hal_person_id")
+
+    def test_all_id_matches_rejected_falls_through_to_name_form(self):
+        """Tous les matchs d'identifiant/cross-source rejetés → on retombe
+        sur le name form (qui, lui, doit déjà être gardé en amont)."""
+        decision = decide_person_match(
+            orcid_match=99,
+            hal_match=88,
+            idref_match=17,
+            cross_source_match=42,
+            name_form_outcome=NameFormDecision(action="match", person_id=7),
+            rejected_person_ids=frozenset({99, 88, 17, 42}),
+        )
+        assert decision == PersonMatchDecision(action="match", person_id=7, reason="single_name")
+
+    def test_rejected_cross_source_match_skips_to_name_form_outcome(self):
+        """Seul signal = cross-source, mais rejeté → on suit l'issue name form
+        (ici skip ambigu)."""
+        decision = decide_person_match(
+            orcid_match=None,
+            hal_match=None,
+            idref_match=None,
+            cross_source_match=42,
+            name_form_outcome=self._skip(),
+            rejected_person_ids=frozenset({42}),
+        )
+        assert decision == PersonMatchDecision(action="skip", reason="ambiguous_name_form")
