@@ -33,7 +33,7 @@ def set_concept_doi(conn: Connection, source_publication_id: int, concept_doi: s
         text("""
             UPDATE source_publications
             SET external_ids = external_ids
-                || jsonb_build_object('zenodo_concept_doi', :concept_doi),
+                || jsonb_build_object('zenodo_concept_doi', CAST(:concept_doi AS text)),
                 updated_at = now()
             WHERE id = :id
         """),
