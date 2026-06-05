@@ -91,7 +91,7 @@ def _insert_address_structure(
 
 
 def _setup_uca_perimeter(conn):
-    """Monte un périmètre UCA minimal pour que propagate_uca_for_addresses marche."""
+    """Monte un périmètre UCA minimal pour que propagate_in_perimeter_for_addresses marche."""
     uca = _create_structure(conn, code="UCA", name="UCA", structure_type="universite")
     _create_perimeter(conn, "uca", [uca])
     _set_config(conn, "perimeter_persons", "uca")
@@ -541,14 +541,14 @@ class TestPropagationSkipsNoOp:
 
     @pytest.fixture
     def spy_propagate(self, monkeypatch):
-        """Remplace propagate_uca_for_addresses par un spy qui compte les appels."""
+        """Remplace propagate_in_perimeter_for_addresses par un spy qui compte les appels."""
         calls: list[list[int]] = []
 
         def fake_propagate(conn, address_ids, **kw):  # noqa: ARG001
             calls.append(list(address_ids))
 
         monkeypatch.setattr(
-            addresses_structures_module, "propagate_uca_for_addresses", fake_propagate
+            addresses_structures_module, "propagate_in_perimeter_for_addresses", fake_propagate
         )
         return calls
 
