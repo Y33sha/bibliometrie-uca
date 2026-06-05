@@ -12,59 +12,8 @@ import copy
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from domain.normalize import normalize_text
-from domain.publications.doc_types import map_doc_type
-from domain.publications.identifiers import DOI, normalize_nnt
-from domain.publications.publication import Publication
 from infrastructure.repositories import publication_repository
-from tests.integration.helpers.publications import (
-    find_or_create_for_tests as find_or_create_publication,
-)
-
-
-def _create_all_publications(conn):
-    """Crée les publications pour tous les source_publications orphelins."""
-    repo = publication_repository(conn)
-    rows = conn.execute(
-        text("""
-            SELECT id, source, doi, title, pub_year, doc_type, journal_id,
-                   oa_status, language, container_title, external_ids
-            FROM source_publications WHERE publication_id IS NULL
-            ORDER BY id
-        """)
-    ).all()
-    for row in rows:
-        doc = dict(row._mapping)
-        title = doc["title"] or ""
-        pub_year = doc["pub_year"]
-        if not title or not pub_year:
-            continue
-        raw_type = doc["doc_type"] or "other"
-        doc_type = map_doc_type(raw_type, doc["source"])
-        ext_ids = doc["external_ids"] or {}
-        nnt = ext_ids.get("nnt")
-        if nnt:
-            nnt = normalize_nnt(nnt)
-        candidate = Publication(
-            id=None,
-            title=title,
-            title_normalized=normalize_text(title),
-            pub_year=pub_year,
-            doc_type=doc_type,
-            doi=DOI(doc["doi"]) if doc["doi"] else None,
-            oa_status=doc["oa_status"] or "unknown",
-            journal_id=doc["journal_id"],
-            container_title=doc["container_title"],
-            language=doc["language"],
-        )
-        result, _ = find_or_create_publication(candidate, nnt=nnt, allow_create=True, repo=repo)
-        if result and result.id is not None:
-            conn.execute(
-                text("UPDATE source_publications SET publication_id = :pid WHERE id = :sid"),
-                {"pid": result.id, "sid": doc["id"]},
-            )
-            repo.update_sources(result.id)
-
+from tests.integration.helpers.publications_phase import create_all_publications
 
 # ── Données HAL minimales ───────────────────────────────────────
 
@@ -114,7 +63,6 @@ def _run_normalize_hal(conn):
     from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.repositories import (
         journal_repository,
-        publication_repository,
         publisher_repository,
     )
 
@@ -180,7 +128,6 @@ def _refresh_stale_publications(conn):
     from infrastructure.queries.pipeline.publications_match_or_create import (
         fetch_stale_publication_ids,
     )
-    from infrastructure.repositories import publication_repository
 
     repo = publication_repository(conn)
     for pub_id in fetch_stale_publication_ids(conn):
@@ -200,7 +147,7 @@ class TestHalReprocessingUpdatesOaStatus:
         # 1. Premier traitement : openAccess_bool = false → closed
         _insert_hal_staging(sa_sync_conn, HAL_DOC_CLOSED)
         _run_normalize_hal(sa_sync_conn)
-        _create_all_publications(sa_sync_conn)
+        create_all_publications(sa_sync_conn)
 
         assert _get_pub_oa_status(sa_sync_conn, hal_id) == "closed"
 
@@ -231,7 +178,7 @@ class TestHalReprocessingUpdatesOaStatus:
         open_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
         _insert_hal_staging(sa_sync_conn, open_doc)
         _run_normalize_hal(sa_sync_conn)
-        _create_all_publications(sa_sync_conn)
+        create_all_publications(sa_sync_conn)
 
         assert _get_pub_oa_status(sa_sync_conn, hal_id) == "green"
 

@@ -1,6 +1,6 @@
 """Idempotence : combinatoire multi-sources (HAL + OpenAlex)."""
 
-from tests.integration.pipeline.idempotence._helpers import create_all_publications
+from tests.integration.helpers.publications_phase import create_all_publications
 from tests.integration.pipeline.idempotence.test_normalize_hal import (
     insert_hal_staging,
     run_normalize_hal,
@@ -71,12 +71,14 @@ INTER_OA_DOCS = [
                         "id": "https://openalex.org/A991001",
                         "display_name": "Alice Dupont",
                     },
+                    "raw_author_name": "Alice Dupont",
                     "author_position": "first",
                     "institutions": [],
                     "raw_affiliation_strings": [],
                 },
                 {
                     "author": {"id": "https://openalex.org/A991002", "display_name": "Bob Martin"},
+                    "raw_author_name": "Bob Martin",
                     "author_position": "last",
                     "institutions": [],
                     "raw_affiliation_strings": [],
@@ -102,6 +104,7 @@ INTER_OA_DOCS = [
                         "id": "https://openalex.org/A991003",
                         "display_name": "Charlie Noid",
                     },
+                    "raw_author_name": "Charlie Noid",
                     "author_position": "first",
                     "institutions": [],
                     "raw_affiliation_strings": [],

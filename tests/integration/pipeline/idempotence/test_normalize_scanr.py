@@ -1,6 +1,6 @@
 """Idempotence : normalisation ScanR."""
 
-from tests.integration.pipeline.idempotence._helpers import create_all_publications
+from tests.integration.helpers.publications_phase import create_all_publications
 
 SCANR_STAGING_DOCS = [
     {
