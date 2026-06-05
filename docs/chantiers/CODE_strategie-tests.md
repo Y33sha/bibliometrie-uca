@@ -41,7 +41,7 @@ Cosmic Python conseille d'être parcimonieux sur les tests unitaires du domain *
 ### Problème 1 — Dé-fictionnaliser, puis supprimer le helper
 
 - [x] **`test_dedup_publications.py`** (commit `02f8779b`) : 21 tests-fiction supprimés (cascade DOI / conflit doc_type / NNT + 8 tautologiques sur un matching par titre inexistant), 14 tests conservés et re-seedés via `repo.create` (12 `refresh_from_sources` + 2 `find_by_nnt`). Mesure : 0 ligne prod perdue (publications.py 86 / aggregation 64 / publication_repository 145, inchangés).
-- [ ] **`test_scenarios.py::TestPublicationService`** (nature a, pur cascade). Pré-requis : re-héberger la couverture de `application/publications.py:155-178` (branche auto-merge sur collision DOI de `refresh_from_sources`) que cette classe détient seule, via un test ciblé re-seedé. Puis supprimer la classe.
+- [x] **`test_scenarios.py::TestPublicationService`** (commit `2a12d46c`) — même sac mixte que test_dedup (pas « pur cascade ») : 6 tests-fiction supprimés (create, dédup DOI, 2 tautologiques titre, allow_create), 2 tests `refresh_from_sources` re-seedés via `repo.create` dont celui qui couvre seul la branche auto-merge `publications.py:155-178`. Classe renommée `TestRefreshFromSources`. Mesure suite complète : 0 ligne prod perdue.
 - [ ] **`idempotence/_helpers.py::create_all_publications` + `test_reprocessing.py::_create_all_publications`** (nature b). Dépend du Problème 1-bis.
 - [ ] **Supprimer `find_or_create_for_tests`** (et `tests/integration/helpers/publications.py`) une fois zéro caller. Vérifier qu'aucune ligne prod ne perd sa couverture.
 

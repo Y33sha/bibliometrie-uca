@@ -66,3 +66,5 @@ Trois tables alimentées par les phases `subjects` et `cooccurrences` du pipelin
 | `subjects`, `publication_subjects` | `application/pipeline/subjects/run.py` | — |
 | `subject_cooccurrences` | `application/pipeline/cooccurrences/run.py` | recalcul global après ingestion subjects |
 | `apc_payments` | import APC (CSV) | — |
+
+La propriété n'est pas enforcée (convention, pas de contrat import-linter ni de GRANT). Deux écritures transverses la franchissent sans owner dédié : la **fusion de journaux** (`journal_repository`) re-pointe `journal_id` sur `publications` et `source_publications` ; la **propagation des pays** (`infrastructure/queries/pipeline/countries.py`, `address_repository`) écrit les colonnes `countries[]` sur `source_authorships`, `source_publications` et `publications`.
