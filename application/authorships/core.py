@@ -93,7 +93,7 @@ def exclude_authorship(
     return {"id": authorship_id, "person_id": person_id, "publication_id": publication_id}
 
 
-def propagate_uca_for_addresses(
+def propagate_in_perimeter_for_addresses(
     conn: Connection,
     address_ids: list[int],
     *,

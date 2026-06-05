@@ -12,7 +12,7 @@ from sqlalchemy import text
 from application.authorships.core import (
     delete_orphan_authorships,
     exclude_authorship,
-    propagate_uca_for_addresses,
+    propagate_in_perimeter_for_addresses,
     reject_pair,
 )
 from domain.errors import NotFoundError
@@ -658,11 +658,11 @@ class TestPropagateAuthorshipAttributes:
         )
 
 
-# ── propagate_uca_for_addresses ───────────────────────────────
+# ── propagate_in_perimeter_for_addresses ───────────────────────────────
 
 
 class TestPropagateUcaForAddresses:
-    """propagate_uca_for_addresses recalcule in_perimeter et structure_ids
+    """propagate_in_perimeter_for_addresses recalcule in_perimeter et structure_ids
     sur les source_authorships puis propage vers l'authorship vérité,
     après une modification sur address_structures."""
 
@@ -683,7 +683,7 @@ class TestPropagateUcaForAddresses:
 
     def test_noop_on_empty_address_ids(self, sa_sync_conn, repo, perimeter_queries):
         self._setup_uca(sa_sync_conn)
-        propagate_uca_for_addresses(
+        propagate_in_perimeter_for_addresses(
             sa_sync_conn, [], repo=repo, perimeter_queries=perimeter_queries
         )
         # Pas d'assertion négative utile : on vérifie juste qu'aucune exception
@@ -692,7 +692,7 @@ class TestPropagateUcaForAddresses:
         """Si aucun périmètre configuré, la fonction sort sans rien faire."""
         addr_id = _create_address(sa_sync_conn)
         # Aucun set_config perimeter_persons
-        propagate_uca_for_addresses(
+        propagate_in_perimeter_for_addresses(
             sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
         )
 
@@ -709,7 +709,7 @@ class TestPropagateUcaForAddresses:
         _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=True)
         _link_sa_address(sa_sync_conn, sa_id, addr_id)
 
-        propagate_uca_for_addresses(
+        propagate_in_perimeter_for_addresses(
             sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
         )
 
@@ -758,7 +758,7 @@ class TestPropagateUcaForAddresses:
         _link_address_structure(sa_sync_conn, addr_id, uca_id, is_confirmed=False)
         _link_sa_address(sa_sync_conn, sa_id, addr_id)
 
-        propagate_uca_for_addresses(
+        propagate_in_perimeter_for_addresses(
             sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
         )
 
