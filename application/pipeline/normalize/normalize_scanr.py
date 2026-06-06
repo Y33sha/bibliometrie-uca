@@ -15,7 +15,6 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
 
 import logging
-import time
 from collections.abc import Callable
 
 from sqlalchemy import Connection
@@ -334,41 +333,33 @@ def process_work(
     scanr_id = staging_row.source_id
     raw_data = staging_row.raw_data
     doc = raw_data
-    timings: dict[str, float] = {}
 
     try:
+        from application.pipeline.timings import StepTimer
+
         title = get_title(doc)
         pub_year = doc.get("year")
         if not has_minimal_publication_metadata(title, pub_year):
             logger.warning(f"Impossible d'insérer {scanr_id} — titre ou année manquant")
             return False
 
-        t0 = time.perf_counter()
+        t = StepTimer()
         publisher_id = upsert_publisher(doc, publisher_repo=publisher_repo)
-        timings["publisher"] = time.perf_counter() - t0
-
-        t0 = time.perf_counter()
         journal_id = upsert_journal(doc, publisher_id, journal_repo=journal_repo)
-        timings["journal"] = time.perf_counter() - t0
+        t.mark("publisher+journal")
 
         pub_meta = extract_pub_metadata(doc, journal_id, scanr_id)
 
-        t0 = time.perf_counter()
         source_publication_id = insert_scanr_document(
             conn, queries, doc, staging_id, scanr_id, None, pub_meta
         )
-        timings["scanr_doc"] = time.perf_counter() - t0
+        t.mark("scanr_doc")
 
-        t0 = time.perf_counter()
         process_authors(conn, authorship_queries, doc, source_publication_id)
-        timings["authors"] = time.perf_counter() - t0
+        t.mark("authors")
 
         staging_queries.mark_done(conn, staging_id)
-
-        total = sum(timings.values())
-        if total > 0.5:
-            breakdown = " | ".join(f"{k}:{v:.3f}s" for k, v in timings.items())
-            logger.info(f"  SLOW {scanr_id} ({total:.3f}s) : {breakdown}")
+        t.log_if_slow(scanr_id, logger)
 
         return True
 
