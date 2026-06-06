@@ -67,7 +67,10 @@ def build(
     linked = queries.link_source_authorships_to_authorships(conn)
     logger.info(f"  {linked} liens posés")
 
-    logger.info("Étape 3 : recomposition des attributs (passe convergente)...")
+    logger.info(
+        "Étape 3 : recomposition des attributs "
+        "(author_position, is_corresponding, in_perimeter, roles)..."
+    )
     updated = queries.propagate_authorship_attributes(conn)
     logger.info(f"  {updated} authorships mises à jour")
 

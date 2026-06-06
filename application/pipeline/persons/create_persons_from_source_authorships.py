@@ -207,7 +207,11 @@ def run(
     skipped_counts: dict[str, int] = defaultdict(int)
     created = 0
 
-    for a in all_authorships:
+    total = len(all_authorships)
+    for i, a in enumerate(all_authorships):
+        if i and i % 5000 == 0:
+            logger.info("  %d/%d authorships traitées...", i, total)
+
         # ── Sous-décisions ─────────────────────────────────────────
         cross_source_match: int | None = None
         pub_id = a.publication_id
