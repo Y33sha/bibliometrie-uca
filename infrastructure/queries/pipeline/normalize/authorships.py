@@ -14,6 +14,8 @@ ne préexiste — d'où l'absence d'`ON CONFLICT` sur ces deux INSERT (seul
 `addresses`, table partagée non vidée, le conserve).
 """
 
+import hashlib
+
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -114,12 +116,21 @@ def upsert_addresses_batch(conn: Connection, values: list[AddressBatchItem]) -> 
 
 
 def fetch_address_ids_by_raw_text(conn: Connection, raw_texts: list[str]) -> dict[str, int]:
-    """Retourne `{raw_text: id}` pour un lot d'adresses."""
+    """Retourne `{raw_text: id}` pour un lot d'adresses.
+
+    Filtre sur `md5(raw_text)` (et non `raw_text`) pour exploiter l'index unique
+    fonctionnel `addresses_raw_text_key (md5(raw_text))` — celui-là même qui sert
+    le `ON CONFLICT` de `upsert_addresses_batch`. Sans ça, `WHERE raw_text = ANY(...)`
+    déclenche un seq scan de toute la table `addresses` à chaque document (coût fixe
+    ~0,5 s par publication, indépendant du nombre d'auteurs). `md5()` PostgreSQL et
+    `hashlib.md5` sur l'UTF-8 coïncident.
+    """
     if not raw_texts:
         return {}
+    md5s = [hashlib.md5(t.encode()).hexdigest() for t in raw_texts]
     rows = conn.execute(
-        text("SELECT raw_text, id FROM addresses WHERE raw_text = ANY(:raw_texts)"),
-        {"raw_texts": raw_texts},
+        text("SELECT raw_text, id FROM addresses WHERE md5(raw_text) = ANY(:md5s)"),
+        {"md5s": md5s},
     ).all()
     return {r.raw_text: r.id for r in rows}
 
