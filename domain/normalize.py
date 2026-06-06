@@ -42,15 +42,24 @@ def normalize_text(text: str) -> str:
     """Normalise un texte pour comparaison / dédoublonnage / matching.
 
     Pipeline :
-      1. minuscules + strip
-      2. remplacer les tirets/apostrophes Unicode par ASCII
-      3. NFKD (décompose les accents)
-      4. ASCII encode/ignore (supprime les combining marks)
-      5. tout sauf [a-z0-9] → espaces
-      6. collapse espaces multiples
+      1. retirer les balises (MathML/HTML) `<...>` entièrement
+      2. minuscules + strip
+      3. remplacer les tirets/apostrophes Unicode par ASCII
+      4. NFKD (décompose les accents)
+      5. ASCII encode/ignore (supprime les combining marks)
+      6. tout sauf [a-z0-9] → espaces
+      7. collapse espaces multiples
     """
     if not text:
         return ""
+    # Retrait des balises avant tout : on supprime `<...>` en entier (nom de
+    # balise inclus), sinon `mml`, `i`, `sub`… subsisteraient comme texte après
+    # l'étape [^a-z0-9] et pollueraient le dédoublonnage par titre (certaines
+    # sources exposent les titres avec balises MathML/HTML, d'autres non).
+    # Le premier caractère doit être une lettre (ou `/`) pour ne pas avaler les
+    # indices de Miller `<111>` / `< 110 >` (cristallographie), qui sont du
+    # contenu, pas du markup (audit titres bruts : seuls cas non-balise observés).
+    text = re.sub(r"</?[A-Za-z][^>]*>", " ", text)
     text = text.lower().strip()
     text = text.translate(_UNICODE_TO_ASCII)
     text = unicodedata.normalize("NFKD", text)

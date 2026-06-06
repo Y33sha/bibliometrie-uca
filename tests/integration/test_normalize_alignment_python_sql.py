@@ -52,6 +52,17 @@ ALIGNED = [
     pytest.param("½ litre", id="vulgar-fraction-half"),
     pytest.param("¼ tour", id="vulgar-fraction-quarter"),
     pytest.param("⅔ majorité", id="vulgar-fraction-two-thirds"),
+    # Retrait des balises MathML/HTML (migration c4f8a1e6b3d9)
+    pytest.param("<i>foo</i>", id="tag-italic"),
+    pytest.param("CaF<sub>2</sub> structure", id="tag-sub"),
+    pytest.param(
+        'decay <mml:math xmlns:mml="x" display="inline">y</mml:math> rate', id="tag-mathml-attrs"
+    ),
+    pytest.param("</scp>BAR<scp>", id="tag-scp-closing-first"),
+    # Indices de Miller : pas des balises (1er char chiffre/espace) → préservés
+    pytest.param("<111> direction", id="miller-111"),
+    pytest.param("{100}<011> slip", id="miller-011"),
+    pytest.param("< 110 > plane", id="miller-110-spaced"),
 ]
 
 
