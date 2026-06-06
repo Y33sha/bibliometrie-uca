@@ -29,6 +29,7 @@ from domain.errors import (
 )
 from infrastructure.repositories import (
     journal_repository,
+    publication_repository,
     publisher_repository,
 )
 
@@ -41,6 +42,11 @@ def repo(sa_sync_conn):
 @pytest.fixture
 def pub_repo(sa_sync_conn):
     return publisher_repository(sa_sync_conn)
+
+
+@pytest.fixture
+def publication_repo(sa_sync_conn):
+    return publication_repository(sa_sync_conn)
 
 
 def _fetch_one(conn, sql_text: str, **params):
@@ -362,17 +368,23 @@ class TestResetJournalApc:
 
 
 class TestMergePublishers:
-    def test_raises_on_self_merge(self, sa_sync_conn, repo, pub_repo):
+    def test_raises_on_self_merge(self, sa_sync_conn, repo, pub_repo, publication_repo):
         p_id = _insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(ConflictError, match="lui-même"):
-            merge_publishers(p_id, p_id, publisher_repo=pub_repo, journal_repo=repo)
+            merge_publishers(
+                p_id, p_id, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+            )
 
-    def test_transfers_journals_and_deletes_source(self, sa_sync_conn, repo, pub_repo):
+    def test_transfers_journals_and_deletes_source(
+        self, sa_sync_conn, repo, pub_repo, publication_repo
+    ):
         target = _insert_publisher(sa_sync_conn, "Target")
         source = _insert_publisher(sa_sync_conn, "Source")
         j1 = _insert_journal(sa_sync_conn, "Journal 1", publisher_id=source)
 
-        merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+        merge_publishers(
+            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+        )
 
         assert (
             _fetch_one(sa_sync_conn, "SELECT id FROM publishers WHERE id = :id", id=source)
@@ -380,7 +392,7 @@ class TestMergePublishers:
         row = _fetch_one(sa_sync_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=j1)
         assert row.publisher_id == target
 
-    def test_merges_same_title_journals(self, sa_sync_conn, repo, pub_repo):
+    def test_merges_same_title_journals(self, sa_sync_conn, repo, pub_repo, publication_repo):
         """Si cible et source ont un journal de même titre, ils sont fusionnés."""
         target = _insert_publisher(sa_sync_conn, "Target")
         source = _insert_publisher(sa_sync_conn, "Source")
@@ -388,7 +400,9 @@ class TestMergePublishers:
         js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, eissn="1476-4687")
         _insert_publication(sa_sync_conn, journal_id=js)
 
-        merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+        merge_publishers(
+            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+        )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
         row = _fetch_one(sa_sync_conn, "SELECT issn, eissn FROM journals WHERE id = :id", id=jt)
@@ -396,7 +410,7 @@ class TestMergePublishers:
         assert row.eissn == "1476-4687"
 
     def test_merges_same_title_journals_with_only_source_openalex_id(
-        self, sa_sync_conn, repo, pub_repo
+        self, sa_sync_conn, repo, pub_repo, publication_repo
     ):
         """Cible sans openalex_id, source avec : la fusion doit déplacer
         l'openalex_id du source vers la cible sans violer UNIQUE(openalex_id)."""
@@ -405,20 +419,30 @@ class TestMergePublishers:
         jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target)
         js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, openalex_id="S4210225546")
 
-        merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+        merge_publishers(
+            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+        )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
         row = _fetch_one(sa_sync_conn, "SELECT openalex_id FROM journals WHERE id = :id", id=jt)
         assert row.openalex_id == "S4210225546"
 
-    def test_raises_blocked_error_on_issn_conflict(self, sa_sync_conn, repo, pub_repo):
+    def test_raises_blocked_error_on_issn_conflict(
+        self, sa_sync_conn, repo, pub_repo, publication_repo
+    ):
         target = _insert_publisher(sa_sync_conn, "Target")
         source = _insert_publisher(sa_sync_conn, "Source")
         jt = _insert_journal(sa_sync_conn, "Nature", publisher_id=target, issn="0028-0836")
         js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, issn="9999-9999")
 
         with pytest.raises(PublisherMergeBlockedError) as exc_info:
-            merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+            merge_publishers(
+                target,
+                source,
+                publisher_repo=pub_repo,
+                journal_repo=repo,
+                pub_repo=publication_repo,
+            )
 
         blockers = exc_info.value.blocking_journals
         assert len(blockers) == 1
@@ -430,7 +454,9 @@ class TestMergePublishers:
         assert "ISSN" in b["reason"]
         assert "0028-0836" in b["reason"] and "9999-9999" in b["reason"]
 
-    def test_blocks_when_target_has_internal_duplicate_titles(self, sa_sync_conn, repo, pub_repo):
+    def test_blocks_when_target_has_internal_duplicate_titles(
+        self, sa_sync_conn, repo, pub_repo, publication_repo
+    ):
         """Si la cible a 2 journaux au même titre et la source en a 1, la fusion
         N→1 casserait. On flagge ces paires comme blockers."""
         target = _insert_publisher(sa_sync_conn, "Target")
@@ -440,14 +466,22 @@ class TestMergePublishers:
         _insert_journal(sa_sync_conn, "Nature", publisher_id=source)
 
         with pytest.raises(PublisherMergeBlockedError) as exc_info:
-            merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+            merge_publishers(
+                target,
+                source,
+                publisher_repo=pub_repo,
+                journal_repo=repo,
+                pub_repo=publication_repo,
+            )
 
         blockers = exc_info.value.blocking_journals
         assert len(blockers) == 2
         for b in blockers:
             assert "doublon interne" in b["reason"]
 
-    def test_collects_all_blockers_in_one_pass(self, sa_sync_conn, repo, pub_repo):
+    def test_collects_all_blockers_in_one_pass(
+        self, sa_sync_conn, repo, pub_repo, publication_repo
+    ):
         """Plusieurs paires de revues bloquantes → toutes remontées d'un coup."""
         target = _insert_publisher(sa_sync_conn, "Target")
         source = _insert_publisher(sa_sync_conn, "Source")
@@ -457,11 +491,17 @@ class TestMergePublishers:
         _insert_journal(sa_sync_conn, "Rev2", publisher_id=source, eissn="4444-4444")
 
         with pytest.raises(PublisherMergeBlockedError) as exc_info:
-            merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+            merge_publishers(
+                target,
+                source,
+                publisher_repo=pub_repo,
+                journal_repo=repo,
+                pub_repo=publication_repo,
+            )
 
         assert len(exc_info.value.blocking_journals) == 2
 
-    def test_enriches_target_flags(self, sa_sync_conn, repo, pub_repo):
+    def test_enriches_target_flags(self, sa_sync_conn, repo, pub_repo, publication_repo):
         """is_predatory = OR logique : vrai si l'une des sources l'était."""
         target = _insert_publisher(sa_sync_conn, "Target")
         source = _insert_publisher(sa_sync_conn, "Source")
@@ -469,28 +509,38 @@ class TestMergePublishers:
             text("UPDATE publishers SET is_predatory = TRUE WHERE id = :id"), {"id": source}
         )
 
-        merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+        merge_publishers(
+            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+        )
 
         row = _fetch_one(
             sa_sync_conn, "SELECT is_predatory FROM publishers WHERE id = :id", id=target
         )
         assert row.is_predatory is True
 
-    def test_transfers_openalex_id_when_target_has_none(self, sa_sync_conn, repo, pub_repo):
+    def test_transfers_openalex_id_when_target_has_none(
+        self, sa_sync_conn, repo, pub_repo, publication_repo
+    ):
         """Target sans openalex_id, source avec : la cible reçoit celui de la source."""
         target = _insert_publisher(sa_sync_conn, "Target", openalex_id=None)
         source = _insert_publisher(sa_sync_conn, "Source", openalex_id="P999")
-        merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+        merge_publishers(
+            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+        )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
         )
         assert row.openalex_id == "P999"
 
-    def test_keeps_target_openalex_id_when_both_set(self, sa_sync_conn, repo, pub_repo):
+    def test_keeps_target_openalex_id_when_both_set(
+        self, sa_sync_conn, repo, pub_repo, publication_repo
+    ):
         """Si les deux ont un openalex_id, celui de la cible est conservé."""
         target = _insert_publisher(sa_sync_conn, "Target", openalex_id="P_TARGET")
         source = _insert_publisher(sa_sync_conn, "Source", openalex_id="P_SOURCE")
-        merge_publishers(target, source, publisher_repo=pub_repo, journal_repo=repo)
+        merge_publishers(
+            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+        )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
         )
@@ -501,17 +551,27 @@ class TestMergePublishers:
 
 
 class TestMergeJournals:
-    def test_raises_on_self_merge(self, sa_sync_conn, repo):
+    def test_raises_on_self_merge(self, sa_sync_conn, repo, publication_repo):
         j_id = _insert_journal(sa_sync_conn, "Nature")
         with pytest.raises(ConflictError, match="lui-même"):
-            merge_journals(j_id, j_id, repo=repo)
+            merge_journals(j_id, j_id, repo=repo, pub_repo=publication_repo)
 
-    def test_transfers_publications(self, sa_sync_conn, repo):
+    def test_transfers_publications(self, sa_sync_conn, repo, publication_repo):
         target = _insert_journal(sa_sync_conn, "Target")
         source = _insert_journal(sa_sync_conn, "Source")
         pub_id = _insert_publication(sa_sync_conn, journal_id=source)
+        # ≥1 source_publication : sinon `refresh_from_sources` (déclenché par la
+        # requalification post-merge) supprimerait la publication comme orpheline.
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO source_publications "
+                "(source, source_id, title, pub_year, journal_id, publication_id) "
+                "VALUES ('openalex', 'W-transfer', 'T', 2024, :jid, :pid)"
+            ),
+            {"jid": source, "pid": pub_id},
+        )
 
-        merge_journals(target, source, repo=repo)
+        merge_journals(target, source, repo=repo, pub_repo=publication_repo)
 
         row = _fetch_one(
             sa_sync_conn, "SELECT journal_id FROM publications WHERE id = :id", id=pub_id
@@ -521,13 +581,13 @@ class TestMergeJournals:
             _fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=source)
         ) is None
 
-    def test_enriches_target_metadata(self, sa_sync_conn, repo):
+    def test_enriches_target_metadata(self, sa_sync_conn, repo, publication_repo):
         target = _insert_journal(sa_sync_conn, "Target")
         source = _insert_journal(
             sa_sync_conn, "Source", issn="1234-5678", eissn="9999-0000", is_in_doaj=True
         )
 
-        merge_journals(target, source, repo=repo)
+        merge_journals(target, source, repo=repo, pub_repo=publication_repo)
 
         row = _fetch_one(
             sa_sync_conn,
@@ -538,12 +598,49 @@ class TestMergeJournals:
         assert row.eissn == "9999-0000"
         assert row.is_in_doaj is True
 
-    def test_does_not_overwrite_existing_fields(self, sa_sync_conn, repo):
+    def test_does_not_overwrite_existing_fields(self, sa_sync_conn, repo, publication_repo):
         """COALESCE : les champs renseignés dans la cible sont préservés."""
         target = _insert_journal(sa_sync_conn, "Target", issn="0028-0836")
         source = _insert_journal(sa_sync_conn, "Source", issn="1234-5678")
 
-        merge_journals(target, source, repo=repo)
+        merge_journals(target, source, repo=repo, pub_repo=publication_repo)
 
         row = _fetch_one(sa_sync_conn, "SELECT issn FROM journals WHERE id = :id", id=target)
         assert row.issn == "0028-0836"
+
+    def test_requalifies_absorbed_publications_against_target_type(
+        self, sa_sync_conn, repo, publication_repo
+    ):
+        """Fusionner une revue dans un média retype ses publications en `media`.
+
+        Régression : avant ce hook, le merge repointait `journal_id` mais laissait
+        les `doc_type` des publications absorbées inchangés.
+        """
+        media = _insert_journal(sa_sync_conn, "Le Monde")
+        revue = _insert_journal(sa_sync_conn, "Revue X")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET journal_type = 'media' WHERE id = :id"), {"id": media}
+        )
+        sa_sync_conn.execute(
+            text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": revue}
+        )
+        pub = _insert_publication(sa_sync_conn, journal_id=revue)
+        sa_sync_conn.execute(
+            text("UPDATE publications SET doc_type = 'article' WHERE id = :id"), {"id": pub}
+        )
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO source_publications "
+                "(source, source_id, title, pub_year, doc_type, journal_id, publication_id) "
+                "VALUES ('openalex', 'W-merge-requalif', 'T', 2024, 'article', :jid, :pid)"
+            ),
+            {"jid": revue, "pid": pub},
+        )
+
+        merge_journals(media, revue, repo=repo, pub_repo=publication_repo)
+
+        row = _fetch_one(
+            sa_sync_conn, "SELECT doc_type, journal_id FROM publications WHERE id = :id", id=pub
+        )
+        assert row.journal_id == media
+        assert row.doc_type == "media"

@@ -14,6 +14,7 @@ from application.ports.api.publishers_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import merge_publishers
 from application.publishers import update_publisher as _update_publisher
@@ -21,6 +22,7 @@ from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPE
 from interfaces.api.deps import (
     audit_repo_sync,
     journal_repo_sync,
+    publication_repo_sync,
     publisher_queries_sync,
     publisher_repo_sync,
 )
@@ -184,13 +186,15 @@ def merge(
     queries: PublisherQueries = Depends(publisher_queries_sync),
     pub_repo: PublisherRepository = Depends(publisher_repo_sync),
     j_repo: JournalRepository = Depends(journal_repo_sync),
+    publication_repo: PublicationRepository = Depends(publication_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
-    Les revues et publications rattachées à la source sont
-    transférées à la cible ; la source est supprimée. 404 si l'un
-    des deux éditeurs est introuvable.
+    Les revues et publications rattachées à la source sont transférées à la
+    cible ; la source est supprimée. Les journaux à titre partagé sont fusionnés
+    (et leurs publications requalifiées contre le `journal_type` cible, cf.
+    `merge_journals`). 404 si l'un des deux éditeurs est introuvable.
     """
     found = queries.existing_publisher_ids((publisher_id, body.source_id))
     if publisher_id not in found:
@@ -203,6 +207,7 @@ def merge(
         body.source_id,
         publisher_repo=pub_repo,
         journal_repo=j_repo,
+        pub_repo=publication_repo,
         audit_repo=audit,
     )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

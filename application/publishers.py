@@ -13,6 +13,7 @@ from application.audit import emit_event
 from application.journals import merge_journals
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
+from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdateFields,
@@ -103,6 +104,7 @@ def merge_publishers(
     *,
     publisher_repo: PublisherRepository,
     journal_repo: JournalRepository,
+    pub_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible.
@@ -163,6 +165,7 @@ def merge_publishers(
             pair["target_journal_id"],
             pair["source_journal_id"],
             repo=journal_repo,
+            pub_repo=pub_repo,
             audit_repo=audit_repo,
         )
 
