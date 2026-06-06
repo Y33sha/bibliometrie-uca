@@ -139,7 +139,8 @@ async def run_async(
             if progress["processed"] % 100 == 0 or progress["processed"] >= total:
                 duplicates = progress["fetched"] - progress["inserted"]
                 log.info(
-                    "  %d/%d — %d records (%d nouveaux, %d doublons, %d not-found)",
+                    "  %s %d/%d — %d records (%d nouveaux, %d doublons, %d not-found)",
+                    adapter.source_key,
                     progress["processed"],
                     total,
                     progress["fetched"],
