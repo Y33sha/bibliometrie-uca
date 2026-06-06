@@ -18,6 +18,7 @@ from application.addresses.structures import (
     batch_review_structure_link,
     review_structure_link,
 )
+from domain.errors import ValidationError
 from infrastructure.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import address_repository, authorship_repository
 
@@ -414,6 +415,11 @@ class TestBatchSetCountryByFilter:
         modified = batch_set_country_by_filter("FR", has_country="no", repo=repo)
         assert addr_no in modified
         assert addr_yes not in modified
+
+    def test_empty_filter_raises(self, repo):
+        """Aucun filtre → refus (garde-fou : ne pas viser toutes les adresses)."""
+        with pytest.raises(ValidationError):
+            batch_set_country_by_filter("FR", repo=repo)
 
 
 # ── propagate_countries_to_similar ──────────────────────────────────

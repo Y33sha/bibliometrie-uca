@@ -347,6 +347,14 @@ class TestBatchSetCountry:
         )
         assert r.status_code == 200
 
+    def test_400_empty_filter(self, auth_client):
+        """Ni IDs ni filtre → 400 (garde-fou contre l'application en masse)."""
+        r = auth_client.post(
+            "/api/addresses/batch-country",
+            json={"country_code": "FR"},
+        )
+        assert r.status_code == 400
+
 
 # ── GET /api/admin/address-stats ─────────────────────────────────
 
