@@ -325,6 +325,32 @@ def bg_propagate_countries_sync(address_ids: list[int]) -> None:
         logger.exception("Erreur propagation pays en background")
 
 
+def bg_propagate_in_perimeter_sync(address_ids: list[int]) -> None:
+    """Tâche de fond sync : propager `in_perimeter` après une review d'affiliation.
+
+    Lancée hors cycle de requête (`BackgroundTasks`) : composition manuelle,
+    connexion DB propre (jamais celle de la requête). Le recompute peut toucher
+    des dizaines de milliers de source_authorships — on le décorrèle de la réponse
+    admin (cf. `docs/chantiers/CODE_background-jobs.md`).
+    """
+    import logging
+
+    from application.authorships.core import propagate_in_perimeter_for_addresses
+
+    logger = logging.getLogger(__name__)
+    try:
+        engine = get_sync_engine()
+        with engine.begin() as conn:
+            propagate_in_perimeter_for_addresses(
+                conn,
+                address_ids,
+                repo=authorship_repository(conn),
+                perimeter_queries=get_perimeter_queries_sync(),
+            )
+    except Exception:
+        logger.exception("Erreur propagation in_perimeter en background")
+
+
 # ----- Périmètre APC : structures considérées comme "internes" -----
 
 

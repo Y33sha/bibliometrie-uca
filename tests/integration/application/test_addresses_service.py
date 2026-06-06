@@ -6,7 +6,6 @@ import json
 import pytest
 from sqlalchemy import text
 
-from application.addresses import structures as addresses_structures_module
 from application.addresses.countries import (
     batch_set_country_by_filter,
     batch_set_country_by_ids,
@@ -115,87 +114,45 @@ def _get_link(conn, address_id, structure_id):
 
 
 class TestReviewStructureLink:
-    def test_confirm_creates_link_if_absent(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries
-    ):
+    def test_confirm_creates_link_if_absent(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            True,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        review_structure_link(addr, uca, True, repo=repo)
 
         link = _get_link(sa_sync_conn, addr, uca)
         assert link is not None
         assert link["is_confirmed"] is True
 
-    def test_reject_creates_link_if_absent(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries
-    ):
+    def test_reject_creates_link_if_absent(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            False,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        review_structure_link(addr, uca, False, repo=repo)
 
         link = _get_link(sa_sync_conn, addr, uca)
         assert link["is_confirmed"] is False
 
-    def test_confirm_updates_existing_link(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries
-    ):
+    def test_confirm_updates_existing_link(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
         _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=False)
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            True,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        review_structure_link(addr, uca, True, repo=repo)
 
         assert _get_link(sa_sync_conn, addr, uca)["is_confirmed"] is True
 
-    def test_reset_deletes_manual_link(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries
-    ):
+    def test_reset_deletes_manual_link(self, sa_sync_conn, repo):
         """Reset supprime le lien manuel (matched_form_id IS NULL)."""
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
         _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)  # manuel
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            None,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        review_structure_link(addr, uca, None, repo=repo)
 
         assert _get_link(sa_sync_conn, addr, uca) is None
 
-    def test_reset_preserves_auto_link_but_clears_confirmation(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries
-    ):
+    def test_reset_preserves_auto_link_but_clears_confirmation(self, sa_sync_conn, repo):
         """Reset sur un lien auto-détecté : le lien reste, is_confirmed → NULL."""
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
@@ -210,15 +167,7 @@ class TestReviewStructureLink:
             sa_sync_conn, addr, uca, is_confirmed=False, matched_form_id=form_id
         )
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            None,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        review_structure_link(addr, uca, None, repo=repo)
 
         link = _get_link(sa_sync_conn, addr, uca)
         assert link is not None  # lien auto préservé
@@ -230,72 +179,39 @@ class TestReviewStructureLink:
 
 
 class TestBatchReviewStructureLink:
-    def test_empty_returns_zero(self, sa_sync_conn, repo, authorship_repo, perimeter_queries):
+    def test_empty_returns_zero(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
-        assert (
-            batch_review_structure_link(
-                sa_sync_conn,
-                [],
-                uca,
-                True,
-                repo=repo,
-                authorship_repo=authorship_repo,
-                perimeter_queries=perimeter_queries,
-            )
-            == 0
-        )
+        updated, changed = batch_review_structure_link([], uca, True, repo=repo)
+        assert updated == 0
+        assert changed == []
 
-    def test_confirm_upserts_lot(self, sa_sync_conn, repo, authorship_repo, perimeter_queries):
+    def test_confirm_upserts_lot(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
         addrs = [_create_address(sa_sync_conn, raw_text=f"adr{i}") for i in range(3)]
 
-        updated = batch_review_structure_link(
-            sa_sync_conn,
-            addrs,
-            uca,
-            True,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        updated, _ = batch_review_structure_link(addrs, uca, True, repo=repo)
 
         assert updated == 3
         for aid in addrs:
             assert _get_link(sa_sync_conn, aid, uca)["is_confirmed"] is True
 
-    def test_reject_lot(self, sa_sync_conn, repo, authorship_repo, perimeter_queries):
+    def test_reject_lot(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
         addrs = [_create_address(sa_sync_conn, raw_text=f"x{i}") for i in range(2)]
 
-        batch_review_structure_link(
-            sa_sync_conn,
-            addrs,
-            uca,
-            False,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        batch_review_structure_link(addrs, uca, False, repo=repo)
 
         for aid in addrs:
             assert _get_link(sa_sync_conn, aid, uca)["is_confirmed"] is False
 
-    def test_reset_lot(self, sa_sync_conn, repo, authorship_repo, perimeter_queries):
+    def test_reset_lot(self, sa_sync_conn, repo):
         uca = _setup_uca_perimeter(sa_sync_conn)
         a1 = _create_address(sa_sync_conn, raw_text="a1")
         a2 = _create_address(sa_sync_conn, raw_text="a2")
         _insert_address_structure(sa_sync_conn, a1, uca, is_confirmed=True)
         _insert_address_structure(sa_sync_conn, a2, uca, is_confirmed=False)
 
-        batch_review_structure_link(
-            sa_sync_conn,
-            [a1, a2],
-            uca,
-            None,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        batch_review_structure_link([a1, a2], uca, None, repo=repo)
 
         # Les 2 liens manuels ont été supprimés
         assert _get_link(sa_sync_conn, a1, uca) is None
@@ -537,30 +453,17 @@ class TestPropagateCountriesToPublications:
 
 
 class TestPropagationSkipsNoOp:
-    """Vérifie que la propagation UCA est skippée quand le changement de
-    is_confirmed n'affecte pas le calcul in_perimeter.
+    """Vérifie que `changed` (les adresses à propager) est vide quand le
+    changement de is_confirmed n'affecte pas le calcul in_perimeter — la
+    propagation (désormais lancée en tâche de fond par le caller) n'est alors
+    pas planifiée.
 
     Règle : contribue au périmètre ssi le lien existe ET
     is_confirmed IS DISTINCT FROM FALSE (NULL ou TRUE).
     Donc NULL ↔ TRUE ne changent rien, seuls les passages par FALSE comptent.
     """
 
-    @pytest.fixture
-    def spy_propagate(self, monkeypatch):
-        """Remplace propagate_in_perimeter_for_addresses par un spy qui compte les appels."""
-        calls: list[list[int]] = []
-
-        def fake_propagate(conn, address_ids, **kw):  # noqa: ARG001
-            calls.append(list(address_ids))
-
-        monkeypatch.setattr(
-            addresses_structures_module, "propagate_in_perimeter_for_addresses", fake_propagate
-        )
-        return calls
-
-    def test_confirm_auto_detected_skips_propagation(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries, spy_propagate
-    ):
+    def test_confirm_auto_detected_skips_propagation(self, sa_sync_conn, repo):
         """Click Relier sur une adresse auto-détectée (NULL → TRUE) = no-op."""
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
@@ -576,125 +479,65 @@ class TestPropagationSkipsNoOp:
             sa_sync_conn, addr, uca, is_confirmed=None, matched_form_id=form_id
         )
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            True,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        changed = review_structure_link(addr, uca, True, repo=repo)
 
-        assert spy_propagate == []
+        assert changed == []
         # Le lien a bien été mis à jour
         assert _get_link(sa_sync_conn, addr, uca)["is_confirmed"] is True
 
-    def test_reconfirm_already_confirmed_skips_propagation(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries, spy_propagate
-    ):
+    def test_reconfirm_already_confirmed_skips_propagation(self, sa_sync_conn, repo):
         """Cliquer Relier sur un lien déjà TRUE = no-op."""
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
         _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            True,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        changed = review_structure_link(addr, uca, True, repo=repo)
 
-        assert spy_propagate == []
+        assert changed == []
 
-    def test_confirm_rejected_triggers_propagation(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries, spy_propagate
-    ):
+    def test_confirm_rejected_triggers_propagation(self, sa_sync_conn, repo):
         """FALSE → TRUE : vrai changement, propagation attendue."""
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
         _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=False)
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            True,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        changed = review_structure_link(addr, uca, True, repo=repo)
 
-        assert spy_propagate == [[addr]]
+        assert changed == [addr]
 
-    def test_reject_confirmed_triggers_propagation(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries, spy_propagate
-    ):
+    def test_reject_confirmed_triggers_propagation(self, sa_sync_conn, repo):
         """TRUE → FALSE : vrai changement (sort du périmètre), propagation."""
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
         _insert_address_structure(sa_sync_conn, addr, uca, is_confirmed=True)
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            False,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        changed = review_structure_link(addr, uca, False, repo=repo)
 
-        assert spy_propagate == [[addr]]
+        assert changed == [addr]
 
-    def test_reject_absent_creates_and_triggers_propagation(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries, spy_propagate
-    ):
+    def test_reject_absent_creates_and_triggers_propagation(self, sa_sync_conn, repo):
         """Pas de lien → FALSE : pas de contribution avant ni après, no-op."""
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            False,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        changed = review_structure_link(addr, uca, False, repo=repo)
 
         # Avant = pas de lien (ne contribue pas), après = lien FALSE (ne contribue pas)
-        # → no-op, skip propagation
-        assert spy_propagate == []
+        # → no-op
+        assert changed == []
 
-    def test_confirm_absent_creates_and_triggers_propagation(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries, spy_propagate
-    ):
+    def test_confirm_absent_creates_and_triggers_propagation(self, sa_sync_conn, repo):
         """Pas de lien → TRUE : contribue maintenant, propagation attendue."""
         uca = _setup_uca_perimeter(sa_sync_conn)
         addr = _create_address(sa_sync_conn)
 
-        review_structure_link(
-            sa_sync_conn,
-            addr,
-            uca,
-            True,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        changed = review_structure_link(addr, uca, True, repo=repo)
 
-        assert spy_propagate == [[addr]]
+        assert changed == [addr]
 
-    def test_batch_only_propagates_changed(
-        self, sa_sync_conn, repo, authorship_repo, perimeter_queries, spy_propagate
-    ):
+    def test_batch_only_propagates_changed(self, sa_sync_conn, repo):
         """Batch mixte : certaines adresses changent, d'autres non.
-        Propagation restreinte aux adresses effectivement impactées."""
+        `changed` restreint aux adresses effectivement impactées."""
         uca = _setup_uca_perimeter(sa_sync_conn)
         # a1 : auto-détectée NULL → TRUE (no-op)
         # a2 : rejetée FALSE → TRUE (changement)
@@ -712,16 +555,7 @@ class TestPropagationSkipsNoOp:
         _insert_address_structure(sa_sync_conn, a1, uca, is_confirmed=None, matched_form_id=form_id)
         _insert_address_structure(sa_sync_conn, a2, uca, is_confirmed=False)
 
-        batch_review_structure_link(
-            sa_sync_conn,
-            [a1, a2, a3],
-            uca,
-            True,
-            repo=repo,
-            authorship_repo=authorship_repo,
-            perimeter_queries=perimeter_queries,
-        )
+        _, changed = batch_review_structure_link([a1, a2, a3], uca, True, repo=repo)
 
-        assert len(spy_propagate) == 1
         # a1 inchangée (déjà contribuait), a2 et a3 nouvellement contribuent
-        assert set(spy_propagate[0]) == {a2, a3}
+        assert set(changed) == {a2, a3}
