@@ -304,6 +304,15 @@ def get_perimeter_queries_sync() -> PerimeterQueries:
     return _perimeter_queries_sync_singleton
 
 
+# ----- Tâches de fond (BackgroundTasks) -----
+#
+# Contrat (cf. chantier CODE_background-jobs, phase hygiène) : une BG task ouvre
+# TOUJOURS sa propre connexion via `with engine.begin()` (commit/rollback + close
+# en sortie, même sur exception) et enveloppe son corps dans un `try/except` qui
+# logue — jamais réutiliser la connexion de la requête (déjà fermée quand la BG
+# task tourne) et jamais laisser une transaction ouverte (idle in transaction).
+
+
 def bg_propagate_countries_sync(address_ids: list[int]) -> None:
     """Tâche de fond sync : propager les pays d'adresses → publications.
 
