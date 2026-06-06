@@ -15,6 +15,15 @@ from sqlalchemy import text
 _seq = itertools.count(1)
 
 
+def refresh_structure_matviews(conn) -> None:
+    """Rafraîchit `source_authorship_structures` puis `authorship_structures`
+    (matview-sur-matview, ordre imposé). Non-concurrent = transactionnel, donc
+    compatible avec l'isolation par rollback des tests. En prod ces matviews sont
+    maintenues par le pipeline ; les tests les rafraîchissent explicitement."""
+    conn.execute(text("REFRESH MATERIALIZED VIEW source_authorship_structures"))
+    conn.execute(text("REFRESH MATERIALIZED VIEW authorship_structures"))
+
+
 def add_authorship_structure(conn, authorship_id: int, structure_id: int) -> None:
     """Lie `authorship_id` à `structure_id` dans la matview `authorship_structures`
     (via une chaîne source minimale + appartenance au périmètre d'affiliation),
@@ -79,5 +88,4 @@ def add_authorship_structure(conn, authorship_id: int, structure_id: int) -> Non
         ),
         {"p": perim_id, "s": structure_id},
     )
-    conn.execute(text("REFRESH MATERIALIZED VIEW source_authorship_structures"))
-    conn.execute(text("REFRESH MATERIALIZED VIEW authorship_structures"))
+    refresh_structure_matviews(conn)

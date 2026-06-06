@@ -119,11 +119,12 @@ def propagate_in_perimeter_for_addresses(
 
     repo.recompute_in_perimeter_on_source_authorships(affected_sa_ids, perimeter_ids)
     repo.propagate_in_perimeter_to_authorships(affected_sa_ids)
-    # Les structures dérivées vivent dans les matviews `source_authorship_structures`
-    # (dépend d'`address_structures`, modifiée par la review) puis
-    # `authorship_structures` (dépend de la précédente) : refresh dans l'ordre.
-    repo.refresh_source_authorship_structures()
-    repo.refresh_authorship_structures()
+    # `in_perimeter` ci-dessus est recalculé en direct depuis les tables de base
+    # (`address_structures`, modifiée par la review) — synchrone et correct. Les
+    # matviews `source_authorship_structures` / `authorship_structures`, qui ne
+    # portent que l'agrégation des structure_ids dérivées, ne sont PAS rafraîchies
+    # ici : maintenues uniquement par le pipeline (staleness bornée à un run,
+    # acceptable pour ces dérivées). Cf. docs/chantiers/CODE_background-jobs.md.
 
 
 def delete_orphan_authorships(person_id: int, *, repo: AuthorshipRepository) -> int:

@@ -12,7 +12,7 @@ Usage :
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
 from infrastructure.repositories.person_repository import (
     _authorships,
@@ -154,9 +154,6 @@ class PgPersonRepository:
         _authorships.recompute_authorship_in_perimeter(
             self._conn, publication_id, person_id, sources
         )
-
-    def refresh_authorship_structures(self) -> None:
-        self._conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY authorship_structures"))
 
     # ── person_name_forms ──────────────────────────────────────────
 
