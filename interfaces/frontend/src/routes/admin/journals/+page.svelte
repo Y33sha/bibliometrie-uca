@@ -19,6 +19,7 @@
 
 	// Merge state : recherche avec debounce + cible en cours de fusion
 	let mergeTargetId: number | null = $state(null);
+	let mergeTargetType = $state('journal');
 	const mergeSearch = useDebouncedSearch<Journal>({
 		search: async (q) => {
 			const data = await api<JournalListResponse>(
@@ -94,8 +95,9 @@
 	}
 
 	// Merge
-	function openMerge(id: number) {
-		mergeTargetId = id;
+	function openMerge(j: Journal) {
+		mergeTargetId = j.id;
+		mergeTargetType = j.journal_type || 'journal';
 		mergeSearch.clear();
 	}
 
@@ -106,6 +108,23 @@
 
 	async function doMerge(sourceId: number) {
 		if (!mergeTargetId) return;
+		// Prévisualiser la requalification : fusionner dans un journal d'un autre
+		// type re-dérive le doc_type des publications absorbées contre le type de la
+		// cible (cf. merge_journals). Compte exact via le même endpoint que le
+		// changement de type, appliqué au journal source avec le type de la cible
+		// (count = 0 si même type → pas de confirmation).
+		try {
+			const impact = await journalsApi.typeChangeImpact(sourceId, mergeTargetType);
+			if (impact.count > 0) {
+				const plural = impact.count > 1 ? 's' : '';
+				const msg = `Cette fusion entraînera un recalcul de la métadonnée « type de document » sur ${impact.count} publication${plural} du journal absorbé. Continuer ?`;
+				if (!confirm(msg)) return;
+			}
+		} catch (e: any) {
+			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
+			alert('Erreur lors du calcul d\'impact : ' + msg);
+			return;
+		}
 		try {
 			await journalsApi.merge(mergeTargetId, sourceId);
 			closeMerge();
@@ -155,7 +174,7 @@
 			</div>
 		{:else}
 			<button class="btn btn-sm" onclick={() => openEdit(j)}>Modifier</button>
-			<button class="btn btn-sm btn-merge" onclick={() => openMerge(j.id)}>Fusionner…</button>
+			<button class="btn btn-sm btn-merge" onclick={() => openMerge(j)}>Fusionner…</button>
 		{/if}
 	{/snippet}
 </JournalsListView>
