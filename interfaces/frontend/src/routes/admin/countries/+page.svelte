@@ -152,6 +152,17 @@
 	let sugFacetOptions: FacetOption[] = $state([]);
 	let selectedSugCountry: string[] = $state([]);
 
+	// Vrai ssi au moins un filtre est actif. Garde l'« Ajouter à tout le filtre »
+	// (mêmes conditions que le body construit dans batchAddCountry) : sans filtre,
+	// l'action viserait toutes les adresses — le backend la refuse (400), on
+	// masque le bouton côté UI. Aligné sur le garde-fou serveur.
+	const hasActiveFilter = $derived(
+		search.trim() !== '' ||
+			selectedHasCountry.length === 1 ||
+			selectedCountry.length === 1 ||
+			selectedSugCountry.length === 1,
+	);
+
 	function toggleSuggest() {
 		suggestMode = !suggestMode;
 		selectedSugCountry = [];
@@ -242,7 +253,7 @@
 			Ajouter aux {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}
 		</button>
 	{/if}
-	{#if batchCountry}
+	{#if batchCountry && hasActiveFilter}
 		<button class="btn-secondary" onclick={() => batchAddCountry(true)} disabled={batchApplying}>
 			Ajouter à tout le filtre ({total.toLocaleString('fr-FR')})
 		</button>
