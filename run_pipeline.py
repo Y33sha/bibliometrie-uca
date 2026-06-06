@@ -396,6 +396,21 @@ def phase_affiliations(**kw: Any) -> Any:
     _run_populate_affiliations(mode=mode)
 
 
+def phase_zenodo_concept(**kw: Any) -> Any:
+    """Resolution du concept DOI des source_publications Zenodo.
+
+    Interroge l'API Zenodo pour resoudre le `conceptdoi` (champ
+    `external_ids.zenodo_concept_doi`), sur lequel portera la dedup
+    concept/version au matching. Idempotent : une erreur temporaire (timeout,
+    rate-limit, panne Zenodo) laisse la SP non resolue, retentee au prochain run.
+
+    Phase distincte, en amont de `publications`, pour pouvoir relancer le matching
+    sans re-solliciter Zenodo (et inversement, rejouer Zenodo seul si l'API etait
+    indisponible).
+    """
+    _run_resolve_zenodo_concept()
+
+
 def phase_publications(**kw: Any) -> Any:
     """Creation des publications canoniques.
 
@@ -403,11 +418,9 @@ def phase_publications(**kw: Any) -> Any:
     une source_authorship in_perimeter (evite de creer des publications
     hors perimetre). Applique ensuite les merges inter-sources (HAL-ID, NNT).
 
-    En amont du matching, resout le concept DOI des source_publications Zenodo
-    (champ `external_ids.zenodo_concept_doi`) pour que la dedup concept/version
-    porte dessus.
+    Prerequis : la phase `zenodo_concept` (en amont) a resolu les concept DOI
+    Zenodo sur lesquels porte la dedup concept/version.
     """
-    _run_resolve_zenodo_concept()
     _run_match_or_create_publications()
     _run_merge_pubs_by_hal_id()
     _run_merge_pubs_by_nnt()
@@ -1443,6 +1456,7 @@ PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
     ("normalize", phase_normalize),
     ("publishers_journals", phase_publishers_journals),
     ("affiliations", phase_affiliations),
+    ("zenodo_concept", phase_zenodo_concept),
     ("publications", phase_publications),
     ("persons", phase_persons),
     ("authorships", phase_authorships),
