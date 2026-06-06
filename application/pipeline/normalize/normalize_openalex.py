@@ -443,6 +443,9 @@ def process_work(
     work = staging_row.raw_data
 
     try:
+        from application.pipeline.timings import StepTimer
+
+        t = StepTimer()
         primary = parse_primary_location(work)
 
         if should_skip_publisher_journal(primary):
@@ -451,16 +454,20 @@ def process_work(
         else:
             publisher_id = upsert_publisher(work, publisher_repo=publisher_repo)
             journal_id = upsert_journal(work, publisher_id, journal_repo=journal_repo)
+        t.mark("publisher+journal")
 
         pub_meta = extract_pub_metadata(work, journal_id)
 
         source_publication_id = insert_openalex_document(
             conn, queries, work, staging_id, None, pub_meta
         )
+        t.mark("oa_doc")
 
         process_authorships(conn, authorship_queries, work, source_publication_id)
+        t.mark("authors")
 
         staging_queries.mark_done(conn, staging_id)
+        t.log_if_slow(openalex_id, logger)
         return True
 
     except Exception as e:

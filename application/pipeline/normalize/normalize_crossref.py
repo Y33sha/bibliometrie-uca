@@ -338,8 +338,12 @@ def process_work(
         return None
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing
 
+    from application.pipeline.timings import StepTimer
+
+    t = StepTimer()
     publisher_id = upsert_publisher(msg, publisher_repo=publisher_repo)
     journal_id = upsert_journal(msg, publisher_id, journal_repo=journal_repo)
+    t.mark("publisher+journal")
 
     external_ids = get_external_ids(msg)
     biblio = get_biblio(msg)
@@ -364,10 +368,13 @@ def process_work(
         biblio=biblio,
         meta=meta,
     )
+    t.mark("crossref_doc")
 
     process_authors(conn, authorship_queries, msg, source_publication_id)
+    t.mark("authors")
 
     staging_queries.mark_done(conn, staging_id)
+    t.log_if_slow(doi, logger)
     return True
 
 

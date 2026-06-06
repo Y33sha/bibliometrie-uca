@@ -228,20 +228,26 @@ def process_work(
     these = row.raw_data
 
     try:
+        from application.pipeline.timings import StepTimer
+
         title = these.get("titrePrincipal")
         if not title:
             logger.warning(f"Thèse {theses_id} sans titre — skip")
             return False
 
+        t = StepTimer()
         pub_meta = extract_pub_metadata(these)
 
         source_publication_id = insert_source_document(
             conn, queries, these, staging_id, theses_id, None, pub_meta
         )
+        t.mark("theses_doc")
 
         process_persons(conn, queries, these, source_publication_id, address_linker=address_linker)
+        t.mark("persons")
 
         staging_queries.mark_done(conn, staging_id)
+        t.log_if_slow(theses_id, logger)
 
         return True
 
