@@ -396,7 +396,7 @@ def phase_affiliations(**kw: Any) -> Any:
     _run_populate_affiliations(mode=mode)
 
 
-def phase_zenodo_concept(**kw: Any) -> Any:
+def phase_zenodo_doi(**kw: Any) -> Any:
     """Resolution du concept DOI des source_publications Zenodo.
 
     Interroge l'API Zenodo pour resoudre le `conceptdoi` (champ
@@ -1456,7 +1456,7 @@ PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
     ("normalize", phase_normalize),
     ("publishers_journals", phase_publishers_journals),
     ("affiliations", phase_affiliations),
-    ("zenodo_concept", phase_zenodo_concept),
+    ("zenodo_doi", phase_zenodo_doi),
     ("publications", phase_publications),
     ("persons", phase_persons),
     ("authorships", phase_authorships),
