@@ -8,7 +8,6 @@ Lectures : port `AddressesQueries`. Mutations : services applicatifs
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
 from application.addresses import countries as countries_service
 from application.addresses import structures as structures_service
@@ -23,14 +22,11 @@ from application.ports.api.addresses_queries import (
     CountrySuggestionsResponse,
 )
 from application.ports.repositories.address_repository import AddressRepository
-from application.ports.repositories.authorship_repository import AuthorshipRepository
 from interfaces.api.deps import (
     address_repo_sync,
     addresses_queries_sync,
-    authorship_repo_sync,
     bg_propagate_countries_sync,
-    db_conn_sync,
-    get_perimeter_queries_sync,
+    bg_propagate_in_perimeter_sync,
     require_admin,
 )
 from interfaces.api.models import (
@@ -102,21 +98,19 @@ def get_address_publications(
 def review_address(
     addr_id: int,
     action: ReviewAction,
-    conn: Connection = Depends(db_conn_sync),
+    bg: BackgroundTasks,
     queries: AddressesQueries = Depends(addresses_queries_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
-    auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
 ) -> AddressReviewResponse:
     """Confirme, rejette ou reset le lien adresse ↔ structure."""
-    structures_service.review_structure_link(
-        conn,
+    changed = structures_service.review_structure_link(
         addr_id,
         action.structure_id,
         action.is_confirmed,
         repo=addr_repo,
-        authorship_repo=auth_repo,
-        perimeter_queries=get_perimeter_queries_sync(),
     )
+    if changed:
+        bg.add_task(bg_propagate_in_perimeter_sync, changed)
     structures = queries.get_address_structures(addr_id)
     link = queries.get_structure_link(addr_id, action.structure_id)
     return AddressReviewResponse(
@@ -130,20 +124,18 @@ def review_address(
 @router.post("/api/addresses/batch-review", response_model=BatchUpdatedResponse)
 def batch_review(
     data: BatchReviewAction,
-    conn: Connection = Depends(db_conn_sync),
+    bg: BackgroundTasks,
     addr_repo: AddressRepository = Depends(address_repo_sync),
-    auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
 ) -> BatchUpdatedResponse:
     """Confirme/rejette/reset en batch."""
-    updated = structures_service.batch_review_structure_link(
-        conn,
+    updated, changed = structures_service.batch_review_structure_link(
         data.address_ids,
         data.structure_id,
         data.is_confirmed,
         repo=addr_repo,
-        authorship_repo=auth_repo,
-        perimeter_queries=get_perimeter_queries_sync(),
     )
+    if changed:
+        bg.add_task(bg_propagate_in_perimeter_sync, changed)
     return BatchUpdatedResponse(updated=updated)
 
 
