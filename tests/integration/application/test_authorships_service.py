@@ -18,7 +18,10 @@ from application.authorships.core import (
 from domain.errors import NotFoundError
 from infrastructure.queries.perimeter import PgPerimeterQueries
 from infrastructure.repositories import authorship_repository
-from tests.integration.helpers.structures import add_authorship_structure
+from tests.integration.helpers.structures import (
+    add_authorship_structure,
+    refresh_structure_matviews,
+)
 
 
 @pytest.fixture
@@ -662,9 +665,15 @@ class TestPropagateAuthorshipAttributes:
 
 
 class TestPropagateUcaForAddresses:
-    """propagate_in_perimeter_for_addresses recalcule in_perimeter et structure_ids
-    sur les source_authorships puis propage vers l'authorship vérité,
-    après une modification sur address_structures."""
+    """propagate_in_perimeter_for_addresses recalcule `in_perimeter` (synchrone,
+    depuis les tables de base) sur les source_authorships puis le propage vers
+    l'authorship vérité, après une modification sur address_structures.
+
+    L'appartenance aux structures n'est plus une colonne : elle vit dans les
+    matviews `*_structures` (une row `(…, structure_id)` par structure), désormais
+    maintenues uniquement par le pipeline — la propagation ne les rafraîchit plus.
+    Les tests qui agrègent ces rows (`array_agg(structure_id)`) rafraîchissent donc
+    explicitement les matviews via `refresh_structure_matviews`."""
 
     def _setup_uca(self, conn):
         """Monte un périmètre UCA minimal + config perimeter_persons/affiliations.
@@ -712,6 +721,9 @@ class TestPropagateUcaForAddresses:
         propagate_in_perimeter_for_addresses(
             sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
         )
+        # `in_perimeter` est synchrone ; `structure_ids` vient des matviews que la
+        # propagation ne rafraîchit plus (cf. docstring) → refresh explicite.
+        refresh_structure_matviews(sa_sync_conn)
 
         sa = sa_sync_conn.execute(
             text(
@@ -761,6 +773,7 @@ class TestPropagateUcaForAddresses:
         propagate_in_perimeter_for_addresses(
             sa_sync_conn, [addr_id], repo=repo, perimeter_queries=perimeter_queries
         )
+        refresh_structure_matviews(sa_sync_conn)
 
         sa = sa_sync_conn.execute(
             text(

@@ -108,8 +108,9 @@ def assign_orphan_authorship(
     # Recomposer l'authorship canonique pour la paire (pub, person)
     if publication_id is not None:
         _refresh_authorship_from_sources(person_id, publication_id, repo=repo)
-        # Les structures dérivées vivent dans la matview `authorship_structures`.
-        repo.refresh_authorship_structures()
+    # `authorship_structures` (agrégation des structure_ids) maintenue uniquement
+    # par le pipeline — pas de refresh sur action admin (staleness bornée à un run,
+    # cf. docs/chantiers/CODE_background-jobs.md).
     return True
 
 
@@ -150,8 +151,9 @@ def batch_assign_orphan_authorships(
     for name_form in repo.get_distinct_name_forms_from_source_authorships(sa_ids):
         repo.add_name_form(person_id, name_form)
 
-    # Les structures dérivées vivent dans la matview `authorship_structures`.
-    repo.refresh_authorship_structures()
+    # `authorship_structures` (agrégation des structure_ids) maintenue uniquement
+    # par le pipeline — pas de refresh sur action admin (staleness bornée à un run,
+    # cf. docs/chantiers/CODE_background-jobs.md).
     return assigned
 
 

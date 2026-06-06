@@ -141,10 +141,6 @@ class PersonRepository(Protocol):
         sources: tuple[str, ...],
     ) -> None: ...
 
-    def refresh_authorship_structures(self) -> None:
-        """Rafraîchit la matview `authorship_structures` (`REFRESH … CONCURRENTLY`)."""
-        ...
-
     # ── person_name_forms ──────────────────────────────────────────
 
     def refresh_name_forms(self, person_id: int, forms: set[str]) -> None: ...

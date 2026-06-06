@@ -174,9 +174,9 @@ class PgAuthorshipRepository:
         source_authorship_ids: list[int],
         perimeter_structure_ids: list[int],
     ) -> None:
-        # `source_authorship_structures` est une matview (réalignée par
-        # refresh_source_authorship_structures) : on ne l'écrit plus ici. On
-        # recalcule in_perimeter directement depuis les adresses résolues
+        # `source_authorship_structures` est une matview (réalignée par le
+        # pipeline) : on ne l'écrit pas ici. On recalcule in_perimeter
+        # directement depuis les adresses résolues
         # filtrées par le périmètre restreint, pour les sa donnés — équivalent
         # à l'ancien EXISTS sur la table de jointure construite avec le même
         # filtre.
@@ -237,17 +237,3 @@ class PgAuthorshipRepository:
         )
 
         self._conn.execute(text("DROP TABLE _affected_authorships"))
-
-    def refresh_source_authorship_structures(self) -> None:
-        """Rafraîchit la matview `source_authorship_structures` après un
-        changement d'`address_structures` (review admin). À appeler avant
-        `refresh_authorship_structures` (matview-sur-matview)."""
-        self._conn.execute(
-            text("REFRESH MATERIALIZED VIEW CONCURRENTLY source_authorship_structures")
-        )
-
-    def refresh_authorship_structures(self) -> None:
-        """Rafraîchit la matview `authorship_structures` après une propagation
-        ciblée d'`in_perimeter` (le caller admin l'appelle une fois en fin
-        d'opération). `CONCURRENTLY` pour ne pas bloquer les lectures labo."""
-        self._conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY authorship_structures"))
