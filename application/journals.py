@@ -159,13 +159,31 @@ def merge_journals(
     source_id: int,
     *,
     repo: JournalRepository,
+    pub_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Fusionne le journal source dans le journal cible."""
+    """Fusionne le journal source dans le journal cible.
+
+    Les publications du journal absorbé sont repointées vers la cible, puis
+    **requalifiées** : leur `doc_type` est re-dérivé contre le `journal_type` de
+    la cible (mêmes règles que `requalify_publications_for_journal` sur un
+    changement de type). Fusionner une revue dans un média retype donc ses
+    publications en `media`.
+    """
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")
 
+    # Capturer les publications du source avant le repoint, pour les requalifier.
+    absorbed_pub_ids = pub_repo.find_ids_by_journal_id(source_id)
+
     repo.merge_journal_into(target_id, source_id)
+
+    # Les publications absorbées pointent désormais sur la cible : `refresh_from_sources`
+    # re-dérive leur doc_type avec le `journal_type` de la cible (la correction lit le
+    # type via la jointure sur `journal_id`, repointée par `merge_journal_into`).
+    for pub_id in absorbed_pub_ids:
+        refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
+
     emit_event(audit_repo, "journal.merged", "journal", target_id, {"source_id": source_id})
 
 
