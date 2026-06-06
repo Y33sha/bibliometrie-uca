@@ -12,6 +12,7 @@ l'agrégat Address mais n'interagissent pas entre elles.
 import logging
 
 from application.ports.repositories.address_repository import AddressRepository
+from domain.errors import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +64,13 @@ def batch_set_country_by_filter(
     suggested_country: str | None = None,
     repo: AddressRepository,
 ) -> list[int]:
-    """Ajoute `country_code` à toutes les adresses correspondant aux filtres.
+    """Ajoute `country_code` aux adresses correspondant aux filtres.
 
-    Filtres combinés en AND (tous doivent matcher). Si aucun filtre n'est
-    fourni, applique à TOUTES les adresses (use with caution).
+    Filtres combinés en AND (tous doivent matcher). **Au moins un filtre est
+    exigé** : un appel sans aucun filtre est refusé (`ValidationError`) pour ne
+    pas appliquer un pays à toutes les adresses en masse (~475k → cascade de
+    propagation). Pour viser un grand ensemble explicitement, passer par
+    `batch_set_country_by_ids`.
 
     Retourne les IDs modifiés.
     """
@@ -86,7 +90,13 @@ def batch_set_country_by_filter(
         conditions.append("%s = ANY(suggested_countries)")
         params.append(suggested_country)
 
-    where_clause = " AND ".join(conditions) if conditions else "TRUE"
+    if not conditions:
+        raise ValidationError(
+            "batch_set_country_by_filter exige au moins un filtre "
+            "(search / has_country / country_code_filter / suggested_country) : "
+            "refus d'appliquer un pays à toutes les adresses."
+        )
+    where_clause = " AND ".join(conditions)
     return repo.batch_add_country_by_where(
         country_code,
         where_clause,
