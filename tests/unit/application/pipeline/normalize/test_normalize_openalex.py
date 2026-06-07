@@ -532,7 +532,8 @@ class TestBuildOpenalexAuthorRecords:
 
     def test_country_code_to_suggested(self):
         """`country_code` OpenAlex (structure désambiguïsée) → `suggested_countries`
-        sur l'adresse, jamais `countries`. Union dédupliquée et en majuscules."""
+        sur l'adresse, jamais `countries`. Union dédupliquée et en minuscules
+        (code canonique = `countries.code`)."""
         work = {
             "authorships": [
                 {
@@ -554,7 +555,7 @@ class TestBuildOpenalexAuthorRecords:
             ]
         }
         addr = build_openalex_author_records(work)[0].addresses[0]
-        assert addr.suggested_countries == ["FR", "US"]
+        assert addr.suggested_countries == ["fr", "us"]
         assert addr.countries is None
 
     def test_no_country_code_no_suggestion(self):

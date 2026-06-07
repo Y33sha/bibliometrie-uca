@@ -382,7 +382,7 @@ def build_openalex_author_records(work: dict) -> list[AuthorRecord]:
             extract_short_id(inst["id"]) for inst in institutions if inst.get("id")
         ]
         suggested_countries = sorted(
-            {inst["country_code"].upper() for inst in institutions if inst.get("country_code")}
+            {inst["country_code"].lower() for inst in institutions if inst.get("country_code")}
         )
         raw_strings = authorship.get("raw_affiliation_strings") or []
         addr_parts = (
