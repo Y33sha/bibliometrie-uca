@@ -6,6 +6,7 @@
   import { base } from "$app/paths";
   import type { Snippet } from "svelte";
   import { auth } from "$lib/api";
+  import DialogHost from "$lib/components/DialogHost.svelte";
 
   let { children }: { children: Snippet } = $props();
 
@@ -152,6 +153,8 @@
 <div class="container">
   {@render children()}
 </div>
+
+<DialogHost />
 
 <style>
   :global(html) {
