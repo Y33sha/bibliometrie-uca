@@ -20,6 +20,8 @@ from application.ports.api.addresses_queries import (
     AddressStatsResponse,
     CountryOut,
     CountrySuggestionsResponse,
+    StructurePredicate,
+    TextPredicate,
 )
 from application.ports.repositories.address_repository import AddressRepository
 from interfaces.api.deps import (
@@ -44,6 +46,39 @@ from interfaces.api.models import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+_TEXT_MODES = {"contains", "not_contains"}
+_STRUCT_OPS = {"recognized", "not_recognized"}
+
+
+def _parse_text_predicates(raw: list[str]) -> tuple[TextPredicate, ...]:
+    """Parse les params répétés `text=<mode>:<terme>` (cf. fiche, décision 8).
+
+    Tolérant : mode inconnu ou terme vide → prédicat ignoré.
+    """
+    out: list[TextPredicate] = []
+    for item in raw:
+        mode, _, term = item.partition(":")
+        term = term.strip()
+        if mode in _TEXT_MODES and term:
+            out.append(TextPredicate(mode=mode, term=term))
+    return tuple(out)
+
+
+def _parse_structure_predicates(raw: list[str]) -> tuple[StructurePredicate, ...]:
+    """Parse les params répétés `struct=<operator>:<id>[,<id>…]`.
+
+    Tolérant : opérateur inconnu ou aucun id valide → prédicat ignoré.
+    """
+    out: list[StructurePredicate] = []
+    for item in raw:
+        op, _, ids_csv = item.partition(":")
+        if op not in _STRUCT_OPS:
+            continue
+        ids = tuple(int(x) for x in (s.strip() for s in ids_csv.split(",")) if x.isdigit())
+        if ids:
+            out.append(StructurePredicate(operator=op, structure_ids=ids))
+    return tuple(out)
+
 
 @router.get("/api/addresses", response_model=AddressListResponse)
 def list_addresses(
@@ -52,13 +87,21 @@ def list_addresses(
     structure_id: int | None = Query(None),
     detected: str = Query("yes"),
     validation: str = Query("pending"),
-    search: str = Query(""),
+    text: list[str] = Query(default=[]),
+    struct: list[str] = Query(default=[]),
+    search: str = Query(""),  # legacy (transition phase 1→2) → un prédicat texte
     search_mode: str = Query("contains"),
     queries: AddressesQueries = Depends(addresses_queries_sync),
 ) -> AddressListResponse:
-    """Liste les adresses avec filtres détection/validation pour une structure."""
-    # Garde-fou : mode "non détecté"/"tous" sans filtre → trop large
-    if detected in ("no", "all") and not search and validation in ("all", "pending"):
+    """Liste les adresses pour une structure, avec prédicats texte/structure composables."""
+    text_predicates = _parse_text_predicates(text)
+    if search:
+        text_predicates = (TextPredicate(mode=search_mode, term=search), *text_predicates)
+    structure_predicates = _parse_structure_predicates(struct)
+
+    # Garde-fou : mode "non détecté"/"tous" sans aucun prédicat de réduction → trop large.
+    has_narrowing = bool(text_predicates) or bool(structure_predicates)
+    if detected in ("no", "all") and not has_narrowing and validation in ("all", "pending"):
         return AddressListResponse(
             total=0,
             page=1,
@@ -71,8 +114,8 @@ def list_addresses(
     filters = AddressListFilters(
         detected=detected,
         validation=validation,
-        search=search,
-        search_mode=search_mode,
+        text_predicates=text_predicates,
+        structure_predicates=structure_predicates,
     )
     sid = structure_id if structure_id is not None else queries.resolve_default_structure_id()
     return queries.list_addresses(structure_id=sid, filters=filters, page=page, per_page=per_page)

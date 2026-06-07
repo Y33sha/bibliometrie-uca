@@ -152,6 +152,24 @@ class TestListAddresses:
         r = client.get("/api/addresses", params={"search": "X", "search_mode": "not_contains"})
         assert r.status_code == 200
 
+    def test_text_predicates_repeated(self, client):
+        r = client.get(
+            "/api/addresses",
+            params={"text": ["contains:Clermont", "not_contains:Toulouse"]},
+        )
+        assert r.status_code == 200
+
+    def test_struct_predicate(self, client):
+        r = client.get("/api/addresses", params={"struct": "recognized:1,2"})
+        assert r.status_code == 200
+
+    def test_struct_predicate_lifts_guard(self, client):
+        # detected=no SANS texte mais AVEC un prédicat structure → pas de garde-fou,
+        # la requête accède à la DB et renvoie une liste normale.
+        r = client.get("/api/addresses", params={"detected": "no", "struct": "recognized:1"})
+        assert r.status_code == 200
+        assert r.json().get("requires_search") is not True
+
 
 # ── GET /api/addresses/{addr_id}/publications ────────────────────
 

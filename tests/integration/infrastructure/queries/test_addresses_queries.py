@@ -5,6 +5,8 @@ from sqlalchemy import text
 from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
     AddressListFilters,
+    StructurePredicate,
+    TextPredicate,
 )
 from infrastructure.queries.api.addresses import PgAddressesQueries
 
@@ -148,13 +150,141 @@ class TestListAddresses:
 
         res = _q(sa_sync_conn).list_addresses(
             structure_id=struct,
-            filters=AddressListFilters(search="Clermont"),
+            filters=AddressListFilters(
+                text_predicates=(TextPredicate(mode="contains", term="Clermont"),)
+            ),
             page=1,
             per_page=10,
         )
         ids = [a.id for a in res.addresses]
         assert a1 in ids
         assert a2 not in ids
+
+    def test_text_predicates_combined_and(self, sa_sync_conn):
+        # contient « Clermont » ET ne contient pas « Toulouse » → ET entre prédicats.
+        scope = _create_structure(sa_sync_conn, code="SCOPE-T")
+        a1 = _create_address(sa_sync_conn, raw_text="Université Clermont Auvergne")
+        a2 = _create_address(sa_sync_conn, raw_text="Université Clermont Toulouse")
+
+        res = _q(sa_sync_conn).list_addresses(
+            structure_id=scope,
+            filters=AddressListFilters(
+                detected="all",
+                validation="all",
+                text_predicates=(
+                    TextPredicate(mode="contains", term="Clermont"),
+                    TextPredicate(mode="not_contains", term="Toulouse"),
+                ),
+            ),
+            page=1,
+            per_page=10,
+        )
+        ids = [a.id for a in res.addresses]
+        assert a1 in ids
+        assert a2 not in ids
+
+
+class TestStructurePredicates:
+    """Prédicats « structure reconnue » (reconnue = lien pending ou confirmé)."""
+
+    def _form(self, conn, struct_id):
+        return (
+            conn.execute(
+                text(
+                    "INSERT INTO structure_name_forms (structure_id, form_text) "
+                    "VALUES (:s, 'f') RETURNING id"
+                ),
+                {"s": struct_id},
+            )
+            .one()
+            .id
+        )
+
+    def test_recognized_matches_pending_and_confirmed_only(self, sa_sync_conn):
+        scope = _create_structure(sa_sync_conn, code="SCOPE-R")
+        k = _create_structure(sa_sync_conn, code="CNRS-R")
+        form_id = self._form(sa_sync_conn, k)
+
+        a_pending = _create_address(sa_sync_conn, raw_text="pending")
+        _link_addr_struct(sa_sync_conn, a_pending, k, matched_form_id=form_id)  # détecté, non revu
+        a_confirmed = _create_address(sa_sync_conn, raw_text="confirmed")
+        _link_addr_struct(sa_sync_conn, a_confirmed, k, is_confirmed=True)  # relié manuel
+        a_rejected = _create_address(sa_sync_conn, raw_text="rejected")
+        _link_addr_struct(sa_sync_conn, a_rejected, k, matched_form_id=form_id, is_confirmed=False)
+        a_none = _create_address(sa_sync_conn, raw_text="none")
+
+        res = _q(sa_sync_conn).list_addresses(
+            structure_id=scope,
+            filters=AddressListFilters(
+                detected="all",
+                validation="all",
+                structure_predicates=(
+                    StructurePredicate(operator="recognized", structure_ids=(k,)),
+                ),
+            ),
+            page=1,
+            per_page=50,
+        )
+        ids = {a.id for a in res.addresses}
+        assert {a_pending, a_confirmed} <= ids
+        assert a_rejected not in ids
+        assert a_none not in ids
+
+    def test_not_recognized_is_complement(self, sa_sync_conn):
+        scope = _create_structure(sa_sync_conn, code="SCOPE-N")
+        k = _create_structure(sa_sync_conn, code="CNRS-N")
+        form_id = self._form(sa_sync_conn, k)
+
+        a_recognized = _create_address(sa_sync_conn, raw_text="rec")
+        _link_addr_struct(sa_sync_conn, a_recognized, k, matched_form_id=form_id)
+        a_rejected = _create_address(sa_sync_conn, raw_text="rej")
+        _link_addr_struct(sa_sync_conn, a_rejected, k, matched_form_id=form_id, is_confirmed=False)
+        a_none = _create_address(sa_sync_conn, raw_text="non")
+
+        res = _q(sa_sync_conn).list_addresses(
+            structure_id=scope,
+            filters=AddressListFilters(
+                detected="all",
+                validation="all",
+                structure_predicates=(
+                    StructurePredicate(operator="not_recognized", structure_ids=(k,)),
+                ),
+            ),
+            page=1,
+            per_page=50,
+        )
+        ids = {a.id for a in res.addresses}
+        assert a_recognized not in ids
+        assert {a_rejected, a_none} <= ids
+
+    def test_recognized_multi_structure_is_or(self, sa_sync_conn):
+        scope = _create_structure(sa_sync_conn, code="SCOPE-M")
+        k1 = _create_structure(sa_sync_conn, code="CNRS-M")
+        k2 = _create_structure(sa_sync_conn, code="INSERM-M")
+        f1 = self._form(sa_sync_conn, k1)
+        f2 = self._form(sa_sync_conn, k2)
+
+        a_k1 = _create_address(sa_sync_conn, raw_text="k1")
+        _link_addr_struct(sa_sync_conn, a_k1, k1, matched_form_id=f1)
+        a_k2 = _create_address(sa_sync_conn, raw_text="k2")
+        _link_addr_struct(sa_sync_conn, a_k2, k2, matched_form_id=f2)
+        a_none = _create_address(sa_sync_conn, raw_text="neither")
+
+        res = _q(sa_sync_conn).list_addresses(
+            structure_id=scope,
+            filters=AddressListFilters(
+                detected="all",
+                validation="all",
+                structure_predicates=(
+                    StructurePredicate(operator="recognized", structure_ids=(k1, k2)),
+                ),
+            ),
+            page=1,
+            per_page=50,
+        )
+        ids = {a.id for a in res.addresses}
+        assert {a_k1, a_k2} <= ids
+        assert a_none not in ids
 
 
 class TestGetAddressRawText:

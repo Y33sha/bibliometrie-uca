@@ -23,6 +23,13 @@ from application.ports.api.addresses_queries import (
     CountrySuggestionsResponse,
 )
 
+# « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé.
+# Exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les
+# prédicats Structure de `list_addresses`.
+_RECOGNIZED_LINK = (
+    "((asx.matched_form_id IS NOT NULL AND asx.is_confirmed IS NULL) OR asx.is_confirmed = TRUE)"
+)
+
 
 def _structure_summary(d: dict[str, Any]) -> AddressStructureSummary:
     return AddressStructureSummary(
@@ -87,10 +94,27 @@ class PgAddressesQueries(AddressesQueries):
         elif filters.validation == "rejected":
             parts.append("ast_filter.is_confirmed = FALSE")
 
-        if filters.search:
-            op = "NOT ILIKE" if filters.search_mode == "not_contains" else "ILIKE"
-            parts.append(f"unaccent(a.raw_text) {op} unaccent(:search)")
-            binds["search"] = f"%{filters.search}%"
+        for i, tp in enumerate(filters.text_predicates):
+            if not tp.term:
+                continue
+            op = "NOT ILIKE" if tp.mode == "not_contains" else "ILIKE"
+            bind = f"txt{i}"
+            parts.append(f"unaccent(a.raw_text) {op} unaccent(:{bind})")
+            binds[bind] = f"%{tp.term}%"
+
+        for i, sp in enumerate(filters.structure_predicates):
+            if not sp.structure_ids:
+                continue
+            bind = f"sids{i}"
+            binds[bind] = list(sp.structure_ids)
+            exists = (
+                "EXISTS (SELECT 1 FROM address_structures asx "
+                f"WHERE asx.address_id = a.id AND asx.structure_id = ANY(:{bind}) "
+                f"AND {_RECOGNIZED_LINK})"
+            )
+            # recognized = reconnue comme au moins une des structures (OR) ;
+            # not_recognized = reconnue comme aucune (De Morgan → NOT EXISTS).
+            parts.append(exists if sp.operator == "recognized" else f"NOT {exists}")
 
         where_clause = (" AND " + " AND ".join(parts)) if parts else ""
         join_type = "JOIN" if use_inner_join else "LEFT JOIN"

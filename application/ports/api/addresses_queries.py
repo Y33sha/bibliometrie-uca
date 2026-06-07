@@ -12,11 +12,33 @@ from pydantic import BaseModel
 
 
 @dataclass(frozen=True, slots=True)
+class TextPredicate:
+    """Filtre texte sur `raw_text`. `mode` ∈ {contains, not_contains}."""
+
+    mode: str
+    term: str
+
+
+@dataclass(frozen=True, slots=True)
+class StructurePredicate:
+    """Filtre « structure reconnue » multi-structures.
+
+    `operator` ∈ {recognized, not_recognized}. Sémantique au sein du prédicat :
+    `recognized` = reconnue comme **au moins une** des `structure_ids` (OR) ;
+    `not_recognized` = reconnue comme **aucune** d'elles. « Reconnue » = lien
+    pending ou confirmé (cf. `_RECOGNIZED_LINK` dans l'adapter).
+    """
+
+    operator: str
+    structure_ids: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class AddressListFilters:
     detected: str = "yes"  # all, yes, no
     validation: str = "pending"  # all, pending, confirmed, rejected
-    search: str = ""
-    search_mode: str = "contains"  # contains, not_contains
+    text_predicates: tuple[TextPredicate, ...] = ()
+    structure_predicates: tuple[StructurePredicate, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
