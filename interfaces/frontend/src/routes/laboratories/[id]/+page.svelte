@@ -6,11 +6,7 @@
 	import { Chart, registerables } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
 	Chart.register(...registerables, ChartDataLabels);
-	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
-	import PersonsTable from '$lib/components/PersonsTable.svelte';
-	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
-	import { IDENTIFIER_ITEMS } from '$lib/filterItems';
+	import PersonsListView from '$lib/components/PersonsListView.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import ThesesListView from '$lib/components/ThesesListView.svelte';
@@ -26,8 +22,6 @@
 	type Structure = components['schemas']['LabStructureCore'];
 	type RelatedStructure = components['schemas']['LabRelatedStructure'];
 	type LabProfile = components['schemas']['LaboratoryDetailResponse'];
-	type LabPerson = components['schemas']['LabPersonOut'];
-	type PersonsResponse = components['schemas']['LaboratoryPersonsResponse'];
 	type LabAddress = components['schemas']['LabAddressOut'];
 	type AddressesResponse = components['schemas']['LaboratoryAddressesResponse'];
 
@@ -50,23 +44,9 @@
 	// pour que le titre de l'onglet (TabNav) reflète le tableau.
 	let pubsTotal = $state(0);
 
-	// --- Persons tab (manual state: API returns total_persons, not total, + inline facets) ---
-	let persons: LabPerson[] = $state([]);
+	// --- Persons tab (déléguée à <PersonsListView> ; le total/loaded remonte
+	// pour le badge d'onglet) ---
 	let personsTotal = $state(0);
-	let personsPage = $state(1);
-	let personsPages = $state(1);
-	let personsSort = $state('name');
-	let personsSearch = $state('');
-	let personsSearchTimer: ReturnType<typeof setTimeout>;
-	type IdState = 'all' | 'yes' | 'no';
-	let selectedDepts: string[] = $state([]);
-	let selectedRoles: string[] = $state([]);
-	let selectedRh: string[] = $state(['yes']);
-	let idStates = $state<Record<string, IdState>>({});
-	let deptOptions: FacetOption[] = $state([]);
-	let roleOptions: FacetOption[] = $state([]);
-	let rhOptions: FacetOption[] = $state([{ value: 'yes', text: 'Oui' }, { value: 'no', text: 'Non' }]);
-	let idCounts = $state<Record<string, { yes: number; no: number }>>({});
 	let personsLoaded = $state(false);
 
 	// Addresses tab
@@ -100,20 +80,13 @@
 		return rorId.replace('https://ror.org/', '');
 	}
 
-	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, persons,
-	// addresses). Les keys de filtres publications sont gérées par
-	// `<PublicationsListView>` lui-même grâce à l'additivité de syncUrl.
+	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, addresses).
+	// Les filtres publications/thèses/personnes sont gérés par leurs ListView.
 	const url = useUrlFilters({
 		basePath: `/laboratories/${labId}`,
 		filters: {
-			tab:              { type: 'single',        urlKey: 'tab', defaultValue: 'dashboard' },
-			personsSort:      { type: 'single',        urlKey: 'psort', defaultValue: 'name' },
-			selectedDepts:    { type: 'string_array',  urlKey: 'pdept' },
-			selectedRoles:    { type: 'string_array',  urlKey: 'prole' },
-			hasRh:            { type: 'single',        urlKey: 'has_rh', defaultValue: 'yes' },
-			idStates:         { type: 'source_states', urlKey: 'id_filter' },
-			personsPage:      { type: 'page',          urlKey: 'ppage' },
-			addrPage:         { type: 'page',          urlKey: 'apage' },
+			tab:              { type: 'single', urlKey: 'tab', defaultValue: 'dashboard' },
+			addrPage:         { type: 'page',   urlKey: 'apage' },
 		},
 	});
 
@@ -121,59 +94,8 @@
 	function syncUrl() {
 		url.syncUrl(() => ({
 			tab: activeTab,
-			personsSort,
-			selectedDepts,
-			selectedRoles,
-			hasRh: selectedRh.length === 1 ? selectedRh[0] : 'all',
-			idStates,
-			personsPage,
 			addrPage,
 		}));
-	}
-
-	function onPersonsSortChange(newSort: string) {
-		personsSort = newSort;
-		personsPage = 1;
-		syncUrl();
-		loadPersons();
-	}
-
-	async function loadPersons() {
-		const params = new URLSearchParams({
-			page: String(personsPage),
-			per_page: '50',
-			sort: personsSort
-		});
-		if (personsSearch.trim()) params.set('search', personsSearch.trim());
-		if (selectedDepts.length) params.set('department', selectedDepts.join(','));
-		if (selectedRoles.length) params.set('role', selectedRoles.join(','));
-		params.set('has_rh', selectedRh.length === 1 ? selectedRh[0] : 'all');
-		const idQueryKey: Record<string, string> = { orcid: 'has_orcid', idhal: 'has_idhal', idref: 'has_idref' };
-		for (const [key, qk] of Object.entries(idQueryKey)) {
-			const v = idStates[key];
-			if (v === 'yes' || v === 'no') params.set(qk, v);
-		}
-		const data = await api<PersonsResponse>(
-			`/api/laboratories/${labId}/persons?${params}`, { key: 'lab-persons' }
-		);
-		persons = data.persons;
-		personsTotal = data.total_persons;
-		personsPages = data.pages;
-		personsPage = data.page;
-		if (data.facets) {
-			deptOptions = data.facets.departments.map((d) => ({ value: d.value, text: d.value, count: d.count }));
-			roleOptions = data.facets.roles.map((r) => ({ value: r.value, text: r.value, count: r.count }));
-			rhOptions = [
-				{ value: 'yes', text: 'Oui', count: data.facets.rh.yes },
-				{ value: 'no', text: 'Non', count: data.facets.rh.no }
-			];
-			idCounts = {
-				orcid: { yes: data.facets.orcid.yes, no: data.facets.orcid.no },
-				idhal: { yes: data.facets.idhal.yes, no: data.facets.idhal.no },
-				idref: { yes: data.facets.idref.yes, no: data.facets.idref.no },
-			};
-		}
-		personsLoaded = true;
 	}
 
 	async function loadAddresses() {
@@ -343,7 +265,6 @@
 		// Les onglets "publications" et "theses" sont gérés par leurs ListView
 		// respectives, qui chargent leurs données dans leur propre onMount.
 		if (tab === 'dashboard') loadDashboard();
-		if (tab === 'persons' && !personsLoaded) loadPersons();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
 
@@ -353,15 +274,6 @@
 		// Restore cross-tab state from URL (les filtres publications sont
 		// restaurés par PublicationsListView lui-même).
 		const restored = url.restoreFromUrl($page.url.searchParams);
-		if (restored.personsSort) personsSort = restored.personsSort as string;
-		if (restored.selectedDepts) selectedDepts = restored.selectedDepts as string[];
-		if (restored.selectedRoles) selectedRoles = restored.selectedRoles as string[];
-		if (restored.hasRh != null) {
-			const rh = restored.hasRh as string;
-			selectedRh = rh === 'all' ? [] : [rh];
-		}
-		if (restored.idStates) idStates = restored.idStates as Record<string, IdState>;
-		if (restored.personsPage) personsPage = restored.personsPage as number;
 		if (restored.addrPage) addrPage = restored.addrPage as number;
 
 		try {
@@ -377,8 +289,6 @@
 		// Load data for the active tab (publications est auto-géré).
 		if (activeTab === 'dashboard') {
 			loadDashboard();
-		} else if (activeTab === 'persons') {
-			loadPersons();
 		} else if (activeTab === 'addresses') {
 			loadAddresses();
 		}
@@ -547,16 +457,12 @@
 	<!-- Tab: Personnes -->
 	{#if activeTab === 'persons'}
 		<div class="tab-content">
-			<div class="toolbar toolbar-card toolbar-sticky">
-				<input type="text" placeholder="Rechercher..." bind:value={personsSearch} oninput={() => { clearTimeout(personsSearchTimer); personsSearchTimer = setTimeout(() => { personsPage = 1; loadPersons(); }, 300); }} />
-				<PresenceFilterToggle label="Identifiants" items={IDENTIFIER_ITEMS} bind:states={idStates} counts={idCounts} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
-				<FacetDropdown label="Fonction" options={roleOptions} searchable bind:selected={selectedRoles} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
-				<FacetDropdown label="Département" options={deptOptions} searchable bind:selected={selectedDepts} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
-				<FacetDropdown label="Base RH" options={rhOptions} bind:selected={selectedRh} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
-				<span class="count">{personsTotal} personne{personsTotal > 1 ? 's' : ''}</span>
-			</div>
-			<PersonsTable persons={persons} sort={personsSort} onSortChange={onPersonsSortChange} />
-			<Pagination page={personsPage} pages={personsPages} onchange={(p) => { personsPage = p; syncUrl(); loadPersons(); }} />
+			<PersonsListView
+				labId={lab.id}
+				urlSync={false}
+				apiKey={`lab-${lab.id}-persons`}
+				onTotalChange={(t) => { personsTotal = t; personsLoaded = true; }}
+			/>
 		</div>
 	{/if}
 
@@ -664,12 +570,6 @@
 	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag) { color: var(--accent); text-decoration: none; }
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }
-
-	/* Persons tab */
-	.person-link { color: var(--accent); text-decoration: none; font-weight: 500; }
-	.person-link:hover { text-decoration: underline; }
-	.person-last { font-weight: 600; }
-	.muted-cell { font-size: 0.85rem; color: var(--muted); }
 
 	/* Addresses tab */
 	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }
