@@ -432,7 +432,7 @@ class TestSuggestCountries:
         _create_address(sa_sync_conn, raw_text="Without", countries=None)
 
         res = _q(sa_sync_conn).suggest_countries(search="")
-        assert any(s.code == "FR" for s in res.suggestions)
+        assert any(s.code == "fr" for s in res.suggestions)
         assert res.without_country >= 1
 
     def test_filters_by_search(self, sa_sync_conn):
@@ -441,4 +441,4 @@ class TestSuggestCountries:
         _create_address(sa_sync_conn, raw_text="Nope", countries=["FR"])
 
         res = _q(sa_sync_conn).suggest_countries(search="Match")
-        assert any(s.code == "FR" for s in res.suggestions)
+        assert any(s.code == "fr" for s in res.suggestions)

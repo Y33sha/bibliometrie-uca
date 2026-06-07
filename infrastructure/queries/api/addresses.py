@@ -273,11 +273,19 @@ class PgAddressesQueries(AddressesQueries):
             parts.append("a.countries IS NOT NULL")
         elif filters.has_country == "no":
             parts.append("a.countries IS NULL")
+        # Match insensible à la casse : les codes pays sont canoniquement en
+        # minuscules (`countries.code`) mais les arrays peuvent contenir des
+        # variantes majuscules (codes ISO OpenAlex). Cf. dedup `lower(...)` plus bas.
         if filters.country_code:
-            parts.append(":country_code = ANY(a.countries)")
+            parts.append(
+                "EXISTS (SELECT 1 FROM unnest(a.countries) x WHERE lower(x) = lower(:country_code))"
+            )
             binds["country_code"] = filters.country_code
         if filters.suggested_country:
-            parts.append(":suggested_country = ANY(a.suggested_countries)")
+            parts.append(
+                "EXISTS (SELECT 1 FROM unnest(a.suggested_countries) x "
+                "WHERE lower(x) = lower(:suggested_country))"
+            )
             binds["suggested_country"] = filters.suggested_country
 
         where = "WHERE " + " AND ".join(parts) if parts else ""
@@ -302,8 +310,12 @@ class PgAddressesQueries(AddressesQueries):
         addresses: list[AddressForCountryAttribution] = []
         for r in rows:
             sc = r.suggested_countries
+            # Dédup + normalisation casse (un code peut apparaître en 'FR' et 'fr').
             suggestions = (
-                [CountrySuggestion(code=c.strip(), count=1) for c in sc]
+                [
+                    CountrySuggestion(code=code, count=1)
+                    for code in sorted({c.strip().lower() for c in sc if c.strip()})
+                ]
                 if filters.suggest and not r.countries and sc
                 else []
             )
@@ -311,7 +323,9 @@ class PgAddressesQueries(AddressesQueries):
                 AddressForCountryAttribution(
                     id=r.id,
                     raw_text=r.raw_text,
-                    countries=list(r.countries) if r.countries else None,
+                    countries=(
+                        sorted({c.strip().lower() for c in r.countries}) if r.countries else None
+                    ),
                     suggested_countries=suggestions,
                     pub_count=r.pub_count,
                 )
@@ -323,16 +337,14 @@ class PgAddressesQueries(AddressesQueries):
             sug_where = f"{where} AND {extra}" if where else f"WHERE {extra}"
             sug_rows = self._conn.execute(
                 text(f"""
-                    SELECT c AS code, COUNT(*) AS cnt
+                    SELECT lower(c) AS code, COUNT(*) AS cnt
                     FROM addresses a, unnest(a.suggested_countries) AS c
                     {sug_where}
-                    GROUP BY c ORDER BY cnt DESC LIMIT 20
+                    GROUP BY lower(c) ORDER BY cnt DESC LIMIT 20
                 """),
                 binds,
             ).all()
-            suggestion_facets = [
-                CountrySuggestion(code=r.code.strip(), count=r.cnt) for r in sug_rows
-            ]
+            suggestion_facets = [CountrySuggestion(code=r.code, count=r.cnt) for r in sug_rows]
 
         # Facette pays (exclut country_code, garde le reste + a.countries IS NOT NULL).
         cf_parts: list[str] = []
@@ -345,20 +357,23 @@ class PgAddressesQueries(AddressesQueries):
         elif filters.has_country == "no":
             cf_parts.append("a.countries IS NULL")
         if filters.suggested_country:
-            cf_parts.append(":cf_suggested = ANY(a.suggested_countries)")
+            cf_parts.append(
+                "EXISTS (SELECT 1 FROM unnest(a.suggested_countries) x "
+                "WHERE lower(x) = lower(:cf_suggested))"
+            )
             cf_binds["cf_suggested"] = filters.suggested_country
         cf_parts.append("a.countries IS NOT NULL")
         cf_where = "WHERE " + " AND ".join(cf_parts)
         cf_rows = self._conn.execute(
             text(f"""
-                SELECT c AS code, COUNT(*) AS cnt
+                SELECT lower(c) AS code, COUNT(*) AS cnt
                 FROM addresses a, unnest(a.countries) AS c
                 {cf_where}
-                GROUP BY c ORDER BY cnt DESC
+                GROUP BY lower(c) ORDER BY cnt DESC
             """),
             cf_binds,
         ).all()
-        country_facets = [CountrySuggestion(code=r.code.strip(), count=r.cnt) for r in cf_rows]
+        country_facets = [CountrySuggestion(code=r.code, count=r.cnt) for r in cf_rows]
 
         return AddressesCountriesResponse(
             total=total,
@@ -384,14 +399,14 @@ class PgAddressesQueries(AddressesQueries):
         )
         sug_rows = self._conn.execute(
             text(f"""
-                SELECT c, COUNT(*) AS cnt
+                SELECT lower(c) AS c, COUNT(*) AS cnt
                 FROM addresses a, unnest(a.countries) AS c
                 {suggest_where}
-                GROUP BY c ORDER BY cnt DESC
+                GROUP BY lower(c) ORDER BY cnt DESC
             """),
             binds,
         ).all()
-        suggestions = [CountrySuggestion(code=r.c.strip(), count=r.cnt) for r in sug_rows]
+        suggestions = [CountrySuggestion(code=r.c, count=r.cnt) for r in sug_rows]
 
         no_country_where = (
             where_clause.replace("WHERE", "WHERE countries IS NULL AND")
