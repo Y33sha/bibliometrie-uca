@@ -13,10 +13,7 @@
 	import { IDENTIFIER_ITEMS } from '$lib/filterItems';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import TabNav from '$lib/components/TabNav.svelte';
-	import ThesesTable from '$lib/components/ThesesTable.svelte';
-	import type { ThesisRow } from '$lib/components/ThesesTable.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import { useFacets } from '$lib/composables/useFacets.svelte';
+	import ThesesListView from '$lib/components/ThesesListView.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
@@ -72,64 +69,6 @@
 	let idCounts = $state<Record<string, { yes: number; no: number }>>({});
 	let orphanStats = $state({ total: 0 });
 	let personsLoaded = $state(false);
-
-	// Theses tab
-	type LabThesis = ThesisRow;
-
-	let thesesSelectedYears: string[] = $state([]);
-	let thesesSelectedStatus: string[] = $state([]);
-	let thesesSelectedAccess: string[] = $state([]);
-	let thesesSort = $state('soutenance_desc');
-
-	function buildThesesParams(): URLSearchParams {
-		const params = new URLSearchParams({ lab_id: labId ?? '' });
-		if (thesesSelectedStatus.length) {
-			params.set('doc_type', thesesSelectedStatus.join(','));
-		} else {
-			params.set('doc_type', 'thesis,ongoing_thesis');
-		}
-		if (thesesSelectedYears.length) params.set('year', thesesSelectedYears.join(','));
-		if (thesesSelectedAccess.length) params.set('access', thesesSelectedAccess.join(','));
-		params.set('sort', thesesSort);
-		return params;
-	}
-
-	const theses = usePaginatedFetch<LabThesis>({
-		endpoint: '/api/publications',
-		itemsKey: 'publications',
-		perPage: 100,
-		apiKey: 'lab-theses',
-		buildParams: buildThesesParams,
-	});
-
-	const thesesFacets = useFacets({
-		endpoint: '/api/publications/facets',
-		apiKey: 'lab-theses-facets',
-		buildParams: buildThesesParams,
-		facets: {
-			years: { type: 'simple', apiKey: 'years' },
-			status: {
-				type: 'label_map',
-				apiKey: 'doc_types',
-				labels: { thesis: 'Soutenues', ongoing_thesis: 'En cours' },
-			},
-			access: { type: 'passthrough', apiKey: 'access' },
-		},
-		afterLoad(_data, options) {
-			options.status = options.status.filter((f) => f.value === 'thesis' || f.value === 'ongoing_thesis');
-		},
-	});
-
-	function onThesesFilterChange() {
-		theses.page = 1;
-		theses.load();
-		thesesFacets.load();
-	}
-
-	function toggleThesesSort(asc: string, desc: string) {
-		thesesSort = thesesSort === desc ? asc : desc;
-		onThesesFilterChange();
-	}
 
 	// Addresses tab
 	let addresses: LabAddress[] = $state([]);
@@ -403,10 +342,9 @@
 	}
 
 	function onTabSwitch(tab: string) {
-		// L'onglet "publications" est géré par <PublicationsListView> qui
-		// charge ses données dans son propre onMount à chaque (re)montage.
+		// Les onglets "publications" et "theses" sont gérés par leurs ListView
+		// respectives, qui chargent leurs données dans leur propre onMount.
 		if (tab === 'dashboard') loadDashboard();
-		if (tab === 'theses' && !theses.loaded) { thesesFacets.load(); theses.load(); }
 		if (tab === 'persons' && !personsLoaded) loadPersons();
 		if (tab === 'addresses' && !addrLoaded) loadAddresses();
 	}
@@ -441,9 +379,6 @@
 		// Load data for the active tab (publications est auto-géré).
 		if (activeTab === 'dashboard') {
 			loadDashboard();
-		} else if (activeTab === 'theses') {
-			thesesFacets.load();
-			theses.load();
 		} else if (activeTab === 'persons') {
 			loadPersons();
 		} else if (activeTab === 'addresses') {
@@ -607,23 +542,7 @@
 	<!-- Tab: Thèses -->
 	{#if activeTab === 'theses'}
 		<div class="tab-content">
-			<div class="toolbar">
-				<FacetDropdown label="Année" options={thesesFacets.options.years} bind:selected={thesesSelectedYears} onchange={() => onThesesFilterChange()} />
-				<FacetDropdown label="Statut" options={thesesFacets.options.status} bind:selected={thesesSelectedStatus} onchange={() => onThesesFilterChange()} />
-				<FacetDropdown label="Accès" options={thesesFacets.options.access} bind:selected={thesesSelectedAccess} onchange={() => onThesesFilterChange()} />
-				<span class="toolbar-spacer"></span>
-				<span class="count">{theses.total} thèse{theses.total > 1 ? 's' : ''}</span>
-			</div>
-			{#if theses.items.length === 0 && theses.total === 0}
-				<div class="no-results">Aucune thèse</div>
-			{:else}
-				<ThesesTable
-					items={theses.items}
-					sort={thesesSort}
-					onToggleSort={toggleThesesSort}
-				/>
-				<Pagination page={theses.page} pages={theses.pages} onchange={(p) => theses.goToPage(p)} />
-			{/if}
+			<ThesesListView labId={lab.id} urlSync={false} apiKey={`lab-${lab.id}-theses`} />
 		</div>
 	{/if}
 
