@@ -124,7 +124,8 @@
 	let currentPage = $state(1);
 	let currentDetected = $state('yes');
 	let currentValidation = $state('pending');
-	let textPredicates = $state<TextPredicate[]>([]);
+	const newTextPredicate = (): TextPredicate => ({ mode: 'contains', term: '' });
+	let textPredicates = $state<TextPredicate[]>([newTextPredicate()]);
 	let structurePredicates = $state<StructurePredicate[]>([]);
 	let currentStructureId = $state<number | null>(null);
 
@@ -190,27 +191,31 @@
 		const all = await api<Structure[]>('/api/structures');
 		allStructures = all.filter((s) => s.type !== 'site');
 		const grouped: GroupedStructures = {};
-		let ucaId: number | null = null;
-
 		for (const s of all) {
 			if (!ALLOWED_TYPES.includes(s.type)) continue;
-			if (s.code === 'uca') ucaId = s.id;
 			if (!grouped[s.type]) grouped[s.type] = [];
 			grouped[s.type].push(s);
 		}
-
 		structures = grouped;
+	}
 
-		if (ucaId) {
-			currentStructureId = ucaId;
-		} else {
-			for (const type of ALLOWED_TYPES) {
-				if (grouped[type]?.length) {
-					currentStructureId = grouped[type][0].id;
-					break;
-				}
-			}
+	/** Structure de scope par défaut : UCA, sinon la première du premier type peuplé. */
+	function defaultStructureId(): number | null {
+		const uca = allStructures.find((s) => s.code === 'uca');
+		if (uca) return uca.id;
+		for (const type of ALLOWED_TYPES) {
+			if (structures[type]?.length) return structures[type][0].id;
 		}
+		return null;
+	}
+
+	/** Résout la structure de scope : URL > localStorage (si valides) > défaut. Une seule assignation, pas de passage transitoire par le défaut. */
+	function resolveScopeStructure(): void {
+		const candidate = $page.url.searchParams.get('structure_id') ?? localStorage.getItem('admin_structure_id');
+		const id = candidate ? parseInt(candidate) : NaN;
+		const isScope = !isNaN(id) && Object.values(structures).some((list) => list.some((s) => s.id === id));
+		currentStructureId = isScope ? id : defaultStructureId();
+		if (currentStructureId) localStorage.setItem('admin_structure_id', String(currentStructureId));
 	}
 
 	async function loadStats(): Promise<void> {
@@ -326,7 +331,7 @@
 	// ---- Prédicats composables ----
 
 	function addTextPredicate(): void {
-		textPredicates = [...textPredicates, { mode: 'contains', term: '' }];
+		textPredicates = [...textPredicates, newTextPredicate()];
 	}
 
 	function addStructurePredicate(): void {
@@ -428,20 +433,12 @@
 		const url = readUrlParams();
 		currentDetected = url.detected;
 		currentValidation = url.validation;
-		textPredicates = url.textPredicates;
+		textPredicates = url.textPredicates.length ? url.textPredicates : [newTextPredicate()];
 		structurePredicates = url.structurePredicates;
 		currentPage = url.p;
 
 		loadStructures().then(() => {
-			// Priorité : URL > localStorage > UCA par défaut
-			const urlSid = $page.url.searchParams.get('structure_id');
-			if (urlSid) {
-				currentStructureId = parseInt(urlSid);
-				localStorage.setItem('admin_structure_id', urlSid);
-			} else {
-				const saved = localStorage.getItem('admin_structure_id');
-				if (saved) currentStructureId = parseInt(saved);
-			}
+			resolveScopeStructure();
 			loadStats();
 			loadAddresses();
 		});
