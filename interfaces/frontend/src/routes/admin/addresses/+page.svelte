@@ -33,6 +33,16 @@
 		[type: string]: Structure[];
 	}
 
+	// Prédicats composables (cf. chantier filtres-adresses-composables).
+	interface TextPredicate {
+		mode: 'contains' | 'not_contains';
+		term: string;
+	}
+	interface StructurePredicate {
+		operator: 'recognized' | 'not_recognized';
+		structureIds: number[];
+	}
+
 	// ---- Constants ----
 
 	const TYPE_LABELS: Record<string, string> = {
@@ -46,16 +56,55 @@
 
 	// ---- URL params helpers ----
 
-	function readUrlParams(): { detected: string; validation: string; search: string; searchMode: string; p: number; structureId: number | null } {
+	function parseTextParam(raw: string): TextPredicate | null {
+		const i = raw.indexOf(':');
+		if (i < 0) return null;
+		const mode = raw.slice(0, i);
+		const term = raw.slice(i + 1);
+		if ((mode === 'contains' || mode === 'not_contains') && term) return { mode, term };
+		return null;
+	}
+
+	function parseStructParam(raw: string): StructurePredicate | null {
+		const i = raw.indexOf(':');
+		if (i < 0) return null;
+		const operator = raw.slice(0, i);
+		if (operator !== 'recognized' && operator !== 'not_recognized') return null;
+		const ids = raw
+			.slice(i + 1)
+			.split(',')
+			.map((x) => parseInt(x))
+			.filter((n) => !isNaN(n));
+		if (!ids.length) return null;
+		return { operator, structureIds: ids };
+	}
+
+	function readUrlParams(): {
+		detected: string;
+		validation: string;
+		textPredicates: TextPredicate[];
+		structurePredicates: StructurePredicate[];
+		p: number;
+		structureId: number | null;
+	} {
 		const sp = $page.url.searchParams;
 		return {
 			detected: sp.get('detected') || 'yes',
 			validation: sp.get('validation') || 'pending',
-			search: sp.get('search') || '',
-			searchMode: sp.get('search_mode') || 'contains',
+			textPredicates: sp.getAll('text').map(parseTextParam).filter((p): p is TextPredicate => p !== null),
+			structurePredicates: sp
+				.getAll('struct')
+				.map(parseStructParam)
+				.filter((p): p is StructurePredicate => p !== null),
 			p: parseInt(sp.get('page') || '1') || 1,
 			structureId: sp.has('structure_id') ? parseInt(sp.get('structure_id')!) || null : null,
 		};
+	}
+
+	function serializePredicateParams(sp: URLSearchParams): void {
+		for (const t of textPredicates) if (t.term) sp.append('text', `${t.mode}:${t.term}`);
+		for (const s of structurePredicates)
+			if (s.structureIds.length) sp.append('struct', `${s.operator}:${s.structureIds.join(',')}`);
 	}
 
 	function syncUrl(): void {
@@ -63,8 +112,7 @@
 		if (currentStructureId) sp.set('structure_id', String(currentStructureId));
 		if (currentDetected !== 'yes') sp.set('detected', currentDetected);
 		if (currentValidation !== 'pending') sp.set('validation', currentValidation);
-		if (currentSearch) sp.set('search', currentSearch);
-		if (currentSearchMode !== 'contains') sp.set('search_mode', currentSearchMode);
+		serializePredicateParams(sp);
 		if (currentPage > 1) sp.set('page', String(currentPage));
 		const qs = sp.toString();
 		const newUrl = window.location.pathname + (qs ? '?' + qs : '');
@@ -76,11 +124,14 @@
 	let currentPage = $state(1);
 	let currentDetected = $state('yes');
 	let currentValidation = $state('pending');
-	let currentSearch = $state('');
-	let currentSearchMode = $state('contains');
+	let textPredicates = $state<TextPredicate[]>([]);
+	let structurePredicates = $state<StructurePredicate[]>([]);
 	let currentStructureId = $state<number | null>(null);
 
 	let structures = $state<GroupedStructures>({});
+	// Liste plate de toutes les structures (hors `site`) pour le picker des
+	// prédicats Structure — distincte du scope (limité aux ALLOWED_TYPES).
+	let allStructures = $state<Structure[]>([]);
 	let stats = $state<Stats>({ total: 0, detected: 0, pending: 0, rejected: 0, confirmed: 0 });
 	let addresses = $state<Address[]>([]);
 	let totalAddresses = $state(0);
@@ -104,10 +155,40 @@
 		`${totalAddresses} adresse${totalAddresses > 1 ? 's' : ''}`
 	);
 
+	// Libellé d'une structure par id (pour les tags des prédicats).
+	const structureLabelById = $derived(
+		new Map(allStructures.map((s) => [s.id, s.acronym || s.name]))
+	);
+	const currentStructureName = $derived(
+		(currentStructureId !== null && structureLabelById.get(currentStructureId)) || '—'
+	);
+	// Dédup global : une structure déjà posée dans un prédicat disparaît de tous les pickers.
+	const usedStructureIds = $derived(
+		new Set(structurePredicates.flatMap((s) => s.structureIds))
+	);
+	// Structures sélectionnables, groupées par type, ALLOWED_TYPES d'abord.
+	const availableStructureGroups = $derived.by((): [string, Structure[]][] => {
+		const groups = new Map<string, Structure[]>();
+		for (const s of allStructures) {
+			if (usedStructureIds.has(s.id)) continue;
+			(groups.get(s.type) ?? groups.set(s.type, []).get(s.type)!).push(s);
+		}
+		const extra = [...groups.keys()].filter((t) => !ALLOWED_TYPES.includes(t));
+		return [...ALLOWED_TYPES, ...extra]
+			.filter((t) => groups.has(t))
+			.map((t) => [t, groups.get(t)!]);
+	});
+
+	function reload(): void {
+		currentPage = 1;
+		loadAddresses();
+	}
+
 	// ---- Data loading ----
 
 	async function loadStructures(): Promise<void> {
 		const all = await api<Structure[]>('/api/structures');
+		allStructures = all.filter((s) => s.type !== 'site');
 		const grouped: GroupedStructures = {};
 		let ucaId: number | null = null;
 
@@ -145,11 +226,10 @@
 			page: String(currentPage),
 			per_page: '200',
 			detected: currentDetected,
-			validation: currentValidation,
-			search: currentSearch,
-			search_mode: currentSearchMode
+			validation: currentValidation
 		});
 		if (currentStructureId) params.set('structure_id', String(currentStructureId));
+		serializePredicateParams(params);
 
 		const data = await api<AddressesResponse>(`/api/addresses?${params}`, { key: 'addr-list' });
 		requiresSearch = data.requires_search ?? false;
@@ -243,22 +323,63 @@
 		selectAll = false;
 	}
 
-	function onSearchInput(e: Event): void {
-		const value = (e.target as HTMLInputElement).value;
-		if (searchTimeout) clearTimeout(searchTimeout);
-		searchTimeout = setTimeout(() => {
-			currentSearch = value;
-			currentPage = 1;
-			loadAddresses();
-		}, 400);
+	// ---- Prédicats composables ----
+
+	function addTextPredicate(): void {
+		textPredicates = [...textPredicates, { mode: 'contains', term: '' }];
 	}
 
-	function onSearchModeChange(e: Event): void {
-		currentSearchMode = (e.target as HTMLSelectElement).value;
-		if (currentSearch) {
-			currentPage = 1;
-			loadAddresses();
-		}
+	function addStructurePredicate(): void {
+		structurePredicates = [...structurePredicates, { operator: 'recognized', structureIds: [] }];
+	}
+
+	function removeTextPredicate(i: number): void {
+		const had = !!textPredicates[i]?.term;
+		textPredicates = textPredicates.filter((_, j) => j !== i);
+		if (had) reload();
+	}
+
+	function removeStructurePredicate(i: number): void {
+		const had = (structurePredicates[i]?.structureIds.length ?? 0) > 0;
+		structurePredicates = structurePredicates.filter((_, j) => j !== i);
+		if (had) reload();
+	}
+
+	function setTextMode(i: number, mode: string): void {
+		textPredicates = textPredicates.map((t, j) =>
+			j === i ? { ...t, mode: mode as TextPredicate['mode'] } : t
+		);
+		if (textPredicates[i].term) reload();
+	}
+
+	function onTextTermInput(i: number, value: string): void {
+		textPredicates = textPredicates.map((t, j) => (j === i ? { ...t, term: value } : t));
+		if (searchTimeout) clearTimeout(searchTimeout);
+		searchTimeout = setTimeout(reload, 400);
+	}
+
+	function setStructureOperator(i: number, operator: string): void {
+		structurePredicates = structurePredicates.map((s, j) =>
+			j === i ? { ...s, operator: operator as StructurePredicate['operator'] } : s
+		);
+		if (structurePredicates[i].structureIds.length) reload();
+	}
+
+	function addStructureToPredicate(i: number, id: number): void {
+		if (!id || isNaN(id)) return;
+		structurePredicates = structurePredicates.map((s, j) =>
+			j === i && !s.structureIds.includes(id)
+				? { ...s, structureIds: [...s.structureIds, id] }
+				: s
+		);
+		reload();
+	}
+
+	function removeStructureFromPredicate(i: number, id: number): void {
+		structurePredicates = structurePredicates.map((s, j) =>
+			j === i ? { ...s, structureIds: s.structureIds.filter((x) => x !== id) } : s
+		);
+		reload();
 	}
 
 	function onFilterChange(): void {
@@ -307,8 +428,8 @@
 		const url = readUrlParams();
 		currentDetected = url.detected;
 		currentValidation = url.validation;
-		currentSearch = url.search;
-		currentSearchMode = url.searchMode;
+		textPredicates = url.textPredicates;
+		structurePredicates = url.structurePredicates;
 		currentPage = url.p;
 
 		loadStructures().then(() => {
@@ -362,42 +483,101 @@
 		{/if}
 	</div>
 
-	<!-- Filters -->
-	<div class="toolbar">
-		<select value={currentSearchMode} onchange={onSearchModeChange}>
-			<option value="contains">contient</option>
-			<option value="not_contains">ne contient pas</option>
-		</select>
+	<!-- Filtres composables -->
+	<div class="filters-zone">
+		<!-- Ligne fixe : détection/validation de la structure étudiée -->
+		<div class="filters-row scope-row">
+			<span class="filters-title">Filtres</span>
+			<span class="scope-echo">Structure étudiée : <strong>{currentStructureName}</strong></span>
+			<label class="scope-field">
+				Détection
+				<select
+					value={currentDetected}
+					onchange={(e) => { currentDetected = (e.target as HTMLSelectElement).value; onFilterChange(); }}
+				>
+					<option value="all">tous</option>
+					<option value="yes">détecté</option>
+					<option value="no">non détecté</option>
+				</select>
+			</label>
+			<label class="scope-field">
+				Validation
+				<select
+					value={currentValidation}
+					onchange={(e) => { currentValidation = (e.target as HTMLSelectElement).value; onFilterChange(); }}
+				>
+					<option value="all">tous</option>
+					<option value="pending">non validé</option>
+					<option value="confirmed">relié</option>
+					<option value="rejected">rejeté</option>
+				</select>
+			</label>
+			<span class="count">{resultCountText}</span>
+		</div>
 
-		<input
-			type="text"
-			class="search-input"
-			placeholder="Rechercher dans les adresses..."
-			autocomplete="off"
-			value={currentSearch}
-			oninput={onSearchInput}
-		/>
+		<!-- Prédicats texte -->
+		{#each textPredicates as tp, i (i)}
+			<div class="filters-row predicate-row">
+				<span class="pred-type">Texte</span>
+				<select value={tp.mode} onchange={(e) => setTextMode(i, (e.target as HTMLSelectElement).value)}>
+					<option value="contains">contient</option>
+					<option value="not_contains">ne contient pas</option>
+				</select>
+				<input
+					type="text"
+					class="pred-text"
+					placeholder="texte recherché…"
+					autocomplete="off"
+					value={tp.term}
+					oninput={(e) => onTextTermInput(i, (e.target as HTMLInputElement).value)}
+				/>
+				<button class="pred-remove" title="Retirer ce filtre" onclick={() => removeTextPredicate(i)}>&#x2717;</button>
+			</div>
+		{/each}
 
-		<select
-			value={currentDetected}
-			onchange={(e) => { currentDetected = (e.target as HTMLSelectElement).value; onFilterChange(); }}
-		>
-			<option value="all">Détection : tous</option>
-			<option value="yes">Détecté</option>
-			<option value="no">Non détecté</option>
-		</select>
+		<!-- Prédicats structure reconnue (multi-structures, OR / aucune) -->
+		{#each structurePredicates as sp, i (i)}
+			<div class="filters-row predicate-row">
+				<span class="pred-type">Structure</span>
+				<select value={sp.operator} onchange={(e) => setStructureOperator(i, (e.target as HTMLSelectElement).value)}>
+					<option value="recognized">reconnue comme l'une de</option>
+					<option value="not_recognized">non reconnue comme aucune de</option>
+				</select>
+				<div class="struct-tags">
+					{#each sp.structureIds as sid (sid)}
+						<span class="struct-chip">
+							{structureLabelById.get(sid) || `#${sid}`}
+							<button title="Retirer" onclick={() => removeStructureFromPredicate(i, sid)}>&#x2717;</button>
+						</span>
+					{/each}
+					<select
+						class="struct-add"
+						value=""
+						onchange={(e) => {
+							const el = e.target as HTMLSelectElement;
+							addStructureToPredicate(i, parseInt(el.value));
+							el.value = '';
+						}}
+					>
+						<option value="" disabled selected>+ structure</option>
+						{#each availableStructureGroups as [type, list] (type)}
+							<optgroup label={TYPE_LABELS[type] || type}>
+								{#each list as s (s.id)}
+									<option value={s.id}>{s.acronym || s.name}</option>
+								{/each}
+							</optgroup>
+						{/each}
+					</select>
+				</div>
+				<button class="pred-remove" title="Retirer cette ligne" onclick={() => removeStructurePredicate(i)}>&#x2717;</button>
+			</div>
+		{/each}
 
-		<select
-			value={currentValidation}
-			onchange={(e) => { currentValidation = (e.target as HTMLSelectElement).value; onFilterChange(); }}
-		>
-			<option value="all">Validation : tous</option>
-			<option value="pending">Non validé</option>
-			<option value="confirmed">Relié</option>
-			<option value="rejected">Rejeté</option>
-		</select>
-
-		<span class="count">{resultCountText}</span>
+		<!-- Ajout de prédicats -->
+		<div class="filters-row add-row">
+			<button class="add-btn" onclick={addTextPredicate}>+ Texte</button>
+			<button class="add-btn" onclick={addStructurePredicate}>+ Structure reconnue</button>
+		</div>
 	</div>
 
 	<!-- Batch action bar -->
@@ -418,7 +598,7 @@
 		{#if loading}
 			<div class="loading-msg">Chargement...</div>
 		{:else if requiresSearch}
-			<div class="loading-msg">Saisissez un terme de recherche pour afficher les résultats.</div>
+			<div class="loading-msg">Ajoutez un filtre (texte ou structure) pour afficher les résultats.</div>
 		{:else if addresses.length === 0}
 			<div class="loading-msg">Aucune adresse trouvée.</div>
 		{:else}
@@ -584,20 +764,132 @@
 		color: var(--success);
 	}
 
-	/* Toolbar */
-	.toolbar input[type='text'],
-	.toolbar select { background: white; }
-	.search-input { width: 250px; }
-	.toolbar-sep {
-		width: 1px;
-		height: 24px;
-		background: var(--border);
-		margin: 0 4px;
-	}
 	.structure-filter {
 		font-weight: 600;
 		border-color: var(--accent) !important;
 		color: var(--accent);
+	}
+
+	/* Filtres composables */
+	.filters-zone {
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--card);
+		padding: 8px 12px;
+		margin-bottom: 10px;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.filters-zone select,
+	.filters-zone input[type='text'] {
+		background: white;
+	}
+	.filters-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+	.scope-row {
+		padding-bottom: 6px;
+		border-bottom: 1px solid var(--border);
+	}
+	.filters-title {
+		font-weight: 600;
+		color: var(--muted);
+		text-transform: uppercase;
+		font-size: 0.75rem;
+		letter-spacing: 0.5px;
+	}
+	.scope-echo {
+		font-size: 0.85rem;
+		color: var(--muted);
+	}
+	.scope-field {
+		font-size: 0.8rem;
+		color: var(--muted);
+		display: flex;
+		align-items: center;
+		gap: 4px;
+	}
+	.count {
+		margin-left: auto;
+		font-size: 0.85rem;
+		color: var(--muted);
+	}
+	.pred-type {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--muted);
+		min-width: 64px;
+	}
+	.pred-text {
+		flex: 1;
+		min-width: 180px;
+	}
+	.struct-tags {
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		flex-wrap: wrap;
+		flex: 1;
+	}
+	.struct-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		font-size: 0.8rem;
+		padding: 2px 4px 2px 8px;
+		border-radius: 10px;
+		background: var(--accent-light);
+		color: var(--accent);
+		font-weight: 500;
+	}
+	.struct-chip button {
+		border: none;
+		background: none;
+		color: inherit;
+		cursor: pointer;
+		font-size: 0.75rem;
+		padding: 0 2px;
+		line-height: 1;
+	}
+	.struct-chip button:hover {
+		color: var(--danger);
+	}
+	.struct-add {
+		font-size: 0.85rem;
+	}
+	.pred-remove {
+		border: 1px solid var(--border);
+		background: white;
+		color: var(--muted);
+		border-radius: 4px;
+		cursor: pointer;
+		padding: 2px 7px;
+		line-height: 1;
+	}
+	.pred-remove:hover {
+		border-color: var(--danger);
+		color: var(--danger);
+	}
+	.add-row {
+		gap: 6px;
+	}
+	.add-btn {
+		border: 1px dashed var(--border);
+		background: white;
+		color: var(--accent);
+		border-radius: 4px;
+		cursor: pointer;
+		padding: 3px 10px;
+		font-size: 0.85rem;
+		font-family: inherit;
+	}
+	.add-btn:hover {
+		border-color: var(--accent);
+		background: var(--accent-light);
 	}
 	.select-all-row {
 		padding: 4px 12px;
