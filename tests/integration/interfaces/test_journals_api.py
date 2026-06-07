@@ -233,9 +233,9 @@ class TestGetJournal:
         assert body["is_in_doaj"] is True
         assert body["doaj_payload"] == payload
 
-    def test_doaj_url_null_when_no_doaj_id_in_payload(self, client):
-        """Payload sans clé `DOAJ id` (cas CSV bootstrap ou seed de test)
-        → `doaj_url` reste null pour que le front fallback sur `<span>`."""
+    def test_doaj_url_null_when_no_url_source_in_payload(self, client):
+        """Payload sans `URL in DOAJ` ni `DOAJ id` → `doaj_url` reste null
+        pour que le front fallback sur `<span>`."""
         jid = _seed_journal()
         payload = {"License": "CC BY"}
         with _pool() as cur:
@@ -258,6 +258,32 @@ class TestGetJournal:
         r = client.get(f"/api/journals/{jid}")
         assert r.status_code == 200
         assert r.json()["doaj_url"] == "https://doaj.org/toc/deadbeef1234"
+
+    def test_doaj_url_from_csv_url_in_doaj(self, client):
+        """Cas massif : payload import CSV qui porte `URL in DOAJ` (URL toute
+        faite) mais pas `DOAJ id`."""
+        jid = _seed_journal()
+        payload = {"URL in DOAJ": "https://doaj.org/toc/csvurl42"}
+        with _pool() as cur:
+            cur.execute(
+                "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
+                (json.dumps(payload), jid),
+            )
+        r = client.get(f"/api/journals/{jid}")
+        assert r.status_code == 200
+        assert r.json()["doaj_url"] == "https://doaj.org/toc/csvurl42"
+
+    def test_doaj_url_prefers_csv_url_over_doaj_id(self, client):
+        jid = _seed_journal()
+        payload = {"URL in DOAJ": "https://doaj.org/toc/fromcsv", "DOAJ id": "fromid"}
+        with _pool() as cur:
+            cur.execute(
+                "UPDATE journals SET doaj_payload = %s::jsonb, is_in_doaj = TRUE WHERE id = %s",
+                (json.dumps(payload), jid),
+            )
+        r = client.get(f"/api/journals/{jid}")
+        assert r.status_code == 200
+        assert r.json()["doaj_url"] == "https://doaj.org/toc/fromcsv"
 
 
 class TestJournalDashboard:
