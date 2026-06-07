@@ -3,6 +3,7 @@
   import { base } from "$app/paths";
   import { goto } from "$app/navigation";
   import { api, ApiError, structures as structuresApi } from "$lib/api";
+  import { toast } from "$lib/dialogs.svelte";
   import { API_SOURCES, type Structure } from "./types";
   import StructureFormModal from "./StructureFormModal.svelte";
 
@@ -38,7 +39,7 @@
     if (!ror) return true;
     if (/^0[a-z0-9]{8}$/.test(ror)) ror = "https://ror.org/" + ror;
     if (!/^https:\/\/ror\.org\/0[a-z0-9]{8}$/.test(ror)) {
-      alert("Format ROR invalide. Attendu : https://ror.org/0xxxxxxxxx");
+      toast("Format ROR invalide. Attendu : https://ror.org/0xxxxxxxxx", "error");
       return false;
     }
     mRor = ror;
@@ -85,7 +86,7 @@
       api_ids: buildApiIds(),
     };
     if (!data.code || !data.name) {
-      alert("Code et nom requis");
+      toast("Code et nom requis", "error");
       return;
     }
     try {
@@ -94,7 +95,7 @@
       goto(`${base}/admin/structures/${created.id}`);
     } catch (e: any) {
       const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-      alert("Erreur: " + msg);
+      toast("Erreur: " + msg, "error");
     }
   }
 

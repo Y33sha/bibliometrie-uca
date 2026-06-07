@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { base } from "$app/paths";
   import { api, ApiError, config as configApi, perimeters as perimetersApi } from "$lib/api";
+  import { confirmDialog, toast } from '$lib/dialogs.svelte';
   import type { components } from "$lib/api/schema";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
@@ -79,17 +80,17 @@
       perimModal = null;
       await load();
     } catch (e) {
-      alert(extractDetail(e));
+      toast(extractDetail(e), 'error');
     }
   }
 
   async function deletePerimeter(id: number) {
-    if (!confirm("Supprimer ce périmètre ?")) return;
+    if (!(await confirmDialog({ message: "Supprimer ce périmètre ?", danger: true }))) return;
     try {
       await perimetersApi.remove(id);
       await load();
     } catch (e) {
-      alert(extractDetail(e));
+      toast(extractDetail(e), 'error');
     }
   }
 
@@ -172,7 +173,7 @@
       editingKey = null;
       await load();
     } catch (e) {
-      alert("Erreur : " + extractDetail(e));
+      toast("Erreur : " + extractDetail(e), 'error');
     }
     saving = false;
   }

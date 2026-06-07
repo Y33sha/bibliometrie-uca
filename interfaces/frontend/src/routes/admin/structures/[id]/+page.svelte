@@ -4,6 +4,7 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { api, ApiError, nameForms, structures as structuresApi } from "$lib/api";
+  import { confirmDialog, toast } from "$lib/dialogs.svelte";
   import {
     API_SOURCES,
     halCollectionUrl,
@@ -207,10 +208,10 @@
     } catch (e) {
       if (e instanceof ApiError) {
         const detailMsg = (e.detail as { detail?: string })?.detail;
-        alert(detailMsg || `Erreur ${e.status}`);
+        toast(detailMsg || `Erreur ${e.status}`, "error");
         return;
       }
-      alert((e as Error).message);
+      toast((e as Error).message, "error");
       return;
     }
     addFormText = "";
@@ -221,12 +222,12 @@
   }
 
   async function deleteForm(formId: number) {
-    if (!confirm("Supprimer cette forme ?")) return;
+    if (!(await confirmDialog({ message: "Supprimer cette forme ?", danger: true }))) return;
     try {
       await nameForms.remove(formId);
     } catch (e) {
       const msg = e instanceof ApiError ? JSON.stringify(e.detail) : (e as Error).message;
-      alert("Erreur suppression: " + msg);
+      toast("Erreur suppression: " + msg, "error");
       return;
     }
     await loadDetail();
@@ -316,7 +317,13 @@
   /* ── Delete structure ── */
 
   async function deleteStructure() {
-    if (!confirm("Supprimer cette structure et toutes ses formes/relations ?")) return;
+    if (
+      !(await confirmDialog({
+        message: "Supprimer cette structure et toutes ses formes/relations ?",
+        danger: true,
+      }))
+    )
+      return;
     await structuresApi.remove(id);
     goto(`${base}/admin/structures`);
   }
@@ -328,7 +335,7 @@
     if (!ror) return true;
     if (/^0[a-z0-9]{8}$/.test(ror)) ror = "https://ror.org/" + ror;
     if (!/^https:\/\/ror\.org\/0[a-z0-9]{8}$/.test(ror)) {
-      alert("Format ROR invalide. Attendu : https://ror.org/0xxxxxxxxx");
+      toast("Format ROR invalide. Attendu : https://ror.org/0xxxxxxxxx", "error");
       return false;
     }
     mRor = ror;
@@ -386,7 +393,7 @@
       refreshCache();
     } catch (e: any) {
       const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-      alert("Erreur: " + msg);
+      toast("Erreur: " + msg, "error");
     }
   }
 

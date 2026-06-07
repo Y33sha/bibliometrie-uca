@@ -12,6 +12,7 @@
 	import TabNav from '$lib/components/TabNav.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
+	import { confirmDialog } from '$lib/dialogs.svelte';
 	import type { components } from '$lib/api/schema';
 
 	const personId = $derived($page.params.id);
@@ -205,7 +206,7 @@
 	}
 
 	async function excludeAuthorship(authorshipId: number) {
-		if (!confirm('Exclure ce lien auteur–publication ? Il ne sera pas recréé automatiquement.')) {
+		if (!(await confirmDialog({ message: 'Exclure ce lien auteur–publication ? Il ne sera pas recréé automatiquement.', danger: true }))) {
 			return false;
 		}
 		await authorships.exclude(authorshipId);
