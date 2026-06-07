@@ -67,7 +67,6 @@
 	let roleOptions: FacetOption[] = $state([]);
 	let rhOptions: FacetOption[] = $state([{ value: 'yes', text: 'Oui' }, { value: 'no', text: 'Non' }]);
 	let idCounts = $state<Record<string, { yes: number; no: number }>>({});
-	let orphanStats = $state({ total: 0 });
 	let personsLoaded = $state(false);
 
 	// Addresses tab
@@ -161,7 +160,6 @@
 		personsTotal = data.total_persons;
 		personsPages = data.pages;
 		personsPage = data.page;
-		orphanStats = data.orphan_authorships;
 		if (data.facets) {
 			deptOptions = data.facets.departments.map((d) => ({ value: d.value, text: d.value, count: d.count }));
 			roleOptions = data.facets.roles.map((r) => ({ value: r.value, text: r.value, count: r.count }));
@@ -549,12 +547,7 @@
 	<!-- Tab: Personnes -->
 	{#if activeTab === 'persons'}
 		<div class="tab-content">
-			{#if orphanStats.total > 0}
-				<div class="orphan-banner">
-					{orphanStats.total} authorship{orphanStats.total > 1 ? 's' : ''} non relié{orphanStats.total > 1 ? 'es' : 'e'} à une personne
-				</div>
-			{/if}
-			<div class="toolbar toolbar-card">
+			<div class="toolbar toolbar-card toolbar-sticky">
 				<input type="text" placeholder="Rechercher..." bind:value={personsSearch} oninput={() => { clearTimeout(personsSearchTimer); personsSearchTimer = setTimeout(() => { personsPage = 1; loadPersons(); }, 300); }} />
 				<PresenceFilterToggle label="Identifiants" items={IDENTIFIER_ITEMS} bind:states={idStates} counts={idCounts} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
 				<FacetDropdown label="Fonction" options={roleOptions} searchable bind:selected={selectedRoles} onchange={() => { personsPage = 1; syncUrl(); loadPersons(); }} />
@@ -677,19 +670,6 @@
 	.person-link:hover { text-decoration: underline; }
 	.person-last { font-weight: 600; }
 	.muted-cell { font-size: 0.85rem; color: var(--muted); }
-	.orphan-banner {
-		display: block;
-		background: #fef3e0;
-		border: 1px solid #f0dca0;
-		border-radius: 5px;
-		padding: 8px 14px;
-		margin-bottom: 12px;
-		font-size: 0.95rem;
-		color: #8a6d1b;
-		text-decoration: none;
-	}
-	.orphan-banner:hover { background: #fdecc8; }
-	.orphan-detail { font-size: 0.85rem; color: #a08530; }
 
 	/* Addresses tab */
 	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }

@@ -28,7 +28,6 @@ from application.ports.api.laboratories_queries import (
     LaboratoryDetailResponse,
     LaboratoryListItem,
     LaboratoryPersonsResponse,
-    LabOrphanAuthorships,
     LabPersonOut,
     LabPersonsFacets,
     LabPersonsFilters,
@@ -283,18 +282,6 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             for r in persons_rows
         ]
 
-        orphan_row = self._conn.execute(
-            text("""
-                SELECT COUNT(DISTINCT a.id) AS total
-                FROM authorships a
-                WHERE a.person_id IS NULL
-                  AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr))
-                  AND a.roles && ARRAY['author']::text[]
-            """),
-            {"lab_arr": lab_arr},
-        ).one()
-        orphan_total = orphan_row.total
-
         # Facettes (chacune exclut son propre filtre). Reconstruction du WHERE
         # avec le `per` alias propre aux facettes au lieu de `p`.
         def facet_clauses(*, skip: str) -> tuple[str, dict[str, Any]]:
@@ -410,7 +397,6 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             per_page=per_page,
             pages=(total_persons + per_page - 1) // per_page or 1,
             persons=persons,
-            orphan_authorships=LabOrphanAuthorships(total=orphan_total),
             facets=LabPersonsFacets(
                 departments=facet_depts,
                 roles=facet_roles,

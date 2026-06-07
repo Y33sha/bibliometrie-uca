@@ -445,7 +445,7 @@ export interface paths {
         };
         /**
          * List Addresses
-         * @description Liste les adresses avec filtres détection/validation pour une structure.
+         * @description Liste les adresses pour une structure, avec prédicats texte/structure composables.
          */
         get: operations["list_addresses_api_addresses_get"];
         put?: never;
@@ -2105,9 +2105,10 @@ export interface paths {
          * Merge
          * @description Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
          *
-         *     Les revues et publications rattachées à la source sont
-         *     transférées à la cible ; la source est supprimée. 404 si l'un
-         *     des deux éditeurs est introuvable.
+         *     Les revues et publications rattachées à la source sont transférées à la
+         *     cible ; la source est supprimée. Les journaux à titre partagé sont fusionnés
+         *     (et leurs publications requalifiées contre le `journal_type` cible, cf.
+         *     `merge_journals`). 404 si l'un des deux éditeurs est introuvable.
          */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
         delete?: never;
@@ -2338,9 +2339,10 @@ export interface paths {
          * Merge
          * @description Fusionne la revue `source_id` dans la revue `journal_id`.
          *
-         *     Les publications et métadonnées de la source sont transférées à
-         *     la cible ; la source est supprimée. 404 si l'une des deux est
-         *     introuvable.
+         *     Les publications et métadonnées de la source sont transférées à la cible ;
+         *     la source est supprimée. Les publications absorbées sont requalifiées contre
+         *     le `journal_type` de la cible (cf. `merge_journals`). 404 si l'une des deux
+         *     est introuvable.
          */
         post: operations["merge_api_journals__journal_id__merge_post"];
         delete?: never;
@@ -2937,22 +2939,6 @@ export interface components {
             detached: boolean;
         };
         /**
-         * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
-         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
-         *     Permet au frontend de styler les inattendus en warning.
-         */
-        DocTypeCount: {
-            /** Doc Type */
-            doc_type: string | null;
-            /** Count */
-            count: number;
-            /** Expected */
-            expected: boolean;
-        };
-        /**
          * DoiPrefixInfo
          * @description Préfixe DOI rattaché à un éditeur (lecture seule, vient de la table `doi_prefixes`).
          */
@@ -3362,7 +3348,7 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["DocTypeCount"][];
+            doc_types: components["schemas"]["application__ports__api__journals_queries__DocTypeCount"][];
             /** Oa Statuses */
             oa_statuses: components["schemas"]["application__ports__api__journals_queries__OaStatusCount"][];
             /** Expected Doc Types */
@@ -3634,11 +3620,6 @@ export interface components {
             /** Count */
             count: number;
         };
-        /** LabOrphanAuthorships */
-        LabOrphanAuthorships: {
-            /** Total */
-            total: number;
-        };
         /**
          * LabPersonOut
          * @description Personne liée à un labo (onglet `persons`).
@@ -3853,7 +3834,6 @@ export interface components {
             pages: number;
             /** Persons */
             persons: components["schemas"]["LabPersonOut"][];
-            orphan_authorships: components["schemas"]["LabOrphanAuthorships"];
             facets: components["schemas"]["LabPersonsFacets"];
         };
         /** LoginRequest */
@@ -3991,16 +3971,6 @@ export interface components {
         OaFacet: {
             /** Value */
             value: string;
-            /** Count */
-            count: number;
-        };
-        /**
-         * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour un éditeur.
-         */
-        OaStatusCount: {
-            /** Oa Status */
-            oa_status: string | null;
             /** Count */
             count: number;
         };
@@ -4980,7 +4950,7 @@ export interface components {
             /** Doc Types */
             doc_types: components["schemas"]["application__ports__api__publishers_queries__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["OaStatusCount"][];
+            oa_statuses: components["schemas"]["application__ports__api__publishers_queries__OaStatusCount"][];
         };
         /**
          * PublisherDetailResponse
@@ -5671,6 +5641,22 @@ export interface components {
             no: number;
         };
         /**
+         * DocTypeCount
+         * @description Compteur de publications par `doc_type` pour une revue.
+         *
+         *     `expected` est vrai si ce `doc_type` figure dans les valeurs attendues
+         *     pour le `journal_type` de la revue (cf. `domain.journals.expected`).
+         *     Permet au frontend de styler les inattendus en warning.
+         */
+        application__ports__api__journals_queries__DocTypeCount: {
+            /** Doc Type */
+            doc_type: string | null;
+            /** Count */
+            count: number;
+            /** Expected */
+            expected: boolean;
+        };
+        /**
          * OaStatusCount
          * @description Compteur de publications par `oa_status` pour une revue.
          *
@@ -5692,6 +5678,16 @@ export interface components {
         application__ports__api__publishers_queries__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
+            /** Count */
+            count: number;
+        };
+        /**
+         * OaStatusCount
+         * @description Compteur de publications par `oa_status` pour un éditeur.
+         */
+        application__ports__api__publishers_queries__OaStatusCount: {
+            /** Oa Status */
+            oa_status: string | null;
             /** Count */
             count: number;
         };
@@ -6385,8 +6381,8 @@ export interface operations {
                 structure_id?: number | null;
                 detected?: string;
                 validation?: string;
-                search?: string;
-                search_mode?: string;
+                text?: string[];
+                struct?: string[];
             };
             header?: never;
             path?: never;

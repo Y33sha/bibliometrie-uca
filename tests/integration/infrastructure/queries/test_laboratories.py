@@ -140,28 +140,6 @@ class TestGetLaboratoryPersons:
         ids = [p.id for p in res.persons]
         assert p_match in ids and p_other not in ids
 
-    def test_counts_orphan_authorships(self, sa_sync_conn):
-        lab = _create_structure(sa_sync_conn, code="LAB")
-        pub = sa_sync_conn.execute(
-            text(
-                "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-                "VALUES ('X', 'x', 2024, 'article') RETURNING id"
-            )
-        ).scalar_one()
-        aid = sa_sync_conn.execute(
-            text(
-                "INSERT INTO authorships (publication_id, person_id, roles) "
-                "VALUES (:pid, NULL, ARRAY['author']::text[]) RETURNING id"
-            ),
-            {"pid": pub},
-        ).scalar_one()
-        add_authorship_structure(sa_sync_conn, aid, lab)
-
-        res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_persons(
-            lab, filters=LabPersonsFilters(), page=1, per_page=50, sort="name"
-        )
-        assert res.orphan_authorships.total == 1
-
 
 class TestGetLaboratoryAddresses:
     def test_lists_linked_addresses(self, sa_sync_conn):

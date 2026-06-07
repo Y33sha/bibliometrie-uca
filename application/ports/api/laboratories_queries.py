@@ -115,17 +115,12 @@ class LabPersonsFacets(BaseModel):
     idref: YesNoCount
 
 
-class LabOrphanAuthorships(BaseModel):
-    total: int
-
-
 class LaboratoryPersonsResponse(BaseModel):
     total_persons: int
     page: int
     per_page: int
     pages: int
     persons: list[LabPersonOut]
-    orphan_authorships: LabOrphanAuthorships
     facets: LabPersonsFacets
 
 
