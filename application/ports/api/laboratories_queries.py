@@ -5,31 +5,15 @@ du chantier typage-projections-strict). Implémenté par
 `infrastructure.queries.api.laboratories.PgLaboratoriesQueries`.
 """
 
-from dataclasses import dataclass, field
 from typing import Protocol
 
 from pydantic import BaseModel
 
 from application.ports.api._common import (
     DashboardOa,
-    FacetValueCount,
     PubYearCount,
-    ValueConfirmedOut,
-    YesNoCount,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
-
-
-@dataclass(frozen=True, slots=True)
-class LabPersonsFilters:
-    search: str = ""
-    departments: list[str] = field(default_factory=list)
-    roles: list[str] = field(default_factory=list)
-    has_rh: str = ""
-    has_orcid: str = ""
-    has_idhal: str = ""
-    has_idref: str = ""
-
 
 # ---------------------------------------------------------------------------
 # DTOs renvoyés par les query services labos
@@ -91,39 +75,6 @@ class LaboratoryDetailResponse(BaseModel):
     theses_count: int
 
 
-class LabPersonOut(BaseModel):
-    """Personne liée à un labo (onglet `persons`)."""
-
-    id: int
-    last_name: str
-    first_name: str
-    role_title: str | None
-    department_name: str | None
-    has_rh: bool
-    pub_count: int
-    orcids: list[ValueConfirmedOut] | None
-    idhals: list[ValueConfirmedOut] | None
-    idrefs: list[ValueConfirmedOut] | None
-
-
-class LabPersonsFacets(BaseModel):
-    departments: list[FacetValueCount]
-    roles: list[FacetValueCount]
-    rh: YesNoCount
-    orcid: YesNoCount
-    idhal: YesNoCount
-    idref: YesNoCount
-
-
-class LaboratoryPersonsResponse(BaseModel):
-    total_persons: int
-    page: int
-    per_page: int
-    pages: int
-    persons: list[LabPersonOut]
-    facets: LabPersonsFacets
-
-
 class LabAddressOut(BaseModel):
     id: int
     raw_text: str
@@ -163,16 +114,6 @@ class LaboratoriesQueries(Protocol):
     def list_laboratories(self) -> list[LaboratoryListItem]: ...
 
     def get_laboratory(self, lab_id: int) -> LaboratoryDetailResponse | None: ...
-
-    def get_laboratory_persons(
-        self,
-        lab_id: int,
-        *,
-        filters: LabPersonsFilters,
-        page: int,
-        per_page: int,
-        sort: str,
-    ) -> LaboratoryPersonsResponse: ...
 
     def get_laboratory_addresses(
         self, lab_id: int, *, page: int, per_page: int

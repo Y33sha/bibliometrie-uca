@@ -4,7 +4,6 @@ import json
 
 from sqlalchemy import text
 
-from application.ports.api.laboratories_queries import LabPersonsFilters
 from infrastructure.queries.api.laboratories import PgLaboratoriesQueries
 from tests.integration.helpers.structures import add_authorship_structure
 
@@ -109,36 +108,6 @@ class TestGetLaboratory:
         assert isinstance(res.parents, list)
         assert isinstance(res.children, list)
         assert isinstance(res.theses_count, int)
-
-
-class TestGetLaboratoryPersons:
-    def test_returns_linked_persons(self, sa_sync_conn):
-        lab = _create_structure(sa_sync_conn, code="LAB")
-        pid = _create_person(sa_sync_conn)
-        _create_pub_with_authorship(sa_sync_conn, pid, lab)
-
-        res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_persons(
-            lab, filters=LabPersonsFilters(), page=1, per_page=50, sort="name"
-        )
-        assert res.total_persons == 1
-        assert res.persons[0].id == pid
-
-    def test_search_filters_by_name(self, sa_sync_conn):
-        lab = _create_structure(sa_sync_conn, code="LAB")
-        p_match = _create_person(sa_sync_conn, last="Dupond", first="Jean")
-        p_other = _create_person(sa_sync_conn, last="Autre", first="Zed")
-        _create_pub_with_authorship(sa_sync_conn, p_match, lab)
-        _create_pub_with_authorship(sa_sync_conn, p_other, lab)
-
-        res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_persons(
-            lab,
-            filters=LabPersonsFilters(search="Dupond"),
-            page=1,
-            per_page=50,
-            sort="name",
-        )
-        ids = [p.id for p in res.persons]
-        assert p_match in ids and p_other not in ids
 
 
 class TestGetLaboratoryAddresses:

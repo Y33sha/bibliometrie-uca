@@ -10,12 +10,9 @@ from application.ports.api.laboratories_queries import (
     LaboratoryDashboardResponse,
     LaboratoryDetailResponse,
     LaboratoryListItem,
-    LaboratoryPersonsResponse,
-    LabPersonsFilters,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from interfaces.api.deps import laboratories_queries_sync
-from interfaces.api.filters import parse_str_csv
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -39,36 +36,6 @@ def get_laboratory(
     if not result:
         raise HTTPException(404, "Laboratory not found")
     return result
-
-
-@router.get("/api/laboratories/{lab_id}/persons", response_model=LaboratoryPersonsResponse)
-def get_laboratory_persons(
-    lab_id: int,
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
-    sort: str = Query("name"),
-    search: str = Query(""),
-    department: str = Query(""),
-    role: str = Query(""),
-    has_rh: str = Query(""),
-    has_orcid: str = Query(""),
-    has_idhal: str = Query(""),
-    has_idref: str = Query(""),
-    queries: LaboratoriesQueries = Depends(laboratories_queries_sync),
-) -> LaboratoryPersonsResponse:
-    """Personnes et authorships orphelines liées à un labo."""
-    filters = LabPersonsFilters(
-        search=search,
-        departments=parse_str_csv(department),
-        roles=parse_str_csv(role),
-        has_rh=has_rh,
-        has_orcid=has_orcid,
-        has_idhal=has_idhal,
-        has_idref=has_idref,
-    )
-    return queries.get_laboratory_persons(
-        lab_id, filters=filters, page=page, per_page=per_page, sort=sort
-    )
 
 
 @router.get("/api/laboratories/{lab_id}/addresses", response_model=LaboratoryAddressesResponse)

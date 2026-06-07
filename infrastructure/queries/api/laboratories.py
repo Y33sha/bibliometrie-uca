@@ -2,22 +2,17 @@
 
 `PgLaboratoriesQueries` hérite explicitement du Protocol
 `application.ports.api.laboratories_queries.LaboratoriesQueries` : mypy
-vérifie la conformité à la définition de classe. La dataclass
-`LabPersonsFilters` et les DTOs sont importés du port (cf. règle 3
-d'`architecture.md`).
+vérifie la conformité à la définition de classe. Les DTOs sont importés
+du port (cf. règle 3 d'`architecture.md`).
 """
 
 import datetime
-from typing import Any
 
-from sqlalchemy import Connection, Row, text
+from sqlalchemy import Connection, text
 
 from application.ports.api._common import (
     DashboardOa,
-    FacetValueCount,
     PubYearCount,
-    ValueConfirmedOut,
-    YesNoCount,
 )
 from application.ports.api.laboratories_queries import (
     LabAddressOut,
@@ -27,10 +22,6 @@ from application.ports.api.laboratories_queries import (
     LaboratoryDashboardResponse,
     LaboratoryDetailResponse,
     LaboratoryListItem,
-    LaboratoryPersonsResponse,
-    LabPersonOut,
-    LabPersonsFacets,
-    LabPersonsFilters,
     LabRelatedStructure,
     LabStructureCore,
     LabTopCountry,
@@ -38,14 +29,7 @@ from application.ports.api.laboratories_queries import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
-from infrastructure.queries.filters import (
-    OA_CLOSED_SQL,
-    WhereClause,
-    assemble_where,
-    person_has_identifier_clause,
-    person_has_rh_clause,
-    persons_sort_clause,
-)
+from infrastructure.queries.filters import OA_CLOSED_SQL
 from infrastructure.queries.perimeter import (
     get_persons_perimeter_root_ids,
     get_persons_structure_ids_list,
@@ -191,220 +175,6 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 for r in children
             ],
             theses_count=theses_row.n,
-        )
-
-    def get_laboratory_persons(  # noqa: C901 (4 facettes × similar conditions)
-        self,
-        lab_id: int,
-        *,
-        filters: LabPersonsFilters,
-        page: int,
-        per_page: int,
-        sort: str,
-    ) -> LaboratoryPersonsResponse:
-        """Personnes liées à un labo + authorships orphelines + facettes."""
-        offset = (page - 1) * per_page
-        lab_arr = [lab_id]
-
-        extra_where, extra_binds = assemble_where(_lab_persons_extra_clauses(filters))
-        base_where = (
-            "a.person_id IS NOT NULL "
-            "AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr)) "
-            "AND a.roles && ARRAY['author']::text[]"
-        )
-        full_where = f"{base_where} AND {extra_where}"
-        common_binds = {**extra_binds, "lab_arr": lab_arr}
-
-        count_row = self._conn.execute(
-            text(f"""
-                SELECT COUNT(DISTINCT a.person_id) AS total
-                FROM authorships a
-                JOIN persons p ON p.id = a.person_id
-                LEFT JOIN persons_rh prh ON prh.person_id = p.id
-                WHERE {full_where}
-            """),
-            common_binds,
-        ).one()
-        total_persons = count_row.total
-
-        order_clause = persons_sort_clause(sort)
-        persons_rows = self._conn.execute(
-            text(f"""
-                SELECT p.id, p.last_name, p.first_name,
-                       prh.role_title, prh.department_name,
-                       (prh.id IS NOT NULL) AS has_rh,
-                       COUNT(DISTINCT a.publication_id) AS pub_count,
-                       (SELECT json_agg(json_build_object(
-                            'value', pi.id_value, 'confirmed', (pi.status = 'confirmed')
-                        ) ORDER BY pi.id_value)
-                        FROM person_identifiers pi
-                        WHERE pi.person_id = p.id AND pi.id_type = 'orcid'
-                          AND pi.status != 'rejected'
-                       ) AS orcids,
-                       (SELECT json_agg(json_build_object(
-                            'value', pi.id_value, 'confirmed', (pi.status = 'confirmed')
-                        ) ORDER BY pi.id_value)
-                        FROM person_identifiers pi
-                        WHERE pi.person_id = p.id AND pi.id_type = 'idhal'
-                          AND pi.status != 'rejected'
-                       ) AS idhals,
-                       (SELECT json_agg(json_build_object(
-                            'value', pi.id_value, 'confirmed', (pi.status = 'confirmed')
-                        ) ORDER BY pi.id_value)
-                        FROM person_identifiers pi
-                        WHERE pi.person_id = p.id AND pi.id_type = 'idref'
-                          AND pi.status != 'rejected'
-                       ) AS idrefs
-                FROM authorships a
-                JOIN persons p ON p.id = a.person_id
-                LEFT JOIN persons_rh prh ON prh.person_id = p.id
-                WHERE {full_where}
-                GROUP BY p.id, p.last_name, p.first_name,
-                         prh.id, prh.role_title, prh.department_name
-                ORDER BY {order_clause}
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
-            {**common_binds, "pg_limit": per_page, "pg_offset": offset},
-        ).all()
-        persons = [
-            LabPersonOut(
-                id=r.id,
-                last_name=r.last_name,
-                first_name=r.first_name,
-                role_title=r.role_title,
-                department_name=r.department_name,
-                has_rh=r.has_rh,
-                pub_count=r.pub_count,
-                orcids=[ValueConfirmedOut(**o) for o in r.orcids] if r.orcids else None,
-                idhals=[ValueConfirmedOut(**o) for o in r.idhals] if r.idhals else None,
-                idrefs=[ValueConfirmedOut(**o) for o in r.idrefs] if r.idrefs else None,
-            )
-            for r in persons_rows
-        ]
-
-        # Facettes (chacune exclut son propre filtre). Reconstruction du WHERE
-        # avec le `per` alias propre aux facettes au lieu de `p`.
-        def facet_clauses(*, skip: str) -> tuple[str, dict[str, Any]]:
-            parts: list[str] = []
-            binds: dict[str, Any] = {"lab_arr": lab_arr}
-            if skip != "search" and filters.search:
-                parts.append(
-                    "(unaccent(per.last_name) ILIKE unaccent(:fac_search_pat) "
-                    "OR unaccent(per.first_name) ILIKE unaccent(:fac_search_pat))"
-                )
-                binds["fac_search_pat"] = f"%{filters.search}%"
-            if skip != "departments" and filters.departments:
-                parts.append("prh.department_name = ANY(:fac_departments)")
-                binds["fac_departments"] = filters.departments
-            if skip != "roles" and filters.roles:
-                parts.append("prh.role_title = ANY(:fac_roles)")
-                binds["fac_roles"] = filters.roles
-            if skip != "has_rh":
-                if filters.has_rh == "yes":
-                    parts.append("prh.id IS NOT NULL")
-                elif filters.has_rh == "no":
-                    parts.append("prh.id IS NULL")
-            if skip != "ids":
-                for id_type, val in (
-                    ("orcid", filters.has_orcid),
-                    ("idhal", filters.has_idhal),
-                    ("idref", filters.has_idref),
-                ):
-                    if val == "yes":
-                        parts.append(
-                            f"EXISTS (SELECT 1 FROM person_identifiers pi "
-                            f"WHERE pi.person_id = per.id AND pi.id_type = '{id_type}' "
-                            f"AND pi.status != 'rejected')"
-                        )
-                    elif val == "no":
-                        parts.append(
-                            f"NOT EXISTS (SELECT 1 FROM person_identifiers pi "
-                            f"WHERE pi.person_id = per.id AND pi.id_type = '{id_type}' "
-                            f"AND pi.status != 'rejected')"
-                        )
-            full = (
-                "a.person_id IS NOT NULL "
-                "AND EXISTS (SELECT 1 FROM authorship_structures aus WHERE aus.authorship_id = a.id AND aus.structure_id = ANY(:lab_arr)) "
-                "AND a.roles && ARRAY['author']::text[]"
-            )
-            if parts:
-                full += " AND " + " AND ".join(parts)
-            return full, binds
-
-        def run_yesno_facet(skip: str) -> Row[Any]:
-            w, p = facet_clauses(skip=skip)
-            return self._conn.execute(
-                text(f"""
-                    SELECT
-                        COUNT(DISTINCT per.id) FILTER (WHERE prh.id IS NOT NULL) AS rh_yes,
-                        COUNT(DISTINCT per.id) FILTER (WHERE prh.id IS NULL) AS rh_no,
-                        COUNT(DISTINCT per.id) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM person_identifiers pi WHERE pi.person_id = per.id
-                            AND pi.id_type = 'orcid' AND pi.status != 'rejected'
-                        )) AS orcid_yes,
-                        COUNT(DISTINCT per.id) FILTER (WHERE NOT EXISTS (
-                            SELECT 1 FROM person_identifiers pi WHERE pi.person_id = per.id
-                            AND pi.id_type = 'orcid' AND pi.status != 'rejected'
-                        )) AS orcid_no,
-                        COUNT(DISTINCT per.id) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM person_identifiers pi WHERE pi.person_id = per.id
-                            AND pi.id_type = 'idhal' AND pi.status != 'rejected'
-                        )) AS idhal_yes,
-                        COUNT(DISTINCT per.id) FILTER (WHERE NOT EXISTS (
-                            SELECT 1 FROM person_identifiers pi WHERE pi.person_id = per.id
-                            AND pi.id_type = 'idhal' AND pi.status != 'rejected'
-                        )) AS idhal_no,
-                        COUNT(DISTINCT per.id) FILTER (WHERE EXISTS (
-                            SELECT 1 FROM person_identifiers pi WHERE pi.person_id = per.id
-                            AND pi.id_type = 'idref' AND pi.status != 'rejected'
-                        )) AS idref_yes,
-                        COUNT(DISTINCT per.id) FILTER (WHERE NOT EXISTS (
-                            SELECT 1 FROM person_identifiers pi WHERE pi.person_id = per.id
-                            AND pi.id_type = 'idref' AND pi.status != 'rejected'
-                        )) AS idref_no
-                    FROM authorships a
-                    JOIN persons per ON per.id = a.person_id
-                    LEFT JOIN persons_rh prh ON prh.person_id = per.id
-                    WHERE {w}
-                """),
-                p,
-            ).one()
-
-        def run_value_facet(*, skip: str, column: str) -> list[FacetValueCount]:
-            w, p = facet_clauses(skip=skip)
-            rows = self._conn.execute(
-                text(f"""
-                    SELECT prh.{column} AS value, COUNT(DISTINCT per.id) AS n
-                    FROM authorships a
-                    JOIN persons per ON per.id = a.person_id
-                    LEFT JOIN persons_rh prh ON prh.person_id = per.id
-                    WHERE {w} AND prh.{column} IS NOT NULL
-                    GROUP BY prh.{column}
-                    ORDER BY n DESC
-                """),
-                p,
-            ).all()
-            return [FacetValueCount(value=r.value, count=r.n) for r in rows]
-
-        facet_rh = run_yesno_facet("has_rh")
-        facet_ids = run_yesno_facet("ids")
-        facet_depts = run_value_facet(skip="departments", column="department_name")
-        facet_roles = run_value_facet(skip="roles", column="role_title")
-
-        return LaboratoryPersonsResponse(
-            total_persons=total_persons,
-            page=page,
-            per_page=per_page,
-            pages=(total_persons + per_page - 1) // per_page or 1,
-            persons=persons,
-            facets=LabPersonsFacets(
-                departments=facet_depts,
-                roles=facet_roles,
-                rh=YesNoCount(yes=facet_rh.rh_yes, no=facet_rh.rh_no),
-                orcid=YesNoCount(yes=facet_ids.orcid_yes, no=facet_ids.orcid_no),
-                idhal=YesNoCount(yes=facet_ids.idhal_yes, no=facet_ids.idhal_no),
-                idref=YesNoCount(yes=facet_ids.idref_yes, no=facet_ids.idref_no),
-            ),
         )
 
     def get_laboratory_addresses(
@@ -589,32 +359,3 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             ),
             top_countries=top_countries,
         )
-
-
-def _lab_persons_extra_clauses(filters: LabPersonsFilters) -> list[WhereClause | None]:
-    """Filtres optionnels en plus de la base (lab_id + roles author)."""
-    out: list[WhereClause | None] = []
-    if filters.search:
-        out.append(
-            WhereClause(
-                """(
-                    unaccent(p.last_name) ILIKE unaccent(:lp_search_pat)
-                    OR unaccent(p.first_name) ILIKE unaccent(:lp_search_pat)
-                )""",
-                {"lp_search_pat": f"%{filters.search}%"},
-            )
-        )
-    if filters.departments:
-        out.append(
-            WhereClause(
-                "prh.department_name = ANY(:lp_departments)",
-                {"lp_departments": filters.departments},
-            )
-        )
-    if filters.roles:
-        out.append(WhereClause("prh.role_title = ANY(:lp_roles)", {"lp_roles": filters.roles}))
-    out.append(person_has_rh_clause(filters.has_rh))
-    out.append(person_has_identifier_clause("orcid", filters.has_orcid))
-    out.append(person_has_identifier_clause("idhal", filters.has_idhal))
-    out.append(person_has_identifier_clause("idref", filters.has_idref))
-    return out
