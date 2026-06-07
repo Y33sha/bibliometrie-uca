@@ -33,6 +33,8 @@ Enum `doc_type` et mappings ([`domain/publications/doc_types.py`](../../domain/p
 
 Playbook [`ajouter-une-regle-de-correction.md`](../playbooks/ajouter-une-regle-de-correction.md) posé. Documente la procédure complète (caractérisation, audit, implémentation, tests, hooks admin si éditable, rattrapage du stock).
 
+**Hooks de requalification** (re-jouer la cascade de correction quand le contexte journal d'une publication change) : changement de `journal_type` via `update_journal` (preview `type-change-impact` + confirmation) **et** fusion de journaux — fusionner dans un journal d'un autre type requalifie les `doc_type` des publications absorbées contre le type de la cible (revue → média ⇒ `media`). Backend dans `merge_journals` (`1a9bce2c`, couvre le merge direct et la cascade de `merge_publishers`), preview + confirmation frontend symétrique du changement de type (`15bbfc4a`).
+
 ## Reste à faire
 
 Pris dans l'ordre :
