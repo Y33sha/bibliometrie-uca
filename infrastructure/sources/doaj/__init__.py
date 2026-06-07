@@ -88,12 +88,22 @@ def build_doaj_toc_url(doaj_id: str | None) -> str | None:
     """Reconstruit l'URL de la fiche DOAJ à partir d'un `DOAJ id`.
 
     Retourne ``None`` si l'id est absent — cas typique d'un journal
-    dont ``is_in_doaj`` a été posé par OpenAlex Sources ou par l'import
-    CSV bootstrap (ni l'un ni l'autre ne fournit l'id DOAJ).
+    dont ``is_in_doaj`` a été posé par OpenAlex Sources.
     """
     if not doaj_id:
         return None
     return DOAJ_TOC_URL.format(id=doaj_id)
+
+
+def resolve_doaj_url(payload_url: str | None, doaj_id: str | None) -> str | None:
+    """URL de fiche DOAJ à partir d'un payload, quelle que soit sa provenance.
+
+    L'import CSV stocke l'URL toute faite sous ``'URL in DOAJ'`` ; la phase
+    d'enrichissement API stocke seulement ``'DOAJ id'``. On privilégie
+    l'URL CSV (cas massif) et on reconstruit depuis l'id sinon. ``None`` si
+    ni l'un ni l'autre n'est disponible.
+    """
+    return payload_url or build_doaj_toc_url(doaj_id)
 
 
 # ── Mapping API → format CSV ────────────────────────────────────────
