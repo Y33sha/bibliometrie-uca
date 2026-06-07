@@ -760,26 +760,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/laboratories/{lab_id}/persons": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Laboratory Persons
-         * @description Personnes et authorships orphelines liées à un labo.
-         */
-        get: operations["get_laboratory_persons_api_laboratories__lab_id__persons_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/laboratories/{lab_id}/addresses": {
         parameters: {
             query?: never;
@@ -1002,6 +982,9 @@ export interface paths {
         /**
          * Persons Directory
          * @description Annuaire public des personnes UCA avec ORCID et idHAL.
+         *
+         *     `lab_id` (optionnel) scope l'annuaire aux personnes du laboratoire — sert
+         *     l'onglet personnes de la fiche labo (un seul endpoint par entité).
          */
         get: operations["persons_directory_api_persons_directory_get"];
         put?: never;
@@ -1061,7 +1044,7 @@ export interface paths {
         };
         /**
          * Persons Facets
-         * @description Facettes dynamiques pour la page personnes.
+         * @description Facettes dynamiques pour la page personnes (scopables à un labo via `lab_id`).
          */
         get: operations["persons_facets_api_persons_facets_get"];
         put?: never;
@@ -3621,43 +3604,6 @@ export interface components {
             count: number;
         };
         /**
-         * LabPersonOut
-         * @description Personne liée à un labo (onglet `persons`).
-         */
-        LabPersonOut: {
-            /** Id */
-            id: number;
-            /** Last Name */
-            last_name: string;
-            /** First Name */
-            first_name: string;
-            /** Role Title */
-            role_title: string | null;
-            /** Department Name */
-            department_name: string | null;
-            /** Has Rh */
-            has_rh: boolean;
-            /** Pub Count */
-            pub_count: number;
-            /** Orcids */
-            orcids: components["schemas"]["ValueConfirmedOut"][] | null;
-            /** Idhals */
-            idhals: components["schemas"]["ValueConfirmedOut"][] | null;
-            /** Idrefs */
-            idrefs: components["schemas"]["ValueConfirmedOut"][] | null;
-        };
-        /** LabPersonsFacets */
-        LabPersonsFacets: {
-            /** Departments */
-            departments: components["schemas"]["FacetValueCount"][];
-            /** Roles */
-            roles: components["schemas"]["FacetValueCount"][];
-            rh: components["schemas"]["YesNoCount"];
-            orcid: components["schemas"]["YesNoCount"];
-            idhal: components["schemas"]["YesNoCount"];
-            idref: components["schemas"]["YesNoCount"];
-        };
-        /**
          * LabRelatedStructure
          * @description Structure voisine (tutelle, sous-labo) dans le détail d'un labo.
          *
@@ -3821,20 +3767,6 @@ export interface components {
             hal_collection: string | null;
             /** Tutelles */
             tutelles: components["schemas"]["LabTutelle"][] | null;
-        };
-        /** LaboratoryPersonsResponse */
-        LaboratoryPersonsResponse: {
-            /** Total Persons */
-            total_persons: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Pages */
-            pages: number;
-            /** Persons */
-            persons: components["schemas"]["LabPersonOut"][];
-            facets: components["schemas"]["LabPersonsFacets"];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -6874,48 +6806,6 @@ export interface operations {
             };
         };
     };
-    get_laboratory_persons_api_laboratories__lab_id__persons_get: {
-        parameters: {
-            query?: {
-                page?: number;
-                per_page?: number;
-                sort?: string;
-                search?: string;
-                department?: string;
-                role?: string;
-                has_rh?: string;
-                has_orcid?: string;
-                has_idhal?: string;
-                has_idref?: string;
-            };
-            header?: never;
-            path: {
-                lab_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LaboratoryPersonsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_laboratory_addresses_api_laboratories__lab_id__addresses_get: {
         parameters: {
             query?: {
@@ -7382,6 +7272,7 @@ export interface operations {
                 has_idhal?: string;
                 has_idref?: string;
                 has_rh?: string;
+                lab_id?: number | null;
                 sort?: string;
             };
             header?: never;
@@ -7491,6 +7382,7 @@ export interface operations {
                 has_idhal?: string;
                 has_idref?: string;
                 has_rh?: string;
+                lab_id?: number | null;
             };
             header?: never;
             path?: never;
