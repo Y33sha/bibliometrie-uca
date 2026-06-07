@@ -6,6 +6,7 @@
   import { esc, deriveStructDetectionStatus } from "$lib/utils";
   import { structDetectionClasses, structDetectionLabels } from "$lib/labels";
   import Pagination from "$lib/components/Pagination.svelte";
+  import { confirmDialog, toast } from '$lib/dialogs.svelte';
 
   // ---------- Types ----------
 
@@ -173,13 +174,13 @@
   // ---------- Form actions (FP) ----------
 
   async function deleteForm(formId: number) {
-    if (!confirm("Supprimer cette forme de nom ? Cela affectera la détection après relance.")) return;
+    if (!(await confirmDialog({ message: "Supprimer cette forme de nom ? Cela affectera la détection après relance.", danger: true }))) return;
     try {
       await nameForms.remove(formId);
       loadTable();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      alert("Erreur : " + msg);
+      toast("Erreur : " + msg, 'error');
     }
   }
 
@@ -213,7 +214,7 @@
       loadTable();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      alert("Erreur : " + msg);
+      toast("Erreur : " + msg, 'error');
     }
   }
 

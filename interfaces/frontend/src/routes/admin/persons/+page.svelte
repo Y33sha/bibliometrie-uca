@@ -3,6 +3,7 @@
   import { base } from "$app/paths";
   import { replaceState } from "$app/navigation";
   import { api, ApiError, orphanAuthorships, persons as personsApi } from "$lib/api";
+  import { toast } from "$lib/dialogs.svelte";
   import { useDebouncedSearch } from "$lib/composables/useDebouncedSearch.svelte";
   import { titleCase } from "$lib/utils";
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
@@ -276,7 +277,7 @@
     } catch (e) {
       const status = e instanceof ApiError ? e.status : "?";
       const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
-      alert(detail || `Erreur ${status}`);
+      toast(detail || `Erreur ${status}`, "error");
       return;
     }
     editNameModal = null;

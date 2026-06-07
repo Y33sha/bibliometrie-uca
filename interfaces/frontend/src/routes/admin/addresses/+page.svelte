@@ -5,6 +5,7 @@
 	import { replaceState } from '$app/navigation';
 	import { addresses as addressesApi, api, ApiError } from '$lib/api';
 	import { esc, sanitizeTitle } from '$lib/utils';
+	import { toast } from '$lib/dialogs.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 
 	// ---- Type definitions ----
@@ -284,11 +285,11 @@
 		} catch (e: unknown) {
 			if (e instanceof ApiError) {
 				const detail = (e.detail as { detail?: string })?.detail;
-				alert(`Erreur ${e.status} : ${detail || 'inconnue'}`);
+				toast(`Erreur ${e.status} : ${detail || 'inconnue'}`, 'error');
 				return;
 			}
 			const msg = e instanceof Error ? e.message : String(e);
-			alert('Erreur réseau : ' + msg);
+			toast('Erreur réseau : ' + msg, 'error');
 		}
 	}
 

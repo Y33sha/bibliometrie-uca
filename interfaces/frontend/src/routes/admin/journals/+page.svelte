@@ -3,6 +3,7 @@
 	import { api, ApiError, journals as journalsApi } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import JournalsListView from '$lib/components/JournalsListView.svelte';
+	import { confirmDialog, toast } from '$lib/dialogs.svelte';
 	import type { components } from '$lib/api/schema';
 
 	type Journal = components['schemas']['JournalOut'];
@@ -63,11 +64,11 @@
 				if (impact.count > 0) {
 					const plural = impact.count > 1 ? 's' : '';
 					const msg = `Ce changement entraînera un recalcul de la métadonnée « type de document » sur ${impact.count} publication${plural}. Continuer ?`;
-					if (!confirm(msg)) return;
+					if (!(await confirmDialog({ message: msg }))) return;
 				}
 			} catch (e: any) {
 				const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-				alert('Erreur lors du calcul d\'impact : ' + msg);
+				toast('Erreur lors du calcul d\'impact : ' + msg, 'error');
 				return;
 			}
 		}
@@ -90,7 +91,7 @@
 			reload();
 		} catch (e: any) {
 			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			alert('Erreur : ' + msg);
+			toast('Erreur : ' + msg, 'error');
 		}
 	}
 
@@ -118,11 +119,11 @@
 			if (impact.count > 0) {
 				const plural = impact.count > 1 ? 's' : '';
 				const msg = `Cette fusion entraînera un recalcul de la métadonnée « type de document » sur ${impact.count} publication${plural} du journal absorbé. Continuer ?`;
-				if (!confirm(msg)) return;
+				if (!(await confirmDialog({ message: msg, danger: true }))) return;
 			}
 		} catch (e: any) {
 			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			alert('Erreur lors du calcul d\'impact : ' + msg);
+			toast('Erreur lors du calcul d\'impact : ' + msg, 'error');
 			return;
 		}
 		try {
@@ -132,10 +133,10 @@
 		} catch (e: any) {
 			if (e instanceof ApiError) {
 				const detail = (e.detail as { detail?: string })?.detail;
-				alert(detail || `Erreur ${e.status}: ${JSON.stringify(e.detail)}`);
+				toast(detail || `Erreur ${e.status}: ${JSON.stringify(e.detail)}`, 'error');
 				return;
 			}
-			alert('Erreur réseau : ' + e.message);
+			toast('Erreur réseau : ' + e.message, 'error');
 		}
 	}
 

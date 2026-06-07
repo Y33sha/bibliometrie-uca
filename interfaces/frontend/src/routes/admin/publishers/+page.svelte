@@ -4,6 +4,7 @@
 	import { api, ApiError, publishers as publishersApi } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import PublishersListView from '$lib/components/PublishersListView.svelte';
+	import { toast } from '$lib/dialogs.svelte';
 
 	import type { components } from '$lib/api/schema';
 	type Publisher = components['schemas']['PublisherListItem'];
@@ -49,7 +50,7 @@
 			reload();
 		} catch (e: any) {
 			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			alert('Erreur : ' + msg);
+			toast('Erreur : ' + msg, 'error');
 		}
 	}
 
@@ -103,10 +104,10 @@
 					blockingDetail = body.detail ?? '';
 					return;
 				}
-				alert(body?.detail || `HTTP ${e.status}`);
+				toast(body?.detail || `HTTP ${e.status}`, 'error');
 				return;
 			}
-			alert('Erreur réseau : ' + e.message);
+			toast('Erreur réseau : ' + e.message, 'error');
 		}
 	}
 
