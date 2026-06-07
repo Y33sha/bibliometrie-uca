@@ -403,6 +403,26 @@ def person_has_rh_clause(value: str) -> WhereClause | None:
     return None
 
 
+def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
+    """Filtre : la personne (alias `p`) a un authorship rôle author rattaché au labo.
+
+    Sert à scoper l'annuaire/les facettes personnes à un laboratoire — même
+    sémantique que le scope publications `lab_clause`, transposée sur `person_id`.
+    """
+    if not lab_id:
+        return None
+    return WhereClause(
+        """EXISTS (
+            SELECT 1 FROM authorships a
+            JOIN authorship_structures aus ON aus.authorship_id = a.id
+            WHERE a.person_id = p.id
+              AND aus.structure_id = :flt_person_lab_id
+              AND a.roles && ARRAY['author']::text[]
+        )""",
+        {"flt_person_lab_id": lab_id},
+    )
+
+
 def persons_sort_clause(sort: str) -> str:
     """Return an ORDER BY clause for the persons query."""
     SORT_MAP = {

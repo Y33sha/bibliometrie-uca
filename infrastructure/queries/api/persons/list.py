@@ -11,6 +11,7 @@ from infrastructure.queries.filters import (
     assemble_where,
     person_has_identifier_clause,
     person_has_rh_clause,
+    person_in_lab_clause,
     persons_sort_clause,
 )
 
@@ -46,9 +47,19 @@ def persons_directory(
     clauses.append(person_has_identifier_clause("idhal", filters.has_idhal))
     clauses.append(person_has_identifier_clause("idref", filters.has_idref))
     clauses.append(person_has_rh_clause(filters.has_rh))
+    clauses.append(person_in_lab_clause(filters.lab_id))
 
     where_sql, binds = assemble_where(clauses)
     order = persons_sort_clause(sort)
+
+    # En contexte labo, `pub_count` est scopé aux publications du labo (cohérent
+    # avec le filtre `lab_id`) ; sinon c'est le total global de la personne.
+    pub_count_lab_filter = (
+        " AND EXISTS (SELECT 1 FROM authorship_structures aus "
+        "WHERE aus.authorship_id = a.id AND aus.structure_id = :flt_person_lab_id)"
+        if filters.lab_id
+        else ""
+    )
 
     count_row = conn.execute(
         text(
@@ -68,6 +79,7 @@ def persons_directory(
                 (SELECT COUNT(DISTINCT a.publication_id)
                  FROM authorships a
                  WHERE a.person_id = p.id AND a.roles && ARRAY['author']::text[]
+                 {pub_count_lab_filter}
                 ) AS pub_count,
                 (SELECT json_agg(json_build_object('value', pi.id_value, 'confirmed', (pi.status = 'confirmed')))
                  FROM person_identifiers pi

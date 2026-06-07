@@ -43,10 +43,15 @@ def persons_directory(
     has_idhal: str = Query(""),
     has_idref: str = Query(""),
     has_rh: str = Query(""),
+    lab_id: int | None = Query(None),
     sort: str = Query("name"),
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> PersonDirectoryResponse:
-    """Annuaire public des personnes UCA avec ORCID et idHAL."""
+    """Annuaire public des personnes UCA avec ORCID et idHAL.
+
+    `lab_id` (optionnel) scope l'annuaire aux personnes du laboratoire — sert
+    l'onglet personnes de la fiche labo (un seul endpoint par entité).
+    """
     filters = DirectoryFilters(
         search=search,
         departments=parse_str_csv(department),
@@ -55,6 +60,7 @@ def persons_directory(
         has_idhal=has_idhal,
         has_idref=has_idref,
         has_rh=has_rh,
+        lab_id=lab_id,
     )
     return queries.persons_directory(filters=filters, page=page, per_page=per_page, sort=sort)
 
@@ -104,9 +110,10 @@ def persons_facets(
     has_idhal: str = Query(""),
     has_idref: str = Query(""),
     has_rh: str = Query(""),
+    lab_id: int | None = Query(None),
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> PersonsFacetsResponse:
-    """Facettes dynamiques pour la page personnes."""
+    """Facettes dynamiques pour la page personnes (scopables à un labo via `lab_id`)."""
     filters = FacetFilters(
         departments=parse_str_csv(department),
         roles=parse_str_csv(role),
@@ -114,6 +121,7 @@ def persons_facets(
         has_idhal=has_idhal,
         has_idref=has_idref,
         has_rh=has_rh,
+        lab_id=lab_id,
     )
     return queries.persons_facets(filters=filters)
 

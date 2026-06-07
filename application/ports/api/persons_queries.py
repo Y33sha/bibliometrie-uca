@@ -36,6 +36,8 @@ class DirectoryFilters:
     has_idhal: str = ""
     has_idref: str = ""
     has_rh: str = ""
+    # Scope facultatif à un laboratoire (onglet personnes de la fiche labo).
+    lab_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +59,8 @@ class FacetFilters:
     has_idhal: str = ""
     has_idref: str = ""
     has_rh: str = ""
+    # Scope facultatif à un laboratoire (onglet personnes de la fiche labo).
+    lab_id: int | None = None
 
 
 # ---------------------------------------------------------------------------
