@@ -5,22 +5,26 @@
 ### En cours
 
 - [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
-- [Stratégie de tests : dé-fictionnaliser, factoriser, parcimonie](CODE_strategie-tests.md) — Problèmes 2 (mocks) et 3 (parcimonie) clôturés ; reste la dé-fictionnalisation du helper (problème 1 + périmètre tests pipeline)
 
 ### En pause
 
 - [Matching cross-source des authorships](METIER_authorships-cross-source-matching.md)
-- [Observabilité et robustesse du pipeline](CODE_observabilite-robustesse-pipeline.md)
+- [Observabilité du pipeline](CODE_observabilite-pipeline.md)
 - [DOI Registration Agencies & DataCite](METIER_doi-ra-datacite.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 
 ### Non commencé
 
-- [Background jobs pour les endpoints longs](CODE_background-jobs.md)
 - [Relations entre publications](METIER_relations-publications.md)
+- [Embargo HAL : statut OA intermédiaire « sous embargo »](METIER_embargo-oa-status.md)
+- [Peaufinage UI (cohérence, responsivité, ergonomie)](CODE_peaufinage-ui.md)
 
 ## Chantiers archivés
 
+- 2026-06-07 — [Barres à facettes homogènes + extraction des ListView (thèses, personnes) + alignement endpoint personnes](archived/2026-06-07_CODE_listviews-facettes-homogenes.md)
+- 2026-06-07 — [Filtres composables pour le repérage des adresses (admin)](CODE_filtres-adresses-composables.md)
+- 2026-06-06 — [Background jobs pour les endpoints longs : matview pipeline-only, garde-fou batch_set_country, propagation des reviews en tâche de fond](archived/2026-06-06_CODE_background-jobs.md)
+- 2026-06-05 — [Stratégie de tests : dé-fictionnaliser, factoriser, parcimonie](CODE_strategie-tests.md)
 - 2026-06-04 — [Matérialiser le périmètre (`perimeter_structures`) — audit `in_perimeter` : conservé](archived/2026-06-04_DATA_perimeter-materialise.md)
 - 2026-06-04 — [Rejet durable d'une paire (publication, personne) : garde matching, détachement, réassignation](archived/2026-06-04_METIER_detachement-rejet-durable.md)
 - 2026-06-03 — [Données dérivées : audit + cadre de décision (matérialisation vs vue)](DATA_donnees-derivees.md)

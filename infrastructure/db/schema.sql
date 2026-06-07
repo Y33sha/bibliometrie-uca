@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict HCBk7UpPmXRZApTPQtEgOIRnXdte9ssT0Gu3ZG35p6ryXgGrErFS8twGXuq8nie
+\restrict 4tbwzndoH1rXB6ngcpuZVBLHm9Tmj5HZU4bMAwlqyLE9SQlprK9kefzkSNUVOTB
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -189,6 +189,11 @@ BEGIN
     IF s IS NULL THEN
         RETURN NULL;
     END IF;
+
+    -- Retrait des balises MathML/HTML (<i>, <sub>, <mml:*> …) en entier.
+    -- Premier caractère = lettre ou '/' : préserve les indices de Miller
+    -- <111>/<110> (cristallographie), qui sont du contenu, pas du markup.
+    s := regexp_replace(s, '</?[A-Za-z][^>]*>', ' ', 'g');
 
     s := replace(s, E'¼', '14');
     s := replace(s, E'½', '12');
@@ -2504,6 +2509,20 @@ CREATE INDEX idx_source_pubs_hal_collections ON public.source_publications USING
 
 
 --
+-- Name: idx_source_pubs_hal_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_hal_id ON public.source_publications USING btree (((external_ids ->> 'hal_id'::text))) WHERE ((external_ids ->> 'hal_id'::text) IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_nnt; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_nnt ON public.source_publications USING btree (((external_ids ->> 'nnt'::text))) WHERE ((external_ids ->> 'nnt'::text) IS NOT NULL);
+
+
+--
 -- Name: idx_source_pubs_pub; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2968,5 +2987,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HCBk7UpPmXRZApTPQtEgOIRnXdte9ssT0Gu3ZG35p6ryXgGrErFS8twGXuq8nie
+\unrestrict 4tbwzndoH1rXB6ngcpuZVBLHm9Tmj5HZU4bMAwlqyLE9SQlprK9kefzkSNUVOTB
 

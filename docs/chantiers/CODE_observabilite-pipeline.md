@@ -1,4 +1,4 @@
-# Chantier — Observabilité et robustesse du pipeline
+# Chantier — Observabilité du pipeline
 
 Commencé le 2026-05-16
 
