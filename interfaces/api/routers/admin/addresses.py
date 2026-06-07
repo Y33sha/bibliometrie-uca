@@ -89,14 +89,10 @@ def list_addresses(
     validation: str = Query("pending"),
     text: list[str] = Query(default=[]),
     struct: list[str] = Query(default=[]),
-    search: str = Query(""),  # legacy (transition phase 1→2) → un prédicat texte
-    search_mode: str = Query("contains"),
     queries: AddressesQueries = Depends(addresses_queries_sync),
 ) -> AddressListResponse:
     """Liste les adresses pour une structure, avec prédicats texte/structure composables."""
     text_predicates = _parse_text_predicates(text)
-    if search:
-        text_predicates = (TextPredicate(mode=search_mode, term=search), *text_predicates)
     structure_predicates = _parse_structure_predicates(struct)
 
     # Garde-fou : mode "non détecté"/"tous" sans aucun prédicat de réduction → trop large.

@@ -136,20 +136,12 @@ class TestListAddresses:
         r = client.get("/api/addresses", params={"structure_id": 1})
         assert r.status_code == 200
 
-    def test_with_search(self, client):
-        r = client.get("/api/addresses", params={"search": "Clermont"})
-        assert r.status_code == 200
-
     def test_validation_confirmed(self, client):
         r = client.get("/api/addresses", params={"validation": "confirmed"})
         assert r.status_code == 200
 
     def test_validation_rejected(self, client):
         r = client.get("/api/addresses", params={"validation": "rejected"})
-        assert r.status_code == 200
-
-    def test_search_not_contains(self, client):
-        r = client.get("/api/addresses", params={"search": "X", "search_mode": "not_contains"})
         assert r.status_code == 200
 
     def test_text_predicates_repeated(self, client):
