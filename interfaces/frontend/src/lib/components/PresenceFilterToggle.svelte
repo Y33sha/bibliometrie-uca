@@ -168,7 +168,7 @@
 	}
 	.facet-btn.has-selection {
 		border-color: var(--accent);
-		background: #e8f0f8;
+		background: var(--accent-light);
 	}
 	.facet-badge {
 		display: inline-flex;
@@ -231,12 +231,12 @@
 		flex-shrink: 0;
 	}
 	.state-icon.state-yes {
-		background: #e6f4ec;
+		background: var(--success-light);
 		color: #2a7d4f;
 	}
 	.state-icon.state-no {
 		background: #fde8e8;
-		color: #c0392b;
+		color: var(--danger);
 	}
 	.item-label {
 		flex: 1;

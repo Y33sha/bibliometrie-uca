@@ -298,9 +298,9 @@
 	.mode-btn:first-child { border-radius: 4px 0 0 4px; }
 	.mode-btn:last-child { border-radius: 0 4px 4px 0; border-left: none; }
 	.mode-btn.active {
-		background: var(--accent, #3b6b9e);
+		background: var(--accent);
 		color: white;
-		border-color: var(--accent, #3b6b9e);
+		border-color: var(--accent);
 		font-weight: 600;
 	}
 
@@ -314,7 +314,7 @@
 	.conflict-pubs h4 {
 		font-size: 0.9rem;
 		margin: 0 0 6px;
-		color: #b8733e;
+		color: var(--bronze);
 	}
 	.conflict-pub-item {
 		display: flex;
@@ -385,7 +385,7 @@
 		font-size: 0.75rem;
 		font-weight: 600;
 		background: #e8eef4;
-		color: #3b6b9e;
+		color: var(--accent);
 	}
 	.pub-col:first-child { border-right: 1px solid var(--border, #e0e0e0); }
 
@@ -470,7 +470,7 @@
 	}
 	.badge-hal { background: #28a745; }
 	.badge-oa { background: #fd7e14; }
-	.badge-wos { background: #3b6b9e; }
+	.badge-wos { background: var(--accent); }
 	.badge-scanr { background: #6f42c1; }
 	.badge-theses { background: #17a2b8; }
 	.badge-crossref { background: #b8860b; }

@@ -198,7 +198,7 @@
     border-radius: 3px;
     font-size: 0.8rem;
     font-weight: 600;
-    color: #c0392b;
+    color: var(--danger);
   }
 
   .pub-doi {
@@ -238,15 +238,15 @@
     font-weight: 500;
   }
   .source-hal-link {
-    background: #e8f0f8;
-    color: #3b6b9e;
+    background: var(--accent-light);
+    color: var(--accent);
   }
   .source-hal-link:hover {
     background: #d0e3f4;
   }
   .source-oa-link {
     background: #fef3e0;
-    color: #b8733e;
+    color: var(--bronze);
   }
   .source-oa-link:hover {
     background: #fde8c8;

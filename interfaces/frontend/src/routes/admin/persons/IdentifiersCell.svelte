@@ -171,7 +171,7 @@
     font-family: inherit;
   }
   .btn-reject:hover {
-    color: #c0392b;
+    color: var(--danger);
   }
   .btn-add-id {
     padding: 2px 8px;

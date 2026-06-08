@@ -79,7 +79,7 @@
 	}
 	.login-error {
 		background: #fde8e8;
-		color: #c0392b;
+		color: var(--danger);
 		padding: 8px 12px;
 		border-radius: 4px;
 		font-size: 0.95rem;

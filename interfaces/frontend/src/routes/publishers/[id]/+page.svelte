@@ -286,7 +286,7 @@
 		margin-right: 8px;
 	}
 	.badge-predatory {
-		font-size: 0.7rem; padding: 2px 6px; background: #c0392b;
+		font-size: 0.7rem; padding: 2px 6px; background: var(--danger);
 		color: white; border-radius: 8px; margin-left: 8px;
 		vertical-align: middle; font-weight: 600; letter-spacing: 0.3px;
 	}

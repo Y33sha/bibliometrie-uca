@@ -151,7 +151,7 @@
 
 <style>
   .back {
-    color: var(--muted, #6b7280);
+    color: var(--muted);
     text-decoration: none;
     font-size: 0.9rem;
     margin-bottom: 8px;
@@ -198,11 +198,11 @@
     opacity: 0.6;
   }
   .empty {
-    color: var(--muted, #6b7280);
+    color: var(--muted);
     font-style: italic;
   }
   .loading {
-    color: var(--muted, #6b7280);
+    color: var(--muted);
   }
   .error {
     color: var(--danger, #dc2626);

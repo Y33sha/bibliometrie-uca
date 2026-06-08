@@ -151,7 +151,7 @@
   .struct-tag {
     display: inline-block;
     padding: 1px 6px;
-    background: #e8f0f8;
+    background: var(--accent-light);
     border-radius: 3px;
     font-size: 0.8rem;
     color: var(--accent);

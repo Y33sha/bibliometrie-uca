@@ -366,7 +366,7 @@
 		padding: 10px 14px; font-size: 0.85rem; color: #6d4c00; margin-bottom: 14px;
 	}
 	.toolbar input { width: 300px; }
-	.tag-source { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; background: #e8f0f8; color: #3b6b9e; }
+	.tag-source { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; background: var(--accent-light); color: var(--accent); }
 	.pub-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
 	.pub-link:hover { text-decoration: underline; }
 	:global(.data-table) { overflow: visible; }

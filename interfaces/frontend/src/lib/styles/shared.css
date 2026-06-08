@@ -351,7 +351,7 @@ th.sorted .sort-arrow {
 .id-badge {
 	display: inline-block;
 	padding: 2px 7px;
-	background: #e8f0f8;
+	background: var(--accent-light);
 	border-radius: 3px;
 	font-size: 0.8rem;
 	color: var(--accent);
@@ -366,7 +366,7 @@ th.sorted .sort-arrow {
 }
 
 .id-badge.id-confirmed {
-	background: #e6f4ec;
+	background: var(--success-light);
 	color: #2a7d4f;
 }
 
@@ -408,7 +408,7 @@ th.sorted .sort-arrow {
 }
 
 .id-hal {
-	background: #e8f0f8;
+	background: var(--accent-light);
 }
 
 .id-hal:hover {
@@ -457,7 +457,7 @@ th.sorted .sort-arrow {
 }
 
 .source-hal {
-	background: #e8f0f8;
+	background: var(--accent-light);
 }
 
 .source-hal:hover {
@@ -531,13 +531,13 @@ th.sorted .sort-arrow {
 }
 
 .source-hal-label {
-	background: #e8f0f8;
-	color: #3b6b9e;
+	background: var(--accent-light);
+	color: var(--accent);
 }
 
 .source-oa-label {
 	background: #fef3e0;
-	color: #b8733e;
+	color: var(--bronze);
 }
 
 .source-wos-label {
@@ -556,7 +556,7 @@ th.sorted .sort-arrow {
 	font-size: 0.8rem;
 	padding: 1px 7px;
 	border-radius: 10px;
-	background: #e8f0f8;
+	background: var(--accent-light);
 	color: var(--accent);
 	font-weight: 500;
 	text-decoration: none;
@@ -590,7 +590,7 @@ th.sorted .sort-arrow {
 }
 
 .type-badge {
-	background: #e8f0f8;
+	background: var(--accent-light);
 	color: var(--accent);
 }
 
@@ -654,13 +654,13 @@ th.sorted .sort-arrow {
 }
 
 .oa-green {
-	background: #e6f4ec;
+	background: var(--success-light);
 	color: #2a7d4f;
 }
 
 .oa-bronze {
 	background: #fdf0e6;
-	color: #b8733e;
+	color: var(--bronze);
 }
 
 .oa-closed {

@@ -279,7 +279,7 @@
 	.badge-pred {
 		font-size: 0.7rem;
 		padding: 1px 5px;
-		background: #c0392b;
+		background: var(--danger);
 		color: white;
 		border-radius: 8px;
 		margin-left: 6px;

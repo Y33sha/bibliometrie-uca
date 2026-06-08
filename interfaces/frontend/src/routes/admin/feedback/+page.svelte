@@ -584,7 +584,7 @@
     margin: 1px 2px;
   }
   .struct-confirmed {
-    background: #e6f4ec;
+    background: var(--success-light);
     color: #2a7d4f;
   }
   .struct-detected {
@@ -592,7 +592,7 @@
     color: #8a6d10;
   }
   .struct-manual {
-    background: #e8f0f8;
+    background: var(--accent-light);
     color: #2c5e8a;
     border: 1px dashed #a0c0e0;
   }
