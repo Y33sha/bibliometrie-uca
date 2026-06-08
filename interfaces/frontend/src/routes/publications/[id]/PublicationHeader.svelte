@@ -194,7 +194,7 @@
   .predatory-badge {
     display: inline-block;
     padding: 2px 8px;
-    background: #fde8e8;
+    background: var(--danger-light);
     border-radius: 3px;
     font-size: 0.8rem;
     font-weight: 600;

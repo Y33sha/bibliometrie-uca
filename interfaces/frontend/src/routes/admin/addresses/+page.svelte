@@ -703,7 +703,6 @@
 <style>
 	/* Local CSS variables for status colors */
 	.page-addresses {
-		--danger: #c44;
 		--warning: #c68a19;
 		--warning-light: #fef5e0;
 		--highlight: #fff3b0;

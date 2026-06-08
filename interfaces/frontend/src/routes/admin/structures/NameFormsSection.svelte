@@ -360,7 +360,7 @@
     font-family: inherit;
   }
   .ctx-remove:hover {
-    color: #e74c3c;
+    color: var(--danger);
   }
   .sufficient-label {
     color: var(--success);
@@ -385,8 +385,8 @@
     border-color: var(--accent);
   }
   .btn-icon-danger:hover {
-    color: var(--danger, #d32f2f);
-    border-color: var(--danger, #d32f2f);
+    color: var(--danger);
+    border-color: var(--danger);
   }
   .btn-add-tiny {
     display: inline-flex;

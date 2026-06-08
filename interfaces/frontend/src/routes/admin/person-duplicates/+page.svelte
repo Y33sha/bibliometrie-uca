@@ -438,7 +438,7 @@
 		padding: 2px 6px;
 	}
 	.id-confirmed .ident-value { background: #d4edda; }
-	.id-rejected .ident-value { background: #f8d7da; text-decoration: line-through; opacity: 0.6; }
+	.id-rejected .ident-value { background: var(--danger-light); text-decoration: line-through; opacity: 0.6; }
 	.id-pending .ident-value { background: #e3f2fd; }
 
 	h4 {
@@ -505,7 +505,7 @@
 		text-align: center; color: var(--muted, #666); padding: 40px;
 	}
 	.error {
-		color: #dc3545; padding: 8px 12px;
-		background: #f8d7da; border-radius: 4px; margin-bottom: 12px;
+		color: var(--danger); padding: 8px 12px;
+		background: var(--danger-light); border-radius: 4px; margin-bottom: 12px;
 	}
 </style>
