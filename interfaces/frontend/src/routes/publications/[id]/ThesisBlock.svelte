@@ -131,14 +131,14 @@
   .thesis-dl dt,
   .thesis-dl dd {
     padding: 7px 12px;
-    border-bottom: 1px solid #f0efec;
+    border-bottom: 1px solid var(--border-subtle);
     margin: 0;
   }
   .thesis-dl dt {
     font-weight: 600;
     color: var(--muted);
     white-space: nowrap;
-    background: #fafaf8;
+    background: var(--surface-hover);
     font-size: 0.85rem;
   }
   .thesis-dl a {

@@ -111,7 +111,7 @@
 		overflow: hidden;
 	}
 	thead th {
-		background: #f5f4f1;
+		background: var(--surface);
 		padding: 9px 12px;
 		text-align: left;
 		font-size: 0.85rem;
@@ -125,9 +125,9 @@
 	thead th.sortable { cursor: pointer; user-select: none; }
 	thead th.sortable:hover { color: var(--accent); }
 	thead th.sortable.active { color: var(--accent); }
-	tbody tr { border-bottom: 1px solid #f0efec; }
+	tbody tr { border-bottom: 1px solid var(--border-subtle); }
 	tbody tr:last-child { border-bottom: none; }
-	tbody tr:hover { background: #fafaf8; }
+	tbody tr:hover { background: var(--surface-hover); }
 	td { padding: 10px 12px; font-size: 0.95rem; vertical-align: middle; }
 	.no-results { text-align: center; padding: 24px; color: var(--muted); }
 	.person-link { color: var(--accent); text-decoration: none; font-weight: 500; }

@@ -521,7 +521,7 @@
 		text-transform: uppercase; letter-spacing: 0.3px;
 	}
 	.tutelle-tag { background: var(--accent-light); color: var(--accent); }
-	.partner-tag { background: #f0efec; color: var(--muted); }
+	.partner-tag { background: var(--border-subtle); color: var(--muted); }
 	.id-badge { margin-right: 8px; }
 
 	/* Toolbar */
@@ -552,7 +552,7 @@
 		   restent visuellement corrects grâce à border-collapse. */
 	}
 	.tab-content thead th {
-		background: #f5f4f1;
+		background: var(--surface);
 		padding: 8px 10px;
 		text-align: left;
 		font-size: 0.85rem;
@@ -564,9 +564,9 @@
 	.tab-content thead th.sortable { cursor: pointer; user-select: none; }
 	.tab-content thead th.sortable:hover { color: var(--accent); }
 	.tab-content thead th.sortable.active { color: var(--accent); }
-	.tab-content tbody tr { border-bottom: 1px solid #f0efec; }
+	.tab-content tbody tr { border-bottom: 1px solid var(--border-subtle); }
 	.tab-content tbody tr:last-child { border-bottom: none; }
-	.tab-content tbody tr:hover { background: #fafaf8; }
+	.tab-content tbody tr:hover { background: var(--surface-hover); }
 	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag) { color: var(--accent); text-decoration: none; }
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }
@@ -581,5 +581,5 @@
 		font-weight: 500;
 	}
 	.status-tag.confirmed { background: var(--success-light); color: var(--success); }
-	.status-tag.pending { background: #f0efec; color: var(--muted); }
+	.status-tag.pending { background: var(--border-subtle); color: var(--muted); }
 </style>

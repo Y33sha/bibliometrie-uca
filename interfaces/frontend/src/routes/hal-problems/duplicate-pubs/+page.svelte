@@ -211,12 +211,12 @@
 		overflow: hidden;
 	}
 	.pub-table thead th {
-		background: #f5f4f1; padding: 8px 12px; text-align: left;
+		background: var(--surface); padding: 8px 12px; text-align: left;
 		font-size: 0.85rem; font-weight: 600; color: var(--muted);
 		border-bottom: 2px solid var(--border);
 	}
-	.pub-table tbody tr { border-bottom: 1px solid #f0efec; }
-	.pub-table tbody tr:hover { background: #fafaf8; }
+	.pub-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
+	.pub-table tbody tr:hover { background: var(--surface-hover); }
 	.pub-table td { padding: 8px 12px; font-size: 0.9rem; vertical-align: top; }
 	.meta-table td { width: 50%; }
 

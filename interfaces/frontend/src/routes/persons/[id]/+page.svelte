@@ -504,7 +504,7 @@
 	.role-badge {
 		display: inline-block;
 		padding: 2px 8px;
-		background: #f0efec;
+		background: var(--border-subtle);
 		border-radius: 3px;
 		font-size: 0.85rem;
 		color: var(--muted);
@@ -518,7 +518,7 @@
 		border-radius: 6px;
 	}
 	.tab-content thead th {
-		background: #f5f4f1;
+		background: var(--surface);
 		padding: 8px 10px;
 		text-align: left;
 		font-size: 0.85rem;
@@ -527,9 +527,9 @@
 		border-bottom: 2px solid var(--border);
 		white-space: nowrap;
 	}
-	.tab-content tbody tr { border-bottom: 1px solid #f0efec; }
+	.tab-content tbody tr { border-bottom: 1px solid var(--border-subtle); }
 	.tab-content tbody tr:last-child { border-bottom: none; }
-	.tab-content tbody tr:hover { background: #fafaf8; }
+	.tab-content tbody tr:hover { background: var(--surface-hover); }
 	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: middle; }
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag) { color: var(--accent); text-decoration: none; }
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }

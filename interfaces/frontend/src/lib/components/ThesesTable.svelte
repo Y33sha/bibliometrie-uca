@@ -211,7 +211,7 @@
 		font-size: 0.8rem;
 		color: var(--muted);
 		text-transform: uppercase;
-		background: #f5f4f1;
+		background: var(--surface);
 		white-space: nowrap;
 	}
 	.theses-table td {
@@ -220,7 +220,7 @@
 		vertical-align: top;
 	}
 	.theses-table tbody tr:hover {
-		background: var(--hover, #fafaf8);
+		background: var(--surface-hover);
 	}
 	.theses-table td a:not(.lab-tag, .source-tag) {
 		color: var(--accent);

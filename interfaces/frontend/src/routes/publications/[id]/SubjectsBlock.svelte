@@ -75,7 +75,7 @@
   .tags-list li {
     display: inline-flex;
     align-items: center;
-    background: #f5f4f1;
+    background: var(--surface);
     padding: 4px 10px;
     border-radius: 12px;
     font-size: 0.9rem;

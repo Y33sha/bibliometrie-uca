@@ -300,7 +300,7 @@
   }
   .forms-table td {
     padding: 5px 8px;
-    border-bottom: 1px solid #f0efec;
+    border-bottom: 1px solid var(--border-subtle);
     vertical-align: middle;
   }
   .forms-table td:last-child {

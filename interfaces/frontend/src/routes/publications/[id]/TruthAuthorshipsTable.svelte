@@ -93,7 +93,7 @@
     overflow: hidden;
   }
   .auth-table :global(thead th) {
-    background: #f5f4f1;
+    background: var(--surface);
     padding: 8px 10px;
     text-align: left;
     font-size: 0.85rem;
@@ -103,13 +103,13 @@
     white-space: nowrap;
   }
   .auth-table tbody tr {
-    border-bottom: 1px solid #f0efec;
+    border-bottom: 1px solid var(--border-subtle);
   }
   .auth-table tbody tr:last-child {
     border-bottom: none;
   }
   .auth-table tbody tr:hover {
-    background: #fafaf8;
+    background: var(--surface-hover);
   }
   .auth-table td {
     padding: 6px 10px;

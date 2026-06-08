@@ -238,7 +238,7 @@
 		border-radius: 6px;
 	}
 	.publishers-table thead th {
-		background: #f5f4f1;
+		background: var(--surface);
 		padding: 8px 10px;
 		text-align: left;
 		font-size: 0.85rem;
@@ -250,9 +250,9 @@
 	.publishers-table thead th.num { text-align: right; }
 	.publishers-table thead th.sortable { cursor: pointer; user-select: none; }
 	.publishers-table thead th.sortable:hover { color: var(--accent); }
-	.publishers-table tbody tr { border-bottom: 1px solid #f0efec; }
+	.publishers-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
 	.publishers-table tbody tr:last-child { border-bottom: none; }
-	.publishers-table tbody tr:hover { background: #fafaf8; }
+	.publishers-table tbody tr:hover { background: var(--surface-hover); }
 	.publishers-table tbody tr.predatory td { background: #fff0f0; }
 	.publishers-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
 	.publishers-table td.num {
@@ -265,7 +265,7 @@
 
 	.prefixes { display: flex; flex-wrap: wrap; gap: 3px; }
 	.prefix-chip {
-		background: #f0efec;
+		background: var(--border-subtle);
 		color: var(--muted);
 		padding: 1px 6px;
 		border-radius: 8px;

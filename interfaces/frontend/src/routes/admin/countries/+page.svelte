@@ -337,12 +337,12 @@
 		background: var(--card); border: 1px solid var(--border); border-radius: 6px;
 	}
 	.addr-table thead th {
-		background: #f5f4f1; padding: 8px 10px; text-align: left;
+		background: var(--surface); padding: 8px 10px; text-align: left;
 		font-size: 0.85rem; font-weight: 600; color: var(--muted);
 		border-bottom: 2px solid var(--border);
 	}
-	.addr-table tbody tr { border-bottom: 1px solid #f0efec; }
-	.addr-table tbody tr:hover { background: #fafaf8; }
+	.addr-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
+	.addr-table tbody tr:hover { background: var(--surface-hover); }
 	.addr-table td { padding: 6px 10px; font-size: 0.9rem; vertical-align: middle; }
 	.addr-cell { word-break: break-word; }
 	.num-cell { text-align: center; color: var(--muted); font-size: 0.85rem; }

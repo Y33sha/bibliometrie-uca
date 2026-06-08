@@ -627,7 +627,7 @@
 		   restent visuellement corrects grâce à border-collapse). */
 	}
 	.pub-table th {
-		background: #f5f4f1;
+		background: var(--surface);
 		padding: 8px 10px;
 		text-align: left;
 		font-size: 0.85rem;
@@ -638,11 +638,11 @@
 	}
 	.pub-table td {
 		padding: 7px 10px;
-		border-bottom: 1px solid #f0efec;
+		border-bottom: 1px solid var(--border-subtle);
 		font-size: 0.95rem;
 		vertical-align: top;
 	}
-	.pub-table tr:hover td { background: #fafaf8; }
+	.pub-table tr:hover td { background: var(--surface-hover); }
 	.col-menu-th { position: relative; }
 
 	/* Statut HAL (lab) */

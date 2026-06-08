@@ -14,6 +14,10 @@
 	--warning-light: #fef8e8;
 	--accent-light: #e8f0f8;
 	--text-muted: #777;
+	/* Neutres clairs (surfaces) — valeurs dominantes consolidées. */
+	--surface: #f5f4f1;        /* fonds de panneaux, en-têtes de tableau */
+	--surface-hover: #fafaf8;  /* survol/zébrure des lignes */
+	--border-subtle: #f0efec;  /* séparateurs légers (border-bottom) */
 }
 
 /* ── Toolbar ── */
@@ -129,14 +133,14 @@
 	letter-spacing: 0.5px;
 	color: var(--muted);
 	border-bottom: 2px solid var(--border);
-	background: #fafaf8;
+	background: var(--surface-hover);
 	white-space: nowrap;
 }
 
 .data-table td {
 	padding: 7px 10px;
 	font-size: 0.95rem;
-	border-bottom: 1px solid #f0efec;
+	border-bottom: 1px solid var(--border-subtle);
 	vertical-align: top;
 }
 
@@ -145,7 +149,7 @@
 }
 
 .data-table tr:hover td {
-	background: #fafaf8;
+	background: var(--surface-hover);
 }
 
 .num {
@@ -297,7 +301,7 @@ th.sorted .sort-arrow {
 	flex: 1;
 	padding: 10px 16px;
 	border: none;
-	background: #f5f4f1;
+	background: var(--surface);
 	font-size: 0.95rem;
 	font-weight: 500;
 	color: var(--muted);
@@ -571,7 +575,7 @@ th.sorted .sort-arrow {
 .tutelle-tag {
 	display: inline-block;
 	padding: 2px 7px;
-	background: #f0efec;
+	background: var(--border-subtle);
 	border-radius: 3px;
 	font-size: 0.8rem;
 	color: var(--muted);
@@ -582,7 +586,7 @@ th.sorted .sort-arrow {
 .meta-badge {
 	display: inline-block;
 	padding: 2px 8px;
-	background: #f0efec;
+	background: var(--border-subtle);
 	border-radius: 3px;
 	font-size: 0.85rem;
 	color: var(--muted);

@@ -292,7 +292,7 @@
   .collection-tag {
     display: inline-block;
     padding: 1px 6px;
-    background: #f0efec;
+    background: var(--border-subtle);
     border-radius: 3px;
     font-size: 0.8rem;
     color: var(--muted);

@@ -173,7 +173,7 @@
 		overflow: hidden;
 	}
 	thead th {
-		background: #f5f4f1;
+		background: var(--surface);
 		padding: 9px 12px;
 		text-align: left;
 		font-size: 0.85rem;
@@ -190,13 +190,13 @@
 		color: var(--text);
 	}
 	tbody tr {
-		border-bottom: 1px solid #f0efec;
+		border-bottom: 1px solid var(--border-subtle);
 	}
 	tbody tr:last-child {
 		border-bottom: none;
 	}
 	tbody tr:hover {
-		background: #fafaf8;
+		background: var(--surface-hover);
 	}
 	td {
 		padding: 10px 12px;

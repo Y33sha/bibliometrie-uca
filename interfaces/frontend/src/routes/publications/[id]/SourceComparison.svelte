@@ -333,7 +333,7 @@
     font-size: 0.95rem;
     font-weight: 500;
     cursor: pointer;
-    background: #f5f4f1;
+    background: var(--surface);
     border-bottom: 1px solid var(--border);
     user-select: none;
   }
@@ -380,7 +380,7 @@
     border-collapse: collapse;
   }
   .source-grid :global(thead th) {
-    background: #f5f4f1;
+    background: var(--surface);
     padding: 6px 10px;
     text-align: left;
     font-size: 0.8rem;
@@ -390,7 +390,7 @@
     white-space: nowrap;
   }
   .source-grid tbody tr {
-    border-bottom: 1px solid #f0efec;
+    border-bottom: 1px solid var(--border-subtle);
   }
   .source-grid tbody tr:last-child {
     border-bottom: none;
@@ -468,7 +468,7 @@
     overflow: hidden;
   }
   .auth-table :global(thead th) {
-    background: #f5f4f1;
+    background: var(--surface);
     padding: 8px 10px;
     text-align: left;
     font-size: 0.85rem;
@@ -478,7 +478,7 @@
     white-space: nowrap;
   }
   .auth-table tbody tr {
-    border-bottom: 1px solid #f0efec;
+    border-bottom: 1px solid var(--border-subtle);
   }
   .auth-table td {
     padding: 6px 10px;

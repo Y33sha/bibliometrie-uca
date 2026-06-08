@@ -319,7 +319,7 @@
 	}
 	a.publisher-link:hover { text-decoration: underline; }
 	.type-tag {
-		background: #f0efec; color: var(--muted);
+		background: var(--border-subtle); color: var(--muted);
 		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
 	}
 	.badge-doaj {
@@ -353,7 +353,7 @@
 	.small { font-size: 0.8rem; font-weight: 400; }
 
 	.count-table { width: 100%; border-collapse: collapse; }
-	.count-table td { padding: 6px 8px; font-size: 0.95rem; border-bottom: 1px solid #f0efec; }
+	.count-table td { padding: 6px 8px; font-size: 0.95rem; border-bottom: 1px solid var(--border-subtle); }
 	.count-table tr:last-child td { border-bottom: none; }
 	.count-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 	.count-table tr.warning td { background: #fef3e0; color: #8a4a00; }
@@ -375,7 +375,7 @@
 	}
 	.subjects-list li {
 		display: inline-flex; align-items: center; gap: 6px;
-		background: #f5f4f1; padding: 4px 10px; border-radius: 12px;
+		background: var(--surface); padding: 4px 10px; border-radius: 12px;
 		font-size: 0.9rem;
 	}
 	.subjects-list a { color: var(--accent); text-decoration: none; }
@@ -397,7 +397,7 @@
 	}
 	.toggle-raw:hover { text-decoration: underline; }
 	.raw-payload {
-		background: #f5f4f1; padding: 12px; border-radius: 4px;
+		background: var(--surface); padding: 12px; border-radius: 4px;
 		font-size: 0.8rem; max-height: 400px; overflow: auto;
 		white-space: pre-wrap; word-break: break-word;
 	}
