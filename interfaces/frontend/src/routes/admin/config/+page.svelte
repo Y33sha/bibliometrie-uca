@@ -385,13 +385,10 @@
     maxWidth="460px"
     onclose={() => (perimModal = null)}
   >
-      <label>Code</label>
-      <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: uca_wide" />
-      <label>Nom</label>
-      <input bind:value={perimModal.name} placeholder="ex: UCA large" />
-      <label>Description</label>
-      <input bind:value={perimModal.description} />
-      <label>Structures racines</label>
+      <label>Code <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: uca_wide" /></label>
+      <label>Nom <input bind:value={perimModal.name} placeholder="ex: UCA large" /></label>
+      <label>Description <input bind:value={perimModal.description} /></label>
+      <label for="perim-struct-search">Structures racines</label>
       <div class="perimeter-rules" style="margin: 4px 0 8px;">
         {#each perimModal.structures as struct (struct.id)}
           <span class="tag">
@@ -400,7 +397,7 @@
           </span>
         {/each}
       </div>
-      <input type="text" placeholder="Rechercher une structure..." bind:value={perimModal.structSearch} oninput={perimSearchStructures} autocomplete="off" />
+      <input id="perim-struct-search" type="text" placeholder="Rechercher une structure..." bind:value={perimModal.structSearch} oninput={perimSearchStructures} autocomplete="off" />
       {#if perimModal.structResults.length > 0}
         <div class="perim-search-results">
           {#each perimModal.structResults.slice(0, 8) as s (s.id)}

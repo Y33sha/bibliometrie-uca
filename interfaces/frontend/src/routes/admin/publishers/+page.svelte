@@ -199,16 +199,13 @@
 
 {#if editModal}
 <Modal title="Modifier l'éditeur" maxWidth="460px" onclose={() => editModal = null} onsubmit={saveEdit}>
-		<label>Nom</label>
-		<input bind:value={editModal.name} />
-		<label>Pays</label>
-		<input bind:value={editModal.country} placeholder="ex: FR, US" />
-		<label>Type</label>
-		<select bind:value={editModal.publisher_type}>
+		<label>Nom <input bind:value={editModal.name} /></label>
+		<label>Pays <input bind:value={editModal.country} placeholder="ex: FR, US" /></label>
+		<label>Type <select bind:value={editModal.publisher_type}>
 			{#each publisherTypes as opt (opt.value)}
 				<option value={opt.value}>{opt.label_fr}</option>
 			{/each}
-		</select>
+		</select></label>
 		<label class="checkbox-row">
 			<input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur
 		</label>
