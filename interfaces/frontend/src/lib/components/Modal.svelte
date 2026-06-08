@@ -5,12 +5,15 @@
 	let {
 		title,
 		onclose,
+		onsubmit,
 		maxWidth,
 		children,
 		actions
 	}: {
 		title?: string;
 		onclose: () => void;
+		/** Action « valider » déclenchée par Entrée (hors textarea/bouton/select). */
+		onsubmit?: () => void;
 		/** Largeur max (sinon défaut `.modal-content`). */
 		maxWidth?: string;
 		children: Snippet;
@@ -28,6 +31,15 @@
 		if (e.key === 'Escape') {
 			e.preventDefault();
 			onclose();
+			return;
+		}
+		// Entrée valide, sauf si le focus est sur un champ multiligne ou un
+		// contrôle qui gère déjà Entrée (bouton, lien, select).
+		if (e.key === 'Enter' && onsubmit) {
+			const tag = (e.target as HTMLElement | null)?.tagName;
+			if (tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A' || tag === 'SELECT') return;
+			e.preventDefault();
+			onsubmit();
 		}
 	}
 </script>

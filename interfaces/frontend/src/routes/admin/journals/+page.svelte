@@ -3,6 +3,7 @@
 	import { api, ApiError, journals as journalsApi } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import JournalsListView from '$lib/components/JournalsListView.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 	import { confirmDialog, toast } from '$lib/dialogs.svelte';
 	import type { components } from '$lib/api/schema';
 
@@ -181,11 +182,7 @@
 </JournalsListView>
 
 {#if editModal}
-<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-<div class="modal-bg" onclick={() => editModal = null}>
-	<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-	<div class="modal" onclick={(e) => e.stopPropagation()}>
-		<h3>Modifier la revue</h3>
+<Modal title="Modifier la revue" maxWidth="520px" onclose={() => editModal = null} onsubmit={saveEdit}>
 		<label>Titre</label>
 		<input bind:value={editModal.title} />
 		<div style="display:flex;gap:8px">
@@ -221,12 +218,11 @@
 		</div>
 		<label>APC (€)</label>
 		<input bind:value={editModal.apc_amount} placeholder="ex: 2500" type="number" />
-		<div class="modal-actions">
+		{#snippet actions()}
 			<button class="btn" onclick={() => editModal = null}>Annuler</button>
 			<button class="btn btn-primary" onclick={saveEdit}>Enregistrer</button>
-		</div>
-	</div>
-</div>
+		{/snippet}
+</Modal>
 {/if}
 
 <style>

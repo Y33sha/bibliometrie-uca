@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Modal from "$lib/components/Modal.svelte";
   import { sanitizeTitle } from "$lib/utils";
   import { sourceLabels } from "$lib/labels";
   import type { DetachModalState } from "./types";
@@ -18,11 +19,7 @@
   } = $props();
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal-overlay" onclick={onclose}>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-content" onclick={(e) => e.stopPropagation()}>
-    <h3>Forme de nom : « {state.nameForm} »</h3>
+<Modal title={`Forme de nom : « ${state.nameForm} »`} {onclose}>
     {#if state.loading}
       <p>Chargement…</p>
     {:else}
@@ -49,12 +46,6 @@
       {/if}
       {#if state.publications.length === 0}
         <p>Aucune publication liée.</p>
-        <div class="modal-actions">
-          <button class="btn" onclick={onclose}>Annuler</button>
-          <button class="btn btn-danger" onclick={ondetachNameForm}>
-            Détacher cette forme
-          </button>
-        </div>
       {:else}
         <p>Cochez les publications à détacher de cette personne :</p>
         <div class="detach-list">
@@ -71,20 +62,25 @@
             </label>
           {/each}
         </div>
-        <div class="modal-actions">
-          <button class="btn" onclick={onclose}>Annuler</button>
-          <button class="btn btn-danger" onclick={onconfirmDetach}>
-            Détacher {state.publications.filter((p) => p.checked).length} publication{state.publications.filter(
-              (p) => p.checked,
-            ).length > 1
-              ? "s"
-              : ""}
-          </button>
-        </div>
       {/if}
     {/if}
-  </div>
-</div>
+  {#snippet actions()}
+    {#if !state.loading}
+      <button class="btn" onclick={onclose}>Annuler</button>
+      {#if state.publications.length === 0}
+        <button class="btn btn-danger" onclick={ondetachNameForm}>Détacher cette forme</button>
+      {:else}
+        <button class="btn btn-danger" onclick={onconfirmDetach}>
+          Détacher {state.publications.filter((p) => p.checked).length} publication{state.publications.filter(
+            (p) => p.checked,
+          ).length > 1
+            ? "s"
+            : ""}
+        </button>
+      {/if}
+    {/if}
+  {/snippet}
+</Modal>
 
 <style>
   .detach-list {

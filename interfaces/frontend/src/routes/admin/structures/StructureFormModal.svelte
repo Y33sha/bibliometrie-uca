@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Modal from "$lib/components/Modal.svelte";
   import { API_SOURCES, API_SOURCE_LABELS } from "./types";
 
   let {
@@ -26,13 +27,12 @@
   } = $props();
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal-bg" onclick={onclose}>
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal" onclick={(e) => e.stopPropagation()}>
-    <h3>{editMode ? "Modifier la structure" : "Nouvelle structure"}</h3>
+<Modal
+  title={editMode ? "Modifier la structure" : "Nouvelle structure"}
+  maxWidth="460px"
+  {onclose}
+  {onsubmit}
+>
     <label>Code (unique)</label>
     <input placeholder="ex: lpc, chu_clermont, site_cezeaux" bind:value={code} disabled={editMode} />
     <label>Nom complet</label>
@@ -60,14 +60,13 @@
         <input placeholder="ex: id1, id2" bind:value={apiIds[src]} />
       {/each}
     </details>
-    <div class="actions">
+    {#snippet actions()}
       <button class="btn" onclick={onclose}>Annuler</button>
       <button class="btn btn-primary" onclick={onsubmit}>
         {editMode ? "Enregistrer" : "Créer"}
       </button>
-    </div>
-  </div>
-</div>
+    {/snippet}
+</Modal>
 
 <style>
   .api-ids-section {
