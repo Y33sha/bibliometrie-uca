@@ -43,7 +43,7 @@
     </div>
     <div class="modal-actions">
       {#if state.rejected}
-        <button class="btn btn-restore" onclick={() => ontoggleReject(state.personId, false)}
+        <button class="btn btn-confirm" onclick={() => ontoggleReject(state.personId, false)}
           >Restaurer</button
         >
       {:else}
@@ -53,7 +53,7 @@
       {/if}
       <span style="flex:1"></span>
       <button class="btn" onclick={onclose}>Annuler</button>
-      <button class="btn btn-confirm" onclick={onsave}>Enregistrer</button>
+      <button class="btn btn-primary" onclick={onsave}>Enregistrer</button>
     </div>
   </div>
 </div>
@@ -80,16 +80,5 @@
     border: 1px solid #ccc;
     border-radius: 4px;
     font-size: 0.9rem;
-  }
-  .btn-restore {
-    background: #4caf50;
-    color: white;
-    border: none;
-    padding: 6px 14px;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  .btn-restore:hover {
-    background: #388e3c;
   }
 </style>
