@@ -329,7 +329,12 @@ class PublicationsQueries(Protocol):
     ) -> PublicationsFacetsResponse: ...
 
     def export_publications_csv(
-        self, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
+        self,
+        *,
+        filters: ListFilters,
+        apc_structure_ids: list[int],
+        sort: str,
+        columns: list[str],
     ) -> str: ...
 
     def export_theses_csv(

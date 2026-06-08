@@ -23,16 +23,16 @@ L'export CSV (publications et thèses) diverge du tableau affiché sur trois pla
 
 ## Phasage
 
-### Phase 1 — Export fidèle aux filtres + titre nettoyé
-- [ ] Routeur export (publications) : ajouter les Query params manquants, construire le `ListFilters` identique à `list_publications`.
-- [ ] Query export : `_build_export_clauses` → `_build_list_clauses(conn, filters, apc_structure_ids)` ; retirer `_build_export_clauses` si plus utilisé.
-- [ ] Titre : strip HTML + collapse whitespace dans la cellule (publications + thèses).
-- [ ] Vérifier/aligner l'export thèses (filtres liste↔export).
+- [x] **Phase 1 — Export fidèle aux filtres + titre nettoyé** (`121599c3`)
+  - Routeur export publications : `ListFilters` identique à `list_publications` (params complets).
+  - Query : `_build_export_clauses` → `_build_list_clauses` ; code mort `_build_export_clauses`/`_export_source_clause` supprimé (le source export ne gérait que hal/oa → WoS/ScanR/theses ignorés).
+  - Titre : helper `_plain_text` (strip HTML/MathML + collapse whitespace) sur CSV publications + thèses ; test unitaire.
+  - Export thèses : déjà synchronisé (source_clause canonique + access) — vérifié.
 
-### Phase 2 — Colonnes du CSV = colonnes affichées
-- [ ] Front : transmettre les colonnes visibles (clés `useColumnVisibility`) à l'endpoint d'export.
-- [ ] Backend : émettre uniquement les colonnes demandées, dans l'ordre, avec le bon libellé/contenu par colonne.
-- [ ] Mapping (décidé) : une colonne CSV par colonne d'affichage visible (Année↔year, Type↔type, Titre↔title, Revue↔journal, Labo(s)↔labs, Corresp.↔corr, APC↔apc, Accès↔oa, Voie OA↔oa_path, Statut HAL↔hal_status). **DOI + Sources** = contenu de la colonne « Liens » (colonne fixe) → **toujours présents**. **Éditeur** : présent dans le CSV **ssi « Revue » est visible**.
+### Phase 2 — Colonnes du CSV = colonnes affichées ✅
+- [x] Front : `exportCsvUrl` transmet `columns=` (clés `cv.visibleColumns`).
+- [x] Backend : émission dynamique dans l'ordre d'affichage ; APC ajouté (montant total), Corresp. + Voie OA (oa_status) ; SELECT enrichi (`apc_total`, `is_corresponding`). Test ajouté.
+- [x] Mapping (décidé) : une colonne CSV par colonne d'affichage visible (Année↔year, Type↔type, Titre↔title, Revue↔journal, Labo(s)↔labs, Corresp.↔corr, APC↔apc, Accès↔oa, Voie OA↔oa_status). **DOI + Sources** = contenu de la colonne « Liens » (fixe) → **toujours présents**. **Éditeur** : présent **ssi « Revue » visible**. **APC** = montant total € (au lieu du détail UI). **Statut HAL** : exclu du CSV (calculé côté front, dépend de la collection labo — disproportionné à répliquer). Clé d'affichage `oa_path` renommée `oa_status` (hapax → vrai terme).
 
 ### Phase 3 — Nettoyage du whitespace des titres (données, à-côté)
 - [ ] Localiser l'étape de création du titre canonique (normalize / `effective_metadata` / match_or_create) — à tracer, ne pas supposer.
