@@ -5,7 +5,6 @@
 ### En cours
 
 - [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
-- [Export CSV fidèle à l'affichage (+ nettoyage whitespace des titres)](CODE_export-csv-fidele.md)
 
 ### En pause
 
@@ -21,6 +20,7 @@
 
 ## Chantiers archivés
 
+- 2026-06-08 — [Export CSV fidèle à l'affichage (filtres + colonnes + titres nettoyés)](archived/2026-06-08_CODE_export-csv-fidele.md)
 - 2026-06-08 — [Peaufinage UI (cohérence, responsivité, ergonomie)](archived/2026-06-08_CODE_peaufinage-ui.md)
 - 2026-06-07 — [Barres à facettes homogènes + extraction des ListView (thèses, personnes) + alignement endpoint personnes](archived/2026-06-07_CODE_listviews-facettes-homogenes.md)
 - 2026-06-07 — [Filtres composables pour le repérage des adresses (admin)](CODE_filtres-adresses-composables.md)

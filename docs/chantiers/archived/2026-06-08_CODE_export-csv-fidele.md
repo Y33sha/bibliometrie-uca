@@ -41,6 +41,8 @@ L'export CSV (publications et thèses) diverge du tableau affiché sur trois pla
 
 ## Questions ouvertes
 
-- **Colonne « Éditeur » dans l'UI ?** À trancher plus tard (Laura) : ajouter une colonne « Éditeur » après « Revue » (masquée par défaut) + filtres correspondants. En attendant, l'Éditeur suit la visibilité de « Revue » dans le CSV.
-- **Étape de normalisation du titre** (phase 3) : à tracer avant de coder (ne pas supposer).
-- **Strip HTML pour le CSV** : strip regex simple vs lib dédiée — les titres contiennent du HTML/MathML restreint ; un strip de balises + dé-échappement d'entités + collapse d'espaces suffit probablement.
+- **Colonne « Éditeur » dans l'UI ?** (suite éventuelle, hors chantier) — Laura tranchera : ajouter une colonne « Éditeur » après « Revue » (masquée par défaut) + filtres correspondants. En attendant, dans le CSV l'Éditeur suit la visibilité de « Revue ».
+
+### Résolu en cours de chantier
+- ~~Étape de normalisation du titre~~ → tracée : `clean_publication_title` (appliqué à la création dans `match_or_create`).
+- ~~Strip HTML pour le CSV~~ → factorisé : `domain.normalize.strip_markup` (réutilisé par `normalize_text` et l'export), + `html.unescape` + collapse d'espaces.
