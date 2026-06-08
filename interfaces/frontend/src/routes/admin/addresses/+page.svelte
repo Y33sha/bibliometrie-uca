@@ -763,8 +763,13 @@
 	}
 
 	.structure-filter {
+		padding: 6px 10px;
+		border: 1px solid var(--accent);
+		border-radius: 4px;
+		font-size: 0.95rem;
+		font-family: inherit;
+		background: white;
 		font-weight: 600;
-		border-color: var(--accent) !important;
 		color: var(--accent);
 	}
 
@@ -781,6 +786,11 @@
 	}
 	.filters-zone select,
 	.filters-zone input[type='text'] {
+		padding: 6px 10px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		font-size: 0.95rem;
+		font-family: inherit;
 		background: white;
 	}
 	.filters-row {
