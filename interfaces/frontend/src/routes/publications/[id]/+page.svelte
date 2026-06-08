@@ -118,7 +118,7 @@
 {#if error}
   <div class="pub-header"><div class="no-results">Publication introuvable</div></div>
 {:else if !pub}
-  <div class="pub-header"><div class="loading">Chargement...</div></div>
+  <div class="pub-header"><div class="loading">Chargement…</div></div>
 {:else}
   <PublicationHeader
     {pub}

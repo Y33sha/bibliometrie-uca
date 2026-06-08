@@ -290,7 +290,7 @@
 
     <div class="run-detail">
       {#if runLoading}
-        <p class="loading">Chargement...</p>
+        <p class="loading">Chargement…</p>
       {:else if !runDetail}
         <p class="empty">Sélectionner un snapshot dans la liste.</p>
       {:else}
@@ -424,7 +424,7 @@
 
     <div class="report-content">
       {#if reportLoading}
-        <p class="loading">Chargement...</p>
+        <p class="loading">Chargement…</p>
       {:else if reportRenderedHtml}
         {@html reportRenderedHtml}
       {:else}

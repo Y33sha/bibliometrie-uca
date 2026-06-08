@@ -90,7 +90,7 @@
 </div>
 
 {#if loading}
-	<div class="loading">Chargement...</div>
+	<div class="loading">Chargement…</div>
 {:else if pubs.length === 0 && selectedLabId}
 	<div class="no-results">Aucune publication manquante pour {labAcronym} (collection {halCollection})</div>
 {:else}

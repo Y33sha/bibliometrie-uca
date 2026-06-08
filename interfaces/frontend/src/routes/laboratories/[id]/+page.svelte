@@ -310,7 +310,7 @@
 	</div>
 {:else if !lab}
 	<div class="lab-header">
-		<div class="loading">Chargement...</div>
+		<div class="loading">Chargement…</div>
 	</div>
 {:else}
 	<!-- Header -->
@@ -379,7 +379,7 @@
 	{#if activeTab === 'dashboard'}
 		<div class="tab-content">
 			{#if !dashboardLoaded}
-				<div class="loading">Chargement...</div>
+				<div class="loading">Chargement…</div>
 			{:else}
 				<div class="dash-grid">
 					<div class="dash-card dash-card-wide">

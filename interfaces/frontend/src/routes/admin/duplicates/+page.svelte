@@ -106,7 +106,7 @@
   {/if}
 
   {#if loading}
-    <p class="loading">Chargement...</p>
+    <p class="loading">Chargement…</p>
   {:else if !pair}
     <p class="empty">Aucun candidat doublon restant (titres normalisés identiques, &gt; 30 caractères).</p>
   {:else}

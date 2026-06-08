@@ -594,7 +594,7 @@
 	<!-- Address list -->
 	<div class="main-panel" bind:this={mainPanel}>
 		{#if loading}
-			<div class="loading-msg">Chargement...</div>
+			<div class="loading-msg">Chargement…</div>
 		{:else if requiresSearch}
 			<div class="loading-msg">Ajoutez un filtre (texte ou structure) pour afficher les résultats.</div>
 		{:else if addresses.length === 0}
@@ -662,7 +662,7 @@
 					{#if expandedId === addr.id}
 						<div class="addr-detail">
 							{#if pubsLoading}
-								<div class="detail-loading">Chargement...</div>
+								<div class="detail-loading">Chargement…</div>
 							{:else if publications.length === 0}
 								<div class="detail-loading">Aucune publication liée.</div>
 							{:else}

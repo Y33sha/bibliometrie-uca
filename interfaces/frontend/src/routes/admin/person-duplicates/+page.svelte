@@ -153,7 +153,7 @@
 	{/if}
 
 	{#if loading}
-		<p class="loading">Chargement...</p>
+		<p class="loading">Chargement…</p>
 	{:else if !pair}
 		<p class="empty">Aucun candidat doublon de personne restant.</p>
 	{:else}
