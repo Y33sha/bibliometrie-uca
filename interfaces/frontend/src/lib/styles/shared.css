@@ -468,11 +468,11 @@ th.sorted .sort-arrow {
 	background: #d0e3f4;
 }
 
-.source-oa {
+.source-openalex {
 	background: #fef3e0;
 }
 
-.source-oa:hover {
+.source-openalex:hover {
 	background: #fde8c8;
 }
 
@@ -508,6 +508,14 @@ th.sorted .sort-arrow {
 	line-height: 14px;
 }
 
+.source-crossref {
+	background: #f3ead2;
+}
+
+.source-crossref:hover {
+	background: #ebdcb8;
+}
+
 .source-doi {
 	background: #f0f0f0;
 }
@@ -539,7 +547,7 @@ th.sorted .sort-arrow {
 	color: var(--accent);
 }
 
-.source-oa-label {
+.source-openalex-label {
 	background: #fef3e0;
 	color: var(--bronze);
 }

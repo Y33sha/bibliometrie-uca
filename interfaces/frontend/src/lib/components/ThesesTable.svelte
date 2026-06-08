@@ -155,7 +155,7 @@
 							href="https://openalex.org/{t.openalex_id}"
 							target="_blank"
 							rel="noopener"
-							class="source-tag source-oa"
+							class="source-tag source-openalex"
 							title="OpenAlex: {t.openalex_id}"
 						>
 							<img src="{base}/icons/openalex.png" alt="OA" />
@@ -184,7 +184,7 @@
 							class="source-tag source-theses"
 							title="theses.fr: {t.theses_id}"
 						>
-							<img src="https://theses.fr/favicon.ico" alt="theses.fr" />
+							<img src="{base}/icons/theses.ico" alt="theses.fr" />
 						</a>
 					{:else}
 						<span class="source-tag source-placeholder"></span>

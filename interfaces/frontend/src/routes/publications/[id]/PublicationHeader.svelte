@@ -95,7 +95,7 @@
       </a>
     {/each}
     {#each oaSources as s}
-      <a href="https://openalex.org/{s.source_id}" target="_blank" rel="noopener" class="source-link source-oa-link">
+      <a href="https://openalex.org/{s.source_id}" target="_blank" rel="noopener" class="source-link source-openalex-link">
         <img src="{base}/icons/openalex.png" alt="" class="source-ico" />
         OpenAlex : {s.source_id}
       </a>
@@ -113,7 +113,7 @@
     {/each}
     {#each thesesSources as s}
       <a href="https://theses.fr/{s.source_id}" target="_blank" rel="noopener" class="source-link source-theses-link">
-        <img src="https://theses.fr/favicon.ico" alt="" class="source-ico" />
+        <img src="{base}/icons/theses.ico" alt="" class="source-ico" />
         theses.fr : {s.source_id}
       </a>
     {/each}
@@ -244,11 +244,11 @@
   .source-hal-link:hover {
     background: #d0e3f4;
   }
-  .source-oa-link {
+  .source-openalex-link {
     background: #fef3e0;
     color: var(--bronze);
   }
-  .source-oa-link:hover {
+  .source-openalex-link:hover {
     background: #fde8c8;
   }
   .source-scanr-link {

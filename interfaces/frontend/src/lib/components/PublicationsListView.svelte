@@ -564,7 +564,7 @@
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.openalex_id}
-							<a href="https://openalex.org/{p.openalex_id}" target="_blank" rel="noopener" class="source-tag source-oa" title="OpenAlex: {p.openalex_id}">
+							<a href="https://openalex.org/{p.openalex_id}" target="_blank" rel="noopener" class="source-tag source-openalex" title="OpenAlex: {p.openalex_id}">
 								<img src="{base}/icons/openalex.png" alt="OA" />
 							</a>
 						{:else}

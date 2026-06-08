@@ -81,16 +81,6 @@ export const sourceLabels: Record<string, string> = {
 	crossref: 'Crossref'
 };
 
-/** Classes CSS associées aux badges de source. */
-export const sourceBadgeClasses: Record<string, string> = {
-	hal: 'badge-hal',
-	openalex: 'badge-oa',
-	wos: 'badge-wos',
-	scanr: 'badge-scanr',
-	theses: 'badge-theses',
-	crossref: 'badge-crossref'
-};
-
 /** Classes CSS associées aux statuts d'identifiant personne. */
 export const identifierStatusClasses: Record<string, string> = {
 	confirmed: 'id-confirmed',

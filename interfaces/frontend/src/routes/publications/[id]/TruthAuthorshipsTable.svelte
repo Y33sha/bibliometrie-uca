@@ -60,7 +60,7 @@
               <span class="source-tag-label source-hal-label">H</span>
             {/if}
             {#if a.source_openalex}
-              <span class="source-tag-label source-oa-label">OA</span>
+              <span class="source-tag-label source-openalex-label">OA</span>
             {/if}
             {#if a.source_wos}
               <span class="source-tag-label source-wos-label">W</span>

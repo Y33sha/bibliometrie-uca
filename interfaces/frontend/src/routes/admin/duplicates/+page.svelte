@@ -5,7 +5,7 @@
   import { page } from "$app/stores";
   import { onMount } from "svelte";
   import { sanitizeTitle, sourceExternalUrl } from "$lib/utils";
-  import { sourceLabels, sourceBadgeClasses } from "$lib/labels";
+  import SourceTag from "$lib/components/SourceTag.svelte";
 
   import type { components } from "$lib/api/schema";
   type PubDetail = components["schemas"]["PubDedupDetail"];
@@ -134,7 +134,7 @@
           <div class="pub-col">
             <div class="pub-sources">
               {#each pub.sources as src}
-                <a href={sourceExternalUrl(src.source, src.source_id)} target="_blank" rel="noopener" class="source-badge {sourceBadgeClasses[src.source] ?? ''}">{sourceLabels[src.source] ?? src.source}</a>
+                <SourceTag source={src.source} href={sourceExternalUrl(src.source, src.source_id)} id={src.source_id} />
               {/each}
             </div>
             <div class="pub-meta">
@@ -265,36 +265,6 @@
     display: flex;
     gap: 4px;
     margin-bottom: 6px;
-  }
-  .source-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: white;
-    text-decoration: none;
-  }
-  .source-badge:hover {
-    opacity: 0.85;
-  }
-  .badge-hal {
-    background: #28a745;
-  }
-  .badge-oa {
-    background: #fd7e14;
-  }
-  .badge-wos {
-    background: var(--accent);
-  }
-  .badge-scanr {
-    background: #6f42c1;
-  }
-  .badge-theses {
-    background: #17a2b8;
-  }
-  .badge-crossref {
-    background: #b8860b;
   }
   .pub-meta {
     display: flex;
