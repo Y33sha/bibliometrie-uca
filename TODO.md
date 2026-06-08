@@ -3,21 +3,23 @@
 ## Pipeline de traitement
 * [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / pipeline:   51/181... (51 mis à jour, 0 déjà complets) => toujours 0 déjà complet: calculé comment? / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => pourquoi "rattachement" en phase normalize?
 ### Extraction
-* [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
+* [ ] gérer les 429 répétés => skipper entièrement une phase
 * [ ] extraction par ORCID: vérifier faisabilité (quelles sources?)
-* [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples) (compliqué; auditer d'abord pour voir si ça touche bcp de docts)
 * [ ] Paralléliser cross-imports entre eux
 * [ ] "Recherche des works OpenAlex avec primary_location HAL" => étendre à toutes les locations
+* [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
+* [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples) (compliqué; auditer d'abord pour voir si ça touche bcp de docts)
 ### Normalisation
-* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
+* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur / ou juste supprimer le hal_person_id partout par précaution?
 ### Suite du traitement
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? => dirty-set via addresses.updated_at + sa.created_at
-* [ ] phase persons: générer une liste de suggestion de fusions (conflit d'identifiants entre 2 person_id)
+* [ ] phase persons: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 person_id)
+* [ ] pmid comme clé de déduplication: récupérer dans api HAL + OpenAlex (+ScanR?)
 ## Code
-* [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
+* [ ] chantier observabilité pipeline: quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de snapshot; c'est un problème. => faire des snapshots par phase, pas par pipeline
+* [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] DRY upsert_source_publication? (au lieu d'une fonction par source)
-* [ ] chantier observabilité pipeline: quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de rapport; c'est un problème.
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi
@@ -26,7 +28,7 @@
 * sujets: cooccurrences calculées sur publications, ou sur source_publications? idem nombre d'occurrences (ex.: sujet vaches laitières, 10 occurrences annoncées, 2 publications affichées)
 * règle "dumas => mémoire": vérifier qu'elle est tjs active (cf 151542)
 ## Explorer autres sources possibles
-* [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée? récupérer pmid dans api HAL
+* [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée?
 * [ ] pour les jeux de données: DataCite, Zenodo, autres?
 * [ ] divers: ORCID, IdRef, DOAJ
 * [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait tenter un matching de tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
@@ -57,14 +59,12 @@
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
 * [ ] afficher mémoires master et thèses en cours sur liste publications de la page personnes/id
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
+* [ ] colonne éditeur, filtres éditeur + revue?
 ## Détails d'affichage
 * [ ] décomptes sur les onglets: incohérents (cf nb revues par éditeur): supprimer ou corriger?
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
-* [ ] fusion revues ou modif revue: pas de mise à jour automatique de la page
+* [ ] fusion revues ou modif revue: pas de mise à jour automatique de la page admin/journals
 * [ ] lien dashboard => publications: il faut que toutes les facettes actives soient affichées!
-* [ ] pb lien ROR page laboratories
-* [ ] balises html dans l'export csv génèrent des sauts de ligne
-* [ ] filtre sources non pris en compte dans l'export csv
 * [ ] dashboard éditeur / revue: graphiques
 * [ ] ajouter facettes sur dashboards?
 
