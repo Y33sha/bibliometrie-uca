@@ -64,10 +64,10 @@
 	let dashTopCountries: { code: string; name: string; count: number }[] = $state([]);
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	let dashSubjects: SubjectFrequency[] = $state([]);
-	let barCanvas: HTMLCanvasElement;
-	let pieCanvas: HTMLCanvasElement;
-	let collabCanvas: HTMLCanvasElement;
-	let countriesCanvas: HTMLCanvasElement;
+	let barCanvas: HTMLCanvasElement | undefined = $state();
+	let pieCanvas: HTMLCanvasElement | undefined = $state();
+	let collabCanvas: HTMLCanvasElement | undefined = $state();
+	let countriesCanvas: HTMLCanvasElement | undefined = $state();
 	let barChart: Chart | null = null;
 	let pieChart: Chart | null = null;
 	let collabChart: Chart | null = null;

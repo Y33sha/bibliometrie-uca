@@ -51,7 +51,7 @@
 		publisher_count: 0, journal_count: 0,
 	});
 
-	let chartCanvas: HTMLCanvasElement;
+	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
 	let initialYearsApplied = false;
 
