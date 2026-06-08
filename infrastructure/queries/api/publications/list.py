@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy import Connection, text
 
 from application.ports.api.publications_queries import ListFilters
-from domain.normalize import normalize_text
+from domain.normalize import normalize_text, strip_markup
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.queries.filters import (
     OA_OPEN_STATUSES,
@@ -325,17 +325,17 @@ def _export_oa_clause(oa_status: str) -> WhereClause | None:
     )
 
 
-_HTML_TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"\s+")
 
 
 def _plain_text(s: str | None) -> str:
-    """Texte brut pour le CSV : retire les balises HTML/MathML, dé-échappe les
-    entités, et collapse le whitespace (newlines/tabs/espaces multiples) en un
-    seul espace. Reflète le titre tel qu'affiché, sans markup."""
+    """Texte brut pour le CSV : retire les balises HTML/MathML (via
+    `strip_markup`, qui préserve les indices de Miller `<111>`), dé-échappe les
+    entités, et collapse le whitespace en un seul espace. Reflète le titre
+    affiché, sans markup."""
     if not s:
         return ""
-    return _WS_RE.sub(" ", html.unescape(_HTML_TAG_RE.sub("", s))).strip()
+    return _WS_RE.sub(" ", html.unescape(strip_markup(s))).strip()
 
 
 def export_publications_csv(
