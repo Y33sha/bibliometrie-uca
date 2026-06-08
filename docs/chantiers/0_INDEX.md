@@ -5,6 +5,7 @@
 ### En cours
 
 - [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
+- [Export CSV fidèle à l'affichage (+ nettoyage whitespace des titres)](CODE_export-csv-fidele.md)
 
 ### En pause
 

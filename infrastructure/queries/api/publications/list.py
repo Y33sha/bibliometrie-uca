@@ -1,8 +1,10 @@
 """Liste paginée + export CSV des publications."""
 
 import csv
+import html
 import io
 import json
+import re
 from typing import Any
 
 from sqlalchemy import Connection, text
@@ -305,24 +307,6 @@ def list_publications(
 # ── Export CSV ────────────────────────────────────────────────────
 
 
-def _export_source_clause(source_values: list[str]) -> WhereClause | None:
-    """Filtre source pour l'export — comportement historique 4 valeurs
-    hal_yes/no oa_yes/no uniquement."""
-    parts: list[str] = []
-    for sv in source_values:
-        if sv == "hal_yes":
-            parts.append("p.sources @> ARRAY['hal'::source_type]")
-        elif sv == "hal_no":
-            parts.append("NOT p.sources @> ARRAY['hal'::source_type]")
-        elif sv == "oa_yes":
-            parts.append("p.sources @> ARRAY['openalex'::source_type]")
-        elif sv == "oa_no":
-            parts.append("NOT p.sources @> ARRAY['openalex'::source_type]")
-    if not parts:
-        return None
-    return WhereClause(" AND ".join(parts), {})
-
-
 def _export_oa_clause(oa_status: str) -> WhereClause | None:
     """Variante simplifiée du filtre oa_status pour l'export."""
     if not oa_status:
@@ -341,33 +325,31 @@ def _export_oa_clause(oa_status: str) -> WhereClause | None:
     )
 
 
-def _build_export_clauses(filters: ListFilters) -> tuple[str, dict[str, Any]]:
-    """Conditions WHERE pour l'export CSV publications (pas de hal_status,
-    pas d'in_perimeter — comportement historique)."""
-    clauses: list[WhereClause | None] = list(_initial_clauses(filters))
-    clauses.extend(_inline_clauses(filters))
-    if filters.lab_none and not filters.lab_ids:
-        clauses.append(no_lab_clause())
-    elif filters.lab_ids:
-        clauses.append(lab_clause(filters.lab_ids))
-    clauses.append(_export_source_clause(filters.source_values))
-    clauses.append(_export_oa_clause(filters.oa_status))
-    return assemble_where(clauses)
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+
+
+def _plain_text(s: str | None) -> str:
+    """Texte brut pour le CSV : retire les balises HTML/MathML, dé-échappe les
+    entités, et collapse le whitespace (newlines/tabs/espaces multiples) en un
+    seul espace. Reflète le titre tel qu'affiché, sans markup."""
+    if not s:
+        return ""
+    return _WS_RE.sub(" ", html.unescape(_HTML_TAG_RE.sub("", s))).strip()
 
 
 def export_publications_csv(
     conn: Connection, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
 ) -> str:
-    """Export CSV (sans pagination) avec les mêmes filtres que list_publications.
+    """Export CSV (sans pagination) avec EXACTEMENT les mêmes filtres que
+    list_publications (même constructeur de WHERE) : le CSV reflète le tableau
+    affiché.
 
     Retourne la string CSV (préfixée d'un BOM UTF-8 pour Excel). Le caller
     (router) est responsable d'emballer la réponse HTTP.
-
-    Simplification : les filtres hal_status / in_perimeter ne sont pas
-    appliqués dans l'export historique, on reproduit ce comportement.
     """
     conn.execute(text("SET LOCAL jit = off"))
-    where_clause, binds = _build_export_clauses(filters)
+    where_clause, binds = _build_list_clauses(conn, filters, apc_structure_ids)
     order = _ORDER_MAP.get(sort, "p.pub_year DESC, p.title")
 
     if filters.person_id:
@@ -445,7 +427,7 @@ def export_publications_csv(
             [
                 row.pub_year or "",
                 row.doc_type or "",
-                row.title or "",
+                _plain_text(row.title),
                 doi_url,
                 row.journal_title or "",
                 row.publisher_name or "",
@@ -461,9 +443,8 @@ def export_publications_csv(
 def _build_theses_export_clauses(filters: ListFilters) -> tuple[str, dict[str, Any]]:
     """Conditions WHERE pour l'export CSV des thèses.
 
-    Diffère de `_build_export_clauses` :
-    - support des 4 sources (hal/oa/scanr/theses) via source_clause
-    - support du filtre `access` (open/closed) — facette primaire de la page thèses.
+    Spécifique à la page thèses : `source_clause` canonique (4 sources) +
+    filtre `access` (open/closed, facette primaire) + variante `_export_oa_clause`.
     """
     clauses: list[WhereClause | None] = list(_initial_clauses(filters))
     clauses.extend(_inline_clauses(filters))
@@ -555,7 +536,7 @@ def export_theses_csv(
                 row.date_soutenance or "",
                 row.pub_year or "",
                 _THESES_STATUS_LABELS.get(row.doc_type, row.doc_type or ""),
-                row.title or "",
+                _plain_text(row.title),
                 doi_url,
                 row.labs or "",
                 access,
