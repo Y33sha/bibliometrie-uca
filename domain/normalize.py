@@ -38,6 +38,20 @@ _UNICODE_TO_ASCII = str.maketrans(
 )
 
 
+_MARKUP_RE = re.compile(r"</?[A-Za-z][^>]*>")
+
+
+def strip_markup(text: str) -> str:
+    """Retire les balises HTML/MathML `<...>` (remplacées par un espace).
+
+    Le premier caractère doit être une lettre (ou `/`) pour ne pas avaler les
+    indices de Miller `<111>` / `< 110 >` (cristallographie), qui sont du
+    contenu, pas du markup (audit titres bruts : seuls cas non-balise observés).
+    Réutilisé par l'export CSV (titre brut) et par `normalize_text` (dédup).
+    """
+    return _MARKUP_RE.sub(" ", text)
+
+
 def normalize_text(text: str) -> str:
     """Normalise un texte pour comparaison / dédoublonnage / matching.
 
@@ -52,14 +66,9 @@ def normalize_text(text: str) -> str:
     """
     if not text:
         return ""
-    # Retrait des balises avant tout : on supprime `<...>` en entier (nom de
-    # balise inclus), sinon `mml`, `i`, `sub`… subsisteraient comme texte après
-    # l'étape [^a-z0-9] et pollueraient le dédoublonnage par titre (certaines
-    # sources exposent les titres avec balises MathML/HTML, d'autres non).
-    # Le premier caractère doit être une lettre (ou `/`) pour ne pas avaler les
-    # indices de Miller `<111>` / `< 110 >` (cristallographie), qui sont du
-    # contenu, pas du markup (audit titres bruts : seuls cas non-balise observés).
-    text = re.sub(r"</?[A-Za-z][^>]*>", " ", text)
+    # Retrait des balises avant tout, sinon `mml`/`i`/`sub`… subsisteraient
+    # comme texte après l'étape [^a-z0-9] et pollueraient le dédoublonnage.
+    text = strip_markup(text)
     text = text.lower().strip()
     text = text.translate(_UNICODE_TO_ASCII)
     text = unicodedata.normalize("NFKD", text)
