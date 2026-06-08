@@ -72,7 +72,7 @@
 		font-size: 0.85em;
 	}
 	.doc-body :global(:not(pre) > code) {
-		background: #f0efec;
+		background: var(--border-subtle);
 		padding: 2px 5px;
 		border-radius: 3px;
 	}
@@ -90,7 +90,7 @@
 	}
 	.doc-body :global(td) {
 		padding: 8px 12px;
-		border-bottom: 1px solid #f0efec;
+		border-bottom: 1px solid var(--border-subtle);
 	}
 	.doc-body :global(ul),
 	.doc-body :global(ol) {

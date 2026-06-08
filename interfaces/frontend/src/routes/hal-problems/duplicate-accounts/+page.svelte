@@ -126,7 +126,7 @@
     overflow: hidden;
   }
   .pub-table thead th {
-    background: #f5f4f1;
+    background: var(--surface);
     padding: 8px 12px;
     text-align: left;
     font-size: 0.85rem;
@@ -135,10 +135,10 @@
     border-bottom: 2px solid var(--border);
   }
   .pub-table tbody tr {
-    border-bottom: 1px solid #f0efec;
+    border-bottom: 1px solid var(--border-subtle);
   }
   .pub-table tbody tr:hover {
-    background: #fafaf8;
+    background: var(--surface-hover);
   }
   .pub-table td {
     padding: 8px 12px;
@@ -180,7 +180,7 @@
   .hal-pubs {
     font-size: 0.8rem;
     color: var(--muted);
-    background: #f0efec;
+    background: var(--border-subtle);
     padding: 1px 6px;
     border-radius: 3px;
   }

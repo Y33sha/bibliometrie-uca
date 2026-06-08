@@ -289,7 +289,7 @@
 		border-radius: 6px;
 	}
 	.journals-table thead th {
-		background: #f5f4f1;
+		background: var(--surface);
 		padding: 8px 10px;
 		text-align: left;
 		font-size: 0.85rem;
@@ -301,9 +301,9 @@
 	.journals-table thead th.num { text-align: right; }
 	.journals-table thead th.sortable { cursor: pointer; user-select: none; }
 	.journals-table thead th.sortable:hover { color: var(--accent); }
-	.journals-table tbody tr { border-bottom: 1px solid #f0efec; }
+	.journals-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
 	.journals-table tbody tr:last-child { border-bottom: none; }
-	.journals-table tbody tr:hover { background: #fafaf8; }
+	.journals-table tbody tr:hover { background: var(--surface-hover); }
 	.journals-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
 	.journals-table td.num {
 		text-align: right;

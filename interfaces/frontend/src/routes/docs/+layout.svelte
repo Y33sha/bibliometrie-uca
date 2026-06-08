@@ -141,7 +141,7 @@
 		border-radius: 4px;
 	}
 	.docs-sidebar a:hover {
-		background: #f0efec;
+		background: var(--border-subtle);
 	}
 	.docs-sidebar a.active {
 		background: var(--accent);

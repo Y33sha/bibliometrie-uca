@@ -281,7 +281,7 @@
 	}
 	.id-badge { margin-right: 4px; }
 	.type-tag {
-		background: #f0efec; color: var(--muted);
+		background: var(--border-subtle); color: var(--muted);
 		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
 		margin-right: 8px;
 	}
@@ -308,7 +308,7 @@
 	.muted { color: var(--muted); }
 
 	.count-table { width: 100%; border-collapse: collapse; }
-	.count-table td { padding: 6px 8px; font-size: 0.95rem; border-bottom: 1px solid #f0efec; }
+	.count-table td { padding: 6px 8px; font-size: 0.95rem; border-bottom: 1px solid var(--border-subtle); }
 	.count-table tr:last-child td { border-bottom: none; }
 	.count-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 
@@ -318,7 +318,7 @@
 	}
 	.subjects-list li {
 		display: inline-flex; align-items: center; gap: 6px;
-		background: #f5f4f1; padding: 4px 10px; border-radius: 12px;
+		background: var(--surface); padding: 4px 10px; border-radius: 12px;
 		font-size: 0.9rem;
 	}
 	.subjects-list a { color: var(--accent); text-decoration: none; }
@@ -333,14 +333,14 @@
 		background: var(--card); border: 1px solid var(--border); border-radius: 6px;
 	}
 	.journals-table thead th {
-		background: #f5f4f1; padding: 8px 10px; text-align: left;
+		background: var(--surface); padding: 8px 10px; text-align: left;
 		font-size: 0.85rem; font-weight: 600; color: var(--muted);
 		border-bottom: 2px solid var(--border); white-space: nowrap;
 	}
 	.journals-table thead th.num { text-align: right; }
-	.journals-table tbody tr { border-bottom: 1px solid #f0efec; }
+	.journals-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
 	.journals-table tbody tr:last-child { border-bottom: none; }
-	.journals-table tbody tr:hover { background: #fafaf8; }
+	.journals-table tbody tr:hover { background: var(--surface-hover); }
 	.journals-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
 	.journals-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 	.issn-cell { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }

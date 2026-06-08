@@ -943,7 +943,7 @@
 		align-items: start;
 	}
 	.addr-header:hover {
-		background: #fafaf8;
+		background: var(--surface-hover);
 	}
 
 	.addr-text {

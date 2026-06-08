@@ -75,7 +75,7 @@
     padding: 8px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: #fafaf8;
+    background: var(--surface-hover);
   }
   .api-ids-section summary {
     cursor: pointer;

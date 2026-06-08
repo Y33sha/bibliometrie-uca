@@ -212,7 +212,7 @@
     align-items: center;
     gap: 10px;
     padding: 8px 12px;
-    border-bottom: 1px solid #f0efec;
+    border-bottom: 1px solid var(--border-subtle);
     text-decoration: none;
     color: inherit;
   }
@@ -220,7 +220,7 @@
     border-bottom: none;
   }
   .struct-item:hover {
-    background: #fafaf8;
+    background: var(--surface-hover);
   }
   .struct-item .name {
     font-size: 0.95rem;
