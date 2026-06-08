@@ -6,6 +6,7 @@
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import { titleCase } from '$lib/utils';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 	import type { components } from '$lib/api/schema';
 
 	type PersonResult = components['schemas']['PersonSearchResult'];
@@ -304,37 +305,31 @@
 {/if}
 
 {#if createModal}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="modal-overlay" onclick={() => { createModal = null; }}>
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
-			<h3>Créer une personne ({createModal.items.length} authorship{createModal.items.length > 1 ? 's' : ''})</h3>
-			<div class="create-form">
-				<label>
-					Nom
-					<input type="text" bind:value={createModal.lastName}
-						onkeydown={(e) => { if (e.key === 'Enter') confirmCreate(); }} />
-				</label>
-				<label>
-					Prénom
-					<input type="text" bind:value={createModal.firstName}
-						onkeydown={(e) => { if (e.key === 'Enter') confirmCreate(); }} />
-				</label>
-			</div>
-			<div class="modal-actions">
-				<button class="btn" onclick={() => { createModal = null; }}>Annuler</button>
-				<button class="btn btn-confirm" onclick={confirmCreate}>Créer et attribuer</button>
-			</div>
+	<Modal
+		title={`Créer une personne (${createModal.items.length} authorship${createModal.items.length > 1 ? 's' : ''})`}
+		maxWidth="440px"
+		onclose={() => { createModal = null; }}
+		onsubmit={confirmCreate}
+	>
+		<div class="create-form">
+			<label>
+				Nom
+				<input type="text" bind:value={createModal.lastName} />
+			</label>
+			<label>
+				Prénom
+				<input type="text" bind:value={createModal.firstName} />
+			</label>
 		</div>
-	</div>
+		{#snippet actions()}
+			<button class="btn" onclick={() => { createModal = null; }}>Annuler</button>
+			<button class="btn btn-confirm" onclick={confirmCreate}>Créer et attribuer</button>
+		{/snippet}
+	</Modal>
 {/if}
 
 {#if rejectModal}
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="modal-overlay" onclick={() => { rejectModal = null; }}>
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="modal-content" onclick={(e) => e.stopPropagation()}>
-			<h3>Réassignation déjà rejetée</h3>
+	<Modal title="Réassignation déjà rejetée" onclose={() => { rejectModal = null; }}>
 			<p class="reject-detail">{rejectModal.detail}</p>
 			<p class="reject-muted">
 				Cette personne a été détachée de {rejectModal.pairs.length > 1 ? 'ces publications' : 'cette publication'} manuellement.
@@ -350,12 +345,11 @@
 					</li>
 				{/each}
 			</ul>
-			<div class="modal-actions">
+			{#snippet actions()}
 				<button class="btn" onclick={() => { rejectModal = null; }}>Annuler</button>
 				<button class="btn btn-confirm" onclick={confirmReassign}>Réassigner quand même</button>
-			</div>
-		</div>
-	</div>
+			{/snippet}
+	</Modal>
 {/if}
 
 <style>

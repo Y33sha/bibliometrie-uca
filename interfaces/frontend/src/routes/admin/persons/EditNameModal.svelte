@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Modal from "$lib/components/Modal.svelte";
   import type { EditNameState } from "./types";
 
   let {
@@ -14,34 +15,18 @@
   } = $props();
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal-overlay" onclick={onclose}>
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-content modal-small" onclick={(e) => e.stopPropagation()}>
-    <h3>Modifier le nom</h3>
+<Modal title="Modifier le nom" maxWidth="400px" {onclose} onsubmit={onsave}>
     <div class="edit-name-form">
       <label>
         Nom
-        <input
-          type="text"
-          bind:value={state.lastName}
-          onkeydown={(e) => {
-            if (e.key === "Enter") onsave();
-          }}
-        />
+        <input type="text" bind:value={state.lastName} />
       </label>
       <label>
         Prénom
-        <input
-          type="text"
-          bind:value={state.firstName}
-          onkeydown={(e) => {
-            if (e.key === "Enter") onsave();
-          }}
-        />
+        <input type="text" bind:value={state.firstName} />
       </label>
     </div>
-    <div class="modal-actions">
+    {#snippet actions()}
       {#if state.rejected}
         <button class="btn btn-confirm" onclick={() => ontoggleReject(state.personId, false)}
           >Restaurer</button
@@ -54,14 +39,10 @@
       <span style="flex:1"></span>
       <button class="btn" onclick={onclose}>Annuler</button>
       <button class="btn btn-primary" onclick={onsave}>Enregistrer</button>
-    </div>
-  </div>
-</div>
+    {/snippet}
+</Modal>
 
 <style>
-  .modal-small {
-    max-width: 400px;
-  }
   .edit-name-form {
     display: flex;
     flex-direction: column;

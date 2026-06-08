@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Modal from "$lib/components/Modal.svelte";
   import type { EditFormState } from "./types";
 
   let {
@@ -12,13 +13,7 @@
   } = $props();
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events -->
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal-bg" onclick={onclose}>
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal" onclick={(e) => e.stopPropagation()}>
-    <h3>Modifier la forme de nom</h3>
+<Modal title="Modifier la forme de nom" maxWidth="460px" {onclose} onsubmit={onsave}>
     <label>Texte</label>
     <input bind:value={state.form_text} />
     <div class="modal-options">
@@ -42,12 +37,11 @@
         /> Excluante
       </label>
     </div>
-    <div class="actions">
+    {#snippet actions()}
       <button class="btn" onclick={onclose}>Annuler</button>
       <button class="btn btn-primary" onclick={onsave}>Enregistrer</button>
-    </div>
-  </div>
-</div>
+    {/snippet}
+</Modal>
 
 <style>
   .modal-options {

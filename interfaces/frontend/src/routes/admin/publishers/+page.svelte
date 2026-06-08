@@ -4,6 +4,7 @@
 	import { api, ApiError, publishers as publishersApi } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import PublishersListView from '$lib/components/PublishersListView.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 	import { toast } from '$lib/dialogs.svelte';
 
 	import type { components } from '$lib/api/schema';
@@ -197,11 +198,7 @@
 </PublishersListView>
 
 {#if editModal}
-<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-<div class="modal-bg" onclick={() => editModal = null}>
-	<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-	<div class="modal" onclick={(e) => e.stopPropagation()}>
-		<h3>Modifier l'éditeur</h3>
+<Modal title="Modifier l'éditeur" maxWidth="460px" onclose={() => editModal = null} onsubmit={saveEdit}>
 		<label>Nom</label>
 		<input bind:value={editModal.name} />
 		<label>Pays</label>
@@ -215,12 +212,11 @@
 		<label class="checkbox-row">
 			<input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur
 		</label>
-		<div class="modal-actions">
+		{#snippet actions()}
 			<button class="btn" onclick={() => editModal = null}>Annuler</button>
 			<button class="btn btn-primary" onclick={saveEdit}>Enregistrer</button>
-		</div>
-	</div>
-</div>
+		{/snippet}
+</Modal>
 {/if}
 
 <style>

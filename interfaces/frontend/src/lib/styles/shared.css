@@ -229,35 +229,8 @@ th.sorted .sort-arrow {
 	text-decoration: underline;
 }
 
-/* ── Modal (partagé par toutes les pages admin) ── */
-.modal-bg {
-	position: fixed;
-	inset: 0;
-	background: rgba(0, 0, 0, 0.3);
-	z-index: 200;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.modal {
-	background: white;
-	border-radius: 8px;
-	padding: 20px;
-	width: 420px;
-	max-width: 90vw;
-	box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-}
-
-.modal h3 {
-	margin: 0 0 14px;
-	font-size: 1.15rem;
-	color: var(--text);
-	text-transform: none;
-	letter-spacing: normal;
-}
-
-.modal label {
+/* ── Champs de formulaire dans une modale (composant Modal) ── */
+.modal-content label {
 	display: block;
 	font-size: 0.85rem;
 	font-weight: 600;
@@ -265,7 +238,7 @@ th.sorted .sort-arrow {
 	margin: 8px 0 3px;
 }
 
-.modal label.checkbox-row {
+.modal-content label.checkbox-row {
 	display: flex;
 	align-items: center;
 	gap: 6px;
@@ -275,15 +248,15 @@ th.sorted .sort-arrow {
 	cursor: pointer;
 }
 
-.modal label.checkbox-row input[type="checkbox"] {
+.modal-content label.checkbox-row input[type="checkbox"] {
 	width: auto;
 	margin: 0;
 	padding: 0;
 }
 
-.modal input,
-.modal select,
-.modal textarea {
+.modal-content input,
+.modal-content select,
+.modal-content textarea {
 	width: 100%;
 	padding: 6px 8px;
 	border: 1px solid var(--border);
@@ -292,16 +265,8 @@ th.sorted .sort-arrow {
 	font-family: inherit;
 }
 
-.modal textarea {
+.modal-content textarea {
 	resize: vertical;
-}
-
-.modal .actions,
-.modal .modal-actions {
-	display: flex;
-	gap: 8px;
-	justify-content: flex-end;
-	margin-top: 16px;
 }
 
 /* ── Tabs (detail pages) ── */

@@ -9,6 +9,7 @@
 		title={r.title ?? 'Confirmation'}
 		maxWidth="440px"
 		onclose={() => resolveConfirm(false)}
+			onsubmit={() => resolveConfirm(true)}
 	>
 		<p class="confirm-message">{r.message}</p>
 		{#snippet actions()}

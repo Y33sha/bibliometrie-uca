@@ -3,6 +3,7 @@
   import { base } from "$app/paths";
   import { api, ApiError, config as configApi, perimeters as perimetersApi } from "$lib/api";
   import { confirmDialog, toast } from '$lib/dialogs.svelte';
+  import Modal from '$lib/components/Modal.svelte';
   import type { components } from "$lib/api/schema";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
@@ -379,11 +380,11 @@
 </div>
 
 {#if perimModal}
-  <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-  <div class="modal-bg" onclick={() => (perimModal = null)}>
-    <!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-    <div class="modal" onclick={(e) => e.stopPropagation()}>
-      <h3>{perimModal.mode === "create" ? "Nouveau périmètre" : "Modifier le périmètre"}</h3>
+  <Modal
+    title={perimModal.mode === "create" ? "Nouveau périmètre" : "Modifier le périmètre"}
+    maxWidth="460px"
+    onclose={() => (perimModal = null)}
+  >
       <label>Code</label>
       <input bind:value={perimModal.code} disabled={perimModal.mode === "edit"} placeholder="ex: uca_wide" />
       <label>Nom</label>
@@ -409,14 +410,13 @@
           {/each}
         </div>
       {/if}
-      <div class="modal-actions">
+      {#snippet actions()}
         <button class="btn" onclick={() => (perimModal = null)}>Annuler</button>
         <button class="btn btn-primary" onclick={savePerimeter}>
-          {perimModal.mode === "create" ? "Créer" : "Enregistrer"}
+          {perimModal?.mode === "create" ? "Créer" : "Enregistrer"}
         </button>
-      </div>
-    </div>
-  </div>
+      {/snippet}
+  </Modal>
 {/if}
 
 <style>
