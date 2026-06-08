@@ -100,9 +100,6 @@
   .detach-item:hover {
     background: #f5f5f5;
   }
-  .detach-source {
-    flex-shrink: 0;
-  }
   .detach-year {
     color: #888;
     font-size: 0.8rem;

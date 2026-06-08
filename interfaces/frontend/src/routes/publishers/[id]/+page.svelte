@@ -330,29 +330,4 @@
 		background: #fff; padding: 0 6px; border-radius: 8px;
 		font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums;
 	}
-
-	.journals-table {
-		width: 100%; border-collapse: collapse;
-		background: var(--card); border: 1px solid var(--border); border-radius: 6px;
-	}
-	.journals-table thead th {
-		background: var(--surface); padding: 8px 10px; text-align: left;
-		font-size: 0.85rem; font-weight: 600; color: var(--muted);
-		border-bottom: 2px solid var(--border); white-space: nowrap;
-	}
-	.journals-table thead th.num { text-align: right; }
-	.journals-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.journals-table tbody tr:last-child { border-bottom: none; }
-	.journals-table tbody tr:hover { background: var(--surface-hover); }
-	.journals-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
-	.journals-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
-	.issn-cell { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-
-	.journal-link { color: var(--accent); text-decoration: none; font-weight: 500; }
-	.journal-link:hover { text-decoration: underline; }
-	.badge-doaj {
-		font-size: 0.7rem; padding: 1px 5px; background: var(--success);
-		color: white; border-radius: 8px; margin-left: 6px;
-		vertical-align: middle; font-weight: 600;
-	}
 </style>

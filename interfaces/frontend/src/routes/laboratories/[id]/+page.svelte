@@ -524,9 +524,6 @@
 	.partner-tag { background: var(--border-subtle); color: var(--muted); }
 	.id-badge { margin-right: 8px; }
 
-	/* Toolbar */
-	.toolbar input[type='text'] { width: 220px; }
-
 	/* Dashboard */
 	.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 	@media (max-width: 760px) {
@@ -565,15 +562,10 @@
 		border-bottom: 2px solid var(--border);
 		white-space: nowrap;
 	}
-	.tab-content thead th.sortable { cursor: pointer; user-select: none; }
-	.tab-content thead th.sortable:hover { color: var(--accent); }
-	.tab-content thead th.sortable.active { color: var(--accent); }
 	.tab-content tbody tr { border-bottom: 1px solid var(--border-subtle); }
 	.tab-content tbody tr:last-child { border-bottom: none; }
 	.tab-content tbody tr:hover { background: var(--surface-hover); }
 	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
-	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag) { color: var(--accent); text-decoration: none; }
-	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }
 
 	/* Addresses tab */
 	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }
