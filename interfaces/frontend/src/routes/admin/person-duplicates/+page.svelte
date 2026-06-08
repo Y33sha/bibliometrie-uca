@@ -5,7 +5,8 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { sanitizeTitle } from '$lib/utils';
-	import { sourceLabels, sourceBadgeClasses, identifierStatusClasses } from '$lib/labels';
+	import { identifierStatusClasses } from '$lib/labels';
+	import SourceTag from '$lib/components/SourceTag.svelte';
 
 	import type { components } from '$lib/api/schema';
 	type PersonDetail = components['schemas']['PersonDedupDetail'];
@@ -253,7 +254,7 @@
 								<div class="pub-item">
 									<div class="pub-sources-mini">
 										{#each pub.sources as src}
-											<span class="source-mini {sourceBadgeClasses[src] ?? ''}">{sourceLabels[src] ?? src}</span>
+											<SourceTag source={src} />
 										{/each}
 									</div>
 									<a href="{base}/publications/{pub.id}" class="pub-link">
@@ -460,20 +461,6 @@
 		margin-right: 4px;
 		vertical-align: middle;
 	}
-	.source-mini {
-		display: inline-block;
-		padding: 1px 5px;
-		border-radius: 8px;
-		font-size: 0.65rem;
-		font-weight: 600;
-		color: white;
-	}
-	.badge-hal { background: #28a745; }
-	.badge-oa { background: #fd7e14; }
-	.badge-wos { background: var(--accent); }
-	.badge-scanr { background: #6f42c1; }
-	.badge-theses { background: #17a2b8; }
-	.badge-crossref { background: #b8860b; }
 	.pub-link {
 		font-size: 0.85rem;
 		color: inherit;
