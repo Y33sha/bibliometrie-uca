@@ -466,12 +466,16 @@
 <style>
 	/* Dashboard */
 	.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+	@media (max-width: 760px) {
+		.dash-grid { grid-template-columns: 1fr; }
+	}
 	.dash-card-wide { grid-column: 1 / -1; }
 	.dash-card {
 		background: var(--card);
 		border: 1px solid var(--border);
 		border-radius: 6px;
 		padding: 16px;
+		min-width: 0; /* autorise la cellule grid à rétrécir sous la largeur du canvas */
 	}
 	.dash-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 12px; }
 	.chart-wrap { position: relative; height: 280px; }
