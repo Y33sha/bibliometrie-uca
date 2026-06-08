@@ -122,7 +122,7 @@
     color: #155724;
   }
   .identifier-tag.rejected :global(.tag-id) {
-    background: #f8d7da;
+    background: var(--danger-light);
     color: #721c24;
   }
   .tag {
@@ -158,8 +158,8 @@
     font-weight: bold;
   }
   .btn-status.btn-reject.active {
-    color: #dc3545;
-    border-color: #dc3545;
+    color: var(--danger);
+    border-color: var(--danger);
   }
   .btn-reject {
     background: none;

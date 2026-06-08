@@ -174,7 +174,7 @@
     font-family: inherit;
   }
   .tag .remove:hover {
-    color: #e74c3c;
+    color: var(--danger);
   }
   .tag.tutelle {
     background: #d4e8f0;

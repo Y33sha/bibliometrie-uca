@@ -235,7 +235,7 @@
 		color: #2a7d4f;
 	}
 	.state-icon.state-no {
-		background: #fde8e8;
+		background: var(--danger-light);
 		color: var(--danger);
 	}
 	.item-label {

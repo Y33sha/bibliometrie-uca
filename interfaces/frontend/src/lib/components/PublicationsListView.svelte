@@ -657,7 +657,7 @@
 	.hal-ok              { background: var(--success-light); color: #2a7d4f; }
 	.hal-notice          { background: #fff3e0; color: #c77c00; }
 	.hal-hors-collection { background: #ffe8d6; color: #d35400; }
-	.hal-hors-hal        { background: #fde8e8; color: var(--danger); }
+	.hal-hors-hal        { background: var(--danger-light); color: var(--danger); }
 
 	/* Auteur correspondant (person) */
 	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }

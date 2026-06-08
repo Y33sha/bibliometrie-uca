@@ -364,7 +364,7 @@
     color: white;
   }
   .conflict-icon {
-    background: #fde8e8;
+    background: var(--danger-light);
     color: var(--danger);
   }
   .source-summary-count {

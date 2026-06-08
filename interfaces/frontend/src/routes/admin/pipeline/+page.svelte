@@ -606,7 +606,7 @@
   }
   .badge-suspect {
     background: #fde2e2;
-    color: #a40000;
+    color: var(--danger);
     border: 1px solid #f5b5b5;
   }
   .badge-ok {
@@ -643,7 +643,7 @@
   }
   .data-table tr.suspect td.col-key {
     font-weight: 600;
-    color: #a40000;
+    color: var(--danger);
   }
   .col-key {
     text-align: left;
@@ -660,7 +660,7 @@
     color: var(--muted);
   }
   .error-cell {
-    color: #a40000;
+    color: var(--danger);
     font-weight: 600;
   }
 

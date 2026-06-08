@@ -397,9 +397,9 @@
     padding: 40px;
   }
   .error {
-    color: #dc3545;
+    color: var(--danger);
     padding: 8px 12px;
-    background: #f8d7da;
+    background: var(--danger-light);
     border-radius: 4px;
     margin-bottom: 12px;
   }
