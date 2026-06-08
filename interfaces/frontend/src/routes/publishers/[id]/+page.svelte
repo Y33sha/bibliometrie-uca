@@ -348,7 +348,7 @@
 	.journal-link { color: var(--accent); text-decoration: none; font-weight: 500; }
 	.journal-link:hover { text-decoration: underline; }
 	.badge-doaj {
-		font-size: 0.7rem; padding: 1px 5px; background: #2e7d32;
+		font-size: 0.7rem; padding: 1px 5px; background: var(--success);
 		color: white; border-radius: 8px; margin-left: 6px;
 		vertical-align: middle; font-weight: 600;
 	}

@@ -344,7 +344,7 @@
     margin-bottom: 0;
   }
   .source-ok {
-    color: #2a7d4f;
+    color: var(--success);
   }
   .source-conflict {
     color: var(--danger);

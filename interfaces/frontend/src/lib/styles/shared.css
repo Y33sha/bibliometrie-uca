@@ -367,12 +367,12 @@ th.sorted .sort-arrow {
 
 .id-badge.id-confirmed {
 	background: var(--success-light);
-	color: #2a7d4f;
+	color: var(--success);
 }
 
 .id-badge.id-confirmed:hover {
 	background: #d0eadb;
-	color: #2a7d4f;
+	color: var(--success);
 }
 
 /* ── ID icons (round, ORCID/idHAL/IdRef) ── */
@@ -655,7 +655,7 @@ th.sorted .sort-arrow {
 
 .oa-green {
 	background: var(--success-light);
-	color: #2a7d4f;
+	color: var(--green);
 }
 
 .oa-bronze {
@@ -674,8 +674,8 @@ th.sorted .sort-arrow {
 	font-size: 0.75rem;
 	padding: 1px 5px;
 	border-radius: 3px;
-	background: #e8f5e9;
-	color: #2e7d32;
+	background: var(--success-light);
+	color: var(--success);
 	font-weight: 500;
 	cursor: default;
 }

@@ -276,8 +276,8 @@
 		border-radius: 8px;
 	}
 	.status-badge.soutenue {
-		background: #e8f5e9;
-		color: #2e7d32;
+		background: var(--success-light);
+		color: var(--success);
 	}
 	.status-badge.en-cours {
 		background: #fff3e0;

@@ -118,8 +118,8 @@
     text-decoration: line-through;
   }
   .identifier-tag.confirmed :global(.tag-id) {
-    background: #d4edda;
-    color: #155724;
+    background: var(--success-light);
+    color: var(--success);
   }
   .identifier-tag.rejected :global(.tag-id) {
     background: var(--danger-light);
@@ -153,8 +153,8 @@
     background: #f0f0f0;
   }
   .btn-status.active {
-    color: #28a745;
-    border-color: #28a745;
+    color: var(--success);
+    border-color: var(--success);
     font-weight: bold;
   }
   .btn-status.btn-reject.active {

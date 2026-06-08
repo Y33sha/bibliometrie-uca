@@ -232,7 +232,7 @@
 	}
 	.state-icon.state-yes {
 		background: var(--success-light);
-		color: #2a7d4f;
+		color: var(--success);
 	}
 	.state-icon.state-no {
 		background: var(--danger-light);

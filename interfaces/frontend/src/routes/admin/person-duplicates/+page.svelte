@@ -347,7 +347,7 @@
 		color: var(--muted, #666);
 	}
 	.stat-position { background: #e2e6ea; color: #333; font-weight: 600; }
-	.stat-merged { background: #d4edda; color: #155724; }
+	.stat-merged { background: var(--success-light); color: var(--success); }
 	.stat-distinct { background: #fff3cd; color: #856404; }
 	.stat-skipped { background: #e8e8e8; color: #666; }
 	.nav-buttons { display: flex; gap: 4px; margin-left: auto; }
@@ -437,7 +437,7 @@
 	.ident-value {
 		padding: 2px 6px;
 	}
-	.id-confirmed .ident-value { background: #d4edda; }
+	.id-confirmed .ident-value { background: var(--success-light); }
 	.id-rejected .ident-value { background: var(--danger-light); text-decoration: line-through; opacity: 0.6; }
 	.id-pending .ident-value { background: #e3f2fd; }
 

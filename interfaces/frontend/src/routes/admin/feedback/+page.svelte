@@ -585,7 +585,7 @@
   }
   .struct-confirmed {
     background: var(--success-light);
-    color: #2a7d4f;
+    color: var(--success);
   }
   .struct-detected {
     background: var(--warning-light);

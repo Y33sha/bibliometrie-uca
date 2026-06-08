@@ -323,7 +323,7 @@
 		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
 	}
 	.badge-doaj {
-		font-size: 0.7rem; padding: 2px 6px; background: #2e7d32;
+		font-size: 0.7rem; padding: 2px 6px; background: var(--success);
 		color: white; border-radius: 8px; margin-left: 8px;
 		vertical-align: middle; font-weight: 600; letter-spacing: 0.3px;
 		text-decoration: none;
@@ -365,7 +365,7 @@
 	}
 	.expected-label { color: var(--muted); font-weight: 600; margin-right: 4px; }
 	.expected-tag {
-		background: var(--success-light); color: #2a7d4f;
+		background: var(--success-light); color: var(--success);
 		padding: 1px 8px; border-radius: 10px; font-size: 0.8rem;
 	}
 

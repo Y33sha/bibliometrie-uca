@@ -654,7 +654,7 @@
 		font-weight: 500;
 		white-space: nowrap;
 	}
-	.hal-ok              { background: var(--success-light); color: #2a7d4f; }
+	.hal-ok              { background: var(--success-light); color: var(--success); }
 	.hal-notice          { background: #fff3e0; color: #c77c00; }
 	.hal-hors-collection { background: #ffe8d6; color: #d35400; }
 	.hal-hors-hal        { background: var(--danger-light); color: var(--danger); }
