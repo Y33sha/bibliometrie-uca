@@ -120,8 +120,6 @@
 		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--muted);
-		text-transform: uppercase;
-		letter-spacing: 0.3px;
 		border-bottom: 1px solid var(--border);
 		white-space: nowrap;
 	}

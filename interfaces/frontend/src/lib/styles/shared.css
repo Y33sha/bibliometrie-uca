@@ -147,13 +147,11 @@
 .data-table th {
 	text-align: left;
 	padding: 8px 10px;
-	font-size: 0.8rem;
+	font-size: 0.85rem;
 	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.5px;
 	color: var(--muted);
 	border-bottom: 2px solid var(--border);
-	background: var(--surface-hover);
+	background: var(--surface);
 	white-space: nowrap;
 }
 

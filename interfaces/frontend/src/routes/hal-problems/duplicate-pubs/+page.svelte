@@ -107,7 +107,7 @@
 
 {#if activeTab === 'doi'}
 	{#if doiLoading}
-		<div class="loading">Chargement...</div>
+		<div class="loading">Chargement…</div>
 	{:else if doiPairs.length === 0}
 		<div class="no-results">Aucun doublon par DOI</div>
 	{:else}
@@ -138,7 +138,7 @@
 
 {:else}
 	{#if metaLoading}
-		<div class="loading">Chargement...</div>
+		<div class="loading">Chargement…</div>
 	{:else if metaPairs.length === 0}
 		<div class="no-results">Aucun doublon par métadonnées</div>
 	{:else}

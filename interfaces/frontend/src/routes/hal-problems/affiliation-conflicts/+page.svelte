@@ -62,7 +62,7 @@
 </div>
 
 {#if loading}
-	<div class="loading">Chargement...</div>
+	<div class="loading">Chargement…</div>
 {:else if pubs.length === 0}
 	<div class="no-results">Aucun conflit détecté</div>
 {:else}

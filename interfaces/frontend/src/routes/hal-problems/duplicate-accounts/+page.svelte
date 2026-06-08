@@ -55,7 +55,7 @@
 </div>
 
 {#if loading}
-  <div class="loading">Chargement...</div>
+  <div class="loading">Chargement…</div>
 {:else if persons.length === 0}
   <div class="no-results">Aucun doublon détecté</div>
 {:else}

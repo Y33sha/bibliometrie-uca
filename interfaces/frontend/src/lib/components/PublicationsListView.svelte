@@ -190,9 +190,9 @@
 	});
 
 	// Sort display
-	const yearSortArrow = $derived(currentSort === 'year_asc' ? '↑' : currentSort === 'year_desc' ? '↓' : '');
-	const titleSortArrow = $derived(currentSort === 'title' ? '↑' : currentSort === 'title_desc' ? '↓' : '');
-	const apcSortArrow = $derived(currentSort === 'apc_asc' ? '↑' : currentSort === 'apc_desc' ? '↓' : '');
+	const yearSortArrow = $derived(currentSort === 'year_asc' ? '▲' : currentSort === 'year_desc' ? '▼' : '');
+	const titleSortArrow = $derived(currentSort === 'title' ? '▲' : currentSort === 'title_desc' ? '▼' : '');
+	const apcSortArrow = $derived(currentSort === 'apc_asc' ? '▲' : currentSort === 'apc_desc' ? '▼' : '');
 	const yearSortActive = $derived(currentSort === 'year_desc' || currentSort === 'year_asc');
 	const titleSortActive = $derived(currentSort === 'title' || currentSort === 'title_desc');
 	const apcSortActive = $derived(currentSort === 'apc_desc' || currentSort === 'apc_asc');

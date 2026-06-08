@@ -42,7 +42,7 @@
 	}
 
 	function sortArrow(asc: string, desc: string): string {
-		return sort === asc ? '↑' : sort === desc ? '↓' : '';
+		return sort === asc ? '▲' : sort === desc ? '▼' : '';
 	}
 	function sortActive(asc: string, desc: string): boolean {
 		return sort === asc || sort === desc;
@@ -211,9 +211,9 @@
 		text-align: left;
 		padding: 6px 8px;
 		border-bottom: 2px solid var(--border);
-		font-size: 0.8rem;
+		font-size: 0.85rem;
+		font-weight: 600;
 		color: var(--muted);
-		text-transform: uppercase;
 		background: var(--surface);
 		white-space: nowrap;
 	}

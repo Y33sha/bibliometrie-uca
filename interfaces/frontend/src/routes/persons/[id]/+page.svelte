@@ -283,7 +283,7 @@
 	</div>
 {:else if !profile}
 	<div class="profile-header">
-		<div class="loading">Chargement...</div>
+		<div class="loading">Chargement…</div>
 	</div>
 {:else}
 	<!-- Profile header -->
@@ -331,7 +331,7 @@
 	{#if activeTab === 'dashboard'}
 		<div class="tab-content">
 			{#if !dashboardLoaded}
-				<div class="loading">Chargement...</div>
+				<div class="loading">Chargement…</div>
 			{:else}
 				<div class="dash-grid">
 					<div class="dash-card dash-card-wide">
@@ -387,7 +387,7 @@
 	{#if activeTab === 'theses'}
 		<div class="tab-content">
 			{#if !thesesLoaded}
-				<div class="loading">Chargement...</div>
+				<div class="loading">Chargement…</div>
 			{:else if thesesSections.length === 0}
 				<div class="no-results">Aucune thèse liée</div>
 			{:else}
@@ -431,7 +431,7 @@
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
 			{#if !addrLoaded}
-				<div class="loading">Chargement...</div>
+				<div class="loading">Chargement…</div>
 			{:else if addresses.length === 0}
 				<div class="no-results">Aucune adresse</div>
 			{:else}
