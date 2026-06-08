@@ -131,6 +131,16 @@ class TestCleanPublicationTitle:
         """Un titre avec balises HTML déjà propres est laissé tel quel."""
         assert clean_publication_title("<i>Candida</i> species") == ("<i>Candida</i> species")
 
+    def test_collapses_whitespace_keeps_html(self):
+        """Sauts de ligne / tabs / espaces multiples (markup source indenté)
+        collapsés en un espace ; balises HTML conservées (cf. chantier
+        export-csv-fidele, audit : ~1025 titres concernés)."""
+        assert (
+            clean_publication_title("Resistant\n            <i>E. coli</i>\n            ST131")
+            == "Resistant <i>E. coli</i> ST131"
+        )
+        assert clean_publication_title("  spaced \t title  ") == "spaced title"
+
     def test_idempotent(self):
         """Appliquer deux fois ne change rien (sécurité re-traitement)."""
         once = clean_publication_title("&amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt;")

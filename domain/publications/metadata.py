@@ -116,18 +116,24 @@ def has_minimal_publication_metadata(title: str | None, pub_year: int | None) ->
     return bool(title) and bool(pub_year)
 
 
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
 def clean_publication_title(title: str | None) -> str | None:
-    """Décode un titre double-encodé HTML, sinon le retourne tel quel.
+    """Nettoie un titre pour la persistance et l'affichage.
 
-    Détection : présence d'`&amp;` immédiatement suivi d'une entité connue
-    (`lt`, `gt`, `amp`, `quot`, `apos`, `#NNN`, `#xHH`). Ce motif est la
-    signature du double-encodage et ne se rencontre pas dans un titre
-    normal (un `&amp;` isolé légitime style "Smith &amp; Jones" n'est pas
-    suivi d'un nom d'entité, donc reste inchangé).
+    - Décode un titre double-encodé HTML (signature `&amp;` immédiatement suivi
+      d'une entité connue : `lt`, `gt`, `amp`, `quot`, `apos`, `#NNN`, `#xHH` ;
+      un `&amp;` isolé légitime style "Smith &amp; Jones" reste inchangé). Deux
+      niveaux de décodage pour retomber sur le HTML d'origine.
+    - Collapse le whitespace parasite (newlines / tabs / espaces multiples → un
+      seul espace, trim) : fréquent quand le markup source (MathML/HTML) est
+      indenté dans le titre.
 
-    Quand détecté, on décode deux niveaux pour retomber sur le HTML
-    d'origine. Idempotent : un second appel sur le résultat ne change rien.
+    Conserve les balises HTML (rendues à l'affichage). Idempotent.
     """
-    if not title or not _DOUBLE_ENCODED_RE.search(title):
+    if not title:
         return title
-    return _decode_html_entities_once(_decode_html_entities_once(title))
+    if _DOUBLE_ENCODED_RE.search(title):
+        title = _decode_html_entities_once(_decode_html_entities_once(title))
+    return _WHITESPACE_RE.sub(" ", title).strip()
