@@ -1,11 +1,13 @@
 * [ ] oneshot vacuum full journals sur base de prod
 # A régler avant transmission
 ## Pipeline de traitement
+* [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / pipeline:   51/181... (51 mis à jour, 0 déjà complets) => toujours 0 déjà complet: calculé comment? / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => pourquoi "rattachement" en phase normalize?
 ### Extraction
 * [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] extraction par ORCID: vérifier faisabilité (quelles sources?)
 * [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples) (compliqué; auditer d'abord pour voir si ça touche bcp de docts)
 * [ ] Paralléliser cross-imports entre eux
+* [ ] "Recherche des works OpenAlex avec primary_location HAL" => étendre à toutes les locations
 ### Normalisation
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur
 ### Suite du traitement
@@ -22,6 +24,7 @@
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
 * [ ] documents fusionnés à tort par les sources: thèses avec un nom d'éditeur ou de revue: problème de fusion thèse-article (par OpenAlex en général); autre cas: 116652 (chapitres différents fusionnés ensemble par DOI) => créer circuit pour empêcher fusion de source_authorships
 * sujets: cooccurrences calculées sur publications, ou sur source_publications? idem nombre d'occurrences (ex.: sujet vaches laitières, 10 occurrences annoncées, 2 publications affichées)
+* règle "dumas => mémoire": vérifier qu'elle est tjs active (cf 151542)
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée? récupérer pmid dans api HAL
 * [ ] pour les jeux de données: DataCite, Zenodo, autres?
@@ -37,7 +40,8 @@
 ### Côté UI
 * [ ] Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation?
 
-# Détails à régler au fil de l'eau (interface)
+# UI
+* [ ] repenser entièrement la page stats
 ## Admin
 * [ ] interface pour consulter l'audit trail
 * [ ] comportement capricieux de l'UI sur la page countries (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine.
@@ -58,6 +62,11 @@
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
 * [ ] fusion revues ou modif revue: pas de mise à jour automatique de la page
 * [ ] lien dashboard => publications: il faut que toutes les facettes actives soient affichées!
+* [ ] pb lien ROR page laboratories
+* [ ] balises html dans l'export csv génèrent des sauts de ligne
+* [ ] filtre sources non pris en compte dans l'export csv
+* [ ] dashboard éditeur / revue: graphiques
+* [ ] ajouter facettes sur dashboards?
 
 # Cas particuliers, bizarreries à élucider
 * openalex répète des auteurs : publi 77832
@@ -71,6 +80,7 @@
 * http://localhost:5176/bibliometrie/publications/133184 : 2 entrées "theses.fr", dont l'une redirige vers l'autre
 * thèses 160226 et 132778 non fusionnées
 * [ ] élucider pourquoi Openalex contient parfois beaucoup plus d'auteurs : ex. 21105 (OpenAlex semble résoudre les noms d'équipes en listes de noms de personnes, mais je ne sais pas comment)
+* 52083 => pourquoi type data paper?
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
