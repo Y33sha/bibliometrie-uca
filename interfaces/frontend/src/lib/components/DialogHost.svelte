@@ -64,9 +64,9 @@
 		background: var(--success, #2e7d32);
 	}
 	.toast-error {
-		background: var(--danger, #c0392b);
+		background: var(--danger);
 	}
 	.toast-info {
-		background: var(--accent, #3b6b9e);
+		background: var(--accent);
 	}
 </style>

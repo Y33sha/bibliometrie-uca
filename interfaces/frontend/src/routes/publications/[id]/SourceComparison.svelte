@@ -347,7 +347,7 @@
     color: #2a7d4f;
   }
   .source-conflict {
-    color: #c0392b;
+    color: var(--danger);
   }
   .status-icon {
     display: inline-flex;
@@ -365,7 +365,7 @@
   }
   .conflict-icon {
     background: #fde8e8;
-    color: #c0392b;
+    color: var(--danger);
   }
   .source-summary-count {
     font-size: 0.85rem;
@@ -503,7 +503,7 @@
   .struct-tag {
     display: inline-block;
     padding: 1px 6px;
-    background: #e8f0f8;
+    background: var(--accent-light);
     border-radius: 3px;
     font-size: 0.8rem;
     color: var(--accent);

@@ -520,7 +520,7 @@
 		font-size: 0.8rem; font-weight: 600; color: var(--muted);
 		text-transform: uppercase; letter-spacing: 0.3px;
 	}
-	.tutelle-tag { background: #e8f0f8; color: var(--accent); }
+	.tutelle-tag { background: var(--accent-light); color: var(--accent); }
 	.partner-tag { background: #f0efec; color: var(--muted); }
 	.id-badge { margin-right: 8px; }
 
@@ -580,6 +580,6 @@
 		font-size: 0.8rem;
 		font-weight: 500;
 	}
-	.status-tag.confirmed { background: #e6f4ec; color: #2a7d4f; }
+	.status-tag.confirmed { background: var(--success-light); color: #2a7d4f; }
 	.status-tag.pending { background: #f0efec; color: var(--muted); }
 </style>

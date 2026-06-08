@@ -285,7 +285,7 @@
     background: #fd7e14;
   }
   .badge-wos {
-    background: #3b6b9e;
+    background: var(--accent);
   }
   .badge-scanr {
     background: #6f42c1;
@@ -358,7 +358,7 @@
     font-size: 0.8rem;
   }
   .person-link-name {
-    color: var(--accent, #3b6b9e);
+    color: var(--accent);
     text-decoration: none;
     font-size: 0.85rem;
   }

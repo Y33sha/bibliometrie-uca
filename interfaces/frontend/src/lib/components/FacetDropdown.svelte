@@ -187,7 +187,7 @@
 	}
 	.facet-btn.has-selection {
 		border-color: var(--accent);
-		background: #e8f0f8;
+		background: var(--accent-light);
 	}
 	.facet-badge {
 		display: inline-flex;

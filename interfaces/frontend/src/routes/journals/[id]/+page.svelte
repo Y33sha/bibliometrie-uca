@@ -330,7 +330,7 @@
 	}
 	a.badge-doaj:hover { background: #256528; }
 	.badge-predatory {
-		font-size: 0.7rem; padding: 2px 6px; background: #c0392b;
+		font-size: 0.7rem; padding: 2px 6px; background: var(--danger);
 		color: white; border-radius: 8px; margin-left: 6px;
 		vertical-align: middle; font-weight: 600; letter-spacing: 0.3px;
 	}
@@ -365,7 +365,7 @@
 	}
 	.expected-label { color: var(--muted); font-weight: 600; margin-right: 4px; }
 	.expected-tag {
-		background: #e6f4ec; color: #2a7d4f;
+		background: var(--success-light); color: #2a7d4f;
 		padding: 1px 8px; border-radius: 10px; font-size: 0.8rem;
 	}
 

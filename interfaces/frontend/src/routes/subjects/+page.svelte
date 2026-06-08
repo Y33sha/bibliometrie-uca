@@ -148,7 +148,7 @@
   }
   .hint {
     margin: 0 0 16px;
-    color: var(--muted, #6b7280);
+    color: var(--muted);
     font-size: 0.9rem;
   }
   .filters {
@@ -171,7 +171,7 @@
     margin-left: 4px;
   }
   .total {
-    color: var(--muted, #6b7280);
+    color: var(--muted);
     margin: 0 0 8px;
     font-size: 0.9rem;
   }
@@ -179,7 +179,7 @@
     opacity: 0.6;
   }
   .empty {
-    color: var(--muted, #6b7280);
+    color: var(--muted);
     font-style: italic;
   }
   table {
@@ -232,6 +232,6 @@
     text-decoration: underline;
   }
   .loading {
-    color: var(--muted, #6b7280);
+    color: var(--muted);
   }
 </style>

@@ -606,7 +606,7 @@
 
 <style>
 	.filter-banner {
-		background: #e8f0f8;
+		background: var(--accent-light);
 		border: 1px solid #c4d8ed;
 		border-radius: 5px;
 		padding: 8px 14px;
@@ -654,10 +654,10 @@
 		font-weight: 500;
 		white-space: nowrap;
 	}
-	.hal-ok              { background: #e6f4ec; color: #2a7d4f; }
+	.hal-ok              { background: var(--success-light); color: #2a7d4f; }
 	.hal-notice          { background: #fff3e0; color: #c77c00; }
 	.hal-hors-collection { background: #ffe8d6; color: #d35400; }
-	.hal-hors-hal        { background: #fde8e8; color: #c0392b; }
+	.hal-hors-hal        { background: #fde8e8; color: var(--danger); }
 
 	/* Auteur correspondant (person) */
 	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }
@@ -669,5 +669,5 @@
 		color: #ccc; font-size: 0.85rem; padding: 2px 4px;
 		border-radius: 3px; line-height: 1; transition: color 0.15s, background 0.15s;
 	}
-	.exclude-btn:hover { color: #c0392b; background: #fdeaea; }
+	.exclude-btn:hover { color: var(--danger); background: #fdeaea; }
 </style>

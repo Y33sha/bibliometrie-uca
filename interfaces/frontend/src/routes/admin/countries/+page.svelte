@@ -316,7 +316,7 @@
 	.batch-bar {
 		display: flex; align-items: center; gap: 8px;
 		padding: 8px 12px; margin-bottom: 10px;
-		background: #e8f0f8; border-radius: 6px; font-size: 0.9rem;
+		background: var(--accent-light); border-radius: 6px; font-size: 0.9rem;
 	}
 	.batch-bar select { padding: 5px 8px; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; }
 	.batch-result { font-size: 0.85rem; color: var(--success); font-weight: 500; }
@@ -356,7 +356,7 @@
 		background: none; border: none; cursor: pointer;
 		color: #888; font-size: 0.8rem; padding: 0 1px; line-height: 1;
 	}
-	.tag-remove:hover { color: #c0392b; }
+	.tag-remove:hover { color: var(--danger); }
 	.add-country {
 		padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px;
 		font-size: 0.75rem; width: 32px; color: var(--muted); cursor: pointer;
