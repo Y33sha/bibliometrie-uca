@@ -34,10 +34,10 @@ L'export CSV (publications et thèses) diverge du tableau affiché sur trois pla
 - [x] Backend : émission dynamique dans l'ordre d'affichage ; APC ajouté (montant total), Corresp. + Voie OA (oa_status) ; SELECT enrichi (`apc_total`, `is_corresponding`). Test ajouté.
 - [x] Mapping (décidé) : une colonne CSV par colonne d'affichage visible (Année↔year, Type↔type, Titre↔title, Revue↔journal, Labo(s)↔labs, Corresp.↔corr, APC↔apc, Accès↔oa, Voie OA↔oa_status). **DOI + Sources** = contenu de la colonne « Liens » (fixe) → **toujours présents**. **Éditeur** : présent **ssi « Revue » visible**. **APC** = montant total € (au lieu du détail UI). **Statut HAL** : exclu du CSV (calculé côté front, dépend de la collection labo — disproportionné à répliquer). Clé d'affichage `oa_path` renommée `oa_status` (hapax → vrai terme).
 
-### Phase 3 — Nettoyage du whitespace des titres (données, à-côté)
-- [ ] Localiser l'étape de création du titre canonique (normalize / `effective_metadata` / match_or_create) — à tracer, ne pas supposer.
-- [ ] Y collapser le whitespace du titre (`\n`/`\t`/espaces multiples → un espace, trim) ; conserver les balises HTML.
-- [ ] Migration Alembic (SQL pur) pour backfiller le stock (~1025 titres) sur la base de prod (par Laura).
+### Phase 3 — Nettoyage du whitespace des titres (données, à-côté) ✅
+- [x] Point d'accroche : `clean_publication_title` (déjà appliqué à la création dans `match_or_create_publications`, le titre persisté est le nettoyé).
+- [x] Collapse du whitespace ajouté à `clean_publication_title` (`\s+` → un espace + trim) ; balises HTML conservées. Test unitaire.
+- [x] Migration Alembic SQL pur `e3f5a7c9d1b4` (collapse `regexp_replace`, idempotent, downgrade no-op) — **à appliquer par Laura** (`alembic upgrade head` + `dump_schema`).
 
 ## Questions ouvertes
 
