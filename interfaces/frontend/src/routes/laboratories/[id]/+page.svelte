@@ -3,6 +3,7 @@
 	import { base } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
+	import { rorShortId, rorFullUrl } from '$lib/utils';
 	import { Chart, registerables } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
 	Chart.register(...registerables, ChartDataLabels);
@@ -76,9 +77,6 @@
 	const tutelles = $derived(parents.filter((p) => p.relation_type === 'est_tutelle_de'));
 	const partenaires = $derived(parents.filter((p) => p.relation_type === 'est_partenaire_de'));
 
-	function rorShortId(rorId: string): string {
-		return rorId.replace('https://ror.org/', '');
-	}
 
 	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, addresses).
 	// Les filtres publications/thèses/personnes sont gérés par leurs ListView.
@@ -325,7 +323,7 @@
 			<div class="meta-row">
 				{#if lab.ror_id}
 					<span class="meta-label">ROR</span>
-					<a href={lab.ror_id} target="_blank" rel="noopener" class="id-badge">
+					<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="id-badge">
 						{rorShortId(lab.ror_id)}
 					</a>
 				{/if}

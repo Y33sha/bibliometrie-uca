@@ -4,12 +4,11 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { api, ApiError, nameForms, structures as structuresApi } from "$lib/api";
+  import { rorFullUrl, rorShortId } from "$lib/utils";
   import { confirmDialog, toast } from "$lib/dialogs.svelte";
   import {
     API_SOURCES,
     halCollectionUrl,
-    rorFullUrl,
-    rorShortId,
     type EditFormState,
     type NameForm,
     type Structure,

@@ -2,6 +2,7 @@
 	import { onMount } from "svelte";
 	import { base } from "$app/paths";
 	import { api } from "$lib/api";
+	import { rorShortId, rorFullUrl } from "$lib/utils";
 
 	import type { components } from "$lib/api/schema";
 	type Lab = components["schemas"]["LaboratoryListItem"];
@@ -51,10 +52,6 @@
 			sortCol = col;
 			sortAsc = true;
 		}
-	}
-
-	function rorShortId(rorId: string): string {
-		return rorId.replace("https://ror.org/", "");
 	}
 
 	onMount(async () => {
@@ -129,7 +126,7 @@
 				<td>
 					{#if lab.ror_id}
 						<a
-							href={lab.ror_id}
+							href={rorFullUrl(lab.ror_id)}
 							target="_blank"
 							rel="noopener"
 							class="id-badge"

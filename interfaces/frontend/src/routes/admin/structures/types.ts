@@ -32,15 +32,6 @@ export const API_SOURCE_LABELS: Record<string, string> = {
 };
 
 // ── Helpers ──
-export function rorShortId(rorId: string): string {
-  return rorId.replace("https://ror.org/", "");
-}
-
-export function rorFullUrl(rorId: string): string {
-  if (rorId.startsWith("http")) return rorId;
-  return "https://ror.org/" + rorId;
-}
-
 export function halCollectionUrl(code: string): string {
   return `https://hal.science/search/index/?qa%5BcollCode_s%5D%5B%5D=${code}`;
 }
