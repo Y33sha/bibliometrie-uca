@@ -176,6 +176,7 @@
 	<span class="count">{publishers.total.toLocaleString('fr-FR')} éditeur{publishers.total > 1 ? 's' : ''}</span>
 </div>
 
+<div class="table-scroll">
 <table class="publishers-table">
 	<thead>
 		<tr>
@@ -218,6 +219,7 @@
 		{/if}
 	</tbody>
 </table>
+</div>
 
 <Pagination
 	page={publishers.page}
@@ -232,6 +234,7 @@
 <style>
 	.publishers-table {
 		width: 100%;
+		min-width: 620px;
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);

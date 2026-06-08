@@ -56,6 +56,7 @@
 	const titleActive = $derived(sortActive('title', 'title_desc'));
 </script>
 
+<div class="table-scroll">
 <table class="theses-table">
 	<thead>
 		<tr>
@@ -194,10 +195,12 @@
 		{/each}
 	</tbody>
 </table>
+</div>
 
 <style>
 	.theses-table {
 		width: 100%;
+		min-width: 720px;
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);

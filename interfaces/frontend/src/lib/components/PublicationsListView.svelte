@@ -439,6 +439,7 @@
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
 
+<div class="table-scroll">
 <table class="pub-table">
 	<thead>
 		<tr>
@@ -601,6 +602,7 @@
 		{/if}
 	</tbody>
 </table>
+</div>
 
 <Pagination page={pubs.page} pages={pubs.pages} onchange={(p) => { pubs.goToPage(p); syncUrl(); }} />
 
@@ -618,6 +620,7 @@
 	.toolbar input[type='text'] { width: 280px; }
 	.pub-table {
 		width: 100%;
+		min-width: 760px;
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);

@@ -214,6 +214,7 @@
 	<span class="count">{journals.total.toLocaleString('fr-FR')} revue{journals.total > 1 ? 's' : ''}</span>
 </div>
 
+<div class="table-scroll">
 <table class="journals-table">
 	<thead>
 		<tr>
@@ -269,6 +270,7 @@
 		{/if}
 	</tbody>
 </table>
+</div>
 
 <Pagination
 	page={journals.page}
@@ -283,6 +285,7 @@
 <style>
 	.journals-table {
 		width: 100%;
+		min-width: 660px;
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);
