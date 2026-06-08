@@ -183,32 +183,28 @@
 
 {#if editModal}
 <Modal title="Modifier la revue" maxWidth="520px" onclose={() => editModal = null} onsubmit={saveEdit}>
-		<label>Titre</label>
-		<input bind:value={editModal.title} />
+		<label>Titre <input bind:value={editModal.title} /></label>
 		<div style="display:flex;gap:8px">
-			<div style="flex:1"><label>ISSN</label><input bind:value={editModal.issn} placeholder="1234-5678" /></div>
-			<div style="flex:1"><label>eISSN</label><input bind:value={editModal.eissn} /></div>
-			<div style="flex:1"><label>ISSN-L</label><input bind:value={editModal.issnl} /></div>
+			<div style="flex:1"><label>ISSN <input bind:value={editModal.issn} placeholder="1234-5678" /></label></div>
+			<div style="flex:1"><label>eISSN <input bind:value={editModal.eissn} /></label></div>
+			<div style="flex:1"><label>ISSN-L <input bind:value={editModal.issnl} /></label></div>
 		</div>
-		<label>DOI prefix</label>
-		<input bind:value={editModal.doi_prefix} placeholder="ex: 10.1038/s41586" />
+		<label>DOI prefix <input bind:value={editModal.doi_prefix} placeholder="ex: 10.1038/s41586" /></label>
 		<div style="display:flex;gap:8px">
 			<div style="flex:1">
-				<label>Modèle OA</label>
-				<select bind:value={editModal.oa_model}>
+				<label>Modèle OA <select bind:value={editModal.oa_model}>
 					<option value="">(non renseigné)</option>
 					<option value="subscription">Abonnement</option>
 					<option value="full_oa">Full OA (gold/diamond)</option>
 					<option value="repository">Archive/dépôt</option>
-				</select>
+				</select></label>
 			</div>
 			<div style="flex:1">
-				<label>Type</label>
-				<select bind:value={editModal.journal_type}>
+				<label>Type <select bind:value={editModal.journal_type}>
 					{#each journalTypes as opt (opt.value)}
 						<option value={opt.value}>{opt.label_fr}</option>
 					{/each}
-				</select>
+				</select></label>
 			</div>
 		</div>
 		<div style="display:flex;gap:12px;margin-top:8px">
@@ -216,8 +212,7 @@
 			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_predatory} /> Prédateur</label>
 			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_in_doaj} /> DOAJ</label>
 		</div>
-		<label>APC (€)</label>
-		<input bind:value={editModal.apc_amount} placeholder="ex: 2500" type="number" />
+		<label>APC (€) <input bind:value={editModal.apc_amount} placeholder="ex: 2500" type="number" /></label>
 		{#snippet actions()}
 			<button class="btn" onclick={() => editModal = null}>Annuler</button>
 			<button class="btn btn-primary" onclick={saveEdit}>Enregistrer</button>

@@ -33,14 +33,10 @@
   {onclose}
   {onsubmit}
 >
-    <label>Code (unique)</label>
-    <input placeholder="ex: lpc, chu_clermont, site_cezeaux" bind:value={code} disabled={editMode} />
-    <label>Nom complet</label>
-    <input placeholder="ex: Laboratoire de Physique de Clermont" bind:value={name} />
-    <label>Acronyme</label>
-    <input placeholder="ex: LPC" bind:value={acronym} />
-    <label>Type</label>
-    <select bind:value={type}>
+    <label>Code (unique) <input placeholder="ex: lpc, chu_clermont, site_cezeaux" bind:value={code} disabled={editMode} /></label>
+    <label>Nom complet <input placeholder="ex: Laboratoire de Physique de Clermont" bind:value={name} /></label>
+    <label>Acronyme <input placeholder="ex: LPC" bind:value={acronym} /></label>
+    <label>Type <select bind:value={type}>
       <option value="labo">Laboratoire</option>
       <option value="universite">Université</option>
       <option value="onr">ONR</option>
@@ -48,16 +44,13 @@
       <option value="ecole">École</option>
       <option value="site">Site</option>
       <option value="autre">Autre</option>
-    </select>
-    <label>ROR ID</label>
-    <input placeholder="https://ror.org/0xxxxxxxxx" bind:value={ror} />
-    <label>Collection HAL</label>
-    <input placeholder="ex: INSTITUT_PASCAL" bind:value={hal} />
+    </select></label>
+    <label>ROR ID <input placeholder="https://ror.org/0xxxxxxxxx" bind:value={ror} /></label>
+    <label>Collection HAL <input placeholder="ex: INSTITUT_PASCAL" bind:value={hal} /></label>
     <details class="api-ids-section">
       <summary>Identifiants API par source</summary>
       {#each API_SOURCES as src}
-        <label class="api-id-label">{API_SOURCE_LABELS[src]}</label>
-        <input placeholder="ex: id1, id2" bind:value={apiIds[src]} />
+        <label class="api-id-label">{API_SOURCE_LABELS[src]} <input placeholder="ex: id1, id2" bind:value={apiIds[src]} /></label>
       {/each}
     </details>
     {#snippet actions()}

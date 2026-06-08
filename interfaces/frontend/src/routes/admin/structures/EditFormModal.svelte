@@ -14,8 +14,7 @@
 </script>
 
 <Modal title="Modifier la forme de nom" maxWidth="460px" {onclose} onsubmit={onsave}>
-    <label>Texte</label>
-    <input bind:value={state.form_text} />
+    <label>Texte <input bind:value={state.form_text} /></label>
     <div class="modal-options">
       <label class="checkbox-label">
         <input
