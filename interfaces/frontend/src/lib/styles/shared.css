@@ -42,6 +42,13 @@
 	font-family: inherit;
 }
 
+/* Un bouton dans une barre d'outils s'aligne sur le gabarit des champs/
+   dropdowns voisins (même hauteur). `.btn-sm` reste petit volontairement. */
+.toolbar .btn:not(.btn-sm) {
+	padding: 6px 10px;
+	font-size: 0.95rem;
+}
+
 .toolbar-spacer {
 	flex: 1;
 }

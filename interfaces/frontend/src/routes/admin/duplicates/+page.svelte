@@ -93,9 +93,9 @@
 
   <div class="stats-bar">
     <div class="nav-group">
-      <button class="btn-nav" onclick={() => loadAt(Math.max(0, offset - 1))} disabled={loading || offset === 0} title="Paire précédente">&lsaquo;</button>
+      <button class="btn btn-nav" onclick={() => loadAt(Math.max(0, offset - 1))} disabled={loading || offset === 0} title="Paire précédente">&lsaquo;</button>
       <span class="stat stat-position">{total > 0 ? offset + 1 : 0} / {total}</span>
-      <button class="btn-nav" onclick={() => loadAt(offset + 1)} disabled={loading || !pair} title="Paire suivante">&rsaquo;</button>
+      <button class="btn btn-nav" onclick={() => loadAt(offset + 1)} disabled={loading || !pair} title="Paire suivante">&rsaquo;</button>
     </div>
     {#if mergedCount}<span class="stat stat-merged">{mergedCount} fusionnée{mergedCount !== 1 ? "s" : ""}</span>{/if}
     {#if distinctCount}<span class="stat stat-distinct">{distinctCount} distincte{distinctCount !== 1 ? "s" : ""}</span>{/if}
@@ -122,10 +122,10 @@
 
       <!-- Actions -->
       <div class="pair-actions">
-        <button class="btn-merge" onclick={() => mergePair(a.id, b.id)} disabled={acting} title="Garder la publication de gauche, absorber celle de droite"> &larr; Garder gauche </button>
-        <button class="btn-distinct" onclick={() => markDistinct(a.id, b.id)} disabled={acting} title="Ces deux publications sont bien distinctes"> Marquer distincts </button>
-        <button class="btn-skip" onclick={() => loadAt(offset + 1)} disabled={acting} title="Passer cette paire pour y revenir plus tard"> Passer &rsaquo; </button>
-        <button class="btn-merge" onclick={() => mergePair(b.id, a.id)} disabled={acting} title="Garder la publication de droite, absorber celle de gauche"> Garder droite &rarr; </button>
+        <button class="btn btn-merge" onclick={() => mergePair(a.id, b.id)} disabled={acting} title="Garder la publication de gauche, absorber celle de droite"> &larr; Garder gauche </button>
+        <button class="btn btn-distinct" onclick={() => markDistinct(a.id, b.id)} disabled={acting} title="Ces deux publications sont bien distinctes"> Marquer distincts </button>
+        <button class="btn btn-skip" onclick={() => loadAt(offset + 1)} disabled={acting} title="Passer cette paire pour y revenir plus tard"> Passer &rsaquo; </button>
+        <button class="btn btn-merge" onclick={() => mergePair(b.id, a.id)} disabled={acting} title="Garder la publication de droite, absorber celle de gauche"> Garder droite &rarr; </button>
       </div>
 
       <!-- Deux colonnes -->

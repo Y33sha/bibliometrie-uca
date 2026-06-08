@@ -228,7 +228,7 @@
 
 <div class="toolbar">
 	<input type="text" placeholder="Rechercher dans les adresses..." bind:value={search} oninput={onSearchInput} />
-	<button class="btn-suggest" class:active={suggestMode} onclick={toggleSuggest}>
+	<button class="btn btn-suggest" class:active={suggestMode} onclick={toggleSuggest}>
 		{suggestMode ? 'Suggestions actives' : 'Activer suggestions'}
 	</button>
 	{#if !suggestMode}
@@ -249,12 +249,12 @@
 		{/each}
 	</select>
 	{#if selectedIds.size > 0 && batchCountry}
-		<button class="btn-primary" onclick={() => batchAddCountry(false)} disabled={batchApplying}>
+		<button class="btn btn-primary" onclick={() => batchAddCountry(false)} disabled={batchApplying}>
 			Ajouter aux {selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}
 		</button>
 	{/if}
 	{#if batchCountry && hasActiveFilter}
-		<button class="btn-secondary" onclick={() => batchAddCountry(true)} disabled={batchApplying}>
+		<button class="btn" onclick={() => batchAddCountry(true)} disabled={batchApplying}>
 			Ajouter à tout le filtre ({total.toLocaleString('fr-FR')})
 		</button>
 	{/if}
@@ -267,9 +267,9 @@
 	<thead>
 		<tr>
 			<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
-			<th>Adresse</th>
+			<th style="width:100%">Adresse</th>
 			<th style="width:50px">Publis</th>
-			<th style="width:250px">Pays</th>
+			<th>Pays</th>
 		</tr>
 	</thead>
 	<tbody>
@@ -278,7 +278,8 @@
 				<td><input type="checkbox" checked={selectedIds.has(a.id)} onchange={() => toggleSelect(a.id)} /></td>
 				<td class="addr-cell">{a.raw_text}</td>
 				<td class="num-cell">{a.pub_count}</td>
-				<td class="country-cell">
+				<td>
+					<div class="country-cell">
 					{#if a.countries}
 						{#each a.countries as c}
 							<span class="country-tag">
@@ -300,6 +301,7 @@
 							<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
 						{/each}
 					</select>
+					</div>
 				</td>
 			</tr>
 		{/each}
@@ -316,28 +318,18 @@
 		padding: 8px 12px; margin-bottom: 10px;
 		background: #e8f0f8; border-radius: 6px; font-size: 0.9rem;
 	}
-	.batch-bar select { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; }
-	.btn-secondary:disabled { opacity: 0.5; cursor: default; }
-	.btn-secondary {
-		padding: 4px 12px; background: #f0f0f0; color: var(--text);
-		border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-size: 0.85rem;
-	}
-	.btn-secondary:hover { background: #e0e0e0; }
-	.batch-result { font-size: 0.85rem; color: #2e7d32; font-weight: 500; }
-	.btn-suggest {
-		padding: 4px 12px; background: #f0f0f0; color: var(--text);
-		border: 1px solid var(--border); border-radius: 4px; cursor: pointer;
-		font-size: 0.85rem; font-weight: 500;
-	}
-	.btn-suggest:hover { background: #e0e0e0; }
+	.batch-bar select { padding: 5px 8px; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; }
+	.batch-result { font-size: 0.85rem; color: var(--success); font-weight: 500; }
+	/* Toggle "suggestions" : base .btn globale + état actif ambre. */
+	.btn-suggest { font-weight: 500; }
 	.btn-suggest.active {
-		background: #fff3cd; border-color: #f5a623; color: #856404;
+		background: var(--warning-light); border-color: var(--warning); color: var(--text);
 	}
 	.sug-tag {
 		display: inline-flex; align-items: center; gap: 2px;
 		padding: 2px 8px; background: #fff8e1; color: #856404;
 		border: 1px dashed #f5a623; border-radius: 3px; cursor: pointer;
-		font-size: 0.78rem; font-weight: 500;
+		font-size: 0.78rem; font-weight: 500; white-space: nowrap;
 	}
 	.sug-tag:hover { background: #ffecb3; }
 	.addr-table {
@@ -352,9 +344,9 @@
 	.addr-table tbody tr { border-bottom: 1px solid #f0efec; }
 	.addr-table tbody tr:hover { background: #fafaf8; }
 	.addr-table td { padding: 6px 10px; font-size: 0.9rem; vertical-align: middle; }
-	.addr-cell { max-width: 500px; word-break: break-word; }
+	.addr-cell { word-break: break-word; }
 	.num-cell { text-align: center; color: var(--muted); font-size: 0.85rem; }
-	.country-cell { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+	.country-cell { display: flex; flex-wrap: nowrap; gap: 4px; align-items: center; white-space: nowrap; }
 	.country-tag {
 		display: inline-flex; align-items: center; gap: 2px;
 		padding: 2px 6px; background: #e8f5e9;
