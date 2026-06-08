@@ -349,8 +349,8 @@
 	.country-cell { display: flex; flex-wrap: nowrap; gap: 4px; align-items: center; white-space: nowrap; }
 	.country-tag {
 		display: inline-flex; align-items: center; gap: 2px;
-		padding: 2px 6px; background: #e8f5e9;
-		border-radius: 3px; font-size: 0.78rem; color: #2e7d32; white-space: nowrap;
+		padding: 2px 6px; background: var(--success-light);
+		border-radius: 3px; font-size: 0.78rem; color: var(--success); white-space: nowrap;
 	}
 	.tag-remove {
 		background: none; border: none; cursor: pointer;

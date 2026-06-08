@@ -770,7 +770,7 @@
 	.name-cell a { color: var(--accent); text-decoration: none; cursor: pointer; }
 	.name-cell a:hover { text-decoration: underline; }
 	.num-small { font-size: 0.85rem; color: var(--muted); }
-	.apc-cell { font-size: 0.85rem; color: #2e7d32; white-space: nowrap; }
+	.apc-cell { font-size: 0.85rem; color: var(--success); white-space: nowrap; }
 
 	.oa-bar {
 		display: flex;

@@ -217,8 +217,8 @@
     font-weight: 600;
   }
   .stat-merged {
-    background: #d4edda;
-    color: #155724;
+    background: var(--success-light);
+    color: var(--success);
   }
   .stat-distinct {
     background: #fff3cd;

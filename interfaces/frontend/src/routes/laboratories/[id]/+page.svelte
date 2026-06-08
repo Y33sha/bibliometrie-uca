@@ -580,6 +580,6 @@
 		font-size: 0.8rem;
 		font-weight: 500;
 	}
-	.status-tag.confirmed { background: var(--success-light); color: #2a7d4f; }
+	.status-tag.confirmed { background: var(--success-light); color: var(--success); }
 	.status-tag.pending { background: #f0efec; color: var(--muted); }
 </style>

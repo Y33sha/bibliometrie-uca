@@ -102,7 +102,7 @@
 	}
 	.pub-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 	.meta-badge { flex-shrink: 0; }
-	.lab-badge { background: var(--success-light); color: #2a7d4f; font-weight: 500; }
+	.lab-badge { background: var(--success-light); color: var(--success); font-weight: 500; }
 	.pub-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
 	.pub-link:hover { text-decoration: underline; }
 	.hal-list {

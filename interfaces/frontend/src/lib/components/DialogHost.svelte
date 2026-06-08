@@ -61,7 +61,7 @@
 		white-space: pre-line;
 	}
 	.toast-success {
-		background: var(--success, #2e7d32);
+		background: var(--success);
 	}
 	.toast-error {
 		background: var(--danger);
