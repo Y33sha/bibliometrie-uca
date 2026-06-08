@@ -80,10 +80,19 @@ class PgPublicationsQueries(PublicationsQueries):
         return PublicationsFacetsResponse.model_validate(data)
 
     def export_publications_csv(
-        self, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
+        self,
+        *,
+        filters: ListFilters,
+        apc_structure_ids: list[int],
+        sort: str,
+        columns: list[str],
     ) -> str:
         return _export_publications_csv(
-            self._conn, filters=filters, apc_structure_ids=apc_structure_ids, sort=sort
+            self._conn,
+            filters=filters,
+            apc_structure_ids=apc_structure_ids,
+            sort=sort,
+            columns=columns,
         )
 
     def export_theses_csv(

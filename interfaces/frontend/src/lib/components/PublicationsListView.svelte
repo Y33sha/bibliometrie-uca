@@ -132,11 +132,11 @@
 		...(showCorrespondingColumn ? [{ key: 'corr', label: 'Corresp.' }] : []),
 		{ key: 'apc',        label: 'APC' },
 		{ key: 'oa',         label: 'OA' },
-		{ key: 'oa_path',    label: 'Voie OA' },
+		{ key: 'oa_status',    label: 'Voie OA' },
 		...(showHalStatusColumn ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
 		{ key: 'links',      label: 'Liens',      fixed: true },
 	];
-	const initialHidden = ['apc', 'oa_path'];
+	const initialHidden = ['apc', 'oa_status'];
 	if (showHalStatusColumn) initialHidden.push('hal_status');
 	const cv = useColumnVisibility(columnDefs, initialHidden);
 	const col = cv.col;
@@ -359,6 +359,8 @@
 		params.set('sort', currentSort);
 		const q = search.trim();
 		if (q) params.set('search', q);
+		// Colonnes visibles → le CSV reflète le tableau affiché.
+		params.set('columns', cv.visibleColumns.join(','));
 		return `${base}/api/publications/export.csv?${params}`;
 	}
 
@@ -396,7 +398,7 @@
 
 		// Forcer l'affichage des colonnes liées aux filtres actifs
 		const needed: string[] = [];
-		if (selectedOa.length || selectedAccess.length) needed.push('oa', 'oa_path');
+		if (selectedOa.length || selectedAccess.length) needed.push('oa', 'oa_status');
 		if (selectedApc.length) needed.push('apc');
 		if (filterPublisherId || filterJournalId) needed.push('journal');
 		if (selectedDocTypes.length) needed.push('type');
@@ -428,7 +430,7 @@
 	{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
 	{#if !hasFixedLab && col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
 	{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
-	{#if col('oa_path')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
+	{#if col('oa_status')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
 	{#if showHalStatusColumn && col('hal_status')}<FacetDropdown label="Statut HAL" options={facets.options.halStatus} bind:selected={selectedHalStatus} onchange={onFilterChange} />{/if}
 	{#if showCorrespondingColumn && col('corr') && facets.options.corresponding.length}<FacetDropdown label="Corresp." options={facets.options.corresponding} bind:selected={selectedCorr} onchange={onFilterChange} />{/if}
 	{#if showPerimeterFacet && facets.options.perimeter.length}<FacetDropdown label="UCA" options={facets.options.perimeter} bind:selected={selectedPerimeter} onchange={onFilterChange} />{/if}
@@ -458,7 +460,7 @@
 				APC <span class="sort-arrow">{apcSortArrow}</span>
 			</th>{/if}
 			{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
-			{#if col('oa_path')}<th style="width:60px">Voie OA</th>{/if}
+			{#if col('oa_status')}<th style="width:60px">Voie OA</th>{/if}
 			{#if showHalStatusColumn && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
 			<th style="width:80px" class="col-menu-th">
 				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
@@ -546,7 +548,7 @@
 							</span>
 						{/if}
 					</td>{/if}
-					{#if col('oa_path')}<td>
+					{#if col('oa_status')}<td>
 						{#if p.oa_status && p.oa_status !== 'unknown'}
 							<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
 						{/if}

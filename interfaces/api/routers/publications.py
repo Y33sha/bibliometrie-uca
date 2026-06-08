@@ -96,9 +96,11 @@ def export_publications_csv(
     hal_status: str = Query(""),
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
+    columns: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries_sync),
 ) -> Response:
-    """Export CSV des publications (mêmes filtres que list_publications)."""
+    """Export CSV des publications : mêmes filtres ET mêmes colonnes que le
+    tableau affiché (`columns` = clés des colonnes visibles)."""
     lab_ids, lab_none = _parse_lab_id(lab_id)
     filters = ListFilters(
         search=search,
@@ -121,7 +123,10 @@ def export_publications_csv(
         subject_id=subject_id,
     )
     csv_content = queries.export_publications_csv(
-        filters=filters, apc_structure_ids=get_apc_structure_ids_sync(), sort=sort
+        filters=filters,
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        sort=sort,
+        columns=parse_str_csv(columns),
     )
     return Response(
         content=csv_content,

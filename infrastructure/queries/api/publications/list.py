@@ -339,11 +339,17 @@ def _plain_text(s: str | None) -> str:
 
 
 def export_publications_csv(
-    conn: Connection, *, filters: ListFilters, apc_structure_ids: list[int], sort: str
+    conn: Connection,
+    *,
+    filters: ListFilters,
+    apc_structure_ids: list[int],
+    sort: str,
+    columns: list[str],
 ) -> str:
-    """Export CSV (sans pagination) avec EXACTEMENT les mêmes filtres que
-    list_publications (même constructeur de WHERE) : le CSV reflète le tableau
-    affiché.
+    """Export CSV (sans pagination) qui reflète le tableau affiché : mêmes
+    filtres que list_publications (même constructeur de WHERE) ET mêmes colonnes
+    (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et liens
+    (DOI + Sources) toujours présents ; « Éditeur » suit la visibilité de « Revue ».
 
     Retourne la string CSV (préfixée d'un BOM UTF-8 pour Excel). Le caller
     (router) est responsable d'emballer la réponse HTTP.
@@ -366,6 +372,11 @@ def export_publications_csv(
                 pub.name AS publisher_name,
                 src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
                 src_ids.wos_id, src_ids.theses_id,
+                (SELECT COALESCE(SUM(ap.amount_eur_ht), 0) FROM apc_payments ap
+                 WHERE ap.publication_id = p.id) AS apc_total,
+                (SELECT a.is_corresponding FROM authorships a
+                 WHERE a.publication_id = p.id AND a.person_id = :focus_person
+                 LIMIT 1) AS is_corresponding,
                 (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                          ORDER BY COALESCE(s.acronym, s.name))
                  FROM authorships a3
@@ -389,24 +400,37 @@ def export_publications_csv(
             WHERE {where_clause}
             ORDER BY {order}
         """),
-        {**binds, "person_lab_a3": filters.person_id},
+        {**binds, "person_lab_a3": filters.person_id, "focus_person": filters.person_id},
     ).all()
+
+    # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage.
+    # Titre et liens (DOI + Sources) toujours présents ; « Éditeur » suit « Revue »
+    # (clé `journal`). `columns` vide => toutes (compat ascendante).
+    requested = (
+        set(columns)
+        if columns
+        else {"type", "year", "title", "journal", "labs", "corr", "apc", "oa", "oa_status", "links"}
+    )
+    requested |= {"title", "links"}
+    spec: list[tuple[str, str]] = [
+        ("type", "Type"),
+        ("year", "Année"),
+        ("title", "Titre"),
+        ("journal", "Revue"),
+        ("journal", "Éditeur"),
+        ("labs", "Laboratoires"),
+        ("corr", "Corresp."),
+        ("apc", "APC (€)"),
+        ("oa", "Accès"),
+        ("oa_status", "Voie OA"),
+        ("links", "DOI"),
+        ("links", "Sources"),
+    ]
+    emitted = [(key, header) for key, header in spec if key in requested]
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(
-        [
-            "Année",
-            "Type",
-            "Titre",
-            "DOI",
-            "Revue",
-            "Éditeur",
-            "Laboratoires",
-            "Accès",
-            "Sources",
-        ]
-    )
+    writer.writerow([header for _, header in emitted])
     for row in rows:
         doi_url = f"https://doi.org/{row.doi}" if row.doi else ""
         sources: dict[str, str] = {}
@@ -422,20 +446,21 @@ def export_publications_csv(
             )
         if row.theses_id:
             sources["theses"] = f"https://theses.fr/{row.theses_id}"
-        access = "ouvert" if row.oa_status in OA_OPEN_STATUSES else "fermé"
-        writer.writerow(
-            [
-                row.pub_year or "",
-                row.doc_type or "",
-                _plain_text(row.title),
-                doi_url,
-                row.journal_title or "",
-                row.publisher_name or "",
-                row.labs or "",
-                access,
-                json.dumps(sources, ensure_ascii=False) if sources else "",
-            ]
-        )
+        cell = {
+            "Type": row.doc_type or "",
+            "Année": row.pub_year or "",
+            "Titre": _plain_text(row.title),
+            "Revue": row.journal_title or "",
+            "Éditeur": row.publisher_name or "",
+            "Laboratoires": row.labs or "",
+            "Corresp.": "oui" if row.is_corresponding else "",
+            "APC (€)": round(row.apc_total) if row.apc_total else "",
+            "Accès": "ouvert" if row.oa_status in OA_OPEN_STATUSES else "fermé",
+            "Voie OA": row.oa_status or "",
+            "DOI": doi_url,
+            "Sources": json.dumps(sources, ensure_ascii=False) if sources else "",
+        }
+        writer.writerow([cell[header] for _, header in emitted])
 
     return "﻿" + buf.getvalue()
 
