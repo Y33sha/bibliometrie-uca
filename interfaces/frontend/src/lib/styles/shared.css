@@ -72,6 +72,26 @@
 	z-index: 50;
 }
 
+/* Conteneur de tableau scrollable horizontalement (petit écran). */
+.table-scroll {
+	overflow-x: auto;
+}
+
+/* En petit écran, on borne la hauteur pour que la barre de scroll horizontale
+   reste dans le viewport (sinon elle est tout en bas d'un tableau long), et on
+   fige les en-têtes pendant le scroll vertical interne. */
+@media (max-width: 760px) {
+	.table-scroll {
+		max-height: 75vh;
+		overflow-y: auto;
+	}
+	.table-scroll thead th {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+	}
+}
+
 /* ── Count badge (usually in toolbar) ── */
 .count {
 	margin-left: auto;

@@ -40,6 +40,7 @@
 	}
 </script>
 
+<div class="table-scroll">
 <table>
 	<thead>
 		<tr>
@@ -100,10 +101,12 @@
 		{/if}
 	</tbody>
 </table>
+</div>
 
 <style>
 	table {
 		width: 100%;
+		min-width: 620px;
 		border-collapse: collapse;
 		background: var(--card);
 		border: 1px solid var(--border);
