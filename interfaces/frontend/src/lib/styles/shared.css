@@ -704,7 +704,7 @@ th.sorted .sort-arrow {
 	width: 15px;
 	height: 15px;
 	border-radius: 50%;
-	background: var(--accent, #3b82f6);
+	background: var(--accent);
 	color: white;
 	font-size: 0.7rem;
 	font-weight: 700;
