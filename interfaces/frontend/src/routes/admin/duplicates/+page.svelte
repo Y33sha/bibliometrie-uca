@@ -255,6 +255,9 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
+  @media (max-width: 760px) {
+    .pair-columns { grid-template-columns: 1fr; }
+  }
   .pub-col {
     padding: 14px 16px;
   }

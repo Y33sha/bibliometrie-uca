@@ -98,7 +98,7 @@
   {#if subjects.length === 0}
     <p class="empty">Aucun sujet à afficher.</p>
   {:else}
-    <svg {width} {height}>
+    <svg {width} {height} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet">
       <g transform="translate({width / 2}, {height / 2})">
         {#each placedWords as w (w.id)}
           <a href="{base}/subjects/{w.id}">

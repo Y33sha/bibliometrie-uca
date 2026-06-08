@@ -341,6 +341,9 @@
 	.dash-grid {
 		display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
 	}
+	@media (max-width: 760px) {
+		.dash-grid { grid-template-columns: 1fr; }
+	}
 	.dash-card-wide { grid-column: 1 / -1; }
 	.dash-card {
 		background: var(--card); border: 1px solid var(--border);
