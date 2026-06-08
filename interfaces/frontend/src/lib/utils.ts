@@ -165,6 +165,17 @@ export function scanrPubUrl(scanrId: string): string {
 	return `https://scanr.enseignementsup-recherche.gouv.fr/publications/${encodeURIComponent(scanrId)}`;
 }
 
+/** Identifiant ROR court (sans le préfixe https://ror.org/). */
+export function rorShortId(rorId: string): string {
+	return rorId.replace('https://ror.org/', '');
+}
+
+/** URL canonique d'une organisation sur ror.org (accepte un id court ou une URL complète). */
+export function rorFullUrl(rorId: string): string {
+	if (rorId.startsWith('http')) return rorId;
+	return `https://ror.org/${rorId}`;
+}
+
 /** URL externe d'un document sur son portail source.
  * Utilisé par les vues doublons pour ouvrir la notice d'origine. */
 export function sourceExternalUrl(source: string, sourceId: string): string {
