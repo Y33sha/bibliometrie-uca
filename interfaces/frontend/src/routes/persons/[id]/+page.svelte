@@ -538,8 +538,6 @@
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag) { color: var(--accent); text-decoration: none; }
 	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }
 
-	.source-tag-label { padding: 2px 7px; font-size: 0.8rem; }
-
 	/* Theses tab utilise aussi .pub-table */
 	.pub-table td { vertical-align: top; }
 
@@ -560,18 +558,4 @@
 		background: #d0e3f4;
 		text-decoration: none;
 	}
-	.orphan-banner {
-		display: block;
-		background: #fef3e0;
-		border: 1px solid #f0dca0;
-		border-radius: 5px;
-		padding: 8px 14px;
-		margin-bottom: 12px;
-		font-size: 0.95rem;
-		color: #8a6d1b;
-		text-decoration: none;
-	}
-	.orphan-banner:hover { background: #fdecc8; }
-	.orphan-detail { font-size: 0.85rem; color: #a08530; }
-	.col-menu-th { position: relative; }
 </style>

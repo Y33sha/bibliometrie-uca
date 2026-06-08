@@ -224,10 +224,6 @@
     background: #fff3cd;
     color: #856404;
   }
-  .stat-skipped {
-    background: #e8e8e8;
-    color: #666;
-  }
   .nav-group {
     display: flex;
     gap: 4px;

@@ -416,7 +416,6 @@
     margin-top: 8px;
     align-items: center;
   }
-  .add-row input[type="text"],
   .add-row input:not([type]) {
     flex: 1;
     padding: 4px 6px;

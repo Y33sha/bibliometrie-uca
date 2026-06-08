@@ -394,7 +394,6 @@
 		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 280px;
 		margin-top: 4px;
 	}
-	.modal-content { max-width: 400px; }
 	.create-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 	.create-form label { display: flex; flex-direction: column; gap: 3px; font-size: 0.85rem; font-weight: 500; }
 	.create-form input { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }

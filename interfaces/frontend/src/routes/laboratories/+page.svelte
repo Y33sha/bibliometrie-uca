@@ -156,11 +156,6 @@
 </table>
 
 <style>
-	h2 {
-		font-size: 1.2rem;
-		font-weight: 600;
-		margin: 0 0 14px;
-	}
 	.toolbar input[type="text"] {
 		width: 260px;
 	}
