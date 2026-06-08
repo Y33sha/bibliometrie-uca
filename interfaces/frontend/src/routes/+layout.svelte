@@ -2,7 +2,7 @@
   import "$lib/styles/shared.css";
   import "katex/dist/katex.min.css";
   import { page } from "$app/stores";
-  import { goto } from "$app/navigation";
+  import { goto, afterNavigate } from "$app/navigation";
   import { base } from "$app/paths";
   import type { Snippet } from "svelte";
   import { auth } from "$lib/api";
@@ -25,12 +25,11 @@
     isActive("/publishers") || isActive("/journals") || isActive("/subjects"),
   );
 
-  let pipelineDropdownOpen = $state(false);
-  let dropdownOpen = $state(false);
-  let refDropdownOpen = $state(false);
-  let dupDropdownOpen = $state(false);
-  let halDropdownOpen = $state(false);
-  let publicRefDropdownOpen = $state(false);
+  let mobileNavOpen = $state(false);
+  // Referme le menu mobile après chaque navigation.
+  afterNavigate(() => {
+    mobileNavOpen = false;
+  });
 
   function isActive(path: string): boolean {
     const current = $page.url.pathname;
@@ -54,50 +53,36 @@
         Bibliométrie UCA <span class="site-title-admin">Admin</span>
       </h1>
     </div>
-    <nav class="site-nav">
-      <div class="nav-dropdown" role="navigation" class:active={isPipeline} onmouseenter={() => (pipelineDropdownOpen = true)} onmouseleave={() => (pipelineDropdownOpen = false)}>
+    <nav class="site-nav" class:open={mobileNavOpen}>
+      <div class="nav-dropdown" role="navigation" class:active={isPipeline}>
         <button class="nav-link" class:active={isPipeline}>Pipeline &#x25BE;</button>
-        {#if pipelineDropdownOpen}
-          <div class="nav-dropdown-menu">
-            <a href="{base}/admin/config" class:active={isActive("/admin/config")}>Config</a>
-            <a href="{base}/admin/pipeline" class:active={isActive("/admin/pipeline")}>Logs</a>
-          </div>
-        {/if}
+        <div class="nav-dropdown-menu">
+          <a href="{base}/admin/config" class:active={isActive("/admin/config")}>Config</a>
+          <a href="{base}/admin/pipeline" class:active={isActive("/admin/pipeline")}>Logs</a>
+        </div>
       </div>
-      <div
-        class="nav-dropdown"
-        role="navigation"
-        class:active={isReferentiels}
-        onmouseenter={() => (refDropdownOpen = true)}
-        onmouseleave={() => (refDropdownOpen = false)}
-      >
+      <div class="nav-dropdown" role="navigation" class:active={isReferentiels}>
         <button class="nav-link" class:active={isReferentiels}>Référentiels &#x25BE;</button>
-        {#if refDropdownOpen}
-          <div class="nav-dropdown-menu">
-            <a href="{base}/admin/structures" class:active={isActive("/admin/structures")}>Structures</a>
-            <a href="{base}/admin/persons" class:active={isActive("/admin/persons")}>Personnes</a>
-            <a href="{base}/admin/publishers" class:active={isActive("/admin/publishers")}>Éditeurs</a>
-            <a href="{base}/admin/journals" class:active={isActive("/admin/journals")}>Revues</a>
-          </div>
-        {/if}
+        <div class="nav-dropdown-menu">
+          <a href="{base}/admin/structures" class:active={isActive("/admin/structures")}>Structures</a>
+          <a href="{base}/admin/persons" class:active={isActive("/admin/persons")}>Personnes</a>
+          <a href="{base}/admin/publishers" class:active={isActive("/admin/publishers")}>Éditeurs</a>
+          <a href="{base}/admin/journals" class:active={isActive("/admin/journals")}>Revues</a>
+        </div>
       </div>
-      <div class="nav-dropdown" role="navigation" class:active={isAddresses} onmouseenter={() => (dropdownOpen = true)} onmouseleave={() => (dropdownOpen = false)}>
+      <div class="nav-dropdown" role="navigation" class:active={isAddresses}>
         <button class="nav-link" class:active={isAddresses}>Adresses &#x25BE;</button>
-        {#if dropdownOpen}
-          <div class="nav-dropdown-menu">
-            <a href="{base}/admin/addresses" class:active={isActive("/admin/addresses")}>Affiliations</a>
-            <a href="{base}/admin/countries" class:active={isActive("/admin/countries")}>Pays</a>
-          </div>
-        {/if}
+        <div class="nav-dropdown-menu">
+          <a href="{base}/admin/addresses" class:active={isActive("/admin/addresses")}>Affiliations</a>
+          <a href="{base}/admin/countries" class:active={isActive("/admin/countries")}>Pays</a>
+        </div>
       </div>
-      <div class="nav-dropdown" role="navigation" class:active={isDuplicates} onmouseenter={() => (dupDropdownOpen = true)} onmouseleave={() => (dupDropdownOpen = false)}>
+      <div class="nav-dropdown" role="navigation" class:active={isDuplicates}>
         <button class="nav-link" class:active={isDuplicates}>Dédoublonnage &#x25BE;</button>
-        {#if dupDropdownOpen}
-          <div class="nav-dropdown-menu">
-            <a href="{base}/admin/duplicates" class:active={isActive("/admin/duplicates")}>Publications</a>
-            <a href="{base}/admin/person-duplicates" class:active={isActive("/admin/person-duplicates")}>Personnes</a>
-          </div>
-        {/if}
+        <div class="nav-dropdown-menu">
+          <a href="{base}/admin/duplicates" class:active={isActive("/admin/duplicates")}>Publications</a>
+          <a href="{base}/admin/person-duplicates" class:active={isActive("/admin/person-duplicates")}>Personnes</a>
+        </div>
       </div>
       <a href="{base}/stats" class="nav-link nav-switch-link">Public</a>
       <button class="nav-link nav-switch-link" onclick={logout}>Déconnexion</button>
@@ -107,38 +92,28 @@
       <img src="{base}/favicon.png" alt="" class="site-icon" />
       <h1 class="site-title">Bibliométrie UCA</h1>
     </div>
-    <nav class="site-nav">
+    <nav class="site-nav" class:open={mobileNavOpen}>
       <a href="{base}/stats" class="nav-link" class:active={isActive("/stats")}>Statistiques</a>
       <a href="{base}/publications" class="nav-link" class:active={isActive("/publications")}>Publications</a>
       <a href="{base}/theses" class="nav-link" class:active={isActive("/theses")}>Thèses</a>
       <a href="{base}/laboratories" class="nav-link" class:active={isActive("/laboratories")}>Laboratoires</a>
       <a href="{base}/persons" class="nav-link" class:active={isActive("/persons")}>Personnes</a>
-      <div
-        class="nav-dropdown"
-        role="navigation"
-        class:active={isPublicReferentiels}
-        onmouseenter={() => (publicRefDropdownOpen = true)}
-        onmouseleave={() => (publicRefDropdownOpen = false)}
-      >
+      <div class="nav-dropdown" role="navigation" class:active={isPublicReferentiels}>
         <button class="nav-link" class:active={isPublicReferentiels}>Référentiels &#x25BE;</button>
-        {#if publicRefDropdownOpen}
-          <div class="nav-dropdown-menu">
-            <a href="{base}/publishers" class:active={isActive("/publishers")}>Éditeurs</a>
-            <a href="{base}/journals" class:active={isActive("/journals")}>Revues</a>
-            <a href="{base}/subjects" class:active={isActive("/subjects")}>Sujets</a>
-          </div>
-        {/if}
+        <div class="nav-dropdown-menu">
+          <a href="{base}/publishers" class:active={isActive("/publishers")}>Éditeurs</a>
+          <a href="{base}/journals" class:active={isActive("/journals")}>Revues</a>
+          <a href="{base}/subjects" class:active={isActive("/subjects")}>Sujets</a>
+        </div>
       </div>
-      <div class="nav-dropdown" role="navigation" class:active={isHalProblems} onmouseenter={() => (halDropdownOpen = true)} onmouseleave={() => (halDropdownOpen = false)}>
+      <div class="nav-dropdown" role="navigation" class:active={isHalProblems}>
         <button class="nav-link" class:active={isHalProblems}>Problèmes HAL &#x25BE;</button>
-        {#if halDropdownOpen}
-          <div class="nav-dropdown-menu">
-            <a href="{base}/hal-problems/duplicate-accounts" class:active={isActive("/hal-problems/duplicate-accounts")}>Doublons auteurs</a>
-            <a href="{base}/hal-problems/duplicate-pubs" class:active={isActive("/hal-problems/duplicate-pubs")}>Doublons publis</a>
-            <a href="{base}/hal-problems/missing-collections" class:active={isActive("/hal-problems/missing-collections")}>Manques collections</a>
-            <a href="{base}/hal-problems/affiliation-conflicts" class:active={isActive("/hal-problems/affiliation-conflicts")}>Affiliations suspectes</a>
-          </div>
-        {/if}
+        <div class="nav-dropdown-menu">
+          <a href="{base}/hal-problems/duplicate-accounts" class:active={isActive("/hal-problems/duplicate-accounts")}>Doublons auteurs</a>
+          <a href="{base}/hal-problems/duplicate-pubs" class:active={isActive("/hal-problems/duplicate-pubs")}>Doublons publis</a>
+          <a href="{base}/hal-problems/missing-collections" class:active={isActive("/hal-problems/missing-collections")}>Manques collections</a>
+          <a href="{base}/hal-problems/affiliation-conflicts" class:active={isActive("/hal-problems/affiliation-conflicts")}>Affiliations suspectes</a>
+        </div>
       </div>
       <a href="{base}/docs" class="nav-link nav-help-link" title="Documentation" class:active={isActive("/docs")}
         ><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
@@ -148,6 +123,11 @@
       <a href="{base}/admin/pipeline" class="nav-link nav-switch-link">Admin</a>
     </nav>
   {/if}
+  <button
+    class="nav-toggle"
+    aria-label="Menu"
+    aria-expanded={mobileNavOpen}
+    onclick={() => (mobileNavOpen = !mobileNavOpen)}>&#9776;</button>
 </div>
 
 <div class="container">
@@ -212,6 +192,17 @@
   }
   .site-header.admin .nav-dropdown-menu {
     background: #4d8a8c;
+  }
+  .nav-toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 6px;
+    height: 46px;
   }
   .site-title {
     font-family: "Ubuntu", sans-serif;
@@ -285,7 +276,11 @@
     color: white;
     box-shadow: inset 0 -2px 0 white;
   }
+  .nav-dropdown:hover > .nav-dropdown-menu {
+    display: block;
+  }
   .nav-dropdown-menu {
+    display: none;
     position: absolute;
     top: 46px;
     left: 0;
@@ -314,5 +309,59 @@
     max-width: 1400px;
     margin: 0 auto;
     padding: 24px;
+  }
+
+  /* ── Responsive : hamburger + menu vertical sous 860px ── */
+  @media (max-width: 860px) {
+    .nav-toggle {
+      display: flex;
+      align-items: center;
+    }
+    .site-nav {
+      display: none;
+      position: absolute;
+      top: 46px;
+      left: 0;
+      right: 0;
+      flex-direction: column;
+      align-items: stretch;
+      height: auto;
+      padding: 4px 0;
+      background: #5b9ea0;
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
+      z-index: 200;
+    }
+    .site-header.admin .site-nav {
+      background: #3d7a7c;
+    }
+    .site-nav.open {
+      display: flex;
+    }
+    .nav-link {
+      height: auto;
+      width: 100%;
+      padding: 11px 22px;
+    }
+    .nav-dropdown {
+      height: auto;
+      flex-direction: column;
+      align-items: stretch;
+    }
+    /* Sur mobile, les sous-menus sont toujours dépliés (pas de survol). */
+    .nav-dropdown-menu {
+      display: block;
+      position: static;
+      box-shadow: none;
+      border-radius: 0;
+      min-width: 0;
+    }
+    .nav-dropdown-menu a {
+      padding-left: 38px;
+    }
+    .nav-switch-link {
+      margin-left: 0;
+      border-left: none;
+      border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
   }
 </style>
