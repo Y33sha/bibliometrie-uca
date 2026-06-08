@@ -34,23 +34,35 @@ Objectif : peaufinage cohérence + ergonomie, **sans sur-ingénierie ni code tro
 
 ### Phase 2 — Harmonisation styles + tokens
 
-- [ ] Composant `Button` (variantes primary/secondary/danger/ghost) ; brancher les pages aux boutons divergents (`admin/duplicates`, `admin/person-duplicates`, `admin/addresses`, `admin/countries`).
-- [ ] Remplacer les couleurs hex en dur par des tokens CSS (`--success`/`--danger`/`--warning`…) dans les `<style>` des pages/composants.
+- [x] **Pas de composant `Button`** : on a aligné les pages divergentes sur le système global `.btn*` existant + ajouté une règle « bouton de toolbar = gabarit des champs voisins » dans `shared.css`. Fait sur countries, duplicates, person-duplicates ; selects d'addresses au look doux des autres pages (`2e80439a`). (Validé visuellement par Laura page par page.)
+- [x] **Tokens hex → variables** (méthode usage-first, par fonction) :
+  - exacts → token, valeurs identiques (`70c09240`) ; fallback `--accent` divergent collapsé (`2dcc3422`).
+  - rouges d'erreur/rejet → `--danger`/`--danger-light` (`75ee529f`, inclut suppression de l'override `--danger:#c44` d'addresses).
+  - verts succès/validé → `--success`/`--success-light`, `.oa-green` → `--green` (`8d0567b0`).
+  - 3 neutres clairs dominants → `--surface`/`--surface-hover`/`--border-subtle`, valeurs identiques (`9d2a0cc6`).
+  - cohérence bouton inter-modales : « Enregistrer » de EditNameModal en bleu (`8f442257`).
+  - logos de source (au lieu de badges colorés) dans les pages *duplicates via composant `SourceTag` ; icônes en local pour fonctionner hors ligne ; `.source-oa*` renommé `.source-openalex*` (`c86929c3`).
+- [ ] **Couleurs restantes = décisions de palette, pas de la dérive** (différé) :
+  - *catégoriel* (légitime, à tokeniser ou laisser) : couleurs de **sources** (HAL vert *et* bleu selon les pages — incohérence à trancher, OA, theses, WoS), **statut OA** (les tokens `--gold/--green/--bronze/...` existent mais pas leurs variantes claires type `#fef3e0`), **types de structure**, **statuts de thèse**, **badges de sujets**.
+  - *bespoke récurrent sans token* : teal du header/section `#5b9ea0`, bordure info/help `#c4d8ed`.
+  - *neutres froids* (`#f5f5f5`, `#fafafa`, `#f0f0f0`, `#eee`) et *échelle de gris texte* (`#666`/`#888`/`#999`/`#ccc`…) : convergence = léger changement visuel → au cas par cas.
+  - *textes ambre foncé* (`#856404`…) : pas de token lisible (`--warning` trop clair en texte) → nécessiterait un `--warning-dark`.
 
 ### Phase 3 — Responsivité
 
-- [ ] Menu de navigation : hamburger + repli propre en petit écran (`+layout.svelte`).
-- [ ] Grilles dashboard + barres à facettes : media queries (1 colonne en petit écran).
-- [ ] Tableaux larges : conteneur de scroll horizontal ou colonnes masquables ; cibles tactiles agrandies.
+- [x] Menu de navigation : hamburger + menu vertical sous 860px ; dropdowns desktop passés en CSS pur (`56d72b0d`).
+- [x] Grilles dashboard en 1 colonne sous breakpoint + graphiques adaptatifs (`.dash-card` min-width:0, viewBox du nuage de sujets) (`c0b53c6e`). Barres à facettes déjà repliables (`.toolbar` flex-wrap).
+- [x] Tableaux larges : wrapper `.table-scroll` (scroll horizontal + min-width) ; hauteur bornée + en-têtes figés sous 760px (`6fd21de0`). Cibles tactiles écartées (usage admin souris, validé).
 
 ### Phase 4 — A11y quick-wins (léger)
 
-- [ ] Résorber les warnings `svelte-check` triviaux (clavier sur div cliquables, labels de selects) ; focus-trap déjà couvert par `Modal` (phase 1).
+- [x] **Toutes les modales sur le composant `Modal`** (8 modales custom migrées, 2 systèmes CSS fusionnés) ; `Modal` gère Entrée (valider) + Escape (annuler) ; CSS mort `.modal-bg`/`.modal` supprimé ; −13 warnings a11y (`ba119e2b`).
+- [x] Quick-wins a11y/propreté (portée resserrée, validée) : CSS mort retiré (`css_unused_selector` 28→0, `0d5959da`) ; refs canvas en `$state` (`non_reactive_update` 5→0, pas de vrais bugs, `9aec5da0`) ; labels associés aux champs dans les modales (`a11y_label_has_associated_control` 23→0, `cd3cb26e`). **Total warnings svelte-check 113 → 44.** Laissés intentionnellement : `<div>` cliquables (invasif, faible valeur admin) et `state_referenced_locally` (lectures one-shot de props, voulu).
 
 ### Phase 5 — Cohérence des états (au fil)
 
-- [ ] Uniformiser chargement / vide / erreur / succès via les composants partagés.
-- [ ] Tableaux : indicateurs de tri homogènes ; généraliser le menu de colonnes (`ColumnMenu`) au-delà de publications si pertinent.
+- [x] Chargement / vide / erreur / succès : déjà stylés via classes partagées (`.loading`/`.empty`/`.no-results`) ; erreur/succès via Toast (phase 1) ; texte de chargement uniformisé sur l'ellipse « Chargement… » (`fb70b0f1`).
+- [x] Tableaux : flèches de tri homogènes (↑↓ → ▲▼) + en-têtes de colonnes homogènes (`fb70b0f1`). `ColumnMenu` **laissé aux publications** (YAGNI — seule table avec assez de colonnes pour justifier le masquage).
 
 ## Questions ouvertes
 

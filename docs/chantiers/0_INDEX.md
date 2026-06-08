@@ -17,10 +17,10 @@
 
 - [Relations entre publications](METIER_relations-publications.md)
 - [Embargo HAL : statut OA intermédiaire « sous embargo »](METIER_embargo-oa-status.md)
-- [Peaufinage UI (cohérence, responsivité, ergonomie)](CODE_peaufinage-ui.md)
 
 ## Chantiers archivés
 
+- 2026-06-08 — [Peaufinage UI (cohérence, responsivité, ergonomie)](archived/2026-06-08_CODE_peaufinage-ui.md)
 - 2026-06-07 — [Barres à facettes homogènes + extraction des ListView (thèses, personnes) + alignement endpoint personnes](archived/2026-06-07_CODE_listviews-facettes-homogenes.md)
 - 2026-06-07 — [Filtres composables pour le repérage des adresses (admin)](CODE_filtres-adresses-composables.md)
 - 2026-06-06 — [Background jobs pour les endpoints longs : matview pipeline-only, garde-fou batch_set_country, propagation des reviews en tâche de fond](archived/2026-06-06_CODE_background-jobs.md)
