@@ -132,6 +132,25 @@ class PgPublicationRepository:
         ).first()
         return row.publication_id if row else None
 
+    def find_by_pmid(self, pmid: str) -> int | None:
+        """Cherche une publication via PMID stocké dans source_publications.external_ids.
+
+        Le PMID identifie globalement un article PubMed — clé de dédup fiable (un PMID = un article), posée par les normalizers HAL/ScanR/OpenAlex dans `external_ids`.
+        """
+        if not pmid:
+            return None
+        row = self._conn.execute(
+            text("""
+                SELECT publication_id
+                FROM source_publications
+                WHERE publication_id IS NOT NULL
+                  AND external_ids->>'pmid' = :pmid
+                LIMIT 1
+            """),
+            {"pmid": pmid},
+        ).first()
+        return row.publication_id if row else None
+
     def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
         """Ids des publications rattachées à ce journal."""
         result = self._conn.execute(

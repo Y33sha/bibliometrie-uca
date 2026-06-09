@@ -123,6 +123,7 @@ class TestDecidePublicationMatch:
             doi_merge_with_id=10,
             nnt_match_id=20,
             hal_id_match_id=30,
+            pmid_match_id=50,
             metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
         )
         assert decision == PublicationMatchDecision(
@@ -139,13 +140,23 @@ class TestDecidePublicationMatch:
             action="match", publication_id=20, matched_by=DeduplicationKey.NNT
         )
 
-    def test_hal_wins_over_metadata(self):
+    def test_hal_wins_over_pmid_and_metadata(self):
         decision = decide_publication_match(
             hal_id_match_id=30,
+            pmid_match_id=50,
             metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
         )
         assert decision == PublicationMatchDecision(
             action="match", publication_id=30, matched_by=DeduplicationKey.HAL_ID
+        )
+
+    def test_pmid_wins_over_metadata(self):
+        decision = decide_publication_match(
+            pmid_match_id=50,
+            metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
+        )
+        assert decision == PublicationMatchDecision(
+            action="match", publication_id=50, matched_by=DeduplicationKey.PMID
         )
 
     def test_metadata_only(self):

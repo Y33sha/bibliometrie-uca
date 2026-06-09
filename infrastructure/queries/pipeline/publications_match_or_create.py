@@ -123,6 +123,34 @@ def bulk_link_orphans_by_hal_id(conn: Connection) -> int:
     ).rowcount
 
 
+def bulk_link_orphans_by_pmid(conn: Connection) -> int:
+    """Rattache les orphelins par PMID (stocké sur `source_publications.external_ids`).
+
+    Symétrique avec `bulk_link_orphans_by_nnt`/`_by_hal_id` : un PMID identifie globalement un article PubMed (un PMID = un article), posé dans `external_ids` par les normalizers HAL/ScanR/OpenAlex.
+
+    Le bump de `sp.updated_at` est nécessaire pour que `fetch_stale_publication_ids` voie ces publications comme stale en Phase 2 et déclenche `refresh_from_sources`.
+    """
+    return conn.execute(
+        text("""
+            WITH pmid_lookup AS (
+                SELECT (external_ids->>'pmid') AS pmid,
+                       MIN(publication_id) AS publication_id
+                FROM source_publications
+                WHERE publication_id IS NOT NULL
+                  AND external_ids ? 'pmid'
+                GROUP BY (external_ids->>'pmid')
+            )
+            UPDATE source_publications sp
+            SET publication_id = pl.publication_id,
+                updated_at = now()
+            FROM pmid_lookup pl
+            WHERE sp.publication_id IS NULL
+              AND sp.external_ids ? 'pmid'
+              AND (sp.external_ids ->> 'pmid') = pl.pmid
+        """)
+    ).rowcount
+
+
 def fetch_thesis_primary_author(conn: Connection, publication_id: int) -> tuple[str, str] | None:
     """Retourne `(last_name, first_name)` de l'auteur principal d'une publication thèse existante.
 
@@ -247,6 +275,9 @@ class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
 
     def bulk_link_orphans_by_hal_id(self, conn: Connection) -> int:
         return bulk_link_orphans_by_hal_id(conn)
+
+    def bulk_link_orphans_by_pmid(self, conn: Connection) -> int:
+        return bulk_link_orphans_by_pmid(conn)
 
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int

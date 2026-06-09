@@ -548,8 +548,8 @@ class TestRun:
 
         run(conn, queries, logger, pub_repo=repo)
 
-        # Phase A end (1) + Phase B 3 steps (3) + stale intermediate à 500/1000 (2) + final (1) → 7.
-        assert conn.commit_count == 7
+        # Phase A end (1) + Phase B 4 steps (4) + stale intermediate à 500/1000 (2) + final (1) → 8.
+        assert conn.commit_count == 8
 
     def test_intermediate_commit_every_500_docs(self, patched_process, logger):
         """Tous les 500 docs traités en Phase A, un commit intermédiaire est lancé (hors dry-run)."""
@@ -563,8 +563,8 @@ class TestRun:
 
         run(conn, queries, logger, pub_repo=repo)
 
-        # Phase A intermediate à 500/1000 (2) + Phase A end (1) + Phase B 3 steps (3) + final (1) → 7.
-        assert conn.commit_count == 7
+        # Phase A intermediate à 500/1000 (2) + Phase A end (1) + Phase B 4 steps (4) + final (1) → 8.
+        assert conn.commit_count == 8
 
     def test_refresh_exception_rollbacks_and_reraises(self, patched_process, logger):
         """Une exception dans `refresh_from_sources` (passe 2) → rollback + re-raise.
@@ -584,8 +584,8 @@ class TestRun:
             run(conn, queries, logger, pub_repo=repo)
 
         assert conn.rolled_back is True
-        # Phase A end (1) + Phase B 3 steps (3) = 4 commits avant que la passe 2 (stale) plante.
-        assert conn.commit_count == 4
+        # Phase A end (1) + Phase B 4 steps (4) = 5 commits avant que la passe 2 (stale) plante.
+        assert conn.commit_count == 5
 
     def test_top_level_exception_rollbacks_and_reraises(self, patched_process, logger):
         """Exception venant de `fetch_orphan_in_perimeter_source_publications` → rollback + re-raise."""
