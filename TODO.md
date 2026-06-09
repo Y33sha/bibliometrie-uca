@@ -1,10 +1,9 @@
-* [ ] oneshot vacuum full journals sur base de prod
 # A régler avant transmission
 ## Pipeline de traitement
-* [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / pipeline:   51/181... (51 mis à jour, 0 déjà complets) => toujours 0 déjà complet: calculé comment? / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => pourquoi "rattachement" en phase normalize?
+* [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / pipeline:   51/181... (51 mis à jour, 0 déjà complets) => toujours 0 déjà complet: calculé comment? / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => pourquoi "rattachement" en phase normalize? / "Recherche des works OpenAlex avec primary_location HAL..." => log obsolète
 ### Extraction
 * [ ] gérer les 429 répétés => skipper entièrement une phase
-* [ ] extraction par ORCID: vérifier faisabilité (quelles sources?)
+* [ ] extraction par ORCID: vérifier pertinence/faisabilité (quelles sources?)
 * [ ] Paralléliser cross-imports entre eux
 * [ ] "Recherche des works OpenAlex avec primary_location HAL" => étendre à toutes les locations
 * [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
@@ -14,7 +13,6 @@
 ### Suite du traitement
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? => dirty-set via addresses.updated_at + sa.created_at
 * [ ] phase persons: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 person_id)
-* [ ] pmid comme clé de déduplication: récupérer dans api HAL + OpenAlex (+ScanR?)
 ## Code
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
 * [ ] chantier observabilité pipeline: quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de snapshot; c'est un problème. => faire des snapshots par phase, pas par pipeline
@@ -24,9 +22,9 @@
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
-* [ ] documents fusionnés à tort par les sources: thèses avec un nom d'éditeur ou de revue: problème de fusion thèse-article (par OpenAlex en général); autre cas: 116652 (chapitres différents fusionnés ensemble par DOI) => créer circuit pour empêcher fusion de source_authorships
 * sujets: cooccurrences calculées sur publications, ou sur source_publications? idem nombre d'occurrences (ex.: sujet vaches laitières, 10 occurrences annoncées, 2 publications affichées)
-* règle "dumas => mémoire": vérifier qu'elle est tjs active (cf 151542)
+* [ ] DUMAS: distinguer mémoires et thèses d'exercice?
+* [ ] fusion de publications: comment sont traités les external_ids? (en cas de doublon de clé)
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée?
 * [ ] pour les jeux de données: DataCite, Zenodo, autres?
@@ -55,7 +53,7 @@
 * [ ] signaler publis HAL non correctement reliées au compte HAL (dans la page problèmes-hal?)
 * [ ] publications: indiquer si premier/dernier auteur
 ### Publications
-* [ ] Filtres supplémentaires possibles: langue; has_doi; corresponding_is_in_perimeter; (peer_reviewed? suppose de posséder la donnée ou de pouvoir la déduire des sources)
+* [ ] Filtres supplémentaires possibles: langue; has_doi; corresponding_is_in_perimeter; peer_reviewed? (suppose de posséder la donnée ou de pouvoir la déduire des sources);
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
 * [ ] afficher mémoires master et thèses en cours sur liste publications de la page personnes/id
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
@@ -63,7 +61,6 @@
 ## Détails d'affichage
 * [ ] décomptes sur les onglets: incohérents (cf nb revues par éditeur): supprimer ou corriger?
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
-* [ ] fusion revues ou modif revue: pas de mise à jour automatique de la page admin/journals
 * [ ] lien dashboard => publications: il faut que toutes les facettes actives soient affichées!
 * [ ] dashboard éditeur / revue: graphiques
 * [ ] ajouter facettes sur dashboards?
@@ -89,3 +86,30 @@
 
 # Pas nécessaire de le régler, du moment qu'on le documente
 * [ ] re-tester le circuit des imports RH => pas urgent, pas d'imports csv à terme en prod
+
+# Règles de correction à mettre en place
+* journaux: titre terminé par " eBooks" => plateforme d'ebooks
+* titre commence par "Editorial:" => type éditorial
+* titre commence par "Letter:" => type lettre
+* titre commence par "Systematic review" => type review
+* titre contient "A systematic reviewé => idem
+* dumas => mémoires, thèses d'exercice (comment distinguer?)
+
+# Oneshots sur base de prod à la prochaine occasion
+* vacuum full journals
+* réimporter docts openalex avec >=2 hal-ids:
+```
+UPDATE staging
+SET raw_hash = NULL
+WHERE source = 'openalex'
+  AND source_id IN (
+    SELECT sp.source_id
+    FROM source_publications sp
+    CROSS JOIN LATERAL unnest(sp.urls) AS u
+    WHERE sp.source = 'openalex' AND sp.urls IS NOT NULL
+    GROUP BY sp.source_id
+    HAVING COUNT(DISTINCT (regexp_match(lower(u),
+           '(?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+'))[1]) >= 2
+  );
+```
+* quid de scanr? a priori la même opération est nécessaire

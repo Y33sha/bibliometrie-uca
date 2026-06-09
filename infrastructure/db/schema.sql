@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xmwywHfDe0JNBfNLkAUW0bBJ9HpPzGhgvdnHNTUjALs4F266bKCiuIxLOHyb0XO
+\restrict 08GgrgcxkWSLnHTQSOYblAcuBvM7n2hgaAiBogNYedxEG9StLDMGWsWQVSNdwd2
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -2512,7 +2512,7 @@ CREATE INDEX idx_source_pubs_hal_collections ON public.source_publications USING
 -- Name: idx_source_pubs_hal_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_source_pubs_hal_id ON public.source_publications USING btree (((external_ids ->> 'hal_id'::text))) WHERE ((external_ids ->> 'hal_id'::text) IS NOT NULL);
+CREATE INDEX idx_source_pubs_hal_id ON public.source_publications USING gin (((external_ids -> 'hal_id'::text)));
 
 
 --
@@ -2520,6 +2520,13 @@ CREATE INDEX idx_source_pubs_hal_id ON public.source_publications USING btree ((
 --
 
 CREATE INDEX idx_source_pubs_nnt ON public.source_publications USING btree (((external_ids ->> 'nnt'::text))) WHERE ((external_ids ->> 'nnt'::text) IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_pmid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_pmid ON public.source_publications USING btree (((external_ids ->> 'pmid'::text))) WHERE ((external_ids ->> 'pmid'::text) IS NOT NULL);
 
 
 --
@@ -2987,5 +2994,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xmwywHfDe0JNBfNLkAUW0bBJ9HpPzGhgvdnHNTUjALs4F266bKCiuIxLOHyb0XO
+\unrestrict 08GgrgcxkWSLnHTQSOYblAcuBvM7n2hgaAiBogNYedxEG9StLDMGWsWQVSNdwd2
 
