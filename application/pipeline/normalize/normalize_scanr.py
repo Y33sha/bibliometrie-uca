@@ -57,13 +57,6 @@ def extract_doi(doc: dict) -> str | None:
     return None
 
 
-def extract_hal_id(doc: dict) -> str | None:
-    for ext in doc.get("externalIds") or []:
-        if ext.get("type") == "hal":
-            return ext.get("id")
-    return None
-
-
 def get_title(doc: dict) -> str | None:
     title = doc.get("title")
     if isinstance(title, dict):
@@ -159,17 +152,20 @@ def insert_scanr_document(
     abstract, biblio, keywords, topics, urls).
     """
     ext: dict[str, JsonValue] = {}
-    if hal_id := extract_hal_id(doc):
-        ext["hal_id"] = hal_id
     if nnt := pub_meta["nnt"]:
         ext["nnt"] = nnt
+    # hal_id multivalué : un document ScanR peut référencer plusieurs dépôts HAL.
+    hal_ids: list[str] = []
     for eid in doc.get("externalIds") or []:
-        if isinstance(eid, dict) and eid.get("type") and eid.get("id"):
-            etype = eid["type"].lower()
-            if etype == "pmid":
-                ext["pmid"] = eid["id"]
-            elif etype == "hal" and not ext.get("hal_id"):
-                ext["hal_id"] = eid["id"]
+        if not (isinstance(eid, dict) and eid.get("type") and eid.get("id")):
+            continue
+        etype = eid["type"].lower()
+        if etype == "hal" and eid["id"] not in hal_ids:
+            hal_ids.append(eid["id"])
+        elif etype == "pmid":
+            ext["pmid"] = eid["id"]
+    if hal_ids:
+        ext["hal_id"] = hal_ids
     external_ids = ext if ext else None
 
     summary = doc.get("summary") or {}

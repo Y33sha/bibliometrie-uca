@@ -52,7 +52,7 @@ class PublicationsMatchOrCreateQueries(Protocol):
     def bulk_link_orphans_by_hal_id(self, conn: Connection) -> int:
         """Phase B step 3/4 : rattache les orphelins par hal_id
         (deux donor paths : SP HAL native via `source_id`, OU SP
-        cross-source via `external_ids->>'hal_id'`)."""
+        cross-source via `external_ids.hal_id`, liste)."""
 
     def bulk_link_orphans_by_pmid(self, conn: Connection) -> int:
         """Phase B step 4/4 : rattache les orphelins par PMID

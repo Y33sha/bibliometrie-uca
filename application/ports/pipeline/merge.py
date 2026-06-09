@@ -17,7 +17,7 @@ class NntDuplicateRow(NamedTuple):
 
 
 class OaScanrHalRow(NamedTuple):
-    """`source_publications` OpenAlex/ScanR avec un `external_ids.hal_id` non null."""
+    """`source_publications` OpenAlex/ScanR avec ≥1 `external_ids.hal_id` (liste)."""
 
     src_doc_id: int
     source: str

@@ -4,8 +4,29 @@
 # ── OpenAlex ─────────────────────────────────────────────────────
 
 from application.pipeline.normalize.normalize_openalex import (
+    extract_locations_data,
     extract_short_id,
 )
+
+
+class TestExtractLocationsDataHalIds:
+    def test_collects_hal_ids_from_urls_and_location_id(self):
+        """hal_id multivalué : collecté depuis les URLs ET les location.id (OAI-PMH),
+        y compris un dépôt dont seule la location.id porte le hal-id."""
+        work = {
+            "locations": [
+                {"landing_page_url": "https://doi.org/10.1/x", "id": "doi:10.1/x"},
+                {"landing_page_url": "https://hal.science/hal-111", "id": "pmh:oai:HAL:hal-111v1"},
+                {"landing_page_url": None, "id": "pmh:oai:HAL:hal-222v1"},
+            ]
+        }
+        _urls, ext = extract_locations_data(work)
+        assert ext["hal_id"] == ["hal-111", "hal-222"]
+
+    def test_no_hal(self):
+        work = {"locations": [{"landing_page_url": "https://doi.org/10.1/x", "id": "doi:10.1/x"}]}
+        _urls, ext = extract_locations_data(work)
+        assert "hal_id" not in ext
 from domain.publications.doc_types import _SOURCE_MAPS, map_doc_type
 from domain.publications.doc_types import DOC_TYPES_SET as VALID_DOC_TYPES_SET
 from domain.publications.identifiers import extract_hal_id_from_url
@@ -83,7 +104,7 @@ from application.pipeline.normalize.normalize_hal import (
 
 class TestBuildHalExternalIds:
     def test_minimal(self):
-        assert build_hal_external_ids({}, "hal-1234", None) == {"hal_id": "hal-1234"}
+        assert build_hal_external_ids({}, "hal-1234", None) == {"hal_id": ["hal-1234"]}
 
     def test_nnt(self):
         assert build_hal_external_ids({}, "hal-1", "2021CLFA0030")["nnt"] == "2021CLFA0030"
@@ -103,7 +124,7 @@ class TestBuildHalExternalIds:
 
     def test_non_id_link_ignored(self):
         doc = {"linkExtUrl_s": "https://example.com/openaccess"}
-        assert build_hal_external_ids(doc, "hal-1", None) == {"hal_id": "hal-1"}
+        assert build_hal_external_ids(doc, "hal-1", None) == {"hal_id": ["hal-1"]}
 
 
 class TestHALAsStr:

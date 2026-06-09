@@ -15,7 +15,7 @@ from domain.sources.openalex import (
 class TestExtractExternalIdsFromUrls:
     def test_hal(self):
         urls = ["https://hal.science/hal-04123456v2"]
-        assert extract_external_ids_from_urls(urls) == {"hal_id": "hal-04123456"}
+        assert extract_external_ids_from_urls(urls) == {"hal_id": ["hal-04123456"]}
 
     def test_nnt(self):
         urls = ["https://www.theses.fr/2021CLFAC030"]
@@ -38,13 +38,15 @@ class TestExtractExternalIdsFromUrls:
         urls = ["http://arxiv.org/abs/1210.6893"]
         assert extract_external_ids_from_urls(urls) == {"arxiv_id": "1210.6893"}
 
-    def test_first_match_wins_per_type(self):
-        """Pour un même type d'ID, la première URL qui matche gagne."""
+    def test_hal_collects_all_distinct(self):
+        """hal_id est multivalué : toutes les URLs HAL distinctes sont collectées
+        (ordre d'apparition, version ignorée). Les clés scalaires restent au premier match."""
         urls = [
             "https://hal.science/hal-04111111",
             "https://hal.science/hal-04222222",
+            "https://hal.science/hal-04111111v2",  # doublon (version) → ignoré
         ]
-        assert extract_external_ids_from_urls(urls) == {"hal_id": "hal-04111111"}
+        assert extract_external_ids_from_urls(urls) == {"hal_id": ["hal-04111111", "hal-04222222"]}
 
     def test_multiple_types_combined(self):
         urls = [
@@ -53,7 +55,7 @@ class TestExtractExternalIdsFromUrls:
             "https://pubmed.ncbi.nlm.nih.gov/12345678",
         ]
         assert extract_external_ids_from_urls(urls) == {
-            "hal_id": "hal-04123456",
+            "hal_id": ["hal-04123456"],
             "nnt": "2021CLFAC030",
             "pmid": "12345678",
         }

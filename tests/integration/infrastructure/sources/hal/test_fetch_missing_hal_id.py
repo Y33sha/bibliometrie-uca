@@ -95,7 +95,7 @@ class TestFindHalIdsFromScanr:
         ).scalar_one()
         sa_sync_conn.execute(
             _INSERT_SOURCE_PUB_SQL,
-            {"sid": "scanr-norm", "staging_id": staging_id, "external_ids": {"hal_id": "hal-eee"}},
+            {"sid": "scanr-norm", "staging_id": staging_id, "external_ids": {"hal_id": ["hal-eee"]}},
         )
         result = find_hal_ids_from_scanr(sa_sync_conn)
         assert {"source": "scanr", "hal_id": "hal-eee", "scanr_id": "scanr-norm"} in result

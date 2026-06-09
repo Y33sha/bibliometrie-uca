@@ -42,7 +42,7 @@ class ExternalIds(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    hal_id: str | None = None  # HAL ID document (ex. "hal-04123456")
+    hal_id: list[str] | None = None  # dépôts HAL référencés (ex. ["hal-04123456"])
     nnt: str | None = None  # Numéro National de Thèse
     pmid: str | None = None  # PubMed ID
     pmcid: str | None = None  # PubMed Central ID
@@ -50,14 +50,20 @@ class ExternalIds(BaseModel):
 
     @field_validator("hal_id", mode="before")
     @classmethod
-    def _normalize_hal_id(cls, v: str | None) -> str | None:
-        """Normalise via HALId : URL → ID canonique, strip version."""
+    def _normalize_hal_id(cls, v: str | list[str] | None) -> list[str] | None:
+        """Normalise chaque hal_id via HALId (URL → ID canonique, strip version) ;
+        dédoublonne. Tolère un scalaire (données pré-migration) en plus d'une liste."""
         if v is None or v == "":
             return None
-        normalized = HALId.try_parse(v)
-        if normalized is None:
-            raise ValueError(f"HAL ID invalide : {v!r}")
-        return normalized.value
+        raw = [v] if isinstance(v, str) else list(v)
+        out: list[str] = []
+        for item in raw:
+            normalized = HALId.try_parse(item)
+            if normalized is None:
+                raise ValueError(f"HAL ID invalide : {item!r}")
+            if normalized.value not in out:
+                out.append(normalized.value)
+        return out or None
 
     @field_validator("nnt", mode="before")
     @classmethod

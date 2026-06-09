@@ -195,42 +195,43 @@ def map_openalex_oa_status(raw: str | None) -> str | None:
 # =============================================================
 
 
-def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]:
+def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str | list[str]]:
     """Extrait les identifiants exposés dans une liste d'URLs.
 
     Reconnait HAL (préfixes ``hal-``/``tel-``/``halshs-``…), NNT
-    (URLs ``theses.fr/<NNT>``), PMID (PubMed), PMC et arXiv. Pour chaque
-    type, le **premier** match dans l'ordre des URLs gagne — l'ordre
-    des URLs en entrée est donc significatif (le caller choisit
-    typiquement landing_page_url avant pdf_url, primary_location avant
-    autres).
+    (URLs ``theses.fr/<NNT>``), PMID (PubMed), PMCID et arXiv.
 
-    Les extracteurs d'ID par URL (PMID/PMC/arXiv/HAL) vivent dans
+    ``hal_id`` est **multivalué** : une œuvre peut référencer plusieurs
+    dépôts HAL (chapitres, versions, doublons), tous collectés (liste
+    dédupliquée, ordre d'apparition). Les autres clés sont 1:1 avec un
+    document → premier match gagnant (l'ordre des URLs est significatif :
+    le caller choisit typiquement landing_page_url avant pdf_url).
+
+    Les extracteurs d'ID par URL (PMID/PMCID/arXiv/HAL) vivent dans
     ``domain.publications.identifiers`` (neutres, réutilisés par HAL).
 
-    Pas de normalisation ici : le NNT n'est PAS passé par
-    ``normalize_nnt`` (à l'inverse de ``extract_nnt_from_location``)
-    car c'est un extracteur opportuniste depuis une URL — la
-    normalisation est laissée au caller selon l'usage (les
-    ``external_ids`` JSONB stockent souvent la forme brute pour
-    traçabilité).
+    Pas de normalisation du NNT ici (à l'inverse de
+    ``extract_nnt_from_location``) — extracteur opportuniste depuis une
+    URL, la normalisation est laissée au caller.
     """
-    external_ids: dict[str, str] = {}
+    external_ids: dict[str, str | list[str]] = {}
+    hal_ids: list[str] = []
     for url in urls:
-        if not external_ids.get("hal_id"):
-            if hal_id := extract_hal_id_from_url(url):
-                external_ids["hal_id"] = hal_id
-        if not external_ids.get("nnt"):
+        if (hal_id := extract_hal_id_from_url(url)) and hal_id not in hal_ids:
+            hal_ids.append(hal_id)
+        if "nnt" not in external_ids:
             m = _THESES_FR_URL_RE.search(url)
             if m:
                 external_ids["nnt"] = m.group(1)
-        if not external_ids.get("pmid"):
+        if "pmid" not in external_ids:
             if pmid := normalize_pmid(url):
                 external_ids["pmid"] = pmid
-        if not external_ids.get("pmcid"):
+        if "pmcid" not in external_ids:
             if pmcid := normalize_pmcid(url):
                 external_ids["pmcid"] = pmcid
-        if not external_ids.get("arxiv_id"):
+        if "arxiv_id" not in external_ids:
             if arxiv_id := normalize_arxiv_id(url):
                 external_ids["arxiv_id"] = arxiv_id
+    if hal_ids:
+        external_ids["hal_id"] = hal_ids
     return external_ids

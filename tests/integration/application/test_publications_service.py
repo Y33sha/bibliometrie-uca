@@ -177,7 +177,7 @@ class TestFindByHalId:
             pub_id,
             source="hal",
             source_id="hal-12345",
-            external_ids={"hal_id": "hal-12345"},
+            external_ids={"hal_id": ["hal-12345"]},
         )
         assert repo.find_by_hal_id("hal-12345") == pub_id
 
@@ -189,7 +189,7 @@ class TestFindByHalId:
             pub_id,
             source="openalex",
             source_id="W123",
-            external_ids={"hal_id": "hal-67890"},
+            external_ids={"hal_id": ["hal-67890"]},
         )
         assert repo.find_by_hal_id("hal-67890") == pub_id
 
@@ -203,7 +203,7 @@ class TestFindByHalId:
             None,
             source="hal",
             source_id="hal-orphan",
-            external_ids={"hal_id": "hal-orphan"},
+            external_ids={"hal_id": ["hal-orphan"]},
         )
         assert repo.find_by_hal_id("hal-orphan") is None
 

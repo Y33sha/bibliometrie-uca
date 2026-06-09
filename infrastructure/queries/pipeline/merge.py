@@ -37,15 +37,18 @@ def find_nnt_duplicates(conn: Connection) -> list[NntDuplicateRow]:
 def fetch_source_publications_with_hal_external_id(
     conn: Connection,
 ) -> list[OaScanrHalRow]:
-    """`source_publications` OpenAlex/ScanR qui référencent un `external_ids.hal_id`."""
+    """`source_publications` OpenAlex/ScanR qui référencent un `external_ids.hal_id`.
+
+    `hal_id` étant une **liste**, on déplie : une ligne par (SP, hal-id référencé)."""
     rows = conn.execute(
         text("""
             SELECT sd.id AS src_doc_id, sd.source::text AS source,
                    sd.source_id AS src_id, sd.publication_id AS src_pub_id,
-                   sd.external_ids->>'hal_id' AS hal_id
+                   h AS hal_id
             FROM source_publications sd
+            CROSS JOIN LATERAL jsonb_array_elements_text(sd.external_ids->'hal_id') AS h
             WHERE sd.source IN ('openalex', 'scanr')
-              AND sd.external_ids->>'hal_id' IS NOT NULL
+              AND jsonb_typeof(sd.external_ids->'hal_id') = 'array'
         """)
     ).all()
     return [

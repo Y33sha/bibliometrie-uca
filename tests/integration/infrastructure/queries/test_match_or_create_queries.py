@@ -158,7 +158,7 @@ def test_bulk_link_orphans_by_hal_id_bumps_sp_updated_at(sa_sync_conn):
         sa_sync_conn,
         source="hal",
         source_id="hal-12345",
-        external_ids='{"hal_id": "hal-12345"}',
+        external_ids='{"hal_id": ["hal-12345"]}',
         old_age_days=10,
     )
     sa_sync_conn.execute(
@@ -173,7 +173,7 @@ def test_bulk_link_orphans_by_hal_id_bumps_sp_updated_at(sa_sync_conn):
         sa_sync_conn,
         source="openalex",
         source_id="W42",
-        external_ids='{"hal_id": "hal-12345"}',
+        external_ids='{"hal_id": ["hal-12345"]}',
         old_age_days=10,
     )
 
@@ -200,7 +200,7 @@ def test_bulk_link_orphans_by_hal_id_symmetric_orphan_hal_to_cross_source(sa_syn
         sa_sync_conn,
         source="openalex",
         source_id="W77",
-        external_ids='{"hal_id": "hal-XYZ"}',
+        external_ids='{"hal_id": ["hal-XYZ"]}',
         old_age_days=10,
     )
     sa_sync_conn.execute(
@@ -215,7 +215,7 @@ def test_bulk_link_orphans_by_hal_id_symmetric_orphan_hal_to_cross_source(sa_syn
         sa_sync_conn,
         source="hal",
         source_id="hal-XYZ",
-        external_ids='{"hal_id": "hal-XYZ"}',
+        external_ids='{"hal_id": ["hal-XYZ"]}',
         old_age_days=10,
     )
 

@@ -84,7 +84,7 @@ def _view_from_row(doc: SourcePublicationRow) -> SourcePublicationWithJournalVie
 def extract_known_identifiers(external_ids: dict[str, object] | None) -> dict[str, str]:
     """Filtre `external_ids` aux valeurs `str` non vides.
 
-    Convention : toutes les clés de dédup cross-source (`hal_id`, `nnt`, `pmid`, …) vivent dans `external_ids`, y compris quand elles coïncident avec `source_id` (cas HAL : le normalizer pose `external_ids.hal_id = source_id`, cf. theses pour NNT). Pas de fallback sur `source_id` — la responsabilité est portée par les normalizers à l'écriture.
+    Convention : toutes les clés de dédup cross-source (`hal_id`, `nnt`, `pmid`, …) vivent dans `external_ids`, y compris quand elles coïncident avec `source_id` (cas HAL : le normalizer pose `external_ids.hal_id = [source_id]` — liste, cf. theses pour NNT). Pas de fallback sur `source_id` — la responsabilité est portée par les normalizers à l'écriture.
     """
     if not isinstance(external_ids, dict):
         return {}
@@ -145,8 +145,11 @@ def process_document(
     nnt = known_ids.get("nnt")
     if nnt:
         nnt = normalize_nnt(nnt)
-    hal_id = known_ids.get("hal_id")
     pmid = known_ids.get("pmid")
+    # hal_id est multivalué (liste) : `extract_known_identifiers` ne garde que les
+    # valeurs str, on lit donc la liste directement depuis external_ids.
+    raw_hal_ids = doc.external_ids.get("hal_id") if isinstance(doc.external_ids, dict) else None
+    hal_ids = raw_hal_ids if isinstance(raw_hal_ids, list) else []
 
     # Pour les œuvres Zenodo, le DOI canonique est le concept DOI (résolu en
     # amont par `resolve_zenodo_concept`) : concept + versions partagent ce DOI
@@ -174,10 +177,14 @@ def process_document(
     if nnt:
         nnt_match_id = pub_repo.find_by_nnt(nnt)
 
-    # Prefetch HAL_ID (clé portée par `external_ids` sur toutes les sources, y compris HAL natif)
+    # Prefetch HAL_ID : matche sur le premier des hal-ids référencés qui résout
+    # (clé multivaluée portée par `external_ids` sur toutes les sources).
     hal_id_match_id: int | None = None
-    if hal_id:
-        hal_id_match_id = pub_repo.find_by_hal_id(hal_id)
+    for h in hal_ids or []:
+        if isinstance(h, str):
+            hal_id_match_id = pub_repo.find_by_hal_id(h)
+            if hal_id_match_id is not None:
+                break
 
     # Prefetch PMID (clé portée par `external_ids` ; un PMID = un article PubMed)
     pmid_match_id: int | None = None

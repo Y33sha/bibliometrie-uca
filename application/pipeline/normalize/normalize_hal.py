@@ -164,7 +164,7 @@ def build_hal_external_ids(doc: dict, hal_id: str, nnt: str | None) -> dict[str,
     symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ
     `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
     """
-    external_ids: dict[str, JsonValue] = {"hal_id": hal_id}
+    external_ids: dict[str, JsonValue] = {"hal_id": [hal_id]}
     if nnt:
         external_ids["nnt"] = nnt
     if pmid := normalize_pmid(as_str(doc.get("pubmedid_s"))):

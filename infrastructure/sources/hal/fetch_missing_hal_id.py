@@ -71,9 +71,9 @@ _INSERT_NOT_FOUND_SQL = text(
 def find_hal_primary_locations(conn: Connection) -> list[dict[str, Any]]:
     """halIds référencés par OpenAlex mais absents de staging HAL.
 
-    Deux sources :
-    - staging non normalisé (raw_data.primary_location) — nouveaux docs du run en cours
-    - source_publications déjà normalisés (external_ids->>'hal_id') — docs des runs précédents
+    Deux sources, **toutes locations** (pas seulement la primary) :
+    - staging non normalisé (raw_data.locations : landing_page_url + location.id OAI-PMH) — nouveaux docs du run en cours
+    - source_publications déjà normalisés (external_ids.hal_id, liste) — docs des runs précédents
 
     Retourne `[{openalex_id, hal_id, landing_url}, ...]`.
 
@@ -87,20 +87,20 @@ def find_hal_primary_locations(conn: Connection) -> list[dict[str, Any]]:
     rows = conn.execute(
         text(
             """
-            SELECT source_id AS openalex_id,
-                   raw_data->'primary_location'->>'landing_page_url' AS url
-            FROM staging
-            WHERE source = 'openalex'
-              AND processed = FALSE
-              AND (
-                  raw_data->'primary_location'->>'landing_page_url' ILIKE '%hal.science%'
-                  OR raw_data->'primary_location'->>'landing_page_url' ILIKE '%hal.archives-ouvertes.fr%'
-              )
+            SELECT s.source_id AS openalex_id,
+                   loc->>'landing_page_url' AS url,
+                   loc->>'id' AS loc_id
+            FROM staging s
+            CROSS JOIN LATERAL jsonb_array_elements(s.raw_data->'locations') AS loc
+            WHERE s.source = 'openalex'
+              AND s.processed = FALSE
+              AND jsonb_typeof(s.raw_data->'locations') = 'array'
             """
         )
     ).all()
     for row in rows:
-        hal_id = extract_hal_id_from_url(row.url)
+        # hal_id depuis la landing page OU le location.id (OAI-PMH) — toutes locations.
+        hal_id = extract_hal_id_from_url(row.url) or extract_hal_id_from_url(row.loc_id)
         if hal_id:
             results[hal_id] = {
                 "openalex_id": row.openalex_id,
@@ -111,10 +111,11 @@ def find_hal_primary_locations(conn: Connection) -> list[dict[str, Any]]:
     rows = conn.execute(
         text(
             """
-            SELECT source_id AS openalex_id, external_ids->>'hal_id' AS hal_id
+            SELECT source_id AS openalex_id, h AS hal_id
             FROM source_publications
+            CROSS JOIN LATERAL jsonb_array_elements_text(external_ids->'hal_id') AS h
             WHERE source = 'openalex'
-              AND external_ids->>'hal_id' IS NOT NULL
+              AND jsonb_typeof(external_ids->'hal_id') = 'array'
             """
         )
     ).all()
@@ -141,7 +142,7 @@ def find_hal_ids_from_scanr(conn: Connection) -> list[dict[str, Any]]:
     """halIds référencés par ScanR mais absents de staging HAL.
 
     Deux sources :
-    - source_publications ScanR déjà normalisés (external_ids->>'hal_id')
+    - source_publications ScanR déjà normalisés (external_ids.hal_id, liste)
     - staging ScanR non encore normalisé (raw_data.externalIds type='hal')
 
     Retourne `[{source: "scanr", hal_id, scanr_id}, ...]`.
@@ -152,12 +153,13 @@ def find_hal_ids_from_scanr(conn: Connection) -> list[dict[str, Any]]:
     rows = conn.execute(
         text(
             """
-            SELECT sd.source_id AS scanr_id, sd.external_ids->>'hal_id' AS hal_id
+            SELECT sd.source_id AS scanr_id, h AS hal_id
             FROM source_publications sd
+            CROSS JOIN LATERAL jsonb_array_elements_text(sd.external_ids->'hal_id') AS h
             WHERE sd.source = 'scanr'
-              AND sd.external_ids->>'hal_id' IS NOT NULL
+              AND jsonb_typeof(sd.external_ids->'hal_id') = 'array'
               AND NOT EXISTS (
-                  SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = sd.external_ids->>'hal_id'
+                  SELECT 1 FROM staging sh WHERE sh.source = 'hal' AND sh.source_id = h
               )
             """
         )

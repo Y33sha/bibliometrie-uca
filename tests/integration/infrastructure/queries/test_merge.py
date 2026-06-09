@@ -61,8 +61,8 @@ class TestFindNntDuplicates:
 class TestFetchSourcePublicationsWithHalExternalId:
     def test_returns_openalex_and_scanr_with_hal_external(self, sa_sync_conn):
         p = _create_pub(sa_sync_conn)
-        oa = _create_sd(sa_sync_conn, "openalex", "oa-1", p, external_ids={"hal_id": "hal-X1"})
-        sc = _create_sd(sa_sync_conn, "scanr", "sc-1", p, external_ids={"hal_id": "hal-X2"})
+        oa = _create_sd(sa_sync_conn, "openalex", "oa-1", p, external_ids={"hal_id": ["hal-X1"]})
+        sc = _create_sd(sa_sync_conn, "scanr", "sc-1", p, external_ids={"hal_id": ["hal-X2"]})
         _create_sd(sa_sync_conn, "hal", "h-1", p)  # HAL lui-même exclu
         _create_sd(sa_sync_conn, "openalex", "oa-2", p)  # sans external.hal_id
 
