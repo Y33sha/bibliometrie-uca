@@ -43,16 +43,20 @@ class PublicationsMatchOrCreateQueries(Protocol):
         """
 
     def bulk_link_orphans_by_doi(self, conn: Connection) -> int:
-        """Phase B step 1/3 : rattache les orphelins par DOI."""
+        """Phase B step 1/4 : rattache les orphelins par DOI."""
 
     def bulk_link_orphans_by_nnt(self, conn: Connection) -> int:
-        """Phase B step 2/3 : rattache les orphelins par NNT
+        """Phase B step 2/4 : rattache les orphelins par NNT
         (stocké sur `source_publications.external_ids`)."""
 
     def bulk_link_orphans_by_hal_id(self, conn: Connection) -> int:
-        """Phase B step 3/3 : rattache les orphelins par hal_id
+        """Phase B step 3/4 : rattache les orphelins par hal_id
         (deux donor paths : SP HAL native via `source_id`, OU SP
         cross-source via `external_ids->>'hal_id'`)."""
+
+    def bulk_link_orphans_by_pmid(self, conn: Connection) -> int:
+        """Phase B step 4/4 : rattache les orphelins par PMID
+        (stocké sur `source_publications.external_ids`)."""
 
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int

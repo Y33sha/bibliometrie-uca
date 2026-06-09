@@ -16,12 +16,13 @@ _BOOK_DOC_TYPES: frozenset[str] = frozenset({"book"})
 class DeduplicationKey(StrEnum):
     """Identifiants cross-source par lesquels une publication peut être dédupliquée.
 
-    Conventionnellement ordre de priorité par défaut (DOI > NNT > HAL_ID), mais chaque cascade caller décide quelles clés elle consulte et dans quel ordre. `StrEnum` (PEP 663) garde la valeur sérialisable telle quelle.
+    L'enum ne fixe pas de priorité : l'ordre de la cascade est défini dans `decide_publication_match` (DOI > NNT > HAL_ID > PMID > metadata) ; un appelant choisit seulement *quelles* clés il fournit (une clé omise vaut `None` et est ignorée). `StrEnum` (PEP 663) garde la valeur sérialisable telle quelle.
     """
 
     DOI = "doi"
     NNT = "nnt"
     HAL_ID = "hal_id"
+    PMID = "pmid"
 
 
 class MetadataDeduplicationCase(StrEnum):
@@ -67,11 +68,12 @@ def decide_publication_match(
     doi_merge_with_id: int | None = None,
     nnt_match_id: int | None = None,
     hal_id_match_id: int | None = None,
+    pmid_match_id: int | None = None,
     metadata_match: tuple[int, MetadataDeduplicationCase] | None = None,
 ) -> PublicationMatchDecision:
     """Sélecteur de cascade pur : premier match non-None dans l'ordre de priorité gagne.
 
-    Priorité par défaut : DOI > NNT > HAL_ID > metadata. Tous les paramètres sont optionnels (None par défaut) ; le caller passe ceux qu'il a pré-fetchés.
+    Priorité par défaut : DOI > NNT > HAL_ID > PMID > metadata. Tous les paramètres sont optionnels (None par défaut) ; le caller passe ceux qu'il a pré-fetchés.
 
     Pour le DOI, le caller doit avoir préalablement appelé `resolve_doi_conflict` et passé `merge_with_id` (None si le conflit chapter/book a invalidé le match). `decide_publication_match` ne re-vérifie pas les invariants du DOI ; il fait confiance au merge_with_id pré-calculé.
 
@@ -94,6 +96,12 @@ def decide_publication_match(
             action="match",
             publication_id=hal_id_match_id,
             matched_by=DeduplicationKey.HAL_ID,
+        )
+    if pmid_match_id is not None:
+        return PublicationMatchDecision(
+            action="match",
+            publication_id=pmid_match_id,
+            matched_by=DeduplicationKey.PMID,
         )
     if metadata_match is not None:
         pub_id, case = metadata_match

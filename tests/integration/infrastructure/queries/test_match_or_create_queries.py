@@ -9,6 +9,7 @@ from infrastructure.queries.pipeline.publications_match_or_create import (
     bulk_link_orphans_by_doi,
     bulk_link_orphans_by_hal_id,
     bulk_link_orphans_by_nnt,
+    bulk_link_orphans_by_pmid,
     fetch_stale_publication_ids,
 )
 
@@ -228,3 +229,48 @@ def test_bulk_link_orphans_by_hal_id_symmetric_orphan_hal_to_cross_source(sa_syn
         ).scalar_one()
         == pub_id
     )
+
+
+# ── bulk_link_orphans_by_pmid ───────────────────────────────────────
+
+
+def test_bulk_link_orphans_by_pmid_bumps_sp_updated_at(sa_sync_conn):
+    """Après rattachement par PMID, `sp.updated_at` doit dépasser `publications.updated_at` (cf. note dans `test_bulk_link_orphans_by_doi_bumps_sp_updated_at`)."""
+    pub_id = _create_pub(sa_sync_conn, title="Article biomed")
+    _force_pub_updated_at(sa_sync_conn, pub_id, days_ago=1)
+    # Donor : SP ScanR déjà rattachée, avec external_ids.pmid
+    _create_orphan_sp(
+        sa_sync_conn,
+        source="scanr",
+        source_id="scanr-1",
+        external_ids='{"pmid": "28973220"}',
+        old_age_days=10,
+    )
+    sa_sync_conn.execute(
+        text(
+            "UPDATE source_publications SET publication_id = :pid "
+            "WHERE source = 'scanr' AND source_id = 'scanr-1'"
+        ),
+        {"pid": pub_id},
+    )
+    # Orphan à rattacher : OpenAlex avec le même PMID en external_ids
+    sp_id, _ = _create_orphan_sp(
+        sa_sync_conn,
+        source="openalex",
+        source_id="W43",
+        external_ids='{"pmid": "28973220"}',
+        old_age_days=10,
+    )
+
+    linked = bulk_link_orphans_by_pmid(sa_sync_conn)
+
+    assert linked == 1
+    assert (
+        sa_sync_conn.execute(
+            text("SELECT publication_id FROM source_publications WHERE id = :id"),
+            {"id": sp_id},
+        ).scalar_one()
+        == pub_id
+    )
+    assert _get_sp_updated_at(sa_sync_conn, sp_id) > _get_pub_updated_at(sa_sync_conn, pub_id)
+    assert pub_id in fetch_stale_publication_ids(sa_sync_conn)

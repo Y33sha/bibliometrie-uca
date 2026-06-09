@@ -146,6 +146,7 @@ def process_document(
     if nnt:
         nnt = normalize_nnt(nnt)
     hal_id = known_ids.get("hal_id")
+    pmid = known_ids.get("pmid")
 
     # Pour les œuvres Zenodo, le DOI canonique est le concept DOI (résolu en
     # amont par `resolve_zenodo_concept`) : concept + versions partagent ce DOI
@@ -178,6 +179,11 @@ def process_document(
     if hal_id:
         hal_id_match_id = pub_repo.find_by_hal_id(hal_id)
 
+    # Prefetch PMID (clé portée par `external_ids` ; un PMID = un article PubMed)
+    pmid_match_id: int | None = None
+    if pmid:
+        pmid_match_id = pub_repo.find_by_pmid(pmid)
+
     # Prefetch dédup par métadonnées : aiguillage par doc_type vers la
     # règle correspondante. Les règles vivent dans
     # `metadata_deduplication_rules.py` ; chaque membre de
@@ -207,6 +213,7 @@ def process_document(
         doi_merge_with_id=doi_merge_with_id,
         nnt_match_id=nnt_match_id,
         hal_id_match_id=hal_id_match_id,
+        pmid_match_id=pmid_match_id,
         metadata_match=metadata_match,
     )
 
@@ -285,30 +292,37 @@ def run(
         if dry_run:
             logger.info("Phase B (bulk link hors-périmètre) : skipped (dry-run)")
         else:
-            logger.info("Phase B step 1/3 : rattachement par DOI...")
+            logger.info("Phase B step 1/4 : rattachement par DOI...")
             t0 = time.perf_counter()
             n_doi = queries.bulk_link_orphans_by_doi(conn)
             conn.commit()
             logger.info("  → %d rattachées (%.1fs)", n_doi, time.perf_counter() - t0)
 
-            logger.info("Phase B step 2/3 : rattachement par NNT...")
+            logger.info("Phase B step 2/4 : rattachement par NNT...")
             t0 = time.perf_counter()
             n_nnt = queries.bulk_link_orphans_by_nnt(conn)
             conn.commit()
             logger.info("  → %d rattachées (%.1fs)", n_nnt, time.perf_counter() - t0)
 
-            logger.info("Phase B step 3/3 : rattachement par hal_id...")
+            logger.info("Phase B step 3/4 : rattachement par hal_id...")
             t0 = time.perf_counter()
             n_hal_id = queries.bulk_link_orphans_by_hal_id(conn)
             conn.commit()
             logger.info("  → %d rattachées (%.1fs)", n_hal_id, time.perf_counter() - t0)
 
+            logger.info("Phase B step 4/4 : rattachement par PMID...")
+            t0 = time.perf_counter()
+            n_pmid = queries.bulk_link_orphans_by_pmid(conn)
+            conn.commit()
+            logger.info("  → %d rattachées (%.1fs)", n_pmid, time.perf_counter() - t0)
+
             logger.info(
-                "Phase B terminée : %d rattachées (DOI=%d, NNT=%d, hal_id=%d)",
-                n_doi + n_nnt + n_hal_id,
+                "Phase B terminée : %d rattachées (DOI=%d, NNT=%d, hal_id=%d, PMID=%d)",
+                n_doi + n_nnt + n_hal_id + n_pmid,
                 n_doi,
                 n_nnt,
                 n_hal_id,
+                n_pmid,
             )
 
         # ── Phase 2 : refresh des publications stale ──
