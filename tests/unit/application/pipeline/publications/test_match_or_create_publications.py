@@ -29,11 +29,11 @@ from application.ports.pipeline.publications_match_or_create import SourcePublic
 
 class TestExtractKnownIdentifiers:
     def test_returns_external_ids_as_is(self):
-        """Cas nominal : `external_ids` traversent, valeurs str non vides retenues."""
+        """Valeurs str non vides retenues ; `hal_id` (liste) est ignoré ici — lu à part
+        dans `process_document` car multivalué."""
         assert extract_known_identifiers(
-            {"hal_id": "hal-X", "nnt": "2021CLFAC030", "pmid": "12345"}
+            {"hal_id": ["hal-X"], "nnt": "2021CLFAC030", "pmid": "12345"}
         ) == {
-            "hal_id": "hal-X",
             "nnt": "2021CLFAC030",
             "pmid": "12345",
         }
@@ -315,7 +315,7 @@ class TestProcessDocumentHalMatch:
             doc=_make_doc(
                 source="hal",
                 source_id="hal-12345",
-                external_ids={"hal_id": "hal-12345"},
+                external_ids={"hal_id": ["hal-12345"]},
             ),
             dry_run=False,
             pub_repo=repo,

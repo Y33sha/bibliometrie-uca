@@ -2,7 +2,7 @@
 
 Cas typique : OpenAlex et HAL ont chacune créé une publication canonique (parce que la SP HAL a été ingérée avant la SP OpenAlex qui carry le hal_id, ou inversement), et un même document HAL se retrouve donc référencé par deux publications. On fusionne via `merge_publications_by_key` (choix de cible trivial `min(pub_ids)`, résolution des chaînes de redirection dans le batch).
 
-Le cas « SP HAL orpheline à rattacher à une publication existante » est désormais entièrement couvert par `bulk_link_orphans_by_hal_id` côté `match_or_create_publications` (Phase B) — le normalizer HAL pose `external_ids.hal_id = source_id`, ce qui rend la query bulk symétrique avec les autres sources. Pas de path `link_only` ici.
+Le cas « SP HAL orpheline à rattacher à une publication existante » est désormais entièrement couvert par `bulk_link_orphans_by_hal_id` côté `match_or_create_publications` (Phase B) — le normalizer HAL pose `external_ids.hal_id = [source_id]`, ce qui rend la query bulk symétrique avec les autres sources. Pas de path `link_only` ici.
 
 L'orchestrateur dépend du port `MergeQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/merge_pubs_by_hal_id.py`.
 """

@@ -105,20 +105,29 @@ def bulk_link_orphans_by_hal_id(conn: Connection) -> int:
     return conn.execute(
         text("""
             WITH hal_id_lookup AS (
-                SELECT (external_ids->>'hal_id') AS hal_id,
-                       MIN(publication_id) AS publication_id
+                SELECT h AS hal_id, MIN(publication_id) AS publication_id
                 FROM source_publications
+                CROSS JOIN LATERAL jsonb_array_elements_text(external_ids->'hal_id') AS h
                 WHERE publication_id IS NOT NULL
-                  AND external_ids ? 'hal_id'
-                GROUP BY (external_ids->>'hal_id')
+                  AND jsonb_typeof(external_ids->'hal_id') = 'array'
+                GROUP BY h
+            ),
+            orphan_target AS (
+                -- Un orphelin peut porter plusieurs hal-ids : cible = MIN des
+                -- publications matchées (déterministe).
+                SELECT sp.id AS sp_id, MIN(hl.publication_id) AS publication_id
+                FROM source_publications sp
+                CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids->'hal_id') AS sh
+                JOIN hal_id_lookup hl ON hl.hal_id = sh
+                WHERE sp.publication_id IS NULL
+                  AND jsonb_typeof(sp.external_ids->'hal_id') = 'array'
+                GROUP BY sp.id
             )
             UPDATE source_publications sp
-            SET publication_id = hl.publication_id,
+            SET publication_id = ot.publication_id,
                 updated_at = now()
-            FROM hal_id_lookup hl
-            WHERE sp.publication_id IS NULL
-              AND sp.external_ids ? 'hal_id'
-              AND (sp.external_ids ->> 'hal_id') = hl.hal_id
+            FROM orphan_target ot
+            WHERE sp.id = ot.sp_id
         """)
     ).rowcount
 

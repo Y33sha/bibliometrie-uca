@@ -116,7 +116,7 @@ class PgPublicationRepository:
     def find_by_hal_id(self, hal_id: str) -> int | None:
         """Cherche une publication rattachée à un HAL ID donné.
 
-        `external_ids->>'hal_id'` est la clé canonique : le normalizer HAL la pose au même titre que les normalizers cross-source (OpenAlex, ScanR) — symétrie avec ce que theses fait déjà pour NNT. Pas besoin de regarder `source_id` séparément.
+        `external_ids.hal_id` est une **liste** de dépôts HAL (le normalizer HAL y pose le sien, les normalizers cross-source tous ceux qu'ils référencent) — on teste l'appartenance via `@>`. Pas besoin de regarder `source_id` séparément.
         """
         if not hal_id:
             return None
@@ -125,7 +125,7 @@ class PgPublicationRepository:
                 SELECT publication_id
                 FROM source_publications
                 WHERE publication_id IS NOT NULL
-                  AND external_ids->>'hal_id' = :hal_id
+                  AND external_ids->'hal_id' @> jsonb_build_array(CAST(:hal_id AS text))
                 LIMIT 1
             """),
             {"hal_id": hal_id},

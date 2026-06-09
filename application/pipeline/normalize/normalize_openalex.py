@@ -37,7 +37,7 @@ from application.ports.repositories.publisher_repository import PublisherReposit
 from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import clean_doi, extract_hal_id_from_url
 from domain.sources.openalex import (
     extract_external_ids_from_urls,
     extract_nnt_from_location,
@@ -63,17 +63,35 @@ def extract_locations_data(work: dict) -> tuple[list[str], dict]:
 
     Retourne (urls, external_ids) où :
       - urls : liste dédupliquée de landing_page_url et pdf_url
-      - external_ids : dict d'identifiants extraits des URLs (hal_id, nnt, pmid, pmcid, arxiv_id)
+      - external_ids : dict d'identifiants (nnt, pmid, pmcid, arxiv_id scalaires ;
+        hal_id **liste** de tous les dépôts HAL référencés)
+
+    Les hal-ids sont collectés depuis les URLs **et** depuis `location.id`
+    (format OAI-PMH `pmh:oai:HAL:<halid>`), source structurée présente sur
+    chaque location même quand la landing page est un DOI ou une page éditeur.
     """
     urls = []
     seen = set()
+    location_ids: list[str] = []
     for loc in work.get("locations") or []:
         for key in ("landing_page_url", "pdf_url"):
             url = loc.get(key)
             if url and url not in seen:
                 seen.add(url)
                 urls.append(url)
-    return urls, extract_external_ids_from_urls(urls)
+        if loc_id := loc.get("id"):
+            location_ids.append(loc_id)
+
+    external_ids = extract_external_ids_from_urls(urls)
+    # Compléter hal_id avec les location.id (OAI-PMH) — capte les dépôts HAL
+    # absents des URLs (landing = DOI/éditeur).
+    hal_ids: list[str] = list(external_ids.get("hal_id") or [])
+    for loc_id in location_ids:
+        if (hal_id := extract_hal_id_from_url(loc_id)) and hal_id not in hal_ids:
+            hal_ids.append(hal_id)
+    if hal_ids:
+        external_ids["hal_id"] = hal_ids
+    return urls, external_ids
 
 
 def reconstruct_abstract(inverted_index: dict | None) -> str | None:
@@ -237,14 +255,13 @@ def insert_openalex_document(
     primary = parse_primary_location(work)
 
     # URLs et identifiants extraits des locations
-    urls, location_ids = extract_locations_data(work)
+    urls, external_ids = extract_locations_data(work)
     if nnt := pub_meta["nnt"]:
-        location_ids["nnt"] = nnt
+        external_ids["nnt"] = nnt
     # Conserver le DOI original si retiré lors d'un conflit chapitre/ouvrage
     if source_doi := pub_meta.get("source_doi"):
-        location_ids["source_doi"] = source_doi
+        external_ids["source_doi"] = source_doi
 
-    external_ids = location_ids if location_ids else None
     cited_by_count = work.get("cited_by_count")
     is_retracted = work.get("is_retracted") or False
 
@@ -311,7 +328,7 @@ def insert_openalex_document(
         doc_type=pub_meta["doc_type"],
         publication_id=publication_id,
         staging_id=staging_id,
-        external_ids=external_ids,
+        external_ids=external_ids or None,
         urls=urls or None,
         cited_by_count=cited_by_count,
         journal_id=pub_meta["journal_id"],

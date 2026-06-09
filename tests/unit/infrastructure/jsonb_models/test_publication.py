@@ -34,16 +34,20 @@ class TestExternalIdsParsing:
             pmcid="987654",
             arxiv_id="https://arxiv.org/abs/2401.00123",
         )
-        assert ids.hal_id == "hal-04123456"
+        assert ids.hal_id == ["hal-04123456"]
         assert ids.nnt == "2021CLFA0030"  # normalisé en majuscules
         assert ids.pmid == "12345"
         assert ids.pmcid == "PMC987654"  # préfixe PMC ajouté
         assert ids.arxiv_id == "2401.00123"  # URL → id canonique
 
     def test_normalize_hal_url(self):
-        """Une URL HAL en entrée est normalisée en ID canonique."""
+        """Une URL HAL en entrée (scalaire toléré) est normalisée en ID canonique, en liste."""
         ids = ExternalIds(hal_id="https://hal.science/hal-04123456v2")
-        assert ids.hal_id == "hal-04123456"
+        assert ids.hal_id == ["hal-04123456"]
+
+    def test_hal_id_list_normalized_and_deduped(self):
+        ids = ExternalIds(hal_id=["https://hal.science/hal-111v2", "hal-222", "hal-111"])
+        assert ids.hal_id == ["hal-111", "hal-222"]
 
     def test_empty_string_treated_as_none(self):
         ids = ExternalIds(hal_id="", nnt="")
@@ -69,11 +73,11 @@ class TestExternalIdsParsing:
     def test_to_dict_omits_none(self):
         ids = ExternalIds(hal_id="hal-1234")
         dumped = ids.to_dict()
-        assert dumped == {"hal_id": "hal-1234"}  # nnt/pmid/pmcid/arxiv_id omis car None
+        assert dumped == {"hal_id": ["hal-1234"]}  # nnt/pmid/pmcid/arxiv_id omis car None
 
     def test_roundtrip_from_db(self):
         """Simule un aller-retour : lecture depuis BD (dict) → model → retour dict."""
-        from_db = {"hal_id": "hal-04123456", "nnt": "2021CLFA0030", "pmid": "12345678"}
+        from_db = {"hal_id": ["hal-04123456"], "nnt": "2021CLFA0030", "pmid": "12345678"}
         ids = ExternalIds(**from_db)
         back = ids.to_dict()
         assert back == from_db

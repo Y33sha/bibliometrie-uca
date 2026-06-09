@@ -16,7 +16,7 @@ _BOOK_DOC_TYPES: frozenset[str] = frozenset({"book"})
 class DeduplicationKey(StrEnum):
     """Identifiants cross-source par lesquels une publication peut être dédupliquée.
 
-    L'enum ne fixe pas de priorité : l'ordre de la cascade est défini dans `decide_publication_match` (DOI > NNT > HAL_ID > PMID > metadata) ; un appelant choisit seulement *quelles* clés il fournit (une clé omise vaut `None` et est ignorée). `StrEnum` (PEP 663) garde la valeur sérialisable telle quelle.
+    L'enum ne fixe pas de priorité : l'ordre de la cascade est défini dans `decide_publication_match` (DOI > NNT > HAL_ID > PMID > metadata). `StrEnum` (PEP 663) garde la valeur sérialisable telle quelle.
     """
 
     DOI = "doi"
