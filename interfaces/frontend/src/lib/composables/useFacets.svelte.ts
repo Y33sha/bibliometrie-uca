@@ -48,7 +48,9 @@ export type FacetDef = SimpleFacet | LabelMapFacet | LabeledFacet | PassthroughF
 
 interface FacetsConfig<K extends string> {
 	endpoint: string;
-	apiKey: string;
+	/** Clé de cache `api()`. Passer un getter `() => ...` pour qu'un changement
+	 *  (invalidation après édition admin) recharge les facettes. */
+	apiKey: string | (() => string);
 	buildParams: () => URLSearchParams;
 	facets: Record<K, FacetDef>;
 	sourceCountsKey?: string;
@@ -63,11 +65,24 @@ export function useFacets<K extends string>(config: FacetsConfig<K>) {
 	let options: Record<K, FacetOption[]> = $state(initialOptions);
 	let sourceCounts: Record<string, { yes: number; no: number }> = $state({});
 
+	const currentKey = (): string =>
+		typeof config.apiKey === 'function' ? config.apiKey() : config.apiKey;
+	let lastKey: string | undefined;
+
+	// Recharge les facettes quand la clé d'API change (invalidation après
+	// édition/fusion admin). `apiKey` doit être un getter pour être suivi ;
+	// la garde `lastKey` évite un double-chargement au montage.
+	$effect(() => {
+		const key = currentKey();
+		if (lastKey !== undefined && key !== lastKey) load();
+	});
+
 	async function load() {
+		lastKey = currentKey();
 		const params = config.buildParams();
 		const data = await api<Record<string, unknown>>(
 			config.endpoint + '?' + params,
-			{ key: config.apiKey },
+			{ key: lastKey },
 		);
 
 		const newOpts = {} as Record<K, FacetOption[]>;

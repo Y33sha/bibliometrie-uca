@@ -61,7 +61,7 @@
 		endpoint: '/api/publishers',
 		itemsKey: 'publishers',
 		perPage,
-		apiKey,
+		apiKey: () => apiKey,
 		buildParams() {
 			const params = buildFilterParams();
 			params.set('sort', currentSort);
@@ -73,7 +73,7 @@
 
 	const facets = useFacets({
 		endpoint: '/api/publishers/facets',
-		apiKey: `${apiKey}-facets`,
+		apiKey: () => `${apiKey}-facets`,
 		buildParams: buildFilterParams,
 		facets: {
 			publisherTypes: { type: 'labeled', apiKey: 'publisher_types' },
