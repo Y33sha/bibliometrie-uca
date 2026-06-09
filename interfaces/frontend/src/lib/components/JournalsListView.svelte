@@ -82,7 +82,7 @@
 		endpoint: '/api/journals',
 		itemsKey: 'journals',
 		perPage,
-		apiKey,
+		apiKey: () => apiKey,
 		buildParams() {
 			const params = buildFilterParams();
 			params.set('sort', currentSort);
@@ -94,7 +94,7 @@
 
 	const facets = useFacets({
 		endpoint: '/api/journals/facets',
-		apiKey: `${apiKey}-facets`,
+		apiKey: () => `${apiKey}-facets`,
 		buildParams: buildFilterParams,
 		facets: {
 			journalTypes: { type: 'labeled', apiKey: 'journal_types' },
