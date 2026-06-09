@@ -63,7 +63,7 @@ def extract_locations_data(work: dict) -> tuple[list[str], dict]:
 
     Retourne (urls, external_ids) où :
       - urls : liste dédupliquée de landing_page_url et pdf_url
-      - external_ids : dict d'identifiants extraits des URLs (hal_id, nnt, pmid, pmc)
+      - external_ids : dict d'identifiants extraits des URLs (hal_id, nnt, pmid, pmcid, arxiv_id)
     """
     urls = []
     seen = set()

@@ -44,7 +44,13 @@ from application.publishers import find_or_create_publisher
 from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.publications.authorship_roles import map_role
-from domain.publications.identifiers import clean_doi, normalize_nnt
+from domain.publications.identifiers import (
+    clean_doi,
+    normalize_arxiv_id,
+    normalize_nnt,
+    normalize_pmcid,
+    normalize_pmid,
+)
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.hal import derive_hal_oa_status
 from domain.types import JsonValue
@@ -149,6 +155,31 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
 # =============================================================
 
 
+def build_hal_external_ids(doc: dict, hal_id: str, nnt: str | None) -> dict[str, JsonValue]:
+    """Construit `external_ids` (clés de dédup cross-source) pour un doc HAL.
+
+    `hal_id` est redondant avec `source_id` côté identité, mais on le pose
+    aussi ici pour que les queries de matching/linking (`find_by_hal_id`,
+    `bulk_link_orphans_by_hal_id`) traitent HAL comme les autres sources —
+    symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ
+    `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
+    """
+    external_ids: dict[str, JsonValue] = {"hal_id": hal_id}
+    if nnt:
+        external_ids["nnt"] = nnt
+    if pmid := normalize_pmid(as_str(doc.get("pubmedid_s"))):
+        external_ids["pmid"] = pmid
+    link_urls = doc.get("linkExtUrl_s")
+    if isinstance(link_urls, str):
+        link_urls = [link_urls]
+    for url in link_urls or []:
+        if "pmcid" not in external_ids and (pmcid := normalize_pmcid(url)):
+            external_ids["pmcid"] = pmcid
+        if "arxiv_id" not in external_ids and (arxiv_id := normalize_arxiv_id(url)):
+            external_ids["arxiv_id"] = arxiv_id
+    return external_ids
+
+
 def insert_hal_document(
     conn: Connection,
     queries: HalNormalizeQueries,
@@ -177,10 +208,7 @@ def insert_hal_document(
 
     collections_array = sorted(collections) if collections else None
 
-    # Clés de dédup cross-source dans external_ids. `hal_id` est redondant avec `source_id` côté identité, mais on le pose aussi ici pour que les queries de matching/linking (`find_by_hal_id`, `bulk_link_orphans_by_hal_id`) puissent traiter HAL comme toutes les autres sources — symétrie avec ce que theses fait déjà pour NNT.
-    external_ids: dict[str, JsonValue] = {"hal_id": hal_id}
-    if nnt := pub_meta["nnt"]:
-        external_ids["nnt"] = nnt
+    external_ids = build_hal_external_ids(doc, hal_id, pub_meta["nnt"])
 
     # Abstract
     abstract = as_str(doc.get("abstract_s"))

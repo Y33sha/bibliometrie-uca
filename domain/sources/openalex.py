@@ -12,7 +12,13 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from domain.publications.identifiers import extract_hal_id_from_url, normalize_nnt
+from domain.publications.identifiers import (
+    extract_hal_id_from_url,
+    normalize_arxiv_id,
+    normalize_nnt,
+    normalize_pmcid,
+    normalize_pmid,
+)
 
 # =============================================================
 # LOCATIONS
@@ -188,23 +194,19 @@ def map_openalex_oa_status(raw: str | None) -> str | None:
 # IDs DEPUIS LES URLs
 # =============================================================
 
-# Patterns d'identifiants exposés en clair dans les URLs des locations
-# OpenAlex. Volontairement co-localisés ici — OpenAlex est aujourd'hui
-# le seul consommateur ; à promouvoir en module général si une autre
-# source devait extraire des IDs depuis des URLs publiques par regex.
-_PMID_URL_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")
-_PMC_URL_RE = re.compile(r"ncbi\.nlm\.nih\.gov/pmc/articles/(?:PMC)?(\d+)")
-
 
 def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]:
     """Extrait les identifiants exposés dans une liste d'URLs.
 
     Reconnait HAL (préfixes ``hal-``/``tel-``/``halshs-``…), NNT
-    (URLs ``theses.fr/<NNT>``), PMID (PubMed) et PMC. Pour chaque
+    (URLs ``theses.fr/<NNT>``), PMID (PubMed), PMC et arXiv. Pour chaque
     type, le **premier** match dans l'ordre des URLs gagne — l'ordre
     des URLs en entrée est donc significatif (le caller choisit
     typiquement landing_page_url avant pdf_url, primary_location avant
     autres).
+
+    Les extracteurs d'ID par URL (PMID/PMC/arXiv/HAL) vivent dans
+    ``domain.publications.identifiers`` (neutres, réutilisés par HAL).
 
     Pas de normalisation ici : le NNT n'est PAS passé par
     ``normalize_nnt`` (à l'inverse de ``extract_nnt_from_location``)
@@ -216,19 +218,19 @@ def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str]:
     external_ids: dict[str, str] = {}
     for url in urls:
         if not external_ids.get("hal_id"):
-            hal_id = extract_hal_id_from_url(url)
-            if hal_id:
+            if hal_id := extract_hal_id_from_url(url):
                 external_ids["hal_id"] = hal_id
         if not external_ids.get("nnt"):
             m = _THESES_FR_URL_RE.search(url)
             if m:
                 external_ids["nnt"] = m.group(1)
         if not external_ids.get("pmid"):
-            m = _PMID_URL_RE.search(url)
-            if m:
-                external_ids["pmid"] = m.group(1)
-        if not external_ids.get("pmc"):
-            m = _PMC_URL_RE.search(url)
-            if m:
-                external_ids["pmc"] = f"PMC{m.group(1)}"
+            if pmid := normalize_pmid(url):
+                external_ids["pmid"] = pmid
+        if not external_ids.get("pmcid"):
+            if pmcid := normalize_pmcid(url):
+                external_ids["pmcid"] = pmcid
+        if not external_ids.get("arxiv_id"):
+            if arxiv_id := normalize_arxiv_id(url):
+                external_ids["arxiv_id"] = arxiv_id
     return external_ids
