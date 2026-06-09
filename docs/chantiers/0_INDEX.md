@@ -15,11 +15,13 @@
 
 ### Non commencé
 
+- [Fusions abusives de documents distincts par les sources](METIER_fusions-abusives-sources.md)
 - [Relations entre publications](METIER_relations-publications.md)
 - [Embargo HAL : statut OA intermédiaire « sous embargo »](METIER_embargo-oa-status.md)
 
 ## Chantiers archivés
 
+- 2026-06-09 — [Complétude des identifiants externes & clés de déduplication](archived/2026-06-09_METIER_completude-identifiants.md)
 - 2026-06-08 — [Export CSV fidèle à l'affichage (filtres + colonnes + titres nettoyés)](archived/2026-06-08_CODE_export-csv-fidele.md)
 - 2026-06-08 — [Peaufinage UI (cohérence, responsivité, ergonomie)](archived/2026-06-08_CODE_peaufinage-ui.md)
 - 2026-06-07 — [Barres à facettes homogènes + extraction des ListView (thèses, personnes) + alignement endpoint personnes](archived/2026-06-07_CODE_listviews-facettes-homogenes.md)
