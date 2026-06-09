@@ -23,13 +23,22 @@ class TestExternalIdsParsing:
         assert ids.hal_id is None
         assert ids.nnt is None
         assert ids.pmid is None
-        assert ids.pmc is None
+        assert ids.pmcid is None
+        assert ids.arxiv_id is None
 
     def test_from_dict_basic(self):
-        ids = ExternalIds(hal_id="hal-04123456", nnt="2021clfa0030", pmid="12345")
+        ids = ExternalIds(
+            hal_id="hal-04123456",
+            nnt="2021clfa0030",
+            pmid="12345",
+            pmcid="987654",
+            arxiv_id="https://arxiv.org/abs/2401.00123",
+        )
         assert ids.hal_id == "hal-04123456"
         assert ids.nnt == "2021CLFA0030"  # normalisé en majuscules
         assert ids.pmid == "12345"
+        assert ids.pmcid == "PMC987654"  # préfixe PMC ajouté
+        assert ids.arxiv_id == "2401.00123"  # URL → id canonique
 
     def test_normalize_hal_url(self):
         """Une URL HAL en entrée est normalisée en ID canonique."""
@@ -51,16 +60,16 @@ class TestExternalIdsParsing:
 
     def test_accepts_extra_keys(self):
         """Les clés non déclarées (futures évolutions) sont conservées telles quelles."""
-        ids = ExternalIds(hal_id="hal-1234", arxiv="2401.00123", issn="0028-0836")
+        ids = ExternalIds(hal_id="hal-1234", mag="2912345678", issn="0028-0836")
         # Les extras sont accessibles via model_extra
         dumped = ids.to_dict()
-        assert dumped["arxiv"] == "2401.00123"
+        assert dumped["mag"] == "2912345678"
         assert dumped["issn"] == "0028-0836"
 
     def test_to_dict_omits_none(self):
         ids = ExternalIds(hal_id="hal-1234")
         dumped = ids.to_dict()
-        assert dumped == {"hal_id": "hal-1234"}  # nnt/pmid/pmc omis car None
+        assert dumped == {"hal_id": "hal-1234"}  # nnt/pmid/pmcid/arxiv_id omis car None
 
     def test_roundtrip_from_db(self):
         """Simule un aller-retour : lecture depuis BD (dict) → model → retour dict."""

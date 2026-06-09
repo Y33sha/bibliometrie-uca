@@ -75,9 +75,35 @@ class TestOADocTypeMap:
 
 from application.pipeline.normalize.normalize_hal import (
     as_str,
+    build_hal_external_ids,
     get_title,
     parse_author_structures,
 )
+
+
+class TestBuildHalExternalIds:
+    def test_minimal(self):
+        assert build_hal_external_ids({}, "hal-1234", None) == {"hal_id": "hal-1234"}
+
+    def test_nnt(self):
+        assert build_hal_external_ids({}, "hal-1", "2021CLFA0030")["nnt"] == "2021CLFA0030"
+
+    def test_pmid_from_pubmedid(self):
+        assert (
+            build_hal_external_ids({"pubmedid_s": "28973220"}, "hal-1", None)["pmid"] == "28973220"
+        )
+
+    def test_pmcid_from_link(self):
+        doc = {"linkExtUrl_s": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5625084"}
+        assert build_hal_external_ids(doc, "hal-1", None)["pmcid"] == "PMC5625084"
+
+    def test_arxiv_from_link_list(self):
+        doc = {"linkExtUrl_s": ["https://arxiv.org/abs/2401.00123"]}
+        assert build_hal_external_ids(doc, "hal-1", None)["arxiv_id"] == "2401.00123"
+
+    def test_non_id_link_ignored(self):
+        doc = {"linkExtUrl_s": "https://example.com/openaccess"}
+        assert build_hal_external_ids(doc, "hal-1", None) == {"hal_id": "hal-1"}
 
 
 class TestHALAsStr:

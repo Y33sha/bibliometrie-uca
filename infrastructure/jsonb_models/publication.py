@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from application.ports.api.publications_queries import EcoleDoctorale, PartenaireThese
-from domain.publications.identifiers import NNT, HALId
+from domain.publications.identifiers import NNT, PMCID, PMID, ArxivId, HALId
 
 # Re-export pour compat des tests / importeurs historiques.
 __all__ = [
@@ -35,7 +35,7 @@ class ExternalIds(BaseModel):
     normalisées via les value objects du domaine — un HAL URL en entrée
     est stocké comme HAL ID canonique, un NNT est mis en majuscules, etc.
 
-    `extra="allow"` autorise les clés non déclarées (arxiv, issn, …)
+    `extra="allow"` autorise les clés non déclarées (issn, …)
     pour ne pas bloquer l'évolution du schéma sur une clé nouvelle.
     Les clés déclarées ici sont les seules qui sont validées/normalisées.
     """
@@ -45,7 +45,8 @@ class ExternalIds(BaseModel):
     hal_id: str | None = None  # HAL ID document (ex. "hal-04123456")
     nnt: str | None = None  # Numéro National de Thèse
     pmid: str | None = None  # PubMed ID
-    pmc: str | None = None  # PubMed Central ID
+    pmcid: str | None = None  # PubMed Central ID
+    arxiv_id: str | None = None  # arXiv ID
 
     @field_validator("hal_id", mode="before")
     @classmethod
@@ -67,6 +68,36 @@ class ExternalIds(BaseModel):
         normalized = NNT.try_parse(v)
         if normalized is None:
             raise ValueError(f"NNT invalide : {v!r}")
+        return normalized.value
+
+    @field_validator("pmid", mode="before")
+    @classmethod
+    def _normalize_pmid(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        normalized = PMID.try_parse(v)
+        if normalized is None:
+            raise ValueError(f"PMID invalide : {v!r}")
+        return normalized.value
+
+    @field_validator("pmcid", mode="before")
+    @classmethod
+    def _normalize_pmcid(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        normalized = PMCID.try_parse(v)
+        if normalized is None:
+            raise ValueError(f"PMCID invalide : {v!r}")
+        return normalized.value
+
+    @field_validator("arxiv_id", mode="before")
+    @classmethod
+    def _normalize_arxiv_id(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        normalized = ArxivId.try_parse(v)
+        if normalized is None:
+            raise ValueError(f"arXiv ID invalide : {v!r}")
         return normalized.value
 
     def to_dict(self) -> dict[str, Any]:

@@ -1,15 +1,18 @@
 """Value objects et helpers de normalisation des identifiants publication.
 
-DOI, HALId (document HAL), NNT (Numéro National de Thèse). Trois VOs
-immuables et auto-validés au même contrat que ``domain/persons/identifiers.py`` :
+DOI, HALId (document HAL), NNT (Numéro National de Thèse), PMID (PubMed),
+PMCID (PubMed Central), ArxivId (arXiv). VOs immuables et auto-validés au
+même contrat que ``domain/persons/identifiers.py`` :
 
 - ``X("...")`` strict : lève ``ValidationError`` si malformé
 - ``X.try_parse(...)`` tolérant : renvoie None si malformé
 
-Les helpers ``clean_doi``, ``normalize_nnt``, ``extract_hal_id_from_url``
-sont exposés indépendamment pour les call sites qui veulent juste
-normaliser sans construire un VO (typiquement les normalizers de
-pipeline qui stockent la forme texte en base).
+Les helpers ``clean_doi``, ``normalize_nnt``, ``extract_hal_id_from_url``,
+``normalize_pmid``, ``normalize_pmcid``, ``normalize_arxiv_id`` sont exposés
+indépendamment pour les call sites qui veulent juste normaliser sans
+construire un VO (typiquement les normalizers de pipeline qui stockent la
+forme texte en base). Ils acceptent une URL (location OpenAlex, lien externe
+HAL) ou un identifiant brut.
 """
 
 import re
@@ -176,6 +179,136 @@ class NNT:
         return self.value
 
 
+# ── PMID / PMCID (PubMed) ──────────────────────────────────────────
+
+_PMID_URL_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")
+_PMC_URL_RE = re.compile(r"ncbi\.nlm\.nih\.gov/pmc/articles/(?:PMC)?(\d+)")
+_PMCID_BARE_RE = re.compile(r"^(?:PMC)?(\d+)$", re.IGNORECASE)
+
+
+def _normalize_pmid(raw: str | None) -> str | None:
+    """PMID depuis une URL PubMed ou un identifiant brut (suite de chiffres)."""
+    if not raw:
+        return None
+    s = raw.strip()
+    m = _PMID_URL_RE.search(s)
+    if m:
+        return m.group(1)
+    return s if s.isdigit() else None
+
+
+def _normalize_pmcid(raw: str | None) -> str | None:
+    """PMCID (`PMC<digits>`) depuis une URL PubMed Central ou un id brut."""
+    if not raw:
+        return None
+    s = raw.strip()
+    m = _PMC_URL_RE.search(s)
+    if m:
+        return f"PMC{m.group(1)}"
+    m = _PMCID_BARE_RE.match(s)
+    return f"PMC{m.group(1)}" if m else None
+
+
+@dataclass(frozen=True)
+class PMID:
+    """PubMed ID (suite de chiffres). Accepte une URL PubMed en entrée."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        cleaned = _normalize_pmid(self.value)
+        if not cleaned:
+            raise ValidationError(f"PMID invalide : {self.value!r}")
+        object.__setattr__(self, "value", cleaned)
+
+    @classmethod
+    def try_parse(cls, raw: str | None) -> "PMID | None":
+        if not raw:
+            return None
+        try:
+            return cls(raw)
+        except ValidationError:
+            return None
+
+    def __str__(self) -> str:
+        return self.value
+
+
+@dataclass(frozen=True)
+class PMCID:
+    """PubMed Central ID (`PMC<digits>`). Accepte une URL PMC en entrée."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        cleaned = _normalize_pmcid(self.value)
+        if not cleaned:
+            raise ValidationError(f"PMCID invalide : {self.value!r}")
+        object.__setattr__(self, "value", cleaned)
+
+    @classmethod
+    def try_parse(cls, raw: str | None) -> "PMCID | None":
+        if not raw:
+            return None
+        try:
+            return cls(raw)
+        except ValidationError:
+            return None
+
+    def __str__(self) -> str:
+        return self.value
+
+
+# ── arXiv ──────────────────────────────────────────────────────────
+
+_ARXIV_URL_RE = re.compile(
+    r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5}|[a-z.\-]+/\d{7})",
+    re.IGNORECASE,
+)
+_ARXIV_BARE_RE = re.compile(r"^(\d{4}\.\d{4,5}|[a-z.\-]+/\d{7})(?:v\d+)?$", re.IGNORECASE)
+
+
+def _normalize_arxiv_id(raw: str | None) -> str | None:
+    """Identifiant arXiv depuis une URL `arxiv.org/abs|pdf/<id>` ou un id brut.
+
+    Gère le format moderne (`2103.00001`) et l'ancien (`math/0211159`),
+    en ignorant le suffixe de version (`v2`) et l'extension `.pdf`.
+    """
+    if not raw:
+        return None
+    s = raw.strip()
+    m = _ARXIV_URL_RE.search(s)
+    if m:
+        return m.group(1)
+    m = _ARXIV_BARE_RE.match(s)
+    return m.group(1) if m else None
+
+
+@dataclass(frozen=True)
+class ArxivId:
+    """Identifiant arXiv. Accepte une URL arXiv ou un id brut en entrée."""
+
+    value: str
+
+    def __post_init__(self) -> None:
+        cleaned = _normalize_arxiv_id(self.value)
+        if not cleaned:
+            raise ValidationError(f"arXiv ID invalide : {self.value!r}")
+        object.__setattr__(self, "value", cleaned)
+
+    @classmethod
+    def try_parse(cls, raw: str | None) -> "ArxivId | None":
+        if not raw:
+            return None
+        try:
+            return cls(raw)
+        except ValidationError:
+            return None
+
+    def __str__(self) -> str:
+        return self.value
+
+
 # ── Helpers publics (API string-in/string-out) ─────────────────────
 #
 # Ces fonctions couvrent le besoin du code existant qui travaille sur
@@ -207,3 +340,18 @@ def extract_hal_id_from_url(url: str | None) -> str | None:
     'hal-04123456'
     """
     return _normalize_hal_id(url)
+
+
+def normalize_pmid(raw: str | None) -> str | None:
+    """PMID canonique depuis une URL PubMed ou un id brut ; None sinon."""
+    return _normalize_pmid(raw)
+
+
+def normalize_pmcid(raw: str | None) -> str | None:
+    """PMCID canonique (`PMC<digits>`) depuis une URL PMC ou un id brut ; None sinon."""
+    return _normalize_pmcid(raw)
+
+
+def normalize_arxiv_id(raw: str | None) -> str | None:
+    """Identifiant arXiv canonique depuis une URL arXiv ou un id brut ; None sinon."""
+    return _normalize_arxiv_id(raw)

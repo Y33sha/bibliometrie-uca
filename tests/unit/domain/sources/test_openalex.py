@@ -27,12 +27,16 @@ class TestExtractExternalIdsFromUrls:
 
     def test_pmc_with_prefix(self):
         urls = ["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC987654"]
-        assert extract_external_ids_from_urls(urls) == {"pmc": "PMC987654"}
+        assert extract_external_ids_from_urls(urls) == {"pmcid": "PMC987654"}
 
     def test_pmc_without_prefix(self):
         """Le préfixe PMC est ajouté même si l'URL ne le contient pas."""
         urls = ["https://www.ncbi.nlm.nih.gov/pmc/articles/987654"]
-        assert extract_external_ids_from_urls(urls) == {"pmc": "PMC987654"}
+        assert extract_external_ids_from_urls(urls) == {"pmcid": "PMC987654"}
+
+    def test_arxiv(self):
+        urls = ["http://arxiv.org/abs/1210.6893"]
+        assert extract_external_ids_from_urls(urls) == {"arxiv_id": "1210.6893"}
 
     def test_first_match_wins_per_type(self):
         """Pour un même type d'ID, la première URL qui matche gagne."""

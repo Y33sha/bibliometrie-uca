@@ -38,6 +38,7 @@ HAL_FIELDS = [
     "label_s",
     "collCode_s",
     "nntId_s",
+    "pubmedid_s",
     "abstract_s",
     "keyword_s",
     "domain_s",

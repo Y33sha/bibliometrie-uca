@@ -9,7 +9,13 @@ from domain.errors import ValidationError
 from domain.publications.identifiers import (
     DOI,
     NNT,
+    PMCID,
+    PMID,
+    ArxivId,
     HALId,
+    normalize_arxiv_id,
+    normalize_pmcid,
+    normalize_pmid,
 )
 
 # ── DOI ────────────────────────────────────────────────────────────
@@ -171,3 +177,61 @@ class TestNNT:
 
     def test_try_parse_invalid(self):
         assert NNT.try_parse("") is None
+
+
+# ── Helpers de normalisation PMID / PMCID / arXiv ──────────────────
+
+
+class TestNormalizeIdHelpers:
+    def test_pmid_from_url_and_raw(self):
+        assert normalize_pmid("https://pubmed.ncbi.nlm.nih.gov/28973220") == "28973220"
+        assert normalize_pmid("28973220") == "28973220"
+        assert normalize_pmid(None) is None
+        assert normalize_pmid("not-a-pmid") is None
+
+    def test_pmcid_with_without_prefix_and_url(self):
+        assert (
+            normalize_pmcid("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5625084") == "PMC5625084"
+        )
+        assert normalize_pmcid("https://www.ncbi.nlm.nih.gov/pmc/articles/5625084") == "PMC5625084"
+        assert normalize_pmcid("PMC5625084") == "PMC5625084"
+        assert normalize_pmcid("5625084") == "PMC5625084"
+        assert normalize_pmcid("https://hal.science/hal-04123456") is None
+
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("http://arxiv.org/abs/1210.6893", "1210.6893"),
+            ("https://arxiv.org/pdf/1507.00609.pdf", "1507.00609"),
+            ("http://arxiv.org/abs/1210.6893v2", "1210.6893"),
+            ("https://arxiv.org/abs/math/0211159", "math/0211159"),
+            ("2401.00123", "2401.00123"),  # id brut
+            ("2401.00123v3", "2401.00123"),  # version ignorée
+            ("https://doi.org/10.1234/x", None),
+        ],
+    )
+    def test_arxiv_id_from_url_and_raw(self, raw, expected):
+        assert normalize_arxiv_id(raw) == expected
+
+
+# ── Value objects PMID / PMCID / ArxivId ───────────────────────────
+
+
+class TestPubMedArxivVOs:
+    def test_pmid(self):
+        assert PMID("https://pubmed.ncbi.nlm.nih.gov/28973220").value == "28973220"
+        assert PMID.try_parse("not-a-pmid") is None
+        with pytest.raises(ValidationError):
+            PMID("not-a-pmid")
+
+    def test_pmcid(self):
+        assert PMCID("5625084").value == "PMC5625084"
+        assert str(PMCID("PMC5625084")) == "PMC5625084"
+        with pytest.raises(ValidationError):
+            PMCID("garbage")
+
+    def test_arxiv_id(self):
+        assert ArxivId("https://arxiv.org/abs/2401.00123v2").value == "2401.00123"
+        assert ArxivId.try_parse(None) is None
+        with pytest.raises(ValidationError):
+            ArxivId("garbage")
