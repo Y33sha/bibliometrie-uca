@@ -29,18 +29,32 @@ Tant que ces fusions ne sont pas défaites, la règle **`DUMAS (dumas.ccsd) => m
 
 ## Décisions
 
-- **Approche maintenance-first.** On commence par des **scripts de maintenance** (audit + réparation), pas par une modification du pipeline. On découvre les règles sur cas réels (méthode empirique) et on garde le risque réversible (un script se rejoue ; une régression de pipeline non). Les scripts vivent dans `interfaces/cli/maintenance/`.
-- **Critère absolu de non-fusion** : un côté sur une revue (DOI de revue) **et** l'autre sur **DUMAS, TEL ou theses.fr** → documents nécessairement distincts.
-- **Intégration pipeline (détection à la création) différée** jusqu'à des règles éprouvées ; peut rester hors pipeline si les scripts de maintenance suffisent.
+- **Deux familles, deux approches** :
+  - **Ouvrage ↔ chapitres (OUV/COUV)** : la règle existe déjà (`resolve_doi_conflict`), seulement défaite par la passe bulk DOI → correctif **immédiat**, pas d'audit.
+  - **Thèse ↔ article** : critère à découvrir → **maintenance-first** (audit + réparation par scripts, méthode empirique, risque réversible) avant toute intégration pipeline. Scripts dans `interfaces/cli/maintenance/`.
+- **Critère absolu de non-fusion** (thèse↔article) : un côté revue (DOI de revue), l'autre **DUMAS / TEL / theses.fr** → documents nécessairement distincts.
+- **❌ Pondérer les sources contre OpenAlex** : inopérant quand OpenAlex est la seule source.
+- **Deux leviers de garde, complémentaires** :
+  - `bulk_link_orphans_by_doi` applique l'**exception** chapitre/ouvrage/titre — la fuite OUV/COUV est un SP orphelin rattaché à une pub par DOI brut (pas une paire pub↔pub, donc `distinct_publications` ne la couvre pas).
+  - `distinct_publications` = garde **pub↔pub** (`merge_pubs_*`, `merge_into`) : `resolve_doi_conflict` y inscrit la paire quand il scinde, ces passes l'interrogent. Reste **franchissable par l'admin** (cf. Contexte).
 
 ## Phasage
 
-1. **Script d'audit** — lister les fausses fusions probables. Signaux : DOI de revue + URL dumas/TEL/theses.fr sur la même publication ; titres différents sous un même DOI ; thèse portant un nom de revue/éditeur. Sortie = paires candidates + signal, **sans écriture**. C'est là qu'on découvre et affine les règles.
-2. **Script de réparation** — pour une paire validée : créer la 2ᵉ publication, répartir les `source_publications` selon le critère, reconstruire les deux canoniques via `refresh_from_sources`, puis `mark_distinct`. Idempotent, rejouable. (`mark_distinct` et `merge_into` existent déjà.)
-3. **Itérer 1 ↔ 2** jusqu'à des règles stables et un taux de faux positifs acceptable.
-4. **Garde dure** (petite modif pipeline) — refuser la fusion d'une paire enregistrée : `WHERE NOT EXISTS (distinct_publications)` dans les requêtes de merge bulk + garde dans `merge_pubs_by_hal_id` et `merge_into` (qui aujourd'hui efface la garde). Conservatrice : ne fait que **refuser** des fusions marquées, n'invente aucune séparation. Doit rester franchissable par l'admin (cf. circuit d'override, plus bas).
-5. **(Différé) Détection à la création** dans le pipeline — cas b1/b2 ci-dessous, une fois les règles éprouvées.
-6. **Aval** : règle `DUMAS => mémoire` (cf. [METIER_doc-types](METIER_doc-types.md)).
+### 1. Ouvrage ↔ chapitres — garde immédiate (règle connue)
+
+- Exception chapitre/ouvrage/titre dans `bulk_link_orphans_by_doi` : ne pas rattacher un SP `book_chapter` à une pub `book`, ni à une pub chapitre de titre différent.
+- `resolve_doi_conflict` (chemin per-doc) inscrit la paire dans `distinct_publications` quand il scinde ; `merge_pubs_*` et `merge_into` l'interrogent (et cessent de l'effacer).
+- Oneshot : re-split des OUV/COUV déjà fusionnés (≈55, cf. audit) + inscription des paires.
+
+### 2. Thèse ↔ article — maintenance-first (critère à découvrir)
+
+- Script d'audit (sans écriture) : critère revue ⇔ dépôt-thèse, affiné sur cas réels.
+- Script de réparation : créer la 2ᵉ publication, répartir les `source_publications`, reconstruire les deux canoniques (`refresh_from_sources`), `mark_distinct`. Idempotent.
+- Itérer audit ↔ réparation ; intégration à la création (cas b1) différée si justifiée.
+
+### 3. Aval — `DUMAS => mémoire`
+
+Une fois les fusions défaites (cf. [METIER_doc-types](METIER_doc-types.md)).
 
 ### Audit initial (2026-06-09)
 
@@ -51,7 +65,7 @@ Premier passage exploratoire (lecture seule, base de prod) — sert à figer les
 - **Périmètre total ≈ 98** fausses fusions probables (43 + 55), hors résiduel non détectable.
 - Enseignement : « titres ≠ sous un DOI » seul est inexploitable (FR/EN) ; c'est la restriction `book`/`COUV` qui rend la règle B utilisable. Règle A directement exploitable.
 
-### Cas à la création (référence pour la phase 5)
+### Cas à la création (référence — détection en pipeline, différée)
 
 - **(a) Faux doublon HAL d'abord** (même DOI, chapitres différents) : la distinction est déjà opérée par `resolve_doi_conflict` → y ajouter `mark_distinct`. Quand l'OpenAlex arrive ensuite (même DOI), empêcher la passe bulk DOI de re-fusionner (garde en place). Miroir thèse-first : thèse (HAL/theses.fr/DUMAS) d'abord, puis OpenAlex article — même forme, discriminant = le critère absolu.
 - **(b1) OpenAlex d'abord, avec discriminant** (locations : revue + dépôt-thèse) : créer 2 publications, rattacher l'OpenAlex à la publication de sa `primary_location`, marquer distinct.
@@ -65,6 +79,7 @@ Premier passage exploratoire (lecture seule, base de prod) — sert à figer les
 - **Résiduel non-corrigeable** : OpenAlex fusionne deux docs sans aucun discriminant et aucune source HAL/theses.fr ne vient forcer la séparation → indétectable, reste fusionné.
 - **Fusion N-aire (> 2 docs)** : ouvrage à N chapitres, ou thèse + article + preprint. Le modèle par paires tient mais l'enregistrement doit généraliser (marquer chaque nouveau distinct des précédents).
 - **(b1) Métadonnées de la 2ᵉ publication** : stub depuis la *secondary location* OpenAlex, ou laissée à la vraie source-thèse à venir (le second choix ne peut pas poser de garde paire→paire tant que la 2ᵉ publication n'existe pas).
+- **Create-then-merge vs passes orphelins** (hors scope, à évaluer) : créer une pub par `source_publication` puis fusionner rendrait `distinct_publications` une garde **uniforme** pub↔pub (plus d'angle mort SP→pub, plus besoin de dupliquer l'exception dans la passe bulk). Mais ça créerait les pubs hors-périmètre que le gate `in_perimeter` évite → cycle de vie à gérer. Restructuration du pipeline, pas un détour.
 
 ## Liens
 
