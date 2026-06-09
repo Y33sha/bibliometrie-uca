@@ -46,6 +46,10 @@ _INSERT_HAL_SQL = text(
                 THEN FALSE
             ELSE staging.processed
         END,
+        -- Renseigne le DOI trouvé quand la ligne HAL existait sans (doc moissonné
+        -- avant que HAL ne porte le doiId_s) : sinon le DOI ne serait jamais posé
+        -- et le cross-import le re-chercherait à chaque run. Ne clobbe pas un DOI déjà présent.
+        doi = COALESCE(staging.doi, EXCLUDED.doi),
         last_seen_at = now()
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
