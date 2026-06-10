@@ -17,31 +17,37 @@ class PgDoiPrefixRepository:
     def get_unresolved_prefixes_with_samples(
         self, *, n_samples_per_prefix: int
     ) -> list[tuple[str, list[str]]]:
-        """Renvoie `[(prefix, [doi1, doi2, ...]), ...]` pour chaque préfixe DOI présent en staging mais absent de `doi_prefixes`. Au plus `n_samples_per_prefix` DOIs par préfixe, ordonnés par longueur croissante pour minimiser la complexité d'encodage URL côté client doi.org/ra."""
+        """Renvoie `[(prefix, [doi1, doi2, ...]), ...]` pour chaque préfixe DOI absent de `doi_prefixes`. Les DOI proviennent de `staging.doi` (primaire) **et** de `source_publications.external_ids.related_dois` (DOI secondaires : preprint, dépôt, édition). Au plus `n_samples_per_prefix` DOIs par préfixe, ordonnés par longueur croissante pour minimiser la complexité d'encodage URL côté client doi.org/ra."""
         result = self._conn.execute(
             text(
                 """
-                WITH new_prefixes AS (
-                    SELECT DISTINCT split_part(s.doi, '/', 1) AS prefix
-                    FROM staging s
+                WITH all_dois AS (
+                    SELECT doi FROM staging WHERE doi IS NOT NULL AND doi <> ''
+                    UNION
+                    SELECT d AS doi
+                    FROM source_publications
+                    CROSS JOIN LATERAL
+                        jsonb_array_elements_text(external_ids->'related_dois') AS d
+                    WHERE jsonb_typeof(external_ids->'related_dois') = 'array'
+                ),
+                new_prefixes AS (
+                    SELECT DISTINCT split_part(ad.doi, '/', 1) AS prefix
+                    FROM all_dois ad
                     LEFT JOIN doi_prefixes dp
-                        ON dp.prefix = split_part(s.doi, '/', 1)
-                    WHERE s.doi IS NOT NULL
-                      AND s.doi <> ''
-                      AND dp.prefix IS NULL
+                        ON dp.prefix = split_part(ad.doi, '/', 1)
+                    WHERE dp.prefix IS NULL
                 ),
                 samples AS (
                     SELECT
-                        split_part(s.doi, '/', 1) AS prefix,
-                        s.doi,
+                        split_part(ad.doi, '/', 1) AS prefix,
+                        ad.doi,
                         ROW_NUMBER() OVER (
-                            PARTITION BY split_part(s.doi, '/', 1)
-                            ORDER BY length(s.doi), s.doi
+                            PARTITION BY split_part(ad.doi, '/', 1)
+                            ORDER BY length(ad.doi), ad.doi
                         ) AS rn
-                    FROM staging s
+                    FROM all_dois ad
                     JOIN new_prefixes np
-                        ON np.prefix = split_part(s.doi, '/', 1)
-                    WHERE s.doi IS NOT NULL AND s.doi <> ''
+                        ON np.prefix = split_part(ad.doi, '/', 1)
                 )
                 SELECT prefix, array_agg(doi ORDER BY rn) AS dois
                 FROM samples
