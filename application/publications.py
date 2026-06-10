@@ -9,7 +9,7 @@ from dataclasses import replace
 from application.audit import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PubByDoi, PublicationRepository
-from domain.errors import NotFoundError
+from domain.errors import DistinctDoiError, NotFoundError
 from domain.publications.aggregation import (
     first_non_null,
 )
@@ -215,13 +215,17 @@ def merge_publications(
     Orchestration domain-driven :
 
     1. Charge `target` et `source` comme entités `Publication` via le repo.
-    2. `target.absorb(source)` : enrichissement métadonnées en mémoire (règle pairwise OA, COALESCE des scalaires nullable, union countries) — vit dans l'aggregate.
-    3. `repo.merge_into(target_id, source_id)` : plumbing FK (transfert des source_publications + authorships avec dédup, cleanup distinct_publications, DELETE de la ligne source).
-    4. `repo.save(target)` : persistance des métadonnées enrichies. Fait APRÈS le DELETE pour éviter la collision sur la contrainte UNIQUE lower(doi) au cas où target a inhérité le DOI de source.
-    5. Recalcule `sources` agrégé.
-    6. Émet l'événement d'audit.
+    2. Garde « 1 DOI = 1 publication » : si les deux portent des DOI non-nuls
+       différents, refuse (`DistinctDoiError`) — ce sont des œuvres distinctes,
+       quelle que soit la clé qui les a rapprochées.
+    3. `target.absorb(source)` : enrichissement métadonnées en mémoire (règle pairwise OA, COALESCE des scalaires nullable, union countries) — vit dans l'aggregate.
+    4. `repo.merge_into(target_id, source_id)` : plumbing FK (transfert des source_publications + authorships avec dédup, cleanup distinct_publications, DELETE de la ligne source).
+    5. `repo.save(target)` : persistance des métadonnées enrichies, après le `merge_into`.
+    6. Recalcule `sources` agrégé.
+    7. Émet l'événement d'audit.
 
-    Lève `NotFoundError` si target ou source n'existe pas.
+    Lève `NotFoundError` si target ou source n'existe pas ; `DistinctDoiError`
+    si les deux portent des DOI non-nuls différents.
     """
     target = repo.find_by_id(target_id)
     source = repo.find_by_id(source_id)
@@ -229,6 +233,9 @@ def merge_publications(
         raise NotFoundError(f"Publication target #{target_id} introuvable")
     if source is None:
         raise NotFoundError(f"Publication source #{source_id} introuvable")
+
+    if target.doi and source.doi and target.doi != source.doi:
+        raise DistinctDoiError(target_id, source_id, str(target.doi), str(source.doi))
 
     target.absorb(source)
     repo.merge_into(target_id, source_id)

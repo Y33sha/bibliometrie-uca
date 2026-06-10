@@ -60,6 +60,25 @@ class PublisherMergeBlockedError(ConflictError):
         )
 
 
+class DistinctDoiError(ConflictError):
+    """Fusion refusée : deux publications portent des DOI non-nuls différents.
+
+    Par principe « 1 DOI = 1 publication », elles désignent des œuvres
+    distinctes et ne peuvent pas fusionner — quelle que soit la clé qui les a
+    rapprochées (hal_id, nnt, pmid, métadonnées). Les cas où l'on voudrait
+    malgré tout fusionner (DOI erroné, ou documents liés) sont traités à part."""
+
+    def __init__(self, target_id: int, source_id: int, target_doi: str, source_doi: str) -> None:
+        self.target_id = target_id
+        self.source_id = source_id
+        self.target_doi = target_doi
+        self.source_doi = source_doi
+        super().__init__(
+            f"Fusion refusée : #{target_id} ({target_doi}) et "
+            f"#{source_id} ({source_doi}) ont des DOI distincts"
+        )
+
+
 class UnauthorizedError(DomainError):
     """Accès refusé : session invalide ou permissions insuffisantes (→ HTTP 401)."""
 

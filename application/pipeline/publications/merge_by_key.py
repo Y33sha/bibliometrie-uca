@@ -13,6 +13,7 @@ from sqlalchemy import Connection
 from application.pipeline._savepoint import savepoint
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.publications import merge_publications, refresh_from_sources
+from domain.errors import DistinctDoiError
 
 
 def merge_publications_by_key(
@@ -29,7 +30,7 @@ def merge_publications_by_key(
 
     Pour chaque groupe : résout les redirections déjà accumulées dans le batch, choisit le `min` des id résolus comme cible, fusionne les autres dedans (un par un, savepoint individuel pour permettre la continuation après échec).
 
-    Retourne `(merged, errors)`. Chaque fusion réussie incrémente `merged` ; chaque exception incrémente `errors` (loggée en warning, le batch continue).
+    Retourne `(merged, errors)`. Chaque fusion réussie incrémente `merged` ; chaque exception incrémente `errors` (loggée en warning, le batch continue). Une paire bloquée par la garde « DOI distincts » (`DistinctDoiError`) n'est ni fusionnée ni comptée en erreur : elle est ignorée (œuvres distinctes) et journalisée.
     """
     redirects: dict[int, int] = {}
 
@@ -43,6 +44,7 @@ def merge_publications_by_key(
         return pub_id
 
     merged = 0
+    skipped_distinct = 0
     errors = 0
 
     for key_label, pub_ids in groups:
@@ -69,8 +71,16 @@ def merge_publications_by_key(
                 redirects[source_id] = target_id
                 merged += 1
                 logger.info(f"  [MERGE] {label}")
+            except DistinctDoiError:
+                # DOI non-nuls différents : œuvres distinctes. On ne fusionne
+                # pas (le savepoint a annulé la tentative) et ce n'est pas une
+                # erreur — pas de redirection, la source reste vivante.
+                logger.info(f"  [SKIP DOI distincts] {label}")
+                skipped_distinct += 1
             except Exception as e:
                 logger.warning(f"  Échec {label}: {e}")
                 errors += 1
 
+    if skipped_distinct:
+        logger.info(f"  {skipped_distinct} fusion(s) ignorée(s) (DOI distincts)")
     return merged, errors
