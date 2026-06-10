@@ -20,6 +20,7 @@ dependencies = [
     "pydantic==2.12.5",          # requis par pydantic-settings et utilisé directement
     "pydantic-settings==2.13.1",
     "openpyxl==3.1.5",           # utilisé par interfaces/cli/import_persons.py
+    "pyahocorasick==2.2.0",      # automate Aho-Corasick : matching multi-formes des adresses (phase affiliations)
 ]
 
 [project.optional-dependencies]
@@ -138,6 +139,7 @@ DEP002 = ["python-dotenv"]
 # Alias paquet distribué → nom de module importé (les noms peuvent différer).
 [tool.deptry.package_module_name_map]
 pydantic-settings = "pydantic_settings"
+pyahocorasick = "ahocorasick"
 
 # ----------------------------------------------------------------------
 # Ruff : linter + formateur (remplace flake8, isort, pyupgrade, black)
