@@ -57,7 +57,10 @@ def reset_all_resolved_at(conn: Connection) -> None:
 
 
 def fetch_addresses_to_resolve(conn: Connection, *, incremental: bool) -> list[tuple[int, str]]:
-    """Retourne `(id, raw_text)` des adresses à traiter.
+    """Retourne `(id, normalized_text)` des adresses à traiter.
+
+    Le matching opère sur `normalized_text` (déjà normalisé à l'insertion par
+    `normalize_text`), pas sur le brut : aucun recalcul côté pipeline.
 
     Si `incremental=True` : uniquement celles avec `resolved_at IS NULL`.
     Sinon : toutes les adresses.
@@ -65,12 +68,15 @@ def fetch_addresses_to_resolve(conn: Connection, *, incremental: bool) -> list[t
     if incremental:
         rows = conn.execute(
             text(
-                "SELECT a.id, a.raw_text FROM addresses a WHERE a.resolved_at IS NULL ORDER BY a.id"
+                "SELECT a.id, a.normalized_text FROM addresses a "
+                "WHERE a.resolved_at IS NULL ORDER BY a.id"
             )
         ).all()
     else:
-        rows = conn.execute(text("SELECT a.id, a.raw_text FROM addresses a ORDER BY a.id")).all()
-    return [(r.id, r.raw_text) for r in rows]
+        rows = conn.execute(
+            text("SELECT a.id, a.normalized_text FROM addresses a ORDER BY a.id")
+        ).all()
+    return [(r.id, r.normalized_text) for r in rows]
 
 
 def delete_obsolete_detections(

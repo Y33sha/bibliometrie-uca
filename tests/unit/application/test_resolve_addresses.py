@@ -6,10 +6,8 @@ import pytest
 
 from application.pipeline.affiliations import resolve_addresses as resolve_addresses_module
 from application.pipeline.affiliations.resolve_addresses import (
-    build_forms_by_structure,
-    match_form_in_text,
+    AddressMatcher,
     process_addresses,
-    resolve_address,
     run_resolution,
 )
 from application.ports.pipeline.address_resolution import StructureNameForm
@@ -39,60 +37,56 @@ def _form(
     )
 
 
-# ── match_form_in_text ───────────────────────────────────────────
+def _matches(form: StructureNameForm, text: str) -> bool:
+    """Vrai si `form` (seule) est détectée dans `text` par l'automate."""
+    return bool(AddressMatcher([form]).resolve(text))
 
 
-class TestMatchFormInText:
+# ── Matching d'une forme (sous-chaîne / mot entier) ──────────────
+
+
+class TestFormMatching:
     def test_long_substring(self):
         """Forme > 6 chars : simple recherche de sous-chaîne."""
-        form = _form(1, "clermont", "clermont")
-        assert match_form_in_text(form, "univ clermont auvergne") is True
+        assert _matches(_form(1, "clermont", "clermont"), "univ clermont auvergne") is True
 
     def test_long_not_found(self):
-        form = _form(1, "grenoble", "grenoble")
-        assert match_form_in_text(form, "univ clermont auvergne") is False
+        assert _matches(_form(1, "grenoble", "grenoble"), "univ clermont auvergne") is False
 
     def test_short_word_boundary(self):
         """Forme <= 6 chars : doit être un mot entier (boundaries)."""
         form = _form(1, "limos", "limos")
-        assert match_form_in_text(form, "limos clermont") is True
-        assert match_form_in_text(form, "polimos lab") is False
+        assert _matches(form, "limos clermont") is True
+        assert _matches(form, "polimos lab") is False
 
     def test_short_at_end(self):
-        form = _form(1, "limos", "limos")
-        assert match_form_in_text(form, "lab limos") is True
+        assert _matches(_form(1, "limos", "limos"), "lab limos") is True
 
     def test_short_alone(self):
-        form = _form(1, "limos", "limos")
-        assert match_form_in_text(form, "limos") is True
+        assert _matches(_form(1, "limos", "limos"), "limos") is True
 
     def test_word_boundary_flag(self):
         """Forme avec is_word_boundary=True, même si > 6 chars."""
         form = _form(1, "clermont", is_word_boundary=True)
-        assert match_form_in_text(form, "clermont ferrand") is True
-        assert match_form_in_text(form, "preclermont") is False
+        assert _matches(form, "clermont ferrand") is True
+        assert _matches(form, "preclermont") is False
 
     def test_empty_form(self):
-        form = _form(1, "", form_normalized="")
-        assert match_form_in_text(form, "some text") is False
+        assert _matches(_form(1, "", form_normalized=""), "some text") is False
 
 
-# ── resolve_context ──────────────────────────────────────────────
-
-# ── resolve_address ──────────────────────────────────────────────
+# ── AddressMatcher.resolve ───────────────────────────────────────
 
 
 class TestResolveAddress:
     def test_simple_match(self):
         forms = [_form(1, "limos", "limos", form_id=10)]
-        fbs = build_forms_by_structure(forms)
-        result = resolve_address("lab limos clermont", forms, fbs)
+        result = AddressMatcher(forms).resolve("lab limos clermont")
         assert result == [(1, 10)]
 
     def test_no_match(self):
         forms = [_form(1, "grenoble", "grenoble")]
-        fbs = build_forms_by_structure(forms)
-        result = resolve_address("lab limos clermont", forms, fbs)
+        result = AddressMatcher(forms).resolve("lab limos clermont")
         assert result == []
 
     def test_multiple_structures(self):
@@ -100,8 +94,7 @@ class TestResolveAddress:
             _form(1, "limos", "limos", form_id=10),
             _form(2, "clermont", "clermont", form_id=20),
         ]
-        fbs = build_forms_by_structure(forms)
-        result = resolve_address("limos clermont ferrand", forms, fbs)
+        result = AddressMatcher(forms).resolve("limos clermont ferrand")
         assert len(result) == 2
         structure_ids = {sid for sid, _ in result}
         assert structure_ids == {1, 2}
@@ -112,8 +105,7 @@ class TestResolveAddress:
             _form(1, "limos", "limos", form_id=10),
             _form(1, "laboratoire limos", "laboratoire limos", form_id=11),
         ]
-        fbs = build_forms_by_structure(forms)
-        result = resolve_address("laboratoire limos clermont", forms, fbs)
+        result = AddressMatcher(forms).resolve("laboratoire limos clermont")
         assert len(result) == 1
         assert result[0][0] == 1
 
@@ -123,8 +115,7 @@ class TestResolveAddress:
             _form(1, "limos", "limos", form_id=10, requires_context_of=[2]),
             _form(2, "clermont", "clermont", form_id=20),
         ]
-        fbs = build_forms_by_structure(forms)
-        result = resolve_address("limos clermont", forms, fbs)
+        result = AddressMatcher(forms).resolve("limos clermont")
         structure_ids = {sid for sid, _ in result}
         assert 1 in structure_ids
 
@@ -134,8 +125,7 @@ class TestResolveAddress:
             _form(1, "limos", "limos", form_id=10, requires_context_of=[2]),
             _form(2, "grenoble", "grenoble", form_id=20),
         ]
-        fbs = build_forms_by_structure(forms)
-        result = resolve_address("limos clermont", forms, fbs)
+        result = AddressMatcher(forms).resolve("limos clermont")
         structure_ids = {sid for sid, _ in result}
         assert 1 not in structure_ids
 
@@ -151,14 +141,13 @@ class TestResolveAddress:
             ),  # LRL, nécessite UCA
             _form(169, "universite clermont auvergne", form_id=100),  # UCA
         ]
-        fbs = build_forms_by_structure(forms)
         text = (
             "pole des cardiopathies congenitales du nouveau ne a l adulte "
             "centre constitutif cardiopathies congenitales complexes m3c "
             "groupe hospitalier paris saint joseph hopital marie lannelongue "
             "inserm u999 universite paris saclay"
         )
-        result = resolve_address(text, forms, fbs)
+        result = AddressMatcher(forms).resolve(text)
         matched_ids = {sid for sid, _ in result}
         assert 217 not in matched_ids  # LRL ne doit PAS matcher
 
@@ -170,9 +159,8 @@ class TestResolveAddress:
             ),
             _form(169, "universite clermont auvergne", form_id=100),
         ]
-        fbs = build_forms_by_structure(forms)
         text = "inserm u999 universite clermont auvergne"
-        result = resolve_address(text, forms, fbs)
+        result = AddressMatcher(forms).resolve(text)
         matched_ids = {sid for sid, _ in result}
         assert 217 in matched_ids  # LRL doit matcher
         assert 169 in matched_ids  # UCA aussi
@@ -183,8 +171,7 @@ class TestResolveAddress:
             _form(1, "limos", "limos", form_id=10, requires_context_of=[99]),
             _form(99, "uca", "uca", form_id=99),
         ]
-        fbs = build_forms_by_structure(forms)
-        result = resolve_address("limos uca", forms, fbs)
+        result = AddressMatcher(forms).resolve("limos uca")
         structure_ids = {sid for sid, _ in result}
         assert 1 in structure_ids
 
@@ -194,21 +181,19 @@ class TestResolveAddress:
             _form(1, "limos", "limos", form_id=10),
             _form(1, "limos paris", "limos paris", form_id=11, is_excluding=True),
         ]
-        fbs = build_forms_by_structure(forms)
-        result = resolve_address("lab limos paris", forms, fbs)
+        result = AddressMatcher(forms).resolve("lab limos paris")
         assert result == []
 
     def test_excluding_form_skipped_when_not_matching(self):
-        """Une forme `is_excluding=True` qui ne matche pas n'affecte rien et passe par le `continue` excluding de la passe 2.
+        """Une forme `is_excluding=True` qui ne matche pas n'affecte rien.
 
-        On la met sur une *autre* structure que la forme matchante, sinon le skip se ferait via `sid in seen_structures` (passe 2 en deux temps).
+        On la met sur une *autre* structure que la forme matchante.
         """
         forms = [
             _form(2, "grenoble", "grenoble", form_id=20, is_excluding=True),
             _form(1, "limos", "limos", form_id=10),
         ]
-        fbs = build_forms_by_structure(forms)
-        result = resolve_address("lab limos clermont", forms, fbs)
+        result = AddressMatcher(forms).resolve("lab limos clermont")
         assert result == [(1, 10)]
 
 
@@ -361,12 +346,12 @@ class TestProcessAddresses:
     def test_in_perimeter_counts_uca(self, logger):
         """Une adresse qui matche une structure du périmètre incrémente uca_count."""
         forms = [_form(1, "limos", form_id=10)]
-        fbs = build_forms_by_structure(forms)
+        matcher = AddressMatcher(forms)
         queries = _FakeQueries()
         conn = _FakeConn()
 
         uca_count, affil_count = process_addresses(
-            conn, queries, [(101, "lab limos clermont")], forms, fbs, {1}, logger
+            conn, queries, [(101, "lab limos clermont")], matcher, {1}, logger
         )
 
         assert uca_count == 1
@@ -378,12 +363,12 @@ class TestProcessAddresses:
     def test_out_of_perimeter_doesnt_count_uca(self, logger):
         """Match hors périmètre : affiliations créées mais uca_count reste à 0."""
         forms = [_form(1, "limos", form_id=10)]
-        fbs = build_forms_by_structure(forms)
+        matcher = AddressMatcher(forms)
         queries = _FakeQueries()
         conn = _FakeConn()
 
         uca_count, affil_count = process_addresses(
-            conn, queries, [(101, "lab limos clermont")], forms, fbs, perimeter=set(), logger=logger
+            conn, queries, [(101, "lab limos clermont")], matcher, perimeter=set(), logger=logger
         )
 
         assert uca_count == 0
@@ -392,12 +377,12 @@ class TestProcessAddresses:
     def test_no_match_only_marks_resolved(self, logger):
         """Adresse sans match : aucun upsert, mais l'adresse est marquée résolue (idempotence)."""
         forms = [_form(1, "limos", form_id=10)]
-        fbs = build_forms_by_structure(forms)
+        matcher = AddressMatcher(forms)
         queries = _FakeQueries()
         conn = _FakeConn()
 
         uca_count, affil_count = process_addresses(
-            conn, queries, [(101, "univ paris saclay")], forms, fbs, {1}, logger
+            conn, queries, [(101, "univ paris saclay")], matcher, {1}, logger
         )
 
         assert uca_count == 0
@@ -410,11 +395,11 @@ class TestProcessAddresses:
     def test_obsolete_removed_counted(self, logger):
         """`delete_obsolete_detections` qui retourne >0 alimente removed_count, loggé en fin."""
         forms = [_form(1, "limos", form_id=10)]
-        fbs = build_forms_by_structure(forms)
+        matcher = AddressMatcher(forms)
         queries = _FakeQueries(obsolete_per_addr=2)
         conn = _FakeConn()
 
-        process_addresses(conn, queries, [(101, "lab limos clermont")], forms, fbs, {1}, logger)
+        process_addresses(conn, queries, [(101, "lab limos clermont")], matcher, {1}, logger)
 
         assert queries.delete_calls == [(101, [1])]
 
@@ -423,12 +408,12 @@ class TestProcessAddresses:
         monkeypatch.setattr(resolve_addresses_module, "BATCH_SIZE", 2)
 
         forms = [_form(1, "limos", form_id=10)]
-        fbs = build_forms_by_structure(forms)
+        matcher = AddressMatcher(forms)
         queries = _FakeQueries()
         conn = _FakeConn()
 
         rows = [(i, "lab limos clermont") for i in range(1, 4)]  # 3 adresses, BATCH_SIZE=2
-        process_addresses(conn, queries, rows, forms, fbs, {1}, logger)
+        process_addresses(conn, queries, rows, matcher, {1}, logger)
 
         # Commit intermédiaire au 2e + commit final → 2 commits.
         assert conn.commits == 2
