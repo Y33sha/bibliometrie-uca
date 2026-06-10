@@ -744,11 +744,12 @@ publications = Table(
     Index("idx_publications_titlenorm_year", "title_normalized", "pub_year"),
     Index("idx_publications_year", "pub_year"),
     Index("idx_publications_year_type", "pub_year", "doc_type"),
-    # Index UNIQUE sur expression lower(doi) — complété à la main.
+    # Index sur expression lower(doi) — complété à la main. Non-unique :
+    # l'unicité « 1 DOI = 1 publication » est garantie par la passe de fusion,
+    # plus par la DB (cf. chantier création⇒fusion).
     Index(
-        "publications_doi_lower_key",
+        "idx_publications_doi_lower",
         text("lower(doi)"),
-        unique=True,
         postgresql_where=text("doi IS NOT NULL"),
     ),
 )
