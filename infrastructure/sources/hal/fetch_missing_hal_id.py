@@ -68,7 +68,7 @@ _INSERT_NOT_FOUND_SQL = text(
 )
 
 
-def find_hal_primary_locations(conn: Connection) -> list[dict[str, Any]]:
+def find_hal_ids_from_openalex(conn: Connection) -> list[dict[str, Any]]:
     """halIds référencés par OpenAlex mais absents de staging HAL.
 
     Deux sources, **toutes locations** (pas seulement la primary) :
@@ -275,7 +275,7 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
                 foreign_id=r["openalex_id"],
                 landing_url=r.get("landing_url"),
             )
-            for r in find_hal_primary_locations(conn)
+            for r in find_hal_ids_from_openalex(conn)
         ]
 
     def find_halid_refs_from_scanr(self, conn: Connection) -> list[HalIdRef]:

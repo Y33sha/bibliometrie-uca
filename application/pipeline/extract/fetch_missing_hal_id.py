@@ -146,7 +146,7 @@ async def fetch_missing_hal_ids(
     """
     adapter.configure(conn)
 
-    log.info("Recherche des works OpenAlex avec primary_location HAL...")
+    log.info("Recherche des halIds référencés par OpenAlex (toutes locations)...")
     hal_refs_oa = adapter.find_halid_refs_from_openalex(conn)
     log.info(f"  {len(hal_refs_oa)} halIds OpenAlex absents de staging_hal")
 
