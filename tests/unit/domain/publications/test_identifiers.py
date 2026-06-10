@@ -13,6 +13,7 @@ from domain.publications.identifiers import (
     PMID,
     ArxivId,
     HALId,
+    extract_doi_from_url,
     normalize_arxiv_id,
     normalize_pmcid,
     normalize_pmid,
@@ -29,6 +30,7 @@ class TestDOIConstruction:
             ("https://doi.org/10.1234/test", "10.1234/test"),  # strip https
             ("http://doi.org/10.1234/test", "10.1234/test"),  # strip http
             ("https://dx.doi.org/10.1234/test", "10.1234/test"),  # strip dx.doi.org
+            ("http://dx.doi.org/10.1234/test", "10.1234/test"),  # strip http dx.doi.org
             ("  10.1234/test  ", "10.1234/test"),  # strip whitespace
             ("10.6084/m9.figshare.31023197.v1", "10.6084/m9.figshare.31023197"),  # suffixe .vN
             ("10.36227/techrxiv.19754971.v2", "10.36227/techrxiv.19754971"),  # suffixe .v2
@@ -212,6 +214,27 @@ class TestNormalizeIdHelpers:
     )
     def test_arxiv_id_from_url_and_raw(self, raw, expected):
         assert normalize_arxiv_id(raw) == expected
+
+
+# ── extract_doi_from_url ───────────────────────────────────────────
+
+
+class TestExtractDoiFromUrl:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("https://doi.org/10.1234/x", "10.1234/x"),  # URL doi.org
+            ("http://dx.doi.org/10.1234/x", "10.1234/x"),  # URL dx.doi.org
+            ("doi:10.1234/x", "10.1234/x"),  # forme OAI-PMH location.id
+            ("doi:10.1234/X.v2", "10.1234/x"),  # nettoyé (lowercase + version)
+            ("https://hal.science/hal-04123456", None),  # autre identifiant
+            ("https://arxiv.org/abs/2401.00123", None),
+            (None, None),
+            ("", None),
+        ],
+    )
+    def test_extracts(self, raw, expected):
+        assert extract_doi_from_url(raw) == expected
 
 
 # ── Value objects PMID / PMCID / ArxivId ───────────────────────────

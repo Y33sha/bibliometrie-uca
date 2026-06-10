@@ -83,6 +83,19 @@ class TestExtractLocationsData:
         urls, _ = extract_locations_data(work)
         assert urls == ["https://b.com"]
 
+    def test_collects_all_location_dois(self):
+        """DOI collectés depuis les URLs doi.org ET les location.id `doi:`,
+        dédupliqués. Le retrait du primaire est fait par l'appelant."""
+        work = {
+            "locations": [
+                {"landing_page_url": "https://doi.org/10.1/a", "id": "doi:10.1/a"},
+                {"landing_page_url": "https://doi.org/10.2/b"},
+                {"id": "doi:10.3/c"},
+            ]
+        }
+        _, ids = extract_locations_data(work)
+        assert ids["related_dois"] == ["10.1/a", "10.2/b", "10.3/c"]
+
 
 # ── reconstruct_abstract ─────────────────────────────────────────
 
@@ -407,6 +420,29 @@ class TestInsertOpenalexDocument:
         queries = _FakeQueries()
         captured = self._call(queries, {"id": "https://openalex.org/W1", "biblio": {}})
         assert captured["biblio"] is None
+
+    def test_related_dois_excludes_primary(self):
+        queries = _FakeQueries()
+        work = {
+            "id": "https://openalex.org/W1",
+            "doi": "https://doi.org/10.1/primary",
+            "locations": [
+                {"landing_page_url": "https://doi.org/10.1/primary"},
+                {"id": "doi:10.2/preprint"},
+            ],
+        }
+        captured = self._call(queries, work)
+        assert captured["external_ids"]["related_dois"] == ["10.2/preprint"]
+
+    def test_related_dois_absent_when_only_primary(self):
+        queries = _FakeQueries()
+        work = {
+            "id": "https://openalex.org/W1",
+            "doi": "https://doi.org/10.1/primary",
+            "locations": [{"landing_page_url": "https://doi.org/10.1/primary"}],
+        }
+        captured = self._call(queries, work)
+        assert "related_dois" not in (captured["external_ids"] or {})
 
     def test_biblio_publisher_and_journal_from_primary_location(self):
         queries = _FakeQueries()

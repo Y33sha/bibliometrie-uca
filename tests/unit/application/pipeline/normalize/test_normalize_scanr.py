@@ -100,6 +100,37 @@ class TestInsertScanrDocumentBiblio:
         assert captured["biblio"] == {"journal": {"title": "J. Phys."}}
 
 
+class TestInsertScanrDocumentExternalIds:
+    def _call(self, doc, pub_meta) -> dict[str, Any]:
+        queries = _FakeQueries()
+        insert_scanr_document(
+            MagicMock(),
+            queries,
+            doc,
+            staging_id=1,
+            scanr_id="sc-1",
+            publication_id=None,
+            pub_meta=pub_meta,
+        )
+        return queries.upserted_documents[-1]
+
+    def test_related_dois_excludes_primary(self):
+        doc = {
+            "externalIds": [
+                {"type": "doi", "id": "10.1/primary"},
+                {"type": "doi", "id": "10.2/anie"},
+                {"type": "hal", "id": "hal-1"},
+            ]
+        }
+        captured = self._call(doc, {**_EMPTY_PUB_META, "doi": "10.1/primary"})
+        assert captured["external_ids"]["related_dois"] == ["10.2/anie"]
+
+    def test_related_dois_absent_when_only_primary(self):
+        doc = {"externalIds": [{"type": "doi", "id": "10.1/primary"}]}
+        captured = self._call(doc, {**_EMPTY_PUB_META, "doi": "10.1/primary"})
+        assert "related_dois" not in (captured["external_ids"] or {})
+
+
 # ── build_scanr_author_records (parsing pur) ─────────────────────
 
 

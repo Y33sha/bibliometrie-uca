@@ -25,6 +25,7 @@ class TestExternalIdsParsing:
         assert ids.pmid is None
         assert ids.pmcid is None
         assert ids.arxiv_id is None
+        assert ids.related_dois is None
 
     def test_from_dict_basic(self):
         ids = ExternalIds(
@@ -48,6 +49,18 @@ class TestExternalIdsParsing:
     def test_hal_id_list_normalized_and_deduped(self):
         ids = ExternalIds(hal_id=["https://hal.science/hal-111v2", "hal-222", "hal-111"])
         assert ids.hal_id == ["hal-111", "hal-222"]
+
+    def test_related_dois_normalized_and_deduped(self):
+        ids = ExternalIds(related_dois=["https://doi.org/10.1/X", "10.2/y", "10.1/x"])
+        assert ids.related_dois == ["10.1/x", "10.2/y"]
+
+    def test_related_dois_scalar_tolerated(self):
+        ids = ExternalIds(related_dois="10.1/x")
+        assert ids.related_dois == ["10.1/x"]
+
+    def test_invalid_related_doi_raises(self):
+        with pytest.raises(PydanticValidationError):
+            ExternalIds(related_dois=["https://doi.org/"])
 
     def test_empty_string_treated_as_none(self):
         ids = ExternalIds(hal_id="", nnt="")
