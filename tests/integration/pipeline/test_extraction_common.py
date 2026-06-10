@@ -166,6 +166,23 @@ class TestGetCrossImportDois:
         assert "10.1038/nature.1" in result
         assert "10.99999/x.1" in result
 
+    def test_includes_related_dois_from_source_publications(self, db):
+        """Les related_dois des source_publications normalisés (source != cible)
+        entrent dans le pool, comme les DOI primaires de staging."""
+        db.execute(
+            "INSERT INTO staging (source, source_id, doi, raw_data, processed) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            ("openalex", "W1", "10.1234/primary", "{}", True),
+        )
+        db.execute(
+            "INSERT INTO source_publications (source, source_id, title, external_ids) "
+            "VALUES (%s, %s, %s, %s)",
+            ("openalex", "W1", "T", '{"related_dois": ["10.9999/preprint"]}'),
+        )
+        result = get_cross_import_dois(db.connection, "hal")
+        assert "10.1234/primary" in result
+        assert "10.9999/preprint" in result
+
     def test_hal_target_no_prefix_filter(self, db):
         """target='hal' : aucun filtre par RA, tous les DOIs candidats remontent."""
         db.execute(
