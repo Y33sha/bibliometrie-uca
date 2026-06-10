@@ -3,37 +3,38 @@
 Toutes les normalisations textuelles du projet passent par ce module
 afin d'éviter la duplication et les incohérences.
 
-La normalisation Python est alignée sur la fonction SQL normalize_name_form() :
-  lowercase → unaccent → tout sauf [a-z0-9] → espaces → collapse
+La normalisation Python est la référence ; la fonction SQL
+normalize_name_form() est alignée dessus (filet de non-régression :
+tests/integration/test_normalize_alignment_python_sql.py). Pipeline :
+  minuscules → lettres latines autonomes → NFKD → retrait des diacritiques
+  → tout sauf [a-z0-9] → espaces → collapse
 """
 
 import re
 import unicodedata
 
-# Caractères Unicode qui doivent être remplacés par leur équivalent ASCII
-# avant la suppression des non-ASCII (sinon ils disparaissent silencieusement
-# et collent les mots : "Abeywickrama‐Samarakoon" → "abeywickramasamarakoon").
-# Les ligatures œ/æ sont avalées par NFKD + encode("ascii", "ignore") parce
-# qu'elles ne se décomposent pas (un seul caractère sans diacritique) : on
-# les expanse explicitement vers oe/ae. `str.maketrans` accepte les valeurs
-# multi-caractères quand on lui passe un dict.
-_UNICODE_TO_ASCII = str.maketrans(
+# Lettres latines autonomes que NFKD ne décompose pas (ce ne sont pas des
+# base+diacritique mais des lettres à part entière) alors que PostgreSQL
+# unaccent les translittère. Sans cette table elles seraient supprimées par
+# le passage [^a-z0-9] et colleraient leurs voisins ("Meyerhofstrasse"
+# perdrait son ss). Les valeurs reproduisent unaccent. Appliquée après
+# lower(), donc les majuscules sont déjà repliées sur leur minuscule.
+_LATIN_LETTERS = str.maketrans(
     {
-        "\u2010": "-",  # HYPHEN
-        "\u2011": "-",  # NON-BREAKING HYPHEN
-        "\u2012": "-",  # FIGURE DASH
-        "\u2013": "-",  # EN DASH
-        "\u2014": "-",  # EM DASH
-        "\u2015": "-",  # HORIZONTAL BAR
-        "\u2018": "'",  # LEFT SINGLE QUOTATION MARK
-        "\u2019": "'",  # RIGHT SINGLE QUOTATION MARK (apostrophe typographique)
-        "\u201a": "'",  # SINGLE LOW-9 QUOTATION MARK
-        "\u201c": '"',  # LEFT DOUBLE QUOTATION MARK
-        "\u201d": '"',  # RIGHT DOUBLE QUOTATION MARK
-        "\u2032": "'",  # PRIME
-        "\u00ad": "-",  # SOFT HYPHEN
-        "\u0153": "oe",  # LATIN SMALL LIGATURE OE (\u0153)
-        "\u00e6": "ae",  # LATIN SMALL LIGATURE AE (\u00e6)
+        "\u00df": "ss",  # LATIN SMALL LETTER SHARP S
+        "\u00f8": "o",  # LATIN SMALL LETTER O WITH STROKE
+        "\u0142": "l",  # LATIN SMALL LETTER L WITH STROKE
+        "\u0131": "i",  # LATIN SMALL LETTER DOTLESS I
+        "\u0111": "d",  # LATIN SMALL LETTER D WITH STROKE
+        "\u00f0": "d",  # LATIN SMALL LETTER ETH
+        "\u00fe": "th",  # LATIN SMALL LETTER THORN
+        "\u0127": "h",  # LATIN SMALL LETTER H WITH STROKE
+        "\u014b": "n",  # LATIN SMALL LETTER ENG
+        "\u0167": "t",  # LATIN SMALL LETTER T WITH STROKE
+        "\u0138": "k",  # LATIN SMALL LETTER KRA
+        "\u017f": "s",  # LATIN SMALL LETTER LONG S
+        "\u0153": "oe",  # LATIN SMALL LIGATURE OE
+        "\u00e6": "ae",  # LATIN SMALL LIGATURE AE
     }
 )
 
@@ -58,10 +59,11 @@ def normalize_text(text: str) -> str:
     Pipeline :
       1. retirer les balises (MathML/HTML) `<...>` entièrement
       2. minuscules + strip
-      3. remplacer les tirets/apostrophes Unicode par ASCII
-      4. NFKD (décompose les accents)
-      5. ASCII encode/ignore (supprime les combining marks)
-      6. tout sauf [a-z0-9] → espaces
+      3. translittérer les lettres latines autonomes (ß, ø, ł...)
+      4. NFKD (décompose les caractères accentués et de compatibilité)
+      5. retirer les seules combining marks (diacritiques)
+      6. tout sauf [a-z0-9] → espaces (les symboles restants n'avalent
+         donc pas leurs voisins)
       7. collapse espaces multiples
     """
     if not text:
@@ -70,9 +72,9 @@ def normalize_text(text: str) -> str:
     # comme texte après l'étape [^a-z0-9] et pollueraient le dédoublonnage.
     text = strip_markup(text)
     text = text.lower().strip()
-    text = text.translate(_UNICODE_TO_ASCII)
+    text = text.translate(_LATIN_LETTERS)
     text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
+    text = "".join(c for c in text if not unicodedata.combining(c))
     text = re.sub(r"[^a-z0-9]+", " ", text)
     return text.strip()
 

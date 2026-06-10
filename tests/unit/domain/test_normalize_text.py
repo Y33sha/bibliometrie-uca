@@ -32,6 +32,21 @@ class TestNormalizeText:
             # Cohérence : avec ou sans ligature, même résultat
             ("oeuvres", "oeuvres"),
             ("aethelstan", "aethelstan"),
+            # Lettres latines autonomes (translittérées comme unaccent, pas
+            # supprimées) : sinon "straße" collerait en "strae".
+            ("Meyerhofstraße", "meyerhofstrasse"),
+            ("Øresund", "oresund"),
+            ("Łódź", "lodz"),
+            ("Reykjavík þingvellir", "reykjavik thingvellir"),
+            # I turc avec point → i (lower()+NFKD le replie)
+            ("İstanbul", "istanbul"),
+            # Fractions vulgaires → chiffres espacés (comme "1/4" tapé à la main)
+            ("½ litre", "1 2 litre"),
+            ("¼ tour", "1 4 tour"),
+            ("10⁻³", "10 3"),
+            # Exposant/indice attaché → chiffre collé (comme "x2", "h2o")
+            ("x²", "x2"),
+            ("H₂O", "h2o"),
             # Ponctuation → espaces
             ("Hello, World!", "hello world"),
             # None-equivalent
