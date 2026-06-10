@@ -9,9 +9,10 @@ from sqlalchemy import Connection
 
 
 class SourcePublicationRow(NamedTuple):
-    """Projection SQL pour la phase match_or_create.
+    """Projection SQL pour la phase de création des publications.
 
-    Colonnes de `source_publications` consommées par `process_document` plus la colonne dérivée `in_perimeter` (TRUE ssi au moins un `source_authorship` rattaché est in_perimeter), utilisée pour gater la création d'une publication canonique.
+    Colonnes de `source_publications` consommées par `process_document` pour
+    créer la publication canonique.
     """
 
     id: int
@@ -27,36 +28,17 @@ class SourcePublicationRow(NamedTuple):
     container_title: str | None
     external_ids: dict[str, object] | None
     urls: list[str] | None
-    in_perimeter: bool
 
 
 class PublicationsMatchOrCreateQueries(Protocol):
-    """Opérations SQL pour le rattachement (match ou création) des `source_publications` aux `publications` canoniques."""
+    """Opérations SQL pour la création des publications canoniques à partir des `source_publications`, et les lectures de critères des passes de fusion."""
 
-    def fetch_orphan_in_perimeter_source_publications(
-        self, conn: Connection
-    ) -> list[SourcePublicationRow]:
-        """Phase A : orphelins avec ≥1 source_authorship in_perimeter.
+    def fetch_orphan_source_publications(self, conn: Connection) -> list[SourcePublicationRow]:
+        """Tous les orphelins (`publication_id IS NULL`).
 
-        Seuls candidats à la création d'une publication canonique. Traités
-        un par un via la cascade Python `decide_publication_match`.
+        Chacun donne une publication canonique (modèle création⇒fusion) ;
+        le dédoublonnage est délégué aux passes de fusion.
         """
-
-    def bulk_link_orphans_by_doi(self, conn: Connection) -> int:
-        """Phase B step 1/4 : rattache les orphelins par DOI."""
-
-    def bulk_link_orphans_by_nnt(self, conn: Connection) -> int:
-        """Phase B step 2/4 : rattache les orphelins par NNT
-        (stocké sur `source_publications.external_ids`)."""
-
-    def bulk_link_orphans_by_hal_id(self, conn: Connection) -> int:
-        """Phase B step 3/4 : rattache les orphelins par hal_id
-        (deux donor paths : SP HAL native via `source_id`, OU SP
-        cross-source via `external_ids.hal_id`, liste)."""
-
-    def bulk_link_orphans_by_pmid(self, conn: Connection) -> int:
-        """Phase B step 4/4 : rattache les orphelins par PMID
-        (stocké sur `source_publications.external_ids`)."""
 
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int

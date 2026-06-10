@@ -21,6 +21,7 @@ def run_merge(
     *,
     pub_repo: PublicationRepository,
     dry_run: bool = False,
+    commit: bool = True,
 ) -> None:
     try:
         duplicates = queries.find_doi_duplicates(conn)
@@ -35,7 +36,7 @@ def run_merge(
             conn, groups, logger=logger, pub_repo=pub_repo, dry_run=dry_run
         )
 
-        if not dry_run:
+        if commit and not dry_run:
             conn.commit()
             logger.info("Commit OK.")
 

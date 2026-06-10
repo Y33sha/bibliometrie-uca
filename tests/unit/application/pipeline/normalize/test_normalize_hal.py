@@ -257,7 +257,7 @@ class TestInsertHalDocument:
         assert captured["external_ids"] == {"hal_id": ["h1"], "nnt": "2024CLFAC001"}
 
     def test_hal_id_always_in_external_ids(self):
-        """Le normalizer pose `external_ids.hal_id = source_id` même hors thèse, pour que les queries de dédup (`find_by_hal_id`, `bulk_link_orphans_by_hal_id`) traitent HAL comme les autres sources (symétrie avec ce que theses fait déjà pour NNT)."""
+        """Le normalizer pose `external_ids.hal_id = source_id` même hors thèse, pour que les queries de dédup (`find_by_hal_id`, la passe de fusion par hal_id) traitent HAL comme les autres sources (symétrie avec ce que theses fait déjà pour NNT)."""
         queries = _FakeQueries()
         captured = self._call(queries, {})
         assert captured["external_ids"] == {"hal_id": ["h1"]}
