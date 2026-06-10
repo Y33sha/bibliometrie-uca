@@ -29,7 +29,12 @@ _DOI_VERSION_SUFFIX = re.compile(r"\.v\d+$", re.IGNORECASE)
 # Suffixe `/pdf` parfois collé au DOI quand une source expose l'URL de la
 # ressource PDF au lieu du DOI canonique — strip pour éviter les doublons.
 _DOI_PDF_SUFFIX = re.compile(r"/pdf$", re.IGNORECASE)
-_DOI_URL_PREFIXES = ("https://doi.org/", "http://doi.org/", "https://dx.doi.org/")
+_DOI_URL_PREFIXES = (
+    "https://doi.org/",
+    "http://doi.org/",
+    "https://dx.doi.org/",
+    "http://dx.doi.org/",
+)
 
 
 def _normalize_doi(raw: str | None) -> str | None:
@@ -340,6 +345,24 @@ def extract_hal_id_from_url(url: str | None) -> str | None:
     'hal-04123456'
     """
     return _normalize_hal_id(url)
+
+
+def extract_doi_from_url(url: str | None) -> str | None:
+    """Extrait le DOI d'une URL `doi.org`/`dx.doi.org` ou d'un identifiant
+    OAI-PMH `doi:<doi>` (forme prise par `location.id` côté OpenAlex). None sinon.
+
+    >>> extract_doi_from_url("https://doi.org/10.1234/x")
+    '10.1234/x'
+    >>> extract_doi_from_url("doi:10.1234/x")
+    '10.1234/x'
+    """
+    if not url:
+        return None
+    if url.startswith("doi:"):
+        return clean_doi(url[4:])
+    if "doi.org/" in url:
+        return clean_doi(url)
+    return None
 
 
 def normalize_pmid(raw: str | None) -> str | None:

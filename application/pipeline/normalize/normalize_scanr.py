@@ -154,8 +154,10 @@ def insert_scanr_document(
     ext: dict[str, JsonValue] = {}
     if nnt := pub_meta["nnt"]:
         ext["nnt"] = nnt
-    # hal_id multivalué : un document ScanR peut référencer plusieurs dépôts HAL.
+    # hal_id et related_dois multivalués : un document ScanR peut référencer
+    # plusieurs dépôts HAL et plusieurs DOI (preprint/dépôt/édition).
     hal_ids: list[str] = []
+    dois: list[str] = []
     for eid in doc.get("externalIds") or []:
         if not (isinstance(eid, dict) and eid.get("type") and eid.get("id")):
             continue
@@ -164,8 +166,14 @@ def insert_scanr_document(
             hal_ids.append(eid["id"])
         elif etype == "pmid":
             ext["pmid"] = eid["id"]
+        elif etype == "doi" and (doi := clean_doi(eid["id"])) and doi not in dois:
+            dois.append(doi)
     if hal_ids:
         ext["hal_id"] = hal_ids
+    # related_dois = DOI secondaires (autres que le primaire, qui vit sur `doi`).
+    # Le doiUrl ScanR est toujours redondant avec un externalIds type=doi.
+    if related_dois := [d for d in dois if d != pub_meta["doi"]]:
+        ext["related_dois"] = related_dois
     external_ids = ext if ext else None
 
     summary = doc.get("summary") or {}

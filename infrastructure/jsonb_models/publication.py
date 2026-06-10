@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from application.ports.api.publications_queries import EcoleDoctorale, PartenaireThese
-from domain.publications.identifiers import NNT, PMCID, PMID, ArxivId, HALId
+from domain.publications.identifiers import DOI, NNT, PMCID, PMID, ArxivId, HALId
 
 # Re-export pour compat des tests / importeurs historiques.
 __all__ = [
@@ -47,6 +47,10 @@ class ExternalIds(BaseModel):
     pmid: str | None = None  # PubMed ID
     pmcid: str | None = None  # PubMed Central ID
     arxiv_id: str | None = None  # arXiv ID
+    # Autres DOI présents dans le record (preprint, dépôt, dataset, édition,
+    # DOI de l'ouvrage hôte d'un chapitre) — pour relations-publications. Jamais
+    # clé de fusion : le DOI primaire de la publication est sur la colonne `doi`.
+    related_dois: list[str] | None = None
 
     @field_validator("hal_id", mode="before")
     @classmethod
@@ -105,6 +109,22 @@ class ExternalIds(BaseModel):
         if normalized is None:
             raise ValueError(f"arXiv ID invalide : {v!r}")
         return normalized.value
+
+    @field_validator("related_dois", mode="before")
+    @classmethod
+    def _normalize_related_dois(cls, v: str | list[str] | None) -> list[str] | None:
+        """Normalise chaque DOI via le VO DOI ; dédoublonne. Tolère un scalaire."""
+        if v is None or v == "":
+            return None
+        raw = [v] if isinstance(v, str) else list(v)
+        out: list[str] = []
+        for item in raw:
+            normalized = DOI.try_parse(item)
+            if normalized is None:
+                raise ValueError(f"DOI invalide : {item!r}")
+            if normalized.value not in out:
+                out.append(normalized.value)
+        return out or None
 
     def to_dict(self) -> dict[str, Any]:
         """Sérialise pour écriture en base (JSONB).
