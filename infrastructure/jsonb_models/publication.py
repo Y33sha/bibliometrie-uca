@@ -194,6 +194,7 @@ class PublicationMeta(BaseModel):
     date_inscription: str | None = None
 
     discipline: str | None = None
+    etablissement: str | None = None  # établissement de soutenance (theses.fr)
     ecoles_doctorales: list[EcoleDoctorale] | None = None
     partenaires: list[PartenaireThese] | None = None
 
