@@ -207,10 +207,10 @@ class TestPopulateAffiliationsIdempotence:
 
 
 class TestPopulateAffiliationsTheses:
-    """Régression : les authorships theses doivent passer par
-    `set_in_perimeter_from_addresses` comme les autres sources. Avant fix,
-    `BIBLIO_SOURCES` excluait theses → `in_perimeter` restait FALSE et la
-    cascade `create_persons_from_source_authorships` ne voyait jamais ces
+    """Régression : les authorships theses doivent obtenir `in_perimeter` comme
+    les autres sources (le sync est source-agnostique, dérivé de la matview).
+    Avant fix, `BIBLIO_SOURCES` excluait theses → `in_perimeter` restait FALSE et
+    la cascade `create_persons_from_source_authorships` ne voyait jamais ces
     authorships (jury, directeurs, rapporteurs, voire auteurs)."""
 
     def test_theses_authorship_in_perimeter_via_address(self, sa_sync_conn):

@@ -390,10 +390,9 @@ def phase_affiliations(**kw: Any) -> Any:
     source_authorships d'une source non listée resteraient bloquées sans
     `structure_ids` après la résolution d'une nouvelle adresse.
     """
-    mode = kw.get("mode", "full")
     _run_refresh_perimeter_structures()
     _run_resolve_addresses()
-    _run_populate_affiliations(mode=mode)
+    _run_populate_affiliations()
 
 
 def phase_zenodo_doi(**kw: Any) -> Any:
@@ -593,24 +592,18 @@ def _run_refresh_perimeter_structures() -> None:
     log.info("✓ perimeter_structures : %d liens en %.1fs", n, time.time() - t0)
 
 
-def _run_populate_affiliations(*, mode: str) -> None:
+def _run_populate_affiliations() -> None:
     from application.pipeline.affiliations.populate_affiliations import run_populate
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.perimeter import get_persons_structure_ids
     from infrastructure.queries.pipeline.affiliations import PgAffiliationsQueries
 
-    log.info("▶ populate_affiliations --mode %s", mode)
+    log.info("▶ populate_affiliations")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
         perimeter_ids = get_persons_structure_ids(conn)
-        run_populate(
-            conn,
-            PgAffiliationsQueries(),
-            log,
-            perimeter_ids,
-            mode=mode,
-        )
+        run_populate(conn, PgAffiliationsQueries(), log, perimeter_ids)
         conn.commit()
     finally:
         conn.close()

@@ -15,12 +15,6 @@ logger = setup_logger("populate_affiliations", os.path.join(os.path.dirname(__fi
 def main() -> None:
     parser = argparse.ArgumentParser(description="Peuplement in_perimeter + refresh structures")
     parser.add_argument("--stats", action="store_true", help="Stats uniquement")
-    parser.add_argument(
-        "--mode",
-        default="full",
-        choices=["full", "weekly", "daily"],
-        help="Mode d'exécution (daily: incrémental, autres: complet)",
-    )
     args = parser.parse_args()
 
     conn = get_sync_engine().connect()
@@ -32,13 +26,7 @@ def main() -> None:
             return
 
         perimeter_ids = get_persons_structure_ids(conn)
-        run_populate(
-            conn,
-            queries,
-            logger,
-            perimeter_ids,
-            mode=args.mode,
-        )
+        run_populate(conn, queries, logger, perimeter_ids)
         conn.commit()
     finally:
         conn.close()

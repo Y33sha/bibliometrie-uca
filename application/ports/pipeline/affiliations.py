@@ -11,11 +11,12 @@ from sqlalchemy import Connection
 class AffiliationsQueries(Protocol):
     """Opérations SQL pour poser `in_perimeter`/`structure_ids` via adresses résolues."""
 
-    def reset_source_authorships_for(self, conn: Connection, source: str) -> int: ...
+    def sync_in_perimeter(self, conn: Connection, *, perimeter_ids: list[int]) -> tuple[int, int]:
+        """Aligne `in_perimeter` sur le périmètre (depuis la matview), n'écrivant que les changements.
 
-    def set_in_perimeter_from_addresses(
-        self, conn: Connection, *, source: str, perimeter_ids: list[int], daily: bool
-    ) -> int: ...
+        Retourne `(passées_TRUE, passées_FALSE)`.
+        """
+        ...
 
     def refresh_source_authorship_structures(self, conn: Connection) -> None: ...
 
