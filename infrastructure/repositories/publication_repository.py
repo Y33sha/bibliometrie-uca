@@ -500,6 +500,19 @@ class PgPublicationRepository:
             return None
         return row.pub_id_a, row.pub_id_b
 
+    def are_distinct(self, pub_id_a: int, pub_id_b: int) -> bool:
+        """True si la paire `(a, b)` est inscrite dans `distinct_publications`."""
+        return (
+            self._conn.execute(
+                text("""
+                    SELECT 1 FROM distinct_publications
+                    WHERE pub_id_a = LEAST(:a, :b) AND pub_id_b = GREATEST(:a, :b)
+                """),
+                {"a": pub_id_a, "b": pub_id_b},
+            ).first()
+            is not None
+        )
+
 
 def _json_dumps_or_none(value: dict | None) -> str | None:
     """Sérialise un dict en string JSON pour `CAST(:p AS jsonb)`. None passé tel quel."""

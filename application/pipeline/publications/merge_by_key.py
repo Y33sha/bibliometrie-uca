@@ -30,7 +30,7 @@ def merge_publications_by_key(
 
     Pour chaque groupe : résout les redirections déjà accumulées dans le batch, choisit le `min` des id résolus comme cible, fusionne les autres dedans (un par un, savepoint individuel pour permettre la continuation après échec).
 
-    Retourne `(merged, errors)`. Chaque fusion réussie incrémente `merged` ; chaque exception incrémente `errors` (loggée en warning, le batch continue). Une paire bloquée par la garde « DOI distincts » (`DistinctDoiError`) n'est ni fusionnée ni comptée en erreur : elle est ignorée (œuvres distinctes) et journalisée.
+    Retourne `(merged, errors)`. Chaque fusion réussie incrémente `merged` ; chaque exception incrémente `errors` (loggée en warning, le batch continue). Une paire bloquée par une garde de distinction — pré-marquée dans `distinct_publications`, ou DOI non-nuls différents (`DistinctDoiError`) — n'est ni fusionnée ni comptée en erreur : elle est ignorée et journalisée.
     """
     redirects: dict[int, int] = {}
 
@@ -64,6 +64,14 @@ def merge_publications_by_key(
                 merged += 1
                 continue
 
+            if pub_repo.are_distinct(target_id, source_id):
+                # Paire pré-marquée distincte (passe mark_distinct_publications) :
+                # garde soft, on ne fusionne pas. Le merge admin manuel (via
+                # merge_publications direct) ne passe pas par cette garde.
+                logger.info(f"  [SKIP distinct pré-marqué] {label}")
+                skipped_distinct += 1
+                continue
+
             try:
                 with savepoint(conn, "merge_by_key"):
                     merge_publications(target_id, source_id, repo=pub_repo)
@@ -82,5 +90,5 @@ def merge_publications_by_key(
                 errors += 1
 
     if skipped_distinct:
-        logger.info(f"  {skipped_distinct} fusion(s) ignorée(s) (DOI distincts)")
+        logger.info(f"  {skipped_distinct} fusion(s) ignorée(s) (publications distinctes)")
     return merged, errors

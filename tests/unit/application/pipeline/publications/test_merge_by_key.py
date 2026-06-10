@@ -77,12 +77,19 @@ def logger() -> logging.Logger:
     return logging.getLogger("test_merge_by_key")
 
 
+def _make_repo() -> MagicMock:
+    """Repo mocké avec `are_distinct=False` (aucune paire pré-marquée distincte)."""
+    repo = MagicMock()
+    repo.are_distinct.return_value = False
+    return repo
+
+
 # ── Cas dégénérés ─────────────────────────────────────────────────
 
 
 def test_empty_groups_returns_zero_zero(captured, logger):
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
 
     merged, errors = merge_publications_by_key(conn, [], logger=logger, pub_repo=repo)
 
@@ -93,7 +100,7 @@ def test_empty_groups_returns_zero_zero(captured, logger):
 def test_single_resolved_id_is_skipped(captured, logger):
     """Si tous les `pub_ids` du groupe se réduisent à un seul après resolve : pas de merge."""
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
 
     merged, errors = merge_publications_by_key(
         conn, [("key=X", [42])], logger=logger, pub_repo=repo
@@ -109,7 +116,7 @@ def test_single_resolved_id_is_skipped(captured, logger):
 def test_two_ids_merges_into_min(captured, logger):
     """Cas standard : 2 ids → target=min, source=max, un merge + un refresh."""
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
 
     merged, errors = merge_publications_by_key(
         conn, [("key=X", [99, 10])], logger=logger, pub_repo=repo
@@ -126,7 +133,7 @@ def test_two_ids_merges_into_min(captured, logger):
 def test_multiple_sources_in_one_group_all_target_min(captured, logger):
     """3 ids → 2 merges, tous vers le min."""
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
 
     merged, errors = merge_publications_by_key(
         conn, [("key=X", [50, 10, 30])], logger=logger, pub_repo=repo
@@ -140,7 +147,7 @@ def test_multiple_sources_in_one_group_all_target_min(captured, logger):
 def test_multiple_groups_independent(captured, logger):
     """Deux groupes indépendants : chacun mergé séparément."""
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
 
     merged, errors = merge_publications_by_key(
         conn,
@@ -158,7 +165,7 @@ def test_multiple_groups_independent(captured, logger):
 
 def test_dry_run_does_not_call_merge(captured, logger):
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
 
     merged, errors = merge_publications_by_key(
         conn, [("key=X", [10, 99])], logger=logger, pub_repo=repo, dry_run=True
@@ -177,7 +184,7 @@ def test_dry_run_does_not_call_merge(captured, logger):
 def test_merge_failure_increments_errors_and_continues(captured, logger):
     """Une exception sur un merge est attrapée → errors++, le batch continue."""
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
     captured["merge_raises"] = {30: RuntimeError("DB constraint")}
 
     merged, errors = merge_publications_by_key(
@@ -201,7 +208,7 @@ def test_distinct_doi_is_skipped_not_errored(captured, logger):
     """Une fusion bloquée par `DistinctDoiError` est ignorée : ni mergée, ni
     comptée en erreur, et la source n'est pas redirigée."""
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
     captured["merge_raises"] = {30: DistinctDoiError(10, 30, "10.1/a", "10.2/b")}
 
     merged, errors = merge_publications_by_key(
@@ -219,7 +226,7 @@ def test_distinct_doi_skip_does_not_redirect_source(captured, logger):
     """La source ignorée pour DOI distincts reste vivante : un groupe ultérieur
     qui la contient ne la redirige pas vers la cible refusée."""
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
     captured["merge_raises"] = {99: DistinctDoiError(10, 99, "10.1/a", "10.2/b")}
 
     # Groupe 1 : 10 + 99 → refus (DOI distincts), pas de redirect de 99.
@@ -234,13 +241,29 @@ def test_distinct_doi_skip_does_not_redirect_source(captured, logger):
     assert captured["merge_calls"] == [(10, 99), (5, 99)]
 
 
+def test_premarked_distinct_pair_is_skipped(captured, logger):
+    """Une paire pré-marquée dans `distinct_publications` (`are_distinct=True`)
+    est ignorée avant toute tentative de fusion (garde soft de la passe)."""
+    conn = _FakeConn()
+    repo = _make_repo()
+    repo.are_distinct.side_effect = lambda a, b: {a, b} == {10, 30}
+
+    merged, errors = merge_publications_by_key(
+        conn, [("key=X", [10, 20, 30, 40])], logger=logger, pub_repo=repo
+    )
+
+    # 30 pré-marquée distincte de la cible 10 → skip, sans tentative de merge.
+    assert (merged, errors) == (2, 0)
+    assert captured["merge_calls"] == [(10, 20), (10, 40)]
+
+
 # ── Résolution des redirections cross-groupes ────────────────────
 
 
 def test_redirect_resolution_uses_latest_target(captured, logger):
     """Si pub A a été mergée dans B au groupe 1, alors un groupe 2 contenant A doit rediriger vers B."""
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
 
     # Groupe 1 : 10 + 99 → 99 mergée dans 10. Redirect 99 → 10.
     # Groupe 2 : 99 + 5 → après resolve : {10, 5} → target=5, source=10.
@@ -262,7 +285,7 @@ def test_redirect_chain_collapses_to_one(captured, logger):
     Groupe 2 : 99 + 99 (formellement 2 ids mais après resolve : {10, 10} = {10}) → skip.
     """
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
 
     merged, errors = merge_publications_by_key(
         conn,
@@ -278,7 +301,7 @@ def test_redirect_chain_collapses_to_one(captured, logger):
 def test_redirect_chain_two_hops(captured, logger):
     """Redirect en chaîne : groupe 1 redirige 30→20, groupe 2 redirige 20→10, groupe 3 contenant 30 doit aller vers 10."""
     conn = _FakeConn()
-    repo = MagicMock()
+    repo = _make_repo()
 
     # Groupe 1 : 20 + 30 → 30 redirige vers 20.
     # Groupe 2 : 10 + 20 → 20 redirige vers 10.
