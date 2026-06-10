@@ -4,7 +4,7 @@ Mocks : port `MergeQueries`, `Connection` (commit/rollback), `PublicationReposit
 
 Couvre `find_merge_candidates` (pure shuffle) et `run_merge` (orchestration : merge + commit/rollback). La régression historique (OA+ScanR sur même hal_id) est dans `test_second_source_with_same_hal_id_is_not_dropped`.
 
-Le path historique « SP HAL orpheline → lien simple » a été retiré (couvert désormais par `bulk_link_orphans_by_hal_id` côté `match_or_create_publications`).
+Le path historique « SP HAL orpheline → lien simple » a été retiré : avec le modèle création⇒fusion, chaque SP crée sa publication et cette passe fusionne celles qui partagent un hal_id.
 """
 
 from __future__ import annotations
@@ -96,7 +96,7 @@ def test_no_op_when_both_sources_already_merged():
 
 
 def test_hal_orphan_ignored():
-    """SP HAL orpheline : ignorée par `find_merge_candidates`. Le rattachement est désormais entièrement délégué à `bulk_link_orphans_by_hal_id` (Phase B de match_or_create_publications)."""
+    """SP HAL orpheline : ignorée par `find_merge_candidates`. Avec le create-all, elle crée sa propre publication ; la fusion par hal_id (sur les publications) s'en charge ensuite."""
     src_rows = [_src("openalex", src_pub_id=10, hal_id="hal-Y")]
     hal_rows = [_hal("hal-Y", hal_pub_id=None, hal_doc_id=500)]
 
