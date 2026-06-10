@@ -15,6 +15,9 @@ htmlcov/
 build/
 dist/
 
+# Dumps de crash Cygwin/MSYS (bash interrompu sous Windows)
+*.stackdump
+
 # Frontend (SvelteKit)
 interfaces/frontend/node_modules/
 interfaces/frontend/build/
