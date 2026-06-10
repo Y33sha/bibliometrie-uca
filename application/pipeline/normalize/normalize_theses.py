@@ -95,6 +95,9 @@ def _build_source_meta(these: dict) -> dict | None:
     if discipline:
         meta["discipline"] = discipline
 
+    if etablissement := these.get("etabSoutenanceN"):
+        meta["etablissement"] = etablissement
+
     ecoles = these.get("ecolesDoctorale") or []
     ecoles_clean = [{"nom": e["nom"], "ppn": e.get("ppn")} for e in ecoles if e.get("nom")]
     if ecoles_clean:
@@ -189,10 +192,14 @@ def process_persons(
 
     authorships = aggregate_thesis_persons(these)
 
-    # Affiliations auteur : partenaires de recherche (labos), partagées
-    # par toutes les personnes du document.
+    # Adresses partagées par toutes les personnes du document : labos
+    # partenaires + établissement de soutenance. Ce dernier (UCA) rattache la
+    # thèse au périmètre — theses.fr ne porte pas d'adresses, et les labos
+    # partenaires ne sont pas toujours des structures du périmètre.
     partenaires = these.get("partenairesDeRecherche") or []
-    addr_parts = [p["nom"] for p in partenaires if p.get("nom")] or []
+    addr_parts = [p["nom"] for p in partenaires if p.get("nom")]
+    if etablissement := these.get("etabSoutenanceN"):
+        addr_parts.append(etablissement)
 
     for a in authorships:
         sa_id = queries.upsert_theses_source_authorship(

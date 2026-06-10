@@ -131,11 +131,16 @@ class TestBuildSourceMeta:
         meta = _build_source_meta({"dateSoutenance": "15/03/2024"})
         assert meta == {"date_soutenance": "2024-03-15"}
 
+    def test_etablissement(self):
+        meta = _build_source_meta({"etabSoutenanceN": "Université Clermont Auvergne (2021-...)"})
+        assert meta == {"etablissement": "Université Clermont Auvergne (2021-...)"}
+
     def test_full(self):
         these = {
             "dateSoutenance": "15/03/2024",
             "datePremiereInscriptionDoctorat": "10/09/2020",
             "discipline": "Informatique",
+            "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
             "ecolesDoctorale": [{"nom": "EDSPI", "ppn": "1234"}, {"nom": "EDMS"}],
             "partenairesDeRecherche": [
                 {"nom": "LIMOS", "type": "labo"},
@@ -147,6 +152,7 @@ class TestBuildSourceMeta:
         assert meta["date_soutenance"] == "2024-03-15"
         assert meta["date_inscription"] == "2020-09-10"
         assert meta["discipline"] == "Informatique"
+        assert meta["etablissement"] == "Université Clermont Auvergne (2021-...)"
         assert meta["ecoles_doctorales"] == [
             {"nom": "EDSPI", "ppn": "1234"},
             {"nom": "EDMS", "ppn": None},
@@ -299,6 +305,40 @@ class TestProcessPersons:
         these = {"partenairesDeRecherche": [{"nom": "LIMOS"}, {"nom": "LRL"}, {}]}
         process_persons(MagicMock(), queries, these, 10, address_linker=linker)
         assert linker.links == [(101, ["LIMOS", "LRL"])]
+
+    def test_etablissement_appended_to_addr_parts(self, monkeypatch):
+        class _A:
+            raw_author_name = "X"
+            author_position = 0
+            roles = ["author"]
+            person_identifiers = None
+
+        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_A()])
+        queries = _FakeQueries()
+        linker = _FakeAddressLinker()
+        these = {
+            "partenairesDeRecherche": [{"nom": "LIMOS"}],
+            "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
+        }
+        process_persons(MagicMock(), queries, these, 10, address_linker=linker)
+        assert linker.links == [(101, ["LIMOS", "Université Clermont Auvergne (2021-...)"])]
+
+    def test_etablissement_alone_creates_link(self, monkeypatch):
+        """Sans partenaire, l'établissement de soutenance suffit à poser une
+        adresse (→ rattachement périmètre des thèses)."""
+
+        class _A:
+            raw_author_name = "X"
+            author_position = 0
+            roles = ["author"]
+            person_identifiers = None
+
+        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda these: [_A()])
+        queries = _FakeQueries()
+        linker = _FakeAddressLinker()
+        these = {"etabSoutenanceN": "Université Clermont Auvergne (2021-...)"}
+        process_persons(MagicMock(), queries, these, 10, address_linker=linker)
+        assert linker.links == [(101, ["Université Clermont Auvergne (2021-...)"])]
 
     def test_no_partenaires_no_link(self, monkeypatch):
         class _A:
