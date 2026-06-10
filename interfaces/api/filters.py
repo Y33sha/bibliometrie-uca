@@ -1,6 +1,6 @@
 """Parsers pour les query params HTTP (CSV → listes typées).
 
-Les constructeurs de filtres SQL (apply_*_filter, PUB_IS_UCA, etc.) ont
+Les constructeurs de filtres SQL (apply_*_filter, PUBLICATION_IS_IN_PERIMETER, etc.) ont
 migré dans `infrastructure/queries/filters.py` — ils construisent du
 SQL, donc appartiennent à l'infrastructure. Importer depuis là.
 """

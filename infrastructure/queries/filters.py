@@ -32,7 +32,7 @@ OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
 # Filtre SQL : la publication a au moins un authorship dans le périmètre.
 # Exclut les doc_types out-of-scope et les personnes rejetées (fausses
 # entités).
-PUB_IS_UCA = f"""(
+PUBLICATION_IS_IN_PERIMETER = f"""(
     EXISTS (SELECT 1 FROM authorships a
             JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
             WHERE a.publication_id = p.id AND a.in_perimeter = TRUE)
