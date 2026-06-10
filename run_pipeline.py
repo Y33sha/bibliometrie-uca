@@ -392,7 +392,7 @@ def phase_affiliations(**kw: Any) -> Any:
     """
     mode = kw.get("mode", "full")
     _run_refresh_perimeter_structures()
-    _run_resolve_addresses(mode)
+    _run_resolve_addresses()
     _run_populate_affiliations(mode=mode)
 
 
@@ -1108,18 +1108,18 @@ def _run_enrich_publishers_from_ror() -> None:
     log.info("✓ enrich_publishers_from_ror terminé en %.1fs", time.time() - t0)
 
 
-def _run_resolve_addresses(mode: str) -> None:
+def _run_resolve_addresses() -> None:
     from application.pipeline.affiliations.resolve_addresses import run_resolution
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.perimeter import get_persons_structure_ids
     from infrastructure.queries.pipeline.address_resolution import PgAddressResolutionQueries
 
-    log.info("▶ resolve_addresses --mode %s", mode)
+    log.info("▶ resolve_addresses")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
         perimeter_ids = get_persons_structure_ids(conn)
-        run_resolution(conn, PgAddressResolutionQueries(), perimeter_ids, log, mode=mode)
+        run_resolution(conn, PgAddressResolutionQueries(), perimeter_ids, log)
     finally:
         conn.close()
     log.info("✓ resolve_addresses terminé en %.1fs", time.time() - t0)

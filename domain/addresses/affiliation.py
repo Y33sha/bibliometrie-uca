@@ -3,8 +3,7 @@ adresse vers des structures de recherche.
 
 Une `AddressAffiliation` porte un `Address` (VO) accompagné de son
 état de résolution : structures liées (avec leur statut de
-confirmation), pays détectés/suggérés, comptage d'usage, horodatage
-de résolution.
+confirmation), pays détectés/suggérés, comptage d'usage.
 
 Identité = `id` (clé surrogate ; aligné sur `addresses.id` côté
 schéma — l'adresse et son état partagent la même ligne).
@@ -19,7 +18,6 @@ confirmation manuelle, suggestion automatique) vit ici.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
 
 from domain.addresses.address import Address
 from domain.errors import ConflictError, NotFoundError
@@ -53,7 +51,6 @@ class AddressAffiliation:
     raw_text: str
     countries: tuple[str, ...] = ()
     suggested_countries: tuple[str, ...] = ()
-    resolved_at: datetime | None = None
     pub_count: int = 0
     structure_links: tuple[StructureLink, ...] = field(default=())
 
@@ -90,13 +87,6 @@ class AddressAffiliation:
                 is_confirmed=None,
             ),
         )
-
-    def mark_resolved(self, at: datetime) -> None:
-        """Marque l'adresse comme résolue à l'instant `at`.
-
-        Le caller fournit le timestamp (pureté du domaine).
-        """
-        self.resolved_at = at
 
     def _update_link(self, structure_id: int, *, is_confirmed: bool) -> None:
         new_links: list[StructureLink] = []

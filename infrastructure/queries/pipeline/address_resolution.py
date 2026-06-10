@@ -44,126 +44,107 @@ def load_name_forms(conn: Connection) -> list[StructureNameForm]:
     ]
 
 
-def reset_auto_detected(conn: Connection) -> int:
-    """Supprime les liens `address_structures` auto-détectés. Retourne le rowcount."""
-    return conn.execute(
-        text("DELETE FROM address_structures WHERE matched_form_id IS NOT NULL")
-    ).rowcount
-
-
-def reset_all_resolved_at(conn: Connection) -> None:
-    """Remet `addresses.resolved_at` à NULL pour forcer un recalcul complet."""
-    conn.execute(text("UPDATE addresses SET resolved_at = NULL"))
-
-
-def fetch_addresses_to_resolve(conn: Connection, *, incremental: bool) -> list[tuple[int, str]]:
-    """Retourne `(id, normalized_text)` des adresses à traiter.
+def fetch_addresses_chunk(conn: Connection, *, after_id: int, limit: int) -> list[tuple[int, str]]:
+    """Tranche `(id, normalized_text)` triée par `id`, `id > after_id`.
 
     Le matching opère sur `normalized_text` (déjà normalisé à l'insertion par
     `normalize_text`), pas sur le brut : aucun recalcul côté pipeline.
-
-    Si `incremental=True` : uniquement celles avec `resolved_at IS NULL`.
-    Sinon : toutes les adresses.
+    Pagination keyset : la mémoire reste bornée par `limit`, pas par le total.
     """
-    if incremental:
-        rows = conn.execute(
-            text(
-                "SELECT a.id, a.normalized_text FROM addresses a "
-                "WHERE a.resolved_at IS NULL ORDER BY a.id"
-            )
-        ).all()
-    else:
-        rows = conn.execute(
-            text("SELECT a.id, a.normalized_text FROM addresses a ORDER BY a.id")
-        ).all()
+    rows = conn.execute(
+        text(
+            "SELECT a.id, a.normalized_text FROM addresses a "
+            "WHERE a.id > :after ORDER BY a.id LIMIT :limit"
+        ),
+        {"after": after_id, "limit": limit},
+    ).all()
     return [(r.id, r.normalized_text) for r in rows]
 
 
-def delete_obsolete_detections(
-    conn: Connection, addr_id: int, kept_structure_ids: list[int]
+def delete_obsolete_detections_bulk(
+    conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
 ) -> int:
-    """Supprime les liens auto-détectés devenus obsolètes (non confirmés).
+    """Supprime en bloc les détections auto non confirmées devenues obsolètes.
 
-    `kept_structure_ids` : structures toujours détectées (à garder).
-    Les liens `matched_form_id IS NOT NULL` vers d'autres structures et
-    `is_confirmed IS NULL` sont supprimés. Retourne le rowcount.
+    Pour les adresses `addr_ids`, retire les liens `matched_form_id IS NOT NULL`
+    / `is_confirmed IS NULL` dont le `(address_id, structure_id)` n'est pas dans
+    `kept_pairs` (encore détecté). Retourne le rowcount.
     """
-    if kept_structure_ids:
-        return conn.execute(
-            text("""
-                DELETE FROM address_structures
-                WHERE address_id = :addr_id
-                  AND matched_form_id IS NOT NULL
-                  AND structure_id != ALL(:kept)
-                  AND is_confirmed IS NULL
-            """),
-            {"addr_id": addr_id, "kept": kept_structure_ids},
-        ).rowcount
+    if not addr_ids:
+        return 0
+    kept_aids = [a for a, _ in kept_pairs]
+    kept_sids = [s for _, s in kept_pairs]
     return conn.execute(
         text("""
-            DELETE FROM address_structures
-            WHERE address_id = :addr_id
-              AND matched_form_id IS NOT NULL
-              AND is_confirmed IS NULL
+            DELETE FROM address_structures a
+            WHERE a.address_id = ANY(:addr_ids)
+              AND a.matched_form_id IS NOT NULL
+              AND a.is_confirmed IS NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM unnest(CAST(:kept_aids AS int[]), CAST(:kept_sids AS int[])) AS k(aid, sid)
+                  WHERE k.aid = a.address_id AND k.sid = a.structure_id
+              )
         """),
-        {"addr_id": addr_id},
+        {"addr_ids": addr_ids, "kept_aids": kept_aids, "kept_sids": kept_sids},
     ).rowcount
 
 
-def unflag_obsolete_detections(
-    conn: Connection, addr_id: int, kept_structure_ids: list[int]
+def unflag_obsolete_detections_bulk(
+    conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
 ) -> None:
-    """Retire `matched_form_id` sur les liens obsolètes confirmés/rejetés manuellement.
+    """Retire en bloc `matched_form_id` des liens manuels (is_confirmed) obsolètes.
 
-    Les liens manuels (is_confirmed IS NOT NULL) ne sont pas supprimés,
-    mais perdent leur marqueur de détection auto.
+    Les liens manuels ne sont pas supprimés, mais perdent leur marqueur auto.
     """
-    if kept_structure_ids:
-        conn.execute(
-            text("""
-                UPDATE address_structures
-                SET matched_form_id = NULL
-                WHERE address_id = :addr_id
-                  AND matched_form_id IS NOT NULL
-                  AND structure_id != ALL(:kept)
-                  AND is_confirmed IS NOT NULL
-            """),
-            {"addr_id": addr_id, "kept": kept_structure_ids},
-        )
-    else:
-        conn.execute(
-            text("""
-                UPDATE address_structures
-                SET matched_form_id = NULL
-                WHERE address_id = :addr_id
-                  AND matched_form_id IS NOT NULL
-                  AND is_confirmed IS NOT NULL
-            """),
-            {"addr_id": addr_id},
-        )
-
-
-def upsert_detected_structure(
-    conn: Connection, addr_id: int, structure_id: int, form_id: int
-) -> None:
-    """Crée ou met à jour le lien `address_structures` avec le form_id détecté."""
+    if not addr_ids:
+        return
+    kept_aids = [a for a, _ in kept_pairs]
+    kept_sids = [s for _, s in kept_pairs]
     conn.execute(
         text("""
-            INSERT INTO address_structures
-                (address_id, structure_id, matched_form_id)
-            VALUES (:addr_id, :struct_id, :form_id)
-            ON CONFLICT (address_id, structure_id)
-                DO UPDATE SET matched_form_id = EXCLUDED.matched_form_id
+            UPDATE address_structures a
+            SET matched_form_id = NULL
+            WHERE a.address_id = ANY(:addr_ids)
+              AND a.matched_form_id IS NOT NULL
+              AND a.is_confirmed IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM unnest(CAST(:kept_aids AS int[]), CAST(:kept_sids AS int[])) AS k(aid, sid)
+                  WHERE k.aid = a.address_id AND k.sid = a.structure_id
+              )
         """),
-        {"addr_id": addr_id, "struct_id": structure_id, "form_id": form_id},
+        {"addr_ids": addr_ids, "kept_aids": kept_aids, "kept_sids": kept_sids},
     )
 
 
-def mark_address_resolved(conn: Connection, addr_id: int) -> None:
-    """Marque une adresse comme résolue (`resolved_at = now()`)."""
+def upsert_detected_structures_bulk(
+    conn: Connection, detections: list[tuple[int, int, int]]
+) -> None:
+    """Insère/maj en bloc les détections `(address_id, structure_id, form_id)`.
+
+    `resolve` garantit l'unicité de `(address_id, structure_id)` dans la tranche,
+    donc l'ON CONFLICT ne porte jamais deux fois sur la même ligne. La clause
+    `WHERE ... IS DISTINCT FROM` rend l'upsert idempotent : un lien dont le
+    `matched_form_id` est déjà à jour n'est pas réécrit (pas de churn ni de bloat
+    sur un recalcul qui ne change rien).
+    """
+    if not detections:
+        return
+    aids = [d[0] for d in detections]
+    sids = [d[1] for d in detections]
+    fids = [d[2] for d in detections]
     conn.execute(
-        text("UPDATE addresses SET resolved_at = now() WHERE id = :addr_id"),
-        {"addr_id": addr_id},
+        text("""
+            INSERT INTO address_structures (address_id, structure_id, matched_form_id)
+            SELECT aid, sid, fid
+            FROM unnest(CAST(:aids AS int[]), CAST(:sids AS int[]), CAST(:fids AS int[]))
+                 AS t(aid, sid, fid)
+            ON CONFLICT (address_id, structure_id)
+                DO UPDATE SET matched_form_id = EXCLUDED.matched_form_id
+                WHERE address_structures.matched_form_id IS DISTINCT FROM EXCLUDED.matched_form_id
+        """),
+        {"aids": aids, "sids": sids, "fids": fids},
     )
 
 
@@ -173,31 +154,22 @@ class PgAddressResolutionQueries(AddressResolutionQueries):
     def load_name_forms(self, conn: Connection) -> list[StructureNameForm]:
         return load_name_forms(conn)
 
-    def reset_auto_detected(self, conn: Connection) -> int:
-        return reset_auto_detected(conn)
-
-    def reset_all_resolved_at(self, conn: Connection) -> None:
-        reset_all_resolved_at(conn)
-
-    def fetch_addresses_to_resolve(
-        self, conn: Connection, *, incremental: bool
+    def fetch_addresses_chunk(
+        self, conn: Connection, *, after_id: int, limit: int
     ) -> list[tuple[int, str]]:
-        return fetch_addresses_to_resolve(conn, incremental=incremental)
+        return fetch_addresses_chunk(conn, after_id=after_id, limit=limit)
 
-    def delete_obsolete_detections(
-        self, conn: Connection, addr_id: int, kept_structure_ids: list[int]
+    def delete_obsolete_detections_bulk(
+        self, conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
     ) -> int:
-        return delete_obsolete_detections(conn, addr_id, kept_structure_ids)
+        return delete_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
 
-    def unflag_obsolete_detections(
-        self, conn: Connection, addr_id: int, kept_structure_ids: list[int]
+    def unflag_obsolete_detections_bulk(
+        self, conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
     ) -> None:
-        unflag_obsolete_detections(conn, addr_id, kept_structure_ids)
+        unflag_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
 
-    def upsert_detected_structure(
-        self, conn: Connection, addr_id: int, structure_id: int, form_id: int
+    def upsert_detected_structures_bulk(
+        self, conn: Connection, detections: list[tuple[int, int, int]]
     ) -> None:
-        upsert_detected_structure(conn, addr_id, structure_id, form_id)
-
-    def mark_address_resolved(self, conn: Connection, addr_id: int) -> None:
-        mark_address_resolved(conn, addr_id)
+        upsert_detected_structures_bulk(conn, detections)

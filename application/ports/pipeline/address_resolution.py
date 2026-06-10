@@ -26,28 +26,48 @@ class StructureNameForm(NamedTuple):
 
 
 class AddressResolutionQueries(Protocol):
-    """Opérations SQL pour résoudre les adresses → structures."""
+    """Opérations SQL pour résoudre les adresses → structures.
+
+    Chaque run est un recalcul complet idempotent : toutes les adresses sont
+    traitées par tranches (keyset par `id`), et seules les détections
+    `address_structures` qui changent sont écrites. Mémoire et allers-retours
+    SQL bornés par la taille de tranche, pas par le total.
+    """
 
     def load_name_forms(self, conn: Connection) -> list[StructureNameForm]: ...
 
-    def reset_auto_detected(self, conn: Connection) -> int: ...
+    def fetch_addresses_chunk(
+        self, conn: Connection, *, after_id: int, limit: int
+    ) -> list[tuple[int, str]]:
+        """Tranche `(id, normalized_text)` triée par `id`, `id > after_id`.
 
-    def reset_all_resolved_at(self, conn: Connection) -> None: ...
+        Liste vide = plus rien à traiter.
+        """
+        ...
 
-    def fetch_addresses_to_resolve(
-        self, conn: Connection, *, incremental: bool
-    ) -> list[tuple[int, str]]: ...
+    def delete_obsolete_detections_bulk(
+        self, conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
+    ) -> int:
+        """Supprime les détections auto non confirmées devenues obsolètes.
 
-    def delete_obsolete_detections(
-        self, conn: Connection, addr_id: int, kept_structure_ids: list[int]
-    ) -> int: ...
+        Pour les adresses `addr_ids`, retire les liens `matched_form_id IS NOT
+        NULL` / `is_confirmed IS NULL` dont le `(address_id, structure_id)`
+        n'est pas dans `kept_pairs` (encore détectés). Retourne le rowcount.
+        """
+        ...
 
-    def unflag_obsolete_detections(
-        self, conn: Connection, addr_id: int, kept_structure_ids: list[int]
-    ) -> None: ...
+    def unflag_obsolete_detections_bulk(
+        self, conn: Connection, addr_ids: list[int], kept_pairs: list[tuple[int, int]]
+    ) -> None:
+        """Retire `matched_form_id` des liens manuels (is_confirmed) obsolètes."""
+        ...
 
-    def upsert_detected_structure(
-        self, conn: Connection, addr_id: int, structure_id: int, form_id: int
-    ) -> None: ...
+    def upsert_detected_structures_bulk(
+        self, conn: Connection, detections: list[tuple[int, int, int]]
+    ) -> None:
+        """Insère/maj en bloc les détections `(address_id, structure_id, form_id)`.
 
-    def mark_address_resolved(self, conn: Connection, addr_id: int) -> None: ...
+        Idempotent : ne réécrit pas les liens dont le `matched_form_id` est déjà
+        à jour.
+        """
+        ...
