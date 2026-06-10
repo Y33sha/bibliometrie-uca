@@ -9,10 +9,12 @@ passent par `application.publications.merge_publications`.
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.merge import (
+    DoiDuplicateRow,
     HalSourceRow,
     MergeQueries,
     NntDuplicateRow,
     OaScanrHalRow,
+    PmidDuplicateRow,
 )
 
 
@@ -32,6 +34,46 @@ def find_nnt_duplicates(conn: Connection) -> list[NntDuplicateRow]:
         """)
     ).all()
     return [NntDuplicateRow(nnt=r.nnt, pub_ids=r.pub_ids, sources=r.sources) for r in rows]
+
+
+def find_pmid_duplicates(conn: Connection) -> list[PmidDuplicateRow]:
+    """Liste les PMID dont les `source_publications` pointent vers plusieurs publications."""
+    rows = conn.execute(
+        text("""
+            SELECT sd.external_ids->>'pmid' AS pmid,
+                   array_agg(DISTINCT sd.publication_id ORDER BY sd.publication_id) AS pub_ids,
+                   array_agg(DISTINCT sd.source::text ORDER BY sd.source::text) AS sources
+            FROM source_publications sd
+            WHERE sd.external_ids->>'pmid' IS NOT NULL
+              AND sd.publication_id IS NOT NULL
+            GROUP BY sd.external_ids->>'pmid'
+            HAVING COUNT(DISTINCT sd.publication_id) > 1
+            ORDER BY sd.external_ids->>'pmid'
+        """)
+    ).all()
+    return [PmidDuplicateRow(pmid=r.pmid, pub_ids=r.pub_ids, sources=r.sources) for r in rows]
+
+
+def find_doi_duplicates(conn: Connection) -> list[DoiDuplicateRow]:
+    """Liste les DOI portés par plusieurs `publications` (colonne `publications.doi`).
+
+    Le DOI étant 1:1 avec une publication, ce cas est transitoire : produit par
+    le create-then-merge avant convergence (la contrainte UNIQUE ayant été
+    retirée). `merge_publications_by_key` dédoublonne en respectant la garde
+    `distinct_publications` (ex. ouvrage/chapitre au même DOI).
+    """
+    rows = conn.execute(
+        text("""
+            SELECT lower(doi) AS doi,
+                   array_agg(id ORDER BY id) AS pub_ids
+            FROM publications
+            WHERE doi IS NOT NULL
+            GROUP BY lower(doi)
+            HAVING COUNT(*) > 1
+            ORDER BY lower(doi)
+        """)
+    ).all()
+    return [DoiDuplicateRow(doi=r.doi, pub_ids=r.pub_ids) for r in rows]
 
 
 def fetch_source_publications_with_hal_external_id(
@@ -92,6 +134,12 @@ class PgMergeQueries(MergeQueries):
 
     def find_nnt_duplicates(self, conn: Connection) -> list[NntDuplicateRow]:
         return find_nnt_duplicates(conn)
+
+    def find_pmid_duplicates(self, conn: Connection) -> list[PmidDuplicateRow]:
+        return find_pmid_duplicates(conn)
+
+    def find_doi_duplicates(self, conn: Connection) -> list[DoiDuplicateRow]:
+        return find_doi_duplicates(conn)
 
     def fetch_source_publications_with_hal_external_id(
         self, conn: Connection
