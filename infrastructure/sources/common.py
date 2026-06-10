@@ -166,7 +166,13 @@ def mark_undiscoverable_stale_disappeared(conn: Connection) -> int:
 
 
 def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
-    """Retourne les DOI présents dans les autres sources staging mais absents de la cible.
+    """Retourne les DOI présents dans les autres sources mais absents de la cible.
+
+    Pool = `staging.doi` (DOI primaire) ∪ `source_publications.external_ids.related_dois`
+    (DOI secondaires : preprint/dépôt/édition). Les related_dois proviennent des
+    source_publications normalisés (runs précédents) : ceux d'un record fraîchement
+    ingéré ne sont pas encore normalisés au moment du cross_imports et sont rattrapés
+    au run suivant — bénin (le pipeline est convergent).
 
     Comparaison directe sur `doi` : tous les DOIs sont stockés en minuscules
     (cf. `domain.publication._normalize_doi`), donc plus besoin d'un cas
@@ -191,48 +197,62 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
 
     target_ra = _TARGET_RA.get(target)
     join_clause = (
-        "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(s.doi, '/', 1)" if target_ra else ""
+        "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
+    # Pool de DOI candidats : primaires (staging.doi) + secondaires (related_dois
+    # des source_publications normalisés). Partagé par les deux branches.
+    candidates_cte = """
+        WITH candidates AS (
+            SELECT s.doi
+            FROM staging s
+            WHERE s.source != {t} AND s.doi IS NOT NULL
+            UNION
+            SELECT d AS doi
+            FROM source_publications sp
+            CROSS JOIN LATERAL
+                jsonb_array_elements_text(sp.external_ids->'related_dois') AS d
+            WHERE sp.source != {t}
+              AND jsonb_typeof(sp.external_ids->'related_dois') = 'array'
+        )
+    """
 
     if isinstance(conn, Connection):
         prefix_filter = " AND (dp.ra = :target_ra OR dp.ra IS NULL)" if target_ra else ""
         query = f"""
-            SELECT DISTINCT s.doi
-            FROM staging s
+            {candidates_cte.format(t=":target")}
+            SELECT DISTINCT c.doi
+            FROM candidates c
             {join_clause}
-            WHERE s.source != :target
-              AND s.doi IS NOT NULL{prefix_filter}
-              AND s.doi NOT IN (
-                  SELECT doi FROM staging WHERE source = :target AND doi IS NOT NULL
-              )
+            WHERE c.doi NOT IN (
+                      SELECT doi FROM staging WHERE source = :target AND doi IS NOT NULL
+                  ){prefix_filter}
               AND NOT EXISTS (
                   SELECT 1 FROM doi_lookups l
-                  WHERE l.source = :target AND l.doi = s.doi AND l.next_retry > now()
+                  WHERE l.source = :target AND l.doi = c.doi AND l.next_retry > now()
               )
-            ORDER BY s.doi
+            ORDER BY c.doi
         """
         params: dict[str, str] = {"target": target}
         if target_ra:
             params["target_ra"] = target_ra
         return list(conn.execute(text(query), params).scalars())
 
-    pg_prefix_filter = " AND (dp.ra = %s OR dp.ra IS NULL)" if target_ra else ""
+    pg_prefix_filter = " AND (dp.ra = %(target_ra)s OR dp.ra IS NULL)" if target_ra else ""
     query_pg = f"""
-        SELECT DISTINCT s.doi
-        FROM staging s
+        {candidates_cte.format(t="%(target)s")}
+        SELECT DISTINCT c.doi
+        FROM candidates c
         {join_clause}
-        WHERE s.source != %s
-          AND s.doi IS NOT NULL{pg_prefix_filter}
-          AND s.doi NOT IN (
-              SELECT doi FROM staging WHERE source = %s AND doi IS NOT NULL
-          )
+        WHERE c.doi NOT IN (
+                  SELECT doi FROM staging WHERE source = %(target)s AND doi IS NOT NULL
+              ){pg_prefix_filter}
           AND NOT EXISTS (
               SELECT 1 FROM doi_lookups l
-              WHERE l.source = %s AND l.doi = s.doi AND l.next_retry > now()
+              WHERE l.source = %(target)s AND l.doi = c.doi AND l.next_retry > now()
           )
-        ORDER BY s.doi
+        ORDER BY c.doi
     """
-    pg_params = (target, target_ra, target, target) if target_ra else (target, target, target)
+    pg_params = {"target": target, "target_ra": target_ra} if target_ra else {"target": target}
     with conn.cursor() as cur:
         cur.execute(query_pg, pg_params)
         return [row["doi"] for row in cur.fetchall()]
