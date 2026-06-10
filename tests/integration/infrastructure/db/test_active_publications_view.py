@@ -42,3 +42,45 @@ class TestActivePublicationsViewMatchesDomain:
             f"et OUT_OF_SCOPE_DOC_TYPES ({sorted(OUT_OF_SCOPE_DOC_TYPES)}). "
             f"Modifier les deux ensemble."
         )
+
+
+class TestActivePublicationsViewPerimeter:
+    """La vue restreint aussi au périmètre : une publication active sans aucun
+    ``source_authorship`` in_perimeter en est exclue."""
+
+    def _make_active_pub(self, conn: Connection, *, in_perimeter: bool) -> int:
+        pub = conn.execute(
+            text(
+                "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
+                "VALUES ('T', 't', 2024, CAST('article' AS doc_type)) RETURNING id"
+            )
+        ).scalar_one()
+        sp = conn.execute(
+            text(
+                "INSERT INTO source_publications (source, source_id, title, publication_id) "
+                "VALUES ('openalex', :sid, 'T', :p) RETURNING id"
+            ),
+            {"sid": f"W{pub}", "p": pub},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO source_authorships (source, source_publication_id, in_perimeter) "
+                "VALUES ('openalex', :sp, :ip)"
+            ),
+            {"sp": sp, "ip": in_perimeter},
+        )
+        return pub
+
+    def test_excludes_when_no_in_perimeter_authorship(self, sa_sync_conn: Connection):
+        pub = self._make_active_pub(sa_sync_conn, in_perimeter=False)
+        present = sa_sync_conn.execute(
+            text("SELECT 1 FROM v_active_publications WHERE id = :p"), {"p": pub}
+        ).scalar()
+        assert present is None
+
+    def test_includes_when_in_perimeter_authorship(self, sa_sync_conn: Connection):
+        pub = self._make_active_pub(sa_sync_conn, in_perimeter=True)
+        present = sa_sync_conn.execute(
+            text("SELECT 1 FROM v_active_publications WHERE id = :p"), {"p": pub}
+        ).scalar()
+        assert present == 1
