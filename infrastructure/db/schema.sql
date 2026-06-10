@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 08GgrgcxkWSLnHTQSOYblAcuBvM7n2hgaAiBogNYedxEG9StLDMGWsWQVSNdwd2
+\restrict I5HqwrvfUnymnS05KQSGmmcYawpPMuns5xmKaoPvDZNNia1S92x4gWC50FuATcU
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -1421,8 +1421,11 @@ ALTER SEQUENCE public.subjects_id_seq OWNED BY public.subjects.id;
 
 CREATE VIEW public.v_active_publications AS
  SELECT id
-   FROM public.publications
-  WHERE (doc_type <> ALL (ARRAY['peer_review'::public.doc_type, 'memoir'::public.doc_type]));
+   FROM public.publications p
+  WHERE ((doc_type <> ALL (ARRAY['peer_review'::public.doc_type, 'memoir'::public.doc_type])) AND (EXISTS ( SELECT 1
+           FROM (public.source_publications sp
+             JOIN public.source_authorships sa ON ((sa.source_publication_id = sp.id)))
+          WHERE ((sp.publication_id = p.id) AND (sa.in_perimeter = true)))));
 
 
 --
@@ -2390,6 +2393,13 @@ CREATE INDEX idx_pub_title_trgm ON public.publications USING gin (title_normaliz
 
 
 --
+-- Name: idx_publications_doi_lower; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publications_doi_lower ON public.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
+
+
+--
 -- Name: idx_publications_journal; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2604,13 +2614,6 @@ CREATE INDEX idx_subjects_oa_label_lower ON public.subjects USING btree (lower(l
 --
 
 CREATE INDEX publication_subjects_subject_idx ON public.publication_subjects USING btree (subject_id);
-
-
---
--- Name: publications_doi_lower_key; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX publications_doi_lower_key ON public.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
 
 
 --
@@ -2994,5 +2997,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 08GgrgcxkWSLnHTQSOYblAcuBvM7n2hgaAiBogNYedxEG9StLDMGWsWQVSNdwd2
+\unrestrict I5HqwrvfUnymnS05KQSGmmcYawpPMuns5xmKaoPvDZNNia1S92x4gWC50FuATcU
 

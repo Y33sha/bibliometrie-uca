@@ -4,6 +4,7 @@
 
 ### En cours
 
+- [Publications : matching par création⇒fusion + modélisation des identifiants](DATA_publications-creation-fusion.md)
 - [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
 
 ### En pause
