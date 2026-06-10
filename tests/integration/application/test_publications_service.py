@@ -17,6 +17,7 @@ from application.publications import (
     merge_publications,
     resolve_doi_conflict,
 )
+from domain.errors import DistinctDoiError
 from infrastructure.repositories import publication_repository
 
 
@@ -319,6 +320,39 @@ class TestMergePublications:
             is None
         )
 
+    def test_refuses_distinct_dois(self, sa_sync_conn, repo):
+        """Garde « 1 DOI = 1 publication » : deux DOI non-nuls différents → refus,
+        aucune des deux n'est touchée."""
+        target = _insert_publication(sa_sync_conn, doi="10.1/a")
+        source = _insert_publication(sa_sync_conn, doi="10.2/b")
+        with pytest.raises(DistinctDoiError):
+            merge_publications(target, source, repo=repo)
+        for pid in (target, source):
+            assert (
+                _select_one(sa_sync_conn, "SELECT id FROM publications WHERE id = :id", id=pid)
+                is not None
+            )
+
+    def test_merges_when_one_doi_null(self, sa_sync_conn, repo):
+        """Un seul DOI non-null : pas de conflit, fusion appliquée."""
+        target = _insert_publication(sa_sync_conn, doi="10.1/a")
+        source = _insert_publication(sa_sync_conn, doi=None)
+        merge_publications(target, source, repo=repo)
+        assert (
+            _select_one(sa_sync_conn, "SELECT id FROM publications WHERE id = :id", id=source)
+            is None
+        )
+
+    def test_merges_when_same_doi(self, sa_sync_conn, repo):
+        """Même DOI des deux côtés : fusion (la contrainte unique ayant été retirée)."""
+        target = _insert_publication(sa_sync_conn, doi="10.1/a")
+        source = _insert_publication(sa_sync_conn, doi="10.1/a")
+        merge_publications(target, source, repo=repo)
+        assert (
+            _select_one(sa_sync_conn, "SELECT id FROM publications WHERE id = :id", id=source)
+            is None
+        )
+
     def test_dedup_authorships_by_person(self, sa_sync_conn, repo):
         """Si target et source ont une authorship pour la même person, la source est jetée."""
         target = _insert_publication(sa_sync_conn, title="Target")
@@ -362,18 +396,6 @@ class TestMergePublications:
             text("SELECT doi FROM publications WHERE id = :id"), {"id": target}
         ).scalar_one()
         assert doi == "10.1234/src"
-
-    def test_keeps_target_doi_when_both_set(self, sa_sync_conn, repo):
-        """Si les deux ont un DOI, celui de la cible est conservé."""
-        target = _insert_publication(sa_sync_conn, title="Target", doi="10.1234/target")
-        source = _insert_publication(sa_sync_conn, title="Source", doi="10.1234/source")
-
-        merge_publications(target, source, repo=repo)
-
-        doi = sa_sync_conn.execute(
-            text("SELECT doi FROM publications WHERE id = :id"), {"id": target}
-        ).scalar_one()
-        assert doi == "10.1234/target"
 
     def test_oa_status_upgrade_diamond_wins(self, sa_sync_conn, repo):
         """Si source est diamond, la cible devient diamond même si elle avait gold."""

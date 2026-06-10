@@ -15,6 +15,7 @@ import pytest
 
 from application.pipeline.publications import merge_by_key
 from application.pipeline.publications.merge_by_key import merge_publications_by_key
+from domain.errors import DistinctDoiError
 
 
 class _FakeNested:
@@ -191,6 +192,46 @@ def test_merge_failure_increments_errors_and_continues(captured, logger):
     assert captured["refresh_calls"] == [10, 10]
     # Savepoint rollbacked pour l'échec.
     assert any(n.rolled_back for n in conn.nested_calls)
+
+
+# ── Garde « DOI distincts » : skip, pas erreur ───────────────────
+
+
+def test_distinct_doi_is_skipped_not_errored(captured, logger):
+    """Une fusion bloquée par `DistinctDoiError` est ignorée : ni mergée, ni
+    comptée en erreur, et la source n'est pas redirigée."""
+    conn = _FakeConn()
+    repo = MagicMock()
+    captured["merge_raises"] = {30: DistinctDoiError(10, 30, "10.1/a", "10.2/b")}
+
+    merged, errors = merge_publications_by_key(
+        conn, [("key=X", [10, 20, 30, 40])], logger=logger, pub_repo=repo
+    )
+
+    # 30 ignorée (DOI distincts) : ni dans merged ni dans errors. 20 et 40 mergées.
+    assert (merged, errors) == (2, 0)
+    assert captured["merge_calls"] == [(10, 20), (10, 30), (10, 40)]
+    assert captured["refresh_calls"] == [10, 10]  # pas de refresh pour 30
+    assert any(n.rolled_back for n in conn.nested_calls)
+
+
+def test_distinct_doi_skip_does_not_redirect_source(captured, logger):
+    """La source ignorée pour DOI distincts reste vivante : un groupe ultérieur
+    qui la contient ne la redirige pas vers la cible refusée."""
+    conn = _FakeConn()
+    repo = MagicMock()
+    captured["merge_raises"] = {99: DistinctDoiError(10, 99, "10.1/a", "10.2/b")}
+
+    # Groupe 1 : 10 + 99 → refus (DOI distincts), pas de redirect de 99.
+    # Groupe 2 : 99 + 5 → resolve(99)=99 (non redirigé) → target=5, source=99
+    # (et non (5, 10)). 99 relève donc à nouveau → re-skip.
+    merged, errors = merge_publications_by_key(
+        conn, [("k1", [10, 99]), ("k2", [99, 5])], logger=logger, pub_repo=repo
+    )
+
+    assert (merged, errors) == (0, 0)
+    # (5, 99) et non (5, 10) : 99 n'a pas été redirigé vers 10.
+    assert captured["merge_calls"] == [(10, 99), (5, 99)]
 
 
 # ── Résolution des redirections cross-groupes ────────────────────
