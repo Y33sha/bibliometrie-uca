@@ -6,8 +6,10 @@ colonnes `*_normalized` est exclue. La décision retenue est d'aligner SQL sur
 Python (décompositions NFKD côté SQL via PL/pgSQL).
 
 Migration `b2d4e7a1c8f3` aligne SQL pour : chiffres exposants/indices,
-superscript-minus, fractions vulgaires. Ce fichier est le filet de
-non-régression : tout cas qui se remet à diverger échoue ici.
+superscript-minus, fractions vulgaires. Migration `e2c7a9f4b1d6` aligne pour :
+lettres latines autonomes (déjà gérées par unaccent), fractions désormais
+**espacées** (`¼` → `1 4`), `İ` turc, exposant moins → espace. Ce fichier est le
+filet de non-régression : tout cas qui se remet à diverger échoue ici.
 """
 
 from __future__ import annotations
@@ -52,6 +54,14 @@ ALIGNED = [
     pytest.param("½ litre", id="vulgar-fraction-half"),
     pytest.param("¼ tour", id="vulgar-fraction-quarter"),
     pytest.param("⅔ majorité", id="vulgar-fraction-two-thirds"),
+    # Lettres latines autonomes (migration e2c7a9f4b1d6)
+    pytest.param("Meyerhofstraße", id="sharp-s"),
+    pytest.param("Øresund", id="o-stroke"),
+    pytest.param("Łódź", id="l-stroke"),
+    pytest.param("Đặng đại", id="d-stroke"),
+    pytest.param("Reykjavík þingvellir", id="thorn"),
+    pytest.param("Smørrebrød", id="eth-via-o-stroke"),
+    pytest.param("İstanbul", id="turkish-dotted-i"),
     # Retrait des balises MathML/HTML (migration c4f8a1e6b3d9)
     pytest.param("<i>foo</i>", id="tag-italic"),
     pytest.param("CaF<sub>2</sub> structure", id="tag-sub"),
