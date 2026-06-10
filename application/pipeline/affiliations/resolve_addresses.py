@@ -26,7 +26,7 @@ from application.ports.pipeline.address_resolution import (
     StructureNameForm,
 )
 
-BATCH_SIZE = 1000
+CHUNK_SIZE = 10000
 
 
 # ─── Matching ────────────────────────────────────────────────────
@@ -114,90 +114,76 @@ def run_resolution(
     queries: AddressResolutionQueries,
     perimeter_ids: set[int],
     logger: logging.Logger,
-    *,
-    mode: str = "full",
-    reset: bool = False,
-    rerun: bool = False,
 ) -> None:
-    """Exécute le pipeline de résolution. `conn` nécessaire pour commit batch."""
-    if reset or rerun:
-        affils = queries.reset_auto_detected(conn)
-        queries.reset_all_resolved_at(conn)
-        conn.commit()
-        logger.info(f"Reset : {affils} affiliations auto supprimées")
-        if reset and not rerun:
-            return
-
+    """Recalcul complet idempotent des affiliations. `conn` nécessaire pour commit batch."""
     logger.info("Chargement des structures et formes...")
     forms = queries.load_name_forms(conn)
     logger.info(f"  {len(forms)} formes chargées")
     matcher = AddressMatcher(forms)
     logger.info(f"  {len(perimeter_ids)} structures dans le périmètre")
 
-    incremental = mode == "daily"
-    if incremental:
-        logger.info("Mode incrémental : adresses non résolues uniquement")
-    rows = queries.fetch_addresses_to_resolve(conn, incremental=incremental)
-    total = len(rows)
-    logger.info(f"  {total} adresses à résoudre")
-
-    if total > 0:
-        process_addresses(conn, queries, rows, matcher, perimeter_ids, logger)
+    process_addresses(conn, queries, matcher, perimeter_ids, logger)
 
 
 def process_addresses(
     conn: Connection,
     queries: AddressResolutionQueries,
-    rows: list[tuple[int, str]],
     matcher: AddressMatcher,
     perimeter: set[int],
     logger: logging.Logger,
+    *,
+    chunk_size: int = CHUNK_SIZE,
 ) -> tuple[int, int]:
-    """Traite une liste d'adresses : détection + affiliations.
+    """Résout toutes les adresses par tranches (keyset) : matching mémoire + écritures en bloc.
 
-    `rows` fournit `(id, normalized_text)` : le texte est déjà normalisé en
-    base (colonne `addresses.normalized_text`), aucun recalcul ici.
+    Chaque tranche est lue (`normalized_text`, déjà normalisé en base — aucun
+    recalcul), matchée en mémoire, puis synchronisée en trois requêtes
+    ensemblistes (delete obsolètes / unflag / upsert idempotent des détections)
+    avant commit. Seules les détections qui changent sont écrites ; mémoire et
+    allers-retours SQL bornés par `chunk_size`.
     """
     t_start = time.perf_counter()
-    total = len(rows)
     processed = 0
     uca_count = 0
     affil_count = 0
     removed_count = 0
+    after_id = 0
 
-    for addr_id, normalized_text in rows:
-        matches = matcher.resolve(normalized_text)
+    while True:
+        rows = queries.fetch_addresses_chunk(conn, after_id=after_id, limit=chunk_size)
+        if not rows:
+            break
+        after_id = rows[-1][0]  # tranche triée par id
 
-        in_perimeter = any(sid in perimeter for sid, _ in matches)
-        if in_perimeter:
-            uca_count += 1
+        addr_ids: list[int] = []
+        detections: list[tuple[int, int, int]] = []
+        kept_pairs: list[tuple[int, int]] = []
+        for addr_id, normalized_text in rows:
+            addr_ids.append(addr_id)
+            matches = matcher.resolve(normalized_text)
+            if any(sid in perimeter for sid, _ in matches):
+                uca_count += 1
+            for structure_id, form_id in matches:
+                detections.append((addr_id, structure_id, form_id))
+                kept_pairs.append((addr_id, structure_id))
+                affil_count += 1
 
-        detected_structure_ids = [sid for sid, _ in matches]
+        removed_count += queries.delete_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
+        queries.unflag_obsolete_detections_bulk(conn, addr_ids, kept_pairs)
+        queries.upsert_detected_structures_bulk(conn, detections)
+        conn.commit()
 
-        removed_count += queries.delete_obsolete_detections(conn, addr_id, detected_structure_ids)
-        queries.unflag_obsolete_detections(conn, addr_id, detected_structure_ids)
-
-        for structure_id, form_id in matches:
-            affil_count += 1
-            queries.upsert_detected_structure(conn, addr_id, structure_id, form_id)
-
-        queries.mark_address_resolved(conn, addr_id)
-        processed += 1
-        if processed % BATCH_SIZE == 0:
-            conn.commit()
-            elapsed = time.perf_counter() - t_start
-            rate = processed / elapsed
-            logger.info(
-                f"  {processed}/{total} "
-                f"({uca_count} UCA, {affil_count} affiliations, "
-                f"{removed_count} obsolètes supprimés) "
-                f"— {rate:.0f} addr/s"
-            )
-
-    conn.commit()
+        processed += len(rows)
+        elapsed = time.perf_counter() - t_start
+        logger.info(
+            f"  {processed} traitées "
+            f"({uca_count} UCA, {affil_count} affiliations, "
+            f"{removed_count} obsolètes supprimés) "
+            f"— {processed / elapsed:.0f} addr/s"
+        )
 
     elapsed = time.perf_counter() - t_start
-    if total > 0:
+    if processed > 0:
         logger.info(f"\n=== Terminé en {elapsed:.1f}s ===")
         logger.info(f"  Adresses traitées    : {processed}")
         logger.info(f"  UCA                  : {uca_count} ({100 * uca_count / processed:.1f}%)")

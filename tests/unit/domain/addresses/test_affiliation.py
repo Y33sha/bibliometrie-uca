@@ -1,8 +1,6 @@
 """Tests de l'aggregate root ``AddressAffiliation`` + VO interne
 ``StructureLink`` (scaffolding Phase 1)."""
 
-from datetime import UTC, datetime
-
 import pytest
 
 from domain.addresses.address import Address
@@ -25,7 +23,6 @@ class TestAddressAffiliationConstruction:
         assert aff.id == 42
         assert aff.address.normalized_text == "université clermont auvergne"
         assert aff.countries == ()
-        assert aff.resolved_at is None
         assert aff.pub_count == 0
         assert aff.structure_links == ()
 
@@ -87,11 +84,3 @@ class TestRejectStructure:
         aff = _make()
         with pytest.raises(NotFoundError):
             aff.reject_structure(structure_id=99)
-
-
-class TestMarkResolved:
-    def test_sets_resolved_at(self):
-        aff = _make()
-        ts = datetime(2026, 5, 13, 12, 0, tzinfo=UTC)
-        aff.mark_resolved(at=ts)
-        assert aff.resolved_at == ts

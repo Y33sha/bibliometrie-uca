@@ -451,7 +451,6 @@ addresses = Table(
     Column("pub_count", Integer, server_default="0"),
     Column("countries", ARRAY(CHAR(2))),
     Column("suggested_countries", ARRAY(CHAR(2))),
-    Column("resolved_at", DateTime(timezone=True)),
     # Index UNIQUE sur expression md5(raw_text) — complété à la main, hors
     # de portée de --autogenerate qui ne sait pas représenter l'expression.
     Index("addresses_raw_text_key", text("md5(raw_text)"), unique=True),
