@@ -7,7 +7,7 @@ from sqlalchemy import Connection, Row, text
 
 from infrastructure.queries.api.stats._shared import stats_apc_clause
 from infrastructure.queries.filters import (
-    PUB_IS_UCA,
+    PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     assemble_where,
     lab_clause,
@@ -17,7 +17,7 @@ from infrastructure.queries.filters import (
 
 _BASE_CLAUSES = " AND ".join(
     [
-        PUB_IS_UCA,
+        PUBLICATION_IS_IN_PERIMETER,
         "p.doc_type IN ('article', 'review')",
         "(j.oa_model IS DISTINCT FROM 'repository')",
     ]
@@ -201,7 +201,7 @@ def stats_summary(
 
 _AVAILABLE_YEARS_SQL = f"""
     SELECT DISTINCT pub_year FROM publications p
-    WHERE {PUB_IS_UCA} AND pub_year IS NOT NULL
+    WHERE {PUBLICATION_IS_IN_PERIMETER} AND pub_year IS NOT NULL
     ORDER BY pub_year DESC
 """
 

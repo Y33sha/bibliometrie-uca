@@ -10,7 +10,7 @@ from infrastructure.queries.api.stats._shared import (
     stats_apc_clause,
 )
 from infrastructure.queries.filters import (
-    PUB_IS_UCA,
+    PUBLICATION_IS_IN_PERIMETER,
     assemble_where,
     lab_clause,
     oa_clause,
@@ -44,7 +44,7 @@ def _build_journal_stats_sql(
     offset = (page - 1) * per_page
     static_clauses = " AND ".join(
         [
-            PUB_IS_UCA,
+            PUBLICATION_IS_IN_PERIMETER,
             "j.id IS NOT NULL",
             "p.doc_type IN ('article', 'review')",
             "j.oa_model IS DISTINCT FROM 'repository'",

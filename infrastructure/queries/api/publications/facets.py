@@ -15,7 +15,7 @@ from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.queries.filters import (
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
-    PUB_IS_UCA,
+    PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     access_clause,
     apc_clause,
@@ -72,7 +72,7 @@ class _PublicationFacetsBuilder:
             out.append(WhereClause(f"p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}", {}))
             out.append(person_clause(f.person_id))
         else:
-            out.append(WhereClause(PUB_IS_UCA, {}))
+            out.append(WhereClause(PUBLICATION_IS_IN_PERIMETER, {}))
         out.append(excluded_doc_type_clause(f.excluded_types))
         return out
 

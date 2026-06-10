@@ -14,7 +14,7 @@ from domain.normalize import normalize_text, strip_markup
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.queries.filters import (
     OA_OPEN_STATUSES,
-    PUB_IS_UCA,
+    PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     access_clause,
     apc_clause,
@@ -46,7 +46,7 @@ def _initial_clauses(filters: ListFilters) -> list[WhereClause]:
         return [person_clause(filters.person_id)]
     if filters.lab_ids:
         return []
-    return [WhereClause(PUB_IS_UCA, {})]
+    return [WhereClause(PUBLICATION_IS_IN_PERIMETER, {})]
 
 
 def _search_clause(search: str) -> WhereClause | None:
