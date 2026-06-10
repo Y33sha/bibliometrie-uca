@@ -424,6 +424,8 @@ def phase_publications(**kw: Any) -> Any:
     _run_match_or_create_publications()
     _run_merge_pubs_by_hal_id()
     _run_merge_pubs_by_nnt()
+    _run_merge_pubs_by_doi()
+    _run_merge_pubs_by_pmid()
     # `addresses.pub_count` compte les publications par adresse : recalcul ici,
     # une fois les publications créées et fusionnées — il n'y a rien à compter
     # au stade `normalize`. Un run `--only publications` suffit à le tenir à jour.
@@ -658,6 +660,38 @@ def _run_merge_pubs_by_hal_id() -> None:
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
+
+
+def _run_merge_pubs_by_doi() -> None:
+    from application.pipeline.publications.merge_pubs_by_doi import run_merge
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.merge import PgMergeQueries
+    from infrastructure.repositories import publication_repository
+
+    log.info("▶ merge_pubs_by_doi")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run_merge(conn, PgMergeQueries(), log, pub_repo=publication_repository(conn))
+    finally:
+        conn.close()
+    log.info("✓ merge_pubs_by_doi terminé en %.1fs", time.time() - t0)
+
+
+def _run_merge_pubs_by_pmid() -> None:
+    from application.pipeline.publications.merge_pubs_by_pmid import run_merge
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.merge import PgMergeQueries
+    from infrastructure.repositories import publication_repository
+
+    log.info("▶ merge_pubs_by_pmid")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run_merge(conn, PgMergeQueries(), log, pub_repo=publication_repository(conn))
+    finally:
+        conn.close()
+    log.info("✓ merge_pubs_by_pmid terminé en %.1fs", time.time() - t0)
 
 
 def _run_normalize_hal() -> None:

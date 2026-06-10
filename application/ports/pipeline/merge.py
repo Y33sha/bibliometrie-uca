@@ -16,6 +16,24 @@ class NntDuplicateRow(NamedTuple):
     sources: list[str]
 
 
+class PmidDuplicateRow(NamedTuple):
+    """Doublon par PMID : groupe de publications partageant un même PMID cross-source."""
+
+    pmid: str
+    pub_ids: list[int]
+    sources: list[str]
+
+
+class DoiDuplicateRow(NamedTuple):
+    """Doublon par DOI : groupe de publications partageant un même `lower(doi)`.
+
+    Le DOI vit sur la colonne `publications.doi` (pas dans `external_ids`), d'où
+    l'absence de `sources` (information portée par les `source_publications`)."""
+
+    doi: str
+    pub_ids: list[int]
+
+
 class OaScanrHalRow(NamedTuple):
     """`source_publications` OpenAlex/ScanR avec ≥1 `external_ids.hal_id` (liste)."""
 
@@ -35,9 +53,13 @@ class HalSourceRow(NamedTuple):
 
 
 class MergeQueries(Protocol):
-    """Opérations SQL pour les scripts de fusion par NNT / hal_id."""
+    """Opérations SQL pour les scripts de fusion par NNT / PMID / DOI / hal_id."""
 
     def find_nnt_duplicates(self, conn: Connection) -> list[NntDuplicateRow]: ...
+
+    def find_pmid_duplicates(self, conn: Connection) -> list[PmidDuplicateRow]: ...
+
+    def find_doi_duplicates(self, conn: Connection) -> list[DoiDuplicateRow]: ...
 
     def fetch_source_publications_with_hal_external_id(
         self, conn: Connection
