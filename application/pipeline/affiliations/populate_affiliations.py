@@ -16,28 +16,6 @@ import time
 from sqlalchemy import Connection
 
 from application.ports.pipeline.affiliations import AffiliationsQueries
-from domain.sources.registry import ALL_SOURCES
-
-
-def _step_address_source(
-    conn: Connection,
-    queries: AffiliationsQueries,
-    logger: logging.Logger,
-    source: str,
-    perimeter_ids: set[int],
-    daily: bool = False,
-) -> None:
-    """Étape : source avec adresses — (re)poser in_perimeter."""
-    label = source.capitalize() if source != "openalex" else "OA"
-
-    if not daily:
-        n = queries.reset_source_authorships_for(conn, source)
-        logger.info(f"  {label} reset : {n} authorships")
-
-    n = queries.set_in_perimeter_from_addresses(
-        conn, source=source, perimeter_ids=list(perimeter_ids), daily=daily
-    )
-    logger.info(f"  {label} in_perimeter = TRUE : {n} authorships")
 
 
 def show_stats(conn: Connection, queries: AffiliationsQueries, logger: logging.Logger) -> None:
@@ -60,33 +38,28 @@ def run_populate(
     queries: AffiliationsQueries,
     logger: logging.Logger,
     perimeter_ids: set[int],
-    *,
-    mode: str = "full",
 ) -> None:
-    """Phase source-agnostique : traite toutes les sources systématiquement.
+    """Aligne `in_perimeter` de toutes les sources, dérivé de la matview.
 
-    `resolve_addresses` (en amont) résout les adresses indépendamment des
-    sources, donc cette propagation doit l'être aussi — sinon les
-    `source_authorships` d'une source non listée restent bloquées sans
-    `in_perimeter` malgré une adresse résolue.
+    1. Refresh de `source_authorship_structures` (le JOIN adresses⋈structures sur
+       le périmètre d'affiliation), en amont du refresh de `authorship_structures`
+       (phase authorships).
+    2. Sync source-agnostique de `in_perimeter` depuis cette matview, filtrée au
+       périmètre restreint. Idempotent : un run qui ne change rien n'écrit rien.
+
+    Source-agnostique par construction : `resolve_addresses` résout les adresses
+    indépendamment des sources, donc la propagation l'est aussi (sinon des
+    `source_authorships` resteraient bloquées sans `in_perimeter` malgré une
+    adresse résolue).
     """
-    daily = mode == "daily"
-
     t0 = time.perf_counter()
-
     logger.info(f"Périmètre restreint : {len(perimeter_ids)} structures")
-    if daily:
-        logger.info("Mode daily : traitement des authorships récentes uniquement")
 
-    for source in ALL_SOURCES:
-        _step_address_source(conn, queries, logger, source, perimeter_ids, daily=daily)
-
-    # `source_authorship_structures` est une matview globale (périmètre
-    # d'affiliation) : un refresh unique après que toutes les sources ont
-    # réaligné leurs adresses/in_perimeter, en amont du refresh de
-    # `authorship_structures` (phase authorships).
     logger.info("Refresh matview source_authorship_structures...")
     queries.refresh_source_authorship_structures(conn)
+
+    added, removed = queries.sync_in_perimeter(conn, perimeter_ids=list(perimeter_ids))
+    logger.info(f"in_perimeter : +{added} / -{removed}")
 
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")
