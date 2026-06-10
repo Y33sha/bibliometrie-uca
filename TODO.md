@@ -1,23 +1,24 @@
 # A régler avant transmission
 ## Pipeline de traitement
-* [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / pipeline:   51/181... (51 mis à jour, 0 déjà complets) => toujours 0 déjà complet: calculé comment? / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => pourquoi "rattachement" en phase normalize? / "Recherche des works OpenAlex avec primary_location HAL..." => log obsolète
+* [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / pipeline:   51/181... (51 mis à jour, 0 déjà complets) => toujours 0 déjà complet: calculé comment? / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => pourquoi "rattachement" en phase normalize?
 ### Extraction
 * [ ] gérer les 429 répétés => skipper entièrement une phase
 * [ ] extraction par ORCID: vérifier pertinence/faisabilité (quelles sources?)
 * [ ] Paralléliser cross-imports entre eux
-* [ ] "Recherche des works OpenAlex avec primary_location HAL" => étendre à toutes les locations
 * [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples) (compliqué; auditer d'abord pour voir si ça touche bcp de docts)
 ### Normalisation
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur / ou juste supprimer le hal_person_id partout par précaution?
 ### Suite du traitement
 * [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? => dirty-set via addresses.updated_at + sa.created_at
+* [ ] idem affiliations: rendre cette phase totalement incrémentale (avec hooks admin) au lieu de tout recalculer à chaque run
 * [ ] phase persons: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 person_id)
 ## Code
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
 * [ ] chantier observabilité pipeline: quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de snapshot; c'est un problème. => faire des snapshots par phase, pas par pipeline
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] DRY upsert_source_publication? (au lieu d'une fonction par source)
+* [ ] Audit complet "nommage des variables". S'assurer que le code est structure-agnostique. Eviter abréviations (publication > publi > pub...). Revoir certains noms trop restrictifs (publication->document? journal->container?)
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi
@@ -45,6 +46,7 @@
 ## Admin
 * [ ] interface pour consulter l'audit trail
 * [ ] comportement capricieux de l'UI sur la page countries (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine.
+* [ ] structures: name forms: is_word_boundary devrait être false si contient séparateur de mot, même si nb cars `<` 6
 ### Personnes (admin)
 * [ ] quoi faire des entités aberrantes (auteurs mal parsés)? a minima, s'assurer qu'elles n'apparaissent pas dans orphan-authorships
 * [ ] date de dernière publication UCA? (permet de filtrer les auteurs "legacy" vs actifs)
@@ -55,15 +57,15 @@
 ### Publications
 * [ ] Filtres supplémentaires possibles: langue; has_doi; corresponding_is_in_perimeter; peer_reviewed? (suppose de posséder la donnée ou de pouvoir la déduire des sources);
 * [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
-* [ ] afficher mémoires master et thèses en cours sur liste publications de la page personnes/id
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses? (où se trouve la métadonnée établissement?)
 * [ ] colonne éditeur, filtres éditeur + revue?
 ## Détails d'affichage
 * [ ] décomptes sur les onglets: incohérents (cf nb revues par éditeur): supprimer ou corriger?
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
 * [ ] lien dashboard => publications: il faut que toutes les facettes actives soient affichées!
-* [ ] dashboard éditeur / revue: graphiques
+* [ ] dashboard éditeur/revue: graphiques
 * [ ] ajouter facettes sur dashboards?
+* [ ] double scroll dans admin/addresses: chiant
 
 # Cas particuliers, bizarreries à élucider
 * openalex répète des auteurs : publi 77832
