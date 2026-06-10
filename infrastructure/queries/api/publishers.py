@@ -19,6 +19,7 @@ from application.ports.api.publishers_queries import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.normalize import normalize_text
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from infrastructure.db.tables import publishers as t_publishers
 
@@ -323,13 +324,14 @@ class PgPublisherQueries(PublisherQueries):
         plusieurs rows par (pub_id, subject_id) (sources différentes).
         """
         rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS n
                 FROM publication_subjects ps
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN journals j ON j.id = p.journal_id
                 JOIN subjects s ON s.id = ps.subject_id
                 WHERE j.publisher_id = :id
+                  AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
                   AND s.usage_count <= 5000
                 GROUP BY s.id, s.label, s.ontologies
                 ORDER BY n DESC, lower(s.label)

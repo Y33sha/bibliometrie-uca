@@ -29,6 +29,7 @@ from domain.journals.journal import (
     OA_MODELS,
 )
 from domain.normalize import normalize_text
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.db.tables import journals as t_journals
 from infrastructure.sources.doaj import resolve_doaj_url
 
@@ -386,12 +387,13 @@ class PgJournalQueries(JournalQueries):
         peut avoir plusieurs rows par (pub_id, subject_id) (sources différentes).
         """
         rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT s.id, s.label, s.ontologies, COUNT(DISTINCT p.id) AS n
                 FROM publication_subjects ps
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN subjects s ON s.id = ps.subject_id
                 WHERE p.journal_id = :id
+                  AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
                   AND s.usage_count <= 5000
                 GROUP BY s.id, s.label, s.ontologies
                 ORDER BY n DESC, lower(s.label)

@@ -28,19 +28,11 @@ from application.ports.api.laboratories_queries import (
     LabTutelle,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.queries.filters import OA_CLOSED_SQL
 from infrastructure.queries.perimeter import (
     get_persons_perimeter_root_ids,
     get_persons_structure_ids_list,
-)
-
-# Filtre étendu pour les stats de contribution effective d'un labo :
-# OUT_OF_SCOPE (peer_review, memoir) + ongoing_thesis (les thèses en
-# cours ne comptent pas comme contribution finalisée).
-_DOC_TYPES_EXCLUDED_FROM_LAB_CONTRIBUTIONS = sorted(OUT_OF_SCOPE_DOC_TYPES | {"ongoing_thesis"})
-_DOC_TYPES_EXCLUDED_FROM_LAB_CONTRIBUTIONS_SQL = (
-    "(" + ", ".join(f"'{t}'" for t in _DOC_TYPES_EXCLUDED_FROM_LAB_CONTRIBUTIONS) + ")"
 )
 
 
@@ -220,9 +212,8 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
     def get_laboratory_subjects(self, lab_id: int, *, limit: int = 30) -> list[SubjectFrequency]:
         """Top sujets des publications d'un labo, ordonnés par fréquence locale.
 
-        Filtre `peer_review`, `memoir`, `ongoing_thesis` pour rester cohérent
-        avec ce qui est affiché dans l'onglet "Publications" de la page labo, et
-        exclut les sujets trop génériques (`subjects.usage_count` > 5000).
+        Filtre le scope (`peer_review`, `memoir`) et exclut les sujets trop
+        génériques (`subjects.usage_count` > 5000).
         """
         # EXISTS plutôt que JOIN authorships : chaque publi apparaît une fois,
         # plutôt que dupliquée par auteur du labo. Le COUNT(DISTINCT p.id) reste
@@ -234,7 +225,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
                 FROM publication_subjects ps
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN subjects s ON s.id = ps.subject_id
-                WHERE p.doc_type NOT IN {_DOC_TYPES_EXCLUDED_FROM_LAB_CONTRIBUTIONS_SQL}
+                WHERE p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
                   AND s.usage_count <= 5000
                   AND EXISTS (
                       SELECT 1 FROM authorships a

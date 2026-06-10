@@ -271,36 +271,43 @@ class TestGetLaboratorySubjects:
         assert res[1].label == "Biology"
         assert res[1].count == 1
 
-    def test_excludes_peer_review_memoir_ongoing_thesis(self, sa_sync_conn):
+    def test_excludes_out_of_scope_but_keeps_ongoing_thesis(self, sa_sync_conn):
+        """Scope seul : `peer_review`/`memoir` exclus, mais une thèse en cours
+        (doc_type actif) contribue bien aux sujets du labo."""
         lab = _create_structure(sa_sync_conn, "L1")
         _setup_perimeter(sa_sync_conn, [lab])
 
-        # Publi peer_review : doit être exclue.
-        excluded_pub = sa_sync_conn.execute(
-            text(
-                "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
-                "VALUES ('X', 'x', 2024, CAST('peer_review' AS doc_type)) RETURNING id"
+        # peer_review → hors-scope (exclu) ; ongoing_thesis → actif (gardé).
+        for doc_type, label in (("peer_review", "X"), ("ongoing_thesis", "Y")):
+            pub = sa_sync_conn.execute(
+                text(
+                    "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
+                    "VALUES ('T', 't', 2024, CAST(:dt AS doc_type)) RETURNING id"
+                ),
+                {"dt": doc_type},
+            ).scalar_one()
+            aid = sa_sync_conn.execute(
+                text(
+                    "INSERT INTO authorships (publication_id, in_perimeter, roles) "
+                    "VALUES (:p, TRUE, ARRAY['author']::text[]) RETURNING id"
+                ),
+                {"p": pub},
+            ).scalar_one()
+            add_authorship_structure(sa_sync_conn, aid, lab)
+            sid = sa_sync_conn.execute(
+                text(
+                    "INSERT INTO subjects (label, ontologies, usage_count) "
+                    "VALUES (:l, :o, 1) RETURNING id"
+                ),
+                {"l": label, "o": json.dumps({})},
+            ).scalar_one()
+            sa_sync_conn.execute(
+                text(
+                    "INSERT INTO publication_subjects (publication_id, subject_id, source) "
+                    "VALUES (:p, :s, 'hal')"
+                ),
+                {"p": pub, "s": sid},
             )
-        ).scalar_one()
-        aid = sa_sync_conn.execute(
-            text(
-                "INSERT INTO authorships (publication_id, in_perimeter, roles) "
-                "VALUES (:p, TRUE, ARRAY['author']::text[]) RETURNING id"
-            ),
-            {"p": excluded_pub},
-        ).scalar_one()
-        add_authorship_structure(sa_sync_conn, aid, lab)
-        sid = sa_sync_conn.execute(
-            text("INSERT INTO subjects (label, ontologies) VALUES ('X', :o) RETURNING id"),
-            {"o": json.dumps({})},
-        ).scalar_one()
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-                "VALUES (:p, :s, 'hal')"
-            ),
-            {"p": excluded_pub, "s": sid},
-        )
 
         res = PgLaboratoriesQueries(sa_sync_conn).get_laboratory_subjects(lab, limit=10)
-        assert res == []
+        assert [r.label for r in res] == ["Y"]
