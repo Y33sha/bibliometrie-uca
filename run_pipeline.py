@@ -427,6 +427,7 @@ def phase_publications(**kw: Any) -> Any:
     _run_merge_pubs_by_nnt()
     _run_merge_pubs_by_doi()
     _run_merge_pubs_by_pmid()
+    _run_merge_pubs_by_metadata()
     # `addresses.pub_count` compte les publications par adresse : recalcul ici,
     # une fois les publications créées et fusionnées — il n'y a rien à compter
     # au stade `normalize`. Un run `--only publications` suffit à le tenir à jour.
@@ -661,6 +662,22 @@ def _run_merge_pubs_by_hal_id() -> None:
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
+
+
+def _run_merge_pubs_by_metadata() -> None:
+    from application.pipeline.publications.merge_pubs_by_metadata import run_merge
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.metadata_merge import PgMetadataMergeQueries
+    from infrastructure.repositories import publication_repository
+
+    log.info("▶ merge_pubs_by_metadata")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run_merge(conn, PgMetadataMergeQueries(), log, pub_repo=publication_repository(conn))
+    finally:
+        conn.close()
+    log.info("✓ merge_pubs_by_metadata terminé en %.1fs", time.time() - t0)
 
 
 def _run_mark_distinct_publications() -> None:
