@@ -420,7 +420,7 @@ def phase_publications(**kw: Any) -> Any:
     Prerequis : la phase `zenodo_concept` (en amont) a resolu les concept DOI
     Zenodo sur lesquels porte la dedup concept/version.
     """
-    _run_match_or_create_publications()
+    _run_create_publications()
     _run_mark_distinct_publications()
     _run_merge_pubs_by_hal_id()
     _run_merge_pubs_by_nnt()
@@ -515,28 +515,28 @@ def _run_resolve_zenodo_concept() -> None:
     log.info("✓ resolve_zenodo_concept terminé en %.1fs", time.time() - t0)
 
 
-def _run_match_or_create_publications() -> None:
-    from application.pipeline.publications.match_or_create_publications import run
+def _run_create_publications() -> None:
+    from application.pipeline.publications.create_publications import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.publications_match_or_create import (
-        PgPublicationsMatchOrCreateQueries,
+    from infrastructure.queries.pipeline.publications_create import (
+        PgPublicationsCreateQueries,
     )
     from infrastructure.repositories import audit_repository, publication_repository
 
-    log.info("▶ match_or_create_publications")
+    log.info("▶ create_publications")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
         run(
             conn,
-            PgPublicationsMatchOrCreateQueries(),
+            PgPublicationsCreateQueries(),
             log,
             pub_repo=publication_repository(conn),
             audit_repo=audit_repository(conn),
         )
     finally:
         conn.close()
-    log.info("✓ match_or_create_publications terminé en %.1fs", time.time() - t0)
+    log.info("✓ create_publications terminé en %.1fs", time.time() - t0)
 
 
 def _run_create_persons() -> None:

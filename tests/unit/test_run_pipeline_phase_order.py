@@ -20,7 +20,7 @@ def test_recompute_addresses_runs_in_publications_not_normalize():
         patch.object(run_pipeline, "_run_normalize_openalex"),
         patch.object(run_pipeline, "_run_normalize_wos"),
         patch.object(run_pipeline, "_vacuum_staging"),
-        patch.object(run_pipeline, "_run_match_or_create_publications"),
+        patch.object(run_pipeline, "_run_create_publications"),
         patch.object(run_pipeline, "_run_mark_distinct_publications"),
         patch.object(run_pipeline, "_run_merge_pubs_by_hal_id"),
         patch.object(run_pipeline, "_run_merge_pubs_by_nnt"),

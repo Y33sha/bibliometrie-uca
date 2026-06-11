@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `infrastructure.queries.pipeline.publications_match_or_create`.
+"""Tests d'intégration pour `infrastructure.queries.pipeline.publications_create`.
 
 Couvre la requête de création (tous les orphelins) et le contrat de
 **staleness** : une `source_publications` modifiée après le dernier refresh
@@ -8,7 +8,7 @@ ré-agrège (non-régression du bug oa_status faussement figé du 2026-05-28).
 
 from sqlalchemy import text
 
-from infrastructure.queries.pipeline.publications_match_or_create import (
+from infrastructure.queries.pipeline.publications_create import (
     fetch_orphan_source_publications,
     fetch_stale_publication_ids,
 )

@@ -11,8 +11,8 @@ import logging
 from sqlalchemy import Connection
 
 from application.pipeline.publications import (
+    create_publications,
     mark_distinct_publications,
-    match_or_create_publications,
     merge_pubs_by_doi,
     merge_pubs_by_hal_id,
     merge_pubs_by_metadata,
@@ -22,8 +22,8 @@ from application.pipeline.publications import (
 from infrastructure.queries.pipeline.distinct_publications import PgDistinctPublicationsQueries
 from infrastructure.queries.pipeline.merge import PgMergeQueries
 from infrastructure.queries.pipeline.metadata_merge import PgMetadataMergeQueries
-from infrastructure.queries.pipeline.publications_match_or_create import (
-    PgPublicationsMatchOrCreateQueries,
+from infrastructure.queries.pipeline.publications_create import (
+    PgPublicationsCreateQueries,
 )
 from infrastructure.repositories import publication_repository
 
@@ -39,9 +39,9 @@ def create_all_publications(conn: Connection) -> None:
     au téardown, on ne doit donc rien committer.
     """
     repo = publication_repository(conn)
-    mc_queries = PgPublicationsMatchOrCreateQueries()
+    mc_queries = PgPublicationsCreateQueries()
     for doc in mc_queries.fetch_orphan_source_publications(conn):
-        match_or_create_publications.process_document(
+        create_publications.process_document(
             conn, mc_queries, doc, dry_run=False, pub_repo=repo
         )
 
