@@ -1,8 +1,23 @@
 # Chantier — Fusions abusives de documents distincts par les sources
 
+Commencé le 2026-06-09 — clos le 2026-06-11.
+
+## Clôture
+
+Résolu pour l'essentiel par le pivot **création⇒fusion** ([2026-06-11_DATA_publications-creation-fusion](2026-06-11_DATA_publications-creation-fusion.md)), qui a absorbé le volet anti-fusion :
+
+- **Ouvrage↔chapitres** et **thèse↔article (en paire)** : `detect_distinct_case` (`domain/publications/distinct_publications.py` — `OUVRAGE_VS_CHAPITRE`, `CHAPITRES_TITRES_DIFFERENTS`, `THESE_VS_ARTICLE`) + passe `mark_distinct_publications` ; les passes de fusion interrogent `distinct_publications`. L'angle mort **bulk DOI** (`bulk_link_orphans_by_doi`) a disparu — une publication par `source_publication`, le dédoublonnage passe par les fusions pub↔pub gardées.
+- **`distinct_publications`** est devenue la garde **uniforme pub↔pub**, consultée par le pipeline (plus seulement l'API), et **repointée** du perdant vers le gagnant à la fusion (au lieu d'être supprimée) — une distinction survit donc à l'absorption d'une de ses publications.
+- **`DUMAS (dumas.ccsd) ⇒ mémoire`** (l'aval) : règle dure URL-only rétablie (`DUMAS_URL_TO_MEMOIR`, inconditionnelle sur le `doc_type` brut), rattrapage du stock par `interfaces/cli/oneshot/refresh_publications_with_dumas_url.py`.
+
+Différé / non bloquant :
+
+- **Fusion abusive dans une seule `source_publication` OpenAlex** (cas b1/b2 ci-dessous) : **bénin**. La thèse (SP theses.fr / NNT) et l'article (SP DOI crossref…) sont moissonnés séparément et existent déjà comme deux publications ; la SP OpenAlex se rattache à l'une — l'article si le DOI éditeur est sa *primary location*, sinon la thèse par NNT (auquel cas le DOI article se retrouve sur deux publications, corrigeable a posteriori). Pas de distinction perdue.
+- **Circuit d'override admin** (rendre une paire marquée re-fusionnable sur décision confirmée) : reporté à l'ouverture du chantier de déduplication admin manuelle.
+
 ## Contexte
 
-Le matching cross-source rattache des `source_publications` orphelines à une publication canonique via `decide_publication_match` ([`match_or_create_publications.py`](../../application/pipeline/publications/match_or_create_publications.py)) — cascade DOI → NNT → HAL_ID → titre/année (thèses, proceedings) — complétée par les passes bulk (Phase B : DOI, NNT, hal_id) et [`merge_pubs_by_hal_id.py`](../../application/pipeline/publications/merge_pubs_by_hal_id.py).
+Le matching cross-source rattache des `source_publications` orphelines à une publication canonique via `decide_publication_match` ([`match_or_create_publications.py`](../../../application/pipeline/publications/match_or_create_publications.py)) — cascade DOI → NNT → HAL_ID → titre/année (thèses, proceedings) — complétée par les passes bulk (Phase B : DOI, NNT, hal_id) et [`merge_pubs_by_hal_id.py`](../../../application/pipeline/publications/merge_pubs_by_hal_id.py).
 
 Problème **inverse de la déduplication** : ici une source (OpenAlex le plus souvent) **agrège en une seule œuvre deux documents réellement distincts**, et notre matching propage cette fusion en une seule `publication` canonique.
 
@@ -13,9 +28,9 @@ Problème **inverse de la déduplication** : ici une source (OpenAlex le plus so
 
 ### Ce qui résiste déjà / ce qui force la fusion
 
-`resolve_doi_conflict` ([`domain/publications/deduplication.py`](../../domain/publications/deduplication.py)) gère le conflit de DOI **dans le matching par document** : chapitre vs ouvrage → DOI retiré (pas de fusion) ; **deux chapitres aux titres différents → DOI invalidé des deux côtés, distinction préservée** ; sinon fusion.
+`resolve_doi_conflict` ([`domain/publications/deduplication.py`](../../../domain/publications/deduplication.py)) gère le conflit de DOI **dans le matching par document** : chapitre vs ouvrage → DOI retiré (pas de fusion) ; **deux chapitres aux titres différents → DOI invalidé des deux côtés, distinction préservée** ; sinon fusion.
 
-Mais cette exception ne joue **que dans le chemin par document**. La passe **bulk** `bulk_link_orphans_by_doi` (Phase B, [`infrastructure/queries/pipeline/publications_match_or_create.py`](../../infrastructure/queries/pipeline/publications_match_or_create.py)) rattache tout orphelin par **égalité de DOI brute** (`COALESCE(external_ids->>'zenodo_concept_doi', doi) = p.doi`), **sans** rejouer `resolve_doi_conflict` — donc sans l'exception chapitre/ouvrage/titre. C'est elle qui force ouvrage + chapitres sous une même publication via le DOI partagé du livre (vérifié sur 116652 : 3 enregistrements HAL `OUV`/`COUV` portant tous `10.4000/15s4x`).
+Mais cette exception ne joue **que dans le chemin par document**. La passe **bulk** `bulk_link_orphans_by_doi` (Phase B, [`infrastructure/queries/pipeline/publications_match_or_create.py`](../../../infrastructure/queries/pipeline/publications_match_or_create.py)) rattache tout orphelin par **égalité de DOI brute** (`COALESCE(external_ids->>'zenodo_concept_doi', doi) = p.doi`), **sans** rejouer `resolve_doi_conflict` — donc sans l'exception chapitre/ouvrage/titre. C'est elle qui force ouvrage + chapitres sous une même publication via le DOI partagé du livre (vérifié sur 116652 : 3 enregistrements HAL `OUV`/`COUV` portant tous `10.4000/15s4x`).
 
 ### État de `distinct_publications`
 
@@ -25,7 +40,7 @@ La garde est **« soft » par choix** : elle doit pouvoir être **outrepassée p
 
 ### Conséquence aval
 
-Tant que ces fusions ne sont pas défaites, la règle **`DUMAS (dumas.ccsd) => mémoire`** (url-only) ne peut pas s'appliquer proprement : elle forcerait un `doc_type` unique sur une entité qui mêle deux documents. Cette règle est donc **bloquée en amont par ce chantier** (cf. [METIER_doc-types](METIER_doc-types.md)).
+Tant que ces fusions ne sont pas défaites, la règle **`DUMAS (dumas.ccsd) => mémoire`** (url-only) ne peut pas s'appliquer proprement : elle forcerait un `doc_type` unique sur une entité qui mêle deux documents. Cette règle est donc **bloquée en amont par ce chantier** (cf. [METIER_doc-types](../METIER_doc-types.md)).
 
 ## Décisions
 
@@ -54,7 +69,7 @@ Tant que ces fusions ne sont pas défaites, la règle **`DUMAS (dumas.ccsd) => m
 
 ### 3. Aval — `DUMAS => mémoire`
 
-Une fois les fusions défaites (cf. [METIER_doc-types](METIER_doc-types.md)).
+Une fois les fusions défaites (cf. [METIER_doc-types](../METIER_doc-types.md)).
 
 ### Audit initial (2026-06-09)
 
@@ -83,6 +98,6 @@ Premier passage exploratoire (lecture seule, base de prod) — sert à figer les
 
 ## Liens
 
-- [METIER_doc-types](METIER_doc-types.md) — la règle `DUMAS => mémoire` dépend de ce chantier ; reste ouverte ensuite la distinction mémoire / thèse d'exercice (que DUMAS lui-même ne fait pas : la thèse d'exercice y est typée mémoire), pour l'instant « mémoire » pour tout.
-- [METIER_authorships-cross-source-matching](METIER_authorships-cross-source-matching.md) — problème connexe mais inverse (rattacher les authorships d'un *même* document).
-- État actuel : [`domain/publications/deduplication.py`](../../domain/publications/deduplication.py) (`resolve_doi_conflict`), [`application/pipeline/publications/match_or_create_publications.py`](../../application/pipeline/publications/match_or_create_publications.py) (`decide_publication_match` + Phase B), [`merge_pubs_by_hal_id.py`](../../application/pipeline/publications/merge_pubs_by_hal_id.py), [`application/publications.py`](../../application/publications.py) (`mark_distinct`, `merge_into`).
+- [METIER_doc-types](../METIER_doc-types.md) — la règle `DUMAS => mémoire` dépend de ce chantier ; reste ouverte ensuite la distinction mémoire / thèse d'exercice (que DUMAS lui-même ne fait pas : la thèse d'exercice y est typée mémoire), pour l'instant « mémoire » pour tout.
+- [METIER_authorships-cross-source-matching](../METIER_authorships-cross-source-matching.md) — problème connexe mais inverse (rattacher les authorships d'un *même* document).
+- État actuel : [`domain/publications/deduplication.py`](../../../domain/publications/deduplication.py) (`resolve_doi_conflict`), [`application/pipeline/publications/match_or_create_publications.py`](../../../application/pipeline/publications/match_or_create_publications.py) (`decide_publication_match` + Phase B), [`merge_pubs_by_hal_id.py`](../../../application/pipeline/publications/merge_pubs_by_hal_id.py), [`application/publications.py`](../../../application/publications.py) (`mark_distinct`, `merge_into`).
