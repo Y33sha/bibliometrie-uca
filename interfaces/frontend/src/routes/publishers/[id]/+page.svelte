@@ -125,7 +125,7 @@
 				</span>
 				{#if publisher.country}
 					<span class="meta-label">Pays</span>
-					<span class="type-tag">{publisher.country}</span>
+					<span class="type-tag">{publisher.country.toUpperCase()}</span>
 				{/if}
 				{#if publisher.openalex_id}
 					<span class="meta-label">OpenAlex</span>

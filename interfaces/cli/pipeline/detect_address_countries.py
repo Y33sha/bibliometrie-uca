@@ -130,7 +130,7 @@ def detect_countries(
         batch = matched[i : i + 5000]
         conn.execute(
             stmt,
-            [{"addr_id": addr_id, "val": [iso.lower()]} for addr_id, iso in batch],
+            [{"addr_id": addr_id, "val": [iso]} for addr_id, iso in batch],
         )
     conn.commit()
 

@@ -108,11 +108,12 @@ def fetch_publishers_batch(
 def extract_country_ror(source: dict) -> tuple[str | None, str | None]:
     """Extrait `(country, ror)` depuis la payload OpenAlex Publishers.
 
-    `country` = premier code de `country_codes` (vide → None).
+    `country` = premier code de `country_codes`, en minuscule (canonique ;
+    OpenAlex renvoie de la majuscule) (vide → None).
     `ror` = `ids.ror` parsé en short form (vide → None).
     """
     country_codes = source.get("country_codes") or []
-    country = country_codes[0] if country_codes else None
+    country = country_codes[0].lower() if country_codes else None
 
     ids = source.get("ids") or {}
     ror_url = ids.get("ror")

@@ -32,7 +32,7 @@
 		editModal = {
 			id: pub.id,
 			name: pub.name,
-			country: pub.country || '',
+			country: (pub.country || '').toUpperCase(),
 			is_predatory: pub.is_predatory,
 			publisher_type: pub.publisher_type,
 		};
