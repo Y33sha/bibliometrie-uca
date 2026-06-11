@@ -50,8 +50,8 @@ Lecture seule sur la base de prod, avant de figer le critère de génération.
 - [x] Casse canonicalisée en **minuscule** : `place_name_forms.iso_code` + `publishers.country` étaient les seuls outliers vs `countries.code` / `addresses.countries` / la cascade. Conversions retirées (`detect` n'a plus de `.lower()` par adresse ; OpenAlex enrich lowercase à l'entrée) ; affichage front en MAJ (présentation).
 - [ ] Marches suivantes (même méthode, expressions) : villes, codes postaux, autres formes d'universités (universidad / università / universität…).
 
-### 3. Détection par place names (logique pipeline)
-- [ ] Passe de détection via automate Aho-Corasick sur `place_name_forms` : place / institution → `countries` (n'importe où), nom de pays → `countries` (fin de segment).
+### 3. Détection des institutions (logique pipeline)
+- [x] Passe `detect_institution_countries` (automate Aho-Corasick sur `place_name_forms` `kind = 'institution'`, match au mot près n'importe où) → `countries` (autoritaire) quand toutes les institutions matchées s'accordent ; conflit (pays multiples) → ignoré, laissé à `suggest`. Câblée entre `detect_address_countries` (noms de pays, fin de segment) et `suggest`. Rendement mesuré : **12 297** adresses résolues (~6% des sans-pays), 72 conflits, 0,7s.
 
 ### 4. `suggest` recompute-all idempotent
 - [ ] Retirer `reset` / `reset_empty` ; le mode full recalcule toutes les cibles éligibles, écriture idempotente (deltas seulement).

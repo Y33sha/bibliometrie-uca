@@ -469,6 +469,7 @@ def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     """Detection des pays des adresses et recalcul sur les publications."""
     metrics = PhaseMetrics()
     metrics.merge(_run_detect_address_countries())
+    metrics.merge(_run_detect_institution_countries())
     metrics.merge(_run_suggest_address_countries(reset_empty=MODES[mode].reset_country_suggestions))
     _run_refresh_publication_countries()
     return metrics
@@ -1474,6 +1475,25 @@ def _run_detect_address_countries() -> PhaseMetrics:
         conn.close()
     log.info(
         "✓ detect_address_countries terminé en %.1fs — %s",
+        time.time() - t0,
+        metrics.as_summary(),
+    )
+    return metrics
+
+
+def _run_detect_institution_countries() -> PhaseMetrics:
+    from infrastructure.db.engine import get_sync_engine
+    from interfaces.cli.pipeline.detect_institution_countries import detect_institution_countries
+
+    log.info("▶ detect_institution_countries")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        metrics = detect_institution_countries(conn, direct=True)
+    finally:
+        conn.close()
+    log.info(
+        "✓ detect_institution_countries terminé en %.1fs — %s",
         time.time() - t0,
         metrics.as_summary(),
     )
