@@ -17,13 +17,14 @@ Usage:
 
 import argparse
 
-from sqlalchemy import Connection, bindparam, func, select, update
+from sqlalchemy import Connection, func, select
 
 from application.pipeline.countries.place_name_detector import PlaceNameDetector
 from application.pipeline.metrics import PhaseMetrics
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.tables import addresses, place_name_forms
 from infrastructure.observability.log import setup_logger
+from infrastructure.queries.pipeline.countries import write_suggested_countries
 
 logger = setup_logger("detect_institution_countries", "processing/logs")
 
@@ -70,15 +71,9 @@ def detect_institution_countries(conn: Connection, *, direct: bool = True) -> Ph
             conflicts += 1
     logger.info(f"Résolues : {len(matched)}, conflits (pays multiples, ignorés) : {conflicts}")
 
-    column = addresses.c.countries if direct else addresses.c.suggested_countries
-    stmt = (
-        update(addresses)
-        .where(addresses.c.id == bindparam("addr_id"))
-        .values({column: bindparam("val")})
+    write_suggested_countries(
+        conn, matched, target_column="countries" if direct else "suggested_countries"
     )
-    for i in range(0, len(matched), 5000):
-        batch = matched[i : i + 5000]
-        conn.execute(stmt, [{"addr_id": addr_id, "val": val} for addr_id, val in batch])
     conn.commit()
 
     return PhaseMetrics(total=len(rows), new=len(matched), extras={"conflicts": conflicts})
