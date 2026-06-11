@@ -40,24 +40,24 @@ Lecture seule sur la base de prod, avant de figer le critère de génération.
 
 ## Phasage
 
-### 1. Découverte des candidats villes
-- Requête de génération (lecture seule) : tokens des `addresses.normalized_text` ayant un pays, fréquence ≥ 10, un seul pays distinct associé. Sortie : `(token, iso_code, fréquence)` triée, pour mesurer le volume et alimenter la curation.
-- À décider sur pièces : granularité token seul vs expressions multi-mots (« clermont ferrand », « new york »).
+### 1. Schéma + bascule des consommateurs existants
+- [x] Migration `c3e9b1f7a4d2` : rename `country_name_forms` → `place_name_forms` (+ séquence, contraintes, index), colonne `kind` (`country` | `place`, défaut `country`). `tables.py`, `seed.sql`, `generate_seed` (spec + `kind`).
+- [x] Consommateurs existants câblés sur `place_name_forms` (`kind = 'country'`) : `detect_address_countries`, résolution nom-de-pays → ISO côté publishers (crossref enrich + audit oneshot).
 
-### 2. Curation
-- Tri manuel one-shot des candidats : ne garder que de vrais noms de lieux, assembler les expressions multi-mots si retenu.
+### 2. Découverte + seed (institutions = universités)
+- [x] Constat : les **tokens isolés** singleton-pays captent la **langue** (tout mot français → `fr` dans un corpus francophone), pas le lieu — abandonnés au profit d'**expressions**.
+- [x] Première marche : noms d'**universités**, n-grammes singleton-pays autour de « université » / « university » (`universite X`, `university of X`, `X university`, `X university hospital`), dédup suffixe (retire les fragments tronqués à gauche). 4405 expressions, 93 pays. Seedées `kind = 'institution'` via migration `b8e3a1f6d4c2` (SQL pur, reproductible).
+- [x] Casse canonicalisée en **minuscule** : `place_name_forms.iso_code` + `publishers.country` étaient les seuls outliers vs `countries.code` / `addresses.countries` / la cascade. Conversions retirées (`detect` n'a plus de `.lower()` par adresse ; OpenAlex enrich lowercase à l'entrée) ; affichage front en MAJ (présentation).
+- [ ] Marches suivantes (même méthode, expressions) : villes, codes postaux, autres formes d'universités (universidad / università / universität…).
 
-### 3. Schéma
-- Migration : renommer `country_name_forms` → `place_name_forms`, ajouter `kind` (défaut `country` pour l'existant), insérer les villes curées (`kind = city`). Mettre à jour `tables.py` + le snapshot.
+### 3. Détection par place names (logique pipeline)
+- [ ] Passe de détection via automate Aho-Corasick sur `place_name_forms` : place / institution → `countries` (n'importe où), nom de pays → `countries` (fin de segment).
 
-### 4. Détection par place names (logique pipeline)
-- Passe de détection via automate Aho-Corasick sur `place_name_forms` : pays → `countries`, ville → `suggested_countries`. S'intercale entre `detect` (segment) et `suggest` (flou) — ou les absorbe, à décider.
+### 4. `suggest` recompute-all idempotent
+- [ ] Retirer `reset` / `reset_empty` ; le mode full recalcule toutes les cibles éligibles, écriture idempotente (deltas seulement).
 
-### 5. `suggest` recompute-all idempotent
-- Retirer `reset` / `reset_empty` ; le mode full recalcule toutes les cibles éligibles, écriture idempotente (deltas seulement).
-
-### 6. `refresh_publication_countries` — performances
-- Instruire les options (différé).
+### 5. `refresh_publication_countries` — performances
+- [ ] Instruire les options (différé).
 
 ## Questions ouvertes
 

@@ -203,7 +203,7 @@
 					{#if p.is_predatory}<span class="badge-pred">prédateur</span>{/if}
 				</td>
 				<td class="muted">{publisherTypeLabel(p.publisher_type)}</td>
-				<td class="muted">{p.country ?? ''}</td>
+				<td class="muted">{p.country?.toUpperCase() ?? ''}</td>
 				<td class="prefixes">
 					{#each p.doi_prefixes as dp (dp.prefix)}
 						<span class="prefix-chip" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>

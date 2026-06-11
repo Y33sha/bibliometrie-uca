@@ -222,10 +222,12 @@ class PgPublisherQueries(PublisherQueries):
             """),
             binds_c,
         ).all()
-        # Pays : pas d'enum, on expose ce qui est observé (texte libre = code
-        # pays ISO en pratique). `label` = `value`.
+        # Pays : pas d'enum, on expose ce qui est observé (code pays ISO en
+        # pratique). `value` = code minuscule canonique (pour le filtre) ;
+        # `label` en majuscule (présentation).
         countries_facet = [
-            PublishersFacetOption(value=r.value, label=r.value, count=r.n) for r in country_rows
+            PublishersFacetOption(value=r.value, label=r.value.upper(), count=r.n)
+            for r in country_rows
         ]
 
         return PublishersFacetsResponse(
