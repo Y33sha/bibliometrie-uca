@@ -13,7 +13,7 @@ Pipeline d'extraction :
    `api.crossref.org/members/{id}`
 2. Parser `location` (texte libre style "Amsterdam, NX, Netherlands")
    → dernier élément = nom du pays
-3. Normaliser et chercher dans `country_name_forms` pour obtenir
+3. Normaliser et chercher dans `place_name_forms` pour obtenir
    l'ISO-2
 
 Ne fait AUCUNE écriture en base.
@@ -112,10 +112,10 @@ def main() -> int:
             return 0
 
         cnf_rows = conn.execute(
-            text("SELECT form_normalized, iso_code FROM country_name_forms")
+            text("SELECT form_normalized, iso_code FROM place_name_forms WHERE kind = 'country'")
         ).all()
         country_map: dict[str, str] = {r.form_normalized: r.iso_code for r in cnf_rows}
-        log.info("Mapping country_name_forms : %d formes connues", len(country_map))
+        log.info("Mapping noms de pays : %d formes connues", len(country_map))
 
         no_record = 0
         no_location = 0
@@ -156,7 +156,7 @@ def main() -> int:
         log.info("─" * 70)
         log.info("Bilan sur %d publishers candidats :", total)
         log.info("  mapped       : %d  (country posable via Crossref)", mapped)
-        log.info("  no_match     : %d  (pays brut non mappé dans country_name_forms)", no_match)
+        log.info("  no_match     : %d  (pays brut non mappé dans place_name_forms)", no_match)
         log.info("  no_location  : %d  (Crossref ne renvoie pas de location)", no_location)
         log.info("  no_record    : %d  (Crossref member 404 ou erreur)", no_record)
         log.info("─" * 70)
@@ -166,7 +166,7 @@ def main() -> int:
                 log.info("  %s  %d", iso, n)
         if unmatched_raw:
             log.info("─" * 70)
-            log.info("Top 10 pays bruts non mappés (= forme absente de country_name_forms) :")
+            log.info("Top 10 pays bruts non mappés (= forme absente de place_name_forms) :")
             for raw, n in unmatched_raw.most_common(10):
                 log.info("  %-40s %d", raw, n)
             log.info("Exemples no_match (publisher → location) :")
