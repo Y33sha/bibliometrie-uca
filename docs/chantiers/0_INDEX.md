@@ -4,7 +4,6 @@
 
 ### En cours
 
-- [Publications : matching par création⇒fusion + modélisation des identifiants](DATA_publications-creation-fusion.md)
 - [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
 
 ### En pause
@@ -22,6 +21,7 @@
 
 ## Chantiers archivés
 
+- 2026-06-11 — [Publications : matching par création⇒fusion + modélisation des identifiants](archived/2026-06-11_DATA_publications-creation-fusion.md)
 - 2026-06-09 — [Complétude des identifiants externes & clés de déduplication](archived/2026-06-09_METIER_completude-identifiants.md)
 - 2026-06-08 — [Export CSV fidèle à l'affichage (filtres + colonnes + titres nettoyés)](archived/2026-06-08_CODE_export-csv-fidele.md)
 - 2026-06-08 — [Peaufinage UI (cohérence, responsivité, ergonomie)](archived/2026-06-08_CODE_peaufinage-ui.md)

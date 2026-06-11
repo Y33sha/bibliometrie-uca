@@ -1,6 +1,6 @@
 # Chantier — Publications : matching par création⇒fusion + modélisation des identifiants
 
-Commencé le 2026-06-10
+Commencé le 2026-06-10 - terminé le 2026-06-11
 
 ## Contexte
 
@@ -45,10 +45,13 @@ Problèmes :
 - [x] Passes de fusion par **identifiant** : DOI / hal_id / nnt / pmid via `merge_publications_by_key`, gardées par `distinct_publications` (paires pré-marquées) **et** « DOI distincts ». hal_id/nnt existaient ; DOI + pmid ajoutées (la passe pmid corrige 85 doublons réels). Câblées en phase publications.
 - [x] Fusion par **métadonnées** (thèse, proceedings) : `merge_pubs_by_metadata` — paires au même `title_normalized` + `pub_year`, critères réutilisés (compat auteur primary thèse, nombre d'auteurs proceedings). Câblée après les fusions par identifiant.
 - [x] Création d'1 publication par `source_publication` (retrait du gate + matching + Phase B), `effective_metadata` à la création. La requête remonte tous les orphelins ; le dédoublonnage est délégué aux passes de fusion. Param `commit` sur les passes pour le helper de tests.
-- [ ] **Nettoyage** du code devenu mort par la bascule : `resolve_doi_conflict`, `decide_publication_match`, règles `metadata_deduplication_rules`, requêtes de critères du matching (`fetch_thesis_primary_author_from_source_publication`, `fetch_source_authorship_count`) + leurs tests.
+- [x] **Logique métier de dédup rapatriée dans `domain/publications/deduplication.py`** (`DeduplicationKey` + `MetadataDeduplicationCase` + `detect_metadata_merge_case` pure), importée par les passes (`merge_pubs_by_metadata` appelle la règle ; les passes par identifiant déclarent leur `DeduplicationKey`). Code mort retiré : `resolve_doi_conflict`, `decide_publication_match`, le module `metadata_deduplication_rules`, les finders inutilisés (`find_by_nnt`/`hal_id`/`pmid`, `find_thesis_by_title`, `find_proceedings_by_title_year`), les accesseurs DOI (`get_doi`/`set_doi`/`clear_doi`) + leurs tests. L'auto-fusion DOI au sein de `refresh_from_sources` (vestige de la contrainte UNIQUE) est retirée : le dédoublonnage DOI passe uniformément par `merge_pubs_by_doi` ; `find_by_doi` + `PubByDoi` supprimés en conséquence.
 
 ### Phase 4 — Consommateurs
-- [ ] Filtrer `in_perimeter` (ou cibler `perimeter_publications`) sur les requêtes qui listent/comptent les publications directement (~10).
+- [x] Filtre périmètre sur les vues **globales** de publications (`publications/list`, `facets`, `stats/summary|journals|publishers`) — déjà en place via `PUBLICATION_IS_IN_PERIMETER`.
+- [x] Catalogues **journals** et **publishers** : `pub_count`, EXISTS « a des publications », répartitions doc_type/oa, sujets-par-entité ne comptent plus que les publications in-perimeter + in-scope. Filtre paramétré par alias (`publication_in_perimeter(alias)`) car le publisher occupe déjà `p`.
+- Lecture **hors-périmètre assumée** pour labos / personnes / adresses (pas de filtre).
+- [ ] **Sujets** (`usage_count` + co-occurrences) à restreindre au périmètre — dans la **phase subjects du pipeline**, pas à la requête. Reporté à un chantier ultérieur (suivi hors fiche).
 
 ### Phase 5 — Migration / rerun
 - [ ] Rerun complet du stock après bascule.
@@ -57,13 +60,12 @@ Problèmes :
 
 - **Ordre des passes de fusion** + idempotence (résolution des chaînes de redirection dans un batch — `merge_publications_by_key` le fait déjà pour nnt/hal_id).
 - **Cycle de vie des publications hors-périmètre** : suppression différée ou non, à trancher après observation (volume, propreté).
-- **Primaire ScanR arbitraire** en double-édition (`ange`/`anie`) : la publication canonique peut porter l'une ou l'autre ; relations rattrape. Acceptable.
 - **`resolve_doi_conflict` N-aire** (ouvrage + N chapitres) + inscription des paires dans `distinct_publications`.
 - Volume/perf de la création de masse puis fusion (faible au volume UCA, mais à mesurer).
 
 ## Liens
 
-- [METIER_fusions-abusives-sources](METIER_fusions-abusives-sources.md) — ce chantier **absorbe** son volet chapitres/ouvrage : la garde anti-fusion devient triviale et uniforme en pub↔pub (plus de bricolage SQL). Reste à ce chantier-là le critère thèse↔article (revue ⇔ dépôt-thèse) et le circuit d'override admin.
-- [METIER_relations-publications](METIER_relations-publications.md) — consomme `related_dois` (publié ↔ preprint ↔ dépôt, ouvrage ↔ chapitres, éditions).
-- [METIER_doc-types](METIER_doc-types.md) — les mésclassements preprint/dataset se règlent par règles de correction, pas par le choix de DOI.
-- État actuel : [`match_or_create_publications.py`](../../application/pipeline/publications/match_or_create_publications.py), [`deduplication.py`](../../domain/publications/deduplication.py) (`resolve_doi_conflict`), [`merge.py`](../../infrastructure/queries/pipeline/merge.py), [`resolve_doi_prefixes.py`](../../application/pipeline/publishers_journals/resolve_doi_prefixes.py).
+- [METIER_fusions-abusives-sources](../METIER_fusions-abusives-sources.md) — ce chantier **absorbe** son volet chapitres/ouvrage : la garde anti-fusion devient triviale et uniforme en pub↔pub (plus de bricolage SQL). Reste à ce chantier-là le critère thèse↔article (revue ⇔ dépôt-thèse) et le circuit d'override admin.
+- [METIER_relations-publications](../METIER_relations-publications.md) — consomme `related_dois` (publié ↔ preprint ↔ dépôt, ouvrage ↔ chapitres, éditions).
+- [METIER_doc-types](../METIER_doc-types.md) — les mésclassements preprint/dataset se règlent par règles de correction, pas par le choix de DOI.
+- État actuel : [`match_or_create_publications.py`](../../../application/pipeline/publications/match_or_create_publications.py), [`deduplication.py`](../../../domain/publications/deduplication.py) (`resolve_doi_conflict`), [`merge.py`](../../../infrastructure/queries/pipeline/merge.py), [`resolve_doi_prefixes.py`](../../../application/pipeline/publishers_journals/resolve_doi_prefixes.py).
