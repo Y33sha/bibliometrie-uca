@@ -1,16 +1,11 @@
 """Fusionne les publications dupliquées par métadonnées (thèse / proceedings).
 
-Transpose en fusion pub↔pub les règles `MetadataDeduplicationCase` (jadis
-appliquées au matching SP→publication) : deux publications au même
-`title_normalized` + `pub_year` et de même famille de doc_type sont fusionnées
-si les critères doc_type-spécifiques tiennent.
+Orchestration : pour chaque paire de publications au même `title_normalized` +
+`pub_year` (détectées en SQL), prefetch des critères puis appel de la règle
+domaine `detect_metadata_merge_case`. Les cas nommés et leurs critères vivent
+dans `domain/publications/deduplication.py` — aucune logique métier ici.
 
-- **thèse** (`thesis`/`ongoing_thesis`) : compatibilité de l'auteur primary
-  (`thesis_authors_compatible`) ; si l'un des deux est inconnu, accepté.
-- **proceedings** : titre normalisé long (> 30 car.) + même nombre d'auteurs
-  (`MAX` par source de chaque côté).
-
-Le cas « deux DOI non-nuls différents » n'est pas filtré ici : la garde de
+Le cas « deux DOI non-nuls différents » n'est pas filtré : la garde de
 `merge_publications_by_key` le refuse de toute façon (œuvres distinctes).
 
 L'orchestrateur dépend du port `MetadataMergeQueries`. Le point d'entrée CLI est
@@ -22,41 +17,9 @@ import logging
 from sqlalchemy import Connection
 
 from application.pipeline.publications.merge_by_key import merge_publications_by_key
-from application.ports.pipeline.metadata_merge import (
-    MetadataMergeCandidatePair,
-    MetadataMergeQueries,
-)
+from application.ports.pipeline.metadata_merge import MetadataMergeQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from domain.normalize import normalize_name
-from domain.sources.theses import thesis_authors_compatible
-
-_THESIS_DOC_TYPES = frozenset({"thesis", "ongoing_thesis"})
-_PROCEEDINGS_MIN_TITLE_LEN = 30
-
-
-def _thesis_pair_merges(
-    conn: Connection, queries: MetadataMergeQueries, pair: MetadataMergeCandidatePair
-) -> bool:
-    author_a = queries.fetch_thesis_primary_author(conn, pair.id_a)
-    author_b = queries.fetch_thesis_primary_author(conn, pair.id_b)
-    # Auteur inconnu d'un côté → accepté (comportement historique du matching).
-    if author_a is None or author_b is None:
-        return True
-    # `thesis_authors_compatible` normalise `primary` mais attend le `claimed`
-    # déjà normalisé ; les deux auteurs viennent ici de la BDD (bruts), on
-    # normalise donc le second.
-    claimed = (normalize_name(author_b[0]), normalize_name(author_b[1]))
-    return thesis_authors_compatible(author_a, claimed)
-
-
-def _proceedings_pair_merges(
-    conn: Connection, queries: MetadataMergeQueries, pair: MetadataMergeCandidatePair
-) -> bool:
-    if len(pair.title_normalized) <= _PROCEEDINGS_MIN_TITLE_LEN:
-        return False
-    count_a = queries.fetch_max_source_authorship_count_per_publication(conn, pair.id_a)
-    count_b = queries.fetch_max_source_authorship_count_per_publication(conn, pair.id_b)
-    return count_a == count_b
+from domain.publications.deduplication import detect_metadata_merge_case
 
 
 def run_merge(
@@ -74,15 +37,21 @@ def run_merge(
 
         groups: list[tuple[str, list[int]]] = []
         for pair in pairs:
-            is_thesis = pair.doc_type_a in _THESIS_DOC_TYPES
-            merges = (
-                _thesis_pair_merges(conn, queries, pair)
-                if is_thesis
-                else _proceedings_pair_merges(conn, queries, pair)
+            case = detect_metadata_merge_case(
+                doc_type_a=pair.doc_type_a,
+                doc_type_b=pair.doc_type_b,
+                title_normalized=pair.title_normalized,
+                thesis_primary_author_a=queries.fetch_thesis_primary_author(conn, pair.id_a),
+                thesis_primary_author_b=queries.fetch_thesis_primary_author(conn, pair.id_b),
+                author_count_a=queries.fetch_max_source_authorship_count_per_publication(
+                    conn, pair.id_a
+                ),
+                author_count_b=queries.fetch_max_source_authorship_count_per_publication(
+                    conn, pair.id_b
+                ),
             )
-            if merges:
-                kind = "thèse" if is_thesis else "proceedings"
-                label = f"{kind} «{pair.title_normalized[:40]}» {pair.id_a}↔{pair.id_b}"
+            if case is not None:
+                label = f"{case.value} «{pair.title_normalized[:40]}» {pair.id_a}↔{pair.id_b}"
                 groups.append((label, [pair.id_a, pair.id_b]))
 
         if not groups:

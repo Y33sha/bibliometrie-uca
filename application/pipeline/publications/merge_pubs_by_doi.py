@@ -12,6 +12,9 @@ from sqlalchemy import Connection
 from application.pipeline.publications.merge_by_key import merge_publications_by_key
 from application.ports.pipeline.merge import MergeQueries
 from application.ports.repositories.publication_repository import PublicationRepository
+from domain.publications.deduplication import DeduplicationKey
+
+_KEY = DeduplicationKey.DOI
 
 
 def run_merge(
@@ -31,7 +34,7 @@ def run_merge(
             logger.info("Rien à faire.")
             return
 
-        groups = [(f"DOI={dup.doi}", dup.pub_ids) for dup in duplicates]
+        groups = [(f"{_KEY.name}={dup.doi}", dup.pub_ids) for dup in duplicates]
         merged, errors = merge_publications_by_key(
             conn, groups, logger=logger, pub_repo=pub_repo, dry_run=dry_run
         )
