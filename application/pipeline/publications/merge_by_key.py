@@ -15,6 +15,10 @@ from application.ports.repositories.publication_repository import PublicationRep
 from application.publications import merge_publications, refresh_from_sources
 from domain.errors import DistinctDoiError
 
+# Au volume du create⇒merge (dizaines de milliers de paires), le détail par
+# paire part en DEBUG ; INFO ne reçoit qu'une progression tous les N.
+_PROGRESS_EVERY = 1000
+
 
 def merge_publications_by_key(
     conn: Connection,
@@ -46,6 +50,7 @@ def merge_publications_by_key(
     merged = 0
     skipped_distinct = 0
     errors = 0
+    processed = 0
 
     for key_label, pub_ids in groups:
         resolved_ids = sorted({resolve(pid) for pid in pub_ids})
@@ -58,9 +63,15 @@ def merge_publications_by_key(
 
         for source_id in to_merge:
             label = f"{key_label} : pub {source_id} → {target_id}"
+            processed += 1
+            if processed % _PROGRESS_EVERY == 0:
+                logger.info(
+                    f"  … {processed} paires traitées "
+                    f"({merged} fusionnées, {skipped_distinct} ignorées, {errors} erreurs)"
+                )
 
             if dry_run:
-                logger.info(f"  [DRY] {label}")
+                logger.debug(f"  [DRY] {label}")
                 merged += 1
                 continue
 
@@ -68,7 +79,7 @@ def merge_publications_by_key(
                 # Paire pré-marquée distincte (passe mark_distinct_publications) :
                 # garde soft, on ne fusionne pas. Le merge admin manuel (via
                 # merge_publications direct) ne passe pas par cette garde.
-                logger.info(f"  [SKIP distinct pré-marqué] {label}")
+                logger.debug(f"  [SKIP distinct pré-marqué] {label}")
                 skipped_distinct += 1
                 continue
 
@@ -78,12 +89,12 @@ def merge_publications_by_key(
                     refresh_from_sources(target_id, repo=pub_repo)
                 redirects[source_id] = target_id
                 merged += 1
-                logger.info(f"  [MERGE] {label}")
+                logger.debug(f"  [MERGE] {label}")
             except DistinctDoiError:
                 # DOI non-nuls différents : œuvres distinctes. On ne fusionne
                 # pas (le savepoint a annulé la tentative) et ce n'est pas une
                 # erreur — pas de redirection, la source reste vivante.
-                logger.info(f"  [SKIP DOI distincts] {label}")
+                logger.debug(f"  [SKIP DOI distincts] {label}")
                 skipped_distinct += 1
             except Exception as e:
                 logger.warning(f"  Échec {label}: {e}")
