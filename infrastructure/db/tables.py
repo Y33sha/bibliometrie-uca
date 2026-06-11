@@ -581,6 +581,10 @@ source_authorships = Table(
     Column("in_perimeter", Boolean, server_default="false"),
     Column("source_structures", ARRAY(Text)),
     Column("countries", ARRAY(Text)),
+    # Refresh pays incrémental : True = `countries` à (re)calculer depuis les
+    # adresses. Posé par normalize (nouveaux sa) et detect/institution (adresse
+    # changée), remis à False par le refresh.
+    Column("countries_dirty", Boolean, nullable=False, server_default="true"),
     Column("person_id", Integer),
     Column("author_name_normalized", Text),
     Column("is_corresponding", Boolean, server_default="false"),

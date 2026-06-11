@@ -56,8 +56,8 @@ Lecture seule sur la base de prod, avant de figer le critère de génération.
 ### 4. `suggest` recompute-all idempotent
 - [x] `reset` / `reset_empty` supprimés. Le mode full (`recompute_all`) recalcule toutes les adresses sans pays (`length` ≥ 5), pas seulement les nouvelles ; écriture idempotente (`IS DISTINCT FROM` → seules les suggestions qui changent sont réécrites, zéro churn d'index sur un recalcul stable). Élimine le scan de reset (~34s). Attribut de mode `reset_country_suggestions` → `recompute_country_suggestions`.
 
-### 5. `refresh_publication_countries` — performances
-- [ ] Instruire les options (différé).
+### 5. `refresh_publication_countries` — refresh incrémental
+- [x] Flag `countries_dirty` sur `source_authorships` (migration `d5b8c3f1e9a2`) : nouveaux sa (normalize, défaut `true`) + sa dont une adresse change (detect / institution, marquage ciblé) sont dirty ; le refresh ne recalcule que les sa dirty (puis sp et publications scopés sur eux), et purge le flag en fin de cascade. Le recompute complet (~461s pour **0** changement, mesuré) devient O(ce qui a changé) → secondes en run nominal. Cleanup orphelin fondu dans le LEFT JOIN ; split par source supprimé (le dirty-scoping borne le volume, plus de spill à éviter).
 
 ## Questions ouvertes
 
