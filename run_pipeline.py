@@ -411,21 +411,22 @@ def phase_zenodo_doi(**kw: Any) -> Any:
 
 
 def phase_publications(**kw: Any) -> Any:
-    """Creation des publications canoniques.
+    """Creation des publications canoniques puis fusions de deduplication.
 
-    Ne cree des publications que pour les source_publications ayant au moins
-    une source_authorship in_perimeter (evite de creer des publications
-    hors perimetre). Applique ensuite les merges inter-sources (HAL-ID, NNT).
+    Une publication par source_publication a la creation, puis les passes de
+    fusion par identifiant dans l'ordre DOI -> NNT -> PMID -> HAL-ID (du plus
+    autoritaire au moins), enfin la fusion par metadonnees. Les paires marquees
+    distinctes (mark_distinct, en amont) gardent toutes les passes.
 
     Prerequis : la phase `zenodo_concept` (en amont) a resolu les concept DOI
     Zenodo sur lesquels porte la dedup concept/version.
     """
     _run_create_publications()
     _run_mark_distinct_publications()
-    _run_merge_pubs_by_hal_id()
-    _run_merge_pubs_by_nnt()
     _run_merge_pubs_by_doi()
+    _run_merge_pubs_by_nnt()
     _run_merge_pubs_by_pmid()
+    _run_merge_pubs_by_hal_id()
     _run_merge_pubs_by_metadata()
     # `addresses.pub_count` compte les publications par adresse : recalcul ici,
     # une fois les publications créées et fusionnées — il n'y a rien à compter
