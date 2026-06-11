@@ -2,92 +2,81 @@
 Suggestion de pays pour les adresses restantes (sans pays après detect).
 
 Pour chaque adresse sans pays, cherche les adresses AVEC pays dont le texte
-normalisé la contient comme sous-chaîne (LIKE). Stocke les pays trouvés
-dans addresses.suggested_countries.
+normalisé la contient comme sous-chaîne, et retient le ou les pays les plus
+fréquents. Stocke dans addresses.suggested_countries (confirmation manuelle).
 
-Se lance après detect_address_countries.py pour rattraper les cas où le
-pays n'apparaît pas en fin de chaîne.
+Se lance après detect_address_countries.py pour rattraper les cas où le pays
+n'apparaît pas en fin de chaîne.
 
-Implémentation : un UPDATE bulk SQL par batch (CTE + UPDATE) qui exploite
-l'index trigramme `idx_addresses_normalized_text_trgm` (migration 020).
-Avant cette refonte : ~1 requête SQL par adresse + round-trip Python →
-plusieurs heures pour ~8k adresses ; désormais : minutes.
+Implémentation : un automate Aho-Corasick inversé (cibles = motifs, pool =
+textes) balayé en un seul passage, par batch de cibles pour borner la mémoire
+(cf. application/pipeline/countries/suggest_countries.py). Remplace l'ancienne
+recherche trigram par cible (une requête SQL par adresse, plusieurs heures sur
+le stock complet ; désormais ~1-2 min).
 
 Usage:
-    python interfaces/cli/pipeline/suggest_address_countries.py
-    python interfaces/cli/pipeline/suggest_address_countries.py --direct       # écrire dans countries
-    python interfaces/cli/pipeline/suggest_address_countries.py --reset        # remettre à NULL
-    python interfaces/cli/pipeline/suggest_address_countries.py --batch-size 200
+    python -m interfaces.cli.pipeline.suggest_address_countries
+    python -m interfaces.cli.pipeline.suggest_address_countries --direct       # écrire dans countries
+    python -m interfaces.cli.pipeline.suggest_address_countries --reset        # remettre à NULL
+    python -m interfaces.cli.pipeline.suggest_address_countries --batch-size 20000
 """
 
 import argparse
 import time
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
+from application.pipeline.countries.suggest_countries import CountrySuggester
 from application.pipeline.metrics import PhaseMetrics
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.countries import suggest_addresses_countries_batch
+from infrastructure.queries.pipeline.countries import (
+    count_suggest_eligible,
+    fetch_suggest_targets_chunk,
+    load_country_pool,
+    reset_suggested_countries,
+    write_suggested_countries,
+)
 
 logger = setup_logger("suggest_countries", "processing/logs")
+
+# Batch de cibles : l'automate, les compteurs et l'écriture sont bornés par
+# cette taille ; le pool est rescanné une fois par batch. Grand par défaut —
+# le coût d'un balayage du pool s'amortit sur tout le batch.
+BATCH_SIZE = 50000
 
 
 def suggest_countries(
     conn: Connection,
     *,
-    batch_size: int = 500,
+    batch_size: int = BATCH_SIZE,
     direct: bool = False,
     reset: bool = False,
     reset_empty: bool = False,
 ) -> PhaseMetrics:
-    """Suggère des pays pour les adresses sans pays via match trigramme.
+    """Suggère des pays pour les adresses sans pays via automate Aho-Corasick inversé.
 
     Phase importable depuis `run_pipeline.py` ; ne ferme pas la connexion.
-    Defaults pipeline : `direct=False` (écrit dans `suggested_countries`, confirmation manuelle attendue). `total` = adresses traitées, `new` = nb d'adresses pour lesquelles une suggestion a été trouvée.
+    Defaults pipeline : `direct=False` (écrit dans `suggested_countries`,
+    confirmation manuelle attendue). `total` = adresses traitées, `new` = nb
+    d'adresses pour lesquelles une suggestion a été trouvée.
 
     `reset` : remet à NULL toutes les suggestions (vides + non vides). Usage manuel.
-    `reset_empty` : remet à NULL uniquement les suggestions vides (`= []`, adresses déjà tentées sans match). Activé par défaut en mode `full` du pipeline pour bénéficier d'une éventuelle évolution des heuristiques sans perdre les suggestions positives existantes.
+    `reset_empty` : remet à NULL uniquement les suggestions vides (`= []`,
+    adresses déjà tentées sans match). Activé par défaut en mode `full`.
     """
     target_column = "countries" if direct else "suggested_countries"
 
     if reset:
         with conn.begin():
-            result = conn.execute(
-                text("""
-                    UPDATE addresses SET suggested_countries = NULL
-                    WHERE countries IS NULL AND suggested_countries IS NOT NULL
-                """)
-            )
-        logger.info(f"{result.rowcount} suggestions réinitialisées")
+            n = reset_suggested_countries(conn, only_empty=False)
+        logger.info(f"{n} suggestions réinitialisées")
     elif reset_empty:
         with conn.begin():
-            result = conn.execute(
-                text("""
-                    UPDATE addresses SET suggested_countries = NULL
-                    WHERE countries IS NULL
-                      AND suggested_countries IS NOT NULL
-                      AND cardinality(suggested_countries) = 0
-                """)
-            )
-        logger.info(f"{result.rowcount} suggestions vides réinitialisées (mode full)")
+            n = reset_suggested_countries(conn, only_empty=True)
+        logger.info(f"{n} suggestions vides réinitialisées (mode full)")
 
-    counts = conn.execute(
-        text("""
-            SELECT
-                COUNT(*) FILTER (
-                    WHERE suggested_countries IS NULL AND length(normalized_text) >= 5
-                ) AS eligible,
-                COUNT(*) FILTER (WHERE cardinality(suggested_countries) > 0) AS has_suggestion,
-                COUNT(*) FILTER (
-                    WHERE suggested_countries IS NOT NULL
-                      AND cardinality(suggested_countries) = 0
-                ) AS empty_attempted,
-                COUNT(*) FILTER (WHERE length(normalized_text) < 5) AS too_short
-            FROM addresses
-            WHERE countries IS NULL
-        """)
-    ).one()
+    counts = count_suggest_eligible(conn)
     total = counts.eligible
     logger.info(
         f"{total} adresses à traiter (batch_size={batch_size}) — "
@@ -95,23 +84,31 @@ def suggest_countries(
         f"{counts.empty_attempted} déjà tentées sans match, "
         f"{counts.too_short} trop courtes"
     )
-
     if total == 0:
         logger.info("Rien à faire.")
         return PhaseMetrics()
 
+    logger.info("Chargement du pool (adresses avec pays)...")
+    pool = load_country_pool(conn)
+    logger.info(f"  {len(pool)} adresses dans le pool")
+
     processed = 0
     found = 0
+    after_id = 0
     t0 = time.time()
     while True:
-        n_done, n_found = suggest_addresses_countries_batch(
-            conn, batch_size=batch_size, target_column=target_column
-        )
-        conn.commit()
-        if n_done == 0:
+        targets = fetch_suggest_targets_chunk(conn, after_id=after_id, limit=batch_size)
+        if not targets:
             break
-        processed += n_done
-        found += n_found
+        after_id = targets[-1][0]  # tranche triée par id
+
+        suggestions = CountrySuggester(targets).suggest(pool)
+        rows = [(addr_id, suggestions.get(addr_id, [])) for addr_id, _ in targets]
+        write_suggested_countries(conn, rows, target_column=target_column)
+        conn.commit()
+
+        processed += len(targets)
+        found += sum(1 for _, sug in rows if sug)
         elapsed = time.time() - t0
         rate = processed / elapsed if elapsed > 0 else 0
         remaining = (total - processed) / rate if rate > 0 else 0
@@ -127,7 +124,7 @@ def suggest_countries(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch-size", type=int, default=500)
+    parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     parser.add_argument(
         "--direct", action="store_true", help="Écrire dans countries au lieu de suggested_countries"
     )
