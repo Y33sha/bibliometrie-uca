@@ -142,6 +142,38 @@ def refresh_publication_countries(conn: Connection) -> int:
     ).rowcount
 
 
+class AddressCountryStatus(NamedTuple):
+    """Bilan de l'état pays des adresses (restreint à `pub_count > 0`)."""
+
+    total: int
+    with_country: int
+    with_suggestion: int
+    none: int
+
+
+def count_address_country_status(conn: Connection) -> AddressCountryStatus:
+    """Bilan global de la résolution des pays sur les adresses utiles (`pub_count > 0`).
+
+    Logué au début et à la fin de la phase countries, pas après chaque passe.
+    """
+    row = conn.execute(
+        text("""
+            SELECT
+                count(*) AS total,
+                count(*) FILTER (WHERE countries IS NOT NULL) AS with_country,
+                count(*) FILTER (
+                    WHERE countries IS NULL AND cardinality(suggested_countries) > 0
+                ) AS with_suggestion,
+                count(*) FILTER (
+                    WHERE countries IS NULL AND suggested_countries IS NULL
+                ) AS none
+            FROM addresses
+            WHERE pub_count > 0
+        """)
+    ).one()
+    return AddressCountryStatus(row.total, row.with_country, row.with_suggestion, row.none)
+
+
 class SuggestEligibleCounts(NamedTuple):
     """Compteurs des adresses sans pays, pour le log de la passe suggest."""
 
