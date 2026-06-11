@@ -27,118 +27,150 @@ from sqlalchemy import Connection, text
 from application.ports.pipeline.countries import CountryQueries
 
 
-def refresh_sa_countries_for_source(conn: Connection, source: str) -> int:
-    """Recalcule `source_authorships.countries` pour les sa d'une source donnée.
+def mark_source_authorships_dirty_for_addresses(conn: Connection, address_ids: list[int]) -> int:
+    """Marque `countries_dirty` les source_authorships liés à des adresses dont
+    `countries` vient de changer (appelé par detect / institution après écriture).
 
-    Pass 1 du refresh global, batchée par source pour éviter le spill
-    sur disque (work_mem ~64MB ne suffit pas pour le GROUP BY + DISTINCT
-    sur 7M rows en une fois). Chaque source = max ~3M rows (WoS),
-    tient en mémoire.
+    Le refresh ne recalculera que ces sa (+ les nouveaux, dirty dès leur création
+    par normalize). Retourne le nombre de sa nouvellement marqués.
+    """
+    if not address_ids:
+        return 0
+    return conn.execute(
+        text("""
+            UPDATE source_authorships sa
+            SET countries_dirty = true
+            WHERE NOT sa.countries_dirty
+              AND sa.id IN (
+                  SELECT saa.source_authorship_id
+                  FROM source_authorship_addresses saa
+                  WHERE saa.address_id = ANY(:ids)
+              )
+        """),
+        {"ids": address_ids},
+    ).rowcount
 
-    CTE `expanded` qui dédoublonne `(sa_id, country)` via hash, puis
-    GROUP BY pour agréger en array. UPDATE join filtré par
-    `sa.source = :source` pour borner le volume.
 
-    Retourne le nombre de sa mises à jour. Idempotent (`IS DISTINCT FROM`).
+def refresh_sa_countries(conn: Connection) -> int:
+    """Recalcule `source_authorships.countries` pour tous les sa `countries_dirty`.
+
+    `countries` = union des pays des adresses du sa, ou NULL si aucune adresse
+    utile — le LEFT JOIN couvre l'orphelin (un sa qui perd ses pays repasse à
+    NULL), ce qui rend l'ancienne passe de cleanup inutile. Bornée aux sa dirty
+    via l'index partiel → peu de lignes en run nominal, donc une seule requête
+    suffit (l'ancien split par source n'évitait le spill que sur le recompute
+    complet, désormais inexistant). Idempotent (`IS DISTINCT FROM`) ; le flag est
+    purgé en fin de cascade.
+
+    Retourne le nombre de sa mis à jour.
     """
     return conn.execute(
         text("""
-            WITH expanded AS (
-                SELECT DISTINCT saa.source_authorship_id AS sa_id, c::text AS country_code
+            WITH dirty_sa AS (
+                SELECT id FROM source_authorships WHERE countries_dirty
+            ),
+            expanded AS (
+                SELECT saa.source_authorship_id AS sa_id, c::text AS country_code
                 FROM source_authorship_addresses saa
-                JOIN source_authorships sa ON sa.id = saa.source_authorship_id
+                JOIN dirty_sa d ON d.id = saa.source_authorship_id
                 JOIN addresses a ON a.id = saa.address_id
                 CROSS JOIN LATERAL unnest(a.countries) AS c
                 WHERE a.countries IS NOT NULL
-                  AND sa.source = :source
             ),
-            sa_new AS (
-                SELECT sa_id, array_agg(country_code ORDER BY country_code) AS new_countries
+            agg AS (
+                SELECT sa_id, array_agg(DISTINCT country_code ORDER BY country_code) AS new_countries
                 FROM expanded
                 GROUP BY sa_id
             )
             UPDATE source_authorships sa
-            SET countries = sn.new_countries
-            FROM sa_new sn
-            WHERE sa.id = sn.sa_id
-              AND sa.countries IS DISTINCT FROM sn.new_countries
-        """),
-        {"source": source},
-    ).rowcount
-
-
-def cleanup_sa_countries_orphans(conn: Connection) -> int:
-    """Pass 2 : met à NULL les sa polluées (`countries` non-NULL mais
-    aucune adresse utile).
-
-    Borne le scan aux sa avec `countries IS NOT NULL`, sous-ensemble
-    étroit — rapide même sans batching.
-
-    Retourne le nombre de sa nettoyées. Idempotent.
-    """
-    return conn.execute(
-        text("""
-            UPDATE source_authorships sa
-            SET countries = NULL
-            WHERE sa.countries IS NOT NULL
-              AND NOT EXISTS (
-                  SELECT 1 FROM source_authorship_addresses saa
-                  JOIN addresses a ON a.id = saa.address_id
-                  WHERE saa.source_authorship_id = sa.id
-                    AND a.countries IS NOT NULL
-              )
+            SET countries = agg.new_countries
+            FROM dirty_sa d
+            LEFT JOIN agg ON agg.sa_id = d.id
+            WHERE sa.id = d.id
+              AND sa.countries IS DISTINCT FROM agg.new_countries
         """)
     ).rowcount
 
 
 def refresh_address_source_countries(conn: Connection) -> int:
-    """Propage `addresses.countries` vers `source_publications.countries` (OA/WoS/ScanR).
+    """Recalcule `source_publications.countries` des sp ayant un sa `countries_dirty`.
 
-    Pour chaque document non-HAL, collecte les pays des adresses de ses auteurs
-    (via `source_authorship_addresses` → `addresses.countries`).
-    Retourne le nombre de lignes mises à jour.
+    `countries` = union des pays des adresses des sa du document (calcul direct
+    depuis les adresses), ou NULL si aucune (LEFT JOIN orphelin). Idempotent.
+    Retourne le nombre de sp mis à jour.
     """
     return conn.execute(
         text("""
-            UPDATE source_publications sd
-            SET countries = sub.doc_countries
-            FROM (
-                SELECT sa.source_publication_id,
-                       array_agg(DISTINCT c::text ORDER BY c::text) AS doc_countries
+            WITH dirty_sp AS (
+                SELECT DISTINCT source_publication_id AS sp_id
+                FROM source_authorships
+                WHERE countries_dirty AND source_publication_id IS NOT NULL
+            ),
+            expanded AS (
+                SELECT sa.source_publication_id AS sp_id, c::text AS country_code
                 FROM source_authorships sa
+                JOIN dirty_sp d ON d.sp_id = sa.source_publication_id
                 JOIN source_authorship_addresses saa ON saa.source_authorship_id = sa.id
-                JOIN addresses a ON a.id = saa.address_id,
-                LATERAL unnest(a.countries) AS c
+                JOIN addresses a ON a.id = saa.address_id
+                CROSS JOIN LATERAL unnest(a.countries) AS c
                 WHERE a.countries IS NOT NULL
-                GROUP BY sa.source_publication_id
-            ) sub
-            WHERE sd.id = sub.source_publication_id
-              AND sd.countries IS DISTINCT FROM sub.doc_countries
+            ),
+            agg AS (
+                SELECT sp_id, array_agg(DISTINCT country_code ORDER BY country_code) AS new_countries
+                FROM expanded
+                GROUP BY sp_id
+            )
+            UPDATE source_publications sp
+            SET countries = agg.new_countries
+            FROM dirty_sp d
+            LEFT JOIN agg ON agg.sp_id = d.sp_id
+            WHERE sp.id = d.sp_id
+              AND sp.countries IS DISTINCT FROM agg.new_countries
         """)
     ).rowcount
 
 
 def refresh_publication_countries(conn: Connection) -> int:
-    """Calcule `publications.countries` comme union des `source_publications.countries`.
+    """Recalcule `publications.countries` des publications dont un sp a un sa `countries_dirty`.
 
-    Retourne le nombre de lignes mises à jour.
+    `countries` = union des `source_publications.countries` de la publication, ou
+    NULL si aucune (LEFT JOIN orphelin). Idempotent. Retourne le nombre de
+    publications mises à jour.
     """
     return conn.execute(
         text("""
+            WITH dirty_pub AS (
+                SELECT DISTINCT sp.publication_id AS pub_id
+                FROM source_publications sp
+                JOIN source_authorships sa ON sa.source_publication_id = sp.id
+                WHERE sa.countries_dirty AND sp.publication_id IS NOT NULL
+            ),
+            expanded AS (
+                SELECT sp.publication_id AS pub_id, c::text AS country_code
+                FROM source_publications sp
+                JOIN dirty_pub d ON d.pub_id = sp.publication_id
+                CROSS JOIN LATERAL unnest(sp.countries) AS c
+                WHERE sp.countries IS NOT NULL
+            ),
+            agg AS (
+                SELECT pub_id, array_agg(DISTINCT country_code ORDER BY country_code) AS all_countries
+                FROM expanded
+                GROUP BY pub_id
+            )
             UPDATE publications p
-            SET countries = sub.all_countries
-            FROM (
-                SELECT sd.publication_id AS pub_id,
-                       array_agg(DISTINCT c ORDER BY c) AS all_countries
-                FROM source_publications sd,
-                LATERAL unnest(sd.countries) AS c
-                WHERE sd.countries IS NOT NULL
-                  AND sd.publication_id IS NOT NULL
-                GROUP BY sd.publication_id
-            ) sub
-            WHERE p.id = sub.pub_id
-              AND p.countries IS DISTINCT FROM sub.all_countries
+            SET countries = agg.all_countries
+            FROM dirty_pub d
+            LEFT JOIN agg ON agg.pub_id = d.pub_id
+            WHERE p.id = d.pub_id
+              AND p.countries IS DISTINCT FROM agg.all_countries
         """)
+    ).rowcount
+
+
+def clear_source_authorships_dirty(conn: Connection) -> int:
+    """Remet `countries_dirty` à false sur tous les sa traités (fin de cascade)."""
+    return conn.execute(
+        text("UPDATE source_authorships SET countries_dirty = false WHERE countries_dirty")
     ).rowcount
 
 
@@ -282,14 +314,14 @@ def write_suggested_countries(
 class PgCountryQueries(CountryQueries):
     """Adapter PostgreSQL implémentant `application.ports.countries.CountryQueries`."""
 
-    def refresh_sa_countries_for_source(self, conn: Connection, source: str) -> int:
-        return refresh_sa_countries_for_source(conn, source)
-
-    def cleanup_sa_countries_orphans(self, conn: Connection) -> int:
-        return cleanup_sa_countries_orphans(conn)
+    def refresh_sa_countries(self, conn: Connection) -> int:
+        return refresh_sa_countries(conn)
 
     def refresh_address_source_countries(self, conn: Connection) -> int:
         return refresh_address_source_countries(conn)
 
     def refresh_publication_countries(self, conn: Connection) -> int:
         return refresh_publication_countries(conn)
+
+    def clear_source_authorships_dirty(self, conn: Connection) -> int:
+        return clear_source_authorships_dirty(conn)

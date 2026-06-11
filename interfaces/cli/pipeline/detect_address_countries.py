@@ -28,7 +28,10 @@ from domain.normalize import normalize_text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.tables import addresses, place_name_forms
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.countries import count_address_country_status
+from infrastructure.queries.pipeline.countries import (
+    count_address_country_status,
+    mark_source_authorships_dirty_for_addresses,
+)
 
 logger = setup_logger("detect_countries", "processing/logs")
 
@@ -125,6 +128,9 @@ def detect_countries(
             stmt,
             [{"addr_id": addr_id, "val": [iso]} for addr_id, iso in batch],
         )
+    if direct and matched:
+        # countries a changé → marquer dirty les sa liés pour le refresh incrémental.
+        mark_source_authorships_dirty_for_addresses(conn, [addr_id for addr_id, _ in matched])
     conn.commit()
 
     logger.info(f"{len(matched)} adresses mises à jour ({column.name})")

@@ -18,35 +18,30 @@ import time
 from sqlalchemy import Connection
 
 from application.ports.pipeline.countries import CountryQueries
-from domain.sources.registry import ALL_SOURCES
 
 
 def refresh(conn: Connection, queries: CountryQueries, logger: logging.Logger) -> int:
     t0 = time.perf_counter()
 
-    # Étape 1 : sa.countries — batché par source (évite le spill sur disque
-    # du GROUP BY agrégé sur 7M rows en une seule passe).
-    for source in ALL_SOURCES:
-        t_source = time.perf_counter()
-        n = queries.refresh_sa_countries_for_source(conn, source)
-        logger.info(
-            f"source_authorships.countries[{source}] : {n} mis à jour "
-            f"en {time.perf_counter() - t_source:.1f}s"
-        )
-    # Pass 2 : nettoyer les sa polluées (countries non-NULL sans adresses utiles)
-    t_cleanup = time.perf_counter()
-    n_cleanup = queries.cleanup_sa_countries_orphans(conn)
+    # Étape 1 : sa.countries — uniquement les sa `countries_dirty`, en une seule
+    # requête (plus de split par source : le LEFT JOIN orphelin absorbe le
+    # cleanup, et le dirty-scoping borne le volume → pas de spill à éviter).
+    t_sa = time.perf_counter()
+    n_sa = queries.refresh_sa_countries(conn)
     logger.info(
-        f"source_authorships.countries cleanup : {n_cleanup} polluées remises à NULL "
-        f"en {time.perf_counter() - t_cleanup:.1f}s"
+        f"source_authorships.countries : {n_sa} mis à jour en {time.perf_counter() - t_sa:.1f}s"
     )
 
-    # Étape 2 : sp.countries
+    # Étape 2 : sp.countries (documents dont un sa est dirty)
     addr_updated = queries.refresh_address_source_countries(conn)
     logger.info(f"source_publications.countries : {addr_updated} mis à jour")
 
-    # Étape 3 : publications.countries
+    # Étape 3 : publications.countries (dont un sp a un sa dirty)
     updated = queries.refresh_publication_countries(conn)
+
+    # Le flag `countries_dirty` a borné la portée des 3 étapes : on le purge.
+    queries.clear_source_authorships_dirty(conn)
+
     elapsed = time.perf_counter() - t0
     logger.info(f"{updated} publications mises à jour en {elapsed:.1f}s")
     return updated

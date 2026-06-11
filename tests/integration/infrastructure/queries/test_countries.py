@@ -3,11 +3,14 @@
 from sqlalchemy import text
 
 from infrastructure.queries.pipeline.countries import (
+    clear_source_authorships_dirty,
     count_suggest_eligible,
     fetch_suggest_targets_chunk,
     load_country_pool,
+    mark_source_authorships_dirty_for_addresses,
     refresh_address_source_countries,
     refresh_publication_countries,
+    refresh_sa_countries,
     write_suggested_countries,
 )
 
@@ -104,8 +107,11 @@ class TestRefreshAddressSourceCountries:
 class TestRefreshPublicationCountries:
     def test_unions_all_source_countries(self, sa_sync_conn):
         pub_id = _create_pub(sa_sync_conn)
-        _create_sd(sa_sync_conn, pub_id, "hal", "hal-1", countries=["FR"])
-        _create_sd(sa_sync_conn, pub_id, "openalex", "oa-1", countries=["US", "FR"])
+        sd1 = _create_sd(sa_sync_conn, pub_id, "hal", "hal-1", countries=["FR"])
+        sd2 = _create_sd(sa_sync_conn, pub_id, "openalex", "oa-1", countries=["US", "FR"])
+        # un sa (dirty par défaut) met la publication dans la portée du refresh.
+        _create_sa(sa_sync_conn, sd1, "hal")
+        _create_sa(sa_sync_conn, sd2, "openalex")
 
         updated = refresh_publication_countries(sa_sync_conn)
         assert updated == 1
@@ -123,7 +129,8 @@ class TestRefreshPublicationCountries:
 
     def test_noop_when_already_up_to_date(self, sa_sync_conn):
         pub_id = _create_pub(sa_sync_conn)
-        _create_sd(sa_sync_conn, pub_id, "hal", "hal-1", countries=["FR"])
+        sd = _create_sd(sa_sync_conn, pub_id, "hal", "hal-1", countries=["FR"])
+        _create_sa(sa_sync_conn, sd, "hal")  # dirty → publication dans la portée
         sa_sync_conn.execute(
             text("UPDATE publications SET countries = ARRAY['FR'] WHERE id = :pid"),
             {"pid": pub_id},
@@ -131,6 +138,80 @@ class TestRefreshPublicationCountries:
 
         updated = refresh_publication_countries(sa_sync_conn)
         assert updated == 0
+
+
+def _sa_countries(conn, sa_id):
+    return conn.execute(
+        text("SELECT countries FROM source_authorships WHERE id = :i"), {"i": sa_id}
+    ).scalar_one()
+
+
+def _sa_dirty(conn, sa_id):
+    return conn.execute(
+        text("SELECT countries_dirty FROM source_authorships WHERE id = :i"), {"i": sa_id}
+    ).scalar_one()
+
+
+def _link_sa_address(conn, sa_id, addr_id):
+    conn.execute(
+        text(
+            "INSERT INTO source_authorship_addresses (source_authorship_id, address_id) "
+            "VALUES (:s, :a)"
+        ),
+        {"s": sa_id, "a": addr_id},
+    )
+
+
+class TestDirtyDrivenSaCountries:
+    """Refresh `sa.countries` borné aux sa `countries_dirty` (+ orphelin, mark, clear)."""
+
+    def test_only_dirty_sa_recomputed(self, sa_sync_conn):
+        pub = _create_pub(sa_sync_conn)
+        sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-d")
+        dirty_sa = _create_sa(sa_sync_conn, sd, "openalex")  # dirty par défaut
+        clean_sa = _create_sa(sa_sync_conn, sd, "openalex", author_position=1)
+        sa_sync_conn.execute(
+            text("UPDATE source_authorships SET countries_dirty = false WHERE id = :i"),
+            {"i": clean_sa},
+        )
+        addr = _create_address(sa_sync_conn, "Lyon", ["FR"])
+        _link_sa_address(sa_sync_conn, dirty_sa, addr)
+        _link_sa_address(sa_sync_conn, clean_sa, addr)
+
+        refresh_sa_countries(sa_sync_conn)
+        assert _sa_countries(sa_sync_conn, dirty_sa) == ["FR"]
+        assert _sa_countries(sa_sync_conn, clean_sa) is None  # non dirty → pas recalculé
+
+    def test_orphan_dirty_sa_reset_to_null(self, sa_sync_conn):
+        pub = _create_pub(sa_sync_conn)
+        sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-o")
+        sa = _create_sa(sa_sync_conn, sd, "openalex")  # dirty, sans adresse utile
+        sa_sync_conn.execute(
+            text("UPDATE source_authorships SET countries = ARRAY['FR']::char(2)[] WHERE id = :i"),
+            {"i": sa},
+        )
+        refresh_sa_countries(sa_sync_conn)
+        assert _sa_countries(sa_sync_conn, sa) is None  # orphelin → NULL
+
+    def test_mark_dirty_for_addresses(self, sa_sync_conn):
+        pub = _create_pub(sa_sync_conn)
+        sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-m")
+        sa = _create_sa(sa_sync_conn, sd, "openalex")
+        sa_sync_conn.execute(
+            text("UPDATE source_authorships SET countries_dirty = false WHERE id = :i"), {"i": sa}
+        )
+        addr = _create_address(sa_sync_conn, "Nantes", ["FR"])
+        _link_sa_address(sa_sync_conn, sa, addr)
+
+        assert mark_source_authorships_dirty_for_addresses(sa_sync_conn, [addr]) == 1
+        assert _sa_dirty(sa_sync_conn, sa) is True
+
+    def test_clear_dirty(self, sa_sync_conn):
+        pub = _create_pub(sa_sync_conn)
+        sd = _create_sd(sa_sync_conn, pub, "openalex", "oa-c")
+        sa = _create_sa(sa_sync_conn, sd, "openalex")  # dirty par défaut
+        clear_source_authorships_dirty(sa_sync_conn)
+        assert _sa_dirty(sa_sync_conn, sa) is False
 
 
 def _create_address_full_sa(conn, raw_text, normalized_text=None, countries=None, pub_count=0):
