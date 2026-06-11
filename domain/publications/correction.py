@@ -142,9 +142,9 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {"url_contains": "theses.fr/"},
         "applies_correction": {"doc_type": "thesis"},
     },
-    # DUMAS héberge des mémoires de master qu'OpenAlex classe à tort en `dissertation`. Whitelist `dissertation` pour ne pas dégrader les rares cas DUMAS de vraies thèses.
+    # DUMAS (dumas.ccsd) n'héberge que des mémoires : règle URL-only, inconditionnelle sur le `doc_type` brut (comme theses.fr). La whitelist `dissertation` d'avant gardait contre les entités mêlant une thèse DUMAS et l'article publié (OpenAlex typait alors « article ») ; cette fusion abusive est désormais scindée en amont (création⇒fusion + `distinct_publications`, cas `THESE_VS_ARTICLE`), donc la règle dure peut s'appliquer. La distinction mémoire / thèse d'exercice (que DUMAS ne fait pas) est différée : « memoir » pour tout DUMAS.
     MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR: {
-        "applies_to": {"doc_type": "dissertation", "url_contains": "dumas."},
+        "applies_to": {"url_contains": "dumas.ccsd"},
         "applies_correction": {"doc_type": "memoir"},
     },
     # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type` brut.

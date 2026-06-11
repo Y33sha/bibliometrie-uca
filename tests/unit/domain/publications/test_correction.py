@@ -70,25 +70,22 @@ class TestThesesFrRule:
 
 
 class TestDumasRule:
-    def test_dumas_dissertation_corrects_to_memoir(self):
+    def test_dumas_url_corrects_to_memoir(self):
         view = _view(doc_type="dissertation", urls=("https://dumas.ccsd.cnrs.fr/dumas-12345",))
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "memoir"
         assert corrected.rule == MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR
 
-    def test_dumas_case_insensitive_on_doc_type(self):
-        view = _view(doc_type="Dissertation", urls=("https://dumas.ccsd.cnrs.fr/dumas-1",))
+    def test_dumas_url_corrects_regardless_of_doc_type(self):
+        # Règle dure URL-only : un `doc_type` brut OpenAlex « article » (mésclassement
+        # ou entité mêlant thèse + article) passe quand même en `memoir`.
+        view = _view(doc_type="article", urls=("https://dumas.ccsd.cnrs.fr/dumas-1",))
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
         assert corrected.value == "memoir"
 
-    def test_dumas_url_without_dissertation_no_correction(self):
-        # URL dumas mais doc_type non-dissertation : pas de reclassement en mémoire.
-        view = _view(doc_type="article", urls=("https://dumas.ccsd.cnrs.fr/dumas-1",))
-        assert effective_metadata(view).doc_type is None
-
-    def test_dissertation_without_dumas_url_no_correction(self):
+    def test_no_dumas_url_no_correction(self):
         view = _view(doc_type="dissertation", urls=("https://example.com/x",))
         assert effective_metadata(view).doc_type is None
 
