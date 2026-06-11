@@ -475,15 +475,20 @@ addresses = Table(
 )
 
 
-country_name_forms = Table(
-    "country_name_forms",
+place_name_forms = Table(
+    "place_name_forms",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("iso_code", Text, nullable=False),
     Column("form_normalized", Text, nullable=False),
+    # `country` (noms de pays, détectés en fin d'adresse) | `place` (villes,
+    # institutions, codes postaux, détectés n'importe où). Défaut `country` :
+    # legacy + résolution nom-de-pays → ISO ; les places posent `place`.
+    Column("kind", Text, nullable=False, server_default="country"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    UniqueConstraint("form_normalized", name="country_name_forms_form_normalized_key"),
-    Index("idx_cnf_iso", "iso_code"),
+    UniqueConstraint("form_normalized", name="place_name_forms_form_normalized_key"),
+    Index("idx_pnf_iso", "iso_code"),
+    CheckConstraint("kind IN ('country', 'place')", name="place_name_forms_kind_check"),
 )
 
 

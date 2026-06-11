@@ -1,8 +1,10 @@
 """
-Détection automatique des pays des adresses via country_name_forms.
+Détection automatique des pays des adresses via les noms de pays.
 
 Parse le dernier segment (après la dernière virgule) de chaque adresse
-sans pays et le matche contre la table country_name_forms.
+sans pays et le matche contre les noms de pays de `place_name_forms`
+(`kind = 'country'`). Les noms de pays sont détectés en fin de segment ;
+les villes/institutions (`kind = 'place'`) relèvent d'une passe dédiée.
 
 Deux modes :
   - suggest : peuple addresses.suggested_countries (validation manuelle)
@@ -24,15 +26,17 @@ from sqlalchemy import Connection, bindparam, select, text, update
 from application.pipeline.metrics import PhaseMetrics
 from domain.normalize import normalize_text
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.db.tables import addresses, country_name_forms
+from infrastructure.db.tables import addresses, place_name_forms
 from infrastructure.observability.log import setup_logger
 
 logger = setup_logger("suggest_countries", "processing/logs")
 
 
 def load_country_forms(conn: Connection) -> dict[str, str]:
-    """Charge country_name_forms. Retourne {form_normalized: iso_code}."""
-    stmt = select(country_name_forms.c.form_normalized, country_name_forms.c.iso_code)
+    """Charge les noms de pays (`place_name_forms`, `kind = 'country'`). Retourne {form_normalized: iso_code}."""
+    stmt = select(place_name_forms.c.form_normalized, place_name_forms.c.iso_code).where(
+        place_name_forms.c.kind == "country"
+    )
     return {r.form_normalized: r.iso_code for r in conn.execute(stmt)}
 
 

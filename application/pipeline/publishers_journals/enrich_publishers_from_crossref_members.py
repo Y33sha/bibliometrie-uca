@@ -9,7 +9,7 @@ Pour chaque publisher avec `country IS NULL` + au moins un
    injecté par la composition root).
 2. Parse `location` (texte libre) → dernier segment = nom du pays via
    `domain.publishers.crossref_location.parse_country_segment`.
-3. Résout le nom du pays en ISO-2 via la table `country_name_forms`
+3. Résout le nom du pays en ISO-2 via la table `place_name_forms`
    (mapping chargé en bloc au démarrage).
 4. Écrit `publishers.country` si résolu — politique « NULL only »
    garantie par le filtre côté query.
@@ -17,7 +17,7 @@ Pour chaque publisher avec `country IS NULL` + au moins un
 Audit `audit_crossref_member_countries` a montré ~95% de couverture
 sur les candidats (1162 / 1219). Les 4.6% de `no_match` sont des
 locations dégénérées (Crossref ne met pas le pays au bout, ou forme
-absente de `country_name_forms`).
+absente de `place_name_forms`).
 
 Le fetcher concret vit dans `infrastructure/sources/crossref/members.py` ;
 il est injecté par la composition root pour respecter l'étanchéité DDD.
@@ -70,10 +70,10 @@ def run_enrich_publishers_from_crossref_members(
         # Charger le mapping nom-pays → ISO-2 une fois (la table contient
         # quelques centaines de formes au plus).
         country_map_rows = conn.execute(
-            text("SELECT form_normalized, iso_code FROM country_name_forms")
+            text("SELECT form_normalized, iso_code FROM place_name_forms WHERE kind = 'country'")
         ).all()
         country_map: dict[str, str] = {r.form_normalized: r.iso_code for r in country_map_rows}
-        logger.info("country_name_forms : %d formes connues", len(country_map))
+        logger.info("noms de pays connus : %d formes", len(country_map))
 
         mapped_count = 0
         no_match = 0
@@ -129,7 +129,7 @@ def run_enrich_publishers_from_crossref_members(
         if unmatched_raw:
             top = ", ".join(f"{raw}={n}" for raw, n in unmatched_raw.most_common(5))
             logger.info(
-                "Top 5 country bruts non mappés (à enrichir dans country_name_forms si volume justifie) : %s",
+                "Top 5 country bruts non mappés (à enrichir dans place_name_forms si volume justifie) : %s",
                 top,
             )
 

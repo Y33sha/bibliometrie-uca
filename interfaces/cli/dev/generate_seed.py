@@ -5,7 +5,7 @@ Génère db/seed.sql à partir des données de référence de la base courante.
 Tables exportées :
   - config              (paramètres applicatifs)
   - countries           (référentiel pays)
-  - country_name_forms  (formes de noms de pays)
+  - place_name_forms    (noms de pays, et plus tard de lieux/institutions)
   - structures          (structures UCA, labos, partenaires)
   - structure_relations  (relations entre structures)
   - perimeters          (périmètres UCA, UCA élargi)
@@ -52,8 +52,8 @@ TABLES: list[dict[str, Any]] = [
         "order": "code",
     },
     {
-        "table": "country_name_forms",
-        "columns": ["id", "iso_code", "form_normalized"],
+        "table": "place_name_forms",
+        "columns": ["id", "iso_code", "form_normalized", "kind"],
         "order": "id",
     },
     {
