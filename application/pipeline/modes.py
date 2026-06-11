@@ -32,11 +32,11 @@ class ModePolicy:
     # `resolve_doi_prefixes` (l'autre sub-step de la phase) tourne dans tous
     # les modes sans gate — il est rapide et alimente le matching publisher.
     run_journal_enrichment: bool
-    # True = remet `addresses.suggested_countries` à NULL pour les adresses
-    # déjà tentées sans succès (`= []`) avant la phase countries. Permet de
-    # bénéficier d'éventuelles évolutions des heuristiques de matching ou
-    # d'un nouveau corpus d'adresses similaires.
-    reset_country_suggestions: bool
+    # True = la passe suggest recalcule TOUTES les adresses sans pays (pas
+    # seulement les nouvelles), pour bénéficier d'un pool agrandi ou de formes
+    # ajoutées. Écriture idempotente (seules les suggestions qui changent sont
+    # réécrites).
+    recompute_country_suggestions: bool
 
 
 # WoS : crédit API contractuel limité à 50 000 full records/an. WoS est
@@ -55,7 +55,7 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=False,
         run_oa_status=False,
         run_journal_enrichment=False,
-        reset_country_suggestions=False,
+        recompute_country_suggestions=False,
     ),
     "weekly": ModePolicy(
         # Pas de WoS (cf. note crédit API ci-dessus).
@@ -67,7 +67,7 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=False,
         run_oa_status=False,
         run_journal_enrichment=False,
-        reset_country_suggestions=False,
+        recompute_country_suggestions=False,
     ),
     "full": ModePolicy(
         extract_sources=frozenset({"hal", "openalex", "wos", "scanr", "theses"}),
@@ -77,7 +77,7 @@ MODES: dict[str, ModePolicy] = {
         vacuum_full=True,
         run_oa_status=True,
         run_journal_enrichment=True,
-        reset_country_suggestions=True,
+        recompute_country_suggestions=True,
     ),
 }
 
