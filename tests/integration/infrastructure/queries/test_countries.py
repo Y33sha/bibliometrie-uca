@@ -239,7 +239,7 @@ def _get_address_field_sa(conn, addr_id, field):
 
 class TestSuggestCountryQueries:
     """Requêtes de la passe suggest : sélection des cibles (keyset + éligibilité +
-    recompute_all), chargement du pool, écriture bulk idempotente. Le matching
+    retry_empty), chargement du pool, écriture bulk idempotente. Le matching
     (cible → pays) est couvert en unit par `CountrySuggester`."""
 
     def test_fetch_targets_excludes_ineligible(self, sa_sync_conn):
@@ -261,19 +261,21 @@ class TestSuggestCountryQueries:
         ids = {i for i, _ in fetch_suggest_targets_chunk(sa_sync_conn, after_id=a, limit=1000)}
         assert a not in ids and b in ids
 
-    def test_fetch_recompute_all_includes_already_attempted(self, sa_sync_conn):
+    def test_fetch_retry_empty_includes_empties_not_positives(self, sa_sync_conn):
         fresh = _create_address_full_sa(sa_sync_conn, "Fresh", "lab fresh seul")
-        attempted = _create_address_full_sa(sa_sync_conn, "Att", "lab attempted seul")
-        write_suggested_countries(sa_sync_conn, [(attempted, ["FR"])])  # déjà tentée
+        empty = _create_address_full_sa(sa_sync_conn, "Empty", "lab empty seul")
+        positive = _create_address_full_sa(sa_sync_conn, "Pos", "lab positive seul")
+        write_suggested_countries(sa_sync_conn, [(empty, []), (positive, ["FR"])])
         inc = {i for i, _ in fetch_suggest_targets_chunk(sa_sync_conn, after_id=0, limit=1000)}
-        assert fresh in inc and attempted not in inc  # incrémental : exclut la déjà-tentée
+        assert fresh in inc and empty not in inc and positive not in inc  # incrémental : nouvelles
         full = {
             i
             for i, _ in fetch_suggest_targets_chunk(
-                sa_sync_conn, after_id=0, limit=1000, recompute_all=True
+                sa_sync_conn, after_id=0, limit=1000, retry_empty=True
             )
         }
-        assert fresh in full and attempted in full  # recompute_all : inclut la déjà-tentée
+        # retry_empty : nouvelles + vides, mais pas les positives.
+        assert fresh in full and empty in full and positive not in full
 
     def test_load_pool_returns_only_countried(self, sa_sync_conn):
         _create_address_full_sa(sa_sync_conn, "P", "lab pool a", countries=["FR"])
@@ -316,4 +318,4 @@ class TestSuggestCountryQueries:
         write_suggested_countries(sa_sync_conn, [(attempted, [])])  # tentée sans match
         counts = count_suggest_eligible(sa_sync_conn)
         assert counts.eligible >= 1  # la fraîche (suggested_countries IS NULL)
-        assert counts.all_eligible > counts.eligible  # all_eligible inclut aussi la tentée
+        assert counts.empty_attempted >= 1  # la tentée sans match (`= []`)
