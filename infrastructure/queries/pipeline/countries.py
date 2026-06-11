@@ -19,6 +19,9 @@ Fonctions module-level pour compat avec le code existant ;
 `application.ports.countries.CountryQueries`.
 """
 
+import json
+from typing import NamedTuple
+
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.countries import CountryQueries
@@ -139,79 +142,117 @@ def refresh_publication_countries(conn: Connection) -> int:
     ).rowcount
 
 
-def suggest_addresses_countries_batch(
-    conn: Connection, *, batch_size: int, target_column: str = "suggested_countries"
-) -> tuple[int, int]:
-    """Suggère un pays pour les adresses sans pays via substring match.
+class SuggestEligibleCounts(NamedTuple):
+    """Compteurs des adresses sans pays, pour le log de la passe suggest."""
 
-    Pour chaque adresse cible (sans `countries` et sans `suggested_countries`,
-    `normalized_text` ≥ 5 chars), cherche les adresses du pool (avec `countries`)
-    dont le `normalized_text` la contient comme sous-chaîne. Le ou les pays
-    les plus fréquents parmi ces matches deviennent la suggestion.
+    eligible: int
+    has_suggestion: int
+    empty_attempted: int
+    too_short: int
 
-    Tout est fait en une seule requête SQL bulk (CTE + UPDATE + window function)
-    qui exploite l'index trigramme `idx_addresses_normalized_text_trgm`
-    (cf migration 020). CTE complexe : reste en SQL brut via ``text()``.
 
-    Les cibles sans match reçoivent un array vide (et non NULL) — c'est ce
-    marquage qui permet à la passe suivante de les sauter via le filtre
-    `WHERE suggested_countries IS NULL`.
+def count_suggest_eligible(conn: Connection) -> SuggestEligibleCounts:
+    """Compteurs des adresses sans pays (éligibles, déjà suggérées, tentées sans match, trop courtes)."""
+    row = conn.execute(
+        text("""
+            SELECT
+                COUNT(*) FILTER (
+                    WHERE suggested_countries IS NULL AND length(normalized_text) >= 5
+                ) AS eligible,
+                COUNT(*) FILTER (WHERE cardinality(suggested_countries) > 0) AS has_suggestion,
+                COUNT(*) FILTER (
+                    WHERE suggested_countries IS NOT NULL AND cardinality(suggested_countries) = 0
+                ) AS empty_attempted,
+                COUNT(*) FILTER (WHERE length(normalized_text) < 5) AS too_short
+            FROM addresses
+            WHERE countries IS NULL
+        """)
+    ).one()
+    return SuggestEligibleCounts(
+        row.eligible, row.has_suggestion, row.empty_attempted, row.too_short
+    )
 
-    Args:
-        batch_size: nombre d'adresses cibles traitées en un coup.
-        target_column: `suggested_countries` (défaut) ou `countries` (mode
-            `--direct` du CLI : écrase directement la colonne canonique).
 
-    Retourne (n_processed, n_with_suggestion).
+def reset_suggested_countries(conn: Connection, *, only_empty: bool) -> int:
+    """Remet `suggested_countries` à NULL et retourne le rowcount.
+
+    `only_empty=True` (mode full du pipeline) ne réinitialise que les suggestions
+    vides (`= []`, adresses déjà tentées sans match) pour rejouer une évolution
+    des heuristiques sans perdre les suggestions positives existantes.
+    """
+    sql = (
+        "UPDATE addresses SET suggested_countries = NULL "
+        "WHERE countries IS NULL AND suggested_countries IS NOT NULL"
+    )
+    if only_empty:
+        sql += " AND cardinality(suggested_countries) = 0"
+    return conn.execute(text(sql)).rowcount
+
+
+def fetch_suggest_targets_chunk(
+    conn: Connection, *, after_id: int, limit: int
+) -> list[tuple[int, str]]:
+    """Tranche `(id, normalized_text)` des adresses sans pays à suggérer (keyset par id).
+
+    Éligibles : `countries IS NULL`, pas encore tentées (`suggested_countries IS
+    NULL`), `normalized_text` ≥ 5 caractères. Liste vide = terminé.
+    """
+    rows = conn.execute(
+        text("""
+            SELECT id, normalized_text
+            FROM addresses
+            WHERE countries IS NULL
+              AND suggested_countries IS NULL
+              AND length(normalized_text) >= 5
+              AND id > :after
+            ORDER BY id
+            LIMIT :limit
+        """),
+        {"after": after_id, "limit": limit},
+    ).all()
+    return [(r.id, r.normalized_text) for r in rows]
+
+
+def load_country_pool(conn: Connection) -> list[tuple[str, list[str]]]:
+    """Charge le pool : `(normalized_text, countries)` des adresses *avec* pays.
+
+    Tenu en mémoire et rescanné à chaque batch de cibles par `CountrySuggester`.
+    """
+    rows = conn.execute(
+        text("SELECT normalized_text, countries FROM addresses WHERE countries IS NOT NULL")
+    ).all()
+    return [(r.normalized_text, r.countries) for r in rows]
+
+
+def write_suggested_countries(
+    conn: Connection,
+    rows: list[tuple[int, list[str]]],
+    *,
+    target_column: str = "suggested_countries",
+) -> None:
+    """Écrit en bloc la suggestion de chaque cible (`[]` = tentée sans match).
+
+    `target_column` : `suggested_countries` (défaut) ou `countries` (mode
+    `--direct` : écrase la colonne canonique). Bulk via `jsonb_array_elements`.
     """
     if target_column not in ("suggested_countries", "countries"):
         raise ValueError(f"target_column invalide : {target_column!r}")
-
-    result = conn.execute(
+    if not rows:
+        return
+    payload = json.dumps([{"id": addr_id, "c": countries} for addr_id, countries in rows])
+    conn.execute(
         text(f"""
-            WITH targets AS (
-                SELECT id, normalized_text
-                FROM addresses
-                WHERE countries IS NULL
-                  AND suggested_countries IS NULL
-                  AND length(normalized_text) >= 5
-                ORDER BY pub_count DESC, id
-                LIMIT :batch_size
-            ),
-            matches AS (
-                SELECT t.id AS target_id, c, count(*) AS cnt
-                FROM targets t
-                JOIN addresses a2
-                    ON a2.normalized_text LIKE '%' || t.normalized_text || '%'
-                CROSS JOIN LATERAL unnest(a2.countries) AS c
-                WHERE a2.countries IS NOT NULL
-                GROUP BY t.id, c
-            ),
-            ranked AS (
-                SELECT target_id, c, cnt,
-                       max(cnt) OVER (PARTITION BY target_id) AS max_cnt
-                FROM matches
-            ),
-            top_per_target AS (
-                SELECT target_id,
-                       array_agg(DISTINCT trim(c) ORDER BY trim(c)) AS suggested
-                FROM ranked
-                WHERE cnt = max_cnt
-                GROUP BY target_id
-            )
             UPDATE addresses a
-            SET {target_column} = COALESCE(tp.suggested, ARRAY[]::char(2)[])
-            FROM targets t
-            LEFT JOIN top_per_target tp ON tp.target_id = t.id
-            WHERE a.id = t.id
-            RETURNING (tp.suggested IS NOT NULL) AS had_match
+            SET {target_column} = d.cty
+            FROM (
+                SELECT (e->>'id')::int AS id,
+                       ARRAY(SELECT jsonb_array_elements_text(e->'c'))::char(2)[] AS cty
+                FROM jsonb_array_elements(CAST(:payload AS jsonb)) e
+            ) d
+            WHERE a.id = d.id
         """),
-        {"batch_size": batch_size},
+        {"payload": payload},
     )
-    rows = result.all()
-    n_processed = len(rows)
-    n_with_suggestion = sum(1 for r in rows if r.had_match)
-    return n_processed, n_with_suggestion
 
 
 class PgCountryQueries(CountryQueries):

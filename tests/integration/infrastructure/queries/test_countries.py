@@ -3,9 +3,13 @@
 from sqlalchemy import text
 
 from infrastructure.queries.pipeline.countries import (
+    count_suggest_eligible,
+    fetch_suggest_targets_chunk,
+    load_country_pool,
     refresh_address_source_countries,
     refresh_publication_countries,
-    suggest_addresses_countries_batch,
+    reset_suggested_countries,
+    write_suggested_countries,
 )
 
 
@@ -153,78 +157,65 @@ def _get_address_field_sa(conn, addr_id, field):
     ).scalar_one()
 
 
-class TestSuggestAddressesCountriesBatch:
-    """Régression : la version bulk SQL doit produire les mêmes suggestions
-    que l'ancienne boucle Python (pour chaque cible : pays majoritaire dans
-    le pool d'adresses dont normalized_text contient celui de la cible)."""
+class TestSuggestCountryQueries:
+    """Requêtes de la passe suggest : sélection des cibles (keyset + éligibilité),
+    chargement du pool, écriture bulk, reset. Le matching (cible → pays) est
+    couvert en unit par `CountrySuggester`."""
 
-    def test_picks_majority_country_from_substring_matches(self, sa_sync_conn):
-        # Pool : 3 adresses avec FR contenant "lab foo", 1 avec US contenant "lab foo"
-        _create_address_full_sa(sa_sync_conn, "Lab Foo, Univ A", "lab foo univ a", countries=["FR"])
-        _create_address_full_sa(sa_sync_conn, "Lab Foo, Univ B", "lab foo univ b", countries=["FR"])
-        _create_address_full_sa(sa_sync_conn, "Lab Foo, Univ C", "lab foo univ c", countries=["FR"])
-        _create_address_full_sa(sa_sync_conn, "Lab Foo, Univ D", "lab foo univ d", countries=["US"])
-        target = _create_address_full_sa(sa_sync_conn, "Lab Foo seul", "lab foo")
+    def test_fetch_targets_excludes_ineligible(self, sa_sync_conn):
+        eligible = _create_address_full_sa(sa_sync_conn, "Lab Foo seul", "lab foo seul")
+        countried = _create_address_full_sa(sa_sync_conn, "Done", "already done", countries=["FR"])
+        short = _create_address_full_sa(sa_sync_conn, "Sh", "abcd")  # 4 chars
+        suggested = _create_address_full_sa(sa_sync_conn, "Sug", "sug done")
+        write_suggested_countries(sa_sync_conn, [(suggested, ["FR"])])
 
-        n_done, n_found = suggest_addresses_countries_batch(sa_sync_conn, batch_size=10)
+        ids = {i for i, _ in fetch_suggest_targets_chunk(sa_sync_conn, after_id=0, limit=1000)}
+        assert eligible in ids
+        assert countried not in ids  # a déjà des pays
+        assert short not in ids  # normalized_text < 5
+        assert suggested not in ids  # déjà tentée
 
-        assert n_done == 1
-        assert n_found == 1
-        assert _get_address_field_sa(sa_sync_conn, target, "suggested_countries") == ["FR"]
+    def test_fetch_targets_keyset_after_id(self, sa_sync_conn):
+        a = _create_address_full_sa(sa_sync_conn, "A", "lab aaa seul")
+        b = _create_address_full_sa(sa_sync_conn, "B", "lab bbb seul")
+        ids = {i for i, _ in fetch_suggest_targets_chunk(sa_sync_conn, after_id=a, limit=1000)}
+        assert a not in ids and b in ids
 
-    def test_returns_all_tied_countries_sorted(self, sa_sync_conn):
-        # Égalité parfaite : 1 FR, 1 US, 1 DE → suggestion = ['DE', 'FR', 'US']
-        _create_address_full_sa(sa_sync_conn, "Foo bar A", "foo bar a", countries=["FR"])
-        _create_address_full_sa(sa_sync_conn, "Foo bar B", "foo bar b", countries=["US"])
-        _create_address_full_sa(sa_sync_conn, "Foo bar C", "foo bar c", countries=["DE"])
-        target = _create_address_full_sa(sa_sync_conn, "Foo bar seul", "foo bar")
+    def test_load_pool_returns_only_countried(self, sa_sync_conn):
+        _create_address_full_sa(sa_sync_conn, "P", "lab pool a", countries=["FR"])
+        _create_address_full_sa(sa_sync_conn, "N", "lab no country")
+        texts = {t for t, _ in load_country_pool(sa_sync_conn)}
+        assert "lab pool a" in texts
+        assert "lab no country" not in texts
 
-        suggest_addresses_countries_batch(sa_sync_conn, batch_size=10)
+    def test_write_suggested_array_and_empty(self, sa_sync_conn):
+        a = _create_address_full_sa(sa_sync_conn, "A", "lab a seul")
+        b = _create_address_full_sa(sa_sync_conn, "B", "lab b seul")
+        write_suggested_countries(sa_sync_conn, [(a, ["FR"]), (b, [])])
+        assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") == ["FR"]
+        # array vide (et non NULL) : marque « tentée sans match » pour la sauter ensuite.
+        assert _get_address_field_sa(sa_sync_conn, b, "suggested_countries") == []
 
-        assert _get_address_field_sa(sa_sync_conn, target, "suggested_countries") == [
-            "DE",
-            "FR",
-            "US",
-        ]
+    def test_write_direct_to_countries(self, sa_sync_conn):
+        a = _create_address_full_sa(sa_sync_conn, "A", "lab a seul")
+        write_suggested_countries(sa_sync_conn, [(a, ["FR"])], target_column="countries")
+        assert _get_address_field_sa(sa_sync_conn, a, "countries") == ["FR"]
+        assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") is None
 
-    def test_marks_no_match_with_empty_array_to_skip_next_batch(self, sa_sync_conn):
-        # Pas de pool → cible reçoit array vide (et non NULL) pour ne pas
-        # être retraitée à la passe suivante.
-        target = _create_address_full_sa(sa_sync_conn, "Truc inconnu", "truc inconnu")
-
-        n_done, n_found = suggest_addresses_countries_batch(sa_sync_conn, batch_size=10)
-
-        assert n_done == 1
-        assert n_found == 0
-        assert _get_address_field_sa(sa_sync_conn, target, "suggested_countries") == []
-
-    def test_skips_addresses_already_with_countries(self, sa_sync_conn):
-        _create_address_full_sa(sa_sync_conn, "Already done", "already done", countries=["FR"])
-
-        n_done, _ = suggest_addresses_countries_batch(sa_sync_conn, batch_size=10)
-        assert n_done == 0
-
-    def test_skips_short_normalized_text(self, sa_sync_conn):
-        # length < 5 → exclu de la requête (filtre identique à l'ancienne version)
-        _create_address_full_sa(
-            sa_sync_conn, "Pool A", "pool", countries=["FR"]
-        )  # 4 chars : ignoré
-        _create_address_full_sa(sa_sync_conn, "Pool B", "pools", countries=["FR"])  # 5 chars : ok
-
-        n_done, _ = suggest_addresses_countries_batch(sa_sync_conn, batch_size=10)
-        assert n_done == 0  # tous sont avec countries
-
-    def test_direct_mode_writes_to_countries(self, sa_sync_conn):
-        _create_address_full_sa(sa_sync_conn, "Lab X UCA, FR", "lab x uca fr", countries=["FR"])
-        target = _create_address_full_sa(sa_sync_conn, "Lab X UCA", "lab x uca")
-
-        suggest_addresses_countries_batch(sa_sync_conn, batch_size=10, target_column="countries")
-
-        assert _get_address_field_sa(sa_sync_conn, target, "countries") == ["FR"]
-        assert _get_address_field_sa(sa_sync_conn, target, "suggested_countries") is None
-
-    def test_invalid_target_column_raises(self, sa_sync_conn):
+    def test_write_invalid_column_raises(self, sa_sync_conn):
         import pytest
 
         with pytest.raises(ValueError):
-            suggest_addresses_countries_batch(sa_sync_conn, batch_size=10, target_column="bogus")
+            write_suggested_countries(sa_sync_conn, [(1, ["FR"])], target_column="bogus")
+
+    def test_reset_only_empty_preserves_positive(self, sa_sync_conn):
+        empty = _create_address_full_sa(sa_sync_conn, "E", "lab e seul")
+        nonempty = _create_address_full_sa(sa_sync_conn, "N", "lab n seul")
+        write_suggested_countries(sa_sync_conn, [(empty, []), (nonempty, ["FR"])])
+        reset_suggested_countries(sa_sync_conn, only_empty=True)
+        assert _get_address_field_sa(sa_sync_conn, empty, "suggested_countries") is None
+        assert _get_address_field_sa(sa_sync_conn, nonempty, "suggested_countries") == ["FR"]
+
+    def test_count_eligible(self, sa_sync_conn):
+        _create_address_full_sa(sa_sync_conn, "E", "lab eligible seul")
+        assert count_suggest_eligible(sa_sync_conn).eligible >= 1
