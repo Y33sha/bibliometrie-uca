@@ -3,16 +3,16 @@
 import argparse
 import os
 
-from application.pipeline.publications.match_or_create_publications import run
+from application.pipeline.publications.create_publications import run
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.publications_match_or_create import (
-    PgPublicationsMatchOrCreateQueries,
+from infrastructure.queries.pipeline.publications_create import (
+    PgPublicationsCreateQueries,
 )
 from infrastructure.repositories import audit_repository, publication_repository
 
 logger = setup_logger(
-    "match_or_create_publications", os.path.join(os.path.dirname(__file__), "logs")
+    "create_publications", os.path.join(os.path.dirname(__file__), "logs")
 )
 
 
@@ -27,7 +27,7 @@ def main() -> None:
     try:
         run(
             conn,
-            PgPublicationsMatchOrCreateQueries(),
+            PgPublicationsCreateQueries(),
             logger,
             pub_repo=publication_repository(conn),
             audit_repo=audit_repository(conn),

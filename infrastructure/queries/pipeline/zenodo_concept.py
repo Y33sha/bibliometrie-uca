@@ -27,7 +27,7 @@ def fetch_zenodo_source_publications_without_concept(
 
 def set_concept_doi(conn: Connection, source_publication_id: int, concept_doi: str) -> None:
     # `updated_at` est bumpé pour qu'une SP déjà rattachée à une publication
-    # redevienne stale : `match_or_create` re-promeut alors le DOI canonique
+    # redevienne stale : `create` re-promeut alors le DOI canonique
     # vers le concept et fusionne les doublons concept/version (cas inter-run).
     conn.execute(
         text("""

@@ -1,11 +1,11 @@
-"""Tests unitaires de `application.pipeline.publications.match_or_create_publications`.
+"""Tests unitaires de `application.pipeline.publications.create_publications`.
 
 Couvre :
 - `extract_known_identifiers` : helper pur (cf. `TestExtractKnownIdentifiers`).
 - `process_document` : création seule (modèle création⇒fusion) — early-returns, corrections, concept DOI Zenodo, nettoyage de titre.
 - `run` : boucle de création + refresh des stale, commit/rollback, dry-run, exceptions.
 
-Mocks : port `PublicationsMatchOrCreateQueries`, `PublicationRepository`. `refresh_from_sources` monkeypatché pour isoler la logique.
+Mocks : port `PublicationsCreateQueries`, `PublicationRepository`. `refresh_from_sources` monkeypatché pour isoler la logique.
 """
 
 from __future__ import annotations
@@ -16,13 +16,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.pipeline.publications import match_or_create_publications
-from application.pipeline.publications.match_or_create_publications import (
+from application.pipeline.publications import create_publications
+from application.pipeline.publications.create_publications import (
     extract_known_identifiers,
     process_document,
     run,
 )
-from application.ports.pipeline.publications_match_or_create import SourcePublicationRow
+from application.ports.pipeline.publications_create import SourcePublicationRow
 
 
 class TestExtractKnownIdentifiers:
@@ -57,7 +57,7 @@ class TestExtractKnownIdentifiers:
 
 @pytest.fixture
 def logger() -> logging.Logger:
-    return logging.getLogger("test_match_or_create_publications")
+    return logging.getLogger("test_create_publications")
 
 
 def _make_doc(**overrides: Any) -> SourcePublicationRow:
@@ -89,7 +89,7 @@ def captured(monkeypatch):
     def fake_refresh(pub_id, *, repo, audit_repo=None):  # noqa: ARG001
         state["refresh_calls"].append(pub_id)
 
-    monkeypatch.setattr(match_or_create_publications, "refresh_from_sources", fake_refresh)
+    monkeypatch.setattr(create_publications, "refresh_from_sources", fake_refresh)
     return state
 
 
@@ -182,7 +182,7 @@ class TestProcessDocumentTitleCleaning:
         repo = MagicMock()
         repo.create.return_value = 1
         monkeypatch.setattr(
-            match_or_create_publications, "clean_publication_title", lambda t: "Titre & co"
+            create_publications, "clean_publication_title", lambda t: "Titre & co"
         )
 
         process_document(
@@ -220,8 +220,8 @@ def patched_process(monkeypatch):
         if state["refresh_raises_on_id"] == pub_id:
             raise RuntimeError(f"refresh boom on {pub_id}")
 
-    monkeypatch.setattr(match_or_create_publications, "process_document", fake_process)
-    monkeypatch.setattr(match_or_create_publications, "refresh_from_sources", fake_refresh)
+    monkeypatch.setattr(create_publications, "process_document", fake_process)
+    monkeypatch.setattr(create_publications, "refresh_from_sources", fake_refresh)
     return state
 
 

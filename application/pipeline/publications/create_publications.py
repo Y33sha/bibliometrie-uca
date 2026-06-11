@@ -7,7 +7,7 @@ Modèle création⇒fusion :
 1. Pour chaque `source_publication` sans `publication_id` (tous périmètres confondus) : création d'une publication, `effective_metadata` appliquant les corrections (doc_type, journal, oa_status). Pas de matching ni de gate périmètre — le dédoublonnage est délégué aux passes de fusion qui suivent (par identifiant : DOI/hal_id/NNT/PMID ; par métadonnées : thèse/proceedings).
 2. Pour chaque publication stale (au moins un `source_publication.updated_at > publications.updated_at`) : `refresh_from_sources` pour ré-agréger les méta canoniques (dont DOI promu par priorité de source).
 
-L'orchestrateur dépend du port `PublicationsMatchOrCreateQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/match_or_create_publications.py`.
+L'orchestrateur dépend du port `PublicationsCreateQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/create_publications.py`.
 """
 
 import logging
@@ -15,8 +15,8 @@ from typing import Literal
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.publications_match_or_create import (
-    PublicationsMatchOrCreateQueries,
+from application.ports.pipeline.publications_create import (
+    PublicationsCreateQueries,
     SourcePublicationRow,
 )
 from application.ports.repositories.audit_repository import AuditRepository
@@ -78,7 +78,7 @@ def extract_known_identifiers(external_ids: dict[str, object] | None) -> dict[st
 
 def process_document(
     conn: Connection,
-    queries: PublicationsMatchOrCreateQueries,
+    queries: PublicationsCreateQueries,
     doc: SourcePublicationRow,
     dry_run: bool,
     *,
@@ -150,7 +150,7 @@ def process_document(
 
 def run(
     conn: Connection,
-    queries: PublicationsMatchOrCreateQueries,
+    queries: PublicationsCreateQueries,
     logger: logging.Logger,
     *,
     pub_repo: PublicationRepository,

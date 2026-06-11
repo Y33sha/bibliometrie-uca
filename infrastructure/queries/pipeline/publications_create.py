@@ -1,6 +1,6 @@
 """Query service : SQL de la phase `create_publications`.
 
-Appelé par `application/pipeline/publications/match_or_create_publications.py` (modèle création⇒fusion) :
+Appelé par `application/pipeline/publications/create_publications.py` (modèle création⇒fusion) :
 
 1. **Création** (`fetch_orphan_source_publications`) : tous les orphelins (`publication_id IS NULL`), chacun donnant une publication canonique. Le dédoublonnage est délégué aux passes de fusion (identifiants puis métadonnées).
 2. **SELECT publications stale** (`fetch_stale_publication_ids`) pour ré-agrégation des métadonnées canoniques.
@@ -12,8 +12,8 @@ L'attachement d'un `source_publications` à un `publications` est mutualisé ave
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.publications_match_or_create import (
-    PublicationsMatchOrCreateQueries,
+from application.ports.pipeline.publications_create import (
+    PublicationsCreateQueries,
     SourcePublicationRow,
 )
 from domain.persons.name_matching import parse_raw_author_name
@@ -108,8 +108,8 @@ def fetch_max_source_authorship_count_per_publication(conn: Connection, publicat
     return row.max_n
 
 
-class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
-    """Adapter PostgreSQL pour `application.ports.pipeline.publications_match_or_create.PublicationsMatchOrCreateQueries`.
+class PgPublicationsCreateQueries(PublicationsCreateQueries):
+    """Adapter PostgreSQL pour `application.ports.pipeline.publications_create.PublicationsCreateQueries`.
 
     Délègue `link_source_publication_to_publication` à
     `infrastructure.queries.pipeline.merge` (même SQL).

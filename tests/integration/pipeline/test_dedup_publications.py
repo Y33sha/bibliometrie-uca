@@ -8,7 +8,7 @@ Chaque test tourne dans une transaction rollbackée (isolation complète). Les
 publications sont semées directement via le repo (`create`) — pas de cascade de
 matching : la déduplication est testée à l'unité
 (`tests/unit/domain/publications/test_deduplication.py`) et sur la vraie entrée
-pipeline (`tests/integration/infrastructure/queries/test_match_or_create_queries.py`).
+pipeline (`tests/integration/infrastructure/queries/test_create_queries.py`).
 """
 
 from sqlalchemy import text
