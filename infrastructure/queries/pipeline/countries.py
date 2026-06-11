@@ -177,7 +177,8 @@ def count_address_country_status(conn: Connection) -> AddressCountryStatus:
 class SuggestEligibleCounts(NamedTuple):
     """Compteurs des adresses sans pays, pour le log de la passe suggest."""
 
-    eligible: int
+    eligible: int  # pas encore tentées (suggested_countries IS NULL) — mode incrémental
+    all_eligible: int  # toutes (len >= 5, suggested ou non) — mode recompute_all
     has_suggestion: int
     empty_attempted: int
     too_short: int
@@ -191,6 +192,7 @@ def count_suggest_eligible(conn: Connection) -> SuggestEligibleCounts:
                 COUNT(*) FILTER (
                     WHERE suggested_countries IS NULL AND length(normalized_text) >= 5
                 ) AS eligible,
+                COUNT(*) FILTER (WHERE length(normalized_text) >= 5) AS all_eligible,
                 COUNT(*) FILTER (WHERE cardinality(suggested_countries) > 0) AS has_suggestion,
                 COUNT(*) FILTER (
                     WHERE suggested_countries IS NOT NULL AND cardinality(suggested_countries) = 0
@@ -201,40 +203,27 @@ def count_suggest_eligible(conn: Connection) -> SuggestEligibleCounts:
         """)
     ).one()
     return SuggestEligibleCounts(
-        row.eligible, row.has_suggestion, row.empty_attempted, row.too_short
+        row.eligible, row.all_eligible, row.has_suggestion, row.empty_attempted, row.too_short
     )
-
-
-def reset_suggested_countries(conn: Connection, *, only_empty: bool) -> int:
-    """Remet `suggested_countries` à NULL et retourne le rowcount.
-
-    `only_empty=True` (mode full du pipeline) ne réinitialise que les suggestions
-    vides (`= []`, adresses déjà tentées sans match) pour rejouer une évolution
-    des heuristiques sans perdre les suggestions positives existantes.
-    """
-    sql = (
-        "UPDATE addresses SET suggested_countries = NULL "
-        "WHERE countries IS NULL AND suggested_countries IS NOT NULL"
-    )
-    if only_empty:
-        sql += " AND cardinality(suggested_countries) = 0"
-    return conn.execute(text(sql)).rowcount
 
 
 def fetch_suggest_targets_chunk(
-    conn: Connection, *, after_id: int, limit: int
+    conn: Connection, *, after_id: int, limit: int, recompute_all: bool = False
 ) -> list[tuple[int, str]]:
     """Tranche `(id, normalized_text)` des adresses sans pays à suggérer (keyset par id).
 
-    Éligibles : `countries IS NULL`, pas encore tentées (`suggested_countries IS
-    NULL`), `normalized_text` ≥ 5 caractères. Liste vide = terminé.
+    `recompute_all=True` (mode full) : toutes les adresses sans pays (`length` ≥ 5),
+    pour recalculer les suggestions contre le pool courant (écriture idempotente
+    en aval). Sinon (incrémental) : seulement celles pas encore tentées
+    (`suggested_countries IS NULL`). Liste vide = terminé.
     """
+    suggested_filter = "" if recompute_all else "AND suggested_countries IS NULL"
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT id, normalized_text
             FROM addresses
             WHERE countries IS NULL
-              AND suggested_countries IS NULL
+              {suggested_filter}
               AND length(normalized_text) >= 5
               AND id > :after
             ORDER BY id
@@ -266,6 +255,8 @@ def write_suggested_countries(
 
     `target_column` : `suggested_countries` (défaut) ou `countries` (mode
     `--direct` : écrase la colonne canonique). Bulk via `jsonb_array_elements`.
+    Idempotent : seules les lignes dont la valeur change sont écrites
+    (`IS DISTINCT FROM`), pas de churn d'index sur un recalcul à l'identique.
     """
     if target_column not in ("suggested_countries", "countries"):
         raise ValueError(f"target_column invalide : {target_column!r}")
@@ -282,6 +273,7 @@ def write_suggested_countries(
                 FROM jsonb_array_elements(CAST(:payload AS jsonb)) e
             ) d
             WHERE a.id = d.id
+              AND a.{target_column} IS DISTINCT FROM d.cty
         """),
         {"payload": payload},
     )

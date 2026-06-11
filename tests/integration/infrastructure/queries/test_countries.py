@@ -8,7 +8,6 @@ from infrastructure.queries.pipeline.countries import (
     load_country_pool,
     refresh_address_source_countries,
     refresh_publication_countries,
-    reset_suggested_countries,
     write_suggested_countries,
 )
 
@@ -158,9 +157,9 @@ def _get_address_field_sa(conn, addr_id, field):
 
 
 class TestSuggestCountryQueries:
-    """Requêtes de la passe suggest : sélection des cibles (keyset + éligibilité),
-    chargement du pool, écriture bulk, reset. Le matching (cible → pays) est
-    couvert en unit par `CountrySuggester`."""
+    """Requêtes de la passe suggest : sélection des cibles (keyset + éligibilité +
+    recompute_all), chargement du pool, écriture bulk idempotente. Le matching
+    (cible → pays) est couvert en unit par `CountrySuggester`."""
 
     def test_fetch_targets_excludes_ineligible(self, sa_sync_conn):
         eligible = _create_address_full_sa(sa_sync_conn, "Lab Foo seul", "lab foo seul")
@@ -180,6 +179,20 @@ class TestSuggestCountryQueries:
         b = _create_address_full_sa(sa_sync_conn, "B", "lab bbb seul")
         ids = {i for i, _ in fetch_suggest_targets_chunk(sa_sync_conn, after_id=a, limit=1000)}
         assert a not in ids and b in ids
+
+    def test_fetch_recompute_all_includes_already_attempted(self, sa_sync_conn):
+        fresh = _create_address_full_sa(sa_sync_conn, "Fresh", "lab fresh seul")
+        attempted = _create_address_full_sa(sa_sync_conn, "Att", "lab attempted seul")
+        write_suggested_countries(sa_sync_conn, [(attempted, ["FR"])])  # déjà tentée
+        inc = {i for i, _ in fetch_suggest_targets_chunk(sa_sync_conn, after_id=0, limit=1000)}
+        assert fresh in inc and attempted not in inc  # incrémental : exclut la déjà-tentée
+        full = {
+            i
+            for i, _ in fetch_suggest_targets_chunk(
+                sa_sync_conn, after_id=0, limit=1000, recompute_all=True
+            )
+        }
+        assert fresh in full and attempted in full  # recompute_all : inclut la déjà-tentée
 
     def test_load_pool_returns_only_countried(self, sa_sync_conn):
         _create_address_full_sa(sa_sync_conn, "P", "lab pool a", countries=["FR"])
@@ -208,14 +221,18 @@ class TestSuggestCountryQueries:
         with pytest.raises(ValueError):
             write_suggested_countries(sa_sync_conn, [(1, ["FR"])], target_column="bogus")
 
-    def test_reset_only_empty_preserves_positive(self, sa_sync_conn):
-        empty = _create_address_full_sa(sa_sync_conn, "E", "lab e seul")
-        nonempty = _create_address_full_sa(sa_sync_conn, "N", "lab n seul")
-        write_suggested_countries(sa_sync_conn, [(empty, []), (nonempty, ["FR"])])
-        reset_suggested_countries(sa_sync_conn, only_empty=True)
-        assert _get_address_field_sa(sa_sync_conn, empty, "suggested_countries") is None
-        assert _get_address_field_sa(sa_sync_conn, nonempty, "suggested_countries") == ["FR"]
+    def test_write_idempotent_same_value_then_overwrite(self, sa_sync_conn):
+        a = _create_address_full_sa(sa_sync_conn, "A", "lab a seul")
+        write_suggested_countries(sa_sync_conn, [(a, ["FR"])])
+        write_suggested_countries(sa_sync_conn, [(a, ["FR"])])  # même valeur : no-op
+        assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") == ["FR"]
+        write_suggested_countries(sa_sync_conn, [(a, ["BE"])])  # valeur différente : écrase
+        assert _get_address_field_sa(sa_sync_conn, a, "suggested_countries") == ["BE"]
 
     def test_count_eligible(self, sa_sync_conn):
         _create_address_full_sa(sa_sync_conn, "E", "lab eligible seul")
-        assert count_suggest_eligible(sa_sync_conn).eligible >= 1
+        attempted = _create_address_full_sa(sa_sync_conn, "A", "lab attempted seul")
+        write_suggested_countries(sa_sync_conn, [(attempted, [])])  # tentée sans match
+        counts = count_suggest_eligible(sa_sync_conn)
+        assert counts.eligible >= 1  # la fraîche (suggested_countries IS NULL)
+        assert counts.all_eligible > counts.eligible  # all_eligible inclut aussi la tentée

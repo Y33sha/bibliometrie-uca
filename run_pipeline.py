@@ -471,7 +471,9 @@ def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     _log_countries_summary("Bilan initial")
     metrics.merge(_run_detect_address_countries())
     metrics.merge(_run_detect_institution_countries())
-    metrics.merge(_run_suggest_address_countries(reset_empty=MODES[mode].reset_country_suggestions))
+    metrics.merge(
+        _run_suggest_address_countries(recompute_all=MODES[mode].recompute_country_suggestions)
+    )
     _run_refresh_publication_countries()
     _log_countries_summary("Bilan final")
     return metrics
@@ -1522,15 +1524,15 @@ def _run_detect_institution_countries() -> PhaseMetrics:
     return metrics
 
 
-def _run_suggest_address_countries(*, reset_empty: bool = False) -> PhaseMetrics:
+def _run_suggest_address_countries(*, recompute_all: bool = False) -> PhaseMetrics:
     from infrastructure.db.engine import get_sync_engine
     from interfaces.cli.pipeline.suggest_address_countries import suggest_countries
 
-    log.info("▶ suggest_address_countries%s", " (reset_empty)" if reset_empty else "")
+    log.info("▶ suggest_address_countries%s", " (recompute-all)" if recompute_all else "")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        metrics = suggest_countries(conn, reset_empty=reset_empty)
+        metrics = suggest_countries(conn, recompute_all=recompute_all)
     finally:
         conn.close()
     log.info(
