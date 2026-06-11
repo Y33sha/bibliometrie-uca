@@ -209,10 +209,9 @@ def count_address_country_status(conn: Connection) -> AddressCountryStatus:
 class SuggestEligibleCounts(NamedTuple):
     """Compteurs des adresses sans pays, pour le log de la passe suggest."""
 
-    eligible: int  # pas encore tentées (suggested_countries IS NULL) — mode incrémental
-    all_eligible: int  # toutes (len >= 5, suggested ou non) — mode recompute_all
+    eligible: int  # pas encore tentées (suggested_countries IS NULL) — toujours traitées
     has_suggestion: int
-    empty_attempted: int
+    empty_attempted: int  # tentées sans match (`= []`) — retraitées en mode retry_empty
     too_short: int
 
 
@@ -224,7 +223,6 @@ def count_suggest_eligible(conn: Connection) -> SuggestEligibleCounts:
                 COUNT(*) FILTER (
                     WHERE suggested_countries IS NULL AND length(normalized_text) >= 5
                 ) AS eligible,
-                COUNT(*) FILTER (WHERE length(normalized_text) >= 5) AS all_eligible,
                 COUNT(*) FILTER (WHERE cardinality(suggested_countries) > 0) AS has_suggestion,
                 COUNT(*) FILTER (
                     WHERE suggested_countries IS NOT NULL AND cardinality(suggested_countries) = 0
@@ -235,21 +233,26 @@ def count_suggest_eligible(conn: Connection) -> SuggestEligibleCounts:
         """)
     ).one()
     return SuggestEligibleCounts(
-        row.eligible, row.all_eligible, row.has_suggestion, row.empty_attempted, row.too_short
+        row.eligible, row.has_suggestion, row.empty_attempted, row.too_short
     )
 
 
 def fetch_suggest_targets_chunk(
-    conn: Connection, *, after_id: int, limit: int, recompute_all: bool = False
+    conn: Connection, *, after_id: int, limit: int, retry_empty: bool = False
 ) -> list[tuple[int, str]]:
     """Tranche `(id, normalized_text)` des adresses sans pays à suggérer (keyset par id).
 
-    `recompute_all=True` (mode full) : toutes les adresses sans pays (`length` ≥ 5),
-    pour recalculer les suggestions contre le pool courant (écriture idempotente
-    en aval). Sinon (incrémental) : seulement celles pas encore tentées
+    `retry_empty=True` (mode full) : nouvelles **+ vides** (`suggested_countries IS
+    NULL OR cardinality = 0`) — on réessaie les échecs au cas où le pool aurait
+    grossi, sans toucher aux suggestions positives (qui changent rarement et
+    coûtent cher à recalculer). Sinon (incrémental) : seulement les nouvelles
     (`suggested_countries IS NULL`). Liste vide = terminé.
     """
-    suggested_filter = "" if recompute_all else "AND suggested_countries IS NULL"
+    suggested_filter = (
+        "AND (suggested_countries IS NULL OR cardinality(suggested_countries) = 0)"
+        if retry_empty
+        else "AND suggested_countries IS NULL"
+    )
     rows = conn.execute(
         text(f"""
             SELECT id, normalized_text

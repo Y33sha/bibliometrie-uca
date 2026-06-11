@@ -17,7 +17,7 @@ le stock complet ; désormais ~1-2 min).
 Usage:
     python -m interfaces.cli.pipeline.suggest_address_countries
     python -m interfaces.cli.pipeline.suggest_address_countries --direct       # écrire dans countries
-    python -m interfaces.cli.pipeline.suggest_address_countries --recompute-all # recalculer tout
+    python -m interfaces.cli.pipeline.suggest_address_countries --retry-empty   # réessayer les vides
     python -m interfaces.cli.pipeline.suggest_address_countries --batch-size 20000
 """
 
@@ -50,7 +50,7 @@ def suggest_countries(
     *,
     batch_size: int = BATCH_SIZE,
     direct: bool = False,
-    recompute_all: bool = False,
+    retry_empty: bool = False,
 ) -> PhaseMetrics:
     """Suggère des pays pour les adresses sans pays via automate Aho-Corasick inversé.
 
@@ -59,17 +59,16 @@ def suggest_countries(
     confirmation manuelle attendue). `total` = adresses traitées, `new` = nb
     d'adresses pour lesquelles une suggestion a été trouvée.
 
-    `recompute_all` (mode `full`) : recalcule **toutes** les adresses sans pays
-    (`length` ≥ 5), pas seulement les nouvelles — pour profiter d'un pool agrandi
-    ou de formes ajoutées. L'écriture étant idempotente, seules les suggestions
-    qui changent sont réécrites. Sinon (incrémental) : seulement celles pas encore
-    tentées (`suggested_countries IS NULL`).
+    `retry_empty` (mode `full`) : traite les nouvelles **+ les vides** (échecs
+    précédents `= []`), pour réessayer au cas où le pool aurait grossi — sans
+    recalculer les suggestions positives (qui changent rarement et coûtent cher).
+    Sinon (incrémental) : seulement les nouvelles (`suggested_countries IS NULL`).
     """
     target_column = "countries" if direct else "suggested_countries"
 
     counts = count_suggest_eligible(conn)
-    total = counts.all_eligible if recompute_all else counts.eligible
-    mode = "recompute-all" if recompute_all else "incrémental"
+    total = counts.eligible + (counts.empty_attempted if retry_empty else 0)
+    mode = "retry-vides" if retry_empty else "incrémental"
     logger.info(
         f"{total} adresses à traiter (mode {mode}, batch_size={batch_size}) — "
         f"{counts.has_suggestion} déjà avec suggestion, "
@@ -90,7 +89,7 @@ def suggest_countries(
     t0 = time.time()
     while True:
         targets = fetch_suggest_targets_chunk(
-            conn, after_id=after_id, limit=batch_size, recompute_all=recompute_all
+            conn, after_id=after_id, limit=batch_size, retry_empty=retry_empty
         )
         if not targets:
             break
@@ -123,15 +122,15 @@ def main() -> None:
         "--direct", action="store_true", help="Écrire dans countries au lieu de suggested_countries"
     )
     parser.add_argument(
-        "--recompute-all",
+        "--retry-empty",
         action="store_true",
-        help="Recalculer toutes les adresses sans pays (sinon seulement les nouvelles)",
+        help="Réessayer aussi les suggestions vides (sinon seulement les nouvelles)",
     )
     args = parser.parse_args()
 
     with get_sync_engine().connect() as conn:
         suggest_countries(
-            conn, batch_size=args.batch_size, direct=args.direct, recompute_all=args.recompute_all
+            conn, batch_size=args.batch_size, direct=args.direct, retry_empty=args.retry_empty
         )
 
 
