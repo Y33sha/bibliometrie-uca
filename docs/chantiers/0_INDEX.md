@@ -4,6 +4,7 @@
 
 ### En cours
 
+- [Pays : noms de lieux pour la détection + performances](DATA_countries-place-names.md)
 - [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
 
 ### En pause
