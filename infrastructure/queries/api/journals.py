@@ -29,8 +29,8 @@ from domain.journals.journal import (
     OA_MODELS,
 )
 from domain.normalize import normalize_text
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from infrastructure.db.tables import journals as t_journals
+from infrastructure.queries.filters import publication_in_perimeter
 from infrastructure.sources.doaj import resolve_doaj_url
 
 
@@ -77,7 +77,10 @@ def _build_journal_where(
         parts.append("j.oa_model = ANY(:oa_models)")
         binds["oa_models"] = oa_models
     if with_pubs:
-        parts.append("EXISTS (SELECT 1 FROM publications pub WHERE pub.journal_id = j.id)")
+        parts.append(
+            "EXISTS (SELECT 1 FROM publications pub WHERE pub.journal_id = j.id "
+            f"AND {publication_in_perimeter('pub')})"
+        )
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
 
@@ -137,7 +140,8 @@ class PgJournalQueries(JournalQueries):
                        j.doaj_payload->>'DOAJ id' AS doaj_id,
                        j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv,
                        (SELECT COUNT(*) FROM publications pub
-                        WHERE pub.journal_id = j.id) AS pub_count
+                        WHERE pub.journal_id = j.id
+                          AND {publication_in_perimeter("pub")}) AS pub_count
                 FROM journals j
                 LEFT JOIN publishers p ON p.id = j.publisher_id
                 WHERE {where}
@@ -278,7 +282,7 @@ class PgJournalQueries(JournalQueries):
 
     def get_journal_detail(self, journal_id: int) -> JournalDetailResponse | None:
         row = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT j.id, j.title, j.issn, j.eissn, j.issnl,
                        j.publisher_id, p.name AS pub_name,
                        j.openalex_id, j.is_in_doaj, j.is_predatory,
@@ -288,7 +292,8 @@ class PgJournalQueries(JournalQueries):
                        j.doaj_payload->>'DOAJ id' AS doaj_id,
                        j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv,
                        (SELECT COUNT(*) FROM publications pub
-                        WHERE pub.journal_id = j.id) AS pub_count
+                        WHERE pub.journal_id = j.id
+                          AND {publication_in_perimeter("pub")}) AS pub_count
                 FROM journals j
                 LEFT JOIN publishers p ON p.id = j.publisher_id
                 WHERE j.id = :id
@@ -332,22 +337,24 @@ class PgJournalQueries(JournalQueries):
         oa_model = journal_row.oa_model
 
         doc_type_rows = self._conn.execute(
-            text("""
-                SELECT doc_type, COUNT(*) AS n
-                FROM publications
-                WHERE journal_id = :id
-                GROUP BY doc_type
-                ORDER BY n DESC, doc_type NULLS LAST
+            text(f"""
+                SELECT p.doc_type AS doc_type, COUNT(*) AS n
+                FROM publications p
+                WHERE p.journal_id = :id
+                  AND {publication_in_perimeter("p")}
+                GROUP BY p.doc_type
+                ORDER BY n DESC, p.doc_type NULLS LAST
             """),
             {"id": journal_id},
         ).all()
         oa_rows = self._conn.execute(
-            text("""
-                SELECT oa_status, COUNT(*) AS n
-                FROM publications
-                WHERE journal_id = :id
-                GROUP BY oa_status
-                ORDER BY n DESC, oa_status NULLS LAST
+            text(f"""
+                SELECT p.oa_status AS oa_status, COUNT(*) AS n
+                FROM publications p
+                WHERE p.journal_id = :id
+                  AND {publication_in_perimeter("p")}
+                GROUP BY p.oa_status
+                ORDER BY n DESC, p.oa_status NULLS LAST
             """),
             {"id": journal_id},
         ).all()
@@ -393,7 +400,7 @@ class PgJournalQueries(JournalQueries):
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN subjects s ON s.id = ps.subject_id
                 WHERE p.journal_id = :id
-                  AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
+                  AND {publication_in_perimeter("p")}
                   AND s.usage_count <= 5000
                 GROUP BY s.id, s.label, s.ontologies
                 ORDER BY n DESC, lower(s.label)

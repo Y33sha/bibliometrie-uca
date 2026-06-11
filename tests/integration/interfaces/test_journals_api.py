@@ -67,6 +67,29 @@ def _seed_journal(title: str | None = None, publisher_id: int | None = None) -> 
         return cur.fetchone()["id"]
 
 
+def _add_in_perimeter_authorships(journal_id: int) -> None:
+    """Pose un authorship in_perimeter (personne non rejetée) sur chaque
+    publication de la revue : les requêtes journals/publishers ne comptent que
+    les publications du périmètre."""
+    with _pool() as cur:
+        cur.execute("SELECT id FROM publications WHERE journal_id = %s", (journal_id,))
+        pub_ids = [r["id"] for r in cur.fetchall()]
+        for pid in pub_ids:
+            name = _uniq("Author")
+            cur.execute(
+                "INSERT INTO persons "
+                "(last_name, first_name, last_name_normalized, first_name_normalized) "
+                "VALUES (%s, 'Jane', normalize_name_form(%s), 'jane') RETURNING id",
+                (name, name),
+            )
+            person_id = cur.fetchone()["id"]
+            cur.execute(
+                "INSERT INTO authorships (publication_id, person_id, in_perimeter, roles) "
+                "VALUES (%s, %s, TRUE, ARRAY['author'])",
+                (pid, person_id),
+            )
+
+
 @pytest.fixture(scope="module", autouse=True)
 def _cleanup_after_module():
     yield
@@ -149,6 +172,7 @@ class TestListJournals:
                 "INSERT INTO publications (title, pub_year, journal_id) VALUES ('p1', 2024, %s)",
                 (with_data,),
             )
+        _add_in_perimeter_authorships(with_data)
         r = client.get("/api/journals", params={"with_pubs": "true", "per_page": 200})
         assert r.status_code == 200
         titles = {j["title"] for j in r.json()["journals"]}
@@ -315,6 +339,7 @@ class TestJournalDashboard:
                 "       ('p3', 2024, 'preprint', NULL, %s)",
                 (jid, jid, jid),
             )
+        _add_in_perimeter_authorships(jid)
         r = client.get(f"/api/journals/{jid}/dashboard")
         assert r.status_code == 200
         body = r.json()
@@ -334,6 +359,7 @@ class TestJournalDashboard:
                 "VALUES ('p1', 2024, 'article', %s), ('p2', 2024, 'conference_paper', %s)",
                 (jid, jid),
             )
+        _add_in_perimeter_authorships(jid)
         r = client.get(f"/api/journals/{jid}/dashboard")
         body = r.json()
         by_dt = {d["doc_type"]: d for d in body["doc_types"]}
@@ -351,6 +377,7 @@ class TestJournalDashboard:
                 "       ('p3', 2024, 'unknown', %s)",
                 (jid, jid, jid),
             )
+        _add_in_perimeter_authorships(jid)
         r = client.get(f"/api/journals/{jid}/dashboard")
         body = r.json()
         by_oa = {o["oa_status"]: o for o in body["oa_statuses"]}
@@ -370,6 +397,7 @@ class TestJournalDashboard:
                 "VALUES ('p1', 2024, 'gold', %s), ('p2', 2024, 'closed', %s)",
                 (jid, jid),
             )
+        _add_in_perimeter_authorships(jid)
         r = client.get(f"/api/journals/{jid}/dashboard")
         body = r.json()
         assert body["expected_oa_statuses"] == []
@@ -412,6 +440,7 @@ class TestJournalSubjects:
                 "VALUES (%s, %s, 'hal'), (%s, %s, 'hal'), (%s, %s, 'hal')",
                 (pub_ids[0], spec_id, pub_ids[1], spec_id, pub_ids[0], gen_id),
             )
+        _add_in_perimeter_authorships(jid)
         r = client.get(f"/api/journals/{jid}/subjects")
         assert r.status_code == 200
         body = r.json()

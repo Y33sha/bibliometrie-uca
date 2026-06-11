@@ -19,9 +19,9 @@ from application.ports.api.publishers_queries import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.normalize import normalize_text
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from infrastructure.db.tables import publishers as t_publishers
+from infrastructure.queries.filters import publication_in_perimeter
 
 
 def _build_publisher_where(
@@ -63,7 +63,7 @@ def _build_publisher_where(
             "EXISTS ("
             " SELECT 1 FROM publications pub"
             " JOIN journals j ON j.id = pub.journal_id"
-            " WHERE j.publisher_id = p.id"
+            f" WHERE j.publisher_id = p.id AND {publication_in_perimeter('pub')}"
             ")"
         )
     return (" AND ".join(parts) if parts else "TRUE", binds)
@@ -137,7 +137,8 @@ class PgPublisherQueries(PublisherQueries):
                         WHERE j.publisher_id = p.id) AS journal_count,
                        (SELECT COUNT(*) FROM publications pub
                         JOIN journals j2 ON j2.id = pub.journal_id
-                        WHERE j2.publisher_id = p.id) AS pub_count,
+                        WHERE j2.publisher_id = p.id
+                          AND {publication_in_perimeter("pub")}) AS pub_count,
                        {_doi_prefixes_sql()} AS doi_prefixes
                 FROM publishers p
                 WHERE {where}
@@ -241,7 +242,8 @@ class PgPublisherQueries(PublisherQueries):
                         WHERE j.publisher_id = p.id) AS journal_count,
                        (SELECT COUNT(*) FROM publications pub
                         JOIN journals j2 ON j2.id = pub.journal_id
-                        WHERE j2.publisher_id = p.id) AS pub_count,
+                        WHERE j2.publisher_id = p.id
+                          AND {publication_in_perimeter("pub")}) AS pub_count,
                        {_doi_prefixes_sql()} AS doi_prefixes
                 FROM publishers p
                 WHERE p.id = :id
@@ -282,22 +284,24 @@ class PgPublisherQueries(PublisherQueries):
             {"id": publisher_id},
         ).all()
         doc_type_rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT p.doc_type, COUNT(*) AS n
                 FROM publications p
                 JOIN journals j ON j.id = p.journal_id
                 WHERE j.publisher_id = :id
+                  AND {publication_in_perimeter("p")}
                 GROUP BY p.doc_type
                 ORDER BY n DESC, p.doc_type NULLS LAST
             """),
             {"id": publisher_id},
         ).all()
         oa_rows = self._conn.execute(
-            text("""
+            text(f"""
                 SELECT p.oa_status, COUNT(*) AS n
                 FROM publications p
                 JOIN journals j ON j.id = p.journal_id
                 WHERE j.publisher_id = :id
+                  AND {publication_in_perimeter("p")}
                 GROUP BY p.oa_status
                 ORDER BY n DESC, p.oa_status NULLS LAST
             """),
@@ -331,7 +335,7 @@ class PgPublisherQueries(PublisherQueries):
                 JOIN journals j ON j.id = p.journal_id
                 JOIN subjects s ON s.id = ps.subject_id
                 WHERE j.publisher_id = :id
-                  AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
+                  AND {publication_in_perimeter("p")}
                   AND s.usage_count <= 5000
                 GROUP BY s.id, s.label, s.ontologies
                 ORDER BY n DESC, lower(s.label)
