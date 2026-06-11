@@ -468,10 +468,12 @@ def phase_authorships(**kw: Any) -> Any:
 def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     """Detection des pays des adresses et recalcul sur les publications."""
     metrics = PhaseMetrics()
+    _log_countries_summary("Bilan initial")
     metrics.merge(_run_detect_address_countries())
     metrics.merge(_run_detect_institution_countries())
     metrics.merge(_run_suggest_address_countries(reset_empty=MODES[mode].reset_country_suggestions))
     _run_refresh_publication_countries()
+    _log_countries_summary("Bilan final")
     return metrics
 
 
@@ -1479,6 +1481,26 @@ def _run_detect_address_countries() -> PhaseMetrics:
         metrics.as_summary(),
     )
     return metrics
+
+
+def _log_countries_summary(label: str) -> None:
+    """Bilan global de l'état pays des adresses, en début et fin de phase countries."""
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.countries import count_address_country_status
+
+    conn = get_sync_engine().connect()
+    try:
+        s = count_address_country_status(conn)
+    finally:
+        conn.close()
+    log.info(
+        "%s — adresses (pub_count > 0) : %d total | %d avec pays | %d avec suggestion | %d sans rien",
+        label,
+        s.total,
+        s.with_country,
+        s.with_suggestion,
+        s.none,
+    )
 
 
 def _run_detect_institution_countries() -> PhaseMetrics:

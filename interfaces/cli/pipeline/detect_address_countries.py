@@ -21,15 +21,16 @@ Usage:
 import argparse
 from collections import Counter
 
-from sqlalchemy import Connection, bindparam, select, text, update
+from sqlalchemy import Connection, bindparam, select, update
 
 from application.pipeline.metrics import PhaseMetrics
 from domain.normalize import normalize_text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.tables import addresses, place_name_forms
 from infrastructure.observability.log import setup_logger
+from infrastructure.queries.pipeline.countries import count_address_country_status
 
-logger = setup_logger("suggest_countries", "processing/logs")
+logger = setup_logger("detect_countries", "processing/logs")
 
 
 def load_country_forms(conn: Connection) -> dict[str, str]:
@@ -49,22 +50,14 @@ def extract_last_segment(raw_text: str) -> str:
 
 
 def show_stats(conn: Connection) -> None:
-    # count(*) FILTER (...) : reste en text() (peu lisible en SA Core)
-    row = conn.execute(
-        text("""
-            SELECT count(*) AS total,
-                   count(*) FILTER (WHERE countries IS NOT NULL) AS avec_pays,
-                   count(*) FILTER (WHERE countries IS NULL AND suggested_countries IS NOT NULL
-                                    AND array_length(suggested_countries, 1) > 0) AS avec_suggestion,
-                   count(*) FILTER (WHERE countries IS NULL AND suggested_countries IS NULL) AS sans_rien
-            FROM addresses WHERE pub_count > 0
-        """)
-    ).one()
+    """Affiche le bilan global (mode `--stats` du CLI). Dans le pipeline, le bilan
+    est logué une fois en début et une fois en fin de phase, pas ici."""
+    s = count_address_country_status(conn)
     logger.info("Adresses (pub_count > 0) :")
-    logger.info(f"  Total            : {row.total}")
-    logger.info(f"  Avec pays        : {row.avec_pays}")
-    logger.info(f"  Avec suggestion  : {row.avec_suggestion}")
-    logger.info(f"  Sans rien        : {row.sans_rien}")
+    logger.info(f"  Total            : {s.total}")
+    logger.info(f"  Avec pays        : {s.with_country}")
+    logger.info(f"  Avec suggestion  : {s.with_suggestion}")
+    logger.info(f"  Sans rien        : {s.none}")
 
 
 def detect_countries(
@@ -135,7 +128,6 @@ def detect_countries(
     conn.commit()
 
     logger.info(f"{len(matched)} adresses mises à jour ({column.name})")
-    show_stats(conn)
     return PhaseMetrics(total=len(rows), new=len(matched), extras={"unmatched": unmatched})
 
 
