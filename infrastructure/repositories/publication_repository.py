@@ -294,7 +294,7 @@ class PgPublicationRepository:
 
         1. Transfert des `source_publications` (FK vers target).
         2. Transfert des `authorships` vérité (avec déduplication par `person_id` : si target a déjà une row pour ce person, on supprime celle de source au lieu de la déplacer).
-        3. Nettoyage des paires `distinct_publications` impliquant source.
+        3. Repointage des paires `distinct_publications` de source vers target (la distinction est préservée, pas perdue).
         4. Suppression de la ligne `publications` source.
 
         L'enrichissement des métadonnées canoniques (doi, oa_status, countries, etc.) est porté par `Publication.absorb(other)` côté domaine et persisté par `repo.save(target)` côté application — pas par cette méthode. Le caller (`application.publications.merge_publications`) orchestre : absorb → save → merge_into → update_sources.
@@ -321,11 +321,30 @@ class PgPublicationRepository:
             {"t": target_id, "s": source_id},
         )
 
-        # 3. Nettoyer distinct_publications et supprimer la source
+        # 3. Repointer distinct_publications de source vers target : pour chaque
+        #    paire (source, autre), insérer (autre, target) réordonnée. On écarte
+        #    l'auto-paire (autre = target) et on dédoublonne via ON CONFLICT, puis
+        #    on supprime les anciennes paires de source.
+        self._conn.execute(
+            text("""
+                INSERT INTO distinct_publications (pub_id_a, pub_id_b)
+                SELECT LEAST(other_id, :t), GREATEST(other_id, :t)
+                FROM (
+                    SELECT CASE WHEN pub_id_a = :s THEN pub_id_b ELSE pub_id_a END AS other_id
+                    FROM distinct_publications
+                    WHERE pub_id_a = :s OR pub_id_b = :s
+                ) AS pairs
+                WHERE other_id <> :t
+                ON CONFLICT (pub_id_a, pub_id_b) DO NOTHING
+            """),
+            {"t": target_id, "s": source_id},
+        )
         self._conn.execute(
             text("DELETE FROM distinct_publications WHERE pub_id_a = :s OR pub_id_b = :s"),
             {"s": source_id},
         )
+
+        # 4. Supprimer la source.
         self._conn.execute(text("DELETE FROM publications WHERE id = :s"), {"s": source_id})
 
     # ── Suppression ────────────────────────────────────────────────

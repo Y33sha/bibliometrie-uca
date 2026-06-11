@@ -270,3 +270,58 @@ class TestMarkDistinct:
             {"a": min(p1, p2), "b": max(p1, p2)},
         ).scalar_one()
         assert n == 1
+
+
+class TestMergeRepointsDistinct:
+    """Une fusion repointe les paires `distinct_publications` du perdant vers le
+    gagnant (au lieu de les supprimer) : la distinction survit à la fusion."""
+
+    @staticmethod
+    def _pairs(conn) -> set[tuple[int, int]]:
+        return {
+            (r.pub_id_a, r.pub_id_b)
+            for r in conn.execute(
+                text("SELECT pub_id_a, pub_id_b FROM distinct_publications")
+            ).all()
+        }
+
+    def test_repoints_loser_to_winner(self, sa_sync_conn, repo):
+        winner = _insert_publication(sa_sync_conn, title="Winner")
+        loser = _insert_publication(sa_sync_conn, title="Loser")
+        other = _insert_publication(sa_sync_conn, title="Other")
+        mark_distinct(loser, other, repo=repo)  # (loser, other) distinctes
+
+        merge_publications(winner, loser, repo=repo)  # loser absorbée par winner
+
+        pairs = self._pairs(sa_sync_conn)
+        assert (min(winner, other), max(winner, other)) in pairs
+        assert all(loser not in pair for pair in pairs)  # plus de référence au perdant
+
+    def test_dedupes_when_target_pair_exists(self, sa_sync_conn, repo):
+        winner = _insert_publication(sa_sync_conn, title="Winner")
+        loser = _insert_publication(sa_sync_conn, title="Loser")
+        other = _insert_publication(sa_sync_conn, title="Other")
+        mark_distinct(loser, other, repo=repo)
+        mark_distinct(winner, other, repo=repo)  # la paire cible existe déjà
+
+        merge_publications(winner, loser, repo=repo)
+
+        n = sa_sync_conn.execute(
+            text(
+                "SELECT COUNT(*) AS n FROM distinct_publications "
+                "WHERE pub_id_a = :a AND pub_id_b = :b"
+            ),
+            {"a": min(winner, other), "b": max(winner, other)},
+        ).scalar_one()
+        assert n == 1  # ON CONFLICT DO NOTHING : pas de doublon
+
+    def test_drops_self_pair(self, sa_sync_conn, repo):
+        """Défensif : si perdant et gagnant étaient marqués distincts, la fusion
+        ne crée pas d'auto-paire (gagnant, gagnant)."""
+        winner = _insert_publication(sa_sync_conn, title="Winner")
+        loser = _insert_publication(sa_sync_conn, title="Loser")
+        mark_distinct(winner, loser, repo=repo)
+
+        merge_publications(winner, loser, repo=repo)
+
+        assert all(winner not in pair for pair in self._pairs(sa_sync_conn))
