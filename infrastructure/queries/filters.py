@@ -29,15 +29,22 @@ def _sql_list(values: tuple[str, ...]) -> str:
 OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
 OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
 
-# Filtre SQL : la publication a au moins un authorship dans le périmètre.
-# Exclut les doc_types out-of-scope et les personnes rejetées (fausses
-# entités).
-PUBLICATION_IS_IN_PERIMETER = f"""(
+
+def publication_in_perimeter(alias: str = "p") -> str:
+    """Filtre SQL : la publication (table `publications` aliasée `alias`) a au
+    moins un authorship dans le périmètre (personne non rejetée) et un doc_type
+    in-scope. `alias` paramètre le nom de l'alias dans la requête appelante —
+    nécessaire quand `p` est déjà pris (ex. le publisher dans `publishers.py`)."""
+    return f"""(
     EXISTS (SELECT 1 FROM authorships a
             JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
-            WHERE a.publication_id = p.id AND a.in_perimeter = TRUE)
-    AND p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
+            WHERE a.publication_id = {alias}.id AND a.in_perimeter = TRUE)
+    AND {alias}.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
 )"""
+
+
+# La plupart des requêtes aliasent les publications `p` : constante de commodité.
+PUBLICATION_IS_IN_PERIMETER = publication_in_perimeter()
 
 
 @dataclass(frozen=True)
