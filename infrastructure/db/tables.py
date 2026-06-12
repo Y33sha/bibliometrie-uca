@@ -451,6 +451,10 @@ addresses = Table(
     Column("pub_count", Integer, server_default="0"),
     Column("countries", ARRAY(CHAR(2))),
     Column("suggested_countries", ARRAY(CHAR(2))),
+    # Refresh pays incrémental : True = `countries` vient de changer, les `sa`
+    # liés sont à recalculer. Posé gratuitement à l'écriture de `countries`
+    # (detect / institution), dérivé par JOIN au refresh, purgé en fin de cascade.
+    Column("countries_dirty", Boolean, nullable=False, server_default="false"),
     # Index UNIQUE sur expression md5(raw_text) — complété à la main, hors
     # de portée de --autogenerate qui ne sait pas représenter l'expression.
     Index("addresses_raw_text_key", text("md5(raw_text)"), unique=True),
