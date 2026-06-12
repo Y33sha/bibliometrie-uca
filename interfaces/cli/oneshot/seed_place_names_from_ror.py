@@ -8,9 +8,10 @@ propre, sans inférence empirique.
 Deux modes :
   --build : télécharge le dump ROR v2.8 (épinglé, reproductible), aplatit
             `names[].value × locations[].geonames_details.country_code`, ne garde
-            que les formes **mono-pays** et **hors acronymes** (les acronymes
-            courts/communs génèrent des faux positifs que le prune ne rattrape
-            pas), normalise via `normalize_text`, écrit `data/ror_institutions.csv`.
+            que les formes **mono-pays**, **hors acronymes**, **non purement
+            numériques** et **≥ 6 caractères** (acronymes, numériques et formes
+            courtes génèrent des faux positifs que le prune ne rattrape pas),
+            normalise via `normalize_text`, écrit `data/ror_institutions.csv`.
   (défaut): lit `data/ror_institutions.csv` et insère `kind='institution'`
             (`ON CONFLICT (form_normalized) DO NOTHING`, idempotent).
 
@@ -67,7 +68,9 @@ def build_csv() -> None:
             continue
         for name in org.get("names", []):
             form = normalize_text(name.get("value", ""))
-            if not form or len(form) < 3:
+            # Écarte les formes purement numériques (codes/numéros pris pour des
+            # noms d'orgs) et les formes trop courtes (< 6 car. → faux positifs).
+            if not form or form.isdigit() or len(form) < 6:
                 continue
             form_countries[form] |= countries
             if "acronym" not in name.get("types", []):
