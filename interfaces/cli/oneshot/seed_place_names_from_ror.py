@@ -21,6 +21,7 @@ entre machines. À lancer après avoir vidé les anciennes formes non-country.
 Usage :
     python -m interfaces.cli.oneshot.seed_place_names_from_ror --build
     python -m interfaces.cli.oneshot.seed_place_names_from_ror
+    python -m interfaces.cli.oneshot.seed_place_names_from_ror --csv data/empirical_not_in_ror.csv
 """
 
 import argparse
@@ -88,11 +89,13 @@ def build_csv() -> None:
     logger.info(f"{len(rows)} formes mono-pays hors acronymes → {CSV_PATH}")
 
 
-def seed() -> None:
-    """Insère les formes du CSV dans `place_name_forms` (idempotent)."""
-    with open(CSV_PATH, encoding="utf-8") as f:
+def seed(csv_path: str) -> None:
+    """Insère les formes d'un CSV (`iso_code`, `form_normalized`) dans
+    `place_name_forms` (`kind='institution'`, idempotent). Sert pour le CSV ROR
+    comme pour un CSV de formes empiriques curées."""
+    with open(csv_path, encoding="utf-8") as f:
         rows = [(r["iso_code"], r["form_normalized"]) for r in csv.DictReader(f)]
-    logger.info(f"{len(rows)} formes à insérer depuis {CSV_PATH}")
+    logger.info(f"{len(rows)} formes à insérer depuis {csv_path}")
 
     stmt = text("""
         INSERT INTO place_name_forms (iso_code, form_normalized, kind)
@@ -117,11 +120,14 @@ def main() -> None:
     parser.add_argument(
         "--build", action="store_true", help="(Re)générer le CSV depuis le dump ROR"
     )
+    parser.add_argument(
+        "--csv", default=CSV_PATH, help="CSV à seeder (iso_code, form_normalized)"
+    )
     args = parser.parse_args()
     if args.build:
         build_csv()
     else:
-        seed()
+        seed(args.csv)
 
 
 if __name__ == "__main__":
