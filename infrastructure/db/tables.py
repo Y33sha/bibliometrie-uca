@@ -486,14 +486,16 @@ place_name_forms = Table(
     # `iso_code` en minuscule (canonique, cf. countries.code / addresses.countries).
     Column("iso_code", Text, nullable=False),
     Column("form_normalized", Text, nullable=False),
-    # `country` (noms de pays, détectés en fin d'adresse) | `institution`
-    # (universités, CHU… détectés n'importe où). Défaut `country` : legacy +
-    # résolution nom-de-pays → ISO ; les institutions posent `institution`.
+    # `country` (noms de pays, détectés en fin d'adresse) | `institution` /
+    # `city` (lieux détectés n'importe où, via la passe place). Défaut `country` :
+    # legacy + résolution nom-de-pays → ISO.
     Column("kind", Text, nullable=False, server_default="country"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("form_normalized", name="place_name_forms_form_normalized_key"),
     Index("idx_pnf_iso", "iso_code"),
-    CheckConstraint("kind IN ('country', 'institution')", name="place_name_forms_kind_check"),
+    CheckConstraint(
+        "kind IN ('country', 'institution', 'city')", name="place_name_forms_kind_check"
+    ),
 )
 
 

@@ -50,8 +50,8 @@ Lecture seule sur la base de prod, avant de figer le critère de génération.
 - [x] Casse canonicalisée en **minuscule** : `place_name_forms.iso_code` + `publishers.country` étaient les seuls outliers vs `countries.code` / `addresses.countries` / la cascade. Conversions retirées (`detect` n'a plus de `.lower()` par adresse ; OpenAlex enrich lowercase à l'entrée) ; affichage front en MAJ (présentation).
 - [ ] Marches suivantes (même méthode, expressions) : villes, codes postaux, autres formes d'universités (universidad / università / universität…).
 
-### 3. Détection des institutions (logique pipeline)
-- [x] Passe `detect_institution_countries` (automate Aho-Corasick sur `place_name_forms` `kind = 'institution'`, match au mot près n'importe où) → `countries` (autoritaire) quand toutes les institutions matchées s'accordent ; conflit (pays multiples) → ignoré, laissé à `suggest`. Câblée entre `detect_address_countries` (noms de pays, fin de segment) et `suggest`. Rendement mesuré : **12 297** adresses résolues (~6% des sans-pays), 72 conflits, 0,7s.
+### 3. Détection des lieux (logique pipeline)
+- [x] Passe `detect_place_countries` (automate Aho-Corasick sur `place_name_forms` `kind IN ('institution', 'city')`, match au mot près n'importe où) → `countries` (autoritaire) quand tous les lieux matchés s'accordent ; conflit (pays multiples) → ignoré, laissé à `suggest`. Câblée entre `detect_address_countries` (noms de pays, fin de segment) et `suggest`. Rendement mesuré (institutions seules) : **12 297** adresses résolues (~6% des sans-pays), 72 conflits, 0,7s.
 
 ### 4. `suggest` : retry-vides idempotent
 - [x] `reset` / `reset_empty` supprimés (scan ~34s en moins). Le mode full (`retry_empty`) réessaie les nouvelles **+ les vides** (`= []`, échecs précédents — au cas où le pool aurait grossi), **sans recalculer les positives** (rarement changeantes, coûteuses : recalculer tout faisait 164k/~160s vs 47k/~55s). Écriture idempotente (`IS DISTINCT FROM`). Incrémental : nouvelles seulement. Attribut de mode `reset_country_suggestions` → `retry_empty_country_suggestions`.
