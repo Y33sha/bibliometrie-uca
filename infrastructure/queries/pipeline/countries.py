@@ -197,7 +197,8 @@ def count_address_country_status(conn: Connection) -> AddressCountryStatus:
                     WHERE countries IS NULL AND cardinality(suggested_countries) > 0
                 ) AS with_suggestion,
                 count(*) FILTER (
-                    WHERE countries IS NULL AND suggested_countries IS NULL
+                    WHERE countries IS NULL
+                      AND (suggested_countries IS NULL OR cardinality(suggested_countries) = 0)
                 ) AS none
             FROM addresses
             WHERE pub_count > 0
