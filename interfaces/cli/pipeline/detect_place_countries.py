@@ -1,18 +1,19 @@
 """
-Détection du pays d'adresses institutionnelles via les noms d'institutions.
+Détection du pays d'adresses via les noms de lieux (institutions, villes).
 
-Cherche les formes `place_name_forms` de `kind = 'institution'` (universités, CHU…)
-comme sous-chaînes du `normalized_text` de chaque adresse sans pays, via un automate
-Aho-Corasick (cf. application/pipeline/countries/place_name_detector.py). Quand
-toutes les institutions matchées pointent le même pays, écrit `countries`
-(autoritaire) ; en cas de conflit (pays multiples), n'écrit rien.
+Cherche les formes `place_name_forms` de `kind IN ('institution', 'city')`
+(universités, CHU, villes…) comme sous-chaînes du `normalized_text` de chaque
+adresse sans pays, via un automate Aho-Corasick (cf.
+application/pipeline/countries/place_name_detector.py). Quand tous les lieux
+matchés pointent le même pays, écrit `countries` (autoritaire) ; en cas de
+conflit (pays multiples), n'écrit rien.
 
 Se lance après detect_address_countries.py (noms de pays en fin de segment) et
 avant suggest_address_countries.py (emprunt flou).
 
 Usage:
-    python -m interfaces.cli.pipeline.detect_institution_countries
-    python -m interfaces.cli.pipeline.detect_institution_countries --suggest  # → suggested_countries
+    python -m interfaces.cli.pipeline.detect_place_countries
+    python -m interfaces.cli.pipeline.detect_place_countries --suggest  # → suggested_countries
 """
 
 import argparse
@@ -26,30 +27,30 @@ from infrastructure.db.tables import addresses, place_name_forms
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.pipeline.countries import write_countries
 
-logger = setup_logger("detect_institution_countries", "processing/logs")
+logger = setup_logger("detect_place_countries", "processing/logs")
 
 
-def load_institution_forms(conn: Connection) -> dict[str, str]:
-    """Charge les formes d'institutions (`place_name_forms`, `kind = 'institution'`)."""
+def load_place_forms(conn: Connection) -> dict[str, str]:
+    """Charge les noms de lieux (`place_name_forms`, `kind IN ('institution', 'city')`)."""
     stmt = select(place_name_forms.c.form_normalized, place_name_forms.c.iso_code).where(
-        place_name_forms.c.kind == "institution"
+        place_name_forms.c.kind.in_(("institution", "city"))
     )
     return {r.form_normalized: r.iso_code for r in conn.execute(stmt)}
 
 
-def detect_institution_countries(conn: Connection, *, direct: bool = True) -> PhaseMetrics:
-    """Détecte le pays d'adresses institutionnelles via les noms d'institutions.
+def detect_place_countries(conn: Connection, *, direct: bool = True) -> PhaseMetrics:
+    """Détecte le pays d'adresses via les noms de lieux (institutions, villes).
 
     Phase importable depuis `run_pipeline.py` ; ne ferme pas la connexion. Pour
-    chaque adresse sans pays, si toutes les institutions matchées pointent le même
-    pays, écrit `countries` (autoritaire ; `direct=False` → `suggested_countries`).
+    chaque adresse sans pays, si tous les lieux matchés pointent le même pays,
+    écrit `countries` (autoritaire ; `direct=False` → `suggested_countries`).
     Conflit (pays multiples) → rien écrit, laissé à la passe `suggest`.
 
     `total` = adresses sans pays examinées, `new` = adresses résolues,
     `extras["conflicts"]` = adresses à pays multiples ignorées.
     """
-    forms = load_institution_forms(conn)
-    logger.info(f"{len(forms)} formes d'institutions chargées")
+    forms = load_place_forms(conn)
+    logger.info(f"{len(forms)} noms de lieux chargés")
     if not forms:
         return PhaseMetrics()
     detector = PlaceNameDetector(forms)
@@ -88,7 +89,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     with get_sync_engine().connect() as conn:
-        metrics = detect_institution_countries(conn, direct=not args.suggest)
+        metrics = detect_place_countries(conn, direct=not args.suggest)
     logger.info(metrics.as_summary())
 
 
