@@ -34,7 +34,7 @@ from infrastructure.queries.pipeline.countries import (
     count_suggest_eligible,
     fetch_suggest_targets_chunk,
     load_country_pool,
-    write_suggested_countries,
+    write_countries,
 )
 
 logger = setup_logger("suggest_countries", "processing/logs")
@@ -97,7 +97,7 @@ def suggest_countries(
 
         suggestions = CountrySuggester(targets).suggest(pool)
         rows = [(addr_id, suggestions.get(addr_id, [])) for addr_id, _ in targets]
-        write_suggested_countries(conn, rows, target_column=target_column)
+        write_countries(conn, rows, target_column=target_column)
         conn.commit()
 
         processed += len(targets)

@@ -21,7 +21,7 @@ Usage:
 import argparse
 from collections import Counter
 
-from sqlalchemy import Connection, bindparam, select, update
+from sqlalchemy import Connection, select
 
 from application.pipeline.metrics import PhaseMetrics
 from domain.normalize import normalize_text
@@ -30,7 +30,7 @@ from infrastructure.db.tables import addresses, place_name_forms
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.pipeline.countries import (
     count_address_country_status,
-    mark_source_authorships_dirty_for_addresses,
+    write_countries,
 )
 
 logger = setup_logger("detect_countries", "processing/logs")
@@ -116,24 +116,15 @@ def detect_countries(
         logger.info("\nDry-run — ajouter --apply pour appliquer.")
         return PhaseMetrics(total=len(rows), extras={"unmatched": unmatched})
 
-    column = addresses.c.countries if direct else addresses.c.suggested_countries
-    stmt = (
-        update(addresses)
-        .where(addresses.c.id == bindparam("addr_id"))
-        .values({column: bindparam("val")})
+    target_column = "countries" if direct else "suggested_countries"
+    # Écriture bulk ; en mode `countries`, `write_countries` pose aussi
+    # `addresses.countries_dirty` → le refresh recalcule les sa liés.
+    write_countries(
+        conn, [(addr_id, [iso]) for addr_id, iso in matched], target_column=target_column
     )
-    for i in range(0, len(matched), 5000):
-        batch = matched[i : i + 5000]
-        conn.execute(
-            stmt,
-            [{"addr_id": addr_id, "val": [iso]} for addr_id, iso in batch],
-        )
-    if direct and matched:
-        # countries a changé → marquer dirty les sa liés pour le refresh incrémental.
-        mark_source_authorships_dirty_for_addresses(conn, [addr_id for addr_id, _ in matched])
     conn.commit()
 
-    logger.info(f"{len(matched)} adresses mises à jour ({column.name})")
+    logger.info(f"{len(matched)} adresses mises à jour ({target_column})")
     return PhaseMetrics(total=len(rows), new=len(matched), extras={"unmatched": unmatched})
 
 

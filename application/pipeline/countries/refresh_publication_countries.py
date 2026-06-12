@@ -39,8 +39,9 @@ def refresh(conn: Connection, queries: CountryQueries, logger: logging.Logger) -
     # Étape 3 : publications.countries (dont un sp a un sa dirty)
     updated = queries.refresh_publication_countries(conn)
 
-    # Le flag `countries_dirty` a borné la portée des 3 étapes : on le purge.
-    queries.clear_source_authorships_dirty(conn)
+    # Les flags `countries_dirty` (sa + adresses) ont borné la portée des 3
+    # étapes : on les purge.
+    queries.clear_countries_dirty(conn)
 
     elapsed = time.perf_counter() - t0
     logger.info(f"{updated} publications mises à jour en {elapsed:.1f}s")

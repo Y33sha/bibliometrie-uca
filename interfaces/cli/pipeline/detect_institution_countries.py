@@ -24,10 +24,7 @@ from application.pipeline.metrics import PhaseMetrics
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.tables import addresses, place_name_forms
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.countries import (
-    mark_source_authorships_dirty_for_addresses,
-    write_suggested_countries,
-)
+from infrastructure.queries.pipeline.countries import write_countries
 
 logger = setup_logger("detect_institution_countries", "processing/logs")
 
@@ -74,12 +71,9 @@ def detect_institution_countries(conn: Connection, *, direct: bool = True) -> Ph
             conflicts += 1
     logger.info(f"Résolues : {len(matched)}, conflits (pays multiples, ignorés) : {conflicts}")
 
-    write_suggested_countries(
-        conn, matched, target_column="countries" if direct else "suggested_countries"
-    )
-    if direct and matched:
-        # countries a changé → marquer dirty les sa liés pour le refresh incrémental.
-        mark_source_authorships_dirty_for_addresses(conn, [addr_id for addr_id, _ in matched])
+    # En mode `countries`, `write_countries` pose aussi `addresses.countries_dirty`
+    # → le refresh recalcule les sa liés (pas de marquage de masse des sa).
+    write_countries(conn, matched, target_column="countries" if direct else "suggested_countries")
     conn.commit()
 
     return PhaseMetrics(total=len(rows), new=len(matched), extras={"conflicts": conflicts})
