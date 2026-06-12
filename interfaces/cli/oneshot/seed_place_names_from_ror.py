@@ -89,17 +89,22 @@ def build_csv() -> None:
     logger.info(f"{len(rows)} formes mono-pays hors acronymes → {CSV_PATH}")
 
 
-def seed(csv_path: str) -> None:
-    """Insère les formes d'un CSV (`iso_code`, `form_normalized`) dans
-    `place_name_forms` (`kind='institution'`, idempotent). Sert pour le CSV ROR
-    comme pour un CSV de formes empiriques curées."""
+def seed(csv_path: str, default_kind: str = "institution") -> None:
+    """Insère les formes d'un CSV dans `place_name_forms` (idempotent).
+
+    Colonnes attendues : `iso_code`, `form_normalized`, et `kind` optionnel. Le
+    `kind` est lu par ligne si la colonne existe, sinon `default_kind` — pour un
+    CSV homogène (ROR, formes empiriques) comme pour un mélange villes/institutions."""
     with open(csv_path, encoding="utf-8") as f:
-        rows = [(r["iso_code"], r["form_normalized"]) for r in csv.DictReader(f)]
+        rows = [
+            (r["iso_code"], r["form_normalized"], r.get("kind") or default_kind)
+            for r in csv.DictReader(f)
+        ]
     logger.info(f"{len(rows)} formes à insérer depuis {csv_path}")
 
     stmt = text("""
         INSERT INTO place_name_forms (iso_code, form_normalized, kind)
-        SELECT e->>'i', e->>'f', 'institution'
+        SELECT e->>'i', e->>'f', e->>'k'
         FROM jsonb_array_elements(CAST(:payload AS jsonb)) e
         ON CONFLICT (form_normalized) DO NOTHING
     """)
@@ -108,7 +113,7 @@ def seed(csv_path: str) -> None:
     with get_sync_engine().connect() as conn:
         for i in range(0, len(rows), BATCH):
             batch = rows[i : i + BATCH]
-            payload = json.dumps([{"i": iso, "f": form} for iso, form in batch])
+            payload = json.dumps([{"i": iso, "f": form, "k": kind} for iso, form, kind in batch])
             inserted += conn.execute(stmt, {"payload": payload}).rowcount
             conn.commit()
             logger.info(f"  {min(i + BATCH, len(rows))}/{len(rows)}")
@@ -121,13 +126,16 @@ def main() -> None:
         "--build", action="store_true", help="(Re)générer le CSV depuis le dump ROR"
     )
     parser.add_argument(
-        "--csv", default=CSV_PATH, help="CSV à seeder (iso_code, form_normalized)"
+        "--csv", default=CSV_PATH, help="CSV à seeder (iso_code, form_normalized, kind?)"
+    )
+    parser.add_argument(
+        "--kind", default="institution", help="kind par défaut si la colonne `kind` est absente"
     )
     args = parser.parse_args()
     if args.build:
         build_csv()
     else:
-        seed(args.csv)
+        seed(args.csv, args.kind)
 
 
 if __name__ == "__main__":
