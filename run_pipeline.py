@@ -303,11 +303,11 @@ def phase_publishers_journals(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     1. `resolve_doi_prefixes` (toujours actif) : préfixe DOI → Registration
        Agency + éditeur Crossref / repository DataCite.
     2. `enrich_journals_from_openalex` (gated par `run_journal_enrichment`) :
-       OpenAlex Sources → APC + DOAJ flag + journal_type.
+       OpenAlex Sources → APC + journal_type.
     3. `enrich_journals_from_doaj` (gated par `run_journal_enrichment`) :
        dump CSV DOAJ (téléchargé au plus tous les ~30 jours dans `data/doaj/`) →
-       `doaj_payload` + `is_in_doaj` pour tout le catalogue. DOAJ fait autorité
-       (reset global puis re-pose des TRUE), surclasse le `is_in_doaj` posé en 2.
+       `doaj_payload` + `is_in_doaj` pour tout le catalogue. DOAJ fait autorité et
+       est seul à poser `is_in_doaj` (reset global puis re-pose des TRUE).
     4. `enrich_publishers_from_openalex` (gated par `run_journal_enrichment`) :
        OpenAlex Publishers → country + ror.
     5. `enrich_publishers_from_crossref_members` (gated par `run_journal_enrichment`) :

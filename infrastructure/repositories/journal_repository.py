@@ -268,27 +268,25 @@ class PgJournalRepository:
         *,
         apc_amount: float | None = None,
         apc_currency: str | None = None,
-        is_in_doaj: bool | None = None,
     ) -> None:
-        """Met à jour les infos APC/DOAJ (COALESCE : champs None ignorés)."""
+        """Met à jour les infos APC (COALESCE : champs None ignorés)."""
         stmt = (
             update(journals)
             .where(journals.c.id == journal_id)
             .values(
                 apc_amount=func.coalesce(apc_amount, journals.c.apc_amount),
                 apc_currency=func.coalesce(apc_currency, journals.c.apc_currency),
-                is_in_doaj=func.coalesce(is_in_doaj, journals.c.is_in_doaj),
             )
         )
         self._conn.execute(stmt)
 
     def reset_journal_apc(self) -> int:
-        """Réinitialise les APC/DOAJ de toutes les revues avec openalex_id.
+        """Réinitialise les APC de toutes les revues avec openalex_id.
         Retourne le nombre de lignes touchées."""
         stmt = (
             update(journals)
             .where(journals.c.openalex_id.is_not(None))
-            .values(apc_amount=None, apc_currency="EUR", is_in_doaj=False)
+            .values(apc_amount=None, apc_currency="EUR")
         )
         return self._conn.execute(stmt).rowcount
 

@@ -137,20 +137,18 @@ def update_journal_apc(
     *,
     apc_amount: float | None = None,
     apc_currency: str | None = None,
-    is_in_doaj: bool | None = None,
     repo: JournalRepository,
 ) -> None:
-    """Met à jour les informations APC/DOAJ d'un journal."""
+    """Met à jour les informations APC d'un journal."""
     repo.update_journal_apc(
         journal_id,
         apc_amount=apc_amount,
         apc_currency=apc_currency,
-        is_in_doaj=is_in_doaj,
     )
 
 
 def reset_journal_apc(*, repo: JournalRepository) -> int:
-    """Réinitialise les APC/DOAJ de toutes les revues avec openalex_id."""
+    """Réinitialise les APC de toutes les revues avec openalex_id."""
     return repo.reset_journal_apc()
 
 
