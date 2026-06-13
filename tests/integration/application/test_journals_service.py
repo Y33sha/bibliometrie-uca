@@ -1,9 +1,9 @@
 """Tests de caractérisation pour application/journals.py et
 application/publishers.py.
 
-Couvre les fonctions sync (find_or_create_*, update_journal_apc,
-reset_journal_apc — utilisées par le pipeline) et les fonctions async
-(update_journal, update_publisher, merge_*).
+Couvre les fonctions sync (find_or_create_*, update_journal_apc — utilisées
+par le pipeline) et les fonctions async (update_journal, update_publisher,
+merge_*).
 """
 
 import pytest
@@ -12,7 +12,6 @@ from sqlalchemy import text
 from application.journals import (
     find_or_create_journal,
     merge_journals,
-    reset_journal_apc,
     update_journal,
     update_journal_apc,
 )
@@ -254,7 +253,7 @@ class TestFindOrCreateJournal:
         assert row.publisher_id == pub_id
 
 
-# ── update_journal_apc / reset_journal_apc ─────────────────────────
+# ── update_journal_apc ─────────────────────────────────────────────
 
 
 class TestUpdateJournalApc:
@@ -331,32 +330,6 @@ class TestUpdatePublisher:
         )
         assert row.name == "Springer Nature"
         assert row.name_normalized == "springer nature"
-
-
-class TestResetJournalApc:
-    def test_resets_only_openalex_journals(self, sa_sync_conn, repo):
-        j1 = _insert_journal(
-            sa_sync_conn, "Nature", openalex_id="S1", apc_amount=3000.0, is_in_doaj=True
-        )
-        j2 = _insert_journal(
-            sa_sync_conn, "Manual", openalex_id=None, apc_amount=500.0, is_in_doaj=True
-        )
-
-        n = reset_journal_apc(repo=repo)
-
-        assert n == 1
-        row = _fetch_one(
-            sa_sync_conn, "SELECT apc_amount, is_in_doaj FROM journals WHERE id = :id", id=j1
-        )
-        assert row.apc_amount is None
-        # reset_journal_apc ne touche plus is_in_doaj (autorité DOAJ).
-        assert row.is_in_doaj is True
-        # j2 intact
-        row = _fetch_one(
-            sa_sync_conn, "SELECT apc_amount, is_in_doaj FROM journals WHERE id = :id", id=j2
-        )
-        assert float(row.apc_amount) == 500.0
-        assert row.is_in_doaj is True
 
 
 # ── merge_publishers ───────────────────────────────────────────────

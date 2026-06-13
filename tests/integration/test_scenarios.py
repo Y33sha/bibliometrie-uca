@@ -138,8 +138,10 @@ class TestPublisherTypesEnum:
 
 class TestJournalTypesEnum:
     def test_python_matches_db(self, sa_sync_conn):
-        """`JOURNAL_TYPES_SET` doit correspondre à l'enum SQL `journal_type`."""
+        """L'enum SQL `journal_type` doit correspondre au domaine
+        (`JOURNAL_TYPES_SET`) ET à la métadonnée SQLAlchemy (`tables.py`)."""
         from domain.journals.journal import JOURNAL_TYPES_SET
+        from infrastructure.db.tables import journal_type_enum
 
         db_types = set(
             sa_sync_conn.execute(
@@ -147,9 +149,14 @@ class TestJournalTypesEnum:
             ).scalars()
         )
         assert JOURNAL_TYPES_SET == db_types, (
-            f"Désynchronisation Python/DB !\n"
-            f"  Python : {sorted(JOURNAL_TYPES_SET)}\n"
-            f"  DB     : {sorted(db_types)}"
+            f"Désynchronisation domaine/DB !\n"
+            f"  Domaine : {sorted(JOURNAL_TYPES_SET)}\n"
+            f"  DB      : {sorted(db_types)}"
+        )
+        assert set(journal_type_enum.enums) == db_types, (
+            f"Désynchronisation tables.py/DB !\n"
+            f"  tables.py : {sorted(journal_type_enum.enums)}\n"
+            f"  DB        : {sorted(db_types)}"
         )
 
 

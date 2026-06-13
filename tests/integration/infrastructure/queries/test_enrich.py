@@ -7,7 +7,7 @@ from sqlalchemy import text
 from infrastructure.queries.pipeline.enrich import (
     doaj_last_import_at,
     fetch_journal_issn_index,
-    fetch_journals_needing_apc,
+    fetch_journals_of_unknown_type,
     fetch_publications_with_doi,
     reset_is_in_doaj,
 )
@@ -114,31 +114,31 @@ class TestFetchPublicationsWithDoi:
         assert any(oa == "gold" for _pid, _doi, oa in rows)
 
 
-class TestFetchJournalsNeedingApc:
+class TestFetchJournalsOfUnknownType:
     def test_returns_tuples(self, sa_sync_conn):
-        _create_journal(sa_sync_conn, openalex_id="S1", apc_amount=None)
-        rows = fetch_journals_needing_apc(sa_sync_conn)
+        _create_journal(sa_sync_conn, openalex_id="S1")  # journal_type 'unknown' par défaut
+        rows = fetch_journals_of_unknown_type(sa_sync_conn)
         assert rows
-        assert all(isinstance(r, tuple) for r in rows)
         for journal_id, oa_id in rows:
             assert isinstance(journal_id, int)
             assert isinstance(oa_id, str)
 
-    def test_returns_only_journals_with_openalex_and_no_apc(self, sa_sync_conn):
-        needs = _create_journal(sa_sync_conn, openalex_id="S1", apc_amount=None)
-        _create_journal(sa_sync_conn, openalex_id="S2", apc_amount=1500)  # déjà APC
-        _create_journal(sa_sync_conn, openalex_id=None, apc_amount=None)  # pas d'openalex
+    def test_returns_only_unknown_type_with_openalex(self, sa_sync_conn):
+        needs = _create_journal(sa_sync_conn, openalex_id="S1")  # unknown + openalex
+        typed = _create_journal(sa_sync_conn, openalex_id="S2")
+        sa_sync_conn.execute(
+            text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": typed}
+        )
+        _create_journal(sa_sync_conn, openalex_id=None)  # pas d'openalex_id
 
-        rows = fetch_journals_needing_apc(sa_sync_conn)
-        ids = [jid for jid, _ in rows]
+        ids = [jid for jid, _ in fetch_journals_of_unknown_type(sa_sync_conn)]
         assert needs in ids
-        assert len(ids) == 1
+        assert typed not in ids  # déjà typé → exclu
 
     def test_respects_limit(self, sa_sync_conn):
         for i in range(3):
             _create_journal(sa_sync_conn, openalex_id=f"S{i}")
-        rows = fetch_journals_needing_apc(sa_sync_conn, limit=2)
-        assert len(rows) == 2
+        assert len(fetch_journals_of_unknown_type(sa_sync_conn, limit=2)) == 2
 
 
 def _create_journal_with_issn(
