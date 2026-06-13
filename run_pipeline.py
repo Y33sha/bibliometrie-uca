@@ -462,10 +462,13 @@ def phase_authorships(**kw: Any) -> Any:
     La purge complète reste disponible en récupération manuelle via la CLI
     `build_authorships --rebuild-full`.
 
-    `build_authorships` pose `publications.in_perimeter` (rollup) ; on enchaîne
-    sur le refresh des `pub_count` (journals + publishers) qui en dérivent.
+    `build_authorships` pose `publications.in_perimeter` (rollup) ; on purge
+    ensuite les publications restées à zéro authorship (orphelines hors-périmètre,
+    cf. `purge_orphan_publications`) puis on rafraîchit les `pub_count` (journals +
+    publishers) qui dérivent de `in_perimeter`.
     """
     _run_build_authorships()
+    _run_purge_orphan_publications()
     _run_refresh_pub_counts()
 
 
@@ -495,6 +498,11 @@ def phase_subjects(**kw: Any) -> Any:
     2. **Co-occurrences** (`subjects.usage_count` + matview `subject_cooccurrences`)
        — recalcule l'usage de chaque sujet et rafraîchit la matview des
        paires de sujets co-présents sur une même publication.
+
+    Aucun filtre périmètre ici : la phase `authorships` a purgé en amont les
+    publications orphelines (zéro authorship), donc `publication_subjects` ne
+    porte plus que du périmètre et `usage_count` / `subject_cooccurrences` en
+    héritent. Ne pas re-filtrer (cf. `purge_orphan_publications`).
 
     Phase source-agnostique : `--sources` n'est pas propagé. Les topics
     peuvent évoluer côté `source_publications` par d'autres voies (re-
@@ -585,6 +593,46 @@ def _run_build_authorships() -> None:
     finally:
         conn.close()
     log.info("✓ build_authorships terminé en %.1fs", time.time() - t0)
+
+
+# Taille de chunk du DELETE de purge : un commit par chunk étale le WAL et rend
+# la progression durable si le run est interrompu (le premier run, ou un full
+# rebuild, peut supprimer ~118k publications d'un coup).
+_PURGE_BATCH_SIZE = 5000
+
+
+def _run_purge_orphan_publications() -> None:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.purge_orphan_publications import (
+        purge_orphan_publications,
+        vacuum_analyze_churned,
+    )
+
+    log.info("▶ purge publications orphelines (zéro authorship)")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    n = 0
+    try:
+        while True:
+            deleted = purge_orphan_publications(conn, limit=_PURGE_BATCH_SIZE)
+            if deleted == 0:
+                break
+            conn.commit()
+            n += deleted
+    finally:
+        conn.close()
+    # VACUUM hors transaction (autocommit) : récupère l'espace des tuples morts
+    # pour réutilisation au run suivant (pas de FULL — cf. module).
+    vac = get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT")
+    try:
+        vacuum_analyze_churned(vac)
+    finally:
+        vac.close()
+    log.info(
+        "✓ purge : %d publication(s) supprimée(s) + VACUUM ANALYZE en %.1fs",
+        n,
+        time.time() - t0,
+    )
 
 
 def _run_refresh_pub_counts() -> None:
