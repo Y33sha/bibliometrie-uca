@@ -384,33 +384,49 @@ class TestFusionAcrossSources:
 
 
 class TestRunOrchestrator:
-    def test_clears_and_reingests(self, sa_sync_conn, queries):
+    def test_ingests_then_skips_unchanged(self, sa_sync_conn, queries):
         pub = _create_pub(sa_sync_conn)
         _create_source_pub(
-            sa_sync_conn,
-            source="hal",
-            source_id="h1",
-            publication_id=pub,
-            keywords=["initial"],
-            topics=None,
+            sa_sync_conn, source="hal", source_id="h1", publication_id=pub, keywords=["initial"]
         )
         logger = logging.getLogger("test")
 
-        n1 = run(sa_sync_conn, queries, logger, sources=["hal"])
+        # Jamais ingérée → ingérée.
+        n1 = run(sa_sync_conn, queries, logger)
         assert n1 == 1
         assert len(_subjects_of(sa_sync_conn, pub)) == 1
 
+        # Sans changement : updated_at <= created_at des liens → ignorée.
+        n2 = run(sa_sync_conn, queries, logger)
+        assert n2 == 0
+        assert len(_subjects_of(sa_sync_conn, pub)) == 1
+
+    def test_reingests_on_content_change(self, sa_sync_conn, queries):
+        pub = _create_pub(sa_sync_conn)
+        _create_source_pub(
+            sa_sync_conn, source="hal", source_id="h1", publication_id=pub, keywords=["initial"]
+        )
+        logger = logging.getLogger("test")
+        run(sa_sync_conn, queries, logger)
+
+        # Changement de contenu : keywords + bump de publications.updated_at (ce
+        # que fait refresh_from_sources en réel quand une source change).
         sa_sync_conn.execute(
             text("UPDATE source_publications SET keywords = :kw WHERE source_id = 'h1'"),
             {"kw": ["replaced"]},
         )
-        n2 = run(sa_sync_conn, queries, logger, sources=["hal"])
+        sa_sync_conn.execute(
+            text("UPDATE publications SET updated_at = clock_timestamp() WHERE id = :id"),
+            {"id": pub},
+        )
+        n2 = run(sa_sync_conn, queries, logger)
         assert n2 == 1
         rows = _subjects_of(sa_sync_conn, pub)
         assert len(rows) == 1
         assert rows[0].label == "replaced"
 
-    def test_skips_unrelated_sources(self, sa_sync_conn, queries):
+    def test_reingests_all_sources_of_changed_pub(self, sa_sync_conn, queries):
+        # Publication-centré : toutes les sources d'une pub changée sont ré-ingérées.
         pub = _create_pub(sa_sync_conn)
         _create_source_pub(
             sa_sync_conn, source="hal", source_id="h1", publication_id=pub, keywords=["x"]
@@ -418,12 +434,28 @@ class TestRunOrchestrator:
         _create_source_pub(
             sa_sync_conn, source="openalex", source_id="oa1", publication_id=pub, keywords=["y"]
         )
-        run(sa_sync_conn, queries, logging.getLogger("test"), sources=["hal"])
-        rows = _subjects_of(sa_sync_conn, pub)
-        assert len(rows) == 1
-        assert rows[0].label == "x"
+        run(sa_sync_conn, queries, logging.getLogger("test"))
+        labels = {r.label for r in _subjects_of(sa_sync_conn, pub)}
+        assert labels == {"x", "y"}
+
+    def test_multi_source_pub_same_source_keeps_both(self, sa_sync_conn, queries):
+        # Deux source_publications de la MÊME source sur une pub (cas ~7%) : le
+        # clear étant par publication, les deux jumeaux sont ré-ingérés ensemble
+        # — aucun lien perdu.
+        pub = _create_pub(sa_sync_conn)
+        _create_source_pub(
+            sa_sync_conn, source="hal", source_id="h1", publication_id=pub, keywords=["alpha"]
+        )
+        _create_source_pub(
+            sa_sync_conn, source="hal", source_id="h2", publication_id=pub, keywords=["beta"]
+        )
+        run(sa_sync_conn, queries, logging.getLogger("test"))
+        labels = {r.label for r in _subjects_of(sa_sync_conn, pub)}
+        assert labels == {"alpha", "beta"}
 
     def test_ignores_unlinked_source_publications(self, sa_sync_conn, queries):
+        # source_pub orphelin (publication_id NULL) : aucune publication ne le
+        # référence → jamais sélectionné, son keyword n'est pas ingéré.
         sa_sync_conn.execute(
             text(
                 "INSERT INTO source_publications (source, source_id, title, keywords) "
@@ -431,9 +463,19 @@ class TestRunOrchestrator:
             ),
             {"kw": ["ghost"]},
         )
-        n = run(sa_sync_conn, queries, logging.getLogger("test"), sources=["hal"])
-        assert n == 0
-        n_links = sa_sync_conn.execute(
-            text("SELECT count(*) AS n FROM publication_subjects")
+        run(sa_sync_conn, queries, logging.getLogger("test"))
+        n_ghost = sa_sync_conn.execute(
+            text("SELECT count(*) FROM subjects WHERE label = 'ghost'")
         ).scalar_one()
-        assert n_links == 0
+        assert n_ghost == 0
+
+    def test_purges_orphan_subjects(self, sa_sync_conn, queries):
+        # Un sujet sans aucun lien est purgé en fin de phase.
+        orphan = sa_sync_conn.execute(
+            text("INSERT INTO subjects (label) VALUES ('orphelin sans lien') RETURNING id")
+        ).scalar_one()
+        run(sa_sync_conn, queries, logging.getLogger("test"))
+        still = sa_sync_conn.execute(
+            text("SELECT 1 FROM subjects WHERE id = :id"), {"id": orphan}
+        ).scalar_one_or_none()
+        assert still is None

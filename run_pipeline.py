@@ -491,9 +491,12 @@ def phase_subjects(**kw: Any) -> Any:
 
     Deux étapes enchaînées, indissociables :
 
-    1. **Ingestion** (`subjects` + `publication_subjects`) — lit
-       `keywords` et `topics` des `source_publications` et alimente les
-       tables canoniques.
+    1. **Ingestion** (`subjects` + `publication_subjects`) — incrémentale et
+       publication-centrée : ne ré-ingère que les publications dont le contenu
+       canonique a changé depuis leur dernière ingestion (`publications.updated_at`
+       > `max(publication_subjects.created_at)`), à partir des `keywords` /
+       `topics` de leurs `source_publications`. Purge en fin les sujets devenus
+       orphelins (plus aucun lien). Cf. `application/pipeline/subjects/run.py`.
 
     2. **Co-occurrences** (`subjects.usage_count` + matview `subject_cooccurrences`)
        — recalcule l'usage de chaque sujet et rafraîchit la matview des
@@ -504,10 +507,9 @@ def phase_subjects(**kw: Any) -> Any:
     porte plus que du périmètre et `usage_count` / `subject_cooccurrences` en
     héritent. Ne pas re-filtrer (cf. `purge_orphan_publications`).
 
-    Phase source-agnostique : `--sources` n'est pas propagé. Les topics
-    peuvent évoluer côté `source_publications` par d'autres voies (re-
-    normalisation, refresh_from_sources) — toutes les sources doivent
-    être ré-ingérées à chaque run. Idempotente.
+    Idempotente. Pour forcer une ré-ingestion complète (récupération), vider
+    `publication_subjects` non rejetés : toutes les publications redeviennent
+    « jamais ingérées ».
     """
     _run_ingest_subjects()
     _run_cooccurrences()
