@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict I5HqwrvfUnymnS05KQSGmmcYawpPMuns5xmKaoPvDZNNia1S92x4gWC50FuATcU
+\restrict A83emnxZqZgxgXhDwQF8qyHeIPuhnDcD2r7FEd9NkaC7wZUtWf42oD63sKiofDW
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -195,32 +195,38 @@ BEGIN
     -- <111>/<110> (cristallographie), qui sont du contenu, pas du markup.
     s := regexp_replace(s, '</?[A-Za-z][^>]*>', ' ', 'g');
 
-    s := replace(s, E'¼', '14');
-    s := replace(s, E'½', '12');
-    s := replace(s, E'¾', '34');
-    s := replace(s, E'⅐', '17');
-    s := replace(s, E'⅑', '19');
-    s := replace(s, E'⅒', '110');
-    s := replace(s, E'⅓', '13');
-    s := replace(s, E'⅔', '23');
-    s := replace(s, E'⅕', '15');
-    s := replace(s, E'⅖', '25');
-    s := replace(s, E'⅗', '35');
-    s := replace(s, E'⅘', '45');
-    s := replace(s, E'⅙', '16');
-    s := replace(s, E'⅚', '56');
-    s := replace(s, E'⅛', '18');
-    s := replace(s, E'⅜', '38');
-    s := replace(s, E'⅝', '58');
-    s := replace(s, E'⅞', '78');
+    -- I turc avec point : PG lower()+unaccent le perd ("İstanbul" → "stanbul").
+    s := replace(s, E'İ', 'i');
+
+    -- Fractions vulgaires → chiffres espacés (comme "1/4" tapé à la main).
+    s := replace(s, E'¼', '1 4');
+    s := replace(s, E'½', '1 2');
+    s := replace(s, E'¾', '3 4');
+    s := replace(s, E'⅐', '1 7');
+    s := replace(s, E'⅑', '1 9');
+    s := replace(s, E'⅒', '1 10');
+    s := replace(s, E'⅓', '1 3');
+    s := replace(s, E'⅔', '2 3');
+    s := replace(s, E'⅕', '1 5');
+    s := replace(s, E'⅖', '2 5');
+    s := replace(s, E'⅗', '3 5');
+    s := replace(s, E'⅘', '4 5');
+    s := replace(s, E'⅙', '1 6');
+    s := replace(s, E'⅚', '5 6');
+    s := replace(s, E'⅛', '1 8');
+    s := replace(s, E'⅜', '3 8');
+    s := replace(s, E'⅝', '5 8');
+    s := replace(s, E'⅞', '7 8');
 
     s := translate(s,
         E'‐‑‒–—―­‘’‚′“”',
         E'-------\x27\x27\x27\x27""'
     );
 
+    -- Chiffres exposants/indices → chiffres ASCII (attachés). L'exposant moins
+    -- `⁻` n'est plus listé : il tombe dans le passage [^a-z0-9] → espace.
     s := translate(s,
-        E'⁰¹²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉⁻',
+        E'⁰¹²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉',
         '01234567890123456789'
     );
 
@@ -281,7 +287,7 @@ CREATE TABLE public.addresses (
     pub_count integer DEFAULT 0,
     countries character(2)[],
     suggested_countries character(2)[],
-    resolved_at timestamp with time zone
+    countries_dirty boolean DEFAULT false NOT NULL
 );
 
 
@@ -530,7 +536,8 @@ CREATE TABLE public.source_authorships (
     raw_author_name text,
     person_identifiers jsonb,
     source_structures text[],
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    countries_dirty boolean DEFAULT true NOT NULL
 );
 
 
@@ -591,38 +598,6 @@ CREATE TABLE public.countries (
     code character(2) NOT NULL,
     name text NOT NULL
 );
-
-
---
--- Name: country_name_forms; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.country_name_forms (
-    id integer NOT NULL,
-    iso_code text NOT NULL,
-    form_normalized text NOT NULL,
-    created_at timestamp with time zone DEFAULT now()
-);
-
-
---
--- Name: country_name_forms_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.country_name_forms_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: country_name_forms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.country_name_forms_id_seq OWNED BY public.country_name_forms.id;
 
 
 --
@@ -777,7 +752,8 @@ CREATE TABLE public.journals (
     is_academic boolean DEFAULT true,
     doi_prefix text,
     doaj_payload jsonb,
-    doaj_imported_at timestamp with time zone
+    doaj_imported_at timestamp with time zone,
+    pub_count integer DEFAULT 0 NOT NULL
 );
 
 
@@ -974,6 +950,40 @@ ALTER SEQUENCE public.pipeline_run_snapshots_id_seq OWNED BY public.pipeline_run
 
 
 --
+-- Name: place_name_forms; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.place_name_forms (
+    id integer CONSTRAINT country_name_forms_id_not_null NOT NULL,
+    iso_code text CONSTRAINT country_name_forms_iso_code_not_null NOT NULL,
+    form_normalized text CONSTRAINT country_name_forms_form_normalized_not_null NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    kind text DEFAULT 'country'::text NOT NULL,
+    CONSTRAINT place_name_forms_kind_check CHECK ((kind = ANY (ARRAY['country'::text, 'institution'::text, 'city'::text])))
+);
+
+
+--
+-- Name: place_name_forms_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.place_name_forms_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: place_name_forms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.place_name_forms_id_seq OWNED BY public.place_name_forms.id;
+
+
+--
 -- Name: publication_subjects; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1011,7 +1021,8 @@ CREATE TABLE public.publications (
     abstract text,
     keywords text[],
     topics jsonb,
-    biblio jsonb
+    biblio jsonb,
+    in_perimeter boolean DEFAULT false NOT NULL
 );
 
 
@@ -1080,7 +1091,8 @@ CREATE TABLE public.publishers (
     is_predatory boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now(),
     publisher_type public.publisher_type DEFAULT 'unknown'::public.publisher_type NOT NULL,
-    ror text
+    ror text,
+    pub_count integer DEFAULT 0 NOT NULL
 );
 
 
@@ -1416,19 +1428,6 @@ ALTER SEQUENCE public.subjects_id_seq OWNED BY public.subjects.id;
 
 
 --
--- Name: v_active_publications; Type: VIEW; Schema: public; Owner: -
---
-
-CREATE VIEW public.v_active_publications AS
- SELECT id
-   FROM public.publications p
-  WHERE ((doc_type <> ALL (ARRAY['peer_review'::public.doc_type, 'memoir'::public.doc_type])) AND (EXISTS ( SELECT 1
-           FROM (public.source_publications sp
-             JOIN public.source_authorships sa ON ((sa.source_publication_id = sp.id)))
-          WHERE ((sp.publication_id = p.id) AND (sa.in_perimeter = true)))));
-
-
---
 -- Name: address_structures id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1461,13 +1460,6 @@ ALTER TABLE ONLY public.audit_log ALTER COLUMN id SET DEFAULT nextval('public.au
 --
 
 ALTER TABLE ONLY public.authorships ALTER COLUMN id SET DEFAULT nextval('public.authorships_id_seq'::regclass);
-
-
---
--- Name: country_name_forms id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.country_name_forms ALTER COLUMN id SET DEFAULT nextval('public.country_name_forms_id_seq'::regclass);
 
 
 --
@@ -1531,6 +1523,13 @@ ALTER TABLE ONLY public.persons_rh ALTER COLUMN id SET DEFAULT nextval('public.p
 --
 
 ALTER TABLE ONLY public.pipeline_run_snapshots ALTER COLUMN id SET DEFAULT nextval('public.pipeline_run_snapshots_id_seq'::regclass);
+
+
+--
+-- Name: place_name_forms id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.place_name_forms ALTER COLUMN id SET DEFAULT nextval('public.place_name_forms_id_seq'::regclass);
 
 
 --
@@ -1691,22 +1690,6 @@ ALTER TABLE ONLY public.countries
 
 
 --
--- Name: country_name_forms country_name_forms_form_normalized_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.country_name_forms
-    ADD CONSTRAINT country_name_forms_form_normalized_key UNIQUE (form_normalized);
-
-
---
--- Name: country_name_forms country_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.country_name_forms
-    ADD CONSTRAINT country_name_forms_pkey PRIMARY KEY (id);
-
-
---
 -- Name: distinct_persons distinct_persons_person_id_a_person_id_b_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1856,6 +1839,22 @@ ALTER TABLE ONLY public.persons_rh
 
 ALTER TABLE ONLY public.pipeline_run_snapshots
     ADD CONSTRAINT pipeline_check_snapshots_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: place_name_forms place_name_forms_form_normalized_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.place_name_forms
+    ADD CONSTRAINT place_name_forms_form_normalized_key UNIQUE (form_normalized);
+
+
+--
+-- Name: place_name_forms place_name_forms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.place_name_forms
+    ADD CONSTRAINT place_name_forms_pkey PRIMARY KEY (id);
 
 
 --
@@ -2113,6 +2112,13 @@ CREATE INDEX idx_addresses_countries ON public.addresses USING gin (countries) W
 
 
 --
+-- Name: idx_addresses_countries_dirty; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_addresses_countries_dirty ON public.addresses USING btree (id) WHERE countries_dirty;
+
+
+--
 -- Name: idx_addresses_normalized_text; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2208,13 +2214,6 @@ CREATE INDEX idx_authorships_pub_uca ON public.authorships USING btree (publicat
 --
 
 CREATE INDEX idx_authorships_uca ON public.authorships USING btree (in_perimeter) WHERE (in_perimeter = true);
-
-
---
--- Name: idx_cnf_iso; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_cnf_iso ON public.country_name_forms USING btree (iso_code);
 
 
 --
@@ -2358,6 +2357,13 @@ CREATE INDEX idx_pipeline_run_snapshots_mode_ran_at ON public.pipeline_run_snaps
 
 
 --
+-- Name: idx_pnf_iso; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pnf_iso ON public.place_name_forms USING btree (iso_code);
+
+
+--
 -- Name: idx_pnf_person_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2397,6 +2403,20 @@ CREATE INDEX idx_pub_title_trgm ON public.publications USING gin (title_normaliz
 --
 
 CREATE INDEX idx_publications_doi_lower ON public.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
+
+
+--
+-- Name: idx_publications_in_perimeter_journal; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publications_in_perimeter_journal ON public.publications USING btree (journal_id) WHERE in_perimeter;
+
+
+--
+-- Name: idx_publications_in_perimeter_year; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publications_in_perimeter_year ON public.publications USING btree (pub_year DESC) WHERE in_perimeter;
 
 
 --
@@ -2460,6 +2480,13 @@ CREATE INDEX idx_publishers_name_trgm ON public.publishers USING gin (name publi
 --
 
 CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authorship_id) WHERE (authorship_id IS NOT NULL);
+
+
+--
+-- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
 
 
 --
@@ -2997,5 +3024,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict I5HqwrvfUnymnS05KQSGmmcYawpPMuns5xmKaoPvDZNNia1S92x4gWC50FuATcU
+\unrestrict A83emnxZqZgxgXhDwQF8qyHeIPuhnDcD2r7FEd9NkaC7wZUtWf42oD63sKiofDW
 
