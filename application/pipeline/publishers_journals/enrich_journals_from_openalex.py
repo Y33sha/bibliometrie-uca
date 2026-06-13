@@ -3,7 +3,7 @@ Sub-step de la phase pipeline `publishers_journals` — enrichit les
 revues à partir de l'API OpenAlex Sources.
 
 Champs mis à jour :
-- `apc_amount`, `apc_currency`, `is_in_doaj` (prix catalogue DOAJ exposés par OpenAlex)
+- `apc_amount`, `apc_currency` (prix catalogue DOAJ exposés par OpenAlex)
 - `journal_type` (via `domain.journals.journal.map_openalex_source_type`), uniquement quand le mapping renvoie une valeur exploitable
 
 Utilise le filtre openalex avec pipe (|) pour interroger jusqu'à 50 sources par requête.
@@ -49,7 +49,7 @@ def to_short_id(full_id: str) -> str:
     return full_id
 
 
-_DEFAULT_SELECT = "id,apc_usd,apc_prices,is_in_doaj,type"
+_DEFAULT_SELECT = "id,apc_usd,apc_prices,type"
 
 
 def fetch_sources_batch(
@@ -154,7 +154,6 @@ def run_enrich_journals_from_openalex(
             return
 
         updated = 0
-        doaj_count = 0
         with_apc = 0
         processed = 0
         raw_type_counter: Counter[str] = Counter()
@@ -180,7 +179,6 @@ def run_enrich_journals_from_openalex(
                     processed += 1
                     continue
 
-                is_in_doaj = source.get("is_in_doaj", False) or False
                 apc_amount, apc_currency = extract_apc(source)
                 raw_type = source.get("type")
                 mapped_type = map_openalex_source_type(raw_type)
@@ -192,7 +190,6 @@ def run_enrich_journals_from_openalex(
                         journal_id,
                         apc_amount=apc_amount,
                         apc_currency=apc_currency,
-                        is_in_doaj=is_in_doaj,
                         repo=journal_repo,
                     )
                     # journal_type : cadence régulière sur des revues fraîches
@@ -207,8 +204,6 @@ def run_enrich_journals_from_openalex(
                         type_written += 1
 
                 updated += 1
-                if is_in_doaj:
-                    doaj_count += 1
                 if apc_amount is not None:
                     with_apc += 1
                 processed += 1
@@ -217,7 +212,7 @@ def run_enrich_journals_from_openalex(
                 conn.commit()
 
             logger.info(
-                f"  {min(i + BATCH_SIZE, total)}/{total} — {with_apc} avec APC, {doaj_count} DOAJ, {type_written} types écrits"
+                f"  {min(i + BATCH_SIZE, total)}/{total} — {with_apc} avec APC, {type_written} types écrits"
             )
 
         if not dry_run:
@@ -225,8 +220,7 @@ def run_enrich_journals_from_openalex(
 
         logger.info(
             f"Terminé : {updated}/{total} revues mises à jour, "
-            f"{with_apc} avec APC, {doaj_count} dans DOAJ, "
-            f"{type_written} journal_type écrits."
+            f"{with_apc} avec APC, {type_written} journal_type écrits."
         )
         if raw_type_counter:
             distrib = ", ".join(f"{t}={n}" for t, n in raw_type_counter.most_common())

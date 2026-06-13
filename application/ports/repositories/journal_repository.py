@@ -111,7 +111,6 @@ class JournalRepository(Protocol):
         *,
         apc_amount: float | None = None,
         apc_currency: str | None = None,
-        is_in_doaj: bool | None = None,
     ) -> None: ...
 
     def reset_journal_apc(self) -> int: ...

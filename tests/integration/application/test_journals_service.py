@@ -260,24 +260,18 @@ class TestFindOrCreateJournal:
 class TestUpdateJournalApc:
     def test_updates_fields(self, sa_sync_conn, repo):
         j_id = _insert_journal(sa_sync_conn, "Nature")
-        update_journal_apc(
-            j_id,
-            apc_amount=3000.0,
-            apc_currency="EUR",
-            is_in_doaj=True,
-            repo=repo,
-        )
+        update_journal_apc(j_id, apc_amount=3000.0, apc_currency="EUR", repo=repo)
         row = _fetch_one(
             sa_sync_conn,
-            "SELECT apc_amount, apc_currency, is_in_doaj FROM journals WHERE id = :id",
+            "SELECT apc_amount, apc_currency FROM journals WHERE id = :id",
             id=j_id,
         )
         assert float(row.apc_amount) == 3000.0
         assert row.apc_currency == "EUR"
-        assert row.is_in_doaj is True
 
-    def test_coalesce_preserves_existing(self, sa_sync_conn, repo):
-        """Sans nouvelle valeur, les champs existants sont conservés."""
+    def test_coalesce_preserves_existing_and_leaves_is_in_doaj(self, sa_sync_conn, repo):
+        """Sans nouvelle valeur, l'APC existant est conservé ; `is_in_doaj` (autorité
+        DOAJ) n'est jamais touché par l'enrichissement APC."""
         j_id = _insert_journal(
             sa_sync_conn, "Nature", apc_amount=2000.0, apc_currency="USD", is_in_doaj=True
         )
@@ -355,7 +349,8 @@ class TestResetJournalApc:
             sa_sync_conn, "SELECT apc_amount, is_in_doaj FROM journals WHERE id = :id", id=j1
         )
         assert row.apc_amount is None
-        assert row.is_in_doaj is False
+        # reset_journal_apc ne touche plus is_in_doaj (autorité DOAJ).
+        assert row.is_in_doaj is True
         # j2 intact
         row = _fetch_one(
             sa_sync_conn, "SELECT apc_amount, is_in_doaj FROM journals WHERE id = :id", id=j2
