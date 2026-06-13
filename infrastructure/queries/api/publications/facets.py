@@ -130,14 +130,16 @@ class _PublicationFacetsBuilder:
 
     def _facet_labs(self) -> tuple[list[dict[str, Any]], int]:
         where_sql, binds = self._clauses_skipping("lab")
+        # `publication_structures` (matview publi↔structure dédoublonnée) → COUNT(*)
+        # par structure, sans jointure authorships ni DISTINCT/tri (cf. migration
+        # d8b3f5a2c9e6). `where_sql` ne porte que sur `p` (publications).
         labs_rows = self.conn.execute(
             text(f"""
                 SELECT s.id AS value, COALESCE(s.acronym, s.name) AS label,
-                       COUNT(DISTINCT a.publication_id) AS count
-                FROM authorships a
-                JOIN publications p ON p.id = a.publication_id
-                JOIN authorship_structures aus ON aus.authorship_id = a.id
-                JOIN structures s ON s.id = aus.structure_id
+                       COUNT(*) AS count
+                FROM publication_structures ps
+                JOIN publications p ON p.id = ps.publication_id
+                JOIN structures s ON s.id = ps.structure_id
                 WHERE {where_sql}
                   AND s.structure_type = 'labo'
                 GROUP BY s.id, s.acronym, s.name
@@ -152,10 +154,9 @@ class _PublicationFacetsBuilder:
                 SELECT COUNT(*) AS total FROM publications p
                 WHERE {where_sql}
                   AND NOT EXISTS (
-                      SELECT 1 FROM authorships a
-                      JOIN authorship_structures aus ON aus.authorship_id = a.id
-                      JOIN structures s ON s.id = aus.structure_id
-                      WHERE a.publication_id = p.id
+                      SELECT 1 FROM publication_structures ps
+                      JOIN structures s ON s.id = ps.structure_id
+                      WHERE ps.publication_id = p.id
                         AND s.structure_type = 'labo'
                   )
             """),

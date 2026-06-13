@@ -572,6 +572,11 @@ authorships = Table(
 # `source_authorships` reliées à une authorship. Pas modélisée dans le metadata
 # SQLAlchemy — tous les accès se font en SQL brut par nom (lectures) ou via
 # REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer en table.
+#
+# `publication_structures` (MATERIALIZED VIEW, migration d8b3f5a2c9e6) : lien
+# publi↔structure dédoublonné, dérivé d'`authorships` × `authorship_structures`.
+# Sert la facette labos (COUNT par structure sans DISTINCT). Même statut (SQL brut
+# + REFRESH dans le pipeline, après `authorship_structures`).
 
 
 rejected_authorships = Table(
