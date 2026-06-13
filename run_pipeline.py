@@ -305,8 +305,9 @@ def phase_publishers_journals(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     2. `enrich_journals_from_openalex` (gated par `run_journal_enrichment`) :
        OpenAlex Sources → APC + DOAJ flag + journal_type.
     3. `enrich_journals_from_doaj` (gated par `run_journal_enrichment`) :
-       API DOAJ par ISSN → `doaj_payload` (format CSV) + `is_in_doaj`.
-       Surclasse le `is_in_doaj` posé en 2 (DOAJ direct > OpenAlex stale).
+       dump CSV DOAJ (téléchargé au plus tous les ~30 jours dans `data/doaj/`) →
+       `doaj_payload` + `is_in_doaj` pour tout le catalogue. DOAJ fait autorité
+       (reset global puis re-pose des TRUE), surclasse le `is_in_doaj` posé en 2.
     4. `enrich_publishers_from_openalex` (gated par `run_journal_enrichment`) :
        OpenAlex Publishers → country + ror.
     5. `enrich_publishers_from_crossref_members` (gated par `run_journal_enrichment`) :
@@ -1036,42 +1037,50 @@ def _run_enrich_journals_from_openalex() -> None:
     log.info("✓ enrich_journals_from_openalex terminé en %.1fs", time.time() - t0)
 
 
+# DOAJ : le dump CSV (source de vérité) est ré-importé au plus une fois tous les
+# N jours (DOAJ publie ~hebdo) ; le dump téléchargé est conservé dans data/doaj/.
+_DOAJ_STALE_DAYS = 30
+_DOAJ_DUMP_PATH = Path(__file__).parent / "data" / "doaj" / "doaj_dump.csv"
+
+
 def _run_enrich_journals_from_doaj() -> None:
-    from application.pipeline.publishers_journals.enrich_journals_from_doaj import (
-        DoajFetcher,
-        DoajShapeMapper,
-        run_enrich_journals_from_doaj,
+    from application.pipeline.publishers_journals.import_journals_from_doaj_dump import (
+        run_import_doaj_dump,
     )
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import journal_repository
-    from infrastructure.sources.api_limits import DOAJ_DELAY
-    from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
+    from infrastructure.sources.config import get_polite_pool_email
     from infrastructure.sources.doaj import (
         build_doaj_user_agent,
-        fetch_doaj_journal,
-        to_csv_shape,
+        fetch_doaj_dump,
+        read_doaj_dump_rows,
     )
 
     log.info("▶ enrich_journals_from_doaj")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        base_url = get_api_base_urls(conn)["doaj"]
-        user_agent = build_doaj_user_agent(get_polite_pool_email(conn))
-        fetcher: DoajFetcher = lambda issn: fetch_doaj_journal(  # noqa: E731
-            issn, base_url=base_url, user_agent=user_agent, logger=log
-        )
-        mapper: DoajShapeMapper = to_csv_shape
+        queries = PgEnrichQueries()
+        last = queries.doaj_last_import_at(conn)
+        threshold = datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=_DOAJ_STALE_DAYS)
+        if last is not None and last > threshold:
+            log.info(
+                "✓ enrich_journals_from_doaj : dump importé il y a < %d jours (%s), skip",
+                _DOAJ_STALE_DAYS,
+                last.date(),
+            )
+            return
 
-        run_enrich_journals_from_doaj(
+        _DOAJ_DUMP_PATH.parent.mkdir(parents=True, exist_ok=True)
+        user_agent = build_doaj_user_agent(get_polite_pool_email(conn))
+        fetch_doaj_dump(str(_DOAJ_DUMP_PATH), user_agent=user_agent, logger=log)
+        run_import_doaj_dump(
             conn,
-            PgEnrichQueries(),
+            queries,
             log,
             journal_repo=journal_repository(conn),
-            fetcher=fetcher,
-            mapper=mapper,
-            rate_delay=DOAJ_DELAY,
+            rows=read_doaj_dump_rows(str(_DOAJ_DUMP_PATH)),
         )
     finally:
         conn.close()

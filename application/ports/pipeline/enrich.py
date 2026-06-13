@@ -5,7 +5,8 @@ par les phases `oa_status` (Unpaywall) et `publishers_journals`
 (sub-step `enrich_journals_from_openalex`).
 """
 
-from typing import Protocol
+from datetime import datetime
+from typing import Any, Protocol
 
 from sqlalchemy import Connection
 
@@ -33,10 +34,17 @@ class EnrichQueries(Protocol):
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, int]]: ...
 
-    def fetch_journals_needing_doaj_fetch(
-        self,
-        conn: Connection,
-        *,
-        stale_days: int,
-        limit: int | None = None,
-    ) -> list[tuple[int, str | None, str | None, str | None]]: ...
+    def fetch_journal_issn_index(self, conn: Connection) -> list[Any]:
+        """Rows `(id, issn, eissn, issnl)` de tous les journaux ayant au moins un
+        ISSN — pour indexer ISSN → journal_id à l'import du dump DOAJ."""
+        ...
+
+    def reset_is_in_doaj(self, conn: Connection) -> int:
+        """`UPDATE journals SET is_in_doaj = FALSE WHERE is_in_doaj` (le dump DOAJ
+        fait autorité, on re-pose les TRUE ensuite). Retourne le rowcount."""
+        ...
+
+    def doaj_last_import_at(self, conn: Connection) -> datetime | None:
+        """`max(journals.doaj_imported_at)` — date du dernier import DOAJ, pour la
+        staleness (None si jamais importé)."""
+        ...
