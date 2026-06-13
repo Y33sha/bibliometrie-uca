@@ -739,10 +739,9 @@ publications = Table(
     Column("sources", ARRAY(source_type_enum), nullable=False, server_default="{}"),
     Column("meta", JSONB),
     Column("is_retracted", Boolean, nullable=False, server_default="false"),
-    Column("abstract", Text),
-    Column("keywords", ARRAY(Text)),
-    Column("topics", JSONB),
-    Column("biblio", JSONB),
+    # abstract / keywords / topics / biblio sont dans `publications_detail` (1:1) :
+    # colonnes grasses lues uniquement par la page détail, sorties pour garder
+    # `publications` étroite (scans listes/facettes).
     # Flag périmètre matérialisé (rollup de authorships.in_perimeter, hors personnes
     # rejetées), maintenu en phase authorships + à l'action de rejet. Lu par le filtre
     # des listes UCA (cf. publication_in_perimeter) ; le scope doc_type reste un filtre
@@ -791,6 +790,20 @@ publications = Table(
         text("lower(doi)"),
         postgresql_where=text("doi IS NOT NULL"),
     ),
+)
+
+
+# Colonnes grasses detail-only sorties de `publications` (1:1, FK ON DELETE CASCADE
+# côté schéma — voir migration). Lues par la page détail et `find_by_id`, écrites
+# par `publication_repository.save` (upsert).
+publications_detail = Table(
+    "publications_detail",
+    metadata,
+    Column("publication_id", Integer, primary_key=True),
+    Column("abstract", Text),
+    Column("keywords", ARRAY(Text)),
+    Column("topics", JSONB),
+    Column("biblio", JSONB),
 )
 
 

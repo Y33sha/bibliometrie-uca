@@ -57,13 +57,14 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
         text("""
             SELECT p.id, p.title, p.pub_year, p.doi, p.doc_type::text AS doc_type,
                    p.oa_status::text AS oa_status,
-                   p.language, p.container_title, p.abstract,
+                   p.language, p.container_title, d.abstract,
                    j.id AS journal_id, j.title AS journal_title, j.issn, j.eissn,
                    j.is_predatory AS journal_predatory, j.apc_amount, j.apc_currency,
                    j.oa_model,
                    pub.id AS publisher_id, pub.name AS publisher_name,
                    pub.is_predatory AS publisher_predatory
             FROM publications p
+            LEFT JOIN publications_detail d ON d.publication_id = p.id
             LEFT JOIN journals j ON j.id = p.journal_id
             LEFT JOIN publishers pub ON pub.id = j.publisher_id
             WHERE p.id = :pid
