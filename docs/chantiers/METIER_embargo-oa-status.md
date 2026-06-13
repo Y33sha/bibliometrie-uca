@@ -47,3 +47,4 @@ Volume : ~32 952 payloads HAL portent un `notBefore` mais la plupart sont des da
 - **Facette « accès » open/closed.** `embargoed` va du côté fermé (cohérent : pas encore accessible) ou forme une 3ᵉ catégorie ? Idem pour les décomptes OA des dashboards.
 - **Autres sources d'embargo.** theses.fr n'expose rien (vérifié). Les autres sources (OpenAlex…) peuvent-elles signaler un embargo, ou est-ce strictement HAL pour l'instant ?
 - **Dates `notBefore` passées.** Confirmer qu'une date échue n'a aucun effet (document traité comme ouvert normal) et ne pollue pas `embargo_until` (NULL vs date passée conservée pour historique ?).
+- **Quel impact de l'API Unpaywall?** Ne pas écraser un statut *embargoed* par un statut *closed*. Si un statut plus ouvert est trouvé: écraser.

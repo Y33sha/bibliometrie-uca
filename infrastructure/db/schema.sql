@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict A83emnxZqZgxgXhDwQF8qyHeIPuhnDcD2r7FEd9NkaC7wZUtWf42oD63sKiofDW
+\restrict bcAWjUebtSRccK4lQWTNhYbhhhZAAiAA3evcMQklMM67tnAYmV53aAYC16KyGFX
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -984,6 +984,18 @@ ALTER SEQUENCE public.place_name_forms_id_seq OWNED BY public.place_name_forms.i
 
 
 --
+-- Name: publication_structures; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.publication_structures AS
+ SELECT DISTINCT a.publication_id,
+    aus.structure_id
+   FROM (public.authorships a
+     JOIN public.authorship_structures aus ON ((aus.authorship_id = a.id)))
+  WITH NO DATA;
+
+
+--
 -- Name: publication_subjects; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1018,11 +1030,20 @@ CREATE TABLE public.publications (
     sources public.source_type[] DEFAULT '{}'::public.source_type[] NOT NULL,
     meta jsonb,
     is_retracted boolean DEFAULT false NOT NULL,
+    in_perimeter boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: publications_detail; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.publications_detail (
+    publication_id integer NOT NULL,
     abstract text,
     keywords text[],
     topics jsonb,
-    biblio jsonb,
-    in_perimeter boolean DEFAULT false NOT NULL
+    biblio jsonb
 );
 
 
@@ -1866,6 +1887,14 @@ ALTER TABLE ONLY public.publication_subjects
 
 
 --
+-- Name: publications_detail publications_detail_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publications_detail
+    ADD CONSTRAINT publications_detail_pkey PRIMARY KEY (publication_id);
+
+
+--
 -- Name: publications publications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2399,6 +2428,13 @@ CREATE INDEX idx_pub_title_trgm ON public.publications USING gin (title_normaliz
 
 
 --
+-- Name: idx_publication_structures_structure; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publication_structures_structure ON public.publication_structures USING btree (structure_id);
+
+
+--
 -- Name: idx_publications_doi_lower; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2634,6 +2670,13 @@ CREATE INDEX idx_structures_type ON public.structures USING btree (structure_typ
 --
 
 CREATE INDEX idx_subjects_oa_label_lower ON public.subjects USING btree (lower(label)) WHERE (ontologies ? 'openalex_topic'::text);
+
+
+--
+-- Name: publication_structures_pub_struct; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX publication_structures_pub_struct ON public.publication_structures USING btree (publication_id, structure_id);
 
 
 --
@@ -2901,6 +2944,14 @@ ALTER TABLE ONLY public.publication_subjects
 
 
 --
+-- Name: publications_detail publications_detail_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publications_detail
+    ADD CONSTRAINT publications_detail_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES public.publications(id) ON DELETE CASCADE;
+
+
+--
 -- Name: publications publications_journal_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3024,5 +3075,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict A83emnxZqZgxgXhDwQF8qyHeIPuhnDcD2r7FEd9NkaC7wZUtWf42oD63sKiofDW
+\unrestrict bcAWjUebtSRccK4lQWTNhYbhhhZAAiAA3evcMQklMM67tnAYmV53aAYC16KyGFX
 
