@@ -77,10 +77,7 @@ def _build_journal_where(
         parts.append("j.oa_model = ANY(:oa_models)")
         binds["oa_models"] = oa_models
     if with_pubs:
-        parts.append(
-            "EXISTS (SELECT 1 FROM publications pub WHERE pub.journal_id = j.id "
-            f"AND {publication_in_perimeter('pub')})"
-        )
+        parts.append("j.pub_count > 0")
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
 
@@ -139,9 +136,7 @@ class PgJournalQueries(JournalQueries):
                        j.journal_type, j.is_academic, j.doi_prefix,
                        j.doaj_payload->>'DOAJ id' AS doaj_id,
                        j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv,
-                       (SELECT COUNT(*) FROM publications pub
-                        WHERE pub.journal_id = j.id
-                          AND {publication_in_perimeter("pub")}) AS pub_count
+                       j.pub_count
                 FROM journals j
                 LEFT JOIN publishers p ON p.id = j.publisher_id
                 WHERE {where}
@@ -282,7 +277,7 @@ class PgJournalQueries(JournalQueries):
 
     def get_journal_detail(self, journal_id: int) -> JournalDetailResponse | None:
         row = self._conn.execute(
-            text(f"""
+            text("""
                 SELECT j.id, j.title, j.issn, j.eissn, j.issnl,
                        j.publisher_id, p.name AS pub_name,
                        j.openalex_id, j.is_in_doaj, j.is_predatory,
@@ -291,9 +286,7 @@ class PgJournalQueries(JournalQueries):
                        j.doaj_payload, j.doaj_imported_at,
                        j.doaj_payload->>'DOAJ id' AS doaj_id,
                        j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv,
-                       (SELECT COUNT(*) FROM publications pub
-                        WHERE pub.journal_id = j.id
-                          AND {publication_in_perimeter("pub")}) AS pub_count
+                       j.pub_count
                 FROM journals j
                 LEFT JOIN publishers p ON p.id = j.publisher_id
                 WHERE j.id = :id

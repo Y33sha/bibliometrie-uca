@@ -59,13 +59,7 @@ def _build_publisher_where(
         parts.append("p.is_predatory = :is_predatory")
         binds["is_predatory"] = is_predatory
     if with_pubs:
-        parts.append(
-            "EXISTS ("
-            " SELECT 1 FROM publications pub"
-            " JOIN journals j ON j.id = pub.journal_id"
-            f" WHERE j.publisher_id = p.id AND {publication_in_perimeter('pub')}"
-            ")"
-        )
+        parts.append("p.pub_count > 0")
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
 
@@ -135,10 +129,7 @@ class PgPublisherQueries(PublisherQueries):
                        p.publisher_type,
                        (SELECT COUNT(*) FROM journals j
                         WHERE j.publisher_id = p.id) AS journal_count,
-                       (SELECT COUNT(*) FROM publications pub
-                        JOIN journals j2 ON j2.id = pub.journal_id
-                        WHERE j2.publisher_id = p.id
-                          AND {publication_in_perimeter("pub")}) AS pub_count,
+                       p.pub_count,
                        {_doi_prefixes_sql()} AS doi_prefixes
                 FROM publishers p
                 WHERE {where}
@@ -242,10 +233,7 @@ class PgPublisherQueries(PublisherQueries):
                        p.publisher_type,
                        (SELECT COUNT(*) FROM journals j
                         WHERE j.publisher_id = p.id) AS journal_count,
-                       (SELECT COUNT(*) FROM publications pub
-                        JOIN journals j2 ON j2.id = pub.journal_id
-                        WHERE j2.publisher_id = p.id
-                          AND {publication_in_perimeter("pub")}) AS pub_count,
+                       p.pub_count,
                        {_doi_prefixes_sql()} AS doi_prefixes
                 FROM publishers p
                 WHERE p.id = :id

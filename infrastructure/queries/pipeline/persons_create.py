@@ -12,6 +12,7 @@ from application.ports.pipeline.persons_create import (
     LinkedAuthorshipRow,
     PersonsCreateQueries,
 )
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 
 
 def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]:
@@ -27,7 +28,7 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
     Les lignes sans `raw_author_name` sont exclues toutes sources confondues (sans nom, l'authorship est inexploitable pour le matching personnes).
     """
     rows = conn.execute(
-        text("""
+        text(f"""
             SELECT sa_auth.id AS authorship_id,
                    sa_auth.source::text AS source,
                    sa_auth.raw_author_name AS full_name,
@@ -40,11 +41,12 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
                    sa_auth.author_position
             FROM source_authorships sa_auth
             JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
-            JOIN v_active_publications vap ON vap.id = sd.publication_id
+            JOIN publications pub ON pub.id = sd.publication_id
             WHERE sa_auth.person_id IS NULL
               AND sa_auth.in_perimeter = TRUE
               AND sd.publication_id IS NOT NULL
               AND sa_auth.raw_author_name IS NOT NULL
+              AND pub.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
         """)
     ).all()
     return [

@@ -438,7 +438,7 @@ def phase_persons(**kw: Any) -> Any:
     """Creation et rattachement des personnes.
 
     Cree des personnes a partir des source_authorships in_perimeter non rattachees.
-    Exclut les publications de type memoir (v_active_publications).
+    Exclut les publications hors-scope doc_type (cf domain/publications/scope).
     Rattache aussi les authorships theses hors-perimetre par IdRef.
     """
     _run_create_persons()
@@ -461,8 +461,12 @@ def phase_authorships(**kw: Any) -> Any:
     prune + recompute des attributs en une passe) : aucune purge routinière.
     La purge complète reste disponible en récupération manuelle via la CLI
     `build_authorships --rebuild-full`.
+
+    `build_authorships` pose `publications.in_perimeter` (rollup) ; on enchaîne
+    sur le refresh des `pub_count` (journals + publishers) qui en dérivent.
     """
     _run_build_authorships()
+    _run_refresh_pub_counts()
 
 
 def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
@@ -581,6 +585,26 @@ def _run_build_authorships() -> None:
     finally:
         conn.close()
     log.info("✓ build_authorships terminé en %.1fs", time.time() - t0)
+
+
+def _run_refresh_pub_counts() -> None:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.pub_counts import refresh_pub_counts
+
+    log.info("▶ refresh pub_count (journals + publishers)")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        n_journals, n_publishers = refresh_pub_counts(conn)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info(
+        "✓ pub_count : %d revues, %d éditeurs mis à jour en %.1fs",
+        n_journals,
+        n_publishers,
+        time.time() - t0,
+    )
 
 
 def _run_refresh_perimeter_structures() -> None:

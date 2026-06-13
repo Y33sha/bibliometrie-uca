@@ -16,6 +16,10 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from application.ports.repositories.journal_repository import JournalUpdateFields
 from domain.journals.journal import Journal
 from infrastructure.db.tables import journal_name_forms, journals
+from infrastructure.queries.pipeline.pub_counts import (
+    refresh_journal_pub_count,
+    refresh_publisher_pub_count,
+)
 
 
 class _JournalRow(NamedTuple):
@@ -426,3 +430,12 @@ class PgJournalRepository:
         )
 
         self._conn.execute(delete(journals).where(journals.c.id == source_id))
+
+        # pub_count : la cible a absorbé les publications de la source. Recalcule la
+        # revue cible, puis les éditeurs concernés (cible + ancien éditeur source).
+        refresh_journal_pub_count(self._conn, target_id)
+        target_publisher = self._conn.execute(
+            select(journals.c.publisher_id).where(journals.c.id == target_id)
+        ).scalar()
+        for publisher_id in {target_publisher, src.publisher_id} - {None}:
+            refresh_publisher_pub_count(self._conn, publisher_id)

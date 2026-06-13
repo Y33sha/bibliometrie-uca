@@ -21,21 +21,12 @@ Justifications :
   permanents UCA — les inclure dans le matching pollue ``persons``
   avec des comptes éphémères qui ne re-publieront probablement pas.
 
-Implémenté à deux niveaux côté infrastructure :
-
-1. Vue SQL ``v_active_publications`` (dans le schéma) : filtre tôt
-   pour les jointures massives du pipeline (étape ``build_authorships``,
-   ``fetch_unlinked_authorships``).
-2. Filtres ``doc_type NOT IN ...`` répétés dans les queries de
-   listing/facets/stats — tous doivent référencer cette constante via
-   ``OUT_OF_SCOPE_DOC_TYPES_SQL`` plutôt que hardcoder la liste.
-
-La vue SQL ne peut pas importer la constante Python directement ;
-sa définition est figée dans une migration. Un test d'intégration
-``tests/integration/infrastructure/db/test_active_publications_view.py``
-vérifie que le contenu de la vue correspond bien à
-``OUT_OF_SCOPE_DOC_TYPES``, comme garde-fou contre la divergence
-silencieuse.
+Implémenté côté infrastructure par un unique mécanisme : le filtre SQL
+``doc_type NOT IN ...`` inliné dans toutes les queries concernées
+(pipeline — ``build_authorships``, ``fetch_unlinked_authorships`` — et
+listing/facets/stats). Toutes doivent référencer la constante
+``OUT_OF_SCOPE_DOC_TYPES_SQL`` plutôt que hardcoder la liste, qui est ainsi
+la source unique de vérité.
 """
 
 

@@ -6,12 +6,14 @@ Les facettes sont calculées séquentiellement sur la même Connection sync
 les requêtes courtes contre une seule base PG locale).
 """
 
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from sqlalchemy import Connection, text
 
 from application.ports.api.publications_queries import FacetFilters
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
+from infrastructure.db.engine import get_sync_engine
 from infrastructure.queries.filters import (
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
@@ -472,26 +474,40 @@ def publications_facets(
     """Facettes dynamiques : chaque facette exclut son propre filtre mais
     applique tous les autres.
 
-    Exécution séquentielle sur la même connexion (le router tourne déjà
-    dans un thread Starlette ; pas de bénéfice à paralléliser des requêtes
-    courtes contre une seule base PG locale).
+    Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur
+    l'ensemble filtré (~0,5 s) ; les enchaîner en séquence dominait le temps de
+    chargement de la page. On les exécute en **parallèle**, chacune dans un thread
+    avec sa propre connexion (psycopg libère le GIL pendant la requête). Le
+    `lab_hal_col` est préchargé une fois et partagé (lecture seule).
     """
-    conn.execute(text("SET LOCAL jit = off"))
-    b = _PublicationFacetsBuilder(conn, filters, apc_structure_ids)
-    b._preload_lab_hal_col()
+    pre = _PublicationFacetsBuilder(conn, filters, apc_structure_ids)
+    pre._preload_lab_hal_col()
+    lab_hal_col = pre.lab_hal_col
+    engine = get_sync_engine()
 
-    labs, no_lab_count = b._facet_labs()
-    return {
-        "years": b._facet_years(),
-        "labs": labs,
-        "no_lab_count": no_lab_count,
-        "doc_types": b._facet_doc_types(),
-        "access": b._facet_access(),
-        "oa_statuses": b._facet_oa_statuses(),
-        "corresponding": b._facet_corresponding(),
-        "source_counts": b._facet_source_counts(),
-        "apc": b._facet_apc(),
-        "countries": b._facet_countries(),
-        "hal_status": b._facet_hal_status(),
-        "in_perimeter": b._facet_in_perimeter(),
+    def run(method_name: str) -> Any:
+        with engine.connect() as facet_conn:
+            facet_conn.execute(text("SET LOCAL jit = off"))
+            builder = _PublicationFacetsBuilder(facet_conn, filters, apc_structure_ids)
+            builder.lab_hal_col = lab_hal_col
+            return getattr(builder, method_name)()
+
+    facet_methods = {
+        "years": "_facet_years",
+        "labs": "_facet_labs",
+        "doc_types": "_facet_doc_types",
+        "access": "_facet_access",
+        "oa_statuses": "_facet_oa_statuses",
+        "corresponding": "_facet_corresponding",
+        "source_counts": "_facet_source_counts",
+        "apc": "_facet_apc",
+        "countries": "_facet_countries",
+        "hal_status": "_facet_hal_status",
+        "in_perimeter": "_facet_in_perimeter",
     }
+    with ThreadPoolExecutor(max_workers=len(facet_methods)) as pool:
+        futures = {key: pool.submit(run, name) for key, name in facet_methods.items()}
+        results = {key: future.result() for key, future in futures.items()}
+
+    labs, no_lab_count = results.pop("labs")
+    return {"labs": labs, "no_lab_count": no_lab_count, **results}
