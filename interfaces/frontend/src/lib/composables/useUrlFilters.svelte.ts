@@ -102,6 +102,13 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 		}
 
 		const qs = p.toString();
+		const targetPath = base + config.basePath;
+		// Garde anti-navigation parasite : `syncUrl` est parfois appelé après un
+		// chargement async (cf. `onMount` des pages qui `await` puis `syncUrl()`).
+		// Si l'utilisateur a changé de route entre-temps, le `goto` ci-dessous —
+		// qui cible `basePath` en dur — le ramènerait sur cette page. On ne
+		// synchronise donc l'URL que si on est encore sur la page propriétaire.
+		if (typeof window !== 'undefined' && window.location.pathname !== targetPath) return;
 		// `goto({ replaceState: true })` plutôt que le `replaceState` bas niveau
 		// de `$app/navigation` : `replaceState` ne mettait pas correctement à
 		// jour l'entrée d'historique du navigateur, et au back, le navigateur
@@ -110,7 +117,7 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 		// navigation — désynchro URL bar ↔ UI. `goto` synchronise history,
 		// store `$page` et bfcache. `noScroll` + `keepFocus` évitent les sauts
 		// quand on coche/décoche un filtre.
-		void goto(base + config.basePath + (qs ? '?' + qs : ''), {
+		void goto(targetPath + (qs ? '?' + qs : ''), {
 			replaceState: true,
 			noScroll: true,
 			keepFocus: true,
