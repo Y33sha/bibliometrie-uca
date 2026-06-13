@@ -28,6 +28,7 @@ JournalType = Literal[
     "ebook_platform",
     "preprint_server",
     "media",
+    "unknown",
 ]
 JOURNAL_TYPES: tuple[JournalType, ...] = (
     "journal",
@@ -37,6 +38,7 @@ JOURNAL_TYPES: tuple[JournalType, ...] = (
     "ebook_platform",
     "preprint_server",
     "media",
+    "unknown",
 )
 JOURNAL_TYPES_SET: frozenset[str] = frozenset(JOURNAL_TYPES)
 
@@ -51,6 +53,7 @@ JOURNAL_TYPE_LABELS_FR: dict[JournalType, str] = {
     "ebook_platform": "Plateforme eBooks",
     "preprint_server": "Serveur de preprints",
     "media": "Média",
+    "unknown": "Inconnu",
 }
 
 # Modèles OA observés en base (colonne `journals.oa_model`, text libre côté
@@ -108,6 +111,6 @@ class Journal:
     apc_amount: Decimal | None = None
     apc_currency: str | None = None
     oa_model: str | None = None
-    journal_type: str = "journal"
+    journal_type: str = "unknown"
     is_academic: bool = True
     doi_prefix: str | None = None

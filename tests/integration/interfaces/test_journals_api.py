@@ -339,10 +339,13 @@ class TestJournalDashboard:
 
     def test_returns_distributions_for_journal_without_pubs(self, client):
         jid = _seed_journal()
+        # Type explicite : le défaut DB est désormais 'unknown' (pas de mapping
+        # doc_types) ; on teste ici le mapping d'un 'journal'.
+        with _pool() as cur:
+            cur.execute("UPDATE journals SET journal_type = 'journal' WHERE id = %s", (jid,))
         r = client.get(f"/api/journals/{jid}/dashboard")
         assert r.status_code == 200
         body = r.json()
-        # journal_type par défaut = 'journal', oa_model NULL.
         assert body["total_publications"] == 0
         assert body["doc_types"] == []
         assert body["oa_statuses"] == []
@@ -572,5 +575,6 @@ class TestJournalTypes:
             "ebook_platform",
             "preprint_server",
             "media",
+            "unknown",
         ]
         assert all("label_fr" in opt and opt["label_fr"] for opt in body)

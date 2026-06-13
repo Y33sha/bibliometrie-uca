@@ -113,8 +113,6 @@ class JournalRepository(Protocol):
         apc_currency: str | None = None,
     ) -> None: ...
 
-    def reset_journal_apc(self) -> int: ...
-
     def update_journal_doaj(
         self,
         journal_id: int,

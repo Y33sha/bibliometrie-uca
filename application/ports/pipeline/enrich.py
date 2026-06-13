@@ -18,7 +18,7 @@ class EnrichQueries(Protocol):
         self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
     ) -> list[tuple[int, str, str | None]]: ...
 
-    def fetch_journals_needing_apc(
+    def fetch_journals_of_unknown_type(
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]: ...
 

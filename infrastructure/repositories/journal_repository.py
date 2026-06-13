@@ -45,7 +45,7 @@ class _JournalRow(NamedTuple):
 def _journal_from_row(row: _JournalRow) -> Journal:
     """Mapping d'une row `journals` SQL vers l'aggregate `Journal`.
 
-    `journal_type` et `is_academic` ont des DEFAULT côté DB ('journal' / true) mais leur colonne reste nullable au schéma — on coerce vers le default pour préserver la sémantique non-nullable de l'aggregate.
+    `journal_type` et `is_academic` ont des DEFAULT côté DB ('unknown' / true) mais leur colonne reste nullable au schéma — on coerce vers le default pour préserver la sémantique non-nullable de l'aggregate.
     """
     return Journal(
         id=row.id,
@@ -60,7 +60,7 @@ def _journal_from_row(row: _JournalRow) -> Journal:
         apc_amount=row.apc_amount,
         apc_currency=row.apc_currency,
         oa_model=row.oa_model,
-        journal_type=row.journal_type if row.journal_type is not None else "journal",
+        journal_type=row.journal_type if row.journal_type is not None else "unknown",
         is_academic=row.is_academic if row.is_academic is not None else True,
         doi_prefix=row.doi_prefix,
     )
@@ -279,16 +279,6 @@ class PgJournalRepository:
             )
         )
         self._conn.execute(stmt)
-
-    def reset_journal_apc(self) -> int:
-        """Réinitialise les APC de toutes les revues avec openalex_id.
-        Retourne le nombre de lignes touchées."""
-        stmt = (
-            update(journals)
-            .where(journals.c.openalex_id.is_not(None))
-            .values(apc_amount=None, apc_currency="EUR")
-        )
-        return self._conn.execute(stmt).rowcount
 
     def update_journal_doaj(
         self,

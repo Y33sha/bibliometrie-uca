@@ -184,6 +184,8 @@ journal_type_enum = PgEnum(
     "book_series",
     "preprint_server",
     "media",
+    "ebook_platform",
+    "unknown",
     name="journal_type",
     create_type=False,
 )
@@ -258,7 +260,7 @@ journals = Table(
     Column("apc_currency", Text, server_default="EUR"),
     Column("oa_model", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("journal_type", journal_type_enum, server_default="journal"),
+    Column("journal_type", journal_type_enum, server_default="unknown"),
     Column("is_academic", Boolean, server_default="true"),
     Column("doi_prefix", Text),
     Column("doaj_payload", JSONB),

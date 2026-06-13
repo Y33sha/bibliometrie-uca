@@ -147,11 +147,6 @@ def update_journal_apc(
     )
 
 
-def reset_journal_apc(*, repo: JournalRepository) -> int:
-    """Réinitialise les APC de toutes les revues avec openalex_id."""
-    return repo.reset_journal_apc()
-
-
 def merge_journals(
     target_id: int,
     source_id: int,

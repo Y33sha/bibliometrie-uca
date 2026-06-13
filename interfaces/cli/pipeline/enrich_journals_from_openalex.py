@@ -1,4 +1,4 @@
-"""Point d'entrée CLI : enrichissement APC/DOAJ et `journal_type` des revues via OpenAlex Sources."""
+"""Point d'entrée CLI : typage `journal_type` (+ APC opportuniste) des revues via OpenAlex Sources."""
 
 import argparse
 import os
@@ -24,15 +24,12 @@ logger = setup_logger(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Enrichir les revues via OpenAlex Sources (APC/DOAJ + journal_type)"
+        description="Typer les revues via OpenAlex Sources (journal_type + APC opportuniste)"
     )
     parser.add_argument(
         "--limit", type=int, default=0, help="Limiter le nombre de revues traitées (0 = toutes)"
     )
     parser.add_argument("--dry-run", action="store_true", help="Aperçu sans modifier la base")
-    parser.add_argument(
-        "--reset", action="store_true", help="Réinitialiser apc_amount/is_in_doaj pour retraiter"
-    )
     args = parser.parse_args()
 
     conn = get_sync_engine().connect()
@@ -47,7 +44,6 @@ def main() -> None:
             openalex_sources_api=get_api_base_urls(conn)["openalex_sources"],
             limit=args.limit,
             dry_run=args.dry_run,
-            reset=args.reset,
             rate_delay=DOAJ_DELAY,
         )
     finally:

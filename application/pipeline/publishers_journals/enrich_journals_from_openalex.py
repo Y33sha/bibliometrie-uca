@@ -22,7 +22,7 @@ from collections import Counter
 import requests
 from sqlalchemy import Connection
 
-from application.journals import reset_journal_apc, update_journal_apc
+from application.journals import update_journal_apc
 from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.journal_repository import (
     JournalRepository,
@@ -137,17 +137,12 @@ def run_enrich_journals_from_openalex(
     openalex_sources_api: str,
     limit: int = 0,
     dry_run: bool = False,
-    reset: bool = False,
     rate_delay: float = 0.1,
 ) -> None:
     try:
-        if reset:
-            count = reset_journal_apc(repo=journal_repo)
-            logger.info(f"Reset : {count} revues réinitialisées.")
-
-        journals = queries.fetch_journals_needing_apc(conn, limit=limit or None)
+        journals = queries.fetch_journals_of_unknown_type(conn, limit=limit or None)
         total = len(journals)
-        logger.info(f"{total} revues à traiter (avec openalex_id, sans APC).")
+        logger.info(f"{total} revues à typer (openalex_id, journal_type inconnu).")
 
         if total == 0:
             logger.info("Rien à faire.")
@@ -192,10 +187,10 @@ def run_enrich_journals_from_openalex(
                         apc_currency=apc_currency,
                         repo=journal_repo,
                     )
-                    # journal_type : cadence régulière sur des revues fraîches
-                    # (fetch_journals_needing_apc filtre apc_amount IS NULL).
-                    # On écrase systématiquement quand le mapping renvoie une
-                    # valeur — la colonne est au défaut DB 'journal' à ce stade.
+                    # journal_type : on ne traite que les revues `unknown`
+                    # (cf. `fetch_journals_of_unknown_type`). On écrit dès que le
+                    # mapping OpenAlex renvoie une valeur ; sinon la revue reste
+                    # `unknown` (re-tentée au prochain run — cas `metadata`/`other`).
                     if mapped_type is not None:
                         journal_repo.update_journal_fields(
                             journal_id,

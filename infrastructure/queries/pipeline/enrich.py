@@ -49,13 +49,16 @@ def fetch_publications_with_doi(
     return [(r.id, r.doi, r.oa_status) for r in rows]
 
 
-def fetch_journals_needing_apc(
+def fetch_journals_of_unknown_type(
     conn: Connection, *, limit: int | None = None
 ) -> list[tuple[int, str]]:
-    """Liste `(id, openalex_id)` des revues à enrichir côté APC/DOAJ.
+    """Liste `(id, openalex_id)` des revues au type indéterminé, à typer via OpenAlex.
 
-    Utilisé par `enrich_journal_apc`. Filtre les revues avec un
-    `openalex_id` et sans `apc_amount` renseigné.
+    Filtre : `openalex_id` renseigné ET `journal_type = 'unknown'`. Le type étant
+    stable par revue, on ne (re)type qu'une fois : un journal nouvellement créé
+    naît `unknown` (défaut DB), est typé au passage, puis sort de la file (plus de
+    réinterrogation inutile de tout le catalogue à chaque full run). L'APC est
+    extrait opportunistement dans la même réponse OpenAlex.
     """
     if limit and limit > 0:
         rows = conn.execute(
@@ -63,7 +66,7 @@ def fetch_journals_needing_apc(
                 SELECT id, openalex_id
                 FROM journals
                 WHERE openalex_id IS NOT NULL
-                  AND apc_amount IS NULL
+                  AND journal_type = 'unknown'
                 ORDER BY id
                 LIMIT :lim
             """),
@@ -75,7 +78,7 @@ def fetch_journals_needing_apc(
                 SELECT id, openalex_id
                 FROM journals
                 WHERE openalex_id IS NOT NULL
-                  AND apc_amount IS NULL
+                  AND journal_type = 'unknown'
                 ORDER BY id
             """)
         ).all()
@@ -244,10 +247,10 @@ class PgEnrichQueries(EnrichQueries):
     ) -> list[tuple[int, str, str | None]]:
         return fetch_publications_with_doi(conn, limit=limit, staleness_days=staleness_days)
 
-    def fetch_journals_needing_apc(
+    def fetch_journals_of_unknown_type(
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]:
-        return fetch_journals_needing_apc(conn, limit=limit)
+        return fetch_journals_of_unknown_type(conn, limit=limit)
 
     def fetch_publishers_needing_enrichment(
         self, conn: Connection, *, limit: int | None = None
