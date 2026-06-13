@@ -126,10 +126,10 @@ class JournalRepository(Protocol):
     ) -> None:
         """Pose `doaj_payload`, `doaj_imported_at` et `is_in_doaj` en bloc.
 
-        Utilisé par le sub-step `enrich_journals_from_doaj`. Sur 404
-        DOAJ, ``payload=None`` + ``is_in_doaj=False`` : `imported_at`
-        est mis à jour quand même pour faire sortir la revue de la file
-        de stale et éviter de la retenter à chaque pipeline.
+        Utilisé par l'import du dump DOAJ (`import_journals_from_doaj_dump`) pour
+        les revues matchées (``is_in_doaj=True`` + payload). Le cas « absente du
+        dump » est traité en bloc par `reset_is_in_doaj` (FALSE global avant
+        re-pose).
         """
         ...
 

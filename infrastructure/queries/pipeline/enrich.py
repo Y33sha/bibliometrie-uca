@@ -10,6 +10,9 @@ Le nom de fichier reste `enrich.py` (legacy) — un split par phase
 sera possible si d'autres queries d'enrichissement s'y ajoutent.
 """
 
+from datetime import datetime
+from typing import Any
+
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.enrich import EnrichQueries
@@ -204,38 +207,33 @@ def fetch_publishers_needing_country_from_crossref(
     return [(r.publisher_id, r.member_id) for r in rows]
 
 
-def fetch_journals_needing_doaj_fetch(
-    conn: Connection,
-    *,
-    stale_days: int,
-    limit: int | None = None,
-) -> list[tuple[int, str | None, str | None, str | None]]:
-    """Liste `(id, issn, eissn, issnl)` des revues à interroger côté DOAJ API.
-
-    Filtre : revue avec au moins un ISSN renseigné ET dernier import DOAJ
-    absent ou plus vieux que ``stale_days`` jours. Les revues qui ont
-    répondu 404 à un fetch récent (et dont on a écrit `doaj_imported_at`
-    quand même) sortent donc de la file pour la fenêtre de stale — évite
-    de retenter les ~12k journaux pas dans DOAJ à chaque pipeline.
-    """
-    base_sql = """
-        SELECT id, issn, eissn, issnl
-        FROM journals
-        WHERE (issn IS NOT NULL OR eissn IS NOT NULL OR issnl IS NOT NULL)
-          AND (
-              doaj_imported_at IS NULL
-              OR doaj_imported_at < now() - make_interval(days => :stale_days)
-          )
-        ORDER BY id
-    """
-    if limit and limit > 0:
-        rows = conn.execute(
-            text(base_sql + " LIMIT :lim"),
-            {"stale_days": stale_days, "lim": limit},
+def fetch_journal_issn_index(conn: Connection) -> list[Any]:
+    """Rows `(id, issn, eissn, issnl)` des journaux ayant au moins un ISSN —
+    matière de l'index ISSN → journal_id à l'import du dump DOAJ."""
+    return list(
+        conn.execute(
+            text(
+                """
+                SELECT id, issn, eissn, issnl
+                FROM journals
+                WHERE issn IS NOT NULL OR eissn IS NOT NULL OR issnl IS NOT NULL
+                """
+            )
         ).all()
-    else:
-        rows = conn.execute(text(base_sql), {"stale_days": stale_days}).all()
-    return [(r.id, r.issn, r.eissn, r.issnl) for r in rows]
+    )
+
+
+def reset_is_in_doaj(conn: Connection) -> int:
+    """`UPDATE journals SET is_in_doaj = FALSE WHERE is_in_doaj` (le dump DOAJ fait
+    autorité). On ne touche que les TRUE pour un rowcount juste et éviter des dead
+    tuples inutiles. Retourne le nombre de flags effacés."""
+    return conn.execute(text("UPDATE journals SET is_in_doaj = FALSE WHERE is_in_doaj")).rowcount
+
+
+def doaj_last_import_at(conn: Connection) -> datetime | None:
+    """`max(journals.doaj_imported_at)` — date du dernier import DOAJ (None si
+    jamais importé), pour la staleness du téléchargement du dump."""
+    return conn.execute(text("SELECT max(doaj_imported_at) FROM journals")).scalar_one()
 
 
 class PgEnrichQueries(EnrichQueries):
@@ -266,11 +264,11 @@ class PgEnrichQueries(EnrichQueries):
     ) -> list[tuple[int, int]]:
         return fetch_publishers_needing_country_from_crossref(conn, limit=limit)
 
-    def fetch_journals_needing_doaj_fetch(
-        self,
-        conn: Connection,
-        *,
-        stale_days: int,
-        limit: int | None = None,
-    ) -> list[tuple[int, str | None, str | None, str | None]]:
-        return fetch_journals_needing_doaj_fetch(conn, stale_days=stale_days, limit=limit)
+    def fetch_journal_issn_index(self, conn: Connection) -> list[Any]:
+        return fetch_journal_issn_index(conn)
+
+    def reset_is_in_doaj(self, conn: Connection) -> int:
+        return reset_is_in_doaj(conn)
+
+    def doaj_last_import_at(self, conn: Connection) -> datetime | None:
+        return doaj_last_import_at(conn)

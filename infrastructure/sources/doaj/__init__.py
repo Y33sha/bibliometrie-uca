@@ -1,83 +1,65 @@
-"""Client API DOAJ + mapper API→format CSV.
+"""Téléchargement du dump CSV public DOAJ + helpers d'URL de fiche.
 
-Endpoint : ``GET {base}/search/journals/issn:{issn}`` (v3, redirige vers
-v4). Retourne un wrapper ``{total, results[]}`` ; ``total == 0`` = revue
-absente de DOAJ.
+Le dump CSV (toutes les revues DOAJ, https://doaj.org/csv) est la **source de
+vérité** pour `journals.doaj_payload` / `is_in_doaj` : il est importé par
+`application/pipeline/publishers_journals/import_journals_from_doaj_dump` (et,
+sur fichier local, par la CLI `interfaces/cli/imports/import_doaj_csv`).
 
-Choix non-orthodoxe assumé (cf. fiche
-`METIER_pipeline-publishers-journals.md`, Phase 4) : le payload stocké
-en base n'est pas la réponse API brute, mais un dict aux **mêmes clés
-que le dump CSV DOAJ** historiquement importé par
-`interfaces/cli/imports/import_doaj_csv.py`. Ça préserve les
-consommateurs existants (front qui hardcode les clés CSV dans
-`READABLE_DOAJ_FIELDS`, audit APC prévu en Phase 7 qui requête
-`doaj_payload->>'APC amount'`) au prix d'un mapping manuel ici.
-
-Divergences API/CSV conservées telles quelles dans le mapper (pas
-d'effort de normalisation supplémentaire vers le format CSV historique) :
-
-- ``Country of publisher`` reste l'ISO-2 brut de l'API
-  (``bibjson.publisher.country`` = ``"US"``), là où le CSV mettait le
-  nom long (``"United States"``).
-- ``Languages…`` reste la liste de codes ISO-639-1 jointe (``"EN|FR"``),
-  là où le CSV mettait les noms longs.
-
-Une seule clé est ajoutée par rapport au CSV : ``"DOAJ id"`` (= ``id``
-racine de l'API), nécessaire pour reconstruire l'URL de la fiche DOAJ
-côté front en Phase 6 (``https://doaj.org/toc/{id}``).
+`doaj_payload` est stocké aux **clés du dump CSV** ; les consommateurs SQL en
+dépendent (`doaj_payload->>'X'`, front `READABLE_DOAJ_FIELDS`, audit APC qui
+requête `doaj_payload->>'APC amount'`).
 """
 
 from __future__ import annotations
 
+import csv
 import logging
-from typing import Any
-from urllib.parse import quote
+from collections.abc import Iterator
 
 import requests
 
-DOAJ_SEARCH_PATH = "search/journals/issn:{issn}"
-
-
-def fetch_doaj_journal(
-    issn: str,
-    *,
-    base_url: str,
-    user_agent: str,
-    logger: logging.Logger,
-    timeout: float = 15.0,
-) -> dict[str, Any] | None:
-    """GET sur l'API DOAJ pour un ISSN.
-
-    Retourne le 1er document du tableau ``results`` (= record DOAJ
-    complet : ``{id, last_updated, bibjson, ...}``), ``None`` si la
-    revue n'est pas dans DOAJ (``total == 0``) ou si la requête échoue.
-
-    Si ``total > 1`` (improbable — un ISSN identifie 1 journal), on
-    prend le 1er résultat et on loggue un warning.
-    """
-    url = f"{base_url.rstrip('/')}/{DOAJ_SEARCH_PATH.format(issn=quote(issn))}"
-    try:
-        resp = requests.get(url, headers={"User-Agent": user_agent}, timeout=timeout)
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
-        body = resp.json()
-    except requests.RequestException as e:
-        logger.warning("DOAJ fetch failed for ISSN %s : %s", issn, e)
-        return None
-
-    results = body.get("results") if isinstance(body, dict) else None
-    if not results:
-        return None
-    if len(results) > 1:
-        logger.warning("DOAJ : %d résultats pour ISSN %s (1er retenu)", len(results), issn)
-    first = results[0]
-    return first if isinstance(first, dict) else None
+DOAJ_CSV_DUMP_URL = "https://doaj.org/csv"
+"""Dump CSV public de toutes les revues DOAJ (généré à la volée par DOAJ)."""
 
 
 def build_doaj_user_agent(mailto: str) -> str:
     """User-Agent courtois pour les requêtes DOAJ (contact email)."""
     return f"bibliometrie-uca/1.0 (mailto:{mailto})"
+
+
+def fetch_doaj_dump(
+    dest_path: str,
+    *,
+    user_agent: str,
+    logger: logging.Logger,
+    url: str = DOAJ_CSV_DUMP_URL,
+    timeout: float = 180.0,
+) -> None:
+    """Télécharge le dump CSV DOAJ en streaming vers `dest_path`.
+
+    Lève `requests.RequestException` en cas d'échec — pas de fallback gracieux
+    ici, le caller décide (on ne veut pas importer un dump tronqué).
+    """
+    logger.info("Téléchargement du dump DOAJ depuis %s …", url)
+    with requests.get(
+        url, headers={"User-Agent": user_agent}, timeout=timeout, stream=True
+    ) as resp:
+        resp.raise_for_status()
+        with open(dest_path, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=1 << 16):
+                if chunk:
+                    f.write(chunk)
+    logger.info("Dump DOAJ téléchargé : %s", dest_path)
+
+
+def read_doaj_dump_rows(path: str) -> Iterator[dict[str, str]]:
+    """Itère les rows du dump CSV DOAJ en dicts `{colonne: valeur}`.
+
+    Générateur : le fichier reste ouvert tant qu'on itère (l'import consomme tout
+    en une passe). Mutualisé entre la CLI (fichier local) et le pipeline (dump
+    téléchargé)."""
+    with open(path, encoding="utf-8") as f:
+        yield from csv.DictReader(f)
 
 
 DOAJ_TOC_URL = "https://doaj.org/toc/{id}"
@@ -87,8 +69,8 @@ DOAJ_TOC_URL = "https://doaj.org/toc/{id}"
 def build_doaj_toc_url(doaj_id: str | None) -> str | None:
     """Reconstruit l'URL de la fiche DOAJ à partir d'un `DOAJ id`.
 
-    Retourne ``None`` si l'id est absent — cas typique d'un journal
-    dont ``is_in_doaj`` a été posé par OpenAlex Sources.
+    Retourne ``None`` si l'id est absent — cas d'un payload sans `DOAJ id`
+    (le dump CSV stocke l'URL toute faite sous `URL in DOAJ`).
     """
     if not doaj_id:
         return None
@@ -98,105 +80,8 @@ def build_doaj_toc_url(doaj_id: str | None) -> str | None:
 def resolve_doaj_url(payload_url: str | None, doaj_id: str | None) -> str | None:
     """URL de fiche DOAJ à partir d'un payload, quelle que soit sa provenance.
 
-    L'import CSV stocke l'URL toute faite sous ``'URL in DOAJ'`` ; la phase
-    d'enrichissement API stocke seulement ``'DOAJ id'``. On privilégie
-    l'URL CSV (cas massif) et on reconstruit depuis l'id sinon. ``None`` si
-    ni l'un ni l'autre n'est disponible.
+    Le dump CSV stocke l'URL toute faite sous ``'URL in DOAJ'`` ; d'anciens
+    payloads issus de l'API ne portaient que ``'DOAJ id'``. On privilégie l'URL
+    CSV et on reconstruit depuis l'id sinon. ``None`` si ni l'un ni l'autre.
     """
     return payload_url or build_doaj_toc_url(doaj_id)
-
-
-# ── Mapping API → format CSV ────────────────────────────────────────
-
-
-_CSV_SEP = "|"
-"""Séparateur historique du dump CSV DOAJ pour les champs multi-valeur (subjects, languages)."""
-
-
-def _join_terms(items: list[Any] | None, key: str | None = None) -> str | None:
-    """Joint une liste de valeurs (str ou dicts) avec ``|``.
-
-    - ``items=None`` ou liste vide → ``None``.
-    - ``key`` fournie → ne garde que les dicts et extrait ``item[key]``.
-      Les entrées non-dict sont ignorées (tolérance payload abîmé).
-    - ``key`` None → str(item), filtre les vides.
-    """
-    if not items:
-        return None
-    parts: list[str] = []
-    for it in items:
-        if key is not None:
-            if not isinstance(it, dict):
-                continue
-            v = it.get(key)
-        else:
-            v = it
-        if v is None:
-            continue
-        s = str(v).strip()
-        if s:
-            parts.append(s)
-    return _CSV_SEP.join(parts) if parts else None
-
-
-def to_csv_shape(api_doc: dict[str, Any]) -> dict[str, str]:
-    """Transforme un record DOAJ API en dict aux clés CSV.
-
-    Filtre les clés vides (cohérent avec ``_clean_row`` de l'import CSV
-    historique) — un consommateur SQL ``doaj_payload->>'X'`` retourne
-    ``NULL`` quand X est absent, ce qui simplifie le code aval.
-
-    Valeurs systématiquement stringifiées (``"2477"`` plutôt que
-    ``2477``) pour rester homogène avec le dump CSV stocké tel quel.
-    """
-
-    def _as_dict(v: Any) -> dict[str, Any]:
-        return v if isinstance(v, dict) else {}
-
-    def _as_list(v: Any) -> list[Any]:
-        return v if isinstance(v, list) else []
-
-    bibjson = _as_dict(api_doc.get("bibjson"))
-    publisher = _as_dict(bibjson.get("publisher"))
-    apc = _as_dict(bibjson.get("apc"))
-    ref = _as_dict(bibjson.get("ref"))
-    licenses = _as_list(bibjson.get("license"))
-
-    out: dict[str, str] = {}
-
-    def put(k: str, v: Any) -> None:
-        if v is None:
-            return
-        s = str(v).strip()
-        if s:
-            out[k] = s
-
-    put("Journal title", bibjson.get("title"))
-    put("Journal URL", ref.get("journal"))
-    put("Publisher", publisher.get("name"))
-    put("Country of publisher", publisher.get("country"))
-    put("Subjects", _join_terms(bibjson.get("subject"), key="term"))
-    put("Languages in which the journal accepts manuscripts", _join_terms(bibjson.get("language")))
-    put(
-        "When did the journal start to publish all content using an open license?",
-        bibjson.get("oa_start"),
-    )
-    if licenses and isinstance(licenses[0], dict):
-        put("Journal license", licenses[0].get("type"))
-
-    has_apc = apc.get("has_apc")
-    if isinstance(has_apc, bool):
-        put("Journal article processing charges (APCs)", "Yes" if has_apc else "No")
-    max_prices = apc.get("max")
-    if isinstance(max_prices, list) and max_prices and isinstance(max_prices[0], dict):
-        # Le CSV historique ne stocke qu'un montant — on prend le 1er
-        # (DOAJ peut lister plusieurs devises pour les revues qui
-        # facturent en USD ET EUR).
-        put("APC amount", max_prices[0].get("price"))
-        put("APC currency", max_prices[0].get("currency"))
-
-    # Clé inédite vs CSV — nécessaire pour reconstruire l'URL fiche DOAJ
-    # côté front (Phase 6) : `https://doaj.org/toc/{id}`.
-    put("DOAJ id", api_doc.get("id"))
-
-    return out
