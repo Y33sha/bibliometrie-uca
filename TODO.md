@@ -2,17 +2,19 @@
 ## Pipeline de traitement
 * [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / pipeline:   51/181... (51 mis à jour, 0 déjà complets) => toujours 0 déjà complet: calculé comment? / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => pourquoi "rattachement" en phase normalize?
 ### Extraction
-* [ ] gérer les 429 répétés => skipper entièrement une phase
+* [ ] gérer les 429 ou 503 répétés => skipper entièrement une phase
 * [ ] extraction par ORCID: vérifier pertinence/faisabilité (quelles sources?)
 * [ ] Paralléliser cross-imports entre eux
 * [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run suivant) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] cross-import: après chaque batch, parser les externalIds des records retournés et retirer de la queue les DOI qui y figurent (éviter de multiplier les appels api pour le même document accessible par id multiples) (compliqué; auditer d'abord pour voir si ça touche bcp de docts)
+* [ ]  HAL: "0 nouveaux, 0 mis à jour, 36 inchangés" alors que j'avais nullé les hash => problème de comparaison de hash ou problème de logging?
+* [ ] Pourquoi l'extract ScanR est aussi lent?
 ### Normalisation
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur / ou juste supprimer le hal_person_id partout par précaution?
 ### Suite du traitement
-* [ ] refresh_publication_countries: peut-on éviter de tout reset à chaque run? => dirty-set via addresses.updated_at + sa.created_at
-* [ ] idem affiliations: rendre cette phase totalement incrémentale (avec hooks admin) au lieu de tout recalculer à chaque run
+* [ ] affiliations: rendre cette phase totalement incrémentale (avec hooks admin) au lieu de tout recalculer à chaque run
 * [ ] phase persons: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 person_id)
+* [ ] phase publications: mettre un flag BOOL "deduplicated" false->true, pour empêcher les publications d'apparaître avant la phase déduplication?
 ## Code
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
 * [ ] chantier observabilité pipeline: quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de snapshot; c'est un problème. => faire des snapshots par phase, pas par pipeline
@@ -24,8 +26,8 @@
 * [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
 * sujets: cooccurrences calculées sur publications, ou sur source_publications? idem nombre d'occurrences (ex.: sujet vaches laitières, 10 occurrences annoncées, 2 publications affichées)
+* sujets: tenir compte du critère "in_perimeter" dans le calcul des occurrences et co-occurrences
 * [ ] DUMAS: distinguer mémoires et thèses d'exercice?
-* [ ] fusion de publications: comment sont traités les external_ids? (en cas de doublon de clé)
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée?
 * [ ] pour les jeux de données: DataCite, Zenodo, autres?
@@ -35,15 +37,14 @@
 ## Méga-papers et alignement inter-sources
 * [ ] publications > 50 auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. En attendant une solution, le mode "conflit de sources" dans la déduplication manuelle des personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`) (chantier chiant, à enterrer le plus proprement possible)
 ## Chantier des signatures institutionnelles
-### Côté backend
-* [ ] pays des adresses: aller plus loin dans l'automatisation de la détection (GeoNames? index n-gram des adresses avec pays associés et degré de certitude?)
 * [ ] distinguer adresses correctes/incorrectes pour affichage %age par labo/personne
-### Côté UI
 * [ ] Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation?
 
 # UI
 * [ ] repenser entièrement la page stats
+* [ ] gérer les warnings vite-plugin-svelte
 ## Admin
+* [ ] fusion / dé-fusion manuelle de publications: circuit à créer
 * [ ] interface pour consulter l'audit trail
 * [ ] comportement capricieux de l'UI sur la page countries (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine.
 * [ ] structures: name forms: is_word_boundary devrait être false si contient séparateur de mot, même si nb cars `<` 6
@@ -64,12 +65,12 @@
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
 * [ ] lien dashboard => publications: il faut que toutes les facettes actives soient affichées!
 * [ ] dashboard éditeur/revue: graphiques
-* [ ] ajouter facettes sur dashboards?
+* [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques?
 * [ ] double scroll dans admin/addresses: chiant
+* [ ] message de chargement plutôt que "aucun résultat trouvé"
 
 # Cas particuliers, bizarreries à élucider
 * openalex répète des auteurs : publi 77832
-* [ ] 79637: authorship source rejetée => la rejeter de l'authorship canonique
 * erreur de parsing OA: publication 113652
 * publi 20832: pourquoi pas d'affiliations
 * 2020CLFAC007 thèse du CROC, pas récupérée via theses.fr! (158960) => aurait dû être récupéré par API theses.fr ET par cross-import de scanR via le NNT
@@ -94,11 +95,11 @@
 * titre commence par "Editorial:" => type éditorial
 * titre commence par "Letter:" => type lettre
 * titre commence par "Systematic review" => type review
-* titre contient "A systematic reviewé => idem
-* dumas => mémoires, thèses d'exercice (comment distinguer?)
+* titre contient "A systematic review" => idem
 
 # Oneshots sur base de prod à la prochaine occasion
 * vacuum full journals
+* oneshot: python interfaces/cli/oneshot/refresh_publications_with_dumas_url.py
 * réimporter docts openalex avec >=2 hal-ids:
 ```
 UPDATE staging
@@ -115,3 +116,5 @@ WHERE source = 'openalex'
   );
 ```
 * quid de scanr? a priori la même opération est nécessaire
+* python -m interfaces.cli.oneshot.seed_place_names_from_ror (après avoir ajouter le csv dans data/)
+* python -m interfaces.cli.oneshot.prune_place_names --apply

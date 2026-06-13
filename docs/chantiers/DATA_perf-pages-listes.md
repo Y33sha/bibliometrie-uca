@@ -42,7 +42,7 @@ Quick-win ciblé, indépendant. Compte de publications in-perimeter **et in-scop
 
 ### 2. Narrow-table
 
-Le gros morceau, à mener une fois (1) et (2) en place pour mesurer le delta.
+Le gros morceau.
 
 - [ ] Split des colonnes detail-only vers `publications_detail`
 - [ ] Le pipeline écrit les deux tables
