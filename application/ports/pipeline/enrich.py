@@ -14,7 +14,7 @@ class EnrichQueries(Protocol):
     """Opérations SQL pour les scripts d'enrichissement pipeline."""
 
     def fetch_publications_with_doi(
-        self, conn: Connection, *, limit: int | None = None
+        self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
     ) -> list[tuple[int, str, str | None]]: ...
 
     def fetch_journals_needing_apc(

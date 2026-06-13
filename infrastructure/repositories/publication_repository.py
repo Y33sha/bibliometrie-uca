@@ -104,7 +104,7 @@ class PgPublicationRepository:
                        CAST(p.oa_status AS text) AS oa_status,
                        p.journal_id, p.container_title, p.language,
                        d.abstract, p.is_retracted, p.countries, d.keywords,
-                       d.topics, d.biblio, p.meta
+                       d.topics, d.biblio, p.meta, p.unpaywall_checked_at
                 FROM publications p
                 LEFT JOIN publications_detail d ON d.publication_id = p.id
                 WHERE p.id = :id
@@ -132,6 +132,7 @@ class PgPublicationRepository:
             topics=m["topics"],
             biblio=m["biblio"],
             meta=m["meta"],
+            unpaywall_checked_at=m["unpaywall_checked_at"],
         )
 
     def save(self, pub: Publication) -> None:
@@ -199,14 +200,25 @@ class PgPublicationRepository:
     # ── Écritures simples ──────────────────────────────────────────
 
     def update_oa_status(self, pub_id: int, oa_status: str) -> None:
-        """Met à jour le statut OA d'une publication."""
+        """Met à jour le statut OA d'une publication (vérification Unpaywall) et
+        pose `unpaywall_checked_at` (staleness de l'enrichissement OA)."""
         self._conn.execute(
             text(
                 "UPDATE publications "
-                "SET oa_status = CAST(:os AS oa_type), updated_at = now() "
+                "SET oa_status = CAST(:os AS oa_type), unpaywall_checked_at = now(), "
+                "updated_at = now() "
                 "WHERE id = :id"
             ),
             {"os": oa_status, "id": pub_id},
+        )
+
+    def mark_unpaywall_checked(self, pub_id: int) -> None:
+        """Pose `unpaywall_checked_at = now()` sans changer le statut — pour les
+        vérifications Unpaywall qui ne modifient rien (statut inchangé, non trouvé,
+        diamond préservé). Évite de re-interroger ce DOI au run suivant."""
+        self._conn.execute(
+            text("UPDATE publications SET unpaywall_checked_at = now() WHERE id = :id"),
+            {"id": pub_id},
         )
 
     def update_sources(self, pub_id: int) -> None:

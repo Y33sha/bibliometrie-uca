@@ -39,6 +39,16 @@ OA_STATUS_UNKNOWN_DEFAULT = "unknown"
 # `repo.merge_into` qu'elle remplace).
 OA_CLOSED_STATUSES: frozenset[str] = frozenset({"closed", "unknown"})
 
+# Statuts OA « stables » : une fois vérifiés par Unpaywall ils ne changent plus
+# (un accès gold/diamond/hybrid reste ouvert dans le temps). La phase `oa_status`
+# ne les re-interroge donc **jamais** une fois vérifiés. Les autres
+# (`closed`/`green`/`bronze`/`unknown`) peuvent évoluer et sont re-vérifiés quand
+# périmés (staleness). Source unique pour le filtre SQL de `fetch_publications_with_doi`.
+STABLE_OA_STATUSES: frozenset[str] = frozenset({"gold", "diamond", "hybrid"})
+
+STABLE_OA_STATUSES_SQL: str = "(" + ", ".join(f"'{s}'" for s in sorted(STABLE_OA_STATUSES)) + ")"
+"""Forme SQL ``('diamond', 'gold', 'hybrid')`` pour la clause ``NOT IN``."""
+
 
 def best_oa_status(statuses: Iterable[str | None]) -> str | None:
     """Retourne le statut OA le plus ouvert parmi `statuses`.

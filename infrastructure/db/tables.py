@@ -752,6 +752,10 @@ publications = Table(
     # des listes UCA (cf. publication_in_perimeter) ; le scope doc_type reste un filtre
     # inline (domain/publications/scope), séparé du périmètre.
     Column("in_perimeter", Boolean, nullable=False, server_default="false"),
+    # Staleness de l'enrichissement OA : date de la dernière vérification Unpaywall
+    # (NULL = jamais). La phase oa_status ne re-vérifie que les non-vérifiés ou les
+    # statuts changeables périmés (cf. STABLE_OA_STATUSES, application/.../oa_status).
+    Column("unpaywall_checked_at", DateTime(timezone=True)),
     Index(
         "idx_pub_countries",
         "countries",
@@ -793,6 +797,12 @@ publications = Table(
     Index(
         "idx_publications_doi_lower",
         text("lower(doi)"),
+        postgresql_where=text("doi IS NOT NULL"),
+    ),
+    # Fetch incrémental oa_status : jamais vérifiés (NULL) d'abord, puis les plus périmés.
+    Index(
+        "idx_pub_unpaywall_checked",
+        text("unpaywall_checked_at NULLS FIRST"),
         postgresql_where=text("doi IS NOT NULL"),
     ),
 )

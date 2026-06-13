@@ -58,18 +58,22 @@ class _FakeQueries:
     def __init__(self, pubs: list[tuple[int, str, str | None]]) -> None:
         self._pubs = pubs
 
-    def fetch_publications_with_doi(self, conn, *, limit=None):  # noqa: ARG002
+    def fetch_publications_with_doi(self, conn, *, limit=None, staleness_days=30):  # noqa: ARG002
         return self._pubs[:limit] if limit else self._pubs
 
 
 class _FakeRepo:
-    """Capture les `update_oa_status(pub_id, status)`."""
+    """Capture les `update_oa_status` et les `mark_unpaywall_checked`."""
 
     def __init__(self) -> None:
         self.updates: list[tuple[int, str]] = []
+        self.checked: list[int] = []
 
     def update_oa_status(self, pub_id: int, status: str) -> None:
         self.updates.append((pub_id, status))
+
+    def mark_unpaywall_checked(self, pub_id: int) -> None:
+        self.checked.append(pub_id)
 
 
 @pytest.fixture
@@ -113,6 +117,7 @@ async def test_404_marks_as_not_found(logger):
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == []
+    assert repo.checked == [1]  # marqué vérifié même si non trouvé (pas re-tiré demain)
 
 
 @pytest.mark.asyncio
@@ -166,6 +171,7 @@ async def test_unchanged_status_skipped(logger):
         fetcher=_make_fetcher(logger),
     )
     assert repo.updates == []
+    assert repo.checked == [1]  # statut inchangé mais marqué vérifié
 
 
 @pytest.mark.asyncio
