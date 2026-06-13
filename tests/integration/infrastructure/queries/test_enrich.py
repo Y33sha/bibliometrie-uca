@@ -22,6 +22,16 @@ def _create_pub(conn, doi=None, pub_year=2024, oa_status=None):
     ).scalar_one()
 
 
+def _set_checked(conn, pub_id, days_ago):
+    conn.execute(
+        text(
+            "UPDATE publications SET unpaywall_checked_at = now() - make_interval(days => :d) "
+            "WHERE id = :id"
+        ),
+        {"d": days_ago, "id": pub_id},
+    )
+
+
 def _create_journal(conn, openalex_id=None, apc_amount=None):
     return conn.execute(
         text("""
@@ -56,14 +66,33 @@ class TestFetchPublicationsWithDoi:
         # Pas de pub sans DOI
         assert all(doi is not None for _pid, doi, _oa in rows)
 
-    def test_sorts_by_pub_year_desc(self, sa_sync_conn):
-        p_2020 = _create_pub(sa_sync_conn, doi="10.1/a", pub_year=2020)
-        p_2024 = _create_pub(sa_sync_conn, doi="10.1/b", pub_year=2024)
-
+    def test_sorts_never_checked_first(self, sa_sync_conn):
+        # Tri `unpaywall_checked_at NULLS FIRST` : les jamais-vérifiés d'abord.
+        checked = _create_pub(sa_sync_conn, doi="10.1/a", oa_status="closed")
+        _set_checked(sa_sync_conn, checked, days_ago=1)
+        never = _create_pub(sa_sync_conn, doi="10.1/b", oa_status="closed")
         rows = fetch_publications_with_doi(sa_sync_conn)
-        ordered_ids = [pid for pid, _, _ in rows if pid in (p_2020, p_2024)]
-        # Plus récent en premier
-        assert ordered_ids == [p_2024, p_2020]
+        ordered = [pid for pid, _, _ in rows if pid in (checked, never)]
+        assert ordered[0] == never
+
+    def test_staleness_excludes_stable_and_fresh(self, sa_sync_conn):
+        # jamais vérifié → inclus (1× même gold, OpenAlex se trompe parfois)
+        never_gold = _create_pub(sa_sync_conn, doi="10.1/n", oa_status="gold")
+        # gold vérifié → exclu (stable, plus jamais re-vérifié)
+        gold_checked = _create_pub(sa_sync_conn, doi="10.1/g", oa_status="gold")
+        _set_checked(sa_sync_conn, gold_checked, days_ago=999)
+        # closed vérifié récemment → exclu (frais)
+        closed_fresh = _create_pub(sa_sync_conn, doi="10.1/cf", oa_status="closed")
+        _set_checked(sa_sync_conn, closed_fresh, days_ago=1)
+        # closed vérifié il y a longtemps → inclus (périmé)
+        closed_stale = _create_pub(sa_sync_conn, doi="10.1/cs", oa_status="closed")
+        _set_checked(sa_sync_conn, closed_stale, days_ago=999)
+
+        ids = {pid for pid, _, _ in fetch_publications_with_doi(sa_sync_conn, staleness_days=30)}
+        assert never_gold in ids
+        assert gold_checked not in ids
+        assert closed_fresh not in ids
+        assert closed_stale in ids
 
     def test_respects_limit(self, sa_sync_conn):
         for i in range(3):

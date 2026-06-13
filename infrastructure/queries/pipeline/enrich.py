@@ -13,36 +13,36 @@ sera possible si d'autres queries d'enrichissement s'y ajoutent.
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.enrich import EnrichQueries
+from domain.publications.metadata import STABLE_OA_STATUSES_SQL
 
 
 def fetch_publications_with_doi(
-    conn: Connection, *, limit: int | None = None
+    conn: Connection, *, limit: int | None = None, staleness_days: int = 30
 ) -> list[tuple[int, str, str | None]]:
-    """Liste `(id, doi, oa_status)` des publications avec un DOI.
+    """Liste `(id, doi, oa_status)` des publications à (re)vérifier sur Unpaywall.
 
-    Utilisé par `enrich_oa_status` pour interroger Unpaywall. Tri par
-    `pub_year DESC, id` pour traiter les publications récentes en premier.
+    Incrémental : ne renvoie que les publications **jamais vérifiées**
+    (`unpaywall_checked_at IS NULL` — y compris gold/diamond/hybrid, vérifiés une
+    fois car OpenAlex se trompe parfois) ou dont le statut est **changeable**
+    (hors `STABLE_OA_STATUSES`) et **périmé** (> `staleness_days`). Triées
+    jamais-vérifiées d'abord puis les plus périmées ; `limit` cape le run pour
+    lisser la charge (le backlog s'écoule sur plusieurs runs).
     """
-    if limit and limit > 0:
-        rows = conn.execute(
-            text("""
-                SELECT id, doi, oa_status::text AS oa_status
-                FROM publications
-                WHERE doi IS NOT NULL
-                ORDER BY pub_year DESC, id
-                LIMIT :lim
-            """),
-            {"lim": limit},
-        ).all()
-    else:
-        rows = conn.execute(
-            text("""
-                SELECT id, doi, oa_status::text AS oa_status
-                FROM publications
-                WHERE doi IS NOT NULL
-                ORDER BY pub_year DESC, id
-            """)
-        ).all()
+    rows = conn.execute(
+        text(f"""
+            SELECT id, doi, oa_status::text AS oa_status
+            FROM publications
+            WHERE doi IS NOT NULL
+              AND (
+                  unpaywall_checked_at IS NULL
+                  OR (oa_status::text NOT IN {STABLE_OA_STATUSES_SQL}
+                      AND unpaywall_checked_at < now() - make_interval(days => :stale))
+              )
+            ORDER BY unpaywall_checked_at ASC NULLS FIRST
+            LIMIT :lim
+        """),
+        {"stale": staleness_days, "lim": limit or None},
+    ).all()
     return [(r.id, r.doi, r.oa_status) for r in rows]
 
 
@@ -242,9 +242,9 @@ class PgEnrichQueries(EnrichQueries):
     """Adapter PostgreSQL pour `application.ports.enrich.EnrichQueries`."""
 
     def fetch_publications_with_doi(
-        self, conn: Connection, *, limit: int | None = None
+        self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
     ) -> list[tuple[int, str, str | None]]:
-        return fetch_publications_with_doi(conn, limit=limit)
+        return fetch_publications_with_doi(conn, limit=limit, staleness_days=staleness_days)
 
     def fetch_journals_needing_apc(
         self, conn: Connection, *, limit: int | None = None

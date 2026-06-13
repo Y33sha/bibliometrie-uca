@@ -8,6 +8,7 @@ La logique métier touchant à une publication canonique (déduplication, fusion
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from domain.errors import ConflictError
 from domain.publications.authorship import Authorship
@@ -41,6 +42,10 @@ class Publication:
     biblio: dict[str, JsonValue] | None = None
     meta: dict[str, JsonValue] | None = None
     authorships: tuple[Authorship, ...] = field(default=())
+    # Date de la dernière vérification Unpaywall (None = jamais). Quand posée,
+    # Unpaywall fait autorité sur `oa_status` : l'agrégation cross-sources ne le
+    # ré-écrit pas (cf. `aggregation.recompute`).
+    unpaywall_checked_at: datetime | None = None
 
     def has_minimal_metadata(self) -> bool:
         """Indique si la publication a les métadonnées minimales requises pour exister en base (titre non vide ET année renseignée).

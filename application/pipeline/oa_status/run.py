@@ -37,6 +37,14 @@ type OaStatusFetcher = Callable[[httpx.AsyncClient, str], Awaitable[str | None]]
 BATCH_SIZE = 50
 MAX_CONCURRENT = 5
 
+# Constantes opérationnelles (pas métier — la règle métier des statuts stables est
+# dans domain/publications/metadata.STABLE_OA_STATUSES).
+MAX_PER_RUN = 10_000
+"""Cap de DOI vérifiés par run : lisse la charge (le backlog des jamais-vérifiés
+s'écoule sur plusieurs runs au lieu d'un pic de ~100k)."""
+STALENESS_DAYS = 30
+"""Au-delà, un statut OA changeable (hors STABLE_OA_STATUSES) est re-vérifié."""
+
 
 async def run_enrich_oa_status(
     conn: Connection,
@@ -49,9 +57,14 @@ async def run_enrich_oa_status(
     dry_run: bool = False,
     max_concurrent: int = MAX_CONCURRENT,
 ) -> None:
-    pubs = queries.fetch_publications_with_doi(conn, limit=limit or None)
+    pubs = queries.fetch_publications_with_doi(
+        conn, limit=limit or MAX_PER_RUN, staleness_days=STALENESS_DAYS
+    )
     total = len(pubs)
-    logger.info(f"{total} publications avec DOI à vérifier sur Unpaywall")
+    logger.info(
+        f"{total} publications à (re)vérifier sur Unpaywall "
+        f"(cap {limit or MAX_PER_RUN}, staleness {STALENESS_DAYS}j)"
+    )
 
     if not total:
         return
@@ -68,20 +81,27 @@ async def run_enrich_oa_status(
             async with sem:
                 status = await fetcher(client, doi)
 
+            # `new_status` non None = on écrit un nouveau statut ; sinon on pose juste
+            # `unpaywall_checked_at` (vérifié, rien à changer) pour ne pas re-tirer ce
+            # DOI au run suivant.
+            new_status: str | None = None
             if status is None:
                 progress["not_found"] += 1
-            elif current_status == "diamond" and status == "gold":
-                # Préservation : Unpaywall ne connaît pas diamond, ne pas écraser.
+            elif (current_status == "diamond" and status == "gold") or status == current_status:
+                # diamond préservé (Unpaywall ne le connaît pas) ou statut inchangé.
                 progress["skipped"] += 1
-            elif status == current_status:
-                progress["skipped"] += 1
-            elif dry_run:
-                logger.info(f"  [DRY] {doi} : {current_status} → {status}")
-                progress["updated"] += 1
             else:
-                async with db_lock:
-                    await asyncio.to_thread(pub_repo.update_oa_status, pub_id, status)
+                new_status = status
                 progress["updated"] += 1
+                if dry_run:
+                    logger.info(f"  [DRY] {doi} : {current_status} → {status}")
+
+            if not dry_run:
+                async with db_lock:
+                    if new_status is not None:
+                        await asyncio.to_thread(pub_repo.update_oa_status, pub_id, new_status)
+                    else:
+                        await asyncio.to_thread(pub_repo.mark_unpaywall_checked, pub_id)
 
             progress["processed"] += 1
             if progress["processed"] % BATCH_SIZE == 0:

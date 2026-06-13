@@ -107,6 +107,30 @@ class TestRefreshFromSources:
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "diamond"
 
+    def test_unpaywall_verified_oa_status_preserved(self, sa_sync_conn):
+        """Une publi vérifiée par Unpaywall (`unpaywall_checked_at` posé) conserve son
+        `oa_status` à refresh — pas de ré-agrégation depuis les sources (Unpaywall fait
+        autorité). Sinon un réimport écraserait la correction Unpaywall."""
+        id1 = _insert_pub(sa_sync_conn, doi="10.1234/upw", oa_status="closed")
+        sa_sync_conn.execute(
+            text("UPDATE publications SET unpaywall_checked_at = now() WHERE id = :id"), {"id": id1}
+        )
+        self._insert_sd(sa_sync_conn, id1, "openalex", oa_status="gold")  # source dit gold
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
+
+        oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
+        assert oa == "closed"  # préservé, pas écrasé par gold
+
+    def test_unverified_oa_status_still_aggregated(self, sa_sync_conn):
+        """Tant que pas vérifiée par Unpaywall (`unpaywall_checked_at` NULL), l'OA est
+        bien ré-agrégé depuis les sources (comportement nominal préservé)."""
+        id1 = _insert_pub(sa_sync_conn, doi="10.1234/agg", oa_status="closed")
+        self._insert_sd(sa_sync_conn, id1, "openalex", oa_status="gold")
+        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
+
+        oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
+        assert oa == "gold"
+
     def test_source_priority_hal_over_openalex(self, sa_sync_conn):
         """HAL est prioritaire sur OpenAlex pour les champs scalaires."""
         id1 = _insert_pub(sa_sync_conn, doi="10.1234/prio", pub_year=2024, doc_type="article")
