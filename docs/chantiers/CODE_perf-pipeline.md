@@ -47,7 +47,7 @@ Effet attendu : ~6642 s (one-shot, backlog écoulé sur ~11 runs à 10k) → que
 
 - [x] **Préservation au refresh** : `aggregation.recompute` ne ré-agrège plus `oa_status` quand `unpaywall_checked_at` est posé (Unpaywall fait autorité). Sans ça, un réimport (publi stale → `refresh_from_sources`) écraserait la correction Unpaywall et, la date étant posée, elle ne serait jamais re-vérifiée → perte permanente sur un statut stable-open. L'entité `Publication` porte désormais `unpaywall_checked_at` (chargé par `find_by_id`).
 
-### 2. subjects — périmètre + purge amont (fait)
+### 2. subjects — périmètre, purge amont, incrémental (fait)
 
 **Audit** : `recompute_usage_counts` et la matview `subject_cooccurrences` comptaient sur **toutes** les publications, dont 58 % hors-périmètre (2,45M liens `publication_subjects`, seulement 42 % in-perimeter). D'où l'écart « 10 occurrences annoncées vs 2 publications affichées ». Comptages déjà par publication (`COUNT(DISTINCT publication_id)`), pas par `source_publication` — le souci était bien le périmètre, pas la granularité.
 
@@ -55,10 +55,18 @@ Effet attendu : ~6642 s (one-shot, backlog écoulé sur ~11 runs à 10k) → que
 
 **Fix retenu** : purge des publications zéro authorship en **fin de phase authorships** (`purge_orphan_publications`), pas de filtre dans subjects. `publication_subjects` (FK CASCADE) reste alors scopé périmètre → `usage_count` + matview en héritent. Le résidu hors-périmètre conservé (11 pubs / 146 liens) garde ses sujets sur les fiches → « les vues par personne montrent tout » préservé. Un gate au `create` a été écarté : non équivalent (25 571 sources sans auteur matché contribuent des métadonnées à 17 863 pubs in-perimeter via fusion par identifiant — un gate les perdrait ; la purge a posteriori tourne après toutes les passes de fusion, donc les garde).
 
-- [ ] Purge `purge_orphan_publications` en fin d'authorships : DELETE batché (commit par chunk de 5000 → WAL étalé, progression durable) + `VACUUM ANALYZE` simple (réutilisation de l'espace, pas de FULL). La cascade des 1,4M `publication_subjects` est un coût **unique** (liens legacy) : la purge tournant avant subjects, les orphelines re-promues n'en reçoivent plus jamais
-- [ ] Effet : ingest subjects + refresh cooccurrences sur ~64k pubs au lieu de ~180k (−58 %)
+- [x] Purge `purge_orphan_publications` en fin d'authorships : DELETE batché (commit par chunk de 5000 → WAL étalé, progression durable) + `VACUUM ANALYZE` simple (réutilisation de l'espace, pas de FULL). La cascade des 1,4M `publication_subjects` est un coût **unique** (liens legacy) : la purge tournant avant subjects, les orphelines re-promues n'en reçoivent plus jamais — `234abaf6`
+- [x] Effet mesuré : publications 183k → 65k ; `publication_subjects` 2,45M → 1,04M (−58 %) ; ingest subjects 1991s → 577s
 
-**Reste** : l'ingest subjects fait toujours clear+ré-ingestion complète des 64k in-perimeter (pas de watermark sur les `source_publications` modifiées). À mesurer après la purge avant de décider d'un vrai incrémental.
+**Incrémental (fait)** : après la purge, l'ingest tournait encore en full (clear-all + ré-ingestion des ~178k source_publications = 577s mesurées). Rendu **incrémental et publication-centré**, sans nouvelle colonne :
+
+- Signal de changement = `publications.updated_at` (vérifié propre : 358/65020 bumpées par run ; les UPDATE in_perimeter/countries/oa_status sont conditionnels `IS DISTINCT FROM`). Référence « dernière ingestion » = `max(publication_subjects.created_at)` par publication (`created_at` a `default now()`). On ne ré-ingère que les pubs où `updated_at > max(created_at)` (ou jamais ingérées, ~1 %).
+- Lecture des `source_publications` (pas `publications_detail`) : la provenance par-source des keywords n'existe qu'à la source (`publications_detail.keywords` est fusionné sans source) ; coût nul puisqu'on ne lit que les pubs changées. Clear par publication (toutes sources) → gère le cas ~7 % de 2+ source_pubs même source.
+- `purge_orphan_subjects` en fin de phase : supprime les sujets sans aucun lien (les `subjects` ne sont plus « jamais purgés »). Nettoie en one-time les 172k orphelins laissés par la purge des pubs + le filet ongoing, et allège cooccurrences.
+
+Effet attendu : daily 577s → quelques secondes (seul le delta).
+
+**Qualité des sujets (fiche `DATA_*` séparée)** : 303k des 311k sujets sont des keywords libres (sans ontologie), dont 100k singletons — bruit qui gonfle aussi cooccurrences. Question de fond : faut-il ingérer les keywords libres comme sujets, fusionner les variantes (trigram/édition/phonétique) ? Hors périmètre perf.
 
 **Tapis roulant (chantier séparé)** : `create_publications` re-promeut les 116k orphelins à chaque run (re-fusion → re-purge). Le `VACUUM` simple évite le bloat, mais la phase publications (~181s) re-crée ces 116k pour rien. Tuer le tapis roulant (gate au create attachant les sources sœurs, ou flag `do_not_promote` avec invalidation) dépasse subjects et touche le cœur création⇒fusion → chantier dédié, à froid.
 
@@ -73,5 +81,4 @@ Backlog ponctuel. Paralléliser les cross-imports entre eux (comme les extracteu
 ## Questions ouvertes
 
 - oa_status : seuil de staleness (N jours) ; le mode `full` force-t-il tout ?
-- subjects : qu'est-ce qui rend le re-traitement complet nécessaire aujourd'hui ?
 - publishers_journals : le payload DOAJ est-il déjà stocké (→ staleness possible sans re-fetch) ?

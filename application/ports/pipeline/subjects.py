@@ -67,15 +67,30 @@ class SubjectsQueries(Protocol):
         une source. Dédoublonne `(pub_id, subject_id)` côté client."""
         ...
 
-    def clear_links_for_source(self, conn: Connection, *, source: str) -> int:
-        """`DELETE FROM publication_subjects WHERE source = X`. Retourne le rowcount."""
+    def clear_publication_subjects_for_pubs(
+        self, conn: Connection, *, publication_ids: list[int]
+    ) -> int:
+        """`DELETE` des liens (non rejetés) des publications données, toutes
+        sources. Préserve les liens rejetés. Retourne le rowcount."""
         ...
 
-    def select_source_publications_with_subjects(
-        self, conn: Connection, *, source: str
+    def select_publications_to_reingest(self, conn: Connection) -> list[int]:
+        """Ids des publications dont les sujets sont à (ré)ingérer : contenu
+        canonique modifié depuis la dernière ingestion (`publications.updated_at`
+        > `max(publication_subjects.created_at)`), ou jamais ingérées."""
+        ...
+
+    def select_source_publications_for_pubs(
+        self, conn: Connection, *, publication_ids: list[int]
     ) -> list[Any]:
-        """Retourne les `source_publications` rattachées (publication_id non NULL)
-        pour la source donnée, avec leurs `keywords` et `topics`."""
+        """`source_publications` (id, publication_id, source, keywords, topics)
+        des publications données — matière première par-source de la
+        ré-ingestion."""
+        ...
+
+    def purge_orphan_subjects(self, conn: Connection) -> int:
+        """`DELETE` des sujets sans aucun lien `publication_subjects` (tous
+        statuts). Retourne le nombre supprimé."""
         ...
 
     def recompute_usage_counts(self, conn: Connection) -> int:

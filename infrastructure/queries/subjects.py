@@ -184,32 +184,91 @@ def clear_publication_subjects(
     ).rowcount
 
 
-def clear_links_for_source(conn: Connection, *, source: str) -> int:
-    """`DELETE FROM publication_subjects WHERE source = X AND NOT rejected`.
+def clear_publication_subjects_for_pubs(conn: Connection, *, publication_ids: list[int]) -> int:
+    """`DELETE` des liens (non rejetés) des publications données, toutes sources.
 
-    Préserve les liens manuellement rejetés (colonne `rejected`) pour qu'ils
-    ne soient pas recréés au passage de la phase `subjects`.
+    Préserve les liens manuellement rejetés (colonne `rejected`). Appelé par la
+    phase `subjects` avant ré-ingestion des publications dont le contenu canonique
+    a changé.
     """
+    if not publication_ids:
+        return 0
     return conn.execute(
-        text("DELETE FROM publication_subjects WHERE source = :src AND NOT rejected"),
-        {"src": source},
+        text("DELETE FROM publication_subjects WHERE publication_id = ANY(:ids) AND NOT rejected"),
+        {"ids": publication_ids},
     ).rowcount
 
 
-def select_source_publications_with_subjects(conn: Connection, *, source: str) -> list[Any]:
-    """Lit les `source_publications` rattachées à une publication canonique."""
+def select_publications_to_reingest(conn: Connection) -> list[int]:
+    """Publications dont les sujets sont à (ré)ingérer : contenu canonique modifié
+    depuis la dernière ingestion de leurs liens, ou jamais ingérées.
+
+    Incrémental sans colonne dédiée : la référence « dernière ingestion » est
+    `max(publication_subjects.created_at)` par publication (le `created_at` est
+    posé à l'INSERT de chaque lien) ; le signal de changement est
+    `publications.updated_at` (bumpé par `refresh_from_sources` quand une source
+    change — conditionnel, donc propre). Les pubs sans aucun lien (jamais
+    ingérées, ~1 %) sont incluses via le `IS NULL`.
+    """
+    return [
+        r.id
+        for r in conn.execute(
+            text(
+                """
+                SELECT p.id
+                FROM publications p
+                LEFT JOIN (
+                    SELECT publication_id, max(created_at) AS last_ingest
+                    FROM publication_subjects
+                    GROUP BY publication_id
+                ) li ON li.publication_id = p.id
+                WHERE li.last_ingest IS NULL OR p.updated_at > li.last_ingest
+                """
+            )
+        ).all()
+    ]
+
+
+def select_source_publications_for_pubs(
+    conn: Connection, *, publication_ids: list[int]
+) -> list[Any]:
+    """`source_publications` (id, publication_id, source, keywords, topics) des
+    publications données — la matière première par-source pour ré-ingérer leurs
+    sujets en conservant l'attribution `publication_subjects.source`.
+    """
+    if not publication_ids:
+        return []
     return list(
         conn.execute(
             text(
                 """
-                SELECT publication_id, keywords, topics
+                SELECT id, publication_id, source, keywords, topics
                 FROM source_publications
-                WHERE source = :src AND publication_id IS NOT NULL
+                WHERE publication_id = ANY(:ids)
+                ORDER BY publication_id
                 """
             ),
-            {"src": source},
+            {"ids": publication_ids},
         ).all()
     )
+
+
+def purge_orphan_subjects(conn: Connection) -> int:
+    """Supprime les sujets sans aucun lien `publication_subjects` (tous statuts).
+
+    Les `subjects` ne sont créés que par l'ingestion et ne sont jamais purgés au
+    fil de l'eau ; un sujet sans lien est un orphelin (ex. keyword d'une
+    publication purgée — la purge des publications cascade les liens mais pas le
+    référentiel, ou keyword retiré d'une source). On vise **zéro lien tous
+    statuts** (et non `usage_count = 0`) pour préserver un sujet portant un lien
+    rejeté (curation). Retourne le nombre supprimé.
+    """
+    return conn.execute(
+        text(
+            "DELETE FROM subjects s WHERE NOT EXISTS "
+            "(SELECT 1 FROM publication_subjects ps WHERE ps.subject_id = s.id)"
+        )
+    ).rowcount
 
 
 # ── Co-occurrences ───────────────────────────────────────────────
@@ -377,13 +436,21 @@ class PgSubjectsQueries(SubjectsQueries):
     ) -> int:
         return link_publication_subjects_bulk(conn, source=source, rows=rows)
 
-    def clear_links_for_source(self, conn: Connection, *, source: str) -> int:
-        return clear_links_for_source(conn, source=source)
+    def clear_publication_subjects_for_pubs(
+        self, conn: Connection, *, publication_ids: list[int]
+    ) -> int:
+        return clear_publication_subjects_for_pubs(conn, publication_ids=publication_ids)
 
-    def select_source_publications_with_subjects(
-        self, conn: Connection, *, source: str
+    def select_publications_to_reingest(self, conn: Connection) -> list[int]:
+        return select_publications_to_reingest(conn)
+
+    def select_source_publications_for_pubs(
+        self, conn: Connection, *, publication_ids: list[int]
     ) -> list[Any]:
-        return select_source_publications_with_subjects(conn, source=source)
+        return select_source_publications_for_pubs(conn, publication_ids=publication_ids)
+
+    def purge_orphan_subjects(self, conn: Connection) -> int:
+        return purge_orphan_subjects(conn)
 
     def recompute_usage_counts(self, conn: Connection) -> int:
         return recompute_usage_counts(conn)

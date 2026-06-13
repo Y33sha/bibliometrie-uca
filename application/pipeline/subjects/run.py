@@ -1,22 +1,27 @@
 """Orchestrateur de la phase `subjects` du pipeline.
 
-Pour chaque source demandée :
-  1. Dégage tous les liens `publication_subjects` existants pour cette source
-     (idempotence : on peut relancer la phase autant qu'on veut).
-  2. Lit toutes les `source_publications` de cette source rattachées à une
-     publication canonique (`publication_id IS NOT NULL`).
-  3. Dispatche vers l'ingestor de la source avec un `SubjectCache` partagé
-     entre toutes les publications de la source (les sujets récurrents ne
-     déclenchent qu'un seul UPSERT chacun).
+Incrémental et publication-centré :
+  1. Sélectionne les publications dont le contenu canonique a changé depuis la
+     dernière ingestion de leurs sujets (`publications.updated_at` >
+     `max(publication_subjects.created_at)`), ou jamais ingérées.
+  2. Dégage leurs liens `publication_subjects` (non rejetés).
+  3. Ré-ingère, par `source_publication`, via l'ingestor de chaque source, avec
+     un `SubjectCache` global (les sujets récurrents ne déclenchent qu'un seul
+     UPSERT, y compris la fusion d'un même label entre sources).
+  4. Purge les `subjects` devenus orphelins (plus aucun lien).
 
-Les `subjects` (référentiel) ne sont jamais purgés : un sujet créé au passage 1
-peut rester orphelin si plus aucune publication ne le référence. Le coût
-mémoire est négligeable et permet de garder l'historique des labels observés.
+On lit les `source_publications` (et non `publications_detail`) pour préserver
+l'attribution par-source des liens : `publication_subjects.source` dit quelle
+source a fourni chaque sujet, alors que les keywords sont fusionnés sans source
+dans `publications_detail`.
+
+Aucune colonne d'état dédiée : la référence « dernière ingestion » est le
+`created_at` des liens eux-mêmes ; la purge des orphelins (étape 4) remplace
+l'ancien référentiel « jamais purgé ».
 """
 
 import logging
 import time
-from collections.abc import Iterable
 from typing import Protocol
 
 from sqlalchemy import Connection
@@ -31,7 +36,6 @@ from application.pipeline.subjects import (
 )
 from application.pipeline.subjects._common import SubjectCache
 from application.ports.pipeline.subjects import SubjectsQueries
-from domain.sources.registry import ALL_SOURCES
 from domain.types import JsonValue
 
 
@@ -56,77 +60,64 @@ INGESTORS: dict[str, SubjectIngestor] = {
     "scanr": ingest_scanr.ingest,
 }
 
-# Fréquence des logs de progression (par source).
-_LOG_EVERY = 1000
+# Fréquence des logs de progression.
+_LOG_EVERY = 2000
 
 
-def run(
-    conn: Connection,
-    queries: SubjectsQueries,
-    logger: logging.Logger,
-    sources: Iterable[str] | None = None,
-) -> int:
-    """Ingère les sujets pour les sources données (toutes par défaut).
+def run(conn: Connection, queries: SubjectsQueries, logger: logging.Logger) -> int:
+    """Ré-ingère les sujets des publications modifiées depuis la dernière passe.
 
     Retourne le nombre total de liens créés.
     """
-    target_sources = sources or ALL_SOURCES
-    total_links = 0
     t_run = time.perf_counter()
 
-    for source in target_sources:
-        ingestor = INGESTORS.get(source)
-        if ingestor is None:
-            logger.warning("subjects/%s : pas d'ingestor, source ignorée", source)
-            continue
+    pub_ids = queries.select_publications_to_reingest(conn)
+    if not pub_ids:
+        n_purged = queries.purge_orphan_subjects(conn)
+        logger.info("subjects : rien à ré-ingérer ; %d sujets orphelins purgés", n_purged)
+        return 0
 
-        n_cleared = queries.clear_links_for_source(conn, source=source)
-        rows = queries.select_source_publications_with_subjects(conn, source=source)
-        total = len(rows)
-        logger.info(
-            "subjects/%s : %d publications à traiter (clear: %d)",
-            source,
-            total,
-            n_cleared,
-        )
-
-        cache = SubjectCache(queries)
-        n_links = 0
-        t0 = time.perf_counter()
-        for i, r in enumerate(rows, start=1):
-            n_links += ingestor(
-                conn,
-                publication_id=r.publication_id,
-                keywords=r.keywords,
-                topics=r.topics,
-                cache=cache,
-            )
-            if i % _LOG_EVERY == 0:
-                elapsed = time.perf_counter() - t0
-                rate = i / elapsed if elapsed else 0.0
-                logger.info(
-                    "subjects/%s : %d/%d (%.0f publis/s, %d liens, cache: %d sujets)",
-                    source,
-                    i,
-                    total,
-                    rate,
-                    n_links,
-                    sum(cache.stats().values()),
-                )
-
-        elapsed = time.perf_counter() - t0
-        logger.info(
-            "subjects/%s terminé : %d liens, %d sujets en cache, %.1fs",
-            source,
-            n_links,
-            sum(cache.stats().values()),
-            elapsed,
-        )
-        total_links += n_links
-
+    n_cleared = queries.clear_publication_subjects_for_pubs(conn, publication_ids=pub_ids)
+    rows = queries.select_source_publications_for_pubs(conn, publication_ids=pub_ids)
     logger.info(
-        "subjects : %d liens au total en %.1fs",
-        total_links,
+        "subjects : %d publications à ré-ingérer (%d source_publications, clear: %d liens)",
+        len(pub_ids),
+        len(rows),
+        n_cleared,
+    )
+
+    cache = SubjectCache(queries)
+    total = len(rows)
+    n_links = 0
+    t0 = time.perf_counter()
+    for i, r in enumerate(rows, start=1):
+        ingestor = INGESTORS.get(r.source)
+        if ingestor is None:
+            continue
+        n_links += ingestor(
+            conn,
+            publication_id=r.publication_id,
+            keywords=r.keywords,
+            topics=r.topics,
+            cache=cache,
+        )
+        if i % _LOG_EVERY == 0:
+            elapsed = time.perf_counter() - t0
+            rate = i / elapsed if elapsed else 0.0
+            logger.info(
+                "subjects : %d/%d source_publications (%.0f/s, %d liens, cache: %d sujets)",
+                i,
+                total,
+                rate,
+                n_links,
+                sum(cache.stats().values()),
+            )
+
+    n_purged = queries.purge_orphan_subjects(conn)
+    logger.info(
+        "subjects : %d liens créés, %d sujets orphelins purgés, %.1fs",
+        n_links,
+        n_purged,
         time.perf_counter() - t_run,
     )
-    return total_links
+    return n_links
