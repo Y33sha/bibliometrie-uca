@@ -47,9 +47,20 @@ Effet attendu : ~6642 s (one-shot, backlog écoulé sur ~11 runs à 10k) → que
 
 - [x] **Préservation au refresh** : `aggregation.recompute` ne ré-agrège plus `oa_status` quand `unpaywall_checked_at` est posé (Unpaywall fait autorité). Sans ça, un réimport (publi stale → `refresh_from_sources`) écraserait la correction Unpaywall et, la date étant posée, elle ne serait jamais re-vérifiée → perte permanente sur un statut stable-open. L'entité `Publication` porte désormais `unpaywall_checked_at` (chargé par `find_by_id`).
 
-### 2. subjects — incrémental
+### 2. subjects — périmètre + purge amont (fait)
 
-À investiguer : aujourd'hui re-traite tout (1991 s). Cible : ne traiter que les publications nouvelles/modifiées.
+**Audit** : `recompute_usage_counts` et la matview `subject_cooccurrences` comptaient sur **toutes** les publications, dont 58 % hors-périmètre (2,45M liens `publication_subjects`, seulement 42 % in-perimeter). D'où l'écart « 10 occurrences annoncées vs 2 publications affichées ». Comptages déjà par publication (`COUNT(DISTINCT publication_id)`), pas par `source_publication` — le souci était bien le périmètre, pas la granularité.
+
+**Cause racine** : le modèle création⇒fusion promeut une publication par `source_publication` orphelin sans gate ; 116k restent à **zéro authorship** (hors-périmètre, sans auteur en base, inatteignables dans l'UI). Mesure des catégories portant des sujets : in-perimeter 64 074 pubs / hors-périmètre-avec-auteur 11 pubs / orphelines 116 102 pubs.
+
+**Fix retenu** : purge des publications zéro authorship en **fin de phase authorships** (`purge_orphan_publications`), pas de filtre dans subjects. `publication_subjects` (FK CASCADE) reste alors scopé périmètre → `usage_count` + matview en héritent. Le résidu hors-périmètre conservé (11 pubs / 146 liens) garde ses sujets sur les fiches → « les vues par personne montrent tout » préservé. Un gate au `create` a été écarté : non équivalent (25 571 sources sans auteur matché contribuent des métadonnées à 17 863 pubs in-perimeter via fusion par identifiant — un gate les perdrait ; la purge a posteriori tourne après toutes les passes de fusion, donc les garde).
+
+- [ ] Purge `purge_orphan_publications` en fin d'authorships : DELETE batché (commit par chunk de 5000 → WAL étalé, progression durable) + `VACUUM ANALYZE` simple (réutilisation de l'espace, pas de FULL). La cascade des 1,4M `publication_subjects` est un coût **unique** (liens legacy) : la purge tournant avant subjects, les orphelines re-promues n'en reçoivent plus jamais
+- [ ] Effet : ingest subjects + refresh cooccurrences sur ~64k pubs au lieu de ~180k (−58 %)
+
+**Reste** : l'ingest subjects fait toujours clear+ré-ingestion complète des 64k in-perimeter (pas de watermark sur les `source_publications` modifiées). À mesurer après la purge avant de décider d'un vrai incrémental.
+
+**Tapis roulant (chantier séparé)** : `create_publications` re-promeut les 116k orphelins à chaque run (re-fusion → re-purge). Le `VACUUM` simple évite le bloat, mais la phase publications (~181s) re-crée ces 116k pour rien. Tuer le tapis roulant (gate au create attachant les sources sœurs, ou flag `do_not_promote` avec invalidation) dépasse subjects et touche le cœur création⇒fusion → chantier dédié, à froid.
 
 ### 3. publishers_journals — API DOAJ
 
