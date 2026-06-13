@@ -42,11 +42,11 @@ Quick-win ciblé, indépendant. Compte de publications in-perimeter **et in-scop
 
 ### 2. Narrow-table
 
-Le gros morceau.
+Le gros morceau. `abstract` / `topics` / `biblio` / `keywords` (~280 Mo) sortis vers `publications_detail` (1:1, FK `ON DELETE CASCADE`). `meta` reste (dates de thèse). `create` n'écrivait pas ces colonnes ; le merge supprime la publi source (→ CASCADE) puis re-agrège la cible.
 
-- [ ] Split des colonnes detail-only vers `publications_detail`
-- [ ] Le pipeline écrit les deux tables
-- [ ] La page détail joint `publications_detail`
+- [x] Split des colonnes detail-only vers `publications_detail` (migration `c2e5a8f1d4b7` : crée la table, déplace les données, drop les colonnes)
+- [x] Le pipeline écrit les deux tables (`publication_repository.save` : UPDATE `publications` + UPSERT `publications_detail`, via `refresh_from_sources`)
+- [x] La page détail joint `publications_detail` (`detail.py` + `find_by_id`)
 
 ### 3. Facettes en un passage / caching
 

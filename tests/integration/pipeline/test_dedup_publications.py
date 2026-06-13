@@ -170,7 +170,11 @@ class TestRefreshFromSources:
         )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
-        kw = _scalar(sa_sync_conn, "SELECT keywords FROM publications WHERE id = :id", id=id1)
+        kw = _scalar(
+            sa_sync_conn,
+            "SELECT keywords FROM publications_detail WHERE publication_id = :id",
+            id=id1,
+        )
         # 'data' et 'Data' sont dédupliqués (case-insensitive), 3 mots-clés
         assert len(kw) == 3
         lower_kw = [k.lower() for k in kw]
@@ -197,7 +201,11 @@ class TestRefreshFromSources:
         )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
-        topics = _scalar(sa_sync_conn, "SELECT topics FROM publications WHERE id = :id", id=id1)
+        topics = _scalar(
+            sa_sync_conn,
+            "SELECT topics FROM publications_detail WHERE publication_id = :id",
+            id=id1,
+        )
         # Chaque source garde sa forme sous sa propre clé
         assert topics["hal"] == {"hal_domains": ["info"]}
         assert topics["openalex"] == {"concepts": ["AI"], "hal_domains": ["math"]}
@@ -221,7 +229,11 @@ class TestRefreshFromSources:
         )
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
-        topics = _scalar(sa_sync_conn, "SELECT topics FROM publications WHERE id = :id", id=id1)
+        topics = _scalar(
+            sa_sync_conn,
+            "SELECT topics FROM publications_detail WHERE publication_id = :id",
+            id=id1,
+        )
         # La liste OpenAlex est préservée telle quelle
         assert isinstance(topics["openalex"], list)
         assert topics["openalex"][0]["domain"] == "SS"

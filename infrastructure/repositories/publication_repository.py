@@ -98,15 +98,16 @@ class PgPublicationRepository:
         """
         row = self._conn.execute(
             text("""
-                SELECT id, title, title_normalized,
-                       CAST(doc_type AS text) AS doc_type,
-                       pub_year, doi,
-                       CAST(oa_status AS text) AS oa_status,
-                       journal_id, container_title, language,
-                       abstract, is_retracted, countries, keywords,
-                       topics, biblio, meta
-                FROM publications
-                WHERE id = :id
+                SELECT p.id, p.title, p.title_normalized,
+                       CAST(p.doc_type AS text) AS doc_type,
+                       p.pub_year, p.doi,
+                       CAST(p.oa_status AS text) AS oa_status,
+                       p.journal_id, p.container_title, p.language,
+                       d.abstract, p.is_retracted, p.countries, d.keywords,
+                       d.topics, d.biblio, p.meta
+                FROM publications p
+                LEFT JOIN publications_detail d ON d.publication_id = p.id
+                WHERE p.id = :id
             """),
             {"id": pub_id},
         ).first()
@@ -151,12 +152,8 @@ class PgPublicationRepository:
                     journal_id = :jid,
                     container_title = :ct,
                     language = :lang,
-                    abstract = :abstract,
                     is_retracted = :is_retracted,
                     countries = CAST(:countries AS text[]),
-                    keywords = CAST(:keywords AS text[]),
-                    topics = CAST(:topics AS jsonb),
-                    biblio = CAST(:biblio AS jsonb),
                     meta = CAST(:meta AS jsonb),
                     updated_at = now()
                 WHERE id = :id
@@ -171,13 +168,31 @@ class PgPublicationRepository:
                 "jid": pub.journal_id,
                 "ct": pub.container_title,
                 "lang": pub.language,
-                "abstract": pub.abstract,
                 "is_retracted": pub.is_retracted,
                 "countries": list(pub.countries) if pub.countries else None,
+                "meta": _json_dumps_or_none(pub.meta),
+            },
+        )
+        # Colonnes grasses (abstract / keywords / topics / biblio) → table 1:1
+        # publications_detail (upsert).
+        self._conn.execute(
+            text("""
+                INSERT INTO publications_detail
+                    (publication_id, abstract, keywords, topics, biblio)
+                VALUES (:id, :abstract, CAST(:keywords AS text[]),
+                        CAST(:topics AS jsonb), CAST(:biblio AS jsonb))
+                ON CONFLICT (publication_id) DO UPDATE SET
+                    abstract = EXCLUDED.abstract,
+                    keywords = EXCLUDED.keywords,
+                    topics = EXCLUDED.topics,
+                    biblio = EXCLUDED.biblio
+            """),
+            {
+                "id": pub.id,
+                "abstract": pub.abstract,
                 "keywords": list(pub.keywords) if pub.keywords else None,
                 "topics": _json_dumps_or_none(pub.topics),
                 "biblio": _json_dumps_or_none(pub.biblio),
-                "meta": _json_dumps_or_none(pub.meta),
             },
         )
 
