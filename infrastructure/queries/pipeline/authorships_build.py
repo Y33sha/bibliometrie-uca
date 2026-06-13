@@ -8,6 +8,7 @@ Appelé par `application/pipeline/build/build_authorships.py`. Regroupe les
 from sqlalchemy import Connection, text
 
 from application.ports.pipeline.authorships_build import AuthorshipsBuildQueries
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from domain.sources.registry import SOURCE_PRIORITY, source_case_sql
 
 
@@ -20,13 +21,14 @@ def insert_missing_authorships(conn: Connection) -> int:
     (anti-join sur `rejected_authorships`). Retourne le rowcount.
     """
     return conn.execute(
-        text("""
+        text(f"""
             WITH all_pairs AS (
                 SELECT DISTINCT sd.publication_id, sa.person_id
                 FROM source_authorships sa
                 JOIN source_publications sd ON sd.id = sa.source_publication_id
-                JOIN v_active_publications vap ON vap.id = sd.publication_id
+                JOIN publications pub ON pub.id = sd.publication_id
                 WHERE sa.person_id IS NOT NULL
+                  AND pub.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
             )
             INSERT INTO authorships (publication_id, person_id)
             SELECT ap.publication_id, ap.person_id
@@ -178,6 +180,30 @@ def count_authorships_in_perimeter(conn: Connection) -> int:
     ).scalar_one()
 
 
+def refresh_publications_in_perimeter(conn: Connection) -> int:
+    """Matérialise `publications.in_perimeter` (rollup de `authorships.in_perimeter`).
+
+    Une publication est in-perimeter si elle a au moins un authorship in-perimeter
+    d'une personne non rejetée — exactement le prédicat du filtre SQL
+    `publication_in_perimeter`. À appeler après l'étape 3 (qui pose
+    `authorships.in_perimeter`). Idempotent : n'écrit que les lignes dont le flag
+    change (`IS DISTINCT FROM`). Retourne le nombre de publications modifiées.
+    """
+    return conn.execute(
+        text("""
+            WITH perim AS (
+                SELECT DISTINCT a.publication_id AS id
+                FROM authorships a
+                JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
+                WHERE a.in_perimeter = TRUE
+            )
+            UPDATE publications p
+            SET in_perimeter = (p.id IN (SELECT id FROM perim))
+            WHERE p.in_perimeter IS DISTINCT FROM (p.id IN (SELECT id FROM perim))
+        """)
+    ).rowcount
+
+
 class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
     """Adapter PostgreSQL pour `application.ports.authorships_build.AuthorshipsBuildQueries`."""
 
@@ -205,3 +231,6 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
 
     def count_authorships_in_perimeter(self, conn: Connection) -> int:
         return count_authorships_in_perimeter(conn)
+
+    def refresh_publications_in_perimeter(self, conn: Connection) -> int:
+        return refresh_publications_in_perimeter(conn)

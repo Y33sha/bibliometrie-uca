@@ -88,6 +88,28 @@ def _add_in_perimeter_authorships(journal_id: int) -> None:
                 "VALUES (%s, %s, TRUE, ARRAY['author'])",
                 (pid, person_id),
             )
+        # Matérialise comme le pipeline (rollup in_perimeter + pub_count) : les
+        # requêtes filtrées au périmètre lisent ces colonnes, pas authorships.
+        cur.execute(
+            "UPDATE publications p SET in_perimeter = EXISTS ("
+            "SELECT 1 FROM authorships a JOIN persons pe "
+            "ON pe.id = a.person_id AND pe.rejected = FALSE "
+            "WHERE a.publication_id = p.id AND a.in_perimeter = TRUE) "
+            "WHERE p.journal_id = %s",
+            (journal_id,),
+        )
+        cur.execute(
+            "UPDATE journals j SET pub_count = COALESCE((SELECT COUNT(*) "
+            "FROM publications p WHERE p.journal_id = j.id AND p.in_perimeter "
+            "AND p.doc_type NOT IN ('memoir', 'peer_review')), 0) WHERE j.id = %s",
+            (journal_id,),
+        )
+        cur.execute(
+            "UPDATE publishers pub SET pub_count = COALESCE((SELECT SUM(j.pub_count) "
+            "FROM journals j WHERE j.publisher_id = pub.id), 0) "
+            "WHERE pub.id = (SELECT publisher_id FROM journals WHERE id = %s)",
+            (journal_id,),
+        )
 
 
 @pytest.fixture(scope="module", autouse=True)

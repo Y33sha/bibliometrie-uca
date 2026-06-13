@@ -263,6 +263,10 @@ journals = Table(
     Column("doi_prefix", Text),
     Column("doaj_payload", JSONB),
     Column("doaj_imported_at", DateTime(timezone=True)),
+    # Compte matérialisé des publications in-perimeter de la revue. Maintenu par le
+    # pipeline (après le rollup in_perimeter) + aux fusions admin. Évite de re-scanner
+    # publications pour le filtre `with_pubs` / le tri / l'affichage.
+    Column("pub_count", Integer, nullable=False, server_default="0"),
     UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
     Index(
         "idx_journals_doi_prefix",
@@ -307,6 +311,9 @@ publishers = Table(
         nullable=False,
         server_default="unknown",
     ),
+    # Compte matérialisé des publications in-perimeter de l'éditeur (= somme de ses
+    # revues). Maintenu par le pipeline + aux fusions admin. Cf. `journals.pub_count`.
+    Column("pub_count", Integer, nullable=False, server_default="0"),
     UniqueConstraint("openalex_id", name="publishers_openalex_id_key"),
     Index("idx_publishers_name_norm", "name_normalized"),
     Index(
@@ -736,6 +743,11 @@ publications = Table(
     Column("keywords", ARRAY(Text)),
     Column("topics", JSONB),
     Column("biblio", JSONB),
+    # Flag périmètre matérialisé (rollup de authorships.in_perimeter, hors personnes
+    # rejetées), maintenu en phase authorships + à l'action de rejet. Lu par le filtre
+    # des listes UCA (cf. publication_in_perimeter) ; le scope doc_type reste un filtre
+    # inline (domain/publications/scope), séparé du périmètre.
+    Column("in_perimeter", Boolean, nullable=False, server_default="false"),
     Index(
         "idx_pub_countries",
         "countries",
@@ -759,6 +771,18 @@ publications = Table(
     Index("idx_publications_titlenorm_year", "title_normalized", "pub_year"),
     Index("idx_publications_year", "pub_year"),
     Index("idx_publications_year_type", "pub_year", "doc_type"),
+    # Listes scopées au périmètre : tri par défaut (pub_year DESC) et sous-requêtes
+    # pub_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
+    Index(
+        "idx_publications_in_perimeter_year",
+        text("pub_year DESC"),
+        postgresql_where=text("in_perimeter"),
+    ),
+    Index(
+        "idx_publications_in_perimeter_journal",
+        "journal_id",
+        postgresql_where=text("in_perimeter"),
+    ),
     # Index sur expression lower(doi) — complété à la main. Non-unique :
     # l'unicité « 1 DOI = 1 publication » est garantie par la passe de fusion,
     # plus par la DB (cf. chantier création⇒fusion).

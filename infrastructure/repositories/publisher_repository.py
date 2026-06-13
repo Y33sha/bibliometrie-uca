@@ -19,6 +19,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from application.ports.repositories.publisher_repository import PublisherUpdateFields
 from domain.publishers.publisher import Publisher
 from infrastructure.db.tables import publisher_name_forms, publishers
+from infrastructure.queries.pipeline.pub_counts import refresh_publisher_pub_count
 
 
 class _PublisherRow(NamedTuple):
@@ -224,3 +225,7 @@ class PgPublisherRepository:
         )
 
         self._conn.execute(delete(publishers).where(publishers.c.id == source_id))
+
+        # pub_count : la cible a absorbé les revues de la source (les pub_count des
+        # revues sont inchangés) → recalcule la somme côté éditeur cible.
+        refresh_publisher_pub_count(self._conn, target_id)

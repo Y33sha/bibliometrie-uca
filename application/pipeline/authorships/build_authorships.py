@@ -77,6 +77,12 @@ def build(
     total_uca = queries.count_authorships_in_perimeter(conn)
     logger.info(f"  Total authorships in_perimeter=TRUE : {total_uca}")
 
+    # Étape 3bis : rollup vers publications.in_perimeter (flag matérialisé que les
+    # filtres de liste UCA lisent au lieu d'un EXISTS sur authorships à chaque appel).
+    logger.info("Étape 3bis : matérialisation de publications.in_perimeter...")
+    pubs_updated = queries.refresh_publications_in_perimeter(conn)
+    logger.info(f"  {pubs_updated} publications mises à jour (flag in_perimeter)")
+
     logger.info("Étape 4 : refresh matview authorship_structures...")
     queries.refresh_authorship_structures(conn)
 

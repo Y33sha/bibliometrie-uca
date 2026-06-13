@@ -31,14 +31,17 @@ OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
 
 
 def publication_in_perimeter(alias: str = "p") -> str:
-    """Filtre SQL : la publication (table `publications` aliasée `alias`) a au
-    moins un authorship dans le périmètre (personne non rejetée) et un doc_type
-    in-scope. `alias` paramètre le nom de l'alias dans la requête appelante —
-    nécessaire quand `p` est déjà pris (ex. le publisher dans `publishers.py`)."""
+    """Filtre SQL : la publication (table `publications` aliasée `alias`) est dans
+    le périmètre et a un doc_type in-scope.
+
+    Lit le flag matérialisé `publications.in_perimeter` (= au moins un authorship
+    in-perimeter d'une personne non rejetée), maintenu en phase `authorships`
+    (`refresh_publications_in_perimeter`) et à l'action de rejet de personne.
+    Filtre **par requête** : seules les listes scopées UCA l'appliquent ; les vues
+    par personne montrent tout. `alias` paramètre l'alias appelant — nécessaire
+    quand `p` est déjà pris (ex. le publisher dans `publishers.py`)."""
     return f"""(
-    EXISTS (SELECT 1 FROM authorships a
-            JOIN persons pe ON pe.id = a.person_id AND pe.rejected = FALSE
-            WHERE a.publication_id = {alias}.id AND a.in_perimeter = TRUE)
+    {alias}.in_perimeter
     AND {alias}.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
 )"""
 
