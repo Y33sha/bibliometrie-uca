@@ -1,6 +1,6 @@
 # STATUS: recurring (dev)
 """
-Génère db/seed.sql à partir des données de référence de la base courante.
+Génère infrastructure/db/seed.sql à partir des données de référence de la base courante.
 
 Tables exportées :
   - config              (paramètres applicatifs)
@@ -13,21 +13,25 @@ Tables exportées :
 
 Usage :
     python -m interfaces.cli.dev.generate_seed
-    python -m interfaces.cli.dev.generate_seed --output db/seed.sql
+    python -m interfaces.cli.dev.generate_seed --output infrastructure/db/seed.sql
 
 Le fichier produit est un SQL pur (INSERT) avec gestion des séquences.
 Il suppose que le schéma (tables, enums, séquences) est déjà appliqué
-via db/schema.sql + migrations.
+via infrastructure/db/schema.sql + migrations.
 """
 
 import argparse
-import os
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Connection, text
 
 from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
+
+# Fichier seed canonique, compagnon de infrastructure/db/schema.sql.
+# `parents[3]` remonte interfaces/cli/dev/ → racine du dépôt.
+DEFAULT_SEED_PATH = Path(__file__).resolve().parents[3] / "infrastructure" / "db" / "seed.sql"
 
 # Tables à exporter, dans l'ordre d'insertion (respect des FK).
 # Valeurs hétérogènes (str, list, dict) — TypedDict ferait sens à terme.
@@ -123,13 +127,13 @@ def escape_sql(value: JsonValue, is_jsonb: bool = False) -> str:
     return f"'{s}'"
 
 
-def generate_seed(conn: Connection, output_path: str) -> None:
+def generate_seed(conn: Connection, output_path: str | Path) -> None:
     lines = []
     lines.append("-- Seed généré automatiquement par interfaces/cli/dev/generate_seed.py")
     lines.append("-- Ne pas modifier à la main — relancer le script pour régénérer.")
     lines.append("--")
-    lines.append("-- Prérequis : schéma appliqué (db/schema.sql + migrations)")
-    lines.append("-- Usage : psql -d bibliometrie -f db/seed.sql")
+    lines.append("-- Prérequis : schéma appliqué (infrastructure/db/schema.sql + migrations)")
+    lines.append("-- Usage : psql -d bibliometrie -f infrastructure/db/seed.sql")
     lines.append("")
     lines.append("BEGIN;")
     lines.append("")
@@ -190,15 +194,10 @@ def generate_seed(conn: Connection, output_path: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Génère db/seed.sql depuis la base courante")
-    parser.add_argument(
-        "--output",
-        default=os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-            "db",
-            "seed.sql",
-        ),
+    parser = argparse.ArgumentParser(
+        description="Génère infrastructure/db/seed.sql depuis la base courante"
     )
+    parser.add_argument("--output", default=DEFAULT_SEED_PATH)
     args = parser.parse_args()
 
     engine = get_sync_engine()
