@@ -32,6 +32,11 @@ class AuthorshipsBuildQueries(Protocol):
         """Rafraîchit la matview `authorship_structures` (`REFRESH … CONCURRENTLY`)."""
         ...
 
+    def refresh_publication_structures(self, conn: Connection) -> None:
+        """Rafraîchit la matview `publication_structures` (publi↔structure, après
+        `refresh_authorship_structures` dont elle dérive)."""
+        ...
+
     def count_authorships_in_perimeter(self, conn: Connection) -> int: ...
 
     def refresh_publications_in_perimeter(self, conn: Connection) -> int:

@@ -173,6 +173,17 @@ def refresh_authorship_structures(conn: Connection) -> None:
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY authorship_structures"))
 
 
+def refresh_publication_structures(conn: Connection) -> None:
+    """Rafraîchit la matview `publication_structures` (publi↔structure dédoublonnée,
+    `CONCURRENTLY` ; requiert l'index unique `(publication_id, structure_id)`).
+
+    Dérive d'`authorships` × `authorship_structures` : à appeler **après**
+    `refresh_authorship_structures`. Sert la facette labos (COUNT par structure
+    sans jointure authorships ni DISTINCT).
+    """
+    conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_structures"))
+
+
 def count_authorships_in_perimeter(conn: Connection) -> int:
     """Compte les `authorships` avec `in_perimeter = TRUE`."""
     return conn.execute(
@@ -228,6 +239,9 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
 
     def refresh_authorship_structures(self, conn: Connection) -> None:
         refresh_authorship_structures(conn)
+
+    def refresh_publication_structures(self, conn: Connection) -> None:
+        refresh_publication_structures(conn)
 
     def count_authorships_in_perimeter(self, conn: Connection) -> int:
         return count_authorships_in_perimeter(conn)

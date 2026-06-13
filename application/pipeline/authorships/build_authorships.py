@@ -83,8 +83,9 @@ def build(
     pubs_updated = queries.refresh_publications_in_perimeter(conn)
     logger.info(f"  {pubs_updated} publications mises à jour (flag in_perimeter)")
 
-    logger.info("Étape 4 : refresh matview authorship_structures...")
+    logger.info("Étape 4 : refresh matviews authorship_structures + publication_structures...")
     queries.refresh_authorship_structures(conn)
+    queries.refresh_publication_structures(conn)
 
     elapsed = time.perf_counter() - t0
     logger.info(f"\nTerminé en {elapsed:.1f}s")

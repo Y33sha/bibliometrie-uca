@@ -16,12 +16,14 @@ _seq = itertools.count(1)
 
 
 def refresh_structure_matviews(conn) -> None:
-    """Rafraîchit `source_authorship_structures` puis `authorship_structures`
-    (matview-sur-matview, ordre imposé). Non-concurrent = transactionnel, donc
-    compatible avec l'isolation par rollback des tests. En prod ces matviews sont
-    maintenues par le pipeline ; les tests les rafraîchissent explicitement."""
+    """Rafraîchit `source_authorship_structures` → `authorship_structures` →
+    `publication_structures` (chaîne matview-sur-matview, ordre imposé).
+    Non-concurrent = transactionnel, donc compatible avec l'isolation par rollback
+    des tests. En prod ces matviews sont maintenues par le pipeline ; les tests les
+    rafraîchissent explicitement."""
     conn.execute(text("REFRESH MATERIALIZED VIEW source_authorship_structures"))
     conn.execute(text("REFRESH MATERIALIZED VIEW authorship_structures"))
+    conn.execute(text("REFRESH MATERIALIZED VIEW publication_structures"))
 
 
 def add_authorship_structure(conn, authorship_id: int, structure_id: int) -> None:
