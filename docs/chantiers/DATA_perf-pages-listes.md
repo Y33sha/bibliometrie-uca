@@ -48,16 +48,26 @@ Le gros morceau. `abstract` / `topics` / `biblio` / `keywords` (~280 Mo) sortis 
 - [x] Le pipeline écrit les deux tables (`publication_repository.save` : UPDATE `publications` + UPSERT `publications_detail`, via `refresh_from_sources`)
 - [x] La page détail joint `publications_detail` (`detail.py` + `find_by_id`)
 
-### 3. Facettes en un passage / caching
+### 3. Facette labos (matview `publication_structures`)
 
-Selon ce que (2) laisse comme résidu.
+Émergé après le narrow-table : une fois les facettes scalaires rapides, la facette labos restait le long pôle (~1,9 s — jointure 4 tables `authorships × authorship_structures × structures × publications` + `COUNT(DISTINCT publication_id)` par labo → tri externe sur disque). Matview `publication_structures` (publi↔structure dédoublonnée, ~8 Mo, dérivée d'`authorships × authorship_structures`). La facette devient `COUNT(*)` par structure dessus, sans jointure authorships ni `DISTINCT`.
 
-- [ ] GROUPING SETS + agrégats `FILTER` pour le cas par défaut (facettes partageant le même WHERE)
+- [x] Matview + migration `d8b3f5a2c9e6` (création + populate + index unique)
+- [x] Refresh pipeline (fin de `phase_authorships`, après `authorship_structures`)
+- [x] Facette labos réécrite : **1,9 s → 0,25 s**
+
+**Bilan global : page publications 23 s → ~2 s** (périmètre matérialisé + vue supprimée + pub_count + narrow-table + facette labos).
+
+### 4. Facettes en un passage (GROUPING SETS) — différé
+
+La parallélisation des facettes est faible (~1,3× sur Postgres local 8 cœurs — 11 requêtes concurrentes en contention). Fondre les ~5 facettes scalaires (même WHERE sur le cas par défaut) en 1-2 scans via `GROUPING SETS` + agrégats `FILTER` viserait le sub-seconde. Mais c'est de la vraie complexité (regroupement par signature de WHERE pour gérer les filtres actifs). Différé : ~2 s acceptable.
+
+- [ ] GROUPING SETS pour le cas par défaut (optionnel)
 - [ ] Caching applicatif (si nécessaire)
 
-### 4. Test de non-régression
+### 5. Test de non-régression — abandonné
 
-- [ ] Temps de chargement de la page publications (liste + facettes) sous un seuil à définir
+Pas de test automatisé : la perf à l'échelle n'est **pas testable en CI** (base de test minuscule → tout y est rapide quel que soit le code ; un seuil calibré sur la vraie échelle serait machine-dépendant et flaky). Un test **structurel** (vérifier que les requêtes lisent bien les colonnes/matviews matérialisées) serait **tautologique** — seul un changement délibéré des requêtes le casserait, et ce changement mettrait le test à jour aussi. Le seul garde-fou « conditions réelles » envisageable serait un **outil de perf-check manuel** lancé contre la base dev (non fait).
 
 ## Questions ouvertes
 
