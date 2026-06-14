@@ -1,6 +1,6 @@
 # Performance des pages de listes (UI)
 
-Commencé le 2026-06-12
+Commencé le 2026-06-12 - terminé le 2026-06-13
 
 ## Contexte
 

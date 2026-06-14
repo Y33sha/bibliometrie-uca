@@ -1,4 +1,4 @@
-# Chantier — Pays : noms de lieux pour la détection + performances de la phase
+# Chantier — Adresses → pays : détection, suggestion et performances de la cascade
 
 Commencé le 2026-06-11
 
@@ -60,6 +60,29 @@ Lecture seule sur la base de prod, avant de figer le critère de génération.
 
 ### 5. `refresh_publication_countries` — refresh incrémental
 - [x] **Deux flags `countries_dirty`** (migrations `d5b8c3f1e9a2` + `f3a8d2c5e1b7`) : sur `source_authorships` pour les **nouveaux sa** (normalize, défaut `true`), et sur `addresses` pour les **pays changés** (posé **gratuitement** dans l'écriture de `countries` par `write_countries` — même ligne déjà réécrite). Le refresh **dérive** les sa à recalculer par une UNION des deux flags (JOIN, lecture) — **pas de marquage de masse** des sa partagés (une adresse institutionnelle liée à des milliers d'authorships ne déclenche plus des centaines de milliers d'écritures de flag). Recalcule les sa dirty (LEFT JOIN orphelin → NULL, cleanup absorbé), puis sp et publications scopés sur eux, puis purge les deux flags. Le recompute complet (~461s pour **0** changement, mesuré) devient O(ce qui a changé). Split par source supprimé (dirty-scoping borne le volume).
+
+### 6. `suggest` : matching flou au lieu de la sous-chaîne exacte (à faire)
+
+`suggest` emprunte le pays d'une adresse du pool *avec* pays qui **contient la cible comme sous-chaîne exacte** (automate Aho-Corasick). Le match exact rate les quasi-identiques : typos (`Clermont Ferand`), variantes d'espacement / ponctuation, ordre des mots, abréviations, accents résiduels — la même institution écrite légèrement différemment n'emprunte pas son pays.
+
+→ Remplacer (ou compléter en dernier recours) la sous-chaîne exacte par un **matching flou** : similarité trigramme `pg_trgm` (opérateur `word_similarity` / `<%`), seuil calibré **empiriquement** (bottom-up sur cas réels, cf. méthode du chantier). Le flou reste **en dernier recours** après les passes déterministes (`detect_*` autoritaires), écrit `suggested_countries` (confirmation manuelle), jamais `countries`.
+
+**Acquis instruits (2026-06-14)** :
+
+- **Index déjà en place.** `idx_addresses_normalized_text_trgm` (GIN `gin_trgm_ops` sur `addresses.normalized_text`) existe déjà — créé par la migration `0018`, déclaré dans `tables.py`. Aucune migration à écrire ; seul `word_similarity` accéléré par `<%` est runnable sur le pool (~790k adresses). Le GiST KNN (`<->>`) fait un seq scan (~34s/requête) — écarté.
+- **Forme de requête.** Par cible : agréger les pays parmi les adresses-pool dont `:cible <% normalized_text` (seuil `word_similarity_threshold ~0.7`), **sans `ORDER BY ... LIMIT`** (on veut tous les pays des matches pour la garde, pas le top-k trié). **Garde consensus** : si les matches au-dessus du seuil ne s'accordent pas sur un pays unique, on n'écrit rien (même logique de conflit que `detect_place_countries`).
+- **Coût et placement — point ouvert.** Le flou est **intrinsèquement par-cible** (une requête par adresse), contrairement à l'Aho-Corasick qui inverse la boucle (un seul passage sur le pool, coût indépendant du nombre de cibles). C'est le prix du flou. Mesure indicative ~2s/cible sur la vraie table, mais **à remesurer base au repos** (cache froid + requête non optimisée faussaient la mesure). Parallélisable (les backends Postgres sont des process séparés → vrais cœurs). Les **~14k résiduelles** (`countries IS NULL`, pas encore suggérées) sont le **rattrapage one-shot**, pas le coût par run (en incrémental, seules les nouvelles résiduelles passent). **Règle de décision** : si le rattrapage parallélisé dépasse ~15 min, sortir `suggest_countries` du pipeline vers un **script de maintenance** dédié ; sinon le garder en phase.
+
+### 7. Cascade `refresh_publication_countries` : matérialiser l'ensemble dirty une fois + fusionner le clear (à étudier)
+
+La cascade (`refresh_sa_countries` → `refresh_address_source_countries` → `refresh_publication_countries` → `clear_countries_dirty`) paie deux coûts cachés sur un rerun complet, observés sur un run à **3,46M `source_authorships` dirty** (`refresh_sa` ~1934s, `clear` ~15 min) :
+
+- **Double-write.** L'étape 1 réécrit les lignes dont `countries` change (~3,18M) ; le `clear` final réécrit **toutes** les lignes dirty (3,46M) pour repasser `countries_dirty = false`. Les lignes changées sont donc réécrites deux fois (pays, puis flag) → ~6,6M écritures au lieu de ~3,46M.
+- **CTE recalculée 3×.** Les trois étapes re-dérivent le même ensemble dirty depuis la CTE `_DIRTY_SA` (scan des 3,46M lignes flaguées), une fois chacune.
+
+On ne peut **pas** fusionner naïvement `countries_dirty = false` dans l'étape 1 : les étapes 2 et 3 re-calculent `_DIRTY_SA` depuis le flag pour trouver les `source_publications` / `publications` à rafraîchir — effacer le flag en étape 1 leur ferait voir un ensemble vide. Le flag doit survivre jusqu'à la fin des trois passes ; c'est pour ça que le `clear` est en étape 4.
+
+**Piste** : matérialiser l'ensemble dirty **une seule fois** au début (table temporaire indexée), pointer les trois étapes dessus au lieu du flag, fusionner `countries_dirty = false` dans l'UPDATE de l'étape 1, et supprimer le `clear` séparé sur `source_authorships` (le clear `addresses`, ~1800 lignes, reste trivial). Gain : écritures `source_authorships` ~6,6M → ~3,46M, et deux scans de 3,46M en moins. En fusionnant, le garde `countries IS DISTINCT FROM` de l'étape 1 perd son effet (le flag bascule sur toutes les lignes dirty) — on réécrit ~284k lignes « pays inchangé » en plus à l'étape 1, négligeable face au `clear` supprimé. Sans effet sur les runs incrémentaux (delta petit) ; gain entièrement sur les gros reruns. À cadrer aussi : l'observabilité (les étapes 3 et 4 n'ont aucun log propre — un `clear` de 15 min se lit comme « publications qui traîne »), donc loguer la durée de chaque étape au passage.
 
 ## Questions ouvertes
 

@@ -12,6 +12,8 @@ Quatre problèmes connexes sur `subjects` / `publication_subjects` repérés à 
 
 4. **Sujets aberrants pour une revue** : signal de cohérence éditoriale non exploité (importé de [METIER_publishers-journals 4d](archived/2026-05-29_METIER_publishers-journals.md)).
 
+5. **Prolifération des keywords libres** : sur ~311k sujets, **303k sont des keywords libres** (sans ontologie), dont ~100k singletons (1 seule publication) et de nombreuses variantes non fusionnées (EN/FR, orthographe, pluriels). Bruit qui gonfle le référentiel et les co-occurrences. Réduction = famille du **matching approximatif** : normalisation + trigrammes (`pg_trgm`) / distance d'édition / phonétique / embeddings — pas Aho-Corasick (qui relève du matching de sous-chaînes, ex. détecteur d'adresses). Décision ouverte : faut-il ingérer les keywords libres comme sujets à part entière, ou les fusionner / les traiter à part ?
+
 ### Constats empiriques de la session d'exploration
 
 **Distribution du `score` OpenAlex sur topics feuille (level 3)** : bimodale, 52k liens à ≥0.9 (65 %) et 16k à <0.1. Échantillons qualifiés à l'œil :

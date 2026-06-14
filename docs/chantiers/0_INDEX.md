@@ -4,7 +4,7 @@
 
 ### En cours
 
-- [Pays : noms de lieux pour la détection + performances](DATA_countries-place-names.md)
+- [Adresses → pays : détection, suggestion et performances de la cascade](DATA_addresses-countries.md)
 - [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
 
 ### En pause
@@ -16,6 +16,7 @@
 
 ### Non commencé
 
+- [Publications : retour à match_or_create, corrections a priori, fusion réparatrice](DATA_publications-match-or-create.md)
 - [Relations entre publications](METIER_relations-publications.md)
 - [Embargo HAL : statut OA intermédiaire « sous embargo »](METIER_embargo-oa-status.md)
 
