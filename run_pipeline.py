@@ -1128,7 +1128,6 @@ def _run_enrich_publishers_from_crossref_members() -> None:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import publisher_repository
-    from infrastructure.sources.api_limits import CROSSREF_DELAY
     from infrastructure.sources.config import get_polite_pool_email
     from infrastructure.sources.crossref.members import fetch_crossref_member
     from infrastructure.sources.doi_prefixes.clients import build_user_agent
@@ -1148,7 +1147,6 @@ def _run_enrich_publishers_from_crossref_members() -> None:
             log,
             publisher_repo=publisher_repository(conn),
             fetcher=fetcher,
-            rate_delay=CROSSREF_DELAY,
         )
     finally:
         conn.close()
@@ -1163,7 +1161,6 @@ def _run_enrich_publishers_from_ror() -> None:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import publisher_repository
-    from infrastructure.sources.api_limits import ROR_DELAY
     from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
     from infrastructure.sources.ror import build_ror_user_agent, fetch_ror_record
 
@@ -1183,7 +1180,6 @@ def _run_enrich_publishers_from_ror() -> None:
             log,
             publisher_repo=publisher_repository(conn),
             fetcher=fetcher,
-            rate_delay=ROR_DELAY,
         )
     finally:
         conn.close()
