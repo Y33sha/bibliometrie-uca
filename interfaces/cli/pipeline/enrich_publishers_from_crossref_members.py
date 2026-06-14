@@ -11,7 +11,6 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.pipeline.enrich import PgEnrichQueries
 from infrastructure.repositories import publisher_repository
-from infrastructure.sources.api_limits import CROSSREF_DELAY
 from infrastructure.sources.config import get_polite_pool_email
 from infrastructure.sources.crossref.members import fetch_crossref_member
 from infrastructure.sources.doi_prefixes.clients import build_user_agent
@@ -50,7 +49,6 @@ def main() -> None:
             fetcher=fetcher,
             limit=args.limit,
             dry_run=args.dry_run,
-            rate_delay=CROSSREF_DELAY,
         )
     finally:
         conn.close()
