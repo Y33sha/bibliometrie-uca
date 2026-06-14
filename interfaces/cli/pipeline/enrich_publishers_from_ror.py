@@ -11,7 +11,6 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.queries.pipeline.enrich import PgEnrichQueries
 from infrastructure.repositories import publisher_repository
-from infrastructure.sources.api_limits import ROR_DELAY
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
 from infrastructure.sources.ror import build_ror_user_agent, fetch_ror_record
 
@@ -47,7 +46,6 @@ def main() -> None:
             fetcher=fetcher,
             limit=args.limit,
             dry_run=args.dry_run,
-            rate_delay=ROR_DELAY,
         )
     finally:
         conn.close()
