@@ -1,8 +1,8 @@
 """Tests pour `application.pipeline.extract.fetch_missing_doi.run_async`.
 
 Deux angles :
-1. **Orchestrateur** : via un fake adapter, vérifie la parallélisation,
-   le sémaphore, le lock DB, et la remontée des stats.
+1. **Orchestrateur** : via un fake adapter, vérifie la parallélisation
+   (pool de workers), le lock DB, et la remontée des stats.
 2. **Adapter OpenAlex + helper async** : via `respx` (mocks httpx),
    vérifie que `fetch_async` et `http_request_with_retry_async`
    parlent à l'API correctement (happy path, 429 retry, erreur).
@@ -96,8 +96,8 @@ class TestRunAsyncOrchestrator:
         assert len(adapter.inserted_records) == 3
 
     @pytest.mark.asyncio
-    async def test_semaphore_caps_concurrent_fetches(self):
-        """`max_concurrent=3` doit plafonner à 3 le nb de fetches en vol."""
+    async def test_worker_pool_caps_concurrent_fetches(self):
+        """`max_concurrent=3` workers doivent plafonner à 3 le nb de fetches en vol."""
         in_flight: list[int] = []
         adapter = _FakeAdapter(record_in_flight=in_flight)
         adapter.max_concurrent = 3
@@ -110,7 +110,7 @@ class TestRunAsyncOrchestrator:
             cross_import_dois_reader=_reader(dois),
         )
         assert max(in_flight) <= 3
-        # Avec 10 DOIs et sem=3, on doit avoir vu le sem saturé au moins une fois
+        # Avec 10 DOIs et 3 workers, on doit avoir vu les 3 workers saturés au moins une fois
         assert max(in_flight) == 3
 
     @pytest.mark.asyncio

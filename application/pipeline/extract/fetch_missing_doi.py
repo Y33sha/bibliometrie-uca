@@ -8,9 +8,9 @@ requête/réponse, SQL d'insertion) est délégué à un adapter qui
 implémente `AsyncFetchMissingDoiAdapter`
 (`application/ports/pipeline/extract/fetch_missing_doi.py`).
 
-Implémentation async (`httpx.AsyncClient` + `asyncio.Semaphore` par
-source) pour saturer les rate-limits autorisés. Sur OpenAlex on
-mesure environ 18 req/s, soit ×3-4 par rapport à un appel séquentiel
+Implémentation async (`httpx.AsyncClient` + pool de `max_concurrent`
+workers par source) pour saturer les rate-limits autorisés. Sur OpenAlex
+on mesure environ 18 req/s, soit ×3-4 par rapport à un appel séquentiel
 respectant le même quota.
 
 Utilisé par la phase `cross_imports` du pipeline, une fois par source
@@ -100,68 +100,77 @@ async def run_async(
 
     batches = [dois[i : i + adapter.batch_size] for i in range(0, total, adapter.batch_size)]
 
-    sem = asyncio.Semaphore(adapter.max_concurrent)
     # Sérialise les inserts : la `Connection` SA sync n'est pas thread-safe,
     # or `asyncio.to_thread` exécute dans un ThreadPoolExecutor partagé.
     db_lock = asyncio.Lock()
     progress = {"processed": 0, "fetched": 0, "inserted": 0, "not_found": 0}
 
+    # Pool de `max_concurrent` workers tirant les lots d'un itérateur partagé,
+    # plutôt qu'un fan-out de toutes les coroutines d'un coup. `next()` est
+    # atomique en asyncio mono-thread (aucun `await` entre deux tirages) : pas de
+    # lot dupliqué ni sauté. Le breaker se vérifie *avant chaque tirage* → dès
+    # qu'il trip, chaque worker finit son lot en vol puis s'arrête sans tirer les
+    # suivants. C'est le « on sort de la boucle » d'un vrai circuit-breaker : pas
+    # de log d'erreur par lot restant, un seul log d'abandon après le gather.
+    batch_iter = iter(enumerate(batches))
+
     async with httpx.AsyncClient() as client:
         request_delay = getattr(adapter, "request_delay_s", 0.0)
 
-        async def process_batch(batch: list[str], batch_idx: int) -> None:
-            # Breaker tripé (source à bout de budget / en panne) : on saute les
-            # lots restants. Les lots en vol au moment du trip lèvent
-            # `SourceUnavailableError` (avalée ci-dessous) ; les suivants no-op ici.
-            if breaker is not None and breaker.tripped:
-                return
-            async with sem:
+        async def worker() -> None:
+            for batch_idx, batch in batch_iter:
+                if breaker is not None and breaker.tripped:
+                    return
                 try:
                     records = list(await adapter.fetch_async(client, batch))
                 except Exception as e:
+                    # Breaker tripé pendant le fetch (source indisponible) :
+                    # abandon silencieux, le log unique vient après le gather.
+                    if breaker is not None and breaker.tripped:
+                        return
                     log.error("Erreur sur lot %d (%d DOI) : %s", batch_idx, len(batch), e)
                     records = []
                 if request_delay:
                     await asyncio.sleep(request_delay)
 
-            # Les sentinelles `not_found` ne sont pas des records API : on les
-            # compte à part, mais on les `insert()` quand même (l'adapter les
-            # route vers le backoff `doi_lookups` / le stub `staging`).
-            real = [r for r in records if not is_not_found_marker(r)]
-            progress["fetched"] += len(real)
-            progress["not_found"] += len(records) - len(real)
-            for record in records:
-                try:
-                    async with db_lock:
-                        if marker_handler is not None and is_not_found_marker(record):
-                            await asyncio.to_thread(marker_handler, conn, record["_doi"])
-                        else:
-                            inserted_one = await asyncio.to_thread(adapter.insert, conn, record)
-                            if inserted_one:
-                                progress["inserted"] += 1
-                except Exception as e:
-                    log.warning("Erreur insertion (%s) : %s", adapter.source_key, e)
+                # Les sentinelles `not_found` ne sont pas des records API : on les
+                # compte à part, mais on les `insert()` quand même (l'adapter les
+                # route vers le backoff `doi_lookups` / le stub `staging`).
+                real = [r for r in records if not is_not_found_marker(r)]
+                progress["fetched"] += len(real)
+                progress["not_found"] += len(records) - len(real)
+                for record in records:
+                    try:
+                        async with db_lock:
+                            if marker_handler is not None and is_not_found_marker(record):
+                                await asyncio.to_thread(marker_handler, conn, record["_doi"])
+                            else:
+                                inserted_one = await asyncio.to_thread(adapter.insert, conn, record)
+                                if inserted_one:
+                                    progress["inserted"] += 1
+                    except Exception as e:
+                        log.warning("Erreur insertion (%s) : %s", adapter.source_key, e)
 
-            progress["processed"] += len(batch)
-            if progress["processed"] % 100 == 0 or progress["processed"] >= total:
-                duplicates = progress["fetched"] - progress["inserted"]
-                log.info(
-                    "  %s %d/%d — %d records (%d nouveaux, %d doublons, %d not-found)",
-                    adapter.source_key,
-                    progress["processed"],
-                    total,
-                    progress["fetched"],
-                    progress["inserted"],
-                    duplicates,
-                    progress["not_found"],
-                )
+                progress["processed"] += len(batch)
+                if progress["processed"] % 100 == 0 or progress["processed"] >= total:
+                    duplicates = progress["fetched"] - progress["inserted"]
+                    log.info(
+                        "  %s %d/%d — %d records (%d nouveaux, %d doublons, %d not-found)",
+                        adapter.source_key,
+                        progress["processed"],
+                        total,
+                        progress["fetched"],
+                        progress["inserted"],
+                        duplicates,
+                        progress["not_found"],
+                    )
 
-        await asyncio.gather(*(process_batch(b, i) for i, b in enumerate(batches)))
+        await asyncio.gather(*(worker() for _ in range(adapter.max_concurrent)))
 
     if breaker is not None and breaker.tripped:
         log.warning(
-            "Source %s à bout (429/5xx répétés) — %d/%d DOI traités, reste sauté"
-            " (retry au prochain run)",
+            "Source %s indisponible (429/5xx répétés) — abandon, %d/%d DOI traités,"
+            " reste au prochain run",
             adapter.source_key,
             progress["processed"],
             total,
