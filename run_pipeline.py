@@ -1280,6 +1280,28 @@ def _extractor_args(
     return argparse.Namespace(dry_run=False, mode=mode, year=year, since=since)
 
 
+def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
+    """Exécute un extracteur avec un circuit-breaker de source (seuil 5).
+
+    Pose le breaker dans la ContextVar (lu par le helper HTTP sync) et le passe à
+    `run_as_phase` (consulté par les boucles `extract_all` pour stopper une source
+    à bout de budget). Seuil 5 : extracteurs séquentiels, pas de batch concurrent
+    comme le cross-import (qui est à 10).
+    """
+    from infrastructure.sources.circuit_breaker import (
+        SourceCircuitBreaker,
+        reset_current_breaker,
+        set_current_breaker,
+    )
+
+    breaker = SourceCircuitBreaker(extractor.SOURCE, threshold=5)
+    token = set_current_breaker(breaker)
+    try:
+        return extractor.run_as_phase(args, breaker=breaker)
+    finally:
+        reset_current_breaker(token)
+
+
 def _run_extract_hal(
     *, mode: str = "full", year: int | None = None, since: str | None = None
 ) -> PhaseMetrics:
@@ -1300,8 +1322,9 @@ def _run_extract_hal(
     conn = engine.connect()
     adapter = PgHalExtractAdapter(base_url=hal_url)
     try:
-        metrics = HalExtractor(conn, source_log, PgStagingQueries(), adapter).run_as_phase(
-            _extractor_args(mode=mode, year=year, since=since)
+        metrics = _run_extractor(
+            HalExtractor(conn, source_log, PgStagingQueries(), adapter),
+            _extractor_args(mode=mode, year=year, since=since),
         )
     finally:
         conn.close()
@@ -1327,8 +1350,9 @@ def _run_extract_openalex(
     conn = engine.connect()
     adapter = PgOpenalexExtractAdapter(base_url=base_url)
     try:
-        metrics = OpenalexExtractor(conn, source_log, PgStagingQueries(), adapter).run_as_phase(
-            _extractor_args(mode=mode, year=year, since=since)
+        metrics = _run_extractor(
+            OpenalexExtractor(conn, source_log, PgStagingQueries(), adapter),
+            _extractor_args(mode=mode, year=year, since=since),
         )
     finally:
         conn.close()
@@ -1353,8 +1377,9 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
     conn = engine.connect()
     adapter = PgWosExtractAdapter(base_url=base_url, api_key=api_key)
     try:
-        metrics = WosExtractor(conn, source_log, PgStagingQueries(), adapter).run_as_phase(
-            _extractor_args(mode=mode, year=year)
+        metrics = _run_extractor(
+            WosExtractor(conn, source_log, PgStagingQueries(), adapter),
+            _extractor_args(mode=mode, year=year),
         )
     finally:
         conn.close()
@@ -1385,8 +1410,9 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
     conn = engine.connect()
     adapter = PgScanrExtractAdapter(base_url=base_url, credentials=credentials)
     try:
-        metrics = ScanrExtractor(conn, source_log, PgStagingQueries(), adapter).run_as_phase(
-            _extractor_args(mode=mode, year=year)
+        metrics = _run_extractor(
+            ScanrExtractor(conn, source_log, PgStagingQueries(), adapter),
+            _extractor_args(mode=mode, year=year),
         )
     finally:
         conn.close()
@@ -1412,8 +1438,9 @@ def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> Phase
     conn = engine.connect()
     adapter = PgThesesExtractAdapter(base_url=base_url)
     try:
-        metrics = ThesesExtractor(conn, source_log, PgStagingQueries(), adapter).run_as_phase(
-            _extractor_args(mode=mode, year=year)
+        metrics = _run_extractor(
+            ThesesExtractor(conn, source_log, PgStagingQueries(), adapter),
+            _extractor_args(mode=mode, year=year),
         )
     finally:
         conn.close()

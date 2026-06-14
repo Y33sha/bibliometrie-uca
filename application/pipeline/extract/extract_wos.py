@@ -171,6 +171,11 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
 
         stats = PhaseMetrics()
         for i, year in enumerate(years):
+            if self._breaker_tripped():
+                self.logger.warning(
+                    "WoS à bout (429/5xx répétés) — années restantes sautées (retry au prochain run)"
+                )
+                break
             try:
                 new, updated, unchanged = extract_year(
                     self._adapter,
@@ -184,7 +189,8 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
                 stats.add(new=new, updated=updated, unchanged=unchanged)
             except Exception as e:
                 self.logger.error(f"Erreur sur l'année {year} : {e} — passage à la suivante")
-            if i < len(years) - 1:
+            # Pas de pause si le breaker vient de tripper : la boucle s'arrête au tour suivant.
+            if i < len(years) - 1 and not self._breaker_tripped():
                 self.logger.info("Pause de 30s avant l'année suivante...")
                 time.sleep(30)
         return stats
