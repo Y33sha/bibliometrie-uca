@@ -1,22 +1,17 @@
 # A régler avant transmission
 ## Pipeline de traitement
-* [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / pipeline:   51/181... (51 mis à jour, 0 déjà complets) => toujours 0 déjà complet: calculé comment? / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => "rattachement" en phase normalize = vestige
+* [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / pipeline:   51/181... (51 mis à jour, 0 déjà complets) => toujours 0 déjà complet: calculé comment? / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => "rattachement" en phase normalize = vestige / cross-import: "Échec après 3 tentatives rec 1 / 429 Too Many Requests rec 1 — attente 4.0s (tentative 1/3)" => toujours préciser la source qui échoue
 ### Extraction
-* [ ] gérer les 429 ou 503 répétés => skipper entièrement une phase
 * [ ] extraction par ORCID: vérifier pertinence/faisabilité (tester différentes sources, auditer le gain)
-* [ ] Paralléliser cross-imports entre eux
 * [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ]  HAL: "0 nouveaux, 0 mis à jour, 36 inchangés" alors que j'avais nullé les hash => problème de comparaison de hash ou problème de logging?
 * [ ] Comprendre pourquoi l'extract ScanR paginé est aussi lent, alors que le cross-import par DOI est ultra-rapide (2s/100 DOI contre 30s OpenAlex); ScanR est presque plus rapide par DOI que par bulk, c'est absurde
+* [ ] cross-import par NNT: " 300/332 — 0 récupérés, 297 absents de HAL" quid des 3 autres?
 ### Normalisation
-* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur / ou juste supprimer le hal_person_id partout par précaution?
+* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur / ou juste supprimer silencieusement le hal_person_id partout par précaution?
 ### Suite du traitement
-* [ ] doi_prefixes: marquer les préfixes DOI non résolus: pas la peine de les retenter au run suivant
-* [ ] phase publisher_journals: critère "stale" pour re-traiter seulement au bout de n jours? / "pipeline:   5300/7500 — 28 avec APC, 973 DOAJ, 5300 types écrits" => les données APC OpenAlex semblent très lacunaires: ne pas exploiter?
-* [ ] API DOAJ: laisser tomber: inacceptablement lent, beaucoup de 404; le dump csv périodique suffit (2026-06-13 10:34:17,303 [INFO] pipeline: 11220 revues candidates (au moins un ISSN, stale > 30 jours). 2026-06-13 10:37:21,833 [INFO] pipeline:   50/11220 traités, 0 dans DOAJ, 50 404)
 * [ ] phase persons: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 person_id)
-* [ ] phase publications: mettre un flag BOOL "deduplicated" false->true, pour empêcher les publications d'apparaître dans l'UI avant la phase déduplication?
-* [ ] en fin de phase authorships, supprimer les publications sans authorship (ie hors périmètre UCA et sans auteur UCA)
+* [ ] phase publications: comparer pros/cons de l'ancien `match_or_create` et du nouveau `create_and_merge`; voir s'il n'y a pas moyen de revenir à un `match_or_create` sans les inconvénients (par ex. distinguer colonnes raw_* et corrected_*: corrections métadonnées et ordres de non-fusion opérés au niveau souce_publication plutôt que publication?). Ou peut-être que la lourdeur de `create_and_merge` est consécutive à un premier full run, et ne se reproduit pas: voir à l'usage
 ## Code
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
 * [ ] chantier observabilité pipeline: quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de snapshot; c'est un problème. => faire des snapshots par phase, pas par pipeline
@@ -30,8 +25,6 @@
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
-* sujets: cooccurrences calculées sur publications, ou sur source_publications? idem nombre d'occurrences (ex.: sujet vaches laitières, 10 occurrences annoncées, 2 publications affichées)
-* sujets: tenir compte du critère "in_perimeter" dans le calcul des occurrences et co-occurrences
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée?
@@ -51,7 +44,7 @@
 ## Admin
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer
 * [ ] comportement capricieux de l'UI sur la page countries (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: "loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine."
-* [ ] structures: name forms: is_word_boundary devrait être false si contient séparateur de mot, même si nb cars `<` 6
+* [ ] structures_name_forms: is_word_boundary devrait être forcé à false si contient séparateur de mot, même si nb cars `<` 6 (? vérifier d'abord l'effet réel de iss_word_boundary)
 ### Personnes (admin)
 * [ ] quoi faire des entités aberrantes (auteurs mal parsés)? a minima, s'assurer qu'elles n'apparaissent pas dans orphan-authorships
 * [ ] date de dernière publication UCA? (permet de filtrer les auteurs "legacy" vs actifs)
@@ -62,12 +55,12 @@
 ### Publications
 * [ ] Filtres supplémentaires possibles: langue; has_doi; corresponding_is_in_perimeter; peer_reviewed? (suppose de posséder la donnée ou de pouvoir la déduire des sources);
 * [ ] colonne éditeur, filtres éditeur + revue?
-* [ ] avoir des groupes de pays (UE, continents) pour la recherche par facettes
-* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre sur "établissement de soutenance")
+* [ ] avoir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
+* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance")
 ## Détails d'affichage
-* [ ] décomptes sur les onglets: souvent incohérents à cause de requêtes légèrement différentes (cf nb revues par éditeur): supprimer ou corriger?
+* [ ] décomptes sur les onglets: souvent incohérents à cause de filtres différents (cf nb revues par éditeur): supprimer ou corriger?
 * [ ] ce serait top si le filtrage par chaîne de caractères recalculait tous les décomptes des facettes
-* [ ] lien dashboard => publications: il faut que toutes les facettes actives soient affichées
+* [ ] lien dashboard => publications: il faut que TOUTES les facettes actives soient affichées
 * [ ] dashboard éditeur/revue: graphiques sur le modèle des dashboards labo/personne
 * [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques?
 * [ ] double scroll dans admin/addresses: chiant
@@ -123,3 +116,4 @@ WHERE source = 'openalex'
 * quid de scanr? a priori la même opération est nécessaire
 * python -m interfaces.cli.oneshot.seed_place_names_from_ror (après avoir ajouter le csv dans data/)
 * python -m interfaces.cli.oneshot.prune_place_names --apply
+* squasher le schéma
