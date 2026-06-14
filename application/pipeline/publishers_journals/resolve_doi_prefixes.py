@@ -5,7 +5,7 @@ Deux passes :
 **Passe 1 — nouveaux préfixes du staging.** Pour chaque préfixe DOI présent en staging mais absent de `doi_prefixes` :
 
 1. Récupère jusqu'à `n_samples` DOI samples du staging pour ce préfixe.
-2. Interroge `doi.org/ra` dans l'ordre via `resolve_ra_fn`. Premier sample qui renvoie une RA valide → on garde la valeur. Si tous les samples échouent (DOI inexistant, erreur réseau), **on n'insère pas** le préfixe : retry au prochain run.
+2. Interroge `doi.org/ra` dans l'ordre via `resolve_ra_fn`. Premier sample qui renvoie une RA valide → on garde la valeur. Si tous les samples échouent (DOI inexistant, erreur réseau), on tente directement les endpoints prefix Crossref puis DataCite ; si rien ne répond nulle part, le préfixe est inséré avec une RA sentinelle `'unknown'` (+ `fetched_at`) pour **ne plus être retenté** (un préfixe non résoluble est probablement erroné). Sans ça, il s'accumulerait et serait réinterrogé à chaque run.
 3. Si RA = `'Crossref'`, interroge `api.crossref.org/prefixes/<prefix>` via `fetch_crossref_prefix_fn` pour récupérer `(name, member_id)`. Le `name` (publisher Crossref) occupe les colonnes `publisher_*`. Normalisation via `normalize_text`, matching contre `publisher_name_forms` pour rattacher un `publisher_id` existant ; sinon création du publisher.
 4. Si RA = `'DataCite'`, interroge `api.datacite.org/prefixes/<prefix>` via `fetch_datacite_prefix_fn` pour récupérer `(provider_name, client_name, client_symbol)`. Le `provider_name` (organisation-mère DataCite) occupe les colonnes `publisher_*` (mêmes règles de match/création) ; le `client_name` et le `client_symbol` (= repository) vont dans les colonnes `client_*` et `datacite_client_symbol`.
 5. **Création de publisher plutôt que `publisher_id NULL`** : si aucun match, on crée le publisher (+ son `publisher_name_form`) plutôt que de laisser orphelin. Les doublons éventuels avec des publishers issus des sources sont rattrapés via fusion manuelle côté admin.
@@ -125,10 +125,6 @@ def _pass_new_prefixes(
     for prefix, samples in prefixes:
         metrics.add(total=1)
         ra = _resolve_ra_with_retry(prefix, samples, resolve_ra_fn, log)
-        if ra is None:
-            metrics.add(unresolved=1)
-            continue
-        metrics.add(resolved=1)
 
         publisher_id: int | None = None
         publisher_name_raw: str | None = None
@@ -138,32 +134,56 @@ def _pass_new_prefixes(
         client_name_normalized: str | None = None
         datacite_client_symbol: str | None = None
 
+        crossref_info: tuple[str, int | None] | None = None
+        datacite_info: tuple[str, str, str] | None = None
         if ra == "Crossref":
             crossref_info = fetch_crossref_prefix_fn(prefix)
-            if crossref_info is not None:
-                publisher_name_raw, crossref_member_id = crossref_info
-                publisher_name_normalized = normalize_text(publisher_name_raw) or None
-                if publisher_name_normalized:
-                    publisher_id, created = _match_or_create_publisher(
-                        publisher_repo,
-                        name_raw=publisher_name_raw,
-                        name_normalized=publisher_name_normalized,
-                    )
-                    metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
         elif ra == "DataCite":
             datacite_info = fetch_datacite_prefix_fn(prefix)
-            if datacite_info is not None:
-                provider_name, client_name_raw, datacite_client_symbol = datacite_info
-                publisher_name_raw = provider_name
-                publisher_name_normalized = normalize_text(provider_name) or None
-                client_name_normalized = normalize_text(client_name_raw) or None
-                if publisher_name_normalized:
-                    publisher_id, created = _match_or_create_publisher(
-                        publisher_repo,
-                        name_raw=publisher_name_raw,
-                        name_normalized=publisher_name_normalized,
-                    )
-                    metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
+        elif ra is None:
+            # RA non résolue (samples KO) : on tente directement les endpoints
+            # prefix Crossref puis DataCite — l'un peut répondre alors que les
+            # DOI samples ne résolvent pas via doi.org/ra.
+            crossref_info = fetch_crossref_prefix_fn(prefix)
+            if crossref_info is not None:
+                ra = "Crossref"
+            else:
+                datacite_info = fetch_datacite_prefix_fn(prefix)
+                if datacite_info is not None:
+                    ra = "DataCite"
+        # else : RA réelle mais non gérée (mEDRA, KISTI, 'unknown'…) → insert tel quel.
+
+        if crossref_info is not None:
+            publisher_name_raw, crossref_member_id = crossref_info
+            publisher_name_normalized = normalize_text(publisher_name_raw) or None
+            if publisher_name_normalized:
+                publisher_id, created = _match_or_create_publisher(
+                    publisher_repo,
+                    name_raw=publisher_name_raw,
+                    name_normalized=publisher_name_normalized,
+                )
+                metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
+        elif datacite_info is not None:
+            provider_name, client_name_raw, datacite_client_symbol = datacite_info
+            publisher_name_raw = provider_name
+            publisher_name_normalized = normalize_text(provider_name) or None
+            client_name_normalized = normalize_text(client_name_raw) or None
+            if publisher_name_normalized:
+                publisher_id, created = _match_or_create_publisher(
+                    publisher_repo,
+                    name_raw=publisher_name_raw,
+                    name_normalized=publisher_name_normalized,
+                )
+                metrics.add(**{"publisher_created" if created else "publisher_matched": 1})
+
+        if ra is None:
+            # Irrésoluble partout : on stocke avec une RA sentinelle 'unknown'
+            # (fetched_at = now() par défaut) pour ne plus retenter ce préfixe à
+            # chaque run — un préfixe non résoluble est probablement erroné.
+            ra = "unknown"
+            metrics.add(unresolved=1)
+        else:
+            metrics.add(resolved=1)
 
         inserted = repo.insert_doi_prefix(
             prefix=prefix,
@@ -262,5 +282,7 @@ def _resolve_ra_with_retry(
         if ra is not None:
             return ra
         log.debug("  %s : sample %s non résoluble, tente le suivant", prefix, doi)
-    log.warning("  %s : tous les samples ont échoué (%d), pas d'insert", prefix, len(samples))
+    log.warning(
+        "  %s : tous les samples ont échoué (%d), fallback Crossref/DataCite", prefix, len(samples)
+    )
     return None

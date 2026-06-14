@@ -390,20 +390,48 @@ def test_first_sample_fails_second_succeeds():
     assert metrics.extras.get("resolved") == 1
 
 
-def test_all_samples_fail_no_insert():
-    """Si tous les samples échouent, on n'insère rien et le préfixe sera retenté."""
+def test_all_samples_fail_and_fallback_fails_stored_as_unknown():
+    """Si tous les samples échouent ET que les endpoints prefix Crossref/DataCite
+    ne répondent pas, on stocke le préfixe avec ra='unknown' (sentinelle +
+    fetched_at) pour ne plus le retenter — au lieu de l'omettre."""
     repo = FakeDoiPrefixRepo(unresolved=[("10.xxx", ["10.xxx/a", "10.xxx/b", "10.xxx/c"])])
     pubrepo = FakePublisherRepo()
     ra = StubResolveRa(answers={"10.xxx/a": None, "10.xxx/b": None, "10.xxx/c": None})
-    cr = StubCrossref()
+    cr = StubCrossref()  # pas de réponse
+    dc = StubDataCite()  # pas de réponse
 
-    metrics = _run(repo, pubrepo, ra, cr)
+    metrics = _run(repo, pubrepo, ra, cr, dc)
 
     assert ra.calls == ["10.xxx/a", "10.xxx/b", "10.xxx/c"]
-    assert repo.inserted == []
-    assert metrics.new == 0
+    # Fallback tenté sur les deux endpoints prefix.
+    assert cr.calls == ["10.xxx"]
+    assert dc.calls == ["10.xxx"]
+    # Stocké en sentinelle → ne sera plus retenté.
+    assert len(repo.inserted) == 1
+    assert repo.inserted[0]["ra"] == "unknown"
+    assert repo.inserted[0]["publisher_id"] is None
+    assert metrics.new == 1
     assert metrics.extras.get("unresolved") == 1
     assert metrics.total == 1
+
+
+def test_unresolved_ra_falls_back_to_crossref_prefix():
+    """RA non résolue (samples KO) mais l'endpoint prefix Crossref répond → on
+    adopte ra='Crossref' et on résout l'éditeur au lieu d'abandonner."""
+    repo = FakeDoiPrefixRepo(unresolved=[("10.1038", ["10.1038/bad"])])
+    pubrepo = FakePublisherRepo()
+    ra = StubResolveRa(answers={"10.1038/bad": None})
+    cr = StubCrossref(answers={"10.1038": ("Nature Publishing Group", 297)})
+    dc = StubDataCite()
+
+    metrics = _run(repo, pubrepo, ra, cr, dc)
+
+    assert cr.calls == ["10.1038"]
+    assert dc.calls == []  # Crossref a répondu → DataCite non tenté
+    row = repo.inserted[0]
+    assert row["ra"] == "Crossref"
+    assert row["crossref_member_id"] == 297
+    assert metrics.extras.get("resolved") == 1
 
 
 # ── Crossref API failure ───────────────────────────────────────────
