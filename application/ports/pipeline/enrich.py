@@ -6,7 +6,7 @@ par les phases `oa_status` (Unpaywall) et `publishers_journals`
 """
 
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Protocol
 
 from sqlalchemy import Connection
 
@@ -34,7 +34,9 @@ class EnrichQueries(Protocol):
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, int]]: ...
 
-    def fetch_journal_issn_index(self, conn: Connection) -> list[Any]:
+    def fetch_journal_issn_index(
+        self, conn: Connection
+    ) -> list[tuple[int, str | None, str | None, str | None]]:
         """Rows `(id, issn, eissn, issnl)` de tous les journaux ayant au moins un
         ISSN — pour indexer ISSN → journal_id à l'import du dump DOAJ."""
         ...

@@ -11,7 +11,6 @@ sera possible si d'autres queries d'enrichissement s'y ajoutent.
 """
 
 from datetime import datetime
-from typing import Any
 
 from sqlalchemy import Connection, text
 
@@ -210,11 +209,14 @@ def fetch_publishers_needing_country_from_crossref(
     return [(r.publisher_id, r.member_id) for r in rows]
 
 
-def fetch_journal_issn_index(conn: Connection) -> list[Any]:
+def fetch_journal_issn_index(
+    conn: Connection,
+) -> list[tuple[int, str | None, str | None, str | None]]:
     """Rows `(id, issn, eissn, issnl)` des journaux ayant au moins un ISSN —
     matière de l'index ISSN → journal_id à l'import du dump DOAJ."""
-    return list(
-        conn.execute(
+    return [
+        (r.id, r.issn, r.eissn, r.issnl)
+        for r in conn.execute(
             text(
                 """
                 SELECT id, issn, eissn, issnl
@@ -223,7 +225,7 @@ def fetch_journal_issn_index(conn: Connection) -> list[Any]:
                 """
             )
         ).all()
-    )
+    ]
 
 
 def reset_is_in_doaj(conn: Connection) -> int:
@@ -267,7 +269,9 @@ class PgEnrichQueries(EnrichQueries):
     ) -> list[tuple[int, int]]:
         return fetch_publishers_needing_country_from_crossref(conn, limit=limit)
 
-    def fetch_journal_issn_index(self, conn: Connection) -> list[Any]:
+    def fetch_journal_issn_index(
+        self, conn: Connection
+    ) -> list[tuple[int, str | None, str | None, str | None]]:
         return fetch_journal_issn_index(conn)
 
     def reset_is_in_doaj(self, conn: Connection) -> int:
