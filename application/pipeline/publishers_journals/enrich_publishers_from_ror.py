@@ -17,8 +17,10 @@ Mapping figé à l'audit Phase 3 (cf. roadmap) :
 - ROR `government` / `facility` / `other` / `healthcare` / `funder` seul
   → skip (= laissé `unknown`)
 
-ROR n'a pas de bulk endpoint par liste d'IDs : 1 req par publisher.
-Volume cible ≈ 400 publishers, ~60 s avec `ROR_DELAY=0.15`.
+ROR n'a pas de bulk endpoint par liste d'IDs : 1 req par publisher. La
+latence ROR (~3s/appel) domine, donc les fetches sont **parallélisés**
+(`ThreadPoolExecutor`) ; le traitement + l'écriture restent séquentiels
+(la connexion sync n'est pas thread-safe).
 
 Le fetcher concret vit dans `infrastructure/sources/ror.py` ; il est
 injecté par la composition root pour respecter l'étanchéité DDD
@@ -26,9 +28,9 @@ injecté par la composition root pour respecter l'étanchéité DDD
 """
 
 import logging
-import time
 from collections import Counter
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from sqlalchemy import Connection
@@ -44,6 +46,7 @@ type RorFetcher = Callable[[str], dict[str, Any] | None]
 """Signature : ``(ror) → record JSON ou None (404 / erreur)``."""
 
 COMMIT_EVERY = 50
+MAX_WORKERS = 8
 
 
 def run_enrich_publishers_from_ror(
@@ -55,7 +58,7 @@ def run_enrich_publishers_from_ror(
     fetcher: RorFetcher,
     limit: int = 0,
     dry_run: bool = False,
-    rate_delay: float = 0.15,
+    max_workers: int = MAX_WORKERS,
 ) -> None:
     try:
         publishers = queries.fetch_publishers_needing_publisher_type_from_ror(
@@ -74,9 +77,14 @@ def run_enrich_publishers_from_ror(
         no_types = 0
         type_counter: Counter[str] = Counter()
 
-        for i, (publisher_id, ror) in enumerate(publishers, 1):
-            record = fetcher(ror)
-            time.sleep(rate_delay)
+        # Fetch concurrent : le goulot est la latence ROR (~3s/appel).
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            records = list(ex.map(lambda pr: fetcher(pr[1]), publishers))
+
+        # Traitement + écriture séquentiels (connexion sync non thread-safe).
+        for i, ((publisher_id, _ror), record) in enumerate(
+            zip(publishers, records, strict=True), 1
+        ):
             if record is None:
                 no_record += 1
                 continue
