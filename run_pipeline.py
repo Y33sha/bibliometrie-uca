@@ -178,9 +178,24 @@ def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> P
         set(sources) if sources else set(policy.fetch_missing_doi_sources)
     ) & policy.fetch_missing_doi_sources
 
-    for target in ("hal", "openalex", "wos", "scanr", "crossref"):
-        if target in effective:
-            metrics.merge(_run_fetch_missing_doi(target))
+    doi_targets = [t for t in ("hal", "openalex", "wos", "scanr", "crossref") if t in effective]
+    if doi_targets:
+        # Cross-imports par DOI en parallèle (comme les extracteurs) : chaque
+        # `_run_fetch_missing_doi` ouvre sa propre connexion, frappe une API
+        # distincte et écrit dans le staging de sa source — aucun état partagé.
+        # La merge des PhaseMetrics reste séquentielle (non thread-safe).
+        # Conséquence assumée : une propagation cross-source d'un DOI fraîchement
+        # importé peut glisser au run suivant (phase de rattrapage idempotente et
+        # auto-bornée), au lieu de l'ordre séquentiel hal→openalex→…
+        log.info(
+            "▶ cross-imports par DOI en parallèle (%d) : %s",
+            len(doi_targets),
+            ", ".join(doi_targets),
+        )
+        with ThreadPoolExecutor(max_workers=len(doi_targets)) as pool:
+            futures = {pool.submit(_run_fetch_missing_doi, t): t for t in doi_targets}
+            for future in as_completed(futures):
+                metrics.merge(future.result())
 
     return metrics
 
