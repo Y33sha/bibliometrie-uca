@@ -27,6 +27,7 @@ import httpx
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
+from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.extract.fetch_missing_doi import (
     AsyncFetchMissingDoiAdapter,
     CrossImportDoisReader,
@@ -45,6 +46,7 @@ async def run_async(
     marker_handler: Callable[[Connection, str], None] | None = None,
     dry_run: bool = False,
     limit: int | None = None,
+    breaker: CircuitBreaker | None = None,
 ) -> PhaseMetrics:
     """Boucle principale : DOIs → fetch async → insert.
 
@@ -108,6 +110,11 @@ async def run_async(
         request_delay = getattr(adapter, "request_delay_s", 0.0)
 
         async def process_batch(batch: list[str], batch_idx: int) -> None:
+            # Breaker tripé (source à bout de budget / en panne) : on saute les
+            # lots restants. Les lots en vol au moment du trip lèvent
+            # `SourceUnavailableError` (avalée ci-dessous) ; les suivants no-op ici.
+            if breaker is not None and breaker.tripped:
+                return
             async with sem:
                 try:
                     records = list(await adapter.fetch_async(client, batch))
@@ -150,6 +157,15 @@ async def run_async(
                 )
 
         await asyncio.gather(*(process_batch(b, i) for i, b in enumerate(batches)))
+
+    if breaker is not None and breaker.tripped:
+        log.warning(
+            "Source %s à bout (429/5xx répétés) — %d/%d DOI traités, reste sauté"
+            " (retry au prochain run)",
+            adapter.source_key,
+            progress["processed"],
+            total,
+        )
 
     duplicates = progress["fetched"] - progress["inserted"]
     log.info(

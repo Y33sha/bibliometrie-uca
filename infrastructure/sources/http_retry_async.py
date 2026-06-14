@@ -20,6 +20,8 @@ import logging
 
 import httpx
 
+from infrastructure.sources.circuit_breaker import get_current_breaker
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,8 +53,17 @@ async def http_request_with_retry_async(
     `label` : chaîne courte (ex: "DOI 10.xxx") insérée dans les logs
     pour distinguer les requêtes concurrentes.
 
+    Circuit-breaker : si un `SourceCircuitBreaker` est posé (ContextVar, cf.
+    `infrastructure.sources.circuit_breaker`), on court-circuite quand il a tripé
+    (`SourceUnavailableError`), on lui compte les échecs 429/5xx/réseau et on le
+    remet à zéro au succès. Les 4xx (404…) ne comptent pas (résultat normal).
+
     Lève la dernière exception rencontrée si max_retries est atteint.
     """
+    breaker = get_current_breaker()
+    if breaker is not None:
+        breaker.check()  # court-circuite si la source a déjà tripé
+
     last_error: Exception | None = None
     for attempt in range(max_retries):
         wait = initial_backoff * (2**attempt)
@@ -72,13 +83,23 @@ async def http_request_with_retry_async(
                 )
                 await asyncio.sleep(wait)
                 continue
-            resp.raise_for_status()
+            try:
+                resp.raise_for_status()
+            except httpx.HTTPStatusError:
+                # 5xx = source en panne → compte pour le breaker ; 4xx (404…) =
+                # résultat normal (non trouvé), on ne compte pas. On propage dans
+                # les deux cas (comportement inchangé).
+                if breaker is not None and 500 <= resp.status_code < 600:
+                    breaker.record_failure()
+                raise
             if retry_on_empty_body and not resp.text.strip():
                 logger.warning(
                     f"Body vide {label} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
                 )
                 await asyncio.sleep(wait)
                 continue
+            if breaker is not None:
+                breaker.record_success()
             return resp.json()
         except json.JSONDecodeError as e:
             last_error = e
@@ -89,12 +110,17 @@ async def http_request_with_retry_async(
         except httpx.RequestError as e:
             last_error = e
             if attempt == max_retries - 1:
+                if breaker is not None:
+                    breaker.record_failure()
                 raise
             logger.warning(
                 f"Erreur réseau {label}: {e} — attente {wait}s (tentative {attempt + 1}/{max_retries})"
             )
             await asyncio.sleep(wait)
 
+    # Boucle épuisée : 429 répétés ou JSON invalide répété → échec source.
+    if breaker is not None:
+        breaker.record_failure()
     logger.error(f"Échec après {max_retries} tentatives {label}")
     if last_error:
         raise last_error
