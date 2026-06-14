@@ -73,10 +73,10 @@ def run_import_doaj_dump(
     rollbackée). Retourne les stats."""
     # Index ISSN → journal_id (premier gagnant) pour matcher en O(1).
     issn_to_journal_id: dict[str, int] = {}
-    for r in queries.fetch_journal_issn_index(conn):
-        for issn in (r.issn, r.eissn, r.issnl):
-            if issn:
-                issn_to_journal_id.setdefault(issn, r.id)
+    for indexed_journal_id, issn, eissn, issnl in queries.fetch_journal_issn_index(conn):
+        for issn_value in (issn, eissn, issnl):
+            if issn_value:
+                issn_to_journal_id.setdefault(issn_value, indexed_journal_id)
     logger.info("%d ISSN indexés (journals.issn/eissn/issnl)", len(issn_to_journal_id))
 
     # Le dump fait autorité : reset global avant de re-poser les TRUE.
