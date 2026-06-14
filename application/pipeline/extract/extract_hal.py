@@ -232,6 +232,12 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
 
         stats = PhaseMetrics()
         for code, label in config.all_collections.items():
+            if self._breaker_tripped():
+                self.logger.warning(
+                    "HAL à bout (429/5xx répétés) — collections restantes sautées"
+                    " (retry au prochain run)"
+                )
+                break
             total, new, updated, unchanged = extract_collection(
                 code,
                 label,

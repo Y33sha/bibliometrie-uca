@@ -161,6 +161,12 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
             stats.add(new=year_new, updated=year_updated, unchanged=year_unchanged)
         else:
             for year in years:
+                if self._breaker_tripped():
+                    self.logger.warning(
+                        "OpenAlex à bout (429/5xx répétés) — années restantes sautées"
+                        " (retry au prochain run)"
+                    )
+                    break
                 year_new, year_updated, year_unchanged = extract_year(
                     self._adapter,
                     self.conn,

@@ -126,6 +126,12 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
         self.logger.info(f"Années : {years}")
         stats = PhaseMetrics()
         for year in years:
+            if self._breaker_tripped():
+                self.logger.warning(
+                    "ScanR à bout (429/5xx répétés) — années restantes sautées"
+                    " (retry au prochain run)"
+                )
+                break
             total, inserted, updated, unchanged = extract_year(
                 self._adapter,
                 self.conn,

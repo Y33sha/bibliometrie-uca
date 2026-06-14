@@ -32,6 +32,7 @@ import requests
 from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
+from application.ports.pipeline.circuit_breaker import CircuitBreaker
 from application.ports.pipeline.staging import StagingQueries
 
 
@@ -77,6 +78,15 @@ class SourceExtractor[ConfigT](ABC):
         self.conn = conn
         self.logger = logger
         self._staging = staging
+        # Circuit-breaker de la source (posé par `run_as_phase`) : les boucles
+        # `extract_all` consultent `_breaker_tripped()` pour s'arrêter quand la
+        # source est à bout de budget / en panne.
+        self._breaker: CircuitBreaker | None = None
+
+    def _breaker_tripped(self) -> bool:
+        """`True` si le circuit-breaker de la source a tripé (à consulter dans les
+        boucles d'`extract_all` pour stopper la source)."""
+        return self._breaker is not None and self._breaker.tripped
 
     # ── Hooks métier ────────────────────────────────────────────
 
@@ -104,16 +114,26 @@ class SourceExtractor[ConfigT](ABC):
 
     # ── Entry point pipeline (imports) ──────────────────────────
 
-    def run_as_phase(self, args: argparse.Namespace | None = None) -> PhaseMetrics:
+    def run_as_phase(
+        self,
+        args: argparse.Namespace | None = None,
+        *,
+        breaker: CircuitBreaker | None = None,
+    ) -> PhaseMetrics:
         """Variante non-CLI : pas de sys.exit, laisse remonter les exceptions.
 
         Utilisée par `run_pipeline.py` quand la phase est invoquée par
         import direct. Les exceptions (`ExtractionConfigError`, HTTP,
         `KeyboardInterrupt`) remontent à l'orchestrateur qui décide quoi
         en faire (rapport partiel, exit code).
+
+        `breaker` : circuit-breaker de la source (posé via la ContextVar par le
+        composition root) ; les boucles `extract_all` le consultent pour stopper
+        une source à bout de budget.
         """
         if args is None:
             args = argparse.Namespace(dry_run=False)
+        self._breaker = breaker
         config = self.load_config(self.conn)
         self.logger.info(f"=== Extraction {self.SOURCE} démarrée ===")
         self.setup_logging(args, config)

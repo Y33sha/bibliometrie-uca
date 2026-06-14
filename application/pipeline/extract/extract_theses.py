@@ -142,6 +142,12 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
     ) -> PhaseMetrics:
         stats = PhaseMetrics()
         for ppn in config.ppns:
+            if self._breaker_tripped():
+                self.logger.warning(
+                    "theses.fr à bout (429/5xx répétés) — PPN restants sautés"
+                    " (retry au prochain run)"
+                )
+                break
             total, inserted, updated, unchanged = extract_ppn(
                 self._adapter,
                 self.conn,
