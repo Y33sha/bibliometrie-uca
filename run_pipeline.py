@@ -1497,6 +1497,11 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
 def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     from application.pipeline.extract.fetch_missing_doi import run_async
     from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.circuit_breaker import (
+        SourceCircuitBreaker,
+        reset_current_breaker,
+        set_current_breaker,
+    )
     from infrastructure.sources.common import get_cross_import_dois
 
     adapter = _make_fetch_missing_doi_adapter(target)
@@ -1504,6 +1509,10 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
     log.info("▶ fetch_missing_doi --target %s", target)
     t0 = time.time()
     conn = get_sync_engine().connect()
+    # Circuit-breaker par source : la ContextVar est posée ici (composition root) ;
+    # le helper HTTP infra la lit, run_async ne consulte que `breaker.tripped`.
+    breaker = SourceCircuitBreaker(target)
+    token = set_current_breaker(breaker)
     try:
         metrics = asyncio.run(
             run_async(
@@ -1511,9 +1520,11 @@ def _run_fetch_missing_doi(target: str) -> PhaseMetrics:
                 adapter,
                 log,
                 cross_import_dois_reader=get_cross_import_dois,
+                breaker=breaker,
             )
         )
     finally:
+        reset_current_breaker(token)
         conn.close()
     log.info(
         "✓ fetch_missing_doi (%s) terminé en %.1fs — %s",
