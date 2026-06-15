@@ -26,10 +26,7 @@ from application.ports.pipeline.publications_match_or_create import (
 )
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.publications import (
-    refresh_from_sources,
-    resolve_doi_conflict,
-)
+from application.publications import refresh_from_sources
 from domain.normalize import normalize_text
 from domain.publications.deduplication import (
     MetadataDeduplicationCase,
@@ -68,7 +65,7 @@ def process_document(
 
     Pattern prefetch → décideur → dispatch : extrait les identifiants candidats, les confronte aux index existants, puis délègue le choix `match`/`create` à `decide_publication_match`. La création est gated par `allow_create = doc.in_perimeter` : un orphelin hors-périmètre peut être rattaché à une publication canonique existante (résolution des conflits inter-sources), mais ne peut pas en créer une nouvelle.
 
-    En dry_run, la cascade de matching (avec son effet de bord `clear_doi` côté `resolve_doi_conflict`) n'est pas jouée — le doc est compté comme "à traiter" sans distinction entre match/create/skip-no-perimeter.
+    En dry_run, la cascade de matching n'est pas jouée — le doc est compté comme "à traiter" sans distinction entre match/create/skip-no-perimeter.
     """
     title = doc.title or ""
     pub_year = doc.pub_year
@@ -110,19 +107,16 @@ def process_document(
     if zenodo_concept_doi:
         doi = zenodo_concept_doi
 
-    # Prefetch DOI : résolution du conflit éventuel (chapter/book) qui peut invalider le DOI ou poser un id de fusion.
+    # Prefetch DOI : un DOI qui pointe une publication existante est un match positif.
+    # Les conflits chapitre/ouvrage (DOI de l'ouvrage porté par erreur par un chapitre)
+    # sont neutralisés **a priori** par la correction relationnelle (`metadata_correction`
+    # cluster) qui nulle le DOI erroné sur la SP avant cette phase — au match, ces SP
+    # n'ont plus le DOI conflictuel, il n'y a donc plus d'arbitrage à faire ici.
     doi_merge_with_id: int | None = None
     if doi:
         existing_by_doi = pub_repo.find_by_doi(doi)
         if existing_by_doi:
-            new_doi_str, doi_merge_with_id = resolve_doi_conflict(
-                doi,
-                doc_type,
-                title_normalized,
-                existing_by_doi,
-                repo=pub_repo,
-            )
-            doi = new_doi_str
+            doi_merge_with_id = existing_by_doi.id
 
     # Prefetch NNT
     nnt_match_id: int | None = None

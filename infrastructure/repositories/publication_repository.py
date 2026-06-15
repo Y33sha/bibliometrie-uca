@@ -87,15 +87,12 @@ class PgPublicationRepository:
         if not doi:
             return None
         row = self._conn.execute(
-            text(
-                "SELECT id, CAST(doc_type AS text) AS doc_type, title_normalized "
-                "FROM publications WHERE lower(doi) = lower(:doi)"
-            ),
+            text("SELECT id FROM publications WHERE lower(doi) = lower(:doi)"),
             {"doi": doi},
         ).first()
         if not row:
             return None
-        return PubByDoi(id=row.id, doc_type=row.doc_type, title_normalized=row.title_normalized)
+        return PubByDoi(id=row.id)
 
     def find_by_nnt(self, nnt: str) -> int | None:
         """Cherche une publication via NNT stocké dans source_publications.external_ids."""
@@ -358,30 +355,6 @@ class PgPublicationRepository:
                 ) sub
                 WHERE id = :id
             """),
-            {"id": pub_id},
-        )
-
-    # ── Accès bas niveau au champ doi ──────────────────────────────
-
-    def get_doi(self, pub_id: int) -> str | None:
-        """Retourne le DOI courant d'une publication, ou None."""
-        return self._conn.execute(
-            text("SELECT doi FROM publications WHERE id = :id"), {"id": pub_id}
-        ).scalar_one_or_none()
-
-    def set_doi(self, pub_id: int, doi: str) -> None:
-        """Attribue un DOI à une publication (ne vérifie pas les conflits
-        d'unicité — le caller doit l'avoir fait via find_by_doi)."""
-        self._conn.execute(
-            text("UPDATE publications SET doi = :doi, updated_at = now() WHERE id = :id"),
-            {"doi": doi, "id": pub_id},
-        )
-
-    def clear_doi(self, pub_id: int) -> None:
-        """Retire le DOI d'une publication (utilisé lors des conflits
-        chapitre/ouvrage)."""
-        self._conn.execute(
-            text("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = :id"),
             {"id": pub_id},
         )
 

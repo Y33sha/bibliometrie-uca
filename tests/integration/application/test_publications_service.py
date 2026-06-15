@@ -1,21 +1,18 @@
 """Tests de caractérisation pour services/publications.py.
 
-Couvre les find_by_* (guards + happy path), resolve_doi_conflict (chapter/book),
-merge_publications.
+Couvre les find_by_* (guards + happy path) et merge_publications.
 """
 
 import pytest
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.ports.repositories.publication_repository import PubByDoi
 from application.publications import (
     find_by_doi,
     find_by_nnt,
     find_thesis_by_title,
     mark_distinct,
     merge_publications,
-    resolve_doi_conflict,
 )
 from domain.errors import DistinctDoiError
 from infrastructure.repositories import publication_repository
@@ -224,70 +221,6 @@ class TestFindThesisByTitle:
         t1 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
         t2 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
         assert set(find_thesis_by_title("dup", 2024, repo=repo)) == {t1, t2}
-
-
-# ── resolve_doi_conflict ───────────────────────────────────────────
-
-
-class TestResolveDoiConflict:
-    def test_chapter_vs_existing_book_drops_doi(self, sa_sync_conn, repo):
-        """Chapitre avec DOI qui pointe vers livre : DOI retiré du chapitre."""
-        existing = PubByDoi(id=1, doc_type="book", title_normalized="livre")
-
-        doi, merge_id = resolve_doi_conflict(
-            "10.x/book", "book_chapter", "chapitre", existing, repo=repo
-        )
-        assert doi is None
-        assert merge_id is None
-
-    def test_book_vs_existing_chapter_strips_doi_from_chapter(self, sa_sync_conn, repo):
-        """Livre avec DOI existant sur un chapitre : DOI retiré du chapitre, livre garde."""
-        existing_id = _insert_publication(
-            sa_sync_conn, title="Chapitre", doc_type="book_chapter", doi="10.x/book"
-        )
-        existing = PubByDoi(id=existing_id, doc_type="book_chapter", title_normalized="chapitre")
-
-        doi, merge_id = resolve_doi_conflict("10.x/book", "book", "livre", existing, repo=repo)
-        assert doi == "10.x/book"
-        assert merge_id is None
-        result_doi = sa_sync_conn.execute(
-            text("SELECT doi FROM publications WHERE id = :id"), {"id": existing_id}
-        ).scalar_one()
-        assert result_doi is None
-
-    def test_two_chapters_different_titles_strip_both(self, sa_sync_conn, repo):
-        """2 chapitres avec titres différents partageant un DOI : les 2 perdent le DOI."""
-        existing_id = _insert_publication(
-            sa_sync_conn, title="C1", doc_type="book_chapter", doi="10.x/shared"
-        )
-        existing = PubByDoi(id=existing_id, doc_type="book_chapter", title_normalized="c1")
-
-        doi, merge_id = resolve_doi_conflict(
-            "10.x/shared", "book_chapter", "c2_different", existing, repo=repo
-        )
-        assert doi is None
-        assert merge_id is None
-        result_doi = sa_sync_conn.execute(
-            text("SELECT doi FROM publications WHERE id = :id"), {"id": existing_id}
-        ).scalar_one()
-        assert result_doi is None
-
-    def test_two_chapters_same_title_merges(self, sa_sync_conn, repo):
-        """2 chapitres avec même titre + DOI → fusion."""
-        existing = PubByDoi(id=42, doc_type="book_chapter", title_normalized="same")
-
-        doi, merge_id = resolve_doi_conflict(
-            "10.x/shared", "book_chapter", "same", existing, repo=repo
-        )
-        assert doi == "10.x/shared"
-        assert merge_id == 42
-
-    def test_compatible_types_merge(self, sa_sync_conn, repo):
-        """Types compatibles (ex: 2 articles) → fusion normale."""
-        existing = PubByDoi(id=42, doc_type="article", title_normalized="a")
-        doi, merge_id = resolve_doi_conflict("10.x/a", "article", "a", existing, repo=repo)
-        assert doi == "10.x/a"
-        assert merge_id == 42
 
 
 # ── merge_publications ────────────────────────────────────────────
