@@ -12,15 +12,10 @@ from domain.source_publications.views import SourcePublicationWithJournalView
 
 @dataclass(frozen=True, slots=True)
 class PubByDoi:
-    """Projection de lecture retournée par `find_by_doi`.
-
-    Porte les champs nécessaires à `resolve_doi_conflict` (arbitrage
-    chapter/book) sans hydrater l'agrégat complet.
-    """
+    """Projection de lecture retournée par `find_by_doi` : l'id de la publication
+    portant ce DOI, sans hydrater l'agrégat complet."""
 
     id: int
-    doc_type: str | None
-    title_normalized: str | None
 
 
 class PublicationRepository(Protocol):
@@ -72,14 +67,6 @@ class PublicationRepository(Protocol):
     def mark_unpaywall_checked(self, pub_id: int) -> None: ...
 
     def update_sources(self, pub_id: int) -> None: ...
-
-    # ── Accès bas niveau au DOI ────────────────────────────────────
-
-    def get_doi(self, pub_id: int) -> str | None: ...
-
-    def set_doi(self, pub_id: int, doi: str) -> None: ...
-
-    def clear_doi(self, pub_id: int) -> None: ...
 
     # ── Agrégation depuis source_publications ──────────────────────
 

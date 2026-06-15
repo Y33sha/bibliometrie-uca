@@ -7,7 +7,7 @@ Couvre :
 
 Les helpers de matching par métadonnées (cas thèse, etc.) sont testés dans `test_metadata_deduplication_rules.py`.
 
-Mocks : port `PublicationsMatchOrCreateQueries`, `PublicationRepository`, `AuditRepository`. `resolve_doi_conflict` et `refresh_from_sources` monkeypatchés dans le module pour isoler la logique d'aiguillage.
+Mocks : port `PublicationsMatchOrCreateQueries`, `PublicationRepository`, `AuditRepository`. `refresh_from_sources` monkeypatché dans le module pour isoler la logique d'aiguillage.
 """
 
 from __future__ import annotations
@@ -89,37 +89,21 @@ def _make_doc(**overrides: Any) -> SourcePublicationRow:
 
 @pytest.fixture
 def captured(monkeypatch):
-    """Monkeypatche `resolve_doi_conflict` et `refresh_from_sources` du module.
-
-    `resolve_doi_conflict_return` peut être overridé par test pour simuler les différents cas de conflit.
-    """
-    state: dict[str, Any] = {
-        "resolve_doi_calls": [],
-        "resolve_doi_return": ("kept-doi", None),
-        "refresh_calls": [],
-    }
-
-    def fake_resolve(doi, doc_type, title_normalized, existing, *, repo):  # noqa: ARG001
-        state["resolve_doi_calls"].append(
-            {"doi": doi, "doc_type": doc_type, "existing_id": existing.id}
-        )
-        return state["resolve_doi_return"]
+    """Monkeypatche `refresh_from_sources` du module pour capturer ses appels."""
+    state: dict[str, Any] = {"refresh_calls": []}
 
     def fake_refresh(pub_id, *, repo, audit_repo=None):  # noqa: ARG001
         state["refresh_calls"].append(pub_id)
 
-    monkeypatch.setattr(match_or_create_publications, "resolve_doi_conflict", fake_resolve)
     monkeypatch.setattr(match_or_create_publications, "refresh_from_sources", fake_refresh)
     return state
 
 
 class _PubByDoiStub:
-    """Stub minimal des champs lus dans `resolve_doi_conflict`."""
+    """Stub d'une publication trouvée par DOI : le matcher n'en lit que `.id`."""
 
-    def __init__(self, id: int, doc_type: str = "article", title_normalized: str = "") -> None:
+    def __init__(self, id: int) -> None:
         self.id = id
-        self.doc_type = doc_type
-        self.title_normalized = title_normalized
 
 
 # ── process_document ─────────────────────────────────────────────
@@ -187,12 +171,15 @@ class TestProcessDocumentCreate:
 
 
 class TestProcessDocumentDoiMatch:
-    def test_doi_match_uses_merge_with_id(self, captured, logger):
-        """DOI existant + resolve renvoie merge_with_id → action=match sur cet id."""
+    def test_doi_links_to_existing_publication(self, captured, logger):
+        """DOI pointant une publication existante → action=match sur son id.
+
+        Plus d'arbitrage chapitre/ouvrage ici : la correction relationnelle a nullé
+        a priori le DOI erroné sur la SP, donc un DOI présent = match positif direct.
+        """
         queries = MagicMock()
         repo = MagicMock()
         repo.find_by_doi.return_value = _PubByDoiStub(id=77)
-        captured["resolve_doi_return"] = ("10.1/x", 77)
 
         result = process_document(
             conn=None,
@@ -203,21 +190,19 @@ class TestProcessDocumentDoiMatch:
         )
 
         assert result == "linked"
-        # Pas de création — match utilisé.
         repo.create.assert_not_called()
+        repo.find_by_doi.assert_called_once_with("10.1/x")
         queries.link_source_publication_to_publication.assert_called_once_with(None, 1, 77)
-        assert captured["resolve_doi_calls"][0]["doi"] == "10.1/x"
         assert captured["refresh_calls"] == [77]
 
-    def test_doi_conflict_returns_none_falls_through_to_create(self, captured, logger):
-        """DOI conflict invalidé (resolve renvoie (None, None)) + pas d'autres clés → création."""
+    def test_doi_not_found_falls_through_to_create(self, captured, logger):
+        """DOI sans publication existante + pas d'autres clés → création, DOI conservé."""
         queries = MagicMock()
         repo = MagicMock()
-        repo.find_by_doi.return_value = _PubByDoiStub(id=77)
+        repo.find_by_doi.return_value = None
         repo.find_by_nnt.return_value = None
         repo.find_by_hal_id.return_value = None
         repo.create.return_value = 99
-        captured["resolve_doi_return"] = (None, None)
 
         result = process_document(
             conn=None,
@@ -228,9 +213,8 @@ class TestProcessDocumentDoiMatch:
         )
 
         assert result == "created"
-        # `doi` est passé tel quel (None) à `repo.create`.
         repo.create.assert_called_once()
-        assert repo.create.call_args.kwargs["doi"] is None
+        assert repo.create.call_args.kwargs["doi"] == "10.1/x"
 
 
 class TestProcessDocumentZenodoConcept:
@@ -261,7 +245,6 @@ class TestProcessDocumentZenodoConcept:
         queries = MagicMock()
         repo = MagicMock()
         repo.find_by_doi.return_value = _PubByDoiStub(id=42)
-        captured["resolve_doi_return"] = ("10.5281/zenodo.10", 42)
         doc = _make_doc(
             doi="10.5281/zenodo.11",
             external_ids={"zenodo_concept_doi": "10.5281/zenodo.10"},
@@ -362,7 +345,6 @@ class TestProcessDocumentPerimeterGate:
         queries = MagicMock()
         repo = MagicMock()
         repo.find_by_doi.return_value = _PubByDoiStub(id=99)
-        captured["resolve_doi_return"] = ("10.1/x", 99)
 
         result = process_document(
             conn=None,

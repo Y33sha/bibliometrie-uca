@@ -14,9 +14,6 @@ from domain.publications.aggregation import (
 from domain.publications.aggregation import (
     refresh_from_sources as _refresh_aggregate,
 )
-from domain.publications.deduplication import (
-    resolve_doi_conflict as _domain_resolve_doi_conflict,
-)
 from domain.publications.identifiers import DOI
 from domain.sources.registry import SOURCE_PRIORITY
 
@@ -39,34 +36,6 @@ def find_thesis_by_title(
 ) -> list[int]:
     """Cherche des thèses par titre normalisé + année (sans journal_id)."""
     return repo.find_thesis_by_title(title_normalized, pub_year)
-
-
-def resolve_doi_conflict(
-    doi: str,
-    doc_type: str,
-    title_normalized: str,
-    existing: PubByDoi,
-    *,
-    repo: PublicationRepository,
-) -> tuple[str | None, int | None]:
-    """Applique la règle `domain.publication.resolve_doi_conflict` et ses effets.
-
-    Délègue la décision au domaine (fonction pure), puis réalise l'effet
-    de bord `clear_doi` via le repository quand la règle le demande.
-
-    Retourne (doi_corrige, publication_id_si_fusion).
-    """
-    decision = _domain_resolve_doi_conflict(
-        new_doi=doi,
-        new_doc_type=doc_type,
-        new_title_normalized=title_normalized,
-        existing_doc_type=existing.doc_type,
-        existing_title_normalized=existing.title_normalized,
-        existing_id=existing.id,
-    )
-    if decision.clear_existing_doi:
-        repo.clear_doi(existing.id)
-    return decision.accepted_doi, decision.merge_with_id
 
 
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
