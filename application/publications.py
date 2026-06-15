@@ -4,8 +4,6 @@ Service Publications — accès exclusif en écriture à la table `publications`
 Toute création, mise à jour ou recherche de publication passe par ce module. Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions au lieu de faire du SQL direct.
 """
 
-from dataclasses import replace
-
 from application.audit import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PubByDoi, PublicationRepository
@@ -20,8 +18,6 @@ from domain.publications.deduplication import (
     resolve_doi_conflict as _domain_resolve_doi_conflict,
 )
 from domain.publications.identifiers import DOI
-from domain.source_publications.correction import effective_metadata
-from domain.source_publications.views import SourcePublicationWithJournalView
 from domain.sources.registry import SOURCE_PRIORITY
 
 
@@ -76,45 +72,6 @@ def resolve_doi_conflict(
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
 
-def apply_corrections(sp: SourcePublicationWithJournalView) -> SourcePublicationWithJournalView:
-    """Applique `effective_metadata` à une vue de source publication et renvoie une vue « effective » : la vue inchangée si aucune correction ne modifie une valeur, sinon une copie avec les champs corrigés et un audit `meta.<field>_corrected_by` pour chaque champ effectivement changé.
-
-    L'audit n'est posé que quand la valeur change réellement : une règle qui « corrige » vers la valeur déjà présente (ex. une SP theses.fr native déjà en `thesis`) n'est pas tracée comme une correction.
-    """
-    corrected = effective_metadata(sp)
-    if corrected.is_empty():
-        return sp
-
-    meta = dict(sp.meta or {})
-    new_journal_id = sp.journal_id
-    new_doc_type = sp.doc_type
-    new_oa_status = sp.oa_status
-    changed = False
-
-    if corrected.journal_id is not None and corrected.journal_id.value != sp.journal_id:
-        new_journal_id = corrected.journal_id.value
-        meta["journal_id_corrected_by"] = corrected.journal_id.rule.value
-        changed = True
-    if corrected.doc_type is not None and corrected.doc_type.value != sp.doc_type:
-        new_doc_type = corrected.doc_type.value
-        meta["doc_type_corrected_by"] = corrected.doc_type.rule.value
-        changed = True
-    if corrected.oa_status is not None and corrected.oa_status.value != sp.oa_status:
-        new_oa_status = corrected.oa_status.value
-        meta["oa_status_corrected_by"] = corrected.oa_status.rule.value
-        changed = True
-
-    if not changed:
-        return sp
-    return replace(
-        sp,
-        journal_id=new_journal_id,
-        doc_type=new_doc_type,
-        oa_status=new_oa_status,
-        meta=meta,
-    )
-
-
 def refresh_from_sources(
     pub_id: int,
     *,
@@ -162,8 +119,8 @@ def refresh_from_sources(
                 return
 
     previous_doi = pub.doi
-    effective_sources = [apply_corrections(s) for s in sources]
-    _refresh_aggregate(pub, effective_sources, source_priority=SOURCE_PRIORITY)
+    # Pas de re-correction ici : la phase `metadata_correction` a déjà écrit le canonique corrigé en place sur chaque `source_publication` (colonnes lues par `get_source_publications`). L'agrégation repart donc des valeurs corrigées.
+    _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY)
     repo.save(pub)
     repo.update_sources(pub_id)
 

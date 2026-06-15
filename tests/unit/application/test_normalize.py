@@ -329,7 +329,11 @@ class TestCrossRefDocTypeMap:
 
 
 class TestFirstDocTypeArbitration:
-    """Arbitrage CrossRef (`journal-article`) vs sous-type plus précis."""
+    """Arbitrage `article` générique vs sous-type plus précis.
+
+    L'arbitrage opère sur des `doc_type` déjà **canoniques et corrigés** (mapping
+    source→canonique persisté en amont sur la `source_publication`), pas sur les
+    nomenclatures sources brutes."""
 
     @staticmethod
     def _src(source: str, doc_type: str | None) -> "SourcePublication":  # noqa: F821
@@ -345,29 +349,29 @@ class TestFirstDocTypeArbitration:
         return arbitrate_doc_type_with_article_subtype
 
     def test_crossref_article_yields_to_hal_review(self):
-        """CrossRef `journal-article` ne doit pas écraser un sous-type review fourni par HAL (priorité moindre)."""
+        """`article` (source prioritaire) ne doit pas écraser un sous-type `review` fourni par une source de priorité moindre."""
         arbitrate = self._arbitrate()
         sources = [
-            self._src("crossref", "journal-article"),  # priorité 2
-            self._src("hal", "art_artrev"),  # priorité 4 → review
+            self._src("crossref", "article"),  # priorité 2 — CrossRef ne distingue pas le sous-type
+            self._src("hal", "review"),  # priorité 4 → sous-type précis
         ]
         assert arbitrate(sources) == "review"
 
-    def test_crossref_book_chapter_kept(self):
-        """CrossRef `book-chapter` est mappé directement, pas un sous-type d'article : la règle d'arbitrage ne s'applique pas."""
+    def test_book_chapter_kept(self):
+        """`book_chapter` n'est pas un sous-type d'article : l'arbitrage ne s'applique pas, le premier non-null l'emporte."""
         arbitrate = self._arbitrate()
         sources = [
-            self._src("crossref", "book-chapter"),
-            self._src("hal", "art_artrev"),
+            self._src("crossref", "book_chapter"),
+            self._src("hal", "review"),
         ]
         assert arbitrate(sources) == "book_chapter"
 
-    def test_crossref_article_no_subtype_falls_back(self):
-        """CrossRef `journal-article` sans sous-type ailleurs → article."""
+    def test_article_no_subtype_falls_back(self):
+        """`article` sans sous-type ailleurs → article."""
         arbitrate = self._arbitrate()
         sources = [
-            self._src("crossref", "journal-article"),
-            self._src("hal", "art"),
+            self._src("crossref", "article"),
+            self._src("hal", "article"),
         ]
         assert arbitrate(sources) == "article"
 
@@ -376,7 +380,7 @@ class TestFirstDocTypeArbitration:
         arbitrate = self._arbitrate()
         sources = [
             self._src("theses", "thesis"),
-            self._src("crossref", "journal-article"),
+            self._src("crossref", "article"),
         ]
         assert arbitrate(sources) == "thesis"
 

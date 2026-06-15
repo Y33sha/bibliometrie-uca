@@ -41,44 +41,8 @@ from domain.publications.metadata import (
     clean_publication_title,
     has_minimal_publication_metadata,
 )
-from domain.source_publications.correction import effective_metadata
-from domain.source_publications.doc_types import map_doc_type
-from domain.source_publications.views import SourcePublicationWithJournalView
 
 Outcome = Literal["created", "linked", "skipped_no_metadata", "skipped_no_perimeter"]
-
-
-def _view_from_row(doc: SourcePublicationRow) -> SourcePublicationWithJournalView:
-    """Construit une `SourcePublicationWithJournalView` à partir d'une `SourcePublicationRow` pour passer à `effective_metadata`. La vue n'est jamais persistée ; elle sert d'input à la cascade de corrections à l'entrée match_or_create.
-
-    Les champs joints depuis `journals` (`journal_type`, `oa_model`, `apc_amount`) sont laissés à `None` : la projection `SourcePublicationRow` ne JOINe pas `journals` aujourd'hui. Conséquence : à l'entrée match_or_create, seules les règles SP-intrinsèques (URL theses.fr/dumas) peuvent firer ; les règles journal-dépendantes (`media`, …) s'appliqueront au refresh post-création où la vue est correctement enrichie (cf. `get_source_publications` côté repo).
-
-    # TODO: quand une règle journal-dépendante produira un `doc_type` routé par la dédup (`thesis`/`proceedings`), JOINer `journals` dans `fetch_orphan_in_perimeter_source_publications` et alimenter les champs ici — sinon la dédup-entrée passera à côté.
-    """
-    return SourcePublicationWithJournalView(
-        id=doc.id,
-        source=doc.source,
-        source_id=doc.source_id,
-        title=doc.title or "",
-        pub_year=doc.pub_year,
-        doc_type=doc.doc_type,
-        doi=doc.doi,
-        journal_id=doc.journal_id,
-        container_title=doc.container_title,
-        language=doc.language,
-        oa_status=doc.oa_status,
-        is_retracted=None,
-        abstract=None,
-        countries=(),
-        keywords=(),
-        urls=tuple(doc.urls or ()),
-        topics=None,
-        biblio=None,
-        meta=None,
-        journal_type=None,
-        oa_model=None,
-        apc_amount=None,
-    )
 
 
 def extract_known_identifiers(external_ids: dict[str, object] | None) -> dict[str, str]:
@@ -116,22 +80,10 @@ def process_document(
         return "created"
 
     doi = doc.doi
-    source = doc.source
-    raw_doc_type = doc.doc_type
+    # `doc_type`/`journal_id`/`oa_status` sont lus tels quels : la phase `metadata_correction` les a déjà mappés source→canonique et corrigés en place sur la `source_publication`, y compris pour les règles journal-dépendantes (elle tourne après `publishers_journals`, JOIN `journals`). Le matching porte donc sur les valeurs corrigées sans re-correction ici — qui, faute de JOIN `journals` sur cette projection, ne verrait de toute façon pas ces règles.
+    doc_type = doc.doc_type or "other"
     journal_id = doc.journal_id
-    raw_oa_status = doc.oa_status
-
-    # Corrections appliquées à la SP entrante avant les queries de dedup metadata, pour que le matching porte sur les valeurs corrigées (cf. domain/source_publications/correction.py).
-    corrected = effective_metadata(_view_from_row(doc))
-    if corrected.doc_type is not None:
-        raw_doc_type = corrected.doc_type.value
-    if corrected.journal_id is not None:
-        journal_id = corrected.journal_id.value
-    if corrected.oa_status is not None:
-        raw_oa_status = corrected.oa_status.value
-
-    doc_type = map_doc_type(raw_doc_type, source) or "other"
-    oa_status = raw_oa_status or OA_STATUS_UNKNOWN_DEFAULT
+    oa_status = doc.oa_status or OA_STATUS_UNKNOWN_DEFAULT
     language = doc.language
     container_title = doc.container_title
 

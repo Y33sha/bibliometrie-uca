@@ -13,7 +13,10 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.repositories import publication_repository
-from tests.integration.helpers.publications_phase import create_all_publications
+from tests.integration.helpers.publications_phase import (
+    apply_metadata_corrections,
+    create_all_publications,
+)
 
 # ── Données HAL minimales ───────────────────────────────────────
 
@@ -122,12 +125,16 @@ def _get_pub_oa_status(conn, hal_id):
 def _refresh_stale_publications(conn):
     """Rafraîchit les publications dont au moins un source_publication a été modifié depuis le dernier refresh.
 
-    Reproduit la 2e passe de la phase publications (`match_or_create_publications.run`) : SELECT des pubs stale via comparaison `source_publications.updated_at > publications.updated_at` et `refresh_from_sources` sur chacune.
+    Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes SP avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit le canonique corrigé en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications` et sa 2e passe stale).
+
+    Reproduit ensuite la 2e passe de la phase publications (`match_or_create_publications.run`) : SELECT des pubs stale via comparaison `source_publications.updated_at > publications.updated_at` et `refresh_from_sources` sur chacune.
     """
     from application.publications import refresh_from_sources
     from infrastructure.queries.pipeline.publications_match_or_create import (
         fetch_stale_publication_ids,
     )
+
+    apply_metadata_corrections(conn)
 
     repo = publication_repository(conn)
     for pub_id in fetch_stale_publication_ids(conn):
