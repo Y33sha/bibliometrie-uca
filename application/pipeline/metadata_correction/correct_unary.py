@@ -33,14 +33,18 @@ from application.ports.pipeline.metadata_correction import (
     MetadataCorrectionQueries,
     SourcePublicationForCorrection,
 )
-from domain.source_publications.correction import effective_metadata
+from domain.source_publications.correction import (
+    MetadataCorrectionRule,
+    effective_metadata,
+    strip_dissertation_keys,
+)
 from domain.source_publications.doc_types import map_doc_type
-from domain.source_publications.raw_metadata import hydrate_raw_view, stash_entry
+from domain.source_publications.raw_metadata import hydrate_raw_view, raw_value, stash_entry
 from domain.source_publications.views import SourcePublicationWithJournalView
 
-# Champs corrigeables gérés par la sous-étape unaire. Les autres clés de
-# `raw_metadata` (ex. `doi`, géré par la sous-étape relationnelle) sont préservées.
-_UNARY_FIELDS = ("doc_type", "journal_id", "oa_status")
+# Champs corrigeables gérés par la sous-étape unaire (clés de `raw_metadata` qu'elle (re)pose).
+# Les autres (ex. `doi`, géré par la sous-étape relationnelle) sont préservées.
+_UNARY_FIELDS = ("doc_type", "journal_id", "oa_status", "external_ids")
 
 # Provenance inscrite dans `raw_metadata.<champ>.corrected_by` quand seul le mapping
 # source→canonique a changé la valeur (aucune règle de correction n'a firé).
@@ -110,6 +114,15 @@ def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | No
     new_journal_id = raw.journal_id
     new_oa_status = raw.oa_status
 
+    # external_ids : déconfliction des clés-thèse quand la correction thèse→article a firé
+    # (conflation). On repart du brut reconstruit, donc auto-cicatrisant.
+    raw_external_ids = raw_value(row.raw_metadata, "external_ids", row.external_ids)
+    new_external_ids = raw_external_ids
+    thesis_to_article = (
+        corrected.doc_type is not None
+        and corrected.doc_type.rule == MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE
+    )
+
     # Repart des clés non gérées par cette sous-étape (ne pas écraser `doi` & co).
     raw_metadata = {k: v for k, v in row.raw_metadata.items() if k not in _UNARY_FIELDS}
 
@@ -121,15 +134,25 @@ def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | No
     if corrected.oa_status is not None and corrected.oa_status.value != raw.oa_status:
         new_oa_status = corrected.oa_status.value
         raw_metadata["oa_status"] = stash_entry(raw.oa_status, corrected.oa_status.rule.value)
+    if thesis_to_article:
+        stripped = strip_dissertation_keys(raw_external_ids)
+        if stripped != raw_external_ids:
+            new_external_ids = stripped
+            raw_metadata["external_ids"] = stash_entry(
+                raw_external_ids, MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE.value
+            )
 
     if (
         new_doc_type == row.doc_type
         and new_journal_id == row.journal_id
         and new_oa_status == row.oa_status
+        and new_external_ids == row.external_ids
         and raw_metadata == row.raw_metadata
     ):
         return None
-    return CorrectionUpdate(row.id, new_doc_type, new_journal_id, new_oa_status, raw_metadata)
+    return CorrectionUpdate(
+        row.id, new_doc_type, new_journal_id, new_oa_status, new_external_ids, raw_metadata
+    )
 
 
 def correct_for_journal(

@@ -18,6 +18,7 @@ def _sp(**overrides: object) -> SourcePublicationForCorrection:
         "container_title": None,
         "language": None,
         "urls": None,
+        "external_ids": {},
         "journal_type": None,
         "oa_model": None,
         "apc_amount": None,
@@ -38,6 +39,57 @@ def test_hal_code_mapped_to_canonical_with_marker():
     assert upd is not None
     assert upd.doc_type == "article"
     assert upd.raw_metadata == {"doc_type": {"raw": "ART", "corrected_by": "DOC_TYPE_MAP"}}
+
+
+def test_thesis_with_journal_id_is_mistyped_article():
+    # Mistype OpenAlex/ScanR : un article typé thèse, rattaché à un journal → article.
+    upd = compute_update(_sp(doc_type="thesis", journal_id=42))
+    assert upd is not None
+    assert upd.doc_type == "article"
+    assert upd.raw_metadata == {
+        "doc_type": {"raw": "thesis", "corrected_by": "THESIS_WITH_JOURNAL_TO_ARTICLE"}
+    }
+
+
+def test_real_thesis_without_journal_id_untouched():
+    assert compute_update(_sp(doc_type="thesis", journal_id=None)) is None
+
+
+def test_thesis_to_article_strips_dissertation_keys():
+    # Conflation : la SP corrigée thèse→article perd le NNT et les hal_id tel-/dumas-,
+    # garde les autres hal_id (article) et les autres clés. Brut stashé pour réversibilité.
+    upd = compute_update(
+        _sp(
+            doc_type="thesis",
+            journal_id=42,
+            external_ids={"nnt": "2020X", "hal_id": ["tel-01", "hal-99"], "pmid": "123"},
+        )
+    )
+    assert upd is not None
+    assert upd.doc_type == "article"
+    assert upd.external_ids == {"hal_id": ["hal-99"], "pmid": "123"}
+    assert upd.raw_metadata["external_ids"] == {
+        "raw": {"nnt": "2020X", "hal_id": ["tel-01", "hal-99"], "pmid": "123"},
+        "corrected_by": "THESIS_WITH_JOURNAL_TO_ARTICLE",
+    }
+
+
+def test_thesis_to_article_without_dissertation_keys_leaves_external_ids():
+    # Mistype pur (pas de clé-thèse) : external_ids inchangé, pas de stash.
+    upd = compute_update(_sp(doc_type="thesis", journal_id=42, external_ids={"pmid": "123"}))
+    assert upd is not None
+    assert upd.doc_type == "article"
+    assert upd.external_ids == {"pmid": "123"}
+    assert "external_ids" not in upd.raw_metadata
+
+
+def test_journal_id_wins_over_theses_fr_url_conflation():
+    # Conflation thèse↔article : une SP theses.fr AVEC un journal_id → article (le journal prime
+    # sur l'URL theses.fr). `journal_id_present: False` garde la règle URL.
+    upd = compute_update(_sp(doc_type="thesis", journal_id=42, urls=["https://theses.fr/2020X"]))
+    assert upd is not None
+    assert upd.doc_type == "article"
+    assert upd.raw_metadata["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
 
 
 def test_hal_code_mapped_then_rule_corrects():

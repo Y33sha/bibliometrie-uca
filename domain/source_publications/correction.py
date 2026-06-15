@@ -20,6 +20,7 @@ from typing import NamedTuple, TypedDict
 
 from domain.normalize import normalize_text
 from domain.source_publications.views import SourcePublicationWithJournalView
+from domain.types import JsonValue
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -30,6 +31,7 @@ class MetadataCorrectionRule(StrEnum):
 
     THESES_FR_URL_TO_THESIS = "THESES_FR_URL_TO_THESIS"
     DUMAS_URL_TO_MEMOIR = "DUMAS_URL_TO_MEMOIR"
+    THESIS_WITH_JOURNAL_TO_ARTICLE = "THESIS_WITH_JOURNAL_TO_ARTICLE"
     JOURNAL_TYPE_MEDIA_TO_MEDIA = "JOURNAL_TYPE_MEDIA_TO_MEDIA"
     JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER = "JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER"
     JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT = "JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT"
@@ -109,6 +111,7 @@ class _AppliesTo(TypedDict, total=False):
     - ``doi_contains`` : `str` — substring présente dans `sp.doi` (DOIs stockés en minuscules).
     - ``title_prefix_normalized`` : `tuple[str, ...]` — `normalize_text(sp.title)` commence par au moins un préfixe du tuple.
     - ``title_regex`` : `re.Pattern[str]` — `pattern.search(sp.title)` matche.
+    - ``journal_id_present`` : `bool` — `(sp.journal_id is not None)` vaut la valeur attendue. Signal « la SP est rattachée à un journal » (donc un article, pas une thèse).
 
     Ajouter un nouveau type de prédicat = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -119,6 +122,7 @@ class _AppliesTo(TypedDict, total=False):
     doi_contains: str
     title_prefix_normalized: tuple[str, ...]
     title_regex: re.Pattern[str]
+    journal_id_present: bool
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -138,15 +142,29 @@ class _RuleDefinition(TypedDict):
 # Ordre = priorité de la cascade (signaux forts d'abord : URL > journal_type > titre). Les whitelists `doc_type` sont calibrées pour être quasi disjointes entre règles d'une même famille, donc l'ordre intra-famille importe peu en pratique. La règle ISBN évaluée avant la règle année-pages : un titre porteur d'un ISBN explicite est plus fiable.
 
 _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
-    # theses.fr fait autorité sur les thèses françaises (OpenAlex classe parfois ces thèses en `article` ou `dissertation`). Inconditionnel sur le `doc_type` brut.
+    # theses.fr fait autorité sur les thèses françaises (OpenAlex classe parfois ces thèses en `article` ou `dissertation`). Gardée par `journal_id_present: False` : une SP theses.fr AVEC un journal_id est une conflation thèse↔article publié — c'est l'aspect article qui prime (`THESIS_WITH_JOURNAL_TO_ARTICLE`), pas l'URL theses.fr. La règle ne corrige donc en `thesis` que les SP theses.fr **sans** journal.
     MetadataCorrectionRule.THESES_FR_URL_TO_THESIS: {
-        "applies_to": {"url_contains": "theses.fr/"},
+        "applies_to": {"url_contains": "theses.fr/", "journal_id_present": False},
         "applies_correction": {"doc_type": "thesis"},
     },
-    # DUMAS (dumas.ccsd) n'héberge que des mémoires : règle URL-only, inconditionnelle sur le `doc_type` brut (comme theses.fr). La whitelist `dissertation` d'avant gardait contre les entités mêlant une thèse DUMAS et l'article publié (OpenAlex typait alors « article ») ; cette fusion abusive est désormais scindée en amont (création⇒fusion + `distinct_publications`, cas `THESE_VS_ARTICLE`), donc la règle dure peut s'appliquer. La distinction mémoire / thèse d'exercice (que DUMAS ne fait pas) est différée : « memoir » pour tout DUMAS.
+    # DUMAS (dumas.ccsd) n'héberge que des mémoires : URL-only, même garde `journal_id_present: False` que theses.fr (une SP DUMAS avec journal_id = article publié → prime sur le mémoire).
     MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR: {
-        "applies_to": {"url_contains": "dumas.ccsd"},
+        "applies_to": {"url_contains": "dumas.ccsd", "journal_id_present": False},
         "applies_correction": {"doc_type": "memoir"},
+    },
+    # Famille thèse + `journal_id` présent ⇒ `article` : une vraie thèse n'est pas rattachée à un
+    # journal (toutes sont sur theses.fr, sans journal_id). Une SP famille-thèse AVEC un journal_id
+    # est un mistype d'OpenAlex/ScanR (article typé `thesis`/`dissertation`), parfois une conflation
+    # thèse↔article publié. Placée APRÈS les règles URL : une SP theses.fr/DUMAS reste thèse/mémoire
+    # même si un journal_id parasite traîne (l'URL est le signal fort). Audit : 67 SP au stock, 0 FP
+    # (aucune vraie thèse n'a de journal_id). Le nullage des clés-thèse (NNT, hal_id `tel-`/`dumas-`)
+    # de la conflation est traité à part (mutation `external_ids`, hors DSL colonne).
+    MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE: {
+        "applies_to": {
+            "doc_type": frozenset({"thesis", "ongoing_thesis", "memoir"}),
+            "journal_id_present": True,
+        },
+        "applies_correction": {"doc_type": "article"},
     },
     # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type` brut.
     MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA: {
@@ -265,6 +283,9 @@ def _check_predicate(sp: SourcePublicationWithJournalView, key: str, value: obje
     if key == "title_regex":
         assert isinstance(value, re.Pattern)
         return bool(sp.title and value.search(sp.title))
+    if key == "journal_id_present":
+        assert isinstance(value, bool)
+        return (sp.journal_id is not None) == value
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 
@@ -291,6 +312,34 @@ def effective_metadata(sp: SourcePublicationWithJournalView) -> CorrectedFields:
     Cascade dans l'ordre des dépendances (`journal_id` → `doc_type` → `oa_status`) ; seul `doc_type` porte des règles à ce stade.
     """
     return CorrectedFields(doc_type=_correct_field(sp, "doc_type"))
+
+
+# Préfixes d'identifiants HAL propres aux dissertations : TEL (thèses en ligne) et DUMAS
+# (mémoires/dissertations étudiantes). Un hal_id à ce préfixe n'est jamais celui d'un article.
+_DISSERTATION_HALID_PREFIXES = ("tel-", "dumas-")
+
+
+def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, JsonValue]:
+    """Retire d'un `external_ids` les clés propres aux **dissertations**, erronées sur une SP
+    article (conflation thèse↔article publié : OpenAlex/ScanR fusionnent une thèse et son article
+    dans un seul enregistrement, en gardant le `nnt` / les hal_id `tel-`/`dumas-` de la thèse).
+
+    Retire `nnt` et les `hal_id` préfixés `tel-`/`dumas-` (en conservant les autres hal_id, qui
+    pointent l'article). Pur. Le caller n'appelle cette fonction que sur les SP corrigées
+    thèse→article (`THESIS_WITH_JOURNAL_TO_ARTICLE`)."""
+    result = {k: v for k, v in external_ids.items() if k != "nnt"}
+    hal_ids = result.get("hal_id")
+    if isinstance(hal_ids, list):
+        kept = [
+            h
+            for h in hal_ids
+            if not (isinstance(h, str) and h.startswith(_DISSERTATION_HALID_PREFIXES))
+        ]
+        if kept:
+            result["hal_id"] = kept
+        else:
+            result.pop("hal_id", None)
+    return result
 
 
 # ── Corrections relationnelles : conflits de clé partagée ────────────────
