@@ -445,13 +445,12 @@ def phase_publications(**kw: Any) -> Any:
     Une publication par source_publication a la creation, puis les passes de
     fusion par identifiant dans l'ordre DOI -> NNT -> PMID -> HAL-ID (du plus
     autoritaire au moins), enfin la fusion par metadonnees. Les paires marquees
-    distinctes (mark_distinct, en amont) gardent toutes les passes.
+    distinctes par l'admin (`distinct_publications`) gardent ces passes.
 
     Prerequis : la phase `zenodo_concept` (en amont) a resolu les concept DOI
     Zenodo sur lesquels porte la dedup concept/version.
     """
     _run_match_or_create_publications()
-    _run_mark_distinct_publications()
     _run_merge_pubs_by_doi()
     _run_merge_pubs_by_nnt()
     _run_merge_pubs_by_pmid()
@@ -810,26 +809,6 @@ def _run_merge_pubs_by_metadata() -> None:
     finally:
         conn.close()
     log.info("✓ merge_pubs_by_metadata terminé en %.1fs", time.time() - t0)
-
-
-def _run_mark_distinct_publications() -> None:
-    from application.pipeline.publications.mark_distinct_publications import run_mark_distinct
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.distinct_publications import (
-        PgDistinctPublicationsQueries,
-    )
-    from infrastructure.repositories import publication_repository
-
-    log.info("▶ mark_distinct_publications")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run_mark_distinct(
-            conn, PgDistinctPublicationsQueries(), log, pub_repo=publication_repository(conn)
-        )
-    finally:
-        conn.close()
-    log.info("✓ mark_distinct_publications terminé en %.1fs", time.time() - t0)
 
 
 def _run_merge_pubs_by_doi() -> None:
