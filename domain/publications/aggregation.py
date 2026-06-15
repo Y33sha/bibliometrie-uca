@@ -9,7 +9,7 @@ Règles d'agrégation par type de champ :
 - **Listes** (`countries`, `keywords`) : union dédupliquée préservant l'ordre de priorité des sources.
 - **JSONB `biblio`, `meta`** : fusion shallow par clé ; en cas de conflit, la source la plus prioritaire l'emporte.
 - **JSONB `topics`** : composite par source — chaque source garde sa forme native sous sa propre clé (`{"openalex": [...], "scanr": ..., "theses": {...}}`).
-- **`doc_type`** : premier non-null avec arbitrage des sous-types d'article (CrossRef renvoie `journal-article` indistinctement pour review / book_review / data_paper / etc. — si une source moins prioritaire propose un sous-type plus précis, on le préfère pour ne pas perdre l'information).
+- **`doc_type`** : premier non-null avec arbitrage des sous-types d'article (CrossRef renvoie `journal-article` indistinctement pour review / book_review / data_paper / etc. — si une source moins prioritaire propose un sous-type plus précis, on le préfère pour ne pas perdre l'information). Les valeurs lues sont déjà canoniques et corrigées (mapping + corrections persistés en amont sur la `source_publication`).
 
 `title_normalized` est recalculé à partir du `title` agrégé, pas pris d'une source (les sources ne fournissent pas ce champ).
 """
@@ -20,7 +20,7 @@ from domain.normalize import normalize_text
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT, best_oa_status
 from domain.publications.publication import Publication
-from domain.source_publications.doc_types import ARTICLE_SUBTYPES, map_doc_type
+from domain.source_publications.doc_types import ARTICLE_SUBTYPES
 from domain.source_publications.views import SourcePublicationWithJournalView
 from domain.types import JsonValue
 
@@ -141,22 +141,22 @@ def topics_by_source(
 def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublicationWithJournalView]) -> str:
     """Choix du `doc_type` canonique : premier non-null dans l'ordre de priorité, avec exception pour les sous-types d'article.
 
-    CrossRef (priorité 2) renvoie `journal-article` indistinctement pour tous les sous-types (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction). Si une source moins prioritaire propose un de ces sous-types plus précis, on le préfère pour ne pas perdre l'information.
+    Les `doc_type` lus sont déjà **canoniques et corrigés** (la phase `metadata_correction` a mappé source→canonique et appliqué les corrections en place sur la `source_publication`) ; l'arbitrage opère donc directement sur les colonnes, sans re-mapper.
+
+    CrossRef (priorité 2) renvoie `journal-article` indistinctement pour tous les sous-types (review, book_review, data_paper, poster, conference_paper, editorial, letter, erratum, retraction). Une source moins prioritaire ayant produit un de ces sous-types plus précis, on le préfère pour ne pas perdre l'information.
     """
     article_subtype_present: str | None = None
     for s in sources:
         if not s.doc_type:
             continue
-        mapped = map_doc_type(s.doc_type, s.source)
-        if mapped in ARTICLE_SUBTYPES:
-            article_subtype_present = mapped
+        if s.doc_type in ARTICLE_SUBTYPES:
+            article_subtype_present = s.doc_type
             break
 
     for s in sources:
         if not s.doc_type:
             continue
-        mapped = map_doc_type(s.doc_type, s.source)
-        if mapped == "article" and article_subtype_present:
+        if s.doc_type == "article" and article_subtype_present:
             return article_subtype_present
-        return mapped
+        return s.doc_type
     return "other"
