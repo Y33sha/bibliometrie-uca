@@ -48,6 +48,14 @@ class PublicationsMatchOrCreateQueries(Protocol):
         self, conn: Connection, publication_id: int
     ) -> tuple[str, str] | None: ...
 
+    def fetch_thesis_primary_author_from_source_publication(
+        self, conn: Connection, source_publication_id: int
+    ) -> tuple[str, str] | None: ...
+
+    def fetch_source_authorship_count(self, conn: Connection, source_publication_id: int) -> int:
+        """Compte les `source_authorships` d'un `source_publication`."""
+        ...
+
     def fetch_max_source_authorship_count_per_publication(
         self, conn: Connection, publication_id: int
     ) -> int:

@@ -15,9 +15,6 @@ from sqlalchemy import Connection
 from application.pipeline.publications.merge_by_key import merge_publications_by_key
 from application.ports.pipeline.merge import MergeQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from domain.publications.deduplication import DeduplicationKey
-
-_KEY = DeduplicationKey.HAL_ID
 
 
 @dataclass(frozen=True)
@@ -78,7 +75,7 @@ def run_merge(
     commit: bool = True,
 ) -> None:
     try:
-        logger.info(f"Recherche des publications distinctes partageant un {_KEY.value}...")
+        logger.info("Recherche des publications distinctes partageant un hal_id...")
         merge_needed = find_merge_candidates(conn, queries)
         logger.info(f"  Publications à fusionner : {len(merge_needed)}")
 

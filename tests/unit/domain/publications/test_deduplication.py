@@ -1,103 +1,170 @@
-"""Tests unitaires de `domain.publications.deduplication`.
-
-Couvre `detect_metadata_merge_case` (règle pure de fusion par métadonnées). La
-compatibilité d'auteur passe par la vraie fonction `thesis_authors_compatible`.
-"""
+"""Tests des règles de déduplication / création des publications."""
 
 from domain.publications.deduplication import (
+    DeduplicationKey,
+    DoiConflictResolution,
     MetadataDeduplicationCase,
-    detect_metadata_merge_case,
+    PublicationMatchDecision,
+    decide_publication_match,
+    resolve_doi_conflict,
 )
 
-# ── Thèse ─────────────────────────────────────────────────────────
+# ── resolve_doi_conflict (règle pure) ──────────────────────────────
 
 
-def _thesis(**kw):
-    return detect_metadata_merge_case(
-        doc_type_a="thesis", doc_type_b="thesis", title_normalized="une these", **kw
-    )
-
-
-def test_thesis_compatible_authors_merge():
-    assert (
-        _thesis(
-            thesis_primary_author_a=("Dupont", "Jean"),
-            thesis_primary_author_b=("Dupont", "J"),
+class TestResolveDoiConflictPure:
+    def test_chapter_vs_book_drops_doi(self):
+        """Chapitre avec DOI qui pointe vers livre : DOI retiré du chapitre."""
+        res = resolve_doi_conflict(
+            new_doi="10.x/book",
+            new_doc_type="book_chapter",
+            new_title_normalized="chapitre",
+            existing_doc_type="book",
+            existing_title_normalized="livre",
+            existing_id=1,
         )
-        is MetadataDeduplicationCase.THESIS_TITLE_YEAR
-    )
-
-
-def test_thesis_incompatible_authors_no_merge():
-    assert (
-        _thesis(
-            thesis_primary_author_a=("Dupont", "Jean"),
-            thesis_primary_author_b=("Martin", "Paul"),
+        assert res == DoiConflictResolution(
+            accepted_doi=None, merge_with_id=None, clear_existing_doi=False
         )
-        is None
-    )
 
-
-def test_thesis_unknown_author_one_side_merges():
-    assert (
-        _thesis(thesis_primary_author_a=("Dupont", "Jean"), thesis_primary_author_b=None)
-        is MetadataDeduplicationCase.THESIS_TITLE_YEAR
-    )
-
-
-def test_thesis_and_ongoing_thesis_same_family():
-    assert (
-        detect_metadata_merge_case(
-            doc_type_a="thesis",
-            doc_type_b="ongoing_thesis",
-            title_normalized="t",
-            thesis_primary_author_a=None,
-            thesis_primary_author_b=None,
+    def test_book_vs_chapter_strips_doi_from_chapter(self):
+        """Livre avec DOI existant sur un chapitre : chapitre perd son DOI, livre garde."""
+        res = resolve_doi_conflict(
+            new_doi="10.x/book",
+            new_doc_type="book",
+            new_title_normalized="livre",
+            existing_doc_type="book_chapter",
+            existing_title_normalized="chapitre",
+            existing_id=42,
         )
-        is MetadataDeduplicationCase.THESIS_TITLE_YEAR
-    )
-
-
-# ── Proceedings ───────────────────────────────────────────────────
-
-
-def _proceedings(title="x" * 40, **kw):
-    return detect_metadata_merge_case(
-        doc_type_a="proceedings", doc_type_b="proceedings", title_normalized=title, **kw
-    )
-
-
-def test_proceedings_same_count_long_title_merges():
-    assert (
-        _proceedings(author_count_a=5, author_count_b=5)
-        is MetadataDeduplicationCase.PROCEEDINGS_TITLE_YEAR_AUTHORCOUNT
-    )
-
-
-def test_proceedings_short_title_no_merge():
-    assert _proceedings(title="court", author_count_a=5, author_count_b=5) is None
-
-
-def test_proceedings_different_count_no_merge():
-    assert _proceedings(author_count_a=5, author_count_b=7) is None
-
-
-# ── Autres doc_types ──────────────────────────────────────────────
-
-
-def test_article_no_case():
-    assert (
-        detect_metadata_merge_case(
-            doc_type_a="article", doc_type_b="article", title_normalized="x" * 40
+        assert res == DoiConflictResolution(
+            accepted_doi="10.x/book", merge_with_id=None, clear_existing_doi=True
         )
-        is None
-    )
 
-
-def test_mixed_family_no_case():
-    assert (
-        detect_metadata_merge_case(
-            doc_type_a="thesis", doc_type_b="proceedings", title_normalized="x" * 40
+    def test_two_chapters_different_titles_strip_both(self):
+        res = resolve_doi_conflict(
+            new_doi="10.x/shared",
+            new_doc_type="book_chapter",
+            new_title_normalized="c2",
+            existing_doc_type="book_chapter",
+            existing_title_normalized="c1",
+            existing_id=7,
         )
-        is None
-    )
+        assert res == DoiConflictResolution(
+            accepted_doi=None, merge_with_id=None, clear_existing_doi=True
+        )
+
+    def test_two_chapters_same_title_merges(self):
+        res = resolve_doi_conflict(
+            new_doi="10.x/shared",
+            new_doc_type="book_chapter",
+            new_title_normalized="same",
+            existing_doc_type="book_chapter",
+            existing_title_normalized="same",
+            existing_id=42,
+        )
+        assert res == DoiConflictResolution(
+            accepted_doi="10.x/shared", merge_with_id=42, clear_existing_doi=False
+        )
+
+    def test_compatible_types_merge(self):
+        res = resolve_doi_conflict(
+            new_doi="10.x/a",
+            new_doc_type="article",
+            new_title_normalized="a",
+            existing_doc_type="article",
+            existing_title_normalized="a",
+            existing_id=42,
+        )
+        assert res == DoiConflictResolution(
+            accepted_doi="10.x/a", merge_with_id=42, clear_existing_doi=False
+        )
+
+    def test_existing_doc_type_none_is_compatible(self):
+        """Pas de doc_type existant → pas de cas spécial, on fusionne."""
+        res = resolve_doi_conflict(
+            new_doi="10.x/a",
+            new_doc_type="article",
+            new_title_normalized="a",
+            existing_doc_type=None,
+            existing_title_normalized="a",
+            existing_id=1,
+        )
+        assert res.accepted_doi == "10.x/a"
+        assert res.merge_with_id == 1
+        assert res.clear_existing_doi is False
+
+    def test_chapter_variants_recognized(self):
+        """Les alias book-chapter et chapter sont traités comme book_chapter."""
+        for alias in ("book-chapter", "chapter"):
+            res = resolve_doi_conflict(
+                new_doi="10.x/b",
+                new_doc_type=alias,
+                new_title_normalized="c",
+                existing_doc_type="book",
+                existing_title_normalized="livre",
+                existing_id=1,
+            )
+            assert res.accepted_doi is None, f"alias {alias} non reconnu"
+
+
+# ── decide_publication_match (cascade pure) ────────────────────────
+
+
+class TestDecidePublicationMatch:
+    def test_no_match_returns_create(self):
+        decision = decide_publication_match()
+        assert decision == PublicationMatchDecision(
+            action="create", publication_id=None, matched_by=None
+        )
+
+    def test_doi_wins_over_all(self):
+        decision = decide_publication_match(
+            doi_merge_with_id=10,
+            nnt_match_id=20,
+            hal_id_match_id=30,
+            pmid_match_id=50,
+            metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
+        )
+        assert decision == PublicationMatchDecision(
+            action="match", publication_id=10, matched_by=DeduplicationKey.DOI
+        )
+
+    def test_nnt_wins_over_hal_and_metadata(self):
+        decision = decide_publication_match(
+            nnt_match_id=20,
+            hal_id_match_id=30,
+            metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
+        )
+        assert decision == PublicationMatchDecision(
+            action="match", publication_id=20, matched_by=DeduplicationKey.NNT
+        )
+
+    def test_hal_wins_over_pmid_and_metadata(self):
+        decision = decide_publication_match(
+            hal_id_match_id=30,
+            pmid_match_id=50,
+            metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
+        )
+        assert decision == PublicationMatchDecision(
+            action="match", publication_id=30, matched_by=DeduplicationKey.HAL_ID
+        )
+
+    def test_pmid_wins_over_metadata(self):
+        decision = decide_publication_match(
+            pmid_match_id=50,
+            metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
+        )
+        assert decision == PublicationMatchDecision(
+            action="match", publication_id=50, matched_by=DeduplicationKey.PMID
+        )
+
+    def test_metadata_only(self):
+        decision = decide_publication_match(
+            metadata_match=(40, MetadataDeduplicationCase.THESIS_TITLE_YEAR),
+        )
+        assert decision == PublicationMatchDecision(
+            action="match",
+            publication_id=40,
+            matched_by=MetadataDeduplicationCase.THESIS_TITLE_YEAR,
+        )
