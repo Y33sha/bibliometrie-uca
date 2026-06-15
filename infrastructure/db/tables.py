@@ -863,6 +863,12 @@ source_publications = Table(
     Column("topics", JSONB),
     Column("biblio", JSONB),
     Column("meta", JSONB),
+    Column(
+        "raw_metadata",
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    ),
     UniqueConstraint("source", "source_id", name="source_publications_source_source_id_key"),
     Index(
         "idx_source_pubs_countries",
@@ -880,6 +886,10 @@ source_publications = Table(
     CheckConstraint(
         "jsonb_typeof(external_ids) = 'object'",
         name="source_publications_external_ids_is_object",
+    ),
+    CheckConstraint(
+        "jsonb_typeof(raw_metadata) = 'object'",
+        name="source_publications_raw_metadata_is_object",
     ),
     Index(
         "idx_source_pubs_hal_collections",
