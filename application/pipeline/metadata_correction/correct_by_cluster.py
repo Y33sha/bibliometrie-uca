@@ -83,7 +83,7 @@ def run(conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Lo
     logger.info("metadata_correction (cluster) : %d SP book/book_chapter examinées", len(rows))
 
     updates = compute_updates(rows)
-    logger.info("  %d corrections de DOI à persister", len(updates))
+    logger.info("  %d corrections de DOI à appliquer", len(updates))
 
     total = 0
     for start in range(0, len(updates), _PERSIST_BATCH):

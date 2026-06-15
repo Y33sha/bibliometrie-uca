@@ -181,7 +181,7 @@ def run(
     logger.info("metadata_correction (unaire) : %d source_publications examinées", len(rows))
 
     updates = [u for row in rows if (u := compute_update(row)) is not None]
-    logger.info("  %d corrections à persister", len(updates))
+    logger.info("  %d corrections à appliquer", len(updates))
 
     if dry_run:
         conn.rollback()
