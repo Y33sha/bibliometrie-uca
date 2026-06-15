@@ -1,6 +1,6 @@
 """Tests de `effective_metadata` (correction des métadonnées canoniques)."""
 
-from domain.publications.correction import (
+from domain.source_publications.correction import (
     CorrectedFields,
     MetadataCorrectionRule,
     effective_metadata,

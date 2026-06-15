@@ -23,7 +23,7 @@ Particularités CrossRef :
   CrossRef portent une affiliation), mais strictement mieux que rien.
 - ``doc_type`` stocké tel quel depuis ``msg["type"]`` ; le mapping
   taxonomie CrossRef → enum canonique vit dans
-  ``domain.publications.doc_types._SOURCE_MAPS["crossref"]`` et est
+  ``domain.source_publications.doc_types._SOURCE_MAPS["crossref"]`` et est
   appliqué par ``arbitrate_doc_type_with_article_subtype`` au moment
   du refresh. Le cas ``journal-article`` indistinct est arbitré contre
   les sous-types plus précis exposés par HAL/OA (review, conference_paper,

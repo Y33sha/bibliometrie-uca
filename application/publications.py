@@ -16,11 +16,11 @@ from domain.publications.aggregation import (
 from domain.publications.aggregation import (
     refresh_from_sources as _refresh_aggregate,
 )
-from domain.publications.correction import effective_metadata
 from domain.publications.deduplication import (
     resolve_doi_conflict as _domain_resolve_doi_conflict,
 )
 from domain.publications.identifiers import DOI
+from domain.source_publications.correction import effective_metadata
 from domain.source_publications.views import SourcePublicationWithJournalView
 from domain.sources.registry import SOURCE_PRIORITY
 

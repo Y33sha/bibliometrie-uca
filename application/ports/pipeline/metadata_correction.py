@@ -3,7 +3,7 @@
 Implémenté par `infrastructure.queries.pipeline.metadata_correction.PgMetadataCorrectionQueries`.
 
 La phase persiste sur `source_publications` les valeurs corrigées par les règles
-de `domain.publications.correction`, pour que le matching aval lise des colonnes
+de `domain.source_publications.correction`, pour que le matching aval lise des colonnes
 déjà corrigées. Sous-étape unaire (per-record) ici ; la sous-étape relationnelle
 (group-by-DOI) viendra en Phase 2.
 """

@@ -31,18 +31,18 @@ from application.publications import (
     resolve_doi_conflict,
 )
 from domain.normalize import normalize_text
-from domain.publications.correction import effective_metadata
 from domain.publications.deduplication import (
     MetadataDeduplicationCase,
     decide_publication_match,
 )
-from domain.publications.doc_types import map_doc_type
 from domain.publications.identifiers import normalize_nnt
 from domain.publications.metadata import (
     OA_STATUS_UNKNOWN_DEFAULT,
     clean_publication_title,
     has_minimal_publication_metadata,
 )
+from domain.source_publications.correction import effective_metadata
+from domain.source_publications.doc_types import map_doc_type
 from domain.source_publications.views import SourcePublicationWithJournalView
 
 Outcome = Literal["created", "linked", "skipped_no_metadata", "skipped_no_perimeter"]
@@ -121,7 +121,7 @@ def process_document(
     journal_id = doc.journal_id
     raw_oa_status = doc.oa_status
 
-    # Corrections appliquées à la SP entrante avant les queries de dedup metadata, pour que le matching porte sur les valeurs corrigées (cf. domain/publications/correction.py).
+    # Corrections appliquées à la SP entrante avant les queries de dedup metadata, pour que le matching porte sur les valeurs corrigées (cf. domain/source_publications/correction.py).
     corrected = effective_metadata(_view_from_row(doc))
     if corrected.doc_type is not None:
         raw_doc_type = corrected.doc_type.value

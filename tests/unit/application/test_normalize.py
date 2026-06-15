@@ -27,9 +27,11 @@ class TestExtractLocationsDataHalIds:
         work = {"locations": [{"landing_page_url": "https://doi.org/10.1/x", "id": "doi:10.1/x"}]}
         _urls, ext = extract_locations_data(work)
         assert "hal_id" not in ext
-from domain.publications.doc_types import _SOURCE_MAPS, map_doc_type
-from domain.publications.doc_types import DOC_TYPES_SET as VALID_DOC_TYPES_SET
+
+
 from domain.publications.identifiers import extract_hal_id_from_url
+from domain.source_publications.doc_types import _SOURCE_MAPS, map_doc_type
+from domain.source_publications.doc_types import DOC_TYPES_SET as VALID_DOC_TYPES_SET
 
 
 class TestOAExtractShortId:
