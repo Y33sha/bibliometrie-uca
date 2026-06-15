@@ -2,10 +2,13 @@
 
 from sqlalchemy import text
 
+from application.pipeline.metadata_correction.correct_by_cluster import compute_updates
 from application.pipeline.metadata_correction.correct_unary import compute_update
 from infrastructure.queries.pipeline.metadata_correction import (
+    fetch_doi_cluster_candidates,
     fetch_for_unary_correction,
     persist_corrections,
+    persist_doi_corrections,
 )
 
 
@@ -123,3 +126,83 @@ def test_self_heals_when_journal_no_longer_media(sa_sync_conn):
     doc_type, raw = _state(conn, sp)
     assert doc_type == "article"
     assert raw == {}
+
+
+# ── Sous-étape cluster : ouvrage/chapitre au même DOI ──
+
+
+def _seed_typed_sp(conn, *, source_id, doc_type, doi):
+    return conn.execute(
+        text(
+            "INSERT INTO source_publications (source, source_id, title, doc_type, doi) "
+            "VALUES ('openalex', :sid, 'T', :dt, :doi) RETURNING id"
+        ),
+        {"sid": source_id, "dt": doc_type, "doi": doi},
+    ).scalar_one()
+
+
+def _apply_cluster(conn) -> int:
+    rows = fetch_doi_cluster_candidates(conn)
+    return persist_doi_corrections(conn, compute_updates(rows))
+
+
+def test_chapter_loses_doi_of_its_book(sa_sync_conn):
+    conn = sa_sync_conn
+    book = _seed_typed_sp(conn, source_id="b1", doc_type="book", doi="10.1/x")
+    chapter = _seed_typed_sp(conn, source_id="c1", doc_type="book_chapter", doi="10.1/x")
+
+    assert _apply_cluster(conn) == 1  # seul le chapitre
+
+    book_doi, _ = _state(conn, book)
+    # le book garde son DOI
+    assert (
+        conn.execute(
+            text("SELECT doi FROM source_publications WHERE id = :id"), {"id": book}
+        ).scalar_one()
+        == "10.1/x"
+    )
+    chap_doi = conn.execute(
+        text("SELECT doi FROM source_publications WHERE id = :id"), {"id": chapter}
+    ).scalar_one()
+    assert chap_doi is None
+    chap_raw = conn.execute(
+        text("SELECT raw_metadata FROM source_publications WHERE id = :id"), {"id": chapter}
+    ).scalar_one()
+    assert chap_raw == {"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}}
+
+    # Réversibilité : le DOI brut du chapitre reste reconstructible.
+    reconstructed = conn.execute(
+        text(
+            "SELECT COALESCE(raw_metadata->'doi'->>'raw', doi) "
+            "FROM source_publications WHERE id = :id"
+        ),
+        {"id": chapter},
+    ).scalar_one()
+    assert reconstructed == "10.1/x"
+
+
+def test_idempotent_and_self_heals_when_book_retyped(sa_sync_conn):
+    conn = sa_sync_conn
+    book = _seed_typed_sp(conn, source_id="b1", doc_type="book", doi="10.1/x")
+    chapter = _seed_typed_sp(conn, source_id="c1", doc_type="book_chapter", doi="10.1/x")
+    assert _apply_cluster(conn) == 1
+    assert _apply_cluster(conn) == 0  # idempotent
+
+    # L'ouvrage est retypé (n'est plus un book) : le chapitre récupère son DOI.
+    conn.execute(
+        text("UPDATE source_publications SET doc_type = 'article' WHERE id = :id"), {"id": book}
+    )
+    assert _apply_cluster(conn) == 1
+    chap_doi = conn.execute(
+        text("SELECT doi, raw_metadata FROM source_publications WHERE id = :id"), {"id": chapter}
+    ).one()
+    assert chap_doi.doi == "10.1/x"
+    assert chap_doi.raw_metadata == {}
+
+
+def test_chapters_without_book_untouched(sa_sync_conn):
+    # chapitre/chapitre est différé : deux chapitres au même DOI sans ouvrage → rien.
+    conn = sa_sync_conn
+    _seed_typed_sp(conn, source_id="c1", doc_type="book_chapter", doi="10.1/y")
+    _seed_typed_sp(conn, source_id="c2", doc_type="book_chapter", doi="10.1/y")
+    assert _apply_cluster(conn) == 0
