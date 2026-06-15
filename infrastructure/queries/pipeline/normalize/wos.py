@@ -68,6 +68,7 @@ def upsert_wos_source_publication(
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
             external_ids = source_publications.external_ids || EXCLUDED.external_ids,
+            keys_dirty = true,
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(

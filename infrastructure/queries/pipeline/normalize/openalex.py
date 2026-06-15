@@ -69,6 +69,7 @@ def upsert_openalex_source_publication(
             abstract = COALESCE(EXCLUDED.abstract, source_publications.abstract),
             keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
+            keys_dirty = true,
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(

@@ -68,6 +68,7 @@ def upsert_crossref_source_publication(
             cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
             biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
             meta = COALESCE(EXCLUDED.meta, source_publications.meta),
+            keys_dirty = true,
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
