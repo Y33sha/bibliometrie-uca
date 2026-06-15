@@ -14,7 +14,7 @@ from datetime import datetime
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.enrich import EnrichQueries
+from application.ports.pipeline.enrich import EnrichQueries, JournalIssnRow
 from domain.publications.metadata import STABLE_OA_STATUSES_SQL
 
 
@@ -209,13 +209,11 @@ def fetch_publishers_needing_country_from_crossref(
     return [(r.publisher_id, r.member_id) for r in rows]
 
 
-def fetch_journal_issn_index(
-    conn: Connection,
-) -> list[tuple[int, str | None, str | None, str | None]]:
-    """Rows `(id, issn, eissn, issnl)` des journaux ayant au moins un ISSN —
-    matière de l'index ISSN → journal_id à l'import du dump DOAJ."""
+def fetch_journal_issn_index(conn: Connection) -> list[JournalIssnRow]:
+    """`JournalIssnRow` des journaux ayant au moins un ISSN — matière de l'index
+    ISSN → journal_id à l'import du dump DOAJ."""
     return [
-        (r.id, r.issn, r.eissn, r.issnl)
+        JournalIssnRow(r.id, r.issn, r.eissn, r.issnl)
         for r in conn.execute(
             text(
                 """
@@ -269,9 +267,7 @@ class PgEnrichQueries(EnrichQueries):
     ) -> list[tuple[int, int]]:
         return fetch_publishers_needing_country_from_crossref(conn, limit=limit)
 
-    def fetch_journal_issn_index(
-        self, conn: Connection
-    ) -> list[tuple[int, str | None, str | None, str | None]]:
+    def fetch_journal_issn_index(self, conn: Connection) -> list[JournalIssnRow]:
         return fetch_journal_issn_index(conn)
 
     def reset_is_in_doaj(self, conn: Connection) -> int:
