@@ -32,24 +32,14 @@ from domain.publications.deduplication import (
     MetadataDeduplicationCase,
     decide_publication_match,
 )
-from domain.publications.identifiers import normalize_nnt
 from domain.publications.metadata import (
     OA_STATUS_UNKNOWN_DEFAULT,
     clean_publication_title,
     has_minimal_publication_metadata,
 )
+from domain.source_publications.keys import project_confirmation_keys
 
 Outcome = Literal["created", "linked", "skipped_no_metadata", "skipped_no_perimeter"]
-
-
-def extract_known_identifiers(external_ids: dict[str, object] | None) -> dict[str, str]:
-    """Filtre `external_ids` aux valeurs `str` non vides.
-
-    Convention : toutes les clés de dédup cross-source (`hal_id`, `nnt`, `pmid`, …) vivent dans `external_ids`, y compris quand elles coïncident avec `source_id` (cas HAL : le normalizer pose `external_ids.hal_id = [source_id]` — liste, cf. theses pour NNT). Pas de fallback sur `source_id` — la responsabilité est portée par les normalizers à l'écriture.
-    """
-    if not isinstance(external_ids, dict):
-        return {}
-    return {k: v for k, v in external_ids.items() if isinstance(v, str) and v}
 
 
 def process_document(
@@ -76,7 +66,6 @@ def process_document(
     if dry_run:
         return "created"
 
-    doi = doc.doi
     # `doc_type`/`journal_id`/`oa_status` sont lus tels quels : la phase `metadata_correction` les a déjà mappés source→canonique et corrigés en place sur la `source_publication`, y compris pour les règles journal-dépendantes (elle tourne après `publishers_journals`, JOIN `journals`). Le matching porte donc sur les valeurs corrigées sans re-correction ici — qui, faute de JOIN `journals` sur cette projection, ne verrait de toute façon pas ces règles.
     doc_type = doc.doc_type or "other"
     journal_id = doc.journal_id
@@ -90,22 +79,14 @@ def process_document(
         title = cleaned_title
     title_normalized = normalize_text(title)
 
-    known_ids = extract_known_identifiers(doc.external_ids)
-    nnt = known_ids.get("nnt")
-    if nnt:
-        nnt = normalize_nnt(nnt)
-    pmid = known_ids.get("pmid")
-    # hal_id est multivalué (liste) : `extract_known_identifiers` ne garde que les
-    # valeurs str, on lit donc la liste directement depuis external_ids.
-    raw_hal_ids = doc.external_ids.get("hal_id") if isinstance(doc.external_ids, dict) else None
-    hal_ids = raw_hal_ids if isinstance(raw_hal_ids, list) else []
-
-    # Pour les œuvres Zenodo, le DOI canonique est le concept DOI (résolu en
-    # amont par `resolve_zenodo_concept`) : concept + versions partagent ce DOI
-    # effectif et convergent vers une publication unique via le chemin DOI.
-    zenodo_concept_doi = known_ids.get("zenodo_concept_doi")
-    if zenodo_concept_doi:
-        doi = zenodo_concept_doi
+    # Clés de confirmation (DOI effectif Zenodo inclus, NNT/PMID/HAL normalisés) :
+    # projection partagée avec la réconciliation des composantes — une seule
+    # définition de « quelles clés porte cette SP ».
+    keys = project_confirmation_keys(doc.doi, doc.external_ids)
+    doi = keys.doi
+    nnt = keys.nnt
+    pmid = keys.pmid
+    hal_ids = keys.hal_ids
 
     # Prefetch DOI : un DOI qui pointe une publication existante est un match positif.
     # Les conflits chapitre/ouvrage (DOI de l'ouvrage porté par erreur par un chapitre)
@@ -126,11 +107,10 @@ def process_document(
     # Prefetch HAL_ID : matche sur le premier des hal-ids référencés qui résout
     # (clé multivaluée portée par `external_ids` sur toutes les sources).
     hal_id_match_id: int | None = None
-    for h in hal_ids or []:
-        if isinstance(h, str):
-            hal_id_match_id = pub_repo.find_by_hal_id(h)
-            if hal_id_match_id is not None:
-                break
+    for h in hal_ids:
+        hal_id_match_id = pub_repo.find_by_hal_id(h)
+        if hal_id_match_id is not None:
+            break
 
     # Prefetch PMID (clé portée par `external_ids` ; un PMID = un article PubMed)
     pmid_match_id: int | None = None

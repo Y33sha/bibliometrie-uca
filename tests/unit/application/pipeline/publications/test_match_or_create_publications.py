@@ -1,11 +1,10 @@
 """Tests unitaires de `application.pipeline.publications.match_or_create_publications`.
 
 Couvre :
-- `extract_known_identifiers` : helper pur (cf. `TestExtractKnownIdentifiers`).
 - `process_document` : aiguillage DOI / NNT / HAL / thesis vers `decide_publication_match`.
 - `run` : boucle d'orchestration, commit/rollback, dry-run, exceptions.
 
-Les helpers de matching par métadonnées (cas thèse, etc.) sont testés dans `test_metadata_deduplication_rules.py`.
+L'extraction des clés de confirmation (DOI effectif Zenodo, NNT/PMID/HAL) est portée par `domain.source_publications.keys.project_confirmation_keys`, testée dans `tests/unit/domain/source_publications/test_keys.py`. Les helpers de matching par métadonnées (cas thèse, etc.) sont testés dans `test_metadata_deduplication_rules.py`.
 
 Mocks : port `PublicationsMatchOrCreateQueries`, `PublicationRepository`, `AuditRepository`. `refresh_from_sources` monkeypatché dans le module pour isoler la logique d'aiguillage.
 """
@@ -20,39 +19,10 @@ import pytest
 
 from application.pipeline.publications import match_or_create_publications
 from application.pipeline.publications.match_or_create_publications import (
-    extract_known_identifiers,
     process_document,
     run,
 )
 from application.ports.pipeline.publications_match_or_create import SourcePublicationRow
-
-
-class TestExtractKnownIdentifiers:
-    def test_returns_external_ids_as_is(self):
-        """Valeurs str non vides retenues ; `hal_id` (liste) est ignoré ici — lu à part
-        dans `process_document` car multivalué."""
-        assert extract_known_identifiers(
-            {"hal_id": ["hal-X"], "nnt": "2021CLFAC030", "pmid": "12345"}
-        ) == {
-            "nnt": "2021CLFAC030",
-            "pmid": "12345",
-        }
-
-    def test_ignores_non_str_values(self):
-        """`external_ids` peut contenir des listes (issn/isbn Crossref) ou None — on les ignore ici."""
-        assert extract_known_identifiers(
-            {"issn": ["0028-0836"], "nnt": None, "pmid": "12345"},
-        ) == {"pmid": "12345"}
-
-    def test_ignores_empty_strings(self):
-        assert extract_known_identifiers({"hal_id": ""}) == {}
-
-    def test_empty_external_ids(self):
-        assert extract_known_identifiers({}) == {}
-
-    def test_none_external_ids(self):
-        assert extract_known_identifiers(None) == {}
-
 
 # ── Helpers de mocking ───────────────────────────────────────────
 
