@@ -832,6 +832,7 @@ source_publications = Table(
     Column("source_id", Text, nullable=False),
     Column("doi", Text),
     Column("title", Text, nullable=False),
+    Column("title_normalized", Text),
     Column("pub_year", SmallInteger),
     Column("doc_type", Text),
     Column("publication_id", Integer),
@@ -870,6 +871,12 @@ source_publications = Table(
         server_default=text("'{}'::jsonb"),
     ),
     UniqueConstraint("source", "source_id", name="source_publications_source_source_id_key"),
+    Index(
+        "idx_source_pubs_title_normalized_trgm",
+        "title_normalized",
+        postgresql_using="gin",
+        postgresql_ops={"title_normalized": "gin_trgm_ops"},
+    ),
     Index(
         "idx_source_pubs_countries",
         "countries",

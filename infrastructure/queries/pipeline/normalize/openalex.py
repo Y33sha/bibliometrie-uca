@@ -9,6 +9,7 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.openalex import OpenalexNormalizeQueries
+from domain.publications.metadata import normalized_title
 from domain.types import JsonValue
 
 
@@ -43,11 +44,11 @@ def upsert_openalex_source_publication(
         external_ids = {}
     stmt = text("""
         INSERT INTO source_publications
-            (source, source_id, doi, title, pub_year, doc_type,
+            (source, source_id, doi, title, title_normalized, pub_year, doc_type,
              publication_id, staging_id, external_ids, urls, cited_by_count,
              journal_id, oa_status, language, container_title,
              is_retracted, biblio, abstract, keywords, topics)
-        VALUES ('openalex', :openalex_id, :doi, :title, :pub_year, :doc_type,
+        VALUES ('openalex', :openalex_id, :doi, :title, :title_normalized, :pub_year, :doc_type,
                 :publication_id, :staging_id, :external_ids, :urls, :cited_by_count,
                 :journal_id, :oa_status, :language, :container_title,
                 :is_retracted, :biblio, :abstract, :keywords, :topics_json)
@@ -81,6 +82,7 @@ def upsert_openalex_source_publication(
             "openalex_id": openalex_id,
             "doi": doi,
             "title": title,
+            "title_normalized": normalized_title(title),
             "pub_year": pub_year,
             "doc_type": doc_type,
             "publication_id": publication_id,
