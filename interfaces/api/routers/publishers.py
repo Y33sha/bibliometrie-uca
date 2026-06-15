@@ -3,6 +3,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import Connection
 
 from application.ports.api.publishers_queries import (
     PublisherDashboardResponse,
@@ -12,6 +13,7 @@ from application.ports.api.publishers_queries import (
     PublishersFacetsResponse,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
+from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -21,7 +23,9 @@ from application.publishers import update_publisher as _update_publisher
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
     audit_repo_sync,
+    db_conn_sync,
     journal_repo_sync,
+    metadata_correction_queries_sync,
     publication_repo_sync,
     publisher_queries_sync,
     publisher_repo_sync,
@@ -183,11 +187,13 @@ def update_publisher(
 def merge(
     publisher_id: int,
     body: MergeRequest,
+    conn: Connection = Depends(db_conn_sync),
     queries: PublisherQueries = Depends(publisher_queries_sync),
     pub_repo: PublisherRepository = Depends(publisher_repo_sync),
     j_repo: JournalRepository = Depends(journal_repo_sync),
     publication_repo: PublicationRepository = Depends(publication_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
+    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries_sync),
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
@@ -205,6 +211,8 @@ def merge(
     merge_publishers(
         publisher_id,
         body.source_id,
+        conn=conn,
+        correction_queries=correction_queries,
         publisher_repo=pub_repo,
         journal_repo=j_repo,
         pub_repo=publication_repo,

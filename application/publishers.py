@@ -9,8 +9,11 @@ La fusion d'éditeurs (`merge_publishers`) reste ici parce que sémantiquement c
 from collections import Counter
 from typing import cast
 
+from sqlalchemy import Connection
+
 from application.audit import emit_event
 from application.journals import merge_journals
+from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -102,6 +105,8 @@ def merge_publishers(
     target_id: int,
     source_id: int,
     *,
+    conn: Connection,
+    correction_queries: MetadataCorrectionQueries,
     publisher_repo: PublisherRepository,
     journal_repo: JournalRepository,
     pub_repo: PublicationRepository,
@@ -164,6 +169,8 @@ def merge_publishers(
         merge_journals(
             pair["target_journal_id"],
             pair["source_journal_id"],
+            conn=conn,
+            correction_queries=correction_queries,
             repo=journal_repo,
             pub_repo=pub_repo,
             audit_repo=audit_repo,

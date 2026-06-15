@@ -65,6 +65,15 @@ class MetadataCorrectionQueries(Protocol):
         """
         ...
 
+    def fetch_for_unary_correction_by_journal(
+        self, conn: Connection, journal_id: int
+    ) -> list[SourcePublicationForCorrection]:
+        """Les `source_publications` rattachées à un journal (`journal_id = :jid`).
+
+        Recompute ciblé après un changement de `journal_type` (hook admin) : seules
+        ces SP voient leur correction journal-dépendante bouger."""
+        ...
+
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
         """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`
         (pour que le refresh stale aval ré-agrège la publication). Retourne le
