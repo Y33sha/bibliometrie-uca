@@ -78,3 +78,18 @@ class TestMalformedExternalIds:
             None, {"issn": ["0028-0836"], "nnt": None, "pmid": "12345"}
         )
         assert keys == ConfirmationKeys(doi=None, nnt=None, pmid="12345", hal_ids=())
+
+
+class TestTokens:
+    def test_tokens_namespaced_by_type(self):
+        keys = ConfirmationKeys(doi="d", nnt="n", pmid="p", hal_ids=("h1", "h2"))
+        assert keys.tokens() == frozenset(
+            {("doi", "d"), ("nnt", "n"), ("pmid", "p"), ("hal_id", "h1"), ("hal_id", "h2")}
+        )
+
+    def test_absent_keys_produce_no_token(self):
+        keys = ConfirmationKeys(doi="d", nnt=None, pmid=None, hal_ids=())
+        assert keys.tokens() == frozenset({("doi", "d")})
+
+    def test_no_keys_empty_token_set(self):
+        assert ConfirmationKeys(doi=None, nnt=None, pmid=None, hal_ids=()).tokens() == frozenset()
