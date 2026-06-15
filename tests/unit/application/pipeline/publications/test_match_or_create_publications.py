@@ -187,46 +187,6 @@ class TestProcessDocumentDoiMatch:
         assert repo.create.call_args.kwargs["doi"] == "10.1/x"
 
 
-class TestProcessDocumentZenodoConcept:
-    """Approche B : le DOI canonique d'une SP Zenodo est son concept DOI."""
-
-    def test_create_uses_concept_doi_not_version(self, captured, logger):
-        """Sans pub existante : la pub est créée avec le concept DOI, pas la version."""
-        queries = MagicMock()
-        repo = MagicMock()
-        repo.find_by_doi.return_value = None
-        repo.find_by_nnt.return_value = None
-        repo.find_by_hal_id.return_value = None
-        repo.create.return_value = 7
-        doc = _make_doc(
-            doi="10.5281/zenodo.11",  # version
-            external_ids={"zenodo_concept_doi": "10.5281/zenodo.10"},  # concept
-        )
-
-        result = process_document(conn=None, queries=queries, doc=doc, dry_run=False, pub_repo=repo)
-
-        assert result == "created"
-        # Lookup et création sur le concept DOI, jamais la version.
-        repo.find_by_doi.assert_called_once_with("10.5281/zenodo.10")
-        assert repo.create.call_args.kwargs["doi"] == "10.5281/zenodo.10"
-
-    def test_version_links_to_existing_concept_publication(self, captured, logger):
-        """Une SP version rejoint la publication portée par le concept DOI."""
-        queries = MagicMock()
-        repo = MagicMock()
-        repo.find_by_doi.return_value = _PubByDoiStub(id=42)
-        doc = _make_doc(
-            doi="10.5281/zenodo.11",
-            external_ids={"zenodo_concept_doi": "10.5281/zenodo.10"},
-        )
-
-        result = process_document(conn=None, queries=queries, doc=doc, dry_run=False, pub_repo=repo)
-
-        assert result == "linked"
-        repo.find_by_doi.assert_called_once_with("10.5281/zenodo.10")
-        queries.link_source_publication_to_publication.assert_called_once_with(None, 1, 42)
-
-
 class TestProcessDocumentNntMatch:
     def test_nnt_match_used_when_no_doi(self, captured, logger):
         queries = MagicMock()

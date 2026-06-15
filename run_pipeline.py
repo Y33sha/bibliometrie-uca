@@ -431,11 +431,14 @@ def phase_metadata_correction(**kw: Any) -> Any:
 
     Tourne après `publishers_journals` (journaux typés, donc les règles
     journal-dépendantes ont leurs entrées fraîches) et avant `publications`
-    (le matching lit les colonnes corrigées). Deux sous-étapes : unaire
-    (per-record : mapping + règles de correction) puis cluster (group-by-clé :
-    nullage des clés erronées, ouvrage/chapitre au même DOI).
+    (le matching lit les colonnes corrigées). Trois sous-étapes : unaire
+    (per-record : mapping + règles de correction), Zenodo (substitution
+    version→concept du DOI), puis cluster (group-by-clé : nullage des clés
+    erronées, ouvrage/chapitre au même DOI). La substitution Zenodo précède le
+    cluster pour que le group-by-DOI regroupe sur le concept.
     """
     _run_correct_metadata_unary()
+    _run_correct_zenodo_concept()
     _run_correct_by_cluster()
 
 
@@ -576,6 +579,21 @@ def _run_correct_metadata_unary() -> None:
     finally:
         conn.close()
     log.info("✓ metadata_correction (unaire) terminé en %.1fs", time.time() - t0)
+
+
+def _run_correct_zenodo_concept() -> None:
+    from application.pipeline.metadata_correction.correct_zenodo_concept import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
+
+    log.info("▶ metadata_correction (zenodo)")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run(conn, PgMetadataCorrectionQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ metadata_correction (zenodo) terminé en %.1fs", time.time() - t0)
 
 
 def _run_correct_by_cluster() -> None:

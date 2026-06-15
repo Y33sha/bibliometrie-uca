@@ -13,6 +13,7 @@ from application.ports.pipeline.metadata_correction import (
     DoiCorrectionUpdate,
     MetadataCorrectionQueries,
     SourcePublicationForCorrection,
+    ZenodoConceptRow,
 )
 
 # Projection partagée : SP + champs joints `journals` (règles journal-dépendantes)
@@ -58,6 +59,19 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
         """)
     ).all()
     return [DoiClusterRow(*row) for row in rows]
+
+
+def fetch_zenodo_concept_candidates(conn: Connection) -> list[ZenodoConceptRow]:
+    """SP au concept DOI Zenodo caché, pour la substitution version→concept de la colonne `doi`."""
+    rows = conn.execute(
+        text("""
+            SELECT sp.id, sp.doi, sp.external_ids->>'zenodo_concept_doi' AS concept_doi,
+                   sp.raw_metadata
+            FROM source_publications sp
+            WHERE sp.external_ids ? 'zenodo_concept_doi'
+        """)
+    ).all()
+    return [ZenodoConceptRow(*row) for row in rows]
 
 
 def persist_doi_corrections(conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
@@ -112,3 +126,6 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
 
     def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
         return persist_doi_corrections(conn, updates)
+
+    def fetch_zenodo_concept_candidates(self, conn: Connection) -> list[ZenodoConceptRow]:
+        return fetch_zenodo_concept_candidates(conn)
