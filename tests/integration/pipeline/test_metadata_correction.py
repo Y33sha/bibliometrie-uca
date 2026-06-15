@@ -131,13 +131,14 @@ def test_self_heals_when_journal_no_longer_media(sa_sync_conn):
 # ── Sous-étape cluster : ouvrage/chapitre au même DOI ──
 
 
-def _seed_typed_sp(conn, *, source_id, doc_type, doi):
+def _seed_typed_sp(conn, *, source_id, doc_type, doi, title="T", title_normalized="t"):
     return conn.execute(
         text(
-            "INSERT INTO source_publications (source, source_id, title, doc_type, doi) "
-            "VALUES ('openalex', :sid, 'T', :dt, :doi) RETURNING id"
+            "INSERT INTO source_publications "
+            "(source, source_id, title, title_normalized, doc_type, doi) "
+            "VALUES ('openalex', :sid, :title, :tn, :dt, :doi) RETURNING id"
         ),
-        {"sid": source_id, "dt": doc_type, "doi": doi},
+        {"sid": source_id, "dt": doc_type, "doi": doi, "title": title, "tn": title_normalized},
     ).scalar_one()
 
 
@@ -200,9 +201,59 @@ def test_idempotent_and_self_heals_when_book_retyped(sa_sync_conn):
     assert chap_doi.raw_metadata == {}
 
 
-def test_chapters_without_book_untouched(sa_sync_conn):
-    # chapitre/chapitre est différé : deux chapitres au même DOI sans ouvrage → rien.
+def test_chapters_same_title_untouched(sa_sync_conn):
+    # Même chapitre (titre normalisé identique) sous un DOI : pas de conflit.
     conn = sa_sync_conn
-    _seed_typed_sp(conn, source_id="c1", doc_type="book_chapter", doi="10.1/y")
-    _seed_typed_sp(conn, source_id="c2", doc_type="book_chapter", doi="10.1/y")
+    _seed_typed_sp(
+        conn, source_id="c1", doc_type="book_chapter", doi="10.1/y", title_normalized="introduction"
+    )
+    _seed_typed_sp(
+        conn, source_id="c2", doc_type="book_chapter", doi="10.1/y", title_normalized="introduction"
+    )
+    assert _apply_cluster(conn) == 0
+
+
+def test_chapters_distinct_titles_both_lose_doi(sa_sync_conn):
+    # Deux chapitres réellement distincts au même DOI (sans ouvrage) → tous deux perdent le DOI.
+    conn = sa_sync_conn
+    c1 = _seed_typed_sp(
+        conn,
+        source_id="c1",
+        doc_type="book_chapter",
+        doi="10.1/z",
+        title_normalized="geographie de l environnement",
+    )
+    c2 = _seed_typed_sp(
+        conn,
+        source_id="c2",
+        doc_type="book_chapter",
+        doi="10.1/z",
+        title_normalized="nommer et representer les processus biophysiques",
+    )
+    assert _apply_cluster(conn) == 2
+    for sp in (c1, c2):
+        row = conn.execute(
+            text("SELECT doi, raw_metadata FROM source_publications WHERE id = :id"), {"id": sp}
+        ).one()
+        assert row.doi is None
+        assert row.raw_metadata["doi"]["corrected_by"] == "CHAPITRES_TITRES_DIFFERENTS"
+
+
+def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
+    # « chapitre 14 X » vs « X » : même chapitre après nettoyage → pas de conflit.
+    conn = sa_sync_conn
+    _seed_typed_sp(
+        conn,
+        source_id="c1",
+        doc_type="book_chapter",
+        doi="10.1/w",
+        title_normalized="chapitre 14 les limnosystemes",
+    )
+    _seed_typed_sp(
+        conn,
+        source_id="c2",
+        doc_type="book_chapter",
+        doi="10.1/w",
+        title_normalized="les limnosystemes",
+    )
     assert _apply_cluster(conn) == 0

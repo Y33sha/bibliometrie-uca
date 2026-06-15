@@ -50,7 +50,7 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
     correction relationnelle group-by-DOI."""
     rows = conn.execute(
         text("""
-            SELECT sp.id, sp.doc_type, sp.doi, sp.raw_metadata,
+            SELECT sp.id, sp.doc_type, sp.doi, sp.title_normalized, sp.raw_metadata,
                    lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS raw_doi
             FROM source_publications sp
             WHERE sp.doc_type IN ('book', 'book_chapter')

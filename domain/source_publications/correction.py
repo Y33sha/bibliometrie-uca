@@ -15,6 +15,7 @@ Cascade entre champs (ordre des dépendances) : `journal_id` → `doc_type` → 
 
 import re
 from enum import StrEnum
+from itertools import combinations
 from typing import NamedTuple, TypedDict
 
 from domain.normalize import normalize_text
@@ -311,13 +312,44 @@ class DistinctMergeCase(StrEnum):
     # chapitre (`book_chapter`) la porte par erreur → le chapitre la perd.
     OUVRAGE_VS_CHAPITRE = "OUVRAGE_VS_CHAPITRE"
 
+    # Plusieurs chapitres (`book_chapter`) partageant une clé mais de titres réellement
+    # différents : la clé est celle de l'ouvrage hôte (absent du groupe), recopiée à tort sur
+    # ses chapitres → tous la perdent.
+    CHAPITRES_TITRES_DIFFERENTS = "CHAPITRES_TITRES_DIFFERENTS"
+
 
 class KeyGroupMember(NamedTuple):
-    """Un membre d'un groupe de SP partageant une clé : son id et son `doc_type` **canonique**
-    (corrigé par la passe unaire)."""
+    """Un membre d'un groupe de SP partageant une clé : son id, son `doc_type` **canonique**
+    (corrigé par la passe unaire) et son `title_normalized` (matérialisé)."""
 
     id: int
     doc_type: str | None
+    title_normalized: str | None
+
+
+# Marqueurs structurels de titre de chapitre, retirés avant comparaison : un chapitre est
+# fréquemment saisi avec son numéro (« chapitre 14 … ») par une source et sans par une autre.
+_CHAPTER_TITLE_MARKERS = re.compile(
+    r"\b(chapitre|chapter|chap|ch|section|sec|partie|part|vol|tome|pp|p)\b"
+)
+
+
+def _clean_chapter_title(title_normalized: str | None) -> str:
+    """Retire le bruit structurel d'un titre normalisé (chiffres = numéros de chapitre/page,
+    mots-marqueurs) et re-collapse les espaces, pour comparer des **chapitres** sans qu'un
+    numéro ou un marqueur fasse paraître distincts deux enregistrements du même chapitre.
+    Déterministe (aucune similarité floue)."""
+    cleaned = re.sub(r"\d+", " ", title_normalized or "")
+    cleaned = _CHAPTER_TITLE_MARKERS.sub(" ", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
+def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
+    """True si le groupe contient deux chapitres **réellement distincts** : après nettoyage,
+    une paire de titres qui ne sont ni égaux ni l'un contenu dans l'autre (la containment
+    couvre les troncatures de sous-titre). Identité stricte sur le résidu — pas de seuil flou."""
+    cleaned = [c for c in (_clean_chapter_title(t) for t in titles) if c]
+    return any(a != b and a not in b and b not in a for a, b in combinations(cleaned, 2))
 
 
 def detect_erroneous_key_holders(
@@ -327,11 +359,14 @@ def detect_erroneous_key_holders(
     qui la portent **par erreur** (à nuller). Pur, déterministe, sans effet de bord, et
     indépendant du type de clé — c'est le caller qui sait par quelle clé le groupe est formé.
 
-    Ouvrage + chapitre dans le même groupe : les `book_chapter` perdent la clé (qui est celle
-    de l'ouvrage). Un groupe sans motif connu renvoie `[]` (clé conservée partout).
+    - **Ouvrage + chapitre** dans le groupe : les `book_chapter` perdent la clé (celle de
+      l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
+    - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent la
+      clé (celle de l'ouvrage hôte absent). Détection par nettoyage + containment + identité
+      stricte (`_group_has_distinct_chapters`) — pas de similarité floue. Les faux positifs
+      résiduels (coquilles) relèvent d'une correction admin.
 
-    Cas différés (cf. fiche chantier) : chapitre/chapitre au même DOI (comparaison de titre
-    floue) et thèse/article (souvent un mistype → correction de `doc_type`, pas un nullage)."""
+    Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas un nullage)."""
     types = {m.doc_type for m in group}
     if "book" in types and "book_chapter" in types:
         return [
@@ -339,4 +374,8 @@ def detect_erroneous_key_holders(
             for m in group
             if m.doc_type == "book_chapter"
         ]
+    if types == {"book_chapter"} and _group_has_distinct_chapters(
+        [m.title_normalized for m in group]
+    ):
+        return [(m.id, DistinctMergeCase.CHAPITRES_TITRES_DIFFERENTS) for m in group]
     return []
