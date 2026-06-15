@@ -426,6 +426,17 @@ def phase_zenodo_doi(**kw: Any) -> Any:
     _run_resolve_zenodo_concept()
 
 
+def phase_metadata_correction(**kw: Any) -> Any:
+    """Persistance des corrections de métadonnées sur les source_publications.
+
+    Tourne après `publishers_journals` (journaux typés, donc les règles
+    journal-dépendantes ont leurs entrées fraîches) et avant `publications`
+    (le matching lit les colonnes corrigées). Sous-étape unaire (per-record)
+    aujourd'hui ; la sous-étape relationnelle (group-by-DOI) viendra s'ajouter.
+    """
+    _run_correct_metadata_unary()
+
+
 def phase_publications(**kw: Any) -> Any:
     """Creation des publications canoniques puis fusions de deduplication.
 
@@ -549,6 +560,21 @@ def _run_resolve_zenodo_concept() -> None:
     finally:
         conn.close()
     log.info("✓ resolve_zenodo_concept terminé en %.1fs", time.time() - t0)
+
+
+def _run_correct_metadata_unary() -> None:
+    from application.pipeline.metadata_correction.correct_unary import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
+
+    log.info("▶ metadata_correction (unaire)")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run(conn, PgMetadataCorrectionQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ metadata_correction terminé en %.1fs", time.time() - t0)
 
 
 def _run_match_or_create_publications() -> None:
@@ -1699,6 +1725,7 @@ PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
     ("publishers_journals", phase_publishers_journals),
     ("affiliations", phase_affiliations),
     ("zenodo_doi", phase_zenodo_doi),
+    ("metadata_correction", phase_metadata_correction),
     ("publications", phase_publications),
     ("persons", phase_persons),
     ("authorships", phase_authorships),

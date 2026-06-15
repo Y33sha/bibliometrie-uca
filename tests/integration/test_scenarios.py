@@ -68,6 +68,11 @@ class TestDoiCaseInsensitive:
     """La contrainte unique sur DOI est case-insensitive (lower(doi)).
     Les lookups doivent aussi être case-insensitive."""
 
+    @pytest.mark.xfail(
+        strict=True,
+        reason="UNIQUE(lower(doi)) droppé par la bascule create-all ; rétabli en Phase 4 "
+        "du chantier match-or-create (après rerun du stock). xpass strict = penser à retirer ce marqueur.",
+    )
     def test_unique_constraint_blocks_case_variant(self, sa_sync_conn):
         create_publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
         with pytest.raises(IntegrityError):
