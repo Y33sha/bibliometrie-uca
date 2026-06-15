@@ -454,6 +454,7 @@ def phase_publications(**kw: Any) -> Any:
     Zenodo sur lesquels porte la dedup concept/version.
     """
     _run_match_or_create_publications()
+    _run_reconcile_components()
     _run_merge_pubs_by_doi()
     _run_merge_pubs_by_nnt()
     _run_merge_pubs_by_pmid()
@@ -633,6 +634,30 @@ def _run_match_or_create_publications() -> None:
     finally:
         conn.close()
     log.info("✓ match_or_create_publications terminé en %.1fs", time.time() - t0)
+
+
+def _run_reconcile_components() -> None:
+    from application.pipeline.publications.reconcile_components import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.publications_reconciliation import (
+        PgPublicationsReconciliationQueries,
+    )
+    from infrastructure.repositories import audit_repository, publication_repository
+
+    log.info("▶ reconcile_components")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run(
+            conn,
+            PgPublicationsReconciliationQueries(),
+            log,
+            pub_repo=publication_repository(conn),
+            audit_repo=audit_repository(conn),
+        )
+    finally:
+        conn.close()
+    log.info("✓ reconcile_components terminé en %.1fs", time.time() - t0)
 
 
 def _run_create_persons() -> None:
