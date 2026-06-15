@@ -2,7 +2,7 @@
 
 Implémente `MetadataMergeQueries`. La détection de paires est ici ; les critères
 (auteur primary thèse, nombre d'auteurs) réutilisent les fonctions de lecture
-déjà écrites pour le matching (`publications_create`).
+déjà écrites pour le matching (`publications_match_or_create`).
 """
 
 from sqlalchemy import Connection, text
@@ -11,7 +11,7 @@ from application.ports.pipeline.metadata_merge import (
     MetadataMergeCandidatePair,
     MetadataMergeQueries,
 )
-from infrastructure.queries.pipeline.publications_create import (
+from infrastructure.queries.pipeline.publications_match_or_create import (
     fetch_max_source_authorship_count_per_publication,
     fetch_thesis_primary_author,
 )

@@ -1,6 +1,6 @@
-"""Port : SQL de la phase publications (`create_publications`).
+"""Port : SQL de la phase publications (`match_or_create_publications`).
 
-Implémenté par `infrastructure.queries.pipeline.publications_create.PgPublicationsCreateQueries`.
+Implémenté par `infrastructure.queries.pipeline.publications_match_or_create.PgPublicationsMatchOrCreateQueries`.
 """
 
 from typing import NamedTuple, Protocol
@@ -30,7 +30,7 @@ class SourcePublicationRow(NamedTuple):
     urls: list[str] | None
 
 
-class PublicationsCreateQueries(Protocol):
+class PublicationsMatchOrCreateQueries(Protocol):
     """Opérations SQL pour la création des publications canoniques à partir des `source_publications`, et les lectures de critères des passes de fusion."""
 
     def fetch_orphan_source_publications(self, conn: Connection) -> list[SourcePublicationRow]:

@@ -1,6 +1,6 @@
 """Résout le concept DOI des source_publications Zenodo (hors chemin chaud).
 
-Sous-étape de la phase `publications`, exécutée AVANT `create` : pour
+Sous-étape de la phase `publications`, exécutée AVANT `match_or_create` : pour
 chaque source_publication au DOI Zenodo sans `external_ids.zenodo_concept_doi`,
 appelle l'API Zenodo (`conceptdoi`) et stocke le concept DOI. Le matching
 dédupliquera ensuite concept + versions sur ce champ.
