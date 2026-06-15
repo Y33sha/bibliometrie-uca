@@ -29,7 +29,7 @@ MODULES = [
     "application.pipeline.normalize.normalize_wos",
     "application.pipeline.normalize.normalize_scanr",
     "application.pipeline.normalize.normalize_theses",
-    "application.pipeline.publications.create_publications",
+    "application.pipeline.publications.match_or_create_publications",
     "application.pipeline.persons.create_persons_from_source_authorships",
     "application.pipeline.authorships.build_authorships",
     "application.pipeline.affiliations.populate_affiliations",
