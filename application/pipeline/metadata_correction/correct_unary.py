@@ -35,6 +35,7 @@ from application.ports.pipeline.metadata_correction import (
 )
 from domain.source_publications.correction import effective_metadata
 from domain.source_publications.doc_types import map_doc_type
+from domain.source_publications.raw_metadata import hydrate_raw_view, stash_entry
 from domain.source_publications.views import SourcePublicationWithJournalView
 
 # Champs corrigeables gérés par la sous-étape unaire. Les autres clés de
@@ -48,30 +49,22 @@ DOC_TYPE_MAP_MARKER = "DOC_TYPE_MAP"
 _PERSIST_BATCH = 5000
 
 
-def _raw(row: SourcePublicationForCorrection, field: str, current: object) -> object:
-    """Valeur brute reconstruite d'un champ : `raw_metadata->'<field>'->>'raw'` si la
-    SP a été corrigée sur ce champ, sinon la valeur courante de la colonne."""
-    entry = row.raw_metadata.get(field)
-    if isinstance(entry, dict) and "raw" in entry:
-        return entry["raw"]
-    return current
-
-
-def _raw_view(row: SourcePublicationForCorrection) -> SourcePublicationWithJournalView:
-    """Vue à valeurs **brutes** pour les champs corrigeables (les autres tels quels),
-    enrichie des champs joints de `journals`. C'est l'input de `effective_metadata`."""
+def _view_from_row(row: SourcePublicationForCorrection) -> SourcePublicationWithJournalView:
+    """Adapte la projection `SourcePublicationForCorrection` en `SourcePublicationWithJournalView`,
+    aux valeurs **courantes** des colonnes (potentiellement déjà corrigées). `hydrate_raw_view`
+    reconstruit ensuite le brut source à partir de `raw_metadata`."""
     return SourcePublicationWithJournalView(
         id=row.id,
         source=row.source,
         source_id=row.source_id,
         title=row.title,
         pub_year=row.pub_year,
-        doc_type=_raw(row, "doc_type", row.doc_type),  # type: ignore[arg-type]
+        doc_type=row.doc_type,
         doi=row.doi,
-        journal_id=_raw(row, "journal_id", row.journal_id),  # type: ignore[arg-type]
+        journal_id=row.journal_id,
         container_title=row.container_title,
         language=row.language,
-        oa_status=_raw(row, "oa_status", row.oa_status),  # type: ignore[arg-type]
+        oa_status=row.oa_status,
         is_retracted=None,
         abstract=None,
         countries=(),
@@ -98,7 +91,7 @@ def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | No
 
     Pure : ne fait pas d'I/O. Préserve les clés de `raw_metadata` hors `_UNARY_FIELDS`
     (la sous-étape relationnelle gère `doi`)."""
-    raw = _raw_view(row)
+    raw = hydrate_raw_view(_view_from_row(row), row.raw_metadata)
 
     # doc_type : mapping d'abord (None laissé tel quel — pas de représentation à traduire),
     # puis correction sur la valeur canonique.
@@ -121,19 +114,13 @@ def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | No
     raw_metadata = {k: v for k, v in row.raw_metadata.items() if k not in _UNARY_FIELDS}
 
     if doc_type_by is not None:
-        raw_metadata["doc_type"] = {"raw": raw_doc_type, "corrected_by": doc_type_by}
+        raw_metadata["doc_type"] = stash_entry(raw_doc_type, doc_type_by)
     if corrected.journal_id is not None and corrected.journal_id.value != raw.journal_id:
         new_journal_id = corrected.journal_id.value
-        raw_metadata["journal_id"] = {
-            "raw": raw.journal_id,
-            "corrected_by": corrected.journal_id.rule.value,
-        }
+        raw_metadata["journal_id"] = stash_entry(raw.journal_id, corrected.journal_id.rule.value)
     if corrected.oa_status is not None and corrected.oa_status.value != raw.oa_status:
         new_oa_status = corrected.oa_status.value
-        raw_metadata["oa_status"] = {
-            "raw": raw.oa_status,
-            "corrected_by": corrected.oa_status.rule.value,
-        }
+        raw_metadata["oa_status"] = stash_entry(raw.oa_status, corrected.oa_status.rule.value)
 
     if (
         new_doc_type == row.doc_type
@@ -143,6 +130,20 @@ def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | No
     ):
         return None
     return CorrectionUpdate(row.id, new_doc_type, new_journal_id, new_oa_status, raw_metadata)
+
+
+def correct_for_journal(
+    conn: Connection, queries: MetadataCorrectionQueries, journal_id: int
+) -> int:
+    """Recompute+persiste les corrections unaires des `source_publications` d'un journal,
+    après un changement de son `journal_type` (hook admin). Retourne le nombre de SP corrigées.
+
+    À enchaîner avec `refresh_from_sources` des publications du journal côté caller : la
+    colonne SP rafraîchie ici est ce que le refresh (et plus tard le matcher) liront —
+    sans ce recompute, `refresh_from_sources` repartirait de la correction périmée."""
+    rows = queries.fetch_for_unary_correction_by_journal(conn, journal_id)
+    updates = [u for row in rows if (u := compute_update(row)) is not None]
+    return queries.persist_corrections(conn, updates)
 
 
 def run(
