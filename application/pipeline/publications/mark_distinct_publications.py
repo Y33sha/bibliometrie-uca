@@ -28,7 +28,6 @@ def run_mark_distinct(
     *,
     pub_repo: PublicationRepository,
     dry_run: bool = False,
-    commit: bool = True,
 ) -> int:
     """Marque les paires distinctes parmi les publications partageant un DOI.
 
@@ -57,7 +56,7 @@ def run_mark_distinct(
                 marked += 1
                 logger.info("  distinct (%s) : %d ⇔ %d", case.value, a.id, b.id)
 
-    if commit and not dry_run:
+    if not dry_run:
         conn.commit()
     logger.info(
         "Terminé : %d paire(s) marquée(s) distinctes%s",
