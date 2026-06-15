@@ -388,7 +388,7 @@ class TestRun:
     def test_no_docs_no_stale_only_logs(self, patched_process, logger):
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = []
+        queries.fetch_orphan_source_publications.return_value = []
         queries.fetch_stale_publication_ids.return_value = []
         repo = MagicMock()
 
@@ -403,7 +403,7 @@ class TestRun:
         """`process_document` retourne created/linked/skipped → tous les compteurs s'incrémentent sans crasher."""
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = [
+        queries.fetch_orphan_source_publications.return_value = [
             _make_doc(id=10),
             _make_doc(id=11),
             _make_doc(id=12),
@@ -426,7 +426,7 @@ class TestRun:
     def test_dry_run_rollbacks_at_end(self, patched_process, logger):
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = [_make_doc(id=10)]
+        queries.fetch_orphan_source_publications.return_value = [_make_doc(id=10)]
         queries.fetch_stale_publication_ids.return_value = []
         repo = MagicMock()
 
@@ -441,7 +441,7 @@ class TestRun:
     def test_stale_publications_refreshed(self, patched_process, logger):
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = []
+        queries.fetch_orphan_source_publications.return_value = []
         queries.fetch_stale_publication_ids.return_value = [100, 200, 300]
         repo = MagicMock()
 
@@ -451,23 +451,23 @@ class TestRun:
         assert conn.committed is True
 
     def test_stale_intermediate_commit_every_500(self, patched_process, logger):
-        """Passe 2 : commit intermédiaire tous les 500 refresh (hors dry-run)."""
+        """Refresh : commit intermédiaire tous les 500 (hors dry-run)."""
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = []
+        queries.fetch_orphan_source_publications.return_value = []
         queries.fetch_stale_publication_ids.return_value = list(range(1, 1001))
         repo = MagicMock()
 
         run(conn, queries, logger, pub_repo=repo)
 
-        # Phase A end (1) + Phase B 4 steps (4) + stale intermediate à 500/1000 (2) + final (1) → 8.
-        assert conn.commit_count == 8
+        # Assignation end (1) + refresh intermediate à 500/1000 (2) + final (1) → 4.
+        assert conn.commit_count == 4
 
     def test_intermediate_commit_every_500_docs(self, patched_process, logger):
-        """Tous les 500 docs traités en Phase A, un commit intermédiaire est lancé (hors dry-run)."""
+        """Tous les 500 orphelins assignés, un commit intermédiaire est lancé (hors dry-run)."""
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = [
+        queries.fetch_orphan_source_publications.return_value = [
             _make_doc(id=i) for i in range(1, 1001)
         ]
         queries.fetch_stale_publication_ids.return_value = []
@@ -475,19 +475,19 @@ class TestRun:
 
         run(conn, queries, logger, pub_repo=repo)
 
-        # Phase A intermediate à 500/1000 (2) + Phase A end (1) + Phase B 4 steps (4) + final (1) → 8.
-        assert conn.commit_count == 8
+        # Assignation intermediate à 500/1000 (2) + assignation end (1) + final (1) → 4.
+        assert conn.commit_count == 4
 
     def test_refresh_exception_rollbacks_and_reraises(self, patched_process, logger):
-        """Une exception dans `refresh_from_sources` (passe 2) → rollback + re-raise.
+        """Une exception dans `refresh_from_sources` → rollback + re-raise.
 
-        Les commits des Phases A et B ont déjà persisté en amont — `committed`
+        Le commit de fin d'assignation a déjà persisté en amont — `committed`
         est True ; `rolled_back` couvre la transaction en cours au moment
         de l'exception.
         """
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.return_value = []
+        queries.fetch_orphan_source_publications.return_value = []
         queries.fetch_stale_publication_ids.return_value = [10, 20, 30]
         repo = MagicMock()
         patched_process["refresh_raises_on_id"] = 20
@@ -496,14 +496,14 @@ class TestRun:
             run(conn, queries, logger, pub_repo=repo)
 
         assert conn.rolled_back is True
-        # Phase A end (1) + Phase B 4 steps (4) = 5 commits avant que la passe 2 (stale) plante.
-        assert conn.commit_count == 5
+        # Assignation end (1) = seul commit avant que le refresh plante.
+        assert conn.commit_count == 1
 
     def test_top_level_exception_rollbacks_and_reraises(self, patched_process, logger):
-        """Exception venant de `fetch_orphan_in_perimeter_source_publications` → rollback + re-raise."""
+        """Exception venant de `fetch_orphan_source_publications` → rollback + re-raise."""
         conn = _FakeConn()
         queries = MagicMock()
-        queries.fetch_orphan_in_perimeter_source_publications.side_effect = RuntimeError("boom")
+        queries.fetch_orphan_source_publications.side_effect = RuntimeError("boom")
         repo = MagicMock()
 
         with pytest.raises(RuntimeError, match="boom"):

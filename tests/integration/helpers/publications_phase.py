@@ -54,9 +54,9 @@ def create_all_publications(conn: Connection):
     (`ART`, `journal-article`…) jusqu'à l'enum canonique → écriture invalide.
 
     Ces tests ne jouent pas la phase affiliations : aucun `source_authorship`
-    n'est in_perimeter, or la phase A ne traite que les orphelins avec ≥1
-    authorship in_perimeter. On sème donc le périmètre à la main
-    (`in_perimeter = TRUE`) — équivalent de ce que pose la phase affiliations
+    n'est in_perimeter, or l'assignation ne *crée* une publication que pour un
+    orphelin in_perimeter (gate `allow_create`). On sème donc le périmètre à la
+    main (`in_perimeter = TRUE`) — équivalent de ce que pose la phase affiliations
     en prod.
     """
     conn.execute(text("UPDATE source_authorships SET in_perimeter = TRUE"))
@@ -65,7 +65,7 @@ def create_all_publications(conn: Connection):
 
     queries = PgPublicationsMatchOrCreateQueries()
     repo = publication_repository(conn)
-    for doc in queries.fetch_orphan_in_perimeter_source_publications(conn):
+    for doc in queries.fetch_orphan_source_publications(conn):
         process_document(conn, queries, doc, dry_run=False, pub_repo=repo)
 
 

@@ -241,10 +241,12 @@ def phase_refresh_stale(sources: Any = None, **kw: Any) -> PhaseMetrics:
 def phase_normalize(**kw: Any) -> Any:
     """Normalisation staging -> tables sources.
 
-    Rattache aux publications existantes (DOI/NNT/HAL-ID) sans en creer.
-    Stocke les metadonnees (abstract, keywords, topics, biblio, etc.) sur
-    source_publications. Vide le raw_data du staging apres traitement.
-    Pour HAL : enrichit les structures et extrait ORCID/IdRef depuis le TEI.
+    Écrit les `source_publications` avec `publication_id = NULL` (aucun
+    rattachement ici : l'assignation aux publications canoniques est faite plus
+    tard par la phase `publications`). Stocke les metadonnees (abstract, keywords,
+    topics, biblio, etc.) sur source_publications. Vide le raw_data du staging
+    apres traitement. Pour HAL : enrichit les structures et extrait ORCID/IdRef
+    depuis le TEI.
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
     # Ordre d'exécution : source la plus autoritative en premier
