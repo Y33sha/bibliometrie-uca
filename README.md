@@ -126,7 +126,7 @@ Pour régénérer le seed depuis une base existante :
 
 ```bash
 # Avec uv (recommandé)
-uv sync
+uv sync --extra dev
 
 # Ou avec pip
 pip install ".[dev]"   # runtime + dev tools (pytest, ruff, mypy, …)
