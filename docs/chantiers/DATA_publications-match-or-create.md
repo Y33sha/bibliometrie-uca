@@ -34,11 +34,19 @@ La phase `normalize` ne rattache **pas** les `source_publications` aux publicati
 - **Idempotence et recompute.** Au re-normalize (cas courant), le normalizer réécrit le **brut** dans la colonne à chaque run ; la correction repart donc toujours du brut frais — idempotence gratuite, pas de double-correction. Le seul chemin sans refetch est l'**édition admin** d'un input éditable (essentiellement `journal_type`) : il faut alors réhydrater le brut depuis `raw_metadata`, réappliquer les règles courantes, re-stasher. Les hooks admin (`update_journal` changeant le `journal_type`, `merge_journals`) doivent donc : (a) recalculer en place les corrections des `source_publications` du journal (réhydrate → réapplique), puis (b) `refresh_from_sources` sur les publications affectées. Obligation bornée mais à câbler explicitement.
 - **Règles de non-fusion ⇒ règles de correction.** Les cas de `distinct_publications` (ouvrage/chapitre au même DOI, deux chapitres de titres différents au même DOI, thèse/mémoire vs article partageant une clé) deviennent des corrections : nuller la clé erronée sur le bon côté. `domain/publications/distinct_publications.py` est supprimé et absorbé comme cas particulier de `domain/publications/correction.py`. La table `distinct_publications` et sa passe `mark_distinct` disparaissent du pipeline.
 - **Retour à match_or_create.** Le matching ex ante `source_publication` → `publication` est rétabli (cascade par identifiant, puis par métadonnées), avec **gate périmètre en branche no-match** : une source qui matche s'attache quel que soit son périmètre (résolution cross-source d'une source UCA mal renseignée) ; une source qui ne matche rien n'est promue en publication **que** si elle est in-périmètre. Le treadmill et la purge de masse disparaissent.
+- **Bascule par revert git, pas réécriture.** Le cluster de la bascule create-all est contigu et auto-contenu (3 commits : `3abeb8ee` → `513046e1` → `feba6e4e`) ; rien de postérieur n'a dérivé son cœur. L'orchestration match_or_create (cascade, gate, ports, tests d'intégration) se **restaure par `git revert`**, surface de conflit limitée à deux fichiers retouchés depuis (`infrastructure/repositories/publication_repository.py`, `application/publications.py`). Le code reverté n'est couplé ni à `v_active_publications` (supprimée) ni à `publications.in_perimeter` (sa requête d'orphelins calcule le périmètre en ligne sur `source_authorships`). L'état post-revert est **transitionnel** — il ramène les gardes négatives (`resolve_doi_conflict`), la passe B bulk aveugle et le match-à-la-création — et ne doit pas tourner en prod avant sa conversion en corrections (Phases 1-2).
 - **Fusion réparatrice en aval, conservée.** La fusion publication↔publication reste, dans son rôle de **réparation** (cas résiduel : une nouvelle source ponte deux clusters jusque-là séparés via deux identifiants distincts ; données nouvelles révélant un doublon). Même prédicat que l'assignation, second site de lecture.
 - **Retour de `UNIQUE (lower(doi))`.** Une fois les DOI erronés nullés par correction, l'invariant « 1 DOI ⇔ 1 document » est rétabli au niveau schéma. La modélisation des DOI secondaires (`external_ids.related_dois`, jamais clé de fusion) est conservée telle quelle.
 - **Forme cible de l'abstraction (orientation, à affiner empiriquement).** Un seul primitif partagé par les deux sites : une **projection** domaine `entité corrigée → ensemble de clés typées`, et — pour le pilier métadonnées — un triplet `(clé de blocage, prefetch des entrées du prédicat, prédicat de confirmation)` déclaré une fois et consommé en deux modes (lookup ex ante, group-by ex post). L'égalité d'identifiant est le cas dégénéré (prefetch vide, confirmation vraie). Aucune logique métier propre à un site. Détail à construire au fil de l'étoffement de la famille de règles métadonnées, pas figé d'avance.
 
 ## Phasage
+
+Les phases 1→3 transforment le scaffold restauré en Phase 0, elles ne construisent pas ex nihilo.
+
+### Phase 0 — Revert : restaurer le scaffold match_or_create
+- [ ] `git revert feba6e4e 513046e1 3abeb8ee` (ordre chronologique inverse) ; résoudre les conflits sur `infrastructure/repositories/publication_repository.py` et `application/publications.py` (les seuls fichiers du cluster retouchés depuis la bascule).
+- [ ] Vérifier la suite verte (les tests d'intégration d'avant-bascule reviennent avec le revert).
+- État obtenu **transitionnel** : il ramène `resolve_doi_conflict`, la passe B bulk aveugle et le match-à-la-création. Ne pas lancer en prod avant Phases 1-2. La suite du chantier le transforme.
 
 ### Phase 1 — Schéma : corrections persistées + UNIQUE DOI
 - [ ] Migration : colonne `raw_metadata` JSONB sur `source_publications` ; la correction écrit l'effective en place dans les colonnes (`doc_type`, `journal_id`, `oa_status`, `doi`) et stashe le brut écrasé dans `raw_metadata` (`{"<champ>": {"raw": …, "by": …}}`), en phase `normalize`.
@@ -46,18 +54,18 @@ La phase `normalize` ne rattache **pas** les `source_publications` aux publicati
 - [ ] Rediriger les hooks admin (`update_journal` changeant le `journal_type`, `merge_journals`) : recompute en place des corrections des `source_publications` du journal (réhydrate le brut depuis `raw_metadata` → réapplique), puis `refresh_from_sources` des publications affectées.
 - [ ] Rétablir `UNIQUE (lower(doi))` (migration + `tables.py`), **après** que la passe de correction a nullé les DOI erronés du stock.
 
-### Phase 2 — Règles de non-fusion ⇒ corrections
+### Phase 2 — Non-fusion ⇒ corrections ; retrait des gardes négatives
 - [ ] Transformer chaque cas de `distinct_publications` en correction de DOI/clé : ouvrage/chapitre (le chapitre perd le DOI de l'ouvrage), deux chapitres de titres différents au même DOI (les deux perdent le DOI), thèse/mémoire vs article (le côté à corriger, cf. Questions ouvertes).
 - [ ] Supprimer `domain/publications/distinct_publications.py` ; loger les cas dans `domain/publications/correction.py`.
-- [ ] Retirer du pipeline la passe `mark_distinct_publications`, la table `distinct_publications` et les gardes `are_distinct` / `DistinctDoiError` rendues sans objet.
+- [ ] Retirer la passe `mark_distinct_publications`, la table `distinct_publications` et les gardes `are_distinct` / `DistinctDoiError`, rendues sans objet.
+- [ ] Retirer du matcher reverté `resolve_doi_conflict` et la **passe B bulk aveugle** : remplacés par le matching uniforme sur valeurs corrigées (les fusions abusives sont désormais évitées par correction a priori, plus par garde).
 
-### Phase 3 — Retour à match_or_create
-- [ ] Matching ex ante `source_publication` → `publication` sur valeurs corrigées : cascade par identifiant puis par métadonnées, attache si match.
-- [ ] Gate périmètre en branche no-match (création seulement si in-périmètre).
-- [ ] Fusion réparatrice en aval conservée, partageant la projection / le prédicat de confirmation avec l'assignation (zéro logique dupliquée entre les deux sites).
-- [ ] Retrait du modèle création⇒fusion : `create_publications` (création inconditionnelle), purge des orphelines + `VACUUM` du treadmill.
-- [ ] Suppression du flag `in_perimeter` des publications.
-- [ ] Corriger les docstrings obsolètes (`normalize`, `create_publications`).
+### Phase 3 — Matcher positif pur sur valeurs corrigées + unification
+- [ ] Pointer la cascade ex ante sur les colonnes **corrigées** (effective), `doc_type` corrigé inclus pour le routage de la dédup métadonnées.
+- [ ] Conserver le gate périmètre en branche no-match (restauré en Phase 0 ; à garder tel quel).
+- [ ] Fusion réparatrice en aval partageant la projection / le prédicat de confirmation avec l'assignation — zéro logique métier propre à un site.
+- [ ] Réévaluer le flag `publications.in_perimeter` : avec le gate, toute publication a ≥1 source in-périmètre, le flag devient constant ; à supprimer si les consommateurs perf (matviews) s'en passent.
+- [ ] Corriger les docstrings obsolètes (`normalize`, et l'en-tête hérité du revert).
 
 ### Phase 4 — Migration / rerun
 - [ ] Rerun complet du stock après bascule ; mesure du nouveau coût de la phase publications.
