@@ -1,61 +1,36 @@
 """Helper de tests : exécute la vraie phase « publications » du pipeline.
 
 Partagé par les tests d'idempotence et de re-traitement, qui ont besoin de
-créer **puis dédupliquer** les publications de leurs source_publications
-orphelins via les vraies passes (modèle création⇒fusion), sans réimplémenter
-l'orchestration.
+créer/rattacher les publications de leurs source_publications orphelins sans
+réimplémenter la cascade de matching.
 """
 
-import logging
+from sqlalchemy import Connection, text
 
-from sqlalchemy import Connection
-
-from application.pipeline.publications import (
-    mark_distinct_publications,
-    match_or_create_publications,
-    merge_pubs_by_doi,
-    merge_pubs_by_hal_id,
-    merge_pubs_by_metadata,
-    merge_pubs_by_nnt,
-    merge_pubs_by_pmid,
-)
-from infrastructure.queries.pipeline.distinct_publications import PgDistinctPublicationsQueries
-from infrastructure.queries.pipeline.merge import PgMergeQueries
-from infrastructure.queries.pipeline.metadata_merge import PgMetadataMergeQueries
+from application.pipeline.publications.match_or_create_publications import process_document
 from infrastructure.queries.pipeline.publications_match_or_create import (
     PgPublicationsMatchOrCreateQueries,
 )
 from infrastructure.repositories import publication_repository
 
-_logger = logging.getLogger("test_publications_phase")
 
+def create_all_publications(conn: Connection):
+    """Crée/rattache les publications des source_publications orphelins via la
+    vraie phase A du pipeline (`process_document` par orphelin), pas une cascade
+    réimplémentée.
 
-def create_all_publications(conn: Connection) -> None:
-    """Rejoue la phase publications de prod (création⇒fusion) sur les orphelins :
-    une publication par `source_publication`, puis marquage des distinctes et
-    passes de fusion (identifiants puis métadonnées).
-
-    `commit=False` partout : la fixture `sa_sync_conn` rollback la transaction
-    au téardown, on ne doit donc rien committer.
+    Ces tests ne jouent pas la phase affiliations : aucun `source_authorship`
+    n'est in_perimeter, or la phase A ne traite que les orphelins avec ≥1
+    authorship in_perimeter. On sème donc le périmètre à la main
+    (`in_perimeter = TRUE`) — équivalent de ce que pose la phase affiliations
+    en prod.
     """
-    repo = publication_repository(conn)
-    mc_queries = PgPublicationsMatchOrCreateQueries()
-    for doc in mc_queries.fetch_orphan_source_publications(conn):
-        match_or_create_publications.process_document(
-            conn, mc_queries, doc, dry_run=False, pub_repo=repo
-        )
+    conn.execute(text("UPDATE source_authorships SET in_perimeter = TRUE"))
 
-    merge_queries = PgMergeQueries()
-    mark_distinct_publications.run_mark_distinct(
-        conn, PgDistinctPublicationsQueries(), _logger, pub_repo=repo, commit=False
-    )
-    merge_pubs_by_hal_id.run_merge(conn, merge_queries, _logger, pub_repo=repo, commit=False)
-    merge_pubs_by_nnt.run_merge(conn, merge_queries, _logger, pub_repo=repo, commit=False)
-    merge_pubs_by_doi.run_merge(conn, merge_queries, _logger, pub_repo=repo, commit=False)
-    merge_pubs_by_pmid.run_merge(conn, merge_queries, _logger, pub_repo=repo, commit=False)
-    merge_pubs_by_metadata.run_merge(
-        conn, PgMetadataMergeQueries(), _logger, pub_repo=repo, commit=False
-    )
+    queries = PgPublicationsMatchOrCreateQueries()
+    repo = publication_repository(conn)
+    for doc in queries.fetch_orphan_in_perimeter_source_publications(conn):
+        process_document(conn, queries, doc, dry_run=False, pub_repo=repo)
 
 
 __all__ = ["create_all_publications"]
