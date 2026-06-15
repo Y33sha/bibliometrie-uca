@@ -53,6 +53,27 @@ class CorrectionUpdate(NamedTuple):
     raw_metadata: dict[str, JsonValue]
 
 
+class DoiClusterRow(NamedTuple):
+    """Une SP `book`/`book_chapter` candidate à la correction relationnelle de DOI.
+
+    `raw_doi` est le DOI **source reconstruit** (`raw_metadata.doi.raw` ou colonne `doi`),
+    en minuscules — clé de regroupement par DOI."""
+
+    id: int
+    doc_type: str | None
+    doi: str | None
+    raw_metadata: dict[str, JsonValue]
+    raw_doi: str
+
+
+class DoiCorrectionUpdate(NamedTuple):
+    """Une mise à jour de correction de DOI : colonne `doi` (nullée ou restaurée) + sidecar."""
+
+    id: int
+    doi: str | None
+    raw_metadata: dict[str, JsonValue]
+
+
 class MetadataCorrectionQueries(Protocol):
     """Opérations SQL de la phase `metadata_correction`."""
 
@@ -77,5 +98,16 @@ class MetadataCorrectionQueries(Protocol):
     def persist_corrections(self, conn: Connection, updates: list[CorrectionUpdate]) -> int:
         """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`
         (pour que le refresh stale aval ré-agrège la publication). Retourne le
+        nombre de lignes mises à jour."""
+        ...
+
+    def fetch_doi_cluster_candidates(self, conn: Connection) -> list[DoiClusterRow]:
+        """Les SP `book`/`book_chapter` ayant un DOI (brut reconstruit), pour la correction
+        relationnelle group-by-DOI. Inclut les SP déjà corrigées (`raw_metadata.doi`) pour
+        la ré-évaluation auto-cicatrisante."""
+        ...
+
+    def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
+        """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`. Retourne le
         nombre de lignes mises à jour."""
         ...

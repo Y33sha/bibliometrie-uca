@@ -290,3 +290,53 @@ def effective_metadata(sp: SourcePublicationWithJournalView) -> CorrectedFields:
     Cascade dans l'ordre des dépendances (`journal_id` → `doc_type` → `oa_status`) ; seul `doc_type` porte des règles à ce stade.
     """
     return CorrectedFields(doc_type=_correct_field(sp, "doc_type"))
+
+
+# ── Corrections relationnelles : conflits de clé partagée ────────────────
+#
+# Les corrections unaires ci-dessus décident d'un record seul. Certaines corrections
+# demandent au contraire de regarder le **groupe de source_publications partageant une
+# clé** (DOI, hal_id, nnt, … ; à terme une clé de métadonnées) : quand ce groupe réunit
+# des œuvres en réalité distinctes, la clé partagée est erronée et doit être nullée sur le
+# ou les mauvais côtés — sinon le matching les fusionnerait à tort. La détection est
+# **agnostique de la clé** (elle raisonne sur les `doc_type` du groupe) ; le caller
+# applicatif regroupe par une clé donnée et persiste le nullage de CETTE clé.
+
+
+class DistinctMergeCase(StrEnum):
+    """Cas où des SP partageant une clé sont en réalité des œuvres distinctes. Inscrit dans
+    `raw_metadata.<clé>.corrected_by` au nullage."""
+
+    # Ouvrage et chapitre partageant une clé : la clé appartient à l'ouvrage (`book`), le
+    # chapitre (`book_chapter`) la porte par erreur → le chapitre la perd.
+    OUVRAGE_VS_CHAPITRE = "OUVRAGE_VS_CHAPITRE"
+
+
+class KeyGroupMember(NamedTuple):
+    """Un membre d'un groupe de SP partageant une clé : son id et son `doc_type` **canonique**
+    (corrigé par la passe unaire)."""
+
+    id: int
+    doc_type: str | None
+
+
+def detect_erroneous_key_holders(
+    group: list[KeyGroupMember],
+) -> list[tuple[int, DistinctMergeCase]]:
+    """Pour un groupe de SP partageant une clé (quelle qu'elle soit), renvoie les `(sp_id, cas)`
+    qui la portent **par erreur** (à nuller). Pur, déterministe, sans effet de bord, et
+    indépendant du type de clé — c'est le caller qui sait par quelle clé le groupe est formé.
+
+    Ouvrage + chapitre dans le même groupe : les `book_chapter` perdent la clé (qui est celle
+    de l'ouvrage). Un groupe sans motif connu renvoie `[]` (clé conservée partout).
+
+    Cas différés (cf. fiche chantier) : chapitre/chapitre au même DOI (comparaison de titre
+    floue) et thèse/article (souvent un mistype → correction de `doc_type`, pas un nullage)."""
+    types = {m.doc_type for m in group}
+    if "book" in types and "book_chapter" in types:
+        return [
+            (m.id, DistinctMergeCase.OUVRAGE_VS_CHAPITRE)
+            for m in group
+            if m.doc_type == "book_chapter"
+        ]
+    return []

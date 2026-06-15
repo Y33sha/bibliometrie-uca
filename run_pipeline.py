@@ -431,10 +431,12 @@ def phase_metadata_correction(**kw: Any) -> Any:
 
     Tourne après `publishers_journals` (journaux typés, donc les règles
     journal-dépendantes ont leurs entrées fraîches) et avant `publications`
-    (le matching lit les colonnes corrigées). Sous-étape unaire (per-record)
-    aujourd'hui ; la sous-étape relationnelle (group-by-DOI) viendra s'ajouter.
+    (le matching lit les colonnes corrigées). Deux sous-étapes : unaire
+    (per-record : mapping + règles de correction) puis cluster (group-by-clé :
+    nullage des clés erronées, ouvrage/chapitre au même DOI).
     """
     _run_correct_metadata_unary()
+    _run_correct_by_cluster()
 
 
 def phase_publications(**kw: Any) -> Any:
@@ -574,7 +576,22 @@ def _run_correct_metadata_unary() -> None:
         run(conn, PgMetadataCorrectionQueries(), log)
     finally:
         conn.close()
-    log.info("✓ metadata_correction terminé en %.1fs", time.time() - t0)
+    log.info("✓ metadata_correction (unaire) terminé en %.1fs", time.time() - t0)
+
+
+def _run_correct_by_cluster() -> None:
+    from application.pipeline.metadata_correction.correct_by_cluster import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
+
+    log.info("▶ metadata_correction (cluster)")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run(conn, PgMetadataCorrectionQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ metadata_correction (cluster) terminé en %.1fs", time.time() - t0)
 
 
 def _run_match_or_create_publications() -> None:
