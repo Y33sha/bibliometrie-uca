@@ -6,9 +6,19 @@ par les phases `oa_status` (Unpaywall) et `publishers_journals`
 """
 
 from datetime import datetime
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
+
+
+class JournalIssnRow(NamedTuple):
+    """Un journal indexable par ISSN à l'import du dump DOAJ : son `id` et ses
+    trois formes d'ISSN (au moins une non-nulle)."""
+
+    id: int
+    issn: str | None
+    eissn: str | None
+    issnl: str | None
 
 
 class EnrichQueries(Protocol):
@@ -34,11 +44,9 @@ class EnrichQueries(Protocol):
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, int]]: ...
 
-    def fetch_journal_issn_index(
-        self, conn: Connection
-    ) -> list[tuple[int, str | None, str | None, str | None]]:
-        """Rows `(id, issn, eissn, issnl)` de tous les journaux ayant au moins un
-        ISSN — pour indexer ISSN → journal_id à l'import du dump DOAJ."""
+    def fetch_journal_issn_index(self, conn: Connection) -> list[JournalIssnRow]:
+        """`JournalIssnRow` de tous les journaux ayant au moins un ISSN — pour
+        indexer ISSN → journal_id à l'import du dump DOAJ."""
         ...
 
     def reset_is_in_doaj(self, conn: Connection) -> int:
