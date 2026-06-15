@@ -25,6 +25,21 @@ class ConfirmationKeys:
     pmid: str | None
     hal_ids: tuple[str, ...]
 
+    def tokens(self) -> frozenset[tuple[str, str]]:
+        """Jeu de tokens `(type, valeur)` portés par la SP, pour le clustering.
+
+        Chaque token est namespacé par son type d'identifiant : un DOI `x` et un NNT `x` ne s'apparentent pas. Deux `source_publications` partageant un token sont reliées dans le graphe de composantes (cf. `connected_components`). Une clé absente ne produit pas de token.
+        """
+        toks: set[tuple[str, str]] = set()
+        if self.doi:
+            toks.add(("doi", self.doi))
+        if self.nnt:
+            toks.add(("nnt", self.nnt))
+        if self.pmid:
+            toks.add(("pmid", self.pmid))
+        toks.update(("hal_id", hal) for hal in self.hal_ids)
+        return frozenset(toks)
+
 
 def project_confirmation_keys(
     doi: str | None, external_ids: Mapping[str, object] | None
