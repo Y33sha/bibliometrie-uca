@@ -11,7 +11,6 @@ L'orchestrateur dépend du port `PublicationsMatchOrCreateQueries`. Le point d'e
 """
 
 import logging
-import time
 from typing import Literal
 
 from sqlalchemy import Connection
@@ -187,9 +186,13 @@ def run(
     dry_run: bool = False,
 ) -> None:
     try:
-        # ── Phase A : orphelins in_perimeter (création ou rattachement) ──
-        docs = queries.fetch_orphan_in_perimeter_source_publications(conn)
-        logger.info("Phase A : %d source_publications orphelins in_perimeter", len(docs))
+        # ── Assignation : tous les orphelins (match cross-source, ou création gatée périmètre) ──
+        # Un seul traitement per-row pour tous les orphelins, quel que soit le périmètre :
+        # le gate `allow_create = in_perimeter` empêche la création hors-périmètre, mais le
+        # rattachement à une publication existante reste permis (résolution des conflits
+        # inter-sources). La réconciliation des composantes (passe suivante) capte les ponts.
+        docs = queries.fetch_orphan_source_publications(conn)
+        logger.info("Assignation : %d source_publications orphelins", len(docs))
 
         counts: dict[Outcome, int] = {
             "created": 0,
@@ -206,62 +209,22 @@ def run(
             if (i + 1) % 500 == 0:
                 if not dry_run:
                     conn.commit()
-                logger.info("  Phase A : %d/%d traités...", i + 1, len(docs))
+                logger.info("  Assignation : %d/%d traités...", i + 1, len(docs))
 
         if not dry_run:
             conn.commit()
         logger.info(
-            "Phase A terminée : %d créées, %d rattachées, %d sans métadonnées",
+            "Assignation terminée : %d créées, %d rattachées, %d sans métadonnées, %d hors-périmètre",
             counts["created"],
             counts["linked"],
             counts["skipped_no_metadata"],
+            counts["skipped_no_perimeter"],
         )
 
-        # ── Phase B : rattachement set-based des orphelins hors-périmètre ──
-        # 3 UPDATEs SQL bulk (DOI / NNT / hal_id), exécutés séparément avec
-        # commit + log entre chaque pour granularité d'observabilité.
-        # Bénéficie des publications créées en Phase A. Pas de création
-        # (gated par in_perimeter).
-        if dry_run:
-            logger.info("Phase B (bulk link hors-périmètre) : skipped (dry-run)")
-        else:
-            logger.info("Phase B step 1/4 : rattachement par DOI...")
-            t0 = time.perf_counter()
-            n_doi = queries.bulk_link_orphans_by_doi(conn)
-            conn.commit()
-            logger.info("  → %d rattachées (%.1fs)", n_doi, time.perf_counter() - t0)
-
-            logger.info("Phase B step 2/4 : rattachement par NNT...")
-            t0 = time.perf_counter()
-            n_nnt = queries.bulk_link_orphans_by_nnt(conn)
-            conn.commit()
-            logger.info("  → %d rattachées (%.1fs)", n_nnt, time.perf_counter() - t0)
-
-            logger.info("Phase B step 3/4 : rattachement par hal_id...")
-            t0 = time.perf_counter()
-            n_hal_id = queries.bulk_link_orphans_by_hal_id(conn)
-            conn.commit()
-            logger.info("  → %d rattachées (%.1fs)", n_hal_id, time.perf_counter() - t0)
-
-            logger.info("Phase B step 4/4 : rattachement par PMID...")
-            t0 = time.perf_counter()
-            n_pmid = queries.bulk_link_orphans_by_pmid(conn)
-            conn.commit()
-            logger.info("  → %d rattachées (%.1fs)", n_pmid, time.perf_counter() - t0)
-
-            logger.info(
-                "Phase B terminée : %d rattachées (DOI=%d, NNT=%d, hal_id=%d, PMID=%d)",
-                n_doi + n_nnt + n_hal_id + n_pmid,
-                n_doi,
-                n_nnt,
-                n_hal_id,
-                n_pmid,
-            )
-
-        # ── Phase 2 : refresh des publications stale ──
+        # ── Refresh des publications stale ──
         # Au moins un source_publication modifié depuis le dernier refresh
         # canonique (couvre les re-traitements des normalizers + les nouveaux
-        # rattachements effectués en Phase A/B).
+        # rattachements effectués à l'assignation).
         stale_ids = queries.fetch_stale_publication_ids(conn)
         logger.info("%d publications stale à rafraîchir", len(stale_ids))
         refreshed = 0

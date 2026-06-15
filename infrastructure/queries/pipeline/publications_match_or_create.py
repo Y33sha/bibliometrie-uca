@@ -1,10 +1,9 @@
 """Query service : SQL de la phase `match_or_create_publications`.
 
-Appelé par `application/pipeline/publications/match_or_create_publications.py`. Trois SELECT / UPDATE :
+Appelé par `application/pipeline/publications/match_or_create_publications.py` :
 
-1. **Phase A — SELECT in_perimeter orphans** (`fetch_orphan_in_perimeter_source_publications`) : seuls les orphelins avec ≥1 source_authorship in_perimeter, traités via la cascade Python `decide_publication_match` qui peut créer ou rattacher.
-2. **Phase B — UPDATEs bulk hors-périmètre** (`bulk_link_remaining_orphans`) : 3 UPDATEs SQL set-based qui rattachent les orphelins restants par DOI, NNT, hal_id. Pas de création. Bénéficie naturellement des publications créées en Phase A.
-3. **SELECT publications stale** (`fetch_stale_publication_ids`) pour ré-agrégation des méta canoniques.
+1. **SELECT orphelins** (`fetch_orphan_source_publications`) : tous les orphelins (`publication_id IS NULL`) avec leur périmètre réel, traités un par un via la cascade Python `decide_publication_match` (match quel que soit le périmètre, création gatée `in_perimeter`).
+2. **SELECT publications stale** (`fetch_stale_publication_ids`) pour ré-agrégation des méta canoniques.
 
 L'attachement d'un `source_publications` à un `publications` (`link_source_publication_to_publication`) est un simple `UPDATE source_publications SET publication_id`.
 """
@@ -18,146 +17,26 @@ from application.ports.pipeline.publications_match_or_create import (
 from domain.persons.name_matching import parse_raw_author_name
 
 
-def fetch_orphan_in_perimeter_source_publications(
-    conn: Connection,
-) -> list[SourcePublicationRow]:
-    """Orphelins (`publication_id IS NULL`) avec ≥1 source_authorship in_perimeter.
+def fetch_orphan_source_publications(conn: Connection) -> list[SourcePublicationRow]:
+    """Tous les orphelins (`publication_id IS NULL`), périmètre réel calculé en ligne.
 
-    Périmètre de la Phase A : seuls candidats à la création d'une publication canonique. Les orphelins hors-périmètre (≈ 98 % du pool typiquement) ne sont pas remontés ici — ils seront traités en Phase B par `bulk_link_remaining_orphans`, qui ne fait que du rattachement set-based, beaucoup moins coûteux qu'une itération Python.
+    `in_perimeter` = TRUE ssi ≥1 `source_authorship` rattaché est in_perimeter ; il gate la création (`allow_create`), pas le rattachement. Traités un par un par la cascade `decide_publication_match`.
     """
     rows = conn.execute(
         text("""
             SELECT sd.id, sd.source::text AS source, sd.source_id, sd.doi, sd.title, sd.pub_year,
                    sd.doc_type::text AS doc_type, sd.journal_id, sd.oa_status::text AS oa_status,
                    sd.language, sd.container_title, sd.external_ids, sd.urls,
-                   TRUE AS in_perimeter
+                   EXISTS (
+                       SELECT 1 FROM source_authorships sa
+                       WHERE sa.source_publication_id = sd.id AND sa.in_perimeter = TRUE
+                   ) AS in_perimeter
             FROM source_publications sd
             WHERE sd.publication_id IS NULL
-              AND EXISTS (
-                  SELECT 1 FROM source_authorships sa
-                  WHERE sa.source_publication_id = sd.id AND sa.in_perimeter = TRUE
-              )
             ORDER BY sd.id
         """)
     ).all()
     return [SourcePublicationRow(**r._mapping) for r in rows]
-
-
-def bulk_link_orphans_by_doi(conn: Connection) -> int:
-    """Rattache les orphelins par DOI (exact match contre `publications.doi`).
-
-    Rapide grâce à `idx_source_pubs_doi` + index sur `publications.doi`.
-
-    Le DOI confronté est la colonne nue : la substitution Zenodo (concept au lieu de
-    la version) est déjà persistée par `metadata_correction`, donc concept + versions
-    portent le même DOI en colonne et rattachent à la même publication canonique.
-
-    Le bump de `sp.updated_at` est nécessaire pour que `fetch_stale_publication_ids` voie ces publications comme stale en Phase 2 et déclenche `refresh_from_sources` — sinon l'agrégation cross-source (oa_status, abstract, …) ne reflète jamais la SP nouvellement rattachée.
-    """
-    return conn.execute(
-        text("""
-            UPDATE source_publications sp
-            SET publication_id = p.id,
-                updated_at = now()
-            FROM publications p
-            WHERE sp.publication_id IS NULL
-              AND p.doi IS NOT NULL
-              AND sp.doi = p.doi
-        """)
-    ).rowcount
-
-
-def bulk_link_orphans_by_nnt(conn: Connection) -> int:
-    """Rattache les orphelins par NNT (stocké sur `source_publications.external_ids`).
-
-    CTE de lookup `(nnt, publication_id)` matérialisée d'abord, puis JOIN avec les orphans — évite un self-join 11M × 11M en JSONB extraction qui mettait >10 min.
-
-    Le bump de `sp.updated_at` est nécessaire pour que `fetch_stale_publication_ids` voie ces publications comme stale en Phase 2 et déclenche `refresh_from_sources` — sinon l'agrégation cross-source (oa_status, abstract, …) ne reflète jamais la SP nouvellement rattachée.
-    """
-    return conn.execute(
-        text("""
-            WITH nnt_lookup AS (
-                SELECT (external_ids->>'nnt') AS nnt,
-                       MIN(publication_id) AS publication_id
-                FROM source_publications
-                WHERE publication_id IS NOT NULL
-                  AND external_ids ? 'nnt'
-                GROUP BY (external_ids->>'nnt')
-            )
-            UPDATE source_publications sp
-            SET publication_id = nl.publication_id,
-                updated_at = now()
-            FROM nnt_lookup nl
-            WHERE sp.publication_id IS NULL
-              AND sp.external_ids ? 'nnt'
-              AND (sp.external_ids ->> 'nnt') = nl.nnt
-        """)
-    ).rowcount
-
-
-def bulk_link_orphans_by_hal_id(conn: Connection) -> int:
-    """Rattache les orphelins par hal_id (stocké sur `source_publications.external_ids`).
-
-    Symétrique avec `bulk_link_orphans_by_nnt` : la clé `hal_id` vit dans `external_ids` sur **toutes** les sources (HAL natif et cross-source) — le normalizer HAL pose `external_ids.hal_id = source_id` au moment de l'insertion.
-
-    Le bump de `sp.updated_at` est nécessaire pour que `fetch_stale_publication_ids` voie ces publications comme stale en Phase 2 et déclenche `refresh_from_sources` — sinon l'agrégation cross-source (oa_status, abstract, …) ne reflète jamais la SP nouvellement rattachée.
-    """
-    return conn.execute(
-        text("""
-            WITH hal_id_lookup AS (
-                SELECT h AS hal_id, MIN(publication_id) AS publication_id
-                FROM source_publications
-                CROSS JOIN LATERAL jsonb_array_elements_text(external_ids->'hal_id') AS h
-                WHERE publication_id IS NOT NULL
-                  AND jsonb_typeof(external_ids->'hal_id') = 'array'
-                GROUP BY h
-            ),
-            orphan_target AS (
-                -- Un orphelin peut porter plusieurs hal-ids : cible = MIN des
-                -- publications matchées (déterministe).
-                SELECT sp.id AS sp_id, MIN(hl.publication_id) AS publication_id
-                FROM source_publications sp
-                CROSS JOIN LATERAL jsonb_array_elements_text(sp.external_ids->'hal_id') AS sh
-                JOIN hal_id_lookup hl ON hl.hal_id = sh
-                WHERE sp.publication_id IS NULL
-                  AND jsonb_typeof(sp.external_ids->'hal_id') = 'array'
-                GROUP BY sp.id
-            )
-            UPDATE source_publications sp
-            SET publication_id = ot.publication_id,
-                updated_at = now()
-            FROM orphan_target ot
-            WHERE sp.id = ot.sp_id
-        """)
-    ).rowcount
-
-
-def bulk_link_orphans_by_pmid(conn: Connection) -> int:
-    """Rattache les orphelins par PMID (stocké sur `source_publications.external_ids`).
-
-    Symétrique avec `bulk_link_orphans_by_nnt`/`_by_hal_id` : un PMID identifie globalement un article PubMed (un PMID = un article), posé dans `external_ids` par les normalizers HAL/ScanR/OpenAlex.
-
-    Le bump de `sp.updated_at` est nécessaire pour que `fetch_stale_publication_ids` voie ces publications comme stale en Phase 2 et déclenche `refresh_from_sources`.
-    """
-    return conn.execute(
-        text("""
-            WITH pmid_lookup AS (
-                SELECT (external_ids->>'pmid') AS pmid,
-                       MIN(publication_id) AS publication_id
-                FROM source_publications
-                WHERE publication_id IS NOT NULL
-                  AND external_ids ? 'pmid'
-                GROUP BY (external_ids->>'pmid')
-            )
-            UPDATE source_publications sp
-            SET publication_id = pl.publication_id,
-                updated_at = now()
-            FROM pmid_lookup pl
-            WHERE sp.publication_id IS NULL
-              AND sp.external_ids ? 'pmid'
-              AND (sp.external_ids ->> 'pmid') = pl.pmid
-        """)
-    ).rowcount
 
 
 def fetch_thesis_primary_author(conn: Connection, publication_id: int) -> tuple[str, str] | None:
@@ -267,22 +146,8 @@ def fetch_max_source_authorship_count_per_publication(conn: Connection, publicat
 class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.publications_match_or_create.PublicationsMatchOrCreateQueries`."""
 
-    def fetch_orphan_in_perimeter_source_publications(
-        self, conn: Connection
-    ) -> list[SourcePublicationRow]:
-        return fetch_orphan_in_perimeter_source_publications(conn)
-
-    def bulk_link_orphans_by_doi(self, conn: Connection) -> int:
-        return bulk_link_orphans_by_doi(conn)
-
-    def bulk_link_orphans_by_nnt(self, conn: Connection) -> int:
-        return bulk_link_orphans_by_nnt(conn)
-
-    def bulk_link_orphans_by_hal_id(self, conn: Connection) -> int:
-        return bulk_link_orphans_by_hal_id(conn)
-
-    def bulk_link_orphans_by_pmid(self, conn: Connection) -> int:
-        return bulk_link_orphans_by_pmid(conn)
+    def fetch_orphan_source_publications(self, conn: Connection) -> list[SourcePublicationRow]:
+        return fetch_orphan_source_publications(conn)
 
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int

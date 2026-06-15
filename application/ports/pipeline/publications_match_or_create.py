@@ -33,30 +33,13 @@ class SourcePublicationRow(NamedTuple):
 class PublicationsMatchOrCreateQueries(Protocol):
     """Opérations SQL pour le rattachement (match ou création) des `source_publications` aux `publications` canoniques."""
 
-    def fetch_orphan_in_perimeter_source_publications(
-        self, conn: Connection
-    ) -> list[SourcePublicationRow]:
-        """Phase A : orphelins avec ≥1 source_authorship in_perimeter.
+    def fetch_orphan_source_publications(self, conn: Connection) -> list[SourcePublicationRow]:
+        """Tous les orphelins (`publication_id IS NULL`), avec leur périmètre réel.
 
-        Seuls candidats à la création d'une publication canonique. Traités
-        un par un via la cascade Python `decide_publication_match`.
+        Traités un par un via la cascade `decide_publication_match` : un orphelin
+        qui matche se rattache quel que soit son périmètre ; un orphelin sans match
+        n'est créé que si `in_perimeter` (gate `allow_create`).
         """
-
-    def bulk_link_orphans_by_doi(self, conn: Connection) -> int:
-        """Phase B step 1/4 : rattache les orphelins par DOI."""
-
-    def bulk_link_orphans_by_nnt(self, conn: Connection) -> int:
-        """Phase B step 2/4 : rattache les orphelins par NNT
-        (stocké sur `source_publications.external_ids`)."""
-
-    def bulk_link_orphans_by_hal_id(self, conn: Connection) -> int:
-        """Phase B step 3/4 : rattache les orphelins par hal_id
-        (deux donor paths : SP HAL native via `source_id`, OU SP
-        cross-source via `external_ids.hal_id`, liste)."""
-
-    def bulk_link_orphans_by_pmid(self, conn: Connection) -> int:
-        """Phase B step 4/4 : rattache les orphelins par PMID
-        (stocké sur `source_publications.external_ids`)."""
 
     def link_source_publication_to_publication(
         self, conn: Connection, source_publication_id: int, publication_id: int
