@@ -19,13 +19,15 @@ def _seed_journal(conn, journal_type: str) -> int:
     ).scalar_one()
 
 
-def _seed_sp(conn, *, source_id: str, doc_type: str | None, journal_id=None, urls=None) -> int:
+def _seed_sp(
+    conn, *, source_id: str, doc_type: str | None, source="openalex", journal_id=None, urls=None
+) -> int:
     return conn.execute(
         text(
             "INSERT INTO source_publications (source, source_id, title, doc_type, journal_id, urls) "
-            "VALUES ('openalex', :sid, 'Un titre', :dt, :jid, :urls) RETURNING id"
+            "VALUES (:src, :sid, 'Un titre', :dt, :jid, :urls) RETURNING id"
         ),
-        {"sid": source_id, "dt": doc_type, "jid": journal_id, "urls": urls},
+        {"src": source, "sid": source_id, "dt": doc_type, "jid": journal_id, "urls": urls},
     ).scalar_one()
 
 
@@ -57,15 +59,26 @@ def test_journal_media_and_theses_url_corrected_plain_untouched(sa_sync_conn):
 
     media_doc_type, media_raw = _state(conn, media_sp)
     assert media_doc_type == "media"
-    assert media_raw == {"doc_type": {"raw": "article", "by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}}
+    assert media_raw == {
+        "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+    }
 
     theses_doc_type, theses_raw = _state(conn, theses_sp)
     assert theses_doc_type == "thesis"
-    assert theses_raw == {"doc_type": {"raw": "article", "by": "THESES_FR_URL_TO_THESIS"}}
+    assert theses_raw == {"doc_type": {"raw": "article", "corrected_by": "THESES_FR_URL_TO_THESIS"}}
 
     plain_doc_type, plain_raw = _state(conn, plain_sp)
     assert plain_doc_type == "article"
     assert plain_raw == {}
+
+
+def test_hal_code_mapped_to_canonical(sa_sync_conn):
+    conn = sa_sync_conn
+    sp = _seed_sp(conn, source_id="hal-1", source="hal", doc_type="ART")
+    assert _apply(conn) == 1
+    doc_type, raw = _state(conn, sp)
+    assert doc_type == "article"  # ART → article par mapping
+    assert raw == {"doc_type": {"raw": "ART", "corrected_by": "DOC_TYPE_MAP"}}
 
 
 def test_reversibility_invariant(sa_sync_conn):
