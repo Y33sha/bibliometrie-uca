@@ -76,7 +76,7 @@ def merge_publications_by_key(
                 continue
 
             if pub_repo.are_distinct(target_id, source_id):
-                # Paire pré-marquée distincte (passe mark_distinct_publications) :
+                # Paire marquée distincte par l'admin (`distinct_publications`) :
                 # garde soft, on ne fusionne pas. Le merge admin manuel (via
                 # merge_publications direct) ne passe pas par cette garde.
                 logger.debug(f"  [SKIP distinct pré-marqué] {label}")
