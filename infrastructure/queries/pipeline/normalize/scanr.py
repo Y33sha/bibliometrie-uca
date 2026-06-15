@@ -67,6 +67,7 @@ def upsert_scanr_source_publication(
             cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
             biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
+            keys_dirty = true,
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(

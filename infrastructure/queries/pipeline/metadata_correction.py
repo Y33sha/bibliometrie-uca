@@ -75,13 +75,15 @@ def fetch_zenodo_concept_candidates(conn: Connection) -> list[ZenodoConceptRow]:
 
 
 def persist_doi_corrections(conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
-    """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`."""
+    """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`, marque
+    `keys_dirty` (le DOI est une clé de confirmation : mutation ⇒ réconciliation)."""
     if not updates:
         return 0
     stmt = text("""
         UPDATE source_publications
         SET doi = :doi,
             raw_metadata = :raw_metadata,
+            keys_dirty = true,
             updated_at = clock_timestamp()
         WHERE id = :id
     """).bindparams(bindparam("raw_metadata", type_=JSONB))
@@ -90,7 +92,8 @@ def persist_doi_corrections(conn: Connection, updates: list[DoiCorrectionUpdate]
 
 
 def persist_corrections(conn: Connection, updates: list[CorrectionUpdate]) -> int:
-    """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`."""
+    """UPDATE en lot des colonnes effectives + `raw_metadata`, bump `updated_at`, marque
+    `keys_dirty` (`doc_type`/`external_ids` sont des clés : mutation ⇒ réconciliation)."""
     if not updates:
         return 0
     stmt = text("""
@@ -100,6 +103,7 @@ def persist_corrections(conn: Connection, updates: list[CorrectionUpdate]) -> in
             oa_status = :oa_status,
             external_ids = :external_ids,
             raw_metadata = :raw_metadata,
+            keys_dirty = true,
             updated_at = clock_timestamp()
         WHERE id = :id
     """).bindparams(bindparam("external_ids", type_=JSONB), bindparam("raw_metadata", type_=JSONB))

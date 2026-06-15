@@ -63,6 +63,7 @@ def upsert_theses_source_publication(
             keywords = COALESCE(EXCLUDED.keywords, source_publications.keywords),
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             meta = COALESCE(EXCLUDED.meta, source_publications.meta),
+            keys_dirty = true,
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(

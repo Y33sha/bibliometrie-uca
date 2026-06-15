@@ -74,6 +74,7 @@ def upsert_hal_source_publication(
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
+            keys_dirty = true,
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
