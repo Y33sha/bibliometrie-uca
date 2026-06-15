@@ -57,11 +57,13 @@ class DoiClusterRow(NamedTuple):
     """Une SP `book`/`book_chapter` candidate à la correction relationnelle de DOI.
 
     `raw_doi` est le DOI **source reconstruit** (`raw_metadata.doi.raw` ou colonne `doi`),
-    en minuscules — clé de regroupement par DOI."""
+    en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison
+    chapitre/chapitre."""
 
     id: int
     doc_type: str | None
     doi: str | None
+    title_normalized: str | None
     raw_metadata: dict[str, JsonValue]
     raw_doi: str
 

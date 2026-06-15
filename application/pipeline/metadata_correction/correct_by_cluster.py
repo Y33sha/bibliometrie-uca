@@ -64,7 +64,9 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
     updates: list[DoiCorrectionUpdate] = []
     for members in groups.values():
         case_by_id = dict(
-            detect_erroneous_key_holders([KeyGroupMember(m.id, m.doc_type) for m in members])
+            detect_erroneous_key_holders(
+                [KeyGroupMember(m.id, m.doc_type, m.title_normalized) for m in members]
+            )
         )
         for m in members:
             if m.doc_type != "book_chapter":
