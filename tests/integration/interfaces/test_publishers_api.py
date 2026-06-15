@@ -324,6 +324,10 @@ class TestPublisherDashboard:
         j_proc = _seed_journal(pid)
         with _pool() as cur:
             cur.execute(
+                "UPDATE journals SET journal_type = 'journal' WHERE id = %s",
+                (j_journal,),
+            )
+            cur.execute(
                 "UPDATE journals SET journal_type = 'proceedings' WHERE id = %s",
                 (j_proc,),
             )
