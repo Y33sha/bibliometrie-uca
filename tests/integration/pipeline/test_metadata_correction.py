@@ -128,6 +128,38 @@ def test_self_heals_when_journal_no_longer_media(sa_sync_conn):
     assert raw == {}
 
 
+def test_thesis_with_journal_corrected_and_deconflated(sa_sync_conn):
+    conn = sa_sync_conn
+    jid = _seed_journal(conn, "journal")
+    sp = conn.execute(
+        text(
+            "INSERT INTO source_publications "
+            "(source, source_id, title, doc_type, journal_id, external_ids) "
+            "VALUES ('openalex', 'W-conflation', 'T', 'thesis', :jid, "
+            '\'{"nnt": "2020CLFAC001", "hal_id": ["tel-01", "hal-99"]}\'::jsonb) RETURNING id'
+        ),
+        {"jid": jid},
+    ).scalar_one()
+
+    assert _apply(conn) == 1
+    row = conn.execute(
+        text("SELECT doc_type, external_ids, raw_metadata FROM source_publications WHERE id = :id"),
+        {"id": sp},
+    ).one()
+    assert row.doc_type == "article"  # mistype corrigé
+    assert row.external_ids == {"hal_id": ["hal-99"]}  # nnt + tel- retirés, hal- gardé
+    assert row.raw_metadata["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
+    assert row.raw_metadata["external_ids"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
+    # Réversibilité : le brut external_ids est reconstructible.
+    raw_nnt = conn.execute(
+        text(
+            "SELECT raw_metadata->'external_ids'->'raw'->>'nnt' FROM source_publications WHERE id = :id"
+        ),
+        {"id": sp},
+    ).scalar_one()
+    assert raw_nnt == "2020CLFAC001"
+
+
 # ── Sous-étape cluster : ouvrage/chapitre au même DOI ──
 
 

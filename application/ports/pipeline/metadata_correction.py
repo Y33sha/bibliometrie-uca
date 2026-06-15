@@ -37,6 +37,7 @@ class SourcePublicationForCorrection(NamedTuple):
     container_title: str | None
     language: str | None
     urls: list[str] | None
+    external_ids: dict[str, JsonValue]
     journal_type: str | None
     oa_model: str | None
     apc_amount: Decimal | None
@@ -44,12 +45,13 @@ class SourcePublicationForCorrection(NamedTuple):
 
 
 class CorrectionUpdate(NamedTuple):
-    """Une mise à jour à persister : colonnes effectives + sidecar `raw_metadata`."""
+    """Une mise à jour à persister : colonnes effectives + `external_ids` + sidecar `raw_metadata`."""
 
     id: int
     doc_type: str | None
     journal_id: int | None
     oa_status: str | None
+    external_ids: dict[str, JsonValue]
     raw_metadata: dict[str, JsonValue]
 
 

@@ -21,7 +21,7 @@ _SELECT = """
     SELECT sp.id, sp.source::text AS source, sp.source_id,
            sp.title, sp.pub_year, sp.doc_type, sp.doi,
            sp.journal_id, sp.oa_status, sp.container_title, sp.language,
-           sp.urls,
+           sp.urls, sp.external_ids,
            j.journal_type::text AS journal_type, j.oa_model, j.apc_amount,
            sp.raw_metadata
     FROM source_publications sp
@@ -84,10 +84,11 @@ def persist_corrections(conn: Connection, updates: list[CorrectionUpdate]) -> in
         SET doc_type = :doc_type,
             journal_id = :journal_id,
             oa_status = :oa_status,
+            external_ids = :external_ids,
             raw_metadata = :raw_metadata,
             updated_at = clock_timestamp()
         WHERE id = :id
-    """).bindparams(bindparam("raw_metadata", type_=JSONB))
+    """).bindparams(bindparam("external_ids", type_=JSONB), bindparam("raw_metadata", type_=JSONB))
     conn.execute(stmt, [u._asdict() for u in updates])
     return len(updates)
 
