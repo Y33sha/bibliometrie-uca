@@ -1,19 +1,22 @@
-"""Tests d'intégration — recalcul des métadonnées canoniques.
+"""Tests d'intégration — recalcul des métadonnées et lookup NNT.
 
-Couvre `refresh_from_sources` sur vraie base PostgreSQL (bibliometrie_test) :
-recalcul des champs d'une publication depuis ses `source_publications` (priorité
-par source, statut OA le plus ouvert, fusion des keywords/topics, etc.).
+Couvre deux fonctions prod sur vraie base PostgreSQL (bibliometrie_test) :
+- `refresh_from_sources` : recalcul des champs d'une publication depuis ses
+  `source_publications` (priorité par source, statut OA le plus ouvert, fusion
+  des keywords/topics, etc.) ;
+- `find_by_nnt` : lookup d'une publication via le NNT porté en `external_ids`.
 
 Chaque test tourne dans une transaction rollbackée (isolation complète). Les
 publications sont semées directement via le repo (`create`) — pas de cascade de
-matching : la déduplication est testée à l'unité
+matching : la décision de déduplication est testée à l'unité
 (`tests/unit/domain/publications/test_deduplication.py`) et sur la vraie entrée
 pipeline (`tests/integration/infrastructure/queries/test_match_or_create_queries.py`).
 """
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
-from application.publications import refresh_from_sources
+from application.publications import find_by_nnt, refresh_from_sources
 from domain.normalize import normalize_text
 from infrastructure.repositories import publication_repository
 
@@ -283,3 +286,58 @@ class TestRefreshFromSources:
             sa_sync_conn, "SELECT is_retracted FROM publications WHERE id = :id", id=id1
         )
         assert is_ret is True
+
+
+# ── Lookup NNT ───────────────────────────────────────────────────
+
+
+_INSERT_NNT_SOURCE_DOC_SQL = text(
+    """
+    INSERT INTO source_publications
+        (source, source_id, title, pub_year, publication_id, external_ids)
+    VALUES (:source, :source_id, 'Thesis', 2023, :pub_id, :external_ids)
+    """
+).bindparams(bindparam("external_ids", type_=JSONB))
+
+
+def _create_source_doc_with_nnt(conn, pub_id, source, source_id, nnt):
+    """Helper : crée un source_document avec NNT dans external_ids."""
+    conn.execute(
+        _INSERT_NNT_SOURCE_DOC_SQL,
+        {
+            "source": source,
+            "source_id": source_id,
+            "pub_id": pub_id,
+            "external_ids": {"nnt": nnt},
+        },
+    )
+
+
+class TestFindByNnt:
+    def test_find_by_nnt(self, sa_sync_conn):
+        """find_by_nnt retrouve une publication via external_ids."""
+        id1 = _insert_pub(
+            sa_sync_conn,
+            title="Ma thèse",
+            title_normalized="ma these",
+            pub_year=2023,
+            doc_type="thesis",
+        )
+        _create_source_doc_with_nnt(sa_sync_conn, id1, "theses", "2023UCFA0069", "2023UCFA0069")
+
+        result = find_by_nnt("2023UCFA0069", repo=publication_repository(sa_sync_conn))
+        assert result == id1
+
+    def test_find_by_nnt_case_insensitive(self, sa_sync_conn):
+        """find_by_nnt normalise en uppercase."""
+        id1 = _insert_pub(
+            sa_sync_conn,
+            title="Ma thèse",
+            title_normalized="ma these",
+            pub_year=2023,
+            doc_type="thesis",
+        )
+        _create_source_doc_with_nnt(sa_sync_conn, id1, "theses", "2023UCFA0069", "2023UCFA0069")
+
+        result = find_by_nnt("2023ucfa0069", repo=publication_repository(sa_sync_conn))
+        assert result == id1

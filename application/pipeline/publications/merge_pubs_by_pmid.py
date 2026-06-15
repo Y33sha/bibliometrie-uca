@@ -14,9 +14,6 @@ from sqlalchemy import Connection
 from application.pipeline.publications.merge_by_key import merge_publications_by_key
 from application.ports.pipeline.merge import MergeQueries
 from application.ports.repositories.publication_repository import PublicationRepository
-from domain.publications.deduplication import DeduplicationKey
-
-_KEY = DeduplicationKey.PMID
 
 
 def run_merge(
@@ -37,7 +34,7 @@ def run_merge(
             return
 
         groups = [
-            (f"{_KEY.name}={dup.pmid} (sources: {', '.join(dup.sources)})", dup.pub_ids)
+            (f"PMID={dup.pmid} (sources: {', '.join(dup.sources)})", dup.pub_ids)
             for dup in duplicates
         ]
         merged, errors = merge_publications_by_key(

@@ -84,6 +84,43 @@ def fetch_stale_publication_ids(conn: Connection) -> list[int]:
     return [row.id for row in rows]
 
 
+def fetch_thesis_primary_author_from_source_publication(
+    conn: Connection, source_publication_id: int
+) -> tuple[str, str] | None:
+    """Retourne `(last_name, first_name)` de l'auteur principal d'un `source_publication` courant (avant rattachement canonique).
+
+    Rôle `author`, tri par `author_position`, 1 ligne max. Parse via `domain.names.parse_raw_author_name`.
+    """
+    row = conn.execute(
+        text("""
+            SELECT raw_author_name
+            FROM source_authorships
+            WHERE source_publication_id = :spid
+              AND 'author' = ANY(roles)
+            ORDER BY author_position
+            LIMIT 1
+        """),
+        {"spid": source_publication_id},
+    ).one_or_none()
+    if row is None or not row.raw_author_name:
+        return None
+    last, first = parse_raw_author_name(row.raw_author_name)
+    return (last, first) if last else None
+
+
+def fetch_source_authorship_count(conn: Connection, source_publication_id: int) -> int:
+    """Compte les `source_authorships` d'un `source_publication`."""
+    row = conn.execute(
+        text("""
+            SELECT COUNT(*) AS n
+            FROM source_authorships
+            WHERE source_publication_id = :spid
+        """),
+        {"spid": source_publication_id},
+    ).one()
+    return row.n
+
+
 def fetch_max_source_authorship_count_per_publication(conn: Connection, publication_id: int) -> int:
     """Pour une publication canonique, retourne le `MAX` du nombre de
     `source_authorships` par source. Chaque source rapporte
@@ -129,6 +166,14 @@ class PgPublicationsMatchOrCreateQueries(PublicationsMatchOrCreateQueries):
         self, conn: Connection, publication_id: int
     ) -> tuple[str, str] | None:
         return fetch_thesis_primary_author(conn, publication_id)
+
+    def fetch_thesis_primary_author_from_source_publication(
+        self, conn: Connection, source_publication_id: int
+    ) -> tuple[str, str] | None:
+        return fetch_thesis_primary_author_from_source_publication(conn, source_publication_id)
+
+    def fetch_source_authorship_count(self, conn: Connection, source_publication_id: int) -> int:
+        return fetch_source_authorship_count(conn, source_publication_id)
 
     def fetch_max_source_authorship_count_per_publication(
         self, conn: Connection, publication_id: int

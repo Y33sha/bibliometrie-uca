@@ -13,6 +13,7 @@ from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, text
 
+from application.ports.repositories.publication_repository import PubByDoi
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.source_publications.views import SourcePublicationWithJournalView
@@ -81,6 +82,75 @@ class PgPublicationRepository:
 
     # ── Recherches ─────────────────────────────────────────────────
 
+    def find_by_doi(self, doi: str) -> PubByDoi | None:
+        """Cherche une publication par DOI (case-insensitive)."""
+        if not doi:
+            return None
+        row = self._conn.execute(
+            text(
+                "SELECT id, CAST(doc_type AS text) AS doc_type, title_normalized "
+                "FROM publications WHERE lower(doi) = lower(:doi)"
+            ),
+            {"doi": doi},
+        ).first()
+        if not row:
+            return None
+        return PubByDoi(id=row.id, doc_type=row.doc_type, title_normalized=row.title_normalized)
+
+    def find_by_nnt(self, nnt: str) -> int | None:
+        """Cherche une publication via NNT stocké dans source_publications.external_ids."""
+        if not nnt:
+            return None
+        row = self._conn.execute(
+            text("""
+                SELECT p.id
+                FROM publications p
+                JOIN source_publications sd ON sd.publication_id = p.id
+                WHERE sd.external_ids->>'nnt' = :nnt
+                LIMIT 1
+            """),
+            {"nnt": nnt.upper()},
+        ).first()
+        return row.id if row else None
+
+    def find_by_hal_id(self, hal_id: str) -> int | None:
+        """Cherche une publication rattachée à un HAL ID donné.
+
+        `external_ids.hal_id` est une **liste** de dépôts HAL (le normalizer HAL y pose le sien, les normalizers cross-source tous ceux qu'ils référencent) — on teste l'appartenance via `@>`. Pas besoin de regarder `source_id` séparément.
+        """
+        if not hal_id:
+            return None
+        row = self._conn.execute(
+            text("""
+                SELECT publication_id
+                FROM source_publications
+                WHERE publication_id IS NOT NULL
+                  AND external_ids->'hal_id' @> jsonb_build_array(CAST(:hal_id AS text))
+                LIMIT 1
+            """),
+            {"hal_id": hal_id},
+        ).first()
+        return row.publication_id if row else None
+
+    def find_by_pmid(self, pmid: str) -> int | None:
+        """Cherche une publication via PMID stocké dans source_publications.external_ids.
+
+        Le PMID identifie globalement un article PubMed — clé de dédup fiable (un PMID = un article), posée par les normalizers HAL/ScanR/OpenAlex dans `external_ids`.
+        """
+        if not pmid:
+            return None
+        row = self._conn.execute(
+            text("""
+                SELECT publication_id
+                FROM source_publications
+                WHERE publication_id IS NOT NULL
+                  AND external_ids->>'pmid' = :pmid
+                LIMIT 1
+            """),
+            {"pmid": pmid},
+        ).first()
+        return row.publication_id if row else None
+
     def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
         """Ids des publications rattachées à ce journal."""
         result = self._conn.execute(
@@ -88,6 +158,54 @@ class PgPublicationRepository:
             {"jid": journal_id},
         )
         return [row.id for row in result]
+
+    def find_thesis_by_title(
+        self,
+        title_normalized: str,
+        pub_year: int,
+    ) -> list[int]:
+        """Cherche des thèses par titre normalisé + année.
+
+        Retourne les ids de candidats pour déduplication thesis-specific
+        (vérification ultérieure de la compatibilité auteur primary
+        dans `match_thesis_by_title_year` du module `metadata_deduplication_rules`).
+        """
+        if not title_normalized or not pub_year:
+            return []
+        result = self._conn.execute(
+            text("""
+                SELECT id FROM publications
+                WHERE title_normalized = :tn AND pub_year = :py
+                  AND doc_type IN ('thesis', 'ongoing_thesis')
+                ORDER BY id
+            """),
+            {"tn": title_normalized, "py": pub_year},
+        )
+        return [row.id for row in result]
+
+    def find_proceedings_by_title_year(
+        self,
+        title_normalized: str,
+        pub_year: int,
+    ) -> list[tuple[int, str | None]]:
+        """Cherche des proceedings par titre normalisé long (>30 car.) + année.
+
+        Retourne `(pub_id, doi)` pour chaque candidate. Le seuil de longueur
+        écarte les titres pauvres (« Foreword », « Welcome message ») qui
+        produiraient des faux positifs.
+        """
+        if not title_normalized or len(title_normalized) <= 30 or not pub_year:
+            return []
+        result = self._conn.execute(
+            text("""
+                SELECT id, doi FROM publications
+                WHERE title_normalized = :tn AND pub_year = :py
+                  AND doc_type = 'proceedings'
+                ORDER BY id
+            """),
+            {"tn": title_normalized, "py": pub_year},
+        )
+        return [(row.id, row.doi) for row in result]
 
     # ── Chargement / persistance de l'aggregate Publication ────────
 
@@ -240,6 +358,30 @@ class PgPublicationRepository:
                 ) sub
                 WHERE id = :id
             """),
+            {"id": pub_id},
+        )
+
+    # ── Accès bas niveau au champ doi ──────────────────────────────
+
+    def get_doi(self, pub_id: int) -> str | None:
+        """Retourne le DOI courant d'une publication, ou None."""
+        return self._conn.execute(
+            text("SELECT doi FROM publications WHERE id = :id"), {"id": pub_id}
+        ).scalar_one_or_none()
+
+    def set_doi(self, pub_id: int, doi: str) -> None:
+        """Attribue un DOI à une publication (ne vérifie pas les conflits
+        d'unicité — le caller doit l'avoir fait via find_by_doi)."""
+        self._conn.execute(
+            text("UPDATE publications SET doi = :doi, updated_at = now() WHERE id = :id"),
+            {"doi": doi, "id": pub_id},
+        )
+
+    def clear_doi(self, pub_id: int) -> None:
+        """Retire le DOI d'une publication (utilisé lors des conflits
+        chapitre/ouvrage)."""
+        self._conn.execute(
+            text("UPDATE publications SET doi = NULL, updated_at = now() WHERE id = :id"),
             {"id": pub_id},
         )
 

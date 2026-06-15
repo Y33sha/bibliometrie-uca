@@ -2,6 +2,7 @@
 
 import pytest
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from application.persons import merge_person
 from application.publications import refresh_from_sources
@@ -46,6 +47,39 @@ def create_journal(conn, title="Test Journal"):
         text("INSERT INTO journals (title, title_normalized) VALUES (:t, lower(:t)) RETURNING id"),
         {"t": title},
     ).scalar_one()
+
+
+def create_publication(conn, title, doi=None, pub_year=2024, journal_id=None):
+    return conn.execute(
+        text(
+            """
+            INSERT INTO publications (title, pub_year, doi, journal_id)
+            VALUES (:title, :py, :doi, :jid) RETURNING id
+            """
+        ),
+        {"title": title, "py": pub_year, "doi": doi, "jid": journal_id},
+    ).scalar_one()
+
+
+# ── DOI case-insensitive (bug corrigé 2026-03-31) ──
+
+
+class TestDoiCaseInsensitive:
+    """La contrainte unique sur DOI est case-insensitive (lower(doi)).
+    Les lookups doivent aussi être case-insensitive."""
+
+    def test_unique_constraint_blocks_case_variant(self, sa_sync_conn):
+        create_publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
+        with pytest.raises(IntegrityError):
+            create_publication(sa_sync_conn, "Pub B", doi="10.1103/physrevc.111.024905")
+
+    def test_lookup_finds_case_variant(self, sa_sync_conn):
+        create_publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
+        result = sa_sync_conn.execute(
+            text("SELECT id FROM publications WHERE lower(doi) = lower(:doi)"),
+            {"doi": "10.1103/physrevc.111.024905"},
+        ).first()
+        assert result is not None
 
 
 # ── Service publications ──
@@ -97,6 +131,42 @@ class TestRefreshFromSources:
         ).one()
         assert row.journal_id == journal_id
         assert row.oa_status == "gold"
+
+    def test_refresh_auto_merges_when_doi_already_taken(self, sa_sync_conn, pub_repo):
+        """Régression : la promotion d'un DOI déjà occupé par une autre publication doit déclencher une fusion automatique au lieu de violer publications_doi_lower_key."""
+        existing_id = _seed_pub(
+            pub_repo,
+            "Thèse côté OpenAlex",
+            pub_year=2020,
+            doc_type="thesis",
+            doi="10.70675/regression-test",
+        )
+        current_id = _seed_pub(pub_repo, "Thèse côté theses.fr", pub_year=2020, doc_type="thesis")
+        sa_sync_conn.execute(
+            text(
+                """
+                INSERT INTO source_publications (source, source_id, title, pub_year,
+                                              publication_id, doi)
+                VALUES ('theses', '2020REGRESS', 'Thèse', 2020, :pid, :doi)
+                """
+            ),
+            {"pid": current_id, "doi": "10.70675/regression-test"},
+        )
+
+        refresh_from_sources(current_id, repo=pub_repo)
+
+        # current est vivant et a hérité du DOI
+        doi = sa_sync_conn.execute(
+            text("SELECT doi FROM publications WHERE id = :id"), {"id": current_id}
+        ).scalar_one_or_none()
+        assert doi == "10.70675/regression-test"
+        # existing a été absorbée
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT id FROM publications WHERE id = :id"), {"id": existing_id}
+            ).first()
+            is None
+        )
 
 
 # ── Cohérence enum sources ──
