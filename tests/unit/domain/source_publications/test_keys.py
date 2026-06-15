@@ -14,10 +14,11 @@ class TestDoi:
         keys = project_confirmation_keys("10.1234/ABC.v2", None)
         assert keys.doi == "10.1234/abc"
 
-    def test_zenodo_concept_overrides_version(self):
-        """Le concept DOI Zenodo remplace le DOI de version porté par la colonne."""
+    def test_doi_read_from_column_ignores_external_ids(self):
+        """Le DOI vient de la colonne nue ; `external_ids.zenodo_concept_doi` (cache) est
+        ignoré — la substitution concept est déjà persistée par `metadata_correction`."""
         keys = project_confirmation_keys(
-            "10.5281/zenodo.11", {"zenodo_concept_doi": "10.5281/zenodo.10"}
+            "10.5281/zenodo.10", {"zenodo_concept_doi": "10.5281/zenodo.999"}
         )
         assert keys.doi == "10.5281/zenodo.10"
 

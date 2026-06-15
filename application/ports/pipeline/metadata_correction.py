@@ -71,10 +71,27 @@ class DoiClusterRow(NamedTuple):
 
 
 class DoiCorrectionUpdate(NamedTuple):
-    """Une mise à jour de correction de DOI : colonne `doi` (nullée ou restaurée) + sidecar."""
+    """Une mise à jour de correction de DOI : colonne `doi` (nullée, restaurée ou
+    substituée) + sidecar. Partagée par la correction relationnelle (cluster) et la
+    substitution Zenodo (concept), qui produisent toutes deux un état cible de la
+    colonne `doi` à persister via `persist_doi_corrections`."""
 
     id: int
     doi: str | None
+    raw_metadata: dict[str, JsonValue]
+
+
+class ZenodoConceptRow(NamedTuple):
+    """Une SP au DOI Zenodo avec son concept DOI mis en cache (`external_ids.zenodo_concept_doi`).
+
+    `doi` est la valeur **courante** de la colonne (potentiellement déjà substituée) ;
+    `concept_doi` est le concept caché par la phase `zenodo_doi` ; `raw_metadata`
+    reconstruit le DOI source d'origine (la version). La correction substitue le concept
+    dans la colonne et stashe la version dans `raw_metadata.doi`."""
+
+    id: int
+    doi: str | None
+    concept_doi: str
     raw_metadata: dict[str, JsonValue]
 
 
@@ -114,4 +131,10 @@ class MetadataCorrectionQueries(Protocol):
     def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
         """UPDATE en lot de la colonne `doi` + `raw_metadata`, bump `updated_at`. Retourne le
         nombre de lignes mises à jour."""
+        ...
+
+    def fetch_zenodo_concept_candidates(self, conn: Connection) -> list[ZenodoConceptRow]:
+        """Les SP au concept DOI Zenodo caché (`external_ids ? 'zenodo_concept_doi'`), pour la
+        substitution version→concept. Inclut les SP déjà substituées (`raw_metadata.doi`) pour
+        la ré-évaluation auto-cicatrisante."""
         ...

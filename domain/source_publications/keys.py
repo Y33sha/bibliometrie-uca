@@ -4,7 +4,7 @@ Une *clé de confirmation* est un identifiant cross-source par lequel deux `sour
 
 Les valeurs sont lues sur la SP **corrigée** (colonne `doi` typée + `external_ids`), déjà normalisées en amont (phase `normalize`) puis corrigées (phase `metadata_correction`). La projection les repasse néanmoins par les VO d'identifiants : idempotent sur des valeurs propres, et garant d'une forme canonique unique quel que soit l'appelant (les lookups repo `find_by_*` consomment cette forme).
 
-Le **DOI effectif** d'une SP Zenodo est son *concept* DOI (`external_ids.zenodo_concept_doi`, résolu par `resolve_zenodo_concept`), pas le DOI de version porté par la colonne : concept et versions convergent ainsi vers une même publication. La projection applique cette substitution en un point, pour que tous les consommateurs en héritent.
+Le DOI lu est la colonne `doi` nue : la substitution Zenodo (concept au lieu de la version) est portée **a priori** par `metadata_correction` (sous-étape Zenodo), donc la colonne porte déjà le concept. La projection n'a aucune connaissance de Zenodo.
 """
 
 from collections.abc import Mapping
@@ -46,13 +46,11 @@ def project_confirmation_keys(
 ) -> ConfirmationKeys:
     """Extrait les clés de confirmation normalisées d'une `source_publication`.
 
-    `external_ids` porte `nnt`, `pmid`, `hal_id` (liste) et `zenodo_concept_doi` (conventions des normalizers). Le DOI effectif est le concept Zenodo s'il est présent, sinon le DOI de la colonne. Une valeur malformée est écartée silencieusement (`try_parse` → `None`), comme une clé absente.
+    `external_ids` porte `nnt`, `pmid`, `hal_id` (liste). Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). Une valeur malformée est écartée silencieusement (`try_parse` → `None`), comme une clé absente.
     """
     ids: Mapping[str, object] = external_ids if isinstance(external_ids, Mapping) else {}
 
-    concept = ids.get("zenodo_concept_doi")
-    effective_doi = concept if isinstance(concept, str) and concept else doi
-    doi_vo = DOI.try_parse(effective_doi) if isinstance(effective_doi, str) else None
+    doi_vo = DOI.try_parse(doi) if isinstance(doi, str) else None
 
     nnt_raw = ids.get("nnt")
     nnt_vo = NNT.try_parse(nnt_raw) if isinstance(nnt_raw, str) else None

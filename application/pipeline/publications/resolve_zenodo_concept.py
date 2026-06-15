@@ -1,16 +1,19 @@
 """Résout le concept DOI des source_publications Zenodo (hors chemin chaud).
 
-Sous-étape de la phase `publications`, exécutée AVANT `match_or_create` : pour
-chaque source_publication au DOI Zenodo sans `external_ids.zenodo_concept_doi`,
-appelle l'API Zenodo (`conceptdoi`) et stocke le concept DOI. Le matching
-dédupliquera ensuite concept + versions sur ce champ.
+Phase `zenodo_doi`, exécutée AVANT `metadata_correction` : pour chaque
+source_publication au DOI Zenodo sans `external_ids.zenodo_concept_doi`, appelle
+l'API Zenodo (`conceptdoi`) et **met en cache** le concept DOI dans `external_ids`.
+C'est un enrichissement (fetch + cache) : la substitution effective du DOI
+(concept en colonne, version dans `raw_metadata`) est portée a posteriori par la
+sous-étape Zenodo de `metadata_correction`, qui consomme ce cache. Le cache
+survit au re-normalize (merge `||` des `external_ids`), donc pas de re-fetch.
 
 Le concept DOI est l'identifiant stable, agnostique aux versions. Un dépôt non
 versionné n'expose pas de `conceptdoi` : on stocke alors le DOI de la SP comme
 son propre concept (il se canonicalise sur lui-même). La SP est ainsi toujours
-résolue — et donc exclue des runs suivants : la sous-étape est idempotente,
-sans double appel API. Une erreur temporaire (rate-limit, timeout) laisse la SP
-non résolue, retentée au prochain run.
+résolue — et donc exclue des runs suivants : la phase est idempotente, sans
+double appel API. Une erreur temporaire (rate-limit, timeout) laisse la SP non
+résolue, retentée au prochain run.
 
 L'orchestrateur dépend des ports `ZenodoConceptQueries` et `ZenodoResolver`. Le
 point d'entrée CLI est dans `interfaces/cli/pipeline/resolve_zenodo_concept.py`.
