@@ -17,10 +17,10 @@ Règles d'agrégation par type de champ :
 from typing import Any
 
 from domain.normalize import normalize_text
-from domain.publications.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT, best_oa_status
 from domain.publications.publication import Publication
+from domain.source_publications.doc_types import ARTICLE_SUBTYPES, map_doc_type
 from domain.source_publications.views import SourcePublicationWithJournalView
 from domain.types import JsonValue
 

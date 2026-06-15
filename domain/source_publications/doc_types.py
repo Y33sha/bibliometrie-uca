@@ -6,7 +6,7 @@ nomenclature. Ce module fournit un point unique de conversion vers l'enum
 PostgreSQL `doc_type` de la table `publications`.
 
 Usage :
-    from domain.publications.doc_types import map_doc_type
+    from domain.source_publications.doc_types import map_doc_type
     canonical = map_doc_type("THESE", source="hal")       # → "thesis"
     canonical = map_doc_type("dissertation", source="openalex")  # → "thesis"
     canonical = map_doc_type("article")                    # → "article" (lookup global)

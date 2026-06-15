@@ -27,7 +27,7 @@ from application.ports.pipeline.metadata_correction import (
     MetadataCorrectionQueries,
     SourcePublicationForCorrection,
 )
-from domain.publications.correction import effective_metadata
+from domain.source_publications.correction import effective_metadata
 from domain.source_publications.views import SourcePublicationWithJournalView
 
 # Champs corrigeables gérés par la sous-étape unaire. Les autres clés de
