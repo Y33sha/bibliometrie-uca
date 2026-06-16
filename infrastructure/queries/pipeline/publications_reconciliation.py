@@ -43,9 +43,11 @@ _UNIVERSE_SQL = text(f"""
            publication_doi, in_perimeter
     FROM dirty
     UNION
+    -- DOI : égalité directe (la colonne est toujours normalisée minuscule par `clean_doi` à
+    -- l'écriture), pour utiliser l'index btree `idx_source_pubs_doi` plutôt qu'un scan via `lower()`.
     SELECT {_COLS.format(a="o")}
     FROM dirty d
-    JOIN source_publications o ON o.doi IS NOT NULL AND lower(o.doi) = lower(d.doi)
+    JOIN source_publications o ON o.doi IS NOT NULL AND o.doi = d.doi
     LEFT JOIN publications p ON p.id = o.publication_id
     WHERE d.doi IS NOT NULL
     UNION

@@ -33,7 +33,7 @@ from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.publication_repository import PublicationRepository
 from domain.dates import french_date_to_iso
 from domain.normalize import normalize_text
-from domain.publications.identifiers import normalize_nnt
+from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.sources.theses import (
     aggregate_thesis_persons,
     derive_theses_doc_type,
@@ -58,7 +58,7 @@ def extract_pub_metadata(these: dict) -> dict:
     year_source = date_soutenance or date_inscription
     pub_year = int(year_source[:4]) if year_source else None
 
-    doi = these.get("doi")
+    doi = clean_doi(these.get("doi"))
     nnt_clean = normalize_nnt(these.get("nnt"))
     title_norm = normalize_text(title) if title else None
 
