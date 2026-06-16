@@ -94,89 +94,11 @@ class PgPublicationRepository:
             return None
         return PubByDoi(id=row.id)
 
-    def find_by_nnt(self, nnt: str) -> int | None:
-        """Cherche une publication via NNT stocké dans source_publications.external_ids."""
-        if not nnt:
-            return None
-        row = self._conn.execute(
-            text("""
-                SELECT p.id
-                FROM publications p
-                JOIN source_publications sd ON sd.publication_id = p.id
-                WHERE sd.external_ids->>'nnt' = :nnt
-                LIMIT 1
-            """),
-            {"nnt": nnt.upper()},
-        ).first()
-        return row.id if row else None
-
-    def find_by_hal_id(self, hal_id: str) -> int | None:
-        """Cherche une publication rattachée à un HAL ID donné.
-
-        `external_ids.hal_id` est une **liste** de dépôts HAL (le normalizer HAL y pose le sien, les normalizers cross-source tous ceux qu'ils référencent) — on teste l'appartenance via `@>`. Pas besoin de regarder `source_id` séparément.
-        """
-        if not hal_id:
-            return None
-        row = self._conn.execute(
-            text("""
-                SELECT publication_id
-                FROM source_publications
-                WHERE publication_id IS NOT NULL
-                  AND external_ids->'hal_id' @> jsonb_build_array(CAST(:hal_id AS text))
-                LIMIT 1
-            """),
-            {"hal_id": hal_id},
-        ).first()
-        return row.publication_id if row else None
-
-    def find_by_pmid(self, pmid: str) -> int | None:
-        """Cherche une publication via PMID stocké dans source_publications.external_ids.
-
-        Le PMID identifie globalement un article PubMed — clé de dédup fiable (un PMID = un article), posée par les normalizers HAL/ScanR/OpenAlex dans `external_ids`.
-        """
-        if not pmid:
-            return None
-        row = self._conn.execute(
-            text("""
-                SELECT publication_id
-                FROM source_publications
-                WHERE publication_id IS NOT NULL
-                  AND external_ids->>'pmid' = :pmid
-                LIMIT 1
-            """),
-            {"pmid": pmid},
-        ).first()
-        return row.publication_id if row else None
-
     def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
         """Ids des publications rattachées à ce journal."""
         result = self._conn.execute(
             text("SELECT id FROM publications WHERE journal_id = :jid ORDER BY id"),
             {"jid": journal_id},
-        )
-        return [row.id for row in result]
-
-    def find_thesis_by_title(
-        self,
-        title_normalized: str,
-        pub_year: int,
-    ) -> list[int]:
-        """Cherche des thèses (thesis/ongoing_thesis) par titre normalisé + année.
-
-        Lookup du **token de confirmation thèse** (`title_normalized`+`pub_year`,
-        cf. `domain.source_publications.keys`) : l'assignation rattache une SP thèse
-        à un de ces candidats (sans garde — le couple titre+année est identifiant).
-        """
-        if not title_normalized or not pub_year:
-            return []
-        result = self._conn.execute(
-            text("""
-                SELECT id FROM publications
-                WHERE title_normalized = :tn AND pub_year = :py
-                  AND doc_type IN ('thesis', 'ongoing_thesis')
-                ORDER BY id
-            """),
-            {"tn": title_normalized, "py": pub_year},
         )
         return [row.id for row in result]
 

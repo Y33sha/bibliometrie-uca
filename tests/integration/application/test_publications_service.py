@@ -1,6 +1,6 @@
 """Tests de caractérisation pour services/publications.py.
 
-Couvre les find_by_* (guards + happy path) et merge_publications.
+Couvre `find_by_doi` (guards + happy path) et merge_publications.
 """
 
 import pytest
@@ -9,8 +9,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.publications import (
     find_by_doi,
-    find_by_nnt,
-    find_thesis_by_title,
     mark_distinct,
     merge_publications,
 )
@@ -131,96 +129,6 @@ class TestFindByDoi:
 
     def test_returns_none_if_not_found(self, sa_sync_conn, repo):
         assert find_by_doi("10.1234/unknown", repo=repo) is None
-
-
-class TestFindByNnt:
-    def test_returns_none_on_empty(self, sa_sync_conn, repo):
-        assert find_by_nnt(None, repo=repo) is None
-        assert find_by_nnt("", repo=repo) is None
-
-    def test_finds_by_nnt_in_external_ids(self, sa_sync_conn, repo):
-        pub_id = _insert_publication(sa_sync_conn, doc_type="thesis")
-        _insert_source_publication(
-            sa_sync_conn,
-            pub_id,
-            source="theses",
-            source_id="t-1",
-            external_ids={"nnt": "2024UCAC0001"},
-        )
-        assert find_by_nnt("2024UCAC0001", repo=repo) == pub_id
-
-    def test_nnt_uppercased_for_lookup(self, sa_sync_conn, repo):
-        pub_id = _insert_publication(sa_sync_conn, doc_type="thesis")
-        _insert_source_publication(
-            sa_sync_conn,
-            pub_id,
-            source="theses",
-            source_id="t-1",
-            external_ids={"nnt": "2024UCAC0001"},
-        )
-        # Même en minuscules en entrée, trouve
-        assert find_by_nnt("2024ucac0001", repo=repo) == pub_id
-
-
-class TestFindByHalId:
-    def test_returns_none_on_empty(self, sa_sync_conn, repo):
-        assert repo.find_by_hal_id("") is None
-        assert repo.find_by_hal_id(None) is None  # type: ignore[arg-type]
-
-    def test_finds_via_hal_native_source(self, sa_sync_conn, repo):
-        """SP HAL native : `external_ids.hal_id` est posé par le normalizer au même titre que `source_id` (convention symétrique avec NNT côté theses)."""
-        pub_id = _insert_publication(sa_sync_conn)
-        _insert_source_publication(
-            sa_sync_conn,
-            pub_id,
-            source="hal",
-            source_id="hal-12345",
-            external_ids={"hal_id": ["hal-12345"]},
-        )
-        assert repo.find_by_hal_id("hal-12345") == pub_id
-
-    def test_finds_via_external_ids_cross_source(self, sa_sync_conn, repo):
-        """SP cross-source : `external_ids->>'hal_id'=hal_id` (OpenAlex/ScanR)."""
-        pub_id = _insert_publication(sa_sync_conn)
-        _insert_source_publication(
-            sa_sync_conn,
-            pub_id,
-            source="openalex",
-            source_id="W123",
-            external_ids={"hal_id": ["hal-67890"]},
-        )
-        assert repo.find_by_hal_id("hal-67890") == pub_id
-
-    def test_returns_none_if_not_found(self, sa_sync_conn, repo):
-        assert repo.find_by_hal_id("hal-unknown") is None
-
-    def test_ignores_orphan_source_publications(self, sa_sync_conn, repo):
-        """Un `source_publication` HAL sans `publication_id` ne doit pas être retourné."""
-        _insert_source_publication(
-            sa_sync_conn,
-            None,
-            source="hal",
-            source_id="hal-orphan",
-            external_ids={"hal_id": ["hal-orphan"]},
-        )
-        assert repo.find_by_hal_id("hal-orphan") is None
-
-
-class TestFindThesisByTitle:
-    def test_returns_empty_on_missing_input(self, sa_sync_conn, repo):
-        assert find_thesis_by_title("", 2024, repo=repo) == []
-        assert find_thesis_by_title("t", None, repo=repo) == []
-
-    def test_finds_only_theses(self, sa_sync_conn, repo):
-        """Ne retourne que les thèses."""
-        _insert_publication(sa_sync_conn, title="A", pub_year=2024, doc_type="article")
-        t_id = _insert_publication(sa_sync_conn, title="A", pub_year=2024, doc_type="thesis")
-        assert find_thesis_by_title("a", 2024, repo=repo) == [t_id]
-
-    def test_returns_multiple_candidates(self, sa_sync_conn, repo):
-        t1 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
-        t2 = _insert_publication(sa_sync_conn, title="Dup", pub_year=2024, doc_type="thesis")
-        assert set(find_thesis_by_title("dup", 2024, repo=repo)) == {t1, t2}
 
 
 # ── merge_publications ────────────────────────────────────────────

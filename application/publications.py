@@ -23,21 +23,6 @@ def find_by_doi(doi: str, *, repo: PublicationRepository) -> PubByDoi | None:
     return repo.find_by_doi(doi)
 
 
-def find_by_nnt(nnt: str, *, repo: PublicationRepository) -> int | None:
-    """Cherche une publication via NNT (source_publications.external_ids)."""
-    return repo.find_by_nnt(nnt)
-
-
-def find_thesis_by_title(
-    title_normalized: str,
-    pub_year: int,
-    *,
-    repo: PublicationRepository,
-) -> list[int]:
-    """Cherche des thèses par titre normalisé + année (sans journal_id)."""
-    return repo.find_thesis_by_title(title_normalized, pub_year)
-
-
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
 
 
