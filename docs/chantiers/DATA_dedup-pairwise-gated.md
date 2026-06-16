@@ -39,7 +39,7 @@ Une **arête pairwise-gated** dans la réconciliation (`reconcile_components`) :
 Contraintes héritées :
 
 - **Cannot-link DOI** préservé : une arête gardée ne fusionne jamais deux DOI distincts (l'ancre DOI et la partition restent souverains).
-- **Blocking de premier ordre** : une clé de blocage pauvre (titre stop, actes) engendre de gros blocs et une confirmation quadratique intra-bloc. Mobiliser les mitigations standard (clés composites/canopy, sorted-neighborhood, drop des blocs stop-title, exiger un accord faible avant comparaison) plutôt que de comparer tout-à-tout.
+- **Le blocking est le vrai travail pour ces types** : leurs titres sont trop génériques pour bloquer finement (un bloc `book_chapter` « Introduction » + année colle des centaines d'œuvres sans rapport, et la confirmation pairwise y est quadratique). Les mitigations sont standard — clés composites/canopy, sorted-neighborhood, drop des blocs à titre stop, ou, pour les chapitres, bloquer sur le **conteneur** (l'ouvrage) plutôt que sur le titre. C'est le cœur du design par type.
 
 ## Phases (à dérouler par type, empiriquement)
 
@@ -49,7 +49,6 @@ Contraintes héritées :
 
 ## Questions ouvertes
 
-- **Qualité du blocking** : à mesure que la famille de types s'étoffe, traiter le blocking comme préoccupation de premier ordre (pas règle par règle). Cible idéale : une clé assez sélective pour que la confirmation soit une **égalité** (le type devient un token, zéro comparaison intra-bloc).
 - **Prédicat pairwise et sur-fusion** : un second accord trop faible (titre générique + même année + même compte d'auteurs par hasard) peut sur-fusionner. Mesurer la précision par type avant de figer.
 - **Thèse mistypée sans `journal_id`** (renvoyée depuis la fiche d'origine) : SP typées thèse portant un DOI éditeur sans `journal_id` (~69 au stock, dont 3 partageant un DOI avec un article). Relève d'une **correction de `doc_type`** (étendre `THESIS_WITH_JOURNAL_TO_ARTICLE` au signal DOI éditeur, unaire ou relationnel), pas de la dédup pairwise — mais à traiter dans le même mouvement d'étoffement des règles.
 
