@@ -2,59 +2,52 @@
 
 ## Contexte
 
-Issu de [DATA_publications-match-or-create](DATA_publications-match-or-create.md) (Phase 3, item 3.2b, renvoyé ici). La déduplication des publications repose sur des **tokens de confirmation par égalité** — DOI, NNT, hal_id, pmid, et le composite thèse `(title_normalized, pub_year)` — qui entrent nativement dans `connected_components` (`domain/publications/clustering.py`) : deux `source_publications` partageant un token sont reliées, la composante est l'œuvre. Ce mécanisme couvre les œuvres à **identifiant fiable** ou à **clé de blocage sélective** (un titre de thèse est unique).
+Issu de [DATA_publications-match-or-create](DATA_publications-match-or-create.md) (Phase 3, item 3.2b, renvoyé ici). La déduplication repose sur des **tokens de confirmation par égalité** — DOI, NNT, hal_id, pmid, composite thèse `(title_normalized, pub_year)` — qui entrent dans `connected_components` (`domain/publications/clustering.py`) : deux `source_publications` partageant un token sont reliées, la composante est l'œuvre. Couvre les œuvres à **identifiant fiable**.
 
-Restent les types **sans identifiant fiable** et à **titre souvent générique**, que ces tokens ne dédupliquent pas :
+Restent les types **sans identifiant fiable** : `conference_paper` (~29 500 SP), `book_chapter` (~18 800), `poster` (~3 500). Des records qui partagent souvent un **titre + année sans DOI/hal_id partagé**.
 
-| doc_type | SP au stock (2026-06) | difficulté |
-|---|---|---|
-| `conference_paper` | ~29 500 | titres parfois génériques (sessions, « Keynote ») |
-| `book_chapter` | ~18 800 | titres très génériques (« Introduction », « Chapitre 1 ») — cas dur |
-| `poster` | ~3 500 | proche de `conference_paper` |
+**La difficulté n'est pas le titre.** Les titres génériques (« Introduction ») sont rares, et réglés par une garde de longueur (`title_normalized` ≥ 20-30) ; au pire « même ouvrage + même titre "Introduction" = même chapitre », aucun problème. La difficulté est de trancher, entre deux records au même titre+année, **même œuvre vs œuvres distinctes-mais-apparentées** :
 
-Pour ces types, la clé de blocage `(doc_type, title_normalized, pub_year)` est **trop peu sélective** pour valoir identité : deux communications « Welcome address » 2020 ne sont pas la même œuvre. Il faut un **second accord** au-delà du titre+année.
+- **Versions** (preprint / article publié) : DOI différents → cannot-link → **relation**, déjà géré (« DOI = identité », cf. [METIER_relations-publications](METIER_relations-publications.md)).
+- **Dépôts multiples** de la même œuvre (plusieurs dépôts HAL, ou HAL + OpenAlex sans DOI partagé), souvent avec un **typage incertain** (une communication tantôt typée `article`, `book_chapter`, « communication dans un congrès »…) → à **fusionner**.
+- **Collision de titre fortuite** (deux œuvres distinctes, même titre+année) → à **ne pas fusionner**.
 
-## Cadre conceptuel — l'axe token vs garde pairwise
+Le discriminant entre les deux derniers = les **auteurs** : mêmes auteurs ⇒ même œuvre, auteurs différents ⇒ œuvres distinctes. C'est le rôle de la **garde pairwise**.
 
-Hérité de la fiche d'origine, c'est la distinction structurante :
+**Conséquence sur le blocking** : le typage étant incertain, la clé de blocage ne peut pas être `doc_type`-stricte (la même œuvre typée différemment ne co-bloquerait pas). Bloquer sur `(title_normalized, pub_year)` avec garde de longueur, type mis de côté — ou corriger les types en amont.
 
-- **Token (confirmation par égalité)** — une clé composite dérivable de la SP, assez **sélective** pour valoir identité. Elle entre dans `connected_components`, zéro comparaison intra-bloc. Cas couverts : identifiants, thèse `(titre, année)`.
-- **Garde pairwise (convergence conservatrice)** — pour une clé de blocage **faible**, une condition d'accord **supplémentaire** (ex. nombre d'auteurs identique) qui n'**arme l'arête que si elle tient**. À l'appariement, un désaccord laisse les records **non-fusionnés** (on ne fusionne jamais sur preuve faible). Mais l'appartenance reste une **fonction dérivée des arêtes courantes** : si la condition cesse de tenir plus tard, l'arête disparaît et la composante se recalcule — donc un split est *possible*, symétriquement aux tokens. Le risque associé (dé-fusionner un vrai doublon quand un signal **bruité** fluctue) est une question ouverte de **stabilité du prédicat** (cf. plus bas), pas une raison de figer les fusions.
+## Cadre conceptuel — token vs garde pairwise
 
-Pourquoi le compte d'auteurs ne peut **pas** être un token : il **varie par source pour la même œuvre** (OpenAlex tronque, HAL liste tout — mesuré : ~16 % des publis multi-sources ont des comptes d'auteurs divergents). Token-iser le compte scinderait de vrais doublons. C'est donc un **prédicat pairwise**, évalué à l'appariement, jamais une clé d'égalité. Il est en revanche **matérialisable** (colonne SP ou projection) pour la perf de l'évaluation, sans changer sa nature.
+- **Token (confirmation par égalité)** — clé composite dérivable de la SP, assez sélective pour valoir identité ; entre dans `connected_components`, zéro comparaison intra-bloc. Cas couverts : identifiants, thèse `(titre, année)`.
+- **Garde pairwise** — pour un blocage qui ne vaut pas identité à lui seul (titre+année), un **second accord** (les **auteurs**) départage même-œuvre vs collision. Utilisée **symétriquement** : l'accord arme l'arête (fusion), le désaccord la refuse — et, l'appartenance étant une **fonction dérivée des arêtes courantes**, si l'accord cesse de tenir l'arête tombe et la composante peut splitter. Pas d'asymétrie « fusionne mais ne défusionne pas » : un signal assez fort pour fusionner l'est pour défusionner.
+
+**Le signal, c'est l'identité d'auteur, pas le compte.** On compare deux *records* : leurs listes d'auteurs se recoupent-elles (premier auteur identique, ou recouvrement de noms) ? L'identité **résiste à la troncature cross-source** — OpenAlex plafonne les listes longues, mais les noms qu'il garde restent un **sous-ensemble** qui matche ceux de HAL. Le **compte**, lui, ne résiste pas : la même œuvre affiche 3 (OpenAlex tronqué) vs 5 (HAL) — ~16 % des œuvres multi-sources ont des comptes par-source divergents — donc une égalité de compte raterait ces doublons. Un « max par source » n'y change rien : un max est **unique par définition**, ce n'est pas un critère de comparaison entre deux records (c'était un artefact du modèle pub-level de l'ancienne règle proceedings, retirée). Le matching de noms est donc le bon prédicat ; un compte pourrait au mieux servir de **pré-filtre** bon marché, pas de critère.
+
+Limite connue du signal auteurs : il **ne distingue pas les versions** (preprint et publié ont les *mêmes* auteurs). Celles-ci sont séparées par le DOI (cannot-link → relation), pas par la garde auteurs. La garde sert donc au cas « même titre+année sans DOI distinctif » : départager dépôt-multiple (même œuvre) de collision (œuvres distinctes).
 
 ## Méthode — audit empirique par type
 
-On n'ajoute **pas** un type sans mesurer son blocage. Recette (la même que pour la thèse) : sur les blocs `(doc_type, title_normalized, pub_year)` à ≥2 SP, mesurer la **divergence réelle** du second signal candidat.
-
-- Divergence ≈ 0 → la clé est assez sélective seule → **token pur** (zéro garde).
-- Divergence non négligeable → **garde pairwise** (second accord) ou **clé de blocage enrichie**.
-
-Et on construit le mécanisme **à la demande**, avec son **premier consommateur réel** — pas d'abstraction spéculative. L'audit de chaque type décide s'il devient un token (et alors aucun mécanisme nouveau) ou une arête gardée.
+On n'ajoute **pas** un type sans mesurer. Recette : sur les blocs `(title_normalized ≥ seuil, pub_year)` à ≥2 records **sans DOI partagé**, vérifier si le recouvrement des auteurs (premier auteur, ou recouvrement de noms) départage proprement même-œuvre vs collision (mesurer faux positifs et faux négatifs). Construire le mécanisme **à la demande**, avec son **premier consommateur réel** — pas d'abstraction spéculative.
 
 ## Mécanisme à construire (quand le premier type le justifie)
 
-Une **arête pairwise-gated** dans la réconciliation (`reconcile_components`) : pour les SP co-bloquées (même `doc_type` + `title_normalized` + `pub_year`), évaluer le prédicat pairwise ; si vrai, **armer l'arête** (l'ajouter au graphe que voit `connected_components`), sinon laisser les SP séparées. Distinct du token (qui entre nativement dans le graphe). La projection partagée `domain/source_publications/keys.py` reste la définition unique des tokens ; les arêtes gardées sont un second canal, hors token.
-
-Contraintes héritées :
-
-- **Cannot-link DOI** préservé : une arête gardée ne fusionne jamais deux DOI distincts (l'ancre DOI et la partition restent souverains).
-- **Le blocking est le vrai travail pour ces types** : leurs titres sont trop génériques pour bloquer finement (un bloc `book_chapter` « Introduction » + année colle des centaines d'œuvres sans rapport, et la confirmation pairwise y est quadratique). Les mitigations sont standard — clés composites/canopy, sorted-neighborhood, drop des blocs à titre stop, ou, pour les chapitres, bloquer sur le **conteneur** (l'ouvrage) plutôt que sur le titre. C'est le cœur du design par type.
+Une **arête pairwise-gated** dans la réconciliation (`reconcile_components`) : pour les records co-bloqués (même titre+année, garde de longueur), évaluer l'accord d'auteurs ; si oui, **armer l'arête** (l'ajouter au graphe que voit `connected_components`), sinon les laisser séparés. Distinct du token (qui entre nativement) ; symétrique (cf. cadre). La projection partagée `domain/source_publications/keys.py` reste la définition des tokens ; les arêtes gardées sont un second canal. **Cannot-link DOI** préservé : une arête gardée ne fusionne jamais deux DOI distincts.
 
 ## Phases (à dérouler par type, empiriquement)
 
-- [ ] **conference_paper** — audit volume + divergence du compte d'auteurs sur les blocs `(conference_paper, titre>seuil, année)`. Décider token vs garde pairwise. Premier consommateur probable du mécanisme.
+- [ ] **conference_paper** — audit : parmi les blocs titre+année sans DOI partagé, l'accord d'auteurs sépare-t-il same-work des collisions ? Premier consommateur probable du mécanisme.
 - [ ] **poster** — idem `conference_paper` (probablement même forme).
-- [ ] **book_chapter** — **cas dur** : titres trop génériques pour que `(type, titre, année)` bloque utilement. Il faut l'identité du **conteneur** (l'ouvrage) — recoupe la correction chapitre/chapitre de la fiche d'origine (Phase 2). À cadrer à part : la clé de blocage n'est pas le titre du chapitre mais `(ouvrage, position/titre de chapitre)`.
+- [ ] **book_chapter** — la difficulté n'est pas les titres (« même ouvrage + même titre = même chapitre ») mais d'avoir l'identité du **conteneur** (l'ouvrage) comme clé de blocage. Recoupe la correction chapitre/chapitre de la fiche d'origine (Phase 2).
 
 ## Questions ouvertes
 
-- **Prédicat pairwise et sur-fusion** : un second accord trop faible (titre générique + même année + même compte d'auteurs par hasard) peut sur-fusionner. Mesurer la précision par type avant de figer.
-- **Stabilité du prédicat vs dé-fusion (split sur bruit)** : l'appartenance étant dérivée des arêtes courantes, une arête pairwise qui tombe **peut** splitter — souhaitable si le signal est fiable, néfaste s'il est bruité. Exemple : deux communications fusionnées sur accord du compte d'auteurs (3 = 3) ; une source révise sa liste (→ 5) ; l'arête tombe → split, alors que c'est la **même œuvre** (enrichissement, pas preuve de distinction). Le bon levier n'est **pas** « interdire le split des fusions pairwise » (ça casserait la pureté « appartenance = fonction de l'état »), mais **choisir des prédicats stables** : l'identité du **conteneur** (chapitres) est stable → split seulement sur vrai changement ; le **compte d'auteurs** est bruité → risque réel. Privilégier les signaux stables, et mesurer le taux de dé-fusion par type avant de retenir un prédicat instable.
+- **Précision de la garde auteurs** : quelle forme de recouvrement (premier auteur seul, recouvrement de noms avec seuil, sous-ensemble strict) — mesurer par type les faux positifs (collisions fusionnées à tort) et faux négatifs (même œuvre non fusionnée). Le compte d'auteurs est écarté comme critère (cassé par la troncature cross-source) ; tout au plus un pré-filtre.
+- **Typage incertain** : la même œuvre typée différemment selon le dépôt ne co-bloque pas si la clé inclut `doc_type`. Bloquer hors type, ou corriger les types en amont — à cadrer.
+- **Versions sans DOI distinctif** : preprint + publié au même titre+année, mêmes auteurs, sans DOI pour les séparer → la garde auteurs les fusionnerait, alors que c'est *peut-être* une relation. Cas limite : à mesurer (fréquence réelle) avant de décider.
 - **Thèse mistypée sans `journal_id`** (renvoyée depuis la fiche d'origine) : SP typées thèse portant un DOI éditeur sans `journal_id` (~69 au stock, dont 3 partageant un DOI avec un article). Relève d'une **correction de `doc_type`** (étendre `THESIS_WITH_JOURNAL_TO_ARTICLE` au signal DOI éditeur, unaire ou relationnel), pas de la dédup pairwise — mais à traiter dans le même mouvement d'étoffement des règles.
 
 ## Liens
 
 - [DATA_publications-match-or-create](DATA_publications-match-or-create.md) — fiche d'origine : tokens de confirmation, réconciliation unifiée merge+split, ancre DOI, vocabulaire token/garde-pairwise. L'item 3.2b y renvoie ici.
-- [METIER_doc-types](METIER_doc-types.md) — nomenclature canonique des `doc_type`.
-- [METIER_relations-publications](METIER_relations-publications.md) — un identifiant secondaire pontant deux DOI = relation, pas fusion.
+- [METIER_doc-types](METIER_doc-types.md) — nomenclature canonique des `doc_type` (et typage incertain des communications).
+- [METIER_relations-publications](METIER_relations-publications.md) — versions (preprint/publié) et identifiants secondaires pontant deux DOI = relations, pas fusions.
