@@ -11,7 +11,6 @@
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur / ou juste supprimer silencieusement le hal_person_id partout par précaution?
 ### Suite du traitement
 * [ ] phase persons: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 person_id)
-* [ ] phase publications: comparer pros/cons de l'ancien `match_or_create` et du nouveau `create_and_merge`; voir s'il n'y a pas moyen de revenir à un `match_or_create` sans les inconvénients (par ex. distinguer colonnes raw_* et corrected_*: corrections métadonnées et ordres de non-fusion opérés au niveau souce_publication plutôt que publication?). Ou peut-être que la lourdeur de `create_and_merge` est consécutive à un premier full run, et ne se reproduit pas: voir à l'usage
 ## Code
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
 * [ ] chantier observabilité pipeline: quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de snapshot; c'est un problème. => faire des snapshots par phase, pas par pipeline
@@ -96,5 +95,5 @@
 * titre contient "A systematic review" => idem
 
 # Oneshots sur base de prod à la prochaine occasion
-* backfill source_publications.title_normalized?
+* python -m interfaces.cli.oneshot.backfill_title_normalized ?
 * squasher le schéma
