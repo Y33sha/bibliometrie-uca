@@ -4,7 +4,7 @@ Matche ou crée les publications canoniques pour les `source_publications` non r
 Phase du pipeline qui s'exécute APRÈS affiliations (quand in_perimeter est déterminé sur les source_authorships) et AVANT persons/authorships.
 
 Deux passes :
-1. Pour chaque `source_publication` sans `publication_id` (tous périmètres confondus) : cascade de matching cross-source (`decide_publication_match` sur DOI, NNT, HAL_ID, THESIS_TITLE_YEAR). Si match : rattache, quel que soit le périmètre — c'est ce qui permet de résoudre les conflits inter-sources (ex. version HAL hors-UCA + version OpenAlex UCA → rattachement à la même publication canonique). Sinon : crée la publication, mais uniquement si `allow_create` (dérivé de la colonne `in_perimeter`) est vrai — sans authorship in_perimeter, on ne fait pas entrer une nouvelle publication dans le périmètre.
+1. Pour chaque `source_publication` sans `publication_id` (tous périmètres confondus) : cascade de matching cross-source (`decide_publication_match` sur DOI, NNT, HAL_ID, PMID, THESIS_META). Si match : rattache, quel que soit le périmètre — c'est ce qui permet de résoudre les conflits inter-sources (ex. version HAL hors-UCA + version OpenAlex UCA → rattachement à la même publication canonique). Sinon : crée la publication, mais uniquement si `allow_create` (dérivé de la colonne `in_perimeter`) est vrai — sans authorship in_perimeter, on ne fait pas entrer une nouvelle publication dans le périmètre.
 2. Pour chaque publication stale (au moins un `source_publication.updated_at > publications.updated_at`) : `refresh_from_sources` pour ré-agréger les méta canoniques (dont DOI promu par priorité de source).
 
 L'orchestrateur dépend du port `PublicationsMatchOrCreateQueries`. Le point d'entrée CLI est dans `interfaces/cli/pipeline/match_or_create_publications.py`.
@@ -15,10 +15,6 @@ from typing import Literal
 
 from sqlalchemy import Connection
 
-from application.pipeline.publications.metadata_deduplication_rules import (
-    match_proceedings_by_title_year_authorcount,
-    match_thesis_by_title_year,
-)
 from application.ports.pipeline.publications_match_or_create import (
     PublicationsMatchOrCreateQueries,
     SourcePublicationRow,
@@ -27,10 +23,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.publications import refresh_from_sources
 from domain.normalize import normalize_text
-from domain.publications.deduplication import (
-    MetadataDeduplicationCase,
-    decide_publication_match,
-)
+from domain.publications.deduplication import decide_publication_match
 from domain.publications.metadata import (
     OA_STATUS_UNKNOWN_DEFAULT,
     clean_publication_title,
@@ -118,37 +111,22 @@ def process_document(
     if pmid:
         pmid_match_id = pub_repo.find_by_pmid(pmid)
 
-    # Prefetch dédup par métadonnées : aiguillage par doc_type vers la
-    # règle correspondante. Les règles vivent dans
-    # `metadata_deduplication_rules.py` ; chaque membre de
-    # `MetadataDeduplicationCase` est documenté côté domain.
-    metadata_match: tuple[int, MetadataDeduplicationCase] | None = None
-    if doc_type == "thesis":
-        metadata_match = match_thesis_by_title_year(
-            conn,
-            queries=queries,
-            source_publication_id=doc.id,
-            title_normalized=title_normalized,
-            pub_year=pub_year,
-            pub_repo=pub_repo,
-        )
-    elif doc_type == "proceedings":
-        metadata_match = match_proceedings_by_title_year_authorcount(
-            conn,
-            queries=queries,
-            source_publication_id=doc.id,
-            title_normalized=title_normalized,
-            pub_year=pub_year,
-            doi=doi,
-            pub_repo=pub_repo,
-        )
+    # Prefetch token thèse : un titre+année de thèse identifie l'œuvre (token de
+    # confirmation, cf. `domain.source_publications.keys`). Lookup sans garde —
+    # deux thèses au même titre+année sont la même (cf. fiche chantier). La
+    # réconciliation des composantes capte le même token a posteriori.
+    thesis_meta_match_id: int | None = None
+    if keys.thesis_meta:
+        thesis_candidates = pub_repo.find_thesis_by_title(title_normalized, pub_year)
+        if thesis_candidates:
+            thesis_meta_match_id = thesis_candidates[0]
 
     decision = decide_publication_match(
         doi_merge_with_id=doi_merge_with_id,
         nnt_match_id=nnt_match_id,
         hal_id_match_id=hal_id_match_id,
         pmid_match_id=pmid_match_id,
-        metadata_match=metadata_match,
+        thesis_meta_match_id=thesis_meta_match_id,
     )
 
     if decision.action == "match":
