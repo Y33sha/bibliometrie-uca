@@ -1,4 +1,4 @@
-# Chantier — Déduplication des publications sans identifiant fiable (arête pairwise-gated)
+"# Chantier — Déduplication des publications sans identifiant fiable (arête pairwise-gated)
 
 ## Contexte
 
@@ -42,6 +42,7 @@ Une **arête pairwise-gated** dans la réconciliation (`reconcile_components`) :
 ## Questions ouvertes
 
 - **Précision de la garde auteurs** : quelle forme de recouvrement (premier auteur seul, recouvrement de noms avec seuil, sous-ensemble strict) — mesurer par type les faux positifs (collisions fusionnées à tort) et faux négatifs (même œuvre non fusionnée). Le compte d'auteurs est écarté comme critère (cassé par la troncature cross-source) ; tout au plus un pré-filtre.
+- **Comparaison de deux listes d'auteurs (vrai problème de design)** : matcher des noms qui divergent — noms composés (« Le Goff », « Da Silva »), initiales (« J. Dupont » vs « Jean Dupont »), ordre nom/prénom, accents, translittération. `names_compatible` (domain) existe mais reste **heuristique/bricolage** — à reprendre proprement avant d'en faire le cœur de la garde, d'autant qu'ici on compare des **listes** (recouvrement), pas deux noms isolés. Tension d'ordre à noter : une comparaison par `person_id` **résolu** serait robuste et contournerait le matching de noms, mais les personnes sont résolues **après** la phase publications — au moment de la dédup on ne dispose que des **noms bruts**. Donc matching de noms requis à ce stade (sauf à revoir l'ordre des phases).
 - **Typage incertain** : la même œuvre typée différemment selon le dépôt ne co-bloque pas si la clé inclut `doc_type`. Bloquer hors type, ou corriger les types en amont — à cadrer.
 - **Versions sans DOI distinctif** : preprint + publié au même titre+année, mêmes auteurs, sans DOI pour les séparer → la garde auteurs les fusionnerait, alors que c'est *peut-être* une relation. Cas limite : à mesurer (fréquence réelle) avant de décider.
 - **Thèse mistypée sans `journal_id`** (renvoyée depuis la fiche d'origine) : SP typées thèse portant un DOI éditeur sans `journal_id` (~69 au stock, dont 3 partageant un DOI avec un article). Relève d'une **correction de `doc_type`** (étendre `THESIS_WITH_JOURNAL_TO_ARTICLE` au signal DOI éditeur, unaire ou relationnel), pas de la dédup pairwise — mais à traiter dans le même mouvement d'étoffement des règles.
