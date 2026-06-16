@@ -96,5 +96,5 @@
 * titre contient "A systematic review" => idem
 
 # Oneshots sur base de prod à la prochaine occasion
-* re-seeder les place_name_forms à partir de seed.sql
+* backfill source_publications.title_normalized?
 * squasher le schéma
