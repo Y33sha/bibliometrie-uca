@@ -1129,6 +1129,7 @@ def _run_enrich_publishers_from_crossref_members() -> None:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import publisher_repository
+    from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
     from infrastructure.sources.config import get_polite_pool_email
     from infrastructure.sources.crossref.members import fetch_crossref_member
     from infrastructure.sources.doi_prefixes.clients import build_user_agent
@@ -1138,8 +1139,11 @@ def _run_enrich_publishers_from_crossref_members() -> None:
     conn = get_sync_engine().connect()
     try:
         user_agent = build_user_agent(get_polite_pool_email(conn))
+        # Coupe-circuit Crossref (budget API) : partagé entre les fetches parallèles ;
+        # une fois tripé, les appels restants sautent l'API (cf. fetch_crossref_member).
+        breaker = SourceCircuitBreaker("crossref")
         fetcher: CrossrefMemberFetcher = lambda member_id: fetch_crossref_member(  # noqa: E731
-            member_id, user_agent=user_agent, logger=log
+            member_id, user_agent=user_agent, logger=log, breaker=breaker
         )
 
         run_enrich_publishers_from_crossref_members(

@@ -33,6 +33,14 @@ from domain.journals.journal import map_openalex_source_type
 OPENALEX_PREFIX = "https://openalex.org/"
 BATCH_SIZE = 50  # max IDs par requête (API limit = 100, on reste prudent)
 COMMIT_EVERY = 500  # commit DB tous les N journals traités
+# Coupe-circuit : N batches consécutifs en 429 (budget API OpenAlex quotidien épuisé)
+# avant d'interrompre l'enrichissement. OpenAlex est la seule source à limite dure
+# quotidienne ; les autres sources n'en ont pas besoin.
+RATE_LIMIT_STRIKES_MAX = 3
+
+
+class _OpenAlexRateLimited(Exception):
+    """429 répétés sur un batch (3 retries épuisés) : budget API probablement épuisé."""
 
 
 def to_full_id(short_id: str) -> str:
@@ -89,11 +97,7 @@ def fetch_sources_batch(
                 continue
             resp.raise_for_status()
             data = resp.json()
-            results = {}
-            for source in data.get("results", []):
-                short = to_short_id(source["id"])
-                results[short] = source
-            return results
+            return {to_short_id(source["id"]): source for source in data.get("results", [])}
         except requests.RequestException as e:
             if attempt < 2:
                 logger.warning(f"Erreur requête (tentative {attempt + 1}/3): {e}")
@@ -101,7 +105,8 @@ def fetch_sources_batch(
             else:
                 logger.error(f"Échec après 3 tentatives: {e}")
                 return {}
-    return {}
+    # Boucle épuisée sans succès ni exception réseau = 3 × 429 → budget épuisé.
+    raise _OpenAlexRateLimited()
 
 
 def extract_apc(source: dict) -> tuple[float | None, str]:
@@ -153,19 +158,36 @@ def run_enrich_journals_from_openalex(
         processed = 0
         raw_type_counter: Counter[str] = Counter()
         type_written = 0
+        strikes = 0  # batches 429 consécutifs (coupe-circuit)
 
         for i in range(0, total, BATCH_SIZE):
             batch = journals[i : i + BATCH_SIZE]
             oa_ids = [row[1] for row in batch]
             id_map = {row[1]: row[0] for row in batch}
 
-            sources = fetch_sources_batch(
-                oa_ids,
-                logger,
-                openalex_sources_api=openalex_sources_api,
-                api_key=api_key,
-                mailto=mailto,
-            )
+            try:
+                sources = fetch_sources_batch(
+                    oa_ids,
+                    logger,
+                    openalex_sources_api=openalex_sources_api,
+                    api_key=api_key,
+                    mailto=mailto,
+                )
+            except _OpenAlexRateLimited:
+                strikes += 1
+                if strikes >= RATE_LIMIT_STRIKES_MAX:
+                    if not dry_run:
+                        conn.commit()
+                    logger.warning(
+                        "⚡ Coupe-circuit OpenAlex (429 sur %d batches consécutifs) : "
+                        "enrichissement revues interrompu à %d/%d. Reste retenté au prochain run.",
+                        strikes,
+                        processed,
+                        total,
+                    )
+                    return
+                continue  # budget peut-être ponctuel : on saute ce batch, on retente le suivant
+            strikes = 0  # succès (ou skip réseau) → on remet le compteur à zéro
             time.sleep(rate_delay)
 
             for oa_id, journal_id in id_map.items():
