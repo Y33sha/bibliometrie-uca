@@ -78,13 +78,21 @@ def _create_new_publication(
 
 
 class ReconcileStats(NamedTuple):
-    """Bilan d'une passe de réconciliation (pour le logging du `run`)."""
+    """Bilan d'une passe de réconciliation, en vocabulaire lisible (pour le log de `run`).
 
-    dirty: int
-    groups: int
-    new_pubs: int
-    dissolved: int
-    survivors: int
+    `processed` = SP dirty traitées ; `publications` = publications résultantes (auxquelles des
+    SP sont rattachées) ; `created` = parmi elles, nouvellement créées (orphelins matérialisés
+    **et** spin-offs de scission) ; `existing` = déjà existantes conservées ; `merges` =
+    publications redondantes absorbées dans une autre et supprimées ; `splits` = nouvelles
+    publications issues d'une scission (un DOI distinct détaché d'une publication existante).
+    """
+
+    processed: int
+    publications: int
+    created: int
+    existing: int
+    merges: int
+    splits: int
     cleared: int
 
 
@@ -94,29 +102,52 @@ def reconcile(
     *,
     pub_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
+    logger: logging.Logger | None = None,
 ) -> ReconcileStats | None:
     """Planifie et applique la réconciliation du voisinage dirty, **sans `commit`** (à la charge
     du caller). Retourne `None` si aucune SP n'est dirty, sinon le bilan.
 
     Primitif partagé par le `run` du pipeline (qui commit) et le helper de tests d'intégration
-    (qui rollback en fin de fixture) — d'où l'absence de `commit` ici.
+    (qui rollback en fin de fixture) — d'où l'absence de `commit` ici. `logger` (optionnel) émet
+    la progression : sur un full rerun, le rafraîchissement des survivants domine le temps, d'où
+    le compteur `i/total`.
     """
     dirty_ids = queries.fetch_dirty_source_publication_ids(conn)
     if not dirty_ids:
         return None
 
+    if logger:
+        logger.info(
+            "Réconciliation : %d source_publications dirty, chargement de l'univers…",
+            len(dirty_ids),
+        )
     rows = queries.fetch_reconciliation_universe(conn)
     rows_by_sp = {row.id: row for row in rows}
     plan = plan_reconciliation(_member(row) for row in rows)
+    if logger:
+        logger.info(
+            "  univers de %d SP → %d publications cibles, %d doublons à fusionner ; application…",
+            len(rows),
+            len(plan.groups),
+            len(plan.dissolved),
+        )
 
     survivors: set[int] = set()
+    created = 0
+    splits = 0
 
-    # 1. Groupes : rattacher chaque SP à son ancre (ou à un nouveau pub — orphelins in-périmètre
-    #    ou partition perdante d'un split).
+    # 1. Groupes : rattacher chaque SP à son ancre (ou à un nouveau pub — orphelins in-périmètre,
+    #    ou partition perdante d'un split = scission d'une publication existante).
     for group in plan.groups:
         target = group.target_publication_id
         if target is None:
+            from_existing = any(
+                rows_by_sp[sp].publication_id is not None for sp in group.source_publication_ids
+            )
             target = _create_new_publication(group, rows_by_sp, pub_repo)
+            created += 1
+            if from_existing:
+                splits += 1
         queries.repoint_source_publications(conn, list(group.source_publication_ids), target)
         survivors.add(target)
 
@@ -131,19 +162,24 @@ def reconcile(
         with savepoint(conn, "reconcile_dissolve"):
             refresh_from_sources(dissolved.publication_id, repo=pub_repo, audit_repo=audit_repo)
 
-    # 3. Rafraîchir les survivants : métadonnées canoniques recomputées.
-    for pub_id in sorted(survivors):
+    # 3. Rafraîchir les survivants : métadonnées canoniques recomputées. Phase la plus longue sur
+    #    un gros run → progression tous les 5000.
+    survivor_ids = sorted(survivors)
+    total = len(survivor_ids)
+    for i, pub_id in enumerate(survivor_ids, 1):
         with savepoint(conn, "reconcile_refresh"):
             refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
+        if logger and (i % 5000 == 0 or i == total):
+            logger.info("  rafraîchissement des métadonnées : %d/%d publications", i, total)
 
     cleared = queries.clear_keys_dirty(conn, dirty_ids)
-    new_pubs = sum(1 for g in plan.groups if g.target_publication_id is None)
     return ReconcileStats(
-        dirty=len(dirty_ids),
-        groups=len(plan.groups),
-        new_pubs=new_pubs,
-        dissolved=len(plan.dissolved),
-        survivors=len(survivors),
+        processed=len(dirty_ids),
+        publications=len(survivors),
+        created=created,
+        existing=len(survivors) - created,
+        merges=len(plan.dissolved),
+        splits=splits,
         cleared=cleared,
     )
 
@@ -165,29 +201,30 @@ def run(
                 plan = plan_reconciliation(
                     _member(row) for row in queries.fetch_reconciliation_universe(conn)
                 )
-                new_pubs = sum(1 for g in plan.groups if g.target_publication_id is None)
+                created = sum(1 for g in plan.groups if g.target_publication_id is None)
                 logger.info(
-                    "  %d groupe(s), %d nouveau(x) pub(s), %d publication(s) dissoute(s)",
+                    "  → rattachées à %d publications (%d créées), %d doublons à fusionner",
                     len(plan.groups),
-                    new_pubs,
+                    created,
                     len(plan.dissolved),
                 )
             conn.rollback()
             return
 
-        stats = reconcile(conn, queries, pub_repo=pub_repo, audit_repo=audit_repo)
+        stats = reconcile(conn, queries, pub_repo=pub_repo, audit_repo=audit_repo, logger=logger)
         if stats is None:
             logger.info("Réconciliation : aucune source_publication dirty")
             return
         conn.commit()
+        logger.info("✓ %d source_publications traitées", stats.processed)
         logger.info(
-            "✓ %d dirty, %d survivant(s), %d nouveau(x), %d dissous, %d SP nettoyées",
-            stats.dirty,
-            stats.survivors,
-            stats.new_pubs,
-            stats.dissolved,
-            stats.cleared,
+            "  → rattachées à %d publications (%d nouvelles dont %d par scission, %d déjà existantes)",
+            stats.publications,
+            stats.created,
+            stats.splits,
+            stats.existing,
         )
+        logger.info("  → %d doublons fusionnés", stats.merges)
     except Exception:
         conn.rollback()
         logger.exception("Erreur")
