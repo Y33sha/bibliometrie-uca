@@ -2,7 +2,7 @@
 
 Implémenté par `infrastructure.queries.pipeline.publications_reconciliation.PgPublicationsReconciliationQueries`.
 
-La passe lit le **voisinage 1-hop** des `source_publications` marquées `keys_dirty` (les SP dirty + celles qui partagent une clé de confirmation avec elles), décide les assignations SP → pub-ancre (`domain.publications.reconciliation.plan_reconciliation` — merge et split unifiés), les applique, puis efface le drapeau. Cf. le raisonnement 1-hop documenté côté domaine.
+La passe lit le **voisinage 1-hop** des `source_publications` marquées `keys_dirty` (les SP dirty + celles qui partagent une clé de confirmation avec elles), décide les assignations SP → pub-ancre (`domain.publications.reconciliation.plan_reconciliation` — assignation, merge et split unifiés : un orphelin se fait matcher/créer/skipper par le même primitif), les applique, puis efface le drapeau. Cf. le raisonnement 1-hop documenté côté domaine.
 """
 
 from typing import NamedTuple, Protocol
@@ -15,32 +15,33 @@ class ReconcileRow(NamedTuple):
 
     `doc_type`/`title_normalized`/`pub_year` alimentent le token métadonnée thèse de
     `project_confirmation_keys` (les identifiants viennent de `doi`/`external_ids`).
-    `publication_doi` = DOI canonique de la publication courante, qui sert à choisir
-    l'ancre de réconciliation (le pub portant le DOI de la partition)."""
+    `publication_id` = `None` si orpheline ; `publication_doi` = DOI canonique de la
+    publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` =
+    la SP a ≥1 authorship in-périmètre (gate de création d'une pub neuve)."""
 
     id: int
     doi: str | None
     external_ids: dict[str, object] | None
-    publication_id: int
+    publication_id: int | None
     doc_type: str | None
     title_normalized: str | None
     pub_year: int | None
     publication_doi: str | None
+    in_perimeter: bool
 
 
 class PublicationsReconciliationQueries(Protocol):
     """Opérations SQL de la réconciliation des composantes."""
 
     def fetch_dirty_source_publication_ids(self, conn: Connection) -> list[int]:
-        """Les `source_publications` `keys_dirty` rattachées à une publication (seeds à réconcilier
-        puis à nettoyer). Les orphelines dirty (sans publication) sont ignorées : rien à réconcilier
-        tant qu'elles ne sont pas matérialisées ; elles restent dirty jusqu'à leur rattachement."""
+        """Les `source_publications` `keys_dirty` (**orphelines comprises** : la réconciliation est
+        aussi l'assignation). Seeds à réconcilier puis à nettoyer (`clear_keys_dirty`)."""
         ...
 
     def fetch_reconciliation_universe(self, conn: Connection) -> list[ReconcileRow]:
-        """Le voisinage 1-hop : les SP dirty (avec publication) **et** les SP qui partagent une clé
-        de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`pub_year`)
-        avec l'une d'elles. Univers sur lequel tourne `connected_components`."""
+        """Le voisinage 1-hop : les SP dirty (orphelines comprises) **et** les SP qui partagent une
+        clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`pub_year`)
+        avec l'une d'elles — matérialisées ou orphelines. Univers sur lequel tourne `connected_components`."""
         ...
 
     def repoint_source_publications(

@@ -7,10 +7,10 @@ Couvre deux fonctions prod sur vraie base PostgreSQL (bibliometrie_test) :
 - `find_by_nnt` : lookup d'une publication via le NNT porté en `external_ids`.
 
 Chaque test tourne dans une transaction rollbackée (isolation complète). Les
-publications sont semées directement via le repo (`create`) — pas de cascade de
-matching : la décision de déduplication est testée à l'unité
-(`tests/unit/domain/publications/test_deduplication.py`) et sur la vraie entrée
-pipeline (`tests/integration/infrastructure/queries/test_match_or_create_queries.py`).
+publications sont semées directement via le repo (`create`) — pas de clustering :
+la décision d'assignation + réconciliation est testée à l'unité
+(`tests/unit/domain/publications/test_reconciliation.py`) et de bout en bout sur
+la vraie passe pipeline (`tests/integration/pipeline/test_reprocessing.py`).
 """
 
 from sqlalchemy import bindparam, text

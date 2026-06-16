@@ -5,9 +5,9 @@ Une *clé de confirmation* est un attribut cross-source par lequel deux `source_
 - **Identifiants** : DOI, NNT, HAL ID, PMID — égalité directe.
 - **Token métadonnée** : pour une classe où une clé composite dérivable de la SP est assez **sélective** pour valoir identité par égalité. Cas validé : la thèse, `("thesis_meta", "<title_normalized>|<pub_year>")` (un titre de thèse + année est unique en pratique ; cf. fiche chantier). Les types à titre faible (proceedings, chapitres…) qui exigeraient un second accord pairwise ne sont **pas** des tokens — ils relèvent d'un mécanisme distinct (futur chantier).
 
-La projection est l'unique définition de « quelles clés porte cette SP », partagée par l'assignation (`match_or_create`) et par la réconciliation des composantes — aucun site ne ré-encode son extraction.
+La projection est l'unique définition de « quelles clés porte cette SP », consommée par la passe d'assignation + réconciliation des composantes (`reconcile_components`) — aucun site ne ré-encode son extraction.
 
-Les valeurs sont lues sur la SP **corrigée** (colonnes typées + `external_ids`), déjà normalisées en amont (phase `normalize`) puis corrigées (phase `metadata_correction`). Les identifiants repassent par les VO : idempotent sur des valeurs propres, forme canonique unique quel que soit l'appelant (les lookups repo `find_by_*` la consomment). Le DOI lu est la colonne nue (concept Zenodo déjà substitué a priori par `metadata_correction`) : la projection ignore Zenodo.
+Les valeurs sont lues sur la SP **corrigée** (colonnes typées + `external_ids`), déjà normalisées en amont (phase `normalize`) puis corrigées (phase `metadata_correction`). Les identifiants repassent par les VO : idempotent sur des valeurs propres, forme canonique unique quel que soit l'appelant (le clustering relie les SP par égalité de tokens). Le DOI lu est la colonne nue (concept Zenodo déjà substitué a priori par `metadata_correction`) : la projection ignore Zenodo.
 """
 
 from collections.abc import Mapping

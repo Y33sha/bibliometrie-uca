@@ -11,7 +11,7 @@ from domain.publications.reconciliation import (
 )
 
 
-def _m(sp_id, pub_id, *, pub_doi=None, doi=None, tokens=(), in_perimeter=False):
+def _m(sp_id, pub_id, *, pub_doi=None, doi=None, tokens=(), in_perimeter=False, tn="t", year=2024):
     return ReconcileMember(
         source_publication_id=sp_id,
         publication_id=pub_id,
@@ -19,6 +19,8 @@ def _m(sp_id, pub_id, *, pub_doi=None, doi=None, tokens=(), in_perimeter=False):
         effective_doi=doi,
         tokens=frozenset(tokens),
         in_perimeter=in_perimeter,
+        title_normalized=tn,
+        pub_year=year,
     )
 
 
@@ -172,6 +174,17 @@ class TestAssignmentOfOrphans:
     def test_lone_orphan_out_of_perimeter_skipped(self):
         plan = plan_reconciliation([_m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")])])
         assert plan.groups == ()
+
+    def test_create_gated_by_missing_metadata(self):
+        """Orphelin in-périmètre mais sans titre/année → pas de create (skip), comme le gate
+        `has_minimal_publication_metadata` (sinon `pub_year NOT NULL` ferait échouer la création)."""
+        plan = plan_reconciliation(
+            [
+                _m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")], in_perimeter=True, year=None),
+                _m(2, None, doi="10.1/x", tokens=[("doi", "10.1/x")], in_perimeter=True, tn=""),
+            ]
+        )
+        assert plan.groups == ()  # aucun membre matérialisable
 
     def test_mixed_orphan_matches_other_orphan_skipped(self):
         """Un orphelin rejoint une pub (DOI X) ; un autre orphelin (DOI Y, hors-périmètre) skip."""

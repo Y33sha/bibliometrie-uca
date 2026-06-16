@@ -445,21 +445,22 @@ def phase_metadata_correction(**kw: Any) -> Any:
 
 
 def phase_publications(**kw: Any) -> Any:
-    """Assignation des `source_publications` aux publications, puis réconciliation.
+    """Assignation des `source_publications` aux publications, en une seule passe.
 
-    `match_or_create` assigne chaque source_publication (match ou création gatée
-    périmètre), puis `reconcile_components` fusionne les publications en surplus
-    par composante connexe des clés de confirmation (DOI/NNT/hal_id/PMID + token
-    thèse `title+year`), dans le respect du cannot-link DOI.
+    `reconcile_components` clusterise le voisinage des SP dirty par composante
+    connexe des clés de confirmation (DOI/NNT/hal_id/PMID + token thèse
+    `title+year`) et assigne chaque SP au pub-ancre de sa partition `(composante ∩
+    DOI)`, dans le respect du cannot-link DOI. Assignation (match/create/skip d'un
+    orphelin) et réconciliation (merge/split de publications matérialisées) sont
+    des facettes du même primitif — un seul `connected_components`, aucun drift.
 
     Les passes ad-hoc `merge_pubs_by_*` ont été retirées du pipeline : la
-    réconciliation les subsume. La dédup thèse passe par le token de confirmation
-    (assignation + réconciliation), plus de passe métadonnées dédiée.
+    réconciliation les subsume. La dédup thèse passe par le token de confirmation,
+    plus de passe métadonnées dédiée.
 
     Prerequis : la phase `zenodo_doi` (en amont) a resolu les concept DOI Zenodo,
     appliqués en colonne par `metadata_correction`.
     """
-    _run_match_or_create_publications()
     _run_reconcile_components()
     # `addresses.pub_count` compte les publications par adresse : recalcul ici,
     # une fois les publications créées et fusionnées — il n'y a rien à compter
@@ -611,30 +612,6 @@ def _run_correct_by_cluster() -> None:
     finally:
         conn.close()
     log.info("✓ metadata_correction (cluster) terminé en %.1fs", time.time() - t0)
-
-
-def _run_match_or_create_publications() -> None:
-    from application.pipeline.publications.match_or_create_publications import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.publications_match_or_create import (
-        PgPublicationsMatchOrCreateQueries,
-    )
-    from infrastructure.repositories import audit_repository, publication_repository
-
-    log.info("▶ match_or_create_publications")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run(
-            conn,
-            PgPublicationsMatchOrCreateQueries(),
-            log,
-            pub_repo=publication_repository(conn),
-            audit_repo=audit_repository(conn),
-        )
-    finally:
-        conn.close()
-    log.info("✓ match_or_create_publications terminé en %.1fs", time.time() - t0)
 
 
 def _run_reconcile_components() -> None:

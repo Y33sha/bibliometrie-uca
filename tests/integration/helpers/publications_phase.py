@@ -2,7 +2,7 @@
 
 Partagé par les tests d'idempotence et de re-traitement, qui ont besoin de
 créer/rattacher les publications de leurs source_publications orphelins sans
-réimplémenter la cascade de matching.
+réimplémenter l'assignation.
 """
 
 from sqlalchemy import Connection, text
@@ -13,10 +13,10 @@ from application.pipeline.metadata_correction.correct_by_cluster import (
 from application.pipeline.metadata_correction.correct_unary import (
     compute_update as compute_unary_update,
 )
-from application.pipeline.publications.match_or_create_publications import process_document
+from application.pipeline.publications.reconcile_components import reconcile
 from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
-from infrastructure.queries.pipeline.publications_match_or_create import (
-    PgPublicationsMatchOrCreateQueries,
+from infrastructure.queries.pipeline.publications_reconciliation import (
+    PgPublicationsReconciliationQueries,
 )
 from infrastructure.repositories import publication_repository
 
@@ -42,31 +42,30 @@ def apply_metadata_corrections(conn: Connection) -> None:
     queries.persist_doi_corrections(conn, cluster_updates)
 
 
-def create_all_publications(conn: Connection):
+def create_all_publications(conn: Connection) -> None:
     """Crée/rattache les publications des source_publications orphelins via la
-    vraie phase A du pipeline (`process_document` par orphelin), pas une cascade
-    réimplémentée.
+    vraie passe d'assignation+réconciliation du pipeline (`reconcile`), pas une
+    cascade réimplémentée.
 
     Joue d'abord `metadata_correction` (unaire puis cluster), comme l'ordre réel
-    du pipeline : le matcher lit le `doc_type`/`journal_id`/`oa_status` canonique
-    corrigé écrit en place sur la `source_publication`, il ne re-mappe ni ne
+    du pipeline : l'assignation lit le `doc_type`/`journal_id`/`oa_status` canonique
+    corrigé écrit en place sur la `source_publication`, elle ne re-mappe ni ne
     re-corrige. Sans cette passe, une SP porterait sa nomenclature source brute
     (`ART`, `journal-article`…) jusqu'à l'enum canonique → écriture invalide.
 
     Ces tests ne jouent pas la phase affiliations : aucun `source_authorship`
     n'est in_perimeter, or l'assignation ne *crée* une publication que pour un
-    orphelin in_perimeter (gate `allow_create`). On sème donc le périmètre à la
-    main (`in_perimeter = TRUE`) — équivalent de ce que pose la phase affiliations
-    en prod.
+    orphelin in_perimeter. On sème donc le périmètre à la main (`in_perimeter = TRUE`)
+    — équivalent de ce que pose la phase affiliations en prod.
+
+    `reconcile` ne commit pas (à la charge du caller), ce qui préserve l'isolation
+    transactionnelle du fixture `sa_sync_conn`.
     """
     conn.execute(text("UPDATE source_authorships SET in_perimeter = TRUE"))
 
     apply_metadata_corrections(conn)
 
-    queries = PgPublicationsMatchOrCreateQueries()
-    repo = publication_repository(conn)
-    for doc in queries.fetch_orphan_source_publications(conn):
-        process_document(conn, queries, doc, dry_run=False, pub_repo=repo)
+    reconcile(conn, PgPublicationsReconciliationQueries(), pub_repo=publication_repository(conn))
 
 
 __all__ = ["apply_metadata_corrections", "create_all_publications"]
