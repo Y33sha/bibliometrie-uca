@@ -1,11 +1,11 @@
-"""Tests unitaires de `domain.publications.clustering.connected_components`.
+"""Tests unitaires de `domain.entity_resolution.connected_components`.
 
-Garde le contrat du clustering ER : fermeture transitive sur tokens partagés, isolation par type de token, singletons sans clé, et déterminisme (composantes triées, racine au `min`).
+Garde le contrat du clustering ER : fermeture transitive sur clés partagées, isolation par type de clé, singletons sans clé, et déterminisme (composantes triées, racine au `min`).
 """
 
 from __future__ import annotations
 
-from domain.publications.clustering import connected_components
+from domain.entity_resolution import connected_components
 
 
 def _tok(*pairs: tuple[str, str]) -> frozenset[tuple[str, str]]:
