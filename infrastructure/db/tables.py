@@ -870,6 +870,7 @@ source_publications = Table(
         nullable=False,
         server_default=text("'{}'::jsonb"),
     ),
+    Column("keys_dirty", Boolean, nullable=False, server_default="true"),
     UniqueConstraint("source", "source_id", name="source_publications_source_source_id_key"),
     Index(
         "idx_source_pubs_title_normalized_trgm",
@@ -908,6 +909,11 @@ source_publications = Table(
         "idx_source_pubs_pub",
         "publication_id",
         postgresql_where=text("publication_id IS NOT NULL"),
+    ),
+    Index(
+        "idx_source_pubs_keys_dirty",
+        "keys_dirty",
+        postgresql_where=text("keys_dirty"),
     ),
     Index(
         "idx_source_pubs_staging",
