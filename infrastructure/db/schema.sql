@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bcAWjUebtSRccK4lQWTNhYbhhhZAAiAA3evcMQklMM67tnAYmV53aAYC16KyGFX
+\restrict jda118urijfBKK8aWfj3sSle91GnyOSUQp1T0cy0DcNNRAs1e1mlWbee8ecVeiP
 
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
@@ -112,7 +112,8 @@ CREATE TYPE public.journal_type AS ENUM (
     'book_series',
     'preprint_server',
     'media',
-    'ebook_platform'
+    'ebook_platform',
+    'unknown'
 );
 
 
@@ -748,7 +749,7 @@ CREATE TABLE public.journals (
     apc_currency text DEFAULT 'EUR'::text,
     oa_model text,
     created_at timestamp with time zone DEFAULT now(),
-    journal_type public.journal_type DEFAULT 'journal'::public.journal_type,
+    journal_type public.journal_type DEFAULT 'unknown'::public.journal_type,
     is_academic boolean DEFAULT true,
     doi_prefix text,
     doaj_payload jsonb,
@@ -1030,7 +1031,8 @@ CREATE TABLE public.publications (
     sources public.source_type[] DEFAULT '{}'::public.source_type[] NOT NULL,
     meta jsonb,
     is_retracted boolean DEFAULT false NOT NULL,
-    in_perimeter boolean DEFAULT false NOT NULL
+    in_perimeter boolean DEFAULT false NOT NULL,
+    unpaywall_checked_at timestamp with time zone
 );
 
 
@@ -1219,7 +1221,11 @@ CREATE TABLE public.source_publications (
     biblio jsonb,
     meta jsonb,
     updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
-    CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text))
+    raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    title_normalized text,
+    keys_dirty boolean DEFAULT true NOT NULL,
+    CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
+    CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
 );
 
 
@@ -2428,17 +2434,17 @@ CREATE INDEX idx_pub_title_trgm ON public.publications USING gin (title_normaliz
 
 
 --
+-- Name: idx_pub_unpaywall_checked; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pub_unpaywall_checked ON public.publications USING btree (unpaywall_checked_at NULLS FIRST) WHERE (doi IS NOT NULL);
+
+
+--
 -- Name: idx_publication_structures_structure; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_publication_structures_structure ON public.publication_structures USING btree (structure_id);
-
-
---
--- Name: idx_publications_doi_lower; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_publications_doi_lower ON public.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
 
 
 --
@@ -2589,6 +2595,20 @@ CREATE INDEX idx_source_pubs_hal_id ON public.source_publications USING gin (((e
 
 
 --
+-- Name: idx_source_pubs_keys_dirty; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_keys_dirty ON public.source_publications USING btree (keys_dirty) WHERE keys_dirty;
+
+
+--
+-- Name: idx_source_pubs_metadata_block; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_metadata_block ON public.source_publications USING btree (title_normalized, pub_year, doc_type);
+
+
+--
 -- Name: idx_source_pubs_nnt; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2614,6 +2634,13 @@ CREATE INDEX idx_source_pubs_pub ON public.source_publications USING btree (publ
 --
 
 CREATE INDEX idx_source_pubs_staging ON public.source_publications USING btree (staging_id) WHERE (staging_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_pubs_title_normalized_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_source_pubs_title_normalized_trgm ON public.source_publications USING gin (title_normalized public.gin_trgm_ops);
 
 
 --
@@ -2684,6 +2711,13 @@ CREATE UNIQUE INDEX publication_structures_pub_struct ON public.publication_stru
 --
 
 CREATE INDEX publication_subjects_subject_idx ON public.publication_subjects USING btree (subject_id);
+
+
+--
+-- Name: publications_doi_lower_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX publications_doi_lower_key ON public.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
 
 
 --
@@ -3075,5 +3109,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bcAWjUebtSRccK4lQWTNhYbhhhZAAiAA3evcMQklMM67tnAYmV53aAYC16KyGFX
+\unrestrict jda118urijfBKK8aWfj3sSle91GnyOSUQp1T0cy0DcNNRAs1e1mlWbee8ecVeiP
 
