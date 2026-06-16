@@ -81,11 +81,14 @@ def _sp_state(conn, sp_id) -> tuple:
 
 class TestUniverse:
     def test_fetches_dirty_and_one_hop_neighbor(self, sa_sync_conn):
-        """Le voisinage = SP dirty + SP non-dirty partageant une clé ; ignore les non-liées."""
+        """Le voisinage = SP dirty + SP non-dirty partageant une clé ; ignore les non-liées.
+
+        DOI porté par les SP, pas par les publications (`UNIQUE(lower(doi))` interdit deux pubs
+        au même DOI) ; le voisinage par DOI joint sur `source_publications.doi`."""
         conn = sa_sync_conn
-        pub_a = _seed_pub(conn, doi="10.1/x")
-        pub_b = _seed_pub(conn, doi="10.1/x")
-        unrelated_pub = _seed_pub(conn, doi="10.9/z")
+        pub_a = _seed_pub(conn)
+        pub_b = _seed_pub(conn)
+        unrelated_pub = _seed_pub(conn)
         dirty = _seed_sp(conn, source_id="a", publication_id=pub_a, doi="10.1/x", keys_dirty=True)
         neighbor = _seed_sp(
             conn, source_id="b", publication_id=pub_b, doi="10.1/x", keys_dirty=False
@@ -145,10 +148,13 @@ class TestUniverse:
 
 class TestEndToEnd:
     def test_two_pubs_sharing_doi_merged(self, sa_sync_conn, monkeypatch):
+        """Deux pubs dont les SP partagent un DOI → fusion. Les pubs n'ont pas (encore) le DOI en
+        colonne (`UNIQUE(lower(doi))` interdit deux pubs au même DOI) : aucune ne le porte, donc
+        l'ancre tombe sur le `min(source_publication_id)`."""
         conn = sa_sync_conn
         monkeypatch.setattr(conn, "commit", lambda: None)
-        pub_a = _seed_pub(conn, doi="10.1/x")
-        pub_b = _seed_pub(conn, doi="10.1/x")
+        pub_a = _seed_pub(conn)
+        pub_b = _seed_pub(conn)
         sp_a = _seed_sp(conn, source_id="a", publication_id=pub_a, doi="10.1/x")
         sp_b = _seed_sp(conn, source_id="b", publication_id=pub_b, doi="10.1/x")
 
@@ -159,8 +165,8 @@ class TestEndToEnd:
             pub_repo=publication_repository(conn),
         )
 
-        # Ancre = le pub portant le DOI ; les deux le portent → min(pub) = pub_a.
-        anchor, absorbed = (pub_a, pub_b) if pub_a < pub_b else (pub_b, pub_a)
+        # Aucune pub ne porte le DOI en colonne → ancre = pub du plus petit source_publication_id.
+        anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
         assert _pub_exists(conn, anchor)
         assert not _pub_exists(conn, absorbed)
         assert _sp_state(conn, sp_a) == (anchor, False)
@@ -259,5 +265,109 @@ class TestEndToEnd:
         assert _pub_exists(conn, pub_a)
         assert _pub_exists(conn, pub_b)
         # Drapeaux nettoyés malgré l'absence de fusion (les SP ont été réconciliées).
+        assert _sp_state(conn, sp_a)[1] is False
+        assert _sp_state(conn, sp_b)[1] is False
+
+
+class TestMetadataBlock:
+    LONG = "une communication scientifique au titre assez long"
+
+    def test_two_conference_papers_merged(self, sa_sync_conn, monkeypatch):
+        """Deux conference_paper cross-source, même titre (long) + année, sans DOI → fusion par token bloc."""
+        conn = sa_sync_conn
+        monkeypatch.setattr(conn, "commit", lambda: None)
+        pub_a = _seed_pub(conn)
+        pub_b = _seed_pub(conn)
+        sp_a = _seed_sp(
+            conn,
+            source_id="a",
+            publication_id=pub_a,
+            doc_type="conference_paper",
+            title_normalized=self.LONG,
+        )
+        sp_b = _seed_sp(
+            conn,
+            source_id="b",
+            publication_id=pub_b,
+            doc_type="conference_paper",
+            title_normalized=self.LONG,
+        )
+
+        run(
+            conn,
+            PgPublicationsReconciliationQueries(),
+            logger,
+            pub_repo=publication_repository(conn),
+        )
+
+        anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
+        assert _pub_exists(conn, anchor)
+        assert not _pub_exists(conn, absorbed)
+        assert _sp_state(conn, sp_a) == (anchor, False)
+        assert _sp_state(conn, sp_b) == (anchor, False)
+
+    def test_short_title_not_merged(self, sa_sync_conn, monkeypatch):
+        """Titre court (≤ seuil) → pas de token bloc, pas de fusion (garde de longueur)."""
+        conn = sa_sync_conn
+        monkeypatch.setattr(conn, "commit", lambda: None)
+        pub_a = _seed_pub(conn)
+        pub_b = _seed_pub(conn)
+        sp_a = _seed_sp(
+            conn,
+            source_id="a",
+            publication_id=pub_a,
+            doc_type="conference_paper",
+            title_normalized="court titre",
+        )
+        sp_b = _seed_sp(
+            conn,
+            source_id="b",
+            publication_id=pub_b,
+            doc_type="conference_paper",
+            title_normalized="court titre",
+        )
+
+        run(
+            conn,
+            PgPublicationsReconciliationQueries(),
+            logger,
+            pub_repo=publication_repository(conn),
+        )
+
+        assert _pub_exists(conn, pub_a)
+        assert _pub_exists(conn, pub_b)
+        assert _sp_state(conn, sp_a)[1] is False
+        assert _sp_state(conn, sp_b)[1] is False
+
+    def test_different_doc_type_not_merged(self, sa_sync_conn, monkeypatch):
+        """Même titre long + année mais doc_type différents → pas de fusion (doc_type dans la clé)."""
+        conn = sa_sync_conn
+        monkeypatch.setattr(conn, "commit", lambda: None)
+        pub_a = _seed_pub(conn)
+        pub_b = _seed_pub(conn)
+        sp_a = _seed_sp(
+            conn,
+            source_id="a",
+            publication_id=pub_a,
+            doc_type="conference_paper",
+            title_normalized=self.LONG,
+        )
+        sp_b = _seed_sp(
+            conn,
+            source_id="b",
+            publication_id=pub_b,
+            doc_type="book_chapter",
+            title_normalized=self.LONG,
+        )
+
+        run(
+            conn,
+            PgPublicationsReconciliationQueries(),
+            logger,
+            pub_repo=publication_repository(conn),
+        )
+
+        assert _pub_exists(conn, pub_a)
+        assert _pub_exists(conn, pub_b)
         assert _sp_state(conn, sp_a)[1] is False
         assert _sp_state(conn, sp_b)[1] is False

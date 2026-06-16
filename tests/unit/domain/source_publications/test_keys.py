@@ -87,24 +87,56 @@ class TestThesisMeta:
         assert keys.thesis_meta is None
 
 
+class TestMetadataBlock:
+    LONG = "une communication scientifique au titre assez long"  # > 30 caractères
+
+    def test_conference_paper_long_title(self):
+        """Type tier-1 + titre long + année → `<doc_type>|<title>|<year>` (doc_type dans la clé)."""
+        keys = _keys(doc_type="conference_paper", title_normalized=self.LONG, pub_year=2020)
+        assert keys.metadata_block == f"conference_paper|{self.LONG}|2020"
+
+    def test_book_chapter_long_title(self):
+        keys = _keys(doc_type="book_chapter", title_normalized=self.LONG, pub_year=2020)
+        assert keys.metadata_block == f"book_chapter|{self.LONG}|2020"
+
+    def test_short_title_no_token(self):
+        """Titre ≤ seuil → pas de token (garde de longueur, écarte les titres génériques)."""
+        keys = _keys(doc_type="conference_paper", title_normalized="court titre", pub_year=2020)
+        assert keys.metadata_block is None
+
+    def test_non_tier1_doc_type_no_token(self):
+        """Un type hors tier-1 (article) au même titre long ne porte pas de token bloc."""
+        keys = _keys(doc_type="article", title_normalized=self.LONG, pub_year=2020)
+        assert keys.metadata_block is None
+
+    def test_without_year_no_token(self):
+        keys = _keys(doc_type="poster", title_normalized=self.LONG, pub_year=None)
+        assert keys.metadata_block is None
+
+
 class TestMalformedExternalIds:
     def test_none_external_ids(self):
         assert _keys("10.1/x") == ConfirmationKeys(
-            doi="10.1/x", nnt=None, pmid=None, hal_ids=(), thesis_meta=None
+            doi="10.1/x", nnt=None, pmid=None, hal_ids=(), thesis_meta=None, metadata_block=None
         )
 
     def test_non_str_values_ignored(self):
         """`external_ids` peut porter des listes (issn/isbn) ou None : ignorés sans crash."""
         keys = _keys(None, {"issn": ["0028-0836"], "nnt": None, "pmid": "12345"})
         assert keys == ConfirmationKeys(
-            doi=None, nnt=None, pmid="12345", hal_ids=(), thesis_meta=None
+            doi=None, nnt=None, pmid="12345", hal_ids=(), thesis_meta=None, metadata_block=None
         )
 
 
 class TestTokens:
     def test_tokens_namespaced_by_type(self):
         keys = ConfirmationKeys(
-            doi="d", nnt="n", pmid="p", hal_ids=("h1", "h2"), thesis_meta="t|2020"
+            doi="d",
+            nnt="n",
+            pmid="p",
+            hal_ids=("h1", "h2"),
+            thesis_meta="t|2020",
+            metadata_block="conference_paper|titre|2020",
         )
         assert keys.tokens() == frozenset(
             {
@@ -114,13 +146,18 @@ class TestTokens:
                 ("hal_id", "h1"),
                 ("hal_id", "h2"),
                 ("thesis_meta", "t|2020"),
+                ("metadata_block", "conference_paper|titre|2020"),
             }
         )
 
     def test_absent_keys_produce_no_token(self):
-        keys = ConfirmationKeys(doi="d", nnt=None, pmid=None, hal_ids=(), thesis_meta=None)
+        keys = ConfirmationKeys(
+            doi="d", nnt=None, pmid=None, hal_ids=(), thesis_meta=None, metadata_block=None
+        )
         assert keys.tokens() == frozenset({("doi", "d")})
 
     def test_no_keys_empty_token_set(self):
-        empty = ConfirmationKeys(doi=None, nnt=None, pmid=None, hal_ids=(), thesis_meta=None)
+        empty = ConfirmationKeys(
+            doi=None, nnt=None, pmid=None, hal_ids=(), thesis_meta=None, metadata_block=None
+        )
         assert empty.tokens() == frozenset()
