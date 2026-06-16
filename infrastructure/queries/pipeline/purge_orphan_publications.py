@@ -38,8 +38,8 @@ def purge_orphan_publications(conn: Connection, *, limit: int | None = None) -> 
 
     Prédicat : zéro authorship actif. Sans perte de curation ni de donnée métier
     (mesuré : 0 `rejected_authorships`, 0 `apc_payments` sur ces publications) ;
-    les éventuels marqueurs `distinct_publications` (CASCADE) sont re-dérivés à
-    chaque run par `mark_distinct_publications`, avant les passes de fusion.
+    les éventuels marqueurs `distinct_publications` partent en CASCADE (paires
+    marquées par l'admin sur une publication purgée — cas marginal).
 
     `limit` borne le nombre de publications supprimées par appel (un chunk) ;
     `None` = tout en une fois. Le batching — boucler sur des chunks avec un commit

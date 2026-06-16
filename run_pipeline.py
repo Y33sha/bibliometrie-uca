@@ -241,10 +241,12 @@ def phase_refresh_stale(sources: Any = None, **kw: Any) -> PhaseMetrics:
 def phase_normalize(**kw: Any) -> Any:
     """Normalisation staging -> tables sources.
 
-    Rattache aux publications existantes (DOI/NNT/HAL-ID) sans en creer.
-    Stocke les metadonnees (abstract, keywords, topics, biblio, etc.) sur
-    source_publications. Vide le raw_data du staging apres traitement.
-    Pour HAL : enrichit les structures et extrait ORCID/IdRef depuis le TEI.
+    Écrit les `source_publications` avec `publication_id = NULL` (aucun
+    rattachement ici : l'assignation aux publications canoniques est faite plus
+    tard par la phase `publications`). Stocke les metadonnees (abstract, keywords,
+    topics, biblio, etc.) sur source_publications. Vide le raw_data du staging
+    apres traitement. Pour HAL : enrichit les structures et extrait ORCID/IdRef
+    depuis le TEI.
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
     # Ordre d'exécution : source la plus autoritative en premier
@@ -426,24 +428,40 @@ def phase_zenodo_doi(**kw: Any) -> Any:
     _run_resolve_zenodo_concept()
 
 
-def phase_publications(**kw: Any) -> Any:
-    """Creation des publications canoniques puis fusions de deduplication.
+def phase_metadata_correction(**kw: Any) -> Any:
+    """Persistance des corrections de métadonnées sur les source_publications.
 
-    Une publication par source_publication a la creation, puis les passes de
-    fusion par identifiant dans l'ordre DOI -> NNT -> PMID -> HAL-ID (du plus
-    autoritaire au moins), enfin la fusion par metadonnees. Les paires marquees
-    distinctes (mark_distinct, en amont) gardent toutes les passes.
-
-    Prerequis : la phase `zenodo_concept` (en amont) a resolu les concept DOI
-    Zenodo sur lesquels porte la dedup concept/version.
+    Tourne après `publishers_journals` (journaux typés, donc les règles
+    journal-dépendantes ont leurs entrées fraîches) et avant `publications`
+    (le matching lit les colonnes corrigées). Trois sous-étapes : unaire
+    (per-record : mapping + règles de correction), Zenodo (substitution
+    version→concept du DOI), puis cluster (group-by-clé : nullage des clés
+    erronées, ouvrage/chapitre au même DOI). La substitution Zenodo précède le
+    cluster pour que le group-by-DOI regroupe sur le concept.
     """
-    _run_create_publications()
-    _run_mark_distinct_publications()
-    _run_merge_pubs_by_doi()
-    _run_merge_pubs_by_nnt()
-    _run_merge_pubs_by_pmid()
-    _run_merge_pubs_by_hal_id()
-    _run_merge_pubs_by_metadata()
+    _run_correct_metadata_unary()
+    _run_correct_zenodo_concept()
+    _run_correct_by_cluster()
+
+
+def phase_publications(**kw: Any) -> Any:
+    """Assignation des `source_publications` aux publications, en une seule passe.
+
+    `reconcile_components` clusterise le voisinage des SP dirty par composante
+    connexe des clés de confirmation (DOI/NNT/hal_id/PMID + token thèse
+    `title+year`) et assigne chaque SP au pub-ancre de sa partition `(composante ∩
+    DOI)`, dans le respect du cannot-link DOI. Assignation (match/create/skip d'un
+    orphelin) et réconciliation (merge/split de publications matérialisées) sont
+    des facettes du même primitif — un seul `connected_components`, aucun drift.
+
+    Les passes ad-hoc `merge_pubs_by_*` ont été retirées du pipeline : la
+    réconciliation les subsume. La dédup thèse passe par le token de confirmation,
+    plus de passe métadonnées dédiée.
+
+    Prerequis : la phase `zenodo_doi` (en amont) a resolu les concept DOI Zenodo,
+    appliqués en colonne par `metadata_correction`.
+    """
+    _run_reconcile_components()
     # `addresses.pub_count` compte les publications par adresse : recalcul ici,
     # une fois les publications créées et fusionnées — il n'y a rien à compter
     # au stade `normalize`. Un run `--only publications` suffit à le tenir à jour.
@@ -551,28 +569,73 @@ def _run_resolve_zenodo_concept() -> None:
     log.info("✓ resolve_zenodo_concept terminé en %.1fs", time.time() - t0)
 
 
-def _run_create_publications() -> None:
-    from application.pipeline.publications.create_publications import run
+def _run_correct_metadata_unary() -> None:
+    from application.pipeline.metadata_correction.correct_unary import run
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.publications_create import (
-        PgPublicationsCreateQueries,
+    from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
+
+    log.info("▶ metadata_correction (unaire)")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run(conn, PgMetadataCorrectionQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ metadata_correction (unaire) terminé en %.1fs", time.time() - t0)
+
+
+def _run_correct_zenodo_concept() -> None:
+    from application.pipeline.metadata_correction.correct_zenodo_concept import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
+
+    log.info("▶ metadata_correction (zenodo)")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run(conn, PgMetadataCorrectionQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ metadata_correction (zenodo) terminé en %.1fs", time.time() - t0)
+
+
+def _run_correct_by_cluster() -> None:
+    from application.pipeline.metadata_correction.correct_by_cluster import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
+
+    log.info("▶ metadata_correction (cluster)")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run(conn, PgMetadataCorrectionQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ metadata_correction (cluster) terminé en %.1fs", time.time() - t0)
+
+
+def _run_reconcile_components() -> None:
+    from application.pipeline.publications.reconcile_components import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.publications_reconciliation import (
+        PgPublicationsReconciliationQueries,
     )
     from infrastructure.repositories import audit_repository, publication_repository
 
-    log.info("▶ create_publications")
+    log.info("▶ reconcile_components")
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
         run(
             conn,
-            PgPublicationsCreateQueries(),
+            PgPublicationsReconciliationQueries(),
             log,
             pub_repo=publication_repository(conn),
             audit_repo=audit_repository(conn),
         )
     finally:
         conn.close()
-    log.info("✓ create_publications terminé en %.1fs", time.time() - t0)
+    log.info("✓ reconcile_components terminé en %.1fs", time.time() - t0)
 
 
 def _run_create_persons() -> None:
@@ -719,106 +782,6 @@ def _run_populate_person_name_forms() -> None:
     finally:
         conn.close()
     log.info("✓ populate_person_name_forms terminé en %.1fs", time.time() - t0)
-
-
-def _run_merge_pubs_by_nnt() -> None:
-    from application.pipeline.publications.merge_pubs_by_nnt import run_merge
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.merge import PgMergeQueries
-    from infrastructure.repositories import publication_repository
-
-    log.info("▶ merge_pubs_by_nnt")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run_merge(conn, PgMergeQueries(), log, pub_repo=publication_repository(conn))
-    finally:
-        conn.close()
-    log.info("✓ merge_pubs_by_nnt terminé en %.1fs", time.time() - t0)
-
-
-def _run_merge_pubs_by_hal_id() -> None:
-    from application.pipeline.publications.merge_pubs_by_hal_id import run_merge
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.merge import PgMergeQueries
-    from infrastructure.repositories import publication_repository
-
-    log.info("▶ merge_pubs_by_hal_id")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run_merge(conn, PgMergeQueries(), log, pub_repo=publication_repository(conn))
-    finally:
-        conn.close()
-    log.info("✓ merge_pubs_by_hal_id terminé en %.1fs", time.time() - t0)
-
-
-def _run_merge_pubs_by_metadata() -> None:
-    from application.pipeline.publications.merge_pubs_by_metadata import run_merge
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.metadata_merge import PgMetadataMergeQueries
-    from infrastructure.repositories import publication_repository
-
-    log.info("▶ merge_pubs_by_metadata")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run_merge(conn, PgMetadataMergeQueries(), log, pub_repo=publication_repository(conn))
-    finally:
-        conn.close()
-    log.info("✓ merge_pubs_by_metadata terminé en %.1fs", time.time() - t0)
-
-
-def _run_mark_distinct_publications() -> None:
-    from application.pipeline.publications.mark_distinct_publications import run_mark_distinct
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.distinct_publications import (
-        PgDistinctPublicationsQueries,
-    )
-    from infrastructure.repositories import publication_repository
-
-    log.info("▶ mark_distinct_publications")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run_mark_distinct(
-            conn, PgDistinctPublicationsQueries(), log, pub_repo=publication_repository(conn)
-        )
-    finally:
-        conn.close()
-    log.info("✓ mark_distinct_publications terminé en %.1fs", time.time() - t0)
-
-
-def _run_merge_pubs_by_doi() -> None:
-    from application.pipeline.publications.merge_pubs_by_doi import run_merge
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.merge import PgMergeQueries
-    from infrastructure.repositories import publication_repository
-
-    log.info("▶ merge_pubs_by_doi")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run_merge(conn, PgMergeQueries(), log, pub_repo=publication_repository(conn))
-    finally:
-        conn.close()
-    log.info("✓ merge_pubs_by_doi terminé en %.1fs", time.time() - t0)
-
-
-def _run_merge_pubs_by_pmid() -> None:
-    from application.pipeline.publications.merge_pubs_by_pmid import run_merge
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.merge import PgMergeQueries
-    from infrastructure.repositories import publication_repository
-
-    log.info("▶ merge_pubs_by_pmid")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run_merge(conn, PgMergeQueries(), log, pub_repo=publication_repository(conn))
-    finally:
-        conn.close()
-    log.info("✓ merge_pubs_by_pmid terminé en %.1fs", time.time() - t0)
 
 
 def _run_normalize_hal() -> None:
@@ -1143,6 +1106,7 @@ def _run_enrich_publishers_from_crossref_members() -> None:
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.enrich import PgEnrichQueries
     from infrastructure.repositories import publisher_repository
+    from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
     from infrastructure.sources.config import get_polite_pool_email
     from infrastructure.sources.crossref.members import fetch_crossref_member
     from infrastructure.sources.doi_prefixes.clients import build_user_agent
@@ -1152,8 +1116,11 @@ def _run_enrich_publishers_from_crossref_members() -> None:
     conn = get_sync_engine().connect()
     try:
         user_agent = build_user_agent(get_polite_pool_email(conn))
+        # Coupe-circuit Crossref (budget API) : partagé entre les fetches parallèles ;
+        # une fois tripé, les appels restants sautent l'API (cf. fetch_crossref_member).
+        breaker = SourceCircuitBreaker("crossref")
         fetcher: CrossrefMemberFetcher = lambda member_id: fetch_crossref_member(  # noqa: E731
-            member_id, user_agent=user_agent, logger=log
+            member_id, user_agent=user_agent, logger=log, breaker=breaker
         )
 
         run_enrich_publishers_from_crossref_members(
@@ -1699,6 +1666,7 @@ PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
     ("publishers_journals", phase_publishers_journals),
     ("affiliations", phase_affiliations),
     ("zenodo_doi", phase_zenodo_doi),
+    ("metadata_correction", phase_metadata_correction),
     ("publications", phase_publications),
     ("persons", phase_persons),
     ("authorships", phase_authorships),

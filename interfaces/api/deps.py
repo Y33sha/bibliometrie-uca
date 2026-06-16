@@ -36,6 +36,7 @@ from application.ports.api.stats_queries import StatsQueries
 from application.ports.api.structures_queries import StructuresQueries
 from application.ports.api.subjects_queries import SubjectsAdminQueries
 from application.ports.config import ConfigStore
+from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.pipeline.perimeter import PerimeterQueries
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.audit_repository import AuditRepository
@@ -62,6 +63,7 @@ from infrastructure.queries.api.stats import PgStatsQueries
 from infrastructure.queries.api.structures import PgStructuresQueries
 from infrastructure.queries.config import PgConfig, PgConfigQueries
 from infrastructure.queries.perimeter import PgPerimeterQueries, PgPerimetersAdminQueries
+from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.queries.subjects import PgSubjectsAdminQueries
 from infrastructure.repositories import (
     address_repository,
@@ -302,6 +304,15 @@ _perimeter_queries_sync_singleton: PerimeterQueries = PgPerimeterQueries()
 def get_perimeter_queries_sync() -> PerimeterQueries:
     """Retourne le singleton sync de `PerimeterQueries`."""
     return _perimeter_queries_sync_singleton
+
+
+# `PgMetadataCorrectionQueries` est sans état (connexion passée aux méthodes) → singleton.
+_metadata_correction_queries_singleton: MetadataCorrectionQueries = PgMetadataCorrectionQueries()
+
+
+def metadata_correction_queries_sync() -> MetadataCorrectionQueries:
+    """Retourne le singleton sync de `MetadataCorrectionQueries` (hooks admin journaux)."""
+    return _metadata_correction_queries_singleton
 
 
 # ----- Tâches de fond (BackgroundTasks) -----

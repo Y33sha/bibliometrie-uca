@@ -793,12 +793,15 @@ publications = Table(
         "journal_id",
         postgresql_where=text("in_perimeter"),
     ),
-    # Index sur expression lower(doi) — complété à la main. Non-unique :
-    # l'unicité « 1 DOI = 1 publication » est garantie par la passe de fusion,
-    # plus par la DB (cf. chantier création⇒fusion).
+    # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
+    # « 1 DOI = 1 publication » est garantie par la DB : la réconciliation des
+    # composantes ne produit jamais deux publications au même DOI (assignation à
+    # l'unique pub-ancre de la partition `(composante ∩ DOI)`). Partiel : les
+    # publications sans DOI (NULL) ne sont pas contraintes.
     Index(
-        "idx_publications_doi_lower",
+        "publications_doi_lower_key",
         text("lower(doi)"),
+        unique=True,
         postgresql_where=text("doi IS NOT NULL"),
     ),
     # Fetch incrémental oa_status : jamais vérifiés (NULL) d'abord, puis les plus périmés.
@@ -832,6 +835,7 @@ source_publications = Table(
     Column("source_id", Text, nullable=False),
     Column("doi", Text),
     Column("title", Text, nullable=False),
+    Column("title_normalized", Text),
     Column("pub_year", SmallInteger),
     Column("doc_type", Text),
     Column("publication_id", Integer),
@@ -863,7 +867,20 @@ source_publications = Table(
     Column("topics", JSONB),
     Column("biblio", JSONB),
     Column("meta", JSONB),
+    Column(
+        "raw_metadata",
+        JSONB,
+        nullable=False,
+        server_default=text("'{}'::jsonb"),
+    ),
+    Column("keys_dirty", Boolean, nullable=False, server_default="true"),
     UniqueConstraint("source", "source_id", name="source_publications_source_source_id_key"),
+    Index(
+        "idx_source_pubs_title_normalized_trgm",
+        "title_normalized",
+        postgresql_using="gin",
+        postgresql_ops={"title_normalized": "gin_trgm_ops"},
+    ),
     Index(
         "idx_source_pubs_countries",
         "countries",
@@ -881,6 +898,10 @@ source_publications = Table(
         "jsonb_typeof(external_ids) = 'object'",
         name="source_publications_external_ids_is_object",
     ),
+    CheckConstraint(
+        "jsonb_typeof(raw_metadata) = 'object'",
+        name="source_publications_raw_metadata_is_object",
+    ),
     Index(
         "idx_source_pubs_hal_collections",
         "hal_collections",
@@ -891,6 +912,11 @@ source_publications = Table(
         "idx_source_pubs_pub",
         "publication_id",
         postgresql_where=text("publication_id IS NOT NULL"),
+    ),
+    Index(
+        "idx_source_pubs_keys_dirty",
+        "keys_dirty",
+        postgresql_where=text("keys_dirty"),
     ),
     Index(
         "idx_source_pubs_staging",

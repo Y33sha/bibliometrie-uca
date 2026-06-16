@@ -6,7 +6,25 @@ from domain.publications.metadata import (
     best_oa_status,
     clean_publication_title,
     has_minimal_publication_metadata,
+    normalized_title,
 )
+
+
+class TestNormalizedTitle:
+    def test_html_decode_then_normalize(self):
+        # `&amp;amp;` (double-encodé) → `&` (clean) → retiré par normalize ; œ → oe.
+        assert normalized_title("Cœur &amp;amp; âme") == "coeur ame"
+
+    def test_collapses_whitespace_and_lowercases(self):
+        assert normalized_title("  ŒUVRE   complète ") == "oeuvre complete"
+
+    def test_none_and_empty_give_empty_string(self):
+        assert normalized_title(None) == ""
+        assert normalized_title("") == ""
+
+    def test_idempotent(self):
+        once = normalized_title("Les Effets thermomécaniques")
+        assert normalized_title(once) == once
 
 
 class TestHasMinimalPublicationMetadata:

@@ -10,6 +10,7 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.hal import HalNormalizeQueries
+from domain.publications.metadata import normalized_title
 from domain.types import JsonValue
 
 
@@ -42,11 +43,11 @@ def upsert_hal_source_publication(
         external_ids = {}
     stmt = text("""
         INSERT INTO source_publications
-            (source, source_id, doi, title, pub_year, doc_type,
+            (source, source_id, doi, title, title_normalized, pub_year, doc_type,
              hal_collections, publication_id, staging_id, external_ids,
              journal_id, oa_status, language, container_title,
              abstract, keywords, topics, biblio, urls)
-        VALUES ('hal', :hal_id, :doi, :title, :pub_year, :doc_type,
+        VALUES ('hal', :hal_id, :doi, :title, :title_normalized, :pub_year, :doc_type,
                 :hal_collections, :publication_id, :staging_id, :external_ids,
                 :journal_id, :oa_status, :language, :container_title,
                 :abstract, :keywords, :topics, :biblio, :urls)
@@ -73,6 +74,7 @@ def upsert_hal_source_publication(
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
+            keys_dirty = true,
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
@@ -86,6 +88,7 @@ def upsert_hal_source_publication(
             "hal_id": hal_id,
             "doi": doi,
             "title": title,
+            "title_normalized": normalized_title(title),
             "pub_year": pub_year,
             "doc_type": doc_type,
             "hal_collections": hal_collections,

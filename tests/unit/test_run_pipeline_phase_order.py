@@ -20,13 +20,7 @@ def test_recompute_addresses_runs_in_publications_not_normalize():
         patch.object(run_pipeline, "_run_normalize_openalex"),
         patch.object(run_pipeline, "_run_normalize_wos"),
         patch.object(run_pipeline, "_vacuum_staging"),
-        patch.object(run_pipeline, "_run_create_publications"),
-        patch.object(run_pipeline, "_run_mark_distinct_publications"),
-        patch.object(run_pipeline, "_run_merge_pubs_by_hal_id"),
-        patch.object(run_pipeline, "_run_merge_pubs_by_nnt"),
-        patch.object(run_pipeline, "_run_merge_pubs_by_doi"),
-        patch.object(run_pipeline, "_run_merge_pubs_by_pmid"),
-        patch.object(run_pipeline, "_run_merge_pubs_by_metadata"),
+        patch.object(run_pipeline, "_run_reconcile_components"),
         patch.object(run_pipeline, "_run_recompute_address_pub_count") as recompute,
     ):
         run_pipeline.phase_normalize()

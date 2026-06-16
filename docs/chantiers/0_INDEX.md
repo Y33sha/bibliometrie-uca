@@ -17,6 +17,7 @@
 ### Non commencé
 
 - [Publications : retour à match_or_create, corrections a priori, fusion réparatrice](DATA_publications-match-or-create.md)
+- [Déduplication des publications sans identifiant fiable (arête pairwise-gated)](DATA_dedup-pairwise-gated.md)
 - [Relations entre publications](METIER_relations-publications.md)
 - [Embargo HAL : statut OA intermédiaire « sous embargo »](METIER_embargo-oa-status.md)
 

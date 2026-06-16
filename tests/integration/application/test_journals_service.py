@@ -12,6 +12,7 @@ from sqlalchemy import text
 from application.journals import (
     find_or_create_journal,
     merge_journals,
+    requalify_publications_for_journal,
     update_journal,
     update_journal_apc,
 )
@@ -26,11 +27,15 @@ from domain.errors import (
     PublisherMergeBlockedError,
     ValidationError,
 )
+from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
 from infrastructure.repositories import (
     journal_repository,
     publication_repository,
     publisher_repository,
 )
+
+# Stateless (connexion passée aux méthodes) → une instance module suffit.
+_CORRECTION_QUERIES = PgMetadataCorrectionQueries()
 
 
 @pytest.fixture
@@ -340,7 +345,13 @@ class TestMergePublishers:
         p_id = _insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(ConflictError, match="lui-même"):
             merge_publishers(
-                p_id, p_id, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+                p_id,
+                p_id,
+                conn=sa_sync_conn,
+                correction_queries=_CORRECTION_QUERIES,
+                publisher_repo=pub_repo,
+                journal_repo=repo,
+                pub_repo=publication_repo,
             )
 
     def test_transfers_journals_and_deletes_source(
@@ -351,7 +362,13 @@ class TestMergePublishers:
         j1 = _insert_journal(sa_sync_conn, "Journal 1", publisher_id=source)
 
         merge_publishers(
-            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            publisher_repo=pub_repo,
+            journal_repo=repo,
+            pub_repo=publication_repo,
         )
 
         assert (
@@ -369,7 +386,13 @@ class TestMergePublishers:
         _insert_publication(sa_sync_conn, journal_id=js)
 
         merge_publishers(
-            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            publisher_repo=pub_repo,
+            journal_repo=repo,
+            pub_repo=publication_repo,
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
@@ -388,7 +411,13 @@ class TestMergePublishers:
         js = _insert_journal(sa_sync_conn, "Nature", publisher_id=source, openalex_id="S4210225546")
 
         merge_publishers(
-            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            publisher_repo=pub_repo,
+            journal_repo=repo,
+            pub_repo=publication_repo,
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM journals WHERE id = :id", id=js)) is None
@@ -407,6 +436,8 @@ class TestMergePublishers:
             merge_publishers(
                 target,
                 source,
+                conn=sa_sync_conn,
+                correction_queries=_CORRECTION_QUERIES,
                 publisher_repo=pub_repo,
                 journal_repo=repo,
                 pub_repo=publication_repo,
@@ -437,6 +468,8 @@ class TestMergePublishers:
             merge_publishers(
                 target,
                 source,
+                conn=sa_sync_conn,
+                correction_queries=_CORRECTION_QUERIES,
                 publisher_repo=pub_repo,
                 journal_repo=repo,
                 pub_repo=publication_repo,
@@ -462,6 +495,8 @@ class TestMergePublishers:
             merge_publishers(
                 target,
                 source,
+                conn=sa_sync_conn,
+                correction_queries=_CORRECTION_QUERIES,
                 publisher_repo=pub_repo,
                 journal_repo=repo,
                 pub_repo=publication_repo,
@@ -478,7 +513,13 @@ class TestMergePublishers:
         )
 
         merge_publishers(
-            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            publisher_repo=pub_repo,
+            journal_repo=repo,
+            pub_repo=publication_repo,
         )
 
         row = _fetch_one(
@@ -493,7 +534,13 @@ class TestMergePublishers:
         target = _insert_publisher(sa_sync_conn, "Target", openalex_id=None)
         source = _insert_publisher(sa_sync_conn, "Source", openalex_id="P999")
         merge_publishers(
-            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            publisher_repo=pub_repo,
+            journal_repo=repo,
+            pub_repo=publication_repo,
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
@@ -507,7 +554,13 @@ class TestMergePublishers:
         target = _insert_publisher(sa_sync_conn, "Target", openalex_id="P_TARGET")
         source = _insert_publisher(sa_sync_conn, "Source", openalex_id="P_SOURCE")
         merge_publishers(
-            target, source, publisher_repo=pub_repo, journal_repo=repo, pub_repo=publication_repo
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            publisher_repo=pub_repo,
+            journal_repo=repo,
+            pub_repo=publication_repo,
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
@@ -522,7 +575,14 @@ class TestMergeJournals:
     def test_raises_on_self_merge(self, sa_sync_conn, repo, publication_repo):
         j_id = _insert_journal(sa_sync_conn, "Nature")
         with pytest.raises(ConflictError, match="lui-même"):
-            merge_journals(j_id, j_id, repo=repo, pub_repo=publication_repo)
+            merge_journals(
+                j_id,
+                j_id,
+                conn=sa_sync_conn,
+                correction_queries=_CORRECTION_QUERIES,
+                repo=repo,
+                pub_repo=publication_repo,
+            )
 
     def test_transfers_publications(self, sa_sync_conn, repo, publication_repo):
         target = _insert_journal(sa_sync_conn, "Target")
@@ -539,7 +599,14 @@ class TestMergeJournals:
             {"jid": source, "pid": pub_id},
         )
 
-        merge_journals(target, source, repo=repo, pub_repo=publication_repo)
+        merge_journals(
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            repo=repo,
+            pub_repo=publication_repo,
+        )
 
         row = _fetch_one(
             sa_sync_conn, "SELECT journal_id FROM publications WHERE id = :id", id=pub_id
@@ -555,7 +622,14 @@ class TestMergeJournals:
             sa_sync_conn, "Source", issn="1234-5678", eissn="9999-0000", is_in_doaj=True
         )
 
-        merge_journals(target, source, repo=repo, pub_repo=publication_repo)
+        merge_journals(
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            repo=repo,
+            pub_repo=publication_repo,
+        )
 
         row = _fetch_one(
             sa_sync_conn,
@@ -571,7 +645,14 @@ class TestMergeJournals:
         target = _insert_journal(sa_sync_conn, "Target", issn="0028-0836")
         source = _insert_journal(sa_sync_conn, "Source", issn="1234-5678")
 
-        merge_journals(target, source, repo=repo, pub_repo=publication_repo)
+        merge_journals(
+            target,
+            source,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            repo=repo,
+            pub_repo=publication_repo,
+        )
 
         row = _fetch_one(sa_sync_conn, "SELECT issn FROM journals WHERE id = :id", id=target)
         assert row.issn == "0028-0836"
@@ -605,10 +686,108 @@ class TestMergeJournals:
             {"jid": revue, "pid": pub},
         )
 
-        merge_journals(media, revue, repo=repo, pub_repo=publication_repo)
+        merge_journals(
+            media,
+            revue,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            repo=repo,
+            pub_repo=publication_repo,
+        )
 
         row = _fetch_one(
             sa_sync_conn, "SELECT doc_type, journal_id FROM publications WHERE id = :id", id=pub
         )
         assert row.journal_id == media
         assert row.doc_type == "media"
+
+
+# ── requalify_publications_for_journal (persistance SP + auto-cicatrisation) ──
+
+
+class TestRequalifyPublicationsForJournal:
+    def _seed(self, conn):
+        """Journal 'journal' + une publication 'article' attestée par une SP 'article'."""
+        journal = _insert_journal(conn, "Revue X")
+        conn.execute(
+            text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": journal}
+        )
+        pub = _insert_publication(conn, journal_id=journal)
+        conn.execute(
+            text("UPDATE publications SET doc_type = 'article' WHERE id = :id"), {"id": pub}
+        )
+        sp = conn.execute(
+            text(
+                "INSERT INTO source_publications "
+                "(source, source_id, title, pub_year, doc_type, journal_id, publication_id) "
+                "VALUES ('openalex', 'W-requalif', 'T', 2024, 'article', :jid, :pid) RETURNING id"
+            ),
+            {"jid": journal, "pid": pub},
+        ).scalar_one()
+        return journal, pub, sp
+
+    def test_persists_sp_correction_and_retypes_publication(self, sa_sync_conn, publication_repo):
+        journal, pub, sp = self._seed(sa_sync_conn)
+        # Le caller a déjà basculé le type (comme update_journal).
+        sa_sync_conn.execute(
+            text("UPDATE journals SET journal_type = 'media' WHERE id = :id"), {"id": journal}
+        )
+
+        count = requalify_publications_for_journal(
+            journal,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            pub_repo=publication_repo,
+        )
+        assert count == 1
+
+        sp_row = _fetch_one(
+            sa_sync_conn,
+            "SELECT doc_type, raw_metadata FROM source_publications WHERE id = :id",
+            id=sp,
+        )
+        # La colonne SP est persistée (ce que lira le matcher), avec le brut réversible.
+        assert sp_row.doc_type == "media"
+        assert sp_row.raw_metadata == {
+            "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+        }
+        pub_row = _fetch_one(
+            sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=pub
+        )
+        assert pub_row.doc_type == "media"
+
+    def test_self_heals_when_type_reverts(self, sa_sync_conn, publication_repo):
+        journal, pub, sp = self._seed(sa_sync_conn)
+        sa_sync_conn.execute(
+            text("UPDATE journals SET journal_type = 'media' WHERE id = :id"), {"id": journal}
+        )
+        requalify_publications_for_journal(
+            journal,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            pub_repo=publication_repo,
+        )
+
+        # Le type revient à 'journal' : la correction doit être défaite, le brut restauré.
+        sa_sync_conn.execute(
+            text("UPDATE journals SET journal_type = 'journal' WHERE id = :id"), {"id": journal}
+        )
+        count = requalify_publications_for_journal(
+            journal,
+            conn=sa_sync_conn,
+            correction_queries=_CORRECTION_QUERIES,
+            pub_repo=publication_repo,
+        )
+        assert count == 1
+
+        sp_row = _fetch_one(
+            sa_sync_conn,
+            "SELECT doc_type, raw_metadata FROM source_publications WHERE id = :id",
+            id=sp,
+        )
+        assert sp_row.doc_type == "article"
+        assert sp_row.raw_metadata == {}
+        pub_row = _fetch_one(
+            sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=pub
+        )
+        assert pub_row.doc_type == "article"

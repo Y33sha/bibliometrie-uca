@@ -181,6 +181,8 @@ Le périmètre initial de cette phase (« extracteur DataCite DOI-driven via `fe
 
 5. **Matching `publisher_name_raw` → `publishers` existant** : seuils et règles (exact normalized, fuzzy, manuel). Démarrage par exact-match sur `name_normalized`, fallback `publisher_id NULL` pour traitement admin manuel.
 
+6. **Résolution concept/version via DataCite plutôt que l'API Zenodo**. La phase `zenodo_doi` résout le concept DOI via l'**API Zenodo** (`conceptdoi`) : lente (~1 s/record — 0,5 s de politesse + latence Zenodo) et longtemps sans coupe-circuit (ajouté le 2026-06-16). Or le versioning est un concept **DataCite général**, porté par `relatedIdentifiers` (`IsVersionOf` / `HasVersion` / `IsNewVersionOf`…) sur **tout** DOI DataCite, pas seulement Zenodo. Les spikes de ce chantier appuient la piste : `relatedIdentifiers` à 67 % sur l'échantillon (Phase 0), et « DataCite ≥ API native Zenodo sur les champs biblio » (Phase 3). **Piste** : remplacer l'API Zenodo par l'API DataCite pour la résolution version/concept — couverture plus large (figshare, Dryad…), une seule API, plus rapide. **Coût** : reconstruire la chaîne de versions depuis `relatedIdentifiers` (pas de champ `conceptdoi` tout fait), complétude inégale par fournisseur. Recoupe `METIER_relations-publications` (les versions *sont* des relations). **Audit préalable** : quelle fraction des DOI DataCite du stock peuple un `relatedIdentifiers` de version, vs ce que le `conceptdoi` Zenodo couvre aujourd'hui.
+
 ## Liens
 
 - doi.org RA API : <https://www.doi.org/factsheets/DOIProxy.html#rest-api>

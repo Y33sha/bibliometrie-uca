@@ -4,59 +4,26 @@ Service Publications — accès exclusif en écriture à la table `publications`
 Toute création, mise à jour ou recherche de publication passe par ce module. Les scripts de normalisation (HAL, OpenAlex, WoS, ScanR) et les autres traitements appellent ces fonctions au lieu de faire du SQL direct.
 """
 
-from dataclasses import replace
-
 from application.audit import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.publication_repository import PublicationRepository
+from application.ports.repositories.publication_repository import PubByDoi, PublicationRepository
 from domain.errors import DistinctDoiError, NotFoundError
+from domain.publications.aggregation import (
+    first_non_null,
+)
 from domain.publications.aggregation import (
     refresh_from_sources as _refresh_aggregate,
 )
-from domain.publications.correction import effective_metadata
-from domain.source_publications.views import SourcePublicationWithJournalView
+from domain.publications.identifiers import DOI
 from domain.sources.registry import SOURCE_PRIORITY
 
+
+def find_by_doi(doi: str, *, repo: PublicationRepository) -> PubByDoi | None:
+    """Cherche une publication par DOI (case-insensitive)."""
+    return repo.find_by_doi(doi)
+
+
 # ── Recalcul complet des métadonnées depuis les source_publications ──────
-
-
-def apply_corrections(sp: SourcePublicationWithJournalView) -> SourcePublicationWithJournalView:
-    """Applique `effective_metadata` à une vue de source publication et renvoie une vue « effective » : la vue inchangée si aucune correction ne modifie une valeur, sinon une copie avec les champs corrigés et un audit `meta.<field>_corrected_by` pour chaque champ effectivement changé.
-
-    L'audit n'est posé que quand la valeur change réellement : une règle qui « corrige » vers la valeur déjà présente (ex. une SP theses.fr native déjà en `thesis`) n'est pas tracée comme une correction.
-    """
-    corrected = effective_metadata(sp)
-    if corrected.is_empty():
-        return sp
-
-    meta = dict(sp.meta or {})
-    new_journal_id = sp.journal_id
-    new_doc_type = sp.doc_type
-    new_oa_status = sp.oa_status
-    changed = False
-
-    if corrected.journal_id is not None and corrected.journal_id.value != sp.journal_id:
-        new_journal_id = corrected.journal_id.value
-        meta["journal_id_corrected_by"] = corrected.journal_id.rule.value
-        changed = True
-    if corrected.doc_type is not None and corrected.doc_type.value != sp.doc_type:
-        new_doc_type = corrected.doc_type.value
-        meta["doc_type_corrected_by"] = corrected.doc_type.rule.value
-        changed = True
-    if corrected.oa_status is not None and corrected.oa_status.value != sp.oa_status:
-        new_oa_status = corrected.oa_status.value
-        meta["oa_status_corrected_by"] = corrected.oa_status.rule.value
-        changed = True
-
-    if not changed:
-        return sp
-    return replace(
-        sp,
-        journal_id=new_journal_id,
-        doc_type=new_doc_type,
-        oa_status=new_oa_status,
-        meta=meta,
-    )
 
 
 def refresh_from_sources(
@@ -71,7 +38,7 @@ def refresh_from_sources(
 
     **Cas orphelin** : si la publication n'a aucune source rattachée, la règle métier dicte qu'elle ne doit pas exister. Court-circuit : suppression via `repo.delete` + audit event `publication.deleted_orphan`, sans appel à l'agrégation.
 
-    Le dédoublonnage par DOI (deux publications au même DOI) est porté par la passe `merge_pubs_by_doi`, pas ici : `refresh_from_sources` n'agrège que les métadonnées.
+    Auto-fusion sur conflit DOI : si la promotion du DOI agrégé entre en collision avec une autre publication qui occupe déjà ce DOI, cette dernière est absorbée dans `pub_id` avant le save — au lieu de laisser remonter une violation de la contrainte unique. `pub_id` reste vivant pour le caller. La fusion est tracée via l'audit event `publication.merged`.
 
     Si `audit_repo` est fourni et que le DOI canonique change effectivement (passage d'une valeur à une autre, ou perte du DOI), un événement `publication.doi_changed` est émis avec l'ancienne et la nouvelle valeur. Pas d'event sur l'attribution initiale (passage de None à une valeur) ni quand la valeur reste identique.
 
@@ -88,9 +55,26 @@ def refresh_from_sources(
         emit_event(audit_repo, "publication.deleted_orphan", "publication", pub_id, {})
         return
 
+    # Si le DOI à promouvoir est déjà occupé par une autre publication, fusionner d'abord pour éviter une violation de la contrainte unique `publications_doi_lower_key`. Cas typique : une thèse avec un DOI ABES (10.70675/…) créée en double — une fois via OpenAlex (DOI seul, NNT inconnu) et une fois via theses.fr/HAL (NNT seul, DOI publié plus tard). Quand le DOI finit par apparaître dans une `source_publication`, sa promotion collisionne avec la pub OpenAlex. La fusion absorbe l'autre dans `pub_id` (qui reste vivant pour le caller).
+    #
+    # Le DOI brut est normalisé via le VO `DOI` avant le lookup : c'est cette forme normalisée (suffixe `.vN` strippé, lowercased) qui sera posée par l'agrégation. Le pré-merge doit chercher la même forme, sinon des collisions échappent au mécanisme.
+    rank = {s: i for i, s in enumerate(SOURCE_PRIORITY)}
+    sorted_sources = sorted(sources, key=lambda s: rank.get(s.source, 99))
+    new_doi_raw = first_non_null(sorted_sources, "doi")
+    new_doi_vo = DOI.try_parse(new_doi_raw) if new_doi_raw else None
+    if new_doi_vo:
+        existing = repo.find_by_doi(str(new_doi_vo))
+        if existing and existing.id != pub_id:
+            merge_publications(pub_id, existing.id, repo=repo, audit_repo=audit_repo)
+            sources = repo.get_source_publications(pub_id)
+            # Recharger pub : ses attributs ont pu être enrichis via Publication.absorb pendant merge_publications.
+            pub = repo.find_by_id(pub_id)
+            if pub is None:
+                return
+
     previous_doi = pub.doi
-    effective_sources = [apply_corrections(s) for s in sources]
-    _refresh_aggregate(pub, effective_sources, source_priority=SOURCE_PRIORITY)
+    # Pas de re-correction ici : la phase `metadata_correction` a déjà écrit le canonique corrigé en place sur chaque `source_publication` (colonnes lues par `get_source_publications`). L'agrégation repart donc des valeurs corrigées.
+    _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY)
     repo.save(pub)
     repo.update_sources(pub_id)
 

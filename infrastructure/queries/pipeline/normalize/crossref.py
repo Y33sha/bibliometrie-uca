@@ -13,6 +13,7 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.crossref import CrossrefNormalizeQueries
+from domain.publications.metadata import normalized_title
 from domain.types import JsonValue
 
 
@@ -43,11 +44,11 @@ def upsert_crossref_source_publication(
         external_ids = {}
     stmt = text("""
         INSERT INTO source_publications
-            (source, source_id, doi, title, pub_year, doc_type,
+            (source, source_id, doi, title, title_normalized, pub_year, doc_type,
              publication_id, staging_id, external_ids,
              journal_id, oa_status, language, container_title,
              abstract, keywords, cited_by_count, biblio, meta)
-        VALUES ('crossref', :source_id, :doi, :title, :pub_year, :doc_type,
+        VALUES ('crossref', :source_id, :doi, :title, :title_normalized, :pub_year, :doc_type,
                 :publication_id, :staging_id, :external_ids,
                 :journal_id, :oa_status, :language, :container_title,
                 :abstract, :keywords, :cited_by_count, :biblio, :meta)
@@ -67,6 +68,7 @@ def upsert_crossref_source_publication(
             cited_by_count = GREATEST(COALESCE(EXCLUDED.cited_by_count, 0), COALESCE(source_publications.cited_by_count, 0)),
             biblio = COALESCE(EXCLUDED.biblio, source_publications.biblio),
             meta = COALESCE(EXCLUDED.meta, source_publications.meta),
+            keys_dirty = true,
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
@@ -80,6 +82,7 @@ def upsert_crossref_source_publication(
             "source_id": doi,
             "doi": doi,
             "title": title,
+            "title_normalized": normalized_title(title),
             "pub_year": pub_year,
             "doc_type": doc_type,
             "publication_id": publication_id,

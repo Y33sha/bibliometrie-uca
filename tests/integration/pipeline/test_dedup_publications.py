@@ -1,14 +1,14 @@
-"""Tests d'intégration — recalcul des métadonnées canoniques.
+"""Tests d'intégration — recalcul des métadonnées des publications.
 
 Couvre `refresh_from_sources` sur vraie base PostgreSQL (bibliometrie_test) :
 recalcul des champs d'une publication depuis ses `source_publications` (priorité
 par source, statut OA le plus ouvert, fusion des keywords/topics, etc.).
 
 Chaque test tourne dans une transaction rollbackée (isolation complète). Les
-publications sont semées directement via le repo (`create`) — pas de cascade de
-matching : la déduplication est testée à l'unité
-(`tests/unit/domain/publications/test_deduplication.py`) et sur la vraie entrée
-pipeline (`tests/integration/infrastructure/queries/test_create_queries.py`).
+publications sont semées directement via le repo (`create`) — pas de clustering :
+la décision d'assignation + réconciliation est testée à l'unité
+(`tests/unit/domain/publications/test_reconciliation.py`) et de bout en bout sur
+la vraie passe pipeline (`tests/integration/pipeline/test_reprocessing.py`).
 """
 
 from sqlalchemy import text
@@ -144,7 +144,7 @@ class TestRefreshFromSources:
     def test_thesis_priority_theses_over_hal(self, sa_sync_conn):
         """Pour les thèses, theses.fr est prioritaire."""
         id1 = _insert_pub(sa_sync_conn, doi="10.1234/thesis-prio", pub_year=2024, doc_type="thesis")
-        self._insert_sd(sa_sync_conn, id1, "hal", language="en", doc_type="THESE")
+        self._insert_sd(sa_sync_conn, id1, "hal", language="en", doc_type="thesis")
         self._insert_sd(sa_sync_conn, id1, "theses", language="fr", doc_type="thesis")
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
@@ -154,21 +154,12 @@ class TestRefreshFromSources:
     def test_source_priority_scanr_over_hal(self, sa_sync_conn):
         """Pour les non-thèses, ScanR est prioritaire sur HAL."""
         id1 = _insert_pub(sa_sync_conn, doi="10.1234/scanr-prio", pub_year=2024, doc_type="article")
-        self._insert_sd(sa_sync_conn, id1, "hal", language="en", doc_type="ART")
+        self._insert_sd(sa_sync_conn, id1, "hal", language="en", doc_type="article")
         self._insert_sd(sa_sync_conn, id1, "scanr", language="fr", doc_type="article")
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "fr"
-
-    def test_doc_type_mapping(self, sa_sync_conn):
-        """Les doc_types bruts sont mappés vers l'enum canonique."""
-        id1 = _insert_pub(sa_sync_conn, pub_year=2024, doc_type="other")
-        self._insert_sd(sa_sync_conn, id1, "hal", doc_type="ART")
-        refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
-
-        dt = _scalar(sa_sync_conn, "SELECT doc_type FROM publications WHERE id = :id", id=id1)
-        assert dt == "article"
 
     def test_ongoing_thesis_to_thesis(self, sa_sync_conn):
         """Un ongoing_thesis passe à thesis quand theses.fr le dit."""

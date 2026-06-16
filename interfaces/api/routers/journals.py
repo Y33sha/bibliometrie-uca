@@ -3,6 +3,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import Connection
 
 from application.journals import (
     merge_journals,
@@ -17,6 +18,7 @@ from application.ports.api.journals_queries import (
     JournalsFacetsResponse,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
+from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
@@ -29,8 +31,10 @@ from domain.journals.journal import (
 )
 from interfaces.api.deps import (
     audit_repo_sync,
+    db_conn_sync,
     journal_queries_sync,
     journal_repo_sync,
+    metadata_correction_queries_sync,
     publication_repo_sync,
 )
 from interfaces.api.filters import parse_str_csv
@@ -196,17 +200,30 @@ def get_journal_subjects(
 def get_type_change_impact(
     journal_id: int,
     new_type: str = Query(...),
+    conn: Connection = Depends(db_conn_sync),
+    repo: JournalRepository = Depends(journal_repo_sync),
     pub_repo: PublicationRepository = Depends(publication_repo_sync),
+    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries_sync),
 ) -> JournalTypeChangeImpact:
-    """Compte combien de publications du journal verraient leur `doc_type` changer si on passait `journal_type` à `new_type`. Dry-run pur, aucune écriture. Sert au preview de la modale admin avant confirmation du PUT."""
+    """Compte combien de publications du journal verraient leur `doc_type` changer si on passait `journal_type` à `new_type`.
+
+    Preview honnête vis-à-vis du PUT : on applique réellement (set du type → recompute des
+    corrections SP → refresh) dans un `SAVEPOINT` qu'on rollback ensuite — preview et apply
+    partagent exactement la même logique, aucune écriture ne survit.
+    """
     if new_type not in JOURNAL_TYPES_SET:
         raise HTTPException(status_code=400, detail=f"journal_type inconnu : {new_type}")
-    count = requalify_publications_for_journal(
-        journal_id,
-        prospective_journal_type=new_type,
-        dry_run=True,
-        pub_repo=pub_repo,
-    )
+    savepoint = conn.begin_nested()
+    try:
+        repo.update_journal_fields(journal_id, {"journal_type": new_type})
+        count = requalify_publications_for_journal(
+            journal_id,
+            conn=conn,
+            correction_queries=correction_queries,
+            pub_repo=pub_repo,
+        )
+    finally:
+        savepoint.rollback()
     return JournalTypeChangeImpact(count=count)
 
 
@@ -214,9 +231,11 @@ def get_type_change_impact(
 def update_journal(
     journal_id: int,
     body: JournalUpdate,
+    conn: Connection = Depends(db_conn_sync),
     repo: JournalRepository = Depends(journal_repo_sync),
     pub_repo: PublicationRepository = Depends(publication_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
+    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries_sync),
 ) -> OkResponse:
     """Met à jour une revue (modification sélective des champs fournis).
 
@@ -238,8 +257,8 @@ def update_journal(
     if type_changed_to is not None:
         requalify_publications_for_journal(
             journal_id,
-            prospective_journal_type=type_changed_to,
-            dry_run=False,
+            conn=conn,
+            correction_queries=correction_queries,
             pub_repo=pub_repo,
             audit_repo=audit,
         )
@@ -250,10 +269,12 @@ def update_journal(
 def merge(
     journal_id: int,
     body: MergeRequest,
+    conn: Connection = Depends(db_conn_sync),
     queries: JournalQueries = Depends(journal_queries_sync),
     repo: JournalRepository = Depends(journal_repo_sync),
     pub_repo: PublicationRepository = Depends(publication_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
+    correction_queries: MetadataCorrectionQueries = Depends(metadata_correction_queries_sync),
 ) -> MergeResponse:
     """Fusionne la revue `source_id` dans la revue `journal_id`.
 
@@ -268,5 +289,13 @@ def merge(
     if body.source_id not in found:
         raise HTTPException(status_code=404, detail="Revue source introuvable")
 
-    merge_journals(journal_id, body.source_id, repo=repo, pub_repo=pub_repo, audit_repo=audit)
+    merge_journals(
+        journal_id,
+        body.source_id,
+        conn=conn,
+        correction_queries=correction_queries,
+        repo=repo,
+        pub_repo=pub_repo,
+        audit_repo=audit,
+    )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=journal_id)

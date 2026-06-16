@@ -3,10 +3,19 @@
 Implémenté par infrastructure/repositories/publication_repository.py.
 """
 
+from dataclasses import dataclass
 from typing import Protocol
 
 from domain.publications.publication import Publication
 from domain.source_publications.views import SourcePublicationWithJournalView
+
+
+@dataclass(frozen=True, slots=True)
+class PubByDoi:
+    """Projection de lecture retournée par `find_by_doi` : l'id de la publication
+    portant ce DOI, sans hydrater l'agrégat complet."""
+
+    id: int
 
 
 class PublicationRepository(Protocol):
@@ -19,7 +28,9 @@ class PublicationRepository(Protocol):
 
     def save(self, pub: Publication) -> None: ...
 
-    # ── Recherches ─────────────────────────────────────────────────
+    # ── Recherches (projections de lecture) ────────────────────────
+
+    def find_by_doi(self, doi: str) -> PubByDoi | None: ...
 
     def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
         """Ids des publications rattachées à ce journal. Utilisé pour requalifier le stock quand un input éditable du journal (ex. `journal_type`) change."""

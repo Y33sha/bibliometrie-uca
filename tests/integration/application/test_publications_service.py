@@ -1,6 +1,6 @@
-"""Tests de caractérisation pour application/publications.py.
+"""Tests de caractérisation pour services/publications.py.
 
-Couvre `merge_publications` (transferts, gardes DOI, agrégation) et `mark_distinct`.
+Couvre `find_by_doi` (guards + happy path) et merge_publications.
 """
 
 import pytest
@@ -8,6 +8,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from application.publications import (
+    find_by_doi,
     mark_distinct,
     merge_publications,
 )
@@ -110,6 +111,24 @@ def _insert_authorship(conn, publication_id, person_id=None):
 
 def _select_one(conn, sql, **binds):
     return conn.execute(text(sql), binds).one_or_none()
+
+
+# ── find_by_* ──────────────────────────────────────────────────────
+
+
+class TestFindByDoi:
+    def test_returns_none_on_empty(self, sa_sync_conn, repo):
+        assert find_by_doi(None, repo=repo) is None
+        assert find_by_doi("", repo=repo) is None
+
+    def test_finds_by_doi_case_insensitive(self, sa_sync_conn, repo):
+        pub_id = _insert_publication(sa_sync_conn, doi="10.1234/ABC")
+        result = find_by_doi("10.1234/abc", repo=repo)
+        assert result is not None
+        assert result.id == pub_id
+
+    def test_returns_none_if_not_found(self, sa_sync_conn, repo):
+        assert find_by_doi("10.1234/unknown", repo=repo) is None
 
 
 # ── merge_publications ────────────────────────────────────────────
