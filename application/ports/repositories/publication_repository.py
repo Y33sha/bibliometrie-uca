@@ -32,21 +32,9 @@ class PublicationRepository(Protocol):
 
     def find_by_doi(self, doi: str) -> PubByDoi | None: ...
 
-    def find_by_nnt(self, nnt: str) -> int | None: ...
-
-    def find_by_hal_id(self, hal_id: str) -> int | None: ...
-
-    def find_by_pmid(self, pmid: str) -> int | None: ...
-
     def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
         """Ids des publications rattachées à ce journal. Utilisé pour requalifier le stock quand un input éditable du journal (ex. `journal_type`) change."""
         ...
-
-    def find_thesis_by_title(
-        self,
-        title_normalized: str,
-        pub_year: int,
-    ) -> list[int]: ...
 
     # ── Écritures simples ──────────────────────────────────────────
 
