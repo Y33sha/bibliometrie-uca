@@ -81,7 +81,9 @@ def process_document(
     # Clés de confirmation (DOI effectif Zenodo inclus, NNT/PMID/HAL normalisés) :
     # projection partagée avec la réconciliation des composantes — une seule
     # définition de « quelles clés porte cette SP ».
-    keys = project_confirmation_keys(doc.doi, doc.external_ids)
+    keys = project_confirmation_keys(
+        doc.doi, doc.external_ids, doc_type, title_normalized, pub_year
+    )
     doi = keys.doi
     nnt = keys.nnt
     pmid = keys.pmid
