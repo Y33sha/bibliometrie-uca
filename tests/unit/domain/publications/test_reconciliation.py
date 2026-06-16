@@ -1,123 +1,132 @@
-"""Tests purs de `domain.publications.reconciliation.plan_merges`.
+"""Tests purs de `plan_reconciliation` : assignation SP → pub-ancre (merge + split unifiés)."""
 
-Garde : fusion par composante, ancre `min(source_publication_id)`, cannot-link DOI (≥2 DOI = fusion conservatrice par DOI, résidu sans-DOI laissé), et détection des publications étalées sur plusieurs composantes (split différé).
-"""
+from domain.publications.reconciliation import (
+    DissolvedPublication,
+    ReconcileMember,
+    WorkGroup,
+    plan_reconciliation,
+)
 
-from domain.publications.reconciliation import MergeGroup, ReconcileMember, plan_merges
+
+def _m(sp_id, pub_id, *, pub_doi=None, doi=None, tokens=()):
+    return ReconcileMember(
+        source_publication_id=sp_id,
+        publication_id=pub_id,
+        publication_doi=pub_doi,
+        effective_doi=doi,
+        tokens=frozenset(tokens),
+    )
 
 
-def _m(sp, pub, doi=None, tokens=()) -> ReconcileMember:
-    return ReconcileMember(sp, pub, doi, frozenset(tokens))
+def _groups(plan):
+    return {g.target_publication_id: g.source_publication_ids for g in plan.groups}
 
 
 class TestMerge:
-    def test_two_pubs_sharing_doi_merge(self):
-        plan = plan_merges(
+    def test_two_pubs_same_doi_merge_to_carrier(self):
+        """Deux pubs portant le même DOI, SP reliées par le token DOI → fusion vers le min des porteurs."""
+        plan = plan_reconciliation(
             [
-                _m(1, 10, "x", [("doi", "x")]),
-                _m(2, 20, "x", [("doi", "x")]),
+                _m(1, 10, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 20, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
             ]
         )
-        assert plan.merges == (MergeGroup(10, (20,)),)
-        assert plan.deferred_split_publication_ids == ()
+        assert _groups(plan) == {10: (1, 2)}
+        assert plan.dissolved == (DissolvedPublication(20, 10),)
 
-    def test_no_doi_shared_secondary_key_merge(self):
-        """Deux publications sans DOI partageant un hal_id : une œuvre, fusion."""
-        plan = plan_merges(
+    def test_no_doi_component_merges_by_min_sp(self):
+        """Composante sans DOI (reliée par hal_id), deux pubs → ancre = pub du plus petit SP."""
+        plan = plan_reconciliation(
             [
-                _m(1, 10, None, [("hal_id", "h")]),
-                _m(2, 20, None, [("hal_id", "h")]),
+                _m(5, 50, tokens=[("hal_id", "hal-1")]),
+                _m(3, 30, tokens=[("hal_id", "hal-1")]),
             ]
         )
-        assert plan.merges == (MergeGroup(10, (20,)),)
+        assert _groups(plan) == {30: (3, 5)}  # min SP = 3 → pub 30
+        assert plan.dissolved == (DissolvedPublication(50, 30),)
 
-    def test_same_publication_no_merge(self):
-        plan = plan_merges(
+    def test_single_pub_stable(self):
+        """Une seule pub, rien à faire : un groupe sur elle-même, aucune dissolution."""
+        plan = plan_reconciliation(
             [
-                _m(1, 10, "x", [("doi", "x")]),
-                _m(2, 10, "x", [("doi", "x")]),
+                _m(1, 10, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 10, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
             ]
         )
-        assert plan.merges == ()
+        assert _groups(plan) == {10: (1, 2)}
+        assert plan.dissolved == ()
 
-    def test_anchor_is_min_source_publication_id(self):
-        """L'ancre est la publication de la SP au plus petit id, pas la plus petite publication."""
-        plan = plan_merges(
+
+class TestDoiAnchor:
+    def test_doi_carrier_beats_smaller_min_sp(self):
+        """L'ancre est le pub qui PORTE le DOI, même si un autre pub a un plus petit SP."""
+        plan = plan_reconciliation(
             [
-                _m(5, 10, None, [("nnt", "a")]),
-                _m(2, 20, None, [("nnt", "a")]),
+                _m(1, 50, doi="10.1/x", tokens=[("doi", "10.1/x")]),  # pub 50 ne porte pas X
+                _m(9, 90, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),  # porteur
             ]
         )
-        assert plan.merges == (MergeGroup(20, (10,)),)
+        # min SP = 1 (pub 50), mais l'ancre est 90 (porteur du DOI).
+        assert _groups(plan) == {90: (1, 9)}
+        assert plan.dissolved == (DissolvedPublication(50, 90),)
 
-    def test_three_pubs_same_doi_single_group(self):
-        plan = plan_merges(
+
+class TestSplit:
+    def test_pub_with_two_dois_splits(self):
+        """Une pub portant doi=X héberge une SP doi=Y (reliées par hal_id) → X garde la pub, Y → nouveau pub."""
+        plan = plan_reconciliation(
             [
-                _m(1, 10, "x", [("doi", "x")]),
-                _m(2, 20, "x", [("doi", "x")]),
-                _m(3, 30, "x", [("doi", "x")]),
+                _m(
+                    1,
+                    10,
+                    pub_doi="10.1/x",
+                    doi="10.1/x",
+                    tokens=[("hal_id", "h"), ("doi", "10.1/x")],
+                ),
+                _m(
+                    2,
+                    10,
+                    pub_doi="10.1/x",
+                    doi="10.2/y",
+                    tokens=[("hal_id", "h"), ("doi", "10.2/y")],
+                ),
             ]
         )
-        assert plan.merges == (MergeGroup(10, (20, 30)),)
+        assert _groups(plan) == {10: (1,), None: (2,)}  # X garde pub 10, Y → nouveau pub
+        assert plan.dissolved == ()  # pub 10 survit (ancre de X)
 
-    def test_disjoint_components_no_merge(self):
-        plan = plan_merges(
+    def test_residual_no_doi_sp_stays(self):
+        """Composante multi-DOI : la SP sans DOI est résiduelle, laissée sur son pub, non dissoute."""
+        plan = plan_reconciliation(
             [
-                _m(1, 10, "x", [("doi", "x")]),
-                _m(2, 20, "y", [("doi", "y")]),
+                _m(
+                    1,
+                    10,
+                    pub_doi="10.1/x",
+                    doi="10.1/x",
+                    tokens=[("hal_id", "h"), ("doi", "10.1/x")],
+                ),
+                _m(
+                    2,
+                    20,
+                    pub_doi="10.2/y",
+                    doi="10.2/y",
+                    tokens=[("hal_id", "h"), ("doi", "10.2/y")],
+                ),
+                _m(3, 30, tokens=[("hal_id", "h")]),  # sans DOI → résiduelle
             ]
         )
-        assert plan.merges == ()
-        assert plan.deferred_split_publication_ids == ()
+        assert _groups(plan) == {10: (1,), 20: (2,)}
+        # pub 30 retient la SP résiduelle 3 → pas dissoute.
+        assert plan.dissolved == ()
 
 
-class TestDoiCannotLink:
-    def test_distinct_dois_bridged_by_secondary_not_merged(self):
-        """hal_id partagé par-dessus deux DOI distincts : conflation, pas de fusion inter-DOI."""
-        plan = plan_merges(
+class TestWorkGroupShape:
+    def test_group_sp_ids_sorted(self):
+        plan = plan_reconciliation(
             [
-                _m(1, 10, "x", [("doi", "x"), ("hal_id", "h")]),
-                _m(2, 20, "y", [("doi", "y"), ("hal_id", "h")]),
+                _m(7, 10, doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 10, doi="10.1/x", tokens=[("doi", "10.1/x")]),
             ]
         )
-        assert plan.merges == ()
-
-    def test_no_doi_bridge_residue_left_intact(self):
-        """Une SP sans DOI pontant deux DOI distincts : sa publication reste intacte (résidu)."""
-        plan = plan_merges(
-            [
-                _m(1, 10, "x", [("doi", "x"), ("hal_id", "h")]),
-                _m(2, 20, "y", [("doi", "y"), ("hal_id", "h")]),
-                _m(3, 30, None, [("hal_id", "h")]),
-            ]
-        )
-        assert plan.merges == ()
-        assert plan.deferred_split_publication_ids == ()
-
-    def test_same_doi_merge_within_multi_doi_component(self):
-        """Composante à 2 DOI : les publications d'un même DOI fusionnent, l'autre DOI reste."""
-        plan = plan_merges(
-            [
-                _m(1, 10, "x", [("doi", "x"), ("hal_id", "h")]),
-                _m(2, 20, "x", [("doi", "x")]),
-                _m(3, 30, "y", [("doi", "y"), ("hal_id", "h")]),
-            ]
-        )
-        # x : pub 10 + pub 20 → fusion ; y : pub 30 seul → rien.
-        assert plan.merges == (MergeGroup(10, (20,)),)
-
-
-class TestDeferredSplit:
-    def test_publication_spanning_components_deferred(self):
-        """Pub 10 a deux SP non co-connexes (clé retirée) : split en attente, exclue du merge."""
-        plan = plan_merges(
-            [
-                _m(1, 10, None, [("nnt", "a")]),
-                _m(2, 10, None, [("pmid", "b")]),
-                _m(3, 20, None, [("nnt", "a")]),
-                _m(4, 30, None, [("pmid", "b")]),
-            ]
-        )
-        # Sans la garde, pub 10 serait absorbée dans deux groupes (fusion de travers).
-        assert plan.merges == ()
-        assert plan.deferred_split_publication_ids == (10,)
+        assert plan.groups == (WorkGroup(10, (2, 7)),)

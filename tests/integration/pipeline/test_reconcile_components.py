@@ -156,12 +156,40 @@ class TestEndToEnd:
             pub_repo=publication_repository(conn),
         )
 
-        # Ancre = publication de la SP au plus petit id (sp_a < sp_b → pub_a).
-        anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
+        # Ancre = le pub portant le DOI ; les deux le portent → min(pub) = pub_a.
+        anchor, absorbed = (pub_a, pub_b) if pub_a < pub_b else (pub_b, pub_a)
         assert _pub_exists(conn, anchor)
         assert not _pub_exists(conn, absorbed)
         assert _sp_state(conn, sp_a) == (anchor, False)
         assert _sp_state(conn, sp_b) == (anchor, False)
+
+    def test_pub_with_two_dois_splits(self, sa_sync_conn, monkeypatch):
+        """Une pub portant doi=X héberge une SP doi=Y (reliées par hal_id) → X garde la pub,
+        Y part sur un nouveau pub."""
+        conn = sa_sync_conn
+        monkeypatch.setattr(conn, "commit", lambda: None)
+        pub = _seed_pub(conn, doi="10.1/x")
+        sp_x = _seed_sp(
+            conn, source_id="x", publication_id=pub, doi="10.1/x", external_ids={"hal_id": ["h"]}
+        )
+        sp_y = _seed_sp(
+            conn, source_id="y", publication_id=pub, doi="10.2/y", external_ids={"hal_id": ["h"]}
+        )
+
+        run(
+            conn,
+            PgPublicationsReconciliationQueries(),
+            logger,
+            pub_repo=publication_repository(conn),
+        )
+
+        # X garde le pub d'origine ; Y est parti sur un autre pub (créé).
+        assert _sp_state(conn, sp_x) == (pub, False)
+        y_pub, y_dirty = _sp_state(conn, sp_y)
+        assert y_pub != pub
+        assert y_dirty is False
+        assert _pub_exists(conn, pub)
+        assert _pub_exists(conn, y_pub)
 
     def test_two_theses_sharing_title_year_merged(self, sa_sync_conn, monkeypatch):
         """Deux thèses cross-source, même titre+année, sans DOI/NNT/hal partagé → fusion par token thèse."""
