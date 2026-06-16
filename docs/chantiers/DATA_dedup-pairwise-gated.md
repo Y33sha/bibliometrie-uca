@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Issu de [DATA_publications-match-or-create](DATA_publications-match-or-create.md) (Phase 3, item 3.2b, renvoyé ici). La déduplication repose sur des **tokens de confirmation par égalité** — DOI, NNT, hal_id, pmid, composite thèse `(title_normalized, pub_year)` — qui entrent dans `connected_components` (`domain/publications/clustering.py`) : deux `source_publications` partageant un token sont reliées, la composante est l'œuvre. Couvre les œuvres à **identifiant fiable**.
+Issu de [DATA_publications-match-or-create](DATA_publications-match-or-create.md) (Phase 3, item 3.2b, renvoyé ici). La déduplication repose sur des **tokens de confirmation par égalité** — DOI, NNT, hal_id, pmid, composite thèse `(title_normalized, pub_year)` — qui entrent dans `connected_components` (`domain/entity_resolution.py`) : deux `source_publications` partageant un token sont reliées, la composante est l'œuvre. Couvre les œuvres à **identifiant fiable**.
 
 Restent les types **sans identifiant fiable** : `conference_paper` (~29 500 SP), `book_chapter` (~18 800), `poster` (~3 500). Des records qui partagent souvent un **titre + année sans DOI/hal_id partagé**.
 

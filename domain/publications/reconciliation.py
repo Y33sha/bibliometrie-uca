@@ -19,7 +19,7 @@ Pourquoi le voisinage **1-hop** suffit (pas de fermeture transitive) : l'invaria
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from domain.publications.clustering import connected_components
+from domain.entity_resolution import connected_components
 
 
 @dataclass(frozen=True, slots=True)
