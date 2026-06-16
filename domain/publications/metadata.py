@@ -10,6 +10,8 @@ dans son propre module.
 import re
 from collections.abc import Iterable
 
+from domain.normalize import normalize_text
+
 # ── Agrégation multi-sources du statut OA ───────────────────────────
 
 # Classement des statuts OA : plus la valeur est grande, plus le
@@ -147,3 +149,11 @@ def clean_publication_title(title: str | None) -> str | None:
     if _DOUBLE_ENCODED_RE.search(title):
         title = _decode_html_entities_once(_decode_html_entities_once(title))
     return _WHITESPACE_RE.sub(" ", title).strip()
+
+
+def normalized_title(title: str | None) -> str:
+    """Forme normalisée d'un titre pour le blocking / la dédup / le matching : nettoyage HTML
+    (`clean_publication_title`) puis `normalize_text`. Déterministe et idempotent — c'est la
+    valeur matérialisée dans `source_publications.title_normalized`, identique à ce que le
+    matcher calcule à la volée."""
+    return normalize_text(clean_publication_title(title) or "")

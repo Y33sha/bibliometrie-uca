@@ -13,6 +13,7 @@ from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, text
 
+from application.ports.repositories.publication_repository import PubByDoi
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.source_publications.views import SourcePublicationWithJournalView
@@ -80,6 +81,18 @@ class PgPublicationRepository:
         self._conn = conn
 
     # ── Recherches ─────────────────────────────────────────────────
+
+    def find_by_doi(self, doi: str) -> PubByDoi | None:
+        """Cherche une publication par DOI (case-insensitive)."""
+        if not doi:
+            return None
+        row = self._conn.execute(
+            text("SELECT id FROM publications WHERE lower(doi) = lower(:doi)"),
+            {"doi": doi},
+        ).first()
+        if not row:
+            return None
+        return PubByDoi(id=row.id)
 
     def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
         """Ids des publications rattachées à ce journal."""
@@ -250,13 +263,13 @@ class PgPublicationRepository:
 
         Sortie consommée par la couche domaine pour la correction (`effective_metadata`) puis l'agrégation (`refresh_from_sources`) — d'où la dénormalisation des champs journal en lecture (cf. `domain/source_publications/views.py`).
 
-        Le `doi` projeté est le DOI effectif : pour une SP Zenodo, le concept DOI (`external_ids.zenodo_concept_doi`) prime sur le DOI version, de sorte que l'agrégation promeut le concept comme DOI canonique (concept + versions → une publication au DOI concept).
+        Le `doi` projeté est la colonne nue : la substitution Zenodo (concept au lieu de la version) est déjà persistée par `metadata_correction`, donc l'agrégation promeut le concept comme DOI canonique sans recalcul ici.
         """
         result = self._conn.execute(
             text("""
                 SELECT sp.id, sp.source::text AS source, sp.source_id,
                        sp.title, sp.pub_year, sp.doc_type::text AS doc_type,
-                       COALESCE(sp.external_ids ->> 'zenodo_concept_doi', sp.doi) AS doi,
+                       sp.doi,
                        sp.journal_id, sp.container_title, sp.language,
                        sp.oa_status::text AS oa_status, sp.is_retracted, sp.abstract,
                        sp.countries, sp.urls, sp.keywords,

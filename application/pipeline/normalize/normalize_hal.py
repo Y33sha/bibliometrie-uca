@@ -159,10 +159,11 @@ def build_hal_external_ids(doc: dict, hal_id: str, nnt: str | None) -> dict[str,
     """Construit `external_ids` (clés de dédup cross-source) pour un doc HAL.
 
     `hal_id` est redondant avec `source_id` côté identité, mais on le pose
-    aussi ici pour que les queries de dédup cross-source (`find_by_hal_id`,
-    la passe de fusion par hal_id) traitent HAL comme les autres sources —
-    symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ
-    `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
+    aussi ici pour qu'il devienne un **token de confirmation** (cf.
+    `domain.source_publications.keys`) et que HAL soit clusterisé comme les autres
+    sources — symétrie avec ce que theses fait déjà pour NNT.
+    `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes
+    (`linkExtUrl_s`).
     """
     external_ids: dict[str, JsonValue] = {"hal_id": [hal_id]}
     if nnt:

@@ -35,6 +35,12 @@ OPENALEX_PREFIX = "https://openalex.org/"
 ROR_PREFIX = "https://ror.org/"
 BATCH_SIZE = 50
 COMMIT_EVERY = 500
+# Coupe-circuit : N batches consécutifs en 429 (budget API OpenAlex épuisé) avant coupure.
+RATE_LIMIT_STRIKES_MAX = 3
+
+
+class _OpenAlexRateLimited(Exception):
+    """429 répétés sur un batch (3 retries épuisés) : budget API probablement épuisé."""
 
 
 def to_full_openalex_id(short_id: str) -> str:
@@ -90,11 +96,9 @@ def fetch_publishers_batch(
                 continue
             resp.raise_for_status()
             data = resp.json()
-            results = {}
-            for source in data.get("results", []):
-                short = to_short_openalex_id(source["id"])
-                results[short] = source
-            return results
+            return {
+                to_short_openalex_id(source["id"]): source for source in data.get("results", [])
+            }
         except requests.RequestException as e:
             if attempt < 2:
                 logger.warning(f"Erreur requête (tentative {attempt + 1}/3): {e}")
@@ -102,7 +106,7 @@ def fetch_publishers_batch(
             else:
                 logger.error(f"Échec après 3 tentatives: {e}")
                 return {}
-    return {}
+    raise _OpenAlexRateLimited()
 
 
 def extract_country_ror(source: dict) -> tuple[str | None, str | None]:
@@ -150,19 +154,36 @@ def run_enrich_publishers_from_openalex(
         country_counter: Counter[str] = Counter()
         no_response = 0
         processed = 0
+        strikes = 0  # batches 429 consécutifs (coupe-circuit)
 
         for i in range(0, total, BATCH_SIZE):
             batch = publishers[i : i + BATCH_SIZE]
             oa_ids = [row[1] for row in batch]
             id_map = {row[1]: row[0] for row in batch}
 
-            sources = fetch_publishers_batch(
-                oa_ids,
-                logger,
-                openalex_publishers_api=openalex_publishers_api,
-                api_key=api_key,
-                mailto=mailto,
-            )
+            try:
+                sources = fetch_publishers_batch(
+                    oa_ids,
+                    logger,
+                    openalex_publishers_api=openalex_publishers_api,
+                    api_key=api_key,
+                    mailto=mailto,
+                )
+            except _OpenAlexRateLimited:
+                strikes += 1
+                if strikes >= RATE_LIMIT_STRIKES_MAX:
+                    if not dry_run:
+                        conn.commit()
+                    logger.warning(
+                        "⚡ Coupe-circuit OpenAlex (429 sur %d batches consécutifs) : "
+                        "enrichissement publishers interrompu à %d/%d. Reste retenté au prochain run.",
+                        strikes,
+                        processed,
+                        total,
+                    )
+                    return
+                continue
+            strikes = 0
             time.sleep(rate_delay)
 
             for oa_id, publisher_id in id_map.items():

@@ -6,18 +6,19 @@ Les opérations sur l'agrégat Publisher vivent dans `application/publishers.py`
 Les routers FastAPI utilisent les mêmes repos que le pipeline (routes `def` exécutées dans le threadpool Starlette).
 """
 
-from dataclasses import replace
 from typing import cast
 
+from sqlalchemy import Connection
+
 from application.audit import emit_event
+from application.pipeline.metadata_correction.correct_unary import correct_for_journal
+from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdateFields
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.publications import apply_corrections, refresh_from_sources
+from application.publications import refresh_from_sources
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
-from domain.publications.aggregation import refresh_from_sources as _refresh_aggregate
-from domain.sources.registry import SOURCE_PRIORITY
 from domain.types import JsonValue
 
 
@@ -151,29 +152,33 @@ def merge_journals(
     target_id: int,
     source_id: int,
     *,
+    conn: Connection,
+    correction_queries: MetadataCorrectionQueries,
     repo: JournalRepository,
     pub_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Fusionne le journal source dans le journal cible.
 
-    Les publications du journal absorbé sont repointées vers la cible, puis
-    **requalifiées** : leur `doc_type` est re-dérivé contre le `journal_type` de
-    la cible (mêmes règles que `requalify_publications_for_journal` sur un
-    changement de type). Fusionner une revue dans un média retype donc ses
-    publications en `media`.
+    Les `source_publications` et publications du journal absorbé sont repointées vers
+    la cible (`merge_journal_into`), puis **requalifiées** contre le `journal_type` de
+    la cible : on recompute en place les corrections des SP de la cible
+    (`correct_for_journal`, qui voit désormais les SP absorbées via le `journal_id`
+    repointé), puis on rafraîchit les publications absorbées. Fusionner une revue dans
+    un média retype donc ses publications en `media`.
     """
     if target_id == source_id:
         raise ConflictError("Impossible de fusionner un journal avec lui-même")
 
-    # Capturer les publications du source avant le repoint, pour les requalifier.
+    # Capturer les publications du source avant le repoint, pour les rafraîchir.
     absorbed_pub_ids = pub_repo.find_ids_by_journal_id(source_id)
 
     repo.merge_journal_into(target_id, source_id)
 
-    # Les publications absorbées pointent désormais sur la cible : `refresh_from_sources`
-    # re-dérive leur doc_type avec le `journal_type` de la cible (la correction lit le
-    # type via la jointure sur `journal_id`, repointée par `merge_journal_into`).
+    # Les SP absorbées portent désormais `journal_id = target` : recompute en place leurs
+    # corrections (le `journal_type` lu par la correction est celui de la cible), puis
+    # refresh des publications absorbées (qui lisent les colonnes SP fraîchement corrigées).
+    correct_for_journal(conn, correction_queries, target_id)
     for pub_id in absorbed_pub_ids:
         refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
 
@@ -186,24 +191,35 @@ def merge_journals(
 def requalify_publications_for_journal(
     journal_id: int,
     *,
-    prospective_journal_type: str | None,
-    dry_run: bool,
+    conn: Connection,
+    correction_queries: MetadataCorrectionQueries,
     pub_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
 ) -> int:
-    """Compte (et applique si `dry_run=False`) la requalification du `doc_type` des publications d'un journal suite au changement de son `journal_type`.
+    """Requalifie le `doc_type` des publications d'un journal après changement de son `journal_type`.
 
-    Modes :
+    Précondition : le `journal.journal_type` a déjà été mis à jour par le caller (dans la
+    même transaction qu'un `update_journal`). Deux temps :
 
-    - ``dry_run=True`` : simulation en mémoire. On charge chaque publication du journal et ses vues sources, on injecte `prospective_journal_type` sur les vues (le journal en base n'a pas encore changé) et on rejoue la cascade correction → agrégation dans une copie en mémoire. Retourne le nombre de publications dont le `doc_type` *changerait*. Aucune écriture DB. Sert au preview de la modale admin.
+    1. `correct_for_journal` recompute **en place** les corrections des `source_publications`
+       du journal — indispensable car `refresh_from_sources` repart de la colonne SP corrigée
+       (pas du brut), donc sans ce recompute il figerait la publication sur l'ancienne
+       correction journal-dépendante.
+    2. `refresh_from_sources` sur chaque publication du journal ré-agrège les colonnes SP
+       fraîchement corrigées (garde-fous habituels : conflits DOI, audit `doi_changed`, orphelins).
 
-    - ``dry_run=False`` : application. Précondition : le `journal.journal_type` a déjà été mis à jour à `prospective_journal_type` par le caller (typiquement dans la même transaction qu'un `update_journal`). On relance `refresh_from_sources` complet sur chaque publication du journal — ce qui passe par les garde-fous habituels (conflits DOI, audit `doi_changed`, orphelins). Retourne le nombre de publications dont le `doc_type` a effectivement changé. Émet l'audit `journal.type_requalified` en fin de boucle si > 0.
+    Retourne le nombre de publications dont le `doc_type` a effectivement changé ; émet
+    l'audit `journal.type_requalified` si > 0.
 
-    Le compte est calculé identiquement dans les deux modes (delta entre `pub.doc_type` avant / après), de sorte que le preview est honnête vis-à-vis de l'apply.
+    Le **preview** (combien changeraient sans appliquer) s'obtient en enveloppant cet appel
+    dans un `SAVEPOINT` rollbacké côté caller — preview et apply partagent ainsi exactement
+    la même logique.
     """
     pub_ids = pub_repo.find_ids_by_journal_id(journal_id)
     if not pub_ids:
         return 0
+
+    correct_for_journal(conn, correction_queries, journal_id)
 
     changed = 0
     for pub_id in pub_ids:
@@ -211,29 +227,17 @@ def requalify_publications_for_journal(
         if pub is None:
             continue
         original_doc_type = pub.doc_type
-
-        if dry_run:
-            sources = pub_repo.get_source_publications(pub_id)
-            if not sources:
-                continue
-            adjusted = [replace(s, journal_type=prospective_journal_type) for s in sources]
-            effective = [apply_corrections(s) for s in adjusted]
-            _refresh_aggregate(pub, effective, source_priority=SOURCE_PRIORITY)
-            new_doc_type = pub.doc_type
-        else:
-            refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
-            pub_after = pub_repo.find_by_id(pub_id)
-            new_doc_type = pub_after.doc_type if pub_after else None
-
-        if new_doc_type != original_doc_type:
+        refresh_from_sources(pub_id, repo=pub_repo, audit_repo=audit_repo)
+        pub_after = pub_repo.find_by_id(pub_id)
+        if pub_after is not None and pub_after.doc_type != original_doc_type:
             changed += 1
 
-    if not dry_run and changed > 0:
+    if changed > 0:
         emit_event(
             audit_repo,
             "journal.type_requalified",
             "journal",
             journal_id,
-            {"count": changed, "new_type": prospective_journal_type},
+            {"count": changed},
         )
     return changed

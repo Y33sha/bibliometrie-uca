@@ -9,6 +9,7 @@ from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.normalize.wos import WosNormalizeQueries
+from domain.publications.metadata import normalized_title
 from domain.types import JsonValue
 
 
@@ -41,12 +42,12 @@ def upsert_wos_source_publication(
         external_ids = {}
     stmt = text("""
         INSERT INTO source_publications
-            (source, source_id, doi, title, pub_year, doc_type,
+            (source, source_id, doi, title, title_normalized, pub_year, doc_type,
              publication_id, staging_id,
              journal_id, oa_status, language, container_title,
              abstract, cited_by_count, biblio, keywords, topics,
              urls, external_ids)
-        VALUES ('wos', :ut, :doi, :title, :pub_year, :doc_type,
+        VALUES ('wos', :ut, :doi, :title, :title_normalized, :pub_year, :doc_type,
                 :publication_id, :staging_id,
                 :journal_id, :oa_status, :language, :container_title,
                 :abstract, :cited_by_count, :biblio, :keywords, :topics,
@@ -67,6 +68,7 @@ def upsert_wos_source_publication(
             topics = COALESCE(EXCLUDED.topics, source_publications.topics),
             urls = COALESCE(EXCLUDED.urls, source_publications.urls),
             external_ids = source_publications.external_ids || EXCLUDED.external_ids,
+            keys_dirty = true,
             updated_at = clock_timestamp()
         RETURNING id
     """).bindparams(
@@ -80,6 +82,7 @@ def upsert_wos_source_publication(
             "ut": ut,
             "doi": doi,
             "title": title,
+            "title_normalized": normalized_title(title),
             "pub_year": pub_year,
             "doc_type": doc_type,
             "publication_id": publication_id,

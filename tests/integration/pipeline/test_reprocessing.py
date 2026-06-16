@@ -13,7 +13,10 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from infrastructure.repositories import publication_repository
-from tests.integration.helpers.publications_phase import create_all_publications
+from tests.integration.helpers.publications_phase import (
+    apply_metadata_corrections,
+    create_all_publications,
+)
 
 # ── Données HAL minimales ───────────────────────────────────────
 
@@ -120,18 +123,20 @@ def _get_pub_oa_status(conn, hal_id):
 
 
 def _refresh_stale_publications(conn):
-    """Rafraîchit les publications dont au moins un source_publication a été modifié depuis le dernier refresh.
+    """Rejoue la phase publications après un re-normalize, pour propager les métadonnées modifiées.
 
-    Reproduit la 2e passe de la phase publications (`create_publications.run`) : SELECT des pubs stale via comparaison `source_publications.updated_at > publications.updated_at` et `refresh_from_sources` sur chacune.
+    Le re-normalize a re-marqué les SP touchées `keys_dirty` ; la réconciliation les reprend donc et `refresh_from_sources` recompute les métadonnées canoniques de leurs publications. Il n'y a plus de « 2e passe stale » dédiée : la réconciliation la subsume (toute SP modifiée est dirty, donc reprise).
+
+    Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes SP avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit le canonique corrigé en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications`).
     """
-    from application.publications import refresh_from_sources
-    from infrastructure.queries.pipeline.publications_create import (
-        fetch_stale_publication_ids,
+    from application.pipeline.publications.reconcile_components import reconcile
+    from infrastructure.queries.pipeline.publications_reconciliation import (
+        PgPublicationsReconciliationQueries,
     )
 
-    repo = publication_repository(conn)
-    for pub_id in fetch_stale_publication_ids(conn):
-        refresh_from_sources(pub_id, repo=repo)
+    apply_metadata_corrections(conn)
+
+    reconcile(conn, PgPublicationsReconciliationQueries(), pub_repo=publication_repository(conn))
 
 
 # ── Tests ───────────────────────────────────────────────────────

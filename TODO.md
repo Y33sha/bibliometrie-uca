@@ -96,24 +96,5 @@
 * titre contient "A systematic review" => idem
 
 # Oneshots sur base de prod à la prochaine occasion
-* vacuum full journals
-* oneshot: python interfaces/cli/oneshot/refresh_publications_with_dumas_url.py
-* réimporter docts openalex avec >=2 hal-ids:
-```
-UPDATE staging
-SET raw_hash = NULL
-WHERE source = 'openalex'
-  AND source_id IN (
-    SELECT sp.source_id
-    FROM source_publications sp
-    CROSS JOIN LATERAL unnest(sp.urls) AS u
-    WHERE sp.source = 'openalex' AND sp.urls IS NOT NULL
-    GROUP BY sp.source_id
-    HAVING COUNT(DISTINCT (regexp_match(lower(u),
-           '(?:hal|tel|halshs|inserm|pasteur|cea|ineris)-\d+'))[1]) >= 2
-  );
-```
-* quid de scanr? a priori la même opération est nécessaire
-* python -m interfaces.cli.oneshot.seed_place_names_from_ror (après avoir ajouter le csv dans data/)
-* python -m interfaces.cli.oneshot.prune_place_names --apply
+* re-seeder les place_name_forms à partir de seed.sql
 * squasher le schéma

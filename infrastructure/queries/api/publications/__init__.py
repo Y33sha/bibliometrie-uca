@@ -5,7 +5,7 @@ Le package est organisé par thème :
 - `facets` : `publications_facets`
 - `detail` : `get_publication_detail`
 
-Les adapters d'écriture pipeline (`pipeline.publications_create`,
+Les adapters d'écriture pipeline (`pipeline.publications_reconciliation`,
 `pipeline.zenodo_concept`) vivent côté `infrastructure/queries/pipeline/`.
 
 `PgPublicationsQueries` agrège les 5 fonctions de lecture sous le port
