@@ -27,51 +27,64 @@ def fetch_dirty_source_publication_ids(conn: Connection) -> list[int]:
 # Dernière branche = composite thèse (doc_type thèse + title_normalized + pub_year),
 # le token métadonnée : sans elle, la SP voisine ne serait pas ramenée et l'arête
 # thèse serait invisible à `connected_components`.
+# Chaque ligne porte `publication_doi` (DOI canonique de la publication courante de la
+# SP, via JOIN) : la réconciliation choisit l'ancre = le pub portant le DOI de la partition.
 # (Au full rerun tout est dirty : l'univers = tout le stock matérialisé = reclustering global.)
-_RECON_COLS = "id, doi, external_ids, publication_id, doc_type, title_normalized, pub_year"
+_COLS = (
+    "{a}.id, {a}.doi, {a}.external_ids, {a}.publication_id, "
+    "{a}.doc_type, {a}.title_normalized, {a}.pub_year, p.doi AS publication_doi"
+)
 _UNIVERSE_SQL = text(f"""
     WITH dirty AS (
-        SELECT {_RECON_COLS}
-        FROM source_publications
-        WHERE keys_dirty AND publication_id IS NOT NULL
+        SELECT {_COLS.format(a="sd")}
+        FROM source_publications sd
+        JOIN publications p ON p.id = sd.publication_id
+        WHERE sd.keys_dirty AND sd.publication_id IS NOT NULL
     )
-    SELECT {_RECON_COLS} FROM dirty
+    SELECT id, doi, external_ids, publication_id, doc_type, title_normalized, pub_year,
+           publication_doi
+    FROM dirty
     UNION
-    SELECT {", ".join("o." + c for c in _RECON_COLS.split(", "))}
+    SELECT {_COLS.format(a="o")}
     FROM dirty d
     JOIN source_publications o
       ON o.publication_id IS NOT NULL AND o.doi IS NOT NULL AND lower(o.doi) = lower(d.doi)
+    JOIN publications p ON p.id = o.publication_id
     WHERE d.doi IS NOT NULL
     UNION
-    SELECT {", ".join("o." + c for c in _RECON_COLS.split(", "))}
+    SELECT {_COLS.format(a="o")}
     FROM dirty d
     JOIN source_publications o
       ON o.publication_id IS NOT NULL
          AND o.external_ids ->> 'nnt' = d.external_ids ->> 'nnt'
+    JOIN publications p ON p.id = o.publication_id
     WHERE d.external_ids ? 'nnt'
     UNION
-    SELECT {", ".join("o." + c for c in _RECON_COLS.split(", "))}
+    SELECT {_COLS.format(a="o")}
     FROM dirty d
     JOIN source_publications o
       ON o.publication_id IS NOT NULL
          AND o.external_ids ->> 'pmid' = d.external_ids ->> 'pmid'
+    JOIN publications p ON p.id = o.publication_id
     WHERE d.external_ids ? 'pmid'
     UNION
-    SELECT {", ".join("o." + c for c in _RECON_COLS.split(", "))}
+    SELECT {_COLS.format(a="o")}
     FROM dirty d
     CROSS JOIN LATERAL jsonb_array_elements_text(d.external_ids -> 'hal_id') AS dh(hal)
     JOIN source_publications o
       ON o.publication_id IS NOT NULL
          AND o.external_ids -> 'hal_id' @> jsonb_build_array(dh.hal)
+    JOIN publications p ON p.id = o.publication_id
     WHERE jsonb_typeof(d.external_ids -> 'hal_id') = 'array'
     UNION
-    SELECT {", ".join("o." + c for c in _RECON_COLS.split(", "))}
+    SELECT {_COLS.format(a="o")}
     FROM dirty d
     JOIN source_publications o
       ON o.publication_id IS NOT NULL
          AND o.doc_type IN ('thesis', 'ongoing_thesis')
          AND o.title_normalized = d.title_normalized
          AND o.pub_year = d.pub_year
+    JOIN publications p ON p.id = o.publication_id
     WHERE d.doc_type IN ('thesis', 'ongoing_thesis')
       AND COALESCE(d.title_normalized, '') <> ''
       AND d.pub_year IS NOT NULL
@@ -89,9 +102,48 @@ def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
             r.doc_type,
             r.title_normalized,
             r.pub_year,
+            r.publication_doi,
         )
         for r in rows
     ]
+
+
+def repoint_source_publications(
+    conn: Connection, source_publication_ids: list[int], publication_id: int
+) -> None:
+    if not source_publication_ids:
+        return
+    stmt = text(
+        "UPDATE source_publications SET publication_id = :pid WHERE id = ANY(:ids)"
+    ).bindparams(bindparam("ids"))
+    conn.execute(stmt, {"pid": publication_id, "ids": source_publication_ids})
+
+
+def repoint_dependents(conn: Connection, from_publication_id: int, to_publication_id: int) -> None:
+    # distinct_publications : re-pointer chaque paire (from, autre) en (autre, to) réordonnée,
+    # écarter l'auto-paire, dédupliquer, puis supprimer les paires de `from`.
+    conn.execute(
+        text("""
+            INSERT INTO distinct_publications (pub_id_a, pub_id_b)
+            SELECT LEAST(other_id, :t), GREATEST(other_id, :t)
+            FROM (
+                SELECT CASE WHEN pub_id_a = :s THEN pub_id_b ELSE pub_id_a END AS other_id
+                FROM distinct_publications
+                WHERE pub_id_a = :s OR pub_id_b = :s
+            ) pairs
+            WHERE other_id <> :t
+            ON CONFLICT (pub_id_a, pub_id_b) DO NOTHING
+        """),
+        {"s": from_publication_id, "t": to_publication_id},
+    )
+    conn.execute(
+        text("DELETE FROM distinct_publications WHERE pub_id_a = :s OR pub_id_b = :s"),
+        {"s": from_publication_id},
+    )
+    conn.execute(
+        text("UPDATE apc_payments SET publication_id = :t WHERE publication_id = :s"),
+        {"s": from_publication_id, "t": to_publication_id},
+    )
 
 
 def clear_keys_dirty(conn: Connection, source_publication_ids: list[int]) -> int:
@@ -111,6 +163,16 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
 
     def fetch_reconciliation_universe(self, conn: Connection) -> list[ReconcileRow]:
         return fetch_reconciliation_universe(conn)
+
+    def repoint_source_publications(
+        self, conn: Connection, source_publication_ids: list[int], publication_id: int
+    ) -> None:
+        repoint_source_publications(conn, source_publication_ids, publication_id)
+
+    def repoint_dependents(
+        self, conn: Connection, from_publication_id: int, to_publication_id: int
+    ) -> None:
+        repoint_dependents(conn, from_publication_id, to_publication_id)
 
     def clear_keys_dirty(self, conn: Connection, source_publication_ids: list[int]) -> int:
         return clear_keys_dirty(conn, source_publication_ids)
