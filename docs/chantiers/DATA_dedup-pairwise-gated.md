@@ -6,7 +6,7 @@ Issu de [DATA_publications-match-or-create](DATA_publications-match-or-create.md
 
 Restent les types **sans identifiant fiable** : `conference_paper` (~29 500 SP), `book_chapter` (~18 800), `poster` (~3 500). Des records qui partagent souvent un **titre + année sans DOI/hal_id partagé**.
 
-**La difficulté n'est pas le titre.** Les titres génériques (« Introduction ») sont rares, et réglés par une garde de longueur (`title_normalized` ≥ 20-30) ; au pire « même ouvrage + même titre "Introduction" = même chapitre », aucun problème. La difficulté est de trancher, entre deux records au même titre+année, **même œuvre vs œuvres distinctes-mais-apparentées** :
+La difficulté est de trancher, entre deux records au même titre+année, **même œuvre vs œuvres distinctes-mais-apparentées** :
 
 - **Versions** (preprint / article publié) : DOI différents → cannot-link → **relation**, déjà géré (« DOI = identité », cf. [METIER_relations-publications](METIER_relations-publications.md)).
 - **Dépôts multiples** de la même œuvre (plusieurs dépôts HAL, ou HAL + OpenAlex sans DOI partagé), souvent avec un **typage incertain** (une communication tantôt typée `article`, `book_chapter`, « communication dans un congrès »…) → à **fusionner**.
@@ -18,12 +18,12 @@ Le discriminant entre les deux derniers = les **auteurs** : mêmes auteurs ⇒ m
 
 ## Cadre conceptuel — token vs garde pairwise
 
-- **Token (confirmation par égalité)** — clé composite dérivable de la SP, assez sélective pour valoir identité ; entre dans `connected_components`, zéro comparaison intra-bloc. Cas couverts : identifiants, thèse `(titre, année)`.
-- **Garde pairwise** — pour un blocage qui ne vaut pas identité à lui seul (titre+année), un **second accord** (les **auteurs**) départage même-œuvre vs collision. Utilisée **symétriquement** : l'accord arme l'arête (fusion), le désaccord la refuse — et, l'appartenance étant une **fonction dérivée des arêtes courantes**, si l'accord cesse de tenir l'arête tombe et la composante peut splitter. Pas d'asymétrie « fusionne mais ne défusionne pas » : un signal assez fort pour fusionner l'est pour défusionner.
+- **Token** — le signal est une **égalité** (DOI, NNT, thèse `(titre, année)`) : relation transitive → on range par valeur (`GROUP BY`), zéro comparaison. *Tout signal bucketable doit devenir un token* — c'est la pression de design.
+- **Garde pairwise** — le signal **n'est pas bucketable**. L'accord d'auteurs est un **recouvrement** (sous-ensemble, noms compatibles), pas une égalité ; non transitif (`{Dupont}` ⊂ `{Dupont, Martin}` ⊄ `{Martin, Durand}`) → pas de clé canonique → comparaison **paire à paire**.
 
-**Le signal, c'est l'identité d'auteur.** On compare deux *records* : leurs listes d'auteurs se recoupent-elles (premier auteur identique, ou recouvrement de noms) ? Recouvrement, pas égalité stricte : les listes sont **tronquées** selon la source (OpenAlex plafonne les listes longues), donc une liste courte reste un **sous-ensemble** dont les noms matchent ceux d'une liste complète. Comparer des noms qui divergent est en soi délicat — cf. question ouverte.
+Le **blocage** `(titre, année)` est, lui, un `GROUP BY` **lossy** (sur-groupe les collisions de titre) : il génère les candidats à coût réduit, la garde tranche dans le bloc. Le recouvrement (et non l'égalité) s'impose car les listes d'auteurs sont **tronquées** selon la source — d'où un matching de noms délicat (cf. question ouverte).
 
-Limite connue du signal auteurs : il **ne distingue pas les versions** (preprint et publié ont les *mêmes* auteurs). Celles-ci sont séparées par le DOI (cannot-link → relation), pas par la garde auteurs. La garde sert donc au cas « même titre+année sans DOI distinctif » : départager dépôt-multiple (même œuvre) de collision (œuvres distinctes).
+Garde **symétrique** (un signal assez fort pour fusionner l'est pour défusionner). Elle ne sépare pas les **versions** (preprint/publié ont les mêmes auteurs — c'est le DOI qui les sépare → relation) ; son rôle est « même titre+année sans DOI distinctif » : départager dépôt-multiple de collision.
 
 ## Méthode — audit empirique par type
 
