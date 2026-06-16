@@ -133,11 +133,14 @@ class TestUniverse:
         )
         assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
 
-    def test_dirty_orphan_excluded(self, sa_sync_conn):
-        """Une SP dirty sans publication n'est pas un seed (rien à réconcilier)."""
+    def test_dirty_orphan_included(self, sa_sync_conn):
+        """Une SP orpheline dirty EST un seed : l'assignation est unifiée dans la réconciliation
+        (elle se fait matcher / créer / skipper par le même primitif)."""
         conn = sa_sync_conn
-        _seed_sp(conn, source_id="orphan", publication_id=None, doi="10.1/x", keys_dirty=True)
-        assert fetch_dirty_source_publication_ids(conn) == []
+        orphan = _seed_sp(
+            conn, source_id="orphan", publication_id=None, doi="10.1/x", keys_dirty=True
+        )
+        assert fetch_dirty_source_publication_ids(conn) == [orphan]
 
 
 class TestEndToEnd:

@@ -123,22 +123,20 @@ def _get_pub_oa_status(conn, hal_id):
 
 
 def _refresh_stale_publications(conn):
-    """Rafraîchit les publications dont au moins un source_publication a été modifié depuis le dernier refresh.
+    """Rejoue la phase publications après un re-normalize, pour propager les métadonnées modifiées.
 
-    Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes SP avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit le canonique corrigé en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications` et sa 2e passe stale).
+    Le re-normalize a re-marqué les SP touchées `keys_dirty` ; la réconciliation les reprend donc et `refresh_from_sources` recompute les métadonnées canoniques de leurs publications. Il n'y a plus de « 2e passe stale » dédiée : la réconciliation la subsume (toute SP modifiée est dirty, donc reprise).
 
-    Reproduit ensuite la 2e passe de la phase publications (`match_or_create_publications.run`) : SELECT des pubs stale via comparaison `source_publications.updated_at > publications.updated_at` et `refresh_from_sources` sur chacune.
+    Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes SP avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit le canonique corrigé en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications`).
     """
-    from application.publications import refresh_from_sources
-    from infrastructure.queries.pipeline.publications_match_or_create import (
-        fetch_stale_publication_ids,
+    from application.pipeline.publications.reconcile_components import reconcile
+    from infrastructure.queries.pipeline.publications_reconciliation import (
+        PgPublicationsReconciliationQueries,
     )
 
     apply_metadata_corrections(conn)
 
-    repo = publication_repository(conn)
-    for pub_id in fetch_stale_publication_ids(conn):
-        refresh_from_sources(pub_id, repo=repo)
+    reconcile(conn, PgPublicationsReconciliationQueries(), pub_repo=publication_repository(conn))
 
 
 # ── Tests ───────────────────────────────────────────────────────

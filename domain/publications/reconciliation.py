@@ -26,7 +26,9 @@ from domain.publications.clustering import connected_components
 class ReconcileMember:
     """Une `source_publication` du voisinage de réconciliation.
 
-    `tokens` = clés de confirmation (cf. `ConfirmationKeys.tokens`) ; `effective_doi` = DOI de partition (colonne corrigée, `None` si absent) ; `publication_id` = publication courante de la SP, **`None` si orpheline** (pas encore matérialisée) ; `publication_doi` = DOI canonique de cette publication courante (`None` si orpheline) ; `in_perimeter` = la SP a ≥1 authorship in-périmètre (gate de création d'une pub neuve).
+    `tokens` = clés de confirmation (cf. `ConfirmationKeys.tokens`) ; `effective_doi` = DOI de partition (colonne corrigée, `None` si absent) ; `publication_id` = publication courante de la SP, **`None` si orpheline** (pas encore matérialisée) ; `publication_doi` = DOI canonique de cette publication courante (`None` si orpheline) ; `in_perimeter` = la SP a ≥1 authorship in-périmètre ; `title_normalized` / `pub_year` = métadonnées minimales requises pour matérialiser une pub neuve.
+
+    `in_perimeter`, `title_normalized` et `pub_year` n'ont de rôle que pour la **création** (partition d'orphelins) : ils décident create vs skip. Les SP matérialisées ne touchent jamais cette branche, d'où leurs défauts inoffensifs.
     """
 
     source_publication_id: int
@@ -34,10 +36,9 @@ class ReconcileMember:
     publication_doi: str | None
     effective_doi: str | None
     tokens: frozenset[tuple[str, str]]
-    # Défaut `False` : seules les SP orphelines (sans pub) consultent ce champ (gate create/skip) ;
-    # les SP matérialisées ne touchent jamais cette branche, le défaut leur est indifférent. Le
-    # câblage qui l'alimente vraiment (univers SQL étendu aux orphelins) est l'étape suivante.
     in_perimeter: bool = False
+    title_normalized: str | None = None
+    pub_year: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,7 +103,8 @@ def _claim(part: list[ReconcileMember]) -> _Claim | None:
       (revendication **forte**, départage `min`), sinon le pub du plus petit `source_publication_id`
       *parmi les SP matérialisées* (**faible**).
     - Partition d'orphelins (aucune SP matérialisée) → `preferred = None` (**create**) si ≥1 membre
-      in-périmètre, sinon `None` retourné (**skip** : aucune pub à créer, les SP restent orphelines).
+      in-périmètre **et** ≥1 membre matérialisable (titre + année — gate `has_minimal_publication_metadata`,
+      sinon `pub_year NOT NULL` ferait échouer la création) ; sinon `None` (**skip**, les SP restent orphelines).
     """
     sp_ids = tuple(sorted(m.source_publication_id for m in part))
     min_sp = min(m.source_publication_id for m in part)
@@ -120,7 +122,8 @@ def _claim(part: list[ReconcileMember]) -> _Claim | None:
             return carriers[0], True, min_sp, sp_ids
         anchor_pub = min(materialized, key=lambda m: m.source_publication_id).publication_id
         return anchor_pub, False, min_sp, sp_ids
-    if any(m.in_perimeter for m in part):
+    creatable = any(m.title_normalized and m.pub_year for m in part)
+    if creatable and any(m.in_perimeter for m in part):
         return None, False, min_sp, sp_ids  # create
     return None  # skip
 
