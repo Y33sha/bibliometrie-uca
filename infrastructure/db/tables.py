@@ -793,12 +793,15 @@ publications = Table(
         "journal_id",
         postgresql_where=text("in_perimeter"),
     ),
-    # Index sur expression lower(doi) — complété à la main. Non-unique :
-    # l'unicité « 1 DOI = 1 publication » est garantie par la passe de fusion,
-    # plus par la DB (cf. chantier création⇒fusion).
+    # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
+    # « 1 DOI = 1 publication » est garantie par la DB : la réconciliation des
+    # composantes ne produit jamais deux publications au même DOI (assignation à
+    # l'unique pub-ancre de la partition `(composante ∩ DOI)`). Partiel : les
+    # publications sans DOI (NULL) ne sont pas contraintes.
     Index(
-        "idx_publications_doi_lower",
+        "publications_doi_lower_key",
         text("lower(doi)"),
+        unique=True,
         postgresql_where=text("doi IS NOT NULL"),
     ),
     # Fetch incrémental oa_status : jamais vérifiés (NULL) d'abord, puis les plus périmés.
