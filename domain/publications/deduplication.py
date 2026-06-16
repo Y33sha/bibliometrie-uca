@@ -9,39 +9,16 @@ from typing import Literal
 
 
 class DeduplicationKey(StrEnum):
-    """Identifiants cross-source par lesquels une publication peut être dédupliquée.
+    """Clés de confirmation cross-source par lesquelles une publication peut être dédupliquée.
 
-    L'enum ne fixe pas de priorité : l'ordre de la cascade est défini dans `decide_publication_match` (DOI > NNT > HAL_ID > PMID > metadata). `StrEnum` (PEP 663) garde la valeur sérialisable telle quelle.
+    L'enum ne fixe pas de priorité : l'ordre de la cascade est défini dans `decide_publication_match` (DOI > NNT > HAL_ID > PMID > THESIS_META). `StrEnum` (PEP 663) garde la valeur sérialisable telle quelle. `THESIS_META` est le **token** composite thèse `(title_normalized, pub_year)` : assez sélectif pour valoir identité par égalité (cf. `domain.source_publications.keys`), au même titre que les identifiants.
     """
 
     DOI = "doi"
     NNT = "nnt"
     HAL_ID = "hal_id"
     PMID = "pmid"
-
-
-class MetadataDeduplicationCase(StrEnum):
-    """Cas de déduplication par métadonnées : combinaisons explicites de critères qui rendent deux publications considérées comme la même (pas un score, pas d'identifiant unique partagé).
-
-    Chaque membre énonce sa règle métier dans le commentaire qui le précède. L'implémentation concrète (prefetch + matching) vit dans `application/pipeline/publications/metadata_deduplication_rules.py`, fonction `match_<nom_du_cas>`.
-    """
-
-    # Thèse : même `title_normalized`, même `pub_year`, compatibilité de
-    # l'auteur primary (helper `thesis_authors_compatible`). Si l'auteur du
-    # `source_publication` courant est inconnu, le candidat est accepté
-    # sans vérification.
-    # Implémentation : `match_thesis_by_title_year`.
-    THESIS_TITLE_YEAR = "thesis_title_year"
-
-    # Proceedings : `doc_type = 'proceedings'`, même `title_normalized`
-    # (longueur > 30 pour exclure les titres pauvres type « Foreword »),
-    # même `pub_year`, même nombre d'auteurs non-excluded (count direct
-    # sur le SP courant comparé au `MAX` par source sur les SP de la pub
-    # canonique candidate), et au moins un des deux DOI null (la
-    # contrainte UNIQUE sur `lower(doi)` exclut l'égalité, donc deux DOI
-    # non-nuls = différents = conflit).
-    # Implémentation : `match_proceedings_by_title_year_authorcount`.
-    PROCEEDINGS_TITLE_YEAR_AUTHORCOUNT = "proceedings_title_year_authorcount"
+    THESIS_META = "thesis_meta"
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,7 +32,7 @@ class PublicationMatchDecision:
 
     action: Literal["match", "create"]
     publication_id: int | None
-    matched_by: DeduplicationKey | MetadataDeduplicationCase | None
+    matched_by: DeduplicationKey | None
 
 
 def decide_publication_match(
@@ -64,15 +41,13 @@ def decide_publication_match(
     nnt_match_id: int | None = None,
     hal_id_match_id: int | None = None,
     pmid_match_id: int | None = None,
-    metadata_match: tuple[int, MetadataDeduplicationCase] | None = None,
+    thesis_meta_match_id: int | None = None,
 ) -> PublicationMatchDecision:
     """Sélecteur de cascade pur : premier match non-None dans l'ordre de priorité gagne.
 
-    Priorité par défaut : DOI > NNT > HAL_ID > PMID > metadata. Tous les paramètres sont optionnels (None par défaut) ; le caller passe ceux qu'il a pré-fetchés.
+    Priorité par défaut : DOI > NNT > HAL_ID > PMID > THESIS_META. Tous les paramètres sont optionnels (None par défaut) ; le caller passe ceux qu'il a pré-fetchés.
 
-    Pour le DOI, le caller passe `doi_merge_with_id` = l'id de la publication portant ce DOI (None si aucune). Pas d'arbitrage chapitre/ouvrage ici : il est traité en amont par la correction relationnelle qui nulle le DOI erroné sur la SP.
-
-    Le `metadata_match` est un tuple `(pub_id, case)` : l'id matché et le cas méta qui l'a produit.
+    Pour le DOI, le caller passe `doi_merge_with_id` = l'id de la publication portant ce DOI (None si aucune). Pas d'arbitrage chapitre/ouvrage ici : il est traité en amont par la correction relationnelle qui nulle le DOI erroné sur la SP. `thesis_meta_match_id` = l'id d'une thèse existante de même titre+année (lookup `find_thesis_by_title`, sans garde — le couple titre+année est identifiant pour une thèse).
     """
     if doi_merge_with_id is not None:
         return PublicationMatchDecision(
@@ -98,12 +73,11 @@ def decide_publication_match(
             publication_id=pmid_match_id,
             matched_by=DeduplicationKey.PMID,
         )
-    if metadata_match is not None:
-        pub_id, case = metadata_match
+    if thesis_meta_match_id is not None:
         return PublicationMatchDecision(
             action="match",
-            publication_id=pub_id,
-            matched_by=case,
+            publication_id=thesis_meta_match_id,
+            matched_by=DeduplicationKey.THESIS_META,
         )
     return PublicationMatchDecision(
         action="create",

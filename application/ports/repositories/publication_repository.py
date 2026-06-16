@@ -48,18 +48,6 @@ class PublicationRepository(Protocol):
         pub_year: int,
     ) -> list[int]: ...
 
-    def find_proceedings_by_title_year(
-        self,
-        title_normalized: str,
-        pub_year: int,
-    ) -> list[tuple[int, str | None]]:
-        """Cherche des proceedings par titre normalisé long (>30 car.) + année.
-
-        Retourne `(pub_id, doi)` pour chaque candidate, le DOI permettant au
-        caller de filtrer les conflits sans réhydrater l'agrégat.
-        """
-        ...
-
     # ── Écritures simples ──────────────────────────────────────────
 
     def update_oa_status(self, pub_id: int, oa_status: str) -> None: ...

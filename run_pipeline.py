@@ -449,20 +449,18 @@ def phase_publications(**kw: Any) -> Any:
 
     `match_or_create` assigne chaque source_publication (match ou création gatée
     périmètre), puis `reconcile_components` fusionne les publications en surplus
-    par composante connexe des clés de confirmation (DOI/NNT/hal_id/PMID), dans le
-    respect du cannot-link DOI. La fusion par métadonnées (thèse/proceedings) reste
-    une passe à part en attendant son intégration au primitif.
+    par composante connexe des clés de confirmation (DOI/NNT/hal_id/PMID + token
+    thèse `title+year`), dans le respect du cannot-link DOI.
 
-    Les passes `merge_pubs_by_{doi,nnt,pmid,hal_id}` ont été retirées du pipeline :
-    la réconciliation les subsume. Leurs CLI restent disponibles pour vérifier en
-    `--dry-run` que la réconciliation reproduit leur résultat sur le stock.
+    Les passes ad-hoc `merge_pubs_by_*` ont été retirées du pipeline : la
+    réconciliation les subsume. La dédup thèse passe par le token de confirmation
+    (assignation + réconciliation), plus de passe métadonnées dédiée.
 
     Prerequis : la phase `zenodo_doi` (en amont) a resolu les concept DOI Zenodo,
     appliqués en colonne par `metadata_correction`.
     """
     _run_match_or_create_publications()
     _run_reconcile_components()
-    _run_merge_pubs_by_metadata()
     # `addresses.pub_count` compte les publications par adresse : recalcul ici,
     # une fois les publications créées et fusionnées — il n'y a rien à compter
     # au stade `normalize`. Un run `--only publications` suffit à le tenir à jour.
@@ -807,22 +805,6 @@ def _run_populate_person_name_forms() -> None:
     finally:
         conn.close()
     log.info("✓ populate_person_name_forms terminé en %.1fs", time.time() - t0)
-
-
-def _run_merge_pubs_by_metadata() -> None:
-    from application.pipeline.publications.merge_pubs_by_metadata import run_merge
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.metadata_merge import PgMetadataMergeQueries
-    from infrastructure.repositories import publication_repository
-
-    log.info("▶ merge_pubs_by_metadata")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run_merge(conn, PgMetadataMergeQueries(), log, pub_repo=publication_repository(conn))
-    finally:
-        conn.close()
-    log.info("✓ merge_pubs_by_metadata terminé en %.1fs", time.time() - t0)
 
 
 def _run_normalize_hal() -> None:

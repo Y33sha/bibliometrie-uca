@@ -161,11 +161,11 @@ class PgPublicationRepository:
         title_normalized: str,
         pub_year: int,
     ) -> list[int]:
-        """Cherche des thèses par titre normalisé + année.
+        """Cherche des thèses (thesis/ongoing_thesis) par titre normalisé + année.
 
-        Retourne les ids de candidats pour déduplication thesis-specific
-        (vérification ultérieure de la compatibilité auteur primary
-        dans `match_thesis_by_title_year` du module `metadata_deduplication_rules`).
+        Lookup du **token de confirmation thèse** (`title_normalized`+`pub_year`,
+        cf. `domain.source_publications.keys`) : l'assignation rattache une SP thèse
+        à un de ces candidats (sans garde — le couple titre+année est identifiant).
         """
         if not title_normalized or not pub_year:
             return []
@@ -179,30 +179,6 @@ class PgPublicationRepository:
             {"tn": title_normalized, "py": pub_year},
         )
         return [row.id for row in result]
-
-    def find_proceedings_by_title_year(
-        self,
-        title_normalized: str,
-        pub_year: int,
-    ) -> list[tuple[int, str | None]]:
-        """Cherche des proceedings par titre normalisé long (>30 car.) + année.
-
-        Retourne `(pub_id, doi)` pour chaque candidate. Le seuil de longueur
-        écarte les titres pauvres (« Foreword », « Welcome message ») qui
-        produiraient des faux positifs.
-        """
-        if not title_normalized or len(title_normalized) <= 30 or not pub_year:
-            return []
-        result = self._conn.execute(
-            text("""
-                SELECT id, doi FROM publications
-                WHERE title_normalized = :tn AND pub_year = :py
-                  AND doc_type = 'proceedings'
-                ORDER BY id
-            """),
-            {"tn": title_normalized, "py": pub_year},
-        )
-        return [(row.id, row.doi) for row in result]
 
     # ── Chargement / persistance de l'aggregate Publication ────────
 

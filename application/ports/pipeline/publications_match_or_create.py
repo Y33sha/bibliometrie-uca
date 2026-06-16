@@ -45,25 +45,4 @@ class PublicationsMatchOrCreateQueries(Protocol):
         self, conn: Connection, source_publication_id: int, publication_id: int
     ) -> None: ...
 
-    def fetch_thesis_primary_author(
-        self, conn: Connection, publication_id: int
-    ) -> tuple[str, str] | None: ...
-
-    def fetch_thesis_primary_author_from_source_publication(
-        self, conn: Connection, source_publication_id: int
-    ) -> tuple[str, str] | None: ...
-
-    def fetch_source_authorship_count(self, conn: Connection, source_publication_id: int) -> int:
-        """Compte les `source_authorships` d'un `source_publication`."""
-        ...
-
-    def fetch_max_source_authorship_count_per_publication(
-        self, conn: Connection, publication_id: int
-    ) -> int:
-        """Pour une publication canonique, retourne le `MAX` du nombre de
-        `source_authorships` par source (chaque source rapporte sa propre
-        liste ; on retient la plus complète).
-        """
-        ...
-
     def fetch_stale_publication_ids(self, conn: Connection) -> list[int]: ...

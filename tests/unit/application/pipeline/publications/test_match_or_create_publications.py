@@ -4,7 +4,7 @@ Couvre :
 - `process_document` : aiguillage DOI / NNT / HAL / thesis vers `decide_publication_match`.
 - `run` : boucle d'orchestration, commit/rollback, dry-run, exceptions.
 
-L'extraction des clés de confirmation (DOI effectif Zenodo, NNT/PMID/HAL) est portée par `domain.source_publications.keys.project_confirmation_keys`, testée dans `tests/unit/domain/source_publications/test_keys.py`. Les helpers de matching par métadonnées (cas thèse, etc.) sont testés dans `test_metadata_deduplication_rules.py`.
+L'extraction des clés de confirmation (DOI effectif Zenodo, NNT/PMID/HAL, token thèse `title+year`) est portée par `domain.source_publications.keys.project_confirmation_keys`, testée dans `tests/unit/domain/source_publications/test_keys.py`.
 
 Mocks : port `PublicationsMatchOrCreateQueries`, `PublicationRepository`, `AuditRepository`. `refresh_from_sources` monkeypatché dans le module pour isoler la logique d'aiguillage.
 """
@@ -239,17 +239,16 @@ class TestProcessDocumentHalMatch:
         queries.link_source_publication_to_publication.assert_called_once_with(None, 1, 33)
 
 
-class TestProcessDocumentThesisMetadata:
-    def test_thesis_metadata_match_falls_through_to_decide(self, captured, logger, monkeypatch):
-        """Thèse sans DOI/NNT/HAL mais titre+année compatibles → match via metadata."""
+class TestProcessDocumentThesisMeta:
+    def test_thesis_token_match_links(self, captured, logger):
+        """Thèse sans DOI/NNT/HAL mais même titre+année qu'une thèse existante → match par token thèse (lookup `find_thesis_by_title`, sans garde auteur)."""
         queries = MagicMock()
         repo = MagicMock()
         repo.find_by_doi.return_value = None
         repo.find_by_nnt.return_value = None
         repo.find_by_hal_id.return_value = None
+        repo.find_by_pmid.return_value = None
         repo.find_thesis_by_title.return_value = [123]
-        queries.fetch_thesis_primary_author_from_source_publication.return_value = None
-        queries.fetch_thesis_primary_author.return_value = None
 
         result = process_document(
             conn=None,
@@ -262,6 +261,26 @@ class TestProcessDocumentThesisMetadata:
         assert result == "linked"
         repo.create.assert_not_called()
         queries.link_source_publication_to_publication.assert_called_once_with(None, 1, 123)
+
+    def test_non_thesis_doc_type_no_thesis_lookup(self, captured, logger):
+        """Un article (pas de token thèse) ne déclenche pas le lookup `find_thesis_by_title`."""
+        queries = MagicMock()
+        repo = MagicMock()
+        repo.find_by_doi.return_value = None
+        repo.find_by_nnt.return_value = None
+        repo.find_by_hal_id.return_value = None
+        repo.find_by_pmid.return_value = None
+        repo.create.return_value = 9
+
+        process_document(
+            conn=None,
+            queries=queries,
+            doc=_make_doc(doc_type="article"),
+            dry_run=False,
+            pub_repo=repo,
+        )
+
+        repo.find_thesis_by_title.assert_not_called()
 
 
 class TestProcessDocumentPerimeterGate:
