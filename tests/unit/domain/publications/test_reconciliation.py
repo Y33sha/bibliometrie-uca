@@ -1,4 +1,7 @@
-"""Tests purs de `plan_reconciliation` : assignation SP → pub-ancre (merge + split unifiés)."""
+"""Tests purs de `plan_reconciliation` : assignation SP → pub-ancre (match/create/skip + merge/split unifiés).
+
+`pub_id=None` = SP orpheline (pas encore matérialisée). La matrice match/create/skip est dans `TestAssignmentOfOrphans`.
+"""
 
 from domain.publications.reconciliation import (
     DissolvedPublication,
@@ -8,13 +11,14 @@ from domain.publications.reconciliation import (
 )
 
 
-def _m(sp_id, pub_id, *, pub_doi=None, doi=None, tokens=()):
+def _m(sp_id, pub_id, *, pub_doi=None, doi=None, tokens=(), in_perimeter=False):
     return ReconcileMember(
         source_publication_id=sp_id,
         publication_id=pub_id,
         publication_doi=pub_doi,
         effective_doi=doi,
         tokens=frozenset(tokens),
+        in_perimeter=in_perimeter,
     )
 
 
@@ -118,6 +122,67 @@ class TestSplit:
         )
         assert _groups(plan) == {10: (1,), 20: (2,)}
         # pub 30 retient la SP résiduelle 3 → pas dissoute.
+        assert plan.dissolved == ()
+
+
+class TestAssignmentOfOrphans:
+    """Matrice match / create / skip : les orphelins (`pub_id=None`) traités par le même primitif."""
+
+    def test_match_orphan_joins_existing_pub(self):
+        """Orphelin + pub existante portant le même DOI → l'orphelin rejoint la pub (match)."""
+        plan = plan_reconciliation(
+            [
+                _m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 50, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+            ]
+        )
+        assert _groups(plan) == {50: (1, 2)}
+        assert plan.dissolved == ()
+
+    def test_create_orphans_with_perimeter(self):
+        """Orphelins seuls, ≥1 in-périmètre, aucune pub → on crée une pub (target=None)."""
+        plan = plan_reconciliation(
+            [
+                _m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")], in_perimeter=True),
+                _m(
+                    2, None, doi="10.1/x", tokens=[("doi", "10.1/x")]
+                ),  # hors-périmètre, mais voisin in
+            ]
+        )
+        assert _groups(plan) == {None: (1, 2)}
+        assert plan.dissolved == ()
+
+    def test_skip_orphans_out_of_perimeter(self):
+        """Orphelins seuls, aucun in-périmètre → aucun groupe (ils restent orphelins)."""
+        plan = plan_reconciliation(
+            [
+                _m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, None, doi="10.1/x", tokens=[("doi", "10.1/x")]),
+            ]
+        )
+        assert plan.groups == ()
+        assert plan.dissolved == ()
+
+    def test_lone_orphan_in_perimeter_creates(self):
+        plan = plan_reconciliation(
+            [_m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")], in_perimeter=True)]
+        )
+        assert _groups(plan) == {None: (1,)}
+
+    def test_lone_orphan_out_of_perimeter_skipped(self):
+        plan = plan_reconciliation([_m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")])])
+        assert plan.groups == ()
+
+    def test_mixed_orphan_matches_other_orphan_skipped(self):
+        """Un orphelin rejoint une pub (DOI X) ; un autre orphelin (DOI Y, hors-périmètre) skip."""
+        plan = plan_reconciliation(
+            [
+                _m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(2, 50, pub_doi="10.1/x", doi="10.1/x", tokens=[("doi", "10.1/x")]),
+                _m(3, None, doi="10.2/y", tokens=[("doi", "10.2/y")]),
+            ]
+        )
+        assert _groups(plan) == {50: (1, 2)}  # sp3 (DOI Y, hors-périmètre) non groupé
         assert plan.dissolved == ()
 
 
