@@ -31,8 +31,10 @@ class _FakeResolver:
     def __init__(self, mapping: dict[str, str | None], errors: set[str] = frozenset()) -> None:
         self._mapping = mapping
         self._errors = errors
+        self.calls = 0
 
     def resolve_concept_doi(self, doi: str) -> str | None:
+        self.calls += 1
         if doi in self._errors:
             raise ZenodoResolutionError("boom")
         return self._mapping.get(doi)
@@ -75,3 +77,36 @@ def test_temporary_error_skips_without_storing():
     run(MagicMock(), queries, resolver, _LOG)
     # SP 1 en erreur → non stockée ; SP 2 résolue.
     assert queries.set_calls == [(2, "10.5281/zenodo.20")]
+
+
+def test_circuit_breaks_after_consecutive_failures():
+    """Régression : Zenodo down (échecs consécutifs) → coupe après le seuil, ne grince pas
+    sur tout le stock (sinon 2376 × ~10s de timeout)."""
+    from application.pipeline.publications.resolve_zenodo_concept import _CONSECUTIVE_FAILURES_MAX
+
+    dois = [f"10.5281/zenodo.{i}" for i in range(50)]
+    docs = [ZenodoSourcePublication(id=i, doi=d) for i, d in enumerate(dois)]
+    queries = _FakeQueries(docs)
+    resolver = _FakeResolver({}, errors=set(dois))  # tout échoue
+
+    run(MagicMock(), queries, resolver, _LOG)
+
+    assert resolver.calls == _CONSECUTIVE_FAILURES_MAX  # coupe au seuil, pas 50
+    assert queries.set_calls == []
+
+
+def test_strike_counter_resets_on_success():
+    """Un succès entre des erreurs remet le compteur à zéro (pas de coupe prématurée)."""
+    dois = [f"10.5281/zenodo.{i}" for i in range(5)]
+    docs = [ZenodoSourcePublication(id=i, doi=d) for i, d in enumerate(dois)]
+    queries = _FakeQueries(docs)
+    # err, err, ok, err, err : max 2 échecs consécutifs < seuil → pas de coupe.
+    resolver = _FakeResolver(
+        {dois[2]: "10.5281/zenodo.concept"},
+        errors={dois[0], dois[1], dois[3], dois[4]},
+    )
+
+    run(MagicMock(), queries, resolver, _LOG)
+
+    assert resolver.calls == 5  # tout le stock parcouru
+    assert queries.set_calls == [(2, "10.5281/zenodo.concept")]

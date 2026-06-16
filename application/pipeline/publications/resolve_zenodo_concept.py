@@ -27,6 +27,10 @@ from application.ports.pipeline.zenodo_concept import ZenodoConceptQueries
 from application.ports.pipeline.zenodo_resolver import ZenodoResolver
 from domain.sources.zenodo import ZenodoResolutionError
 
+# Coupe-circuit : N erreurs Zenodo consécutives (API down ou rate-limited) → on interrompt.
+# Chaque échec est coûteux (timeout ~10s, ou backoff 429), d'où un seuil bas.
+_CONSECUTIVE_FAILURES_MAX = 5
+
 
 def run(
     conn: Connection,
@@ -39,13 +43,26 @@ def run(
 
     resolved = 0
     failed = 0
+    strikes = 0  # erreurs consécutives (coupe-circuit)
     for i, doc in enumerate(docs):
         try:
             concept_doi = resolver.resolve_concept_doi(doc.doi)
         except ZenodoResolutionError as e:
             logger.warning("  SP %d (%s) : %s — retenté au prochain run", doc.id, doc.doi, e)
             failed += 1
+            strikes += 1
+            if strikes >= _CONSECUTIVE_FAILURES_MAX:
+                conn.commit()
+                logger.warning(
+                    "⚡ Coupe-circuit Zenodo (%d échecs consécutifs : API down ou rate-limited) : "
+                    "phase interrompue à %d/%d. Reste retenté au prochain run.",
+                    strikes,
+                    i + 1,
+                    len(docs),
+                )
+                return
             continue
+        strikes = 0  # succès → on remet le compteur à zéro
 
         # Pas de concept exposé (dépôt non versionné) → la SP est son propre
         # concept ; on pose son DOI pour la rendre résolue et idempotente.
