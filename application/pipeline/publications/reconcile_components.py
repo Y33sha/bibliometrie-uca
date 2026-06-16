@@ -47,7 +47,11 @@ def run(
             ReconcileMember(
                 source_publication_id=row.id,
                 publication_id=row.publication_id,
-                effective_doi=(keys := project_confirmation_keys(row.doi, row.external_ids)).doi,
+                effective_doi=(
+                    keys := project_confirmation_keys(
+                        row.doi, row.external_ids, row.doc_type, row.title_normalized, row.pub_year
+                    )
+                ).doi,
                 tokens=keys.tokens(),
             )
             for row in rows

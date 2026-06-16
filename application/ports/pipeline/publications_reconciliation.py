@@ -11,12 +11,18 @@ from sqlalchemy import Connection
 
 
 class ReconcileRow(NamedTuple):
-    """Projection d'une `source_publication` du voisinage : clés + publication courante."""
+    """Projection d'une `source_publication` du voisinage : clés + publication courante.
+
+    `doc_type`/`title_normalized`/`pub_year` alimentent le token métadonnée thèse de
+    `project_confirmation_keys` (les identifiants viennent de `doi`/`external_ids`)."""
 
     id: int
     doi: str | None
     external_ids: dict[str, object] | None
     publication_id: int
+    doc_type: str | None
+    title_normalized: str | None
+    pub_year: int | None
 
 
 class PublicationsReconciliationQueries(Protocol):
@@ -30,8 +36,8 @@ class PublicationsReconciliationQueries(Protocol):
 
     def fetch_reconciliation_universe(self, conn: Connection) -> list[ReconcileRow]:
         """Le voisinage 1-hop : les SP dirty (avec publication) **et** les SP qui partagent une clé
-        de confirmation (DOI / NNT / hal_id / PMID) avec l'une d'elles. Univers sur lequel tourne
-        `connected_components`."""
+        de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`pub_year`)
+        avec l'une d'elles. Univers sur lequel tourne `connected_components`."""
         ...
 
     def clear_keys_dirty(self, conn: Connection, source_publication_ids: list[int]) -> int:

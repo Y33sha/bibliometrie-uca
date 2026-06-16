@@ -33,18 +33,30 @@ def _seed_pub(conn, doi=None) -> int:
     )
 
 
-def _seed_sp(conn, *, source_id, publication_id=None, doi=None, external_ids=None, keys_dirty=True):
+def _seed_sp(
+    conn,
+    *,
+    source_id,
+    publication_id=None,
+    doi=None,
+    external_ids=None,
+    keys_dirty=True,
+    doc_type="article",
+    title_normalized=None,
+):
     stmt = text("""
         INSERT INTO source_publications
-            (source, source_id, title, pub_year, doc_type, doi, external_ids,
+            (source, source_id, title, title_normalized, pub_year, doc_type, doi, external_ids,
              publication_id, keys_dirty)
-        VALUES ('openalex', :sid, 'T', 2024, 'article', :doi, :ext, :pid, :dirty)
+        VALUES ('openalex', :sid, 'T', :tn, 2024, :dt, :doi, :ext, :pid, :dirty)
         RETURNING id
     """).bindparams(bindparam("ext", type_=JSONB))
     return conn.execute(
         stmt,
         {
             "sid": source_id,
+            "tn": title_normalized,
+            "dt": doc_type,
             "doi": doi,
             "ext": external_ids or {},
             "pid": publication_id,
@@ -99,6 +111,28 @@ class TestUniverse:
         )
         assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
 
+    def test_neighbor_by_thesis_meta(self, sa_sync_conn):
+        """Voisinage par token thèse : deux thèses de même titre+année, sans clé d'identifiant partagée."""
+        conn = sa_sync_conn
+        pub_a = _seed_pub(conn)
+        pub_b = _seed_pub(conn)
+        dirty = _seed_sp(
+            conn,
+            source_id="a",
+            publication_id=pub_a,
+            doc_type="thesis",
+            title_normalized="ma these unique",
+        )
+        neighbor = _seed_sp(
+            conn,
+            source_id="b",
+            publication_id=pub_b,
+            doc_type="thesis",
+            title_normalized="ma these unique",
+            keys_dirty=False,
+        )
+        assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
+
     def test_dirty_orphan_excluded(self, sa_sync_conn):
         """Une SP dirty sans publication n'est pas un seed (rien à réconcilier)."""
         conn = sa_sync_conn
@@ -123,6 +157,40 @@ class TestEndToEnd:
         )
 
         # Ancre = publication de la SP au plus petit id (sp_a < sp_b → pub_a).
+        anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
+        assert _pub_exists(conn, anchor)
+        assert not _pub_exists(conn, absorbed)
+        assert _sp_state(conn, sp_a) == (anchor, False)
+        assert _sp_state(conn, sp_b) == (anchor, False)
+
+    def test_two_theses_sharing_title_year_merged(self, sa_sync_conn, monkeypatch):
+        """Deux thèses cross-source, même titre+année, sans DOI/NNT/hal partagé → fusion par token thèse."""
+        conn = sa_sync_conn
+        monkeypatch.setattr(conn, "commit", lambda: None)
+        pub_a = _seed_pub(conn)
+        pub_b = _seed_pub(conn)
+        sp_a = _seed_sp(
+            conn,
+            source_id="a",
+            publication_id=pub_a,
+            doc_type="thesis",
+            title_normalized="ma these unique",
+        )
+        sp_b = _seed_sp(
+            conn,
+            source_id="b",
+            publication_id=pub_b,
+            doc_type="thesis",
+            title_normalized="ma these unique",
+        )
+
+        run(
+            conn,
+            PgPublicationsReconciliationQueries(),
+            logger,
+            pub_repo=publication_repository(conn),
+        )
+
         anchor, absorbed = (pub_a, pub_b) if sp_a < sp_b else (pub_b, pub_a)
         assert _pub_exists(conn, anchor)
         assert not _pub_exists(conn, absorbed)
