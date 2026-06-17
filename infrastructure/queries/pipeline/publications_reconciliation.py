@@ -70,19 +70,8 @@ _UNIVERSE_SQL = text(f"""
     LEFT JOIN publications p ON p.id = o.publication_id
     WHERE jsonb_typeof(d.external_ids -> 'hal_id') = 'array'
     UNION
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_publications o
-      ON o.doc_type IN ('thesis', 'ongoing_thesis')
-         AND o.title_normalized = d.title_normalized
-         AND o.pub_year = d.pub_year
-    LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE d.doc_type IN ('thesis', 'ongoing_thesis')
-      AND COALESCE(d.title_normalized, '') <> ''
-      AND d.pub_year IS NOT NULL
-    UNION
-    -- Token tier-1 (metadata_block) : même doc_type + titre + année, titre assez long.
-    -- length(...) > 30 duplique _TIER1_MIN_TITLE_LENGTH (keys.py) — garder synchrone.
+    -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
+    -- length(...) > 30 duplique _METADATA_BLOCK_MIN_TITLE_LENGTH (keys.py) — garder synchrone.
     SELECT {_COLS.format(a="o")}
     FROM dirty d
     JOIN source_publications o
@@ -90,7 +79,7 @@ _UNIVERSE_SQL = text(f"""
          AND o.title_normalized = d.title_normalized
          AND o.pub_year = d.pub_year
     LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE d.doc_type IN ('conference_paper', 'poster', 'book_chapter')
+    WHERE d.doc_type IS NOT NULL
       AND length(d.title_normalized) > 30
       AND d.pub_year IS NOT NULL
 """)

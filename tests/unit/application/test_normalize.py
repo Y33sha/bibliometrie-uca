@@ -445,7 +445,6 @@ class TestThesesExtractPubMetadata:
         assert meta["nnt"] == "2023UCFA0069"
         assert meta["oa_status"] == "closed"
         assert meta["journal_id"] is None
-        assert meta["title_normalized"]  # non vide
 
     def test_en_cours_falls_back_to_inscription(self):
         these = {
@@ -471,7 +470,6 @@ class TestThesesExtractPubMetadata:
     def test_no_title(self):
         meta = extract_pub_metadata({})
         assert meta["title"] is None
-        assert meta["title_normalized"] is None
 
 
 class TestThesesBuildSourceMeta:

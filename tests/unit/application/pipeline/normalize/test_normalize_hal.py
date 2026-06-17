@@ -340,7 +340,6 @@ class TestInsertHalDocument:
             pub_meta={
                 "doi": None,
                 "title": None,
-                "title_normalized": None,
                 "pub_year": None,
                 "doc_type": None,
                 "nnt": None,

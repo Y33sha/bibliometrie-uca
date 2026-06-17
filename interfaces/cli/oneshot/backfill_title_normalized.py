@@ -6,11 +6,11 @@ Les upserts du `normalize` remplissent désormais `title_normalized` au même mo
 (`domain.publications.metadata.normalized_title`) pour toutes les SP `title_normalized IS NULL`.
 `title` étant INSERT-only, le backfill est définitif (pas de recompute à entretenir).
 
-Peupler `title_normalized` **arme les tokens métadonnée** (`thesis_meta`, `metadata_block`) :
-c'est une mutation de clé. Le one-shot pose donc `keys_dirty = true` sur les doc_types qui
-gagnent un token (cf. `_TOKEN_DOC_TYPES`), pour que la réconciliation les ré-évalue au prochain
-run de la phase `publications`. Les autres types ne gagnent aucun token par `title_normalized`
-(et leur dédup par identifiant est indépendante de ce backfill).
+Peupler `title_normalized` **arme le token métadonnée** (`metadata_block` = `(doc_type, titre,
+année)`) : c'est une mutation de clé. Le one-shot pose donc `keys_dirty = true` sur **toute** SP
+qui gagne ce token (doc_type présent, titre assez long, année présente — cf. `keys.py`), pour que
+la réconciliation matérialise les fusions au prochain run de la phase `publications`. Les SP sans
+titre assez long ne gagnent rien (leur dédup par identifiant est indépendante de ce backfill).
 
 Usage :
     python -m interfaces.cli.oneshot.backfill_title_normalized [--dry-run]
@@ -31,10 +31,10 @@ log = setup_logger("backfill_title_normalized", os.path.dirname(__file__))
 
 BATCH = 5000
 
-# doc_types dont le jeu de tokens change quand `title_normalized` se remplit (token thèse +
-# token bloc tier-1) — cf. `_THESIS_DOC_TYPES` / `_TIER1_DOC_TYPES` dans
-# `domain/source_publications/keys.py`. À garder synchrone.
-_TOKEN_DOC_TYPES = ("thesis", "ongoing_thesis", "conference_paper", "poster", "book_chapter")
+# SP qui gagnent le token `metadata_block` quand `title_normalized` se remplit (cf. `keys.py`) :
+# tout doc_type, titre assez long, année présente. `length > 30` duplique
+# `_METADATA_BLOCK_MIN_TITLE_LENGTH` (keys.py) — garder synchrone.
+_GAINS_TOKEN = "doc_type IS NOT NULL AND length(title_normalized) > 30 AND pub_year IS NOT NULL"
 
 
 def main() -> int:
@@ -50,12 +50,14 @@ def main() -> int:
             n = conn.execute(
                 text("SELECT count(*) FROM source_publications WHERE title_normalized IS NULL")
             ).scalar_one()
+            # Estimation avant backfill : `title_normalized` est NULL, on approxime la longueur
+            # sur le titre brut (≈ la forme normalisée) pour compter les futurs marquages.
             to_dirty = conn.execute(
                 text(
                     "SELECT count(*) FROM source_publications "
-                    "WHERE doc_type = ANY(:types) AND title_normalized IS NULL"
-                ),
-                {"types": list(_TOKEN_DOC_TYPES)},
+                    "WHERE doc_type IS NOT NULL AND pub_year IS NOT NULL "
+                    "AND length(COALESCE(title_normalized, title, '')) > 30"
+                )
             ).scalar_one()
             log.info(
                 "DRY-RUN : %d source_publications à backfiller, dont %d à marquer keys_dirty",
@@ -84,17 +86,16 @@ def main() -> int:
             log.info("  %d backfillés...", total)
         log.info("✓ %d title_normalized backfillés", total)
 
-        # `title_normalized` peuplé ⇒ tokens métadonnée armés : re-dirtier les types concernés
-        # pour que la réconciliation matérialise les fusions au prochain run `publications`.
+        # `title_normalized` peuplé ⇒ token `metadata_block` armé : re-dirtier toute SP qui le
+        # gagne, pour que la réconciliation matérialise les fusions au prochain run `publications`.
+        # `_GAINS_TOKEN` est un fragment de condition constant (pas une valeur) — interpolation sûre.
         marked = conn.execute(
-            text(
-                "UPDATE source_publications SET keys_dirty = true "
-                "WHERE doc_type = ANY(:types) AND title_normalized IS NOT NULL"
-            ),
-            {"types": list(_TOKEN_DOC_TYPES)},
+            text(f"UPDATE source_publications SET keys_dirty = true WHERE {_GAINS_TOKEN}")  # noqa: S608
         ).rowcount
         conn.commit()
-        log.info("✓ %d source_publications marquées keys_dirty (types à token métadonnée)", marked)
+        log.info(
+            "✓ %d source_publications marquées keys_dirty (gagnent le token metadata_block)", marked
+        )
     return 0
 
 
