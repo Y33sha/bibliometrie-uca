@@ -33,7 +33,6 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
-from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
@@ -117,7 +116,6 @@ def extract_pub_metadata(doc: dict, journal_id: int | None, scanr_id: str | None
         container_title = source.get("title")
     return dict(
         title=title,
-        title_normalized=normalize_text(title) if title else None,
         pub_year=doc.get("year"),
         doc_type=doc.get("type"),
         doi=extract_doi(doc),

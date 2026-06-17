@@ -35,7 +35,6 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
-from domain.normalize import normalize_text
 from domain.persons.identifiers import compact_identifiers, normalize_orcid
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.sources.openalex import (
@@ -225,7 +224,6 @@ def extract_pub_metadata(work: dict, journal_id: int | None) -> dict:
 
     return dict(
         title=title,
-        title_normalized=normalize_text(title),
         pub_year=work.get("publication_year"),
         doc_type=work.get("type"),
         doi=clean_doi(work.get("doi")),

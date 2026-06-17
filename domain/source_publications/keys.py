@@ -3,7 +3,7 @@
 Une *clé de confirmation* est un attribut cross-source par lequel deux `source_publications` attestent du même document. Deux familles :
 
 - **Identifiants** : DOI, NNT, HAL ID, PMID — égalité directe.
-- **Token métadonnée** : pour une classe où une clé composite dérivable de la SP est assez **sélective** pour valoir identité par égalité. Deux cas : la **thèse** (`("thesis_meta", "<title_normalized>|<pub_year>")` — titre de thèse + année unique en pratique, `thesis`/`ongoing_thesis` collapsés, sans garde de longueur) ; le **bloc tier-1** (`("metadata_block", "<doc_type>|<title_normalized>|<pub_year>")`) pour les types sans identifiant fiable `conference_paper`/`poster`/`book_chapter`, gardé par une **longueur minimale de titre** (écarte les collisions de titres génériques) — `doc_type` dans la clé (égalité requise) ; audit ~99,95 % de même-œuvre (cf. fiche `DATA_dedup-pairwise-gated`). Les paliers plus lâches (hors `doc_type`, ou titres courts via le conteneur) qui exigeraient un second accord pairwise relèvent d'un mécanisme distinct.
+- **Token métadonnée** : `("metadata_block", "<doc_type>|<title_normalized>|<pub_year>")`, pour **tout** `doc_type` (audit chantier `DATA_dedup-pairwise-gated` : ~99 % de même-œuvre par type au-delà du seuil de longueur). `doc_type` dans la clé = égalité de type requise (décision « DOI = identité » étendue au type). Garde de **longueur minimale de titre** : écarte les collisions de titres génériques. La thèse passe par ce même token (`thesis|<titre>|<année>`) ; pas de collapse `thesis`/`ongoing_thesis` (leurs années diffèrent — inscription vs soutenance —, ils ne co-bloquent donc jamais). Les paliers plus lâches (hors `doc_type`, titres courts via le conteneur) qui exigeraient un second accord pairwise relèvent d'un mécanisme distinct.
 
 La projection est l'unique définition de « quelles clés porte cette SP », consommée par la passe d'assignation + réconciliation des composantes (`reconcile_components`) — aucun site ne ré-encode son extraction.
 
@@ -15,31 +15,23 @@ from dataclasses import dataclass
 
 from domain.publications.identifiers import DOI, NNT, PMID, HALId
 
-# Types dont le couple (title_normalized, pub_year) vaut identité par égalité (token thèse).
-_THESIS_DOC_TYPES: frozenset[str] = frozenset({"thesis", "ongoing_thesis"})
-
-# Types sans identifiant fiable dont le triplet (doc_type, title_normalized, pub_year) vaut
-# identité par égalité (token tier-1), à condition que le titre soit assez long pour écarter
-# les collisions de titres génériques (audit chantier dedup-pairwise-gated : ~99,95 % de
-# même-œuvre au-delà du seuil). `doc_type` est dans la clé : égalité de type requise.
-_TIER1_DOC_TYPES: frozenset[str] = frozenset({"conference_paper", "poster", "book_chapter"})
-# Seuil de longueur de `title_normalized` (caractères, strict). Dupliqué en SQL dans la branche
-# `metadata_block` de l'univers de réconciliation (`publications_reconciliation`) — garder synchrone.
-_TIER1_MIN_TITLE_LENGTH = 30
+# Seuil de longueur de `title_normalized` (caractères, strict) pour le token `metadata_block` :
+# écarte les collisions de titres génériques. Dupliqué en SQL dans la branche `metadata_block`
+# de l'univers de réconciliation (`publications_reconciliation`) — garder synchrone.
+_METADATA_BLOCK_MIN_TITLE_LENGTH = 30
 
 
 @dataclass(frozen=True, slots=True)
 class ConfirmationKeys:
     """Clés de confirmation portées par une `source_publication`, normalisées.
 
-    `hal_ids` est multivalué (une SP peut référencer plusieurs dépôts HAL) ; les autres clés sont au plus unitaires. Les identifiants sont des chaînes canoniques (forme produite par les VO), prêtes pour les lookups `find_by_*`. `thesis_meta` = `"<title_normalized>|<pub_year>"` pour une thèse identifiable par titre+année. `metadata_block` = `"<doc_type>|<title_normalized>|<pub_year>"` pour un type tier-1 à titre assez long. Une clé absente vaut `None` (tuple vide pour `hal_ids`).
+    `hal_ids` est multivalué (une SP peut référencer plusieurs dépôts HAL) ; les autres clés sont au plus unitaires. Les identifiants sont des chaînes canoniques (forme produite par les VO), prêtes pour les lookups `find_by_*`. `metadata_block` = `"<doc_type>|<title_normalized>|<pub_year>"` pour toute SP à `doc_type` présent et titre assez long. Une clé absente vaut `None` (tuple vide pour `hal_ids`).
     """
 
     doi: str | None
     nnt: str | None
     pmid: str | None
     hal_ids: tuple[str, ...]
-    thesis_meta: str | None
     metadata_block: str | None
 
     def tokens(self) -> frozenset[tuple[str, str]]:
@@ -54,8 +46,6 @@ class ConfirmationKeys:
             toks.add(("nnt", self.nnt))
         if self.pmid:
             toks.add(("pmid", self.pmid))
-        if self.thesis_meta:
-            toks.add(("thesis_meta", self.thesis_meta))
         if self.metadata_block:
             toks.add(("metadata_block", self.metadata_block))
         toks.update(("hal_id", hal) for hal in self.hal_ids)
@@ -71,7 +61,7 @@ def project_confirmation_keys(
 ) -> ConfirmationKeys:
     """Extrait les clés de confirmation normalisées d'une `source_publication`.
 
-    `external_ids` porte `nnt`, `pmid`, `hal_id` (liste). Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). Une valeur d'identifiant malformée est écartée silencieusement (`try_parse` → `None`), comme une clé absente. `thesis_meta` est posée pour une thèse à titre+année présents ; `metadata_block` pour un type tier-1 (`conference_paper`/`poster`/`book_chapter`) à `title_normalized` plus long que `_TIER1_MIN_TITLE_LENGTH`.
+    `external_ids` porte `nnt`, `pmid`, `hal_id` (liste). Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). Une valeur d'identifiant malformée est écartée silencieusement (`try_parse` → `None`), comme une clé absente. `metadata_block` est posée pour toute SP à `doc_type` présent, `pub_year` présent et `title_normalized` plus long que `_METADATA_BLOCK_MIN_TITLE_LENGTH`.
     """
     ids: Mapping[str, object] = external_ids if isinstance(external_ids, Mapping) else {}
 
@@ -90,17 +80,11 @@ def project_confirmation_keys(
         if isinstance(hal, str) and (hal_vo := HALId.try_parse(hal)) is not None
     )
 
-    thesis_meta = (
-        f"{title_normalized}|{pub_year}"
-        if doc_type in _THESIS_DOC_TYPES and title_normalized and pub_year is not None
-        else None
-    )
-
     metadata_block = (
         f"{doc_type}|{title_normalized}|{pub_year}"
-        if doc_type in _TIER1_DOC_TYPES
+        if doc_type
         and title_normalized
-        and len(title_normalized) > _TIER1_MIN_TITLE_LENGTH
+        and len(title_normalized) > _METADATA_BLOCK_MIN_TITLE_LENGTH
         and pub_year is not None
         else None
     )
@@ -110,6 +94,5 @@ def project_confirmation_keys(
         nnt=str(nnt_vo) if nnt_vo else None,
         pmid=str(pmid_vo) if pmid_vo else None,
         hal_ids=hal_ids,
-        thesis_meta=thesis_meta,
         metadata_block=metadata_block,
     )

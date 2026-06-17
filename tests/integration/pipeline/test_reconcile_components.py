@@ -114,8 +114,8 @@ class TestUniverse:
         )
         assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
 
-    def test_neighbor_by_thesis_meta(self, sa_sync_conn):
-        """Voisinage par token thèse : deux thèses de même titre+année, sans clé d'identifiant partagée."""
+    def test_neighbor_by_metadata_block(self, sa_sync_conn):
+        """Voisinage par token bloc métadonnée : deux SP de même doc_type + titre (long) + année, sans clé d'identifiant partagée (ici des thèses)."""
         conn = sa_sync_conn
         pub_a = _seed_pub(conn)
         pub_b = _seed_pub(conn)
@@ -124,14 +124,14 @@ class TestUniverse:
             source_id="a",
             publication_id=pub_a,
             doc_type="thesis",
-            title_normalized="ma these unique",
+            title_normalized="ma these de doctorat au titre suffisamment long",
         )
         neighbor = _seed_sp(
             conn,
             source_id="b",
             publication_id=pub_b,
             doc_type="thesis",
-            title_normalized="ma these unique",
+            title_normalized="ma these de doctorat au titre suffisamment long",
             keys_dirty=False,
         )
         assert {r.id for r in fetch_reconciliation_universe(conn)} == {dirty, neighbor}
@@ -201,7 +201,7 @@ class TestEndToEnd:
         assert _pub_exists(conn, y_pub)
 
     def test_two_theses_sharing_title_year_merged(self, sa_sync_conn, monkeypatch):
-        """Deux thèses cross-source, même titre+année, sans DOI/NNT/hal partagé → fusion par token thèse."""
+        """Deux thèses cross-source, même titre (long) + année, sans DOI/NNT/hal partagé → fusion par token bloc métadonnée."""
         conn = sa_sync_conn
         monkeypatch.setattr(conn, "commit", lambda: None)
         pub_a = _seed_pub(conn)
@@ -211,14 +211,14 @@ class TestEndToEnd:
             source_id="a",
             publication_id=pub_a,
             doc_type="thesis",
-            title_normalized="ma these unique",
+            title_normalized="ma these de doctorat au titre suffisamment long",
         )
         sp_b = _seed_sp(
             conn,
             source_id="b",
             publication_id=pub_b,
             doc_type="thesis",
-            title_normalized="ma these unique",
+            title_normalized="ma these de doctorat au titre suffisamment long",
         )
 
         run(

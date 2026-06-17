@@ -1,6 +1,6 @@
 """Tests unitaires de `domain.source_publications.keys.project_confirmation_keys`.
 
-Garde le contrat de la projection partagée : extraction et normalisation des clés de confirmation (DOI / NNT / PMID / HAL), token métadonnée thèse, substitution du DOI effectif Zenodo, et tolérance aux `external_ids` malformés.
+Garde le contrat de la projection partagée : extraction et normalisation des clés de confirmation (DOI / NNT / PMID / HAL), token métadonnée `metadata_block`, et tolérance aux `external_ids` malformés.
 """
 
 from __future__ import annotations
@@ -64,49 +64,30 @@ class TestHalIds:
         assert _keys(None, {"hal_id": "hal-04123456"}).hal_ids == ()
 
 
-class TestThesisMeta:
-    def test_thesis_with_title_and_year(self):
-        """doc_type thèse + titre + année → clé composite `<titre>|<année>`."""
-        keys = _keys(doc_type="thesis", title_normalized="ma these", pub_year=2020)
-        assert keys.thesis_meta == "ma these|2020"
-
-    def test_ongoing_thesis_also_token(self):
-        keys = _keys(doc_type="ongoing_thesis", title_normalized="ma these", pub_year=2021)
-        assert keys.thesis_meta == "ma these|2021"
-
-    def test_non_thesis_doc_type_no_token(self):
-        """Un article au même titre+année ne porte pas de token thèse."""
-        keys = _keys(doc_type="article", title_normalized="ma these", pub_year=2020)
-        assert keys.thesis_meta is None
-
-    def test_thesis_without_title_no_token(self):
-        assert _keys(doc_type="thesis", title_normalized="", pub_year=2020).thesis_meta is None
-
-    def test_thesis_without_year_no_token(self):
-        keys = _keys(doc_type="thesis", title_normalized="ma these", pub_year=None)
-        assert keys.thesis_meta is None
-
-
 class TestMetadataBlock:
     LONG = "une communication scientifique au titre assez long"  # > 30 caractères
 
-    def test_conference_paper_long_title(self):
-        """Type tier-1 + titre long + année → `<doc_type>|<title>|<year>` (doc_type dans la clé)."""
-        keys = _keys(doc_type="conference_paper", title_normalized=self.LONG, pub_year=2020)
-        assert keys.metadata_block == f"conference_paper|{self.LONG}|2020"
+    def test_token_for_any_doc_type(self):
+        """Tout doc_type + titre long + année → `<doc_type>|<title>|<year>` (doc_type dans la clé).
 
-    def test_book_chapter_long_title(self):
-        keys = _keys(doc_type="book_chapter", title_normalized=self.LONG, pub_year=2020)
-        assert keys.metadata_block == f"book_chapter|{self.LONG}|2020"
+        La thèse passe par ce même token (pas de `thesis_meta` séparé)."""
+        for dt in ("conference_paper", "book_chapter", "article", "thesis", "report"):
+            keys = _keys(doc_type=dt, title_normalized=self.LONG, pub_year=2020)
+            assert keys.metadata_block == f"{dt}|{self.LONG}|2020"
+
+    def test_doc_type_in_key_separates_types(self):
+        """Même titre+année mais doc_type différents → clés différentes (pas de fusion cross-type)."""
+        article = _keys(doc_type="article", title_normalized=self.LONG, pub_year=2020)
+        chapter = _keys(doc_type="book_chapter", title_normalized=self.LONG, pub_year=2020)
+        assert article.metadata_block != chapter.metadata_block
 
     def test_short_title_no_token(self):
         """Titre ≤ seuil → pas de token (garde de longueur, écarte les titres génériques)."""
         keys = _keys(doc_type="conference_paper", title_normalized="court titre", pub_year=2020)
         assert keys.metadata_block is None
 
-    def test_non_tier1_doc_type_no_token(self):
-        """Un type hors tier-1 (article) au même titre long ne porte pas de token bloc."""
-        keys = _keys(doc_type="article", title_normalized=self.LONG, pub_year=2020)
+    def test_no_doc_type_no_token(self):
+        keys = _keys(doc_type=None, title_normalized=self.LONG, pub_year=2020)
         assert keys.metadata_block is None
 
     def test_without_year_no_token(self):
@@ -117,14 +98,14 @@ class TestMetadataBlock:
 class TestMalformedExternalIds:
     def test_none_external_ids(self):
         assert _keys("10.1/x") == ConfirmationKeys(
-            doi="10.1/x", nnt=None, pmid=None, hal_ids=(), thesis_meta=None, metadata_block=None
+            doi="10.1/x", nnt=None, pmid=None, hal_ids=(), metadata_block=None
         )
 
     def test_non_str_values_ignored(self):
         """`external_ids` peut porter des listes (issn/isbn) ou None : ignorés sans crash."""
         keys = _keys(None, {"issn": ["0028-0836"], "nnt": None, "pmid": "12345"})
         assert keys == ConfirmationKeys(
-            doi=None, nnt=None, pmid="12345", hal_ids=(), thesis_meta=None, metadata_block=None
+            doi=None, nnt=None, pmid="12345", hal_ids=(), metadata_block=None
         )
 
 
@@ -135,7 +116,6 @@ class TestTokens:
             nnt="n",
             pmid="p",
             hal_ids=("h1", "h2"),
-            thesis_meta="t|2020",
             metadata_block="conference_paper|titre|2020",
         )
         assert keys.tokens() == frozenset(
@@ -145,19 +125,14 @@ class TestTokens:
                 ("pmid", "p"),
                 ("hal_id", "h1"),
                 ("hal_id", "h2"),
-                ("thesis_meta", "t|2020"),
                 ("metadata_block", "conference_paper|titre|2020"),
             }
         )
 
     def test_absent_keys_produce_no_token(self):
-        keys = ConfirmationKeys(
-            doi="d", nnt=None, pmid=None, hal_ids=(), thesis_meta=None, metadata_block=None
-        )
+        keys = ConfirmationKeys(doi="d", nnt=None, pmid=None, hal_ids=(), metadata_block=None)
         assert keys.tokens() == frozenset({("doi", "d")})
 
     def test_no_keys_empty_token_set(self):
-        empty = ConfirmationKeys(
-            doi=None, nnt=None, pmid=None, hal_ids=(), thesis_meta=None, metadata_block=None
-        )
+        empty = ConfirmationKeys(doi=None, nnt=None, pmid=None, hal_ids=(), metadata_block=None)
         assert empty.tokens() == frozenset()

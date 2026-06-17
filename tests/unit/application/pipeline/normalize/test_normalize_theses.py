@@ -106,10 +106,9 @@ class TestExtractPubMetadata:
         )
         assert meta["pub_year"] == 2024
 
-    def test_no_title_no_normalized(self):
+    def test_no_title(self):
         meta = extract_pub_metadata({})
         assert meta["title"] is None
-        assert meta["title_normalized"] is None
 
     def test_nnt_normalized(self):
         meta = extract_pub_metadata({"titrePrincipal": "T", "nnt": "  2024clfac001  "})
@@ -178,7 +177,6 @@ class TestInsertSourceDocument:
     def _pub_meta(self, **overrides) -> dict:
         base = {
             "title": "T",
-            "title_normalized": "t",
             "pub_year": 2024,
             "doc_type": "thesis",
             "doi": None,
