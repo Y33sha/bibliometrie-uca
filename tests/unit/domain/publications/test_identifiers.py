@@ -36,6 +36,9 @@ class TestDOIConstruction:
             ("10.36227/techrxiv.19754971.v2", "10.36227/techrxiv.19754971"),  # suffixe .v2
             ("10.1234/test/pdf", "10.1234/test"),  # suffixe /pdf
             ("https://doi.org/10.1234/test/PDF", "10.1234/test"),  # /PDF + strip url
+            ("10.24072/pcjournal.308/", "10.24072/pcjournal.308"),  # slash final parasite
+            ("https://doi.org/10.1234/test/", "10.1234/test"),  # slash final + strip url
+            ("10.36227/techrxiv.19754971.v2/", "10.36227/techrxiv.19754971"),  # slash + suffixe vN
             # Lowercase : CrossRef traite le DOI en case-insensitive ; lowercase
             # évite les faux doublons cross-sources.
             ("10.1038/Nature", "10.1038/nature"),
