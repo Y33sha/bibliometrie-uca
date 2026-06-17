@@ -181,6 +181,8 @@ export function rorFullUrl(rorId: string): string {
 export function sourceExternalUrl(source: string, sourceId: string): string {
 	if (source === 'hal') return halDocUrl(sourceId);
 	if (source === 'openalex') return `https://openalex.org/${sourceId}`;
+	if (source === 'scanr') return scanrPubUrl(sourceId);
+	if (source === 'theses') return `https://theses.fr/${sourceId}`;
 	if (source === 'wos')
 		return `https://www.webofscience.com/wos/woscc/full-record/${sourceId}`;
 	return '#';
