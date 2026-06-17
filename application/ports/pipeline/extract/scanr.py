@@ -40,6 +40,8 @@ class ScanrExtractAdapter(Protocol):
         year: int,
         affiliation_ids: list[str],
         search_after: list[Any] | None = None,
+        *,
+        track_total: bool = False,
     ) -> dict[str, Any]: ...
 
     def extract_id(self, doc: dict[str, Any]) -> str: ...

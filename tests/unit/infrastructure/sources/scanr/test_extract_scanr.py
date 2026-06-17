@@ -22,7 +22,6 @@ class TestBuildQuery:
     def test_basic_shape(self, adapter):
         q = adapter.build_query(year=2024, affiliation_ids=["A1", "A2"])
         assert q["size"] == SCANR_PER_PAGE
-        assert q["track_total_hits"] is True
         assert q["query"]["bool"]["must"] == [{"term": {"year": 2024}}]
         assert q["query"]["bool"]["should"] == [
             {"term": {"affiliations.id.keyword": "A1"}},
@@ -46,6 +45,17 @@ class TestBuildQuery:
         # Première page : pas de `search_after` dans la requête.
         q = adapter.build_query(year=2024, affiliation_ids=["A1"])
         assert "search_after" not in q
+
+    def test_track_total_only_when_requested(self, adapter):
+        # Le comptage exact du set est coûteux côté Elasticsearch : on ne le
+        # demande que sur la première page (`track_total=True`), pas par défaut.
+        assert adapter.build_query(year=2024, affiliation_ids=["A1"])["track_total_hits"] is False
+        assert (
+            adapter.build_query(year=2024, affiliation_ids=["A1"], track_total=True)[
+                "track_total_hits"
+            ]
+            is True
+        )
 
 
 class TestExtractId:
