@@ -460,7 +460,13 @@ def phase_publications(**kw: Any) -> Any:
 
     Prerequis : la phase `zenodo_doi` (en amont) a resolu les concept DOI Zenodo,
     appliqués en colonne par `metadata_correction`.
+
+    `--rebuild-publications` re-dirtie tout le stock avant la réconciliation : celle-ci
+    dégénère alors en cluster-then-materialize global (à lancer après une évolution des
+    règles de clés, pour matérialiser les fusions/scissions qu'elles impliquent).
     """
+    if kw.get("rebuild_publications"):
+        _run_redirty_all_publications()
     _run_reconcile_components()
     # `addresses.pub_count` compte les publications par adresse : recalcul ici,
     # une fois les publications créées et fusionnées — il n'y a rien à compter
@@ -612,6 +618,20 @@ def _run_correct_by_cluster() -> None:
     finally:
         conn.close()
     log.info("✓ metadata_correction (cluster) terminé en %.1fs", time.time() - t0)
+
+
+def _run_redirty_all_publications() -> None:
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.publications_reconciliation import mark_keys_dirty
+
+    log.info("▶ rebuild publications : re-dirty de tout le stock")
+    conn = get_sync_engine().connect()
+    try:
+        n = mark_keys_dirty(conn)
+        conn.commit()
+    finally:
+        conn.close()
+    log.info("✓ %d source_publications marquées keys_dirty (rebuild complet)", n)
 
 
 def _run_reconcile_components() -> None:
@@ -1737,6 +1757,12 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         action="store_true",
         help="Tuer un éventuel pipeline déjà en cours avant de démarrer (SIGTERM puis SIGKILL).",
     )
+    parser.add_argument(
+        "--rebuild-publications",
+        action="store_true",
+        help="Avant la phase publications, re-dirtie tout le stock (rebuild complet : "
+        "cluster-then-materialize global). À utiliser après une évolution des règles de clés.",
+    )
     args = parser.parse_args()
 
     if args.list:
@@ -1815,6 +1841,7 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
                 mode=args.mode,
                 sources=sources,
                 year=args.year,
+                rebuild_publications=args.rebuild_publications,
             )
         except KeyboardInterrupt:
             log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)

@@ -13,6 +13,7 @@ from infrastructure.queries.pipeline.publications_reconciliation import (
     PgPublicationsReconciliationQueries,
     fetch_dirty_source_publication_ids,
     fetch_reconciliation_universe,
+    mark_keys_dirty,
 )
 from infrastructure.repositories import publication_repository
 
@@ -371,3 +372,29 @@ class TestMetadataBlock:
         assert _pub_exists(conn, pub_b)
         assert _sp_state(conn, sp_a)[1] is False
         assert _sp_state(conn, sp_b)[1] is False
+
+
+class TestMarkKeysDirty:
+    """Primitive de re-matérialisation : re-dirty total ou ciblé (CLI maintenance + flag rebuild)."""
+
+    def test_mark_all(self, sa_sync_conn):
+        conn = sa_sync_conn
+        a = _seed_sp(conn, source_id="a", keys_dirty=False, doc_type="article")
+        b = _seed_sp(conn, source_id="b", keys_dirty=False, doc_type="book_chapter")
+        assert mark_keys_dirty(conn) >= 2
+        assert _sp_state(conn, a)[1] is True
+        assert _sp_state(conn, b)[1] is True
+
+    def test_mark_where_targets_subset(self, sa_sync_conn):
+        conn = sa_sync_conn
+        art = _seed_sp(conn, source_id="art", keys_dirty=False, doc_type="article")
+        chap = _seed_sp(conn, source_id="chap", keys_dirty=False, doc_type="book_chapter")
+        mark_keys_dirty(conn, "doc_type = 'book_chapter'")
+        assert _sp_state(conn, chap)[1] is True
+        assert _sp_state(conn, art)[1] is False
+
+    def test_dry_run_counts_without_writing(self, sa_sync_conn):
+        conn = sa_sync_conn
+        sp = _seed_sp(conn, source_id="d", keys_dirty=False, doc_type="poster")
+        assert mark_keys_dirty(conn, "doc_type = 'poster'", dry_run=True) >= 1
+        assert _sp_state(conn, sp)[1] is False  # dry-run n'écrit pas
