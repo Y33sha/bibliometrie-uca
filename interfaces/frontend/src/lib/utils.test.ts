@@ -149,6 +149,16 @@ describe('sourceExternalUrl', () => {
 		);
 	});
 
+	it('construit une URL ScanR', () => {
+		expect(sourceExternalUrl('scanr', 'hal123')).toBe(
+			'https://scanr.enseignementsup-recherche.gouv.fr/publications/hal123'
+		);
+	});
+
+	it('construit une URL theses.fr', () => {
+		expect(sourceExternalUrl('theses', '2024UCFA0001')).toBe('https://theses.fr/2024UCFA0001');
+	});
+
 	it('retourne # pour une source inconnue', () => {
 		expect(sourceExternalUrl('mystery', 'abc')).toBe('#');
 	});
