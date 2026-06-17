@@ -53,6 +53,34 @@ def strip_markup(text: str) -> str:
     return _MARKUP_RE.sub(" ", text)
 
 
+def sanitize_raw_text(text: str) -> str:
+    """Assainit un texte brut de son bruit invisible, sans le dénaturer.
+
+    Contrairement à `normalize_text` (qui produit une clé de comparaison repliée),
+    préserve casse, accents et ponctuation : sert au texte brut affiché et recherché
+    (`addresses.raw_text`), pas à une clé de matching.
+
+    - tout caractère d'espacement Unicode (NBSP, fine insécable, tabulation…) → espace simple
+    - suppression des caractères de format/contrôle invisibles (zero-width, BOM,
+      trait d'union conditionnel, marques directionnelles, contrôles C0/C1)
+    - collapse des espaces multiples + strip
+
+    Remplace `str.strip()` au point d'insertion des adresses : deux textes ne
+    différant que par un espace insécable convergent ainsi sur la même `raw_text`.
+    """
+    if not text:
+        return ""
+    out: list[str] = []
+    for ch in text:
+        if ch.isspace():
+            out.append(" ")
+        elif unicodedata.category(ch) in ("Cf", "Cc", "Cs", "Co"):
+            continue
+        else:
+            out.append(ch)
+    return re.sub(r" +", " ", "".join(out)).strip()
+
+
 def normalize_text(text: str) -> str:
     """Normalise un texte pour comparaison / dédoublonnage / matching.
 

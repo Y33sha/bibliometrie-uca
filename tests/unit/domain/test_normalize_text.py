@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from domain.normalize import normalize_text
+from domain.normalize import normalize_text, sanitize_raw_text
 
 
 class TestNormalizeText:
@@ -58,3 +58,41 @@ class TestNormalizeText:
     def test_oeuvres_oe_ligature_match_oe(self) -> None:
         """Régression : deux formes équivalentes du même titre matchent après normalisation."""
         assert normalize_text("œuvres littéraires") == normalize_text("oeuvres littéraires")
+
+
+class TestSanitizeRawText:
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("", ""),
+            ("   ", ""),
+            ("  Hello  World  ", "Hello World"),
+            # Casse, accents et ponctuation préservés (≠ normalize_text)
+            ("Université Clermont Auvergne", "Université Clermont Auvergne"),
+            ("Hello, World!", "Hello, World!"),
+            # Espace insécable (U+00A0) → espace simple : le cas du bug
+            ("Université Clermont Auvergne", "Université Clermont Auvergne"),
+            # Fine insécable (U+202F) → espace simple
+            ("12 000 €", "12 000 €"),
+            # Tabulation / retour ligne → espace, collapse
+            ("a\tb\nc", "a b c"),
+            # Zero-width space / non-joiner / joiner supprimés
+            ("a​b‌c‍d", "abcd"),
+            # BOM / zero-width no-break space supprimé
+            ("﻿Paris", "Paris"),
+            # Trait d'union conditionnel (soft hyphen) supprimé
+            ("Cler­mont", "Clermont"),
+            # Marques directionnelles (LRM/RLM) supprimées
+            ("Paris‎‏", "Paris"),
+            # Contrôle C0 supprimé
+            ("a\x00b", "ab"),
+        ],
+    )
+    def test_sanitize_raw_text(self, raw: str, expected: str) -> None:
+        assert sanitize_raw_text(raw) == expected
+
+    def test_nbsp_collapses_to_searchable_form(self) -> None:
+        """Régression : un texte avec NBSP converge sur la forme tapée au clavier."""
+        with_nbsp = "Université Clermont Auvergne"
+        typed = "Université Clermont Auvergne"
+        assert sanitize_raw_text(with_nbsp) == sanitize_raw_text(typed) == typed
