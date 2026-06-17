@@ -21,6 +21,7 @@
   const scanrSources = $derived(sources.filter((s) => s.source === "scanr"));
   const wosSources = $derived(sources.filter((s) => s.source === "wos"));
   const thesesSources = $derived(sources.filter((s) => s.source === "theses"));
+  const crossrefSources = $derived(sources.filter((s) => s.source === "crossref"));
   // Collections HAL : on prend celles de la `source_publications` HAL la
   // plus récente (la 1ère grâce au tri DESC côté API).
   const halCollections = $derived(halSources[0]?.hal_collections ?? []);
@@ -115,6 +116,12 @@
       <a href="https://theses.fr/{s.source_id}" target="_blank" rel="noopener" class="source-link source-theses-link">
         <img src="{base}/icons/theses.ico" alt="" class="source-ico" />
         theses.fr : {s.source_id}
+      </a>
+    {/each}
+    {#each crossrefSources as s}
+      <a href="https://doi.org/{s.source_id}" target="_blank" rel="noopener" class="source-link source-crossref-link">
+        <img src="{base}/icons/crossref.ico" alt="" class="source-ico" />
+        CrossRef : {s.source_id}
       </a>
     {/each}
   </div>
@@ -271,6 +278,13 @@
   }
   .source-theses-link:hover {
     background: #d0ebd3;
+  }
+  .source-crossref-link {
+    background: #e3f2f4;
+    color: #1a7a8c;
+  }
+  .source-crossref-link:hover {
+    background: #d2eaed;
   }
   .source-ico {
     width: 14px;

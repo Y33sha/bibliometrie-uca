@@ -159,6 +159,12 @@ describe('sourceExternalUrl', () => {
 		expect(sourceExternalUrl('theses', '2024UCFA0001')).toBe('https://theses.fr/2024UCFA0001');
 	});
 
+	it('construit une URL DOI pour CrossRef', () => {
+		expect(sourceExternalUrl('crossref', '10.1111/jpm.70007')).toBe(
+			'https://doi.org/10.1111/jpm.70007'
+		);
+	});
+
 	it('retourne # pour une source inconnue', () => {
 		expect(sourceExternalUrl('mystery', 'abc')).toBe('#');
 	});

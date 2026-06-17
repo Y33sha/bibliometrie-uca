@@ -183,6 +183,7 @@ export function sourceExternalUrl(source: string, sourceId: string): string {
 	if (source === 'openalex') return `https://openalex.org/${sourceId}`;
 	if (source === 'scanr') return scanrPubUrl(sourceId);
 	if (source === 'theses') return `https://theses.fr/${sourceId}`;
+	if (source === 'crossref') return `https://doi.org/${sourceId}`;
 	if (source === 'wos')
 		return `https://www.webofscience.com/wos/woscc/full-record/${sourceId}`;
 	return '#';
