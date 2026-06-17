@@ -9,6 +9,7 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from application.pipeline.publications.reconcile_components import run
+from domain.source_publications.keys import project_confirmation_keys
 from infrastructure.queries.pipeline.publications_reconciliation import (
     PgPublicationsReconciliationQueries,
     fetch_dirty_source_publication_ids,
@@ -398,3 +399,95 @@ class TestMarkKeysDirty:
         sp = _seed_sp(conn, source_id="d", keys_dirty=False, doc_type="poster")
         assert mark_keys_dirty(conn, "doc_type = 'poster'", dry_run=True) >= 1
         assert _sp_state(conn, sp)[1] is False  # dry-run n'écrit pas
+
+
+class TestUniverseMatchesPythonTokens:
+    """Différentiel anti-divergence : le voisinage SQL (branches d'univers) relie exactement les
+    SP que les tokens Python (`project_confirmation_keys`) relient. Les deux encodages du même
+    critère d'égalité doivent s'accorder — surtout la garde de longueur `metadata_block`.
+
+    Pour chaque SP, on la marque seule dirty et on compare son voisinage 1-hop SQL à l'ensemble
+    des SP dont les tokens Python intersectent les siens.
+    """
+
+    def test_sql_universe_matches_python_token_linkage(self, sa_sync_conn):
+        conn = sa_sync_conn
+        long_a, long_b = "a" * 40, "b" * 40
+        len30 = "c" * 30  # juste SOUS le seuil strict > 30 → pas de token metadata_block
+        ids = [
+            _seed_sp(conn, source_id="doi1", doi="10.1/x", keys_dirty=False),
+            _seed_sp(conn, source_id="doi2", doi="10.1/x", keys_dirty=False),
+            _seed_sp(
+                conn,
+                source_id="hal1",
+                external_ids={"hal_id": ["hal-1", "hal-2"]},
+                keys_dirty=False,
+            ),
+            _seed_sp(
+                conn,
+                source_id="hal2",
+                external_ids={"hal_id": ["hal-2", "hal-3"]},
+                keys_dirty=False,
+            ),
+            _seed_sp(conn, source_id="nnt1", external_ids={"nnt": "2024UCA01"}, keys_dirty=False),
+            _seed_sp(conn, source_id="nnt2", external_ids={"nnt": "2024UCA01"}, keys_dirty=False),
+            _seed_sp(
+                conn,
+                source_id="mb1",
+                doc_type="conference_paper",
+                title_normalized=long_a,
+                keys_dirty=False,
+            ),
+            _seed_sp(
+                conn,
+                source_id="mb2",
+                doc_type="conference_paper",
+                title_normalized=long_a,
+                keys_dirty=False,
+            ),
+            _seed_sp(
+                conn,
+                source_id="mbo",
+                doc_type="conference_paper",
+                title_normalized=long_b,
+                keys_dirty=False,
+            ),
+            _seed_sp(
+                conn, source_id="s1", doc_type="article", title_normalized=len30, keys_dirty=False
+            ),
+            _seed_sp(
+                conn, source_id="s2", doc_type="article", title_normalized=len30, keys_dirty=False
+            ),
+            _seed_sp(
+                conn, source_id="lone", doc_type="article", title_normalized="zz", keys_dirty=False
+            ),
+        ]
+        rows = {
+            r.id: r
+            for r in conn.execute(
+                text(
+                    "SELECT id, doi, external_ids, doc_type, title_normalized, pub_year "
+                    "FROM source_publications WHERE id = ANY(:ids)"
+                ).bindparams(bindparam("ids")),
+                {"ids": ids},
+            )
+        }
+        toks = {
+            i: project_confirmation_keys(
+                r.doi, r.external_ids, r.doc_type, r.title_normalized, r.pub_year
+            ).tokens()
+            for i, r in rows.items()
+        }
+        seeded = set(ids)
+        for i in ids:
+            conn.execute(
+                text(
+                    "UPDATE source_publications SET keys_dirty = (id = :i) WHERE id = ANY(:ids)"
+                ).bindparams(bindparam("ids")),
+                {"i": i, "ids": ids},
+            )
+            sql_neighbors = {r.id for r in fetch_reconciliation_universe(conn)} & seeded - {i}
+            py_neighbors = {j for j in ids if j != i and toks[i] & toks[j]}
+            assert sql_neighbors == py_neighbors, (
+                f"divergence SP {i} : SQL={sql_neighbors} Python={py_neighbors}"
+            )
