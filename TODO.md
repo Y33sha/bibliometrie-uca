@@ -10,6 +10,7 @@
 ### Normalisation
 * [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur / ou juste supprimer silencieusement le hal_person_id partout par précaution?
 ### Suite du traitement
+* [ ] metadata_correction: ajouter correction via doi_prefix du journal (contrôle de cohérence entre doi et journal_id, avant les corrections journal_type => doc_type)
 * [ ] phase persons: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 person_id)
 ## Code
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
@@ -43,7 +44,7 @@
 ## Admin
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer
 * [ ] comportement capricieux de l'UI sur la page countries (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: "loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine."
-* [ ] structures_name_forms: is_word_boundary devrait être forcé à false si contient séparateur de mot, même si nb cars `<` 6 (? vérifier d'abord l'effet réel de iss_word_boundary)
+* [ ] structures_name_forms: is_word_boundary devrait être forcé à false si contient séparateur de mot, même si nb cars `<` 6 (? vérifier d'abord l'effet réel de is_word_boundary)
 ### Personnes (admin)
 * [ ] quoi faire des entités aberrantes (auteurs mal parsés)? a minima, s'assurer qu'elles n'apparaissent pas dans orphan-authorships
 * [ ] date de dernière publication UCA? (permet de filtrer les auteurs "legacy" vs actifs)
