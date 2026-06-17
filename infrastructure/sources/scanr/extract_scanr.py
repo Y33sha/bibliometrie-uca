@@ -109,16 +109,24 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
         year: int,
         affiliation_ids: list[str],
         search_after: list[Any] | None = None,
+        *,
+        track_total: bool = False,
     ) -> dict[str, Any]:
         """Construit la requête Elasticsearch pour ScanR.
 
         `bool.must` filtre l'année (term exact), `bool.should` matche au
         moins une affiliation (clause OR via `minimum_should_match: 1`).
         Le tri par `id.keyword` ASC permet la pagination `search_after`.
+
+        `track_total` ne demande le comptage exact du set (`track_total_hits`)
+        que sur la première page : Elasticsearch recompte sinon l'intégralité
+        des résultats à *chaque* page, alors que le total n'est consommé qu'une
+        fois (log + dénominateur de progression). Les pages suivantes le coupent
+        (`False`), ce qui évite un full-count par page sur des sets de ~15k docs.
         """
         query: dict[str, Any] = {
             "size": SCANR_PER_PAGE,
-            "track_total_hits": True,
+            "track_total_hits": track_total,
             "query": {
                 "bool": {
                     "must": [{"term": {"year": year}}],

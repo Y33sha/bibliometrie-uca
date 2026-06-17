@@ -35,18 +35,19 @@ def extract_year(
     updated = 0
     unchanged = 0
     seen = 0
-
-    query = adapter.build_query(year, affiliation_ids)
-    data = adapter.fetch_page(query)
-    total = data["hits"]["total"]["value"]
-    logger.info(f"  {year} : {total} publications")
-
-    if dry_run:
-        return total, 0, 0, 0
+    total = 0
 
     while True:
-        query = adapter.build_query(year, affiliation_ids, search_after)
+        first_page = search_after is None
+        query = adapter.build_query(year, affiliation_ids, search_after, track_total=first_page)
         data = adapter.fetch_page(query)
+
+        if first_page:
+            total = data["hits"]["total"]["value"]
+            logger.info(f"  {year} : {total} publications")
+            if dry_run:
+                return total, 0, 0, 0
+
         hits = data["hits"]["hits"]
         if not hits:
             break
