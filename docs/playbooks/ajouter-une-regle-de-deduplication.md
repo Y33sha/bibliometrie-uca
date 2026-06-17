@@ -80,12 +80,13 @@ LEFT JOIN publications p ON p.id = o.publication_id
 WHERE <garde sur d, identique à celle de la projection>
 ```
 
-La branche doit ramener exactement les voisins que la projection relie : même critère d'égalité, même garde. C'est l'invariant à tenir entre `keys.py` (le clustering en mémoire) et le SQL (le voisinage chargé).
+La branche doit ramener exactement les voisins que la projection relie : même critère d'égalité, même garde. C'est l'invariant à tenir entre `keys.py` (le clustering en mémoire) et le SQL (le voisinage chargé) ; un **test différentiel** le garde (cf. § 6).
 
 ### 6. Tests
 
 - **Projection** ([`test_keys.py`](../../tests/unit/domain/source_publications/test_keys.py)) : une SP émet le token quand la garde passe, ne l'émet pas sinon ; cas-limites de la garde (longueur juste sous/au-dessus du seuil).
 - **Univers + bout-en-bout** ([`test_reconcile_components.py`](../../tests/integration/pipeline/test_reconcile_components.py)) : deux SP au même token entrent dans le même univers et fusionnent ; deux DOI distincts co-bloqués ne fusionnent pas (cannot-link).
+- **Différentiel anti-divergence** (`test_reconcile_components.py`) : étendre `TestUniverseMatchesPythonTokens` au token ajouté — semer des SP qui le portent (et les bords de garde : longueur juste sous/au-dessus du seuil) et vérifier que le voisinage SQL relie exactement les SP que les tokens Python relient. C'est ce qui garde la synchronisation `keys.py` ↔ SQL.
 
 ### 7. Rollout sur le stock
 
@@ -99,7 +100,7 @@ Vérifier l'effet : reprendre le SQL d'audit de l'étape 3 — les blocs ciblés
 ## Anti-patterns
 
 - **Token laxiste sans garde de sélectivité** : un titre générique (« Foreword », « Introduction ») partagé par des œuvres distinctes fusionne à tort. La garde de longueur / la restriction de `doc_type` est la défense.
-- **Critère d'égalité divergent entre `keys.py` et le SQL** : la branche d'univers ne ramène pas les voisins que le clustering relie (ou l'inverse) → fusions partielles ou manquées. Garder les deux strictement synchrones.
+- **Critère d'égalité divergent entre `keys.py` et le SQL** : la branche d'univers ne ramène pas les voisins que le clustering relie (ou l'inverse) → fusions partielles ou manquées. Garder les deux strictement synchrones, et étendre le test différentiel (§ 6) au token ajouté pour verrouiller cette synchronisation.
 - **Oublier le rollout** : sans re-dirty, le token ne s'applique qu'aux SP touchées par une (re-)normalisation ultérieure ; le stock existant reste non consolidé.
 
 ## Limites du périmètre
