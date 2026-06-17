@@ -64,6 +64,7 @@
 * [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques?
 * [ ] double scroll dans admin/addresses: chiant
 * [ ] message de chargement plutôt que "aucun résultat trouvé"
+* [ ] page admin/addresses, détail des publications: les titres ne sont pas nettoyés (&lt;p&gt;Fe&lt;sub&gt;3&lt;/sub&gt;O&lt;sub&gt;4&lt;/sub&gt; Magnetic Nanoparticles Under Static Magnetic Field Improve Osteogenesis via RUNX-2 and Inhibit Osteoclastogenesis by the Induction of Apoptosis&lt;/p&gt; 2020 · article · Nedelec, Jean-Marie · INTERNATIONAL JOURNAL OF NANOMEDICINE DOI))
 
 # Cas particuliers, bizarreries à élucider
 * openalex répète des auteurs : publi 77832

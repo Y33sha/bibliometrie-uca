@@ -19,7 +19,7 @@ Une correction est une règle déterministe « si tel signal, alors le champ can
 
 À chaque ajout d'une règle déterministe corrigeant un champ canonique vers une valeur fixe.
 
-Hors-scope : les patterns détectables mais non corrigibles automatiquement (un DOI à préfixe d'éditeur A sur une revue d'éditeur B — preprint légitime ou faux ?). Ils demandent une décision humaine, pas une règle.
+Hors-scope : les patterns d'incohérence détectables mais non corrigibles automatiquement. Ils demandent une décision humaine, pas une règle.
 
 ## Procédure pas-à-pas
 
