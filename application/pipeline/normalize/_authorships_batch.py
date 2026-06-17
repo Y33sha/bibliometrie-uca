@@ -22,7 +22,7 @@ from application.ports.pipeline.normalize.authorships import (
     AuthorshipsBatchQueries,
     SourceAuthorshipBatchItem,
 )
-from domain.normalize import normalize_name_form, normalize_text
+from domain.normalize import normalize_name_form, normalize_text, sanitize_raw_text
 from domain.types import JsonValue
 
 
@@ -115,7 +115,7 @@ def write_source_authorships(
     addr_suggested: dict[str, list[str] | None] = {}
     for rec in ordered:
         for addr in rec.addresses:
-            cleaned = addr.text.strip()
+            cleaned = sanitize_raw_text(addr.text)
             if not cleaned or cleaned in addr_countries:
                 continue
             addr_countries[cleaned] = addr.countries
@@ -148,7 +148,7 @@ def write_source_authorships(
             continue
         seen: set[int] = set()
         for addr in rec.addresses:
-            cleaned = addr.text.strip()
+            cleaned = sanitize_raw_text(addr.text)
             if not cleaned:
                 continue
             addr_id = addr_id_by_text.get(cleaned)

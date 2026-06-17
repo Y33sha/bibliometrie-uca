@@ -5,7 +5,7 @@ Crée les adresses et les liens `source_authorship_addresses` au moment de l'INS
 
 from sqlalchemy import Connection, text
 
-from domain.normalize import normalize_text
+from domain.normalize import normalize_text, sanitize_raw_text
 
 
 def recompute_pub_count(conn: Connection) -> int:
@@ -94,7 +94,7 @@ class PgAddressLinker:
 
         links = 0
         for raw_text in addr_texts:
-            text_clean = raw_text.strip()
+            text_clean = sanitize_raw_text(raw_text)
             if not text_clean:
                 continue
 
