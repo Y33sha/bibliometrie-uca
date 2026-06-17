@@ -3796,10 +3796,10 @@ export interface components {
         };
         /** MergePublications */
         MergePublications: {
-            /** Target Id */
-            target_id: number;
-            /** Source Id */
-            source_id: number;
+            /** Pub Id A */
+            pub_id_a: number;
+            /** Pub Id B */
+            pub_id_b: number;
         };
         /** MergeRequest */
         MergeRequest: {
