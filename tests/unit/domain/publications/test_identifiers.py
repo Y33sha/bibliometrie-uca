@@ -114,6 +114,10 @@ class TestHALIdConstruction:
             ("pasteur-11111111", "pasteur-11111111"),
             ("cea-22222222", "cea-22222222"),
             ("ineris-33333333", "ineris-33333333"),
+            ("emse-03090957", "emse-03090957"),  # collection institutionnelle (préfixe ouvert)
+            ("dumas-01234567", "dumas-01234567"),
+            ("insu-00112233", "insu-00112233"),
+            ("in2p3-04445555", "in2p3-04445555"),  # code de collection avec chiffres
             ("hal-04123456v2", "hal-04123456"),  # strip suffixe version
             ("HAL-04123456", "hal-04123456"),  # lowercase
             ("https://hal.science/hal-04123456", "hal-04123456"),  # strip URL
@@ -128,8 +132,8 @@ class TestHALIdConstruction:
         "raw",
         [
             "",  # vide
-            "other-12345",  # préfixe inconnu
             "hal-",  # aucun chiffre
+            "1234",  # aucun préfixe
         ],
     )
     def test_raises_on_invalid(self, raw):

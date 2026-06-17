@@ -429,6 +429,14 @@ class TestUniverseMatchesPythonTokens:
                 external_ids={"hal_id": ["hal-2", "hal-3"]},
                 keys_dirty=False,
             ),
+            # Préfixe de collection institutionnelle : le VO HALId doit l'accepter comme token
+            # (sinon le SQL les rapproche mais le clustering Python non → divergence + non-fusion).
+            _seed_sp(
+                conn, source_id="emse1", external_ids={"hal_id": ["emse-99"]}, keys_dirty=False
+            ),
+            _seed_sp(
+                conn, source_id="emse2", external_ids={"hal_id": ["emse-99"]}, keys_dirty=False
+            ),
             _seed_sp(conn, source_id="nnt1", external_ids={"nnt": "2024UCA01"}, keys_dirty=False),
             _seed_sp(conn, source_id="nnt2", external_ids={"nnt": "2024UCA01"}, keys_dirty=False),
             _seed_sp(
