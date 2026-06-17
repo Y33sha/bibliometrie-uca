@@ -23,7 +23,7 @@
 * [ ] documenter les process incrémentaux vs recalcul complet et les arbitrages performance vs risque de drift; chaque process incrémental doit avoir un mode --full-rerun
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
-* [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi
+* [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi. Explication: identifiant pour l'INP capture bien au-delà (siren 130021918:	224 185 /  paysage S8ntZ	62 726 / uai 0632033T	11 909 / ror 001f39w38	10 109) => remplacer siren par "paysage" voire dropper l'interrogation INP (voir si INP est un sous-ensemble de UCA)
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 ## Explorer autres sources possibles
