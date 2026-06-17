@@ -2,7 +2,7 @@
 
 Procédure d'écriture, validation et déploiement d'une règle de rapprochement de `source_publications`.
 
-Ce playbook est le *comment*. Le cadre conceptuel (token vs garde pairwise, paliers de blocage) et le catalogue des décisions par type vivent dans la fiche [DATA_dedup-pairwise-gated](../chantiers/DATA_dedup-pairwise-gated.md).
+Ce playbook est le *comment*. Le cadre conceptuel et le catalogue des décisions par type vivent dans la fiche [DATA_dedup-pairwise-gated](../chantiers/DATA_dedup-pairwise-gated.md).
 
 ## Modèle : clustering par tokens de confirmation
 
@@ -21,7 +21,7 @@ Un token est une **égalité** : deux SP au même token sont la même œuvre, sa
 
 Un signal devient un token quand l'**égalité** d'une valeur dérivable de la SP vaut identité d'œuvre — assez sélective pour ne pas regrouper des œuvres distinctes. Les identifiants (DOI, NNT, hal_id, pmid) le sont par nature. Une clé composite de métadonnées (`metadata_block`) l'est pour les classes où l'audit le démontre.
 
-Un signal qui n'est **pas** une égalité — l'accord d'auteurs est un *recouvrement*, non transitif (`{Dupont} ⊂ {Dupont, Martin} ⊄ {Martin, Durand}`) — n'est pas un token. Il relève d'une **arête pairwise-gated** : une clé de blocage génère des candidats, une garde paire-à-paire arme l'arête. Ce canal se construit avec son premier consommateur réel (cf. fiche chantier) ; ce playbook couvre les **tokens**.
+Un token est une **valeur unique** que la SP porte : on range les SP par elle (`GROUP BY`), sans comparaison. Un signal qui n'est pas une telle valeur — l'accord d'auteurs est un *recouvrement* entre deux listes, pas une valeur à ranger — ne peut pas être un token ; le rapprochement par auteurs relève d'un autre mécanisme (cf. fiche chantier). Ce playbook couvre les tokens.
 
 ## Procédure pas-à-pas
 
@@ -54,7 +54,7 @@ Revue du résidu suspect (couples sans recouvrement d'auteurs). Trois sorties :
 
 - **Excédent nul ou négligeable** vs la référence DOI → le token est mûr.
 - **Excédent identifiable** → durcir la garde (longueur, restreindre les `doc_type`) et reprendre en 3.
-- **Excédent irréductible sans garde non-transitive** (l'accord d'auteurs est nécessaire) → ce n'est pas un token : passer à l'arête pairwise-gated (hors playbook).
+- **Excédent irréductible par durcissement de la garde** (il faut comparer les listes d'auteurs pour trancher) → ce n'est pas un token ; le rapprochement passe par le mécanisme décrit dans la fiche chantier (hors playbook).
 
 ### 5. Matérialiser le token
 
@@ -100,9 +100,8 @@ Vérifier l'effet : reprendre le SQL d'audit de l'étape 3 — les blocs ciblés
 
 - **Token laxiste sans garde de sélectivité** : un titre générique (« Foreword », « Introduction ») partagé par des œuvres distinctes fusionne à tort. La garde de longueur / la restriction de `doc_type` est la défense.
 - **Critère d'égalité divergent entre `keys.py` et le SQL** : la branche d'univers ne ramène pas les voisins que le clustering relie (ou l'inverse) → fusions partielles ou manquées. Garder les deux strictement synchrones.
-- **Signal non-transitif traité en token** : forcer un recouvrement (auteurs) dans une égalité produit des fusions en chaîne fautives (`A~B`, `B~C` ⇒ `A~C` à tort). Un recouvrement est une arête pairwise-gated, pas un token.
 - **Oublier le rollout** : sans re-dirty, le token ne s'applique qu'aux SP touchées par une (re-)normalisation ultérieure ; le stock existant reste non consolidé.
 
 ## Limites du périmètre
 
-Les œuvres sans clé d'égalité fiable et dont le rapprochement exige un accord d'auteurs (types à titre faible, dépôts multiples au typage incertain) relèvent de l'**arête pairwise-gated** (cf. fiche chantier), pas d'un token. Les collisions résiduelles d'un token validé relèvent de la revue admin.
+Les œuvres sans clé d'égalité fiable, dont le rapprochement exige de comparer les listes d'auteurs (types à titre faible, dépôts multiples au typage incertain), relèvent du mécanisme décrit dans la fiche chantier, pas d'un token. Les collisions résiduelles d'un token validé relèvent de la revue admin.
