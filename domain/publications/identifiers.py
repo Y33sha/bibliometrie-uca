@@ -341,7 +341,7 @@ def normalize_nnt(nnt: str | None) -> str | None:
 def extract_hal_id_from_url(url: str | None) -> str | None:
     """Extrait le HAL ID canonique d'une URL HAL ou d'un ID brut.
 
-    Gère les préfixes hal/tel/halshs/inserm/pasteur/cea/ineris.
+    Accepte tout préfixe de collection (`hal-`, `tel-`, `halshs-`, `dumas-`, `emse-`, `in2p3-`…).
     Ignore le suffixe de version (v1, v2, etc.).
 
     >>> extract_hal_id_from_url("https://hal.science/hal-04123456v2")
