@@ -150,6 +150,26 @@ def clear_keys_dirty(conn: Connection, source_publication_ids: list[int]) -> int
     return conn.execute(stmt, {"ids": source_publication_ids}).rowcount
 
 
+def mark_keys_dirty(conn: Connection, where: str | None = None, *, dry_run: bool = False) -> int:
+    """Pose `keys_dirty = true` sur les source_publications — toutes, ou le sous-ensemble `where`.
+
+    Outil de re-matérialisation : quand une règle de clés de confirmation change (nouveau token,
+    seuil de garde modifié, projection revue), le stock déjà réconcilié ne reflète plus la règle.
+    Re-marquer `keys_dirty` fait re-réconcilier les SP concernées au prochain run de la phase
+    `publications` ; sur tout le stock, c'est le *cluster-then-materialize* global. `where` est un
+    **fragment SQL de confiance** (CLI maintenance / run_pipeline, jamais une entrée externe).
+    `dry_run` compte sans écrire. Retourne le nombre de SP (marquées, ou qui le seraient).
+    """
+    clause = f" WHERE {where}" if where else ""
+    if dry_run:
+        return conn.execute(
+            text(f"SELECT count(*) FROM source_publications{clause}")  # noqa: S608
+        ).scalar_one()
+    return conn.execute(
+        text(f"UPDATE source_publications SET keys_dirty = true{clause}")  # noqa: S608
+    ).rowcount
+
+
 class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
     """Adapter PostgreSQL pour `PublicationsReconciliationQueries`."""
 
