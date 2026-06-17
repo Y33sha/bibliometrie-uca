@@ -55,6 +55,9 @@ def _normalize_doi(raw: str | None) -> str | None:
     s = s.strip()
     if not s:
         return None
+    # Slash final parasite (artefact d'URL) : `10.x/abc/` ≠ `10.x/abc` sinon, faux doublon.
+    # Strippé avant les suffixes ci-dessous, qui sont ancrés en fin (`v2/`, `/pdf/` matchent alors).
+    s = s.rstrip("/")
     s = _DOI_VERSION_SUFFIX.sub("", s)
     s = _DOI_PDF_SUFFIX.sub("", s)
     return s or None
