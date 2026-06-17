@@ -93,9 +93,12 @@ class DOI:
 
 # ── HAL ID (document) ──────────────────────────────────────────────
 
-# Préfixes de portails HAL (liste historique, cf. utils/hal.py)
-_HAL_DOC_PREFIXES = ("hal", "tel", "halshs", "inserm", "pasteur", "cea", "ineris")
-_HAL_DOC_BASE = re.compile(rf"((?:{'|'.join(_HAL_DOC_PREFIXES)})-\d+)", re.IGNORECASE)
+# Un HAL ID est `<code de collection>-<numéro>`. Le code de collection est ouvert : `hal`, `tel`,
+# `halshs`, `dumas`, `emse`, `in2p3`, `inserm`, `insu`, `cea`… — des dizaines de portails
+# institutionnels, et de nouveaux apparaissent. On matche donc tout préfixe alphanumérique plutôt
+# qu'une liste blanche fermée, qui exclurait silencieusement de la déduplication les collections
+# non listées (deux dépôts au même `hal_id` `emse-…` ne se relieraient pas).
+_HAL_DOC_BASE = re.compile(r"([a-z][a-z0-9]*-\d+)", re.IGNORECASE)
 
 
 def _normalize_hal_id(raw: str | None) -> str | None:
