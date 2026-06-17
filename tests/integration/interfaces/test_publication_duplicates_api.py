@@ -42,9 +42,18 @@ def _uniq(prefix: str) -> str:
 
 
 def _seed_publication(
-    title: str | None = None, doc_type: str = "article", pub_year: int = 2024
+    title: str | None = None,
+    doc_type: str = "article",
+    pub_year: int = 2024,
+    *,
+    with_source: bool = False,
 ) -> int:
-    """Insère une publi minimale ; retourne son id."""
+    """Insère une publi minimale ; retourne son id.
+
+    `with_source=True` lui rattache une `source_publication` : indispensable dès
+    qu'un `refresh_from_sources` est déclenché en aval (une publi sans aucune
+    source est supprimée comme orpheline).
+    """
     title = title or _uniq("Publi")
     with _pool() as cur:
         cur.execute(
@@ -52,7 +61,14 @@ def _seed_publication(
             "VALUES (%s, lower(%s), CAST(%s AS doc_type), %s) RETURNING id",
             (title, title, doc_type, pub_year),
         )
-        return cur.fetchone()["id"]
+        pub_id = cur.fetchone()["id"]
+        if with_source:
+            cur.execute(
+                "INSERT INTO source_publications (source, source_id, title, publication_id) "
+                "VALUES ('hal', %s, %s, %s)",
+                (_uniq("sp"), title, pub_id),
+            )
+        return pub_id
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -60,7 +76,8 @@ def _cleanup_after_module():
     yield
     with _pool() as cur:
         cur.execute(
-            "TRUNCATE TABLE publications, distinct_publications, audit_log RESTART IDENTITY CASCADE"
+            "TRUNCATE TABLE publications, source_publications, distinct_publications, audit_log "
+            "RESTART IDENTITY CASCADE"
         )
 
 
@@ -93,50 +110,51 @@ class TestMergeDuplicatePublications:
     def test_requires_admin(self, client):
         r = client.post(
             "/api/admin/duplicates/merge",
-            json={"target_id": 1, "source_id": 2},
+            json={"pub_id_a": 1, "pub_id_b": 2},
         )
         assert r.status_code == 401
 
-    def test_rejects_same_target_and_source(self, auth_client):
+    def test_rejects_same_ids(self, auth_client):
         r = auth_client.post(
             "/api/admin/duplicates/merge",
-            json={"target_id": 1, "source_id": 1},
+            json={"pub_id_a": 1, "pub_id_b": 1},
         )
         assert r.status_code == 400
         assert "différents" in r.json()["detail"]
 
-    def test_404_when_target_missing(self, auth_client):
-        # target inconnu + source inconnue → 404.
+    def test_404_when_both_missing(self, auth_client):
         r = auth_client.post(
             "/api/admin/duplicates/merge",
-            json={"target_id": 999_999_001, "source_id": 999_999_002},
+            json={"pub_id_a": 999_999_001, "pub_id_b": 999_999_002},
         )
         assert r.status_code == 404
 
-    def test_404_when_only_source_missing(self, auth_client):
-        target = _seed_publication()
+    def test_404_when_only_one_missing(self, auth_client):
+        existing = _seed_publication()
         r = auth_client.post(
             "/api/admin/duplicates/merge",
-            json={"target_id": target, "source_id": 999_999_999},
+            json={"pub_id_a": existing, "pub_id_b": 999_999_999},
         )
         assert r.status_code == 404
 
     def test_merges_two_publications(self, auth_client):
-        target = _seed_publication("Target publication for merge")
-        source = _seed_publication("Source publication for merge")
+        # Chaque publi porte une source : sinon `refresh_from_sources` (déclenché
+        # après la fusion) supprimerait la survivante comme orpheline.
+        a = _seed_publication("First publication for merge", with_source=True)
+        b = _seed_publication("Second publication for merge", with_source=True)
         r = auth_client.post(
             "/api/admin/duplicates/merge",
-            json={"target_id": target, "source_id": source},
+            json={"pub_id_a": a, "pub_id_b": b},
         )
         assert r.status_code == 200
-        body = r.json()
-        assert body == {"ok": True, "target_id": target, "source_id": source}
-        # Source supprimée, target conservée.
+        # La cible survivante est le plus petit id (direction implicite).
+        survivor, absorbed = sorted((a, b))
+        assert r.json() == {"ok": True, "target_id": survivor, "source_id": absorbed}
         with _pool() as cur:
-            cur.execute("SELECT id FROM publications WHERE id IN (%s, %s)", (target, source))
+            cur.execute("SELECT id FROM publications WHERE id IN (%s, %s)", (a, b))
             ids = {row["id"] for row in cur.fetchall()}
-            assert target in ids
-            assert source not in ids
+            assert survivor in ids
+            assert absorbed not in ids
 
 
 class TestMarkDistinctPublications:
