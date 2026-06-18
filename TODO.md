@@ -1,3 +1,4 @@
+python -m interfaces.cli.oneshot.renormalize_escaped_titles
 # A régler avant transmission
 ## Pipeline de traitement
 * [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => "rattachement" en phase normalize = vestige / cross-import: "Échec après 3 tentatives rec 1 / 429 Too Many Requests rec 1 — attente 4.0s (tentative 1/3)" => toujours préciser la source qui échoue
@@ -9,8 +10,9 @@
 * [ ] Comprendre pourquoi l'extract ScanR paginé est aussi lent, alors que le cross-import par DOI est ultra-rapide (2s/100 DOI contre 30s OpenAlex); ScanR est presque plus rapide par DOI que par bulk, c'est absurde
 * [ ] cross-import par NNT: " 300/332 — 0 récupérés, 297 absents de HAL" quid des 3 autres?
 ### Normalisation
-* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur / ou juste supprimer silencieusement le hal_person_id partout par précaution?
+* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur / ou juste supprimer silencieusement le hal_person_id partout par précaution (problème: empêche de détecter l'erreur pour la corriger dans HAL) / ou détecter en phase "persons" et empêcher la propagation des identifiants
 ### Suite du traitement
+* [ ] créer circuit pour correction automatisée des journal_types (titre terminé par " eBooks" => plateforme d'ebooks)
 * [ ] metadata_correction: ajouter correction via doi_prefix du journal (contrôle de cohérence entre doi et journal_id, avant les corrections journal_type => doc_type)
 * [ ] phase persons: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 person_id)
 ## Code
@@ -24,7 +26,6 @@
 * [ ] documenter les process incrémentaux vs recalcul complet et les arbitrages performance vs risque de drift; chaque process incrémental doit avoir un mode --full-rerun
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
-* [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée?
@@ -65,7 +66,6 @@
 * [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques?
 * [ ] double scroll dans admin/addresses: chiant
 * [ ] message de chargement plutôt que "aucun résultat trouvé"
-* [ ] page admin/addresses, détail des publications: les titres ne sont pas nettoyés (&lt;p&gt;Fe&lt;sub&gt;3&lt;/sub&gt;O&lt;sub&gt;4&lt;/sub&gt; Magnetic Nanoparticles Under Static Magnetic Field Improve Osteogenesis via RUNX-2 and Inhibit Osteoclastogenesis by the Induction of Apoptosis&lt;/p&gt; 2020 · article · Nedelec, Jean-Marie · INTERNATIONAL JOURNAL OF NANOMEDICINE DOI))
 
 # Cas particuliers, bizarreries à élucider
 * openalex répète des auteurs : publi 77832
@@ -88,14 +88,3 @@
 
 # Pas nécessaire de le régler, du moment qu'on le documente
 * [ ] re-tester le circuit des imports RH => pas urgent, pas d'imports csv à terme en prod
-
-# Règles de correction à mettre en place
-* journaux: titre terminé par " eBooks" => plateforme d'ebooks
-* titre commence par "Editorial:" => type éditorial
-* titre commence par "Letter:" => type lettre
-* titre commence par "Systematic review" => type review
-* titre contient "A systematic review" => idem
-
-# Oneshots sur base de prod à la prochaine occasion
-* python -m interfaces.cli.oneshot.backfill_title_normalized ?
-* squasher le schéma
