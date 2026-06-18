@@ -43,6 +43,7 @@ async def refetch(
     *,
     dry_run: bool = False,
     limit: int | None = None,
+    full: bool = False,
 ) -> PhaseMetrics:
     """Re-fetch les works OpenAlex avec exactement 100 authorships.
 
@@ -50,10 +51,14 @@ async def refetch(
     connexion (responsabilité du caller). `updated` compte les works
     ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100
     auteurs ; `errors` les fetchs échoués.
+
+    `full=True` (CLI hors-ligne) cible les works déjà normalisés via
+    `source_publications` au lieu des seules lignes staging `processed=FALSE` —
+    utile pour rattraper les tronqués figés par des runs antérieurs.
     """
     adapter.configure(conn)
 
-    truncated = adapter.find_truncated(conn, limit=limit)
+    truncated = adapter.find_truncated(conn, limit=limit, full=full)
     log.info(f"{len(truncated)} works avec 100 auteurs détectés (potentiellement tronqués)")
 
     metrics = PhaseMetrics(total=len(truncated))
