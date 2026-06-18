@@ -116,7 +116,7 @@ class TestAbsorbOaStatus:
         assert absorb_oa_status(None, "unknown") is None
 
 
-# ── clean_publication_title (décodage double-encodage HTML) ────────
+# ── clean_publication_title (décodage des entités HTML) ───────────
 
 
 class TestCleanPublicationTitle:
@@ -147,10 +147,10 @@ class TestCleanPublicationTitle:
         emporte le `&amp;` (rendu correct à l'affichage)."""
         assert clean_publication_title("&lt;i&gt;A &amp; B&lt;/i&gt;") == "<i>A & B</i>"
 
-    def test_preserves_legitimate_single_amp(self):
-        """Un &amp; isolé (encodage simple légitime) ne doit pas être touché —
-        sinon on sur-décode "Smith & Jones" et on casse l'affichage."""
-        assert clean_publication_title("Smith &amp; Jones") == "Smith &amp; Jones"
+    def test_decodes_single_amp_content(self):
+        """Un `&amp;` de contenu isolé est décodé en `&` (sûr : ré-échappé à
+        l'affichage, réduit à un espace au blocking)."""
+        assert clean_publication_title("Smith &amp; Jones") == "Smith & Jones"
 
     def test_preserves_plain_text(self):
         assert clean_publication_title("Plain title without entities") == (
