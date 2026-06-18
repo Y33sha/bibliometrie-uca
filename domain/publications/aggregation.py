@@ -1,6 +1,6 @@
 """Agrégation cross-sources de l'aggregate Publication.
 
-Encapsule les règles d'agrégation : à partir des `source_publications` attachées à une publication canonique (lues via `SourcePublicationWithJournalView`), calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de la lecture multi-sources → `Publication` (vue canonique).
+Encapsule les règles d'agrégation : à partir des `source_publications` attachées à une publication canonique (lues via `SourcePublication`), calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de la lecture multi-sources → `Publication` (vue canonique).
 
 Règles d'agrégation par type de champ :
 - **Scalaires nullable** (`title`, `doi`, `doc_type`, `pub_year`, `journal_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`.
@@ -21,13 +21,13 @@ from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT, best_oa_status
 from domain.publications.publication import Publication
 from domain.source_publications.doc_types import ARTICLE_SUBTYPES
-from domain.source_publications.views import SourcePublicationWithJournalView
+from domain.source_publications.source_publication import SourcePublication
 from domain.types import JsonValue
 
 
 def refresh_from_sources(
     pub: Publication,
-    sources: list[SourcePublicationWithJournalView],
+    sources: list[SourcePublication],
     *,
     source_priority: tuple[str, ...],
 ) -> None:
@@ -78,7 +78,7 @@ def refresh_from_sources(
 # ── Helpers publics ────────────────────────────────────────────────
 
 
-def first_non_null(sources: list[SourcePublicationWithJournalView], attr: str) -> Any:
+def first_non_null(sources: list[SourcePublication], attr: str) -> Any:
     """Premier `getattr(source, attr)` non-null dans l'ordre des `sources`. None si tous absents.
 
     Retour `Any` justifié : type polymorphique selon `attr` (str pour
@@ -94,7 +94,7 @@ def first_non_null(sources: list[SourcePublicationWithJournalView], attr: str) -
 
 
 def merge_lists_dedup_ci(
-    sources: list[SourcePublicationWithJournalView], attr: str
+    sources: list[SourcePublication], attr: str
 ) -> list[Any] | None:
     """Union dédupliquée des listes `source.<attr>`. Déduplication case-insensitive pour les strings, sinon par valeur. Préserve l'ordre d'apparition. None si toutes vides/null.
 
@@ -114,7 +114,7 @@ def merge_lists_dedup_ci(
 
 
 def shallow_merge_jsonb(
-    sources: list[SourcePublicationWithJournalView], attr: str
+    sources: list[SourcePublication], attr: str
 ) -> dict[str, JsonValue] | None:
     """Fusion shallow par clé pour `meta` / `biblio`. La première source à fournir une clé l'emporte (cohérent avec « premier non-null ») ; les clés sont généralement orthogonales entre sources."""
     merged: dict[str, JsonValue] = {}
@@ -128,7 +128,7 @@ def shallow_merge_jsonb(
 
 
 def topics_by_source(
-    sources: list[SourcePublicationWithJournalView],
+    sources: list[SourcePublication],
 ) -> dict[str, JsonValue] | None:
     """Indexe les `topics` par source. Schémas radicalement différents par source — chacun reste sous sa propre clé pour préserver la forme native (liste hiérarchique OpenAlex, dict ScanR, etc.)."""
     out: dict[str, JsonValue] = {}
@@ -138,7 +138,7 @@ def topics_by_source(
     return out or None
 
 
-def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublicationWithJournalView]) -> str:
+def arbitrate_doc_type_with_article_subtype(sources: list[SourcePublication]) -> str:
     """Choix du `doc_type` canonique : premier non-null dans l'ordre de priorité, avec exception pour les sous-types d'article.
 
     Les `doc_type` lus sont déjà **canoniques et corrigés** (la phase `metadata_correction` a mappé source→canonique et appliqué les corrections en place sur la `source_publication`) ; l'arbitrage opère donc directement sur les colonnes, sans re-mapper.

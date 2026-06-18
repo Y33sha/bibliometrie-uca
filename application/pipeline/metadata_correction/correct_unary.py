@@ -40,7 +40,7 @@ from domain.source_publications.correction import (
 )
 from domain.source_publications.doc_types import map_doc_type
 from domain.source_publications.raw_metadata import hydrate_raw_view, raw_value, stash_entry
-from domain.source_publications.views import SourcePublicationWithJournalView
+from domain.source_publications.source_publication import SourcePublication
 
 # Champs corrigeables gérés par la sous-étape unaire (clés de `raw_metadata` qu'elle (re)pose).
 # Les autres (ex. `doi`, géré par la sous-étape relationnelle) sont préservées.
@@ -53,11 +53,11 @@ DOC_TYPE_MAP_MARKER = "DOC_TYPE_MAP"
 _PERSIST_BATCH = 5000
 
 
-def _view_from_row(row: SourcePublicationForCorrection) -> SourcePublicationWithJournalView:
-    """Adapte la projection `SourcePublicationForCorrection` en `SourcePublicationWithJournalView`,
+def _view_from_row(row: SourcePublicationForCorrection) -> SourcePublication:
+    """Adapte la projection `SourcePublicationForCorrection` en `SourcePublication`,
     aux valeurs **courantes** des colonnes (potentiellement déjà corrigées). `hydrate_raw_view`
     reconstruit ensuite le brut source à partir de `raw_metadata`."""
-    return SourcePublicationWithJournalView(
+    return SourcePublication(
         id=row.id,
         source=row.source,
         source_id=row.source_id,

@@ -14,7 +14,7 @@ des corrections (`domain/source_publications/correction.py`).
 
 from dataclasses import replace
 
-from domain.source_publications.views import SourcePublicationWithJournalView
+from domain.source_publications.source_publication import SourcePublication
 from domain.types import JsonValue
 
 RAW = "raw"
@@ -36,9 +36,9 @@ def raw_value[T](raw_metadata: dict[str, JsonValue] | None, field: str, current:
 
 
 def hydrate_raw_view(
-    view: SourcePublicationWithJournalView,
+    view: SourcePublication,
     raw_metadata: dict[str, JsonValue] | None,
-) -> SourcePublicationWithJournalView:
+) -> SourcePublication:
     """Reconstruit la vue aux valeurs **source d'origine** (avant correction), en
     réinjectant chaque champ stashé dans `raw_metadata`. Les champs jamais corrigés
     gardent leur valeur courante. Inverse de la persistance des corrections.
