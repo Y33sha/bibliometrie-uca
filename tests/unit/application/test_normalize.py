@@ -336,10 +336,10 @@ class TestFirstDocTypeArbitration:
     nomenclatures sources brutes."""
 
     @staticmethod
-    def _src(source: str, doc_type: str | None) -> "SourcePublicationWithJournalView":  # noqa: F821
-        from domain.source_publications.views import SourcePublicationWithJournalView
+    def _src(source: str, doc_type: str | None) -> "SourcePublication":  # noqa: F821
+        from domain.source_publications.source_publication import SourcePublication
 
-        return SourcePublicationWithJournalView(
+        return SourcePublication(
             id=None,
             source=source,
             source_id="x",

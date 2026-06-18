@@ -28,7 +28,7 @@ Hors-scope : les patterns d'incohérence détectables mais non corrigibles autom
 Avant d'ouvrir un fichier, expliciter :
 
 - **Champ corrigé** (output) : `doc_type`, `journal_id`, `oa_status`.
-- **Inputs lus** : quels champs de `SourcePublicationWithJournalView` ? Mono- ou multi-critères ?
+- **Inputs lus** : quels champs de `SourcePublication` ? Mono- ou multi-critères ?
 - **Condition** : whitelist (sur un set fini de valeurs d'input) ou inconditionnelle ? La whitelist est presque toujours plus défensive — elle épargne les types-référents (`thesis`, `book`, …).
 - **Origine de l'input** :
   - intrinsèque à la SP (`title`, `urls`, `doc_type`, `doi`) → rien à câbler ;
@@ -105,7 +105,7 @@ return CorrectedFields(
 
 Si l'input vient d'une table hors projection :
 
-1. champ ajouté à `SourcePublicationWithJournalView` ([`views.py`](../../domain/source_publications/views.py)) ;
+1. champ ajouté à `SourcePublication` ([`views.py`](../../domain/source_publications/source_publication.py)) ;
 2. projeté dans la requête `fetch_for_unary_correction` ([`metadata_correction.py`](../../infrastructure/queries/pipeline/metadata_correction.py)) + le port `SourcePublicationForCorrection` ([`metadata_correction`](../../application/ports/pipeline/metadata_correction.py)) ;
 3. reporté dans `_view_from_row` (`correct_unary.py`).
 
@@ -172,7 +172,7 @@ Pour une nouvelle correction relationnelle : ajouter un membre `DistinctMergeCas
 
 **`JOURNAL_TYPE_MEDIA_TO_MEDIA`** — `journal.journal_type = 'media'` ⇒ `doc_type = media`.
 
-- Input : `sp.journal_type` (joint via `SourcePublicationWithJournalView`).
+- Input : `sp.journal_type` (joint via `SourcePublication`).
 - Hook admin : oui — service [`requalify_publications_for_journal`](../../application/journals.py), endpoint `GET /api/journals/{id}/type-change-impact`, requalification synchrone dans le `PUT`, modale frontend.
 - Référence : [`correction.py` — entrée `JOURNAL_TYPE_MEDIA_TO_MEDIA`](../../domain/source_publications/correction.py)
 

@@ -5,10 +5,10 @@ from domain.source_publications.correction import (
     MetadataCorrectionRule,
     effective_metadata,
 )
-from domain.source_publications.views import SourcePublicationWithJournalView
+from domain.source_publications.source_publication import SourcePublication
 
 
-def _view(**overrides: object) -> SourcePublicationWithJournalView:
+def _view(**overrides: object) -> SourcePublication:
     defaults: dict[str, object] = {
         "id": 1,
         "source": "openalex",
@@ -34,7 +34,7 @@ def _view(**overrides: object) -> SourcePublicationWithJournalView:
         "apc_amount": None,
     }
     defaults.update(overrides)
-    return SourcePublicationWithJournalView(**defaults)  # type: ignore[arg-type]
+    return SourcePublication(**defaults)  # type: ignore[arg-type]
 
 
 class TestCorrectedFields:

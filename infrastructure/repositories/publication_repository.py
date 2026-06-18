@@ -16,7 +16,7 @@ from sqlalchemy import Connection, text
 from application.ports.repositories.publication_repository import PubByDoi
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
-from domain.source_publications.views import SourcePublicationWithJournalView
+from domain.source_publications.source_publication import SourcePublication
 
 
 class _SourcePublicationViewRow(NamedTuple):
@@ -46,9 +46,9 @@ class _SourcePublicationViewRow(NamedTuple):
     apc_amount: Decimal | None
 
 
-def _view_from_row(row: _SourcePublicationViewRow) -> SourcePublicationWithJournalView:
+def _view_from_row(row: _SourcePublicationViewRow) -> SourcePublication:
     """Mapping d'une row SQL `source_publications` ⨝ `journals` vers la vue de lecture. Convertit les `text[]` Postgres en tuples immutables."""
-    return SourcePublicationWithJournalView(
+    return SourcePublication(
         id=row.id,
         source=row.source,
         source_id=row.source_id,
@@ -258,10 +258,10 @@ class PgPublicationRepository:
 
     # ── Agrégation depuis source_publications ──────────────────────
 
-    def get_source_publications(self, pub_id: int) -> list[SourcePublicationWithJournalView]:
-        """Retourne les vues `SourcePublicationWithJournalView` attachées à une publication canonique, enrichies par un LEFT JOIN sur `journals` pour porter les champs consommés par les règles journal-dépendantes (`journal_type`, `oa_model`, `apc_amount`).
+    def get_source_publications(self, pub_id: int) -> list[SourcePublication]:
+        """Retourne les vues `SourcePublication` attachées à une publication canonique, enrichies par un LEFT JOIN sur `journals` pour porter les champs consommés par les règles journal-dépendantes (`journal_type`, `oa_model`, `apc_amount`).
 
-        Sortie consommée par la couche domaine pour la correction (`effective_metadata`) puis l'agrégation (`refresh_from_sources`) — d'où la dénormalisation des champs journal en lecture (cf. `domain/source_publications/views.py`).
+        Sortie consommée par la couche domaine pour la correction (`effective_metadata`) puis l'agrégation (`refresh_from_sources`) — d'où la dénormalisation des champs journal en lecture (cf. `domain/source_publications/source_publication.py`).
 
         Le `doi` projeté est la colonne nue : la substitution Zenodo (concept au lieu de la version) est déjà persistée par `metadata_correction`, donc l'agrégation promeut le concept comme DOI canonique sans recalcul ici.
         """
