@@ -21,7 +21,7 @@ YearSelection = Literal["since_last", "weekly", "full"]
 class ModePolicy:
     extract_sources: frozenset[str]
     year_selection: YearSelection
-    refetch_truncated_oa: bool  # TODO: vraiment utile?
+    refetch_truncated_oa: bool
     fetch_missing_doi_sources: frozenset[str]
     vacuum_full: bool
     # Gate la phase `oa_status` (Unpaywall, per-publication). Renommé depuis
