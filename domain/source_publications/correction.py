@@ -75,6 +75,9 @@ class MetadataCorrectionRule(StrEnum):
     TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET = "TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET"
     TITLE_ERRATUM_PREFIX_TO_ERRATUM = "TITLE_ERRATUM_PREFIX_TO_ERRATUM"
     TITLE_RETRACTION_PREFIX_TO_RETRACTION = "TITLE_RETRACTION_PREFIX_TO_RETRACTION"
+    TITLE_EDITORIAL_PREFIX_TO_EDITORIAL = "TITLE_EDITORIAL_PREFIX_TO_EDITORIAL"
+    TITLE_LETTER_PREFIX_TO_LETTER = "TITLE_LETTER_PREFIX_TO_LETTER"
+    TITLE_SYSTEMATIC_REVIEW_TO_REVIEW = "TITLE_SYSTEMATIC_REVIEW_TO_REVIEW"
     TITLE_ISBN_TO_BOOK_REVIEW = "TITLE_ISBN_TO_BOOK_REVIEW"
     TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW = "TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW"
     DOI_FIGSHARE_COLLECTION_TO_DATASET = "DOI_FIGSHARE_COLLECTION_TO_DATASET"
@@ -123,6 +126,17 @@ _ERRATUM_TITLE_PREFIXES = ("erratum", "errata", "corrigendum")
 
 # Préfixes stricts : seules les formulations canoniques utilisées par les éditeurs. Pas « retraction » seul, qui matcherait des titres comme « Retraction of consent in clinical trials ».
 _RETRACTION_TITLE_PREFIXES = ("retraction notice", "retraction note")
+
+# « Editorial: <titre> » (Frontiers & co.). Le « : » est discriminant : `normalize_text`
+# efface la ponctuation, donc un préfixe nu « editorial » matcherait « Editorial Board »,
+# « Editorial comment »… → regex ancrée sur le titre brut (audit : motif univoque).
+_EDITORIAL_PREFIX_PATTERN = re.compile(r"^\s*editorial\s*:", re.IGNORECASE)
+# « Letter: <titre> » (courrier à l'éditeur / research letter).
+_LETTER_PREFIX_PATTERN = re.compile(r"^\s*letter\s*:", re.IGNORECASE)
+# « systematic review(s) » en tête de titre OU en sous-titre (après « : »), forme
+# document-type univoque. Ancré pour exclure les mentions au fil du titre (étude primaire
+# « …cohort, and a systematic review », protocole de revue, reply) — audit : ~100% reviews.
+_SYSTEMATIC_REVIEW_PATTERN = re.compile(r"(^|:\s*)(a\s+)?systematic reviews?\b", re.IGNORECASE)
 
 # Marqueurs de recension d'ouvrage détectés sur le titre brut.
 # `_ISBN_PATTERN` : mention « ISBN » (mot entier) ou préfixe ISBN-13 (97[89] suivi de 10–17 caractères chiffres/espaces/tirets). Signal très net.
@@ -272,6 +286,36 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
             "title_prefix_normalized": _RETRACTION_TITLE_PREFIXES,
         },
         "applies_correction": {"doc_type": "retraction"},
+    },
+    # Titre « Editorial: … » + doc_type ∈ {article, other} ⇒ `editorial`. Frontiers & co.
+    # publient les éditoriaux sous ce préfixe, qu'OpenAlex/ScanR/CrossRef typent souvent
+    # `article`. Ancré sur le « : » (cf. `_EDITORIAL_PREFIX_PATTERN`).
+    MetadataCorrectionRule.TITLE_EDITORIAL_PREFIX_TO_EDITORIAL: {
+        "applies_to": {
+            "doc_type": frozenset({"article", "other"}),
+            "title_regex": _EDITORIAL_PREFIX_PATTERN,
+        },
+        "applies_correction": {"doc_type": "editorial"},
+    },
+    # Titre « Letter: … » + doc_type ∈ {article, other} ⇒ `letter`. Courriers à l'éditeur /
+    # research letters mal typés `article`.
+    MetadataCorrectionRule.TITLE_LETTER_PREFIX_TO_LETTER: {
+        "applies_to": {
+            "doc_type": frozenset({"article", "other"}),
+            "title_regex": _LETTER_PREFIX_PATTERN,
+        },
+        "applies_correction": {"doc_type": "letter"},
+    },
+    # « systematic review » en tête ou en sous-titre + doc_type ∈ {article, other} ⇒ `review`.
+    # Ancré (cf. `_SYSTEMATIC_REVIEW_PATTERN`) pour ne prendre que la forme document-type, pas
+    # les mentions au fil du titre. La whitelist épargne conference_paper/preprint/poster/
+    # memoir/dataset (une revue systématique peut légitimement être l'un d'eux).
+    MetadataCorrectionRule.TITLE_SYSTEMATIC_REVIEW_TO_REVIEW: {
+        "applies_to": {
+            "doc_type": frozenset({"article", "other"}),
+            "title_regex": _SYSTEMATIC_REVIEW_PATTERN,
+        },
+        "applies_correction": {"doc_type": "review"},
     },
     # Titre porteur d'un ISBN explicite + doc_type ∈ {article, review, other} ⇒ `book_review`. `book`/`book_chapter` exclus (un ouvrage ou un chapitre peut légitimement porter son propre ISBN dans le titre — saisie HAL fréquente).
     MetadataCorrectionRule.TITLE_ISBN_TO_BOOK_REVIEW: {

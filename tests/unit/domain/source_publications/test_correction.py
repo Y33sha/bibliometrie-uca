@@ -85,6 +85,58 @@ class TestDumasRule:
         assert effective_metadata(view).doc_type is None
 
 
+class TestTitleEditorialRule:
+    def test_editorial_prefix_corrects_to_editorial(self):
+        view = _view(doc_type="article", title="Editorial: The multifaceted roles of lipids")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "editorial"
+        assert corrected.rule == MetadataCorrectionRule.TITLE_EDITORIAL_PREFIX_TO_EDITORIAL
+
+    def test_editorial_without_colon_no_correction(self):
+        # « Editorial Board », « Editorial comment »… ne sont pas le motif éditorial univoque.
+        assert effective_metadata(_view(doc_type="article", title="Editorial Board")).doc_type is None
+
+    def test_editorial_spares_reference_doc_types(self):
+        assert effective_metadata(_view(doc_type="book", title="Editorial: X")).doc_type is None
+
+
+class TestTitleLetterRule:
+    def test_letter_prefix_corrects_to_letter(self):
+        view = _view(doc_type="article", title="Letter: is the AHHS score really useful?")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "letter"
+        assert corrected.rule == MetadataCorrectionRule.TITLE_LETTER_PREFIX_TO_LETTER
+
+    def test_plural_letters_without_colon_no_correction(self):
+        assert effective_metadata(_view(doc_type="article", title="Letters from the field")).doc_type is None
+
+
+class TestTitleSystematicReviewRule:
+    def test_prefix_corrects_to_review(self):
+        view = _view(doc_type="article", title="Systematic review of atrial vascular access")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "review"
+        assert corrected.rule == MetadataCorrectionRule.TITLE_SYSTEMATIC_REVIEW_TO_REVIEW
+
+    def test_subtitle_after_colon_corrects_to_review(self):
+        view = _view(doc_type="article", title="Impact of psychedelics on craving: a systematic review")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "review"
+
+    def test_mid_title_mention_not_corrected(self):
+        # Étude primaire mentionnant une revue au fil du titre (ni début, ni après « : ») → épargnée.
+        view = _view(doc_type="article", title="French cohort of systemic sclerosis and a systematic review")
+        assert effective_metadata(view).doc_type is None
+
+    def test_spares_conference_paper(self):
+        # Une revue systématique peut légitimement être un conference_paper : whitelist {article, other}.
+        view = _view(doc_type="conference_paper", title="Systematic review of serious games on livestock")
+        assert effective_metadata(view).doc_type is None
+
+
 class TestJournalTypeMediaRule:
     def test_journal_type_media_corrects_to_media(self):
         view = _view(doc_type="article", journal_type="media")
