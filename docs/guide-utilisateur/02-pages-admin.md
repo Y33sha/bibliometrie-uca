@@ -84,7 +84,7 @@ Affiche les faux positifs et faux négatifs dans la détection de structures dan
 - **faux négatifs**: affiliations adresse-structure non détectées par le script mais créées manuellement => action nécessaire: repérer les formes de nom non détectées et les ajouter dans `admin/structures/{id}`.
 - **faux positifs**: affiliations détectées par le script mais rejetées manuellement => action nécessaire: supprimer une forme de nom trop permissive ou lui ajouter un contexte plus contraignant.
 
-Les ajouts/suppressions de formes de noms seront prises en compte à la prochaine exécution du pipeline ([phase `affiliations`](../pipeline/05-affiliations.md)).
+Les ajouts/suppressions de formes de noms seront prises en compte à la prochaine exécution du pipeline ([phase `affiliations`](../pipeline/04-affiliations.md)).
 
 ### Liens adresses-pays
 

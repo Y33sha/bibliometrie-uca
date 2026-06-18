@@ -12,7 +12,7 @@
 
 ![Informations Structure](../screenshots/admin_structures_id_modifier.png)
 
-- Le repérage des affiliations (étape [affiliations](../pipeline/05-affiliations.md) du pipeline) nécessite des **formes de nom** à détecter dans les [adresses](../glossaire.md#adresse) des publications. On peut commencer par indiquer les plus évidentes (nom complet, acronyme, numéro d'UMR). Les contrôles post-pipeline permettent d'affiner en fonction des formes effectivement présentes dans les adresses liées aux publications.
+- Le repérage des affiliations (étape [affiliations](../pipeline/04-affiliations.md) du pipeline) nécessite des **formes de nom** à détecter dans les [adresses](../glossaire.md#adresse) des publications. On peut commencer par indiquer les plus évidentes (nom complet, acronyme, numéro d'UMR). Les contrôles post-pipeline permettent d'affiner en fonction des formes effectivement présentes dans les adresses liées aux publications.
 
 ![Formes de nom](../screenshots/admin_structures_id_nameforms_lmv.png)
 

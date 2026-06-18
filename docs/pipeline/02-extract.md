@@ -24,13 +24,6 @@ flowchart LR
 - Même sans changement, la colonne `last_seen_at` est bumpée à chaque fois qu'un doc est re-vu (moisson bulk ou refetch).
 > Une publication qui cesse d'apparaître dans sa source (par ex. dédoublonnage dans HAL) est détectée puis confirmée par la phase [Refresh & disparitions](#refresh-stale), qui pose un marqueur `disappeared_at`.
 
-**Cas particulier**:
-
-L'[API OpenAlex](../sources/03-openalex.md) limite les authorships à 100 par publication dans les requêtes paginées. Un *refetch* individuel des publications avec 100 authorships est nécessaire.
-
-**`refetch_truncated.py`** — re-télécharge un par un les works OpenAlex tronqués à 100 auteurs. Pour éviter d'écraser la liste complète lors d'un bulk ultérieur, le refetch met à jour `raw_data` mais conserve `raw_hash` (hash du payload bulk initial) ; tant que le bulk renvoie le même payload, l'UPSERT bulk ne touche pas `raw_data`.
-
-
 ## Imports croisés {#cross-imports}
 
 Phase `cross_imports`: deux étapes enchaînées, chacune adressant un cas distinct de "doc visible dans une source mais absent d'une autre".
@@ -54,3 +47,11 @@ Pour chaque DOI stale, refetch via l'adapter `fetch_missing_doi` de sa source : 
 Tournant à chaque run, le seuil étale la charge : une passe ne ramasse que ce qui vient de franchir 90 j. La fenêtre fixe du mode `full` (rétention cumulative) garde la plupart des natifs frais via le bulk, donc le lot stale reste petit (cross-imports + natifs réellement disparus). Pas de filtre par source : sous cadence normale theses et wos ne deviennent jamais stale.
 
 `disappeared_at` est pour l'instant un **marqueur seul** — aucune suppression / exclusion / propagation en aval (à décider plus tard sur cas concrets).
+
+## Works OpenAlex tronqués {#refetch-truncated}
+
+Phase `refetch_truncated`, enchaînée après `refresh_stale` et avant `normalize`. L'[API OpenAlex](../sources/03-openalex.md) plafonne la liste des auteurs à 100 par réponse ; au-delà, les auteurs surnuméraires sont absents du payload moissonné.
+
+Cette phase repère les works OpenAlex tronqués (100 auteurs) encore présents dans le staging et les re-télécharge un par un, en paginant la liste complète des auteurs. Son placement répond à deux contraintes : voir aussi les works ramenés par les imports croisés et le refresh, et passer avant `normalize`, qui marque les lignes (`processed`) et les rend invisibles à la détection.
+
+Pour éviter d'être écrasé par un moissonnage bulk ultérieur, le refetch met à jour `raw_data` mais conserve `raw_hash` (hash du payload bulk initial) ; tant que le bulk renvoie le même payload, l'UPSERT bulk ne touche pas `raw_data`.
