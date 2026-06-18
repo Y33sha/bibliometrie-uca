@@ -85,11 +85,15 @@ atexit.register(clear_status)
 def phase_extract(
     mode: Any = "full", sources: Any = None, year: Any = None, **kw: Any
 ) -> PhaseMetrics:
-    """Phase 1 : Extraction des sources vers staging + refetch truncated.
+    """Phase 1 : Extraction des sources vers staging.
 
-    La politique du mode (sources à interroger, plage d'années, refetch OA)
-    vit dans `application/pipeline/modes.py`. Les scripts d'extraction lisent
-    la config DB pour les plages d'années (`pipeline_years_full/weekly`).
+    La politique du mode (sources à interroger, plage d'années) vit dans
+    `application/pipeline/modes.py`. Les scripts d'extraction lisent la config DB
+    pour les plages d'années (`pipeline_years_full/weekly`).
+
+    Le refetch des works OpenAlex tronqués vit en début de `phase_normalize` (et
+    non ici) : il doit voir aussi les works ramenés par cross_imports et
+    refresh_stale avant que normalize ne les consomme.
     """
     policy = MODES[mode]
     effective = (set(sources) if sources else set(policy.extract_sources)) & policy.extract_sources
@@ -139,9 +143,6 @@ def phase_extract(
                 futures = {pool.submit(fn): name for name, fn in tasks}
                 for future in as_completed(futures):
                     metrics.merge(future.result())
-
-    if policy.refetch_truncated_oa and "openalex" in effective:
-        metrics.merge(_run_refetch_truncated())
 
     return metrics
 
@@ -249,6 +250,16 @@ def phase_normalize(**kw: Any) -> Any:
     depuis le TEI.
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
+    mode = kw.get("mode", "full")
+    policy = MODES[mode]
+    metrics = PhaseMetrics()
+    # refetch_truncated AVANT de normaliser openalex : il cible les lignes staging
+    # openalex `processed=FALSE` à 100 auteurs, que normalize s'apprête à consommer
+    # (`processed`→TRUE, après quoi elles sont invisibles à sa détection). Placé
+    # ici plutôt qu'en fin d'extract, il capte aussi les tronqués ramenés par
+    # cross_imports et refresh_stale.
+    if policy.refetch_truncated_oa and "openalex" in sources:
+        metrics.merge(_run_refetch_truncated())
     # Ordre d'exécution : source la plus autoritative en premier
     # (cf. SOURCE_PRIORITY dans domain/sources.py). Les sources suivantes
     # n'écrasent pas les métadonnées déjà posées par les précédentes
@@ -265,8 +276,6 @@ def phase_normalize(**kw: Any) -> Any:
         _run_normalize_openalex()
     if "wos" in sources:
         _run_normalize_wos()
-    mode = kw.get("mode", "full")
-    policy = MODES[mode]
     # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
     if policy.vacuum_full:
         log.info("VACUUM FULL staging...")
@@ -274,6 +283,7 @@ def phase_normalize(**kw: Any) -> Any:
     else:
         log.info("VACUUM staging...")
         _vacuum_staging(full=False)
+    return metrics
 
 
 def _run_recompute_address_pub_count() -> None:

@@ -9,6 +9,7 @@ tourner après `publications`, pas après `normalize`.
 from unittest.mock import patch
 
 import run_pipeline
+from application.pipeline.metrics import PhaseMetrics
 
 
 def test_recompute_addresses_runs_in_publications_not_normalize():
@@ -19,6 +20,7 @@ def test_recompute_addresses_runs_in_publications_not_normalize():
         patch.object(run_pipeline, "_run_normalize_hal"),
         patch.object(run_pipeline, "_run_normalize_openalex"),
         patch.object(run_pipeline, "_run_normalize_wos"),
+        patch.object(run_pipeline, "_run_refetch_truncated", return_value=PhaseMetrics()),
         patch.object(run_pipeline, "_vacuum_staging"),
         patch.object(run_pipeline, "_run_reconcile_components"),
         patch.object(run_pipeline, "_run_recompute_address_pub_count") as recompute,

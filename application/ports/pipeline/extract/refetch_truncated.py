@@ -33,8 +33,17 @@ class OpenalexRefetchAdapter(Protocol):
     def configure(self, conn: Connection) -> None:
         """Lit la config (URL, auth) depuis la base avant la boucle."""
 
-    def find_truncated(self, conn: Connection, *, limit: int | None = None) -> list[TruncatedWork]:
-        """SELECT des works staging avec exactement 100 authorships."""
+    def find_truncated(
+        self, conn: Connection, *, limit: int | None = None, full: bool = False
+    ) -> list[TruncatedWork]:
+        """SELECT des works OpenAlex avec exactement 100 authorships.
+
+        `full=False` (passe pipeline) : works staging encore `processed=FALSE`,
+        comptés sur `staging.raw_data`. `full=True` (repli hors-ligne) : works déjà
+        normalisés, comptés sur `source_publications` / `source_authorships` —
+        `staging.raw_data` étant vidé après normalisation, c'est l'unique source
+        de comptage pour eux.
+        """
 
     async def fetch_work(
         self, client: httpx.AsyncClient, openalex_id: str

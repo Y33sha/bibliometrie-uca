@@ -20,12 +20,22 @@ def main() -> None:
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--limit", type=int, help="Nombre max de works à traiter")
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help=(
+            "Cible les works déjà normalisés (comptés sur source_publications) "
+            "et non les seules lignes staging non normalisées."
+        ),
+    )
     args = parser.parse_args()
 
     conn = get_sync_engine().connect()
     adapter = PgOpenalexRefetchAdapter()
     try:
-        asyncio.run(refetch(conn, adapter, logger, dry_run=args.dry_run, limit=args.limit))
+        asyncio.run(
+            refetch(conn, adapter, logger, dry_run=args.dry_run, limit=args.limit, full=args.full)
+        )
     finally:
         conn.close()
 

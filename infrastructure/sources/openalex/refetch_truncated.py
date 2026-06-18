@@ -53,6 +53,24 @@ _SELECT_TRUNCATED_SQL = text(
     """
 )
 
+# Mode `full` : les works déjà normalisés ont leur `staging.raw_data` vidé, donc
+# le comptage des auteurs se fait sur `source_authorships`. On remonte le
+# `staging_id` (la ligne staging existe toujours, seul `raw_data` a été purgé)
+# pour que `update_raw_data` re-pose le payload complet et repasse `processed`
+# à FALSE — un normalize ultérieur ré-écrira alors les authorships complètes.
+_SELECT_TRUNCATED_FULL_SQL = text(
+    """
+    SELECT sp.staging_id AS id, sp.source_id
+    FROM source_publications sp
+    JOIN source_authorships sa ON sa.source_publication_id = sp.id
+    WHERE sp.source = 'openalex'
+      AND sp.staging_id IS NOT NULL
+    GROUP BY sp.id, sp.staging_id, sp.source_id
+    HAVING count(*) = 100
+    ORDER BY sp.staging_id
+    """
+)
+
 
 class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
     """Adapter PostgreSQL + HTTP pour `OpenalexRefetchAdapter`.
@@ -71,8 +89,10 @@ class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
         init_auth(api_key=get_openalex_api_key(conn), email=get_polite_pool_email(conn))
         self._base_url = get_api_base_urls(conn)["openalex"]
 
-    def find_truncated(self, conn: Connection, *, limit: int | None = None) -> list[TruncatedWork]:
-        rows = conn.execute(_SELECT_TRUNCATED_SQL).all()
+    def find_truncated(
+        self, conn: Connection, *, limit: int | None = None, full: bool = False
+    ) -> list[TruncatedWork]:
+        rows = conn.execute(_SELECT_TRUNCATED_FULL_SQL if full else _SELECT_TRUNCATED_SQL).all()
         if limit:
             rows = rows[:limit]
         return [TruncatedWork(staging_id=row.id, openalex_id=row.source_id) for row in rows]
