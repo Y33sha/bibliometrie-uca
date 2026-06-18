@@ -72,11 +72,10 @@ describe('sanitizeTitle', () => {
 		expect(result).not.toContain('&amp;');
 	});
 
-	it('ne décode pas un &amp; isolé légitime', () => {
-		// "Smith & Jones" stocké comme "Smith &amp; Jones" (encodage simple)
-		// ne doit PAS être décodé : le & affiché vient de l'échappement final.
+	it('décode un &amp; de contenu isolé (&amp; → &)', () => {
+		// "Smith &amp; Jones" → "Smith & Jones", ré-échappé une fois à l'affichage.
 		const result = sanitizeTitle('Smith &amp; Jones');
-		expect(result).toBe('Smith &amp;amp; Jones');
+		expect(result).toBe('Smith &amp; Jones');
 	});
 });
 

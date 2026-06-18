@@ -97,8 +97,6 @@ function sanitizeMathML(s: string): string {
 
 const HAS_LATEX = /\$\$[\s\S]+?\$\$|\$[^$]+?\$/;
 const HAS_MATHML = /<\/?mml:/;
-const DOUBLE_ENCODED = /&amp;(lt|gt|amp|quot|apos|#\d+|#x[0-9a-f]+);/i;
-const SINGLE_ENCODED_TAG = /&(lt|gt);/i;
 
 const ENTITY_MAP: Record<string, string> = {
 	amp: '&', lt: '<', gt: '>', quot: '"', apos: "'"
@@ -120,24 +118,24 @@ function decodeEntitiesOnce(s: string): string {
 	);
 }
 
-/* Décode les entités HTML d'un titre, en deux temps complémentaires :
- *  - double-encodage (`&amp;lt;`, `&amp;#233;`…) → deux niveaux (markup ET
- *    entités numériques double-échappées) ;
- *  - markup simple-encodé (`&lt;sub&gt;` → `<sub>`) → un niveau, sur les seuls
- *    délimiteurs de balise.
- * Un `&amp;` / `&#NNN;` isolé légitime ("Smith &amp; Jones") n'a pas de
- * délimiteur de balise et reste inchangé. La suite sanitize le markup brut. */
-function unwrapEntityEncodedTags(s: string): string {
+/* Décode les entités HTML d'un titre jusqu'à stabilisation (`&lt;sub&gt;` →
+ * `<sub>`, `&amp;` → `&`, `&#233;` → `é`). La boucle (bornée) absorbe le
+ * double-encodage (`&amp;lt;`). Le markup brut obtenu est ensuite sanitizé ; un
+ * `&` de contenu est ré-échappé par `escapeHtml`. */
+function decodeHtmlEntities(s: string): string {
 	let out = s;
-	if (DOUBLE_ENCODED.test(out)) out = decodeEntitiesOnce(decodeEntitiesOnce(out));
-	if (SINGLE_ENCODED_TAG.test(out)) out = decodeEntitiesOnce(out);
+	for (let i = 0; i < 4; i++) {
+		const decoded = decodeEntitiesOnce(out);
+		if (decoded === out) break;
+		out = decoded;
+	}
 	return out;
 }
 
 export function sanitizeTitle(s: string | null | undefined): string {
 	if (!s) return '';
 
-	const input = unwrapEntityEncodedTags(s);
+	const input = decodeHtmlEntities(s);
 
 	if (HAS_LATEX.test(input)) return renderLatex(input);
 	if (HAS_MATHML.test(input) || /<\/?[a-z]/i.test(input)) return sanitizeMathML(input);

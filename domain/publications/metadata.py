@@ -101,11 +101,6 @@ def absorb_oa_status(target: str | None, source: str | None) -> str | None:
 
 _HTML_ENTITY_NAMED = {"amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'"}
 _HTML_ENTITY_RE = re.compile(r"&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);")
-# Signal de double-encodage HTML (`&amp;` immédiatement suivi d'une entité connue).
-_DOUBLE_ENCODED_RE = re.compile(r"&amp;(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);")
-# Délimiteur de balise simple-encodé (`&lt;`/`&gt;`) : du markup de titre échappé,
-# à décoder. Un `&amp;` / `&#NNN;` isolé légitime n'en contient pas.
-_SINGLE_ENCODED_TAG_RE = re.compile(r"&(?:lt|gt);", re.IGNORECASE)
 
 
 def _decode_html_entities_once(s: str) -> str:
@@ -138,27 +133,25 @@ _WHITESPACE_RE = re.compile(r"\s+")
 def clean_publication_title(title: str | None) -> str | None:
     """Nettoie un titre pour la persistance et l'affichage.
 
-    Deux décodages d'entités, complémentaires :
-
-    - **Double-encodage** (`&amp;` suivi d'une entité connue : `lt`, `gt`, `amp`,
-      `quot`, `apos`, `#NNN`, `#xHH`) → deux niveaux de décodage. Couvre le markup
-      *et* les entités numériques arrivées double-échappées (OpenAlex / ScanR).
-    - **Markup simple-encodé** (`&lt;sub&gt;` → `<sub>`) → un niveau, sur les seuls
-      délimiteurs de balise. Un `&amp;` / `&#NNN;` isolé légitime ("Smith &amp;
-      Jones") n'en contient pas et reste inchangé.
-
-    Puis collapse du whitespace parasite (newlines / tabs / espaces multiples → un
-    seul espace, trim) : fréquent quand le markup source (MathML/HTML) est indenté
-    dans le titre.
+    - Décode les entités HTML jusqu'à stabilisation : `&lt;sub&gt;` → `<sub>`,
+      `&amp;` → `&`, `&#233;` → `é`. La boucle (bornée) absorbe les flux
+      double-échappés (`&amp;lt;`, OpenAlex / ScanR). Décoder est sûr : un `&` de
+      contenu ("Smith & Jones") est ré-échappé au point d'affichage et réduit à
+      un espace par `normalize_text` — rien ne consomme le titre stocké sans
+      l'une ou l'autre de ces étapes.
+    - Collapse le whitespace parasite (newlines / tabs / espaces multiples → un
+      seul espace, trim) : fréquent quand le markup source (MathML/HTML) est
+      indenté dans le titre.
 
     Conserve les balises HTML (rendues à l'affichage). Idempotent.
     """
     if not title:
         return title
-    if _DOUBLE_ENCODED_RE.search(title):
-        title = _decode_html_entities_once(_decode_html_entities_once(title))
-    if _SINGLE_ENCODED_TAG_RE.search(title):
-        title = _decode_html_entities_once(title)
+    for _ in range(4):
+        decoded = _decode_html_entities_once(title)
+        if decoded == title:
+            break
+        title = decoded
     return _WHITESPACE_RE.sub(" ", title).strip()
 
 
