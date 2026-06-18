@@ -48,7 +48,7 @@ flowchart LR
     class F,A,C valid;
 ```
 
-4. Les **authorships** “canoniques” sont déduites à partir des sources dans la phase [`authorships`](09-authorships.md). L'information (`person_id`, `structure_ids`) présente dans la table `source_authorships` est agrégée et répliquée dans la table `authorships`, pour deux raisons :
+4. Les **authorships** “canoniques” sont déduites à partir des sources dans la phase [`authorships`](09-authorships.md). L'information portée par les `source_authorships` — l'auteur (`person_id`) et ses structures de rattachement — est agrégée et répliquée dans la table `authorships`, pour deux raisons :
     - optimiser les requêtes;
     - servir de source d'autorité ultime en cas d'erreur dans une des sources (une `authorship` peut être rejetée (table `rejected_authorships`), ce qui garantit qu'elle ne sera pas recréée à partir des sources).
 
