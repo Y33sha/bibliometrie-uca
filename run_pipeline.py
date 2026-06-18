@@ -431,12 +431,13 @@ def _run_resolve_doi_prefixes() -> PhaseMetrics:
 def phase_affiliations(**kw: Any) -> Any:
     """Résolution des affiliations UCA sur les source_authorships.
 
-    1. resolve_addresses : matche les adresses vers les structures connues
-    2. populate_affiliations : propage in_perimeter et structure_ids
+    1. refresh_perimeter_structures : rematérialise le périmètre (clôture des tutelles)
+    2. resolve_addresses : matche les adresses vers les structures connues
+    3. populate_affiliations : pose in_perimeter sur les source_authorships
 
     Phase source-agnostique : `--sources` n'est pas propagé. Sinon des
-    source_authorships d'une source non listée resteraient bloquées sans
-    `structure_ids` après la résolution d'une nouvelle adresse.
+    source_authorships d'une source non listée garderaient un `in_perimeter`
+    périmé après la résolution d'une nouvelle adresse.
     """
     _run_refresh_perimeter_structures()
     _run_resolve_addresses()
@@ -509,7 +510,6 @@ def phase_persons(**kw: Any) -> Any:
 
     Cree des personnes a partir des source_authorships in_perimeter non rattachees.
     Exclut les publications hors-scope doc_type (cf domain/publications/scope).
-    Rattache aussi les authorships theses hors-perimetre par IdRef.
     """
     _run_create_persons()
     _run_populate_person_name_forms()
@@ -520,7 +520,7 @@ def phase_authorships(**kw: Any) -> Any:
 
     Consolide les source_authorships en authorships canoniques
     (une entree par couple publication x personne), avec in_perimeter
-    et structure_ids propages.
+    consolide ; les structures derivent de la matview authorship_structures.
 
     Phase source-agnostique : `--sources` n'est pas propagé. Une
     source_authorship peut etre touchee par d'autres voies que sa propre
