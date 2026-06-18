@@ -5,9 +5,10 @@ import { fileURLToPath } from 'node:url';
 // Source unique de configuration : le `.env` racine, déjà lu par le backend
 // (python-dotenv) et docker-compose. On le charge ici aussi pour que `BASE_PATH`
 // pilote le préfixe en dev (`npm run dev`) sans variable de shell ni argument.
-// `dotenv` n'écrase pas une variable déjà présente : un export de shell reste
-// prioritaire.
-loadEnv({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
+// `override: true` : le `.env` fait autorité, même si l'environnement injecte
+// déjà `BASE_PATH` (cas de l'extension Python `useEnvFile`, dont la valeur est
+// par ailleurs corrompue par la conversion de chemin POSIX→Windows de Git Bash).
+loadEnv({ path: fileURLToPath(new URL('../../.env', import.meta.url)), override: true });
 
 // `BASE_PATH` : préfixe de déploiement (cf. ROOT_PATH côté backend).
 // Vide par défaut → app servie à la racine (cas du dépôt cloné lancé via

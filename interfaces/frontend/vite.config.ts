@@ -4,8 +4,9 @@ import { config as loadEnv } from 'dotenv';
 import { fileURLToPath } from 'node:url';
 
 // Charge le `.env` racine (cf. svelte.config.js) pour que `BASE_PATH` pilote le
-// préfixe du proxy en dev. `dotenv` n'écrase pas une variable déjà exportée.
-loadEnv({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
+// préfixe du proxy en dev. `override: true` : le `.env` fait autorité même si
+// l'environnement injecte déjà une valeur (cf. svelte.config.js).
+loadEnv({ path: fileURLToPath(new URL('../../.env', import.meta.url)), override: true });
 
 // Doit matcher `paths.base` dans svelte.config.js (même env var `BASE_PATH`).
 // Vide par défaut (app à la racine) ; en dev, vite strip ce préfixe avant de
