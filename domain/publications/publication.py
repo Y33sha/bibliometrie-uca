@@ -2,7 +2,7 @@
 
 Une `Publication` est la vue UCA d'un document scientifique, agrégée depuis une ou plusieurs `SourcePublication`. Identité = `id` (clé surrogate). Identifiant naturel principal : `doi` (quand renseigné ; les autres identifiants — HALId, NNT — vivent côté `source_publications.external_ids`).
 
-Composition : `Publication.authorships` (entité fille `Authorship`). Les `SourcePublication` attachées sont un aggregate séparé, accédées en projection lecture si besoin.
+Composition : `Publication.authorships` (entité fille `Authorship`). Les `source_publications` attachées sont lues en projection (`SourcePublicationWithJournalView`), jamais comme un agrégat mutable.
 
 La logique métier touchant à une publication canonique (déduplication, fusion, agrégation cross-sources, canonicalisation des titres) vit ici.
 """

@@ -1,8 +1,8 @@
 """Read-DTOs côté `source_publications`.
 
-Vues immuables (frozen) produites par les reads SQL et consommées par la couche domaine (correction, agrégation canonique). Elles portent les champs de `source_publications` que ces consommateurs lisent réellement, **plus** des champs joints depuis d'autres tables (ex. `journals`) — c'est de la dénormalisation côté lecture, distincte de l'agrégat d'écriture `SourcePublication` qui, lui, n'expose que les colonnes propres à `source_publications`.
+Vues immuables (frozen) produites par les reads SQL et consommées par la couche domaine (correction, agrégation canonique). Elles portent les champs de `source_publications` que ces consommateurs lisent réellement, **plus** des champs joints depuis d'autres tables (ex. `journals`) — c'est de la dénormalisation côté lecture.
 
-Séparer la vue de l'agrégat préserve la pureté de l'agrégat (l'écriture ne porte pas de champs joints qui ne lui appartiennent pas) et factorise le « contrat de lecture » exigé par `effective_metadata` et `_refresh_aggregate`.
+Ces vues factorisent le « contrat de lecture » exigé par `effective_metadata` et `_refresh_aggregate`.
 """
 
 from dataclasses import dataclass

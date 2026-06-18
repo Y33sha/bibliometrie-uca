@@ -4,7 +4,6 @@ Contenu, organisé par concept métier :
 
 - **Agrégats** (entités avec identité + comportement, invariants métier) :
   - `Publication` (+ entité fille `Authorship`) — `domain/publications/`
-  - `SourcePublication` (+ entité fille `SourceAuthorship`) — `domain/source_publications/`
   - `Person` — `domain/persons/`
   - `PersonIdentifier` (agrégat séparé, identité naturelle `(id_type, id_value)`) — `domain/persons/`
   - `Structure` — `domain/structures/`

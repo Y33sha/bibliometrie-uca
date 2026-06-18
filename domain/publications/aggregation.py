@@ -1,6 +1,6 @@
 """Agrégation cross-sources de l'aggregate Publication.
 
-Encapsule les règles d'agrégation : à partir des `SourcePublication` attachées à une publication canonique, calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de `SourcePublication` (lecture multi-sources) → `Publication` (vue canonique).
+Encapsule les règles d'agrégation : à partir des `source_publications` attachées à une publication canonique (lues via `SourcePublicationWithJournalView`), calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de la lecture multi-sources → `Publication` (vue canonique).
 
 Règles d'agrégation par type de champ :
 - **Scalaires nullable** (`title`, `doi`, `doc_type`, `pub_year`, `journal_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`.

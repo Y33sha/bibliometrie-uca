@@ -336,11 +336,32 @@ class TestFirstDocTypeArbitration:
     nomenclatures sources brutes."""
 
     @staticmethod
-    def _src(source: str, doc_type: str | None) -> "SourcePublication":  # noqa: F821
-        from domain.source_publications.source_publication import SourcePublication
+    def _src(source: str, doc_type: str | None) -> "SourcePublicationWithJournalView":  # noqa: F821
+        from domain.source_publications.views import SourcePublicationWithJournalView
 
-        return SourcePublication(
-            id=None, source=source, source_id="x", title="x", doc_type=doc_type
+        return SourcePublicationWithJournalView(
+            id=None,
+            source=source,
+            source_id="x",
+            title="x",
+            pub_year=None,
+            doc_type=doc_type,
+            doi=None,
+            journal_id=None,
+            container_title=None,
+            language=None,
+            oa_status=None,
+            is_retracted=None,
+            abstract=None,
+            countries=(),
+            keywords=(),
+            urls=(),
+            topics=None,
+            biblio=None,
+            meta=None,
+            journal_type=None,
+            oa_model=None,
+            apc_amount=None,
         )
 
     def _arbitrate(self):

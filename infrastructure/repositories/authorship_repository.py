@@ -40,7 +40,7 @@ def _authorship_from_row(row: _AuthorshipRow) -> Authorship:
 
 
 class PgAuthorshipRepository:
-    """Accès PostgreSQL sync aux agrégats Authorship et SourceAuthorship."""
+    """Accès PostgreSQL sync en lecture aux authorships canoniques."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
