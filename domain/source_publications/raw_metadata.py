@@ -13,9 +13,12 @@ des corrections (`domain/source_publications/correction.py`).
 """
 
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
-from domain.source_publications.source_publication import SourcePublication
 from domain.types import JsonValue
+
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
 
 RAW = "raw"
 CORRECTED_BY = "corrected_by"
@@ -35,10 +38,10 @@ def raw_value[T](raw_metadata: dict[str, JsonValue] | None, field: str, current:
     return current
 
 
-def hydrate_raw_view(
-    view: SourcePublication,
+def hydrate_raw_view[ViewT: DataclassInstance](
+    view: ViewT,
     raw_metadata: dict[str, JsonValue] | None,
-) -> SourcePublication:
+) -> ViewT:
     """Reconstruit la vue aux valeurs **source d'origine** (avant correction), en
     réinjectant chaque champ stashé dans `raw_metadata`. Les champs jamais corrigés
     gardent leur valeur courante. Inverse de la persistance des corrections.

@@ -359,9 +359,6 @@ class TestFirstDocTypeArbitration:
             topics=None,
             biblio=None,
             meta=None,
-            journal_type=None,
-            oa_model=None,
-            apc_amount=None,
         )
 
     def _arbitrate(self):

@@ -8,7 +8,6 @@ intriquées en casts enum (oa_type, doc_type, source_type) et opérations
 array pour gagner à passer par MetaData.
 """
 
-from decimal import Decimal
 from typing import Any, NamedTuple
 
 from sqlalchemy import Connection, text
@@ -20,7 +19,7 @@ from domain.source_publications.source_publication import SourcePublication
 
 
 class _SourcePublicationViewRow(NamedTuple):
-    """Projection SQL `get_source_publications` : colonnes de `source_publications` consommées par la correction (`effective_metadata`) et l'agrégation (`refresh_from_sources` côté domain) **plus** les champs joints depuis `journals` qui alimentent les règles journal-dépendantes."""
+    """Projection SQL `get_source_publications` : colonnes de `source_publications` consommées par l'agrégation canonique (`refresh_from_sources` côté domain)."""
 
     id: int
     source: str
@@ -41,9 +40,6 @@ class _SourcePublicationViewRow(NamedTuple):
     topics: dict[str, Any] | None
     biblio: dict[str, Any] | None
     meta: dict[str, Any] | None
-    journal_type: str | None
-    oa_model: str | None
-    apc_amount: Decimal | None
 
 
 def _view_from_row(row: _SourcePublicationViewRow) -> SourcePublication:
@@ -68,9 +64,6 @@ def _view_from_row(row: _SourcePublicationViewRow) -> SourcePublication:
         topics=row.topics,
         biblio=row.biblio,
         meta=row.meta,
-        journal_type=row.journal_type,
-        oa_model=row.oa_model,
-        apc_amount=row.apc_amount,
     )
 
 
@@ -259,9 +252,7 @@ class PgPublicationRepository:
     # ── Agrégation depuis source_publications ──────────────────────
 
     def get_source_publications(self, pub_id: int) -> list[SourcePublication]:
-        """Retourne les vues `SourcePublication` attachées à une publication canonique, enrichies par un LEFT JOIN sur `journals` pour porter les champs consommés par les règles journal-dépendantes (`journal_type`, `oa_model`, `apc_amount`).
-
-        Sortie consommée par la couche domaine pour la correction (`effective_metadata`) puis l'agrégation (`refresh_from_sources`) — d'où la dénormalisation des champs journal en lecture (cf. `domain/source_publications/source_publication.py`).
+        """Retourne les `SourcePublication` attachées à une publication canonique, pour l'agrégation canonique (`refresh_from_sources`).
 
         Le `doi` projeté est la colonne nue : la substitution Zenodo (concept au lieu de la version) est déjà persistée par `metadata_correction`, donc l'agrégation promeut le concept comme DOI canonique sans recalcul ici.
         """
@@ -273,10 +264,8 @@ class PgPublicationRepository:
                        sp.journal_id, sp.container_title, sp.language,
                        sp.oa_status::text AS oa_status, sp.is_retracted, sp.abstract,
                        sp.countries, sp.urls, sp.keywords,
-                       sp.topics, sp.biblio, sp.meta,
-                       j.journal_type::text AS journal_type, j.oa_model, j.apc_amount
+                       sp.topics, sp.biblio, sp.meta
                 FROM source_publications sp
-                LEFT JOIN journals j ON j.id = sp.journal_id
                 WHERE sp.publication_id = :id
             """),
             {"id": pub_id},

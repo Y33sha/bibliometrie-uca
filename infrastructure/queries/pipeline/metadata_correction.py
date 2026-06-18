@@ -12,9 +12,9 @@ from application.ports.pipeline.metadata_correction import (
     DoiClusterRow,
     DoiCorrectionUpdate,
     MetadataCorrectionQueries,
-    SourcePublicationForCorrection,
     ZenodoConceptRow,
 )
+from domain.source_publications.correction import SourcePublicationForCorrection
 
 # Projection partagée : SP + champs joints `journals` (règles journal-dépendantes)
 # + `raw_metadata` (reconstruction du brut). Le `WHERE` est ajouté par chaque variante.

@@ -31,16 +31,15 @@ from sqlalchemy import Connection
 from application.ports.pipeline.metadata_correction import (
     CorrectionUpdate,
     MetadataCorrectionQueries,
-    SourcePublicationForCorrection,
 )
 from domain.source_publications.correction import (
     MetadataCorrectionRule,
+    SourcePublicationForCorrection,
     effective_metadata,
     strip_dissertation_keys,
 )
 from domain.source_publications.doc_types import map_doc_type
 from domain.source_publications.raw_metadata import hydrate_raw_view, raw_value, stash_entry
-from domain.source_publications.source_publication import SourcePublication
 
 # Champs corrigeables gérés par la sous-étape unaire (clés de `raw_metadata` qu'elle (re)pose).
 # Les autres (ex. `doi`, géré par la sous-étape relationnelle) sont préservées.
@@ -51,36 +50,6 @@ _UNARY_FIELDS = ("doc_type", "journal_id", "oa_status", "external_ids")
 DOC_TYPE_MAP_MARKER = "DOC_TYPE_MAP"
 
 _PERSIST_BATCH = 5000
-
-
-def _view_from_row(row: SourcePublicationForCorrection) -> SourcePublication:
-    """Adapte la projection `SourcePublicationForCorrection` en `SourcePublication`,
-    aux valeurs **courantes** des colonnes (potentiellement déjà corrigées). `hydrate_raw_view`
-    reconstruit ensuite le brut source à partir de `raw_metadata`."""
-    return SourcePublication(
-        id=row.id,
-        source=row.source,
-        source_id=row.source_id,
-        title=row.title,
-        pub_year=row.pub_year,
-        doc_type=row.doc_type,
-        doi=row.doi,
-        journal_id=row.journal_id,
-        container_title=row.container_title,
-        language=row.language,
-        oa_status=row.oa_status,
-        is_retracted=None,
-        abstract=None,
-        countries=(),
-        keywords=(),
-        urls=tuple(row.urls or ()),
-        topics=None,
-        biblio=None,
-        meta=None,
-        journal_type=row.journal_type,
-        oa_model=row.oa_model,
-        apc_amount=row.apc_amount,
-    )
 
 
 def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | None:
@@ -95,7 +64,7 @@ def compute_update(row: SourcePublicationForCorrection) -> CorrectionUpdate | No
 
     Pure : ne fait pas d'I/O. Préserve les clés de `raw_metadata` hors `_UNARY_FIELDS`
     (la sous-étape relationnelle gère `doi`)."""
-    raw = hydrate_raw_view(_view_from_row(row), row.raw_metadata)
+    raw = hydrate_raw_view(row, row.raw_metadata)
 
     # doc_type : mapping d'abord (None laissé tel quel — pas de représentation à traduire),
     # puis correction sur la valeur canonique.

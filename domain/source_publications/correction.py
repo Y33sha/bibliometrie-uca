@@ -1,6 +1,6 @@
 """Correction des métadonnées canoniques.
 
-Expose `effective_metadata`, fonction pure qui applique des règles de correction sur les valeurs d'une publication source, à partir d'une vue de lecture `SourcePublication` qui porte les champs de la SP **plus** des champs joints depuis `journals` (`journal_type`, `oa_model`, `apc_amount`). C'est cette vue qui rend la fonction capable d'appliquer aussi bien les règles SP-intrinsèques (URL) que les règles journal-dépendantes, sans threader de repo.
+Expose `effective_metadata`, fonction pure qui applique des règles de correction sur les valeurs d'une publication source, à partir de `SourcePublicationForCorrection` — sa vue d'entrée, qui porte les champs lus **plus** des champs joints depuis `journals` (`journal_type`, `oa_model`, `apc_amount`). C'est ce qui rend la fonction capable d'appliquer aussi bien les règles SP-intrinsèques (URL) que les règles journal-dépendantes, sans threader de repo.
 
 Distincte de l'agrégation (`aggregation.py` arbitre entre sources) et du normalizer (qui ne mute pas `source_publications`, trace inviolable des sources). Les corrections s'appliquent sur le canonique via `refresh_from_sources` et sur la SP entrante au moment du matching, pour que la dédup matche sur les valeurs corrigées.
 
@@ -14,13 +14,49 @@ Cascade entre champs (ordre des dépendances) : `journal_id` → `doc_type` → 
 """
 
 import re
+from dataclasses import dataclass
+from decimal import Decimal
 from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple, TypedDict
 
 from domain.normalize import normalize_text
-from domain.source_publications.source_publication import SourcePublication
 from domain.types import JsonValue
+
+
+@dataclass(frozen=True, slots=True)
+class SourcePublicationForCorrection:
+    """Vue d'une `source_publications` pour la correction de métadonnées.
+
+    Contrat d'entrée de `effective_metadata` (et `hydrate_raw_view`) : les champs
+    lus par les règles — **valeurs courantes** des colonnes (potentiellement déjà
+    corrigées d'un run précédent) plus les champs joints de `journals`
+    (`journal_type`, `oa_model`, `apc_amount`) — et `raw_metadata`, qui reconstruit
+    le brut normalisé d'origine (`raw_metadata->'<champ>'->>'raw'` prime sur la
+    colonne). Sous-ensemble dédié : l'entité `SourcePublication` complète n'est pas
+    requise (la correction ne porte aucun invariant).
+
+    Frozen : `hydrate_raw_view` et la cascade produisent une nouvelle vue via
+    `dataclasses.replace`, jamais une mutation en place.
+    """
+
+    id: int
+    source: str
+    source_id: str
+    title: str
+    pub_year: int | None
+    doc_type: str | None
+    doi: str | None
+    journal_id: int | None
+    oa_status: str | None
+    container_title: str | None
+    language: str | None
+    urls: list[str] | None
+    external_ids: dict[str, JsonValue]
+    journal_type: str | None
+    oa_model: str | None
+    apc_amount: Decimal | None
+    raw_metadata: dict[str, JsonValue]
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -259,7 +295,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
 # ── Moteur ──────────────────────────────────────────────────────────────
 
 
-def _check_predicate(sp: SourcePublication, key: str, value: object) -> bool:
+def _check_predicate(sp: SourcePublicationForCorrection, key: str, value: object) -> bool:
     """Évalue un prédicat (paire clé/valeur de `applies_to`) sur la SP. Voir `_AppliesTo` pour la sémantique de chaque clé."""
     if key == "doc_type":
         doc_type = (sp.doc_type or "").lower()
@@ -270,7 +306,7 @@ def _check_predicate(sp: SourcePublication, key: str, value: object) -> bool:
         return sp.journal_type == value
     if key == "url_contains":
         assert isinstance(value, str)
-        return any(value in (u or "") for u in sp.urls)
+        return any(value in (u or "") for u in (sp.urls or ()))
     if key == "doi_contains":
         assert isinstance(value, str)
         return value in (sp.doi or "")
@@ -289,12 +325,12 @@ def _check_predicate(sp: SourcePublication, key: str, value: object) -> bool:
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 
-def _rule_applies(sp: SourcePublication, rule_def: _RuleDefinition) -> bool:
+def _rule_applies(sp: SourcePublicationForCorrection, rule_def: _RuleDefinition) -> bool:
     """True si tous les prédicats `applies_to` de la règle sont vérifiés (AND)."""
     return all(_check_predicate(sp, k, v) for k, v in rule_def["applies_to"].items())
 
 
-def _correct_field(sp: SourcePublication, field: str) -> Correction[str] | None:
+def _correct_field(sp: SourcePublicationForCorrection, field: str) -> Correction[str] | None:
     """Applique les règles `_RULES` dans l'ordre ; première qui corrige `field` et dont les prédicats matchent gagne."""
     for rule_id, rule_def in _RULES.items():
         if field not in rule_def["applies_correction"]:
@@ -304,8 +340,8 @@ def _correct_field(sp: SourcePublication, field: str) -> Correction[str] | None:
     return None
 
 
-def effective_metadata(sp: SourcePublication) -> CorrectedFields:
-    """Applique la cascade de corrections sur les champs d'une `SourcePublication`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
+def effective_metadata(sp: SourcePublicationForCorrection) -> CorrectedFields:
+    """Applique la cascade de corrections sur les champs d'une `SourcePublicationForCorrection`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
 
     Fonction pure : aucune I/O, aucun effet de bord. Les données journal/publisher consommées par les règles arrivent par la vue (champs joints à la lecture), pas via des entités passées en paramètre — c'est ce qui permet à la fonction de servir aussi bien la dédup (sur la SP entrante) que le refresh (sur les sources d'une publication).
 

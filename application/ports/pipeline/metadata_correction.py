@@ -8,40 +8,12 @@ déjà corrigées. Sous-étape unaire (per-record) ici ; la sous-étape relation
 (group-by-DOI) viendra en Phase 2.
 """
 
-from decimal import Decimal
 from typing import NamedTuple, Protocol
 
 from sqlalchemy import Connection
 
+from domain.source_publications.correction import SourcePublicationForCorrection
 from domain.types import JsonValue
-
-
-class SourcePublicationForCorrection(NamedTuple):
-    """Projection d'une `source_publications` pour la correction unaire.
-
-    Porte les champs lus par `effective_metadata` — **valeurs courantes** des
-    colonnes (potentiellement déjà corrigées d'un run précédent) plus les champs
-    joints de `journals` — et `raw_metadata`, qui permet de reconstruire le brut
-    normalisé d'origine (`raw_metadata->'<champ>'->>'raw'` prime sur la colonne).
-    """
-
-    id: int
-    source: str
-    source_id: str
-    title: str
-    pub_year: int | None
-    doc_type: str | None
-    doi: str | None
-    journal_id: int | None
-    oa_status: str | None
-    container_title: str | None
-    language: str | None
-    urls: list[str] | None
-    external_ids: dict[str, JsonValue]
-    journal_type: str | None
-    oa_model: str | None
-    apc_amount: Decimal | None
-    raw_metadata: dict[str, JsonValue]
 
 
 class CorrectionUpdate(NamedTuple):

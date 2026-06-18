@@ -1,7 +1,7 @@
 """Tests purs de `compute_update` : mapping source→canonique puis correction unaire idempotente."""
 
 from application.pipeline.metadata_correction.correct_unary import compute_update
-from application.ports.pipeline.metadata_correction import SourcePublicationForCorrection
+from domain.source_publications.correction import SourcePublicationForCorrection
 
 
 def _sp(**overrides: object) -> SourcePublicationForCorrection:
