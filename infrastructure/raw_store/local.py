@@ -43,6 +43,14 @@ class LocalFileRawStore:
     def exists(self, source: str, source_id: str) -> bool:
         return self._path(source, source_id).is_file()
 
+    def delete(self, source: str, source_id: str) -> bool:
+        path = self._path(source, source_id)
+        try:
+            path.unlink()
+            return True
+        except FileNotFoundError:
+            return False
+
     def iter_keys(self, source: str) -> Iterator[str]:
         source_dir = self._root / source
         if not source_dir.is_dir():

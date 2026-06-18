@@ -28,5 +28,11 @@ class RawStore(Protocol):
     def exists(self, source: str, source_id: str) -> bool:
         """True si un payload est stocké pour `(source, source_id)`."""
 
+    def delete(self, source: str, source_id: str) -> bool:
+        """Supprime le payload de `(source, source_id)`. True si un payload existait.
+
+        Idempotent : une clé absente retourne False sans lever.
+        """
+
     def iter_keys(self, source: str) -> Iterator[str]:
         """Itère les `source_id` (clés logiques décodées) stockés pour `source`."""
