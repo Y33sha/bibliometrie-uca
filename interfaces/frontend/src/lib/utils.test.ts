@@ -65,6 +65,13 @@ describe('sanitizeTitle', () => {
 		expect(result).toContain('Gagné');
 	});
 
+	it('décode le markup simple-encodé (&lt;sub&gt; → <sub>)', () => {
+		const result = sanitizeTitle('Fe&lt;sub&gt;3&lt;/sub&gt;O&lt;sub&gt;4&lt;/sub&gt;');
+		expect(result).toContain('<sub>3</sub>');
+		expect(result).not.toContain('&lt;');
+		expect(result).not.toContain('&amp;');
+	});
+
 	it('ne décode pas un &amp; isolé légitime', () => {
 		// "Smith & Jones" stocké comme "Smith &amp; Jones" (encodage simple)
 		// ne doit PAS être décodé : le & affiché vient de l'échappement final.

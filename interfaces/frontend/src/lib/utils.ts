@@ -98,6 +98,7 @@ function sanitizeMathML(s: string): string {
 const HAS_LATEX = /\$\$[\s\S]+?\$\$|\$[^$]+?\$/;
 const HAS_MATHML = /<\/?mml:/;
 const DOUBLE_ENCODED = /&amp;(lt|gt|amp|quot|apos|#\d+|#x[0-9a-f]+);/i;
+const SINGLE_ENCODED_TAG = /&(lt|gt);/i;
 
 const ENTITY_MAP: Record<string, string> = {
 	amp: '&', lt: '<', gt: '>', quot: '"', apos: "'"
@@ -119,20 +120,24 @@ function decodeEntitiesOnce(s: string): string {
 	);
 }
 
-/* Some titres arrivent avec un encodage HTML appliqué deux fois
- * (ex. "&amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt;" pour "<i>Candida</i>").
- * On détecte ce cas (présence de &amp; immédiatement suivi d'une entité
- * connue) et on décode deux niveaux pour retomber sur du HTML normal,
- * que la suite du pipeline sanitize comme d'habitude. */
-function unwrapDoubleEncoded(s: string): string {
-	if (!DOUBLE_ENCODED.test(s)) return s;
-	return decodeEntitiesOnce(decodeEntitiesOnce(s));
+/* Décode les entités HTML d'un titre, en deux temps complémentaires :
+ *  - double-encodage (`&amp;lt;`, `&amp;#233;`…) → deux niveaux (markup ET
+ *    entités numériques double-échappées) ;
+ *  - markup simple-encodé (`&lt;sub&gt;` → `<sub>`) → un niveau, sur les seuls
+ *    délimiteurs de balise.
+ * Un `&amp;` / `&#NNN;` isolé légitime ("Smith &amp; Jones") n'a pas de
+ * délimiteur de balise et reste inchangé. La suite sanitize le markup brut. */
+function unwrapEntityEncodedTags(s: string): string {
+	let out = s;
+	if (DOUBLE_ENCODED.test(out)) out = decodeEntitiesOnce(decodeEntitiesOnce(out));
+	if (SINGLE_ENCODED_TAG.test(out)) out = decodeEntitiesOnce(out);
+	return out;
 }
 
 export function sanitizeTitle(s: string | null | undefined): string {
 	if (!s) return '';
 
-	const input = unwrapDoubleEncoded(s);
+	const input = unwrapEntityEncodedTags(s);
 
 	if (HAS_LATEX.test(input)) return renderLatex(input);
 	if (HAS_MATHML.test(input) || /<\/?[a-z]/i.test(input)) return sanitizeMathML(input);
