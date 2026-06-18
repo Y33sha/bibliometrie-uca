@@ -36,7 +36,7 @@ https://doaj.org/ — Directory of Open Access Journals
 
 Documentation API : https://doaj.org/api/v3/docs
 
-Source d'enrichissement pour les revues, consultée par ISSN. Sa donnée canonique : « cette revue est-elle un journal open access certifié DOAJ, et à quelles conditions ? ». Consommée par le sub-step `enrich_journals_from_doaj` de la phase [`publishers_journals`](../pipeline/04-publishers-journals.md).
+Source d'enrichissement pour les revues, consultée par ISSN. Sa donnée canonique : « cette revue est-elle un journal open access certifié DOAJ, et à quelles conditions ? ». Consommée par le sub-step `enrich_journals_from_doaj` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md).
 
 ### API utilisée
 
@@ -90,7 +90,7 @@ https://ror.org/ — Research Organization Registry
 
 Documentation API : https://ror.readme.io/
 
-Source de typage canonique pour les organismes éditeurs. Consommée par le sub-step `enrich_publishers_from_ror` de la phase [`publishers_journals`](../pipeline/04-publishers-journals.md) pour déduire `publishers.publisher_type` à partir du champ `types` ROR.
+Source de typage canonique pour les organismes éditeurs. Consommée par le sub-step `enrich_publishers_from_ror` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md) pour déduire `publishers.publisher_type` à partir du champ `types` ROR.
 
 ### API utilisée
 

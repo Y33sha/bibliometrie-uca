@@ -41,7 +41,7 @@ Recalculer tout le graphe à chaque run serait inutilement coûteux. Une `source
 
 ## Rafraîchissement des métadonnées canoniques
 
-Une fois les rattachements posés, les métadonnées de chaque publication touchée sont recalculées par agrégation de ses `source_publications` (DOI promu selon la priorité des sources, statut open access, résumé, références bibliographiques, etc.). Les publications vidées de toutes leurs `source_publications` sont supprimées.
+Une fois les rattachements posés, les métadonnées de chaque publication touchée sont recalculées par agrégation de ses `source_publications` (DOI promu selon la priorité des sources, statut open access, résumé, références bibliographiques, etc.). Les publications vidées de toutes leurs `source_publications` sont supprimées. Enfin, le décompte de publications par adresse (`addresses.pub_count`) est recalculé pour refléter les créations, fusions et scissions.
 
 > **Évolutions envisagées**
 > - Élargir le rapprochement par métadonnées aux cas plus lâches qui exigent une confirmation supplémentaire pour rester fiables.

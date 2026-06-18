@@ -14,7 +14,7 @@ Cette phase interroge l'API Zenodo pour chaque `source_publication` Zenodo et me
 
 ## Corrections de métadonnées (phase `metadata_correction`)
 
-Cette phase tourne après [`publishers_journals`](04-publishers-journals.md) — les revues sont typées, donc les règles dépendantes de la revue disposent de données fraîches — et avant le rattachement des publications, qui lit les colonnes corrigées. Trois sous-étapes :
+Cette phase tourne après [`publishers_journals`](05-publishers-journals.md) — les revues sont typées, donc les règles dépendantes de la revue disposent de données fraîches — et avant le rattachement des publications, qui lit les colonnes corrigées. Trois sous-étapes :
 
 1. **Par enregistrement** : mappe le type de document de la source vers le vocabulaire canonique, puis applique les règles de correction — propres à l'enregistrement ou dépendantes de la revue (par exemple un document de type « thèse » paru dans une revue est reclassé en article).
 2. **Substitution Zenodo** : remplace le DOI de version par le concept DOI mis en cache à la phase précédente, pour que concept et versions convergent vers une seule publication.

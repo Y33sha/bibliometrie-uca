@@ -9,22 +9,23 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 - [Moissonnage initial](02-extract.md) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
 - [Imports croisés](02-extract.md#cross-imports) : deux mécanismes de rattrapage cross-source enchaînés — (1) docs HAL manquants repérés par hal-id ou NNT dans d'autres sources, (2) recherche par DOI des records absents d'une source mais présents dans une autre.
 - [Refresh & disparitions](02-extract.md#refresh-stale) : refetch des documents à `last_seen_at` ancien (> 90 j) — rafraîchit les métadonnées vieillissantes et marque (`disappeared_at`) ceux qui ont disparu de leur source.
+- [Works OpenAlex tronqués](02-extract.md#refetch-truncated) : re-télécharge les works OpenAlex dont la liste d'auteurs dépasse le plafond de 100 de l'API.
 
 ## Normalisation
 
 - [Normalisation](03-normalize.md) : transforme les données brutes (*staging*) en tables structurées *par source* (`source_publications`, `source_authorships`). Crée également les `addresses` et leurs liens `source_authorship_addresses`, ainsi que les entités `publishers` et `journals` lorsque les sources les mentionnent.
 
-## Enrichissement des référentiels publishers et journals
-
-- [Publishers & journals](04-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), montant d'APC et type des revues (sources: OpenAlex Sources, DOAJ), pays et ROR des éditeurs (sources: OpenAlex Publishers, fallback Crossref Members), type d'éditeur  (commercial, académique, société savante…) (source: ROR).
-
 ## Repérage des affiliations
 
-- [Affiliations](05-affiliations.md) : résout les liens adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` sur les [authorships](../glossaire.md#authorship) sources.
+- [Affiliations](04-affiliations.md) : résout les liens adresses → structures via les formes de noms (`structure_name_forms`), puis renseigne `in_perimeter` sur les [authorships](../glossaire.md#authorship) sources.
+
+## Enrichissement des référentiels publishers et journals
+
+- [Publishers & journals](05-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), montant d'APC et type des revues (sources: OpenAlex Sources, DOAJ), pays et ROR des éditeurs (sources: OpenAlex Publishers, fallback Crossref Members), type d'éditeur  (commercial, académique, société savante…) (source: ROR).
 
 ## Correction des métadonnées
 
-- [Corrections de métadonnées](06-corrections-metadonnees.md) : prépare les `source_publications` avant leur rattachement, en posant sur leurs colonnes les valeurs corrigées sur lesquelles s'appuiera le matching. Résout d'abord le concept DOI des dépôts Zenodo (un dépôt versionné doit compter pour un seul document), puis applique les corrections de métadonnées — par enregistrement (champs erronés, identifiants à neutraliser) et par grappe de documents partageant une clé.
+- [Corrections de métadonnées](06-metadata-correction.md) : prépare les `source_publications` avant leur rattachement, en posant sur leurs colonnes les valeurs corrigées sur lesquelles s'appuiera le matching. Résout d'abord le concept DOI des dépôts Zenodo (un dépôt versionné doit compter pour un seul document), puis applique les corrections de métadonnées — par enregistrement (champs erronés, identifiants à neutraliser) et par grappe de documents partageant une clé.
 
 ## Création/rattachement des publications
 

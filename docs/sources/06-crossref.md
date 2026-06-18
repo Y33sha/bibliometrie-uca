@@ -16,7 +16,7 @@ Le pipeline n'interroge CrossRef que pour les DOI déjà découverts par les aut
 - Limites du polite pool CrossRef : 10 req/s + 3 concurrentes. L'adapter colle exactement à ces limites (`max_concurrent=3`, `request_delay_s=0.1`)
 - Les 404 sont matérialisés dans `staging` avec `not_found=TRUE` + `processed=TRUE` pour ne pas être réinterrogés à chaque run
 
-**Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identification du Crossref Member (= éditeur déposant) associé à un préfixe DOI. Consommée par le sub-step `resolve_doi_prefixes` de la phase [`publishers_journals`](../pipeline/04-publishers-journals.md), qui peuple la table `doi_prefixes` (préfixe → `crossref_member_id` + nom du déposant).
+**Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identification du Crossref Member (= éditeur déposant) associé à un préfixe DOI. Consommée par le sub-step `resolve_doi_prefixes` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui peuple la table `doi_prefixes` (préfixe → `crossref_member_id` + nom du déposant).
 
 **Members API** (`https://api.crossref.org/members/{id}`) — récupération du record complet d'un Crossref Member (notamment son champ `location` au format `"City, State, Country"`). Consommée par le sub-step `enrich_publishers_from_crossref_members` (fallback `publishers.country` quand OpenAlex Publishers n'a pas matché). Couverture mesurée à l'audit : ~95 % des publishers candidats gagnent un pays via ce fallback.
 
