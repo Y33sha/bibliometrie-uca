@@ -3,12 +3,12 @@
 from domain.source_publications.correction import (
     CorrectedFields,
     MetadataCorrectionRule,
+    SourcePublicationForCorrection,
     effective_metadata,
 )
-from domain.source_publications.source_publication import SourcePublication
 
 
-def _view(**overrides: object) -> SourcePublication:
+def _view(**overrides: object) -> SourcePublicationForCorrection:
     defaults: dict[str, object] = {
         "id": 1,
         "source": "openalex",
@@ -18,23 +18,18 @@ def _view(**overrides: object) -> SourcePublication:
         "doc_type": None,
         "doi": None,
         "journal_id": None,
+        "oa_status": None,
         "container_title": None,
         "language": None,
-        "oa_status": None,
-        "is_retracted": None,
-        "abstract": None,
-        "countries": (),
-        "keywords": (),
         "urls": (),
-        "topics": None,
-        "biblio": None,
-        "meta": None,
+        "external_ids": {},
         "journal_type": None,
         "oa_model": None,
         "apc_amount": None,
+        "raw_metadata": {},
     }
     defaults.update(overrides)
-    return SourcePublication(**defaults)  # type: ignore[arg-type]
+    return SourcePublicationForCorrection(**defaults)  # type: ignore[arg-type]
 
 
 class TestCorrectedFields:
