@@ -135,6 +135,18 @@ class TestCleanPublicationTitle:
         """Entités hexadécimales double-encodées (ex: &amp;#xE9; → é)."""
         assert clean_publication_title("Gagn&amp;#xE9; et al.") == "Gagné et al."
 
+    def test_decodes_single_encoded_html_markup(self):
+        """Cas le plus fréquent du stock : markup simple-échappé `&lt;sub&gt;`."""
+        result = clean_publication_title(
+            "&lt;p&gt;Fe&lt;sub&gt;3&lt;/sub&gt;O&lt;sub&gt;4&lt;/sub&gt; nanoparticles&lt;/p&gt;"
+        )
+        assert result == "<p>Fe<sub>3</sub>O<sub>4</sub> nanoparticles</p>"
+
+    def test_single_encoded_markup_decodes_content_amp_alongside(self):
+        """Markup simple-échappé + `&amp;` de contenu : le décodage du markup
+        emporte le `&amp;` (rendu correct à l'affichage)."""
+        assert clean_publication_title("&lt;i&gt;A &amp; B&lt;/i&gt;") == "<i>A & B</i>"
+
     def test_preserves_legitimate_single_amp(self):
         """Un &amp; isolé (encodage simple légitime) ne doit pas être touché —
         sinon on sur-décode "Smith & Jones" et on casse l'affichage."""
