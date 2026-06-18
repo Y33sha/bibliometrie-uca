@@ -61,6 +61,23 @@ class TestLocalFileRawStore:
         store = LocalFileRawStore(tmp_path)
         assert list(store.iter_keys("hal")) == []
 
+    def test_delete_removes_payload(self, tmp_path):
+        store = LocalFileRawStore(tmp_path)
+        store.put("hal", "hal-1", b"{}")
+        assert store.delete("hal", "hal-1") is True
+        assert store.exists("hal", "hal-1") is False
+
+    def test_delete_absent_is_idempotent(self, tmp_path):
+        store = LocalFileRawStore(tmp_path)
+        assert store.delete("hal", "absent") is False
+
+    def test_delete_unsafe_source_id(self, tmp_path):
+        """La suppression décode la même clé que `put` (ids ScanR avec `/`)."""
+        store = LocalFileRawStore(tmp_path)
+        store.put("scanr", "doi10.1002/abc", b"{}")
+        assert store.delete("scanr", "doi10.1002/abc") is True
+        assert store.exists("scanr", "doi10.1002/abc") is False
+
 
 class TestFactory:
     def test_file_url_builds_local_store(self, tmp_path):
