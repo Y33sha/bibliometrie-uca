@@ -60,7 +60,7 @@ Deux cas de figure:
 | WoS | `daisng_id` | ⚠️ entité algorithmique non fiable | `orcid` (peu fiable), `researcher_id` |
 | CrossRef | rien | ❌ | `orcid` (fiable, article-level) |
 
-Vu l'hétérogénéité des entités personnes selon les sources, il a été décidé de ne pas maintenir de table `source_persons`. Les informations récupérées depuis les sources (forme de nom, identifiants éventuels) sont portées par `source_authorships` (`raw_author_name` pour traçabilité, `author_name_normalized` pour matching par nom, `source_identifiers` JSONB pour les identifiants persistants associés (ORCID, IdRef, idHAL)). La déduplication / création des personnes canoniques se fait dans la [phase `persons`](../pipeline/07-persons.md) du pipeline à partir de ces éléments.
+Vu l'hétérogénéité des entités personnes selon les sources, il a été décidé de ne pas maintenir de table `source_persons`. Les informations récupérées depuis les sources (forme de nom, identifiants éventuels) sont portées par `source_authorships` (`raw_author_name` pour traçabilité, `author_name_normalized` pour matching par nom, `source_identifiers` JSONB pour les identifiants persistants associés (ORCID, IdRef, idHAL)). La déduplication / création des personnes canoniques se fait dans la [phase `persons`](../pipeline/08-persons.md) du pipeline à partir de ces éléments.
 
 ## Sources complémentaires
 

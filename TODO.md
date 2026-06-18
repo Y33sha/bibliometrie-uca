@@ -1,6 +1,7 @@
 # A régler avant transmission
 ## Pipeline de traitement
-* [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / pipeline:   51/181... (51 mis à jour, 0 déjà complets) => toujours 0 déjà complet: calculé comment? / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => "rattachement" en phase normalize = vestige / cross-import: "Échec après 3 tentatives rec 1 / 429 Too Many Requests rec 1 — attente 4.0s (tentative 1/3)" => toujours préciser la source qui échoue
+* [ ] Faire un audit complet du logging, j'en ai marre des logs incompréhensibles ("384 déjà en staging (UPDATE SQL pour les tagger)" => WTF?) / "pipeline: CrossRef 10.1175/jas-d-25-0021.s1 sans titre ou année — pas de rattachement possible, skip" => "rattachement" en phase normalize = vestige / cross-import: "Échec après 3 tentatives rec 1 / 429 Too Many Requests rec 1 — attente 4.0s (tentative 1/3)" => toujours préciser la source qui échoue
+* [ ] peut-on ajouter des commandes clavier? (abandonner phase, passer à la suivante)
 ### Extraction
 * [ ] extraction par ORCID: vérifier pertinence/faisabilité (tester différentes sources, auditer le gain)
 * [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
@@ -23,7 +24,6 @@
 * [ ] documenter les process incrémentaux vs recalcul complet et les arbitrages performance vs risque de drift; chaque process incrémental doit avoir un mode --full-rerun
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
-* [ ] beaucoup d'imports ScanR sont rejetés en phase "affiliations" => comprendre pourquoi. Explication: identifiant pour l'INP capture bien au-delà (siren 130021918:	224 185 /  paysage S8ntZ	62 726 / uai 0632033T	11 909 / ror 001f39w38	10 109) => remplacer siren par "paysage" voire dropper l'interrogation INP (voir si INP est un sous-ensemble de UCA)
 * [ ] années aberrantes dans les sources (2030): mettre null si > current_year?
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 ## Explorer autres sources possibles
