@@ -15,29 +15,35 @@ Usage:
     python run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
 
 Phases (dans l'ordre d'execution):
-    extract        Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
-    cross_imports  Rattrapage cross-source : (1) docs HAL manquants par hal-id/NNT
-                   (auto-borné, tourne toujours), puis (2) par DOI dans chaque source
-                   cible (auto-borné par le backoff doi_lookups)
-    refresh_stale  Refetch des rows à last_seen_at ancien (> STALE_REFRESH_AFTER_DAYS) :
-                   trouvé -> bump last_seen_at + refresh ; 404 / sans DOI -> disappeared_at.
-                   Marque seulement, aucun effet aval.
-    normalize      Normalisation staging -> tables sources (source_publications,
-                   source_authorships). Rattachement aux publications existantes par DOI/NNT/
-                   HAL-ID, mais PAS de creation de publications. Inclut enrichissement
-                   structures HAL et extraction des identifiants ORCID/IdRef depuis le TEI HAL.
-                   Crée les adresses et liens source_authorship_addresses.
-                   Vide le raw_data du staging apres traitement + VACUUM.
-    affiliations   Résolution adresses → structures, puis propagation
-                   in_perimeter et structure_ids sur source_authorships
-    publications   Creation des publications pour les source_publications in-perimeter non
-                   rattaches + merges inter-sources (HAL-ID, NNT)
-    persons        Creation/mapping personnes + formes de noms
-    authorships    Reconstruction authorships canoniques (table de verite) + propagation UCA
-    countries      Detection pays des adresses + recalcul pays des publications
-    subjects       Sujets/mots-clés : ingestion source_publications → subjects + publication_subjects,
-                   puis recalcul subjects.usage_count et refresh de la matview subject_cooccurrences
-    enrich         Enrichissements optionnels (statut OA via Unpaywall, APC revues)
+    extract             Extraction des sources vers staging (HAL, OpenAlex, WoS, ScanR, theses.fr)
+    cross_imports       Rattrapage cross-source : (1) docs HAL manquants par hal-id/NNT
+                        (auto-borné, tourne toujours), puis (2) par DOI dans chaque source
+                        cible (auto-borné par le backoff doi_lookups)
+    refresh_stale       Refetch des rows à last_seen_at ancien (> STALE_REFRESH_AFTER_DAYS) :
+                        trouvé -> bump last_seen_at + refresh ; 404 / sans DOI -> disappeared_at.
+                        Marque seulement, aucun effet aval.
+    refetch_truncated   Re-fetch des works OpenAlex tronqués à 100 auteurs, avant que
+                        normalize ne les consomme.
+    normalize           Normalisation staging -> tables sources (source_publications,
+                        source_authorships) avec publication_id=NULL (le rattachement aux
+                        publications est fait plus tard par la phase publications). Crée les
+                        adresses et liens source_authorship_addresses. Vide le raw_data du
+                        staging apres traitement + VACUUM.
+    publishers_journals Enrichissement des référentiels publishers/journals (préfixes DOI,
+                        APC, DOAJ, pays/ROR, type d'éditeur)
+    affiliations        Résolution adresses → structures, puis propagation in_perimeter
+                        sur source_authorships
+    zenodo_doi          Résolution du concept DOI des dépôts Zenodo versionnés
+    metadata_correction Corrections de métadonnées sur source_publications (par enregistrement,
+                        substitution Zenodo, par grappe)
+    publications        Création/rattachement des publications + fusions/scissions, en une passe
+    persons             Creation/mapping personnes + formes de noms
+    authorships         Reconstruction authorships canoniques (table de verite) + propagation
+                        in_perimeter, puis purge des publications orphelines
+    countries           Detection pays des adresses + recalcul pays des publications
+    subjects            Sujets/mots-clés : ingestion source_publications → subjects +
+                        publication_subjects, puis recalcul usage_count + matview cooccurrences
+    oa_status           Statut open access par publication via Unpaywall
 """
 
 import argparse
@@ -91,9 +97,10 @@ def phase_extract(
     `application/pipeline/modes.py`. Les scripts d'extraction lisent la config DB
     pour les plages d'années (`pipeline_years_full/weekly`).
 
-    Le refetch des works OpenAlex tronqués vit en début de `phase_normalize` (et
-    non ici) : il doit voir aussi les works ramenés par cross_imports et
-    refresh_stale avant que normalize ne les consomme.
+    Le refetch des works OpenAlex tronqués est une phase distincte
+    (`refetch_truncated`), placée après `refresh_stale` et avant `normalize` : il
+    doit voir aussi les works ramenés par cross_imports et refresh_stale avant
+    que normalize ne les consomme.
     """
     policy = MODES[mode]
     effective = (set(sources) if sources else set(policy.extract_sources)) & policy.extract_sources
@@ -239,6 +246,26 @@ def phase_refresh_stale(sources: Any = None, **kw: Any) -> PhaseMetrics:
     return metrics
 
 
+def phase_refetch_truncated(**kw: Any) -> PhaseMetrics:
+    """Re-télécharge les works OpenAlex tronqués à 100 auteurs.
+
+    L'API OpenAlex plafonne la liste des auteurs à 100 par réponse. Cette phase
+    repère les lignes staging openalex `processed=FALSE` à 100 auteurs et les
+    re-télécharge intégralement (pagination des auteurs).
+
+    Placée après `refresh_stale` (pour capter aussi les works tronqués ramenés
+    par `cross_imports` et `refresh_stale`) et avant `normalize` (qui passe les
+    lignes à `processed=TRUE`, après quoi elles sont invisibles à la détection).
+    """
+    sources = kw.get("sources", set(ALL_SOURCES_SET))
+    mode = kw.get("mode", "full")
+    policy = MODES[mode]
+    metrics = PhaseMetrics()
+    if policy.refetch_truncated_oa and "openalex" in sources:
+        metrics.merge(_run_refetch_truncated())
+    return metrics
+
+
 def phase_normalize(**kw: Any) -> Any:
     """Normalisation staging -> tables sources.
 
@@ -253,13 +280,6 @@ def phase_normalize(**kw: Any) -> Any:
     mode = kw.get("mode", "full")
     policy = MODES[mode]
     metrics = PhaseMetrics()
-    # refetch_truncated AVANT de normaliser openalex : il cible les lignes staging
-    # openalex `processed=FALSE` à 100 auteurs, que normalize s'apprête à consommer
-    # (`processed`→TRUE, après quoi elles sont invisibles à sa détection). Placé
-    # ici plutôt qu'en fin d'extract, il capte aussi les tronqués ramenés par
-    # cross_imports et refresh_stale.
-    if policy.refetch_truncated_oa and "openalex" in sources:
-        metrics.merge(_run_refetch_truncated())
     # Ordre d'exécution : source la plus autoritative en premier
     # (cf. SOURCE_PRIORITY dans domain/sources.py). Les sources suivantes
     # n'écrasent pas les métadonnées déjà posées par les précédentes
@@ -1692,6 +1712,7 @@ PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
     ("extract", phase_extract),
     ("cross_imports", phase_cross_imports),
     ("refresh_stale", phase_refresh_stale),
+    ("refetch_truncated", phase_refetch_truncated),
     ("normalize", phase_normalize),
     ("publishers_journals", phase_publishers_journals),
     ("affiliations", phase_affiliations),
