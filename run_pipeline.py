@@ -29,10 +29,10 @@ Phases (dans l'ordre d'execution):
                         publications est fait plus tard par la phase publications). Crée les
                         adresses et liens source_authorship_addresses. Vide le raw_data du
                         staging apres traitement + VACUUM.
-    publishers_journals Enrichissement des référentiels publishers/journals (préfixes DOI,
-                        APC, DOAJ, pays/ROR, type d'éditeur)
     affiliations        Résolution adresses → structures, puis propagation in_perimeter
                         sur source_authorships
+    publishers_journals Enrichissement des référentiels publishers/journals (préfixes DOI,
+                        APC, DOAJ, pays/ROR, type d'éditeur)
     zenodo_doi          Résolution du concept DOI des dépôts Zenodo versionnés
     metadata_correction Corrections de métadonnées sur source_publications (par enregistrement,
                         substitution Zenodo, par grappe)
@@ -345,7 +345,7 @@ def phase_publishers_journals(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     """Enrichissement des référentiels `publishers` et `journals`.
 
     Phase consolidée (cf. `docs/chantiers/METIER_pipeline-publishers-journals.md`),
-    positionnée entre `normalize` et `affiliations`. Sub-steps :
+    positionnée entre `affiliations` et `metadata_correction`. Sub-steps :
 
     1. `resolve_doi_prefixes` (toujours actif) : préfixe DOI → Registration
        Agency + éditeur Crossref / repository DataCite.
@@ -1714,8 +1714,8 @@ PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
     ("refresh_stale", phase_refresh_stale),
     ("refetch_truncated", phase_refetch_truncated),
     ("normalize", phase_normalize),
-    ("publishers_journals", phase_publishers_journals),
     ("affiliations", phase_affiliations),
+    ("publishers_journals", phase_publishers_journals),
     ("zenodo_doi", phase_zenodo_doi),
     ("metadata_correction", phase_metadata_correction),
     ("publications", phase_publications),
