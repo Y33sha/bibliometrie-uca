@@ -1,4 +1,13 @@
 import adapter from '@sveltejs/adapter-static';
+import { config as loadEnv } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+
+// Source unique de configuration : le `.env` racine, déjà lu par le backend
+// (python-dotenv) et docker-compose. On le charge ici aussi pour que `BASE_PATH`
+// pilote le préfixe en dev (`npm run dev`) sans variable de shell ni argument.
+// `dotenv` n'écrase pas une variable déjà présente : un export de shell reste
+// prioritaire.
+loadEnv({ path: fileURLToPath(new URL('../../.env', import.meta.url)) });
 
 // `BASE_PATH` : préfixe de déploiement (cf. ROOT_PATH côté backend).
 // Vide par défaut → app servie à la racine (cas du dépôt cloné lancé via
