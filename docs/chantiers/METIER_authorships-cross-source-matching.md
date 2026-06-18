@@ -55,7 +55,7 @@ Après filtre méga-papers (publis dont le max d'auteurs par source ≤ 50, alig
 
 ## Liens
 
-- Phase persons : [docs/pipeline/07-persons.md](../pipeline/07-persons.md)
+- Phase persons : [docs/pipeline/08-persons.md](../pipeline/08-persons.md)
 - Code matching : [application/pipeline/persons/create_persons_from_source_authorships.py](../../application/pipeline/persons/create_persons_from_source_authorships.py)
 - Query filtre périmètre : [infrastructure/queries/persons/create.py:44-45](../../infrastructure/queries/persons/create.py#L44-L45)
 - Étape 2 de build_authorships (peuplement FK `source_authorships.authorship_id`) : [application/pipeline/authorships/build_authorships.py:69-72](../../application/pipeline/authorships/build_authorships.py#L69-L72)
