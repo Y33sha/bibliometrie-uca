@@ -61,7 +61,7 @@
 		endpoint: '/api/persons/directory',
 		itemsKey: 'persons',
 		perPage,
-		apiKey,
+		apiKey: () => apiKey,
 		buildParams() {
 			const params = buildFilterParams();
 			const q = search.trim();
@@ -73,7 +73,7 @@
 
 	const facets = useFacets({
 		endpoint: '/api/persons/facets',
-		apiKey: `${apiKey}-facets`,
+		apiKey: () => `${apiKey}-facets`,
 		buildParams: buildFilterParams,
 		facets: {
 			depts: { type: 'simple', apiKey: 'departments' },
@@ -100,7 +100,7 @@
 	});
 
 	const url = useUrlFilters({
-		basePath,
+		basePath: () => basePath,
 		debounceMs: 300,
 		filters: {
 			selectedDepts: { type: 'string_array', urlKey: 'department' },

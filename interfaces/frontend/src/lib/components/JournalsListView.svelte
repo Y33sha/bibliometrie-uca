@@ -99,7 +99,7 @@
 	});
 
 	const url = useUrlFilters({
-		basePath,
+		basePath: () => basePath,
 		filters: {
 			selectedJournalTypes: { type: 'string_array', urlKey: 'journal_type' },
 			selectedOaModels: { type: 'string_array', urlKey: 'oa_model' },

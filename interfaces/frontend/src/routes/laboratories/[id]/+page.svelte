@@ -71,7 +71,7 @@
 	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, addresses).
 	// Les filtres publications/thèses/personnes sont gérés par leurs ListView.
 	const url = useUrlFilters({
-		basePath: `/laboratories/${labId}`,
+		basePath: () => `/laboratories/${labId}`,
 		filters: {
 			tab:              { type: 'single', urlKey: 'tab', defaultValue: 'dashboard' },
 			addrPage:         { type: 'page',   urlKey: 'apage' },

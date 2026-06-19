@@ -234,7 +234,7 @@
 		endpoint: '/api/publications',
 		itemsKey: 'publications',
 		perPage,
-		apiKey,
+		apiKey: () => apiKey,
 		buildParams() {
 			const params = buildFilterParams();
 			params.set('sort', currentSort);
@@ -246,7 +246,7 @@
 
 	const facets = useFacets({
 		endpoint: '/api/publications/facets',
-		apiKey: `${apiKey}-facets`,
+		apiKey: () => `${apiKey}-facets`,
 		buildParams: buildFilterParams,
 		sourceCountsKey: 'source_counts',
 		facets: {
@@ -271,7 +271,7 @@
 	});
 
 	const url = useUrlFilters({
-		basePath,
+		basePath: () => basePath,
 		filters: {
 			selectedYears:     { type: 'string_array',  urlKey: 'year' },
 			selectedLabs:      { type: 'string_array',  urlKey: 'lab_id' },
