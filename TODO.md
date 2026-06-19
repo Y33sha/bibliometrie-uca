@@ -56,6 +56,7 @@
 ## Détails d'affichage
 * [ ] dashboard éditeur/revue: graphiques sur le modèle des dashboards labo/personne
 * [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques?
+* [ ] page admin/countries: largeur de colonnes parfois aberrante quand beaucoup de pays sur une adresse
 
 # Cas particuliers, bizarreries à élucider
 * openalex répète des auteurs : publi 77832
