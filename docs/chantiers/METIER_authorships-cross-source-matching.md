@@ -43,15 +43,29 @@ Après filtre méga-papers (publis dont le max d'auteurs par source ≤ 50, alig
 
 ## Phasage
 
-- [x] **Phase 1 — Audit read-only consolidé** : oneshot [interfaces/cli/oneshot/audit_authorships_cross_source.py](../../interfaces/cli/oneshot/audit_authorships_cross_source.py) qui produit (a) les compteurs ci-dessus avec et sans filtre méga-papers, (b) un échantillon de ~20 cas par source (méga-papers exclus) à valider à l'œil (publi + position + nom de référence + nom orphelin).
-- [x] **Phase 2 — Oneshot d'application** : étend la cascade `decide_person_match` étape 4 (cross-source par publi + position) aux SA `in_perimeter = FALSE` quand au moins une autre SA de la même publi est déjà reliée à un `person_id`. UPDATE de `source_authorships.person_id` + `authorship_id`. `source_authorships.in_perimeter` non modifié.
-- [ ] **Phase 3 — Élargissement WoS** : si le volume WoS justifie l'effort (13 k SA dont seulement 0,2 % de nom strictement identique), introduire un critère de matching tolérant aux initiales / casse pour cette source. À arbitrer en fin de Phase 2.
+### Phase 1 — Audit read-only consolidé
+- [x] Oneshot [interfaces/cli/oneshot/audit_authorships_cross_source.py](../../interfaces/cli/oneshot/audit_authorships_cross_source.py) : compteurs (avec / sans filtre méga-papers) + échantillon de ~20 cas par source (méga-papers exclus) à valider à l'œil (publi + position + nom de référence + nom orphelin).
+
+### Phase 2 — Oneshot d'application
+- [x] Étend la cascade `decide_person_match` étape 4 (cross-source par publi + position) aux SA `in_perimeter = FALSE` quand au moins une autre SA de la même publi est déjà reliée à un `person_id`. UPDATE de `source_authorships.person_id` + `authorship_id` ; `source_authorships.in_perimeter` non modifié.
+
+### Phase 3 — Élargissement WoS — no-go
+- [ ] **No-go.** Le volume WoS rattachable est dérisoire : 13 741 SA en brut mais **0,2 %** seulement de nom strictement identique, et **12 SA** après filtre méga-papers (le reste = méga-papers de physique où le matching par position s'effondre). Un critère de matching tolérant (initiales / casse) ne se justifie pas. Contexte renforçant : crédit API WoS épuisé, désabonnement probable. À rouvrir seulement si WoS redevient une source active et que le volume le justifie.
+
+### Phase 4 — Intégration permanente dans la phase persons
+Le oneshot Phase 2 est une application ponctuelle : sans intégration, la lacune réapparaît sur chaque nouvelle publi. On rend la passe cross-source permanente.
+
+- [ ] Passe dédiée **en fin de phase persons**, après la cascade normale (les ancres `person_id` doivent déjà exister sur la publi).
+- [ ] Requête **scopée** : SA `in_perimeter = FALSE`, `person_id IS NULL`, sur une publi ayant ≥1 SA déjà reliée à la même position. Borne le coût (~quelques 10 k, pas le pool mondial non-UCA) et décroît à chaque run, comme le modèle « non-relié » actuel — pas de flag dirty à introduire.
+- [ ] Réutiliser la logique du oneshot Phase 2 (`decide_person_match` étape 4) — factoriser, pas dupliquer.
+- [ ] `source_authorships.in_perimeter` non touché ; seuls `person_id` + `authorship_id` complétés (cf. Décisions).
+- [ ] Mesurer le coût ajouté à la phase persons (doit rester négligeable vu le scope).
+
+Forward-compatible avec une éventuelle refonte « record linkage personnes » : l'arête cross-source (même publi + position + nom compatible, ancrée sur une personne existante) est conservatrice et survivrait à un changement de modèle. Cette refonte — linkage *homonyme-aware*, car les noms de personnes ne sont pas des clés quasi-uniques comme le sont DOI / metadata_block côté publications — est un chantier distinct, hors scope ici.
 
 ## Questions ouvertes
 
-- **Sémantique du nom compatible** au-delà de l'égalité normalisée : on a déjà `names_compatible` ([domain/names.py](domain/names.py)) côté Python qui gère les initiales et variantes. Le réutiliser dans le oneshot Phase 3 plutôt que tirer un SQL CTE.
-- **Intégration permanente vs oneshot** : à terme, la cascade `decide_person_match` étape 4 devrait peut-être systématiquement couvrir les SA hors-périmètre quand un person canonique existe déjà sur la publi. Mais pour le coût `fetch_unlinked_authorships` étendue, il faut mesurer (potentiellement plusieurs M de SA hors-périmètre à charger).
-- **Exposition UI** : audit Phase 1 utile aussi à l'admin (vue "publications avec authorship incomplet par source") ? À arbitrer une fois la Phase 3 stabilisée.
+- **Exposition UI** : l'audit Phase 1 serait-il utile à l'admin (vue « publications avec authorship incomplet par source ») ? À arbitrer après la Phase 4. (Conflits de source => peut servir à la détection de fusions erronées de publications.)
 
 ## Liens
 
