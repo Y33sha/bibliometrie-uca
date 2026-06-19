@@ -133,7 +133,6 @@
 	tbody tr:last-child { border-bottom: none; }
 	tbody tr:hover { background: var(--surface-hover); }
 	td { padding: 10px 12px; font-size: 0.95rem; vertical-align: middle; }
-	.no-results { text-align: center; padding: 24px; color: var(--muted); }
 	.person-link { color: var(--accent); text-decoration: none; font-weight: 500; }
 	.person-link:hover { text-decoration: underline; }
 	.person-last { font-weight: 600; }

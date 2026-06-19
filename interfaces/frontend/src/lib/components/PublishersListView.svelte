@@ -260,7 +260,6 @@
 		color: var(--muted);
 	}
 	.muted { color: var(--muted); }
-	.no-results { text-align: center; color: var(--muted); padding: 30px; }
 
 	.prefixes { display: flex; flex-wrap: wrap; gap: 3px; }
 	.prefix-chip {
