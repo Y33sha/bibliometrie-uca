@@ -1,5 +1,7 @@
 # Chantier — Types de documents : enum, mappings, règles suspects
 
+Terminé le 2026-06-19
+
 Issu de [`regles-metier-domain.md`](regles-metier-domain.md) (Phase 2 historique) + items TODO_LAURA « Types de documents : fixer l'enum et le mapping, algo de résolution de conflits ».
 
 ## Contexte
@@ -45,7 +47,7 @@ Pris dans l'ordre :
 - [x] Types WoS composites — audit fait (sur raw store) : 388 composites ; réduction `doctype_list[0]` au normalize ; `Data Paper` perdu, `Book Chapter`/`Proceedings Paper` à trancher (cf. section)
 - [x] Review = poubelle — audit fait : **pas une poubelle**, mappings sains ; seule action = libellé FR « Article de synthèse »
 - [x] Figshare collections — audit fait + règle `DOI_FIGSHARE_COLLECTION_TO_DATASET` ; dédup des sous-items → relations
-- [ ] Posters / conférence avec même DOI
+- [x] Posters / conférence avec même DOI — audité (~698 DOIs partagés collapsant ~1500 contributions distinctes) ; conflit de clé/dédup, pas un retypage → futur chantier « contrôle des métadonnées par le DOI »
 
 ### Préprints article + journal_id inconnu
 
@@ -118,7 +120,9 @@ Audit (base prod) : **73 collections**, classées **71 `other`** + 1 article + 1
 
 ### Posters / conférence avec même DOI
 
-Détection de doublons en dédup, pas une règle de correction. À traiter quand on touche la dédup, ou en marge si un cas saute pendant un audit.
+Audité : ~698 DOIs sont partagés par ≥2 contributions de titres distincts impliquant posters/conf, collapsant ~1500 œuvres distinctes en ~698 publications via la dédup-DOI. Structure container↔contribution (analog d'ouvrage↔chapitre), mais le conteneur n'est pas toujours typé `book`/`proceedings` : souvent un **supplément de revue typé `article`** (ex. « Abstract Supplement … ACR Annual Meeting », DOI `10.1002/art.40700`, porté par N abstracts/posters distincts). Aucun retypage `doc_type` ne corrige le merge — seul le nullage de la clé partagée sur les contributions le fait (détection de conflit de clé type `detect_erroneous_key_holders`, avec un signal de conteneur élargi au supplément typé `article`).
+
+Renvoyé à un **futur chantier « contrôle des métadonnées par le DOI »** : conflation de `doc_type` ou de titres distincts sous un même DOI, et cohérence préfixe DOI ↔ `doc_type`. Hors-scope doc-types.
 
 ## Décisions actées
 
