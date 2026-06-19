@@ -15,7 +15,7 @@ import { api } from '$lib/api';
  *   pubs.goToPage(3);           // change de page + recharge + scroll top
  */
 
-interface PaginatedFetchOptions {
+export interface PaginatedFetchOptions {
 	endpoint: string;
 	itemsKey: string;
 	perPage?: number;

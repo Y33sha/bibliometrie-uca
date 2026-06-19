@@ -1,18 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mocks SvelteKit : replaceState capture l'URL passée, base est un préfixe figé.
-const replaceStateSpy = vi.fn();
+// Mocks SvelteKit : `goto` capture l'URL passée, base est un préfixe figé.
+const gotoSpy = vi.fn();
 vi.mock('$app/navigation', () => ({
-	replaceState: (...args: unknown[]) => replaceStateSpy(...args),
+	goto: (...args: unknown[]) => gotoSpy(...args),
 }));
 vi.mock('$app/paths', () => ({ base: '/bibliometrie' }));
+
+// `syncUrl` appelle `goto(url, { replaceState, noScroll, keepFocus })`.
+const GOTO_OPTS = { replaceState: true, noScroll: true, keepFocus: true };
 
 // Import APRÈS les mocks pour qu'ils s'appliquent.
 const { useUrlFilters } = await import('./useUrlFilters.svelte');
 
 describe('useUrlFilters', () => {
 	beforeEach(() => {
-		replaceStateSpy.mockClear();
+		gotoSpy.mockClear();
 		vi.useFakeTimers();
 	});
 
@@ -27,7 +30,7 @@ describe('useUrlFilters', () => {
 				filters: { years: { type: 'string_array', urlKey: 'year' } },
 			});
 			f.syncUrl(() => ({ years: [] }));
-			expect(replaceStateSpy).toHaveBeenCalledWith('/bibliometrie/publications', {});
+			expect(gotoSpy).toHaveBeenCalledWith('/bibliometrie/publications', GOTO_OPTS);
 		});
 
 		it('sérialise un string_array en CSV', () => {
@@ -36,9 +39,9 @@ describe('useUrlFilters', () => {
 				filters: { years: { type: 'string_array', urlKey: 'year' } },
 			});
 			f.syncUrl(() => ({ years: ['2024', '2023'] }));
-			expect(replaceStateSpy).toHaveBeenCalledWith(
+			expect(gotoSpy).toHaveBeenCalledWith(
 				'/bibliometrie/publications?year=2024%2C2023',
-				{},
+				GOTO_OPTS,
 			);
 		});
 
@@ -48,7 +51,7 @@ describe('useUrlFilters', () => {
 				filters: { sort: { type: 'single', urlKey: 'sort', defaultValue: 'year_desc' } },
 			});
 			f.syncUrl(() => ({ sort: 'year_desc' }));
-			expect(replaceStateSpy).toHaveBeenCalledWith('/bibliometrie/p', {});
+			expect(gotoSpy).toHaveBeenCalledWith('/bibliometrie/p', GOTO_OPTS);
 		});
 
 		it('inclut un single value différent de sa valeur par défaut', () => {
@@ -57,7 +60,7 @@ describe('useUrlFilters', () => {
 				filters: { sort: { type: 'single', urlKey: 'sort', defaultValue: 'year_desc' } },
 			});
 			f.syncUrl(() => ({ sort: 'title' }));
-			expect(replaceStateSpy).toHaveBeenCalledWith('/bibliometrie/p?sort=title', {});
+			expect(gotoSpy).toHaveBeenCalledWith('/bibliometrie/p?sort=title', GOTO_OPTS);
 		});
 
 		it('sérialise les source_states en yes/no joints par virgule', () => {
@@ -67,8 +70,8 @@ describe('useUrlFilters', () => {
 			});
 			f.syncUrl(() => ({ sourceStates: { hal: 'yes', oa: 'no', wos: 'any' } }));
 			// `any` est ignoré (ni yes ni no)
-			expect(replaceStateSpy).toHaveBeenCalled();
-			const call = replaceStateSpy.mock.calls[0][0] as string;
+			expect(gotoSpy).toHaveBeenCalled();
+			const call = gotoSpy.mock.calls[0][0] as string;
 			expect(call).toContain('sf=hal_yes%2Coa_no');
 			expect(call).not.toContain('any');
 		});
@@ -79,7 +82,7 @@ describe('useUrlFilters', () => {
 				filters: { currentPage: { type: 'page', urlKey: 'page' } },
 			});
 			f.syncUrl(() => ({ currentPage: 1 }));
-			expect(replaceStateSpy).toHaveBeenCalledWith('/bibliometrie/p', {});
+			expect(gotoSpy).toHaveBeenCalledWith('/bibliometrie/p', GOTO_OPTS);
 		});
 
 		it('inclut la page si elle est > 1', () => {
@@ -88,7 +91,7 @@ describe('useUrlFilters', () => {
 				filters: { currentPage: { type: 'page', urlKey: 'page' } },
 			});
 			f.syncUrl(() => ({ currentPage: 3 }));
-			expect(replaceStateSpy).toHaveBeenCalledWith('/bibliometrie/p?page=3', {});
+			expect(gotoSpy).toHaveBeenCalledWith('/bibliometrie/p?page=3', GOTO_OPTS);
 		});
 
 		it('préserve les keys URL non gérées par cette instance', () => {
@@ -98,7 +101,7 @@ describe('useUrlFilters', () => {
 				getCurrentParams: () => new URLSearchParams('tab=publications&foo=bar'),
 			});
 			f.syncUrl(() => ({ years: ['2024'] }));
-			const call = replaceStateSpy.mock.calls[0][0] as string;
+			const call = gotoSpy.mock.calls[0][0] as string;
 			expect(call).toContain('tab=publications');
 			expect(call).toContain('foo=bar');
 			expect(call).toContain('year=2024');
@@ -111,7 +114,7 @@ describe('useUrlFilters', () => {
 				getCurrentParams: () => new URLSearchParams('year=2020&keep=me'),
 			});
 			f.syncUrl(() => ({ years: ['2024'] }));
-			const call = replaceStateSpy.mock.calls[0][0] as string;
+			const call = gotoSpy.mock.calls[0][0] as string;
 			expect(call).toContain('year=2024');
 			expect(call).not.toContain('year=2020');
 			expect(call).toContain('keep=me');
@@ -124,7 +127,7 @@ describe('useUrlFilters', () => {
 				getCurrentParams: () => new URLSearchParams('year=2020&keep=me'),
 			});
 			f.syncUrl(() => ({ years: [] }));
-			const call = replaceStateSpy.mock.calls[0][0] as string;
+			const call = gotoSpy.mock.calls[0][0] as string;
 			expect(call).not.toContain('year');
 			expect(call).toContain('keep=me');
 		});
