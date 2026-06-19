@@ -6,7 +6,7 @@ python -m interfaces.cli.oneshot.renormalize_escaped_titles
 ### Extraction
 * [ ] extraction par ORCID: vérifier pertinence/faisabilité (tester différentes sources, auditer le gain)
 * [ ] à étudier: cross-import: seulement in_perimeter? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
-* [ ]  HAL: "0 nouveaux, 0 mis à jour, 36 inchangés" alors que j'avais nullé les hash => problème de comparaison de hash ou problème de logging?
+* [ ] HAL: "0 nouveaux, 0 mis à jour, 36 inchangés" alors que j'avais nullé les hash => problème de comparaison de hash ou problème de logging?
 * [ ] Comprendre pourquoi l'extract ScanR paginé est aussi lent, alors que le cross-import par DOI est ultra-rapide (2s/100 DOI contre 30s OpenAlex); ScanR est presque plus rapide par DOI que par bulk, c'est absurde
 * [ ] cross-import par NNT: " 300/332 — 0 récupérés, 297 absents de HAL" quid des 3 autres?
 ### Normalisation
@@ -22,8 +22,8 @@ python -m interfaces.cli.oneshot.renormalize_escaped_titles
 * [ ] DRY upsert_source_publication? (au lieu d'une fonction par source)
 * [ ] Audit complet "nommage des variables". S'assurer que le code est structure-agnostique. Eviter abréviations (publication > publi > pub...). Revoir certains noms trop restrictifs (publication->document? journal->container?)
 ## Doc
-* [ ] documenter la duplication de données (vues matérialisées, tables et colonnes dérivées) et quantifier poids vs gain de performance
-* [ ] documenter les process incrémentaux vs recalcul complet et les arbitrages performance vs risque de drift; chaque process incrémental doit avoir un mode --full-rerun
+* [ ] documenter la duplication de données (vues matérialisées, tables et colonnes dérivées) et leur refresh + quantifier poids vs gain de performance en lecture
+* [ ] documenter les process incrémentaux (flag *dirty*) vs recalcul complet, et les arbitrages entre gain de temps et risque de drift; chaque process incrémental doit avoir un mode --full-rebuild
 
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
@@ -44,7 +44,7 @@ python -m interfaces.cli.oneshot.renormalize_escaped_titles
 * [ ] gérer les warnings vite-plugin-svelte
 ## Admin
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer
-* [ ] comportement capricieux de l'UI sur la page countries (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: "loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine."
+* [ ] comportement capricieux de l'UI sur la page admin/countries (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: "loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine."
 * [ ] structures_name_forms: is_word_boundary devrait être forcé à false si contient séparateur de mot, même si nb cars `<` 6 (? vérifier d'abord l'effet réel de is_word_boundary)
 ### Personnes (admin)
 * [ ] quoi faire des entités aberrantes (auteurs mal parsés)? a minima, s'assurer qu'elles n'apparaissent pas dans orphan-authorships
@@ -54,7 +54,7 @@ python -m interfaces.cli.oneshot.renormalize_escaped_titles
 * [ ] signaler publis HAL non correctement reliées au compte HAL?
 * [ ] publications: indiquer si premier/dernier auteur
 ### Publications
-* [ ] Filtres supplémentaires possibles: langue; has_doi; corresponding_is_in_perimeter; peer_reviewed? (suppose de posséder la donnée ou de pouvoir la déduire des sources);
+* [ ] Filtres supplémentaires possibles: langue; has_doi (crossref, datacite, other, none); corresponding_is_in_perimeter; peer_reviewed? (suppose de posséder la donnée ou de pouvoir la déduire des sources);
 * [ ] colonne éditeur, filtres éditeur + revue?
 * [ ] avoir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance")
@@ -64,8 +64,7 @@ python -m interfaces.cli.oneshot.renormalize_escaped_titles
 * [ ] lien dashboard => publications: il faut que TOUTES les facettes actives soient affichées
 * [ ] dashboard éditeur/revue: graphiques sur le modèle des dashboards labo/personne
 * [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques?
-* [ ] double scroll dans admin/addresses: chiant
-* [ ] message de chargement plutôt que "aucun résultat trouvé"
+* [ ] champ recherche de la page sujets: sensible aux accents; corriger et auditer tous les autres
 
 # Cas particuliers, bizarreries à élucider
 * openalex répète des auteurs : publi 77832
