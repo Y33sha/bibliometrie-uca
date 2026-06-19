@@ -49,10 +49,7 @@ Après filtre méga-papers (publis dont le max d'auteurs par source ≤ 50, alig
 ### Phase 2 — Oneshot d'application
 - [x] Étend la cascade `decide_person_match` étape 4 (cross-source par publi + position) aux SA `in_perimeter = FALSE` quand au moins une autre SA de la même publi est déjà reliée à un `person_id`. UPDATE de `source_authorships.person_id` + `authorship_id` ; `source_authorships.in_perimeter` non modifié.
 
-### Phase 3 — Élargissement WoS — no-go
-- [ ] **No-go.** Le volume WoS rattachable est dérisoire : 13 741 SA en brut mais **0,2 %** seulement de nom strictement identique, et **12 SA** après filtre méga-papers (le reste = méga-papers de physique où le matching par position s'effondre). Un critère de matching tolérant (initiales / casse) ne se justifie pas. Contexte renforçant : crédit API WoS épuisé, désabonnement probable. À rouvrir seulement si WoS redevient une source active et que le volume le justifie.
-
-### Phase 4 — Intégration permanente dans la phase persons
+### Phase 3 — Intégration permanente dans la phase persons
 Le oneshot Phase 2 est une application ponctuelle : sans intégration, la lacune réapparaît sur chaque nouvelle publi. On rend la passe cross-source permanente.
 
 - [ ] Passe dédiée **en fin de phase persons**, après la cascade normale (les ancres `person_id` doivent déjà exister sur la publi).
@@ -65,7 +62,7 @@ Forward-compatible avec une éventuelle refonte « record linkage personnes » :
 
 ## Questions ouvertes
 
-- **Exposition UI** : l'audit Phase 1 serait-il utile à l'admin (vue « publications avec authorship incomplet par source ») ? À arbitrer après la Phase 4. (Conflits de source => peut servir à la détection de fusions erronées de publications.)
+- **Exposition UI** : l'audit Phase 1 serait-il utile à l'admin (vue « publications avec authorship incomplet par source ») ? À arbitrer après la Phase 3. (Conflits de source => peut servir à la détection de fusions erronées de publications.)
 
 ## Liens
 
