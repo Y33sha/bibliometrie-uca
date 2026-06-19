@@ -5,8 +5,6 @@
 	export interface TabDef {
 		id: string;
 		label: string;
-		count?: number;
-		showCount?: boolean;
 	}
 
 	interface Props {
@@ -50,9 +48,6 @@
 	{#each tabs as t (t.id)}
 		<button class="tab" class:active={activeTab === t.id} onclick={() => switchTab(t.id)}>
 			{t.label}
-			{#if t.showCount !== false && t.count != null && t.count > 0}
-				<span class="tab-count">{t.count}</span>
-			{/if}
 		</button>
 	{/each}
 </div>

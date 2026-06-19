@@ -61,7 +61,6 @@
 		apcMode = 'uca' as ApcMode,
 		perPage = 100,
 		onExcludeAuthorship,
-		onTotalChange,
 	}: {
 		apiKey?: string;
 		externalFilters?: ExternalFilters;
@@ -89,11 +88,6 @@
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
 		perPage?: number;
 		onExcludeAuthorship?: (authorshipId: number, pubId: number) => void | boolean | Promise<void | boolean>;
-		/** Notifie le parent du nombre total de publications après filtrage,
-		 *  pour que le titre d'onglet (TabNav) puisse refléter le tableau
-		 *  exactement (en tenant compte des doc_type exclus côté API et
-		 *  du `excluded_doc_type=ongoing_thesis` ajouté par défaut). */
-		onTotalChange?: (total: number) => void;
 	} = $props();
 
 	const hasFixedLab = $derived(externalFilters?.labId != null);
@@ -113,11 +107,6 @@
 		if (!p.oa_status || ['closed', 'unknown'].includes(p.oa_status)) return 'notice';
 		return 'ok';
 	}
-
-	// Notifie le parent à chaque changement de `pubs.total`.
-	$effect(() => {
-		if (onTotalChange) onTotalChange(pubs.total);
-	});
 
 	// --- Column visibility ---
 	// Ordre des colonnes = ordre dans le tableau. Les colonnes optionnelles

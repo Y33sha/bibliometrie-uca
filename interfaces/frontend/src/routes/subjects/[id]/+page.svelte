@@ -24,10 +24,6 @@
   let data = $state<SubjectDetailResponse | null>(null);
   let loading = $state(false);
   let error = $state(false);
-  // Total publications du tableau (post-filtrage des doc_type exclus côté
-  // API), remonté par PublicationsListView via callback. Si null, on
-  // affiche `usage_count` par défaut (avant ouverture de l'onglet).
-  let pubsTotal = $state<number | null>(null);
   // Compteur incrémenté à chaque appel : on ignore les réponses obsolètes
   // si l'utilisateur a re-cliqué entre-temps.
   let requestId = 0;
@@ -55,7 +51,6 @@
   // Recharge à chaque changement d'id.
   $effect(() => {
     const id = subjectId;
-    pubsTotal = null; // reset pour ne pas afficher l'ancien compte
     loadFor(id, NEIGHBORS_LIMIT, MIN_COOCCURRENCE);
   });
 
@@ -109,11 +104,7 @@
     <TabNav
       tabs={[
         { id: "graph", label: "Graphe des co-occurrences" },
-        {
-          id: "publications",
-          label: "Publications",
-          count: pubsTotal ?? data.subject.usage_count,
-        },
+        { id: "publications", label: "Publications" },
       ]}
     />
 
@@ -143,7 +134,6 @@
           }}
           urlSync={false}
           showFilterBanner={false}
-          onTotalChange={(t) => (pubsTotal = t)}
         />
       {/key}
     {/if}

@@ -33,14 +33,6 @@
 	let subjects = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
 
-	// `pub_count` du detail sert au compteur de l'onglet tant que
-	// PublicationsListView n'a pas remonté son total post-filtrage.
-	let pubsTotal = $state(0);
-
-	// Onglet Revues : alimente le compteur d'onglet via JournalsListView
-	// (qui gère lui-même chargement, facettes, pagination).
-	let journalsTotal = $state(0);
-
 	// Labels FR des publisher_type / journal_type — alimentent les colonnes
 	// du dashboard. Le tableau de l'onglet Revues utilise JournalsListView
 	// qui fetch ses propres labels via /api/journal-types.
@@ -50,7 +42,6 @@
 	async function loadPublisher() {
 		try {
 			publisher = await api<PublisherDetail>(`/api/publishers/${publisherId}`);
-			pubsTotal = publisher.pub_count;
 		} catch {
 			error = true;
 		}
@@ -146,9 +137,9 @@
 	<!-- Tabs -->
 	<TabNav
 		tabs={[
-			{ id: 'dashboard', label: 'Dashboard', showCount: false },
-			{ id: 'journals', label: 'Revues', count: journalsTotal || publisher.journal_count },
-			{ id: 'publications', label: 'Publications', count: pubsTotal }
+			{ id: 'dashboard', label: 'Dashboard' },
+			{ id: 'journals', label: 'Revues' },
+			{ id: 'publications', label: 'Publications' }
 		]}
 		onswitch={onTabSwitch}
 	/>
@@ -242,7 +233,6 @@
 				externalFilters={{ publisherId }}
 				hidePublisherColumn
 				withPubs
-				onTotalChange={(t) => (journalsTotal = t)}
 			/>
 		</div>
 	{/if}
@@ -256,7 +246,6 @@
 				basePath={`/publishers/${publisherId}`}
 				showFilterBanner={false}
 				perPage={50}
-				onTotalChange={(t) => (pubsTotal = t)}
 			/>
 		</div>
 	{/if}

@@ -25,7 +25,6 @@
 		withPubs = false,
 		actionCell,
 		actionColumnHeader = '',
-		onTotalChange,
 	}: {
 		apiKey?: string;
 		urlSync?: boolean;
@@ -37,7 +36,6 @@
 		/** Snippet rendu dans la colonne actions (1 row → 1 cell). */
 		actionCell?: Snippet<[Publisher]>;
 		actionColumnHeader?: string;
-		onTotalChange?: (total: number) => void;
 	} = $props();
 
 	// --- Filter state ---
@@ -45,10 +43,6 @@
 	let currentSort = $state('-pubs');
 	let selectedPublisherTypes: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
-
-	$effect(() => {
-		if (onTotalChange) onTotalChange(publishers.total);
-	});
 
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();

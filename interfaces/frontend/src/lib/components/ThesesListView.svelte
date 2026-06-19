@@ -19,8 +19,7 @@
 		labId,
 		urlSync = true,
 		basePath = '/theses',
-		perPage = 100,
-		onTotalChange
+		perPage = 100
 	}: {
 		apiKey?: string;
 		/** Contexte labo fixe : borne les résultats à ce labo et masque la facette Laboratoire. */
@@ -28,7 +27,6 @@
 		urlSync?: boolean;
 		basePath?: string;
 		perPage?: number;
-		onTotalChange?: (total: number) => void;
 	} = $props();
 
 	const hasFixedLab = $derived(labId != null);
@@ -153,10 +151,6 @@
 	function exportCsvUrl(): string {
 		return `${base}/api/publications/export-theses.csv?${buildFilterParams()}`;
 	}
-
-	$effect(() => {
-		if (onTotalChange) onTotalChange(pubs.total);
-	});
 
 	onMount(async () => {
 		if (urlSync) {
