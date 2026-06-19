@@ -8,8 +8,6 @@
 * [ ] Comprendre pourquoi l'extract ScanR paginé est aussi lent, alors que le cross-import par DOI est ultra-rapide (2s/100 DOI contre 30s OpenAlex); ScanR est presque plus rapide par DOI que par bulk, c'est absurde
 * [ ] cross-import par NNT: " 300/332 — 0 récupérés, 297 absents de HAL" quid des 3 autres?
 * [ ] analyser les diff de payload pour voir si on peut diminuer le churn en filtrant les champs importés (ScanR notamment)
-### Normalisation
-* [ ] https://hal.science/hal-03102156, https://hal.science/hal-03624131: deux fois le même auteur hal, une fois erroné: que faire? on ne devrait jamais avoir 2 fois le même hal_person_id dans une publi => lever une erreur / ou juste supprimer silencieusement le hal_person_id partout par précaution (problème: empêche de détecter l'erreur pour la corriger dans HAL) / ou détecter en phase "persons" et empêcher la propagation des identifiants
 ### Suite du traitement
 * [ ] créer circuit pour correction automatisée des journal_types (titre terminé par " eBooks" => plateforme d'ebooks)
 * [ ] metadata_correction: ajouter correction via doi_prefix du journal (contrôle de cohérence entre doi et journal_id, avant les corrections journal_type => doc_type)
@@ -54,7 +52,7 @@
 * [ ] Filtres supplémentaires possibles: langue; has_doi (crossref, datacite, other, none); corresponding_is_in_perimeter; peer_reviewed? (suppose de posséder la donnée ou de pouvoir la déduire des sources);
 * [ ] colonne éditeur, filtres éditeur + revue?
 * [ ] avoir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
-* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline)
+* [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
 ## Détails d'affichage
 * [ ] dashboard éditeur/revue: graphiques sur le modèle des dashboards labo/personne
 * [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques?
