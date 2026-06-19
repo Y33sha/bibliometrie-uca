@@ -53,6 +53,7 @@ class ListFilters:
 
 @dataclass(frozen=True, slots=True)
 class FacetFilters:
+    search: str = ""
     departments: list[str] = field(default_factory=list)
     roles: list[str] = field(default_factory=list)
     has_orcid: str = ""

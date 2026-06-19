@@ -111,10 +111,12 @@ def persons_facets(
     has_idref: str = Query(""),
     has_rh: str = Query(""),
     lab_id: int | None = Query(None),
+    search: str = Query(""),
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> PersonsFacetsResponse:
     """Facettes dynamiques pour la page personnes (scopables à un labo via `lab_id`)."""
     filters = FacetFilters(
+        search=search,
         departments=parse_str_csv(department),
         roles=parse_str_csv(role),
         has_orcid=has_orcid,

@@ -12,6 +12,7 @@ from infrastructure.queries.filters import (
     person_has_identifier_clause,
     person_has_rh_clause,
     person_in_lab_clause,
+    person_search_clause,
     persons_sort_clause,
 )
 
@@ -24,14 +25,7 @@ def persons_directory(
     """Annuaire public des personnes avec ORCID et idHAL."""
     offset = (page - 1) * per_page
     clauses: list[WhereClause | None] = [WhereClause("p.rejected = FALSE", {})]
-    if filters.search:
-        clauses.append(
-            WhereClause(
-                "(unaccent(p.last_name) ILIKE unaccent(:search_pat) "
-                "OR unaccent(p.first_name) ILIKE unaccent(:search_pat))",
-                {"search_pat": f"%{filters.search}%"},
-            )
-        )
+    clauses.append(person_search_clause(filters.search))
     if filters.departments:
         clauses.append(
             WhereClause(

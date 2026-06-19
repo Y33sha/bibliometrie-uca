@@ -11,6 +11,7 @@ from infrastructure.queries.filters import (
     person_has_identifier_clause,
     person_has_rh_clause,
     person_in_lab_clause,
+    person_search_clause,
 )
 
 _BASE_FROM = "persons p LEFT JOIN persons_rh prh ON prh.person_id = p.id"
@@ -20,8 +21,11 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_clauses(*, skip: str) -> list[WhereClause | None]:
-        # Le scope labo n'est pas une facette : il s'applique toujours.
-        out: list[WhereClause | None] = [person_in_lab_clause(filters.lab_id)]
+        # Scope labo + recherche nom : jamais des facettes, toujours appliqués.
+        out: list[WhereClause | None] = [
+            person_in_lab_clause(filters.lab_id),
+            person_search_clause(filters.search),
+        ]
         if skip != "department" and filters.departments:
             out.append(
                 WhereClause(
