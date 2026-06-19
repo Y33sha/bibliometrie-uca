@@ -477,20 +477,35 @@ class TestBuildHalAuthorRecords:
         # Sans hal_person_id ni idhal, person_identifiers est None.
         assert build_hal_author_records(doc)[0].person_identifiers is None
 
-    def test_duplicate_hal_person_id_in_doc_marked_dubious(self):
-        """Un même hal_person_id sur ≥2 auteurs du dépôt (erreur HAL) est rangé sous
-        `hal_person_id_dubious` (valeur conservée, écartée du matching) ; les comptes
-        non dupliqués gardent `hal_person_id`."""
+    def test_duplicate_hal_person_id_marks_all_identifiers_dubious(self):
+        """Un même hal_person_id sur ≥2 auteurs du dépôt (erreur HAL) rend TOUTE
+        l'identité douteuse : tous les identifiants de ces signatures (ici
+        hal_person_id + idref, attachés au compte HAL) passent sous une clé
+        `_dubious`. Les comptes non dupliqués restent intacts."""
+        label_xml = (
+            '<TEI xmlns="http://www.tei-c.org/ns/1.0"><biblFull><titleStmt>'
+            '<author><idno type="IDREF">111111111</idno></author>'
+            '<author><idno type="IDREF">111111111</idno></author>'
+            "<author></author>"
+            "</titleStmt></biblFull></TEI>"
+        )
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": [
                 "Marie Dupont_FacetSep_49236-749496_FacetSep_",
                 "Jean Martin_FacetSep_10000-749496_FacetSep_",
                 "Sophie Bernard_FacetSep_20000-555_FacetSep_",
             ],
+            "label_xml": label_xml,
         }
         records = build_hal_author_records(doc)
-        assert records[0].person_identifiers == {"hal_person_id_dubious": 749496}
-        assert records[1].person_identifiers == {"hal_person_id_dubious": 749496}
+        assert records[0].person_identifiers == {
+            "hal_person_id_dubious": 749496,
+            "idref_dubious": "111111111",
+        }
+        assert records[1].person_identifiers == {
+            "hal_person_id_dubious": 749496,
+            "idref_dubious": "111111111",
+        }
         assert records[2].person_identifiers == {"hal_person_id": 555}
 
     def test_form_struct_map_resolves_addr_parts(self):

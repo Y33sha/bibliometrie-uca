@@ -407,8 +407,9 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
       présents) et `addresses` (noms de structures).
 
     Un `hal_person_id` listé sur plusieurs auteurs du même dépôt (erreur de saisie
-    HAL) est rangé sous `hal_person_id_dubious` au lieu de `hal_person_id` : valeur
-    conservée mais écartée du matching personnes.
+    HAL) rend toute l'identité de ces signatures douteuse : tous les identifiants
+    (hal_person_id/idref/idhal/orcid, attachés au compte HAL) sont alors rangés sous
+    une clé suffixée `_dubious` — valeur conservée mais écartée du matching personnes.
     """
     qualities = doc.get("authQuality_s") or []
     # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul
@@ -480,16 +481,20 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
         if not name:
             continue
 
-        # Identifiants normalisés cross-source pour cette authorship. Compte HAL
-        # en doublon dans le dépôt → rangé sous `hal_person_id_dubious`.
-        is_dubious = hal_person_id in dubious_hal_ids
+        # Identifiants normalisés cross-source pour cette authorship.
         ids = compact_identifiers(
             orcid=orcid,
             idref=idref,
             idhal=idhal,
-            hal_person_id=None if is_dubious else hal_person_id,
-            hal_person_id_dubious=hal_person_id if is_dubious else None,
+            hal_person_id=hal_person_id,
         )
+        # Compte HAL dupliqué dans le dépôt → toute l'identité de la signature est
+        # douteuse : idref/idhal/orcid sont attachés au compte HAL (pas à la
+        # personne), donc faux pour la signature erronée comme le hal_person_id. On
+        # suffixe `_dubious` à *tous* les identifiants présents → aucun ne sert au
+        # matching personnes, mais tout est conservé (réversible, diagnosticable).
+        if ids and hal_person_id in dubious_hal_ids:
+            ids = {f"{k}_dubious": v for k, v in ids.items()}
         identifiers = ids if ids else None
 
         # Structures affiliées à cet auteur sur ce document (par form_id).
