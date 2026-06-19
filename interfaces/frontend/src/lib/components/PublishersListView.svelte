@@ -70,7 +70,14 @@
 	const facets = useFacets({
 		endpoint: '/api/publishers/facets',
 		apiKey: () => `${apiKey}-facets`,
-		buildParams: buildFilterParams,
+		// Inclut le terme de recherche pour que les comptes de facettes suivent le
+		// champ de recherche (comme la liste).
+		buildParams() {
+			const params = buildFilterParams();
+			const q = search.trim();
+			if (q) params.set('search', q);
+			return params;
+		},
 		facets: {
 			publisherTypes: { type: 'labeled', apiKey: 'publisher_types' },
 			countries: { type: 'labeled', apiKey: 'countries' },
@@ -110,6 +117,7 @@
 		publishers.page = 1;
 		syncUrl();
 		publishers.load();
+		facets.load();
 	});
 
 	function setSort(s: string) {
