@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { runInEffectRoot } from './effectRoot.svelte';
+import type { PaginatedFetchOptions } from './usePaginatedFetch.svelte';
 
 let apiResponse: Record<string, unknown> = {};
 // `(..._args: unknown[])` plutôt que `()` : permet à TS de typer
@@ -9,6 +11,21 @@ vi.mock('$lib/api', () => ({ api: (...args: unknown[]) => apiSpy(...args) }));
 
 const { usePaginatedFetch } = await import('./usePaginatedFetch.svelte');
 
+// `usePaginatedFetch` utilise `$effect` (rechargement réactif sur changement de
+// clé) : il doit être instancié dans un scope d'effet, sinon `effect_orphan`.
+// `mount` enveloppe la création ; les scopes sont disposés après chaque test.
+const cleanups: Array<() => void> = [];
+afterEach(() => {
+	for (const c of cleanups) c();
+	cleanups.length = 0;
+});
+
+function mount<T>(opts: PaginatedFetchOptions) {
+	const { value, cleanup } = runInEffectRoot(() => usePaginatedFetch<T>(opts));
+	cleanups.push(cleanup);
+	return value;
+}
+
 describe('usePaginatedFetch', () => {
 	beforeEach(() => {
 		apiSpy.mockClear();
@@ -16,7 +33,7 @@ describe('usePaginatedFetch', () => {
 	});
 
 	it('démarre avec items=[], total=0, page=1, loaded=false', () => {
-		const f = usePaginatedFetch<number>({
+		const f = mount<number>({
 			endpoint: '/api/x',
 			itemsKey: 'items',
 			apiKey: 'k',
@@ -29,9 +46,22 @@ describe('usePaginatedFetch', () => {
 		expect(f.loaded).toBe(false);
 	});
 
+	it('loading vaut true à la création, false après load()', async () => {
+		apiResponse = { items: [], total: 0, page: 1, pages: 1 };
+		const f = mount<number>({
+			endpoint: '/api/x',
+			itemsKey: 'items',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+		});
+		expect(f.loading).toBe(true);
+		await f.load();
+		expect(f.loading).toBe(false);
+	});
+
 	it('load() injecte page et per_page dans les params', async () => {
 		apiResponse = { items: [], total: 0, page: 1, pages: 1 };
-		const f = usePaginatedFetch<number>({
+		const f = mount<number>({
 			endpoint: '/api/x',
 			itemsKey: 'items',
 			perPage: 25,
@@ -47,7 +77,7 @@ describe('usePaginatedFetch', () => {
 
 	it('par défaut, perPage = 50', async () => {
 		apiResponse = { items: [], total: 0, page: 1, pages: 1 };
-		const f = usePaginatedFetch({
+		const f = mount({
 			endpoint: '/api/x',
 			itemsKey: 'items',
 			apiKey: 'k',
@@ -59,7 +89,7 @@ describe('usePaginatedFetch', () => {
 
 	it('peuple items, total, page, pages, loaded depuis la réponse', async () => {
 		apiResponse = { items: [10, 20, 30], total: 100, page: 2, pages: 4 };
-		const f = usePaginatedFetch<number>({
+		const f = mount<number>({
 			endpoint: '/api/x',
 			itemsKey: 'items',
 			apiKey: 'k',
@@ -75,7 +105,7 @@ describe('usePaginatedFetch', () => {
 
 	it('utilise itemsKey custom (e.g. "publications")', async () => {
 		apiResponse = { publications: ['a', 'b'], total: 2, page: 1, pages: 1 };
-		const f = usePaginatedFetch<string>({
+		const f = mount<string>({
 			endpoint: '/api/publications',
 			itemsKey: 'publications',
 			apiKey: 'k',
@@ -88,7 +118,7 @@ describe('usePaginatedFetch', () => {
 	it('goToPage met à jour page, recharge et scroll en haut', async () => {
 		apiResponse = { items: [], total: 0, page: 3, pages: 5 };
 		const scrollSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
-		const f = usePaginatedFetch({
+		const f = mount({
 			endpoint: '/api/x',
 			itemsKey: 'items',
 			apiKey: 'k',
@@ -104,7 +134,7 @@ describe('usePaginatedFetch', () => {
 	});
 
 	it('items est mutable (set externe possible)', () => {
-		const f = usePaginatedFetch<number>({
+		const f = mount<number>({
 			endpoint: '/api/x',
 			itemsKey: 'items',
 			apiKey: 'k',
@@ -116,7 +146,7 @@ describe('usePaginatedFetch', () => {
 
 	it('page est mutable (set externe possible avant load)', async () => {
 		apiResponse = { items: [], total: 0, page: 5, pages: 10 };
-		const f = usePaginatedFetch({
+		const f = mount({
 			endpoint: '/api/x',
 			itemsKey: 'items',
 			apiKey: 'k',
