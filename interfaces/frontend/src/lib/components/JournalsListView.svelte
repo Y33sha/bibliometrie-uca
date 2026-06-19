@@ -91,7 +91,14 @@
 	const facets = useFacets({
 		endpoint: '/api/journals/facets',
 		apiKey: () => `${apiKey}-facets`,
-		buildParams: buildFilterParams,
+		// Inclut le terme de recherche pour que les comptes de facettes suivent le
+		// champ de recherche (comme la liste).
+		buildParams() {
+			const params = buildFilterParams();
+			const q = search.trim();
+			if (q) params.set('search', q);
+			return params;
+		},
 		facets: {
 			journalTypes: { type: 'labeled', apiKey: 'journal_types' },
 			oaModels: { type: 'labeled', apiKey: 'oa_models' },
@@ -135,6 +142,7 @@
 		journals.page = 1;
 		syncUrl();
 		journals.load();
+		facets.load();
 	});
 
 	function setSort(s: string) {
