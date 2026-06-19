@@ -36,9 +36,6 @@
 	let error = $state(false);
 	let isAdmin = $state(false);
 
-	// Total des publications après filtrage, remonté par PublicationsListView.
-	let pubsTotal = $state(0);
-
 	const activeTab = $derived(
 		(() => {
 			const t = $page.url.searchParams.get('tab');
@@ -54,7 +51,6 @@
 
 	// Addresses tab
 	let addresses: Address[] = $state([]);
-	let addrTotal = $state(0);
 	let addrPage = $state(1);
 	let addrPages = $state(1);
 	let addrLoaded = $state(false);
@@ -124,7 +120,6 @@
 			total: number; page: number; pages: number; addresses: Address[];
 		}>(`/api/persons/${personId}/addresses?${params}`, { key: 'person-detail-addresses' });
 		addresses = data.addresses;
-		addrTotal = data.total;
 		addrPages = data.pages;
 		addrPage = data.page;
 		addrLoaded = true;
@@ -317,12 +312,12 @@
 	<TabNav
 		tabs={[
 			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'publications', label: 'Publications', count: pubsTotal },
-			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses', count: thesesCount }] : []),
+			{ id: 'publications', label: 'Publications' },
+			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
 			// TODO: onglet « Identités » désactivé — à déplacer côté admin
 			// ou à supprimer définitivement (cf. PersonProfileResponse.authors).
-			// { id: 'identities', label: 'Identités', count: authors.length },
-			{ id: 'addresses', label: 'Adresses', count: addrLoaded ? addrTotal : undefined },
+			// { id: 'identities', label: 'Identités' },
+			{ id: 'addresses', label: 'Adresses' },
 		]}
 		onswitch={onTabSwitch}
 	/>
@@ -378,7 +373,6 @@
 				onExcludeAuthorship={excludeAuthorship}
 				apcMode="person-uca"
 				perPage={50}
-				onTotalChange={(t) => (pubsTotal = t)}
 			/>
 		</div>
 	{/if}

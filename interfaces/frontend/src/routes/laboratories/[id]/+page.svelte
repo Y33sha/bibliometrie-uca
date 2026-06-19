@@ -41,18 +41,8 @@
 		})()
 	);
 
-	// Total des publications après filtrage, remonté par PublicationsListView
-	// pour que le titre de l'onglet (TabNav) reflète le tableau.
-	let pubsTotal = $state(0);
-
-	// --- Persons tab (déléguée à <PersonsListView> ; le total/loaded remonte
-	// pour le badge d'onglet) ---
-	let personsTotal = $state(0);
-	let personsLoaded = $state(false);
-
 	// Addresses tab
 	let addresses: LabAddress[] = $state([]);
-	let addrTotal = $state(0);
 	let addrPage = $state(1);
 	let addrPages = $state(1);
 	let addrLoaded = $state(false);
@@ -105,7 +95,6 @@
 			`/api/laboratories/${labId}/addresses?${params}`, { key: 'lab-addresses' }
 		);
 		addresses = data.addresses;
-		addrTotal = data.total;
 		addrPages = data.pages;
 		addrPage = data.page;
 		addrLoaded = true;
@@ -363,11 +352,11 @@
 	<!-- Tabs -->
 	<TabNav
 		tabs={[
-			{ id: 'dashboard', label: 'Dashboard', showCount: false },
-			{ id: 'publications', label: 'Publications', count: pubsTotal },
-			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses', count: thesesCount }] : []),
-			{ id: 'persons', label: 'Personnes', count: personsLoaded ? personsTotal : undefined },
-			{ id: 'addresses', label: 'Adresses', count: addrLoaded ? addrTotal : undefined },
+			{ id: 'dashboard', label: 'Dashboard' },
+			{ id: 'publications', label: 'Publications' },
+			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
+			{ id: 'persons', label: 'Personnes' },
+			{ id: 'addresses', label: 'Adresses' },
 		]}
 		onswitch={onTabSwitch}
 		afterNavigate={syncUrl}
@@ -440,7 +429,6 @@
 				showHalStatusColumn
 				apcMode="lab"
 				perPage={50}
-				onTotalChange={(t) => (pubsTotal = t)}
 			/>
 		</div>
 	{/if}
@@ -459,7 +447,6 @@
 				labId={lab.id}
 				urlSync={false}
 				apiKey={`lab-${lab.id}-persons`}
-				onTotalChange={(t) => { personsTotal = t; personsLoaded = true; }}
 			/>
 		</div>
 	{/if}

@@ -309,13 +309,6 @@ th.sorted .sort-arrow {
 	box-shadow: inset 0 -2px 0 var(--accent);
 }
 
-.tab-count {
-	font-size: 0.8rem;
-	font-weight: 400;
-	color: var(--muted);
-	margin-left: 4px;
-}
-
 /* ── Pub table column widths ── */
 /* width: 100% sur le th = idiome HTML table « cette colonne absorbe
    tout le restant ». Combiné avec width: 1px sur Revue (shrink) et

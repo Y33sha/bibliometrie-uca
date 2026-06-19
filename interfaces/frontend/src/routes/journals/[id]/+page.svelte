@@ -27,9 +27,6 @@
 	let subjects = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
 
-	// `pub_count` du detail sert au compteur de l'onglet tant que
-	// PublicationsListView n'a pas remonté son total post-filtrage.
-	let pubsTotal = $state(0);
 	let showRawDoaj = $state(false);
 
 	let journalTypeLabels: Record<string, string> = $state({});
@@ -52,7 +49,6 @@
 	async function loadJournal() {
 		try {
 			journal = await api<JournalDetail>(`/api/journals/${journalId}`);
-			pubsTotal = journal.pub_count;
 		} catch {
 			error = true;
 		}
@@ -171,8 +167,8 @@
 	<!-- Tabs -->
 	<TabNav
 		tabs={[
-			{ id: 'dashboard', label: 'Dashboard', showCount: false },
-			{ id: 'publications', label: 'Publications', count: pubsTotal }
+			{ id: 'dashboard', label: 'Dashboard' },
+			{ id: 'publications', label: 'Publications' }
 		]}
 		onswitch={onTabSwitch}
 	/>
@@ -290,7 +286,6 @@
 				basePath={`/journals/${journalId}`}
 				showFilterBanner={false}
 				perPage={50}
-				onTotalChange={(t) => (pubsTotal = t)}
 			/>
 		</div>
 	{/if}

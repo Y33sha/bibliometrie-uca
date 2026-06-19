@@ -32,7 +32,6 @@
 		hidePublisherColumn = false,
 		actionCell,
 		actionColumnHeader = '',
-		onTotalChange,
 	}: {
 		apiKey?: string;
 		externalFilters?: ExternalFilters;
@@ -50,7 +49,6 @@
 		actionCell?: Snippet<[Journal]>;
 		/** En-tête de la colonne actions (vide par défaut, comme admin). */
 		actionColumnHeader?: string;
-		onTotalChange?: (total: number) => void;
 	} = $props();
 
 	// --- Filter state ---
@@ -59,10 +57,6 @@
 	let selectedJournalTypes: string[] = $state([]);
 	let selectedOaModels: string[] = $state([]);
 	let selectedDoaj: string[] = $state([]); // 'true' / 'false'
-
-	$effect(() => {
-		if (onTotalChange) onTotalChange(journals.total);
-	});
 
 	// --- Params builder partagé entre liste + facettes ---
 	function buildFilterParams(): URLSearchParams {

@@ -21,8 +21,7 @@
 		labId,
 		urlSync = true,
 		basePath = '/persons',
-		perPage = 50,
-		onTotalChange
+		perPage = 50
 	}: {
 		apiKey?: string;
 		/** Contexte labo fixe : scope l'annuaire aux personnes du laboratoire. */
@@ -30,7 +29,6 @@
 		urlSync?: boolean;
 		basePath?: string;
 		perPage?: number;
-		onTotalChange?: (total: number) => void;
 	} = $props();
 
 	let search = $state('');
@@ -146,10 +144,6 @@
 		dir.page = 1;
 		syncUrl();
 		dir.load();
-	});
-
-	$effect(() => {
-		if (onTotalChange) onTotalChange(dir.total);
 	});
 
 	onMount(async () => {
