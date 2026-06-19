@@ -161,6 +161,21 @@ def search_clause(search: str) -> WhereClause | None:
     )
 
 
+def person_search_clause(search: str) -> WhereClause | None:
+    """Recherche annuaire : nom ou prénom (accent-insensible).
+
+    Partagée par l'annuaire des personnes et ses facettes (mêmes résultats).
+    Alias `p` = persons. Bind `:flt_person_search`.
+    """
+    if not search:
+        return None
+    return WhereClause(
+        "(unaccent(p.last_name) ILIKE unaccent(:flt_person_search) "
+        "OR unaccent(p.first_name) ILIKE unaccent(:flt_person_search))",
+        {"flt_person_search": f"%{search}%"},
+    )
+
+
 def source_clause(source_values: list[str]) -> WhereClause | None:
     """Filtre source via publications.sources (GIN). `source_values` = liste
     `{prefix}_{yes|no}` (constantes côté front, sans bind nécessaire)."""

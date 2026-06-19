@@ -93,3 +93,17 @@ class TestDirectoryLabScope:
         # et strictement inférieur au global qui inclut les deux).
         assert scoped.rh.yes + scoped.rh.no == 1
         assert unscoped.rh.yes + unscoped.rh.no >= 2
+
+    def test_facets_respect_search(self, sa_sync_conn):
+        """Régression : les comptes de facettes suivent la recherche par nom."""
+        lab = _structure(sa_sync_conn, "LAB-SRCH")
+        p1 = _person(sa_sync_conn, "Dupont")
+        _authorship_in_lab(sa_sync_conn, p1, lab_id=lab)
+        p2 = _person(sa_sync_conn, "Martin")
+        _authorship_in_lab(sa_sync_conn, p2, lab_id=lab)
+
+        q = PgPersonsQueries(sa_sync_conn)
+        both = q.persons_facets(filters=FacetFilters(lab_id=lab))
+        dupont = q.persons_facets(filters=FacetFilters(lab_id=lab, search="dupont"))
+        assert both.rh.yes + both.rh.no == 2
+        assert dupont.rh.yes + dupont.rh.no == 1
