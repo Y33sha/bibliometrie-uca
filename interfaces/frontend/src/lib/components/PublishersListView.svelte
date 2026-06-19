@@ -55,6 +55,7 @@
 	const publishers = usePaginatedFetch<Publisher>({
 		endpoint: '/api/publishers',
 		itemsKey: 'publishers',
+		// svelte-ignore state_referenced_locally
 		perPage,
 		apiKey: () => apiKey,
 		buildParams() {

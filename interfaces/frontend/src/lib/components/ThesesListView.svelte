@@ -61,6 +61,7 @@
 	const pubs = usePaginatedFetch<ThesisRow>({
 		endpoint: '/api/publications',
 		itemsKey: 'publications',
+		// svelte-ignore state_referenced_locally
 		perPage,
 		apiKey: () => apiKey,
 		buildParams: buildFilterParams
