@@ -64,6 +64,10 @@ def http_request_with_retry(
     breaker = get_current_breaker()
     if breaker is not None:
         breaker.check()  # court-circuite si la source a déjà tripé
+        # Préfixe la source dans tous les logs de retry/échec ci-dessous : sans
+        # ça, un message comme « 429 Too Many Requests rec 1 » ne dit pas *quelle*
+        # source rate-limite. Le breaker (ContextVar) porte le nom de la source.
+        label = f"{breaker.source} {label}".rstrip()
 
     last_error: Exception | None = None
     for attempt in range(max_retries):
