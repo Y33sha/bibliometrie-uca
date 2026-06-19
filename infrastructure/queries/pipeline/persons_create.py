@@ -5,7 +5,7 @@ Regroupe les SELECT nécessaires aux 4 passes de rattachement
 (comptes HAL, cross-source, IdRef/ORCID connus, lookup `person_name_forms`).
 """
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, Row, text
 
 from application.ports.pipeline.persons_create import (
     BareUnlinkedAuthorship,
@@ -38,7 +38,8 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
                    sa_auth.person_identifiers->>'idref' AS idref,
                    sa_auth.roles,
                    sd.publication_id,
-                   sa_auth.author_position
+                   sa_auth.author_position,
+                   TRUE AS in_perimeter
             FROM source_authorships sa_auth
             JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
             JOIN publications pub ON pub.id = sd.publication_id
@@ -49,21 +50,134 @@ def fetch_unlinked_authorships(conn: Connection) -> list[BareUnlinkedAuthorship]
               AND pub.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
         """)
     ).all()
-    return [
-        BareUnlinkedAuthorship(
-            authorship_id=r.authorship_id,
-            source=r.source,
-            full_name=r.full_name,
-            author_name_normalized=r.author_name_normalized,
-            orcid=r.orcid,
-            hal_person_id=r.hal_person_id,
-            idref=r.idref,
-            roles=r.roles,
-            publication_id=r.publication_id,
-            author_position=r.author_position,
-        )
-        for r in rows
+    return [_to_bare(r) for r in rows]
+
+
+def _to_bare(r: Row) -> BareUnlinkedAuthorship:
+    """Mappe une ligne SQL (projection partagée) vers `BareUnlinkedAuthorship`."""
+    return BareUnlinkedAuthorship(
+        authorship_id=r.authorship_id,
+        source=r.source,
+        full_name=r.full_name,
+        author_name_normalized=r.author_name_normalized,
+        orcid=r.orcid,
+        hal_person_id=r.hal_person_id,
+        idref=r.idref,
+        roles=r.roles,
+        publication_id=r.publication_id,
+        author_position=r.author_position,
+        in_perimeter=r.in_perimeter,
+    )
+
+
+_OOP_PROJECTION = """
+    sa_auth.id AS authorship_id,
+    sa_auth.source::text AS source,
+    sa_auth.raw_author_name AS full_name,
+    sa_auth.author_name_normalized,
+    sa_auth.person_identifiers->>'orcid' AS orcid,
+    sa_auth.person_identifiers->>'hal_person_id' AS hal_person_id,
+    sa_auth.person_identifiers->>'idref' AS idref,
+    sa_auth.roles,
+    sd.publication_id,
+    sa_auth.author_position,
+    FALSE AS in_perimeter
+"""
+
+# Conditions communes à toutes les branches : SA orpheline hors-périmètre,
+# rattachée à une publication active dans le scope métier, avec un nom.
+_OOP_COMMON_WHERE = f"""
+    sa_auth.person_id IS NULL
+    AND sa_auth.in_perimeter = FALSE
+    AND sd.publication_id IS NOT NULL
+    AND sa_auth.raw_author_name IS NOT NULL
+    AND pub.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}
+"""
+
+
+def _oop_identifier_branch(id_type: str, *, source_filter: str = "") -> str:
+    """Branche « identifiant-ancré » : SA hors-périmètre dont l'identifiant
+    `id_type` (jsonb) est déjà porté par une personne connue (non rejetée).
+
+    Jointure `person_identifiers` ↔ `source_authorships` sur la valeur jsonb.
+    Pas d'index d'expression : le planner ne sait pas sonder par valeur sur un
+    jsonb (testé : JOIN / `= ANY` / LATERAL aboutissent tous à un seq scan des
+    SA orphelines), il scanne donc l'espace orphelin. Coût assumé (cf. fiche
+    `METIER_authorships-cross-source-matching`) en attendant la refonte ER
+    set-based. `person_identifiers ? '{id_type}'` et la restriction de source
+    ORCID sont des filtres de correction, pas d'optimisation.
+    """
+    return f"""
+        SELECT {_OOP_PROJECTION}
+        FROM person_identifiers pi
+        JOIN source_authorships sa_auth
+            ON sa_auth.person_identifiers->>'{id_type}' = pi.id_value
+        JOIN source_publications sd ON sd.id = sa_auth.source_publication_id
+        JOIN publications pub ON pub.id = sd.publication_id
+        WHERE pi.id_type = '{id_type}'
+          AND pi.status <> 'rejected'
+          AND sa_auth.person_identifiers ? '{id_type}'
+          {source_filter}
+          AND {_OOP_COMMON_WHERE}
+    """
+
+
+# Branche « cross-source-ancrée » : SA hors-périmètre à une (publication,
+# position) où une autre source_authorship est déjà rattachée à une personne.
+# Self-join sur la **position source** (`linked.author_position`), pas la position
+# canonique de `authorships` : c'est la clé qu'utilise `linked_index` côté
+# orchestrateur ; s'ancrer sur la canonique sous-fetcherait dès que les sources
+# divergent sur l'ordre des auteurs. La requête ne fait que borner les candidats ;
+# le matching nom-compatible est tranché côté Python (`decide_cross_source_match`).
+_OOP_CROSS_SOURCE_BRANCH = f"""
+    SELECT {_OOP_PROJECTION}
+    FROM source_authorships linked
+    JOIN source_publications sd_linked ON sd_linked.id = linked.source_publication_id
+    JOIN source_publications sd ON sd.publication_id = sd_linked.publication_id
+    JOIN source_authorships sa_auth
+        ON sa_auth.source_publication_id = sd.id
+       AND sa_auth.author_position = linked.author_position
+    JOIN publications pub ON pub.id = sd.publication_id
+    WHERE linked.person_id IS NOT NULL
+      AND linked.author_position IS NOT NULL
+      AND {_OOP_COMMON_WHERE}
+"""
+
+# ORCID : restreint aux sources à ORCID déposé par l'auteur, à garder synchronisé
+# avec `ORCID_MATCH_SOURCES` du domaine (filtre de correction : l'ORCID WoS/ScanR
+# est dérivé algorithmiquement, pas un signal de matching).
+_OOP_CANDIDATES_SQL = " UNION ".join(
+    [
+        _oop_identifier_branch(
+            "orcid", source_filter="AND sa_auth.source IN ('crossref', 'openalex', 'hal')"
+        ),
+        _oop_identifier_branch("idref"),
+        _oop_identifier_branch("hal_person_id"),
+        _OOP_CROSS_SOURCE_BRANCH,
     ]
+)
+
+
+def fetch_out_of_perimeter_candidates(conn: Connection) -> list[BareUnlinkedAuthorship]:
+    """Candidats hors-périmètre (`in_perimeter = FALSE`) rattachables sans
+    forme de nom : par identifiant fort partagé avec une personne connue, ou
+    par ancrage cross-source (même publication × position qu'un authorship
+    déjà rattaché).
+
+    Union des quatre branches d'accès, dédupliquée en SQL (`UNION`) : une même
+    SA peut être candidate par plusieurs chemins. La cascade côté orchestrateur
+    arbitre ensuite (les barreaux nom/création y sont neutralisés pour ces
+    candidats hors-périmètre).
+
+    On ne ramène jamais le pool mondial non-UCA : seulement les SA ancrées sur
+    une personne existante (jointure identifiant) ou une position liée
+    (cross-source). L'ensemble *rendu* décroît à chaque run (une fois rattachée,
+    une SA n'est plus orpheline) ; le *coût* du fetch, lui, reste celui d'un scan
+    de l'espace orphelin (cf. docstrings des branches) — acceptable (~minutes)
+    en attendant la refonte ER set-based.
+    """
+    rows = conn.execute(text(_OOP_CANDIDATES_SQL)).all()
+    return [_to_bare(r) for r in rows]
 
 
 def fetch_linked_authorships(conn: Connection) -> list[LinkedAuthorshipRow]:
@@ -175,6 +289,9 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
 
     def fetch_unlinked_authorships(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
         return fetch_unlinked_authorships(conn)
+
+    def fetch_out_of_perimeter_candidates(self, conn: Connection) -> list[BareUnlinkedAuthorship]:
+        return fetch_out_of_perimeter_candidates(conn)
 
     def fetch_linked_authorships(self, conn: Connection) -> list[LinkedAuthorshipRow]:
         return fetch_linked_authorships(conn)

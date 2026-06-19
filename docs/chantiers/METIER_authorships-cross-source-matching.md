@@ -38,7 +38,8 @@ Après filtre méga-papers (publis dont le max d'auteurs par source ≤ 50, alig
 
 - **Lecture seule d'abord** : avant tout fix, on consolide l'audit. Le volume actuel (~64 k SA candidates au rattachement, ~33 k de plus avec position match mais nom non strictement identique) doit être qualifié à l'œil sur un sample pour mesurer le taux de faux positifs avant un éventuel oneshot d'application.
 - **Critère "position compatible" strict** au démarrage : même position exacte uniquement, comme la cascade existante (`decide_cross_source_match`). On élargira (tolérance ±N, ou alignement par nom) plus tard si l'audit qualitatif justifie l'ouverture.
-- **`source_authorships.in_perimeter` n'est pas touché** par un éventuel fix : la valeur reflète honnêtement la détection par chaque source. Un auteur UCA-CHU qui ne signe que CHU dans OpenAlex doit rester `in_perimeter = FALSE` côté SA OA — cette information est exploitable (signal de signature dégradée pour cet auteur sur cette publication). Seuls `person_id` et `authorship_id` sont à compléter côté SA.
+- **`source_authorships.in_perimeter` n'est pas touché** : la valeur reflète honnêtement la détection par chaque source. Un auteur UCA-CHU qui ne signe que CHU dans OpenAlex doit rester `in_perimeter = FALSE` côté SA OA — cette information est exploitable (signal de signature dégradée pour cet auteur sur cette publication).
+- **La garde `in_perimeter` ne conditionne que le barreau nominal** (match unique / création par forme de nom). Les barreaux non-nominaux — identifiant fort (ORCID/IdRef/hal_person_id partagé avec une personne connue) et cross-source (même publication × position qu'une `source_authorships` déjà reliée) — sont sûrs hors-périmètre : ils s'ancrent sur une personne *existante*, sans risque d'introduire un auteur non-UCA. Un match hors-périmètre applique donc les **mêmes effets** qu'en périmètre (`person_id`, forme de nom, identifiants observés en `pending`) : `in_perimeter` ne conditionne pas l'enregistrement de ce qu'une personne confirmée a signé. `authorship_id` reste posé par `build_authorships` en aval (la phase authorships tourne après persons).
 - **L'authorship canonique reste la table de vérité** pour `in_perimeter` (déjà union des sources via build_authorships étape 4). Pas de modification de cette logique.
 
 ## Phasage
@@ -50,15 +51,16 @@ Après filtre méga-papers (publis dont le max d'auteurs par source ≤ 50, alig
 - [x] Étend la cascade `decide_person_match` étape 4 (cross-source par publi + position) aux SA `in_perimeter = FALSE` quand au moins une autre SA de la même publi est déjà reliée à un `person_id`. UPDATE de `source_authorships.person_id` + `authorship_id` ; `source_authorships.in_perimeter` non modifié.
 
 ### Phase 3 — Intégration permanente dans la phase persons
-Le oneshot Phase 2 est une application ponctuelle : sans intégration, la lacune réapparaît sur chaque nouvelle publi. On rend la passe cross-source permanente.
+Le oneshot Phase 2 est une application ponctuelle : sans intégration, la lacune réapparaît à chaque nouvelle publi. La phase persons traite désormais, dans la **même cascade**, deux populations de candidats (`get_out_of_perimeter_candidates` + boucle unifiée dans `create_persons_from_source_authorships.py`) :
 
-- [ ] Passe dédiée **en fin de phase persons**, après la cascade normale (les ancres `person_id` doivent déjà exister sur la publi).
-- [ ] Requête **scopée** : SA `in_perimeter = FALSE`, `person_id IS NULL`, sur une publi ayant ≥1 SA déjà reliée à la même position. Borne le coût (~quelques 10 k, pas le pool mondial non-UCA) et décroît à chaque run, comme le modèle « non-relié » actuel — pas de flag dirty à introduire.
-- [ ] Réutiliser la logique du oneshot Phase 2 (`decide_person_match` étape 4) — factoriser, pas dupliquer.
-- [ ] `source_authorships.in_perimeter` non touché ; seuls `person_id` + `authorship_id` complétés (cf. Décisions).
-- [ ] Mesurer le coût ajouté à la phase persons (doit rester négligeable vu le scope).
+- [x] **In-périmètre** (`in_perimeter = TRUE`) : inchangé, tous les barreaux.
+- [x] **Hors-périmètre ancré** (`in_perimeter = FALSE`) : barreau nominal neutralisé (`NameFormDecision(action="skip")`), seuls jouent les identifiants forts et le cross-source. Garde `in_perimeter` déplacée au barreau name_form (cf. Décisions).
+- [x] Fetch `fetch_out_of_perimeter_candidates` = UNION dédupliquée de 4 branches : ORCID (sources `ORCID_MATCH_SOURCES` uniquement) / IdRef / hal_person_id (jointure `person_identifiers` ↔ valeur jsonb) + cross-source (self-join `source_authorships` sur la **position source**, ancré sur `person_id IS NOT NULL` comme `linked_index` — *pas* sur la table `authorships`, qui n'est reconstruite qu'à la phase suivante).
+- [x] `source_authorships.in_perimeter` non touché ; `authorship_id` posé par `build_authorships` en aval.
 
-Forward-compatible avec une éventuelle refonte « record linkage personnes » : l'arête cross-source (même publi + position + nom compatible, ancrée sur une personne existante) est conservatrice et survivrait à un changement de modèle. Cette refonte — linkage *homonyme-aware*, car les noms de personnes ne sont pas des clés quasi-uniques comme le sont DOI / metadata_block côté publications — est un chantier distinct, hors scope ici.
+**Coût du fetch — un scan de l'espace orphelin (~minutes, jugé négligeable).** Le planner ne sait pas sonder par valeur sur un jsonb : JOIN, `= ANY(:array)`, LATERAL et nested-loop forcé aboutissent tous à un seq scan des SA orphelines. Des index partiels d'expression (`(person_identifiers->>'orcid')` etc.) ont été créés puis **abandonnés** : non utilisés par le planner (seul le hal, petit, passait en bitmap), et l'index partiel `person_id IS NULL` retenait ~2,9 M d'ORCID monde jamais matchables. Aucun flag dirty introduit (l'incrémental serait une demi-mesure ; voir ci-dessous).
+
+**Reporté : refonte ER set-based des personnes.** La vraie levée du coût passe par la **normalisation des identifiants** (table d'occurrences indexée `(id_type, id_value)`), qui rendrait le matching personnes ensembliste comme la réconciliation publications l'est sur les clés — fetch trivial, planner-friendly, cross-temporel natif. Chantier distinct (le matching persons est aujourd'hui une cascade Python ligne-à-ligne), *homonyme-aware* (les noms ne sont pas des clés quasi-uniques comme DOI / metadata_block). Tant qu'il n'est pas fait, le résiduel cross-temporel (personne acquérant *après coup* un identifiant matchant une SA déjà nettoyée) est balayé par une relance du oneshot Phase 2.
 
 ## Questions ouvertes
 

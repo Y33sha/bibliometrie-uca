@@ -508,8 +508,11 @@ def phase_publications(**kw: Any) -> Any:
 def phase_persons(**kw: Any) -> Any:
     """Creation et rattachement des personnes.
 
-    Cree des personnes a partir des source_authorships in_perimeter non rattachees.
-    Exclut les publications hors-scope doc_type (cf domain/publications/scope).
+    Cree des personnes a partir des source_authorships in_perimeter non rattachees,
+    et rattache en complement les authorships hors-perimetre ancrees sur une
+    personne connue (identifiant fort partage ou cross-source ; pas de matching
+    ni creation par nom). Exclut les publications hors-scope doc_type
+    (cf domain/publications/scope).
     """
     _run_create_persons()
     _run_populate_person_name_forms()
