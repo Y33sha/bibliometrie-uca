@@ -27,24 +27,50 @@ Volume : ~32 952 payloads HAL portent un `notBefore` mais la plupart sont des da
 1. **Nouveau membre d'enum `embargoed`**, intermédiaire entre `closed` et `green`. Sémantique : le dépôt existe (l'auteur a fait sa part), mais l'accès est légalement différé. Ni fermé (rien à reprocher à l'auteur) ni encore ouvert.
 2. **`OA_RANK` re-numéroté** pour insérer `embargoed` entre `green` et `closed` : `diamond 8 > gold 7 > hybrid 6 > bronze 5 > green 4 > embargoed 3 > closed 2 > unknown 1`. Effet recherché : si une *autre* source atteste l'ouverture réelle ailleurs (OpenAlex `gold`, etc.), elle l'emporte sur `embargoed` ; `embargoed` ne « gagne » que face à `closed`/`unknown`/silence.
 3. **Extraction au normalize HAL** de `ref[@type='file']/date/@notBefore` (à côté du parsing TEI existant), stockée dans une nouvelle colonne `source_publications.embargo_until DATE` (NULL = pas d'embargo connu).
-4. **`derive_hal_oa_status` rendu conscient de l'embargo** : si une date de fin d'embargo est dans le futur, renvoyer `embargoed` au lieu de `green`, même quand `fileMain_s` est présent. La règle `file_main → green` ne s'applique plus que hors embargo.
+4. **`derive_hal_oa_status` date-agnostique** : fichier présent + `embargo_until` renseigné ⇒ `embargoed`, sans regarder la date. La règle `file_main → green` ne s'applique plus dès qu'un embargo est connu. La **levée** à l'échéance n'est **pas** dans le derive — elle est portée par la règle de correction (décision 6), pour que la logique de date ne vive qu'à un seul endroit.
 5. **UI intermédiaire** calquée sur les thèses « en cours » : icône sablier + mention « embargo » (et idéalement la date de levée), au lieu du cadenas ouvert. Pastille `oa-embargoed` dédiée.
-6. **Promotion `embargoed → green` par le pipeline, pas à la lecture.** La date étant stockée, une étape de pipeline (à chaque run) promeut en `green` tout `embargoed` dont `embargo_until <= current_date`, indépendamment d'un éventuel ré-import HAL (qui est en retard). Le statut en base reste la vérité, pas de dérivation au read-time. Propriété qui le rend trivialement correct : si `publications.oa_status = 'embargoed'`, c'est qu'aucune source n'était plus ouverte (sinon `best_oa_status` aurait déjà gagné), donc la levée mène toujours à `green`.
+6. **Promotion `embargoed → green` par une règle de correction `oa_status`, pas par une étape dédiée.** `effective_metadata` gagne une règle `oa_status == embargoed` + `embargo_expired` ⇒ `green`, où `embargo_expired` (`embargo_until <= current_date`) est calculé dans le **SQL de fetch** des corrections — la fonction reste pure (elle lit un booléen, pas d'horloge). La règle tourne dans `metadata_correction`, qui ré-examine **tous** les `source_publications` à chaque run : la promotion est donc automatique à l'échéance, sans ré-import HAL. Le persist des corrections pose déjà `keys_dirty` inconditionnellement, donc la phase `publications` ré-agrège `best_oa_status` et le canonique passe à `green`. Trivialement correct : si `publications.oa_status = 'embargoed'`, c'est qu'aucune source n'était plus ouverte (sinon `best_oa_status` aurait gagné), donc la levée mène toujours à `green`. La logique de date vit en un seul endroit (la règle), et il n'y a aucune phase de pipeline dédiée.
 
 ## Phasage
 
-1. **Audit volumétrie** : compter les `source_publications` HAL avec `notBefore` futur, et le recouvrement avec d'autres sources qui les déclarent déjà ouverts (combien resteraient réellement `embargoed` après `best_oa_status`). Confirme l'ampleur et valide le rang choisi.
-2. **Migration** : `ALTER TYPE oa_type ADD VALUE 'embargoed'` + `ALTER TABLE source_publications ADD COLUMN embargo_until DATE`. (Alembic, SQL pur ; `ADD VALUE` est non transactionnel — vérifier le découpage Alembic.)
-3. **Domaine** : `OA_RANK` mis à jour ; tests de `best_oa_status` couvrant `embargoed` vs sources ouvertes/fermées.
-4. **Normalize HAL** : extraction `notBefore` → `embargo_until` ; `derive_hal_oa_status` prend la date en paramètre et renvoie `embargoed` si futur. Tests unitaires (embargo futur, échu, absent ; avec/sans `fileMain_s`).
-5. **Rattrapage du stock** : re-normalisation HAL `raw_hash=null` (selon le mode de re-run habituel) pour repositionner le statut des documents concernés.
-6. **API + UI** : exposer `oa_status='embargoed'` (et la date) ; libellé `$lib/labels` ; rendu sablier + mention « embargo » ; décider du rangement dans la facette « accès » (cf. questions).
+### 1. Audit volumétrie
+*Prérequis : confirme l'ampleur et valide le rang choisi (décision 2).*
+- [ ] Compter les `source_publications` HAL avec `notBefore` futur
+- [ ] Mesurer le recouvrement avec les sources qui les déclarent déjà ouverts — combien resteraient réellement `embargoed` après `best_oa_status`
+
+### 2. Migration (Alembic, SQL pur)
+- [ ] `ALTER TYPE oa_type ADD VALUE 'embargoed'` — non transactionnel, vérifier le découpage Alembic
+- [ ] `ALTER TABLE source_publications ADD COLUMN embargo_until DATE`
+
+### 3. Domaine
+- [ ] `OA_RANK` mis à jour : `embargoed` inséré entre `green` et `closed`
+- [ ] Tests `best_oa_status` : `embargoed` face à une source ouverte, à `closed`, au silence
+
+### 4. Normalize HAL
+- [ ] Extraction `ref[@type='file']/date/@notBefore` → `embargo_until`, à côté du parsing TEI existant
+- [ ] `derive_hal_oa_status` date-agnostique : fichier présent + `embargo_until` renseigné ⇒ `embargoed` (la levée est portée par la règle de correction, pas par le derive)
+- [ ] Tests unitaires du derive : avec embargo / sans embargo, avec et sans `fileMain_s`
+
+### 5. Règle de correction `oa_status`
+*La promotion `embargoed → green` est une règle de correction de métadonnées, pas une étape de pipeline dédiée (décision 6).*
+- [ ] Calcul de `embargo_expired` (`embargo_until <= current_date`) dans le SQL de fetch des corrections — `effective_metadata` reste pure
+- [ ] Prédicats `oa_status` (entrée) et `embargo_expired` ; règle `oa_status=embargoed + embargo_expired ⇒ green`
+- [ ] Tests : embargo échu ⇒ `green`, futur ⇒ inchangé, absent ⇒ inchangé
+- [ ] Propagation au canonique acquise (`persist_corrections` pose déjà `keys_dirty` ⇒ ré-agrégation `best_oa_status` en phase `publications`)
+
+### 6. Rattrapage du stock
+- [ ] Réimport HAL (`raw_hash=null`) pour repeupler `embargo_until` (nouvelle extraction au normalize) et repositionner le statut des documents concernés
+
+### 7. API + UI
+- [ ] Exposer `oa_status='embargoed'` et la date dans l'API
+- [ ] Libellé `embargoed` dans `$lib/labels`
+- [ ] Rendu sablier + mention « embargo » (idéalement la date de levée), pastille `oa-embargoed`
+- [ ] Trancher le rangement dans la facette « accès » (cf. Questions ouvertes)
 
 ## Questions ouvertes
 
-- **Cible de la promotion `embargoed → green` (décision 6).** L'`UPDATE` à l'échéance porte-t-il sur `source_publications` (puis re-agrégation `best_oa_status` des publications touchées) ou directement sur `publications` ? Le direct exige `embargo_until` au niveau canonique (cf. point suivant) ; sinon, jointure `publications → source_publications` HAL. Choisir où placer l'étape dans le pipeline (proche de la phase oa_status / enrich).
-- **`embargo_until` au niveau canonique ?** Le propager sur `publications` (pour afficher « embargo jusqu'au X » et faire la promotion directement sur la table canonique) ou le garder seulement sur `source_publications` (UI et promotion via jointure) ?
+- **`embargo_until` au niveau canonique ? (affichage seulement).** La promotion n'en a plus besoin (règle de correction au niveau SP + ré-agrégation). Reste l'UI : afficher « embargo jusqu'au X » exige soit `embargo_until` propagé sur `publications`, soit une jointure `publications → source_publications` HAL à la lecture.
 - **Facette « accès » open/closed.** `embargoed` va du côté fermé (cohérent : pas encore accessible) ou forme une 3ᵉ catégorie ? Idem pour les décomptes OA des dashboards.
 - **Autres sources d'embargo.** theses.fr n'expose rien (vérifié). Les autres sources (OpenAlex…) peuvent-elles signaler un embargo, ou est-ce strictement HAL pour l'instant ?
-- **Dates `notBefore` passées.** Confirmer qu'une date échue n'a aucun effet (document traité comme ouvert normal) et ne pollue pas `embargo_until` (NULL vs date passée conservée pour historique ?).
+- **Dates `notBefore` passées.** Avec le derive date-agnostique, une date échue produit `embargoed` (derive) puis `green` (règle de correction) dans le même run — pas de traitement spécial, le document finit `green`. Reste : garde-t-on `embargo_until` renseigné même pour une date passée (historique) ou le nulle-t-on ?
 - **Quel impact de l'API Unpaywall?** Ne pas écraser un statut *embargoed* par un statut *closed*. Si un statut plus ouvert est trouvé: écraser.

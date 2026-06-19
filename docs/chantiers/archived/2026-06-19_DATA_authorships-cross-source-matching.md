@@ -1,6 +1,6 @@
 # Chantier — Matching cross-source des authorships
 
-Commencé le 2026-05-30
+Commencé le 2026-05-30 - Terminé le 2026-06-19
 
 ## Contexte
 

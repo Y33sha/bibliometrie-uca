@@ -9,7 +9,7 @@
 
 ### En pause
 
-- [Matching cross-source des authorships](METIER_authorships-cross-source-matching.md)
+- [Matching cross-source des authorships](DATA_authorships-cross-source-matching.md)
 - [Observabilité du pipeline](CODE_observabilite-pipeline.md)
 - [DOI Registration Agencies & DataCite](METIER_doi-ra-datacite.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
