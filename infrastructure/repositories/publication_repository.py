@@ -272,6 +272,13 @@ class PgPublicationRepository:
         )
         return [_view_from_row(_SourcePublicationViewRow(*row)) for row in result]
 
+    def get_journal_type(self, journal_id: int) -> str | None:
+        """`journal_type` d'un journal (cast text). None si le journal n'existe pas ou son type est NULL."""
+        return self._conn.execute(
+            text("SELECT journal_type::text FROM journals WHERE id = :id"),
+            {"id": journal_id},
+        ).scalar_one_or_none()
+
     # ── Création ───────────────────────────────────────────────────
 
     def create(

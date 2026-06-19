@@ -41,14 +41,26 @@ def test_hal_code_mapped_to_canonical_with_marker():
     assert upd.raw_metadata == {"doc_type": {"raw": "ART", "corrected_by": "DOC_TYPE_MAP"}}
 
 
-def test_thesis_with_journal_id_is_mistyped_article():
-    # Mistype OpenAlex/ScanR : un article typé thèse, rattaché à un journal → article.
-    upd = compute_update(_sp(doc_type="thesis", journal_id=42))
+def test_thesis_with_journal_id_and_publisher_doi_is_mistyped_article():
+    # Mistype OpenAlex/ScanR : un article typé thèse, rattaché à un journal, avec un DOI d'éditeur
+    # (préfixe ≠ registre de thèses) → article.
+    upd = compute_update(_sp(doc_type="thesis", journal_id=42, doi="10.1016/j.ex.2020.01.001"))
     assert upd is not None
     assert upd.doc_type == "article"
     assert upd.raw_metadata == {
         "doc_type": {"raw": "thesis", "corrected_by": "THESIS_WITH_JOURNAL_TO_ARTICLE"}
     }
+
+
+def test_thesis_with_journal_id_but_thesis_registry_doi_stays_thesis():
+    # DOI ABES (registre des thèses FR) : c'est le DOI propre de la thèse, le journal_id est parasite
+    # (conflation thèse↔version publiée) → le type reste thèse, pas de correction.
+    assert compute_update(_sp(doc_type="thesis", journal_id=42, doi="10.70675/abc123")) is None
+
+
+def test_thesis_with_journal_id_no_doi_stays_thesis():
+    # Sans DOI, rien ne distingue le mistype de la conflation : on ne bascule pas, le type reste thèse.
+    assert compute_update(_sp(doc_type="thesis", journal_id=42, doi=None)) is None
 
 
 def test_real_thesis_without_journal_id_untouched():
@@ -62,6 +74,7 @@ def test_thesis_to_article_strips_dissertation_keys():
         _sp(
             doc_type="thesis",
             journal_id=42,
+            doi="10.1016/j.ex.2020.01.001",
             external_ids={"nnt": "2020X", "hal_id": ["tel-01", "hal-99"], "pmid": "123"},
         )
     )
@@ -76,7 +89,14 @@ def test_thesis_to_article_strips_dissertation_keys():
 
 def test_thesis_to_article_without_dissertation_keys_leaves_external_ids():
     # Mistype pur (pas de clé-thèse) : external_ids inchangé, pas de stash.
-    upd = compute_update(_sp(doc_type="thesis", journal_id=42, external_ids={"pmid": "123"}))
+    upd = compute_update(
+        _sp(
+            doc_type="thesis",
+            journal_id=42,
+            doi="10.1016/j.ex.2020.01.001",
+            external_ids={"pmid": "123"},
+        )
+    )
     assert upd is not None
     assert upd.doc_type == "article"
     assert upd.external_ids == {"pmid": "123"}
@@ -84,9 +104,17 @@ def test_thesis_to_article_without_dissertation_keys_leaves_external_ids():
 
 
 def test_journal_id_wins_over_theses_fr_url_conflation():
-    # Conflation thèse↔article : une SP theses.fr AVEC un journal_id → article (le journal prime
-    # sur l'URL theses.fr). `journal_id_present: False` garde la règle URL.
-    upd = compute_update(_sp(doc_type="thesis", journal_id=42, urls=["https://theses.fr/2020X"]))
+    # Conflation thèse↔article : une SP theses.fr AVEC un journal_id ET un DOI d'éditeur → article
+    # (`journal_id_present: False` garde la règle URL ; `doi_prefix_not_in` distingue l'article
+    # publié — DOI éditeur — d'une vraie thèse à DOI ABES).
+    upd = compute_update(
+        _sp(
+            doc_type="thesis",
+            journal_id=42,
+            doi="10.1016/j.ex.2020.01.001",
+            urls=["https://theses.fr/2020X"],
+        )
+    )
     assert upd is not None
     assert upd.doc_type == "article"
     assert upd.raw_metadata["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"

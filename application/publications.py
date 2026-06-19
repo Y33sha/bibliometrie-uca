@@ -15,6 +15,11 @@ from domain.publications.aggregation import (
     refresh_from_sources as _refresh_aggregate,
 )
 from domain.publications.identifiers import DOI
+from domain.publications.publication import Publication
+from domain.source_publications.correction import (
+    SourcePublicationForCorrection,
+    effective_metadata,
+)
 from domain.sources.registry import SOURCE_PRIORITY
 
 
@@ -73,8 +78,13 @@ def refresh_from_sources(
                 return
 
     previous_doi = pub.doi
-    # Pas de re-correction ici : la phase `metadata_correction` a déjà écrit le canonique corrigé en place sur chaque `source_publication` (colonnes lues par `get_source_publications`). L'agrégation repart donc des valeurs corrigées.
+    # Les corrections per-record sont déjà persistées sur chaque `source_publication` par la phase
+    # `metadata_correction` (colonnes lues par `get_source_publications`) ; l'agrégation repart donc
+    # des valeurs corrigées. Mais l'arbitrage choisit `doc_type` et `journal_id` indépendamment :
+    # une correction journal-dépendante appliquée à la SP qui a résolu le journal ne suit pas le
+    # `journal_id` canonique — on la rejoue sur le canonique après agrégation.
     _refresh_aggregate(pub, sources, source_priority=SOURCE_PRIORITY)
+    _apply_canonical_doc_type_correction(pub, repo=repo)
     repo.save(pub)
     repo.update_sources(pub_id)
 
@@ -89,6 +99,55 @@ def refresh_from_sources(
                 "new_doi": str(pub.doi) if pub.doi else None,
             },
         )
+
+
+def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationRepository) -> None:
+    """Rejoue les corrections de `doc_type` sur la publication canonique après l'arbitrage.
+
+    L'arbitrage choisit `doc_type` (première source par priorité) et `journal_id` (premier non-nul)
+    **indépendamment**, possiblement depuis deux `source_publications` différentes. Une correction
+    journal-dépendante (`JOURNAL_TYPE_MEDIA_TO_MEDIA`, …) appliquée par SP en phase
+    `metadata_correction` ne fire que sur la SP qui a résolu le journal ; elle ne suit donc pas le
+    `journal_id` canonique. On reconstruit une vue de la publication canonique (son `doc_type` arbitré
+    + le `journal_type` de son `journal_id` arbitré) et on rejoue `effective_metadata` complète : les
+    règles journal-dépendantes s'appliquent alors au journal réellement résolu. Les règles URL n'ont
+    pas d'effet ici (le canonique n'agrège pas les URLs), ce qui est voulu — elles restent
+    SP-intrinsèques.
+
+    Mute `pub.doc_type` et trace la règle dans `pub.meta['corrections']['doc_type']` si une
+    correction s'applique. `meta` étant recalculé à chaque refresh (merge des `meta` sources), la
+    trace est éphémère et re-posée à chaque run — pas de brut à préserver côté canonique, contrairement
+    au sidecar `raw_metadata` des `source_publications`. Une seule lecture I/O (`journal_type`).
+    Idempotent : sur une publication déjà cohérente, aucun changement.
+    """
+    journal_type = repo.get_journal_type(pub.journal_id) if pub.journal_id is not None else None
+    view = SourcePublicationForCorrection(
+        id=pub.id or 0,
+        source="canonical",
+        source_id=str(pub.id),
+        title=pub.title,
+        pub_year=pub.pub_year,
+        doc_type=pub.doc_type,
+        doi=str(pub.doi) if pub.doi else None,
+        journal_id=pub.journal_id,
+        oa_status=pub.oa_status,
+        container_title=pub.container_title,
+        language=pub.language,
+        urls=None,
+        external_ids={},
+        journal_type=journal_type,
+        oa_model=None,
+        apc_amount=None,
+        raw_metadata={},
+    )
+    corrected = effective_metadata(view)
+    if corrected.doc_type is not None and corrected.doc_type.value != pub.doc_type:
+        pub.doc_type = corrected.doc_type.value
+        meta = dict(pub.meta or {})
+        corrections = dict(meta.get("corrections") or {})
+        corrections["doc_type"] = corrected.doc_type.rule.value
+        meta["corrections"] = corrections
+        pub.meta = meta
 
 
 def mark_distinct(
