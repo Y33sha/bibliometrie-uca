@@ -21,8 +21,10 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
     """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
     def base_clauses(*, skip: str) -> list[WhereClause | None]:
-        # Scope labo + recherche nom : jamais des facettes, toujours appliqués.
+        # Scope labo + recherche nom + exclusion des personnes rejetées : jamais
+        # des facettes, toujours appliqués (alignés sur l'annuaire `persons_directory`).
         out: list[WhereClause | None] = [
+            WhereClause("p.rejected = FALSE", {}),
             person_in_lab_clause(filters.lab_id),
             person_search_clause(filters.search),
         ]
