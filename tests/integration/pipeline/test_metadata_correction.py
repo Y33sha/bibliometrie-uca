@@ -131,11 +131,13 @@ def test_self_heals_when_journal_no_longer_media(sa_sync_conn):
 def test_thesis_with_journal_corrected_and_deconflated(sa_sync_conn):
     conn = sa_sync_conn
     jid = _seed_journal(conn, "journal")
+    # DOI d'éditeur (préfixe ≠ registre de thèses) : signe la version publiée → la conflation
+    # thèse↔article bascule en `article`. (Avec un DOI ABES ou sans DOI, le type resterait thèse.)
     sp = conn.execute(
         text(
             "INSERT INTO source_publications "
-            "(source, source_id, title, doc_type, journal_id, external_ids) "
-            "VALUES ('openalex', 'W-conflation', 'T', 'thesis', :jid, "
+            "(source, source_id, title, doc_type, doi, journal_id, external_ids) "
+            "VALUES ('openalex', 'W-conflation', 'T', 'thesis', '10.1016/j.ex.2020.01.001', :jid, "
             '\'{"nnt": "2020CLFAC001", "hal_id": ["tel-01", "hal-99"]}\'::jsonb) RETURNING id'
         ),
         {"jid": jid},

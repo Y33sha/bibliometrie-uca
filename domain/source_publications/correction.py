@@ -10,7 +10,7 @@ Architecture : chaque règle est une entrée du dict `_RULES`, mappant un membre
 
 Le moteur `_check_predicate` interprète chaque clé d'`applies_to` selon une convention fixe (voir le TypedDict `_AppliesTo` pour la liste exhaustive). `_correct_field(sp, "doc_type")` parcourt les règles dans l'ordre du dict et retourne la première qui (a) corrige le champ demandé et (b) dont tous les prédicats matchent.
 
-Cascade entre champs (ordre des dépendances) : `journal_id` → `doc_type` → `oa_status`. Le membre `MetadataCorrectionRule` qui a produit la correction est inscrit dans `publications.meta.<field>_corrected_by` par le caller, pour tracer la correction.
+Cascade entre champs (ordre des dépendances) : `journal_id` → `doc_type` → `oa_status`. La provenance (le membre `MetadataCorrectionRule` ayant produit la correction) est tracée par le caller, à un emplacement propre à chaque niveau : une `source_publication` la stashe dans `raw_metadata.<champ>.corrected_by`, **avec la valeur brute écrasée** (réversibilité, la colonne est mutée en place) ; une publication canonique l'inscrit dans `meta.corrections.<champ>` (provenance seule — le canonique est recalculé à chaque refresh, sans brut à préserver).
 """
 
 import re
@@ -62,7 +62,7 @@ class SourcePublicationForCorrection:
 class MetadataCorrectionRule(StrEnum):
     """Identifiants des règles de correction figées. Une règle = un membre.
 
-    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est inscrit dans `publications.meta.<field>_corrected_by` au moment où la règle est appliquée — c'est la trace d'audit consultable pour le re-run ciblé et l'affichage UI.
+    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est tracé par le caller au moment où la règle est appliquée (`source_publications.raw_metadata.<champ>.corrected_by` côté SP, `publications.meta.corrections.<champ>` côté canonique) — trace d'audit consultable pour le re-run ciblé et l'affichage UI.
     """
 
     THESES_FR_URL_TO_THESIS = "THESES_FR_URL_TO_THESIS"
@@ -146,6 +146,15 @@ _YEAR_PAGES_END_PATTERN = re.compile(
     r"(19|20)\d{2}[\s,.]+\d{1,4}\s*(pp|pages?|p)\.?\s*$", re.IGNORECASE
 )
 
+# Préfixes DOI des registres de thèses : un DOI émis par ces registres est le DOI *propre* de la
+# thèse, pas celui d'une version publiée. `10.70675` = ABES (Agence Bibliographique de
+# l'Enseignement Supérieur), résolu via `doi_prefixes` (publisher « agence bibliographique de l
+# enseignement superieur »). Ensemble volontairement incomplet : les thèses déposées en repository
+# institutionnel (Wageningen, Karlsruhe…) ont des préfixes variés non listés — elles n'apparaissent
+# pas avec un journal_id aujourd'hui (conflations → relations-publications). Les généraliser suppose
+# une nature de registrant (éditeur vs repository vs registre) dans `doi_prefixes`, absente à ce jour.
+_THESIS_REGISTRY_DOI_PREFIXES = ("10.70675",)
+
 
 # ── Mini-DSL des règles ─────────────────────────────────────────────────
 
@@ -162,6 +171,7 @@ class _AppliesTo(TypedDict, total=False):
     - ``title_prefix_normalized`` : `tuple[str, ...]` — `normalize_text(sp.title)` commence par au moins un préfixe du tuple.
     - ``title_regex`` : `re.Pattern[str]` — `pattern.search(sp.title)` matche.
     - ``journal_id_present`` : `bool` — `(sp.journal_id is not None)` vaut la valeur attendue. Signal « la SP est rattachée à un journal » (donc un article, pas une thèse).
+    - ``doi_prefix_not_in`` : `tuple[str, ...]` — la SP porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
 
     Ajouter un nouveau type de prédicat = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -173,6 +183,7 @@ class _AppliesTo(TypedDict, total=False):
     title_prefix_normalized: tuple[str, ...]
     title_regex: re.Pattern[str]
     journal_id_present: bool
+    doi_prefix_not_in: tuple[str, ...]
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -202,17 +213,20 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {"url_contains": "dumas.ccsd", "journal_id_present": False},
         "applies_correction": {"doc_type": "memoir"},
     },
-    # Famille thèse + `journal_id` présent ⇒ `article` : une vraie thèse n'est pas rattachée à un
-    # journal (toutes sont sur theses.fr, sans journal_id). Une SP famille-thèse AVEC un journal_id
-    # est un mistype d'OpenAlex/ScanR (article typé `thesis`/`dissertation`), parfois une conflation
-    # thèse↔article publié. Placée APRÈS les règles URL : une SP theses.fr/DUMAS reste thèse/mémoire
-    # même si un journal_id parasite traîne (l'URL est le signal fort). Audit : 67 SP au stock, 0 FP
-    # (aucune vraie thèse n'a de journal_id). Le nullage des clés-thèse (NNT, hal_id `tel-`/`dumas-`)
-    # de la conflation est traité à part (mutation `external_ids`, hors DSL colonne).
+    # Famille thèse + `journal_id` présent ⇒ `article`, SAUF si le DOI est celui d'un registre de
+    # thèses (`doi_prefix_not_in`). Une vraie thèse a un DOI ABES (ou pas de DOI) ; un DOI d'éditeur
+    # signe au contraire la version publiée. Le `doc_type=thesis` + `journal_id` + DOI éditeur est
+    # donc un article publié (mistype d'OpenAlex/ScanR, ou conflation thèse↔version publiée mergées
+    # par titre) → `article`. Avec un DOI ABES ou aucun DOI, le `journal_id` est parasite (la version
+    # publiée d'une conflation) : le type reste thèse, le nettoyage du journal_id relève des relations.
+    # Placée APRÈS les règles URL : une SP theses.fr/DUMAS reste thèse/mémoire (l'URL est le signal
+    # fort). Le nullage des clés-thèse (NNT, hal_id `tel-`/`dumas-`) de la conflation est traité à
+    # part (mutation `external_ids`, hors DSL colonne).
     MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE: {
         "applies_to": {
             "doc_type": frozenset({"thesis", "ongoing_thesis", "memoir"}),
             "journal_id_present": True,
+            "doi_prefix_not_in": _THESIS_REGISTRY_DOI_PREFIXES,
         },
         "applies_correction": {"doc_type": "article"},
     },
@@ -366,6 +380,11 @@ def _check_predicate(sp: SourcePublicationForCorrection, key: str, value: object
     if key == "journal_id_present":
         assert isinstance(value, bool)
         return (sp.journal_id is not None) == value
+    if key == "doi_prefix_not_in":
+        assert isinstance(value, tuple)
+        if not sp.doi:
+            return False
+        return sp.doi.split("/", 1)[0] not in value
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 
