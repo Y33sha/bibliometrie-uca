@@ -142,6 +142,7 @@
 		pubs.page = 1;
 		syncUrl();
 		pubs.load();
+		facets.load();
 	});
 
 	function toggleSort(asc: string, desc: string) {
