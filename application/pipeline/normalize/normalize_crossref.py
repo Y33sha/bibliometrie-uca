@@ -333,7 +333,7 @@ def process_work(
     title = get_title(msg)
     pub_year = get_pub_year(msg)
     if not has_minimal_publication_metadata(title, pub_year):
-        logger.warning(f"CrossRef {doi} sans titre ou année — pas de rattachement possible, skip")
+        logger.warning(f"CrossRef {doi} : titre ou année manquant — ignoré")
         staging_queries.mark_done(conn, staging_id)
         return None
     assert isinstance(title, str) and isinstance(pub_year, int)  # narrowing

@@ -63,6 +63,9 @@ async def http_request_with_retry_async(
     breaker = get_current_breaker()
     if breaker is not None:
         breaker.check()  # court-circuite si la source a déjà tripé
+        # Préfixe la source dans les logs de retry/échec (cf. http_retry sync) :
+        # le breaker (ContextVar) porte le nom de la source qui rate-limite.
+        label = f"{breaker.source} {label}".rstrip()
 
     last_error: Exception | None = None
     for attempt in range(max_retries):

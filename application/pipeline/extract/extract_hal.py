@@ -169,7 +169,7 @@ def extract_collection(
     )
 
     if mode == "incremental":
-        logger.info(f"    {len(known)} déjà en staging (UPDATE SQL pour les tagger)")
+        logger.info(f"    {len(known)} docs déjà connus")
         total_new, total_updated, total_unchanged = _extract_incremental(
             adapter, collection_code, orphans, known, conn, existing_ids, logger
         )
