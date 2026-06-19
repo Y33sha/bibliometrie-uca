@@ -9,9 +9,15 @@ from sqlalchemy import Connection
 
 
 class BareUnlinkedAuthorship(NamedTuple):
-    """Projection SQL brute : `source_authorships` UCA non rattaché à une personne.
+    """Projection SQL brute : `source_authorships` non rattaché à une personne.
 
     `roles` non vide en pratique uniquement pour theses (auteur vs directeur).
+
+    `in_perimeter` reflète la détection UCA de la source sur cette signature.
+    Les candidats `in_perimeter = FALSE` ne sont rattachables que par les
+    barreaux non-nominaux de la cascade (identifiants forts, cross-source) —
+    le matching/création par forme de nom reste réservé au périmètre UCA
+    (cf. `decide_name_form_outcome` et l'orchestrateur).
     """
 
     authorship_id: int
@@ -24,6 +30,7 @@ class BareUnlinkedAuthorship(NamedTuple):
     roles: list[str] | None
     publication_id: int | None
     author_position: int
+    in_perimeter: bool
 
 
 class LinkedAuthorshipRow(NamedTuple):
@@ -40,6 +47,10 @@ class PersonsCreateQueries(Protocol):
     """Opérations SQL pour le rattachement des authorships aux personnes."""
 
     def fetch_unlinked_authorships(self, conn: Connection) -> list[BareUnlinkedAuthorship]: ...
+
+    def fetch_out_of_perimeter_candidates(
+        self, conn: Connection
+    ) -> list[BareUnlinkedAuthorship]: ...
 
     def fetch_linked_authorships(self, conn: Connection) -> list[LinkedAuthorshipRow]: ...
 

@@ -24,10 +24,18 @@ donc fiable comme signal de matching personne.
   Crossref.
 - ``hal`` : ORCID attaché à l'auteur dans le TEI HAL (``label_xml``).
 
-``wos`` est exclu : son ORCID (``PreferredORCID``) résulte du matching
-algorithmique interne de Web of Science, régulièrement fautif. L'ORCID WoS
-reste enregistré sur ``person_identifiers`` mais n'est pas utilisé comme
-signal de matching."""
+``wos`` et ``scanr`` sont exclus : leur ORCID est dérivé (matching
+algorithmique interne pour WoS, couche de dénormalisation pour ScanR), pas
+déposé par l'auteur. Il reste enregistré sur ``person_identifiers`` mais n'est
+pas utilisé comme signal de matching.
+
+TODO(scanr-idref-asymetrie) : l'IdRef est matché sans restriction de source
+(``decide_match_by_identifier(idref, idref_map)``), donc l'IdRef ScanR EST un
+signal, alors qu'il provient du même bloc ``denormalized`` que son ORCID exclu.
+Asymétrie possiblement défendable (ScanR est dans le domaine de l'autorité
+française IdRef/SUDOC) mais à objectiver : mesurer le taux d'accord IdRef ScanR
+vs sources fiables avant de décider de garder, ou de source-garder l'IdRef
+comme l'ORCID."""
 
 MAX_AUTHORS_CROSS_SOURCE = 50
 """Au-delà de ce seuil d'auteurs sur une publication, le matching

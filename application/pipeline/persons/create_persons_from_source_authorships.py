@@ -1,5 +1,20 @@
 """
-Crée des entités Personnes à partir des authorships sources UCA non rattachées.
+Crée des entités Personnes à partir des authorships sources non rattachées.
+
+Deux populations de candidats traversent la **même** cascade :
+
+- **In-périmètre** (`source_authorships.in_perimeter = TRUE`) : authorships dont
+  la source a détecté une affiliation UCA. Éligibles à tous les barreaux.
+- **Hors-périmètre** ancrés (`in_perimeter = FALSE`) : authorships rattachables
+  sans forme de nom — identifiant fort partagé avec une personne connue, ou
+  ancrage cross-source (même publication × position qu'un authorship déjà lié).
+  Le barreau `person_name_forms` (match unique / création) y est neutralisé :
+  un nom seul ne peut ni introduire ni attacher une personne hors-périmètre.
+  Cf. `get_out_of_perimeter_candidates` et la garde dans la boucle.
+
+La garde `in_perimeter` conditionne donc le seul barreau nominal : enregistrer
+ce qu'une personne confirmée-par-identifiant a signé (link, name form,
+identifiants) n'en dépend pas.
 
 Cascade unifiée — une seule boucle qui interroge 5 signaux en parallèle puis
 délègue la décision à `domain.persons.matching.decide_person_match`, du plus
@@ -63,6 +78,7 @@ from domain.normalize import normalize_name
 from domain.persons.creation import allow_person_creation
 from domain.persons.matching import (
     ORCID_MATCH_SOURCES,
+    NameFormDecision,
     decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
@@ -84,6 +100,7 @@ class EnrichedAuthorship(NamedTuple):
     roles: list[str] | None
     publication_id: int | None
     author_position: int
+    in_perimeter: bool
     last_name: str
     first_name: str
     last_norm: str
@@ -114,6 +131,7 @@ def _enrich(row: BareUnlinkedAuthorship) -> EnrichedAuthorship:
         roles=row.roles,
         publication_id=row.publication_id,
         author_position=row.author_position,
+        in_perimeter=row.in_perimeter,
         last_name=last_name,
         first_name=first_name,
         last_norm=last_norm,
@@ -128,6 +146,18 @@ def get_all_unlinked_authorships(
     """Charge les authorships UCA sans person_id (toutes sources) et les enrichit
     (parsing noms, flag allow_create)."""
     return [_enrich(row) for row in queries.fetch_unlinked_authorships(conn)]
+
+
+def get_out_of_perimeter_candidates(
+    conn: Connection, queries: PersonsCreateQueries
+) -> list[EnrichedAuthorship]:
+    """Charge les candidats hors-périmètre rattachables sans forme de nom
+    (identifiant fort partagé ou ancrage cross-source) et les enrichit.
+
+    Ces candidats traversent la même cascade que les UCA, mais le barreau
+    `person_name_forms` (match unique / création) y est neutralisé : un nom
+    seul ne peut ni introduire ni attacher une personne hors-périmètre."""
+    return [_enrich(row) for row in queries.fetch_out_of_perimeter_candidates(conn)]
 
 
 def load_linked_authorships_by_pub(
@@ -186,8 +216,14 @@ def run(
     person_repo: PersonRepository,
     dry_run: bool = False,
 ) -> None:
-    all_authorships = get_all_unlinked_authorships(conn, queries)
-    logger.info(f"{len(all_authorships)} authorships UCA non rattachées (toutes sources)")
+    in_perimeter_authorships = get_all_unlinked_authorships(conn, queries)
+    out_of_perimeter_authorships = get_out_of_perimeter_candidates(conn, queries)
+    all_authorships = in_perimeter_authorships + out_of_perimeter_authorships
+    logger.info(
+        f"{len(in_perimeter_authorships)} authorships UCA non rattachées "
+        f"+ {len(out_of_perimeter_authorships)} candidats hors-périmètre "
+        f"(identifiant fort / cross-source)"
+    )
 
     if not all_authorships:
         logger.info("Rien à faire.")
@@ -206,6 +242,7 @@ def run(
     matched_counts: dict[str, int] = defaultdict(int)
     skipped_counts: dict[str, int] = defaultdict(int)
     created = 0
+    out_of_perimeter_matched = 0
 
     total = len(all_authorships)
     for i, a in enumerate(all_authorships):
@@ -242,12 +279,18 @@ def run(
             rejected_by_pub.get(pub_id, frozenset()) if pub_id is not None else frozenset()
         )
 
-        norm = a.author_name_normalized
-        name_form_outcome = decide_name_form_outcome(
-            name_form_map.get(norm) if norm else None,
-            a.allow_create,
-            rejected_person_ids=rejected_for_pub,
-        )
+        # Barreau name_form réservé au périmètre UCA : hors-périmètre, un nom
+        # seul ne peut ni attacher ni créer une personne (on n'a que des
+        # candidats ancrés sur un identifiant fort ou une position cross-source).
+        if a.in_perimeter:
+            norm = a.author_name_normalized
+            name_form_outcome = decide_name_form_outcome(
+                name_form_map.get(norm) if norm else None,
+                a.allow_create,
+                rejected_person_ids=rejected_for_pub,
+            )
+        else:
+            name_form_outcome = NameFormDecision(action="skip", reason="out_of_perimeter")
 
         # ── Décision unifiée ────────────────────────────────────────
         decision = decide_person_match(
@@ -275,6 +318,8 @@ def run(
                 # vérifiables manuellement via l'admin si erronés.
                 add_identifiers(pid, [a_dict], repo=person_repo)
             matched_counts[decision.reason] += 1
+            if not a.in_perimeter:
+                out_of_perimeter_matched += 1
             # Mettre à jour linked_index pour que les authorships suivantes
             # sur la même (pub_id, position) puissent matcher en cross-source.
             if pub_id is not None:
@@ -313,8 +358,10 @@ def run(
 
     # ── Résumé ─────────────────────────────────────────────────────
     linked_total = sum(matched_counts.values())
-    skipped_total = sum(skipped_counts.values())
-    unlinked = len(all_authorships) - linked_total - created
+    in_perimeter_total = len(in_perimeter_authorships)
+    out_of_perimeter_total = len(out_of_perimeter_authorships)
+    in_perimeter_matched = linked_total - out_of_perimeter_matched
+    in_perimeter_unlinked = in_perimeter_total - in_perimeter_matched - created
 
     logger.info("\n=== Résumé ===")
     logger.info(f"  ORCID                    : {matched_counts['orcid']} rattachées")
@@ -324,11 +371,14 @@ def run(
     logger.info(f"  Name form (single match) : {matched_counts['single_name']} rattachées")
     logger.info(f"  Créées                   : {created}")
     logger.info(
-        f"  Skippées                 : {skipped_total} "
-        f"(ambiguës={skipped_counts['ambiguous_name_form']}, "
-        f"create interdit={skipped_counts['creation_not_allowed']})"
+        f"  Skippées (périmètre UCA) : ambiguës={skipped_counts['ambiguous_name_form']}, "
+        f"create interdit={skipped_counts['creation_not_allowed']}"
     )
-    logger.info(f"  Non résolues             : {unlinked}")
+    logger.info(f"  Non résolues (UCA)       : {in_perimeter_unlinked}")
+    logger.info(
+        f"  Hors-périmètre           : {out_of_perimeter_matched}/{out_of_perimeter_total} "
+        f"candidats rattachés (identifiant fort / cross-source)"
+    )
     # Commit/rollback laissés au caller (le CLI commit / rollback selon
     # `--dry-run`, les tests d'intégration restent dans leur transaction
     # rollbackée).
