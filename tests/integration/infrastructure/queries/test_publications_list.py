@@ -4,7 +4,8 @@ import json
 
 from sqlalchemy import text
 
-from application.ports.api.publications_queries import ListFilters
+from application.ports.api.publications_queries import FacetFilters, ListFilters
+from infrastructure.queries.api.publications.facets import _PublicationFacetsBuilder
 from infrastructure.queries.api.publications.list import list_publications
 from tests.integration.helpers.structures import add_authorship_structure
 
@@ -145,6 +146,26 @@ class TestSearch:
         )
         ids = [p["id"] for p in res["publications"]]
         assert pub in ids
+
+    def test_facets_respect_search(self, sa_sync_conn):
+        """Régression : les comptes de facettes suivent la recherche titre, pas
+        seulement les autres filtres (la facette doit refléter le tableau)."""
+        lab = _create_lab(sa_sync_conn)
+        for title in ("quantum gravity", "classical mechanics"):
+            pid = _create_pub(sa_sync_conn, title=title)
+            _attach(sa_sync_conn, pid, lab)
+            sa_sync_conn.execute(
+                text("UPDATE publications SET in_perimeter = TRUE WHERE id = :id"), {"id": pid}
+            )
+
+        def years_total(search: str) -> int:
+            builder = _PublicationFacetsBuilder(
+                sa_sync_conn, FacetFilters(search=search, lab_ids=[lab]), []
+            )
+            return sum(r["count"] for r in builder._facet_years())
+
+        assert years_total("") == 2
+        assert years_total("quantum") == 1
 
 
 class TestHalStatusMultipleHalEntries:

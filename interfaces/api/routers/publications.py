@@ -48,6 +48,7 @@ def publications_facets(
     hal_status: str = Query(""),
     in_perimeter: str = Query(""),
     subject_id: int | None = Query(None),
+    search: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries_sync),
 ) -> PublicationsFacetsResponse:
     """Facettes dynamiques pour la page publications."""
@@ -70,6 +71,7 @@ def publications_facets(
         hal_status_values=parse_str_csv(hal_status),
         in_perimeter=in_perimeter,
         subject_id=subject_id,
+        search=search,
     )
     return queries.publications_facets(
         filters=filters, apc_structure_ids=get_apc_structure_ids_sync()

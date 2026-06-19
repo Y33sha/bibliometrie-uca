@@ -31,6 +31,7 @@ from infrastructure.queries.filters import (
     oa_clause,
     person_clause,
     publisher_id_clause,
+    search_clause,
     source_clause,
     subject_clause,
     year_clause,
@@ -49,27 +50,12 @@ def _initial_clauses(filters: ListFilters) -> list[WhereClause]:
     return [WhereClause(PUBLICATION_IS_IN_PERIMETER, {})]
 
 
-def _search_clause(search: str) -> WhereClause | None:
-    """Recherche sur title_normalized + label de sujet, partagée entre
-    list/export. Utilise le bind `:search_pat` (pattern normalisé)."""
-    if not search:
-        return None
-    pattern = f"%{normalize_text(search)}%"
-    return WhereClause(
-        "(p.title_normalized ILIKE :search_pat "
-        "OR p.id IN (SELECT ps.publication_id FROM publication_subjects ps "
-        "JOIN subjects s ON s.id = ps.subject_id "
-        "WHERE normalize_name_form(s.label) ILIKE :search_pat))",
-        {"search_pat": pattern},
-    )
-
-
 def _inline_clauses(filters: ListFilters) -> list[WhereClause | None]:
     """Filtres simples partagés entre list/export."""
     out: list[WhereClause | None] = [
         WhereClause(f"p.doc_type NOT IN {OUT_OF_SCOPE_DOC_TYPES_SQL}", {}),
         excluded_doc_type_clause(filters.excluded_types),
-        _search_clause(filters.search),
+        search_clause(filters.search),
         year_clause(filters.years),
         doc_type_clause(filters.doc_types),
         publisher_id_clause(filters.publisher_id),
