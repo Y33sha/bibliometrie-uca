@@ -2,6 +2,7 @@
 	import { base } from '$app/paths';
 	import { titleCase } from '$lib/utils';
 	import IdentifiersCell from './IdentifiersCell.svelte';
+	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 
 	type Identifier = { value: string; confirmed?: boolean };
 	export type PersonRow = {
@@ -19,10 +20,12 @@
 
 	let {
 		persons,
+		loading = false,
 		sort,
 		onSortChange,
 	}: {
 		persons: PersonRow[];
+		loading?: boolean;
 		sort: string;
 		onSortChange: (newSort: string) => void;
 	} = $props();
@@ -71,7 +74,7 @@
 	</thead>
 	<tbody>
 		{#if persons.length === 0}
-			<tr><td colspan="5" class="no-results">Aucune personne trouvée</td></tr>
+			<TableStatusRow {loading} colspan={5} emptyText="Aucune personne trouvée" />
 		{:else}
 			{#each persons as p (p.id)}
 				<tr>

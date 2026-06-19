@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { base } from '$app/paths';
 	import { sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
+	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 
 	export type ThesisRow = {
 		id: number;
@@ -20,11 +21,13 @@
 
 	let {
 		items,
+		loading = false,
 		sort,
 		onToggleSort,
 		showLabsColumn = false,
 	}: {
 		items: ThesisRow[];
+		loading?: boolean;
 		sort: string;
 		onToggleSort: (asc: string, desc: string) => void;
 		showLabsColumn?: boolean;
@@ -85,6 +88,9 @@
 		</tr>
 	</thead>
 	<tbody>
+		{#if items.length === 0}
+			<TableStatusRow {loading} colspan={showLabsColumn ? 8 : 7} emptyText="Aucune thèse" />
+		{/if}
 		{#each items as t (t.id)}
 			{@const insc = formatDate(t.date_inscription)}
 			{@const sout = formatDate(t.date_soutenance)}

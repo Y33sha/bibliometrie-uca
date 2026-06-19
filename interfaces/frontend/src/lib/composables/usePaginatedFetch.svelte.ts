@@ -31,6 +31,9 @@ export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
 	let page = $state(1);
 	let pages = $state(1);
 	let loaded = $state(false);
+	// `true` dès la création : tant que le premier `load()` n'a pas abouti, on
+	// n'a pas de données — les tableaux affichent « Chargement… », pas « vide ».
+	let loading = $state(true);
 
 	const perPage = opts.perPage ?? 50;
 	const currentKey = (): string =>
@@ -38,20 +41,25 @@ export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
 	let lastKey: string | undefined;
 
 	async function load() {
-		lastKey = currentKey();
-		const params = opts.buildParams();
-		params.set('page', String(page));
-		params.set('per_page', String(perPage));
+		loading = true;
+		try {
+			lastKey = currentKey();
+			const params = opts.buildParams();
+			params.set('page', String(page));
+			params.set('per_page', String(perPage));
 
-		const data = await api<Record<string, unknown>>(
-			opts.endpoint + '?' + params,
-			{ key: lastKey },
-		);
-		items = data[opts.itemsKey] as T[];
-		total = data.total as number;
-		pages = data.pages as number;
-		page = data.page as number;
-		loaded = true;
+			const data = await api<Record<string, unknown>>(
+				opts.endpoint + '?' + params,
+				{ key: lastKey },
+			);
+			items = data[opts.itemsKey] as T[];
+			total = data.total as number;
+			pages = data.pages as number;
+			page = data.page as number;
+			loaded = true;
+		} finally {
+			loading = false;
+		}
 	}
 
 	// Recharge quand la clé d'API change (ex. après une édition/fusion admin qui
@@ -77,6 +85,7 @@ export function usePaginatedFetch<T>(opts: PaginatedFetchOptions) {
 		set page(v: number) { page = v; },
 		get pages() { return pages; },
 		get loaded() { return loaded; },
+		get loading() { return loading; },
 		load,
 		goToPage,
 	};

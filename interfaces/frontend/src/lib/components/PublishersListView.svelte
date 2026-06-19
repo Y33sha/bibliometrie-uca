@@ -6,6 +6,7 @@
 
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
@@ -215,7 +216,7 @@
 			</tr>
 		{/each}
 		{#if publishers.items.length === 0}
-			<tr><td colspan={actionCell ? 7 : 6} class="no-results">Aucun éditeur ne correspond aux filtres.</td></tr>
+			<TableStatusRow loading={publishers.loading} colspan={actionCell ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>
