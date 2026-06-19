@@ -477,6 +477,22 @@ class TestBuildHalAuthorRecords:
         # Sans hal_person_id ni idhal, person_identifiers est None.
         assert build_hal_author_records(doc)[0].person_identifiers is None
 
+    def test_duplicate_hal_person_id_in_doc_marked_dubious(self):
+        """Un même hal_person_id sur ≥2 auteurs du dépôt (erreur HAL) est rangé sous
+        `hal_person_id_dubious` (valeur conservée, écartée du matching) ; les comptes
+        non dupliqués gardent `hal_person_id`."""
+        doc = {
+            "authFullNameFormIDPersonIDIDHal_fs": [
+                "Marie Dupont_FacetSep_49236-749496_FacetSep_",
+                "Jean Martin_FacetSep_10000-749496_FacetSep_",
+                "Sophie Bernard_FacetSep_20000-555_FacetSep_",
+            ],
+        }
+        records = build_hal_author_records(doc)
+        assert records[0].person_identifiers == {"hal_person_id_dubious": 749496}
+        assert records[1].person_identifiers == {"hal_person_id_dubious": 749496}
+        assert records[2].person_identifiers == {"hal_person_id": 555}
+
     def test_form_struct_map_resolves_addr_parts(self):
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": ["X_FacetSep_49236-749496_FacetSep_"],

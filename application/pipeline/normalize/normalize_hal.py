@@ -23,6 +23,7 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 import logging
 import xml.etree.ElementTree as ET
+from collections import Counter
 from collections.abc import Callable
 
 from sqlalchemy import Connection
@@ -404,6 +405,10 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
     - Produit pour chaque auteur les `source_structures` (TEXT[] des halId_s
       natifs), `person_identifiers` (orcid/idref/idhal/hal_person_id quand
       présents) et `addresses` (noms de structures).
+
+    Un `hal_person_id` listé sur plusieurs auteurs du même dépôt (erreur de saisie
+    HAL) est rangé sous `hal_person_id_dubious` au lieu de `hal_person_id` : valeur
+    conservée mais écartée du matching personnes.
     """
     qualities = doc.get("authQuality_s") or []
     # ORCID et IdRef par auteur : parsés depuis le TEI (label_xml), seul
@@ -445,6 +450,18 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
     struct_name_by_hal_id: dict[str, str] = {}
     form_struct_map = parse_author_structures(doc, struct_name_by_hal_id=struct_name_by_hal_id)
 
+    # Un même compte HAL (hal_person_id) listé sur ≥2 auteurs du *même dépôt* est
+    # une erreur de saisie HAL (jamais deux fois le même compte dans un dépôt) :
+    # propager l'identifiant lierait à tort les deux signatures à la même personne.
+    # On renomme alors la clé en `hal_person_id_dubious` : valeur conservée
+    # (réversible, diagnosticable) mais invisible au matching personnes, qui lit
+    # `hal_person_id`. Idempotent (recalculé à chaque normalisation depuis le brut).
+    dubious_hal_ids = {
+        pid
+        for pid, n in Counter(hal_person_id_by_pos.values()).items()
+        if pid is not None and n >= 2
+    }
+
     records: list[AuthorRecord] = []
     for position, name in enumerate(names):
         hal_person_id = hal_person_id_by_pos.get(position)
@@ -463,12 +480,15 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
         if not name:
             continue
 
-        # Identifiants normalisés cross-source pour cette authorship.
+        # Identifiants normalisés cross-source pour cette authorship. Compte HAL
+        # en doublon dans le dépôt → rangé sous `hal_person_id_dubious`.
+        is_dubious = hal_person_id in dubious_hal_ids
         ids = compact_identifiers(
             orcid=orcid,
             idref=idref,
             idhal=idhal,
-            hal_person_id=hal_person_id,
+            hal_person_id=None if is_dubious else hal_person_id,
+            hal_person_id_dubious=hal_person_id if is_dubious else None,
         )
         identifiers = ids if ids else None
 
