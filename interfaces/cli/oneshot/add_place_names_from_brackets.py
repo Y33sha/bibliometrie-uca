@@ -43,7 +43,112 @@ MIN_RESOLVED = 3  # adresses résolues min pour inférer le pays
 MIN_CONSENSUS = 0.85  # part du pays majoritaire parmi les résolues
 
 _BRACKET = re.compile(r"\[([^\]]+)\]")
-_DATE = re.compile(r"\b\d{4}\b")
+
+# Mots-outils + termes académiques/administratifs génériques : une forme dont
+# *tous* les tokens sont là-dedans n'est pas un lieu mais un intitulé de
+# discipline / structure (ex. « sciences », « sante », « societes et humanites »,
+# « ecole doctorale »). Rejetée — un vrai nom de ville a ≥1 token hors de cet
+# ensemble. (Les formes contenant un chiffre — codes d'unité u1235, ur 13822,
+# dates — sont rejetées séparément.)
+_GENERIC_TOKENS = {
+    # mots-outils
+    "et",
+    "de",
+    "des",
+    "du",
+    "la",
+    "le",
+    "les",
+    "l",
+    "d",
+    "en",
+    "aux",
+    "au",
+    "pour",
+    "sur",
+    # disciplines / champs
+    "sciences",
+    "science",
+    "sante",
+    "societe",
+    "societes",
+    "humanites",
+    "humanite",
+    "technologie",
+    "technologies",
+    "lettres",
+    "langues",
+    "langue",
+    "droit",
+    "medecine",
+    "pharmacie",
+    "odontologie",
+    "biologie",
+    "chimie",
+    "physique",
+    "mathematiques",
+    "informatique",
+    "gestion",
+    "economie",
+    "economiques",
+    "sociologie",
+    "psychologie",
+    "histoire",
+    "geographie",
+    "philosophie",
+    "education",
+    "ingenierie",
+    "environnement",
+    "agronomie",
+    "materiaux",
+    "energie",
+    "numerique",
+    "arts",
+    "design",
+    "communication",
+    "developpement",
+    "vie",
+    "naturelles",
+    "humaines",
+    "sociales",
+    "appliquees",
+    "fondamentale",
+    "clinique",
+    "publique",
+    "moleculaire",
+    "cellulaire",
+    # structures / admin
+    "ecole",
+    "doctorale",
+    "ed",
+    "ufr",
+    "departement",
+    "service",
+    "pole",
+    "direction",
+    "federation",
+    "reseau",
+    "plateforme",
+    "equipe",
+    "groupe",
+    "unite",
+    "axe",
+    "programme",
+    "projet",
+    "chaire",
+    "fondation",
+    "institut",
+    "laboratoire",
+    "centre",
+    "faculte",
+    "recherche",
+    "formation",
+    "etudes",
+    "master",
+    "doctorat",
+    "specialite",
+    "mention",
+}
 
 # Bruit non géographique fréquent dans les crochets.
 NOISE = {"en ligne", "email protected", "at", "virtual", "online", "visio", "by zoom", "web"}
@@ -92,7 +197,19 @@ COUNTRY_WORDS = {
 # Formes ambiguës où le crochet ne fixe pas le pays de façon fiable (à compléter
 # au vu du dry-run). `rome` : Rome NY + École française de Rome (fr) ; `nice` :
 # adjectif anglais.
-EXCLUDE = {"rome", "nice", "tours", "laval", "nancy", "columbia", "as", "io"}
+EXCLUDE = {
+    "rome",
+    "nice",
+    "tours",
+    "laval",
+    "nancy",
+    "columbia",
+    "as",
+    "io",
+    "www hubertbonin com",
+    "florence",
+    "point",
+}
 
 # Au-delà, la « forme » est un fragment d'adresse entier (ex. « associated with
 # … university … usa »), pas un nom de lieu — inutile et bruyant.
@@ -152,12 +269,15 @@ def main() -> None:
         for r in rows:
             for raw in _BRACKET.findall(r.raw_text):
                 form = normalize_text(raw)
+                tokens = form.split()
                 if (
                     not form
                     or len(form) < 3
-                    or len(form.split()) > MAX_WORDS
-                    or form.isdigit()
-                    or _DATE.search(form)
+                    or len(tokens) > MAX_WORDS
+                    or any(ch.isdigit() for ch in form)  # codes d'unité, dates
+                    or all(
+                        t in _GENERIC_TOKENS for t in tokens
+                    )  # discipline/structure, pas un lieu
                     or form in NOISE
                     or form in COUNTRY_WORDS
                     or form in EXCLUDE
