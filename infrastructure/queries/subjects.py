@@ -322,8 +322,8 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
         binds: dict[str, Any] = {"min_count": min_count, "lim": limit, "off": offset}
         where = "usage_count >= :min_count"
         if q:
-            where += " AND lower(label) LIKE :q"
-            binds["q"] = f"%{q.lower()}%"
+            where += " AND unaccent(label) ILIKE unaccent(:q)"
+            binds["q"] = f"%{q}%"
         rows = self._conn.execute(
             text(f"""
                 SELECT id, label, language, ontologies, usage_count
@@ -349,8 +349,8 @@ class PgSubjectsAdminQueries(SubjectsAdminQueries):
         binds: dict[str, Any] = {"min_count": min_count}
         where = "usage_count >= :min_count"
         if q:
-            where += " AND lower(label) LIKE :q"
-            binds["q"] = f"%{q.lower()}%"
+            where += " AND unaccent(label) ILIKE unaccent(:q)"
+            binds["q"] = f"%{q}%"
         row = self._conn.execute(
             text(f"SELECT COUNT(*) AS n FROM subjects WHERE {where}"),
             binds,
