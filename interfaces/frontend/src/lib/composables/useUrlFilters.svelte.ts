@@ -39,7 +39,10 @@ interface PageFilter {
 type FilterDef = StringArrayFilter | SingleValueFilter | SourceStatesFilter | PageFilter;
 
 interface UrlFiltersConfig {
-	basePath: string;
+	/** Chemin de la page propriétaire. Accepte un getter `() => ...` quand il
+	 *  dérive d'un prop/route réactif (ex. `/persons/${personId}`) : il est alors
+	 *  relu à chaque `syncUrl` au lieu d'être capturé au montage. */
+	basePath: string | (() => string);
 	filters: Record<string, FilterDef>;
 	debounceMs?: number;
 	/**
@@ -102,7 +105,8 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 		}
 
 		const qs = p.toString();
-		const targetPath = base + config.basePath;
+		const targetPath =
+			base + (typeof config.basePath === 'function' ? config.basePath() : config.basePath);
 		// Garde anti-navigation parasite : `syncUrl` est parfois appelé après un
 		// chargement async (cf. `onMount` des pages qui `await` puis `syncUrl()`).
 		// Si l'utilisateur a changé de route entre-temps, le `goto` ci-dessous —

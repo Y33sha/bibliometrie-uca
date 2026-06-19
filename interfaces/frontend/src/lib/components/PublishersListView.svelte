@@ -77,7 +77,7 @@
 	});
 
 	const url = useUrlFilters({
-		basePath,
+		basePath: () => basePath,
 		filters: {
 			selectedPublisherTypes: { type: 'string_array', urlKey: 'publisher_type' },
 			selectedCountries: { type: 'string_array', urlKey: 'country' },
