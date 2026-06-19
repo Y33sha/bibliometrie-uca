@@ -6,6 +6,7 @@
 
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
@@ -266,7 +267,7 @@
 			</tr>
 		{/each}
 		{#if journals.items.length === 0}
-			<tr><td colspan={hidePublisherColumn ? 4 : 5} class="no-results">Aucune revue ne correspond aux filtres.</td></tr>
+			<TableStatusRow loading={journals.loading} colspan={hidePublisherColumn ? 4 : 5} emptyText="Aucune revue ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>

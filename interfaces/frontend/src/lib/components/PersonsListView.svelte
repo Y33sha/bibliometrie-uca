@@ -186,7 +186,7 @@
 	<span class="count">{dir.total} personne{dir.total > 1 ? 's' : ''}</span>
 </div>
 
-<PersonsTable persons={dir.items} sort={currentSort} {onSortChange} />
+<PersonsTable persons={dir.items} loading={dir.loading} sort={currentSort} {onSortChange} />
 
 <Pagination
 	page={dir.page}

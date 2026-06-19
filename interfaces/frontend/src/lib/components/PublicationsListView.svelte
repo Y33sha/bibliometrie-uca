@@ -10,6 +10,7 @@
 	import { oaLabelsMap } from '$lib/labels';
 	import { docTypeSingular, docTypePlural } from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
+	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 	import { useColumnVisibility } from '$lib/composables/useColumnVisibility.svelte';
@@ -473,7 +474,7 @@
 	</thead>
 	<tbody>
 		{#if pubs.items.length === 0}
-			<tr><td colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0)} class="no-results">Aucune publication trouvée</td></tr>
+			<TableStatusRow loading={pubs.loading} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0)} emptyText="Aucune publication trouvée" />
 		{:else}
 			{#each pubs.items as p (p.id)}
 				<tr>

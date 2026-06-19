@@ -211,20 +211,16 @@
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
 
-{#if pubs.loaded && pubs.total === 0}
-	<div class="no-results">Aucune thèse</div>
-{:else}
-	<ThesesTable items={pubs.items} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} />
-	<Pagination
-		page={pubs.page}
-		pages={pubs.pages}
-		onchange={(p: number) => {
-			pubs.page = p;
-			syncUrl();
-			pubs.load();
-		}}
-	/>
-{/if}
+<ThesesTable items={pubs.items} loading={pubs.loading} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} />
+<Pagination
+	page={pubs.page}
+	pages={pubs.pages}
+	onchange={(p: number) => {
+		pubs.page = p;
+		syncUrl();
+		pubs.load();
+	}}
+/>
 
 <style>
 	.toolbar input[type='text'] {
