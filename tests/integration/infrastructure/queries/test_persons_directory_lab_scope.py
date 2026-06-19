@@ -107,3 +107,18 @@ class TestDirectoryLabScope:
         dupont = q.persons_facets(filters=FacetFilters(lab_id=lab, search="dupont"))
         assert both.rh.yes + both.rh.no == 2
         assert dupont.rh.yes + dupont.rh.no == 1
+
+    def test_facets_exclude_rejected(self, sa_sync_conn):
+        """Régression : les facettes excluent les personnes rejetées (comme l'annuaire)."""
+        lab = _structure(sa_sync_conn, "LAB-REJ")
+        p_ok = _person(sa_sync_conn, "Active")
+        _authorship_in_lab(sa_sync_conn, p_ok, lab_id=lab)
+        p_rej = _person(sa_sync_conn, "Rejected")
+        _authorship_in_lab(sa_sync_conn, p_rej, lab_id=lab)
+        sa_sync_conn.execute(
+            text("UPDATE persons SET rejected = TRUE WHERE id = :id"), {"id": p_rej}
+        )
+
+        q = PgPersonsQueries(sa_sync_conn)
+        res = q.persons_facets(filters=FacetFilters(lab_id=lab))
+        assert res.rh.yes + res.rh.no == 1
