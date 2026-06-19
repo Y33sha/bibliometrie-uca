@@ -34,6 +34,7 @@ from infrastructure.queries.filters import (
     oa_clause,
     person_clause,
     publisher_id_clause,
+    search_clause,
     source_clause,
     subject_clause,
     year_clause,
@@ -76,6 +77,9 @@ class _PublicationFacetsBuilder:
         else:
             out.append(WhereClause(PUBLICATION_IS_IN_PERIMETER, {}))
         out.append(excluded_doc_type_clause(f.excluded_types))
+        # Recherche titre/sujet : filtre global (jamais une dimension de facette),
+        # appliqué à tous les comptes pour qu'ils suivent le champ de recherche.
+        out.append(search_clause(f.search))
         return out
 
     def _clauses_skipping(self, skip: str) -> tuple[str, dict[str, Any]]:  # noqa: C901

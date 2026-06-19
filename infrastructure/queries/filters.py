@@ -11,6 +11,7 @@ Vit dans `infrastructure/` parce que ces fonctions génèrent du SQL
 from dataclasses import dataclass
 from typing import Any
 
+from domain.normalize import normalize_text
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 
 OA_OPEN_STATUSES = ("gold", "hybrid", "bronze", "green", "diamond")
@@ -139,6 +140,24 @@ def excluded_doc_type_clause(excluded_types: list[str]) -> WhereClause | None:
         return None
     return WhereClause(
         "p.doc_type::text != ALL(:flt_excluded_types)", {"flt_excluded_types": excluded_types}
+    )
+
+
+def search_clause(search: str) -> WhereClause | None:
+    """Recherche plein-texte : titre normalisé ou label de sujet.
+
+    Partagée par la liste, l'export et les facettes pour que les trois comptent
+    le même ensemble. Bind `:flt_search_pat`.
+    """
+    if not search:
+        return None
+    pattern = f"%{normalize_text(search)}%"
+    return WhereClause(
+        "(p.title_normalized ILIKE :flt_search_pat "
+        "OR p.id IN (SELECT ps.publication_id FROM publication_subjects ps "
+        "JOIN subjects s ON s.id = ps.subject_id "
+        "WHERE normalize_name_form(s.label) ILIKE :flt_search_pat))",
+        {"flt_search_pat": pattern},
     )
 
 

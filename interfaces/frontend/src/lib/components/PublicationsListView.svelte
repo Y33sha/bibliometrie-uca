@@ -252,7 +252,14 @@
 	const facets = useFacets({
 		endpoint: '/api/publications/facets',
 		apiKey: () => `${apiKey}-facets`,
-		buildParams: buildFilterParams,
+		// Inclut le terme de recherche pour que les comptes de facettes suivent le
+		// champ de recherche (comme la liste), pas seulement les autres filtres.
+		buildParams() {
+			const params = buildFilterParams();
+			const q = search.trim();
+			if (q) params.set('search', q);
+			return params;
+		},
 		sourceCountsKey: 'source_counts',
 		facets: {
 			years:         { type: 'simple',      apiKey: 'years' },
@@ -332,6 +339,7 @@
 		pubs.page = 1;
 		syncUrl();
 		pubs.load();
+		facets.load();
 	});
 
 	function toggleSortYear() {

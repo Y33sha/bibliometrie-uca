@@ -65,6 +65,7 @@ class FacetFilters:
     hal_status_values: list[str] = field(default_factory=list)
     in_perimeter: str = ""
     subject_id: int | None = None
+    search: str = ""
 
 
 # ---------------------------------------------------------------------------
