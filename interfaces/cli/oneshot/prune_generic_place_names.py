@@ -54,6 +54,18 @@ GENERIC_FORMS = [
     "architecture",
     "sante publique",
     "clinical immunology",
+    # 2e passe : queue de génériques résiduels (mots communs, domaines, types).
+    "particulier",
+    "autres",
+    "savoirs",
+    "hepatology",
+    "neurosurgery",
+    "college of medicine",
+    "faculty of physics",
+    "mathematiques appliquees",
+    "human nutrition unit",
+    "division of human nutrition",
+    "agriculture and food",
 ]
 
 
@@ -61,9 +73,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Compte sans rien modifier.")
     args = parser.parse_args()
-
-    # Match au mot près (espaces encadrants), comme le détecteur Aho-Corasick.
-    patterns = [f"% {f} %" for f in GENERIC_FORMS]
 
     with get_sync_engine().connect() as conn:
         present = {
@@ -81,7 +90,15 @@ def main() -> None:
         )
         if absent:
             logger.info("  (déjà absentes : %s)", ", ".join(absent))
+        if not present:
+            logger.info("Rien à supprimer.")
+            return
 
+        # On ne nulle QUE les adresses des formes réellement supprimées ce run : une
+        # forme déjà absente n'affecte plus la détection, ses adresses sont déjà
+        # recalculées (inutile de les re-nuller). Idempotent + incrémental.
+        patterns = [f"% {f} %" for f in sorted(present)]
+        # Match au mot près (espaces encadrants), comme le détecteur Aho-Corasick.
         n_addr = conn.execute(
             text(
                 "SELECT count(*) FROM addresses "
