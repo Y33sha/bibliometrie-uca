@@ -1,39 +1,39 @@
 # STATUS: oneshot (2026-05-30)
 """Rattache aux person canoniques les `source_authorships` orphelines
-quand un person canonique existe deja sur la meme publication a la meme
+quand un person canonique existe déjà sur la même publication à la même
 position avec un `author_name_normalized` strictement identique.
 
 Bootstrap transitoire qui comble le trou de la phase persons sur les SA
-hors-perimetre : la cascade actuelle ne traite que les SA
-`in_perimeter = TRUE`, donc une SA OpenAlex/CrossRef qui n'a pas detecte
-UCA reste orpheline alors qu'un person UCA est identifie par HAL a la
-meme position. Cf. fiche `METIER_authorships-cross-source-matching`.
+hors-périmètre : la cascade actuelle ne traite que les SA
+`in_perimeter = TRUE`, donc une SA OpenAlex/CrossRef qui n'a pas détecté
+UCA reste orpheline alors qu'un person UCA est identifié par HAL à la
+même position. Cf. fiche `METIER_authorships-cross-source-matching`.
 
-Criteres stricts (zero tolerance, alignes sur la decision du chantier) :
+Critères stricts (zéro tolérance, alignés sur la décision du chantier) :
 
-- position exacte (`author_position` egale entre la SA orpheline et la
-  SA de reference) ;
-- egalite stricte de `author_name_normalized`.
+- position exacte (`author_position` égale entre la SA orpheline et la
+  SA de référence) ;
+- égalité stricte de `author_name_normalized`.
 
-Effets de bord, alignes sur la cascade `decide_person_match` action
+Effets de bord, alignés sur la cascade `decide_person_match` action
 `match` :
 
 - UPDATE `source_authorships.person_id` et `authorship_id` ;
-- pour chaque SA rattachee, propagation des identifiants observes
+- pour chaque SA rattachée, propagation des identifiants observés
   (`orcid`, `idhal`, `idref`, `hal_person_id`) vers `person_identifiers`
   via `add_identifiers_from_authorships` (statut `pending`, conflits
-  logges en warning) ;
-- `add_name_form` n'est PAS appele : le nom est strictement identique
-  par construction, la name_form existe deja sur la person ;
-- `source_authorships.in_perimeter` n'est PAS modifie : la valeur
-  reflete honnetement la detection par chaque source. Un auteur UCA-CHU
+  loggés en warning) ;
+- `add_name_form` n'est PAS appelé : le nom est strictement identique
+  par construction, la name_form existe déjà sur la person ;
+- `source_authorships.in_perimeter` n'est PAS modifié : la valeur
+  reflète honnêtement la détection par chaque source. Un auteur UCA-CHU
   qui ne signe que CHU dans OpenAlex doit rester `in_perimeter = FALSE`
-  cote SA OA. Seul l'appariement person est complete.
+  côté SA OA. Seul l'appariement person est complété.
 
-Cas pathologique : si pour un meme (publication, position, nom
-normalise) plusieurs `person_id` canoniques distincts sont candidats,
-on skip cette SA et on log les person_ids concernes -- signal fort de
-doublon de person dans la base, a investiguer via l'admin
+Cas pathologique : si pour un même (publication, position, nom
+normalisé) plusieurs `person_id` canoniques distincts sont candidats,
+on skip cette SA et on log les person_ids concernés -- signal fort de
+doublon de person dans la base, à investiguer via l'admin
 `/admin/person-duplicates`.
 
 Idempotent : un re-run ne retraite que les nouvelles SA orphelines.
@@ -59,10 +59,10 @@ log = setup_logger("link_source_authorships_by_name", os.path.dirname(__file__))
 
 # CTE de base : tous les triplets (orphan_sa_id, person_id candidat,
 # authorship_id candidat) pour chaque SA orpheline matchant un authorship
-# canonique sur (publication, position, nom normalise). Une meme SA peut
-# apparaitre plusieurs fois si plusieurs SA d'autres sources convergent sur le
-# meme triplet (idempotent par DISTINCT ensuite) -- ou diverger sur des
-# `person_id` differents, ce qui est le cas pathologique signale.
+# canonique sur (publication, position, nom normalisé). Une même SA peut
+# apparaître plusieurs fois si plusieurs SA d'autres sources convergent sur le
+# même triplet (idempotent par DISTINCT ensuite) -- ou diverger sur des
+# `person_id` différents, ce qui est le cas pathologique signalé.
 _BASE_CTE = """
     WITH linked AS (
         SELECT a.id AS authorship_id, a.publication_id, a.person_id, a.author_position
@@ -133,7 +133,7 @@ _UPDATE_SQL = (
 
 def _identifier_dict(orphan_identifiers: dict | None) -> dict[str, object]:
     """Adapte le jsonb `source_authorships.person_identifiers` au format
-    dict attendu par `add_identifiers_from_authorships` (cle `id_type` =
+    dict attendu par `add_identifiers_from_authorships` (clé `id_type` =
     valeur)."""
     if not orphan_identifiers:
         return {}
@@ -150,7 +150,7 @@ def main() -> int:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="N'ecrit rien : compte les SA qui seraient rattachees.",
+        help="N'écrit rien : compte les SA qui seraient rattachées.",
     )
     args = parser.parse_args()
 
@@ -159,9 +159,9 @@ def main() -> int:
         ambiguous = conn.execute(text(_AMBIGUOUS_SQL)).all()
         if ambiguous:
             log.warning(
-                "%d cas ambigus (plusieurs person_id distincts pour un meme"
-                " (publication, position, nom normalise)) -- doublons person"
-                " probables, a investiguer dans /admin/person-duplicates :",
+                "%d cas ambigus (plusieurs person_id distincts pour un même"
+                " (publication, position, nom normalisé)) -- doublons person"
+                " probables, à investiguer dans /admin/person-duplicates :",
                 len(ambiguous),
             )
             for a in ambiguous:
@@ -173,7 +173,7 @@ def main() -> int:
                     a.person_ids,
                 )
         else:
-            log.info("Aucun cas ambigu detecte.")
+            log.info("Aucun cas ambigu détecté.")
 
         to_link = conn.execute(text(_FETCH_TO_LINK_SQL)).all()
         log.info("%d SA candidates au rattachement.", len(to_link))
@@ -181,7 +181,7 @@ def main() -> int:
         if args.dry_run:
             with_ids = sum(1 for r in to_link if r.orphan_identifiers)
             log.info(
-                "(dry-run) dont %d porteuses d'au moins un identifiant a propager.",
+                "(dry-run) dont %d porteuses d'au moins un identifiant à propager.",
                 with_ids,
             )
             return 0
@@ -206,7 +206,7 @@ def main() -> int:
                 continue
             add_identifiers_from_authorships(r.person_id, [ids], repo=repo)
             n_with_ids += 1
-        log.info("Identifiants propages depuis %d SA.", n_with_ids)
+        log.info("Identifiants propagés depuis %d SA.", n_with_ids)
 
         conn.commit()
     return 0
