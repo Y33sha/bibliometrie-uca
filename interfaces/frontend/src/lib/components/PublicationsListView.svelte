@@ -118,15 +118,19 @@
 		{ key: 'year',       label: 'Année' },
 		{ key: 'title',      label: 'Titre',      fixed: true },
 		{ key: 'journal',    label: 'Revue' },
+		// svelte-ignore state_referenced_locally
 		...(hasFixedLab ? [] : [{ key: 'labs', label: 'Labo(s)' }]),
+		// svelte-ignore state_referenced_locally
 		...(showCorrespondingColumn ? [{ key: 'corr', label: 'Corresp.' }] : []),
 		{ key: 'apc',        label: 'APC' },
 		{ key: 'oa',         label: 'OA' },
 		{ key: 'oa_status',    label: 'Voie OA' },
+		// svelte-ignore state_referenced_locally
 		...(showHalStatusColumn ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
 		{ key: 'links',      label: 'Liens',      fixed: true },
 	];
 	const initialHidden = ['apc', 'oa_status'];
+	// svelte-ignore state_referenced_locally
 	if (showHalStatusColumn) initialHidden.push('hal_status');
 	const cv = useColumnVisibility(columnDefs, initialHidden);
 	const col = cv.col;
@@ -233,6 +237,7 @@
 	const pubs = usePaginatedFetch<Publication>({
 		endpoint: '/api/publications',
 		itemsKey: 'publications',
+		// svelte-ignore state_referenced_locally
 		perPage,
 		apiKey: () => apiKey,
 		buildParams() {

@@ -76,6 +76,7 @@
 	const journals = usePaginatedFetch<Journal>({
 		endpoint: '/api/journals',
 		itemsKey: 'journals',
+		// svelte-ignore state_referenced_locally
 		perPage,
 		apiKey: () => apiKey,
 		buildParams() {

@@ -60,6 +60,7 @@
 	const dir = usePaginatedFetch<PersonRow>({
 		endpoint: '/api/persons/directory',
 		itemsKey: 'persons',
+		// svelte-ignore state_referenced_locally
 		perPage,
 		apiKey: () => apiKey,
 		buildParams() {
