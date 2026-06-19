@@ -316,7 +316,6 @@
 		white-space: nowrap;
 	}
 	.muted { color: var(--muted); }
-	.no-results { text-align: center; color: var(--muted); padding: 30px; }
 
 	.journal-link { color: var(--accent); text-decoration: none; font-weight: 500; }
 	.journal-link:hover { text-decoration: underline; }
