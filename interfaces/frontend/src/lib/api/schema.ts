@@ -288,7 +288,8 @@ export interface paths {
         };
         /**
          * Export Publications Csv
-         * @description Export CSV des publications (mêmes filtres que list_publications).
+         * @description Export CSV des publications : mêmes filtres ET mêmes colonnes que le
+         *     tableau affiché (`columns` = clés des colonnes visibles).
          */
         get: operations["export_publications_csv_api_publications_export_csv_get"];
         put?: never;
@@ -397,12 +398,19 @@ export interface paths {
         put?: never;
         /**
          * Merge Duplicate Publications
-         * @description Fusionne la publication `source_id` dans `target_id`.
+         * @description Fusionne deux publications doublons.
          *
-         *     Les authorships, sources, adresses et métadonnées de la source
-         *     sont transférées à la cible ; la source est supprimée.
-         *     Encadrée par un SAVEPOINT : un échec rollback la fusion sans
-         *     impacter la transaction englobante. 400 si les ids sont égaux,
+         *     La cible survivante est choisie implicitement (le plus petit id) : côté
+         *     publications, la direction de fusion n'a aucun effet durable, car
+         *     `refresh_from_sources` re-dérive *toutes* les métadonnées canoniques depuis
+         *     l'union des `source_publications` — union identique quel que soit le sens.
+         *     (À l'inverse des personnes, dont le nom du côté gardé survit.) Le refresh
+         *     immédiat fait converger la publication vers son état canonique sans attendre
+         *     un run du pipeline.
+         *
+         *     Authorships, sources, adresses et métadonnées sont transférés vers la cible ;
+         *     la source est supprimée. Encadrée par un SAVEPOINT : un échec rollback la
+         *     fusion sans impacter la transaction englobante. 400 si les ids sont égaux,
          *     404 si une des publications est introuvable.
          */
         post: operations["merge_duplicate_publications_api_admin_duplicates_merge_post"];
@@ -2298,7 +2306,11 @@ export interface paths {
         };
         /**
          * Get Type Change Impact
-         * @description Compte combien de publications du journal verraient leur `doc_type` changer si on passait `journal_type` à `new_type`. Dry-run pur, aucune écriture. Sert au preview de la modale admin avant confirmation du PUT.
+         * @description Compte combien de publications du journal verraient leur `doc_type` changer si on passait `journal_type` à `new_type`.
+         *
+         *     Preview honnête vis-à-vis du PUT : on applique réellement (set du type → recompute des
+         *     corrections SP → refresh) dans un `SAVEPOINT` qu'on rollback ensuite — preview et apply
+         *     partagent exactement la même logique, aucune écriture ne survit.
          */
         get: operations["get_type_change_impact_api_journals__journal_id__type_change_impact_get"];
         put?: never;
@@ -2872,6 +2884,8 @@ export interface components {
         DashboardOa: {
             /** Open Access */
             open_access: number;
+            /** Embargoed */
+            embargoed: number;
             /** Closed */
             closed: number;
             /** Unknown */
@@ -3477,6 +3491,8 @@ export interface components {
             bronze: number;
             /** Green */
             green: number;
+            /** Embargoed */
+            embargoed: number;
             /** Closed */
             closed: number;
             /** Unknown */
@@ -3651,6 +3667,8 @@ export interface components {
             bronze: number;
             /** Green */
             green: number;
+            /** Embargoed */
+            embargoed: number;
             /** Closed */
             closed: number;
             /** Unknown */
@@ -4973,6 +4991,8 @@ export interface components {
             bronze: number;
             /** Green */
             green: number;
+            /** Embargoed */
+            embargoed: number;
             /** Closed */
             closed: number;
             /** Unknown */
@@ -5185,6 +5205,8 @@ export interface components {
             green: number;
             /** Bronze */
             bronze: number;
+            /** Embargoed */
+            embargoed: number;
             /** Closed */
             closed: number;
             /** Unknown */
@@ -5560,6 +5582,8 @@ export interface components {
             bronze: number;
             /** Green */
             green: number;
+            /** Embargoed */
+            embargoed: number;
             /** Closed */
             closed: number;
             /** Unknown */
@@ -6021,6 +6045,7 @@ export interface operations {
                 hal_status?: string;
                 in_perimeter?: string;
                 subject_id?: number | null;
+                search?: string;
             };
             header?: never;
             path?: never;
@@ -6056,12 +6081,20 @@ export interface operations {
                 year?: string;
                 publisher_id?: number | null;
                 journal_id?: number | null;
+                access?: string;
                 oa_status?: string;
                 source_filter?: string;
                 doc_type?: string;
+                excluded_doc_type?: string;
                 sort?: string;
                 person_id?: number | null;
-                excluded_doc_type?: string;
+                is_corresponding?: string;
+                has_apc?: string;
+                country?: string;
+                hal_status?: string;
+                in_perimeter?: string;
+                subject_id?: number | null;
+                columns?: string;
             };
             header?: never;
             path?: never;
@@ -7383,6 +7416,7 @@ export interface operations {
                 has_idref?: string;
                 has_rh?: string;
                 lab_id?: number | null;
+                search?: string;
             };
             header?: never;
             path?: never;

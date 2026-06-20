@@ -23,6 +23,7 @@ class OaCounts(BaseModel):
     hybrid: int
     bronze: int
     green: int
+    embargoed: int
     closed: int
     unknown: int
 
@@ -83,6 +84,7 @@ class YearStatsRow(BaseModel):
     hybrid: int
     bronze: int
     green: int
+    embargoed: int
     closed: int
     unknown: int
 
@@ -98,6 +100,7 @@ class StatsSummary(BaseModel):
     hybrid: int
     green: int
     bronze: int
+    embargoed: int
     closed: int
     unknown: int
     publisher_count: int

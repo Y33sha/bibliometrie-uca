@@ -20,6 +20,8 @@
 	type PublisherRow = components['schemas']['PublisherStatsRow'];
 	type JournalRow = components['schemas']['JournalStatsRow'];
 	type LabRow = components['schemas']['LabStatsRow'];
+	// Ligne partagée par les 3 onglets pour la ventilation OA (mêmes champs OaCounts).
+	type OaRow = PublisherRow | JournalRow | LabRow;
 
 	// --- State ---
 	type View = 'top' | 'publisher_detail' | 'journal_detail';
@@ -47,7 +49,7 @@
 	}
 
 	let summary: Summary = $state({
-		total_pubs: 0, gold: 0, hybrid: 0, green: 0, bronze: 0, closed: 0, unknown: 0,
+		total_pubs: 0, gold: 0, hybrid: 0, green: 0, bronze: 0, embargoed: 0, closed: 0, unknown: 0,
 		publisher_count: 0, journal_count: 0,
 	});
 
@@ -256,6 +258,7 @@
 					{ label: 'Hybrid', data: data.map((d) => d.hybrid), backgroundColor: cs.getPropertyValue('--hybrid').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
 					{ label: 'Bronze', data: data.map((d) => d.bronze), backgroundColor: cs.getPropertyValue('--bronze').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
 					{ label: 'Green', data: data.map((d) => d.green), backgroundColor: cs.getPropertyValue('--green').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
+					{ label: 'Embargo', data: data.map((d) => d.embargoed), backgroundColor: cs.getPropertyValue('--embargoed').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
 					{ label: 'Closed', data: data.map((d) => d.closed), backgroundColor: cs.getPropertyValue('--closed').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
 					{ label: 'Indéterminé', data: data.map((d) => d.unknown), backgroundColor: cs.getPropertyValue('--unknown').trim(), barPercentage: 0.5, categoryPercentage: 0.7 }
 				]
@@ -410,6 +413,34 @@
 	<title>Statistiques — Bibliométrie UCA</title>
 </svelte:head>
 
+<!-- En-têtes et cellules de ventilation OA, partagés par les onglets éditeurs/revues/labos. -->
+{#snippet oaHeaderCols()}
+	<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
+	<th class="num">Green</th><th class="num">Emb.</th><th class="num">Closed</th><th class="num">Ind.</th>
+{/snippet}
+
+{#snippet oaBreakdownCells(r: OaRow)}
+	<td>
+		<div class="oa-bar">
+			<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
+			<span class="gold" style="width:{oaPercent(r.gold, r.pub_count)}"></span>
+			<span class="hybrid" style="width:{oaPercent(r.hybrid, r.pub_count)}"></span>
+			<span class="bronze" style="width:{oaPercent(r.bronze, r.pub_count)}"></span>
+			<span class="green" style="width:{oaPercent(r.green, r.pub_count)}"></span>
+			<span class="embargoed" style="width:{oaPercent(r.embargoed, r.pub_count)}"></span><span class="closed" style="width:{oaPercent(r.closed, r.pub_count)}"></span>
+			<span class="unknown" style="width:{oaPercent(r.unknown, r.pub_count)}"></span>
+		</div>
+	</td>
+	<td class="num num-small">{r.diamond}</td>
+	<td class="num num-small">{r.gold}</td>
+	<td class="num num-small">{r.hybrid}</td>
+	<td class="num num-small">{r.bronze}</td>
+	<td class="num num-small">{r.green}</td>
+	<td class="num num-small">{r.embargoed}</td>
+	<td class="num num-small">{r.closed}</td>
+	<td class="num num-small">{r.unknown}</td>
+{/snippet}
+
 <!-- Summary row -->
 <div class="summary-row">
 	<div class="summary-card">
@@ -492,6 +523,7 @@
 		<span><span class="legend-dot" style="background:var(--hybrid)"></span>Hybrid</span>
 		<span><span class="legend-dot" style="background:var(--bronze)"></span>Bronze</span>
 		<span><span class="legend-dot" style="background:var(--green)"></span>Green</span>
+		<span><span class="legend-dot" style="background:var(--embargoed)"></span>Embargo</span>
 		<span><span class="legend-dot" style="background:var(--closed)"></span>Closed</span>
 		<span><span class="legend-dot" style="background:var(--unknown)"></span>Indéterminé</span>
 	</div>
@@ -511,8 +543,7 @@
 				<th class="num sortable" class:active={pubSort === 'pubs' || pubSort === '-pubs'} onclick={() => { pubSort = toggleSort(pubSort, 'pubs'); pubFetch.page = 1; pubFetch.load(); }}>Articles {pubSort === 'pubs' ? '▲' : pubSort === '-pubs' ? '▼' : ''}</th>
 				<th class="num sortable" class:active={pubSort === 'apc' || pubSort === '-apc'} onclick={() => { pubSort = toggleSort(pubSort, 'apc'); pubFetch.page = 1; pubFetch.load(); }}>APC UCA {pubSort === 'apc' ? '▲' : pubSort === '-apc' ? '▼' : ''}</th>
 				<th style="min-width:100px">OA</th>
-				<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
-				<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
+				{@render oaHeaderCols()}
 			</tr>
 		</thead>
 		<tbody>
@@ -525,24 +556,7 @@
 					<td class="num num-small">{r.journal_count}</td>
 					<td class="num">{r.pub_count}</td>
 					<td class="num apc-cell">{r.apc_uca > 0 ? Math.round(r.apc_uca).toLocaleString('fr-FR') + ' €' : ''}</td>
-					<td>
-						<div class="oa-bar">
-							<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
-							<span class="gold" style="width:{oaPercent(r.gold, r.pub_count)}"></span>
-							<span class="hybrid" style="width:{oaPercent(r.hybrid, r.pub_count)}"></span>
-							<span class="bronze" style="width:{oaPercent(r.bronze, r.pub_count)}"></span>
-							<span class="green" style="width:{oaPercent(r.green, r.pub_count)}"></span>
-							<span class="closed" style="width:{oaPercent(r.closed, r.pub_count)}"></span>
-							<span class="unknown" style="width:{oaPercent(r.unknown, r.pub_count)}"></span>
-						</div>
-					</td>
-					<td class="num num-small">{r.diamond}</td>
-					<td class="num num-small">{r.gold}</td>
-					<td class="num num-small">{r.hybrid}</td>
-					<td class="num num-small">{r.bronze}</td>
-					<td class="num num-small">{r.green}</td>
-					<td class="num num-small">{r.closed}</td>
-					<td class="num num-small">{r.unknown}</td>
+					{@render oaBreakdownCells(r)}
 				</tr>
 			{/each}
 		</tbody>
@@ -560,8 +574,7 @@
 				<th class="num sortable" class:active={journalSort === 'pubs' || journalSort === '-pubs'} onclick={() => { journalSort = toggleSort(journalSort, 'pubs'); journalFetch.page = 1; journalFetch.load(); }}>Articles {journalSort === 'pubs' ? '▲' : journalSort === '-pubs' ? '▼' : ''}</th>
 				<th class="num sortable" class:active={journalSort === 'apc' || journalSort === '-apc'} onclick={() => { journalSort = toggleSort(journalSort, 'apc'); journalFetch.page = 1; journalFetch.load(); }}>APC UCA {journalSort === 'apc' ? '▲' : journalSort === '-apc' ? '▼' : ''}</th>
 				<th style="min-width:100px">OA</th>
-				<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
-				<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
+				{@render oaHeaderCols()}
 			</tr>
 		</thead>
 		<tbody>
@@ -576,24 +589,7 @@
 					{/if}
 					<td class="num">{r.pub_count}</td>
 					<td class="num apc-cell">{r.apc_uca > 0 ? Math.round(r.apc_uca).toLocaleString('fr-FR') + ' €' : ''}</td>
-					<td>
-						<div class="oa-bar">
-							<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
-							<span class="gold" style="width:{oaPercent(r.gold, r.pub_count)}"></span>
-							<span class="hybrid" style="width:{oaPercent(r.hybrid, r.pub_count)}"></span>
-							<span class="bronze" style="width:{oaPercent(r.bronze, r.pub_count)}"></span>
-							<span class="green" style="width:{oaPercent(r.green, r.pub_count)}"></span>
-							<span class="closed" style="width:{oaPercent(r.closed, r.pub_count)}"></span>
-							<span class="unknown" style="width:{oaPercent(r.unknown, r.pub_count)}"></span>
-						</div>
-					</td>
-					<td class="num num-small">{r.diamond}</td>
-					<td class="num num-small">{r.gold}</td>
-					<td class="num num-small">{r.hybrid}</td>
-					<td class="num num-small">{r.bronze}</td>
-					<td class="num num-small">{r.green}</td>
-					<td class="num num-small">{r.closed}</td>
-					<td class="num num-small">{r.unknown}</td>
+					{@render oaBreakdownCells(r)}
 				</tr>
 			{/each}
 		</tbody>
@@ -611,8 +607,7 @@
 					<th class="num sortable" class:active={labSort === 'pubs' || labSort === '-pubs'} onclick={() => { labSort = toggleSort(labSort, 'pubs'); labFetch.page = 1; labFetch.load(); }}>Articles {labSort === 'pubs' ? '▲' : labSort === '-pubs' ? '▼' : ''}</th>
 					<th class="num sortable" class:active={labSort === 'apc' || labSort === '-apc'} onclick={() => { labSort = toggleSort(labSort, 'apc'); labFetch.page = 1; labFetch.load(); }}>APC UCA {labSort === 'apc' ? '▲' : labSort === '-apc' ? '▼' : ''}</th>
 					<th style="min-width:100px">OA</th>
-					<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
-					<th class="num">Green</th><th class="num">Closed</th><th class="num">Ind.</th>
+					{@render oaHeaderCols()}
 				</tr>
 			</thead>
 			<tbody>
@@ -623,24 +618,7 @@
 						</td>
 						<td class="num">{r.pub_count}</td>
 						<td class="num apc-cell">{r.apc_uca > 0 ? Math.round(r.apc_uca).toLocaleString('fr-FR') + ' €' : ''}</td>
-						<td>
-							<div class="oa-bar">
-								<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
-								<span class="gold" style="width:{oaPercent(r.gold, r.pub_count)}"></span>
-								<span class="hybrid" style="width:{oaPercent(r.hybrid, r.pub_count)}"></span>
-								<span class="bronze" style="width:{oaPercent(r.bronze, r.pub_count)}"></span>
-								<span class="green" style="width:{oaPercent(r.green, r.pub_count)}"></span>
-								<span class="closed" style="width:{oaPercent(r.closed, r.pub_count)}"></span>
-								<span class="unknown" style="width:{oaPercent(r.unknown, r.pub_count)}"></span>
-							</div>
-						</td>
-						<td class="num num-small">{r.diamond}</td>
-						<td class="num num-small">{r.gold}</td>
-						<td class="num num-small">{r.hybrid}</td>
-						<td class="num num-small">{r.bronze}</td>
-						<td class="num num-small">{r.green}</td>
-						<td class="num num-small">{r.closed}</td>
-						<td class="num num-small">{r.unknown}</td>
+						{@render oaBreakdownCells(r)}
 					</tr>
 				{/each}
 			</tbody>
@@ -785,6 +763,7 @@
 	.oa-bar .hybrid { background: var(--hybrid); }
 	.oa-bar .bronze { background: var(--bronze); }
 	.oa-bar .green { background: var(--green); }
+	.oa-bar .embargoed { background: var(--embargoed); }
 	.oa-bar .closed { background: var(--closed); }
 	.oa-bar .unknown { background: var(--unknown); }
 

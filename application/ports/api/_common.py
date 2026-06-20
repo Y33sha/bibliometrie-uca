@@ -40,6 +40,7 @@ class PubYearCount(BaseModel):
 
 class DashboardOa(BaseModel):
     open_access: int
+    embargoed: int
     closed: int
     unknown: int
     total: int

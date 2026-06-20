@@ -97,6 +97,7 @@ def _by_year_sql(
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'embargoed') AS embargoed,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown
         FROM publications p
@@ -162,6 +163,7 @@ def _summary_sql(
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'embargoed') AS embargoed,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
             COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown,
             COUNT(DISTINCT j.publisher_id) AS publisher_count,

@@ -50,7 +50,7 @@
 	// Dashboard tab
 	let dashboardLoaded = $state(false);
 	let dashPubsByYear: { year: number; count: number }[] = $state([]);
-	let dashOa: { open_access: number; closed: number; unknown: number; total: number } = $state({ open_access: 0, closed: 0, unknown: 0, total: 0 });
+	let dashOa: { open_access: number; embargoed: number; closed: number; unknown: number; total: number } = $state({ open_access: 0, embargoed: 0, closed: 0, unknown: 0, total: 0 });
 	let dashCollab: { total_articles: number; international: number; domestic: number } = $state({ total_articles: 0, international: 0, domestic: 0 });
 	let dashTopCountries: { code: string; name: string; count: number }[] = $state([]);
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
@@ -104,7 +104,7 @@
 		const [data, subjects] = await Promise.all([
 			api<{
 				pubs_by_year: { year: number; count: number }[];
-				oa: { open_access: number; closed: number; unknown: number; total: number };
+				oa: { open_access: number; embargoed: number; closed: number; unknown: number; total: number };
 				collab: { total_articles: number; international: number; domestic: number };
 				top_countries: { code: string; name: string; count: number }[];
 			}>(`/api/laboratories/${labId}/dashboard`, { key: 'lab-dashboard' }),
@@ -163,10 +163,10 @@
 			pieChart = new Chart(pieCanvas, {
 				type: 'doughnut',
 				data: {
-					labels: ['Open Access', 'Closed', 'Indéterminé'],
+					labels: ['Open Access', 'Sous embargo', 'Closed', 'Indéterminé'],
 					datasets: [{
-						data: [dashOa.open_access, dashOa.closed, dashOa.unknown],
-						backgroundColor: ['#2a7d4f', '#c0392b', '#ccc'],
+						data: [dashOa.open_access, dashOa.embargoed, dashOa.closed, dashOa.unknown],
+						backgroundColor: ['#2a7d4f', '#b08900', '#c0392b', '#ccc'],
 					}]
 				},
 				options: {

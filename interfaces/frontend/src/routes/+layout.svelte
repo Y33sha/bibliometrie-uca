@@ -160,6 +160,7 @@
     --hybrid: #8e6bbf;
     --bronze: #b8733e;
     --green: #2a7d4f;
+    --embargoed: #b08900;
     --closed: #555;
     --unknown: #bbb;
   }
