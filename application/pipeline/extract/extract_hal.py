@@ -30,20 +30,22 @@ def extract_union(
     conn: Connection,
     logger: logging.Logger,
     *,
+    scope_label: str,
     years: list[int] | None = None,
     since: str | None = None,
     dry_run: bool = False,
     breaker_tripped: Callable[[], bool] = lambda: False,
 ) -> PhaseMetrics:
-    """Extrait l'union des collections configurées via une requête `cursorMark`.
+    """Extrait l'union des collections configurées pour un périmètre temporel.
 
     Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les
     collections de `config.all_collections`, puis paginate en `cursorMark`
     jusqu'à stabilisation du marqueur. Chaque document est upserté une fois.
+    `scope_label` (ex. `« 2024 »`, `« depuis 2026-05-01 »`) étiquette les logs.
     Retourne `PhaseMetrics(new, updated, unchanged, total)`.
 
-    En `dry_run`, une seule page est tirée pour lire `numFound` (volume de
-    l'union) sans rien écrire.
+    En `dry_run`, une seule page est tirée pour lire `numFound` (volume du
+    périmètre) sans rien écrire.
     """
     codes = list(config.all_collections.keys())
     query = adapter.build_query(years=years, since=since)
@@ -55,11 +57,11 @@ def extract_union(
         data = adapter.fetch_page_cursor(query, fq, "*")
         total = int(data.get("response", {}).get("numFound", 0))
         metrics.add(total=total)
-        logger.info(f"  Union des {len(codes)} collections : {total} docs (dry-run)")
+        logger.info(f"  {scope_label} : {total} docs (dry-run)")
         return metrics
 
     page_size = adapter.per_page_for(None)
-    logger.info(f"  Union des {len(codes)} collections : interrogation HAL…")
+    logger.info(f"  {scope_label} : interrogation HAL…")
     cursor = "*"
     page = 0
     total_pages: int | None = None
@@ -74,12 +76,12 @@ def extract_union(
         docs = resp.get("docs", [])
 
         # `numFound` n'est connu qu'à la première réponse cursorMark : on logue
-        # alors le volume de l'union et le nombre de pages attendu.
+        # alors le volume du périmètre et le nombre de pages attendu.
         if total_pages is None:
             num_found = int(resp.get("numFound", 0))
             total_pages = (num_found + page_size - 1) // page_size if num_found else 0
             logger.info(
-                f"  {num_found} documents dans l'union → ~{total_pages} pages de {page_size}"
+                f"  {scope_label} : {num_found} documents → ~{total_pages} pages de {page_size}"
             )
 
         for doc in docs:
@@ -101,7 +103,7 @@ def extract_union(
         if docs:
             page += 1
             logger.info(
-                f"  page {page}/{total_pages} — {metrics.total} docs "
+                f"  {scope_label} page {page}/{total_pages} — {metrics.total} docs "
                 f"({metrics.new} nouveaux, {metrics.updated} mis à jour, "
                 f"{metrics.unchanged} inchangés)"
             )
@@ -157,20 +159,53 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
         )
 
     def extract_all(self, args: argparse.Namespace, config: HalExtractConfig) -> PhaseMetrics:
-        """Extraction de l'union des collections en une passe `cursorMark`."""
+        """Extraction de l'union des collections, périmètre temporel par périmètre.
+
+        En mode `--since`, un seul périmètre (les dépôts depuis la date). Sinon une
+        passe `cursorMark` par année : progression visible année par année et reprise
+        ciblée via `--year` sans tout recommencer (chaque année est un sous-ensemble
+        disjoint — un document n'a qu'une `producedDateY_i`).
+        """
+        if args.since:
+            return extract_union(
+                self._adapter,
+                config,
+                self.conn,
+                self.logger,
+                scope_label=f"depuis {args.since}",
+                since=args.since,
+                dry_run=args.dry_run,
+                breaker_tripped=self._breaker_tripped,
+            )
+
         config_years = self._adapter.get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
 
-        return extract_union(
-            self._adapter,
-            config,
-            self.conn,
-            self.logger,
-            years=years,
-            since=args.since,
-            dry_run=args.dry_run,
-            breaker_tripped=self._breaker_tripped,
-        )
+        metrics = PhaseMetrics()
+        for year in years:
+            if self._breaker_tripped():
+                self.logger.warning(
+                    "HAL à bout (429/5xx répétés) — années restantes sautées"
+                    " (retry au prochain run)"
+                )
+                break
+            year_metrics = extract_union(
+                self._adapter,
+                config,
+                self.conn,
+                self.logger,
+                scope_label=str(year),
+                years=[year],
+                dry_run=args.dry_run,
+                breaker_tripped=self._breaker_tripped,
+            )
+            metrics.merge(year_metrics)
+            if not args.dry_run:
+                self.logger.info(
+                    f"  {year} terminé : {year_metrics.new} nouveaux, "
+                    f"{year_metrics.updated} mis à jour, {year_metrics.unchanged} inchangés"
+                )
+        return metrics
 
 
 __all__ = [

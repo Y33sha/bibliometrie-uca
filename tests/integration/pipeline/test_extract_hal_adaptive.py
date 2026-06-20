@@ -70,7 +70,9 @@ class TestCursorPagination:
         ]
         adapter = _adapter(pages)
 
-        metrics = extract_union(adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025])
+        metrics = extract_union(
+            adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, scope_label="2025", years=[2025]
+        )
 
         assert metrics.total == 3
         assert metrics.new == 3
@@ -84,7 +86,9 @@ class TestCursorPagination:
         pages = [_page([_doc("hal-1")], next_cursor="*")]
         adapter = _adapter(pages)
 
-        metrics = extract_union(adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025])
+        metrics = extract_union(
+            adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, scope_label="2025", years=[2025]
+        )
 
         assert metrics.total == 1
         assert adapter.fetch_page_cursor.call_count == 1
@@ -93,7 +97,9 @@ class TestCursorPagination:
         pages = [_page([], next_cursor="*")]
         adapter = _adapter(pages)
 
-        metrics = extract_union(adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025])
+        metrics = extract_union(
+            adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, scope_label="2025", years=[2025]
+        )
 
         assert metrics.total == 0
         assert (metrics.new, metrics.updated, metrics.unchanged) == (0, 0, 0)
@@ -115,7 +121,9 @@ class TestRouting:
         ]
         adapter = _adapter(pages)
 
-        metrics = extract_union(adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025])
+        metrics = extract_union(
+            adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, scope_label="2025", years=[2025]
+        )
 
         assert (metrics.new, metrics.updated, metrics.unchanged) == (1, 1, 1)
         assert metrics.total == 3
@@ -127,7 +135,9 @@ class TestRouting:
         ]
         adapter = _adapter(pages)
 
-        metrics = extract_union(adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025])
+        metrics = extract_union(
+            adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, scope_label="2025", years=[2025]
+        )
 
         assert metrics.total == 1
         # Le doc sans halId n'est pas upserté.
@@ -140,7 +150,13 @@ class TestDryRun:
         adapter = _adapter(pages)
 
         metrics = extract_union(
-            adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025], dry_run=True
+            adapter,
+            _config({"C": "Coll"}),
+            MagicMock(),
+            _LOGGER,
+            scope_label="2025",
+            years=[2025],
+            dry_run=True,
         )
 
         assert metrics.total == 4242
@@ -158,6 +174,7 @@ class TestBreaker:
             _config({"C": "Coll"}),
             MagicMock(),
             _LOGGER,
+            scope_label="2025",
             years=[2025],
             breaker_tripped=lambda: True,
         )
