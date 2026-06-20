@@ -33,10 +33,9 @@ _UPSERT_HAL_SQL = text(
         SELECT raw_hash AS old_hash FROM staging
         WHERE source = 'hal' AND source_id = :hal_id
     )
-    INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, raw_hash)
-    VALUES ('hal', :hal_id, :doi, :raw_data, :hal_collections, :raw_hash)
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+    VALUES ('hal', :hal_id, :doi, :raw_data, :raw_hash)
     ON CONFLICT (source, source_id) DO UPDATE SET
-        hal_collections = EXCLUDED.hal_collections,
         raw_data = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                 THEN EXCLUDED.raw_data
@@ -151,11 +150,6 @@ class PgHalExtractAdapter(HalExtractAdapter):
         terms = " OR ".join(f'"{code}"' for code in collection_codes)
         return f"collCode_s:({terms})"
 
-    def configured_collections(self, doc: dict[str, Any], configured: set[str]) -> list[str]:
-        """Collections **du périmètre** auxquelles ce record appartient : `collCode_s`
-        du record ∩ collections configurées (l'ordre du record est préservé)."""
-        return [code for code in (doc.get("collCode_s") or []) if code in configured]
-
     # ── HTTP ───────────────────────────────────────────────────
 
     def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> dict[str, Any]:
@@ -184,20 +178,18 @@ class PgHalExtractAdapter(HalExtractAdapter):
         hal_id: str,
         doi: str | None,
         raw_data: dict[str, Any],
-        hal_collections: list[str],
     ) -> tuple[bool, bool]:
-        """UPSERT staging : pose `hal_collections` (collections du périmètre du record),
-        met à jour `raw_data` si le hash a changé. Retourne `(inserted, changed)` :
-        `inserted` = vraie insertion (`xmax = 0`), `changed` = contenu réécrit (hash
-        distinct de l'ancien). Une row re-vue à hash identique → `(False, False)`. Un
-        `raw_hash=null` en base force le re-import (`NULL IS DISTINCT FROM <hash>`)."""
+        """UPSERT staging : met à jour `raw_data` si le hash a changé. Retourne
+        `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`), `changed` =
+        contenu réécrit (hash distinct de l'ancien). Une row re-vue à hash identique →
+        `(False, False)`. Un `raw_hash=null` en base force le re-import
+        (`NULL IS DISTINCT FROM <hash>`)."""
         row = conn.execute(
             _UPSERT_HAL_SQL,
             {
                 "hal_id": hal_id,
                 "doi": doi,
                 "raw_data": raw_data,
-                "hal_collections": hal_collections,
                 "raw_hash": compute_hash(raw_data),
             },
         ).one()

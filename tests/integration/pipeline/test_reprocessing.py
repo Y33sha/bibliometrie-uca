@@ -33,13 +33,11 @@ HAL_DOC_CLOSED = {
 }
 
 
-def _insert_hal_staging(conn, doc, hal_collections=None):
+def _insert_hal_staging(conn, doc):
     """Insère un document HAL dans staging."""
-    if hal_collections is None:
-        hal_collections = ["TEST_COLL"]
     stmt = text("""
-        INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed)
-        VALUES ('hal', :halid, :doi, :raw_data, :hal_collections, FALSE)
+        INSERT INTO staging (source, source_id, doi, raw_data, processed)
+        VALUES ('hal', :halid, :doi, :raw_data, FALSE)
         ON CONFLICT (source, source_id) DO UPDATE SET
             raw_data = EXCLUDED.raw_data,
             processed = FALSE
@@ -50,7 +48,6 @@ def _insert_hal_staging(conn, doc, hal_collections=None):
             "halid": doc["halId_s"],
             "doi": doc.get("doiId_s"),
             "raw_data": doc,
-            "hal_collections": hal_collections,
         },
     )
 
@@ -60,7 +57,7 @@ def _run_normalize_hal(conn):
     import logging
 
     from application.pipeline.normalize.normalize_hal import process_work
-    from application.ports.pipeline.staging import HalStagingRow
+    from application.ports.pipeline.staging import StagingRow
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.pipeline.normalize.hal import PgHalNormalizeQueries
     from infrastructure.queries.pipeline.staging import PgStagingQueries
@@ -79,7 +76,7 @@ def _run_normalize_hal(conn):
 
     rows = conn.execute(
         text("""
-            SELECT id, source_id, doi, raw_data, hal_collections
+            SELECT id, source_id, doi, raw_data
             FROM staging
             WHERE source = 'hal' AND processed = FALSE
             ORDER BY id
@@ -87,12 +84,11 @@ def _run_normalize_hal(conn):
     ).all()
     processed = 0
     for row in rows:
-        staging_row = HalStagingRow(
+        staging_row = StagingRow(
             id=row.id,
             source_id=row.source_id,
             doi=row.doi,
             raw_data=row.raw_data,
-            hal_collections=row.hal_collections,
         )
         if process_work(
             conn,

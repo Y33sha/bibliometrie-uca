@@ -30,7 +30,7 @@ from application.ports.pipeline.staging import StagingQueries, StagingRow
 class SourceNormalizer(ABC):
     """Template method pour la normalisation source → tables structurées.
 
-    Le port `StagingQueries` retourne `list[StagingRow]` ; pour HAL, ce sont en réalité des `HalStagingRow` (substitution LSP). Le normalizer HAL accède à `.hal_collections` via `isinstance` au début de son `process_work`.
+    Le port `StagingQueries` retourne `list[StagingRow]` pour toutes les sources.
 
     Override points :
     - `SOURCE` : identifiant source (obligatoire, ex: "hal", "openalex")

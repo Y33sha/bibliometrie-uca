@@ -4,7 +4,6 @@ HAL_STAGING_DOCS = [
     {
         "halid": "hal-99000001",
         "doi": "10.9999/hal-test-001",
-        "hal_collections": ["TEST"],
         "raw_data": {
             "docType_s": "ART",
             "title_s": ["A HAL Article on Tectonics"],
@@ -22,7 +21,6 @@ HAL_STAGING_DOCS = [
     {
         "halid": "hal-99000002",
         "doi": "10.9999/hal-test-002",
-        "hal_collections": ["TEST"],
         "raw_data": {
             "docType_s": "COUV",
             "title_s": ["A Chapter in a Book"],
@@ -36,7 +34,6 @@ HAL_STAGING_DOCS = [
     {
         "halid": "hal-99000003",
         "doi": None,
-        "hal_collections": ["TEST"],
         "raw_data": {
             "docType_s": "THESE",
             "title_s": ["Une thèse sans DOI sur la géologie"],
@@ -52,8 +49,8 @@ def insert_hal_staging(conn, docs):
     from sqlalchemy.dialects.postgresql import JSONB
 
     stmt = text("""
-        INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed)
-        VALUES ('hal', :halid, :doi, :raw_data, :hal_collections, FALSE)
+        INSERT INTO staging (source, source_id, doi, raw_data, processed)
+        VALUES ('hal', :halid, :doi, :raw_data, FALSE)
         ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE
     """).bindparams(bindparam("raw_data", type_=JSONB))
     for doc in docs:
@@ -63,7 +60,6 @@ def insert_hal_staging(conn, docs):
                 "halid": doc["halid"],
                 "doi": doc["doi"],
                 "raw_data": doc["raw_data"],
-                "hal_collections": doc["hal_collections"],
             },
         )
 
@@ -75,7 +71,7 @@ def run_normalize_hal(conn):
     from sqlalchemy import text
 
     from application.pipeline.normalize.normalize_hal import process_work
-    from application.ports.pipeline.staging import HalStagingRow
+    from application.ports.pipeline.staging import StagingRow
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
     from infrastructure.queries.pipeline.normalize.hal import PgHalNormalizeQueries
     from infrastructure.queries.pipeline.staging import PgStagingQueries
@@ -95,18 +91,17 @@ def run_normalize_hal(conn):
 
     rows = conn.execute(
         text("""
-            SELECT id, source_id, doi, raw_data, hal_collections
+            SELECT id, source_id, doi, raw_data
             FROM staging WHERE source = 'hal' AND processed = FALSE ORDER BY id
         """)
     ).all()
     processed = 0
     for row in rows:
-        staging_row = HalStagingRow(
+        staging_row = StagingRow(
             id=row.id,
             source_id=row.source_id,
             doi=row.doi,
             raw_data=row.raw_data,
-            hal_collections=row.hal_collections,
         )
         if process_work(
             conn,

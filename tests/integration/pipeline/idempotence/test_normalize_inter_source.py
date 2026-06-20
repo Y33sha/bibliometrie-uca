@@ -16,7 +16,6 @@ INTER_HAL_DOCS = [
     {
         "halid": "hal-99100001",
         "doi": SHARED_DOI,
-        "hal_collections": ["TEST"],
         "raw_data": {
             "docType_s": "ART",
             "title_s": ["Shared Article on Geochemistry"],
@@ -35,7 +34,6 @@ INTER_HAL_DOCS = [
     {
         "halid": "hal-99100002",
         "doi": None,
-        "hal_collections": ["TEST"],
         "raw_data": {
             "docType_s": "REPORT",
             "title_s": ["Un rapport sans DOI"],

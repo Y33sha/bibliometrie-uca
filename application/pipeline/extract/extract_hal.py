@@ -40,15 +40,13 @@ def extract_union(
 
     Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les
     collections de `config.all_collections`, puis paginate en `cursorMark`
-    jusqu'à stabilisation du marqueur. Chaque document est upserté une fois
-    avec ses `hal_collections` du périmètre (`collCode_s` ∩ collections
-    configurées). Retourne `PhaseMetrics(new, updated, unchanged, total)`.
+    jusqu'à stabilisation du marqueur. Chaque document est upserté une fois.
+    Retourne `PhaseMetrics(new, updated, unchanged, total)`.
 
     En `dry_run`, une seule page est tirée pour lire `numFound` (volume de
     l'union) sans rien écrire.
     """
     codes = list(config.all_collections.keys())
-    configured = set(codes)
     query = adapter.build_query(years=years, since=since)
     fq = adapter.build_collections_fq(codes)
 
@@ -90,8 +88,7 @@ def extract_union(
             if not hal_id:
                 continue
             doi = adapter.extract_doi(doc)
-            collections = adapter.configured_collections(doc, configured)
-            inserted, changed = adapter.upsert_work(conn, hal_id, doi, doc, collections)
+            inserted, changed = adapter.upsert_work(conn, hal_id, doi, doc)
             if inserted:
                 metrics.add(new=1, total=1)
             elif changed:

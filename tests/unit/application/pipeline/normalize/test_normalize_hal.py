@@ -28,18 +28,17 @@ from application.pipeline.normalize.normalize_hal import (
     upsert_journal,
     upsert_publisher,
 )
-from application.ports.pipeline.staging import HalStagingRow
+from application.ports.pipeline.staging import StagingRow
 
 # ── Stubs ────────────────────────────────────────────────────────
 
 
-def _staging_row(staging_id=1, hal_id="hal-1", doi=None, raw=None, collections=None):
-    return HalStagingRow(
+def _staging_row(staging_id=1, hal_id="hal-1", doi=None, raw=None):
+    return StagingRow(
         id=staging_id,
         source_id=hal_id,
         doi=doi,
         raw_data=raw or {},
-        hal_collections=collections,
     )
 
 
@@ -254,7 +253,7 @@ class TestActiveEmbargoUntil:
 
 
 class TestInsertHalDocument:
-    def _call(self, queries, doc, *, hal_collections_staging=None, pub_meta=None) -> dict:
+    def _call(self, queries, doc, *, pub_meta=None) -> dict:
         # Par défaut, pub_meta est dérivé via extract_pub_metadata pour rester
         # cohérent avec le flux réel (extract → insert). Tests qui veulent
         # forcer une valeur passent un pub_meta explicite.
@@ -266,21 +265,16 @@ class TestInsertHalDocument:
             doc,
             staging_id=1,
             hal_id="h1",
-            hal_collections_staging=hal_collections_staging,
             publication_id=None,
             pub_meta=pub_meta,
         )
         return queries.upserted_documents[-1]
 
-    def test_collections_merge_staging_and_coll_codes(self):
+    def test_collections_from_coll_codes(self):
         queries = _FakeQueries()
-        captured = self._call(
-            queries,
-            {"collCode_s": ["UCA", "LIMOS"]},
-            hal_collections_staging=["UCA", "LRL"],
-        )
-        # Union dédupliquée, triée.
-        assert captured["hal_collections"] == ["LIMOS", "LRL", "UCA"]
+        captured = self._call(queries, {"collCode_s": ["UCA", "LIMOS", "UCA"]})
+        # Dédupliquées, triées, depuis le seul `collCode_s` du raw_data.
+        assert captured["hal_collections"] == ["LIMOS", "UCA"]
 
     def test_no_collections_returns_none(self):
         queries = _FakeQueries()

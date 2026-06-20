@@ -38,7 +38,6 @@ def _upsert(conn, source_id, doi):
             "source_id": source_id,
             "doi": doi,
             "raw_data": {"halId_s": source_id, "doiId_s": doi},
-            "hal_collections": None,
             "raw_hash": "newhash",
         },
     )
