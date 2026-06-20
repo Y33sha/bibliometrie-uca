@@ -60,7 +60,7 @@
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	let dashboardLoaded = $state(false);
 	let dashPubsByYear: { year: number; count: number }[] = $state([]);
-	let dashOa = $state({ open_access: 0, closed: 0, unknown: 0, total: 0 });
+	let dashOa = $state({ open_access: 0, embargoed: 0, closed: 0, unknown: 0, total: 0 });
 	let dashSubjects: SubjectFrequency[] = $state([]);
 	let barCanvas = $state<HTMLCanvasElement | undefined>();
 	let pieCanvas = $state<HTMLCanvasElement | undefined>();
@@ -174,10 +174,10 @@
 			pieChart = new Chart(pieCanvas, {
 				type: 'doughnut',
 				data: {
-					labels: ['Open Access', 'Closed', 'Indéterminé'],
+					labels: ['Open Access', 'Sous embargo', 'Closed', 'Indéterminé'],
 					datasets: [{
-						data: [dashOa.open_access, dashOa.closed, dashOa.unknown],
-						backgroundColor: ['#2a7d4f', '#c0392b', '#ccc'],
+						data: [dashOa.open_access, dashOa.embargoed, dashOa.closed, dashOa.unknown],
+						backgroundColor: ['#2a7d4f', '#b08900', '#c0392b', '#ccc'],
 					}]
 				},
 				options: {

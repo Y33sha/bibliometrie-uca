@@ -271,8 +271,10 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             text(f"""
                 SELECT
                     COUNT(DISTINCT p.id) FILTER (
-                        WHERE p.oa_status NOT IN {OA_CLOSED_SQL} AND p.oa_status IS NOT NULL
+                        WHERE p.oa_status NOT IN {OA_CLOSED_SQL}
+                          AND p.oa_status != 'embargoed' AND p.oa_status IS NOT NULL
                     ) AS open_access,
+                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'embargoed') AS embargoed,
                     COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
                     COUNT(DISTINCT p.id) FILTER (
                         WHERE p.oa_status = 'unknown' OR p.oa_status IS NULL
@@ -339,6 +341,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
             pubs_by_year=pubs_by_year,
             oa=DashboardOa(
                 open_access=oa.open_access,
+                embargoed=oa.embargoed,
                 closed=oa.closed,
                 unknown=oa.unknown,
                 total=oa.total,
