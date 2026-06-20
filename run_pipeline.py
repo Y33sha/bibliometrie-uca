@@ -33,9 +33,8 @@ Phases (dans l'ordre d'execution):
                         sur source_authorships
     publishers_journals Enrichissement des référentiels publishers/journals (préfixes DOI,
                         APC, DOAJ, pays/ROR, type d'éditeur)
-    zenodo_doi          Résolution du concept DOI des dépôts Zenodo versionnés
     metadata_correction Corrections de métadonnées sur source_publications (par enregistrement,
-                        substitution Zenodo, par grappe)
+                        et par grappe de DOI : concept DataCite, ouvrage/chapitre)
     publications        Création/rattachement des publications + fusions/scissions, en une passe
     persons             Creation/mapping personnes + formes de noms
     authorships         Reconstruction authorships canoniques (table de verite) + propagation
@@ -444,34 +443,16 @@ def phase_affiliations(**kw: Any) -> Any:
     _run_populate_affiliations()
 
 
-def phase_zenodo_doi(**kw: Any) -> Any:
-    """Resolution du concept DOI des source_publications Zenodo.
-
-    Interroge l'API Zenodo pour resoudre le `conceptdoi` (champ
-    `external_ids.zenodo_concept_doi`), sur lequel portera la dedup
-    concept/version au matching. Idempotent : une erreur temporaire (timeout,
-    rate-limit, panne Zenodo) laisse la SP non resolue, retentee au prochain run.
-
-    Phase distincte, en amont de `publications`, pour pouvoir relancer le matching
-    sans re-solliciter Zenodo (et inversement, rejouer Zenodo seul si l'API etait
-    indisponible).
-    """
-    _run_resolve_zenodo_concept()
-
-
 def phase_metadata_correction(**kw: Any) -> Any:
     """Persistance des corrections de métadonnées sur les source_publications.
 
     Tourne après `publishers_journals` (journaux typés, donc les règles
     journal-dépendantes ont leurs entrées fraîches) et avant `publications`
-    (le matching lit les colonnes corrigées). Trois sous-étapes : unaire
-    (per-record : mapping + règles de correction), Zenodo (substitution
-    version→concept du DOI), puis cluster (group-by-clé : nullage des clés
-    erronées, ouvrage/chapitre au même DOI). La substitution Zenodo précède le
-    cluster pour que le group-by-DOI regroupe sur le concept.
+    (le matching lit les colonnes corrigées). Deux sous-étapes : unaire
+    (per-record : mapping + règles de correction), puis cluster (group-by-DOI :
+    substitution version→concept DataCite, nullage des DOI erronés ouvrage/chapitre).
     """
     _run_correct_metadata_unary()
-    _run_correct_zenodo_concept()
     _run_correct_by_cluster()
 
 
@@ -489,8 +470,8 @@ def phase_publications(**kw: Any) -> Any:
     réconciliation les subsume. La dédup thèse passe par le token de confirmation,
     plus de passe métadonnées dédiée.
 
-    Prerequis : la phase `zenodo_doi` (en amont) a resolu les concept DOI Zenodo,
-    appliqués en colonne par `metadata_correction`.
+    Prerequis : `metadata_correction` (en amont) a substitué en colonne le DOI concept
+    des versions DataCite, de sorte que le matching regroupe sur le concept.
 
     `--rebuild-publications` re-dirtie tout le stock avant la réconciliation : celle-ci
     dégénère alors en cluster-then-materialize global (à lancer après une évolution des
@@ -588,26 +569,6 @@ def phase_subjects(**kw: Any) -> Any:
     _run_cooccurrences()
 
 
-def _run_resolve_zenodo_concept() -> None:
-    from application.pipeline.publications.resolve_zenodo_concept import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.zenodo_concept import PgZenodoConceptQueries
-    from infrastructure.sources.config import get_api_base_urls
-    from infrastructure.sources.zenodo import HttpZenodoResolver
-
-    log.info("▶ resolve_zenodo_concept")
-    t0 = time.time()
-    engine = get_sync_engine()
-    with engine.connect() as bootstrap:
-        zenodo_api = get_api_base_urls(bootstrap)["zenodo"]
-    conn = engine.connect()
-    try:
-        run(conn, PgZenodoConceptQueries(), HttpZenodoResolver(api_base=zenodo_api), log)
-    finally:
-        conn.close()
-    log.info("✓ resolve_zenodo_concept terminé en %.1fs", time.time() - t0)
-
-
 def _run_correct_metadata_unary() -> None:
     from application.pipeline.metadata_correction.correct_unary import run
     from infrastructure.db.engine import get_sync_engine
@@ -621,21 +582,6 @@ def _run_correct_metadata_unary() -> None:
     finally:
         conn.close()
     log.info("✓ metadata_correction (unaire) terminé en %.1fs", time.time() - t0)
-
-
-def _run_correct_zenodo_concept() -> None:
-    from application.pipeline.metadata_correction.correct_zenodo_concept import run
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
-
-    log.info("▶ metadata_correction (zenodo)")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run(conn, PgMetadataCorrectionQueries(), log)
-    finally:
-        conn.close()
-    log.info("✓ metadata_correction (zenodo) terminé en %.1fs", time.time() - t0)
 
 
 def _run_correct_by_cluster() -> None:
@@ -1744,7 +1690,6 @@ PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
     ("normalize", phase_normalize),
     ("affiliations", phase_affiliations),
     ("publishers_journals", phase_publishers_journals),
-    ("zenodo_doi", phase_zenodo_doi),
     ("metadata_correction", phase_metadata_correction),
     ("publications", phase_publications),
     ("persons", phase_persons),

@@ -19,9 +19,10 @@ class TestDoi:
         assert _keys("10.1234/ABC.v2").doi == "10.1234/abc"
 
     def test_doi_read_from_column_ignores_external_ids(self):
-        """Le DOI vient de la colonne nue ; `external_ids.zenodo_concept_doi` (cache) est
-        ignoré — la substitution concept est déjà persistée par `metadata_correction`."""
-        keys = _keys("10.5281/zenodo.10", {"zenodo_concept_doi": "10.5281/zenodo.999"})
+        """Le DOI vient de la colonne nue ; les `external_ids` (ici des DOI secondaires) ne
+        servent jamais de clé de confirmation — la substitution concept est déjà persistée en
+        colonne par `metadata_correction`."""
+        keys = _keys("10.5281/zenodo.10", {"related_dois": ["10.5281/zenodo.999"]})
         assert keys.doi == "10.5281/zenodo.10"
 
     def test_no_doi(self):
