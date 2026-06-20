@@ -1,184 +1,111 @@
 """Orchestrateur d'extraction HAL.
 
-Pilote l'extraction par collection labo, avec choix adaptatif entre
-fetch full (toutes les pages) et fetch incrémental (orphelins
-individuels + UPDATE SQL pour tagger les connus). Le détail HTTP/SQL
+Interroge l'**union** des collections configurées en une seule requête Solr
+(`fq=collCode_s:(C1 OR … OR Cn)`), paginée en `cursorMark`. Solr dédoublonne
+l'union côté serveur : chaque document est récupéré une fois, quel que soit le
+nombre de collections du périmètre auxquelles il appartient. Le détail HTTP/SQL
 est délégué à `HalExtractAdapter`.
+
+Le routage new/updated/unchanged vient du `(inserted, changed)` de l'upsert
+staging piloté par `raw_hash` : un `raw_hash=null` en base force le re-import
+(re-fetch → hash recalculé → contenu réécrit + `processed=FALSE`).
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+from collections.abc import Callable
 
 from sqlalchemy import Connection
 
 from application.pipeline.extract.base import SourceExtractor
-from application.pipeline.extract.hal_helpers import (
-    choose_extraction_mode,
-    count_full_fetch_pages,
-)
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from application.ports.pipeline.staging import StagingQueries
 
+# Cadence des logs de progression (toutes les N pages cursorMark).
+_PROGRESS_EVERY_PAGES = 20
 
-def _extract_full(
+
+def extract_union(
     adapter: HalExtractAdapter,
-    query: str,
-    collection_code: str,
+    config: HalExtractConfig,
     conn: Connection,
-    existing_ids: set[str],
-    total_count: int,
-    logger: logging.Logger,
-) -> tuple[int, int, int]:
-    """Full-fetch : paginate tous les papiers d'une collection.
-
-    Retourne `(new, updated, unchanged)` (insertion / contenu réécrit / re-vu
-    identique), ventilé via le `(inserted, changed)` de l'UPSERT."""
-    start = 0
-    total_new = 0
-    total_updated = 0
-    total_unchanged = 0
-    while start < total_count:
-        data = adapter.fetch_page(query, collection_code, start)
-        docs = data["response"]["docs"]
-        # Safeguard : si page vide alors qu'on n'a pas atteint total_count
-        # (incohérence côté serveur, rare mais observable en cas de race
-        # de réplication Solr), on sort pour éviter une boucle infinie.
-        if not docs:
-            break
-        new_in_page = 0
-        updated_in_page = 0
-        unchanged_in_page = 0
-        for doc in docs:
-            hal_id = adapter.extract_id(doc)
-            if not hal_id:
-                continue
-            doi = adapter.extract_doi(doc)
-            inserted, changed = adapter.upsert_work(conn, hal_id, doi, doc, collection_code)
-            if inserted:
-                existing_ids.add(hal_id)
-                new_in_page += 1
-            elif changed:
-                updated_in_page += 1
-            else:
-                unchanged_in_page += 1
-        conn.commit()
-        total_new += new_in_page
-        total_updated += updated_in_page
-        total_unchanged += unchanged_in_page
-        start += len(docs)
-    return total_new, total_updated, total_unchanged
-
-
-def _extract_incremental(
-    adapter: HalExtractAdapter,
-    collection_code: str,
-    orphans: list[str],
-    known: list[str],
-    conn: Connection,
-    existing_ids: set[str],
-    logger: logging.Logger,
-) -> tuple[int, int, int]:
-    """Fetch individuel des orphelins + UPDATE SQL pour les connus.
-
-    Retourne `(new, updated, unchanged)`. Les orphelins fetchés sont ventilés
-    via le `(inserted, changed)` de l'UPSERT (quasi tous `new`). Les rows déjà
-    en staging sont taguées avec cette collection sans réécrire `raw_data` →
-    comptées **inchangées** (le tag est du bookkeeping, pas un re-import de
-    contenu). Choisi par `extract_collection` quand la collection est
-    majoritairement déjà en staging (umbrella type PRES_CLERMONT).
-    """
-    total_new = 0
-    total_updated = 0
-    total_unchanged = 0
-    for i, hal_id in enumerate(orphans, 1):
-        try:
-            doc = adapter.fetch_single_work(hal_id)
-        except Exception as e:
-            logger.warning(f"Échec fetch orphelin {hal_id} : {e}")
-            continue
-        if doc is None:
-            logger.warning(f"Orphelin {hal_id} introuvable côté HAL")
-            continue
-        actual_hal_id = adapter.extract_id(doc)
-        if not actual_hal_id:
-            continue
-        doi = adapter.extract_doi(doc)
-        inserted, changed = adapter.upsert_work(conn, actual_hal_id, doi, doc, collection_code)
-        conn.commit()
-        existing_ids.add(actual_hal_id)
-        if inserted:
-            total_new += 1
-        elif changed:
-            total_updated += 1
-        else:
-            total_unchanged += 1
-        if i % 100 == 0:
-            logger.info(f"    Orphelins fetchés : {i}/{len(orphans)}")
-    total_unchanged += adapter.tag_existing_with_collection(conn, known, collection_code)
-    return total_new, total_updated, total_unchanged
-
-
-def extract_collection(
-    collection_code: str,
-    collection_label: str,
-    conn: Connection,
-    existing_ids: set[str],
-    adapter: HalExtractAdapter,
     logger: logging.Logger,
     *,
     years: list[int] | None = None,
     since: str | None = None,
     dry_run: bool = False,
-) -> tuple[int, int, int, int]:
-    """Extrait tous les works d'une collection. Retourne `(total, new, updated, unchanged)`.
+    breaker_tripped: Callable[[], bool] = lambda: False,
+) -> PhaseMetrics:
+    """Extrait l'union des collections configurées via une requête `cursorMark`.
 
-    Stratégie adaptative :
-      1. Preview : liste des halIds de la collection via Solr `fl=halId_s`
-         (payload léger, ~1 call même pour les méga-collections)
-      2. Diff contre `existing_ids` (déjà en staging depuis d'autres collections)
-      3. Décision via `choose_extraction_mode` : compare le nb d'orphelins
-         au nb de pages full-fetch.
+    Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les
+    collections de `config.all_collections`, puis paginate en `cursorMark`
+    jusqu'à stabilisation du marqueur. Chaque document est upserté une fois
+    avec ses `hal_collections` du périmètre (`collCode_s` ∩ collections
+    configurées). Retourne `PhaseMetrics(new, updated, unchanged, total)`.
+
+    En `dry_run`, une seule page est tirée pour lire `numFound` (volume de
+    l'union) sans rien écrire.
     """
+    codes = list(config.all_collections.keys())
+    configured = set(codes)
     query = adapter.build_query(years=years, since=since)
+    fq = adapter.build_collections_fq(codes)
 
-    # Phase 0 — preview IDs-only
-    all_ids = adapter.fetch_collection_ids(query, collection_code)
-    total_count = len(all_ids)
-    logger.info(f"  {collection_code} ({collection_label}) : {total_count} docs")
+    metrics = PhaseMetrics()
 
-    if dry_run or total_count == 0:
-        return total_count, 0, 0, 0
+    if dry_run:
+        data = adapter.fetch_page_cursor(query, fq, "*")
+        total = int(data.get("response", {}).get("numFound", 0))
+        metrics.add(total=total)
+        logger.info(f"  Union des {len(codes)} collections : {total} docs (dry-run)")
+        return metrics
 
-    orphans = [hid for hid in all_ids if hid not in existing_ids]
-    known = [hid for hid in all_ids if hid in existing_ids]
-    per_page = adapter.per_page_for(collection_code)
-    full_fetch_pages = count_full_fetch_pages(total_count, per_page)
-    mode = choose_extraction_mode(total_count, len(orphans), per_page)
+    cursor = "*"
+    page = 0
+    while True:
+        if breaker_tripped():
+            logger.warning(
+                "HAL à bout (429/5xx répétés) — pagination interrompue (retry au prochain run)"
+            )
+            break
+        data = adapter.fetch_page_cursor(query, fq, cursor)
+        resp = data.get("response", {})
+        docs = resp.get("docs", [])
+        for doc in docs:
+            hal_id = adapter.extract_id(doc)
+            if not hal_id:
+                continue
+            doi = adapter.extract_doi(doc)
+            collections = adapter.configured_collections(doc, configured)
+            inserted, changed = adapter.upsert_work(conn, hal_id, doi, doc, collections)
+            if inserted:
+                metrics.add(new=1, total=1)
+            elif changed:
+                metrics.add(updated=1, total=1)
+            else:
+                metrics.add(unchanged=1, total=1)
+        conn.commit()
 
-    logger.info(
-        "    Aiguillage %s : total=%d, orphelins=%d, pages_full=%d, per_page=%d → mode=%s",
-        collection_code,
-        total_count,
-        len(orphans),
-        full_fetch_pages,
-        per_page,
-        mode,
-    )
+        page += 1
+        if page % _PROGRESS_EVERY_PAGES == 0:
+            logger.info(
+                f"  {metrics.total} docs ({metrics.new} nouveaux, {metrics.updated} mis à jour, "
+                f"{metrics.unchanged} inchangés)"
+            )
 
-    if mode == "incremental":
-        logger.info(f"    {len(known)} docs déjà connus")
-        total_new, total_updated, total_unchanged = _extract_incremental(
-            adapter, collection_code, orphans, known, conn, existing_ids, logger
-        )
-    else:  # mode == "full"
-        total_new, total_updated, total_unchanged = _extract_full(
-            adapter, query, collection_code, conn, existing_ids, total_count, logger
-        )
+        # Fin de pagination cursorMark : Solr renvoie le même marqueur que celui
+        # envoyé une fois l'union épuisée. Le test `not docs` borne aussi la boucle
+        # en cas d'incohérence serveur (page vide avant stabilisation).
+        next_cursor = data.get("nextCursorMark", cursor)
+        if next_cursor == cursor or not docs:
+            break
+        cursor = next_cursor
 
-    return total_count, total_new, total_updated, total_unchanged
+    return metrics
 
 
 class HalExtractor(SourceExtractor[HalExtractConfig]):
@@ -227,37 +154,28 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
         config: HalExtractConfig,
         existing_ids: set[str],
     ) -> PhaseMetrics:
+        """Extraction de l'union des collections en une passe `cursorMark`.
+
+        `existing_ids` (pré-chargé par le base class pour les sources à routage
+        `is_new`) n'est pas utilisé par HAL : l'upsert `ON CONFLICT` piloté par
+        `raw_hash` tranche seul new-vs-existing côté base.
+        """
         config_years = self._adapter.get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
 
-        stats = PhaseMetrics()
-        for code, label in config.all_collections.items():
-            if self._breaker_tripped():
-                self.logger.warning(
-                    "HAL à bout (429/5xx répétés) — collections restantes sautées"
-                    " (retry au prochain run)"
-                )
-                break
-            total, new, updated, unchanged = extract_collection(
-                code,
-                label,
-                self.conn,
-                existing_ids,
-                self._adapter,
-                self.logger,
-                years=years,
-                since=args.since,
-                dry_run=args.dry_run,
-            )
-            stats.add(new=new, updated=updated, unchanged=unchanged, total=total)
-            if not args.dry_run and (new > 0 or updated > 0 or unchanged > 0):
-                self.logger.info(
-                    f"    → {new} nouveaux, {updated} mis à jour, {unchanged} inchangés"
-                )
-        return stats
+        return extract_union(
+            self._adapter,
+            config,
+            self.conn,
+            self.logger,
+            years=years,
+            since=args.since,
+            dry_run=args.dry_run,
+            breaker_tripped=self._breaker_tripped,
+        )
 
 
 __all__ = [
     "HalExtractor",
-    "extract_collection",
+    "extract_union",
 ]

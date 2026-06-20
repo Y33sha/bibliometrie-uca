@@ -1,282 +1,192 @@
-"""Tests de l'extraction HAL adaptive (preview IDs → full-fetch ou incrémental).
+"""Tests de l'extraction HAL en requête unique multi-collections (`cursorMark`).
 
-Stratégie : un fake `HalExtractAdapter` (MagicMock) injecté à
-`extract_collection`. On monkeypatche `_extract_full` et
-`_extract_incremental` dans `application.pipeline.extract.extract_hal`
-pour observer lequel est choisi. On ne teste pas la plomberie HTTP/SQL
-(couverte par le helper retry + tests adapter dédiés).
+Stratégie : un fake `HalExtractAdapter` (MagicMock) injecté à `extract_union`,
+qui sert des pages `cursorMark` scriptées. On vérifie la pagination (boucle
+jusqu'à stabilisation du marqueur), le routage new/updated/unchanged issu du
+`(inserted, changed)` de l'upsert, et la dérivation des `hal_collections` du
+périmètre. La plomberie HTTP/SQL réelle est couverte ailleurs (helper retry +
+tests adapter dédiés).
 
-Le rate-limit est interne à l'adapter (cf. `PgHalExtractAdapter._get`) :
-l'orchestrateur n'appelle plus `time.sleep`, et les fakes MagicMock ne
-dorment pas — aucun monkeypatch du sleep n'est nécessaire ici.
+Le rate-limit est interne à l'adapter (`PgHalExtractAdapter._get`) : l'orchestrateur
+n'appelle plus `time.sleep`, et les fakes MagicMock ne dorment pas.
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from unittest.mock import MagicMock
 
-import pytest
-from sqlalchemy import text
+from application.pipeline.extract.extract_hal import extract_union
+from application.ports.pipeline.extract.hal import HalExtractConfig
 
-from application.pipeline.extract import extract_hal
-from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
-
-
-@pytest.fixture
-def spies(monkeypatch):
-    """Remplace les deux chemins d'extraction par des spies simples."""
-    calls: dict[str, list] = {"full": [], "incremental": []}
-
-    def fake_full(adapter, query, collection_code, conn, existing_ids, total_count, logger):
-        calls["full"].append({"collection": collection_code, "total": total_count})
-        return 0, 0, 0  # (new, updated, unchanged)
-
-    def fake_incremental(adapter, collection_code, orphans, known, conn, existing_ids, logger):
-        calls["incremental"].append(
-            {
-                "collection": collection_code,
-                "orphans": list(orphans),
-                "known": list(known),
-            }
-        )
-        return (
-            len(orphans),
-            0,
-            len(known),
-        )  # (new, updated, unchanged) : connus = taggés (inchangés)
-
-    monkeypatch.setattr(extract_hal, "_extract_full", fake_full)
-    monkeypatch.setattr(extract_hal, "_extract_incremental", fake_incremental)
-    return calls
+_LOGGER = logging.getLogger("test")
 
 
-def _fake_adapter(preview_ids: list[str]) -> MagicMock:
-    """Construit un MagicMock du port HalExtractAdapter avec preview_ids fixé.
+def _config(collections: Mapping[str, str]) -> HalExtractConfig:
+    return HalExtractConfig(
+        base_url="https://example/",
+        all_collections=dict(collections),
+        n_collections=len(collections),
+        n_extra=0,
+    )
 
-    `per_page_for` doit renvoyer un int réel (consommé par le calcul de
-    pagination), et `build_query` une chaîne (passée telle quelle aux fetchs).
+
+def _page(docs: list[dict], next_cursor: str, num_found: int | None = None) -> dict:
+    """Réponse Solr minimale : `response.docs` + `nextCursorMark`."""
+    return {
+        "response": {"numFound": num_found if num_found is not None else len(docs), "docs": docs},
+        "nextCursorMark": next_cursor,
+    }
+
+
+def _adapter(pages: list[dict]) -> MagicMock:
+    """MagicMock du port servant `pages` successivement à chaque `fetch_page_cursor`.
+
+    Les méthodes pures (`build_query`, `build_collections_fq`, `extract_id`,
+    `extract_doi`, `configured_collections`) gardent un comportement réaliste ;
+    `upsert_work` renvoie `(inserted, changed)` selon le champ `_route` du doc.
     """
     a = MagicMock()
-    a.fetch_collection_ids.return_value = preview_ids
-    a.per_page_for.return_value = 500
     a.build_query.return_value = "q"
+    a.build_collections_fq.return_value = "collCode_s:(...)"
+    a.fetch_page_cursor.side_effect = pages
+    a.extract_id.side_effect = lambda doc: doc.get("halId_s", "")
+    a.extract_doi.side_effect = lambda doc: doc.get("doiId_s")
+    a.configured_collections.side_effect = lambda doc, configured: [
+        c for c in (doc.get("collCode_s") or []) if c in configured
+    ]
+    a.upsert_work.side_effect = lambda conn, hal_id, doi, raw, colls: raw.get(
+        "_route", (True, False)
+    )
     return a
 
 
-class TestAdaptiveDispatch:
-    def test_incremental_mode_triggered_for_umbrella(self, spies):
-        """5000 papiers, 4995 connus, 5 orphelins.
-        per_page=500 → full_fetch_pages=10. Seuil 10 × 10 = 100. 5 < 100 → INCRÉMENTAL.
-        """
-        preview_ids = [f"hal-{i}" for i in range(5000)]
-        adapter = _fake_adapter(preview_ids)
-        existing = {f"hal-{i}" for i in range(5, 5000)}
+def _doc(hal_id: str, *, collections: list[str] | None = None, route=(True, False)) -> dict:
+    return {"halId_s": hal_id, "collCode_s": collections or [], "_route": route}
 
-        total, _new, _updated, _unchanged = extract_hal.extract_collection(
-            collection_code="UMBRELLA",
-            collection_label="Umbrella",
-            conn=MagicMock(),
-            existing_ids=existing,
-            adapter=adapter,
-            logger=logging.getLogger("test"),
-            years=[2025, 2026],
+
+class TestCursorPagination:
+    def test_paginates_until_cursor_stabilises(self):
+        """Trois pages : deux pleines puis une vide qui stabilise le marqueur."""
+        pages = [
+            _page([_doc("hal-1"), _doc("hal-2")], next_cursor="c1"),
+            _page([_doc("hal-3")], next_cursor="c2"),
+            _page([], next_cursor="c2"),  # marqueur stable → fin
+        ]
+        adapter = _adapter(pages)
+
+        metrics = extract_union(adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025])
+
+        assert metrics.total == 3
+        assert metrics.new == 3
+        # 3 fetchs : 2 pages de docs + la page de confirmation vide.
+        assert adapter.fetch_page_cursor.call_count == 3
+        # Premier appel avec le marqueur initial "*".
+        assert adapter.fetch_page_cursor.call_args_list[0].args[2] == "*"
+
+    def test_stops_when_single_page_marker_already_stable(self):
+        """Une seule page dont le `nextCursorMark` égale le marqueur envoyé → arrêt sans fetch superflu."""
+        pages = [_page([_doc("hal-1")], next_cursor="*")]
+        adapter = _adapter(pages)
+
+        metrics = extract_union(adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025])
+
+        assert metrics.total == 1
+        assert adapter.fetch_page_cursor.call_count == 1
+
+    def test_empty_union_returns_zero(self):
+        pages = [_page([], next_cursor="*")]
+        adapter = _adapter(pages)
+
+        metrics = extract_union(adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025])
+
+        assert metrics.total == 0
+        assert (metrics.new, metrics.updated, metrics.unchanged) == (0, 0, 0)
+
+
+class TestRouting:
+    def test_routes_inserted_updated_unchanged(self):
+        """`(inserted, changed)` de l'upsert ventile new / updated / unchanged."""
+        pages = [
+            _page(
+                [
+                    _doc("hal-new", route=(True, False)),
+                    _doc("hal-upd", route=(False, True)),
+                    _doc("hal-same", route=(False, False)),
+                ],
+                next_cursor="c1",
+            ),
+            _page([], next_cursor="c1"),
+        ]
+        adapter = _adapter(pages)
+
+        metrics = extract_union(adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025])
+
+        assert (metrics.new, metrics.updated, metrics.unchanged) == (1, 1, 1)
+        assert metrics.total == 3
+
+    def test_skips_docs_without_hal_id(self):
+        pages = [
+            _page([_doc(""), _doc("hal-ok")], next_cursor="c1"),
+            _page([], next_cursor="c1"),
+        ]
+        adapter = _adapter(pages)
+
+        metrics = extract_union(adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025])
+
+        assert metrics.total == 1
+        # Le doc sans halId n'est pas upserté.
+        assert adapter.upsert_work.call_count == 1
+
+
+class TestCollectionsDerivation:
+    def test_hal_collections_intersect_configured(self):
+        """`hal_collections` passées à l'upsert = `collCode_s` ∩ collections configurées."""
+        pages = [
+            _page(
+                [_doc("hal-1", collections=["LIMOS", "PRES_CLERMONT", "HORS-PERIMETRE"])],
+                next_cursor="c1",
+            ),
+            _page([], next_cursor="c1"),
+        ]
+        adapter = _adapter(pages)
+        config = _config({"LIMOS": "Limos", "PRES_CLERMONT": "Umbrella"})
+
+        extract_union(adapter, config, MagicMock(), _LOGGER, years=[2025])
+
+        # 4e argument positionnel d'upsert_work = hal_collections.
+        passed = adapter.upsert_work.call_args.args[4]
+        assert passed == ["LIMOS", "PRES_CLERMONT"]
+
+
+class TestDryRun:
+    def test_dry_run_reads_numfound_without_upsert(self):
+        pages = [_page([_doc("hal-1")], next_cursor="c1", num_found=4242)]
+        adapter = _adapter(pages)
+
+        metrics = extract_union(
+            adapter, _config({"C": "Coll"}), MagicMock(), _LOGGER, years=[2025], dry_run=True
         )
-        assert total == 5000
-        assert spies["incremental"] and not spies["full"]
-        call = spies["incremental"][0]
-        assert call["collection"] == "UMBRELLA"
-        assert sorted(call["orphans"]) == [f"hal-{i}" for i in range(5)]
-        assert len(call["known"]) == 4995
 
-    def test_full_fetch_mode_when_staging_empty(self, spies):
-        """100 papiers, staging vide → 100 orphelins, full_fetch_pages=1.
-        Seuil 10 × 1 = 10. 100 > 10 → FULL-FETCH."""
-        preview_ids = [f"hal-{i}" for i in range(100)]
-        adapter = _fake_adapter(preview_ids)
-
-        total, _new, _updated, _unchanged = extract_hal.extract_collection(
-            collection_code="FRESH",
-            collection_label="Fresh",
-            conn=MagicMock(),
-            existing_ids=set(),
-            adapter=adapter,
-            logger=logging.getLogger("test"),
-            years=[2025, 2026],
-        )
-        assert total == 100
-        assert spies["full"] and not spies["incremental"]
-        assert spies["full"][0]["collection"] == "FRESH"
-        assert spies["full"][0]["total"] == 100
-
-    def test_boundary_orphans_at_threshold_picks_full(self, spies):
-        """Borne : orphans == 10 × full_fetch_pages → full (règle `<` stricte).
-        5000 papiers, 4900 connus, 100 orphelins. per_page=500 → pages=10. Seuil 100. 100 < 100 = False.
-        """
-        preview_ids = [f"hal-{i}" for i in range(5000)]
-        adapter = _fake_adapter(preview_ids)
-        existing = {f"hal-{i}" for i in range(100, 5000)}
-
-        total, _new, _updated, _unchanged = extract_hal.extract_collection(
-            collection_code="BOUNDARY",
-            collection_label="Boundary",
-            conn=MagicMock(),
-            existing_ids=existing,
-            adapter=adapter,
-            logger=logging.getLogger("test"),
-            years=[2025],
-        )
-        assert total == 5000
-        assert spies["full"] and not spies["incremental"]
-
-    def test_boundary_orphans_just_below_threshold_picks_incremental(self, spies):
-        """Borne inverse : orphans == seuil - 1 → incrémental.
-        5000 papiers, 4901 connus, 99 orphelins. per_page=500 → pages=10. Seuil 100. 99 < 100 = True.
-        """
-        preview_ids = [f"hal-{i}" for i in range(5000)]
-        adapter = _fake_adapter(preview_ids)
-        existing = {f"hal-{i}" for i in range(99, 5000)}
-
-        total, _new, _updated, _unchanged = extract_hal.extract_collection(
-            collection_code="JUSTBELOW",
-            collection_label="JustBelow",
-            conn=MagicMock(),
-            existing_ids=existing,
-            adapter=adapter,
-            logger=logging.getLogger("test"),
-            years=[2025],
-        )
-        assert total == 5000
-        assert spies["incremental"] and not spies["full"]
-
-    def test_dry_run_skips_both_paths(self, spies):
-        preview_ids = [f"hal-{i}" for i in range(50)]
-        adapter = _fake_adapter(preview_ids)
-
-        total, new, updated, unchanged = extract_hal.extract_collection(
-            collection_code="DRY",
-            collection_label="Dry",
-            conn=MagicMock(),
-            existing_ids=set(),
-            adapter=adapter,
-            logger=logging.getLogger("test"),
-            years=[2025],
-            dry_run=True,
-        )
-        assert total == 50
-        assert (new, updated, unchanged) == (0, 0, 0)
-        assert not spies["full"] and not spies["incremental"]
-
-    def test_empty_collection_returns_zero(self, spies):
-        adapter = _fake_adapter([])
-
-        total, new, updated, unchanged = extract_hal.extract_collection(
-            collection_code="EMPTY",
-            collection_label="Empty",
-            conn=MagicMock(),
-            existing_ids=set(),
-            adapter=adapter,
-            logger=logging.getLogger("test"),
-            years=[2025],
-        )
-        assert total == 0
-        assert (new, updated, unchanged) == (0, 0, 0)
-        assert not spies["full"] and not spies["incremental"]
-
-
-class TestExtractFullSafeguard:
-    """Tests du safeguard qui évite les boucles infinies sur `_extract_full`."""
-
-    def test_empty_docs_breaks_loop_even_if_start_below_total(self):
-        """Si l'API retourne une page vide alors que start < total_count
-        (incohérence rare côté Solr), on sort du loop au lieu de spinner."""
-        adapter = MagicMock()
-        adapter.fetch_page.return_value = {"response": {"numFound": 1000, "docs": []}}
-
-        conn = MagicMock()
-        total_new, total_updated, total_unchanged = extract_hal._extract_full(
-            adapter=adapter,
-            query="q",
-            collection_code="C",
-            conn=conn,
-            existing_ids=set(),
-            total_count=1000,
-            logger=logging.getLogger("test"),
-        )
-        assert (total_new, total_updated, total_unchanged) == (0, 0, 0)  # sortie propre
+        assert metrics.total == 4242
+        assert adapter.fetch_page_cursor.call_count == 1
         adapter.upsert_work.assert_not_called()
 
 
-# ── tag_existing_with_collection : tests SQL via l'adapter Pg ────
+class TestBreaker:
+    def test_breaker_interrupts_pagination(self):
+        """Le circuit-breaker tripé stoppe la boucle avant le premier fetch."""
+        adapter = _adapter([_page([_doc("hal-1")], next_cursor="c1")])
 
-
-class _NoCommitConn:
-    """Wrap une SA Connection en neutralisant commit() pour que le
-    rollback de la fixture `sa_sync_conn` reste effectif."""
-
-    def __init__(self, real_conn):
-        self._conn = real_conn
-
-    def execute(self, *args, **kwargs):
-        return self._conn.execute(*args, **kwargs)
-
-    def commit(self):
-        pass
-
-
-class TestTagExistingWithCollection:
-    def test_empty_hal_ids_skips_query(self):
-        adapter = PgHalExtractAdapter(base_url="https://example/")
-        conn = MagicMock()
-        n = adapter.tag_existing_with_collection(conn, [], "FOO")
-        assert n == 0
-        conn.execute.assert_not_called()
-
-    def test_append_collection_to_existing_array(self, sa_sync_conn):
-        adapter = PgHalExtractAdapter(base_url="https://example/")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO staging (source, source_id, raw_data, hal_collections) "
-                "VALUES ('hal', 'hal-existing', '{}'::jsonb, ARRAY['OLD']::TEXT[])"
-            )
+        metrics = extract_union(
+            adapter,
+            _config({"C": "Coll"}),
+            MagicMock(),
+            _LOGGER,
+            years=[2025],
+            breaker_tripped=lambda: True,
         )
-        n = adapter.tag_existing_with_collection(
-            _NoCommitConn(sa_sync_conn), ["hal-existing"], "GEOLAB"
-        )
-        assert n == 1
-        row = sa_sync_conn.execute(
-            text("SELECT hal_collections FROM staging WHERE source_id = 'hal-existing'")
-        ).one()
-        assert row.hal_collections == ["OLD", "GEOLAB"]
 
-    def test_init_collection_array_when_null(self, sa_sync_conn):
-        adapter = PgHalExtractAdapter(base_url="https://example/")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO staging (source, source_id, raw_data, hal_collections) "
-                "VALUES ('hal', 'hal-null', '{}'::jsonb, NULL)"
-            )
-        )
-        n = adapter.tag_existing_with_collection(
-            _NoCommitConn(sa_sync_conn), ["hal-null"], "GEOLAB"
-        )
-        assert n == 1
-        row = sa_sync_conn.execute(
-            text("SELECT hal_collections FROM staging WHERE source_id = 'hal-null'")
-        ).one()
-        assert row.hal_collections == ["GEOLAB"]
-
-    def test_no_duplicate_when_collection_already_present(self, sa_sync_conn):
-        adapter = PgHalExtractAdapter(base_url="https://example/")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO staging (source, source_id, raw_data, hal_collections) "
-                "VALUES ('hal', 'hal-dup', '{}'::jsonb, ARRAY['GEOLAB']::TEXT[])"
-            )
-        )
-        n = adapter.tag_existing_with_collection(_NoCommitConn(sa_sync_conn), ["hal-dup"], "GEOLAB")
-        assert n == 1
-        row = sa_sync_conn.execute(
-            text("SELECT hal_collections FROM staging WHERE source_id = 'hal-dup'")
-        ).one()
-        assert row.hal_collections == ["GEOLAB"]
+        assert metrics.total == 0
+        adapter.fetch_page_cursor.assert_not_called()
