@@ -145,7 +145,7 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
             self.logger.info(f"Année(s) : {years or 'toutes (config)'}")
         self.logger.info(
             f"Collections : {len(config.all_collections)} "
-            f"({config.n_collections} labos + {config.n_extra} extra)"
+            f"({config.n_collections} structures du périmètre + {config.n_extra} extra)"
         )
 
     def extract_all(

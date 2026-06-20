@@ -23,8 +23,8 @@ class HalExtractConfig:
     """Config d'extraction HAL chargée depuis la BDD."""
 
     base_url: str
-    all_collections: Mapping[str, str]  # {code → label}, fusion labos + extra
-    n_collections: int  # nombre de collections labo
+    all_collections: Mapping[str, str]  # {code → label}, fusion périmètre + extra
+    n_collections: int  # nombre de collections du périmètre
     n_extra: int  # nombre de collections extra ajoutées
 
 
