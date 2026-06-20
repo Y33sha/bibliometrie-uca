@@ -47,7 +47,7 @@ AUTHOR_SOURCES_SQL = _to_sql(AUTHOR_SOURCES)
 # canoniques) et passe en 2e après theses ; pour les documents hors-thèse
 # la clé `theses` n'apparaît simplement pas dans les rows et l'ordre se
 # réduit aux sources restantes.
-SOURCE_PRIORITY: tuple[str, ...] = ("theses", "crossref", "scanr", "hal", "openalex", "wos")
+SOURCE_PRIORITY: tuple[str, ...] = ("theses", "crossref", "hal", "openalex", "scanr", "wos")
 
 
 # Sources qui peuvent apparaître comme clés du JSONB `structures.api_ids`
