@@ -65,11 +65,11 @@ class DataciteFetchMissingDoiAdapter:
 
     source_key = "datacite"
     batch_size = 1
-    # DataCite throttle agressivement les clients non authentifiés : ~10 req/s
-    # (3 concurrentes) déclenche des 429 en rafale. On interroge en série avec
-    # une pause franche (~1,3 req/s sustained) pour ne pas se faire limiter.
-    max_concurrent = 1
-    request_delay_s = 0.5
+    # Limite DataCite (anonyme) : 3000 req / 5 min = 10 req/s. L'API répond très
+    # vite (~10 ms), donc le délai par worker domine le débit : avec 3
+    # concurrentes, `request_delay_s=0.35` plafonne à ~8,5 req/s, sous la limite.
+    max_concurrent = 3
+    request_delay_s = 0.35
 
     base_url: str
     headers: dict[str, str]
@@ -92,8 +92,6 @@ class DataciteFetchMissingDoiAdapter:
                 url,
                 headers=self.headers,
                 timeout=30,
-                max_retries=5,
-                initial_backoff=2.0,
                 label=f"DOI {doi}",
             )
         except httpx.HTTPStatusError as e:
