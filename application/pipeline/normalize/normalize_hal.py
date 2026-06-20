@@ -25,6 +25,7 @@ import logging
 import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Callable
+from datetime import date
 
 from sqlalchemy import Connection
 
@@ -132,6 +133,8 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
     if not journal_id:
         container_title = as_str(doc.get("bookTitle_s")) or as_str(doc.get("conferenceTitle_s"))
 
+    embargo_until = active_embargo_until(doc.get("label_xml"), date.today())
+
     return dict(
         title=title,
         pub_year=doc.get("producedDateY_i"),
@@ -142,7 +145,9 @@ def extract_pub_metadata(doc: dict, journal_id: int | None) -> dict:
             doc.get("openAccess_bool"),
             doc.get("fileMain_s"),
             doc.get("linkExtId_s"),
+            embargo_until,
         ),
+        embargo_until=embargo_until,
         journal_id=journal_id,
         container_title=container_title,
         language=language,
@@ -267,6 +272,7 @@ def insert_hal_document(
         external_ids=external_ids,
         journal_id=pub_meta["journal_id"],
         oa_status=pub_meta["oa_status"],
+        embargo_until=pub_meta["embargo_until"],
         language=pub_meta["language"],
         container_title=pub_meta["container_title"],
         abstract=abstract,
@@ -283,6 +289,41 @@ def insert_hal_document(
 
 
 _TEI_NS = {"tei": "http://www.tei-c.org/ns/1.0"}
+
+
+def active_embargo_until(label_xml: str | None, today: date) -> date | None:
+    """Date de fin d'un embargo HAL **encore actif** (future), sinon None.
+
+    Lit `ref[@type='file']/date/@notBefore` du TEI (`label_xml`) : la date à laquelle
+    le fichier déposé devient accessible. Plusieurs refs `type='file'` (page + document) :
+    on retient la plus tardive. Une date déjà échue (fichier accessible) renvoie None —
+    pas d'embargo actif, on ne stocke pas d'historique. La levée à l'échéance d'une date
+    future stockée est portée par une règle de correction `oa_status`, sans dépendre d'un
+    ré-import HAL.
+    """
+    if not label_xml:
+        return None
+    try:
+        root = ET.fromstring(label_xml)
+    except ET.ParseError:
+        return None
+    dates: list[date] = []
+    for ref in root.iter(f"{{{_TEI_NS['tei']}}}ref"):
+        if ref.get("type") != "file":
+            continue
+        date_el = ref.find("tei:date", _TEI_NS)
+        if date_el is None:
+            continue
+        not_before = date_el.get("notBefore")
+        if not_before:
+            try:
+                dates.append(date.fromisoformat(not_before))
+            except ValueError:
+                continue
+    if not dates:
+        return None
+    latest = max(dates)
+    return latest if latest > today else None
 
 
 def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:

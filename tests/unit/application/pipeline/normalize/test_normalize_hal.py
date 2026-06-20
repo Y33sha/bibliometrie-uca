@@ -8,6 +8,7 @@ Pattern : `_FakeQueries` + `_FakeAuthorshipQueries` + `MagicMock`, pas de DB.
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -16,6 +17,7 @@ import pytest
 from application.pipeline.normalize import normalize_hal
 from application.pipeline.normalize.normalize_hal import (
     HalNormalizer,
+    active_embargo_until,
     as_str,
     build_hal_author_records,
     extract_pub_metadata,
@@ -204,6 +206,50 @@ class TestExtractPubMetadata:
         assert meta["nnt"] == "2024CLFAC001"
 
 
+# ── active_embargo_until ─────────────────────────────────────────
+
+
+def _embargo_tei(refs: str) -> str:
+    return f'<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><body>{refs}</body></text></TEI>'
+
+
+class TestActiveEmbargoUntil:
+    TODAY = date(2026, 6, 20)
+
+    def test_future_file_embargo_returned(self):
+        xml = _embargo_tei('<ref type="file" target="x"><date notBefore="2027-01-01"/></ref>')
+        assert active_embargo_until(xml, self.TODAY) == date(2027, 1, 1)
+
+    def test_past_embargo_is_none(self):
+        # Date échue : pas d'embargo actif (fichier accessible).
+        xml = _embargo_tei('<ref type="file" target="x"><date notBefore="2018-09-14"/></ref>')
+        assert active_embargo_until(xml, self.TODAY) is None
+
+    def test_multiple_files_take_latest(self):
+        xml = _embargo_tei(
+            '<ref type="file" target="a"><date notBefore="2026-12-01"/></ref>'
+            '<ref type="file" target="b"><date notBefore="2027-03-01"/></ref>'
+        )
+        assert active_embargo_until(xml, self.TODAY) == date(2027, 3, 1)
+
+    def test_non_file_ref_ignored(self):
+        # Embargo sur une annexe (type='annex') : ignoré, seul le fichier compte.
+        xml = _embargo_tei('<ref type="annex" target="x"><date notBefore="2027-01-01"/></ref>')
+        assert active_embargo_until(xml, self.TODAY) is None
+
+    def test_file_ref_without_date_is_none(self):
+        assert (
+            active_embargo_until(_embargo_tei('<ref type="file" target="x"/>'), self.TODAY) is None
+        )
+
+    def test_no_label_xml(self):
+        assert active_embargo_until(None, self.TODAY) is None
+        assert active_embargo_until("", self.TODAY) is None
+
+    def test_malformed_xml_is_none(self):
+        assert active_embargo_until("<not valid xml", self.TODAY) is None
+
+
 # ── insert_hal_document ──────────────────────────────────────────
 
 
@@ -345,12 +391,14 @@ class TestInsertHalDocument:
                 "nnt": None,
                 "journal_id": 7,
                 "oa_status": "gold",
+                "embargo_until": date(2027, 1, 1),
                 "language": "fr",
                 "container_title": "Book",
             },
         )
         assert captured["journal_id"] == 7
         assert captured["oa_status"] == "gold"
+        assert captured["embargo_until"] == date(2027, 1, 1)
         assert captured["language"] == "fr"
         assert captured["container_title"] == "Book"
 

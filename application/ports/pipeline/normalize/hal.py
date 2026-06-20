@@ -3,6 +3,7 @@
 Implémenté par `infrastructure.queries.pipeline.normalize.hal.PgHalNormalizeQueries`.
 """
 
+from datetime import date
 from typing import Protocol
 
 from sqlalchemy import Connection
@@ -28,6 +29,7 @@ class HalNormalizeQueries(Protocol):
         external_ids: JsonValue,
         journal_id: int | None,
         oa_status: str | None,
+        embargo_until: date | None,
         language: str | None,
         container_title: str | None,
         abstract: str | None,
