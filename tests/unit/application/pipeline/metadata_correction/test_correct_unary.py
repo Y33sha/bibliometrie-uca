@@ -23,6 +23,7 @@ def _sp(**overrides: object) -> SourcePublicationForCorrection:
         "oa_model": None,
         "apc_amount": None,
         "raw_metadata": {},
+        "embargo_expired": False,
     }
     base.update(overrides)
     return SourcePublicationForCorrection(**base)  # type: ignore[arg-type]
@@ -163,6 +164,22 @@ def test_self_heals_when_rule_no_longer_applies():
     assert upd is not None
     assert upd.doc_type == "article"
     assert upd.raw_metadata == {}
+
+
+def test_expired_embargo_promotes_oa_status_to_green():
+    # oa_status `embargoed` + embargo expiré (calculé au fetch) → `green`, brut stashé.
+    upd = compute_update(_sp(oa_status="embargoed", embargo_expired=True))
+    assert upd is not None
+    assert upd.oa_status == "green"
+    assert upd.raw_metadata["oa_status"] == {
+        "raw": "embargoed",
+        "corrected_by": "EMBARGO_EXPIRED_TO_GREEN",
+    }
+
+
+def test_active_embargo_oa_status_untouched():
+    # Embargo non expiré → pas de promotion, no-op.
+    assert compute_update(_sp(oa_status="embargoed", embargo_expired=False)) is None
 
 
 def test_null_doc_type_left_null_when_no_rule():
