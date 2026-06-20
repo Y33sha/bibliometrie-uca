@@ -166,6 +166,3 @@ class PgStagingQueries(StagingQueries):
 
     def mark_done(self, conn: Connection, staging_id: int) -> None:
         mark_done(conn, staging_id, self._raw_store)
-
-    def fetch_existing_source_ids(self, conn: Connection, source: str) -> set[str]:
-        return fetch_existing_source_ids(conn, source)

@@ -22,7 +22,6 @@ def extract_year(
     conn: Connection,
     year: int,
     affiliation_ids: list[str],
-    existing_ids: set[str],
     logger: logging.Logger,
     *,
     dry_run: bool = False,
@@ -114,12 +113,7 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
     def setup_logging(self, args: argparse.Namespace, config: ScanrExtractConfig) -> None:
         self.logger.info(f"=== Extraction ScanR : {len(config.affiliation_ids)} structures ===")
 
-    def extract_all(
-        self,
-        args: argparse.Namespace,
-        config: ScanrExtractConfig,
-        existing_ids: set[str],
-    ) -> PhaseMetrics:
+    def extract_all(self, args: argparse.Namespace, config: ScanrExtractConfig) -> PhaseMetrics:
         config_years = self._adapter.get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
         self.logger.info(f"Années : {years}")
@@ -136,7 +130,6 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
                 self.conn,
                 year,
                 config.affiliation_ids,
-                existing_ids,
                 self.logger,
                 dry_run=args.dry_run,
             )

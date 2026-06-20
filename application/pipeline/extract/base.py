@@ -2,12 +2,11 @@
 
 Capture le boilerplate commun aux 5 extractors :
 - parsing CLI
-- chargement de `existing_ids` en staging (via `StagingQueries` port)
 - gestion des exceptions (HTTPError → log + exit 1, KeyboardInterrupt → log + exit 0)
 - logs de header + summary
 
 Chaque source hérite et implémente `load_config()` + `extract_all()`. L'itération
-(cursor / search_after / firstRecord / collections × pages) reste spécifique à
+(cursor / search_after / firstRecord / cursorMark × pages) reste spécifique à
 chaque source — pas de template trop contraignant.
 
 Deux entry points :
@@ -58,7 +57,7 @@ class SourceExtractor[ConfigT](ABC):
     - `SOURCE` : identifiant source (ex: "hal", "openalex")
     - `DESCRIPTION` : description CLI
     - `load_config(conn) -> dict` : charge la config depuis la DB (URL, auth, affiliations, etc.)
-    - `extract_all(args, config, existing_ids) -> PhaseMetrics` : boucle d'extraction
+    - `extract_all(args, config) -> PhaseMetrics` : boucle d'extraction
 
     Points d'override optionnels :
     - `add_cli_args(parser)` : args spécifiques au-delà de --dry-run
@@ -95,9 +94,7 @@ class SourceExtractor[ConfigT](ABC):
         """Charge la config DB (URL, auth, affiliations, années, etc.)."""
 
     @abstractmethod
-    def extract_all(
-        self, args: argparse.Namespace, config: ConfigT, existing_ids: set[str]
-    ) -> PhaseMetrics:
+    def extract_all(self, args: argparse.Namespace, config: ConfigT) -> PhaseMetrics:
         """Pilote l'extraction complète. Retourne les métriques finales."""
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:  # noqa: B027
@@ -137,13 +134,7 @@ class SourceExtractor[ConfigT](ABC):
         config = self.load_config(self.conn)
         self.logger.info(f"=== Extraction {self.SOURCE} démarrée ===")
         self.setup_logging(args, config)
-        existing_ids = (
-            self._staging.fetch_existing_source_ids(self.conn, self.SOURCE)
-            if not args.dry_run
-            else set()
-        )
-        self.logger.info(f"{len(existing_ids)} documents déjà en staging")
-        metrics = self.extract_all(args, config, existing_ids)
+        metrics = self.extract_all(args, config)
         self.log_summary(metrics, args)
         return metrics
 

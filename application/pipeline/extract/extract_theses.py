@@ -28,7 +28,6 @@ def extract_ppn(
     adapter: ThesesExtractAdapter,
     conn: Connection,
     ppn: str,
-    existing_ids: set[str],
     logger: logging.Logger,
     *,
     year: int | None = None,
@@ -132,12 +131,7 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
         if args.year is not None:
             self.logger.info(f"Filtre année (NNT préfixe) : {args.year}")
 
-    def extract_all(
-        self,
-        args: argparse.Namespace,
-        config: ThesesExtractConfig,
-        existing_ids: set[str],
-    ) -> PhaseMetrics:
+    def extract_all(self, args: argparse.Namespace, config: ThesesExtractConfig) -> PhaseMetrics:
         stats = PhaseMetrics()
         for ppn in config.ppns:
             if self._breaker_tripped():
@@ -150,7 +144,6 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
                 self._adapter,
                 self.conn,
                 ppn,
-                existing_ids,
                 self.logger,
                 year=args.year,
                 dry_run=args.dry_run,
