@@ -124,6 +124,8 @@ def access_clause(access: str | None) -> WhereClause | None:
         return WhereClause(
             "p.oa_status::text = ANY(:flt_oa_open)", {"flt_oa_open": list(OA_OPEN_STATUSES)}
         )
+    if access == "embargo":
+        return WhereClause("p.oa_status::text = 'embargoed'", {})
     if access == "closed":
         return WhereClause(f"(p.oa_status::text IN {OA_CLOSED_SQL} OR p.oa_status IS NULL)", {})
     return None

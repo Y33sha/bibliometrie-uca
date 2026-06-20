@@ -158,6 +158,43 @@ async def test_diamond_replaced_by_other_status(logger):
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_embargoed_not_downgraded_to_closed(logger):
+    """Embargo connu (HAL) : Unpaywall voit le fichier non encore accessible et
+    renvoie 'closed' — on ne rétrograde pas vers closed/unknown."""
+    pubs = [(1, "10.1/emb", "embargoed")]
+    _route("10.1/emb", status="closed")
+
+    repo = _FakeRepo()
+    await module.run_enrich_oa_status(
+        MagicMock(),
+        _FakeQueries(pubs),
+        logger,
+        pub_repo=repo,
+        fetcher=_make_fetcher(logger),
+    )
+    assert repo.updates == []
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_embargoed_replaced_by_open_status(logger):
+    """Embargo → green/gold : un statut réellement plus ouvert (trouvé ailleurs) écrase bien."""
+    pubs = [(1, "10.1/emb", "embargoed")]
+    _route("10.1/emb", status="green")
+
+    repo = _FakeRepo()
+    await module.run_enrich_oa_status(
+        MagicMock(),
+        _FakeQueries(pubs),
+        logger,
+        pub_repo=repo,
+        fetcher=_make_fetcher(logger),
+    )
+    assert repo.updates == [(1, "green")]
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_unchanged_status_skipped(logger):
     pubs = [(1, "10.1/same", "gold")]
     _route("10.1/same", status="gold")
