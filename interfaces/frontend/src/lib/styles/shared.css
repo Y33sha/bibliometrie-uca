@@ -617,6 +617,10 @@ th.sorted .sort-arrow {
 	color: #999;
 }
 
+.oa-lock-embargo .oa-lock-label {
+	color: #856404;
+}
+
 /* ── OA tags ── */
 .oa-tag {
 	display: inline-block;
@@ -649,6 +653,11 @@ th.sorted .sort-arrow {
 .oa-bronze {
 	background: #fdf0e6;
 	color: var(--bronze);
+}
+
+.oa-embargoed {
+	background: #fff3cd;
+	color: #856404;
 }
 
 .oa-closed {

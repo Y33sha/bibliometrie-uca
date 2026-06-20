@@ -539,7 +539,12 @@
 						{/if}
 					</td>{/if}
 					{#if col('oa')}<td class="oa-lock-cell">
-						{#if p.oa_status && !['unknown', 'closed'].includes(p.oa_status)}
+						{#if p.oa_status === 'embargoed'}
+							<span class="oa-lock-badge oa-lock-embargo">
+								<img src="{base}/hourglass.svg" alt="Sous embargo" class="oa-lock" title="Sous embargo : dépôt existant, accès différé" />
+								<span class="oa-lock-label">embargo</span>
+							</span>
+						{:else if p.oa_status && !['unknown', 'closed'].includes(p.oa_status)}
 							<span class="oa-lock-badge oa-lock-open">
 								<img src="{base}/lock-open.svg" alt="Open Access" class="oa-lock" title="Open Access ({p.oa_status})" />
 								<span class="oa-lock-label">ouvert</span>
