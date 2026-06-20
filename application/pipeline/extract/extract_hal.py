@@ -24,11 +24,6 @@ from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from application.ports.pipeline.staging import StagingQueries
 
-# Cadence des logs de progression (toutes les N pages cursorMark). Une page = 500
-# documents au payload lourd (HAL_FIELDS inclut le TEI `label_xml`) : 5 pages
-# ≈ 2 500 docs donnent un signe de vie régulier sans noyer les logs.
-_PROGRESS_EVERY_PAGES = 5
-
 
 def extract_union(
     adapter: HalExtractAdapter,
@@ -66,9 +61,11 @@ def extract_union(
         logger.info(f"  Union des {len(codes)} collections : {total} docs (dry-run)")
         return metrics
 
-    logger.info(f"  Union des {len(codes)} collections : pagination cursorMark (pages de 500)…")
+    page_size = adapter.per_page_for(None)
+    logger.info(f"  Union des {len(codes)} collections : interrogation HAL…")
     cursor = "*"
     page = 0
+    total_pages: int | None = None
     while True:
         if breaker_tripped():
             logger.warning(
@@ -78,6 +75,16 @@ def extract_union(
         data = adapter.fetch_page_cursor(query, fq, cursor)
         resp = data.get("response", {})
         docs = resp.get("docs", [])
+
+        # `numFound` n'est connu qu'à la première réponse cursorMark : on logue
+        # alors le volume de l'union et le nombre de pages attendu.
+        if total_pages is None:
+            num_found = int(resp.get("numFound", 0))
+            total_pages = (num_found + page_size - 1) // page_size if num_found else 0
+            logger.info(
+                f"  {num_found} documents dans l'union → ~{total_pages} pages de {page_size}"
+            )
+
         for doc in docs:
             hal_id = adapter.extract_id(doc)
             if not hal_id:
@@ -93,10 +100,13 @@ def extract_union(
                 metrics.add(unchanged=1, total=1)
         conn.commit()
 
-        page += 1
-        if page % _PROGRESS_EVERY_PAGES == 0:
+        # Un log par page (pages lourdes : ~500 docs TEI + 500 upserts) pour un
+        # signe de vie régulier. La page de confirmation vide finale n'est pas loguée.
+        if docs:
+            page += 1
             logger.info(
-                f"  {metrics.total} docs ({metrics.new} nouveaux, {metrics.updated} mis à jour, "
+                f"  page {page}/{total_pages} — {metrics.total} docs "
+                f"({metrics.new} nouveaux, {metrics.updated} mis à jour, "
                 f"{metrics.unchanged} inchangés)"
             )
 
