@@ -67,6 +67,7 @@ export const oaLabelsMap: Record<string, string> = {
 	hybrid: 'Hybrid',
 	bronze: 'Bronze',
 	green: 'Green',
+	embargoed: 'Sous embargo',
 	closed: 'Closed',
 	unknown: 'Indéterminé'
 };
