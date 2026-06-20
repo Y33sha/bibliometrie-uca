@@ -9,14 +9,14 @@ Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum
 """
 
 # Toutes les sources, dans l'ordre conventionnel (chronologique d'intégration)
-ALL_SOURCES = ("hal", "openalex", "wos", "scanr", "theses", "crossref")
+ALL_SOURCES = ("hal", "openalex", "wos", "scanr", "theses", "crossref", "datacite")
 
 # Sources comme set (pour les tests d'appartenance et les valeurs par défaut)
 ALL_SOURCES_SET = frozenset(ALL_SOURCES)
 
 # Sources interrogeables par DOI pour le cross-import (`fetch_missing_doi`).
 # Theses absent car son API ne se requête pas par DOI mais par NNT.
-DOI_SEARCHABLE_SOURCES = ("hal", "openalex", "wos", "scanr", "crossref")
+DOI_SEARCHABLE_SOURCES = ("hal", "openalex", "wos", "scanr", "crossref", "datacite")
 DOI_SEARCHABLE_SOURCES_SET = frozenset(DOI_SEARCHABLE_SOURCES)
 
 
@@ -42,12 +42,21 @@ AUTHOR_SOURCES_SQL = _to_sql(AUTHOR_SOURCES)
 #   (theses en premier → son autorité métadonnées est appliquée
 #   avant tout enrichissement)
 #
-# theses.fr fait autorité sur les métadonnées de thèse ; CrossRef est
-# l'autorité officielle de l'enregistrement DOI (métadonnées éditeur
-# canoniques) et passe en 2e après theses ; pour les documents hors-thèse
-# la clé `theses` n'apparaît simplement pas dans les rows et l'ordre se
-# réduit aux sources restantes.
-SOURCE_PRIORITY: tuple[str, ...] = ("theses", "crossref", "hal", "openalex", "scanr", "wos")
+# theses.fr fait autorité sur les métadonnées de thèse ; CrossRef et DataCite
+# sont les autorités officielles de l'enregistrement DOI (métadonnées
+# canoniques) pour leurs périmètres respectifs et passent juste après theses ;
+# pour les documents hors-thèse la clé `theses` n'apparaît simplement pas dans
+# les rows et l'ordre se réduit aux sources restantes. Crossref et DataCite ne
+# se concurrencent pas : chaque RA fait autorité sur ses propres DOI.
+SOURCE_PRIORITY: tuple[str, ...] = (
+    "theses",
+    "crossref",
+    "datacite",
+    "hal",
+    "openalex",
+    "scanr",
+    "wos",
+)
 
 
 # Sources qui peuvent apparaître comme clés du JSONB `structures.api_ids`

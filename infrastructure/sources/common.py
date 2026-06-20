@@ -103,6 +103,7 @@ def upsert_staging(
 # ces APIs cherchent par DOI sans contrainte de registrar.
 _TARGET_RA: dict[str, str] = {
     "crossref": "Crossref",
+    "datacite": "DataCite",
 }
 
 

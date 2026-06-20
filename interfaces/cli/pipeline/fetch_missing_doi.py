@@ -28,6 +28,7 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.sources.common import get_cross_import_dois
 from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
+from infrastructure.sources.datacite.fetch_missing_doi import DataciteFetchMissingDoiAdapter
 from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
 from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
 from infrastructure.sources.scanr.fetch_missing_doi import ScanrFetchMissingDoiAdapter
@@ -48,6 +49,7 @@ ADAPTERS: dict[str, type[AsyncFetchMissingDoiAdapter]] = cast(
         "wos": WosFetchMissingDoiAdapter,
         "scanr": ScanrFetchMissingDoiAdapter,
         "crossref": CrossrefFetchMissingDoiAdapter,
+        "datacite": DataciteFetchMissingDoiAdapter,
     },
 )
 
