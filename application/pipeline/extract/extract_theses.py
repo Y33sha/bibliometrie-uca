@@ -21,7 +21,6 @@ from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
     ThesesExtractConfig,
 )
-from application.ports.pipeline.staging import StagingQueries
 
 
 def extract_ppn(
@@ -98,10 +97,9 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
         self,
         conn: Connection,
         logger: logging.Logger,
-        staging: StagingQueries,
         adapter: ThesesExtractAdapter,
     ) -> None:
-        super().__init__(conn, logger, staging)
+        super().__init__(conn, logger)
         self._adapter = adapter
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:

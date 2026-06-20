@@ -18,7 +18,6 @@ from application.ports.pipeline.extract.openalex import (
     OpenalexExtractAdapter,
     OpenalexExtractConfig,
 )
-from application.ports.pipeline.staging import StagingQueries
 
 
 def extract_year(
@@ -98,10 +97,9 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
         self,
         conn: Connection,
         logger: logging.Logger,
-        staging: StagingQueries,
         adapter: OpenalexExtractAdapter,
     ) -> None:
-        super().__init__(conn, logger, staging)
+        super().__init__(conn, logger)
         self._adapter = adapter
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:

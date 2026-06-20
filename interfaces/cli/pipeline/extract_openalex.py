@@ -5,7 +5,6 @@ import os
 from application.pipeline.extract.extract_openalex import OpenalexExtractor
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.queries.pipeline.staging import PgStagingQueries
 from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
 
@@ -18,7 +17,7 @@ def main() -> None:
         base_url = get_api_base_urls(bootstrap).get("openalex", "https://api.openalex.org/works")
     conn = engine.connect()
     adapter = PgOpenalexExtractAdapter(base_url=base_url)
-    OpenalexExtractor(conn, logger, PgStagingQueries(), adapter).run()
+    OpenalexExtractor(conn, logger, adapter).run()
 
 
 if __name__ == "__main__":

@@ -13,10 +13,6 @@ Deux entry points :
 - `run(argv)` : CLI standalone, gère exit codes et logs d'erreur.
 - `run_as_phase()` : depuis `run_pipeline.py`, lève les exceptions à
   l'orchestrateur et retourne `PhaseMetrics`.
-
-Le wiring du `StagingQueries` (adapter PostgreSQL) est de la responsabilité
-du composition root (CLI ou run_pipeline) — l'orchestrateur ne connaît
-que le Protocol.
 """
 
 from __future__ import annotations
@@ -32,7 +28,6 @@ from sqlalchemy import Connection
 
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.circuit_breaker import CircuitBreaker
-from application.ports.pipeline.staging import StagingQueries
 
 
 class ExtractionConfigError(Exception):
@@ -72,11 +67,9 @@ class SourceExtractor[ConfigT](ABC):
         self,
         conn: Connection,
         logger: logging.Logger,
-        staging: StagingQueries,
     ) -> None:
         self.conn = conn
         self.logger = logger
-        self._staging = staging
         # Circuit-breaker de la source (posé par `run_as_phase`) : les boucles
         # `extract_all` consultent `_breaker_tripped()` pour s'arrêter quand la
         # source est à bout de budget / en panne.

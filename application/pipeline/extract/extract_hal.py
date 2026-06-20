@@ -22,7 +22,6 @@ from sqlalchemy import Connection
 from application.pipeline.extract.base import SourceExtractor
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
-from application.ports.pipeline.staging import StagingQueries
 
 
 def extract_union(
@@ -128,10 +127,9 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
         self,
         conn: Connection,
         logger: logging.Logger,
-        staging: StagingQueries,
         adapter: HalExtractAdapter,
     ) -> None:
-        super().__init__(conn, logger, staging)
+        super().__init__(conn, logger)
         self._adapter = adapter
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
