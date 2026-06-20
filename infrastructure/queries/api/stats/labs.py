@@ -9,6 +9,7 @@ from infrastructure.queries.api.stats._shared import (
     stats_apc_clause,
 )
 from infrastructure.queries.filters import (
+    OA_BREAKDOWN_COLS_SQL,
     WhereClause,
     assemble_where,
     oa_clause,
@@ -103,14 +104,7 @@ def _build_stats_labs_sql(
             s.name AS lab_name,
             COUNT(DISTINCT p.id) AS pub_count,
             COALESCE(SUM(DISTINCT ap_lab.amount_eur_ht), 0)::numeric(12,2) AS apc_uca,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'embargoed') AS embargoed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown
+            {OA_BREAKDOWN_COLS_SQL}
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
         JOIN pub_structs ps_structs ON ps_structs.publication_id = p.id

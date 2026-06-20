@@ -10,6 +10,7 @@ from infrastructure.queries.api.stats._shared import (
     stats_apc_clause,
 )
 from infrastructure.queries.filters import (
+    OA_BREAKDOWN_COLS_SQL,
     PUBLICATION_IS_IN_PERIMETER,
     assemble_where,
     lab_clause,
@@ -84,14 +85,7 @@ def _build_journal_stats_sql(
             j.apc_amount,
             COUNT(DISTINCT p.id) AS pub_count,
             SUM({APC_SUM_SA})::numeric(12,2) AS apc_uca,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'embargoed') AS embargoed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown
+            {OA_BREAKDOWN_COLS_SQL}
         FROM publications p
         JOIN journals j ON j.id = p.journal_id
         LEFT JOIN publishers pub ON pub.id = j.publisher_id

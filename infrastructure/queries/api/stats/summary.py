@@ -7,6 +7,7 @@ from sqlalchemy import Connection, Row, text
 
 from infrastructure.queries.api.stats._shared import stats_apc_clause
 from infrastructure.queries.filters import (
+    OA_BREAKDOWN_COLS_SQL,
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     assemble_where,
@@ -92,14 +93,7 @@ def _by_year_sql(
         SELECT
             p.pub_year,
             COUNT(DISTINCT p.id) AS pub_count,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'gold') AS gold,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'diamond') AS diamond,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'hybrid') AS hybrid,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'bronze') AS bronze,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'green') AS green,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'embargoed') AS embargoed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'unknown') AS unknown
+            {OA_BREAKDOWN_COLS_SQL}
         FROM publications p
         LEFT JOIN journals j ON j.id = p.journal_id
         WHERE {_BASE_CLAUSES} AND {dyn_where}

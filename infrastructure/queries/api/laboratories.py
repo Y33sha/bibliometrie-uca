@@ -29,7 +29,7 @@ from application.ports.api.laboratories_queries import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
-from infrastructure.queries.filters import OA_CLOSED_SQL
+from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL
 from infrastructure.queries.perimeter import (
     get_persons_perimeter_root_ids,
     get_persons_structure_ids_list,
@@ -270,16 +270,7 @@ class PgLaboratoriesQueries(LaboratoriesQueries):
         oa = self._conn.execute(
             text(f"""
                 SELECT
-                    COUNT(DISTINCT p.id) FILTER (
-                        WHERE p.oa_status NOT IN {OA_CLOSED_SQL}
-                          AND p.oa_status != 'embargoed' AND p.oa_status IS NOT NULL
-                    ) AS open_access,
-                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'embargoed') AS embargoed,
-                    COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
-                    COUNT(DISTINCT p.id) FILTER (
-                        WHERE p.oa_status = 'unknown' OR p.oa_status IS NULL
-                    ) AS unknown,
-                    COUNT(DISTINCT p.id) AS total
+                    {OA_DASHBOARD_COLS_SQL}
                 FROM publications p
                 JOIN authorships a ON a.publication_id = p.id
                 WHERE a.in_perimeter = TRUE
