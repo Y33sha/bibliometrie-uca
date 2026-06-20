@@ -179,19 +179,6 @@ export function rorFullUrl(rorId: string): string {
 	return `https://ror.org/${rorId}`;
 }
 
-/** URL externe d'un document sur son portail source.
- * Utilisé par les vues doublons pour ouvrir la notice d'origine. */
-export function sourceExternalUrl(source: string, sourceId: string): string {
-	if (source === 'hal') return halDocUrl(sourceId);
-	if (source === 'openalex') return `https://openalex.org/${sourceId}`;
-	if (source === 'scanr') return scanrPubUrl(sourceId);
-	if (source === 'theses') return `https://theses.fr/${sourceId}`;
-	if (source === 'crossref') return `https://doi.org/${sourceId}`;
-	if (source === 'wos')
-		return `https://www.webofscience.com/wos/woscc/full-record/${sourceId}`;
-	return '#';
-}
-
 /** Dérive le statut de détection d'une structure à partir des flags
  * `is_confirmed` (tri-state nullable) et `is_detected` (booléen).
  *

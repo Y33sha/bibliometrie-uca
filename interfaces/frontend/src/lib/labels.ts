@@ -72,15 +72,6 @@ export const oaLabelsMap: Record<string, string> = {
 	unknown: 'Indéterminé'
 };
 
-/** Libellés courts des sources (badges, colonnes). */
-export const sourceLabels: Record<string, string> = {
-	hal: 'HAL',
-	openalex: 'OpenAlex',
-	wos: 'WoS',
-	scanr: 'ScanR',
-	theses: 'theses.fr',
-	crossref: 'Crossref'
-};
 
 /** Classes CSS associées aux statuts d'identifiant personne. */
 export const identifierStatusClasses: Record<string, string> = {

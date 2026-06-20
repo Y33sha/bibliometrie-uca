@@ -492,6 +492,14 @@ th.sorted .sort-arrow {
 	background: #ebdcb8;
 }
 
+.source-datacite {
+	background: #d9f1ec;
+}
+
+.source-datacite:hover {
+	background: #c6e8e0;
+}
+
 .source-doi {
 	background: #f0f0f0;
 }

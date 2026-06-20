@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { base } from '$app/paths';
-	import { sourceLabels } from '$lib/labels';
+	import { sourceIcon, sourceLabel } from '$lib/sources';
 
 	let {
 		source,
@@ -8,18 +7,8 @@
 		id = undefined,
 	}: { source: string; href?: string; id?: string | number } = $props();
 
-	// Logos locaux uniquement (l'appli doit tourner hors ligne).
-	const ICONS: Record<string, string> = {
-		hal: `${base}/icons/hal.ico`,
-		openalex: `${base}/icons/openalex.png`,
-		wos: `${base}/icons/wos.ico`,
-		scanr: `${base}/scanr-icon.svg`,
-		theses: `${base}/icons/theses.ico`,
-		crossref: `${base}/icons/crossref.ico`,
-	};
-
-	const label = $derived(sourceLabels[source] ?? source);
-	const icon = $derived(ICONS[source]);
+	const label = $derived(sourceLabel(source));
+	const icon = $derived(sourceIcon(source));
 	const title = $derived(id != null ? `${label} : ${id}` : label);
 </script>
 

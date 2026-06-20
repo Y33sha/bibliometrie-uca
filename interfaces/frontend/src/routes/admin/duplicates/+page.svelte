@@ -4,7 +4,8 @@
   import { replaceState } from "$app/navigation";
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { sanitizeTitle, sourceExternalUrl } from "$lib/utils";
+  import { sanitizeTitle } from "$lib/utils";
+  import { sourceExternalUrl } from "$lib/sources";
   import SourceTag from "$lib/components/SourceTag.svelte";
 
   import type { components } from "$lib/api/schema";
