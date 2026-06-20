@@ -6,6 +6,8 @@ des `source_authorships` passe par le writer batch partagé
 (`PgAuthorshipsBatchQueries`), commun à toutes les sources.
 """
 
+from datetime import date
+
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -28,6 +30,7 @@ def upsert_hal_source_publication(
     external_ids: JsonValue,
     journal_id: int | None,
     oa_status: str | None,
+    embargo_until: date | None,
     language: str | None,
     container_title: str | None,
     abstract: str | None,
@@ -45,11 +48,11 @@ def upsert_hal_source_publication(
         INSERT INTO source_publications
             (source, source_id, doi, title, title_normalized, pub_year, doc_type,
              hal_collections, publication_id, staging_id, external_ids,
-             journal_id, oa_status, language, container_title,
+             journal_id, oa_status, embargo_until, language, container_title,
              abstract, keywords, topics, biblio, urls)
         VALUES ('hal', :hal_id, :doi, :title, :title_normalized, :pub_year, :doc_type,
                 :hal_collections, :publication_id, :staging_id, :external_ids,
-                :journal_id, :oa_status, :language, :container_title,
+                :journal_id, :oa_status, :embargo_until, :language, :container_title,
                 :abstract, :keywords, :topics, :biblio, :urls)
         ON CONFLICT (source, source_id) DO UPDATE SET
             publication_id = COALESCE(
@@ -67,6 +70,7 @@ def upsert_hal_source_publication(
             external_ids = source_publications.external_ids || EXCLUDED.external_ids,
             journal_id = COALESCE(EXCLUDED.journal_id, source_publications.journal_id),
             oa_status = COALESCE(EXCLUDED.oa_status, source_publications.oa_status),
+            embargo_until = EXCLUDED.embargo_until,
             language = COALESCE(EXCLUDED.language, source_publications.language),
             container_title = COALESCE(EXCLUDED.container_title, source_publications.container_title),
             abstract = COALESCE(EXCLUDED.abstract, source_publications.abstract),
@@ -97,6 +101,7 @@ def upsert_hal_source_publication(
             "external_ids": external_ids,
             "journal_id": journal_id,
             "oa_status": oa_status,
+            "embargo_until": embargo_until,
             "language": language,
             "container_title": container_title,
             "abstract": abstract,
@@ -127,6 +132,7 @@ class PgHalNormalizeQueries(HalNormalizeQueries):
         external_ids: JsonValue,
         journal_id: int | None,
         oa_status: str | None,
+        embargo_until: date | None,
         language: str | None,
         container_title: str | None,
         abstract: str | None,
@@ -148,6 +154,7 @@ class PgHalNormalizeQueries(HalNormalizeQueries):
             external_ids=external_ids,
             journal_id=journal_id,
             oa_status=oa_status,
+            embargo_until=embargo_until,
             language=language,
             container_title=container_title,
             abstract=abstract,

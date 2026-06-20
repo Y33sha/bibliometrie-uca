@@ -1,3 +1,5 @@
+from datetime import date
+
 from domain.sources.hal import derive_hal_doc_type, derive_hal_oa_status
 
 
@@ -68,3 +70,23 @@ class TestDeriveHalOaStatus:
 
     def test_open_access_none_returns_none(self):
         assert derive_hal_oa_status(None, None, None) is None
+
+    def test_file_main_with_embargo_returns_embargoed(self):
+        # Fichier déposé mais sous embargo (date de levée renseignée) → embargoed, pas green.
+        assert (
+            derive_hal_oa_status(
+                False, "https://hal.science/hal-12345/document", None, date(2027, 1, 1)
+            )
+            == "embargoed"
+        )
+
+    def test_file_main_without_embargo_stays_green(self):
+        # Sans embargo (embargo_until=None) : comportement inchangé.
+        assert (
+            derive_hal_oa_status(True, "https://hal.science/hal-12345/document", None, None)
+            == "green"
+        )
+
+    def test_embargo_without_file_main_not_embargoed(self):
+        # Pas de fichier déposé : l'embargo seul ne tague pas (délégation).
+        assert derive_hal_oa_status(True, None, None, date(2027, 1, 1)) is None

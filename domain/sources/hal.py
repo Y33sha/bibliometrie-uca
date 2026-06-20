@@ -5,6 +5,8 @@ extracteurs qui encapsulent la connaissance de la sémantique HAL
 pour le reste du pipeline.
 """
 
+from datetime import date
+
 from domain.source_publications.doc_types import map_doc_type
 
 
@@ -57,6 +59,7 @@ def derive_hal_oa_status(
     open_access_bool: bool | None,
     file_main: str | None,
     link_ext_id: str | None,
+    embargo_until: date | None = None,
 ) -> str | None:
     """Mapping HAL → enum oa_status canonique.
 
@@ -81,6 +84,10 @@ def derive_hal_oa_status(
        (None) plutôt que de tagger faussement OA.
 
     Sémantique :
+      - file_main présent + embargo actif (`embargo_until` renseigné) → 'embargoed' :
+        le fichier est déposé mais l'accès est légalement différé. Date-agnostique —
+        la levée à l'échéance est portée par une règle de correction `oa_status`
+        (`embargoed → green`), pas ici.
       - file_main présent → 'green'
       - link_ext_id ∈ GREEN_LINK_EXT_IDS (arxiv, pubmedcentral) → 'green'
       - link_ext_id == 'openaccess' → 'hybrid' (cf. note conservatif)
@@ -95,6 +102,8 @@ def derive_hal_oa_status(
     'hybrid' uniquement quand le journal n'est pas full-OA. Même TODO
     côté ScanR.
     """
+    if file_main and embargo_until is not None:
+        return "embargoed"
     if file_main:
         return "green"
     if link_ext_id in GREEN_LINK_EXT_IDS:
