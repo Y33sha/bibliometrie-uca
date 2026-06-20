@@ -328,13 +328,13 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": "letter"},
     },
-    # « systematic review » en tête ou en sous-titre + doc_type ∈ {article, other} ⇒ `review`.
+    # « systematic review » en tête ou en sous-titre + doc_type ∈ {article} ⇒ `review`.
     # Ancré (cf. `_SYSTEMATIC_REVIEW_PATTERN`) pour ne prendre que la forme document-type, pas
     # les mentions au fil du titre. La whitelist épargne conference_paper/preprint/poster/
     # memoir/dataset (une revue systématique peut légitimement être l'un d'eux).
     MetadataCorrectionRule.TITLE_SYSTEMATIC_REVIEW_TO_REVIEW: {
         "applies_to": {
-            "doc_type": frozenset({"article", "other"}),
+            "doc_type": frozenset({"article"}),
             "title_regex": _SYSTEMATIC_REVIEW_PATTERN,
         },
         "applies_correction": {"doc_type": "review"},
