@@ -4,38 +4,40 @@
 
 ### En cours
 
-- [Adresses → pays : détection, suggestion et performances de la cascade](DATA_addresses-countries.md)
-- [Types de documents : enum, mappings, règles suspects](METIER_doc-types.md)
+- [Embargo HAL : statut OA intermédiaire « sous embargo »](METIER_embargo-oa-status.md)
 
 ### En pause
 
-- [Matching cross-source des authorships](DATA_authorships-cross-source-matching.md)
 - [Observabilité du pipeline](CODE_observabilite-pipeline.md)
 - [DOI Registration Agencies & DataCite](METIER_doi-ra-datacite.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
+- [Déduplication des publications sans identifiant fiable (arête pairwise-gated)](DATA_dedup-pairwise-gated.md)
 
 ### Non commencé
 
-- [Publications : retour à match_or_create, corrections a priori, fusion réparatrice](DATA_publications-match-or-create.md)
-- [Déduplication des publications sans identifiant fiable (arête pairwise-gated)](DATA_dedup-pairwise-gated.md)
 - [Relations entre publications](METIER_relations-publications.md)
-- [Embargo HAL : statut OA intermédiaire « sous embargo »](METIER_embargo-oa-status.md)
 
 ## Chantiers archivés
 
+- 2026-06-19 — [Types de documents : enum, mappings, règles suspects](archived/METIER_doc-types.md)
+- 2026-06-19 — [Matching cross-source des authorships](archived/DATA_authorships-cross-source-matching.md)
+- 2026-06-19 — [Adresses → pays : détection, suggestion et performances de la cascade](archived/DATA_addresses-countries.md)
+- 2026-06-16 — [Publications : retour à match_or_create, corrections a priori, fusion réparatrice](archived/DATA_publications-match-or-create.md)
+- 2026-06-14 — [Performance du pipeline (phase par phase)](archived/2026-06-13_CODE_perf-pipeline.md)
+- 2026-06-13 — [Performance des pages de listes (UI)](archived/2026-06-13_DATA_perf-pages-listes.md)
 - 2026-06-11 — [Publications : matching par création⇒fusion + modélisation des identifiants](archived/2026-06-11_DATA_publications-creation-fusion.md)
 - 2026-06-11 — [Fusions abusives de documents distincts par les sources](archived/2026-06-11_METIER_fusions-abusives-sources.md)
 - 2026-06-09 — [Complétude des identifiants externes & clés de déduplication](archived/2026-06-09_METIER_completude-identifiants.md)
 - 2026-06-08 — [Export CSV fidèle à l'affichage (filtres + colonnes + titres nettoyés)](archived/2026-06-08_CODE_export-csv-fidele.md)
 - 2026-06-08 — [Peaufinage UI (cohérence, responsivité, ergonomie)](archived/2026-06-08_CODE_peaufinage-ui.md)
 - 2026-06-07 — [Barres à facettes homogènes + extraction des ListView (thèses, personnes) + alignement endpoint personnes](archived/2026-06-07_CODE_listviews-facettes-homogenes.md)
-- 2026-06-07 — [Filtres composables pour le repérage des adresses (admin)](CODE_filtres-adresses-composables.md)
+- 2026-06-07 — [Filtres composables pour le repérage des adresses (admin)](archived/CODE_filtres-adresses-composables.md)
 - 2026-06-06 — [Background jobs pour les endpoints longs : matview pipeline-only, garde-fou batch_set_country, propagation des reviews en tâche de fond](archived/2026-06-06_CODE_background-jobs.md)
-- 2026-06-05 — [Stratégie de tests : dé-fictionnaliser, factoriser, parcimonie](CODE_strategie-tests.md)
+- 2026-06-05 — [Stratégie de tests : dé-fictionnaliser, factoriser, parcimonie](archived/CODE_strategie-tests.md)
 - 2026-06-04 — [Matérialiser le périmètre (`perimeter_structures`) — audit `in_perimeter` : conservé](archived/2026-06-04_DATA_perimeter-materialise.md)
 - 2026-06-04 — [Rejet durable d'une paire (publication, personne) : garde matching, détachement, réassignation](archived/2026-06-04_METIER_detachement-rejet-durable.md)
-- 2026-06-03 — [Données dérivées : audit + cadre de décision (matérialisation vs vue)](DATA_donnees-derivees.md)
-- 2026-06-03 — [Normalize : batcher l'insertion des authorships](CODE_batcher-normalize-authorships.md)
+- 2026-06-03 — [Données dérivées : audit + cadre de décision (matérialisation vs vue)](archived/DATA_donnees-derivees.md)
+- 2026-06-03 — [Normalize : batcher l'insertion des authorships](archived/CODE_batcher-normalize-authorships.md)
 - 2026-06-02 — [Authorships : build source-agnostique en une passe convergente](archived/2026-06-02_CODE_simplifier-build-authorships.md)
 - 2026-06-01 — [Sidecar `rejected_authorships` (extraire `authorships.excluded`)](archived/2026-06-01_DATA_rejected-authorships-sidecar.md)
 - 2026-05-31 — [Stockage des données brutes (raw store)](archived/2026-05-31_DATA_raw-data-store.md)
