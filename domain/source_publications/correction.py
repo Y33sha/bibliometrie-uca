@@ -126,7 +126,7 @@ _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES = (
 )
 
 # Pattern textuel très spécifique, univoque dans les corpus observés.
-_ERRATUM_TITLE_PREFIXES = ("erratum", "errata", "corrigendum")
+_ERRATUM_TITLE_PREFIXES = ("erratum", "errata", "corrigendum", "author correction", "publisher correction")
 
 # Préfixes stricts : seules les formulations canoniques utilisées par les éditeurs. Pas « retraction » seul, qui matcherait des titres comme « Retraction of consent in clinical trials ».
 _RETRACTION_TITLE_PREFIXES = ("retraction notice", "retraction note")
