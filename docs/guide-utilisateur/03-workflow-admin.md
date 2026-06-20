@@ -84,7 +84,7 @@ Il est nécessaire, en particulier apès les premiers runs, de **fusionner** les
 - le transfert des PIDs;
 - le transfert des publications.
 
-Un garde-fou empêche de fusionner ensemble deux personnes présentes dans l'[extraction RH](../sources/09-imports-manuels.md).
+Un garde-fou empêche de fusionner ensemble deux personnes présentes dans l'[extraction RH](../sources/10-imports-manuels.md).
 
 Des scripts en ligne de commande permettent d'accélérer le travail:
 - [merge_duplicate_persons_by_publication](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/maintenance/merge_duplicate_persons_by_publication.py) : personnes distinctes figurant comme auteur de la même publication (repérée sur différentes sources), en même position auteur, avec des noms compatibles (au sens de la fonction [names_compatible](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/persons/name_matching.py))

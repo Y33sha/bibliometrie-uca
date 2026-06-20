@@ -25,7 +25,7 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 
 ## Correction des métadonnées
 
-- [Corrections de métadonnées](06-metadata-correction.md) : prépare les `source_publications` avant leur rattachement, en posant sur leurs colonnes les valeurs corrigées sur lesquelles s'appuiera le matching. Résout d'abord le concept DOI des dépôts Zenodo (un dépôt versionné doit compter pour un seul document), puis applique les corrections de métadonnées — par enregistrement (champs erronés, identifiants à neutraliser) et par grappe de documents partageant une clé.
+- [Corrections de métadonnées](06-metadata-correction.md) : prépare les `source_publications` avant leur rattachement, en posant sur leurs colonnes les valeurs corrigées sur lesquelles s'appuiera le matching. Corrections par enregistrement (champs erronés, identifiants à neutraliser) et par grappe de documents partageant un DOI (convergence des versions d'un dépôt sur son DOI concept stable, neutralisation des DOI partagés à tort entre documents distincts).
 
 ## Création/rattachement des publications
 

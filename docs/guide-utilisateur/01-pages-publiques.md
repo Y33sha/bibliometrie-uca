@@ -67,7 +67,7 @@ TODO: à compléter
 
 Liste des personnes avec leurs identifiants (ORCID, idHAL) et affiliations.
 Filtrable par:
-- présence ou non dans la [base RH](../sources/09-imports-manuels.md#donnees-rh),
+- présence ou non dans la [base RH](../sources/10-imports-manuels.md#donnees-rh),
 - données RH (rôle, affiliation),
 - identifiants (ORCID, idHAL).
 

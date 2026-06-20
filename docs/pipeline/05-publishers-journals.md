@@ -8,10 +8,10 @@ Six sous-étapes enchaînées. La première (`resolve_doi_prefixes`) s'exécute 
 |---|---|---|---|
 | `resolve_doi_prefixes` | Crossref `/prefixes/{prefix}` + DataCite `/dois?prefix=` | `doi_prefixes` : pour chaque préfixe DOI, son agence d'enregistrement et l'éditeur (Crossref) ou l'entrepôt (DataCite) qui le détient | toujours |
 | `enrich_journals_from_openalex` | [OpenAlex Sources](../sources/03-openalex.md) | `journals` : type de revue, montant et devise des frais de publication (APC) | mode `full` |
-| `enrich_journals_from_doaj` | export CSV du [DOAJ](../sources/08-sources-supplementaires.md#doaj) | `journals` : fiche DOAJ complète (`doaj_payload`) et appartenance au DOAJ (`is_in_doaj`) | mode `full` |
+| `enrich_journals_from_doaj` | export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj) | `journals` : fiche DOAJ complète (`doaj_payload`) et appartenance au DOAJ (`is_in_doaj`) | mode `full` |
 | `enrich_publishers_from_openalex` | [OpenAlex Publishers](../sources/03-openalex.md) | `publishers` : pays (ISO-2) et identifiant ROR | mode `full` |
 | `enrich_publishers_from_crossref_members` | [Crossref Members](../sources/06-crossref.md) | `publishers` : pays (rattrapage des éditeurs sans pays après OpenAlex) | mode `full` |
-| `enrich_publishers_from_ror` | [ROR](../sources/08-sources-supplementaires.md#ror) | `publishers` : type d'éditeur (`commercial`, `academic_institution`, `learned_society`, `repository`) | mode `full` |
+| `enrich_publishers_from_ror` | [ROR](../sources/09-sources-supplementaires.md#ror) | `publishers` : type d'éditeur (`commercial`, `academic_institution`, `learned_society`, `repository`) | mode `full` |
 
 ## DOAJ : import par export complet
 
@@ -31,12 +31,6 @@ Chaque sous-étape est incrémentale — filtres d'éligibilité :
 - `enrich_publishers_from_ror` : éditeurs ayant un ROR et un type encore inconnu (`publisher_type = 'unknown'`).
 
 Politique d'écrasement : une valeur n'est posée que si la cible est vide. Les valeurs saisies à la main par un administrateur sont donc préservées.
-
-## Code
-
-- Orchestration : `run_pipeline.py:phase_publishers_journals`.
-- Sous-étapes : `application/pipeline/publishers_journals/`.
-- Sources externes : `infrastructure/sources/doaj/`, `infrastructure/sources/ror.py`, `infrastructure/sources/crossref/members.py`, `infrastructure/sources/doi_prefixes/`, `infrastructure/sources/openalex/`.
 
 ## Import manuel d'un export DOAJ
 

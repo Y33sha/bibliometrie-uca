@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict wITMsZvUubmqrxiRfo9BjkhdXXt4lb0gCo11e8nem2h4qY7ymChyO1nf6xcza2Y
+\restrict KpoRZ2BfwopE1vkXk5xgHsWBMYQPWZSupB6tXjyHIz9msWRGwBkdKaUjLetbTxl
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -157,7 +157,8 @@ CREATE TYPE public.source_type AS ENUM (
     'wos',
     'scanr',
     'theses',
-    'crossref'
+    'crossref',
+    'datacite'
 );
 
 
@@ -1265,7 +1266,6 @@ CREATE TABLE public.staging (
     imported_at timestamp with time zone DEFAULT now(),
     raw_hash text,
     last_seen_at timestamp with time zone DEFAULT now(),
-    hal_collections text[],
     not_found_at timestamp with time zone,
     disappeared_at timestamp with time zone,
     CONSTRAINT staging_not_found_at_implies_processed CHECK (((not_found_at IS NULL) OR processed))
@@ -3111,5 +3111,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wITMsZvUubmqrxiRfo9BjkhdXXt4lb0gCo11e8nem2h4qY7ymChyO1nf6xcza2Y
+\unrestrict KpoRZ2BfwopE1vkXk5xgHsWBMYQPWZSupB6tXjyHIz9msWRGwBkdKaUjLetbTxl
 
