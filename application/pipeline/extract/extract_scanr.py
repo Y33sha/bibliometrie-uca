@@ -14,7 +14,6 @@ from sqlalchemy import Connection
 from application.pipeline.extract.base import ExtractionConfigError, SourceExtractor
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.scanr import ScanrExtractAdapter, ScanrExtractConfig
-from application.ports.pipeline.staging import StagingQueries
 
 
 def extract_year(
@@ -89,10 +88,9 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
         self,
         conn: Connection,
         logger: logging.Logger,
-        staging: StagingQueries,
         adapter: ScanrExtractAdapter,
     ) -> None:
-        super().__init__(conn, logger, staging)
+        super().__init__(conn, logger)
         self._adapter = adapter
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:

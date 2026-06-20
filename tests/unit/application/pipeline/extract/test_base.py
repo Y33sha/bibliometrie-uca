@@ -5,7 +5,7 @@ Couvre :
 - Entry point CLI `run` : exit codes pour `ExtractionConfigError` (2), `requests.HTTPError` (1), `KeyboardInterrupt` (0), happy path. `conn.close()` toujours appelé.
 - `parse_args` : flag `--dry-run` + extension via `add_cli_args`.
 
-Pas de DB ni de réseau : fake extractor avec `load_config`/`extract_all` déterministes, `Connection` mockée, `StagingQueries` port mocké via MagicMock.
+Pas de DB ni de réseau : fake extractor avec `load_config`/`extract_all` déterministes et `Connection` mockée.
 """
 
 from __future__ import annotations
@@ -32,13 +32,12 @@ class _FakeExtractor(SourceExtractor):
         self,
         conn,
         logger,
-        staging,
         *,
         config: dict[str, Any] | None = None,
         metrics: PhaseMetrics | None = None,
         raise_in_extract: Exception | None = None,
     ) -> None:
-        super().__init__(conn, logger, staging)
+        super().__init__(conn, logger)
         self._config = config or {"affiliations": ["UCA"]}
         self._metrics = metrics or PhaseMetrics(new=42, total=42)
         self._raise_in_extract = raise_in_extract
@@ -80,18 +79,12 @@ def conn():
     return MagicMock()
 
 
-@pytest.fixture
-def staging():
-    """Mock `StagingQueries` port (injecté mais non consommé par l'extracteur)."""
-    return MagicMock()
-
-
 # ── run_as_phase ─────────────────────────────────────────────────
 
 
 class TestRunAsPhase:
-    def test_happy_path_calls_pipeline_in_order(self, conn, logger, staging):
-        ext = _FakeExtractor(conn, logger, staging)
+    def test_happy_path_calls_pipeline_in_order(self, conn, logger):
+        ext = _FakeExtractor(conn, logger)
         args = argparse.Namespace(dry_run=False)
 
         metrics = ext.run_as_phase(args)
@@ -107,9 +100,9 @@ class TestRunAsPhase:
         assert ext.log_summary_calls == [metrics]
         assert metrics.new == 42
 
-    def test_no_args_defaults_to_non_dry_run(self, conn, logger, staging):
+    def test_no_args_defaults_to_non_dry_run(self, conn, logger):
         """`run_as_phase()` sans argument fabrique un Namespace(dry_run=False)."""
-        ext = _FakeExtractor(conn, logger, staging)
+        ext = _FakeExtractor(conn, logger)
 
         ext.run_as_phase()
 
@@ -120,18 +113,18 @@ class TestRunAsPhase:
 
 
 class TestRunCli:
-    def test_happy_path_returns_no_exit(self, conn, logger, staging):
+    def test_happy_path_returns_no_exit(self, conn, logger):
         """Sans erreur : pas de SystemExit, conn.close() appelé dans finally."""
-        ext = _FakeExtractor(conn, logger, staging)
+        ext = _FakeExtractor(conn, logger)
 
         ext.run([])
 
         assert ext.extract_all_calls
         conn.close.assert_called_once()
 
-    def test_extraction_config_error_exit_2(self, conn, logger, staging):
+    def test_extraction_config_error_exit_2(self, conn, logger):
         ext = _FakeExtractor(
-            conn, logger, staging, raise_in_extract=ExtractionConfigError("missing affiliations")
+            conn, logger, raise_in_extract=ExtractionConfigError("missing affiliations")
         )
 
         with pytest.raises(SystemExit) as exc_info:
@@ -140,13 +133,13 @@ class TestRunCli:
         assert exc_info.value.code == 2
         conn.close.assert_called_once()
 
-    def test_http_error_exit_1_with_response_body(self, conn, logger, staging):
+    def test_http_error_exit_1_with_response_body(self, conn, logger):
         """`requests.HTTPError` → exit 1, log inclut le début du body de réponse."""
         response = MagicMock()
         response.text = "Server says no" * 100  # Vérifie le slice [:500]
         err = requests.exceptions.HTTPError("Bad request")
         err.response = response
-        ext = _FakeExtractor(conn, logger, staging, raise_in_extract=err)
+        ext = _FakeExtractor(conn, logger, raise_in_extract=err)
 
         with pytest.raises(SystemExit) as exc_info:
             ext.run([])
@@ -154,19 +147,19 @@ class TestRunCli:
         assert exc_info.value.code == 1
         conn.close.assert_called_once()
 
-    def test_http_error_without_response(self, conn, logger, staging):
+    def test_http_error_without_response(self, conn, logger):
         """Branch `e.response is None` : pas de second log, exit 1 quand même."""
         err = requests.exceptions.HTTPError("No response attached")
         err.response = None
-        ext = _FakeExtractor(conn, logger, staging, raise_in_extract=err)
+        ext = _FakeExtractor(conn, logger, raise_in_extract=err)
 
         with pytest.raises(SystemExit) as exc_info:
             ext.run([])
 
         assert exc_info.value.code == 1
 
-    def test_keyboard_interrupt_exit_0(self, conn, logger, staging):
-        ext = _FakeExtractor(conn, logger, staging, raise_in_extract=KeyboardInterrupt())
+    def test_keyboard_interrupt_exit_0(self, conn, logger):
+        ext = _FakeExtractor(conn, logger, raise_in_extract=KeyboardInterrupt())
 
         with pytest.raises(SystemExit) as exc_info:
             ext.run([])
@@ -174,9 +167,9 @@ class TestRunCli:
         assert exc_info.value.code == 0
         conn.close.assert_called_once()
 
-    def test_conn_close_called_even_on_unexpected_exception(self, conn, logger, staging):
+    def test_conn_close_called_even_on_unexpected_exception(self, conn, logger):
         """Le `finally` ferme la connexion même si une exception non-cattée remonte."""
-        ext = _FakeExtractor(conn, logger, staging, raise_in_extract=RuntimeError("boom"))
+        ext = _FakeExtractor(conn, logger, raise_in_extract=RuntimeError("boom"))
 
         with pytest.raises(RuntimeError, match="boom"):
             ext.run([])
@@ -188,23 +181,23 @@ class TestRunCli:
 
 
 class TestParseArgs:
-    def test_default_dry_run_false(self, conn, logger, staging):
-        ext = _FakeExtractor(conn, logger, staging)
+    def test_default_dry_run_false(self, conn, logger):
+        ext = _FakeExtractor(conn, logger)
 
         args = ext.parse_args([])
 
         assert args.dry_run is False
 
-    def test_dry_run_flag(self, conn, logger, staging):
-        ext = _FakeExtractor(conn, logger, staging)
+    def test_dry_run_flag(self, conn, logger):
+        ext = _FakeExtractor(conn, logger)
 
         args = ext.parse_args(["--dry-run"])
 
         assert args.dry_run is True
 
-    def test_add_cli_args_hook_runs(self, conn, logger, staging):
+    def test_add_cli_args_hook_runs(self, conn, logger):
         """L'override `add_cli_args` est invoqué, ses args sont parsés."""
-        ext = _FakeExtractor(conn, logger, staging)
+        ext = _FakeExtractor(conn, logger)
 
         args = ext.parse_args(["--extra-flag"])
 
@@ -229,9 +222,9 @@ class _MinimalExtractor(SourceExtractor):
 
 
 class TestLogSummaryDefault:
-    def test_default_logs_terminé_message(self, conn, staging, caplog):
+    def test_default_logs_terminé_message(self, conn, caplog):
         logger = logging.getLogger("test_log_summary_default")
-        ext = _MinimalExtractor(conn, logger, staging)
+        ext = _MinimalExtractor(conn, logger)
         metrics = PhaseMetrics(new=3, total=3)
 
         with caplog.at_level(logging.INFO, logger=logger.name):

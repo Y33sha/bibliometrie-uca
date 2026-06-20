@@ -16,7 +16,6 @@ from sqlalchemy import Connection
 from application.pipeline.extract.base import ExtractionConfigError, SourceExtractor
 from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
-from application.ports.pipeline.staging import StagingQueries
 
 # Constantes techniques de l'orchestration (pas spécifiques à l'API).
 _BREATHER_EVERY = 10  # pause longue toutes les N pages
@@ -123,10 +122,9 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
         self,
         conn: Connection,
         logger: logging.Logger,
-        staging: StagingQueries,
         adapter: WosExtractAdapter,
     ) -> None:
-        super().__init__(conn, logger, staging)
+        super().__init__(conn, logger)
         self._adapter = adapter
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:

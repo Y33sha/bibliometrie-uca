@@ -1327,7 +1327,6 @@ def _run_extract_hal(
 ) -> PhaseMetrics:
     from application.pipeline.extract.extract_hal import HalExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.hal.extract_hal import PgHalExtractAdapter
 
@@ -1343,7 +1342,7 @@ def _run_extract_hal(
     adapter = PgHalExtractAdapter(base_url=hal_url)
     try:
         metrics = _run_extractor(
-            HalExtractor(conn, source_log, PgStagingQueries(), adapter),
+            HalExtractor(conn, source_log, adapter),
             _extractor_args(mode=mode, year=year, since=since),
         )
     finally:
@@ -1357,7 +1356,6 @@ def _run_extract_openalex(
 ) -> PhaseMetrics:
     from application.pipeline.extract.extract_openalex import OpenalexExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.openalex.extract_openalex import PgOpenalexExtractAdapter
 
@@ -1371,7 +1369,7 @@ def _run_extract_openalex(
     adapter = PgOpenalexExtractAdapter(base_url=base_url)
     try:
         metrics = _run_extractor(
-            OpenalexExtractor(conn, source_log, PgStagingQueries(), adapter),
+            OpenalexExtractor(conn, source_log, adapter),
             _extractor_args(mode=mode, year=year, since=since),
         )
     finally:
@@ -1383,7 +1381,6 @@ def _run_extract_openalex(
 def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
     from application.pipeline.extract.extract_wos import WosExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
     from infrastructure.sources.wos.extract_wos import PgWosExtractAdapter
 
@@ -1398,7 +1395,7 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
     adapter = PgWosExtractAdapter(base_url=base_url, api_key=api_key)
     try:
         metrics = _run_extractor(
-            WosExtractor(conn, source_log, PgStagingQueries(), adapter),
+            WosExtractor(conn, source_log, adapter),
             _extractor_args(mode=mode, year=year),
         )
     finally:
@@ -1410,7 +1407,6 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
 def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
     from application.pipeline.extract.extract_scanr import ScanrExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.scanr.extract_scanr import (
         PgScanrExtractAdapter,
@@ -1431,7 +1427,7 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
     adapter = PgScanrExtractAdapter(base_url=base_url, credentials=credentials)
     try:
         metrics = _run_extractor(
-            ScanrExtractor(conn, source_log, PgStagingQueries(), adapter),
+            ScanrExtractor(conn, source_log, adapter),
             _extractor_args(mode=mode, year=year),
         )
     finally:
@@ -1443,7 +1439,6 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
 def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
     from application.pipeline.extract.extract_theses import ThesesExtractor
     from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.staging import PgStagingQueries
     from infrastructure.sources.config import get_api_base_urls
     from infrastructure.sources.theses.extract_theses import PgThesesExtractAdapter
 
@@ -1459,7 +1454,7 @@ def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> Phase
     adapter = PgThesesExtractAdapter(base_url=base_url)
     try:
         metrics = _run_extractor(
-            ThesesExtractor(conn, source_log, PgStagingQueries(), adapter),
+            ThesesExtractor(conn, source_log, adapter),
             _extractor_args(mode=mode, year=year),
         )
     finally:
