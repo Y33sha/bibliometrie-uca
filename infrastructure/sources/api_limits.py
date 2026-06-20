@@ -52,9 +52,6 @@ CROSSREF_DELAY = 0.1
 # Unpaywall — ~8 req/s conservateur
 UNPAYWALL_DELAY = 0.12
 
-# Zenodo — courtoisie
-ZENODO_DELAY = 0.5
-
 # DOAJ — courtoisie
 DOAJ_DELAY = 0.15
 

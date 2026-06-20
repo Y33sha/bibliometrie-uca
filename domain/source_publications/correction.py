@@ -126,7 +126,13 @@ _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES = (
 )
 
 # Pattern textuel très spécifique, univoque dans les corpus observés.
-_ERRATUM_TITLE_PREFIXES = ("erratum", "errata", "corrigendum", "author correction", "publisher correction")
+_ERRATUM_TITLE_PREFIXES = (
+    "erratum",
+    "errata",
+    "corrigendum",
+    "author correction",
+    "publisher correction",
+)
 
 # Préfixes stricts : seules les formulations canoniques utilisées par les éditeurs. Pas « retraction » seul, qui matcherait des titres comme « Retraction of consent in clinical trials ».
 _RETRACTION_TITLE_PREFIXES = ("retraction notice", "retraction note")
@@ -470,38 +476,61 @@ def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, Jso
     return result
 
 
-# ── Corrections relationnelles : conflits de clé partagée ────────────────
+# ── Corrections relationnelles : le DOI effectif d'un cluster ────────────
 #
 # Les corrections unaires ci-dessus décident d'un record seul. Certaines corrections
-# demandent au contraire de regarder le **groupe de source_publications partageant une
-# clé** (DOI, hal_id, nnt, … ; à terme une clé de métadonnées) : quand ce groupe réunit
-# des œuvres en réalité distinctes, la clé partagée est erronée et doit être nullée sur le
-# ou les mauvais côtés — sinon le matching les fusionnerait à tort. La détection est
-# **agnostique de la clé** (elle raisonne sur les `doc_type` du groupe) ; le caller
-# applicatif regroupe par une clé donnée et persiste le nullage de CETTE clé.
+# demandent au contraire de regarder le **groupe de source_publications partageant un
+# DOI** et d'en déduire le DOI effectif de chaque membre. Deux familles de cas, opposées :
+#
+# - **convergence (même œuvre)** : les versions DataCite d'une même œuvre portent chacune
+#   leur DOI de version ; toutes doivent converger sur le DOI **concept** (stable,
+#   agnostique aux versions), exposé par un `relatedIdentifiers` `IsVersionOf` du payload
+#   DataCite → substitution `doi = concept` ;
+# - **divergence (œuvres distinctes)** : un DOI partagé par des œuvres en réalité distinctes
+#   (ouvrage/chapitre, chapitres de titres différents) est erroné sur le ou les mauvais
+#   côtés → nullage du DOI, sinon le matching les fusionnerait à tort.
+#
+# La décision est **agnostique de la source** ; le caller applicatif regroupe par DOI (brut
+# reconstruit) et persiste la cible de chaque membre. La famille de cas est extensible — on
+# peut en ajouter d'autres, comme la passe unaire empile ses règles.
 
 
-class DistinctMergeCase(StrEnum):
-    """Cas où des SP partageant une clé sont en réalité des œuvres distinctes. Inscrit dans
-    `raw_metadata.<clé>.corrected_by` au nullage."""
+class DoiClusterCase(StrEnum):
+    """Cas de correction du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans
+    `raw_metadata.doi.corrected_by`."""
 
-    # Ouvrage et chapitre partageant une clé : la clé appartient à l'ouvrage (`book`), le
-    # chapitre (`book_chapter`) la porte par erreur → le chapitre la perd.
+    # Versions DataCite d'une même œuvre → convergence sur le DOI concept (stable).
+    DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"
+
+    # Ouvrage et chapitre partageant un DOI : le DOI appartient à l'ouvrage (`book`), le
+    # chapitre (`book_chapter`) le porte par erreur → le chapitre le perd.
     OUVRAGE_VS_CHAPITRE = "OUVRAGE_VS_CHAPITRE"
 
-    # Plusieurs chapitres (`book_chapter`) partageant une clé mais de titres réellement
-    # différents : la clé est celle de l'ouvrage hôte (absent du groupe), recopiée à tort sur
-    # ses chapitres → tous la perdent.
+    # Plusieurs chapitres (`book_chapter`) partageant un DOI mais de titres réellement
+    # différents : le DOI est celui de l'ouvrage hôte (absent du groupe), recopié à tort sur
+    # ses chapitres → tous le perdent.
     CHAPITRES_TITRES_DIFFERENTS = "CHAPITRES_TITRES_DIFFERENTS"
 
 
-class KeyGroupMember(NamedTuple):
-    """Un membre d'un groupe de SP partageant une clé : son id, son `doc_type` **canonique**
-    (corrigé par la passe unaire) et son `title_normalized` (matérialisé)."""
+class DoiClusterMember(NamedTuple):
+    """Un membre d'un groupe de SP partageant un DOI : son id, son `doc_type` **canonique**
+    (corrigé par la passe unaire), son `title_normalized` (matérialisé) et le DOI **concept**
+    (présent si ce membre — typiquement la SP `datacite` — déclare un `IsVersionOf` pour le
+    DOI du groupe)."""
 
     id: int
     doc_type: str | None
     title_normalized: str | None
+    concept_doi: str | None = None
+
+
+class DoiClusterDecision(NamedTuple):
+    """Cible de correction du DOI d'un membre : `target_doi` (`None` = nullage, sinon le DOI
+    substitué) et le cas qui l'a produite."""
+
+    id: int
+    target_doi: str | None
+    case: DoiClusterCase
 
 
 # Marqueurs structurels de titre de chapitre, retirés avant comparaison : un chapitre est
@@ -529,30 +558,48 @@ def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
     return any(a != b and a not in b and b not in a for a, b in combinations(cleaned, 2))
 
 
-def detect_erroneous_key_holders(
-    group: list[KeyGroupMember],
-) -> list[tuple[int, DistinctMergeCase]]:
-    """Pour un groupe de SP partageant une clé (quelle qu'elle soit), renvoie les `(sp_id, cas)`
-    qui la portent **par erreur** (à nuller). Pur, déterministe, sans effet de bord, et
-    indépendant du type de clé — c'est le caller qui sait par quelle clé le groupe est formé.
+def resolve_cluster_doi_corrections(
+    group: list[DoiClusterMember],
+) -> list[DoiClusterDecision]:
+    """Pour un groupe de SP partageant un DOI, renvoie les corrections `(sp_id, target_doi,
+    cas)`. Pur, déterministe, sans effet de bord, agnostique de la source — c'est le caller
+    qui forme le groupe par DOI.
 
-    - **Ouvrage + chapitre** dans le groupe : les `book_chapter` perdent la clé (celle de
-      l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
-    - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent la
-      clé (celle de l'ouvrage hôte absent). Détection par nettoyage + containment + identité
+    - **Versions DataCite** (un membre porte un `concept_doi`) : tous les membres convergent
+      sur le concept (`target_doi = concept`). Prime sur les cas ci-dessous — les œuvres
+      versionnées (datasets, preprints) ne sont pas des ouvrages/chapitres.
+    - **Ouvrage + chapitre** : les `book_chapter` perdent le DOI (`target_doi = None`, celui
+      de l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
+    - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le
+      DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + identité
       stricte (`_group_has_distinct_chapters`) — pas de similarité floue. Les faux positifs
       résiduels (coquilles) relèvent d'une correction admin.
 
-    Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas un nullage)."""
-    types = {m.doc_type for m in group}
-    if "book" in types and "book_chapter" in types:
+    Les membres hors famille ouvrage (article partageant le DOI par accident) ne reçoivent
+    aucune décision : la détection ouvrage/chapitre raisonne sur le sous-ensemble book/chapter.
+
+    Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas du DOI)."""
+    concept = next((m.concept_doi for m in group if m.concept_doi), None)
+    if concept is not None:
         return [
-            (m.id, DistinctMergeCase.OUVRAGE_VS_CHAPITRE)
+            DoiClusterDecision(m.id, concept, DoiClusterCase.DATACITE_VERSION_TO_CONCEPT)
             for m in group
-            if m.doc_type == "book_chapter"
         ]
-    if types == {"book_chapter"} and _group_has_distinct_chapters(
-        [m.title_normalized for m in group]
+
+    book_family = [m for m in group if m.doc_type in ("book", "book_chapter")]
+    chapters = [m for m in book_family if m.doc_type == "book_chapter"]
+    has_book = any(m.doc_type == "book" for m in book_family)
+    if has_book and chapters:
+        return [
+            DoiClusterDecision(m.id, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE) for m in chapters
+        ]
+    if (
+        chapters
+        and not has_book
+        and _group_has_distinct_chapters([m.title_normalized for m in chapters])
     ):
-        return [(m.id, DistinctMergeCase.CHAPITRES_TITRES_DIFFERENTS) for m in group]
+        return [
+            DoiClusterDecision(m.id, None, DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS)
+            for m in chapters
+        ]
     return []

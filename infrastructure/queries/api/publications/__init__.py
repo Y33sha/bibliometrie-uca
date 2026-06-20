@@ -6,7 +6,7 @@ Le package est organisé par thème :
 - `detail` : `get_publication_detail`
 
 Les adapters d'écriture pipeline (`pipeline.publications_reconciliation`,
-`pipeline.zenodo_concept`) vivent côté `infrastructure/queries/pipeline/`.
+`pipeline.metadata_correction`) vivent côté `infrastructure/queries/pipeline/`.
 
 `PgPublicationsQueries` agrège les 5 fonctions de lecture sous le port
 `application.ports.api.publications_queries.PublicationsQueries`. Les fonctions

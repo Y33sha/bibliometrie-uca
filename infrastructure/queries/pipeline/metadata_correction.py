@@ -12,7 +12,6 @@ from application.ports.pipeline.metadata_correction import (
     DoiClusterRow,
     DoiCorrectionUpdate,
     MetadataCorrectionQueries,
-    ZenodoConceptRow,
 )
 from domain.source_publications.correction import SourcePublicationForCorrection
 
@@ -50,31 +49,50 @@ def fetch_for_unary_correction_by_journal(
 
 
 def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
-    """SP `book`/`book_chapter` ayant un DOI (brut reconstruit, en minuscules) pour la
-    correction relationnelle group-by-DOI."""
+    """Membres des groupes-DOI candidats à la correction par cluster, avec leur `concept_doi`.
+
+    `version_map` dérive le mapping DOI de version → DOI concept depuis les
+    `meta.related_identifiers` (`IsVersionOf`) des SP `datacite` (clé = DOI **brut**
+    reconstruit, stable après substitution). `candidate_dois` réunit les DOI à examiner :
+    versionnés, portés par un `book`/`book_chapter`, ou déjà corrigés (`raw_metadata.doi`,
+    pour l'auto-cicatrisation). On renvoie **tous** les membres de ces DOI (toutes sources)."""
     rows = conn.execute(
         text("""
+            WITH version_map AS (
+                SELECT DISTINCT
+                    lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS version_doi,
+                    lower(rel->>'doi') AS concept_doi
+                FROM source_publications sp
+                CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
+                WHERE sp.source = 'datacite'
+                  AND rel->>'relation_type' = 'IsVersionOf'
+                  AND rel->>'doi' IS NOT NULL
+                  AND lower(rel->>'doi')
+                      <> lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
+            ),
+            candidate_dois AS (
+                SELECT version_doi AS d FROM version_map
+                UNION
+                SELECT lower(COALESCE(raw_metadata->'doi'->>'raw', doi)) AS d
+                FROM source_publications
+                WHERE doc_type IN ('book', 'book_chapter')
+                  AND COALESCE(raw_metadata->'doi'->>'raw', doi) IS NOT NULL
+                UNION
+                SELECT lower(COALESCE(raw_metadata->'doi'->>'raw', doi)) AS d
+                FROM source_publications
+                WHERE raw_metadata ? 'doi'
+            )
             SELECT sp.id, sp.doc_type, sp.doi, sp.title_normalized, sp.raw_metadata,
-                   lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS raw_doi
+                   lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS raw_doi,
+                   vm.concept_doi
             FROM source_publications sp
-            WHERE sp.doc_type IN ('book', 'book_chapter')
-              AND COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi) IS NOT NULL
+            JOIN candidate_dois c
+              ON c.d = lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
+            LEFT JOIN version_map vm
+              ON vm.version_doi = lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
         """)
     ).all()
     return [DoiClusterRow(*row) for row in rows]
-
-
-def fetch_zenodo_concept_candidates(conn: Connection) -> list[ZenodoConceptRow]:
-    """SP au concept DOI Zenodo caché, pour la substitution version→concept de la colonne `doi`."""
-    rows = conn.execute(
-        text("""
-            SELECT sp.id, sp.doi, sp.external_ids->>'zenodo_concept_doi' AS concept_doi,
-                   sp.raw_metadata
-            FROM source_publications sp
-            WHERE sp.external_ids ? 'zenodo_concept_doi'
-        """)
-    ).all()
-    return [ZenodoConceptRow(*row) for row in rows]
 
 
 def persist_doi_corrections(conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
@@ -133,6 +151,3 @@ class PgMetadataCorrectionQueries(MetadataCorrectionQueries):
 
     def persist_doi_corrections(self, conn: Connection, updates: list[DoiCorrectionUpdate]) -> int:
         return persist_doi_corrections(conn, updates)
-
-    def fetch_zenodo_concept_candidates(self, conn: Connection) -> list[ZenodoConceptRow]:
-        return fetch_zenodo_concept_candidates(conn)
