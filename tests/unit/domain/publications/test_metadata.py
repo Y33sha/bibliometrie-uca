@@ -71,11 +71,23 @@ class TestBestOAStatus:
         # le statut "unknown" a un rank > 0 : il gagne face à rien
         assert best_oa_status(["unknown"]) == "unknown"
 
+    def test_embargoed_wins_over_closed_and_unknown(self):
+        # embargoed (dépôt sous embargo) est plus ouvert que closed/unknown
+        assert best_oa_status(["closed", "embargoed", "unknown"]) == "embargoed"
+
+    def test_open_status_wins_over_embargoed(self):
+        # une source réellement ouverte (green ou mieux) l'emporte sur embargoed
+        assert best_oa_status(["embargoed", "green"]) == "green"
+        assert best_oa_status(["embargoed", "gold"]) == "gold"
+
+    def test_embargoed_alone(self):
+        assert best_oa_status(["embargoed"]) == "embargoed"
+
     def test_rank_order_is_strict(self):
         # ordre documenté dans la docstring
         assert OA_RANK["diamond"] > OA_RANK["gold"] > OA_RANK["hybrid"]
         assert OA_RANK["hybrid"] > OA_RANK["bronze"] > OA_RANK["green"]
-        assert OA_RANK["green"] > OA_RANK["closed"] > OA_RANK["unknown"]
+        assert OA_RANK["green"] > OA_RANK["embargoed"] > OA_RANK["closed"] > OA_RANK["unknown"]
 
 
 # ── absorb_oa_status (règle pairwise pour fusion d'entités) ─────────

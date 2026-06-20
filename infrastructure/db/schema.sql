@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict jda118urijfBKK8aWfj3sSle91GnyOSUQp1T0cy0DcNNRAs1e1mlWbee8ecVeiP
+\restrict wITMsZvUubmqrxiRfo9BjkhdXXt4lb0gCo11e8nem2h4qY7ymChyO1nf6xcza2Y
 
--- Dumped from database version 18.1
--- Dumped by pg_dump version 18.1
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -128,7 +128,8 @@ CREATE TYPE public.oa_type AS ENUM (
     'green',
     'closed',
     'unknown',
-    'diamond'
+    'diamond',
+    'embargoed'
 );
 
 
@@ -1224,6 +1225,7 @@ CREATE TABLE public.source_publications (
     raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     title_normalized text,
     keys_dirty boolean DEFAULT true NOT NULL,
+    embargo_until date,
     CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
     CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
 );
@@ -3109,5 +3111,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jda118urijfBKK8aWfj3sSle91GnyOSUQp1T0cy0DcNNRAs1e1mlWbee8ecVeiP
+\unrestrict wITMsZvUubmqrxiRfo9BjkhdXXt4lb0gCo11e8nem2h4qY7ymChyO1nf6xcza2Y
 
