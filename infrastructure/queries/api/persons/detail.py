@@ -7,7 +7,7 @@ from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
-from infrastructure.queries.filters import OA_CLOSED_SQL
+from infrastructure.queries.filters import OA_DASHBOARD_COLS_SQL
 
 
 def person_profile(conn: Connection, person_id: int) -> dict[str, Any] | None:
@@ -311,16 +311,7 @@ def person_dashboard(conn: Connection, person_id: int) -> dict[str, Any]:
     oa = conn.execute(
         text(f"""
             SELECT
-                COUNT(DISTINCT p.id) FILTER (
-                    WHERE p.oa_status NOT IN {OA_CLOSED_SQL}
-                      AND p.oa_status != 'embargoed' AND p.oa_status IS NOT NULL
-                ) AS open_access,
-                COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'embargoed') AS embargoed,
-                COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = 'closed') AS closed,
-                COUNT(DISTINCT p.id) FILTER (
-                    WHERE p.oa_status = 'unknown' OR p.oa_status IS NULL
-                ) AS unknown,
-                COUNT(DISTINCT p.id) AS total
+                {OA_DASHBOARD_COLS_SQL}
             FROM publications p
             JOIN authorships a ON a.publication_id = p.id
             WHERE a.person_id = :pid
