@@ -1,8 +1,8 @@
 """Adapter HAL pour la phase extract : HTTP (Solr search API) + écritures staging + config.
 
 Implémente le port `application.ports.pipeline.extract.hal.HalExtractAdapter`.
-L'orchestration de la phase (boucle par collection, aiguillage
-full/incremental, batch commits) vit côté
+L'orchestration de la phase (requête unique sur l'union des collections,
+pagination `cursorMark`, batch commits) vit côté
 `application.pipeline.extract.extract_hal`.
 """
 
@@ -27,24 +27,6 @@ from infrastructure.sources.config import (
 from infrastructure.sources.hal.fields import HAL_FIELDS
 from infrastructure.sources.http_retry import http_request_with_retry
 
-# Max imposé par HAL pour `rows` sur une requête Solr (n'utilisé que pour
-# la passe préview IDs-only, payload minuscule).
-_HAL_PREVIEW_ROWS = 10000
-
-
-_TAG_COLLECTION_SQL = text(
-    """
-    UPDATE staging
-    SET hal_collections = CASE
-            WHEN hal_collections IS NULL THEN ARRAY[:code]::TEXT[]
-            WHEN :code = ANY(hal_collections) THEN hal_collections
-            ELSE hal_collections || CAST(:code AS TEXT)
-        END,
-        last_seen_at = now()
-    WHERE source = 'hal' AND source_id = ANY(:ids)
-    """
-)
-
 _UPSERT_HAL_SQL = text(
     """
     WITH old AS (
@@ -52,14 +34,9 @@ _UPSERT_HAL_SQL = text(
         WHERE source = 'hal' AND source_id = :hal_id
     )
     INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, raw_hash)
-    VALUES ('hal', :hal_id, :doi, :raw_data, ARRAY[:collection], :raw_hash)
+    VALUES ('hal', :hal_id, :doi, :raw_data, :hal_collections, :raw_hash)
     ON CONFLICT (source, source_id) DO UPDATE SET
-        hal_collections = CASE
-            WHEN staging.hal_collections IS NULL THEN ARRAY[EXCLUDED.hal_collections[1]]
-            WHEN EXCLUDED.hal_collections[1] = ANY(staging.hal_collections)
-                THEN staging.hal_collections
-            ELSE staging.hal_collections || EXCLUDED.hal_collections[1]
-        END,
+        hal_collections = EXCLUDED.hal_collections,
         raw_data = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                 THEN EXCLUDED.raw_data
@@ -167,62 +144,37 @@ class PgHalExtractAdapter(HalExtractAdapter):
         """Extrait le DOI nettoyé depuis un document HAL (champ `doiId_s`)."""
         return clean_doi(doc.get("doiId_s"))
 
+    def build_collections_fq(self, collection_codes: list[str]) -> str:
+        """Filtre Solr `collCode_s:("C1" OR "C2" …)` couvrant toutes les collections
+        configurées en une requête. Les codes sont quotés : certains portent un tiret
+        (ex. `CHU-CLERMONTFERRAND`) que Solr interpréterait sinon comme un opérateur."""
+        terms = " OR ".join(f'"{code}"' for code in collection_codes)
+        return f"collCode_s:({terms})"
+
+    def configured_collections(self, doc: dict[str, Any], configured: set[str]) -> list[str]:
+        """Collections **du périmètre** auxquelles ce record appartient : `collCode_s`
+        du record ∩ collections configurées (l'ordre du record est préservé)."""
+        return [code for code in (doc.get("collCode_s") or []) if code in configured]
+
     # ── HTTP ───────────────────────────────────────────────────
 
-    def fetch_page(self, query: str, collection_code: str, start: int) -> dict[str, Any]:
-        """Récupère une page de résultats (full payload avec HAL_FIELDS)."""
+    def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> dict[str, Any]:
+        """Une page Solr en pagination `cursorMark` (full payload `HAL_FIELDS`).
+
+        `cursor_mark` vaut `"*"` au premier appel, puis le `nextCursorMark` renvoyé par
+        la réponse précédente. La réponse porte `response.docs` et `nextCursorMark` ;
+        l'appelant boucle jusqu'à ce que le marqueur se stabilise. `sort=docid asc`
+        (clé unique) est requis par cursorMark."""
         params = {
             "q": query,
+            "fq": fq,
             "fl": ",".join(HAL_FIELDS),
-            "rows": self.per_page_for(collection_code),
-            "start": start,
+            "rows": self.per_page_for(None),
             "sort": "docid asc",
+            "cursorMark": cursor_mark,
             "wt": "json",
         }
-        if collection_code:
-            params["fq"] = f"collCode_s:{collection_code}"
-        label = f"HAL coll={collection_code or '-'} start={start}"
-        return self._get(params, label)
-
-    def fetch_collection_ids(self, query: str, collection_code: str) -> list[str]:
-        """Liste les halIds d'une collection via Solr `fl=halId_s` (payload minuscule)."""
-        all_ids: list[str] = []
-        start = 0
-        total_count: int | None = None
-        while True:
-            params = {
-                "q": query,
-                "fl": "halId_s",
-                "rows": _HAL_PREVIEW_ROWS,
-                "start": start,
-                "sort": "docid asc",
-                "wt": "json",
-                "fq": f"collCode_s:{collection_code}",
-            }
-            label = f"HAL preview coll={collection_code} start={start}"
-            data = self._get(params, label)
-            resp = data.get("response", {})
-            if total_count is None:
-                total_count = int(resp.get("numFound", 0))
-            docs = resp.get("docs", [])
-            all_ids.extend(d["halId_s"] for d in docs if d.get("halId_s"))
-            start += len(docs)
-            if start >= total_count or not docs:
-                break
-        return all_ids
-
-    def fetch_single_work(self, hal_id: str) -> dict[str, Any] | None:
-        """Récupère un document par halId, full HAL_FIELDS. Un appel = un document."""
-        params = {
-            "q": f'halId_s:"{hal_id}"',
-            "fl": ",".join(HAL_FIELDS),
-            "rows": 1,
-            "wt": "json",
-        }
-        label = f"HAL single halId={hal_id}"
-        data = self._get(params, label)
-        docs = data.get("response", {}).get("docs", [])
-        return docs[0] if docs else None
+        return self._get(params, f"HAL cursor={cursor_mark[:16]}")
 
     # ── SQL ────────────────────────────────────────────────────
 
@@ -232,33 +184,21 @@ class PgHalExtractAdapter(HalExtractAdapter):
         hal_id: str,
         doi: str | None,
         raw_data: dict[str, Any],
-        collection: str,
+        hal_collections: list[str],
     ) -> tuple[bool, bool]:
-        """UPSERT staging : ajoute la collection, met à jour raw_data si hash changé.
-
-        Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`),
-        `changed` = contenu réécrit (hash distinct de l'ancien). Pour une row
-        re-vue à hash identique, `(False, False)` (seul `last_seen_at`/la
-        collection sont bumpés).
-        """
+        """UPSERT staging : pose `hal_collections` (collections du périmètre du record),
+        met à jour `raw_data` si le hash a changé. Retourne `(inserted, changed)` :
+        `inserted` = vraie insertion (`xmax = 0`), `changed` = contenu réécrit (hash
+        distinct de l'ancien). Une row re-vue à hash identique → `(False, False)`. Un
+        `raw_hash=null` en base force le re-import (`NULL IS DISTINCT FROM <hash>`)."""
         row = conn.execute(
             _UPSERT_HAL_SQL,
             {
                 "hal_id": hal_id,
                 "doi": doi,
                 "raw_data": raw_data,
-                "collection": collection,
+                "hal_collections": hal_collections,
                 "raw_hash": compute_hash(raw_data),
             },
         ).one()
         return (bool(row.inserted), bool(row.changed))
-
-    def tag_existing_with_collection(
-        self, conn: Connection, hal_ids: list[str], collection_code: str
-    ) -> int:
-        """Append `collection_code` à `hal_collections` pour les halIds donnés."""
-        if not hal_ids:
-            return 0
-        result = conn.execute(_TAG_COLLECTION_SQL, {"code": collection_code, "ids": hal_ids})
-        conn.commit()
-        return result.rowcount

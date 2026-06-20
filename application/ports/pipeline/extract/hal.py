@@ -45,17 +45,24 @@ class HalExtractAdapter(Protocol):
 
     def per_page_for(self, collection_code: str | None) -> int: ...
 
+    def build_collections_fq(self, collection_codes: list[str]) -> str:
+        """Filtre Solr `collCode_s:(…)` couvrant l'union des collections configurées."""
+        ...
+
+    def configured_collections(self, doc: dict[str, Any], configured: set[str]) -> list[str]:
+        """Collections du périmètre du record : `collCode_s` ∩ collections configurées."""
+        ...
+
     def extract_id(self, doc: dict[str, Any]) -> str: ...
 
     def extract_doi(self, doc: dict[str, Any]) -> str | None: ...
 
     # ── HTTP (l'adapter connaît la base_url via sa construction) ──
 
-    def fetch_collection_ids(self, query: str, collection_code: str) -> list[str]: ...
-
-    def fetch_single_work(self, hal_id: str) -> dict[str, Any] | None: ...
-
-    def fetch_page(self, query: str, collection_code: str, start: int) -> dict[str, Any]: ...
+    def fetch_page_cursor(self, query: str, fq: str, cursor_mark: str) -> dict[str, Any]:
+        """Une page Solr en pagination `cursorMark` (`cursor_mark="*"` au premier
+        appel, puis le `nextCursorMark` de la réponse précédente)."""
+        ...
 
     # ── SQL ────────────────────────────────────────────────────
 
@@ -65,12 +72,8 @@ class HalExtractAdapter(Protocol):
         hal_id: str,
         doi: str | None,
         raw_data: dict[str, Any],
-        collection: str,
+        hal_collections: list[str],
     ) -> tuple[bool, bool]:
         """UPSERT staging. Retourne `(inserted, changed)` : insertion réelle
         (`xmax = 0`) et contenu réécrit (hash distinct de l'ancien)."""
         ...
-
-    def tag_existing_with_collection(
-        self, conn: Connection, hal_ids: list[str], collection_code: str
-    ) -> int: ...

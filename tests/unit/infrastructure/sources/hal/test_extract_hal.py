@@ -78,3 +78,29 @@ class TestPerPageFor:
     def test_override_for_megaauthorship_collection(self, adapter):
         # LPC-CLERMONT : physique des particules, payloads label_xml énormes → per_page réduit.
         assert adapter.per_page_for("LPC-CLERMONT") == 50
+
+
+class TestBuildCollectionsFq:
+    def test_single_collection_quoted(self, adapter):
+        assert adapter.build_collections_fq(["LIMOS"]) == 'collCode_s:("LIMOS")'
+
+    def test_union_joined_with_or(self, adapter):
+        # Les codes sont quotés : un tiret (CHU-CLERMONTFERRAND) serait sinon lu
+        # comme un opérateur Solr.
+        assert adapter.build_collections_fq(["LIMOS", "CHU-CLERMONTFERRAND"]) == (
+            'collCode_s:("LIMOS" OR "CHU-CLERMONTFERRAND")'
+        )
+
+
+class TestConfiguredCollections:
+    def test_keeps_only_configured_preserving_record_order(self, adapter):
+        doc = {"collCode_s": ["PRES_CLERMONT", "HORS-PERIMETRE", "LIMOS"]}
+        configured = {"LIMOS", "PRES_CLERMONT"}
+        assert adapter.configured_collections(doc, configured) == ["PRES_CLERMONT", "LIMOS"]
+
+    def test_empty_when_no_collcode(self, adapter):
+        assert adapter.configured_collections({}, {"LIMOS"}) == []
+
+    def test_empty_when_no_intersection(self, adapter):
+        doc = {"collCode_s": ["OTHER"]}
+        assert adapter.configured_collections(doc, {"LIMOS"}) == []
