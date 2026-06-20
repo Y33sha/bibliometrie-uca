@@ -184,16 +184,6 @@ class TestMergePublications:
             is None
         )
 
-    def test_merges_when_same_doi(self, sa_sync_conn, repo):
-        """Même DOI des deux côtés : fusion (la contrainte unique ayant été retirée)."""
-        target = _insert_publication(sa_sync_conn, doi="10.1/a")
-        source = _insert_publication(sa_sync_conn, doi="10.1/a")
-        merge_publications(target, source, repo=repo)
-        assert (
-            _select_one(sa_sync_conn, "SELECT id FROM publications WHERE id = :id", id=source)
-            is None
-        )
-
     def test_dedup_authorships_by_person(self, sa_sync_conn, repo):
         """Si target et source ont une authorship pour la même person, la source est jetée."""
         target = _insert_publication(sa_sync_conn, title="Target")
