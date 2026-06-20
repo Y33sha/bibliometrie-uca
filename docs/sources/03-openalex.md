@@ -15,7 +15,7 @@ https://developers.openalex.org/
 
 > APC OpenAlex peu fiable (cf. audit du 2026-05-26 dans la fiche chantier `METIER_pipeline-publishers-journals` : médiane 21% d'écart vs DOAJ, OpenAlex sous-estime systématiquement). Cible visée à terme : retrait. État actuel conservé en attendant une source de remplacement pour les ~2 300 revues hors-DOAJ.
 
-**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur. Sub-step `enrich_publishers_from_openalex` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `publishers.country` (ISO-2 depuis `country_codes[0]`) et `publishers.ror` (depuis `ids.ror`, short form). Couverture limitée (~13% des publishers locaux ont un `openalex_id`) ; le complément `country` est posé par [Crossref Members](06-crossref.md), et le typage `publisher_type` repose sur [ROR](08-sources-supplementaires.md#ror).
+**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur. Sub-step `enrich_publishers_from_openalex` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `publishers.country` (ISO-2 depuis `country_codes[0]`) et `publishers.ror` (depuis `ids.ror`, short form). Couverture limitée (~13% des publishers locaux ont un `openalex_id`) ; le complément `country` est posé par [Crossref Members](06-crossref.md), et le typage `publisher_type` repose sur [ROR](09-sources-supplementaires.md#ror).
 
 ## Données récupérées
 

@@ -143,13 +143,13 @@ Une règle ajoutée à `_RULES` ne s'applique qu'aux SP retraitées. Pour l'appl
 
 Le catalogue des règles actives est le dict `_RULES` lui-même (entrées + commentaire de motivation inline au-dessus de chaque entrée). Pas de duplication dans une fiche séparée. Si la règle illustre une combinaison input/output non couverte ci-dessous, compléter le § Exemples.
 
-## Corrections relationnelles (cluster)
+## Corrections par grappe de DOI (cluster)
 
-Les règles `_RULES` décident d'une SP **seule**. Certaines corrections demandent de regarder le **groupe de SP partageant une clé** : quand ce groupe réunit des œuvres distinctes, la clé partagée est erronée et doit être nullée sur le mauvais côté, sinon le matching les fusionnerait à tort.
+Les règles `_RULES` décident d'une SP **seule**. D'autres corrections demandent de regarder le **groupe de SP partageant un DOI** et d'en déduire le DOI effectif de chaque membre. Deux familles : **convergence** (les versions DataCite d'une même œuvre convergent sur le DOI concept stable) et **divergence** (un DOI partagé par des œuvres distinctes est neutralisé sur le mauvais côté, sinon le matching les fusionnerait à tort).
 
-La décision est dans `detect_erroneous_key_holders` (`correction.py`) — pure, **agnostique de la clé** (elle raisonne sur les `doc_type` du groupe). La sous-étape [`correct_by_cluster.py`](../../application/pipeline/metadata_correction/correct_by_cluster.py) regroupe par DOI brut, demande au domaine quels DOI sont erronés, nulle le DOI fautif et stashe le brut sous la provenance `DistinctMergeCase`. Cas couverts : ouvrage + chapitre au même DOI (le chapitre perd le DOI) ; chapitres de titres réellement distincts au même DOI (le DOI de l'ouvrage hôte, recopié à tort — tous le perdent).
+La décision est dans `resolve_cluster_doi_corrections` (`correction.py`) — pure, agnostique de la source. La sous-étape [`correct_by_cluster.py`](../../application/pipeline/metadata_correction/correct_by_cluster.py) regroupe par DOI brut, demande au domaine le DOI cible de chaque membre, substitue ou nulle le DOI et stashe le brut sous la provenance `DoiClusterCase`. Cas couverts : versions DataCite → DOI concept ; ouvrage + chapitre au même DOI (le chapitre perd le DOI) ; chapitres de titres réellement distincts au même DOI (tous le perdent).
 
-Pour une nouvelle correction relationnelle : ajouter un membre `DistinctMergeCase` (l'énoncé métier dans son commentaire) + la branche de détection dans `detect_erroneous_key_holders`, et regrouper sur la clé voulue côté sous-étape cluster.
+Pour un nouveau cas : ajouter un membre `DoiClusterCase` (l'énoncé métier dans son commentaire) + la branche correspondante dans `resolve_cluster_doi_corrections`.
 
 ## Exemples concrets
 

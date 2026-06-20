@@ -32,7 +32,7 @@ https://treemaps.openapc.net/apcdata/clermont-u/
 
 ## <span id="doaj"></span>DOAJ — bootstrap CSV
 
-Le flux régulier passe par l'API DOAJ (cf. [08-sources-supplementaires.md#doaj](08-sources-supplementaires.md#doaj)). L'import CSV reste utilisable pour un bootstrap rapide depuis un dump complet (~21 k revues, plus rapide qu'un fetch unitaire).
+Le flux régulier passe par l'API DOAJ (cf. [09-sources-supplementaires.md#doaj](09-sources-supplementaires.md#doaj)). L'import CSV reste utilisable pour un bootstrap rapide depuis un dump complet (~21 k revues, plus rapide qu'un fetch unitaire).
 
 Dump téléchargé manuellement depuis https://doaj.org/csv puis importé via `python -m interfaces.cli.imports.import_doaj_csv data/doaj_journalcsv_*.csv`.
 

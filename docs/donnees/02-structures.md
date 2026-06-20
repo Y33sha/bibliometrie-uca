@@ -47,7 +47,7 @@ Légende :
 - **`structure_relations`** : définit les relations entre structures. Deux relations existent : **tutelle** (asymétrique), **partenariat** (symétrique, non transitif). La relation "partenariat" est purement informative (elle réplique l'information présente dans le [référentiel ROR](../glossaire.md#ror)) ; la relation "tutelle" a une conséquence sur les **structures incluses dans un périmètre** donné.
 - **`structure_name_forms`** : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Exemple : `LMV` reconnaît le labo *Magmas et Volcans* seulement si `uca` ou `site_clermont` reconnus dans l'adresse. Sinon : probablement *Laboratoire de mathématiques de Versailles*. Cette table est utilisée dans la phase `affiliations` du [pipeline](../pipeline/01-vue-d-ensemble.md) pour peupler la table de liaison `address_structures`.
 - **`address_structures`** : table de liaison. Les adresses proviennent des authorships sources (peuplées via `source_authorship_addresses` lors de la phase `normalize`, exploitées lors de la phase `affiliations`). Les structures identifiées sont ensuite propagées aux authorships sources.
-- **`apc_payments`** : données provenant d'un import CSV, voir [doc sources](../sources/09-imports-manuels.md#donnees-apc).
+- **`apc_payments`** : données provenant d'un import CSV, voir [doc sources](../sources/10-imports-manuels.md#donnees-apc).
 
 ## Pages admin associées
 
