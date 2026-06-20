@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import time
 from collections.abc import Callable
 
 from sqlalchemy import Connection
@@ -41,7 +42,8 @@ def extract_union(
     Construit `q` (années/`since`) et `fq=collCode_s:(…)` sur toutes les
     collections de `config.all_collections`, puis paginate en `cursorMark`
     jusqu'à stabilisation du marqueur. Chaque document est upserté une fois.
-    `scope_label` (ex. `« 2024 »`, `« depuis 2026-05-01 »`) étiquette les logs.
+    `scope_label` (ex. `« 2024 »`, `« depuis 2026-05-01 »`) étiquette les logs ;
+    le log par page reporte le débit (docs/s) pour calibrer `HAL_PER_PAGE`.
     Retourne `PhaseMetrics(new, updated, unchanged, total)`.
 
     En `dry_run`, une seule page est tirée pour lire `numFound` (volume du
@@ -71,7 +73,9 @@ def extract_union(
                 "HAL à bout (429/5xx répétés) — pagination interrompue (retry au prochain run)"
             )
             break
+        page_started = time.monotonic()
         data = adapter.fetch_page_cursor(query, fq, cursor)
+        fetch_s = time.monotonic() - page_started
         resp = data.get("response", {})
         docs = resp.get("docs", [])
 
@@ -98,12 +102,15 @@ def extract_union(
                 metrics.add(unchanged=1, total=1)
         conn.commit()
 
-        # Un log par page (pages lourdes : ~500 docs TEI + 500 upserts) pour un
-        # signe de vie régulier. La page de confirmation vide finale n'est pas loguée.
+        # Un log par page (pages lourdes : ~rows docs TEI + autant d'upserts) pour un
+        # signe de vie régulier ; le débit fetch (docs/s) sert à calibrer `page_size`.
+        # La page de confirmation vide finale n'est pas loguée.
         if docs:
             page += 1
+            rate = len(docs) / fetch_s if fetch_s > 0 else 0
             logger.info(
-                f"  {scope_label} page {page}/{total_pages} — {metrics.total} docs "
+                f"  {scope_label} page {page}/{total_pages} — {len(docs)} docs en "
+                f"{fetch_s:.1f}s ({rate:.0f}/s), cumul {metrics.total} "
                 f"({metrics.new} nouveaux, {metrics.updated} mis à jour, "
                 f"{metrics.unchanged} inchangés)"
             )
