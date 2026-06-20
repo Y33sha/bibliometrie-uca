@@ -88,6 +88,7 @@ def extract_union(
                 f"  {scope_label} : {num_found} documents → ~{total_pages} pages de {page_size}"
             )
 
+        write_started = time.monotonic()
         for doc in docs:
             hal_id = adapter.extract_id(doc)
             if not hal_id:
@@ -101,16 +102,17 @@ def extract_union(
             else:
                 metrics.add(unchanged=1, total=1)
         conn.commit()
+        write_s = time.monotonic() - write_started
 
-        # Un log par page (pages lourdes : ~rows docs TEI + autant d'upserts) pour un
-        # signe de vie régulier ; le débit fetch (docs/s) sert à calibrer `page_size`.
+        # Un log par page (pages lourdes : ~rows docs TEI + autant d'upserts unitaires)
+        # pour un signe de vie régulier. `fetch` = réponse HAL, `écriture` = upserts
+        # row-par-row + commit : sépare les deux coûts pour calibrer page_size / batch.
         # La page de confirmation vide finale n'est pas loguée.
         if docs:
             page += 1
-            rate = len(docs) / fetch_s if fetch_s > 0 else 0
             logger.info(
-                f"  {scope_label} page {page}/{total_pages} — {len(docs)} docs en "
-                f"{fetch_s:.1f}s ({rate:.0f}/s), cumul {metrics.total} "
+                f"  {scope_label} page {page}/{total_pages} — {len(docs)} docs : "
+                f"fetch {fetch_s:.1f}s, écriture {write_s:.1f}s — cumul {metrics.total} "
                 f"({metrics.new} nouveaux, {metrics.updated} mis à jour, "
                 f"{metrics.unchanged} inchangés)"
             )
