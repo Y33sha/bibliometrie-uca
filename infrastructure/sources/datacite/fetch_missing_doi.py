@@ -67,11 +67,11 @@ class DataciteFetchMissingDoiAdapter:
     batch_size = 1
     # Limites DataCite par tier (fenêtre glissante de 5 min, par IP) : 3000
     # (authentifié), 1000 (identifié = User-Agent avec mailto, notre cas), 500
-    # (anonyme). On est identifié → 1000 / 5 min ≈ 3,3 req/s. L'API répond en
-    # ~10 ms, donc le délai par worker domine : 3 concurrentes × pause 1,2 s
-    # ≈ 2,5 req/s (~740 / 5 min), avec marge sous la limite.
+    # (anonyme). On est identifié → 1000 / 5 min ≈ 3,3 req/s. On vise pile cette
+    # limite, sans marge (3 concurrentes × pause 0,9 s ≈ 3,3 req/s) : un 429 + coupe-
+    # circuit ponctuel en fin de fenêtre est rattrapé au run suivant (pool convergent).
     max_concurrent = 3
-    request_delay_s = 1.2
+    request_delay_s = 0.9
 
     base_url: str
     headers: dict[str, str]
