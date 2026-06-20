@@ -18,11 +18,12 @@ from domain.normalize import normalize_text
 # statut est « ouvert ». Utilisé par `best_oa_status` pour choisir le
 # statut le plus ouvert entre plusieurs sources.
 OA_RANK: dict[str, int] = {
-    "diamond": 7,
-    "gold": 6,
-    "hybrid": 5,
-    "bronze": 4,
-    "green": 3,
+    "diamond": 8,
+    "gold": 7,
+    "hybrid": 6,
+    "bronze": 5,
+    "green": 4,
+    "embargoed": 3,
     "closed": 2,
     "unknown": 1,
 }
