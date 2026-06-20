@@ -1,5 +1,7 @@
 # Chantier — Extraction HAL : requête unique multi-collections
 
+Commencé et terminé le 2026-06-20
+
 Issu de l'investigation 2026-06-20 sur le non-respect de `raw_hash=null` au réimport HAL (« 0 mis à jour » alors que les hash avaient été nullés).
 
 ## Contexte
@@ -53,11 +55,18 @@ Deux systèmes d'upsert staging coexistent : HAL, OpenAlex et WoS utilisent `INS
 - [x] Réécrire `test_extract_hal_adaptive` : cursorMark, dédoublonnage de l'union, `hal_collections` issues de `collCode_s`
 
 ### 5. Rattrapage du stock
-- [ ] Réimport HAL `raw_hash=null` **sans** `--since` → re-fetch complet honorant les hash nullés (débloque la phase 6 du chantier embargo)
+- [x] Réimport HAL `raw_hash=null` **sans** `--since` → re-fetch complet honorant les hash nullés (débloque la phase 6 du chantier embargo)
 
-## Hors scope / suites
+## Chantier annexe
 
-- **Unification des upsert staging.** theses.fr et ScanR pourraient passer à `INSERT … ON CONFLICT DO UPDATE` (comme HAL/OpenAlex/WoS), ce qui retirerait leur dépendance à `existing_ids` et permettrait de le supprimer entièrement du `base.py`. Cleanup distinct de ce chantier.
+Mené dans la foulée :
+
+- [x] **Drop `staging.hal_collections`** — colonne redondante (le normalizer la subsumait via `collCode_s` du `raw_data`) ; supprime aussi la machinerie `HalStagingRow` et simplifie le normalizer. Supersède la décision 3 : plus de portage par colonne staging, `source_publications.hal_collections` reste et se dérive du seul `raw_data`. `2ef27b72`
+- [x] **Mutualisation de l'upsert staging** des 5 sources dans un helper canonique unique ; theses.fr et ScanR quittent le routage `is_new` pour le `ON CONFLICT DO UPDATE` (ScanR récupère au passage le reset `processed=FALSE` qu'il omettait). `325a3e1b`
+- [x] **Suppression d'`existing_ids`** — mort sur les 5 sources une fois theses/ScanR convertis ; retiré de `base.py`, des orchestrateurs et du port `StagingQueries`. `ee3cbef1`
+- [x] **Retrait de l'injection `StagingQueries`** désormais morte dans les extracteurs (base + 5 orchestrateurs + sites de construction). `ea7b837b`
+- [x] **Extraction HAL année par année** — progression visible et reprise ciblée via `--year` après une coupure. `ba4e030f`
+- [x] **Débit docs/s par page + `HAL_PER_PAGE` à 200** — pour calibrer la taille de page (pages TEI lourdes) ; valeur à confirmer empiriquement au prochain import. `9782c30e`
 
 ## Liens
 

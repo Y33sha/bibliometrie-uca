@@ -1,5 +1,7 @@
 # Chantier — Embargo HAL : statut OA intermédiaire « sous embargo »
 
+Commencé le 2026-06-19 - Terminé le 2026-06-20
+
 Issu d'un item TODO_LAURA (« embargos HAL : ajouter l'extraction de `ref[@type='file']/date/@notBefore` ») et d'une investigation 2026-06-07 sur le comportement réel du statut OA pendant l'embargo.
 
 ## Contexte
@@ -61,17 +63,20 @@ Migration `b7e3f9a1c4d8`.
 - [x] Propagation au canonique acquise (`persist_corrections` pose déjà `keys_dirty` ⇒ ré-agrégation `best_oa_status` en phase `publications`)
 
 ### 6. Rattrapage du stock
-- [ ] Réimport HAL (`raw_hash=null`) pour repeupler `embargo_until` (nouvelle extraction au normalize) et repositionner le statut des documents concernés
+- [x] Réimport HAL (`raw_hash=null`) pour repeupler `embargo_until` (nouvelle extraction au normalize) et repositionner le statut des documents concernés. **Bloqué** : l'extraction HAL incrémentale ne re-fetch pas les documents connus, donc `raw_hash=null` est sans effet → cf. [CODE_hal-extract-mono-requete](CODE_hal-extract-mono-requete.md)
 
-### 7. API + UI
-- [ ] Exposer `oa_status='embargoed'` et la date dans l'API
-- [ ] Libellé `embargoed` dans `$lib/labels`
-- [ ] Rendu sablier + mention « embargo » (idéalement la date de levée), pastille `oa-embargoed`
-- [ ] Trancher le rangement dans la facette « accès » (cf. Questions ouvertes)
+### 7. API + UI — ✓
+- [x] `oa_status='embargoed'` exposé dans l'API (la date n'est **pas** exposée — décision : pas d'affichage de la date de levée)
+- [x] Libellé `Sous embargo` dans `oaLabelsMap` (`$lib/labels`)
+- [x] Badge sablier (`hourglass.svg`, comme les thèses « en cours ») + pastille `oa-embargoed` ambre ; pas de date affichée
+- [x] Facette « accès » : 3ᵉ catégorie « Sous embargo » entre ouvert et fermé (filtre `access=embargo` + comptage dédié)
+- [x] Garde Unpaywall : `embargoed` non rétrogradé vers `closed`/`unknown` (un statut plus ouvert écrase bien)
+- [x] Page stats : `embargoed` ajouté aux ventilations OA (résumé, graphe annuel, 3 tables éditeurs/revues/labos, légende), rangé par rang juste avant `closed` ; en-têtes/cellules OA mutualisées en snippets
+- [x] Dashboards `persons/[id]` et `laboratories/[id]` : bucket `embargoed` dans le donut OA — corrige aussi un bug (`open_access` comptait les publis embargoed)
 
-## Questions ouvertes
+## Questions ouvertes — tranchées
 
-- **`embargo_until` au niveau canonique ? (affichage seulement).** La promotion n'en a plus besoin (règle de correction au niveau SP + ré-agrégation). Reste l'UI : afficher « embargo jusqu'au X » exige soit `embargo_until` propagé sur `publications`, soit une jointure `publications → source_publications` HAL à la lecture.
-- **Facette « accès » open/closed.** `embargoed` va du côté fermé (cohérent : pas encore accessible) ou forme une 3ᵉ catégorie ? Idem pour les décomptes OA des dashboards.
-- **Autres sources d'embargo.** theses.fr n'expose rien (vérifié). Les autres sources (OpenAlex…) peuvent-elles signaler un embargo, ou est-ce strictement HAL pour l'instant ?
-- **Quel impact de l'API Unpaywall?** Ne pas écraser un statut *embargoed* par un statut *closed*. Si un statut plus ouvert est trouvé: écraser.
+- **`embargo_until` au niveau canonique ?** Non : la date n'apparaît pas en UI, donc rien à propager sur `publications`.
+- **Facette « accès » open/closed.** 3ᵉ catégorie intermédiaire « Sous embargo » (ni ouvert ni fermé), pas côté fermé.
+- **Autres sources d'embargo.** Non : strictement HAL pour l'instant (theses.fr n'expose rien).
+- **Impact API Unpaywall.** Garde ajoutée : Unpaywall ne rétrograde pas `embargoed` vers `closed`/`unknown` ; un statut plus ouvert (green+) écrase. Règle spécifique, calquée sur le garde `diamond` existant — la généralisation « liste no-lower (diamond, embargoed) » a été écartée car elle changerait le comportement actuel de `diamond` (audit de fiabilité séparé à prévoir).

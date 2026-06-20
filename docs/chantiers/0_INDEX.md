@@ -4,26 +4,27 @@
 
 ### En cours
 
-- [Embargo HAL : statut OA intermédiaire « sous embargo »](METIER_embargo-oa-status.md)
+- [DOI Registration Agencies & DataCite](METIER_doi-ra-datacite.md)
+- [Relations entre publications](METIER_relations-publications.md)
 
 ### En pause
 
 - [Observabilité du pipeline](CODE_observabilite-pipeline.md)
-- [DOI Registration Agencies & DataCite](METIER_doi-ra-datacite.md)
 - [Qualité et cohérence des sujets](METIER_sujets-qualite.md)
 - [Déduplication des publications sans identifiant fiable (arête pairwise-gated)](DATA_dedup-pairwise-gated.md)
 
 ### Non commencé
 
-- [Relations entre publications](METIER_relations-publications.md)
+
 
 ## Chantiers archivés
 
-- 2026-06-19 — [Types de documents : enum, mappings, règles suspects](archived/METIER_doc-types.md)
-- 2026-06-19 — [Matching cross-source des authorships](archived/DATA_authorships-cross-source-matching.md)
-- 2026-06-19 — [Adresses → pays : détection, suggestion et performances de la cascade](archived/DATA_addresses-countries.md)
-- 2026-06-16 — [Publications : retour à match_or_create, corrections a priori, fusion réparatrice](archived/DATA_publications-match-or-create.md)
-- 2026-06-14 — [Performance du pipeline (phase par phase)](archived/2026-06-13_CODE_perf-pipeline.md)
+- 2026-06-20 — [Embargo HAL : statut OA intermédiaire « sous embargo »](archived/2026-06-20_METIER_embargo-oa-status.md)
+- 2026-06-19 — [Types de documents : enum, mappings, règles suspects](archived/2026-06-19_METIER_doc-types.md)
+- 2026-06-19 — [Matching cross-source des authorships](archived/2026-06-19_DATA_authorships-cross-source-matching.md)
+- 2026-06-19 — [Adresses → pays : détection, suggestion et performances de la cascade](archived/2026-06-19_DATA_addresses-countries.md)
+- 2026-06-16 — [Publications : retour à match_or_create, corrections a priori, fusion réparatrice](archived/2026-06-16_DATA_publications-match-or-create.md)
+- 2026-06-14 — [Performance du pipeline (phase par phase)](archived/2026-06-14_CODE_perf-pipeline.md)
 - 2026-06-13 — [Performance des pages de listes (UI)](archived/2026-06-13_DATA_perf-pages-listes.md)
 - 2026-06-11 — [Publications : matching par création⇒fusion + modélisation des identifiants](archived/2026-06-11_DATA_publications-creation-fusion.md)
 - 2026-06-11 — [Fusions abusives de documents distincts par les sources](archived/2026-06-11_METIER_fusions-abusives-sources.md)
