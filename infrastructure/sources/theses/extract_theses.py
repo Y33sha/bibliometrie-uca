@@ -12,41 +12,16 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
     ThesesExtractConfig,
 )
 from infrastructure.sources.api_limits import THESES_DELAY, THESES_PER_PAGE
-from infrastructure.sources.common import compute_hash
+from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import get_extraction_api_ids
 from infrastructure.sources.http_retry import http_request_with_retry
-
-_UPDATE_THESES_SQL = text(
-    """
-    UPDATE staging s
-    SET last_seen_at = now(),
-        raw_data = CASE WHEN s.raw_hash IS DISTINCT FROM :raw_hash THEN :raw_data ELSE s.raw_data END,
-        doi      = CASE WHEN s.raw_hash IS DISTINCT FROM :raw_hash THEN :doi ELSE s.doi END,
-        processed = CASE WHEN s.raw_hash IS DISTINCT FROM :raw_hash THEN FALSE ELSE s.processed END,
-        raw_hash = :raw_hash
-    FROM (
-        SELECT raw_hash AS old_hash FROM staging WHERE source = 'theses' AND source_id = :source_id
-    ) old
-    WHERE s.source = 'theses' AND s.source_id = :source_id
-    RETURNING (old.old_hash IS DISTINCT FROM :raw_hash) AS changed
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
-
-_INSERT_THESES_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-    VALUES ('theses', :source_id, :doi, :raw_data, :raw_hash)
-    ON CONFLICT (source, source_id) DO NOTHING
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 class PgThesesExtractAdapter(ThesesExtractAdapter):
@@ -121,26 +96,19 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_these(
-        self, conn: Connection, these: dict[str, Any], *, is_new: bool
-    ) -> tuple[bool, bool, bool]:
-        """INSERT pour les nouvelles, UPDATE sinon.
+    def upsert_these(self, conn: Connection, these: dict[str, Any]) -> tuple[bool, bool, bool]:
+        """UPSERT staging via le helper canonique, ventilé `(new, updated, unchanged)`.
 
-        L'UPDATE bumpe toujours `last_seen_at` (la thèse a été re-vue) mais ne
-        réécrit `raw_data`/`doi`/`processed` que si le `raw_hash` a changé ; le
-        `RETURNING` compare l'ancien hash au nouveau pour distinguer `updated`
-        (contenu réécrit) d'`unchanged` (re-vu identique).
-
-        Retourne `(new, updated, unchanged)` — exactement un `True`.
+        Exactement un `True` : `updated` = contenu réécrit (hash changé),
+        `unchanged` = re-vu identique.
         """
-        raw_hash = compute_hash(these)
-        params = {
-            "source_id": self.extract_id(these),
-            "doi": self.extract_doi(these),
-            "raw_data": these,
-            "raw_hash": raw_hash,
-        }
-        if is_new:
-            return (bool(conn.execute(_INSERT_THESES_SQL, params).rowcount), False, False)
-        changed = bool(conn.execute(_UPDATE_THESES_SQL, params).one().changed)
+        inserted, changed = upsert_staging(
+            conn,
+            source="theses",
+            source_id=self.extract_id(these),
+            doi=self.extract_doi(these),
+            raw_data=these,
+        )
+        if inserted:
+            return (True, False, False)
         return (False, changed, not changed)

@@ -12,8 +12,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.openalex import (
@@ -21,7 +20,7 @@ from application.ports.pipeline.extract.openalex import (
     OpenalexExtractConfig,
 )
 from infrastructure.sources.api_limits import OPENALEX_DELAY, OPENALEX_PER_PAGE
-from infrastructure.sources.common import compute_hash
+from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
     get_extraction_api_ids,
     get_openalex_api_key,
@@ -31,32 +30,6 @@ from infrastructure.sources.config import (
 from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.openalex import SELECT_FIELDS, auth_params, init_auth
 from infrastructure.sources.openalex.parsing import extract_doi, extract_openalex_id
-
-_INSERT_OA_BATCH_SQL = text(
-    """
-    WITH old AS (
-        SELECT raw_hash AS old_hash FROM staging
-        WHERE source = 'openalex' AND source_id = :source_id
-    )
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-    VALUES ('openalex', :source_id, :doi, :raw_data, :raw_hash)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN EXCLUDED.raw_data
-            ELSE staging.raw_data
-        END,
-        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        processed = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN FALSE
-            ELSE staging.processed
-        END,
-        last_seen_at = now()
-    RETURNING (xmax = 0) AS inserted,
-              ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 def build_params(
@@ -152,48 +125,34 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
     # ── SQL ────────────────────────────────────────────────────
 
     def insert_batch(self, conn: Connection, works: list[dict[str, Any]]) -> BatchInsertCounts:
-        """UPSERT bulk d'un batch de works, ventilé new/updated via `xmax`.
+        """UPSERT bulk d'un batch de works, ventilé new/updated/unchanged.
 
-        `raw_hash` est l'unique clé de détection de changement, aligné sur
-        le pattern des autres sources. La préservation des authorships
-        complètes obtenues par `refetch_truncated` repose sur le fait que
-        **refetch ne recalcule pas `raw_hash`** : la ligne refetchée garde
-        le hash du payload bulk initial. Tant que le bulk renvoie ce même
-        payload, la comparaison `raw_hash` reste équivalente et l'UPSERT
-        ne touche pas `raw_data`.
+        La préservation des authorships complètes obtenues par `refetch_truncated`
+        repose sur le fait que **refetch ne recalcule pas `raw_hash`** : la ligne
+        refetchée garde le hash du payload bulk initial. Tant que le bulk renvoie ce
+        même payload, la comparaison `raw_hash` reste équivalente et l'UPSERT ne touche
+        pas `raw_data`.
 
         Le caller est responsable du `conn.commit()` après cette méthode.
 
-        Sémantique des compteurs : `new` = vraies insertions (`xmax = 0`),
-        `updated` = contenu réécrit (hash changé, via la CTE `old` qui lit
-        l'ancien hash avant l'UPSERT), `unchanged` = ON CONFLICT à hash
-        identique (seul `last_seen_at` bumpé).
+        Sémantique des compteurs : `new` = vraies insertions (`xmax = 0`), `updated` =
+        contenu réécrit (hash changé), `unchanged` = re-vu à hash identique (seul
+        `last_seen_at` bumpé).
         """
-        if not works:
-            return BatchInsertCounts(new=0, updated=0, unchanged=0)
-
-        batch = [
-            {
-                "source_id": extract_openalex_id(work),
-                "doi": extract_doi(work),
-                "raw_data": work,
-                "raw_hash": compute_hash(work),
-            }
-            for work in works
-        ]
-        # SQLAlchemy 2 + psycopg3 perdent `RETURNING` en executemany dès que
-        # le statement est un `INSERT ... ON CONFLICT DO UPDATE` (l'optimisation
-        # `insertmanyvalues` ne s'active pas pour les UPSERT, le fallback
-        # `cursor.executemany()` côté psycopg3 ne récupère pas les rows).
-        # Boucle row-par-row pour préserver `(xmax = 0)` et le flag `changed`.
         new_count = 0
         updated_count = 0
         unchanged_count = 0
-        for item in batch:
-            row = conn.execute(_INSERT_OA_BATCH_SQL, item).one()
-            if row.inserted:
+        for work in works:
+            inserted, changed = upsert_staging(
+                conn,
+                source="openalex",
+                source_id=extract_openalex_id(work),
+                doi=extract_doi(work),
+                raw_data=work,
+            )
+            if inserted:
                 new_count += 1
-            elif row.changed:
+            elif changed:
                 updated_count += 1
             else:
                 unchanged_count += 1

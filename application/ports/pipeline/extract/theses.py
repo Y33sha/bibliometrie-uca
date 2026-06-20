@@ -45,9 +45,7 @@ class ThesesExtractAdapter(Protocol):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_these(
-        self, conn: Connection, these: dict[str, Any], *, is_new: bool
-    ) -> tuple[bool, bool, bool]:
+    def upsert_these(self, conn: Connection, these: dict[str, Any]) -> tuple[bool, bool, bool]:
         """UPSERT staging d'une thèse.
 
         Retourne `(new, updated, unchanged)` — exactement un `True`.

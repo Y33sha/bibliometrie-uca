@@ -11,13 +11,12 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from domain.publications.identifiers import clean_doi
 from infrastructure.sources.api_limits import HAL_DELAY, hal_per_page_for
-from infrastructure.sources.common import compute_hash
+from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
     get_api_base_urls,
     get_hal_collections,
@@ -26,32 +25,6 @@ from infrastructure.sources.config import (
 )
 from infrastructure.sources.hal.fields import HAL_FIELDS
 from infrastructure.sources.http_retry import http_request_with_retry
-
-_UPSERT_HAL_SQL = text(
-    """
-    WITH old AS (
-        SELECT raw_hash AS old_hash FROM staging
-        WHERE source = 'hal' AND source_id = :hal_id
-    )
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-    VALUES ('hal', :hal_id, :doi, :raw_data, :raw_hash)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN EXCLUDED.raw_data
-            ELSE staging.raw_data
-        END,
-        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        processed = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN FALSE
-            ELSE staging.processed
-        END,
-        last_seen_at = now()
-    RETURNING (xmax = 0) AS inserted,
-              ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 def _build_url(base_url: str) -> str:
@@ -179,18 +152,5 @@ class PgHalExtractAdapter(HalExtractAdapter):
         doi: str | None,
         raw_data: dict[str, Any],
     ) -> tuple[bool, bool]:
-        """UPSERT staging : met à jour `raw_data` si le hash a changé. Retourne
-        `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`), `changed` =
-        contenu réécrit (hash distinct de l'ancien). Une row re-vue à hash identique →
-        `(False, False)`. Un `raw_hash=null` en base force le re-import
-        (`NULL IS DISTINCT FROM <hash>`)."""
-        row = conn.execute(
-            _UPSERT_HAL_SQL,
-            {
-                "hal_id": hal_id,
-                "doi": doi,
-                "raw_data": raw_data,
-                "raw_hash": compute_hash(raw_data),
-            },
-        ).one()
-        return (bool(row.inserted), bool(row.changed))
+        """UPSERT staging via le helper canonique. Retourne `(inserted, changed)`."""
+        return upsert_staging(conn, source="hal", source_id=hal_id, doi=doi, raw_data=raw_data)

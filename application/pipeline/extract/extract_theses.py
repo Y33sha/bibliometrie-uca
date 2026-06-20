@@ -69,11 +69,9 @@ def extract_ppn(
             if year is not None and not theses_id.startswith(str(year)):
                 continue
 
-            is_new = theses_id not in existing_ids
-            was_new, was_updated, was_unchanged = adapter.upsert_these(conn, these, is_new=is_new)
+            was_new, was_updated, was_unchanged = adapter.upsert_these(conn, these)
             if was_new:
                 inserted += 1
-                existing_ids.add(theses_id)
             elif was_updated:
                 updated += 1
             elif was_unchanged:

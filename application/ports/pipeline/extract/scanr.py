@@ -52,9 +52,7 @@ class ScanrExtractAdapter(Protocol):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_doc(
-        self, conn: Connection, doc: dict[str, Any], *, is_new: bool
-    ) -> tuple[bool, bool, bool]:
+    def upsert_doc(self, conn: Connection, doc: dict[str, Any]) -> tuple[bool, bool, bool]:
         """UPSERT staging d'un document ScanR.
 
         Retourne `(new, updated, unchanged)` — exactement un `True`.
