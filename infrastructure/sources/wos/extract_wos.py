@@ -12,41 +12,18 @@ import time
 from typing import Any
 
 import requests
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection
 
 from application.ports.pipeline.extract._common import BatchInsertCounts
 from application.ports.pipeline.extract.wos import WosExtractAdapter, WosExtractConfig
 from infrastructure.sources.api_limits import WOS_DELAY, WOS_PER_PAGE
-from infrastructure.sources.common import compute_hash
+from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
     get_extraction_api_ids,
     get_years,
 )
 from infrastructure.sources.http_retry import http_request_with_retry
 from infrastructure.sources.wos import parsing
-
-_INSERT_WOS_BATCH_SQL = text(
-    """
-    WITH old AS (
-        SELECT raw_hash AS old_hash FROM staging
-        WHERE source = 'wos' AND source_id = :source_id
-    )
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-    VALUES ('wos', :source_id, :doi, :raw_data, :raw_hash)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-            THEN EXCLUDED.raw_data ELSE staging.raw_data END,
-        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        processed = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-            THEN FALSE ELSE staging.processed END,
-        last_seen_at = now()
-    RETURNING (xmax = 0) AS inserted,
-              ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 class PgWosExtractAdapter(WosExtractAdapter):
@@ -161,30 +138,20 @@ class PgWosExtractAdapter(WosExtractAdapter):
 
         Le caller est responsable du `conn.commit()` après cette méthode.
         """
-        if not records:
-            return BatchInsertCounts(new=0, updated=0, unchanged=0)
-        batch = [
-            {
-                "source_id": parsing.extract_ut(rec),
-                "doi": parsing.extract_doi(rec),
-                "raw_data": rec,
-                "raw_hash": compute_hash(rec),
-            }
-            for rec in records
-        ]
-        # SQLAlchemy 2 + psycopg3 perdent `RETURNING` en executemany dès que
-        # le statement est un `INSERT ... ON CONFLICT DO UPDATE` (l'optimisation
-        # `insertmanyvalues` ne s'active pas pour les UPSERT, le fallback
-        # `cursor.executemany()` côté psycopg3 ne récupère pas les rows).
-        # Boucle row-par-row pour préserver `(xmax = 0)` et le flag `changed`.
         new_count = 0
         updated_count = 0
         unchanged_count = 0
-        for item in batch:
-            row = conn.execute(_INSERT_WOS_BATCH_SQL, item).one()
-            if row.inserted:
+        for rec in records:
+            inserted, changed = upsert_staging(
+                conn,
+                source="wos",
+                source_id=parsing.extract_ut(rec),
+                doi=parsing.extract_doi(rec),
+                raw_data=rec,
+            )
+            if inserted:
                 new_count += 1
-            elif row.changed:
+            elif changed:
                 updated_count += 1
             else:
                 unchanged_count += 1

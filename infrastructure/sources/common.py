@@ -4,8 +4,10 @@ Fonctions partagées par les scripts d'extraction (OpenAlex, HAL, WoS, ScanR).
 
 import hashlib
 import json
+from typing import Any
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
 
 from domain.publications.identifiers import (
     clean_doi,  # noqa: F401 — réexporté pour les scripts d'extraction
@@ -31,6 +33,65 @@ def canonical_json_bytes(raw_data: dict) -> bytes:
 def compute_hash(raw_data: dict) -> str:
     """Calcule le hash MD5 du JSON canonique (clés triées, compact)."""
     return hashlib.md5(canonical_json_bytes(raw_data)).hexdigest()
+
+
+_UPSERT_STAGING_SQL = text(
+    """
+    WITH old AS (
+        SELECT raw_hash AS old_hash FROM staging
+        WHERE source = :source AND source_id = :source_id
+    )
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
+    VALUES (:source, :source_id, :doi, :raw_data, :raw_hash)
+    ON CONFLICT (source, source_id) DO UPDATE SET
+        raw_data = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN EXCLUDED.raw_data
+            ELSE staging.raw_data
+        END,
+        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
+        processed = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN FALSE
+            ELSE staging.processed
+        END,
+        last_seen_at = now()
+    RETURNING (xmax = 0) AS inserted,
+              ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
+    """
+).bindparams(bindparam("raw_data", type_=JSONB))
+
+
+def upsert_staging(
+    conn: Connection,
+    *,
+    source: str,
+    source_id: str,
+    doi: str | None,
+    raw_data: dict[str, Any],
+) -> tuple[bool, bool]:
+    """UPSERT canonique d'une ligne `staging`, partagé par toutes les sources bulk.
+
+    `INSERT … ON CONFLICT (source, source_id) DO UPDATE` piloté par `raw_hash` :
+    réécrit `raw_data` (et repasse `processed=FALSE`) seulement si le hash a changé,
+    bumpe toujours `last_seen_at`. Un `raw_hash=null` en base force le re-import
+    (`NULL IS DISTINCT FROM <hash>`). Le hash est calculé ici via `compute_hash`.
+
+    Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`),
+    `changed` = contenu réécrit (hash distinct de l'ancien). Le commit est à la
+    charge de l'appelant.
+    """
+    row = conn.execute(
+        _UPSERT_STAGING_SQL,
+        {
+            "source": source,
+            "source_id": source_id,
+            "doi": doi,
+            "raw_data": raw_data,
+            "raw_hash": compute_hash(raw_data),
+        },
+    ).one()
+    return (bool(row.inserted), bool(row.changed))
 
 
 # Mapping `target source → RA attendue côté doi_prefixes`. Pour ces sources,

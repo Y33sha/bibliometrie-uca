@@ -59,11 +59,9 @@ def extract_year(
                 continue
 
             seen += 1
-            is_new = scanr_id not in existing_ids
-            was_new, was_updated, was_unchanged = adapter.upsert_doc(conn, doc, is_new=is_new)
+            was_new, was_updated, was_unchanged = adapter.upsert_doc(conn, doc)
             if was_new:
                 inserted += 1
-                existing_ids.add(scanr_id)
             elif was_updated:
                 updated += 1
             elif was_unchanged:

@@ -13,8 +13,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.scanr import (
     ScanrExtractAdapter,
@@ -22,36 +21,13 @@ from application.ports.pipeline.extract.scanr import (
 )
 from domain.publications.identifiers import clean_doi
 from infrastructure.sources.api_limits import SCANR_DELAY, SCANR_PER_PAGE
-from infrastructure.sources.common import compute_hash
+from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import (
     get_extraction_api_ids,
     get_scanr_credentials,
     get_years,
 )
 from infrastructure.sources.http_retry import http_request_with_retry
-
-_UPDATE_SCANR_SQL = text(
-    """
-    UPDATE staging s
-    SET last_seen_at = now(),
-        raw_data = CASE WHEN s.raw_hash IS DISTINCT FROM :raw_hash THEN :raw_data ELSE s.raw_data END,
-        doi      = CASE WHEN s.raw_hash IS DISTINCT FROM :raw_hash THEN :doi ELSE s.doi END,
-        raw_hash = :raw_hash
-    FROM (
-        SELECT raw_hash AS old_hash FROM staging WHERE source = 'scanr' AND source_id = :source_id
-    ) old
-    WHERE s.source = 'scanr' AND s.source_id = :source_id
-    RETURNING (old.old_hash IS DISTINCT FROM :raw_hash) AS changed
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
-
-_INSERT_SCANR_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-    VALUES ('scanr', :source_id, :doi, :raw_data, :raw_hash)
-    ON CONFLICT (source, source_id) DO NOTHING
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 class PgScanrExtractAdapter(ScanrExtractAdapter):
@@ -161,28 +137,21 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
 
     # ── SQL ────────────────────────────────────────────────────
 
-    def upsert_doc(
-        self, conn: Connection, doc: dict[str, Any], *, is_new: bool
-    ) -> tuple[bool, bool, bool]:
-        """INSERT pour les nouveaux, UPDATE sinon.
+    def upsert_doc(self, conn: Connection, doc: dict[str, Any]) -> tuple[bool, bool, bool]:
+        """UPSERT staging via le helper canonique, ventilé `(new, updated, unchanged)`.
 
-        L'UPDATE bumpe toujours `last_seen_at` (le doc a été re-vu) mais ne
-        réécrit `raw_data`/`doi` que si le `raw_hash` a changé ; le `RETURNING`
-        compare l'ancien hash au nouveau pour distinguer `updated` (contenu
-        réécrit) d'`unchanged` (re-vu identique).
-
-        Retourne `(new, updated, unchanged)` — exactement un `True`.
+        Exactement un `True` : `updated` = contenu réécrit (hash changé),
+        `unchanged` = re-vu identique.
         """
-        raw_hash = compute_hash(doc)
-        params = {
-            "source_id": self.extract_id(doc),
-            "doi": self.extract_doi(doc),
-            "raw_data": doc,
-            "raw_hash": raw_hash,
-        }
-        if is_new:
-            return (bool(conn.execute(_INSERT_SCANR_SQL, params).rowcount), False, False)
-        changed = bool(conn.execute(_UPDATE_SCANR_SQL, params).one().changed)
+        inserted, changed = upsert_staging(
+            conn,
+            source="scanr",
+            source_id=self.extract_id(doc),
+            doi=self.extract_doi(doc),
+            raw_data=doc,
+        )
+        if inserted:
+            return (True, False, False)
         return (False, changed, not changed)
 
 
