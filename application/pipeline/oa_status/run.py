@@ -2,8 +2,11 @@
 Phase pipeline `oa_status` — enrichit `publications.oa_status` via Unpaywall.
 
 Pour les publications ayant un DOI, interroge Unpaywall et met à jour
-le statut OA. Écrase les valeurs existantes, SAUF : ne remplace jamais
-'diamond' par 'gold' (Unpaywall ne connaît pas le diamond OA).
+le statut OA. Écrase les valeurs existantes, SAUF : (1) ne remplace jamais
+'diamond' par 'gold' (Unpaywall ne connaît pas le diamond OA) ; (2) ne
+rétrograde jamais 'embargoed' vers 'closed'/'unknown' (l'embargo est connu
+côté HAL, Unpaywall voit juste le fichier non encore accessible) — un statut
+plus ouvert (green+) écrase bien.
 
 Cette phase ne contient qu'un seul sub-step (Unpaywall). Elle s'appelait
 `enrich` avant 2026-05-26, rebaptisée après l'extraction de la phase
@@ -89,6 +92,9 @@ async def run_enrich_oa_status(
                 progress["not_found"] += 1
             elif (current_status == "diamond" and status == "gold") or status == current_status:
                 # diamond préservé (Unpaywall ne le connaît pas) ou statut inchangé.
+                progress["skipped"] += 1
+            elif current_status == "embargoed" and status in ("closed", "unknown"):
+                # embargo connu (HAL) : pas de rétrogradation vers closed/unknown.
                 progress["skipped"] += 1
             else:
                 new_status = status

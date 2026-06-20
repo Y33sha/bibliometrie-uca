@@ -187,6 +187,7 @@ class _PublicationFacetsBuilder:
             text(f"""
                 SELECT
                     COUNT(*) FILTER (WHERE p.oa_status::text IN {OA_OPEN_SQL}) AS open_count,
+                    COUNT(*) FILTER (WHERE p.oa_status::text = 'embargoed') AS embargo_count,
                     COUNT(*) FILTER (
                         WHERE p.oa_status::text IN {OA_CLOSED_SQL}
                            OR p.oa_status IS NULL
@@ -198,6 +199,7 @@ class _PublicationFacetsBuilder:
         ).one()
         return [
             {"value": "open", "text": "Ouvert", "count": r.open_count},
+            {"value": "embargo", "text": "Sous embargo", "count": r.embargo_count},
             {"value": "closed", "text": "Fermé", "count": r.closed_count},
         ]
 
