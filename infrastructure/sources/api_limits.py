@@ -10,7 +10,7 @@ quota dépassé) restent localement hardcodés dans chaque script.
 
 # Archives ouvertes HAL — API SolR (https://api.archives-ouvertes.fr/search/)
 HAL_DELAY = 0.5
-HAL_PER_PAGE = 500  # max autorisé = 10 000
+HAL_PER_PAGE = 200  # max autorisé = 10 000 ; 200 limite le poids des pages (TEI label_xml)
 
 # Overrides par collection : collections de physique des particules avec
 # méga-authorships (3000+ auteurs, collabs CERN/ATLAS/CMS, etc.) produisent

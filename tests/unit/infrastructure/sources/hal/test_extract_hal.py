@@ -72,8 +72,8 @@ class TestExtractDoi:
 
 class TestPerPageFor:
     def test_default_per_page(self, adapter):
-        assert adapter.per_page_for(None) == 500
-        assert adapter.per_page_for("UNKNOWN-COLL") == 500
+        assert adapter.per_page_for(None) == 200
+        assert adapter.per_page_for("UNKNOWN-COLL") == 200
 
     def test_override_for_megaauthorship_collection(self, adapter):
         # LPC-CLERMONT : physique des particules, payloads label_xml énormes → per_page réduit.
