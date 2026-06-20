@@ -24,7 +24,6 @@ from application.ports.pipeline.staging import StagingQueries
 def extract_year(
     adapter: OpenalexExtractAdapter,
     conn: Connection,
-    existing_ids: set[str],
     institution_ids: list[str],
     logger: logging.Logger,
     *,
@@ -63,11 +62,6 @@ def extract_year(
         results = data.get("results", [])
         if not results:
             break
-
-        # Maintenu pour cohérence avec les autres extracteurs : on entretient
-        # `existing_ids` pour que les phases suivantes y aient accès.
-        for work in results:
-            existing_ids.add(adapter.extract_id(work))
 
         counts = adapter.insert_batch(conn, list(results))
         conn.commit()
@@ -136,12 +130,7 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
         if args.since:
             self.logger.info(f"Mode incrémental : documents modifiés depuis {args.since}")
 
-    def extract_all(
-        self,
-        args: argparse.Namespace,
-        config: OpenalexExtractConfig,
-        existing_ids: set[str],
-    ) -> PhaseMetrics:
+    def extract_all(self, args: argparse.Namespace, config: OpenalexExtractConfig) -> PhaseMetrics:
         config_years = self._adapter.get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
         if not args.since:
@@ -152,7 +141,6 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
             year_new, year_updated, year_unchanged = extract_year(
                 self._adapter,
                 self.conn,
-                existing_ids,
                 config.institution_ids,
                 self.logger,
                 since=args.since,
@@ -170,7 +158,6 @@ class OpenalexExtractor(SourceExtractor[OpenalexExtractConfig]):
                 year_new, year_updated, year_unchanged = extract_year(
                     self._adapter,
                     self.conn,
-                    existing_ids,
                     config.institution_ids,
                     self.logger,
                     year=year,

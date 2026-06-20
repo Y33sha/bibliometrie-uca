@@ -1,7 +1,7 @@
 """Tests unitaires de `application.pipeline.extract.base.SourceExtractor`.
 
 Couvre :
-- Cycle `run_as_phase` : load_config → setup_logging → fetch_existing_source_ids (skippé en dry-run) → extract_all → log_summary.
+- Cycle `run_as_phase` : load_config → setup_logging → extract_all → log_summary.
 - Entry point CLI `run` : exit codes pour `ExtractionConfigError` (2), `requests.HTTPError` (1), `KeyboardInterrupt` (0), happy path. `conn.close()` toujours appelé.
 - `parse_args` : flag `--dry-run` + extension via `add_cli_args`.
 
@@ -52,10 +52,8 @@ class _FakeExtractor(SourceExtractor):
         self.load_config_calls += 1
         return self._config
 
-    def extract_all(self, args, config, existing_ids):  # type: ignore[no-untyped-def]
-        self.extract_all_calls.append(
-            {"args": args, "config": config, "existing_ids": existing_ids}
-        )
+    def extract_all(self, args, config):  # type: ignore[no-untyped-def]
+        self.extract_all_calls.append({"args": args, "config": config})
         if self._raise_in_extract:
             raise self._raise_in_extract
         return self._metrics
@@ -84,10 +82,8 @@ def conn():
 
 @pytest.fixture
 def staging():
-    """Mock `StagingQueries` port renvoyant un set stable."""
-    s = MagicMock()
-    s.fetch_existing_source_ids.return_value = {"id-A", "id-B"}
-    return s
+    """Mock `StagingQueries` port (injecté mais non consommé par l'extracteur)."""
+    return MagicMock()
 
 
 # ── run_as_phase ─────────────────────────────────────────────────
@@ -102,28 +98,14 @@ class TestRunAsPhase:
 
         assert ext.load_config_calls == 1
         assert ext.setup_logging_calls == 1
-        # fetch_existing_source_ids appelé hors dry-run.
-        staging.fetch_existing_source_ids.assert_called_once_with(conn, "fake")
-        # extract_all reçoit args, config, existing_ids.
+        # extract_all reçoit args, config.
         assert len(ext.extract_all_calls) == 1
         call = ext.extract_all_calls[0]
         assert call["args"] is args
         assert call["config"] == {"affiliations": ["UCA"]}
-        assert call["existing_ids"] == {"id-A", "id-B"}
         # log_summary reçoit les metrics retournés.
         assert ext.log_summary_calls == [metrics]
         assert metrics.new == 42
-
-    def test_dry_run_skips_existing_ids_lookup(self, conn, logger, staging):
-        ext = _FakeExtractor(conn, logger, staging)
-        args = argparse.Namespace(dry_run=True)
-
-        ext.run_as_phase(args)
-
-        # fetch_existing_source_ids NON appelé en dry-run.
-        staging.fetch_existing_source_ids.assert_not_called()
-        # extract_all reçoit un set vide.
-        assert ext.extract_all_calls[0]["existing_ids"] == set()
 
     def test_no_args_defaults_to_non_dry_run(self, conn, logger, staging):
         """`run_as_phase()` sans argument fabrique un Namespace(dry_run=False)."""
@@ -132,7 +114,6 @@ class TestRunAsPhase:
         ext.run_as_phase()
 
         assert ext.extract_all_calls[0]["args"].dry_run is False
-        staging.fetch_existing_source_ids.assert_called_once_with(conn, "fake")
 
 
 # ── run (CLI entry point) ─────────────────────────────────────────
@@ -243,7 +224,7 @@ class _MinimalExtractor(SourceExtractor):
     def load_config(self, conn):  # type: ignore[no-untyped-def]
         return {}
 
-    def extract_all(self, args, config, existing_ids):  # type: ignore[no-untyped-def]
+    def extract_all(self, args, config):  # type: ignore[no-untyped-def]
         return PhaseMetrics(new=3, total=3)
 
 

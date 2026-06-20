@@ -158,18 +158,8 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
             f"({config.n_collections} structures du périmètre + {config.n_extra} extra)"
         )
 
-    def extract_all(
-        self,
-        args: argparse.Namespace,
-        config: HalExtractConfig,
-        existing_ids: set[str],
-    ) -> PhaseMetrics:
-        """Extraction de l'union des collections en une passe `cursorMark`.
-
-        `existing_ids` (pré-chargé par le base class pour les sources à routage
-        `is_new`) n'est pas utilisé par HAL : l'upsert `ON CONFLICT` piloté par
-        `raw_hash` tranche seul new-vs-existing côté base.
-        """
+    def extract_all(self, args: argparse.Namespace, config: HalExtractConfig) -> PhaseMetrics:
+        """Extraction de l'union des collections en une passe `cursorMark`."""
         config_years = self._adapter.get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
 

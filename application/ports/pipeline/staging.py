@@ -40,11 +40,3 @@ class StagingQueries(Protocol):
     ) -> list[StagingRow]: ...
 
     def mark_done(self, conn: Connection, staging_id: int) -> None: ...
-
-    def fetch_existing_source_ids(self, conn: Connection, source: str) -> set[str]:
-        """Set des `source_id` déjà présents en staging pour une source.
-
-        Consommé par `SourceExtractor.run_as_phase` pour éviter de re-fetcher
-        depuis l'API des documents déjà connus.
-        """
-        ...

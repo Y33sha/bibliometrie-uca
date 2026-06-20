@@ -29,7 +29,6 @@ def extract_year(
     adapter: WosExtractAdapter,
     conn: Connection,
     year: int,
-    existing_uts: set[str],
     affiliations: list[str],
     logger: logging.Logger,
     *,
@@ -83,10 +82,6 @@ def extract_year(
         if records:
             counts = adapter.insert_batch(conn, records)
             conn.commit()
-            for rec in records:
-                ut = rec.get("UID")
-                if ut:
-                    existing_uts.add(ut)
             total_new += counts.new
             total_updated += counts.updated
             total_unchanged += counts.unchanged
@@ -159,12 +154,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
         if remaining:
             self.logger.info(f"Quota annuel restant : {remaining} records")
 
-    def extract_all(
-        self,
-        args: argparse.Namespace,
-        config: WosExtractConfig,
-        existing_ids: set[str],
-    ) -> PhaseMetrics:
+    def extract_all(self, args: argparse.Namespace, config: WosExtractConfig) -> PhaseMetrics:
         config_years = self._adapter.get_years(self.conn, mode=args.mode)
         years = [args.year] if args.year else config_years
         self.logger.info(f"Années : {years}")
@@ -181,7 +171,6 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
                     self._adapter,
                     self.conn,
                     year,
-                    existing_ids,
                     config.affiliations,
                     self.logger,
                     dry_run=args.dry_run,
