@@ -267,7 +267,7 @@
 	<thead>
 		<tr>
 			<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
-			<th style="width:100%">Adresse</th>
+			<th style="width:55%">Adresse</th>
 			<th style="width:50px">Publis</th>
 			<th>Pays</th>
 		</tr>
@@ -333,7 +333,7 @@
 	}
 	.sug-tag:hover { background: #ffecb3; }
 	.addr-table {
-		width: 100%; border-collapse: collapse;
+		width: 100%; border-collapse: collapse; table-layout: fixed;
 		background: var(--card); border: 1px solid var(--border); border-radius: 6px;
 	}
 	.addr-table thead th {
@@ -346,7 +346,7 @@
 	.addr-table td { padding: 6px 10px; font-size: 0.9rem; vertical-align: middle; }
 	.addr-cell { word-break: break-word; }
 	.num-cell { text-align: center; color: var(--muted); font-size: 0.85rem; }
-	.country-cell { display: flex; flex-wrap: nowrap; gap: 4px; align-items: center; white-space: nowrap; }
+	.country-cell { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 	.country-tag {
 		display: inline-flex; align-items: center; gap: 2px;
 		padding: 2px 6px; background: var(--success-light);
