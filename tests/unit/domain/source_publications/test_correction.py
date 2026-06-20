@@ -27,6 +27,7 @@ def _view(**overrides: object) -> SourcePublicationForCorrection:
         "oa_model": None,
         "apc_amount": None,
         "raw_metadata": {},
+        "embargo_expired": False,
     }
     defaults.update(overrides)
     return SourcePublicationForCorrection(**defaults)  # type: ignore[arg-type]
@@ -736,12 +737,34 @@ class TestDoiFigshareCollectionRule:
         assert corrected.rule == MetadataCorrectionRule.DOI_FIGSHARE_COLLECTION_TO_DATASET
 
 
+class TestEmbargoExpiredRule:
+    def test_expired_embargo_promoted_to_green(self):
+        view = _view(oa_status="embargoed", embargo_expired=True)
+        corrected = effective_metadata(view).oa_status
+        assert corrected is not None
+        assert corrected.value == "green"
+        assert corrected.rule == MetadataCorrectionRule.EMBARGO_EXPIRED_TO_GREEN
+
+    def test_active_embargo_not_promoted(self):
+        # Embargo encore en cours (non expiré) → reste `embargoed`.
+        assert (
+            effective_metadata(_view(oa_status="embargoed", embargo_expired=False)).oa_status
+            is None
+        )
+
+    def test_non_embargoed_status_untouched(self):
+        # Un statut non-`embargoed` n'est pas concerné, même si `embargo_expired` est vrai.
+        assert effective_metadata(_view(oa_status="green", embargo_expired=True)).oa_status is None
+        assert effective_metadata(_view(oa_status="closed", embargo_expired=True)).oa_status is None
+
+
 class TestEffectiveMetadataScope:
     def test_no_signals_no_correction(self):
         assert effective_metadata(_view()).is_empty()
 
     def test_only_doc_type_is_touched(self):
-        # Les règles actuelles ne touchent ni journal_id ni oa_status.
+        # journal_id n'a aucune règle ; oa_status n'a que la règle embargo, ici non déclenchée
+        # (gold non expiré). Seul doc_type pourrait être corrigé sur cette vue.
         view = _view(
             doc_type="article",
             urls=("https://theses.fr/s1",),

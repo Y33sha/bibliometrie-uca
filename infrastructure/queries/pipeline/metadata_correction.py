@@ -17,14 +17,17 @@ from application.ports.pipeline.metadata_correction import (
 from domain.source_publications.correction import SourcePublicationForCorrection
 
 # Projection partagée : SP + champs joints `journals` (règles journal-dépendantes)
-# + `raw_metadata` (reconstruction du brut). Le `WHERE` est ajouté par chaque variante.
+# + `raw_metadata` (reconstruction du brut) + `embargo_expired` (calculé ici, seule
+# donnée date-dépendante : la règle de promotion d'embargo lit ce booléen, pas la date,
+# pour garder `effective_metadata` pure). Le `WHERE` est ajouté par chaque variante.
 _SELECT = """
     SELECT sp.id, sp.source::text AS source, sp.source_id,
            sp.title, sp.pub_year, sp.doc_type, sp.doi,
            sp.journal_id, sp.oa_status, sp.container_title, sp.language,
            sp.urls, sp.external_ids,
            j.journal_type::text AS journal_type, j.oa_model, j.apc_amount,
-           sp.raw_metadata
+           sp.raw_metadata,
+           (sp.embargo_until IS NOT NULL AND sp.embargo_until <= current_date) AS embargo_expired
     FROM source_publications sp
     LEFT JOIN journals j ON j.id = sp.journal_id
 """

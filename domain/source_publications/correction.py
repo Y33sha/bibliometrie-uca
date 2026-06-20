@@ -57,6 +57,9 @@ class SourcePublicationForCorrection:
     oa_model: str | None
     apc_amount: Decimal | None
     raw_metadata: dict[str, JsonValue]
+    # Calculé au fetch (`embargo_until <= current_date`), pas une colonne : seule donnée
+    # date-dépendante de la vue, pour garder `effective_metadata` pure (elle lit un booléen).
+    embargo_expired: bool
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -81,6 +84,7 @@ class MetadataCorrectionRule(StrEnum):
     TITLE_ISBN_TO_BOOK_REVIEW = "TITLE_ISBN_TO_BOOK_REVIEW"
     TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW = "TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW"
     DOI_FIGSHARE_COLLECTION_TO_DATASET = "DOI_FIGSHARE_COLLECTION_TO_DATASET"
+    EMBARGO_EXPIRED_TO_GREEN = "EMBARGO_EXPIRED_TO_GREEN"
 
 
 class Correction[T](NamedTuple):
@@ -172,6 +176,8 @@ class _AppliesTo(TypedDict, total=False):
     - ``title_regex`` : `re.Pattern[str]` — `pattern.search(sp.title)` matche.
     - ``journal_id_present`` : `bool` — `(sp.journal_id is not None)` vaut la valeur attendue. Signal « la SP est rattachée à un journal » (donc un article, pas une thèse).
     - ``doi_prefix_not_in`` : `tuple[str, ...]` — la SP porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
+    - ``oa_status`` : `str` — équivalence sur `sp.oa_status` (le statut d'entrée, ex. `embargoed`).
+    - ``embargo_expired`` : `bool` — `sp.embargo_expired` (calculé au fetch : `embargo_until <= current_date`) vaut la valeur attendue.
 
     Ajouter un nouveau type de prédicat = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -184,6 +190,8 @@ class _AppliesTo(TypedDict, total=False):
     title_regex: re.Pattern[str]
     journal_id_present: bool
     doi_prefix_not_in: tuple[str, ...]
+    oa_status: str
+    embargo_expired: bool
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -347,6 +355,15 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": "book_review"},
     },
+    # Embargo HAL levé : un dépôt typé `embargoed` dont la date de fin est passée
+    # (`embargo_expired`, calculé au fetch) devient `green`. Promotion à l'échéance sans
+    # ré-import HAL — seule règle date-dépendante (la date vit dans le fetch, pas dans la
+    # fonction pure). Trace dans `raw_metadata.oa_status` ; corrige un champ orthogonal au
+    # `doc_type`, donc aucun chaînage avec les règles ci-dessus.
+    MetadataCorrectionRule.EMBARGO_EXPIRED_TO_GREEN: {
+        "applies_to": {"oa_status": "embargoed", "embargo_expired": True},
+        "applies_correction": {"oa_status": "green"},
+    },
 }
 
 
@@ -385,6 +402,11 @@ def _check_predicate(sp: SourcePublicationForCorrection, key: str, value: object
         if not sp.doi:
             return False
         return sp.doi.split("/", 1)[0] not in value
+    if key == "oa_status":
+        return sp.oa_status == value
+    if key == "embargo_expired":
+        assert isinstance(value, bool)
+        return sp.embargo_expired == value
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 
@@ -403,14 +425,21 @@ def _correct_field(sp: SourcePublicationForCorrection, field: str) -> Correction
     return None
 
 
+# TODO: corrections indépendantes par champ — pas de feed-forward d'un champ corrigé vers les
+# règles des champs suivants. Une vraie cascade (journal_id → doc_type → oa_status alimentés au
+# fil de l'eau) serait plus logique et pourrait changer le résultat quand des règles se croisent.
+# Hors scope tant qu'aucune règle ne dépend d'un autre champ déjà corrigé.
 def effective_metadata(sp: SourcePublicationForCorrection) -> CorrectedFields:
     """Applique la cascade de corrections sur les champs d'une `SourcePublicationForCorrection`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
 
     Fonction pure : aucune I/O, aucun effet de bord. Les données journal/publisher consommées par les règles arrivent par la vue (champs joints à la lecture), pas via des entités passées en paramètre — c'est ce qui permet à la fonction de servir aussi bien la dédup (sur la SP entrante) que le refresh (sur les sources d'une publication).
 
-    Cascade dans l'ordre des dépendances (`journal_id` → `doc_type` → `oa_status`) ; seul `doc_type` porte des règles à ce stade.
+    Cascade dans l'ordre des dépendances (`journal_id` → `doc_type` → `oa_status`). Chaque champ est corrigé **indépendamment** depuis la même vue d'entrée (pas de feed-forward d'un champ corrigé vers un autre) ; `doc_type` et `oa_status` (promotion d'embargo) portent des règles.
     """
-    return CorrectedFields(doc_type=_correct_field(sp, "doc_type"))
+    return CorrectedFields(
+        doc_type=_correct_field(sp, "doc_type"),
+        oa_status=_correct_field(sp, "oa_status"),
+    )
 
 
 # Préfixes d'identifiants HAL propres aux dissertations : TEL (thèses en ligne) et DUMAS

@@ -139,6 +139,7 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationR
         oa_model=None,
         apc_amount=None,
         raw_metadata={},
+        embargo_expired=False,
     )
     corrected = effective_metadata(view)
     if corrected.doc_type is not None and corrected.doc_type.value != pub.doc_type:

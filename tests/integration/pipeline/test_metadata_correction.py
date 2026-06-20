@@ -162,6 +162,48 @@ def test_thesis_with_journal_corrected_and_deconflated(sa_sync_conn):
     assert raw_nnt == "2020CLFAC001"
 
 
+def test_expired_embargo_promoted_to_green(sa_sync_conn):
+    conn = sa_sync_conn
+    # `embargo_expired` est calculé au fetch (`embargo_until <= current_date`) ; date de levée
+    # passée ⇒ la règle promeut `embargoed → green`. (Règle agnostique de la source.)
+    sp = conn.execute(
+        text(
+            "INSERT INTO source_publications "
+            "(source, source_id, title, doc_type, oa_status, embargo_until) "
+            "VALUES ('openalex', 'W-emb-past', 'T', 'article', 'embargoed', current_date - 1) "
+            "RETURNING id"
+        )
+    ).scalar_one()
+    assert _apply(conn) == 1
+    row = conn.execute(
+        text("SELECT oa_status::text AS oa, raw_metadata FROM source_publications WHERE id = :id"),
+        {"id": sp},
+    ).one()
+    assert row.oa == "green"
+    assert row.raw_metadata["oa_status"] == {
+        "raw": "embargoed",
+        "corrected_by": "EMBARGO_EXPIRED_TO_GREEN",
+    }
+
+
+def test_active_embargo_not_promoted(sa_sync_conn):
+    conn = sa_sync_conn
+    # Date de levée future ⇒ `embargo_expired` faux ⇒ pas de promotion.
+    sp = conn.execute(
+        text(
+            "INSERT INTO source_publications "
+            "(source, source_id, title, doc_type, oa_status, embargo_until) "
+            "VALUES ('openalex', 'W-emb-future', 'T', 'article', 'embargoed', current_date + 365) "
+            "RETURNING id"
+        )
+    ).scalar_one()
+    assert _apply(conn) == 0
+    oa = conn.execute(
+        text("SELECT oa_status::text FROM source_publications WHERE id = :id"), {"id": sp}
+    ).scalar_one()
+    assert oa == "embargoed"
+
+
 # ── Sous-étape cluster : ouvrage/chapitre au même DOI ──
 
 
