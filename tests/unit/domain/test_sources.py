@@ -33,7 +33,8 @@ class TestSourceCaseSql:
         sql = source_case_sql(SOURCE_PRIORITY)
         assert "WHEN 'theses' THEN 1" in sql
         assert "WHEN 'crossref' THEN 2" in sql
-        assert "WHEN 'wos' THEN 6" in sql
+        assert "WHEN 'datacite' THEN 3" in sql
+        assert "WHEN 'wos' THEN 7" in sql
 
 
 class TestDoiSearchableSources:
@@ -42,4 +43,11 @@ class TestDoiSearchableSources:
         assert "theses" not in DOI_SEARCHABLE_SOURCES
 
     def test_contains_all_doi_searchable(self):
-        assert set(DOI_SEARCHABLE_SOURCES) == {"hal", "openalex", "wos", "scanr", "crossref"}
+        assert set(DOI_SEARCHABLE_SOURCES) == {
+            "hal",
+            "openalex",
+            "wos",
+            "scanr",
+            "crossref",
+            "datacite",
+        }

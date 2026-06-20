@@ -64,7 +64,7 @@ if TYPE_CHECKING:
 
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
-from domain.sources.registry import ALL_SOURCES_SET
+from domain.sources.registry import ALL_SOURCES_SET, DOI_SEARCHABLE_SOURCES
 from infrastructure.observability.log import setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
 from infrastructure.pipeline_lock import PipelineAlreadyRunningError, acquire_pipeline_lock
@@ -186,7 +186,7 @@ def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> P
         set(sources) if sources else set(policy.fetch_missing_doi_sources)
     ) & policy.fetch_missing_doi_sources
 
-    doi_targets = [t for t in ("hal", "openalex", "wos", "scanr", "crossref") if t in effective]
+    doi_targets = [t for t in DOI_SEARCHABLE_SOURCES if t in effective]
     if doi_targets:
         # Cross-imports par DOI en parallèle (comme les extracteurs) : chaque
         # `_run_fetch_missing_doi` ouvre sa propre connexion, frappe une API
@@ -214,7 +214,7 @@ def phase_refresh_stale(sources: Any = None, **kw: Any) -> PhaseMetrics:
     Tourne à **chaque run** : le seuil `STALE_REFRESH_AFTER_DAYS` étale la
     charge (chaque passe ne ramasse que ce qui vient de franchir le délai).
 
-    Pour chaque source DOI-queryable (hal, openalex, wos, scanr, crossref),
+    Pour chaque source DOI-queryable (`DOI_SEARCHABLE_SOURCES`),
     refetch des DOI stale → trouvé : bump `last_seen_at` + refresh `raw_data` ;
     404 confirmé : `disappeared_at`. Puis marque disparues les rows stale
     **sans DOI** (non refetchables, mais re-moissonnées par le bulk → rester
@@ -228,9 +228,7 @@ def phase_refresh_stale(sources: Any = None, **kw: Any) -> PhaseMetrics:
     from infrastructure.sources.common import mark_undiscoverable_stale_disappeared
 
     metrics = PhaseMetrics()
-    targets = [
-        t for t in ("hal", "openalex", "wos", "scanr", "crossref") if not sources or t in sources
-    ]
+    targets = [t for t in DOI_SEARCHABLE_SOURCES if not sources or t in sources]
     for target in targets:
         metrics.merge(_run_refresh_stale_doi(target))
 
@@ -1515,6 +1513,7 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
         AsyncFetchMissingDoiAdapter,
     )
     from infrastructure.sources.crossref.fetch_missing_doi import CrossrefFetchMissingDoiAdapter
+    from infrastructure.sources.datacite.fetch_missing_doi import DataciteFetchMissingDoiAdapter
     from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
     from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
     from infrastructure.sources.scanr.fetch_missing_doi import ScanrFetchMissingDoiAdapter
@@ -1531,6 +1530,7 @@ def _make_fetch_missing_doi_adapter(target: str) -> "AsyncFetchMissingDoiAdapter
             "wos": WosFetchMissingDoiAdapter,
             "scanr": ScanrFetchMissingDoiAdapter,
             "crossref": CrossrefFetchMissingDoiAdapter,
+            "datacite": DataciteFetchMissingDoiAdapter,
         },
     )
     return adapter_classes[target]()
