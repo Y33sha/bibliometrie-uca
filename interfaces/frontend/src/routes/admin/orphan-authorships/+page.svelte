@@ -69,6 +69,7 @@
 		theses: 'Thèses',
 		scanr: 'ScanR',
 		crossref: 'CrossRef',
+		datacite: 'DataCite',
 	};
 
 	async function loadOrphans() {

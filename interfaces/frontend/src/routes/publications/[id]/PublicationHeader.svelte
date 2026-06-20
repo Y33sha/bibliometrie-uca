@@ -1,7 +1,8 @@
 <script lang="ts">
   import { base } from "$app/paths";
-  import { sanitizeTitle, halDocUrl, scanrPubUrl } from "$lib/utils";
+  import { sanitizeTitle } from "$lib/utils";
   import { docTypeSingular } from "$lib/labels";
+  import { sourceExternalUrl, sourceIcon, sourceLabel, SOURCE_ORDER } from "$lib/sources";
   import type { PubDetail, Source } from "./types";
 
   // `sources` peut contenir plusieurs rows pour une même source (ex: deux
@@ -16,15 +17,14 @@
     sources: Source[];
   } = $props();
 
-  const halSources = $derived(sources.filter((s) => s.source === "hal"));
-  const oaSources = $derived(sources.filter((s) => s.source === "openalex"));
-  const scanrSources = $derived(sources.filter((s) => s.source === "scanr"));
-  const wosSources = $derived(sources.filter((s) => s.source === "wos"));
-  const thesesSources = $derived(sources.filter((s) => s.source === "theses"));
-  const crossrefSources = $derived(sources.filter((s) => s.source === "crossref"));
-  // Collections HAL : on prend celles de la `source_publications` HAL la
-  // plus récente (la 1ère grâce au tri DESC côté API).
-  const halCollections = $derived(halSources[0]?.hal_collections ?? []);
+  // Liens sources regroupés par type (ordre stable), une entrée par row.
+  const orderedSources = $derived([
+    ...SOURCE_ORDER.flatMap((src) => sources.filter((s) => s.source === src)),
+    ...sources.filter((s) => !SOURCE_ORDER.includes(s.source)),
+  ]);
+  // Collections HAL : celles de la `source_publications` HAL la plus récente
+  // (la 1ère grâce au tri DESC côté API).
+  const halCollections = $derived(sources.find((s) => s.source === "hal")?.hal_collections ?? []);
 
   const langLabels: Record<string, string> = {
     en: "anglais",
@@ -89,39 +89,15 @@
   {/if}
 
   <div class="pub-sources">
-    {#each halSources as s}
-      <a href={halDocUrl(s.source_id, pub.oa_status)} target="_blank" rel="noopener" class="source-link source-hal-link">
-        <img src="{base}/icons/hal.ico" alt="" class="source-ico" />
-        HAL : {s.source_id}
-      </a>
-    {/each}
-    {#each oaSources as s}
-      <a href="https://openalex.org/{s.source_id}" target="_blank" rel="noopener" class="source-link source-openalex-link">
-        <img src="{base}/icons/openalex.png" alt="" class="source-ico" />
-        OpenAlex : {s.source_id}
-      </a>
-    {/each}
-    {#each scanrSources as s}
-      <a href={scanrPubUrl(s.source_id)} target="_blank" rel="noopener" class="source-link source-scanr-link">
-        <img src="{base}/scanr-icon.svg" alt="" class="source-ico" />
-        ScanR : {s.source_id}
-      </a>
-    {/each}
-    {#each wosSources as s}
-      <a href="https://www.webofscience.com/wos/woscc/full-record/{s.source_id}" target="_blank" rel="noopener" class="source-link source-wos-link">
-        WoS : {s.source_id}
-      </a>
-    {/each}
-    {#each thesesSources as s}
-      <a href="https://theses.fr/{s.source_id}" target="_blank" rel="noopener" class="source-link source-theses-link">
-        <img src="{base}/icons/theses.ico" alt="" class="source-ico" />
-        theses.fr : {s.source_id}
-      </a>
-    {/each}
-    {#each crossrefSources as s}
-      <a href="https://doi.org/{s.source_id}" target="_blank" rel="noopener" class="source-link source-crossref-link">
-        <img src="{base}/icons/crossref.ico" alt="" class="source-ico" />
-        CrossRef : {s.source_id}
+    {#each orderedSources as s}
+      <a
+        href={sourceExternalUrl(s.source, s.source_id, pub.oa_status)}
+        target="_blank"
+        rel="noopener"
+        class="source-link source-{s.source}-link"
+      >
+        {#if sourceIcon(s.source)}<img src={sourceIcon(s.source)} alt="" class="source-ico" />{/if}
+        {sourceLabel(s.source)} : {s.source_id}
       </a>
     {/each}
   </div>
@@ -285,6 +261,13 @@
   }
   .source-crossref-link:hover {
     background: #d2eaed;
+  }
+  .source-datacite-link {
+    background: #e3f4ef;
+    color: #0f766e;
+  }
+  .source-datacite-link:hover {
+    background: #d2ebe3;
   }
   .source-ico {
     width: 14px;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import Modal from "$lib/components/Modal.svelte";
   import { sanitizeTitle } from "$lib/utils";
-  import { sourceLabels } from "$lib/labels";
+  import { sourceLabel } from "$lib/sources";
   import type { DetachModalState } from "./types";
 
   let {
@@ -56,7 +56,7 @@
               <span class="detach-title">{@html sanitizeTitle(p.title)}</span>
               <span class="detach-sources">
                 {#each p.sources as s}
-                  <span class="tag tag-source">{sourceLabels[s.source] ?? s.source}</span>
+                  <span class="tag tag-source">{sourceLabel(s.source)}</span>
                 {/each}
               </span>
             </label>
