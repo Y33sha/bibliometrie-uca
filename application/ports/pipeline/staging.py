@@ -12,7 +12,7 @@ from sqlalchemy import Connection
 
 @dataclass(frozen=True)
 class StagingRow:
-    """Projection commune de `staging` (4 colonnes) consommée par les normalizers wos, openalex, scanr, crossref, theses."""
+    """Projection commune de `staging` (4 colonnes) consommée par tous les normalizers."""
 
     id: int
     source_id: str
@@ -20,21 +20,8 @@ class StagingRow:
     raw_data: dict[str, Any]
 
 
-@dataclass(frozen=True)
-class HalStagingRow(StagingRow):
-    """`StagingRow` + la colonne `hal_collections` (TEXT[]) propre à HAL.
-
-    Par substitution LSP : un `HalStagingRow` remplit le contrat de `StagingRow`. Le port retourne `list[StagingRow]` uniformément ; le normalizer HAL fait `isinstance(row, HalStagingRow)` pour accéder à `.hal_collections`.
-    """
-
-    hal_collections: list[str] | None
-
-
 class StagingQueries(Protocol):
-    """Opérations SQL sur la table `staging`.
-
-    `fetch_pending_staging` / `fetch_staging_by_ids` retournent `list[StagingRow]` ; pour `source == 'hal'`, l'implémentation construit des `HalStagingRow` (sous-type de `StagingRow`) qui exposent en plus `.hal_collections`.
-    """
+    """Opérations SQL sur la table `staging`."""
 
     def reset_processed_flag(self, conn: Connection, source: str) -> int: ...
 

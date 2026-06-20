@@ -90,17 +90,3 @@ class TestBuildCollectionsFq:
         assert adapter.build_collections_fq(["LIMOS", "CHU-CLERMONTFERRAND"]) == (
             'collCode_s:("LIMOS" OR "CHU-CLERMONTFERRAND")'
         )
-
-
-class TestConfiguredCollections:
-    def test_keeps_only_configured_preserving_record_order(self, adapter):
-        doc = {"collCode_s": ["PRES_CLERMONT", "HORS-PERIMETRE", "LIMOS"]}
-        configured = {"LIMOS", "PRES_CLERMONT"}
-        assert adapter.configured_collections(doc, configured) == ["PRES_CLERMONT", "LIMOS"]
-
-    def test_empty_when_no_collcode(self, adapter):
-        assert adapter.configured_collections({}, {"LIMOS"}) == []
-
-    def test_empty_when_no_intersection(self, adapter):
-        doc = {"collCode_s": ["OTHER"]}
-        assert adapter.configured_collections(doc, {"LIMOS"}) == []

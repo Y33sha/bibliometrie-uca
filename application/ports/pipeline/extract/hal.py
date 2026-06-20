@@ -49,10 +49,6 @@ class HalExtractAdapter(Protocol):
         """Filtre Solr `collCode_s:(…)` couvrant l'union des collections configurées."""
         ...
 
-    def configured_collections(self, doc: dict[str, Any], configured: set[str]) -> list[str]:
-        """Collections du périmètre du record : `collCode_s` ∩ collections configurées."""
-        ...
-
     def extract_id(self, doc: dict[str, Any]) -> str: ...
 
     def extract_doi(self, doc: dict[str, Any]) -> str | None: ...
@@ -72,7 +68,6 @@ class HalExtractAdapter(Protocol):
         hal_id: str,
         doi: str | None,
         raw_data: dict[str, Any],
-        hal_collections: list[str],
     ) -> tuple[bool, bool]:
         """UPSERT staging. Retourne `(inserted, changed)` : insertion réelle
         (`xmax = 0`) et contenu réécrit (hash distinct de l'ancien)."""

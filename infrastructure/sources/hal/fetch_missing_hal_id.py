@@ -36,8 +36,8 @@ HAL_MAX_CONCURRENT = 5
 
 _UPSERT_HAL_SQL = text(
     """
-    INSERT INTO staging (source, source_id, doi, raw_data, hal_collections, processed, raw_hash)
-    VALUES ('hal', :source_id, :doi, :raw_data, :hal_collections, FALSE, :raw_hash)
+    INSERT INTO staging (source, source_id, doi, raw_data, processed, raw_hash)
+    VALUES ('hal', :source_id, :doi, :raw_data, FALSE, :raw_hash)
     ON CONFLICT (source, source_id) DO UPDATE SET
         raw_data = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
@@ -45,11 +45,6 @@ _UPSERT_HAL_SQL = text(
             ELSE staging.raw_data
         END,
         raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        hal_collections = CASE
-            WHEN staging.hal_collections IS NULL THEN EXCLUDED.hal_collections
-            WHEN EXCLUDED.hal_collections IS NULL THEN staging.hal_collections
-            ELSE (SELECT array_agg(DISTINCT c) FROM unnest(staging.hal_collections || EXCLUDED.hal_collections) AS c)
-        END,
         processed = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                 THEN FALSE
@@ -226,21 +221,17 @@ def find_nnt_without_hal(conn: Connection) -> list[dict[str, Any]]:
 
 
 def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict[str, Any]) -> None:
-    """Insère un document dans staging HAL avec ses collections.
+    """Insère un document dans staging HAL.
 
     Si le document existe et a changé (hash différent), met à jour et
     remet `processed = FALSE`.
     """
-    coll_codes = doc.get("collCode_s") or []
-    hal_collections = coll_codes if isinstance(coll_codes, list) and coll_codes else None
-
     conn.execute(
         _UPSERT_HAL_SQL,
         {
             "source_id": hal_id,
             "doi": doi,
             "raw_data": doc,
-            "hal_collections": hal_collections,
             "raw_hash": compute_hash(doc),
         },
     )

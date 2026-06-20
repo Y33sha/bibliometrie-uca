@@ -1048,7 +1048,6 @@ staging = Table(
     Column("last_seen_at", DateTime(timezone=True), server_default=func.now()),
     Column("not_found_at", DateTime(timezone=True)),
     Column("disappeared_at", DateTime(timezone=True)),
-    Column("hal_collections", ARRAY(Text)),
     UniqueConstraint("source", "source_id", name="staging_source_source_id_key"),
     CheckConstraint(
         "not_found_at IS NULL OR processed",

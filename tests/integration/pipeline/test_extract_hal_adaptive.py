@@ -2,10 +2,9 @@
 
 Stratégie : un fake `HalExtractAdapter` (MagicMock) injecté à `extract_union`,
 qui sert des pages `cursorMark` scriptées. On vérifie la pagination (boucle
-jusqu'à stabilisation du marqueur), le routage new/updated/unchanged issu du
-`(inserted, changed)` de l'upsert, et la dérivation des `hal_collections` du
-périmètre. La plomberie HTTP/SQL réelle est couverte ailleurs (helper retry +
-tests adapter dédiés).
+jusqu'à stabilisation du marqueur) et le routage new/updated/unchanged issu du
+`(inserted, changed)` de l'upsert. La plomberie HTTP/SQL réelle est couverte
+ailleurs (helper retry + tests adapter dédiés).
 
 Le rate-limit est interne à l'adapter (`PgHalExtractAdapter._get`) : l'orchestrateur
 n'appelle plus `time.sleep`, et les fakes MagicMock ne dorment pas.
@@ -44,8 +43,8 @@ def _adapter(pages: list[dict]) -> MagicMock:
     """MagicMock du port servant `pages` successivement à chaque `fetch_page_cursor`.
 
     Les méthodes pures (`build_query`, `build_collections_fq`, `extract_id`,
-    `extract_doi`, `configured_collections`) gardent un comportement réaliste ;
-    `upsert_work` renvoie `(inserted, changed)` selon le champ `_route` du doc.
+    `extract_doi`) gardent un comportement réaliste ; `upsert_work` renvoie
+    `(inserted, changed)` selon le champ `_route` du doc.
     """
     a = MagicMock()
     a.build_query.return_value = "q"
@@ -53,17 +52,12 @@ def _adapter(pages: list[dict]) -> MagicMock:
     a.fetch_page_cursor.side_effect = pages
     a.extract_id.side_effect = lambda doc: doc.get("halId_s", "")
     a.extract_doi.side_effect = lambda doc: doc.get("doiId_s")
-    a.configured_collections.side_effect = lambda doc, configured: [
-        c for c in (doc.get("collCode_s") or []) if c in configured
-    ]
-    a.upsert_work.side_effect = lambda conn, hal_id, doi, raw, colls: raw.get(
-        "_route", (True, False)
-    )
+    a.upsert_work.side_effect = lambda conn, hal_id, doi, raw: raw.get("_route", (True, False))
     return a
 
 
-def _doc(hal_id: str, *, collections: list[str] | None = None, route=(True, False)) -> dict:
-    return {"halId_s": hal_id, "collCode_s": collections or [], "_route": route}
+def _doc(hal_id: str, *, route=(True, False)) -> dict:
+    return {"halId_s": hal_id, "_route": route}
 
 
 class TestCursorPagination:
@@ -138,26 +132,6 @@ class TestRouting:
         assert metrics.total == 1
         # Le doc sans halId n'est pas upserté.
         assert adapter.upsert_work.call_count == 1
-
-
-class TestCollectionsDerivation:
-    def test_hal_collections_intersect_configured(self):
-        """`hal_collections` passées à l'upsert = `collCode_s` ∩ collections configurées."""
-        pages = [
-            _page(
-                [_doc("hal-1", collections=["LIMOS", "PRES_CLERMONT", "HORS-PERIMETRE"])],
-                next_cursor="c1",
-            ),
-            _page([], next_cursor="c1"),
-        ]
-        adapter = _adapter(pages)
-        config = _config({"LIMOS": "Limos", "PRES_CLERMONT": "Umbrella"})
-
-        extract_union(adapter, config, MagicMock(), _LOGGER, years=[2025])
-
-        # 4e argument positionnel d'upsert_work = hal_collections.
-        passed = adapter.upsert_work.call_args.args[4]
-        assert passed == ["LIMOS", "PRES_CLERMONT"]
 
 
 class TestDryRun:

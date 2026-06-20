@@ -38,7 +38,7 @@ from application.pipeline.normalize._authorships_batch import (
 from application.pipeline.normalize.base import SourceNormalizer
 from application.ports.pipeline.normalize.authorships import AuthorshipsBatchQueries
 from application.ports.pipeline.normalize.hal import HalNormalizeQueries
-from application.ports.pipeline.staging import HalStagingRow, StagingQueries, StagingRow
+from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
@@ -191,7 +191,6 @@ def insert_hal_document(
     doc: dict,
     staging_id: int,
     hal_id: str,
-    hal_collections_staging: list | None,
     publication_id: int | None,
     pub_meta: dict,
 ) -> int:
@@ -203,15 +202,11 @@ def insert_hal_document(
     ne sert ici que pour les extras HAL-spécifiques (collections, abstract,
     keywords, domaines, biblio, urls).
     """
-    # Collections : depuis le staging (text[]) + collCode_s du raw_data
-    collections = set()
-    if hal_collections_staging:
-        collections.update(hal_collections_staging)
+    # Collections : `collCode_s` du raw_data (liste complète des collections du record).
     coll_codes = doc.get("collCode_s") or []
-    if isinstance(coll_codes, list):
-        collections.update(coll_codes)
-
-    collections_array = sorted(collections) if collections else None
+    collections_array = (
+        sorted(set(coll_codes)) if isinstance(coll_codes, list) and coll_codes else None
+    )
 
     external_ids = build_hal_external_ids(doc, hal_id, pub_meta["nnt"])
 
@@ -585,7 +580,7 @@ def process_work(
     conn: Connection,
     queries: HalNormalizeQueries,
     logger: logging.Logger,
-    staging_row: HalStagingRow,
+    staging_row: StagingRow,
     *,
     journal_repo: JournalRepository,
     publisher_repo: PublisherRepository,
@@ -599,7 +594,6 @@ def process_work(
     staging_id = staging_row.id
     hal_id = staging_row.source_id
     raw_data = staging_row.raw_data
-    hal_collections_staging = staging_row.hal_collections
     doc = raw_data
 
     try:
@@ -634,7 +628,6 @@ def process_work(
             doc,
             staging_id,
             hal_id,
-            hal_collections_staging,
             None,
             pub_meta,
         )
@@ -685,10 +678,6 @@ class HalNormalizer(SourceNormalizer):
         self._pub_repo = self._pub_repo_factory(conn)
 
     def process_work(self, conn: Connection, row: StagingRow) -> bool | None:
-        # `StagingQueries` retourne des `HalStagingRow` pour source='hal' (LSP).
-        assert isinstance(row, HalStagingRow), (
-            "HalNormalizer attend des HalStagingRow (port mal configuré ?)"
-        )
         assert self._journal_repo is not None, "preload_caches doit être appelé avant"
         assert self._publisher_repo is not None, "preload_caches doit être appelé avant"
         assert self._pub_repo is not None, "preload_caches doit être appelé avant"
