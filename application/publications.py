@@ -145,7 +145,8 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationR
     if corrected.doc_type is not None and corrected.doc_type.value != pub.doc_type:
         pub.doc_type = corrected.doc_type.value
         meta = dict(pub.meta or {})
-        corrections = dict(meta.get("corrections") or {})
+        existing_corrections = meta.get("corrections")
+        corrections = dict(existing_corrections) if isinstance(existing_corrections, dict) else {}
         corrections["doc_type"] = corrected.doc_type.rule.value
         meta["corrections"] = corrections
         pub.meta = meta
