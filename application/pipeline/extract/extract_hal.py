@@ -24,8 +24,10 @@ from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.extract.hal import HalExtractAdapter, HalExtractConfig
 from application.ports.pipeline.staging import StagingQueries
 
-# Cadence des logs de progression (toutes les N pages cursorMark).
-_PROGRESS_EVERY_PAGES = 20
+# Cadence des logs de progression (toutes les N pages cursorMark). Une page = 500
+# documents au payload lourd (HAL_FIELDS inclut le TEI `label_xml`) : 5 pages
+# ≈ 2 500 docs donnent un signe de vie régulier sans noyer les logs.
+_PROGRESS_EVERY_PAGES = 5
 
 
 def extract_union(
@@ -64,6 +66,7 @@ def extract_union(
         logger.info(f"  Union des {len(codes)} collections : {total} docs (dry-run)")
         return metrics
 
+    logger.info(f"  Union des {len(codes)} collections : pagination cursorMark (pages de 500)…")
     cursor = "*"
     page = 0
     while True:
