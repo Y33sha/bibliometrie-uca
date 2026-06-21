@@ -87,8 +87,11 @@ La détection vraiment **heuristique** (rapprochement par titre pour les orpheli
 
 ### Phase 4 — Exploitations en aval
 
+Le retypage à partir des relations **déclarées (signal #1)** se fait en règle de `metadata_correction` au niveau SP, **pas** en lecture de `publication_relations` : la relation déclarée vit dans `meta` (disponible en amont) et est indépendante du `doc_type`, donc acyclique — alors que le signal #2 *dérive* le type du `doc_type` et ne doit jamais le rétro-alimenter. Le retypage durcit le `doc_type` avec un fait source-autoritaire ; comme Crossref/DataCite sont prioritaires sur le type, la correction gagne l'arbitrage canonique.
+
+- [x] Retypage preprint : une SP déclarant `is-preprint-of` (Crossref `meta.relation`) *est* un preprint → règle `PREPRINT_RELATION_TO_PREPRINT` dans `metadata_correction` (prédicat `declares_preprint` calculé au fetch). Corrige le cas fréquent où Crossref ne type pas le record (`doc_type` nul) et où l'arbitrage prenait `article` d'OpenAlex.
+- [ ] Retypage des data papers : une SP déclarant `describes` → dataset est un data paper (peu sont typés aujourd'hui) → même mécanisme (règle `metadata_correction` sur la relation déclarée, pas lecture de `publication_relations`).
 - [ ] Audit des orphelins : remonter les publications de type dépendant (erratum, rétractation, preprint) sans relation naturelle trouvée.
-- [ ] Retypage des data papers : un article porteur d'une relation `describes` → dataset est un data paper (peu sont typés aujourd'hui) → correction de `doc_type`. À séquencer après la population des relations (lecture de `publication_relations`).
 - [ ] Audit des relations multiples : une paire de publications liées par plusieurs relations distinctes est en principe anormale (une seule relation par paire) — la PK à 3 colonnes les autorise, les remonter comme signal d'erreur.
 
 ### Phase 5 (ultérieure) — détection heuristique

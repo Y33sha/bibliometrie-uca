@@ -28,6 +28,7 @@ def _view(**overrides: object) -> SourcePublicationForCorrection:
         "apc_amount": None,
         "raw_metadata": {},
         "embargo_expired": False,
+        "declares_preprint": False,
     }
     defaults.update(overrides)
     return SourcePublicationForCorrection(**defaults)  # type: ignore[arg-type]
@@ -756,6 +757,25 @@ class TestEmbargoExpiredRule:
         # Un statut non-`embargoed` n'est pas concerné, même si `embargo_expired` est vrai.
         assert effective_metadata(_view(oa_status="green", embargo_expired=True)).oa_status is None
         assert effective_metadata(_view(oa_status="closed", embargo_expired=True)).oa_status is None
+
+
+class TestPreprintRelationRule:
+    def test_declared_preprint_retyped_even_without_doc_type(self):
+        # Crossref n'a pas typé le record (doc_type nul) mais déclare is-preprint-of.
+        corrected = effective_metadata(_view(doc_type=None, declares_preprint=True)).doc_type
+        assert corrected is not None
+        assert corrected.value == "preprint"
+        assert corrected.rule == MetadataCorrectionRule.PREPRINT_RELATION_TO_PREPRINT
+
+    def test_declared_preprint_overrides_article(self):
+        corrected = effective_metadata(_view(doc_type="article", declares_preprint=True)).doc_type
+        assert corrected is not None
+        assert corrected.value == "preprint"
+
+    def test_no_declaration_no_retyping(self):
+        assert (
+            effective_metadata(_view(doc_type="article", declares_preprint=False)).doc_type is None
+        )
 
 
 class TestEffectiveMetadataScope:

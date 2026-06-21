@@ -16,9 +16,10 @@ from application.ports.pipeline.metadata_correction import (
 from domain.source_publications.correction import SourcePublicationForCorrection
 
 # Projection partagée : SP + champs joints `journals` (règles journal-dépendantes)
-# + `raw_metadata` (reconstruction du brut) + `embargo_expired` (calculé ici, seule
-# donnée date-dépendante : la règle de promotion d'embargo lit ce booléen, pas la date,
-# pour garder `effective_metadata` pure). Le `WHERE` est ajouté par chaque variante.
+# + `raw_metadata` (reconstruction du brut) + deux booléens calculés ici pour garder
+# `effective_metadata` pure : `embargo_expired` (date-dépendant ; la règle d'embargo lit le
+# booléen, pas la date) et `declares_preprint` (la SP déclare `is-preprint-of`, sans lire `meta`
+# dans le domaine). Le `WHERE` est ajouté par chaque variante.
 _SELECT = """
     SELECT sp.id, sp.source::text AS source, sp.source_id,
            sp.title, sp.pub_year, sp.doc_type, sp.doi,
@@ -26,7 +27,8 @@ _SELECT = """
            sp.urls, sp.external_ids,
            j.journal_type::text AS journal_type, j.oa_model, j.apc_amount,
            sp.raw_metadata,
-           (sp.embargo_until IS NOT NULL AND sp.embargo_until <= current_date) AS embargo_expired
+           (sp.embargo_until IS NOT NULL AND sp.embargo_until <= current_date) AS embargo_expired,
+           COALESCE(jsonb_exists(sp.meta->'relation', 'is-preprint-of'), false) AS declares_preprint
     FROM source_publications sp
     LEFT JOIN journals j ON j.id = sp.journal_id
 """
