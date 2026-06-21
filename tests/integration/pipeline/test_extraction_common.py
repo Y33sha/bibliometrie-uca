@@ -183,6 +183,21 @@ class TestGetCrossImportDois:
         assert "10.1234/primary" in result
         assert "10.9999/preprint" in result
 
+    def test_includes_relation_targets(self, db):
+        """Les cibles des relations entre publications (`publication_relations.target_doi`)
+        entrent dans le pool, pour rapatrier les œuvres liées absentes."""
+        db.execute(
+            "INSERT INTO publications (id, title, pub_year) VALUES (%s, %s, %s)",
+            (1, "Parent", 2020),
+        )
+        db.execute(
+            "INSERT INTO publication_relations "
+            "(from_publication_id, relation_type, target_doi, source) VALUES (%s, %s, %s, %s)",
+            (1, "is_preprint_of", "10.9999/related", "crossref"),
+        )
+        result = get_cross_import_dois(db.connection, "hal")
+        assert "10.9999/related" in result
+
     def test_hal_target_no_prefix_filter(self, db):
         """target='hal' : aucun filtre par RA, tous les DOIs candidats remontent."""
         db.execute(
