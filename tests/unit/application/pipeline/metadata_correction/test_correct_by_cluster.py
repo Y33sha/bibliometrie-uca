@@ -1,4 +1,4 @@
-"""Tests purs : corrections de DOI par cluster (version→concept, ouvrage/chapitre,
+"""Tests purs : corrections de DOI par cluster (convergence même-œuvre, ouvrage/chapitre,
 chapitre/chapitre) + `compute_updates`."""
 
 from application.pipeline.metadata_correction.correct_by_cluster import compute_updates
@@ -12,30 +12,63 @@ from domain.source_publications.correction import (
 
 
 def _row(
-    id, doc_type, doi, title="t", raw_metadata=None, raw_doi="10.1/x", concept_doi=None
+    id,
+    doc_type,
+    doi,
+    title="t",
+    raw_metadata=None,
+    raw_doi="10.1/x",
+    canonical_doi=None,
+    same_work_case=None,
 ) -> DoiClusterRow:
-    return DoiClusterRow(id, doc_type, doi, title, raw_metadata or {}, raw_doi, concept_doi)
+    return DoiClusterRow(
+        id, doc_type, doi, title, raw_metadata or {}, raw_doi, canonical_doi, same_work_case
+    )
 
 
-def _m(id, doc_type, title="t", concept_doi=None) -> DoiClusterMember:
-    return DoiClusterMember(id, doc_type, title, concept_doi)
+def _m(id, doc_type, title="t", canonical_doi=None, same_work_case=None) -> DoiClusterMember:
+    return DoiClusterMember(id, doc_type, title, canonical_doi, same_work_case)
 
 
-# ── domaine pur : version → concept (convergence) ────────────────────────
+# ── domaine pur : convergence même-œuvre ─────────────────────────────────
 
 
-def test_version_group_all_converge_on_concept():
-    # Un membre (datacite) porte le concept ; tous les membres du groupe convergent dessus.
-    group = [_m(1, "dataset", concept_doi="10.5281/zenodo.1"), _m(2, "dataset")]
+def test_same_work_all_converge_on_canonical():
+    # Un membre (datacite) porte le DOI canonique + son cas ; tous convergent dessus.
+    group = [
+        _m(
+            1,
+            "dataset",
+            canonical_doi="10.5281/zenodo.1",
+            same_work_case="DATACITE_VERSION_TO_CONCEPT",
+        ),
+        _m(2, "dataset"),
+    ]
     assert resolve_cluster_doi_corrections(group) == [
         DoiClusterDecision(1, "10.5281/zenodo.1", DoiClusterCase.DATACITE_VERSION_TO_CONCEPT),
         DoiClusterDecision(2, "10.5281/zenodo.1", DoiClusterCase.DATACITE_VERSION_TO_CONCEPT),
     ]
 
 
-def test_version_takes_precedence_over_book_chapter():
-    # Improbable en pratique (disjoint), mais la convergence prime si un concept est présent.
-    group = [_m(1, "book", concept_doi="10.5281/zenodo.1"), _m(2, "book_chapter")]
+def test_same_work_carries_its_case():
+    # Le cas porté par le membre est restitué (variante, pièce de package…).
+    for case in ("DATACITE_VARIANT_TO_PRIMARY", "DATACITE_PACKAGE_PIECE"):
+        group = [_m(1, "dataset", canonical_doi="10.9/canon", same_work_case=case)]
+        assert resolve_cluster_doi_corrections(group) == [
+            DoiClusterDecision(1, "10.9/canon", DoiClusterCase(case))
+        ]
+
+
+def test_same_work_takes_precedence_over_book_chapter():
+    group = [
+        _m(
+            1,
+            "book",
+            canonical_doi="10.5281/zenodo.1",
+            same_work_case="DATACITE_VERSION_TO_CONCEPT",
+        ),
+        _m(2, "book_chapter"),
+    ]
     cases = {d.case for d in resolve_cluster_doi_corrections(group)}
     assert cases == {DoiClusterCase.DATACITE_VERSION_TO_CONCEPT}
 
@@ -55,7 +88,6 @@ def test_only_book_no_correction():
 
 
 def test_article_sharing_book_doi_is_ignored():
-    # Un article partageant par accident le DOI d'un ouvrage n'est pas touché ; le chapitre l'est.
     group = [_m(1, "book"), _m(2, "book_chapter"), _m(3, "article")]
     assert resolve_cluster_doi_corrections(group) == [
         DoiClusterDecision(2, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE)
@@ -113,13 +145,14 @@ def test_chapters_typo_is_false_positive_left_to_admin():
 
 
 def test_version_doi_substituted_to_concept():
-    # raw_doi = la version ; concept porté par le membre datacite → substitution + stash.
+    # raw_doi = la version ; canonique porté par le membre datacite → substitution + stash.
     datacite = _row(
         1,
         "dataset",
         "10.5281/zenodo.10",
         raw_doi="10.5281/zenodo.10",
-        concept_doi="10.5281/zenodo.1",
+        canonical_doi="10.5281/zenodo.1",
+        same_work_case="DATACITE_VERSION_TO_CONCEPT",
     )
     hal = _row(2, "dataset", "10.5281/zenodo.10", raw_doi="10.5281/zenodo.10")
     updates = compute_updates([datacite, hal])
@@ -132,16 +165,58 @@ def test_version_doi_substituted_to_concept():
     )
 
 
-def test_concept_equal_to_version_is_noop():
-    # Dépôt non versionné (concept == version) : pas de substitution.
+def test_variant_substituted_to_primary():
+    # Copie repository → version publiée, provenance DATACITE_VARIANT_TO_PRIMARY.
     row = _row(
-        1, "dataset", "10.5281/zenodo.5", raw_doi="10.5281/zenodo.5", concept_doi="10.5281/zenodo.5"
+        1,
+        "article",
+        "10.18154/rwth-1",
+        raw_doi="10.18154/rwth-1",
+        canonical_doi="10.1103/published",
+        same_work_case="DATACITE_VARIANT_TO_PRIMARY",
+    )
+    assert compute_updates([row]) == [
+        DoiCorrectionUpdate(
+            1,
+            "10.1103/published",
+            {"doi": {"raw": "10.18154/rwth-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}},
+        )
+    ]
+
+
+def test_package_piece_substituted_to_parent():
+    row = _row(
+        1,
+        "dataset",
+        "10.15454/abc/file1",
+        raw_doi="10.15454/abc/file1",
+        canonical_doi="10.15454/abc",
+        same_work_case="DATACITE_PACKAGE_PIECE",
+    )
+    assert compute_updates([row]) == [
+        DoiCorrectionUpdate(
+            1,
+            "10.15454/abc",
+            {"doi": {"raw": "10.15454/abc/file1", "corrected_by": "DATACITE_PACKAGE_PIECE"}},
+        )
+    ]
+
+
+def test_concept_equal_to_canonical_is_noop():
+    # Dépôt non versionné (canonique == DOI brut) : pas de substitution.
+    row = _row(
+        1,
+        "dataset",
+        "10.5281/zenodo.5",
+        raw_doi="10.5281/zenodo.5",
+        canonical_doi="10.5281/zenodo.5",
+        same_work_case="DATACITE_VERSION_TO_CONCEPT",
     )
     assert compute_updates([row]) == []
 
 
-def test_self_heals_when_concept_gone():
-    # Déjà substituée mais le concept n'est plus dérivable (pas de membre datacite) → restaure la version.
+def test_self_heals_when_canonical_gone():
+    # Déjà substituée mais le canonique n'est plus dérivable → restaure le DOI brut.
     row = _row(
         1,
         "dataset",

@@ -49,29 +49,52 @@ def fetch_for_unary_correction_by_journal(
 
 
 def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
-    """Membres des groupes-DOI candidats à la correction par cluster, avec leur `concept_doi`.
+    """Membres des groupes-DOI candidats à la correction par cluster.
 
-    `version_map` dérive le mapping DOI de version → DOI concept depuis les
-    `meta.related_identifiers` (`IsVersionOf`) des SP `datacite` (clé = DOI **brut**
-    reconstruit, stable après substitution). `candidate_dois` réunit les DOI à examiner :
-    versionnés, portés par un `book`/`book_chapter`, ou déjà corrigés (`raw_metadata.doi`,
-    pour l'auto-cicatrisation). On renvoie **tous** les membres de ces DOI (toutes sources)."""
+    `same_work` dérive le mapping forme secondaire DataCite → DOI de l'œuvre canonique depuis
+    les `meta.related_identifiers` des SP `datacite` (clé = DOI **brut** reconstruit, stable
+    après substitution) : version → concept (`IsVersionOf`), forme variante → version publiée
+    (`IsVariantFormOf`), et fichier d'un dépôt → dépôt parent (`IsPartOf` dont le DOI porteur
+    est le DOI parent suivi d'un suffixe). `candidate_dois` réunit les DOI à examiner : formes
+    secondaires, portés par un `book`/`book_chapter`, ou déjà corrigés (`raw_metadata.doi`, pour
+    l'auto-cicatrisation). On renvoie **tous** les membres de ces DOI (toutes sources)."""
     rows = conn.execute(
         text("""
-            WITH version_map AS (
-                SELECT DISTINCT
-                    lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS version_doi,
-                    lower(rel->>'doi') AS concept_doi
-                FROM source_publications sp
-                CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
-                WHERE sp.source = 'datacite'
-                  AND rel->>'relation_type' = 'IsVersionOf'
-                  AND rel->>'doi' IS NOT NULL
-                  AND lower(rel->>'doi')
-                      <> lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
+            WITH same_work AS (
+                SELECT DISTINCT ON (secondary_doi) secondary_doi, canonical_doi, same_work_case
+                FROM (
+                    SELECT
+                        lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS secondary_doi,
+                        lower(rel->>'doi') AS canonical_doi,
+                        CASE rel->>'relation_type'
+                            WHEN 'IsVersionOf' THEN 'DATACITE_VERSION_TO_CONCEPT'
+                            WHEN 'IsVariantFormOf' THEN 'DATACITE_VARIANT_TO_PRIMARY'
+                        END AS same_work_case
+                    FROM source_publications sp
+                    CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
+                    WHERE sp.source = 'datacite'
+                      AND rel->>'relation_type' IN ('IsVersionOf', 'IsVariantFormOf')
+                      AND rel->>'doi' IS NOT NULL
+                      AND lower(rel->>'doi')
+                          <> lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
+                    UNION ALL
+                    SELECT
+                        lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS secondary_doi,
+                        lower(rel->>'doi') AS canonical_doi,
+                        'DATACITE_PACKAGE_PIECE' AS same_work_case
+                    FROM source_publications sp
+                    CROSS JOIN LATERAL jsonb_array_elements(sp.meta->'related_identifiers') rel
+                    WHERE sp.source = 'datacite'
+                      AND sp.doc_type = 'dataset'
+                      AND rel->>'relation_type' = 'IsPartOf'
+                      AND rel->>'doi' IS NOT NULL
+                      AND lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
+                          LIKE lower(rel->>'doi') || '/%'
+                ) s
+                ORDER BY secondary_doi
             ),
             candidate_dois AS (
-                SELECT version_doi AS d FROM version_map
+                SELECT secondary_doi AS d FROM same_work
                 UNION
                 SELECT lower(COALESCE(raw_metadata->'doi'->>'raw', doi)) AS d
                 FROM source_publications
@@ -84,12 +107,12 @@ def fetch_doi_cluster_candidates(conn: Connection) -> list[DoiClusterRow]:
             )
             SELECT sp.id, sp.doc_type, sp.doi, sp.title_normalized, sp.raw_metadata,
                    lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi)) AS raw_doi,
-                   vm.concept_doi
+                   sw.canonical_doi, sw.same_work_case
             FROM source_publications sp
             JOIN candidate_dois c
               ON c.d = lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
-            LEFT JOIN version_map vm
-              ON vm.version_doi = lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
+            LEFT JOIN same_work sw
+              ON sw.secondary_doi = lower(COALESCE(sp.raw_metadata->'doi'->>'raw', sp.doi))
         """)
     ).all()
     return [DoiClusterRow(*row) for row in rows]

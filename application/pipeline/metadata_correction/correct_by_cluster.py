@@ -3,8 +3,9 @@
 Group-by-DOI sur les `source_publications` : le domaine déduit, pour chaque groupe partageant
 un DOI, le DOI effectif de chaque membre. Deux familles de cas (extensibles) :
 
-- **convergence** : les versions DataCite d'une même œuvre (un membre `datacite` déclare un
-  `IsVersionOf`) convergent sur le DOI **concept** stable — substitution `doi = concept` ;
+- **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre
+  canonique — version → concept (`IsVersionOf`), forme variante / copie repository → version
+  publiée (`IsVariantFormOf`), fichier d'un dépôt → dépôt parent (`IsPartOf`) ;
 - **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de
   titres différents) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
 
@@ -70,7 +71,9 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
             d.id: d
             for d in resolve_cluster_doi_corrections(
                 [
-                    DoiClusterMember(m.id, m.doc_type, m.title_normalized, m.concept_doi)
+                    DoiClusterMember(
+                        m.id, m.doc_type, m.title_normalized, m.canonical_doi, m.same_work_case
+                    )
                     for m in members
                 ]
             )
@@ -83,8 +86,9 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
 
 
 def run(conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Logger) -> None:
-    """Passe cluster : substitue le DOI concept des versions DataCite et nulle le DOI des
-    chapitres portant le DOI de l'ouvrage."""
+    """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre canonique
+    (version → concept, variante → version publiée, fichier → dépôt parent) et nulle le DOI
+    des chapitres portant le DOI de l'ouvrage."""
     rows = queries.fetch_doi_cluster_candidates(conn)
     logger.info("metadata_correction (cluster) : %d SP examinées", len(rows))
 
