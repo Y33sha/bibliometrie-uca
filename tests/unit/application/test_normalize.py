@@ -16,12 +16,15 @@ class TestExtractLocationsDataHalIds:
         work = {
             "locations": [
                 {"landing_page_url": "https://doi.org/10.1/x", "id": "doi:10.1/x"},
-                {"landing_page_url": "https://hal.science/hal-111", "id": "pmh:oai:HAL:hal-111v1"},
-                {"landing_page_url": None, "id": "pmh:oai:HAL:hal-222v1"},
+                {
+                    "landing_page_url": "https://hal.science/hal-04000111",
+                    "id": "pmh:oai:HAL:hal-04000111v1",
+                },
+                {"landing_page_url": None, "id": "pmh:oai:HAL:hal-04000222v1"},
             ]
         }
         _urls, ext = extract_locations_data(work)
-        assert ext["hal_id"] == ["hal-111", "hal-222"]
+        assert ext["hal_id"] == ["hal-04000111", "hal-04000222"]
 
     def test_no_hal(self):
         work = {"locations": [{"landing_page_url": "https://doi.org/10.1/x", "id": "doi:10.1/x"}]}
@@ -67,6 +70,25 @@ class TestOAExtractHalIdFromUrl:
 
     def test_no_match(self):
         assert extract_hal_id_from_url("https://doi.org/10.1234/test") is None
+
+    def test_foreign_host_doi_fragment_rejected(self):
+        # Suffixe de DOI DataCite `mot-chiffres` sur un hôte non-HAL : pas un hal_id.
+        assert extract_hal_id_from_url("https://doi.org/10.3204/pubdb-2020-00553") is None
+        assert extract_hal_id_from_url("https://doi.org/10.18154/rwth-2020-07399") is None
+
+    def test_foreign_host_purl_rejected(self):
+        assert (
+            extract_hal_id_from_url("https://resolver.sub.uni-goettingen.de/purl?gro-2/84100")
+            is None
+        )
+
+    def test_short_number_rejected(self):
+        # Moins de 8 chiffres : ce n'est pas un docid HAL.
+        assert extract_hal_id_from_url("https://hal.science/gsi-2021") is None
+
+    def test_institutional_portal(self):
+        # Portail white-label sur domaine institutionnel (label `hal`).
+        assert extract_hal_id_from_url("https://hal.inrae.fr/hal-04123456") == "hal-04123456"
 
     def test_none(self):
         assert extract_hal_id_from_url(None) is None

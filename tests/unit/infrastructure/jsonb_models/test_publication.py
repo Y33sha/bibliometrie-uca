@@ -47,8 +47,10 @@ class TestExternalIdsParsing:
         assert ids.hal_id == ["hal-04123456"]
 
     def test_hal_id_list_normalized_and_deduped(self):
-        ids = ExternalIds(hal_id=["https://hal.science/hal-111v2", "hal-222", "hal-111"])
-        assert ids.hal_id == ["hal-111", "hal-222"]
+        ids = ExternalIds(
+            hal_id=["https://hal.science/hal-04000111v2", "hal-04000222", "hal-04000111"]
+        )
+        assert ids.hal_id == ["hal-04000111", "hal-04000222"]
 
     def test_related_dois_normalized_and_deduped(self):
         ids = ExternalIds(related_dois=["https://doi.org/10.1/X", "10.2/y", "10.1/x"])
@@ -77,16 +79,16 @@ class TestExternalIdsParsing:
 
     def test_accepts_extra_keys(self):
         """Les clés non déclarées (futures évolutions) sont conservées telles quelles."""
-        ids = ExternalIds(hal_id="hal-1234", mag="2912345678", issn="0028-0836")
+        ids = ExternalIds(hal_id="hal-04001234", mag="2912345678", issn="0028-0836")
         # Les extras sont accessibles via model_extra
         dumped = ids.to_dict()
         assert dumped["mag"] == "2912345678"
         assert dumped["issn"] == "0028-0836"
 
     def test_to_dict_omits_none(self):
-        ids = ExternalIds(hal_id="hal-1234")
+        ids = ExternalIds(hal_id="hal-04001234")
         dumped = ids.to_dict()
-        assert dumped == {"hal_id": ["hal-1234"]}  # nnt/pmid/pmcid/arxiv_id omis car None
+        assert dumped == {"hal_id": ["hal-04001234"]}  # nnt/pmid/pmcid/arxiv_id omis car None
 
     def test_roundtrip_from_db(self):
         """Simule un aller-retour : lecture depuis BD (dict) → model → retour dict."""
