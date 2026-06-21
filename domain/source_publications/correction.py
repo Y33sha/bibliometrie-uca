@@ -482,10 +482,11 @@ def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, Jso
 # demandent au contraire de regarder le **groupe de source_publications partageant un
 # DOI** et d'en déduire le DOI effectif de chaque membre. Deux familles de cas, opposées :
 #
-# - **convergence (même œuvre)** : les versions DataCite d'une même œuvre portent chacune
-#   leur DOI de version ; toutes doivent converger sur le DOI **concept** (stable,
-#   agnostique aux versions), exposé par un `relatedIdentifiers` `IsVersionOf` du payload
-#   DataCite → substitution `doi = concept` ;
+# - **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de
+#   l'œuvre canonique, exposé par un `relatedIdentifiers` → substitution `doi = canonique`.
+#   Trois cas : version → concept (`IsVersionOf`) ; forme variante, ex. copie repository →
+#   version publiée (`IsVariantFormOf`) ; fichier d'un dépôt → dépôt parent (`IsPartOf` dont
+#   le DOI porteur est le DOI parent suivi d'un suffixe) ;
 # - **divergence (œuvres distinctes)** : un DOI partagé par des œuvres en réalité distinctes
 #   (ouvrage/chapitre, chapitres de titres différents) est erroné sur le ou les mauvais
 #   côtés → nullage du DOI, sinon le matching les fusionnerait à tort.
@@ -499,8 +500,14 @@ class DoiClusterCase(StrEnum):
     """Cas de correction du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans
     `raw_metadata.doi.corrected_by`."""
 
-    # Versions DataCite d'une même œuvre → convergence sur le DOI concept (stable).
-    DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"
+    # Formes secondaires DataCite → convergence sur l'œuvre canonique.
+    DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"  # version → concept (IsVersionOf)
+    DATACITE_VARIANT_TO_PRIMARY = (
+        "DATACITE_VARIANT_TO_PRIMARY"  # copie repository → version publiée (IsVariantFormOf)
+    )
+    DATACITE_PACKAGE_PIECE = (
+        "DATACITE_PACKAGE_PIECE"  # fichier d'un dépôt → dépôt parent (IsPartOf)
+    )
 
     # Ouvrage et chapitre partageant un DOI : le DOI appartient à l'ouvrage (`book`), le
     # chapitre (`book_chapter`) le porte par erreur → le chapitre le perd.
@@ -514,14 +521,16 @@ class DoiClusterCase(StrEnum):
 
 class DoiClusterMember(NamedTuple):
     """Un membre d'un groupe de SP partageant un DOI : son id, son `doc_type` **canonique**
-    (corrigé par la passe unaire), son `title_normalized` (matérialisé) et le DOI **concept**
-    (présent si ce membre — typiquement la SP `datacite` — déclare un `IsVersionOf` pour le
-    DOI du groupe)."""
+    (corrigé par la passe unaire) et son `title_normalized` (matérialisé). `canonical_doi` est
+    le DOI de l'œuvre canonique vers laquelle converger, présent si ce membre (typiquement une
+    SP `datacite`) est une **forme secondaire** déclarant la relation ; `same_work_case` porte
+    alors le `DoiClusterCase` correspondant (version/variante/pièce de package)."""
 
     id: int
     doc_type: str | None
     title_normalized: str | None
-    concept_doi: str | None = None
+    canonical_doi: str | None = None
+    same_work_case: str | None = None
 
 
 class DoiClusterDecision(NamedTuple):
@@ -565,9 +574,10 @@ def resolve_cluster_doi_corrections(
     cas)`. Pur, déterministe, sans effet de bord, agnostique de la source — c'est le caller
     qui forme le groupe par DOI.
 
-    - **Versions DataCite** (un membre porte un `concept_doi`) : tous les membres convergent
-      sur le concept (`target_doi = concept`). Prime sur les cas ci-dessous — les œuvres
-      versionnées (datasets, preprints) ne sont pas des ouvrages/chapitres.
+    - **Même œuvre DataCite** (un membre porte un `canonical_doi`) : tous les membres convergent
+      sur l'œuvre canonique (`target_doi = canonical_doi`), avec le cas porté par ce membre
+      (version → concept, variante → version publiée, fichier → dépôt parent). Prime sur les cas
+      ci-dessous — ces œuvres (datasets, preprints, copies repository) ne sont pas des ouvrages.
     - **Ouvrage + chapitre** : les `book_chapter` perdent le DOI (`target_doi = None`, celui
       de l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
     - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le
@@ -579,12 +589,10 @@ def resolve_cluster_doi_corrections(
     aucune décision : la détection ouvrage/chapitre raisonne sur le sous-ensemble book/chapter.
 
     Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas du DOI)."""
-    concept = next((m.concept_doi for m in group if m.concept_doi), None)
-    if concept is not None:
-        return [
-            DoiClusterDecision(m.id, concept, DoiClusterCase.DATACITE_VERSION_TO_CONCEPT)
-            for m in group
-        ]
+    canonical = next((m for m in group if m.canonical_doi), None)
+    if canonical is not None:
+        case = DoiClusterCase(canonical.same_work_case)
+        return [DoiClusterDecision(m.id, canonical.canonical_doi, case) for m in group]
 
     book_family = [m for m in group if m.doc_type in ("book", "book_chapter")]
     chapters = [m for m in book_family if m.doc_type == "book_chapter"]

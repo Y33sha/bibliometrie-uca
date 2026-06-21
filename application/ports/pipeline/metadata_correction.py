@@ -32,9 +32,9 @@ class DoiClusterRow(NamedTuple):
 
     `raw_doi` est le DOI **source reconstruit** (`raw_metadata.doi.raw` ou colonne `doi`),
     en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison
-    chapitre/chapitre. `concept_doi` est le DOI concept stable quand `raw_doi` est un DOI de
-    version DataCite (dérivé du `IsVersionOf` d'une SP `datacite` partageant le DOI), sinon
-    `None`."""
+    chapitre/chapitre. `canonical_doi` est le DOI de l'œuvre canonique quand `raw_doi` est
+    une **forme secondaire** DataCite (version, forme variante, ou fichier de package), sinon
+    `None` ; `same_work_case` porte alors le `DoiClusterCase` correspondant."""
 
     id: int
     doc_type: str | None
@@ -42,14 +42,14 @@ class DoiClusterRow(NamedTuple):
     title_normalized: str | None
     raw_metadata: dict[str, JsonValue]
     raw_doi: str
-    concept_doi: str | None
+    canonical_doi: str | None
+    same_work_case: str | None
 
 
 class DoiCorrectionUpdate(NamedTuple):
     """Une mise à jour de correction de DOI : colonne `doi` (nullée, restaurée ou
-    substituée) + sidecar. Partagée par la correction relationnelle (cluster) et la
-    substitution Zenodo (concept), qui produisent toutes deux un état cible de la
-    colonne `doi` à persister via `persist_doi_corrections`."""
+    substituée) + sidecar. Produite par la correction de DOI par cluster (convergence
+    même-œuvre ou nullage de DOI partagé à tort), persistée via `persist_doi_corrections`."""
 
     id: int
     doi: str | None

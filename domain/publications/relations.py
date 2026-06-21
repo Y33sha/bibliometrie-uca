@@ -91,8 +91,6 @@ _CROSSREF_MAP: dict[str, RelationType] = {
 # - Crossref `is-comment-on` / `has-comment` : peut recouvrir du peer-review ou de
 #   la discussion — nature à auditer.
 # - Crossref `expression_of_concern` : ni correction ni rétractation franche.
-# - DataCite `IsVariantFormOf` : même œuvre sous une autre forme → déduplication
-#   ou relation ?
 
 
 def map_datacite_relation(relation_type: str) -> RelationType | None:
