@@ -39,6 +39,13 @@ class TestDOIConstruction:
             ("10.24072/pcjournal.308/", "10.24072/pcjournal.308"),  # slash final parasite
             ("https://doi.org/10.1234/test/", "10.1234/test"),  # slash final + strip url
             ("10.36227/techrxiv.19754971.v2/", "10.36227/techrxiv.19754971"),  # slash + suffixe vN
+            ("10.18145/ivia)", "10.18145/ivia"),  # parenthèse finale non appariée
+            ("10.1234/test.", "10.1234/test"),  # point final parasite
+            ("10.1234/test).", "10.1234/test"),  # ponctuations finales cumulées
+            (
+                "10.1007/jhep07(2020)108",
+                "10.1007/jhep07(2020)108",
+            ),  # parenthèses appariées conservées
             # Lowercase : CrossRef traite le DOI en case-insensitive ; lowercase
             # évite les faux doublons cross-sources.
             ("10.1038/Nature", "10.1038/nature"),
