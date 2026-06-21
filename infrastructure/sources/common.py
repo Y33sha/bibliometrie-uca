@@ -231,10 +231,11 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     """Retourne les DOI présents dans les autres sources mais absents de la cible.
 
     Pool = `staging.doi` (DOI primaire) ∪ `source_publications.external_ids.related_dois`
-    (DOI secondaires : preprint/dépôt/édition). Les related_dois proviennent des
-    source_publications normalisés (runs précédents) : ceux d'un record fraîchement
-    ingéré ne sont pas encore normalisés au moment du cross_imports et sont rattrapés
-    au run suivant — bénin (le pipeline est convergent).
+    (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi`
+    (cibles des relations entre publications : preprint/supplément/data paper… à rapatrier).
+    Les related_dois et les relations proviennent des runs précédents (source_publications
+    normalisés, phase `relations`) : ceux d'un record fraîchement ingéré sont rattrapés au
+    run suivant — bénin (le pipeline est convergent).
 
     Comparaison directe sur `doi` : tous les DOIs sont stockés en minuscules
     (cf. `domain.publication._normalize_doi`), donc plus besoin d'un cas
@@ -262,7 +263,8 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
         "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
     # Pool de DOI candidats : primaires (staging.doi) + secondaires (related_dois
-    # des source_publications normalisés). Partagé par les deux branches.
+    # des source_publications normalisés) + cibles des relations entre publications.
+    # Partagé par les deux branches.
     candidates_cte = """
         WITH candidates AS (
             SELECT s.doi
@@ -275,6 +277,9 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
                 jsonb_array_elements_text(sp.external_ids->'related_dois') AS d
             WHERE sp.source != {t}
               AND jsonb_typeof(sp.external_ids->'related_dois') = 'array'
+            UNION
+            SELECT pr.target_doi AS doi
+            FROM publication_relations pr
         )
     """
 
