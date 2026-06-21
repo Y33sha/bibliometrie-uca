@@ -4,6 +4,7 @@ from domain.publications.relations import (
     RelationType,
     extract_crossref_relations,
     extract_datacite_relations,
+    infer_shared_key_relation,
     map_crossref_relation,
     map_datacite_relation,
 )
@@ -96,3 +97,45 @@ class TestExtractCrossref:
     def test_no_relation(self):
         assert extract_crossref_relations({}) == []
         assert extract_crossref_relations({"relation": None}) == []
+
+
+class TestInferSharedKeyRelation:
+    def test_peer_review_out_of_scope(self):
+        assert infer_shared_key_relation("article", "peer_review") is None
+        assert infer_shared_key_relation("peer_review", "preprint") is None
+
+    def test_preprint_directed_to_published(self):
+        # Le preprint est sujet, pointe vers l'autre bout.
+        assert infer_shared_key_relation("article", "preprint") == (
+            RelationType.IS_PREPRINT_OF,
+            "b",
+        )
+        assert infer_shared_key_relation("preprint", "conference_paper") == (
+            RelationType.IS_PREPRINT_OF,
+            "a",
+        )
+
+    def test_erratum_and_dataset(self):
+        assert infer_shared_key_relation("erratum", "article") == (
+            RelationType.IS_CORRECTION_OF,
+            "a",
+        )
+        assert infer_shared_key_relation("article", "dataset") == (
+            RelationType.IS_SUPPLEMENT_TO,
+            "b",
+        )
+
+    def test_book_chapter_is_part_of_book(self):
+        assert infer_shared_key_relation("book", "book_chapter") == (RelationType.IS_PART_OF, "b")
+        assert infer_shared_key_relation("book_chapter", "book") == (RelationType.IS_PART_OF, "a")
+
+    def test_unexpected_couples_are_undefined(self):
+        # Deux exemplaires d'une même œuvre à DOI distincts, ou couple non typé : apparenté.
+        for a, b in [
+            ("article", "article"),
+            ("article", "conference_paper"),
+            ("review", "review"),
+            ("preprint", "preprint"),  # deux preprints : aucun n'est sujet unique
+            ("thesis", "thesis"),
+        ]:
+            assert infer_shared_key_relation(a, b) == (RelationType.IS_RELATED_TO, "sym")
