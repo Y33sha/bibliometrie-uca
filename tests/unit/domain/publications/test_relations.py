@@ -2,6 +2,8 @@
 
 from domain.publications.relations import (
     RelationType,
+    extract_crossref_relations,
+    extract_datacite_relations,
     map_crossref_relation,
     map_datacite_relation,
 )
@@ -53,3 +55,44 @@ class TestCrossrefMapping:
         # Peer-review / commentaire (porteur peer_review), citations, même-œuvre.
         for raw in ("has-review", "is-review-of", "is-comment-on", "references", "is-version-of"):
             assert map_crossref_relation(raw) is None
+
+
+class TestExtractDatacite:
+    def test_keeps_in_scope_drops_rest(self):
+        meta = {
+            "related_identifiers": [
+                {"doi": "10.1/sup", "relation_type": "IsSupplementTo"},
+                {"doi": "10.1/concept", "relation_type": "IsVersionOf"},  # même-œuvre → exclu
+                {"doi": "10.1/cited", "relation_type": "References"},  # citation → exclu
+                {"relation_type": "IsSupplementTo"},  # sans DOI → ignoré
+            ]
+        }
+        assert extract_datacite_relations(meta) == [(RelationType.IS_SUPPLEMENT_TO, "10.1/sup")]
+
+    def test_empty(self):
+        assert extract_datacite_relations({}) == []
+        assert extract_datacite_relations(None) == []
+
+
+class TestExtractCrossref:
+    def test_keeps_doi_targets_in_scope(self):
+        meta = {
+            "relation": {
+                "is-preprint-of": [{"id": "10.1/pub", "id-type": "doi", "asserted-by": "subject"}],
+                "has-review": [{"id": "10.1/rev", "id-type": "doi"}],  # peer-review → exclu
+                "is-part-of": [
+                    {"id": "10.1/ds", "id-type": "doi"},
+                    {"id": "abc", "id-type": "issn"},  # pas un DOI → ignoré
+                ],
+            }
+        }
+        assert sorted(extract_crossref_relations(meta)) == sorted(
+            [
+                (RelationType.IS_PREPRINT_OF, "10.1/pub"),
+                (RelationType.DESCRIBES, "10.1/ds"),
+            ]
+        )
+
+    def test_no_relation(self):
+        assert extract_crossref_relations({}) == []
+        assert extract_crossref_relations({"relation": None}) == []

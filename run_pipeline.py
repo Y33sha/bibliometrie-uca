@@ -36,6 +36,7 @@ Phases (dans l'ordre d'execution):
     metadata_correction Corrections de métadonnées sur source_publications (par enregistrement,
                         et par grappe de DOI : concept DataCite, ouvrage/chapitre)
     publications        Création/rattachement des publications + fusions/scissions, en une passe
+    relations           Population des relations sémantiques entre publications (depuis les sources)
     persons             Creation/mapping personnes + formes de noms
     authorships         Reconstruction authorships canoniques (table de verite) + propagation
                         in_perimeter, puis purge des publications orphelines
@@ -486,6 +487,18 @@ def phase_publications(**kw: Any) -> Any:
     _run_recompute_address_pub_count()
 
 
+def phase_relations(**kw: Any) -> Any:
+    """Population des relations sémantiques entre publications distinctes.
+
+    Tourne après `publications` : les `source_publications` sont rattachées et les DOI
+    cibles résolus en `publication_id`. Reconstruit `publication_relations` depuis les
+    relations déclarées par les sources (DataCite `meta.related_identifiers`, Crossref
+    `meta.relation`). Les relations même-œuvre (versions, variantes, pièces) relèvent de
+    la déduplication (`metadata_correction`), pas d'ici.
+    """
+    _run_populate_relations()
+
+
 def phase_persons(**kw: Any) -> Any:
     """Creation et rattachement des personnes.
 
@@ -635,6 +648,21 @@ def _run_reconcile_components() -> None:
     finally:
         conn.close()
     log.info("✓ reconcile_components terminé en %.1fs", time.time() - t0)
+
+
+def _run_populate_relations() -> None:
+    from application.pipeline.relations.populate_relations import run
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.queries.pipeline.relations import PgPublicationRelationsQueries
+
+    log.info("▶ populate_relations")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    try:
+        run(conn, PgPublicationRelationsQueries(), log)
+    finally:
+        conn.close()
+    log.info("✓ populate_relations terminé en %.1fs", time.time() - t0)
 
 
 def _run_create_persons() -> None:
@@ -1692,6 +1720,7 @@ PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
     ("publishers_journals", phase_publishers_journals),
     ("metadata_correction", phase_metadata_correction),
     ("publications", phase_publications),
+    ("relations", phase_relations),
     ("persons", phase_persons),
     ("authorships", phase_authorships),
     ("countries", phase_countries),

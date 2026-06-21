@@ -20,6 +20,9 @@ Directionnalité : chaque relation est stockée depuis la publication qui la **d
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any
+
+from domain.publications.identifiers import clean_doi
 
 
 class RelationType(StrEnum):
@@ -101,3 +104,39 @@ def map_datacite_relation(relation_type: str) -> RelationType | None:
 def map_crossref_relation(relation_key: str) -> RelationType | None:
     """Type canonique d'une clé `meta.relation` Crossref, ou `None` si hors scope."""
     return _CROSSREF_MAP.get(relation_key)
+
+
+def extract_datacite_relations(meta: dict[str, Any] | None) -> list[tuple[RelationType, str]]:
+    """Relations en scope déclarées par un payload DataCite, depuis
+    `meta.related_identifiers` (`[{doi, relation_type}]`). Renvoie `(type canonique,
+    DOI cible)` ; ignore les types hors scope et les entrées sans DOI."""
+    out: list[tuple[RelationType, str]] = []
+    for item in (meta or {}).get("related_identifiers") or []:
+        if not isinstance(item, dict):
+            continue
+        canonical = map_datacite_relation(item.get("relation_type") or "")
+        target = clean_doi(item.get("doi"))
+        if canonical and target:
+            out.append((canonical, target))
+    return out
+
+
+def extract_crossref_relations(meta: dict[str, Any] | None) -> list[tuple[RelationType, str]]:
+    """Relations en scope déclarées par un payload Crossref, depuis `meta.relation`
+    (`{clé: [{id, id-type, …}]}`). Renvoie `(type canonique, DOI cible)` ; ne garde que les
+    cibles de type DOI et les clés en scope."""
+    relation = (meta or {}).get("relation")
+    if not isinstance(relation, dict):
+        return []
+    out: list[tuple[RelationType, str]] = []
+    for key, entries in relation.items():
+        canonical = map_crossref_relation(key)
+        if not canonical or not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict) or entry.get("id-type") != "doi":
+                continue
+            target = clean_doi(entry.get("id"))
+            if target:
+                out.append((canonical, target))
+    return out
