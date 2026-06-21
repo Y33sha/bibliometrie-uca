@@ -59,6 +59,16 @@ def _normalize_doi(raw: str | None) -> str | None:
     # Slash final parasite (artefact d'URL) : `10.x/abc/` ≠ `10.x/abc` sinon, faux doublon.
     # Strippé avant les suffixes ci-dessous, qui sont ancrés en fin (`v2/`, `/pdf/` matchent alors).
     s = s.rstrip("/")
+    # Ponctuation finale parasite (copier-coller, parsing d'URL) : un DOI ne se termine pas par
+    # `.,;:` ; une parenthèse fermante finale n'est retirée que si elle est non appariée — les DOI
+    # type `10.1007/jhep07(2020)108` portent des parenthèses légitimes.
+    while True:
+        before = s
+        s = s.rstrip(".,;:")
+        if s.endswith(")") and s.count(")") > s.count("("):
+            s = s[:-1]
+        if s == before:
+            break
     s = _DOI_VERSION_SUFFIX.sub("", s)
     s = _DOI_PDF_SUFFIX.sub("", s)
     return s or None
