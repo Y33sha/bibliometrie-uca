@@ -5,9 +5,24 @@ from domain.publications.relations import (
     extract_crossref_relations,
     extract_datacite_relations,
     infer_shared_key_relation,
+    inverse_relation,
     map_crossref_relation,
     map_datacite_relation,
 )
+
+
+class TestInverseRelation:
+    def test_directional_pairs_are_mutual_inverses(self):
+        assert inverse_relation(RelationType.IS_PREPRINT_OF) == RelationType.HAS_PREPRINT
+        assert inverse_relation(RelationType.HAS_PREPRINT) == RelationType.IS_PREPRINT_OF
+        assert inverse_relation(RelationType.DESCRIBES) == RelationType.IS_DESCRIBED_BY
+
+    def test_is_related_to_is_self_inverse(self):
+        assert inverse_relation(RelationType.IS_RELATED_TO) == RelationType.IS_RELATED_TO
+
+    def test_every_type_has_an_inverse(self):
+        for rt in RelationType:
+            assert inverse_relation(inverse_relation(rt)) == rt
 
 
 class TestDataciteMapping:

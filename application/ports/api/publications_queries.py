@@ -296,6 +296,22 @@ class StructureInfo(BaseModel):
     type: str
 
 
+class RelatedPublicationOut(BaseModel):
+    """Une publication apparentée, vue depuis la publication courante.
+
+    `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes
+    sont inversées). `publication_id`/`title`/`pub_year`/`doc_type` sont renseignés quand la cible
+    est au corpus ; sinon seul `doi` l'est (cible hors corpus, lien externe)."""
+
+    relation_type: str
+    doi: str
+    publication_id: int | None = None
+    title: str | None = None
+    pub_year: int | None = None
+    doc_type: str | None = None
+    source: str
+
+
 class PublicationDetailResponse(BaseModel):
     """Détail complet d'une publication : métadonnées + sources + authorships."""
 
@@ -310,6 +326,7 @@ class PublicationDetailResponse(BaseModel):
     thesis_meta: ThesisMeta | None
     structures: dict[str, StructureInfo]
     subjects: list[SubjectOut]
+    relations: list[RelatedPublicationOut]
 
 
 class PublicationsQueries(Protocol):

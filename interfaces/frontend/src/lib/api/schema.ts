@@ -4779,6 +4779,8 @@ export interface components {
             };
             /** Subjects */
             subjects: components["schemas"]["SubjectOut"][];
+            /** Relations */
+            relations: components["schemas"]["RelatedPublicationOut"][];
         };
         /**
          * PublicationListItem
@@ -5055,6 +5057,30 @@ export interface components {
              * @default true
              */
             rejected: boolean;
+        };
+        /**
+         * RelatedPublicationOut
+         * @description Une publication apparentée, vue depuis la publication courante.
+         *
+         *     `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes
+         *     sont inversées). `publication_id`/`title`/`pub_year`/`doc_type` sont renseignés quand la cible
+         *     est au corpus ; sinon seul `doi` l'est (cible hors corpus, lien externe).
+         */
+        RelatedPublicationOut: {
+            /** Relation Type */
+            relation_type: string;
+            /** Doi */
+            doi: string;
+            /** Publication Id */
+            publication_id?: number | null;
+            /** Title */
+            title?: string | null;
+            /** Pub Year */
+            pub_year?: number | null;
+            /** Doc Type */
+            doc_type?: string | null;
+            /** Source */
+            source: string;
         };
         /**
          * RelatedStructureOut
