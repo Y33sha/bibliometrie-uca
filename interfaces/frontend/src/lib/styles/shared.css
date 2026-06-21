@@ -18,6 +18,8 @@
 	--surface: #f5f4f1;        /* fonds de panneaux, en-têtes de tableau */
 	--surface-hover: #fafaf8;  /* survol/zébrure des lignes */
 	--border-subtle: #f0efec;  /* séparateurs légers (border-bottom) */
+	--section-heading: #3d7a7c; /* teal foncé du menu — titres de section */
+	--section-heading-light: #e4efef; /* teal pâle — survol des tags du corps */
 }
 
 /* ── Toolbar ── */
@@ -673,6 +675,27 @@ th.sorted .sort-arrow {
 	color: #555;
 }
 
+/* ── Pastille d'accès générique (fiche détail) ── */
+.access-tag {
+	display: inline-block;
+	font-size: 0.78rem;
+	padding: 2px 8px;
+	border-radius: 8px;
+	font-weight: 600;
+}
+.access-open {
+	background: var(--success-light);
+	color: var(--success);
+}
+.access-embargo {
+	background: #fff3cd;
+	color: #856404;
+}
+.access-closed {
+	background: #e8e8e8;
+	color: #666;
+}
+
 /* ── APC tag ── */
 .apc-tag {
 	display: inline-block;
@@ -937,4 +960,53 @@ th.sorted .sort-arrow {
 	gap: 8px;
 	justify-content: flex-end;
 	margin-top: 16px;
+}
+
+/* ── Page détail publication : sections plates + rangées de tags ──
+   Plutôt qu'un encadré bordé par section (effet « boîtes empilées »), des sections plates
+   séparées par un filet fin : petit label gris capitales + contenu. */
+.detail-section {
+	padding: 14px 2px;
+	border-top: 1px solid var(--border-subtle);
+}
+.detail-section:first-child {
+	border-top: none;
+	padding-top: 4px;
+}
+.detail-label {
+	font-size: 0.98rem;
+	font-weight: 600;
+	color: var(--section-heading);
+	margin: 0 0 9px;
+}
+.detail-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.detail-tags a,
+.detail-tags span.detail-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 3px 10px;
+	border-radius: 12px;
+	font-size: 0.85rem;
+	line-height: 1.35;
+	white-space: nowrap;
+	background: var(--surface);
+	color: var(--text);
+	text-decoration: none;
+}
+.detail-tags a:hover {
+	background: var(--section-heading-light);
+	color: var(--section-heading);
+}
+/* Sous-titre d'une section (ex. « Mots-clés libres », type de relation) : même teal que le titre,
+   plus petit, subordonné. */
+.detail-sublabel {
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--section-heading);
+	margin: 12px 0 7px;
 }

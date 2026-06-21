@@ -1,5 +1,6 @@
 <script lang="ts">
   import { base } from "$app/paths";
+  import SectionLabel from "./SectionLabel.svelte";
   import { docTypeSingular, relationTypeLabel } from "$lib/labels";
   import type { RelatedPublication } from "./types";
 
@@ -25,11 +26,11 @@
 </script>
 
 {#if relations.length > 0}
-  <div class="section relations-section">
-    <h2 class="section-title">Publications liées</h2>
+  <div class="detail-section">
+    <SectionLabel icon="document" text="Publications liées" />
     {#each groups as [rtype, items] (rtype)}
       <div class="relation-group">
-        <h3 class="relation-label">{label(rtype)}</h3>
+        <div class="detail-sublabel">{label(rtype)}</div>
         <ul class="relations-list">
           {#each items as r (r.relation_type + r.doi)}
             <li>
@@ -51,31 +52,11 @@
 {/if}
 
 <style>
-  .relations-section {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 16px 20px;
-    margin-bottom: 16px;
-  }
-  .section-title {
-    font-size: 1.05rem;
-    font-weight: 600;
-    margin: 0 0 10px;
-  }
   .relation-group {
     margin-bottom: 10px;
   }
   .relation-group:last-child {
     margin-bottom: 0;
-  }
-  .relation-label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    margin: 0 0 6px;
   }
   .relations-list {
     list-style: none;

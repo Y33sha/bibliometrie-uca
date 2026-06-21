@@ -18,6 +18,7 @@ export type ThesisAuthorship = components["schemas"]["ThesesAuthorshipOut"];
 export type ThesisMeta = components["schemas"]["ThesisMeta"];
 export type Subject = components["schemas"]["SubjectOut"];
 export type RelatedPublication = components["schemas"]["RelatedPublicationOut"];
+export type ExternalId = components["schemas"]["ExternalIdentifierOut"];
 export type PubResponse = components["schemas"]["PublicationDetailResponse"];
 
 export interface SourceRow {
