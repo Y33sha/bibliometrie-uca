@@ -22,7 +22,7 @@ Source d'enrichissement consultée par DOI pour affiner `publications.oa_status`
 
 Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum canonique : `gold`, `hybrid`, `bronze`, `green`, `closed`.
 
-Consommée par la phase pipeline [`oa_status`](../pipeline/10-enrichissements.md#oa_status).
+Consommée par la phase pipeline [`oa_status`](../pipeline/11-enrichissements.md#oa_status).
 
 ### Particularités
 
