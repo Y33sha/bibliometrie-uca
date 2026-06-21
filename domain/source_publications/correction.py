@@ -60,6 +60,10 @@ class SourcePublicationForCorrection:
     # Calculé au fetch (`embargo_until <= current_date`), pas une colonne : seule donnée
     # date-dépendante de la vue, pour garder `effective_metadata` pure (elle lit un booléen).
     embargo_expired: bool
+    # Calculé au fetch : la SP déclare une relation `is-preprint-of` (Crossref `meta.relation`),
+    # donc elle EST un preprint. Booléen pour garder `effective_metadata` pure (pas de lecture de
+    # `meta` dans le domaine).
+    declares_preprint: bool
 
 
 class MetadataCorrectionRule(StrEnum):
@@ -74,6 +78,7 @@ class MetadataCorrectionRule(StrEnum):
     JOURNAL_TYPE_MEDIA_TO_MEDIA = "JOURNAL_TYPE_MEDIA_TO_MEDIA"
     JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER = "JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER"
     JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT = "JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT"
+    PREPRINT_RELATION_TO_PREPRINT = "PREPRINT_RELATION_TO_PREPRINT"
     TITLE_MEDIA_PREFIX_TO_MEDIA = "TITLE_MEDIA_PREFIX_TO_MEDIA"
     TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET = "TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET"
     TITLE_ERRATUM_PREFIX_TO_ERRATUM = "TITLE_ERRATUM_PREFIX_TO_ERRATUM"
@@ -184,6 +189,7 @@ class _AppliesTo(TypedDict, total=False):
     - ``doi_prefix_not_in`` : `tuple[str, ...]` — la SP porte un DOI **et** son préfixe (`doi.split('/')[0]`) n'appartient à aucun préfixe du tuple. Faux si pas de DOI (le prédicat affirme quelque chose *sur* le DOI). Sert à exclure des registrants connus par préfixe (ex. registres de thèses).
     - ``oa_status`` : `str` — équivalence sur `sp.oa_status` (le statut d'entrée, ex. `embargoed`).
     - ``embargo_expired`` : `bool` — `sp.embargo_expired` (calculé au fetch : `embargo_until <= current_date`) vaut la valeur attendue.
+    - ``declares_preprint`` : `bool` — `sp.declares_preprint` (calculé au fetch : la SP déclare une relation `is-preprint-of`) vaut la valeur attendue.
 
     Ajouter un nouveau type de prédicat = ajouter une clé ici + une branche dans `_check_predicate`.
     """
@@ -198,6 +204,7 @@ class _AppliesTo(TypedDict, total=False):
     doi_prefix_not_in: tuple[str, ...]
     oa_status: str
     embargo_expired: bool
+    declares_preprint: bool
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -263,6 +270,15 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
             "journal_type": "preprint_server",
             "doc_type": frozenset({"article", "other"}),
         },
+        "applies_correction": {"doc_type": "preprint"},
+    },
+    # La SP déclare elle-même une relation `is-preprint-of` (Crossref `meta.relation`) : elle EST
+    # le preprint, signal source-autoritaire et indépendant du `doc_type` (donc acyclique vis-à-vis
+    # des relations dérivées du type). Sans whitelist `doc_type` : la déclaration prime, y compris
+    # quand Crossref n'a pas typé le record (`doc_type` nul → l'arbitrage prenait `article`
+    # d'OpenAlex faute de mieux ; Crossref étant prioritaire, le `preprint` corrigé gagne).
+    MetadataCorrectionRule.PREPRINT_RELATION_TO_PREPRINT: {
+        "applies_to": {"declares_preprint": True},
         "applies_correction": {"doc_type": "preprint"},
     },
     # Titre `interview`/`reportage`/`podcast` + `doc_type` ∈ {article, other} ⇒ `media`. Patterns univoques et récurrents dans le corpus UCA.
@@ -413,6 +429,9 @@ def _check_predicate(sp: SourcePublicationForCorrection, key: str, value: object
     if key == "embargo_expired":
         assert isinstance(value, bool)
         return sp.embargo_expired == value
+    if key == "declares_preprint":
+        assert isinstance(value, bool)
+        return sp.declares_preprint == value
     raise ValueError(f"Prédicat inconnu : {key!r}")
 
 

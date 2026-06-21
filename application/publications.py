@@ -140,6 +140,9 @@ def _apply_canonical_doc_type_correction(pub: Publication, *, repo: PublicationR
         apc_amount=None,
         raw_metadata={},
         embargo_expired=False,
+        # Rejeu canonique limité aux règles journal-dépendantes ; le retypage preprint se fait au
+        # niveau SP (puis gagne par arbitrage Crossref), pas ici.
+        declares_preprint=False,
     )
     corrected = effective_metadata(view)
     if corrected.doc_type is not None and corrected.doc_type.value != pub.doc_type:

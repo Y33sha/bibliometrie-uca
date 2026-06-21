@@ -24,6 +24,7 @@ def _sp(**overrides: object) -> SourcePublicationForCorrection:
         "apc_amount": None,
         "raw_metadata": {},
         "embargo_expired": False,
+        "declares_preprint": False,
     }
     base.update(overrides)
     return SourcePublicationForCorrection(**base)  # type: ignore[arg-type]
