@@ -59,6 +59,11 @@ class PublicationRelationsQueries(Protocol):
         (signal #2)."""
         ...
 
+    def fetch_declared_related_pairs(self, conn: Connection) -> set[frozenset[int]]:
+        """Les paires déjà reliées par une relation déclarée (signal #1), pour écarter un
+        `is_related_to` redondant."""
+        ...
+
     def replace_shared_key_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
         """Remplace les relations issues des clés partagées (`source` shared_key) par `edges`,
         avec la même résolution/dédup que `replace_declared_relations`."""
