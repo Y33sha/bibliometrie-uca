@@ -17,6 +17,7 @@ HAL) ou un identifiant brut.
 
 import re
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from domain.errors import ValidationError
 
@@ -96,24 +97,45 @@ class DOI:
 
 # ── HAL ID (document) ──────────────────────────────────────────────
 
-# Un HAL ID est `<code de collection>-<numéro>`. Le code de collection est ouvert : `hal`, `tel`,
-# `halshs`, `dumas`, `emse`, `in2p3`, `inserm`, `insu`, `cea`… — des dizaines de portails
-# institutionnels, et de nouveaux apparaissent. On matche donc tout préfixe alphanumérique plutôt
-# qu'une liste blanche fermée, qui exclurait silencieusement de la déduplication les collections
-# non listées (deux dépôts au même `hal_id` `emse-…` ne se relieraient pas).
-_HAL_DOC_BASE = re.compile(r"([a-z][a-z0-9]*-\d+)", re.IGNORECASE)
+# Un HAL ID est `<code de collection>-<numéro à 8 chiffres>`. Le code de collection est ouvert :
+# `hal`, `tel`, `halshs`, `dumas`, `emse`, `in2p3`, `inserm`, `insu`, `cea`… — des dizaines de
+# portails institutionnels, et de nouveaux apparaissent. On matche donc tout préfixe alphanumérique
+# plutôt qu'une liste blanche fermée, qui exclurait silencieusement de la déduplication les
+# collections non listées (deux dépôts au même `hal_id` `emse-…` ne se relieraient pas).
+#
+# Le numéro est exigé à 8 chiffres minimum (le docid CCSD est uniforme : tous les hal_id observés en
+# base, tous portails confondus, ont exactement 8 chiffres). Ce plancher écarte les fragments
+# `mot-chiffres` glanés dans des URLs étrangères — un suffixe de DOI DataCite (`pubdb-2020`,
+# `rwth-2020`) ou un PURL (`gro-2`) ne ressemble plus à un hal_id.
+_HAL_DOC_BASE = re.compile(r"([a-z][a-z0-9]*-\d{8,})", re.IGNORECASE)
+
+
+def _is_hal_host(host: str) -> bool:
+    """True si l'hôte est un portail HAL : `hal.science` et ses sous-portails, l'infrastructure
+    CCSD historique (`*.archives-ouvertes.fr`, `*.ccsd.cnrs.fr`) et les portails white-label
+    institutionnels reconnaissables au label `hal` (`hal.inrae.fr`, `www.hal.inserm.fr`…)."""
+    host = host.lower()
+    if host.endswith(".archives-ouvertes.fr") or host.endswith(".ccsd.cnrs.fr"):
+        return True
+    return any(label == "hal" or label.startswith("hal-") for label in host.split("."))
 
 
 def _normalize_hal_id(raw: str | None) -> str | None:
     """Extrait le HAL ID canonique d'une chaîne ou URL.
 
-    Accepte une URL (hal.science, tel.archives-ouvertes.fr, …) ou un HAL
-    ID brut avec éventuel suffixe de version (v1, v2). Retourne l'ID
-    sans version (concept HAL).
+    Accepte une URL (hal.science, tel.archives-ouvertes.fr, …) ou un HAL ID brut avec éventuel
+    suffixe de version (v1, v2). Retourne l'ID sans version (concept HAL).
+
+    Une URL dont l'hôte n'est pas un portail HAL ne porte pas de hal_id : on l'écarte avant le
+    regex, car un fragment `mot-chiffres` d'un DOI ou d'un PURL étranger le tromperait. Un token nu
+    (sans hôte) reste accepté tel quel.
     """
     if not raw:
         return None
     s = raw.strip().lower()
+    host = urlparse(s).hostname
+    if host and not _is_hal_host(host):
+        return None
     m = _HAL_DOC_BASE.search(s)
     return m.group(1) if m else None
 

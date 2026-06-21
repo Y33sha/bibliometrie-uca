@@ -137,6 +137,8 @@ class TestHALIdConstruction:
             "",  # vide
             "hal-",  # aucun chiffre
             "1234",  # aucun préfixe
+            "gsi-2021",  # moins de 8 chiffres : fragment de DOI, pas un docid HAL
+            "https://doi.org/10.3204/pubdb-2020-00553",  # hôte non-HAL
         ],
     )
     def test_raises_on_invalid(self, raw):
