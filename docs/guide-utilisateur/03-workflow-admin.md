@@ -77,7 +77,7 @@ Les ajouts ou suppressions de formes de noms deviennent effectifs au *run* suiva
 
 #### Fusion des doublons
 
-Lorsque les auteurs des publications ne sont pas identifiés par un [PID](../glossaire.md#pid), la phase de [matching personnes](../pipeline/08-persons.md) recourt aux formes de noms pour identifier les auteurs. Des formes de noms multiples pour la même personne conduiront donc à créer des doublons de personnes.
+Lorsque les auteurs des publications ne sont pas identifiés par un [PID](../glossaire.md#pid), la phase de [matching personnes](../pipeline/09-persons.md) recourt aux formes de noms pour identifier les auteurs. Des formes de noms multiples pour la même personne conduiront donc à créer des doublons de personnes.
 
 Il est nécessaire, en particulier apès les premiers runs, de **fusionner** les doublons de personnes. Une fusion de personnes entraîne:
 - le transfert des formes de noms vers la personne cible (tous les futurs matchs par forme de nom aboutiront à cette personne);
@@ -102,7 +102,7 @@ Pour réattribuer les authorships en question: cf [Authorships orphelines](#orph
 
 Travail au long cours.
 
-Les PIDs présents dans les publications sont rattachés aux personnes pendant la phase de [matching personnes](../pipeline/08-persons.md).
+Les PIDs présents dans les publications sont rattachés aux personnes pendant la phase de [matching personnes](../pipeline/09-persons.md).
 
 Un PID se définit par: un **type** (`orcid`, `idref`, `idhal`) et une **valeur**.
 

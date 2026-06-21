@@ -31,13 +31,17 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 
 - [Publications](07-publications.md) : peuple et maintient la table canonique `publications` à partir des `source_publications`. Regroupe celles qui désignent le même document (par identifiants et par métadonnées), crée une publication pour chaque document du périmètre UCA, et fusionne ou scinde les publications existantes selon ce regroupement.
 
+## Relations entre publications
+
+- [Relations](08-relations.md) : peuple `publication_relations`, qui relie des publications **distinctes** apparentées (preprint ↔ version publiée, supplément ↔ article, chapitre ↔ ouvrage, erratum ↔ article corrigé…). Deux signaux : les relations typées déclarées par DataCite et Crossref, et les publications qui partagent une clé d'identité sans avoir fusionné (DOI distincts). Les cibles encore hors corpus rejoignent les imports croisés.
+
 ## Création/rattachement des personnes
 
-- [Personnes](08-persons.md) : peuple la table canonique `persons` et ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef) *via* les authorships sources ayant `in_perimeter = true`. Mappe les authorships sources aux `person_id` créées.
-- [Authorships](09-authorships.md) : peuple la table canonique `authorships` (liens entre `publications` canoniques et `persons` canoniques) à partir des `person_id` référencés dans les authorships sources.
+- [Personnes](09-persons.md) : peuple la table canonique `persons` et ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef) *via* les authorships sources ayant `in_perimeter = true`. Mappe les authorships sources aux `person_id` créées.
+- [Authorships](10-authorships.md) : peuple la table canonique `authorships` (liens entre `publications` canoniques et `persons` canoniques) à partir des `person_id` référencés dans les authorships sources.
 
 ## Enrichissements
 
-- [Pays](10-enrichissements.md) : détection automatisée des pays des adresses. Sert à interroger les collaborations internationales.
-- [Sujets](10-enrichissements.md#subjects) : deux étapes enchaînées — (1) ingestion des sujets/mots-clés des `source_publications` vers les tables canoniques `subjects` et `publication_subjects`, (2) recalcul de `subjects.usage_count` + table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
-- [Statut open access](10-enrichissements.md#oa_status) : statut OA par publication via Unpaywall (souvent plus à jour que les sources).
+- [Pays](11-enrichissements.md) : détection automatisée des pays des adresses. Sert à interroger les collaborations internationales.
+- [Sujets](11-enrichissements.md#subjects) : deux étapes enchaînées — (1) ingestion des sujets/mots-clés des `source_publications` vers les tables canoniques `subjects` et `publication_subjects`, (2) recalcul de `subjects.usage_count` + table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
+- [Statut open access](11-enrichissements.md#oa_status) : statut OA par publication via Unpaywall (souvent plus à jour que les sources).
