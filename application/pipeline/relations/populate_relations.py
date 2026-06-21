@@ -30,6 +30,7 @@ from application.ports.pipeline.relations import (
 )
 from domain.publications.identifiers import clean_doi
 from domain.publications.relations import (
+    RelationType,
     extract_crossref_relations,
     extract_datacite_relations,
     infer_shared_key_relation,
@@ -52,16 +53,24 @@ def _build_declared_edges(sources) -> list[RelationEdge]:
     return edges
 
 
-def _build_shared_key_edges(pairs: list[SharedKeyPair]) -> list[RelationEdge]:
+def _build_shared_key_edges(
+    pairs: list[SharedKeyPair], declared_pairs: set[frozenset[int]]
+) -> list[RelationEdge]:
     """Une arête dirigée par paire partageant une clé. `infer_shared_key_relation` donne le type et
     le sujet (`"a"`, `"b"`, ou `"sym"` symétrique — orienté depuis A, le plus petit id). Les paires
-    hors scope (peer-review) sont écartées."""
+    hors scope (peer-review) sont écartées, ainsi que les `is_related_to` (type vague « à qualifier »)
+    sur une paire déjà typée précisément par le signal #1 — sinon doublon redondant."""
     edges: list[RelationEdge] = []
     for pair in pairs:
         inferred = infer_shared_key_relation(pair.a_doc_type, pair.b_doc_type)
         if inferred is None:
             continue
         relation, subject = inferred
+        if (
+            relation is RelationType.IS_RELATED_TO
+            and frozenset((pair.a_id, pair.b_id)) in declared_pairs
+        ):
+            continue
         if subject == "b":
             from_id, target = pair.b_id, pair.a_doi
         else:  # "a" ou "sym" : A est le sujet (a_id < b_id rend l'orientation stable)
@@ -78,7 +87,8 @@ def run(conn: Connection, queries: PublicationRelationsQueries, logger: logging.
     written_declared = queries.replace_declared_relations(conn, declared_edges)
 
     pairs = queries.fetch_shared_key_pairs(conn)
-    shared_edges = _build_shared_key_edges(pairs)
+    declared_pairs = queries.fetch_declared_related_pairs(conn)
+    shared_edges = _build_shared_key_edges(pairs, declared_pairs)
     written_shared = queries.replace_shared_key_relations(conn, shared_edges)
 
     conn.commit()

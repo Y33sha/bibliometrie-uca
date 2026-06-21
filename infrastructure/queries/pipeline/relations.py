@@ -73,6 +73,20 @@ def fetch_shared_key_pairs(conn: Connection) -> list[SharedKeyPair]:
     ]
 
 
+def fetch_declared_related_pairs(conn: Connection) -> set[frozenset[int]]:
+    """Paires de publications déjà reliées par une relation **déclarée** (signal #1), cibles
+    résolues au corpus. Sert à écarter un `is_related_to` (signal #2) redondant sur une paire déjà
+    typée précisément."""
+    rows = conn.execute(
+        text("""
+            SELECT from_publication_id AS a, target_publication_id AS b
+            FROM publication_relations
+            WHERE source IN ('datacite', 'crossref') AND target_publication_id IS NOT NULL
+        """)
+    ).all()
+    return {frozenset((r.a, r.b)) for r in rows}
+
+
 def _insert_relation_edges(conn: Connection, edges: list[RelationEdge]) -> int:
     """Insère `edges` en résolvant la cible (`target_publication_id` par LEFT JOIN sur le DOI),
     en écartant les auto-relations et en dédoublonnant par la PK. Un seul aller-retour bulk via
@@ -120,6 +134,9 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
 
     def fetch_shared_key_pairs(self, conn: Connection) -> list[SharedKeyPair]:
         return fetch_shared_key_pairs(conn)
+
+    def fetch_declared_related_pairs(self, conn: Connection) -> set[frozenset[int]]:
+        return fetch_declared_related_pairs(conn)
 
     def replace_shared_key_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
         return replace_shared_key_relations(conn, edges)
