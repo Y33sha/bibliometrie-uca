@@ -9,6 +9,7 @@
   import TruthAuthorshipsTable from "./TruthAuthorshipsTable.svelte";
   import SourceComparison from "./SourceComparison.svelte";
   import SubjectsBlock from "./SubjectsBlock.svelte";
+  import RelatedPublications from "./RelatedPublications.svelte";
 
   const pubId = $derived($page.params.id);
   let canGoBack = $state(false);
@@ -124,6 +125,8 @@
     {pub}
     sources={data!.sources}
   />
+
+  <RelatedPublications relations={data!.relations} />
 
   {#if thesesAuth.length || thesisMeta}
     <ThesisBlock

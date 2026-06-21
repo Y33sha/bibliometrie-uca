@@ -60,6 +60,28 @@ export const docTypePlural: Record<string, string> = {
 	media: 'Interventions média'
 };
 
+/** Libellés FR des types de relation entre publications, lus depuis la publication courante
+ * (sujet). Miroir de l'enum PG `relation_type` / `RelationType` du domain backend. */
+export const relationTypeLabel: Record<string, string> = {
+	is_preprint_of: 'Préprint de',
+	has_preprint: 'A pour préprint',
+	is_supplement_to: 'Supplément à',
+	has_supplement: 'A pour supplément',
+	is_part_of: 'Partie de',
+	has_part: 'Contient',
+	is_correction_of: 'Correction de',
+	has_correction: 'Corrigé par',
+	is_retraction_of: 'Rétractation de',
+	has_retraction: 'Rétracté par',
+	is_concern_about: 'Avis de préoccupation sur',
+	has_concern: "Visé par un avis de préoccupation",
+	is_translation_of: 'Traduction de',
+	has_translation: 'A pour traduction',
+	describes: 'Décrit les données',
+	is_described_by: 'Décrit par',
+	is_related_to: 'Apparenté à'
+};
+
 /** Labels pour les voies OA. */
 export const oaLabelsMap: Record<string, string> = {
 	diamond: 'Diamond',

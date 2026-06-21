@@ -82,7 +82,7 @@ La détection vraiment **heuristique** (rapprochement par titre pour les orpheli
 
 ### Phase 3 — UI
 
-- [ ] Afficher les publications liées (et les cibles hors corpus) sur la fiche détail.
+- [x] Afficher les publications liées sur la fiche détail (`RelatedPublications.svelte`, sous le header, avant les sujets). Relations des deux sens, le type entrant inversé pour se lire depuis la publication courante (`inverse_relation`), groupées par type ; cible au corpus → lien interne, cible hors corpus → lien `doi.org`. Exposées par `get_publication_relations` dans la réponse détail.
 - [ ] Réfléchir aux pages listes: publications "dépendantes" exclues par défaut? option de les inclure? distinguer vue tabulaire (totale) vs vue liste (avec groupement des publications liées)?
 
 ### Phase 4 — Exploitations en aval

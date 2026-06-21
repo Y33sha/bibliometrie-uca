@@ -100,6 +100,32 @@ _CROSSREF_MAP: dict[str, RelationType] = {
 }
 
 
+# Paires inverses : une même relation vue depuis l'autre bout. `is_related_to` est symétrique
+# (son propre inverse). Sert à présenter une relation entrante du point de vue de la publication
+# courante (sur la fiche de B, l'arête `A is_preprint_of B` se lit `B has_preprint A`).
+_INVERSE_PAIRS: tuple[tuple[RelationType, RelationType], ...] = (
+    (RelationType.IS_PREPRINT_OF, RelationType.HAS_PREPRINT),
+    (RelationType.IS_SUPPLEMENT_TO, RelationType.HAS_SUPPLEMENT),
+    (RelationType.IS_PART_OF, RelationType.HAS_PART),
+    (RelationType.IS_CORRECTION_OF, RelationType.HAS_CORRECTION),
+    (RelationType.IS_RETRACTION_OF, RelationType.HAS_RETRACTION),
+    (RelationType.IS_CONCERN_ABOUT, RelationType.HAS_CONCERN),
+    (RelationType.IS_TRANSLATION_OF, RelationType.HAS_TRANSLATION),
+    (RelationType.DESCRIBES, RelationType.IS_DESCRIBED_BY),
+)
+_INVERSE_RELATIONS: dict[RelationType, RelationType] = {
+    RelationType.IS_RELATED_TO: RelationType.IS_RELATED_TO,
+    **{a: b for a, b in _INVERSE_PAIRS},
+    **{b: a for a, b in _INVERSE_PAIRS},
+}
+
+
+def inverse_relation(relation: RelationType) -> RelationType:
+    """Type inverse (la relation vue depuis l'autre bout). `is_related_to`, symétrique, est son
+    propre inverse."""
+    return _INVERSE_RELATIONS[relation]
+
+
 def map_datacite_relation(relation_type: str) -> RelationType | None:
     """Type canonique d'un `relationType` DataCite, ou `None` si hors scope."""
     return _DATACITE_MAP.get(relation_type)

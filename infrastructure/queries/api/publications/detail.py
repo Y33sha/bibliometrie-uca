@@ -4,6 +4,62 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
+from domain.publications.relations import RelationType, inverse_relation
+
+
+def get_publication_relations(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
+    """Publications apparentées, des deux sens, vues depuis `pub_id`.
+
+    Les arêtes sortantes (`from_publication_id = pub_id`) gardent leur type ; les entrantes
+    (`target_publication_id = pub_id`) sont inversées pour se lire depuis la publication courante.
+    La cible porte ses métadonnées si elle est au corpus, sinon seul son DOI est connu. Dédupliqué
+    par (type, cible) — une paire déclarée des deux côtés ne s'affiche qu'une fois.
+    """
+    rows = conn.execute(
+        text("""
+            WITH rel AS (
+                SELECT r.relation_type::text AS rtype, r.target_doi AS other_doi,
+                       r.target_publication_id AS other_id, r.source, false AS incoming
+                FROM publication_relations r
+                WHERE r.from_publication_id = :pid
+                UNION ALL
+                SELECT r.relation_type::text, src.doi, r.from_publication_id, r.source, true
+                FROM publication_relations r
+                JOIN publications src ON src.id = r.from_publication_id
+                WHERE r.target_publication_id = :pid
+            )
+            SELECT rel.rtype, rel.other_doi, rel.other_id, rel.source, rel.incoming,
+                   p.title AS other_title, p.pub_year AS other_year,
+                   p.doc_type::text AS other_doc_type
+            FROM rel
+            LEFT JOIN publications p ON p.id = rel.other_id
+            ORDER BY rel.rtype, p.pub_year DESC NULLS LAST
+        """),
+        {"pid": pub_id},
+    ).all()
+    out: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for r in rows:
+        relation_type = r.rtype
+        if r.incoming:
+            relation_type = inverse_relation(RelationType(relation_type)).value
+        key = (relation_type, r.other_doi)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(
+            {
+                "relation_type": relation_type,
+                "doi": r.other_doi,
+                "publication_id": r.other_id,
+                "title": r.other_title,
+                "pub_year": r.other_year,
+                "doc_type": r.other_doc_type,
+                "source": r.source,
+            }
+        )
+    return out
+
 
 def _fetch_biblio_source_authorships(
     conn: Connection, source: str, pub_id: int
@@ -159,6 +215,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
             }
 
     subjects = get_publication_subjects(conn, pub_id)
+    relations = get_publication_relations(conn, pub_id)
 
     all_struct_ids: set[int] = set()
     for rows in (authorships, hal_authorships, oa_authorships, wos_authorships, scanr_authorships):
@@ -190,6 +247,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
         "thesis_meta": thesis_meta,
         "structures": structures,
         "subjects": subjects,
+        "relations": relations,
     }
 
 
