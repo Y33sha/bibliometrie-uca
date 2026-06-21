@@ -156,7 +156,8 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
                            WHERE sa.authorship_id = a.id AND sa.source = 'wos') AS source_wos,
                    EXISTS (SELECT 1 FROM source_authorships sa
                            WHERE sa.authorship_id = a.id AND sa.source = 'scanr') AS source_scanr,
-                   pe.id AS person_id, pe.last_name, pe.first_name
+                   pe.id AS person_id, pe.last_name, pe.first_name,
+                   EXISTS (SELECT 1 FROM persons_rh pr WHERE pr.person_id = pe.id) AS has_rh
             FROM authorships a
             JOIN persons pe ON pe.id = a.person_id
             WHERE a.publication_id = :pid
@@ -216,6 +217,7 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
 
     subjects = get_publication_subjects(conn, pub_id)
     relations = get_publication_relations(conn, pub_id)
+    external_identifiers = get_publication_external_identifiers(conn, pub_id)
 
     all_struct_ids: set[int] = set()
     for rows in (authorships, hal_authorships, oa_authorships, wos_authorships, scanr_authorships):
@@ -248,7 +250,39 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
         "structures": structures,
         "subjects": subjects,
         "relations": relations,
+        "external_identifiers": external_identifiers,
     }
+
+
+# Identifiants externes exposés en sidebar, ordre d'affichage. `hal_id` est exclu (déjà couvert
+# par le lien source HAL) ; `related_dois` aussi (signal de dédup, pas un identifiant à afficher).
+_EXTERNAL_IDENTIFIER_KEYS = (
+    ("arxiv", "arxiv_id"),
+    ("pmid", "pmid"),
+    ("pmcid", "pmcid"),
+    ("nnt", "nnt"),
+)
+
+
+def get_publication_external_identifiers(conn: Connection, pub_id: int) -> list[dict[str, Any]]:
+    """Identifiants externes (arXiv, PMID, PMCID, NNT) agrégés depuis les `external_ids` des
+    `source_publications` de la publication, dédupliqués, dans l'ordre `_EXTERNAL_IDENTIFIER_KEYS`."""
+    rows = conn.execute(
+        text("""
+            SELECT sp.external_ids FROM source_publications sp
+            WHERE sp.publication_id = :pid AND sp.external_ids IS NOT NULL
+        """),
+        {"pid": pub_id},
+    ).all()
+    out: list[dict[str, Any]] = []
+    for id_type, key in _EXTERNAL_IDENTIFIER_KEYS:
+        seen: set[str] = set()
+        for (external_ids,) in rows:
+            value = external_ids.get(key)
+            if isinstance(value, str) and value and value not in seen:
+                seen.add(value)
+                out.append({"type": id_type, "value": value})
+    return out
 
 
 def get_publication_subjects(conn: Connection, pub_id: int) -> list[dict[str, Any]]:

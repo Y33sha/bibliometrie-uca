@@ -213,6 +213,13 @@ class SourcePublicationOut(BaseModel):
     countries: list[str] | None
 
 
+class ExternalIdentifierOut(BaseModel):
+    """Identifiant externe agrégé d'une publication (arXiv, PMID, PMCID, NNT), pour la sidebar."""
+
+    type: str  # "arxiv" | "pmid" | "pmcid" | "nnt"
+    value: str
+
+
 class ConsolidatedAuthorshipOut(BaseModel):
     """Authorship consolidée (liens certifiés person ↔ publication)."""
 
@@ -227,6 +234,7 @@ class ConsolidatedAuthorshipOut(BaseModel):
     person_id: int
     last_name: str
     first_name: str
+    has_rh: bool  # la personne est rattachée au référentiel RH (persons_rh)
 
 
 class SourceAuthorshipOut(BaseModel):
@@ -327,6 +335,7 @@ class PublicationDetailResponse(BaseModel):
     structures: dict[str, StructureInfo]
     subjects: list[SubjectOut]
     relations: list[RelatedPublicationOut]
+    external_identifiers: list[ExternalIdentifierOut]
 
 
 class PublicationsQueries(Protocol):
