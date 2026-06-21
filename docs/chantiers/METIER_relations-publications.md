@@ -92,12 +92,9 @@ Le retypage à partir des relations **déclarées (signal #1)** se fait en règl
 - [x] Retypage preprint : une SP déclarant `is-preprint-of` (Crossref `meta.relation`) *est* un preprint → règle `PREPRINT_RELATION_TO_PREPRINT` dans `metadata_correction` (prédicat `declares_preprint` calculé au fetch). Corrige le cas fréquent où Crossref ne type pas le record (`doc_type` nul) et où l'arbitrage prenait `article` d'OpenAlex.
 - Retypage des data papers : **abandonné**. Une SP déclarant `describes` n'est pas un data paper au sens strict — un article référence souvent des datasets sans en être un (audit : 78 des 104 déclarants sont des articles, légitimement). Pas de règle automatique.
 - Retypage erratum / rétractation depuis la relation : **non viable**. Les `is_correction_of` déclarés sont quasi inexistants (4) et **auto-référentiels** (le DOI corrigé = celui de la publication, artefact Crossref) — ce ne sont pas des erratums. La détection des erratums reste portée par le préfixe de titre (`TITLE_ERRATUM_PREFIX_TO_ERRATUM`). La complétude de cette détection (erratums sans préfixe reconnu) est un audit distinct.
-- [ ] Audit des orphelins : remonter les publications de type dépendant (erratum, rétractation, preprint) sans relation naturelle trouvée.
 - [ ] Audit des relations multiples : le critère d'anomalie n'est **pas** « > 1 relation » mais « ≥ 2 types **précis non-inverses** » sur une même paire. Sur la base courante (761 paires multi-types) : 746 sont de la **redondance inverse** (`has_preprint`+`is_preprint_of`, `describes`+`is_described_by` — le même lien déclaré par les deux bouts, by-design, l'UI le dédoublonne par `(type inversé, doi)`), ~12 étaient un `is_related_to` chevauchant le signal #1 (désormais supprimé à la population), et seulement **3** sont de vraies anomalies (rôles précis contradictoires) — à remonter à la main.
-
-### Phase 5 (ultérieure) — détection heuristique
-
-- [ ] Rapprochement par titre (et autres heuristiques) pour les orphelins sans clé ni relation déclarée.
+- [ ] Audit des orphelins : remonter les publications de type dépendant (erratum, rétractation) sans relation naturelle. Les preprints sont exclus — un preprint sans version publiée est normal (antérieur à une publication qui peut ne jamais venir). Sur la base courante : **148 erratums sur 233** (63 %) et **les 9 rétractations** n'ont aucun lien vers l'article corrigé/rétracté (le signal déclaré est quasi absent : `is_correction_of` auto-référentiels, aucune relation de rétractation). Ils sont correctement **typés** (préfixe de titre) mais non **reliés**.
+- [ ] Rapprochement par titre (et autres heuristiques) pour les orphelins sans clé ni relation déclarée — c'est la voie de rattachement des erratums/rétractations orphelins ci-dessus (titre « Erratum: &lt;titre parent&gt; », ou DOI parent dans le titre/`meta`).
 
 ## Questions ouvertes
 

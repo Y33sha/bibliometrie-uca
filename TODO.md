@@ -1,11 +1,13 @@
+* backfill à lancer: python -m interfaces.cli.oneshot.backfill_purge_malformed_hal_id
 # A régler avant transmission
 ## Pipeline de traitement
 * [ ] Faire un audit complet du logging (complétude, clarté, cohérence entre sources et entre phases)
 ### Extraction
-* [ ] extraction par ORCID: vérifier pertinence/faisabilité (tester différentes sources, auditer le gain)
+* [ ] extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] à étudier: cross-import: seulement `in_perimeter`? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] Comprendre pourquoi l'extract ScanR paginé est aussi lent, alors que le cross-import par DOI est ultra-rapide (2s/100 DOI contre 30s OpenAlex); ScanR est presque plus rapide par DOI que par bulk, c'est absurde (pistes: paralléliser les années d'extraction; batcher les écritures; + item suivant)
 * [ ] analyser les diff de payload pour voir si on peut diminuer le nombre d'UPSERT en filtrant les champs importés (ScanR notamment)
+* [ ] cross-import: ArXiv => déduire DOI DataCite (https://doi.org/10.48550/arXiv.2605.02321)
 ### Suite du traitement
 * [ ] DOI versionnés: déplacer la correction (suppression de suffixes) depuis `clean_doi` vers `metadata_correction`. `clean_doi` devrait se borner au nettoyage simple.
 * [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
@@ -29,12 +31,11 @@
 * faux auteurs UCA créés par une erreur de parsing (toutes les signatures groupées ensemble pour chaque auteur) : ex. publi 77832
 * [ ] OpenAlex résout les noms d'équipes en listes de personnes (21105) => nettoyer les "for the ... study group"
 * [ ] publications avec beaucoup d'auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. En attendant une solution, le mode "conflit de sources" dans la déduplication manuelle des personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`) (chantier chiant, à enterrer le plus proprement possible)
+* [ ] DOI Crossref non trouvés sur Crossref: quel traitement ultérieur? (signaler comme erronés? - auditer d'abord)
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
-* [ ] pour les jeux de données: DataCite, Zenodo, autres?
 * [ ] divers: ORCID, IdRef, DOAJ
 * [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
-* [ ] réévaluer l'intérêt de Crossref comme source (quelle plus-value sur les métadonnées?) - DOI Crossref non trouvés sur Crossref: quel traitement ultérieur? (signaler comme erronés? - auditer d'abord)
 ## Chantier des signatures institutionnelles
 * [ ] Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation?
 * [ ] distinguer adresses correctes/incorrectes pour affichage %age par labo/personne; suppose: 1° de définir une typologie d'erreurs, et leur caractère bloquant ou non; 2° de grouper les signatures par publi pour interroger en pourcentage de publications, non en pourcentage de signatures; 3° de restreindre aux publications *stricto sensu* (ni preprint, ni dataset etc.: définir liste blanche de doc_types à prendre en compte); 4° question des publications sans signature en base (sources HAL/ScanR seulement): exclure du calcul?
@@ -55,14 +56,21 @@
 * [ ] colonne éditeur; filtres éditeur + revue?
 * [ ] définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
+* [ ] refaire entièrement la page Détails publication
 ## Détails d'affichage
 * [ ] dashboard éditeur/revue: graphiques sur le modèle des dashboards labo/personne
 * [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques?
 * [ ] tableau laboratoires: séparer colonnes acronyme et nom; trier par acronyme; rétrécir colonne tutelles
+* [ ] dashboards: ne pas afficher dans la légende les options à 0 cas
+* [ ] page revue: tableau publications, pas besoin de colonne revue
+* [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose
+* [ ] page détails thèse: seul endroit où le tag UCA est un lien (et surprise: http://localhost:5176/bibliometrie/laboratories/169 existe vraiment...)
 
 # Cas particuliers, bizarreries à élucider
 * Daniel Roux: 1 authorship hal, zéro publication sur sa page (ce n'est pas le seul)
 * [ ] 151499: source primaire HAL d'après Openalex mais pas de document HAL en base
+* [ ] 164107: pourquoi type autre?
+* [ ] 165068 type "commmentary"?
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier

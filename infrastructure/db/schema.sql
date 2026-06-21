@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict KpoRZ2BfwopE1vkXk5xgHsWBMYQPWZSupB6tXjyHIz9msWRGwBkdKaUjLetbTxl
+\restrict 0I6igjhgYINGDaHmM71AjDbmAd8CDlWpgBPUcPgJTwT9mG228EJXbH3xGYLg9uJ
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -144,6 +144,31 @@ CREATE TYPE public.publisher_type AS ENUM (
     'repository',
     'aggregator',
     'unknown'
+);
+
+
+--
+-- Name: relation_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.relation_type AS ENUM (
+    'is_preprint_of',
+    'has_preprint',
+    'is_supplement_to',
+    'has_supplement',
+    'is_part_of',
+    'has_part',
+    'is_correction_of',
+    'has_correction',
+    'is_retraction_of',
+    'has_retraction',
+    'is_concern_about',
+    'has_concern',
+    'is_translation_of',
+    'has_translation',
+    'describes',
+    'is_described_by',
+    'is_related_to'
 );
 
 
@@ -984,6 +1009,19 @@ CREATE SEQUENCE public.place_name_forms_id_seq
 --
 
 ALTER SEQUENCE public.place_name_forms_id_seq OWNED BY public.place_name_forms.id;
+
+
+--
+-- Name: publication_relations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.publication_relations (
+    from_publication_id integer NOT NULL,
+    relation_type public.relation_type NOT NULL,
+    target_doi text NOT NULL,
+    target_publication_id integer,
+    source text NOT NULL
+);
 
 
 --
@@ -1887,6 +1925,14 @@ ALTER TABLE ONLY public.place_name_forms
 
 
 --
+-- Name: publication_relations publication_relations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_relations
+    ADD CONSTRAINT publication_relations_pkey PRIMARY KEY (from_publication_id, relation_type, target_doi);
+
+
+--
 -- Name: publication_subjects publication_subjects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2443,6 +2489,20 @@ CREATE INDEX idx_pub_unpaywall_checked ON public.publications USING btree (unpay
 
 
 --
+-- Name: idx_publication_relations_target_doi; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publication_relations_target_doi ON public.publication_relations USING btree (target_doi);
+
+
+--
+-- Name: idx_publication_relations_target_pub; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_publication_relations_target_pub ON public.publication_relations USING btree (target_publication_id) WHERE (target_publication_id IS NOT NULL);
+
+
+--
 -- Name: idx_publication_structures_structure; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2964,6 +3024,22 @@ ALTER TABLE ONLY public.persons_rh
 
 
 --
+-- Name: publication_relations publication_relations_from_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_relations
+    ADD CONSTRAINT publication_relations_from_publication_id_fkey FOREIGN KEY (from_publication_id) REFERENCES public.publications(id) ON DELETE CASCADE;
+
+
+--
+-- Name: publication_relations publication_relations_target_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_relations
+    ADD CONSTRAINT publication_relations_target_publication_id_fkey FOREIGN KEY (target_publication_id) REFERENCES public.publications(id) ON DELETE SET NULL;
+
+
+--
 -- Name: publication_subjects publication_subjects_publication_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3111,5 +3187,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict KpoRZ2BfwopE1vkXk5xgHsWBMYQPWZSupB6tXjyHIz9msWRGwBkdKaUjLetbTxl
+\unrestrict 0I6igjhgYINGDaHmM71AjDbmAd8CDlWpgBPUcPgJTwT9mG228EJXbH3xGYLg9uJ
 
