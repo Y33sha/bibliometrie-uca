@@ -28,6 +28,19 @@ class RelationEdge(NamedTuple):
     source: str
 
 
+class SharedKeyPair(NamedTuple):
+    """Deux publications distinctes (DOI distincts) partageant une clé de confirmation (hal_id,
+    arXiv, PMID, NNT). `a_id < b_id` par construction. Le type de relation se déduit du couple de
+    `doc_type` (`domain.publications.relations.infer_shared_key_relation`)."""
+
+    a_id: int
+    a_doc_type: str | None
+    a_doi: str
+    b_id: int
+    b_doc_type: str | None
+    b_doi: str
+
+
 class PublicationRelationsQueries(Protocol):
     """Opérations SQL de la phase `relations`."""
 
@@ -39,4 +52,14 @@ class PublicationRelationsQueries(Protocol):
         """Remplace les relations déclarées (`source` datacite/crossref) par `edges` :
         résout chaque `target_doi` en `target_publication_id`, écarte les auto-relations,
         dédoublonne par `(from, type, target)`. Retourne le nombre de relations écrites."""
+        ...
+
+    def fetch_shared_key_pairs(self, conn: Connection) -> list[SharedKeyPair]:
+        """Les paires de publications distinctes (DOI distincts) partageant une clé de confirmation
+        (signal #2)."""
+        ...
+
+    def replace_shared_key_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
+        """Remplace les relations issues des clés partagées (`source` shared_key) par `edges`,
+        avec la même résolution/dédup que `replace_declared_relations`."""
         ...

@@ -49,6 +49,10 @@ class RelationType(StrEnum):
     # data papers (un article qui `describes` un dataset en est un).
     DESCRIBES = "describes"
     IS_DESCRIBED_BY = "is_described_by"
+    # Apparentée, type à qualifier : deux publications distinctes partagent une clé de confirmation
+    # (DOI distincts) mais leur couple de doc_type ne permet pas (encore) d'inférer une relation
+    # précise. Symétrique (non directionnel), bucket d'attente du signal #2.
+    IS_RELATED_TO = "is_related_to"
 
 
 # Mapping DataCite `relationType` → type canonique. Les types absents (citations,
@@ -119,6 +123,45 @@ def extract_datacite_relations(meta: dict[str, Any] | None) -> list[tuple[Relati
         if canonical and target:
             out.append((canonical, target))
     return out
+
+
+# Signal #2 — inférence depuis le couple de doc_type d'une paire de publications distinctes (DOI
+# distincts) partageant une clé de confirmation. Types « dépendants » : une publication de ce type
+# est, par nature, sujet d'une relation dirigée vers l'œuvre principale (le preprint est_preprint_de
+# l'article publié, l'erratum corrige l'article, le dataset complète l'article).
+_DEPENDENT_SHARED_KEY_RELATIONS: tuple[tuple[str, RelationType], ...] = (
+    ("preprint", RelationType.IS_PREPRINT_OF),
+    ("erratum", RelationType.IS_CORRECTION_OF),
+    ("dataset", RelationType.IS_SUPPLEMENT_TO),
+)
+
+
+def infer_shared_key_relation(
+    doc_type_a: str | None, doc_type_b: str | None
+) -> tuple[RelationType, str] | None:
+    """Infère la relation entre deux publications **distinctes** (DOI distincts) qui partagent une
+    clé de confirmation, depuis leur couple de `doc_type`.
+
+    Renvoie `(type, sujet)` où `sujet` désigne le bout porteur de la relation dirigée : `"a"`
+    (sujet = A), `"b"` (sujet = B), ou `"sym"` pour `is_related_to` (symétrique — le caller oriente
+    par convention). Renvoie `None` si la paire est hors scope (peer-review).
+
+    Un couple typé (preprint, erratum, dataset, ou ouvrage ↔ chapitre) donne une relation précise et
+    dirigée ; tout autre couple — y compris deux exemplaires d'une même œuvre à DOI distincts non
+    encore fusionnés — donne `is_related_to`, en attendant d'être qualifié."""
+    if "peer_review" in (doc_type_a, doc_type_b):
+        return None
+    for dependent, relation in _DEPENDENT_SHARED_KEY_RELATIONS:
+        a_is_dependent = doc_type_a == dependent
+        b_is_dependent = doc_type_b == dependent
+        if a_is_dependent and not b_is_dependent:
+            return relation, "a"
+        if b_is_dependent and not a_is_dependent:
+            return relation, "b"
+    if {doc_type_a, doc_type_b} == {"book", "book_chapter"}:
+        # Le chapitre est partie de l'ouvrage.
+        return RelationType.IS_PART_OF, ("a" if doc_type_a == "book_chapter" else "b")
+    return RelationType.IS_RELATED_TO, "sym"
 
 
 def extract_crossref_relations(meta: dict[str, Any] | None) -> list[tuple[RelationType, str]]:
