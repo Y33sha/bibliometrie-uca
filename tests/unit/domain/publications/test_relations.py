@@ -40,22 +40,16 @@ class TestCrossrefMapping:
             assert map_crossref_relation(raw) == RelationType.HAS_CORRECTION
         assert map_crossref_relation("corrected") == RelationType.IS_CORRECTION_OF
 
-    def test_retraction_family(self):
+    def test_retraction_and_concern_family(self):
         assert map_crossref_relation("retraction") == RelationType.HAS_RETRACTION
         assert map_crossref_relation("withdrawal") == RelationType.HAS_RETRACTION
+        assert map_crossref_relation("expression_of_concern") == RelationType.HAS_CONCERN
 
     def test_data_paper_describes(self):
         assert map_crossref_relation("is-part-of") == RelationType.DESCRIBES
         assert map_crossref_relation("has-part") == RelationType.IS_DESCRIBED_BY
 
     def test_out_of_scope(self):
-        # Peer-review, commentaire (à auditer), citations, même-œuvre, expression of concern.
-        for raw in (
-            "has-review",
-            "is-review-of",
-            "is-comment-on",
-            "references",
-            "is-version-of",
-            "expression_of_concern",
-        ):
+        # Peer-review / commentaire (porteur peer_review), citations, même-œuvre.
+        for raw in ("has-review", "is-review-of", "is-comment-on", "references", "is-version-of"):
             assert map_crossref_relation(raw) is None

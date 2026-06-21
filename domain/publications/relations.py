@@ -11,7 +11,7 @@ Hors scope (renvoient `None`), avec leur raison :
 
 - **Même œuvre** (versions, formes identiques) : `IsVersionOf` / `HasVersion` / `IsIdenticalTo` / `IsNewVersionOf` / `IsVariantFormOf` / `IsOriginalFormOf` côté DataCite ; `is-version-of` / `has-version` / `new_version` / `is-identical-to` / `is-same-as` côté Crossref. → déduplication (phase `metadata_correction`), pas une relation.
 - **Citations** : `References` / `Cites` / `IsCitedBy` / `IsReferencedBy` ; `references` / `is-referenced-by` / `is-cited-by`. → graphe bibliographique.
-- **Peer-review** : `has-review` / `is-review-of` (Crossref), `IsReviewedBy` (DataCite). → évaluation, pas une œuvre apparentée.
+- **Peer-review / discussion** : `has-review` / `is-review-of` / `is-comment-on` / `has-comment` (Crossref), `IsReviewedBy` (DataCite). → évaluation ou commentaire (le porteur de `is-comment-on` est un `peer_review`), pas une œuvre apparentée.
 - **Vague / dérivation** : `IsDerivedFrom`, `IsSourceOf`, `Requires`, `Continues`, `IsPublishedIn` ; `has-manifestation`, `is-related-material`, `has-related-material`, `is-basis-for`.
 
 Directionnalité : chaque relation est stockée depuis la publication qui la **déclare** (toujours en corpus), avec un type qui porte le sens. Les paires inverses (ex. `IsSupplementTo` / `IsSupplementedBy`) mappent vers des types canoniques inverses. La déduplication des arêtes inverses (quand les deux bouts sont en corpus et déclarent tous deux) relève de la phase de population.
@@ -38,6 +38,8 @@ class RelationType(StrEnum):
     HAS_CORRECTION = "has_correction"
     IS_RETRACTION_OF = "is_retraction_of"
     HAS_RETRACTION = "has_retraction"
+    IS_CONCERN_ABOUT = "is_concern_about"
+    HAS_CONCERN = "has_concern"
     IS_TRANSLATION_OF = "is_translation_of"
     HAS_TRANSLATION = "has_translation"
     # Data paper ↔ jeu de données décrit. Sert aussi à détecter et retyper les
@@ -79,6 +81,9 @@ _CROSSREF_MAP: dict[str, RelationType] = {
     # Rétractation : l'article pointe vers sa notice de rétractation/retrait.
     "retraction": RelationType.HAS_RETRACTION,
     "withdrawal": RelationType.HAS_RETRACTION,
+    # Expression of concern : avis éditorial de doute post-publication (un cran sous
+    # la rétractation), porté par l'article vers la notice.
+    "expression_of_concern": RelationType.HAS_CONCERN,
     "is-translation-of": RelationType.IS_TRANSLATION_OF,
     "has-translation": RelationType.HAS_TRANSLATION,
     # Data paper ↔ dataset décrit. Crossref l'exprime via `is-part-of` (data paper
@@ -86,11 +91,6 @@ _CROSSREF_MAP: dict[str, RelationType] = {
     "is-part-of": RelationType.DESCRIBES,
     "has-part": RelationType.IS_DESCRIBED_BY,
 }
-
-# À trancher avant d'inclure, après audit de la nature des entités liées :
-# - Crossref `is-comment-on` / `has-comment` : peut recouvrir du peer-review ou de
-#   la discussion — nature à auditer.
-# - Crossref `expression_of_concern` : ni correction ni rétractation franche.
 
 
 def map_datacite_relation(relation_type: str) -> RelationType | None:
