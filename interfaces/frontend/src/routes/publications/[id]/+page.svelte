@@ -1,24 +1,40 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { onMount } from "svelte";
-  import { api } from "$lib/api";
+  import { api, auth } from "$lib/api";
   import { sanitizeTitle } from "$lib/utils";
   import type { PubResponse, SourceAuthorship, SourceRow } from "./types";
   import PublicationHeader from "./PublicationHeader.svelte";
+  import PublicationSidebar from "./PublicationSidebar.svelte";
   import ThesisBlock from "./ThesisBlock.svelte";
-  import TruthAuthorshipsTable from "./TruthAuthorshipsTable.svelte";
+  import StructuresBlock from "./StructuresBlock.svelte";
+  import PersonsBlock from "./PersonsBlock.svelte";
   import SourceComparison from "./SourceComparison.svelte";
   import SubjectsBlock from "./SubjectsBlock.svelte";
   import RelatedPublications from "./RelatedPublications.svelte";
 
   const pubId = $derived($page.params.id);
   let canGoBack = $state(false);
+  // Comparaison des sources réservée à l'admin connecté.
+  let isAdmin = $state(false);
 
   let data = $state<PubResponse | null>(null);
   let error = $state(false);
 
   const pub = $derived(data?.publication);
   const hasTruthTable = $derived((data?.authorships.length ?? 0) > 0);
+  // Structures liées : union des structures des signatures consolidées, ordre d'apparition.
+  const structureIds = $derived.by(() => {
+    const seen = new Set<number>();
+    const out: number[] = [];
+    for (const a of data?.authorships ?? [])
+      for (const sid of a.structure_ids ?? [])
+        if (!seen.has(sid)) {
+          seen.add(sid);
+          out.push(sid);
+        }
+    return out;
+  });
   const thesesAuth = $derived(data?.theses_authorships ?? []);
   const thesisMeta = $derived(data?.thesis_meta);
   const thesisAuthorStructures = $derived(
@@ -97,6 +113,11 @@
     } catch {
       error = true;
     }
+    try {
+      isAdmin = (await auth.check()).authenticated;
+    } catch {
+      isAdmin = false;
+    }
   });
 </script>
 
@@ -121,59 +142,57 @@
 {:else if !pub}
   <div class="pub-header"><div class="loading">Chargement…</div></div>
 {:else}
-  <PublicationHeader
-    {pub}
-    sources={data!.sources}
-  />
+  <PublicationHeader {pub} />
 
-  <RelatedPublications relations={data!.relations} />
+  <div class="detail-layout">
+    <div class="detail-main">
+      {#if thesesAuth.length || thesisMeta}
+        <ThesisBlock
+          {thesesAuth}
+          {thesisMeta}
+          {thesisAuthorStructures}
+          structures={data!.structures}
+        />
+      {/if}
 
-  {#if thesesAuth.length || thesisMeta}
-    <ThesisBlock
-      {thesesAuth}
-      {thesisMeta}
-      {thesisAuthorStructures}
-      structures={data!.structures}
-    />
-  {/if}
+      <div class="detail-body">
+        {#if hasTruthTable && pub.doc_type !== "thesis" && pub.doc_type !== "ongoing_thesis"}
+          <PersonsBlock authorships={data!.authorships} />
+        {/if}
 
-  <SubjectsBlock subjects={data!.subjects} />
+        <StructuresBlock {structureIds} structures={data!.structures} />
 
-  {#if pub.abstract}
-    <div class="section abstract-section">
-      <h2 class="section-title">Abstract</h2>
-      <p class="abstract-text">{@html sanitizeTitle(pub.abstract)}</p>
+        <RelatedPublications relations={data!.relations} />
+
+        <SubjectsBlock subjects={data!.subjects} />
+
+        {#if pub.abstract}
+          <div class="detail-section">
+            <div class="detail-label">Résumé</div>
+            <p class="abstract-text">{@html sanitizeTitle(pub.abstract)}</p>
+          </div>
+        {/if}
+      </div>
     </div>
-  {/if}
 
-  {#if hasTruthTable && pub.doc_type !== "thesis" && pub.doc_type !== "ongoing_thesis"}
-    <TruthAuthorshipsTable
-      authorships={data!.authorships}
+    <PublicationSidebar {pub} sources={data!.sources} externalIds={data!.external_identifiers} />
+  </div>
+
+  {#if isAdmin}
+    <SourceComparison
+      data={data!}
+      {sourceRows}
+      {hasSourceConflict}
+      {halSource}
+      {oaSource}
+      {wosSource}
+      {scanrSource}
       structures={data!.structures}
     />
   {/if}
-
-  <SourceComparison
-    data={data!}
-    {sourceRows}
-    {hasSourceConflict}
-    {halSource}
-    {oaSource}
-    {wosSource}
-    {scanrSource}
-    structures={data!.structures}
-  />
 {/if}
 
 <style>
-  .section {
-    margin-bottom: 16px;
-  }
-  .section-title {
-    font-size: 1.05rem;
-    font-weight: 600;
-    margin: 0 0 8px;
-  }
   .pub-header {
     background: var(--card);
     border: 1px solid var(--border);
@@ -181,16 +200,38 @@
     padding: 20px 24px;
     margin-bottom: 16px;
   }
-  .abstract-section {
-    background: white;
+  /* Deux colonnes : contenu à gauche, accès & identité à droite. Replie en une colonne (sidebar
+     sous le contenu) en dessous de 860px. */
+  .detail-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 16px;
+    align-items: start;
+  }
+  .detail-main {
+    min-width: 0;
+  }
+  @media (max-width: 860px) {
+    .detail-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+  /* Panneau unique regroupant les sections plates (structures, personnes, relations, sujets,
+     résumé), séparées par des filets fins plutôt qu'un encadré par section. */
+  .detail-body {
+    background: var(--card);
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 16px 20px;
+    padding: 8px 24px;
+    margin-bottom: 16px;
+  }
+  .detail-body:empty {
+    display: none;
   }
   .abstract-text {
     font-size: 0.95rem;
     line-height: 1.6;
-    color: var(--fg);
+    color: var(--text);
     margin: 0;
   }
 </style>

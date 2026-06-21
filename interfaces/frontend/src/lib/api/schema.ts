@@ -2837,6 +2837,8 @@ export interface components {
             last_name: string;
             /** First Name */
             first_name: string;
+            /** Has Rh */
+            has_rh: boolean;
         };
         /** CountryOut */
         CountryOut: {
@@ -2977,6 +2979,16 @@ export interface components {
             value: string;
             /** Label Fr */
             label_fr: string;
+        };
+        /**
+         * ExternalIdentifierOut
+         * @description Identifiant externe agrégé d'une publication (arXiv, PMID, PMCID, NNT), pour la sidebar.
+         */
+        ExternalIdentifierOut: {
+            /** Type */
+            type: string;
+            /** Value */
+            value: string;
         };
         /** FacetValueCount */
         FacetValueCount: {
@@ -4781,6 +4793,8 @@ export interface components {
             subjects: components["schemas"]["SubjectOut"][];
             /** Relations */
             relations: components["schemas"]["RelatedPublicationOut"][];
+            /** External Identifiers */
+            external_identifiers: components["schemas"]["ExternalIdentifierOut"][];
         };
         /**
          * PublicationListItem

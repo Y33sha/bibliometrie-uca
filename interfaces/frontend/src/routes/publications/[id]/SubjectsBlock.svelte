@@ -1,5 +1,6 @@
 <script lang="ts">
   import { base } from "$app/paths";
+  import SectionLabel from "./SectionLabel.svelte";
   import type { Subject } from "./types";
 
   let { subjects }: { subjects: Subject[] } = $props();
@@ -17,74 +18,22 @@
 </script>
 
 {#if subjects.length > 0}
-  <div class="section subjects-section">
-    <h2 class="section-title">Sujets</h2>
-
+  <div class="detail-section">
+    <SectionLabel icon="tag" text="Sujets" />
     {#if concepts.length > 0}
-      <ul class="tags-list">
+      <div class="detail-tags">
         {#each concepts as s (s.id)}
-          <li>
-            <a href="{base}/subjects/{s.id}" title={tooltip(s)}>{s.label}</a>
-          </li>
+          <a href="{base}/subjects/{s.id}" title={tooltip(s)}>{s.label}</a>
         {/each}
-      </ul>
+      </div>
     {/if}
-
     {#if freeKeywords.length > 0}
-      <h3 class="subsection-title">Mots-clés libres</h3>
-      <ul class="tags-list">
+      <div class="detail-sublabel">Mots-clés libres</div>
+      <div class="detail-tags">
         {#each freeKeywords as s (s.id)}
-          <li>
-            <a href="{base}/subjects/{s.id}" title={tooltip(s)}>{s.label}</a>
-          </li>
+          <a href="{base}/subjects/{s.id}" title={tooltip(s)}>{s.label}</a>
         {/each}
-      </ul>
+      </div>
     {/if}
   </div>
 {/if}
-
-<style>
-  .subjects-section {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 16px 20px;
-    margin-bottom: 16px;
-  }
-  .section-title {
-    font-size: 1.05rem;
-    font-weight: 600;
-    margin: 0 0 10px;
-  }
-  .subsection-title {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    margin: 14px 0 8px;
-  }
-  .tags-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .tags-list li {
-    display: inline-flex;
-    align-items: center;
-    background: var(--surface);
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 0.9rem;
-  }
-  .tags-list a {
-    color: var(--accent);
-    text-decoration: none;
-  }
-  .tags-list a:hover {
-    text-decoration: underline;
-  }
-</style>

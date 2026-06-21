@@ -82,6 +82,16 @@ export const relationTypeLabel: Record<string, string> = {
 	is_related_to: 'Apparenté à'
 };
 
+/** Accès générique pour la fiche détail, sans le jargon OA (gold/green/diamond/…) : on ne dit que
+ * « ouvert / fermé / sous embargo ». Retourne `null` si indéterminé (rien à afficher). Le cas
+ * « thèse en cours » est porté par le `doc_type`, pas ici. `cls` = classe de pastille colorée. */
+export function accessTag(oaStatus: string | null | undefined): { label: string; cls: string } | null {
+	if (!oaStatus || oaStatus === 'unknown') return null;
+	if (oaStatus === 'closed') return { label: 'Fermé', cls: 'access-closed' };
+	if (oaStatus === 'embargoed') return { label: 'Sous embargo', cls: 'access-embargo' };
+	return { label: 'Ouvert', cls: 'access-open' }; // diamond/gold/hybrid/green/bronze
+}
+
 /** Labels pour les voies OA. */
 export const oaLabelsMap: Record<string, string> = {
 	diamond: 'Diamond',
