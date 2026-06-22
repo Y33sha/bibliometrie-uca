@@ -20,9 +20,9 @@ Directionnalité : chaque relation est stockée depuis la publication qui la **d
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
 
 from domain.publications.identifiers import clean_doi
+from domain.types import JsonValue
 
 
 class RelationType(StrEnum):
@@ -136,12 +136,15 @@ def map_crossref_relation(relation_key: str) -> RelationType | None:
     return _CROSSREF_MAP.get(relation_key)
 
 
-def extract_datacite_relations(meta: dict[str, Any] | None) -> list[tuple[RelationType, str]]:
+def extract_datacite_relations(meta: dict[str, JsonValue] | None) -> list[tuple[RelationType, str]]:
     """Relations en scope déclarées par un payload DataCite, depuis
     `meta.related_identifiers` (`[{doi, relation_type}]`). Renvoie `(type canonique,
     DOI cible)` ; ignore les types hors scope et les entrées sans DOI."""
+    related = (meta or {}).get("related_identifiers")
+    if not isinstance(related, list):
+        return []
     out: list[tuple[RelationType, str]] = []
-    for item in (meta or {}).get("related_identifiers") or []:
+    for item in related:
         if not isinstance(item, dict):
             continue
         canonical = map_datacite_relation(item.get("relation_type") or "")
@@ -190,7 +193,7 @@ def infer_shared_key_relation(
     return RelationType.IS_RELATED_TO, "sym"
 
 
-def extract_crossref_relations(meta: dict[str, Any] | None) -> list[tuple[RelationType, str]]:
+def extract_crossref_relations(meta: dict[str, JsonValue] | None) -> list[tuple[RelationType, str]]:
     """Relations en scope déclarées par un payload Crossref, depuis `meta.relation`
     (`{clé: [{id, id-type, …}]}`). Renvoie `(type canonique, DOI cible)` ; ne garde que les
     cibles de type DOI et les clés en scope."""

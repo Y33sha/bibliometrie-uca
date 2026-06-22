@@ -14,6 +14,7 @@ import run_pipeline
 def test_recompute_addresses_runs_in_publications_not_normalize():
     with (
         patch.object(run_pipeline, "_run_normalize_theses"),
+        patch.object(run_pipeline, "_run_normalize_datacite"),
         patch.object(run_pipeline, "_run_normalize_crossref"),
         patch.object(run_pipeline, "_run_normalize_scanr"),
         patch.object(run_pipeline, "_run_normalize_hal"),

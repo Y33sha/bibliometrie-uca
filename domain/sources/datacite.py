@@ -46,6 +46,8 @@ def extract_datacite_pub_year(attributes: dict[str, Any], *, max_year: int) -> i
     arbitrera). Borne inférieure 1500. `max_year` injecté pour la testabilité.
     """
     raw = attributes.get("publicationYear")
+    if raw is None:
+        return None
     try:
         year = int(raw)
     except (TypeError, ValueError):
