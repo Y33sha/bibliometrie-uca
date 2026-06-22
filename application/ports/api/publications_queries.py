@@ -187,6 +187,7 @@ class PublicationDetailCore(BaseModel):
     title: str
     pub_year: int | None
     doi: str | None
+    doi_ra: str | None  # registration agency du préfixe DOI (Crossref / DataCite), via doi_prefixes
     doc_type: str
     oa_status: str
     language: str | None

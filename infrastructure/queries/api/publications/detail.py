@@ -118,11 +118,13 @@ def get_publication_detail(conn: Connection, pub_id: int) -> dict[str, Any] | No
                    j.is_predatory AS journal_predatory, j.apc_amount, j.apc_currency,
                    j.oa_model,
                    pub.id AS publisher_id, pub.name AS publisher_name,
-                   pub.is_predatory AS publisher_predatory
+                   pub.is_predatory AS publisher_predatory,
+                   dp.ra AS doi_ra
             FROM publications p
             LEFT JOIN publications_detail d ON d.publication_id = p.id
             LEFT JOIN journals j ON j.id = p.journal_id
             LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(p.doi, '/', 1)
             WHERE p.id = :pid
         """),
         {"pid": pub_id},

@@ -4731,6 +4731,8 @@ export interface components {
             pub_year: number | null;
             /** Doi */
             doi: string | null;
+            /** Doi Ra */
+            doi_ra: string | null;
             /** Doc Type */
             doc_type: string;
             /** Oa Status */
