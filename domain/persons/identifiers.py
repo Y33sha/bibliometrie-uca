@@ -247,20 +247,24 @@ def mark_shared_identifiers_dubious(
     pas la distinguer des usurpations, donc on sacrifie le match par identifiant sur ce
     document (la signature matchera par nom) plutôt que de mal-attribuer les autres.
 
-    Attend en entrée les `person_identifiers` bruts (clés non suffixées), un par position,
-    tels que produits par `compact_identifiers` (`None` = aucun identifiant). Recalculé
-    depuis le brut à chaque normalisation, donc idempotent en pratique.
+    Un par position, tels que produits par `compact_identifiers` (`None` = aucun identifiant).
+    Idempotent : les clés déjà suffixées `_dubious` sont ignorées à la détection et ne sont
+    pas re-suffixées — réappliquer la fonction (re-normalisation, backfill ré-exécuté) ne
+    change rien. Au normalize, l'entrée est toujours nue, donc comportement inchangé.
     """
+
+    def bare(ids: dict[str, JsonValue] | None) -> list[tuple[str, JsonValue]]:
+        return [(k, v) for k, v in ids.items() if not k.endswith("_dubious")] if ids else []
+
     counts: Counter[tuple[str, JsonValue]] = Counter()
     for ids in ids_by_position:
-        if ids:
-            counts.update(ids.items())
+        counts.update(bare(ids))
     shared = {kv for kv, n in counts.items() if n >= 2}
     if not shared:
         return ids_by_position
     return [
-        {f"{k}_dubious": v for k, v in ids.items()}
-        if ids and any((k, v) in shared for k, v in ids.items())
+        {(k if k.endswith("_dubious") else f"{k}_dubious"): v for k, v in ids.items()}
+        if ids and any(kv in shared for kv in bare(ids))
         else ids
         for ids in ids_by_position
     ]

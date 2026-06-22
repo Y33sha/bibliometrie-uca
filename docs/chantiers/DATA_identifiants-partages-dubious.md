@@ -39,13 +39,13 @@ La séquence de remédiation doit donc être : **`null person_id corrompus` → 
 
 ### Phase 1 — Pipeline (le garde-fou)
 
-- [ ] **Helper partagé** (domain, pur) : `mark_shared_identifiers_dubious(ids_by_position)` — détecte les valeurs portées par ≥2 positions (par type d'id) et suffixe `_dubious` à tous les identifiants des positions concernées. Reproduit le comportement HAL, généralisé à tout type d'identifiant.
-- [ ] **Migrer normalize_hal** sur le helper (remplacer sa logique `Counter` maison ; non-régression stricte du comportement « blindé »).
-- [ ] **Brancher les autres normalizers** : crossref et openalex en priorité (sources de la corruption ORCID et utilisées au matching) ; wos/scanr/datacite par cohérence (garde uniforme, coût nul même si leur ORCID n'est pas un signal de matching).
+- [x] **Helper partagé** (domain, pur) : `mark_shared_identifiers_dubious(ids_by_position)` — détecte les valeurs portées par ≥2 positions (par type d'id) et suffixe `_dubious` à tous les identifiants des positions concernées. Reproduit le comportement HAL, généralisé à tout type d'identifiant.
+- [x] **Migrer normalize_hal** sur le helper (remplacer sa logique `Counter` maison ; non-régression stricte du comportement « blindé »).
+- [x] **Brancher les autres normalizers** : crossref et openalex en priorité (sources de la corruption ORCID et utilisées au matching) ; wos/scanr/datacite par cohérence (garde uniforme, coût nul même si leur ORCID n'est pas un signal de matching).
 
 ### Phase 2 — Backfill et remédiation
 
-- [ ] **Backfill oneshot** généralisé (calqué sur `backfill_dubious_hal_identifiers`) : requalifier `*_dubious` sur le stock crossref/openalex (+ autres) déjà normalisé.
+- [x] **Backfill oneshot** `backfill_dubious_shared_identifiers` (généralise `backfill_dubious_hal_identifiers` à tous les sources/ids). Détection exhaustive = un passage complet en lecture (aucun index ne porte les valeurs d'identifiant), **découpé en fenêtres d'ids** `source_publication_id` (Bitmap Index Scan sur l'unique `(source_publication_id, author_position)`) → mémoire bornée, résumable (`--resume-from`), commit par batch, réutilise le helper. **À lancer sur le serveur** (pas en local).
 - [ ] **Remédiation personnes** : oneshot `null → populate → create → populate`, plus purge des `person_identifiers` (table) qui ne sont plus appuyés par une authorship `in_perimeter`.
 
 ### Phase 3 — Tests
