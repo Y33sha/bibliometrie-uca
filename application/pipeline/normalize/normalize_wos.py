@@ -39,7 +39,11 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
-from domain.persons.identifiers import compact_identifiers, normalize_orcid
+from domain.persons.identifiers import (
+    compact_identifiers,
+    mark_shared_identifiers_dubious,
+    normalize_orcid,
+)
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
 from domain.sources.wos import derive_wos_api_oa_status, is_wos_author_exploitable
@@ -482,17 +486,25 @@ def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRe
             )
         return []
 
+    # Identifiant (orcid/researcher_id) partagé entre ≥2 signatures du record → `_dubious`.
+    ids_by_position = mark_shared_identifiers_dubious(
+        [
+            compact_identifiers(
+                orcid=a.get("orcid"),
+                researcher_id=a.get("researcher_id"),
+            )
+            for a in authors_kept
+        ]
+    )
+
     records: list[AuthorRecord] = []
-    for author in authors_kept:
+    for idx, author in enumerate(authors_kept):
         # Noms des institutions WoS comme identifiants natifs (pas d'ID stable
         # côté WoS — le nom sert d'identifiant).
         institution_names = [
             org["name"] for org in author.get("organizations", []) if org.get("name")
         ]
-        ids = compact_identifiers(
-            orcid=author.get("orcid"),
-            researcher_id=author.get("researcher_id"),
-        )
+        ids = ids_by_position[idx]
         records.append(
             AuthorRecord(
                 position=author["position"],

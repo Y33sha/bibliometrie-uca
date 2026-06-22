@@ -12,6 +12,7 @@ les normalizers de pipeline qui stockent la forme texte en base).
 """
 
 import re
+from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -227,3 +228,39 @@ def compact_identifiers(**ids: JsonValue) -> dict[str, JsonValue] | None:
     """
     out: dict[str, JsonValue] = {k: v for k, v in ids.items() if v}
     return out or None
+
+
+def mark_shared_identifiers_dubious(
+    ids_by_position: list[dict[str, JsonValue] | None],
+) -> list[dict[str, JsonValue] | None]:
+    """Requalifie `_dubious` les identifiants partagés entre signatures d'un même enregistrement.
+
+    Un identifiant — quel que soit son type — porté par **≥2 positions d'auteur distinctes**
+    au sein d'un même enregistrement source est une corruption : un identifiant ne peut pas
+    désigner deux signatures dans un même document (dépôt HAL référençant deux fois le même
+    compte, ORCID du premier auteur recopié sur tous les co-auteurs d'un méga-papier
+    crossref/openalex…). Toute position portant une valeur partagée voit **tous** ses
+    identifiants suffixés `_dubious` : conservés (réversible, diagnosticable) mais invisibles
+    au matching personnes, qui lit les clés non suffixées.
+
+    On requalifie y compris la position du vrai propriétaire de l'identifiant : on ne peut
+    pas la distinguer des usurpations, donc on sacrifie le match par identifiant sur ce
+    document (la signature matchera par nom) plutôt que de mal-attribuer les autres.
+
+    Attend en entrée les `person_identifiers` bruts (clés non suffixées), un par position,
+    tels que produits par `compact_identifiers` (`None` = aucun identifiant). Recalculé
+    depuis le brut à chaque normalisation, donc idempotent en pratique.
+    """
+    counts: Counter[tuple[str, JsonValue]] = Counter()
+    for ids in ids_by_position:
+        if ids:
+            counts.update(ids.items())
+    shared = {kv for kv, n in counts.items() if n >= 2}
+    if not shared:
+        return ids_by_position
+    return [
+        {f"{k}_dubious": v for k, v in ids.items()}
+        if ids and any((k, v) in shared for k, v in ids.items())
+        else ids
+        for ids in ids_by_position
+    ]
