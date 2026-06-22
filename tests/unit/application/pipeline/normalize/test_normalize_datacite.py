@@ -36,6 +36,30 @@ class TestAuthorRecords:
             {"orcid": "0000-0001-5109-3700"},
         ]
 
+    def test_shared_orcid_marked_dubious(self):
+        """Même ORCID sur 2 creators (dépôt de collaboration) → requalifié `_dubious`."""
+        attrs = {
+            "creators": [
+                {
+                    "name": "Acharya, S.",
+                    "nameIdentifiers": [
+                        {"nameIdentifier": "0000-0002-1825-0097", "nameIdentifierScheme": "ORCID"}
+                    ],
+                },
+                {
+                    "name": "Das, S.",
+                    "nameIdentifiers": [
+                        {"nameIdentifier": "0000-0002-1825-0097", "nameIdentifierScheme": "ORCID"}
+                    ],
+                },
+            ]
+        }
+        recs = build_datacite_author_records(attrs)
+        assert [r.person_identifiers for r in recs] == [
+            {"orcid_dubious": "0000-0002-1825-0097"},
+            {"orcid_dubious": "0000-0002-1825-0097"},
+        ]
+
     def test_skips_organizational(self):
         attrs = {
             "creators": [
