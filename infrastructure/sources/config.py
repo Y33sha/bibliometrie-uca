@@ -126,6 +126,8 @@ _API_BASE_URLS_DEFAULTS: dict[str, str] = {
     # CrossRef : racine sans /works, l'adapter compose le chemin selon
     # l'usage (/works/<doi>, /works?filter=orcid:...)
     "crossref": "https://api.crossref.org",
+    # DataCite : racine, l'adapter compose `/dois` (query batch) ou `/dois/<doi>`.
+    "datacite": "https://api.datacite.org",
     # Endpoints secondaires
     "openalex_sources": "https://api.openalex.org/sources",
     "openalex_publishers": "https://api.openalex.org/publishers",

@@ -25,6 +25,7 @@ from application.ports.pipeline.extract.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
+from infrastructure.sources.datacite.fetch_missing_doi import DataciteFetchMissingDoiAdapter
 from infrastructure.sources.hal.fetch_missing_doi import HalFetchMissingDoiAdapter
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 from infrastructure.sources.openalex.fetch_missing_doi import OpenalexFetchMissingDoiAdapter
@@ -441,6 +442,65 @@ class TestScanrFetchAsync:
 
         async with httpx.AsyncClient() as client:
             records = list(await adapter.fetch_async(client, ["10.1/a"]))
+        assert records == []
+
+
+# ── adapter DataCite : fetch_async (batch query) via respx ───────
+
+
+class TestDataciteFetchAsync:
+    @staticmethod
+    def _adapter() -> DataciteFetchMissingDoiAdapter:
+        adapter = DataciteFetchMissingDoiAdapter()
+        adapter.base_url = "https://api.datacite.org"
+        adapter.headers = {"Accept": "application/vnd.api+json"}
+        return adapter
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fetch_async_batch_returns_records(self):
+        """Lot de 2 DOI, 2 nœuds `data` : remappés par DOI exact (lowercase)."""
+        respx.get("https://api.datacite.org/dois").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {"id": "10.1/A", "attributes": {"doi": "10.1/A"}},
+                        {"id": "10.1/B", "attributes": {"doi": "10.1/B"}},
+                    ]
+                },
+            )
+        )
+        async with httpx.AsyncClient() as client:
+            records = list(await self._adapter().fetch_async(client, ["10.1/a", "10.1/b"]))
+        assert all(not is_not_found_marker(r) for r in records)
+        assert {r["attributes"]["doi"] for r in records} == {"10.1/A", "10.1/B"}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fetch_async_batch_marks_unmatched_dois(self):
+        """Lot de 2 DOI, un seul nœud : le DOI absent de la réponse est marqué
+        not_found (diff requêtés / trouvés)."""
+        respx.get("https://api.datacite.org/dois").mock(
+            return_value=httpx.Response(
+                200, json={"data": [{"id": "10.1/a", "attributes": {"doi": "10.1/a"}}]}
+            )
+        )
+        async with httpx.AsyncClient() as client:
+            records = list(await self._adapter().fetch_async(client, ["10.1/a", "10.1/b"]))
+        real = [r for r in records if not is_not_found_marker(r)]
+        assert [r["attributes"]["doi"] for r in real] == ["10.1/a"]
+        missed = {r["_doi"] for r in records if is_not_found_marker(r)}
+        assert missed == {"10.1/b"}
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_fetch_async_network_error_returns_empty(self):
+        """Erreur réseau persistante = lot incomplet : on ne marque aucun DOI
+        not_found (l'absence ne prouve rien)."""
+        respx.get("https://api.datacite.org/dois").mock(side_effect=httpx.ConnectError("refused"))
+        async with httpx.AsyncClient() as client:
+            records = list(await self._adapter().fetch_async(client, ["10.1/a"]))
         assert records == []
 
 
