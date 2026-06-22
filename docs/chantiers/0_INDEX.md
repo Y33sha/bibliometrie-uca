@@ -15,6 +15,7 @@
 
 ### Non commencé
 
+- [Identifiants partagés entre signatures (corruption source) : généraliser le `_dubious`](DATA_identifiants-partages-dubious.md)
 - [Visualisations dynamiques (pivot listes ↔ tableaux de bord)](METIER_visualisations-pivot.md)
 
 ## Chantiers archivés
