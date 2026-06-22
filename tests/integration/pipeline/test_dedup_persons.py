@@ -61,6 +61,17 @@ def _reject_pair(conn, publication_id, person_id):
     )
 
 
+def _set_name_form_status(conn, person_id, raw_name, status):
+    """Force le statut du lien `(forme de `raw_name`, person_id)` dans `person_name_forms`."""
+    conn.execute(
+        text("""
+            UPDATE person_name_forms SET status = CAST(:st AS identifier_status)
+            WHERE person_id = :pid AND name_form = normalize_name_form(:raw)
+        """),
+        {"pid": person_id, "raw": raw_name, "st": status},
+    )
+
+
 def _insert_publication(conn, title="Test Pub", pub_year=2024):
     from domain.normalize import normalize_text
 
@@ -239,6 +250,63 @@ class TestCascadeRun:
         _run_cascade(sa_sync_conn)
 
         assert _get_person_id(sa_sync_conn, hal_as) != person_id
+
+    def test_persons_name_forms_confirmed_on_create(self, sa_sync_conn):
+        """Les formes dérivées du nom/prénom (source 'persons') sont confirmées d'office."""
+        person_id = create_person("Brindacier", "Fifi", repo=person_repository(sa_sync_conn))
+        rows = sa_sync_conn.execute(
+            text(
+                "SELECT name_form, status::text AS status FROM person_name_forms WHERE person_id = :pid"
+            ),
+            {"pid": person_id},
+        ).all()
+        assert rows
+        assert all(r.status == "confirmed" for r in rows)
+        forms = {r.name_form for r in rows}
+        assert "fifi brindacier" in forms
+        assert "brindacier fifi" in forms
+
+    def test_identifier_match_refused_when_name_form_rejected(self, sa_sync_conn):
+        """Forme de nom `rejected` pour la personne : le match identifiant est refusé
+        (corroboration), et le barreau name_form l'exclut aussi → pas de rattachement,
+        même avec un nom par ailleurs compatible."""
+        pub = _insert_publication(sa_sync_conn)
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
+        _seed_identifier(sa_sync_conn, person_id, "hal_person_id", "111222", "confirmed")
+        # "Jean Dupont" serait compatible par tokens, mais rejeté pour cette personne.
+        _set_name_form_status(sa_sync_conn, person_id, "Jean Dupont", "rejected")
+
+        hal_sd = _insert_source_document(sa_sync_conn, "hal", "hal-202", pub)
+        hal_as = _insert_authorship(
+            sa_sync_conn, "hal", hal_sd, "Jean Dupont", identifiers={"hal_person_id": "111222"}
+        )
+
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, hal_as) != person_id
+
+    def test_identifier_match_confirmed_name_form_overrides_token_incompat(self, sa_sync_conn):
+        """Forme de nom `confirmed` pour la personne : le match identifiant est corroboré
+        sans test de tokens — utile au changement de nom, où la signature n'a aucun token
+        commun avec le nom de la personne."""
+        pub = _insert_publication(sa_sync_conn)
+        person_a = create_person("Maneval", "Axelle", repo=person_repository(sa_sync_conn))
+        person_b = create_person("Vanlander", "Bernard", repo=person_repository(sa_sync_conn))
+        _seed_identifier(sa_sync_conn, person_a, "hal_person_id", "987654", "confirmed")
+        # "Van Lander" : aucun token commun avec "Maneval Axelle" (le test de tokens
+        # échouerait), confirmée pour A ; aussi portée par B → barreau name_form ambigu.
+        add_name_form(person_a, "Van Lander", repo=person_repository(sa_sync_conn))
+        add_name_form(person_b, "Van Lander", repo=person_repository(sa_sync_conn))
+        _set_name_form_status(sa_sync_conn, person_a, "Van Lander", "confirmed")
+
+        hal_sd = _insert_source_document(sa_sync_conn, "hal", "hal-203", pub)
+        hal_as = _insert_authorship(
+            sa_sync_conn, "hal", hal_sd, "Van Lander", identifiers={"hal_person_id": "987654"}
+        )
+
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, hal_as) == person_a
 
     def test_rejected_orcid_ignored(self, sa_sync_conn):
         """ORCID `rejected` en base → ignoré par le matching."""
