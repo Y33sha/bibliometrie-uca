@@ -124,7 +124,8 @@
     padding: 16px;
     align-self: start;
     position: sticky;
-    top: 12px;
+    /* Sous le menu supérieur fixe (sticky top:0) + petit écart, sinon masquée au scroll. */
+    top: calc(var(--header-height) + 12px);
   }
   .access-btn {
     display: flex;
