@@ -15,6 +15,7 @@ from application.ports.repositories.structure_repository import (
 )
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
+from domain.structures.identifiers import RorId
 from domain.structures.relations import check_can_create_relation
 
 # ── Mapping des champs UI → colonnes SQL pour la table structures ──
@@ -26,6 +27,21 @@ _STRUCTURE_FIELD_MAP = {
     "rnsr_id": "rnsr_id",
     "hal_collection": "hal_collection",
 }
+
+
+def _normalize_ror_id(raw: str | None) -> str | None:
+    """Forme canonique courte du ror_id (le VO `RorId` strip l'URL `https://ror.org/`),
+    ou `None` si vide. Lève `ValidationError` si une valeur non vide n'est pas un ROR valide.
+
+    Seule barrière d'écriture : tout chemin (form admin, import, futur appelant) passe par
+    le service, donc une URL complète envoyée par un client est ramenée à l'ID 9-char ici.
+    """
+    if not raw or not raw.strip():
+        return None
+    parsed = RorId.try_parse(raw)
+    if parsed is None:
+        raise ValidationError(f"ror_id invalide : {raw!r}")
+    return parsed.value
 
 
 # ── structures ────────────────────────────────────────────────────
@@ -50,7 +66,7 @@ def create_structure(
         name=name,
         acronym=acronym,
         type=type,
-        ror_id=ror_id,
+        ror_id=_normalize_ror_id(ror_id),
         rnsr_id=rnsr_id,
         hal_collection=hal_collection,
         api_ids=api_ids,
@@ -79,6 +95,9 @@ def update_structure(structure_id: int, *, fields: dict, repo: StructureReposito
         val = fields.get(field_name)
         if val is not None:
             update_fields[col_name] = val  # type: ignore[literal-required]
+
+    if "ror_id" in update_fields:
+        update_fields["ror_id"] = _normalize_ror_id(update_fields["ror_id"])
 
     if "api_ids" in fields and fields["api_ids"] is not None:
         # SA sérialise auto en JSONB depuis un dict Python ; pas de Json() wrap.

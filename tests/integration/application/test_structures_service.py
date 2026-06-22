@@ -123,6 +123,22 @@ class TestCreateStructure:
                 repo=repo,
             )
 
+    def test_ror_id_full_url_normalized_to_short(self, sa_sync_conn, repo):
+        """Une URL ROR complète est ramenée à l'ID 9-char canonique (VO RorId),
+        quelle que soit la forme envoyée par le client."""
+        row = create_structure(
+            code="ROR1",
+            name="Ror1",
+            type="labo",
+            ror_id="https://ror.org/026tc4g97",
+            repo=repo,
+        )
+        assert row["ror_id"] == "026tc4g97"
+
+    def test_ror_id_invalid_raises(self, sa_sync_conn, repo):
+        with pytest.raises(ValidationError, match="ror_id invalide"):
+            create_structure(code="ROR2", name="Ror2", type="labo", ror_id="pas-un-ror", repo=repo)
+
 
 class TestUpdateStructure:
     def test_raises_not_found(self, sa_sync_conn, repo):
@@ -165,6 +181,23 @@ class TestUpdateStructure:
         )
         assert updated["name"] == "Original"  # inchangé
         assert updated["acronym"] == "AC"
+
+    def test_ror_id_full_url_normalized_to_short(self, sa_sync_conn, repo):
+        """Régression : éditer une structure en envoyant le ROR en URL complète
+        (ce que faisait le form admin) ne doit plus stocker l'URL — le service la
+        ramène à l'ID court via le VO RorId."""
+        row = create_structure(code="X", name="X", type="labo", ror_id="026tc4g97", repo=repo)
+        updated = update_structure(
+            row["id"],
+            fields={"acronym": "X", "ror_id": "https://ror.org/026tc4g97"},
+            repo=repo,
+        )
+        assert updated["ror_id"] == "026tc4g97"
+
+    def test_ror_id_invalid_raises(self, sa_sync_conn, repo):
+        row = create_structure(code="X", name="X", type="labo", repo=repo)
+        with pytest.raises(ValidationError, match="ror_id invalide"):
+            update_structure(row["id"], fields={"ror_id": "pas-un-ror"}, repo=repo)
 
 
 class TestDeleteStructure:
