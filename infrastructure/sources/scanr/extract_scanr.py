@@ -60,7 +60,9 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
                 self._url,
                 json_body=query,
                 auth=self._auth,
-                timeout=30,
+                # Pages de SCANR_PER_PAGE (1000) : un fetch à froid peut dépasser
+                # 30s. Marge à 60s pour ne pas déclencher un retry inutile.
+                timeout=60,
                 label="ScanR search",
             )
         finally:
@@ -90,9 +92,14 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
     ) -> dict[str, Any]:
         """Construit la requête Elasticsearch pour ScanR.
 
-        `bool.must` filtre l'année (term exact), `bool.should` matche au
-        moins une affiliation (clause OR via `minimum_should_match: 1`).
-        Le tri par `id.keyword` ASC permet la pagination `search_after`.
+        Tout est en **contexte `filter`** : un `term` sur l'année et un `terms`
+        sur les affiliations (« au moins une de la liste » — équivalent strict du
+        `minimum_should_match: 1` d'un `should`). Le contexte `filter` ne calcule
+        aucun `_score` et est cacheable côté cluster ; mesuré ~9× plus rapide que
+        l'équivalent `must`/`should` scoré (≈1 s vs ≈9,5 s par page de 200 sur le
+        cluster ScanR), pour un résultat identique puisque le tri se fait sur
+        `id.keyword` ASC — le score ne sert pas. Ce tri permet la pagination
+        `search_after`.
 
         `track_total` ne demande le comptage exact du set (`track_total_hits`)
         que sur la première page : Elasticsearch recompte sinon l'intégralité
@@ -105,11 +112,10 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
             "track_total_hits": track_total,
             "query": {
                 "bool": {
-                    "must": [{"term": {"year": year}}],
-                    "should": [
-                        {"term": {"affiliations.id.keyword": aid}} for aid in affiliation_ids
-                    ],
-                    "minimum_should_match": 1,
+                    "filter": [
+                        {"term": {"year": year}},
+                        {"terms": {"affiliations.id.keyword": affiliation_ids}},
+                    ]
                 }
             },
             "sort": [{"id.keyword": "asc"}],
