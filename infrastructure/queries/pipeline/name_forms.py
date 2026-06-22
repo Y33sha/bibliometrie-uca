@@ -142,10 +142,17 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
         """)
     ).rowcount
 
+    # `'persons'` ⇒ `confirmed` vaut aussi quand une forme bibliographique gagne la
+    # source `'persons'` (le nom de la personne produit désormais cette forme) ; un
+    # verdict sur une forme non-`'persons'` est préservé.
     updated = conn.execute(
         text("""
             UPDATE person_name_forms p
-            SET sources = e.sources
+            SET sources = e.sources,
+                status = CASE
+                    WHEN 'persons' = ANY(e.sources) THEN 'confirmed'::identifier_status
+                    ELSE p.status
+                END
             FROM _expected_pnf e
             WHERE p.name_form = e.name_form AND p.person_id = e.person_id
               AND p.sources IS DISTINCT FROM e.sources

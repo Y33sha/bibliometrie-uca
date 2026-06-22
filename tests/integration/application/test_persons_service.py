@@ -558,6 +558,40 @@ class TestDetachAuthorships:
             is None
         )
 
+    def test_preserves_rejected_orphan_name_form(self, sa_sync_conn, repo, authorship_repo):
+        """Une forme `rejected` devenue orpheline est préservée : la supprimer
+        détruirait le blocage de non-retour qu'elle matérialise."""
+        person_id = _insert_person(sa_sync_conn)
+        pub_id = _insert_publication(sa_sync_conn)
+        sp_id = _insert_source_publication(sa_sync_conn, pub_id)
+        sa_id = _insert_source_authorship(
+            sa_sync_conn, sp_id, person_id=person_id, author_name_normalized="dupont jean"
+        )
+        repo.add_name_form(person_id, "Dupont Jean", source="hal")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE person_name_forms SET status='rejected' "
+                "WHERE name_form='dupont jean' AND person_id=:p"
+            ),
+            {"p": person_id},
+        )
+
+        result = detach_authorships(
+            person_id,
+            authorships=[{"source": "hal", "authorship_id": sa_id}],
+            repo=repo,
+            authorship_repo=authorship_repo,
+        )
+        assert result["cleaned_forms"] == 0
+        assert (
+            _scalar(
+                sa_sync_conn,
+                "SELECT 1 FROM person_name_forms WHERE name_form='dupont jean' AND person_id=:p",
+                p=person_id,
+            )
+            == 1
+        )
+
     def test_preserves_computed_name_form(self, sa_sync_conn, repo, authorship_repo):
         """Les formes calculées depuis le nom de la personne (source `persons`)
         ne dépendent d'aucune source et survivent au détachement."""

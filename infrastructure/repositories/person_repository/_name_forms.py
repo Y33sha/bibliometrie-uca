@@ -81,11 +81,16 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
     calculées à partir du nom de la personne (source ``'persons'``) sont
     conservées : elles ne dépendent pas des sources.
 
+    Ne touche que les formes ``pending`` : un verdict ``confirmed``/``rejected`` est
+    préservé même devenu orphelin — supprimer une forme ``rejected`` détruirait le
+    blocage de non-retour qu'elle matérialise.
+
     Retourne le nombre de formes supprimées."""
     result = conn.execute(
         text(f"""
             DELETE FROM person_name_forms pnf
             WHERE pnf.person_id = :pid
+              AND pnf.status = 'pending'
               AND NOT ('persons' = ANY(pnf.sources))
               AND NOT EXISTS (
                   SELECT 1 FROM source_authorships sa
@@ -109,9 +114,11 @@ def add_person_source(
     source dans le tableau existant — déduplication + tri stable
     via ``array_agg(DISTINCT ... ORDER BY ...)``.
 
-    Une row **nouvelle** dérivée du nom/prénom (source ``'persons'``) est posée
-    ``confirmed`` (forme canonique de la personne), ``pending`` sinon. Sur conflit
-    le ``status`` n'est pas touché : un verdict existant (humain ou antérieur) prime.
+    Statut : une forme dérivée du nom/prénom (source ``'persons'``) est ``confirmed``
+    — le nom canonique de la personne ne se discute pas —, ``pending`` sinon. La règle
+    vaut aussi sur conflit : ajouter la source ``'persons'`` à une row existante la passe
+    ``confirmed``. Une fusion non-``'persons'`` (forme bibliographique) ne touche pas le
+    statut : un verdict (``confirmed``/``rejected``) est préservé.
     """
     new_sources = [source] if source else []
     status = "confirmed" if source == "persons" else "pending"
@@ -123,7 +130,11 @@ def add_person_source(
                 sources = (
                     SELECT COALESCE(array_agg(DISTINCT s ORDER BY s), '{}'::text[])
                     FROM unnest(person_name_forms.sources || EXCLUDED.sources) AS s
-                )
+                ),
+                status = CASE
+                    WHEN :status = 'confirmed' THEN 'confirmed'::identifier_status
+                    ELSE person_name_forms.status
+                END
         """),
         {"nf": name_form, "pid": person_id, "new_sources": new_sources, "status": status},
     )
