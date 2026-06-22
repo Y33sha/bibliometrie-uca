@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { base } from "$app/paths";
   import Modal from "$lib/components/Modal.svelte";
   import { sanitizeTitle } from "$lib/utils";
   import { sourceLabel } from "$lib/sources";
@@ -17,6 +18,15 @@
     ondetachNameForm: () => void | Promise<void>;
     onmerge: (sourceId: number) => void | Promise<void>;
   } = $props();
+
+  const checkedCount = $derived(state.publications.filter((p) => p.checked).length);
+  const allChecked = $derived(
+    state.publications.length > 0 && state.publications.every((p) => p.checked),
+  );
+
+  function setAll(checked: boolean): void {
+    for (const p of state.publications) p.checked = checked;
+  }
 </script>
 
 <Modal title={`Forme de nom : « ${state.nameForm} »`} {onclose}>
@@ -48,18 +58,33 @@
         <p>Aucune publication liée.</p>
       {:else}
         <p>Cochez les publications à détacher de cette personne :</p>
+        {#if state.publications.length > 1}
+          <label class="checkbox-row detach-all">
+            <input
+              type="checkbox"
+              checked={allChecked}
+              onchange={(e) => setAll(e.currentTarget.checked)}
+            />
+            {allChecked ? "Tout décocher" : "Tout cocher"}
+          </label>
+        {/if}
         <div class="detach-list">
           {#each state.publications as p, i}
-            <label class="detach-item">
+            <div class="detach-item">
               <input type="checkbox" bind:checked={state.publications[i].checked} />
               <span class="detach-year">{p.pub_year ?? "?"}</span>
-              <span class="detach-title">{@html sanitizeTitle(p.title)}</span>
+              <a
+                class="detach-title"
+                href="{base}/publications/{p.pub_id}"
+                target="_blank"
+                rel="noopener"
+              >{@html sanitizeTitle(p.title)}</a>
               <span class="detach-sources">
                 {#each p.sources as s}
                   <span class="tag tag-source">{sourceLabel(s.source)}</span>
                 {/each}
               </span>
-            </label>
+            </div>
           {/each}
         </div>
       {/if}
@@ -70,12 +95,12 @@
       {#if state.publications.length === 0}
         <button class="btn btn-danger" onclick={ondetachNameForm}>Détacher cette forme</button>
       {:else}
-        <button class="btn btn-danger" onclick={onconfirmDetach}>
-          Détacher {state.publications.filter((p) => p.checked).length} publication{state.publications.filter(
-            (p) => p.checked,
-          ).length > 1
-            ? "s"
-            : ""}
+        <button
+          class="btn btn-danger"
+          disabled={checkedCount === 0}
+          onclick={onconfirmDetach}
+        >
+          Détacher {checkedCount} publication{checkedCount > 1 ? "s" : ""}
         </button>
       {/if}
     {/if}
@@ -89,24 +114,50 @@
     gap: 4px;
     margin: 12px 0;
   }
+  .detach-all {
+    margin: 12px 0 4px;
+    /* Aligne la case sur celles des rangées (padding-left de .detach-item). */
+    padding-left: 8px;
+  }
   .detach-item {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     padding: 4px 8px;
     border-radius: 4px;
-    cursor: pointer;
   }
   .detach-item:hover {
     background: #f5f5f5;
+  }
+  .detach-item input[type="checkbox"] {
+    /* Annule le `.modal-content input { width: 100% }` global qui étirait la case
+       sur toute la largeur et écrasait le titre. Marges à 0 (sauf le top) pour aligner
+       sur la case « tout cocher » (`.checkbox-row input { margin: 0 }`). */
+    width: auto;
+    flex-shrink: 0;
+    margin: 2px 0 0;
   }
   .detach-year {
     color: #888;
     font-size: 0.8rem;
     min-width: 30px;
+    flex-shrink: 0;
   }
   .detach-title {
+    flex: 1;
+    min-width: 0;
     font-size: 0.85rem;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .detach-title:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  .detach-sources {
+    flex-shrink: 0;
+    max-width: 120px;
+    text-align: right;
   }
   .other-persons-section {
     margin-bottom: 16px;
