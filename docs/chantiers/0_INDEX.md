@@ -4,7 +4,6 @@
 
 ### En cours
 
-- [DOI Registration Agencies & DataCite](METIER_doi-ra-datacite.md)
 - [Relations entre publications](METIER_relations-publications.md)
 
 ### En pause
@@ -15,11 +14,14 @@
 
 ### Non commencé
 
-- [Identifiants partagés entre signatures (corruption source) : généraliser le `_dubious`](DATA_identifiants-partages-dubious.md)
+- [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
 - [Visualisations dynamiques (pivot listes ↔ tableaux de bord)](METIER_visualisations-pivot.md)
 
 ## Chantiers archivés
 
+- 2026-06-22 — [Identifiants partagés entre signatures (corruption source) : généraliser le `_dubious`](archived/2026-06-22_DATA_identifiants-partages-dubious.md)
+- 2026-06-20 — [DOI Registration Agencies & DataCite](archived/2026-06-20_METIER_doi-ra-datacite.md)
+- 2026-06-20 — [Extraction HAL : requête unique multi-collections](archived/2026-06-20_CODE_hal-extract-mono-requete.md)
 - 2026-06-20 — [Embargo HAL : statut OA intermédiaire « sous embargo »](archived/2026-06-20_METIER_embargo-oa-status.md)
 - 2026-06-19 — [Types de documents : enum, mappings, règles suspects](archived/2026-06-19_METIER_doc-types.md)
 - 2026-06-19 — [Matching cross-source des authorships](archived/2026-06-19_DATA_authorships-cross-source-matching.md)
@@ -33,13 +35,14 @@
 - 2026-06-08 — [Export CSV fidèle à l'affichage (filtres + colonnes + titres nettoyés)](archived/2026-06-08_CODE_export-csv-fidele.md)
 - 2026-06-08 — [Peaufinage UI (cohérence, responsivité, ergonomie)](archived/2026-06-08_CODE_peaufinage-ui.md)
 - 2026-06-07 — [Barres à facettes homogènes + extraction des ListView (thèses, personnes) + alignement endpoint personnes](archived/2026-06-07_CODE_listviews-facettes-homogenes.md)
-- 2026-06-07 — [Filtres composables pour le repérage des adresses (admin)](archived/CODE_filtres-adresses-composables.md)
+- 2026-06-07 — [Filtres composables pour le repérage des adresses (admin)](archived/2026-06-07_CODE_filtres-adresses-composables.md)
 - 2026-06-06 — [Background jobs pour les endpoints longs : matview pipeline-only, garde-fou batch_set_country, propagation des reviews en tâche de fond](archived/2026-06-06_CODE_background-jobs.md)
-- 2026-06-05 — [Stratégie de tests : dé-fictionnaliser, factoriser, parcimonie](archived/CODE_strategie-tests.md)
+- 2026-06-05 — [Stratégie de tests : dé-fictionnaliser, factoriser, parcimonie](archived/2026-06-05_CODE_strategie-tests.md)
 - 2026-06-04 — [Matérialiser le périmètre (`perimeter_structures`) — audit `in_perimeter` : conservé](archived/2026-06-04_DATA_perimeter-materialise.md)
 - 2026-06-04 — [Rejet durable d'une paire (publication, personne) : garde matching, détachement, réassignation](archived/2026-06-04_METIER_detachement-rejet-durable.md)
-- 2026-06-03 — [Données dérivées : audit + cadre de décision (matérialisation vs vue)](archived/DATA_donnees-derivees.md)
-- 2026-06-03 — [Normalize : batcher l'insertion des authorships](archived/CODE_batcher-normalize-authorships.md)
+- 2026-06-03 — [Zenodo : dédup concept/version en matching, pas en normalize](archived/2026-06-03_METIER_zenodo-concept-version.md)
+- 2026-06-03 — [Données dérivées : audit + cadre de décision (matérialisation vs vue)](archived/2026-06-03_DATA_donnees-derivees.md)
+- 2026-06-03 — [Normalize : batcher l'insertion des authorships](archived/2026-06-03_CODE_batcher-normalize-authorships.md)
 - 2026-06-02 — [Authorships : build source-agnostique en une passe convergente](archived/2026-06-02_CODE_simplifier-build-authorships.md)
 - 2026-06-01 — [Sidecar `rejected_authorships` (extraire `authorships.excluded`)](archived/2026-06-01_DATA_rejected-authorships-sidecar.md)
 - 2026-05-31 — [Stockage des données brutes (raw store)](archived/2026-05-31_DATA_raw-data-store.md)
