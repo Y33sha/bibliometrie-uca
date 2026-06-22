@@ -163,6 +163,7 @@
     --embargoed: #b08900;
     --closed: #555;
     --unknown: #bbb;
+    --header-height: 46px; /* hauteur du menu supérieur fixe (sticky top:0) */
   }
   :global(*, *::before, *::after) {
     box-sizing: border-box;
@@ -183,7 +184,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 46px;
+    height: var(--header-height);
     position: sticky;
     top: 0;
     z-index: 100;
