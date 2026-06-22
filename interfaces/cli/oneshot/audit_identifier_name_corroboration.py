@@ -3,12 +3,11 @@
 Outille la décision du levier « rejeter un match identifiant dont le nom est
 incompatible avec la personne ciblée » (chantier
 `DATA_personnes-dedoublonnage-assiste`). Deux analyses indépendantes, lecture
-seule, réutilisant les fonctions domaine pour coller au comportement réel.
+seule, réutilisant `names_compatible` du domaine pour coller au comportement réel.
 
 `--rates` : sur tous les `source_authorships` portant un identifiant
 (orcid/idref/hal_person_id non `_dubious`) qui résout vers une personne connue,
-ventile compatible / abstention (signature trop pauvre) / incompatible (nom de
-famille compatible mais prénom divergent, ou totalement incompatible).
+ventile compatible / incompatible (nom de la signature vs nom de la personne ciblée).
 
 `--double-occurrence` : répond à la question « quand un identifiant rattache une
 authorship à une personne sous un nom incompatible, retrouve-t-on sur la **même**
@@ -22,20 +21,13 @@ Sans argument : lance les deux. Rien n'est écrit.
 """
 
 import argparse
-import re
 import sys
 from collections import defaultdict
 
 from sqlalchemy import text
 
-from domain.normalize import normalize_name
-from domain.persons.name_matching import (
-    last_names_compatible,
-    names_compatible,
-    parse_raw_author_name,
-)
+from domain.persons.name_matching import names_compatible
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.queries.api.person_duplicates import _tokens_match
 
 ORCID_MATCH_SOURCES = frozenset({"crossref", "openalex", "hal"})
 ID_TYPES = ("orcid", "idref", "hal_person_id")
@@ -57,50 +49,11 @@ def load_target_map(conn, id_type):
     return {r.id_value: (r.person_id, r.ln or "", r.fn or "") for r in rows}
 
 
-def _sig(raw_name):
-    """Signature normalisée (last_norm, first_norm) comme dans la cascade."""
-    last, first = parse_raw_author_name(raw_name)
-    return normalize_name(last), normalize_name(first)
-
-
-def _clean(s):
-    """Normalisation de comparaison de noms : comme `normalize_name` mais SANS les
-    chiffres. Les années de naissance collées aux signatures de type SUDOC
-    (« Chiari, Sophie 1977- ») parasitent sinon les tokens et faussent la
-    comparaison. Exception assumée à la normalisation habituelle (qui conserve
-    [a-z0-9]), d'où une fonction ad hoc propre à la comparaison de noms."""
-    return re.sub(r"\s+", " ", re.sub(r"\d+", " ", normalize_name(s or ""))).strip()
-
-
-def name_compatible_strict(raw_name, target_ln, target_fn):
-    """Comparaison positionnelle de la cascade (`names_compatible`), entrées nettoyées (sans chiffres)."""
-    last, first = parse_raw_author_name(raw_name)
-    return names_compatible(_clean(last), _clean(first), _clean(target_ln), _clean(target_fn))
-
-
-def name_compatible_tokens(raw_name, target_ln, target_fn):
-    """Comparaison par ensemble de tokens (`_tokens_match`), entrées nettoyées (sans chiffres).
-
-    Indépendante de l'ordre et tolérante aux initiales : réconcilie « P.M. Llorca »
-    avec « Pierre-Michel Llorca », les noms multi-mots et les noms composés réordonnés."""
-    sig = set(_clean(raw_name).split())
-    person = set(_clean(f"{target_ln} {target_fn}").split())
-    return _tokens_match(sig, person)
-
-
-def classify(sig_ln, sig_fn, target_ln, target_fn):
-    """compatible / abstain / incompat_strong / incompat_firstname."""
-    if names_compatible(sig_ln, sig_fn, target_ln, target_fn):
-        return "compatible"
-    if not sig_fn or not target_fn:
-        return "abstain"
-    if last_names_compatible(sig_ln, target_ln) or last_names_compatible(sig_ln, target_fn):
-        return "incompat_firstname"
-    return "incompat_strong"
-
-
 def audit_rates(conn, maps):
-    """Ventilation compatible / abstention / incompatible par type d'identifiant."""
+    """Ventilation compatible / incompatible par type d'identifiant.
+
+    `names_compatible` comparant par tokens (ordre indifférent), on passe la
+    signature brute entière en premier argument et une chaîne vide en second."""
     stats = {t: defaultdict(int) for t in ID_TYPES}
     result = conn.execution_options(stream_results=True).execute(
         text("""
@@ -119,7 +72,6 @@ def audit_rates(conn, maps):
     n = 0
     for row in result:
         n += 1
-        sig_ln, sig_fn = _sig(row.name)
         values = {"orcid": row.orcid, "idref": row.idref, "hal_person_id": row.hal_person_id}
         for t in ID_TYPES:
             val = values[t]
@@ -132,7 +84,8 @@ def audit_rates(conn, maps):
                 stats[t]["unknown_id"] += 1
                 continue
             stats[t]["resolved"] += 1
-            stats[t][classify(sig_ln, sig_fn, target[1], target[2])] += 1
+            compatible = names_compatible(row.name, "", target[1], target[2])
+            stats[t]["compatible" if compatible else "incompatible"] += 1
 
     print(f"\n[--rates] source_authorships portant un identifiant scannées : {n}\n")
     for t in ID_TYPES:
@@ -142,16 +95,13 @@ def audit_rates(conn, maps):
         print(f"  id inconnu (no-op)        : {s['unknown_id']}")
         print(f"  résolus vers une personne : {resolved}")
         if resolved:
-            for k in ("compatible", "abstain", "incompat_firstname", "incompat_strong"):
-                print(f"    {k:20s} : {s[k]:7d}  ({100 * s[k] / resolved:5.1f}%)")
+            for k in ("compatible", "incompatible"):
+                print(f"    {k:14s} : {s[k]:7d}  ({100 * s[k] / resolved:5.1f}%)")
         print()
 
 
-def audit_double_occurrence(conn, maps, name_compat):
+def audit_double_occurrence(conn, maps):
     """Intrus identifiant + occurrence légitime de la même personne sur la même publi.
-
-    `name_compat(raw_name, target_ln, target_fn) -> bool` : comparateur de noms
-    (strict positionnel ou par tokens) injecté pour mesurer l'impact du choix.
 
     Un seul passage : on accumule les présences légitimes
     `(source_publication_id, person_id)` (authorship au nom compatible avec sa
@@ -181,7 +131,7 @@ def audit_double_occurrence(conn, maps, name_compat):
     for row in result:
         n += 1
         key = (row.spid, row.person_id)
-        if name_compat(row.name, row.pln, row.pfn):
+        if names_compatible(row.name, "", row.pln, row.pfn):
             legit_example.setdefault(key, row.name)
             continue
         # Nom incompatible avec la personne rattachée : l'identifiant est-il la
@@ -212,9 +162,9 @@ def audit_double_occurrence(conn, maps, name_compat):
     print(f"\n[--double-occurrence] source_authorships rattachées scannées : {n}\n")
     print(f"  intrus identifiant (nom incompatible avec la personne ciblée) : {len(intruders)}")
     print(f"  dont CONFIRMÉS par une occurrence légitime sur la même publi  : {len(confirmed)}")
-    print(f"    par type : " + ", ".join(f"{t}={by_type[t]}" for t in ID_TYPES))
+    print("    par type : " + ", ".join(f"{t}={by_type[t]}" for t in ID_TYPES))
     print(
-        f"    par source : "
+        "    par source : "
         + ", ".join(f"{s}={c}" for s, c in sorted(by_source.items(), key=lambda x: -x[1]))
     )
     print("    par (type, source) :")
@@ -229,57 +179,6 @@ def audit_double_occurrence(conn, maps, name_compat):
     print()
 
 
-def audit_comparators(conn):
-    """Désaccords entre `names_compatible` (positionnel) et la comparaison par tokens.
-
-    Population bornée et réelle : chaque `source_authorship` rattachée, comparée à
-    sa personne assignée. La quasi-totalité des rattachements étant corrects, les
-    désaccords isolent où les deux comparateurs divergent sur de vraies paires :
-    `tokens_only` = tokens accepte là où le positionnel rejette (gain de rappel) ;
-    `strict_only` = le positionnel accepte là où tokens rejette (perte de rappel
-    possible de tokens). À juger à l'œil."""
-    counts = defaultdict(int)
-    strict_only, tokens_only = [], []
-    result = conn.execution_options(stream_results=True).execute(
-        text("""
-            SELECT sa.raw_author_name AS name,
-                   p.last_name_normalized AS pln, p.first_name_normalized AS pfn
-            FROM source_authorships sa
-            JOIN persons p ON p.id = sa.person_id
-            WHERE sa.person_id IS NOT NULL AND sa.raw_author_name IS NOT NULL
-        """)
-    )
-    n = 0
-    for row in result:
-        n += 1
-        s = name_compatible_strict(row.name, row.pln, row.pfn)
-        k = name_compatible_tokens(row.name, row.pln, row.pfn)
-        if s and k:
-            counts["agree_compatible"] += 1
-        elif not s and not k:
-            counts["agree_incompatible"] += 1
-        elif s and not k:
-            counts["strict_only"] += 1
-            if len(strict_only) < 40:
-                strict_only.append((row.name, f"{row.pfn} {row.pln}".strip()))
-        else:
-            counts["tokens_only"] += 1
-            if len(tokens_only) < 40:
-                tokens_only.append((row.name, f"{row.pfn} {row.pln}".strip()))
-
-    total = n or 1
-    print(f"\n[--compare] authorships rattachées comparées à leur personne : {n}\n")
-    for k in ("agree_compatible", "agree_incompatible", "tokens_only", "strict_only"):
-        print(f"  {k:20s} : {counts[k]:8d}  ({100 * counts[k] / total:5.2f}%)")
-    print("\n--- tokens_only : tokens compatible, names_compatible NON (signature | personne) ---")
-    for name, person in tokens_only:
-        print(f"  {name!r:42s} | {person!r}")
-    print("\n--- strict_only : names_compatible compatible, tokens NON (signature | personne) ---")
-    for name, person in strict_only:
-        print(f"  {name!r:42s} | {person!r}")
-    print()
-
-
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
@@ -287,33 +186,18 @@ def main():
     parser.add_argument(
         "--double-occurrence", action="store_true", help="Intrus identifiant + occurrence légitime"
     )
-    parser.add_argument(
-        "--compare", action="store_true", help="Désaccords names_compatible vs tokens"
-    )
-    parser.add_argument(
-        "--name-match",
-        choices=("strict", "tokens"),
-        default="tokens",
-        help="Comparateur de noms pour --double-occurrence (défaut : tokens)",
-    )
     args = parser.parse_args()
-    run_both = not (args.rates or args.double_occurrence or args.compare)
-    name_compat = name_compatible_tokens if args.name_match == "tokens" else name_compatible_strict
-    needs_maps = args.rates or args.double_occurrence or run_both
+    run_both = not (args.rates or args.double_occurrence)
 
     conn = get_sync_engine().connect()
     try:
-        if needs_maps:
-            maps = {t: load_target_map(conn, t) for t in ID_TYPES}
-            for t in ID_TYPES:
-                print(f"  map {t}: {len(maps[t])} personnes")
+        maps = {t: load_target_map(conn, t) for t in ID_TYPES}
+        for t in ID_TYPES:
+            print(f"  map {t}: {len(maps[t])} personnes")
         if args.rates or run_both:
             audit_rates(conn, maps)
         if args.double_occurrence or run_both:
-            print(f"\n(comparateur de noms : {args.name_match})")
-            audit_double_occurrence(conn, maps, name_compat)
-        if args.compare or run_both:
-            audit_comparators(conn)
+            audit_double_occurrence(conn, maps)
     finally:
         conn.close()
 
