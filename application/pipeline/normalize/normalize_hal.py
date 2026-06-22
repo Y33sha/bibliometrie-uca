@@ -23,7 +23,6 @@ Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 
 import logging
 import xml.etree.ElementTree as ET
-from collections import Counter
 from collections.abc import Callable
 from datetime import date
 
@@ -43,7 +42,11 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
-from domain.persons.identifiers import compact_identifiers, normalize_orcid
+from domain.persons.identifiers import (
+    compact_identifiers,
+    mark_shared_identifiers_dubious,
+    normalize_orcid,
+)
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import (
     clean_doi,
@@ -487,27 +490,25 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
     struct_name_by_hal_id: dict[str, str] = {}
     form_struct_map = parse_author_structures(doc, struct_name_by_hal_id=struct_name_by_hal_id)
 
-    # Un même compte HAL (hal_person_id) listé sur ≥2 auteurs du *même dépôt* est
-    # une erreur de saisie HAL (jamais deux fois le même compte dans un dépôt) :
-    # propager l'identifiant lierait à tort les deux signatures à la même personne.
-    # On renomme alors la clé en `hal_person_id_dubious` : valeur conservée
-    # (réversible, diagnosticable) mais invisible au matching personnes, qui lit
-    # `hal_person_id`. Idempotent (recalculé à chaque normalisation depuis le brut).
-    dubious_hal_ids = {
-        pid
-        for pid, n in Counter(hal_person_id_by_pos.values()).items()
-        if pid is not None and n >= 2
-    }
+    # Identifiants normalisés par position, puis requalification des partagés : un même
+    # identifiant (compte HAL, ORCID, idref…) porté par ≥2 signatures du *même dépôt* est
+    # une corruption de saisie (un identifiant ne peut pas désigner deux signatures dans un
+    # même document) → suffixé `_dubious`, conservé mais invisible au matching personnes.
+    ids_by_position = mark_shared_identifiers_dubious(
+        [
+            compact_identifiers(
+                orcid=(tei_ids[pos].get("orcid") if pos < len(tei_ids) else None),
+                idref=(tei_ids[pos].get("idref") if pos < len(tei_ids) else None),
+                idhal=(tei_ids[pos].get("idhal") if pos < len(tei_ids) else None),
+                hal_person_id=hal_person_id_by_pos.get(pos),
+            )
+            for pos in range(len(names))
+        ]
+    )
 
     records: list[AuthorRecord] = []
     for position, name in enumerate(names):
-        hal_person_id = hal_person_id_by_pos.get(position)
         form_id = form_id_by_pos.get(position)
-
-        author_ids = tei_ids[position] if position < len(tei_ids) else {}
-        orcid = author_ids.get("orcid")
-        idref = author_ids.get("idref")
-        idhal = author_ids.get("idhal")
 
         # authQuality_s : rôle de l'auteur (aut, crp, dir, edt, …)
         quality = qualities[position] if position < len(qualities) else None
@@ -517,21 +518,7 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
         if not name:
             continue
 
-        # Identifiants normalisés cross-source pour cette authorship.
-        ids = compact_identifiers(
-            orcid=orcid,
-            idref=idref,
-            idhal=idhal,
-            hal_person_id=hal_person_id,
-        )
-        # Compte HAL dupliqué dans le dépôt → toute l'identité de la signature est
-        # douteuse : idref/idhal/orcid sont attachés au compte HAL (pas à la
-        # personne), donc faux pour la signature erronée comme le hal_person_id. On
-        # suffixe `_dubious` à *tous* les identifiants présents → aucun ne sert au
-        # matching personnes, mais tout est conservé (réversible, diagnosticable).
-        if ids and hal_person_id in dubious_hal_ids:
-            ids = {f"{k}_dubious": v for k, v in ids.items()}
-        identifiers = ids if ids else None
+        identifiers = ids_by_position[position]
 
         # Structures affiliées à cet auteur sur ce document (par form_id).
         # Stockées comme halId_s natifs (TEXT[]) sur la sa.

@@ -50,7 +50,11 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
-from domain.persons.identifiers import compact_identifiers, normalize_orcid
+from domain.persons.identifiers import (
+    compact_identifiers,
+    mark_shared_identifiers_dubious,
+    normalize_orcid,
+)
 from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.datacite import (
@@ -183,6 +187,14 @@ def build_datacite_author_records(attributes: dict) -> list[AuthorRecord]:
     if not isinstance(creators, list):
         return []
 
+    # ORCID partagé entre ≥2 creators du record → `_dubious`.
+    ids_by_position = mark_shared_identifiers_dubious(
+        [
+            compact_identifiers(orcid=_creator_orcid(c)) if isinstance(c, dict) else None
+            for c in creators
+        ]
+    )
+
     records: list[AuthorRecord] = []
     for position, creator in enumerate(creators):
         if not isinstance(creator, dict):
@@ -192,8 +204,7 @@ def build_datacite_author_records(attributes: dict) -> list[AuthorRecord]:
         full_name = _creator_full_name(creator)
         if not full_name:
             continue
-        orcid = _creator_orcid(creator)
-        ids = compact_identifiers(orcid=orcid)
+        ids = ids_by_position[position]
         records.append(
             AuthorRecord(
                 position=position,

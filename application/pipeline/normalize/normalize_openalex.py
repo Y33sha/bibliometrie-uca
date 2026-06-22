@@ -35,7 +35,11 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
-from domain.persons.identifiers import compact_identifiers, normalize_orcid
+from domain.persons.identifiers import (
+    compact_identifiers,
+    mark_shared_identifiers_dubious,
+    normalize_orcid,
+)
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.sources.openalex import (
     extract_external_ids_from_urls,
@@ -400,8 +404,16 @@ def build_openalex_author_records(work: dict) -> list[AuthorRecord]:
     - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles ; on
       reproduit l'ancien défaut DB `ARRAY['author']`).
     """
+    authorships = work.get("authorships") or []
+    # ORCID requalifié `_dubious` s'il est partagé entre ≥2 signatures du work : sur les
+    # méga-papers, OpenAlex hérite de crossref l'ORCID du premier auteur recopié sur tous
+    # les co-auteurs — invisibilise-le alors au matching.
+    ids_by_position = mark_shared_identifiers_dubious(
+        [compact_identifiers(orcid=_extract_openalex_orcid(a)) for a in authorships]
+    )
+
     records: list[AuthorRecord] = []
-    for position, authorship in enumerate(work.get("authorships") or []):
+    for position, authorship in enumerate(authorships):
         raw_author_name = authorship.get("raw_author_name")
         if not raw_author_name:
             # Sans nom, l'authorship est inexploitable pour le matching personnes.
@@ -421,7 +433,7 @@ def build_openalex_author_records(work: dict) -> list[AuthorRecord]:
             else [n for n in (i.get("display_name") for i in institutions) if n]
         )
 
-        ids = compact_identifiers(orcid=_extract_openalex_orcid(authorship))
+        ids = ids_by_position[position]
         records.append(
             AuthorRecord(
                 position=position,

@@ -33,7 +33,11 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
-from domain.persons.identifiers import compact_identifiers, normalize_orcid
+from domain.persons.identifiers import (
+    compact_identifiers,
+    mark_shared_identifiers_dubious,
+    normalize_orcid,
+)
 from domain.publications.authorship_roles import map_role
 from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
@@ -269,17 +273,25 @@ def build_scanr_author_records(doc: dict) -> list[AuthorRecord]:
     - affiliations feuilles → adresses, avec `detected_countries` en `countries`
       (pays d'autorité détectés dans le texte de l'affiliation).
     """
+    authors = doc.get("authors") or []
+    # Identifiant (orcid/idref) partagé entre ≥2 signatures du doc → `_dubious`.
+    ids_by_position = mark_shared_identifiers_dubious(
+        [
+            compact_identifiers(
+                orcid=normalize_orcid((a.get("denormalized") or {}).get("orcid")),
+                idref=(a.get("denormalized") or {}).get("idref"),
+            )
+            for a in authors
+        ]
+    )
+
     records: list[AuthorRecord] = []
-    for position, author_data in enumerate(doc.get("authors") or []):
+    for position, author_data in enumerate(authors):
         author_full_name = author_data.get("fullName")
         if not author_full_name:
             continue
 
-        denorm = author_data.get("denormalized") or {}
-        ids = compact_identifiers(
-            orcid=normalize_orcid(denorm.get("orcid")),
-            idref=denorm.get("idref"),
-        )
+        ids = ids_by_position[position]
         roles, _ = map_role("scanr", author_data.get("role"))
 
         addr_parts: list[str] = []

@@ -56,7 +56,11 @@ from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.publishers import find_or_create_publisher
-from domain.persons.identifiers import compact_identifiers, normalize_orcid
+from domain.persons.identifiers import (
+    compact_identifiers,
+    mark_shared_identifiers_dubious,
+    normalize_orcid,
+)
 from domain.publications.identifiers import clean_doi
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.sources.crossref import (
@@ -261,6 +265,18 @@ def build_crossref_author_records(msg: dict) -> list[AuthorRecord]:
     if not isinstance(authors, list):
         return []
 
+    # ORCID requalifié `_dubious` s'il est partagé entre ≥2 signatures du message :
+    # le dépôt crossref des méga-papers (collaborations) recopie souvent l'ORCID du
+    # premier auteur sur tous les co-auteurs — invisibilise-le alors au matching.
+    ids_by_position = mark_shared_identifiers_dubious(
+        [
+            compact_identifiers(orcid=normalize_orcid(a.get("ORCID")))
+            if isinstance(a, dict)
+            else None
+            for a in authors
+        ]
+    )
+
     records: list[AuthorRecord] = []
     for position, author in enumerate(authors):
         if not isinstance(author, dict):
@@ -270,7 +286,7 @@ def build_crossref_author_records(msg: dict) -> list[AuthorRecord]:
         if not full_name:
             continue
 
-        ids = compact_identifiers(orcid=normalize_orcid(author.get("ORCID")))
+        ids = ids_by_position[position]
         source_data: dict[str, JsonValue] | None = (
             {"sequence": author["sequence"]} if author.get("sequence") else None
         )
