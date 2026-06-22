@@ -762,6 +762,8 @@ th.sorted .sort-arrow {
 .btn:disabled {
 	opacity: 0.5;
 	cursor: default;
+	/* Neutralise les `:hover` par variante (.btn-danger:hover, …) sur un bouton désactivé. */
+	pointer-events: none;
 }
 
 .btn-sm {
