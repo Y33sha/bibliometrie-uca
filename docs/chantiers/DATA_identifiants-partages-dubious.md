@@ -46,7 +46,7 @@ La séquence de remédiation doit donc être : **`null person_id corrompus` → 
 ### Phase 2 — Backfill et remédiation
 
 - [x] **Backfill oneshot** `backfill_dubious_shared_identifiers` (généralise `backfill_dubious_hal_identifiers` à tous les sources/ids). Détection exhaustive = un passage complet en lecture (aucun index ne porte les valeurs d'identifiant), **découpé en fenêtres d'ids** `source_publication_id` (Bitmap Index Scan sur l'unique `(source_publication_id, author_position)`) → mémoire bornée, résumable (`--resume-from`), commit par batch, réutilise le helper. **À lancer sur le serveur** (pas en local).
-- [ ] **Remédiation personnes** : oneshot `null → populate → create → populate`, plus purge des `person_identifiers` (table) qui ne sont plus appuyés par une authorship `in_perimeter`.
+- [x] **Remédiation personnes** : oneshot `remediate_dubious_agglomerations` — null `person_id` des signatures `_dubious` (fenêtré, melt-safe) → purge des `person_identifiers` `pending` orphelins (gardе les `confirmed`/`rejected`) → recalcul `person_name_forms`. Puis relancer la phase persons du pipeline pour la ré-attribution (`create_persons` re-matche sur formes propres + ORCID `_dubious`).
 
 ### Phase 3 — Tests
 
