@@ -27,7 +27,7 @@ def main() -> None:
 
     conn = get_sync_engine().connect()
     try:
-        base_url = get_api_base_urls(conn)["unpaywall"]
+        base_url = get_api_base_urls()["unpaywall"]
         email = get_polite_pool_email(conn)
 
         async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:

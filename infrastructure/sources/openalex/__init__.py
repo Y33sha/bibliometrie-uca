@@ -1,7 +1,7 @@
 """Constantes et utilitaires de configuration pour l'extraction OpenAlex.
 
 L'URL de base de l'API vit dans la config DB (`api_base_urls.openalex`),
-lue via `infrastructure.sources.config.get_api_base_urls(cur)["openalex"]`.
+lue via `infrastructure.sources.config.get_api_base_urls()["openalex"]`.
 
 Le parsing pur des works (`extract_openalex_id`, `extract_doi`) vit dans
 `parsing.py` et est couvert par tests unitaires. Ce module ne garde que

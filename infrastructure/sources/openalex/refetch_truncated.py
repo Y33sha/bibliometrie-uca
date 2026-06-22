@@ -87,7 +87,7 @@ class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
 
     def configure(self, conn: Connection) -> None:
         init_auth(api_key=get_openalex_api_key(conn), email=get_polite_pool_email(conn))
-        self._base_url = get_api_base_urls(conn)["openalex"]
+        self._base_url = get_api_base_urls()["openalex"]
 
     def find_truncated(
         self, conn: Connection, *, limit: int | None = None, full: bool = False

@@ -17,7 +17,7 @@ logger = setup_logger("extract_scanr", os.path.join(os.path.dirname(__file__), "
 def main() -> None:
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap)["scanr"]
+        base_url = get_api_base_urls()["scanr"]
         credentials = get_scanr_credentials_from_db(bootstrap)
     conn = engine.connect()
     adapter = PgScanrExtractAdapter(base_url=base_url, credentials=credentials)

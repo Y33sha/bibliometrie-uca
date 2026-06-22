@@ -14,7 +14,7 @@ logger = setup_logger("extract_wos", os.path.join(os.path.dirname(__file__), "lo
 def main() -> None:
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap)["wos"]
+        base_url = get_api_base_urls()["wos"]
         api_key = get_wos_api_key(bootstrap)
     conn = engine.connect()
     adapter = PgWosExtractAdapter(base_url=base_url, api_key=api_key)

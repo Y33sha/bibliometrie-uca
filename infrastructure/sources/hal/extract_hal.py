@@ -72,7 +72,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
             if code not in all_collections:
                 all_collections[code] = code
         return HalExtractConfig(
-            base_url=get_api_base_urls(conn).get("hal", "https://api.archives-ouvertes.fr/search/"),
+            base_url=get_api_base_urls()["hal"],
             all_collections=all_collections,
             n_collections=len(collections),
             n_extra=len(extra_collections),

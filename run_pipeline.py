@@ -1017,7 +1017,7 @@ def _run_enrich_oa_status() -> None:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        base_url = get_api_base_urls(conn)["unpaywall"]
+        base_url = get_api_base_urls()["unpaywall"]
         email = get_polite_pool_email(conn)
 
         async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
@@ -1062,7 +1062,7 @@ def _run_enrich_journals_from_openalex() -> None:
             journal_repo=journal_repository(conn),
             api_key=get_openalex_api_key(conn),
             mailto=get_polite_pool_email(conn),
-            openalex_sources_api=get_api_base_urls(conn)["openalex_sources"],
+            openalex_sources_api=get_api_base_urls()["openalex_sources"],
             rate_delay=DOAJ_DELAY,
         )
     finally:
@@ -1145,7 +1145,7 @@ def _run_enrich_publishers_from_openalex() -> None:
             publisher_repo=publisher_repository(conn),
             api_key=get_openalex_api_key(conn),
             mailto=get_polite_pool_email(conn),
-            openalex_publishers_api=get_api_base_urls(conn)["openalex_publishers"],
+            openalex_publishers_api=get_api_base_urls()["openalex_publishers"],
             rate_delay=DOAJ_DELAY,
         )
     finally:
@@ -1205,7 +1205,7 @@ def _run_enrich_publishers_from_ror() -> None:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        base_url = get_api_base_urls(conn)["ror"]
+        base_url = get_api_base_urls()["ror"]
         user_agent = build_ror_user_agent(get_polite_pool_email(conn))
         fetcher: RorFetcher = lambda ror: fetch_ror_record(  # noqa: E731
             ror, base_url=base_url, user_agent=user_agent, logger=log
@@ -1336,8 +1336,7 @@ def _run_extract_hal(
     t0 = time.time()
     source_log = setup_logger("hal", str(BASE / "logs"))
     engine = get_sync_engine()
-    with engine.connect() as bootstrap:
-        hal_url = get_api_base_urls(bootstrap)["hal"]
+    hal_url = get_api_base_urls()["hal"]
     conn = engine.connect()
     adapter = PgHalExtractAdapter(base_url=hal_url)
     try:
@@ -1363,8 +1362,7 @@ def _run_extract_openalex(
     t0 = time.time()
     source_log = setup_logger("openalex", str(BASE / "logs"))
     engine = get_sync_engine()
-    with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap)["openalex"]
+    base_url = get_api_base_urls()["openalex"]
     conn = engine.connect()
     adapter = PgOpenalexExtractAdapter(base_url=base_url)
     try:
@@ -1389,7 +1387,7 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
     source_log = setup_logger("wos", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap)["wos"]
+        base_url = get_api_base_urls()["wos"]
         api_key = get_wos_api_key(bootstrap)
     conn = engine.connect()
     adapter = PgWosExtractAdapter(base_url=base_url, api_key=api_key)
@@ -1418,7 +1416,7 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
     source_log = setup_logger("scanr", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap)["scanr"]
+        base_url = get_api_base_urls()["scanr"]
         credentials = get_scanr_credentials_from_db(bootstrap)
     conn = engine.connect()
     adapter = PgScanrExtractAdapter(base_url=base_url, credentials=credentials)
@@ -1443,8 +1441,7 @@ def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> Phase
     t0 = time.time()
     source_log = setup_logger("theses", str(BASE / "logs"))
     engine = get_sync_engine()
-    with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap)["theses"]
+    base_url = get_api_base_urls()["theses"]
     conn = engine.connect()
     adapter = PgThesesExtractAdapter(base_url=base_url)
     try:

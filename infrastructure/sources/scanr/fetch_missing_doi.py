@@ -55,10 +55,7 @@ class ScanrFetchMissingDoiAdapter:
     auth: tuple[str, str]
 
     def configure(self, conn: Connection) -> None:
-        self.url = get_api_base_urls(conn).get(
-            "scanr",
-            "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
-        )
+        self.url = get_api_base_urls()["scanr"]
         username, password = get_scanr_credentials(conn)
         self.auth = (username, password)
 

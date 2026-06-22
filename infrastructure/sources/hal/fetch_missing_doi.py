@@ -60,7 +60,7 @@ class HalFetchMissingDoiAdapter:
     base_url: str
 
     def configure(self, conn: Connection) -> None:
-        self.base_url = get_api_base_urls(conn)["hal"]
+        self.base_url = get_api_base_urls()["hal"]
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         doi = dois[0]
