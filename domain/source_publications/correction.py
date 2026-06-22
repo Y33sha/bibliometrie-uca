@@ -609,7 +609,7 @@ def resolve_cluster_doi_corrections(
 
     Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas du DOI)."""
     canonical = next((m for m in group if m.canonical_doi), None)
-    if canonical is not None:
+    if canonical is not None and canonical.same_work_case is not None:
         case = DoiClusterCase(canonical.same_work_case)
         return [DoiClusterDecision(m.id, canonical.canonical_doi, case) for m in group]
 

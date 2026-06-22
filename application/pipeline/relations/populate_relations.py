@@ -24,6 +24,7 @@ import logging
 from sqlalchemy import Connection
 
 from application.ports.pipeline.relations import (
+    DeclaredRelationSource,
     PublicationRelationsQueries,
     RelationEdge,
     SharedKeyPair,
@@ -37,7 +38,7 @@ from domain.publications.relations import (
 )
 
 
-def _build_declared_edges(sources) -> list[RelationEdge]:
+def _build_declared_edges(sources: list[DeclaredRelationSource]) -> list[RelationEdge]:
     edges: list[RelationEdge] = []
     for sp in sources:
         if sp.source == "datacite":
@@ -75,9 +76,9 @@ def _build_shared_key_edges(
             from_id, target = pair.b_id, pair.a_doi
         else:  # "a" ou "sym" : A est le sujet (a_id < b_id rend l'orientation stable)
             from_id, target = pair.a_id, pair.b_doi
-        target = clean_doi(target)
-        if target:
-            edges.append(RelationEdge(from_id, relation.value, target, "shared_key"))
+        cleaned = clean_doi(target)
+        if cleaned:
+            edges.append(RelationEdge(from_id, relation.value, cleaned, "shared_key"))
     return edges
 
 
