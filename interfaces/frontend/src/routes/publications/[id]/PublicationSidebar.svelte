@@ -13,7 +13,7 @@
 
   // NCBI sert un favicon unique pour PubMed et PMC : on les distingue par la valeur, pas le logo.
   const EXT_META: Record<string, { label: string; icon: string; url: (v: string) => string }> = {
-    arxiv: { label: "arXiv", icon: `${base}/icons/arxiv.ico`, url: (v) => `https://arxiv.org/abs/${v}` },
+    arxiv: { label: "arXiv", icon: `${base}/icons/arxiv.png`, url: (v) => `https://arxiv.org/abs/${v}` },
     pmid: {
       label: "PubMed",
       icon: `${base}/icons/ncbi.png`,
