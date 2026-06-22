@@ -243,6 +243,7 @@ def run(
     skipped_counts: dict[str, int] = defaultdict(int)
     created = 0
     out_of_perimeter_matched = 0
+    corroboration_rejected = 0
 
     total = len(all_authorships)
     for i, a in enumerate(all_authorships):
@@ -264,14 +265,38 @@ def run(
                     total_author_count=pub_max_authors.get(pub_id),
                 )
 
-        idref_match = decide_match_by_identifier(a.idref, idref_map)
-        hal_match = decide_match_by_identifier(a.hal_person_id, hal_account_map)
+        # Résolution corroborée par le nom : un match identifiant dont le nom de la
+        # personne ciblée est incompatible avec la signature est refusé (corruption
+        # éparse — un identifiant recopié sur le mauvais co-auteur) et journalisé.
+        idref_decision = decide_match_by_identifier(a.idref, idref_map, a.full_name)
+        hal_decision = decide_match_by_identifier(a.hal_person_id, hal_account_map, a.full_name)
         # ORCID utilisé comme signal de matching uniquement quand il est
         # déposé par l'auteur (crossref / openalex raw_orcid / hal TEI) ;
         # l'ORCID WoS, attribué algorithmiquement, est ignoré ici (il reste
         # enregistré sur person_identifiers via add_identifiers).
         orcid_signal = a.orcid if a.source in ORCID_MATCH_SOURCES else None
-        orcid_match = decide_match_by_identifier(orcid_signal, orcid_map)
+        orcid_decision = decide_match_by_identifier(orcid_signal, orcid_map, a.full_name)
+
+        for id_type, id_value, id_decision in (
+            ("orcid", orcid_signal, orcid_decision),
+            ("hal_person_id", a.hal_person_id, hal_decision),
+            ("idref", a.idref, idref_decision),
+        ):
+            if id_decision.rejection is not None:
+                rejected_pid, target_name = id_decision.rejection
+                logger.info(
+                    "corroboration: rejet %s=%s — signature %r incompatible avec personne %d (%r)",
+                    id_type,
+                    id_value,
+                    a.full_name,
+                    rejected_pid,
+                    target_name,
+                )
+                corroboration_rejected += 1
+
+        idref_match = idref_decision.person_id
+        hal_match = hal_decision.person_id
+        orcid_match = orcid_decision.person_id
 
         # Garde de rejet : personnes rejetées pour cette publication, à
         # éliminer des candidats (matchs annulés, name form désambiguïsé).
@@ -370,6 +395,7 @@ def run(
     logger.info(f"  Cross-source             : {matched_counts['cross_source']} rattachées")
     logger.info(f"  Name form (single match) : {matched_counts['single_name']} rattachées")
     logger.info(f"  Créées                   : {created}")
+    logger.info(f"  Rejets corroboration nom : {corroboration_rejected} matchs identifiant refusés")
     logger.info(
         f"  Skippées (périmètre UCA) : ambiguës={skipped_counts['ambiguous_name_form']}, "
         f"create interdit={skipped_counts['creation_not_allowed']}"

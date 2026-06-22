@@ -177,25 +177,48 @@ class TestDecideNameFormOutcome:
 
 
 class TestDecideMatchByIdentifier:
-    def test_value_present_returns_person_id(self):
-        idref_map = {"252404955": 42, "11111111X": 17}
-        assert decide_match_by_identifier("252404955", idref_map) == 42
+    def test_compatible_name_returns_person_id(self):
+        idref_map = {"252404955": (42, "dupont", "jean"), "11111111X": (17, "martin", "paul")}
+        result = decide_match_by_identifier("252404955", idref_map, "Jean Dupont")
+        assert result.person_id == 42
+        assert result.rejection is None
 
-    def test_value_absent_returns_none(self):
-        assert decide_match_by_identifier("999999999", {"252404955": 42}) is None
+    def test_incompatible_name_rejected(self):
+        """Nom de la personne ciblée incompatible avec la signature → match refusé,
+        rejet matérialisé pour journalisation."""
+        idref_map = {"252404955": (42, "dupont", "jean")}
+        result = decide_match_by_identifier("252404955", idref_map, "Paul Martin")
+        assert result.person_id is None
+        assert result.rejection == (42, "jean dupont")
 
-    def test_falsy_value_returns_none(self):
+    def test_value_absent_returns_empty(self):
+        result = decide_match_by_identifier("999999999", {"252404955": (42, "dupont", "jean")}, "X")
+        assert result.person_id is None
+        assert result.rejection is None
+
+    def test_falsy_value_returns_empty(self):
         """Pas de tentative de lookup si la valeur est vide/None."""
-        assert decide_match_by_identifier(None, {"foo": 1}) is None
-        assert decide_match_by_identifier("", {"foo": 1}) is None
+        assert decide_match_by_identifier(None, {"foo": (1, "a", "b")}, "X").person_id is None
+        assert decide_match_by_identifier("", {"foo": (1, "a", "b")}, "X").person_id is None
 
     def test_empty_map(self):
-        assert decide_match_by_identifier("anything", {}) is None
+        assert decide_match_by_identifier("anything", {}, "X").person_id is None
+
+    def test_surname_only_signature_not_rejected(self):
+        """Signature trop pauvre (nom seul) : compatible (sous-ensemble de tokens),
+        donc pas de refus — on s'abstient plutôt que de rejeter."""
+        idref_map = {"x": (42, "dupont", "jean")}
+        result = decide_match_by_identifier("x", idref_map, "Dupont")
+        assert result.person_id == 42
+        assert result.rejection is None
 
     def test_works_for_orcid_too(self):
         """La fonction est générique : même contrat pour IdRef et ORCID."""
-        orcid_map = {"0000-0001-2345-6789": 7}
-        assert decide_match_by_identifier("0000-0001-2345-6789", orcid_map) == 7
+        orcid_map = {"0000-0001-2345-6789": (7, "curie", "marie")}
+        assert (
+            decide_match_by_identifier("0000-0001-2345-6789", orcid_map, "Marie Curie").person_id
+            == 7
+        )
 
 
 class TestDecidePersonMatch:
