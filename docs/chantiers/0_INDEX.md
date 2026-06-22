@@ -15,7 +15,7 @@
 
 ### Non commencé
 
-
+- [Visualisations dynamiques (pivot listes ↔ tableaux de bord)](METIER_visualisations-pivot.md)
 
 ## Chantiers archivés
 
