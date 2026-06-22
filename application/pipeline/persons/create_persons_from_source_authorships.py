@@ -236,6 +236,7 @@ def run(
     orcid_map = queries.fetch_orcid_to_person_map(conn)
     hal_account_map = queries.fetch_hal_account_to_person_map(conn)
     name_form_map = queries.fetch_name_form_map(conn)
+    name_form_status = queries.fetch_name_form_status_map(conn)
     rejected_by_pub = queries.fetch_rejected_person_ids_by_pub(conn)
     pub_max_authors = _max_authors_per_pub(all_authorships, linked_index)
 
@@ -268,14 +269,21 @@ def run(
         # Résolution corroborée par le nom : un match identifiant dont le nom de la
         # personne ciblée est incompatible avec la signature est refusé (corruption
         # éparse — un identifiant recopié sur le mauvais co-auteur) et journalisé.
-        idref_decision = decide_match_by_identifier(a.idref, idref_map, a.full_name)
-        hal_decision = decide_match_by_identifier(a.hal_person_id, hal_account_map, a.full_name)
+        form = a.author_name_normalized
+        idref_decision = decide_match_by_identifier(
+            a.idref, idref_map, a.full_name, form, name_form_status
+        )
+        hal_decision = decide_match_by_identifier(
+            a.hal_person_id, hal_account_map, a.full_name, form, name_form_status
+        )
         # ORCID utilisé comme signal de matching uniquement quand il est
         # déposé par l'auteur (crossref / openalex raw_orcid / hal TEI) ;
         # l'ORCID WoS, attribué algorithmiquement, est ignoré ici (il reste
         # enregistré sur person_identifiers via add_identifiers).
         orcid_signal = a.orcid if a.source in ORCID_MATCH_SOURCES else None
-        orcid_decision = decide_match_by_identifier(orcid_signal, orcid_map, a.full_name)
+        orcid_decision = decide_match_by_identifier(
+            orcid_signal, orcid_map, a.full_name, form, name_form_status
+        )
 
         for id_type, id_value, id_decision in (
             ("orcid", orcid_signal, orcid_decision),

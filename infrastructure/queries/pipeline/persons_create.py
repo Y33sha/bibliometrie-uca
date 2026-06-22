@@ -252,18 +252,41 @@ def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
     """Charge `person_name_forms` sous forme `{name_form: [person_id, ...]}`.
 
     Agrégation par `name_form` sur la table dénormalisée
-    `(name_form, person_id, sources[])` : un dict trié par
+    `(name_form, person_id, sources[], status)` : un dict trié par
     `person_id` croissant pour stabilité.
+
+    Les liens `status = 'rejected'` sont exclus : une forme de nom rejetée pour une
+    personne ne doit plus la proposer au matching par nom (verrou de non-retour).
     """
     rows = conn.execute(
         text("""
             SELECT name_form,
                    array_agg(person_id ORDER BY person_id) AS person_ids
             FROM person_name_forms
+            WHERE status <> 'rejected'
             GROUP BY name_form
         """)
     ).all()
     return {r.name_form: r.person_ids for r in rows}
+
+
+def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
+    """Charge les verdicts de lien forme↔personne : `{(name_form, person_id): status}`.
+
+    Restreint aux statuts décisifs (`confirmed` / `rejected`, pas `pending`) : sert à
+    la corroboration du matching par identifiant. Quand un identifiant résout vers une
+    personne, le statut du couple (forme de la signature, personne) tranche sans test
+    de compatibilité de nom — `confirmed` corrobore le match, `rejected` le refuse ;
+    en l'absence de verdict, on retombe sur la comparaison par tokens.
+    """
+    rows = conn.execute(
+        text("""
+            SELECT name_form, person_id, status::text AS status
+            FROM person_name_forms
+            WHERE status <> 'pending'
+        """)
+    ).all()
+    return {(r.name_form, r.person_id): r.status for r in rows}
 
 
 def fetch_rejected_person_ids_by_pub(conn: Connection) -> dict[int, frozenset[int]]:
@@ -307,6 +330,9 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
 
     def fetch_name_form_map(self, conn: Connection) -> dict[str, list[int]]:
         return fetch_name_form_map(conn)
+
+    def fetch_name_form_status_map(self, conn: Connection) -> dict[tuple[str, int], str]:
+        return fetch_name_form_status_map(conn)
 
     def fetch_rejected_person_ids_by_pub(self, conn: Connection) -> dict[int, frozenset[int]]:
         return fetch_rejected_person_ids_by_pub(conn)

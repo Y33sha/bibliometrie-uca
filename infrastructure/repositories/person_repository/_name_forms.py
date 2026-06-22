@@ -108,19 +108,24 @@ def add_person_source(
     `sources = []` si `source is None`). Sur conflit, fusionne la
     source dans le tableau existant — déduplication + tri stable
     via ``array_agg(DISTINCT ... ORDER BY ...)``.
+
+    Une row **nouvelle** dérivée du nom/prénom (source ``'persons'``) est posée
+    ``confirmed`` (forme canonique de la personne), ``pending`` sinon. Sur conflit
+    le ``status`` n'est pas touché : un verdict existant (humain ou antérieur) prime.
     """
     new_sources = [source] if source else []
+    status = "confirmed" if source == "persons" else "pending"
     conn.execute(
         text("""
-            INSERT INTO person_name_forms (name_form, person_id, sources)
-            VALUES (:nf, :pid, :new_sources)
+            INSERT INTO person_name_forms (name_form, person_id, sources, status)
+            VALUES (:nf, :pid, :new_sources, CAST(:status AS identifier_status))
             ON CONFLICT (name_form, person_id) DO UPDATE SET
                 sources = (
                     SELECT COALESCE(array_agg(DISTINCT s ORDER BY s), '{}'::text[])
                     FROM unnest(person_name_forms.sources || EXCLUDED.sources) AS s
                 )
         """),
-        {"nf": name_form, "pid": person_id, "new_sources": new_sources},
+        {"nf": name_form, "pid": person_id, "new_sources": new_sources, "status": status},
     )
 
 

@@ -76,6 +76,16 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
       2. INSERT des couples nouveaux.
       3. UPDATE des `sources` qui ont changé.
 
+    Le recompute respecte le `status` (validation du lien forme↔personne) :
+
+    - il ne **modifie jamais** le `status` d'une ligne existante (l'UPDATE ne touche
+      que `sources`) ;
+    - il ne **supprime jamais** une ligne `confirmed`/`rejected` (verdict), sauf une
+      forme de source `'persons'` devenue obsolète — seule une édition du nom/prénom
+      de la personne peut faire disparaître ses formes canoniques ;
+    - une ligne **nouvelle** est insérée `confirmed` si elle dérive du nom/prénom
+      (source `'persons'`, forme canonique de la personne), `pending` sinon.
+
     Retourne `(inserted, updated, deleted)`.
     """
     conn.execute(
@@ -103,6 +113,9 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
     )
     conn.execute(text("CREATE INDEX ON _expected_pnf (name_form, person_id)"))
 
+    # On ne supprime que les `pending` orphelins et les formes `'persons'` devenues
+    # obsolètes (édition du nom). Les verdicts `confirmed`/`rejected` sur des formes
+    # non-canoniques (bibliographiques) sont préservés même s'ils ne sont plus dérivés.
     deleted = conn.execute(
         text("""
             DELETE FROM person_name_forms p
@@ -110,13 +123,18 @@ def sync_from_raw_forms(conn: Connection) -> tuple[int, int, int]:
                 SELECT 1 FROM _expected_pnf e
                 WHERE e.name_form = p.name_form AND e.person_id = p.person_id
             )
+            AND (p.status = 'pending' OR 'persons' = ANY(p.sources))
         """)
     ).rowcount
 
+    # Une forme nouvelle dérivée du nom/prénom (source `'persons'`) est confirmée
+    # d'office ; sinon `pending` (forme bibliographique non vérifiée).
     inserted = conn.execute(
         text("""
-            INSERT INTO person_name_forms (name_form, person_id, sources)
-            SELECT e.name_form, e.person_id, e.sources FROM _expected_pnf e
+            INSERT INTO person_name_forms (name_form, person_id, sources, status)
+            SELECT e.name_form, e.person_id, e.sources,
+                   CASE WHEN 'persons' = ANY(e.sources) THEN 'confirmed' ELSE 'pending' END::identifier_status
+            FROM _expected_pnf e
             WHERE NOT EXISTS (
                 SELECT 1 FROM person_name_forms p
                 WHERE p.name_form = e.name_form AND p.person_id = e.person_id

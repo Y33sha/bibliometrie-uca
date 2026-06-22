@@ -183,6 +183,8 @@ def decide_match_by_identifier(
     value: str | None,
     identifier_map: Mapping[str, tuple[int, str, str]],
     signature: str,
+    signature_form: str | None,
+    name_form_status: Mapping[tuple[str, int], str],
 ) -> IdentifierMatch:
     """Résout un identifiant (IdRef, ORCID…) vers une ``person_id``, corroboré par le nom.
 
@@ -192,13 +194,19 @@ def decide_match_by_identifier(
     déjà filtré sur les statuts non-``rejected``. La fonction est générique : elle
     marche pour n'importe quel id_type indexé sur ``person_identifiers``.
 
-    Corroboration : si la personne ciblée a un nom incompatible avec ``signature``
-    (comparaison ``names_compatible`` par tokens), le match est **refusé** — un
-    identifiant porté par une signature étrangère (corruption éparse : un ORCID recopié
-    sur le mauvais co-auteur) ne doit pas rattacher. Le refus est matérialisé dans
-    ``rejection`` pour journalisation. Une signature trop pauvre pour être comparée
-    (réduite au nom de famille) reste compatible (ses tokens sont un sous-ensemble) et
-    n'est donc pas refusée.
+    Corroboration par le nom, du verdict humain au test heuristique :
+
+    1. Le statut du couple ``(signature_form, person_id)`` dans ``person_name_forms``
+       (``name_form_status``) tranche en priorité — ``confirmed`` corrobore le match
+       sans test (la forme appartient à la personne, y compris un changement de nom),
+       ``rejected`` le refuse sans test.
+    2. À défaut de verdict (``pending`` ou forme inconnue), on teste la compatibilité
+       par tokens (``names_compatible``) : un identifiant porté par une signature
+       étrangère (corruption éparse : un ORCID recopié sur le mauvais co-auteur) est
+       refusé. Une signature trop pauvre (réduite au nom de famille) reste compatible
+       (sous-ensemble de tokens) et n'est donc pas refusée.
+
+    Un refus est matérialisé dans ``rejection`` pour journalisation.
     """
     if not value:
         return IdentifierMatch()
@@ -206,6 +214,13 @@ def decide_match_by_identifier(
     if target is None:
         return IdentifierMatch()
     person_id, target_ln, target_fn = target
+
+    verdict = name_form_status.get((signature_form, person_id)) if signature_form else None
+    if verdict == "confirmed":
+        return IdentifierMatch(person_id=person_id)
+    if verdict == "rejected":
+        return IdentifierMatch(rejection=(person_id, f"{target_fn} {target_ln}".strip()))
+
     if names_compatible(signature, "", target_ln, target_fn):
         return IdentifierMatch(person_id=person_id)
     return IdentifierMatch(rejection=(person_id, f"{target_fn} {target_ln}".strip()))
