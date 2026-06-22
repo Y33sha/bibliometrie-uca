@@ -39,7 +39,12 @@ WOS_PER_PAGE = 10  # recommandation Clarivate (timeouts fréquents au-delà)
 
 # ScanR — Elasticsearch public, courtoisie
 SCANR_DELAY = 0.3
-SCANR_PER_PAGE = 200  # taille des batchs scroll/search_after
+# Taille des batchs search_after. 1000 retenu empiriquement : le cluster ScanR
+# inflige des stalls serveur intermittents (~10s) dont la fréquence suit le
+# *nombre* de requêtes. Réduire les pages (29 → 7 pour une année de ~5500 docs)
+# supprime ces stalls et divise le temps par ~4. 2000 fait couper la connexion
+# par le serveur ; 1000 est le point d'équilibre.
+SCANR_PER_PAGE = 1000
 
 # theses.fr — API publique
 THESES_DELAY = 0.3

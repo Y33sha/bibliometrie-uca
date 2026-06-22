@@ -20,22 +20,23 @@ def adapter() -> PgScanrExtractAdapter:
 
 class TestBuildQuery:
     def test_basic_shape(self, adapter):
+        # Tout en contexte `filter` (non scoré, ~9× plus rapide que `must`/`should`
+        # sur le cluster ScanR) : term année + terms affiliations.
         q = adapter.build_query(year=2024, affiliation_ids=["A1", "A2"])
         assert q["size"] == SCANR_PER_PAGE
-        assert q["query"]["bool"]["must"] == [{"term": {"year": 2024}}]
-        assert q["query"]["bool"]["should"] == [
-            {"term": {"affiliations.id.keyword": "A1"}},
-            {"term": {"affiliations.id.keyword": "A2"}},
+        assert q["query"]["bool"]["filter"] == [
+            {"term": {"year": 2024}},
+            {"terms": {"affiliations.id.keyword": ["A1", "A2"]}},
         ]
-        assert q["query"]["bool"]["minimum_should_match"] == 1
+        assert "should" not in q["query"]["bool"]
         assert q["sort"] == [{"id.keyword": "asc"}]
 
-    def test_no_affiliations_empty_should(self, adapter):
-        # Cas dégénéré : aucune affiliation → should vide. ElasticSearch
-        # ne ramènera rien avec `minimum_should_match: 1`. Pinné pour ne
-        # pas régresser silencieusement.
+    def test_no_affiliations_empty_terms(self, adapter):
+        # Cas dégénéré : aucune affiliation → `terms` vide. ElasticSearch ne
+        # ramènera rien (aucune valeur ne matche). Pinné pour ne pas régresser
+        # silencieusement.
         q = adapter.build_query(year=2024, affiliation_ids=[])
-        assert q["query"]["bool"]["should"] == []
+        assert q["query"]["bool"]["filter"][1] == {"terms": {"affiliations.id.keyword": []}}
 
     def test_search_after_added_when_provided(self, adapter):
         q = adapter.build_query(year=2024, affiliation_ids=["A1"], search_after=["last-id-123"])
