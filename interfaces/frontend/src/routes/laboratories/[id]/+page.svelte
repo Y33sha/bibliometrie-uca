@@ -158,15 +158,21 @@
 			});
 		}
 
-		// Pie chart: OA
+		// Pie chart: OA (on masque les modalités à 0 cas)
 		if (pieCanvas && dashOa.total > 0) {
+			const oa = [
+				{ label: 'Open Access', value: dashOa.open_access, color: '#2a7d4f' },
+				{ label: 'Sous embargo', value: dashOa.embargoed, color: '#b08900' },
+				{ label: 'Closed', value: dashOa.closed, color: '#c0392b' },
+				{ label: 'Indéterminé', value: dashOa.unknown, color: '#ccc' },
+			].filter(s => s.value > 0);
 			pieChart = new Chart(pieCanvas, {
 				type: 'doughnut',
 				data: {
-					labels: ['Open Access', 'Sous embargo', 'Closed', 'Indéterminé'],
+					labels: oa.map(s => s.label),
 					datasets: [{
-						data: [dashOa.open_access, dashOa.embargoed, dashOa.closed, dashOa.unknown],
-						backgroundColor: ['#2a7d4f', '#b08900', '#c0392b', '#ccc'],
+						data: oa.map(s => s.value),
+						backgroundColor: oa.map(s => s.color),
 					}]
 				},
 				options: {
@@ -188,15 +194,19 @@
 			});
 		}
 
-		// Doughnut: collaborations internationales (articles)
+		// Doughnut: collaborations internationales (articles) — on masque les modalités à 0 cas
 		if (collabCanvas && dashCollab.total_articles > 0) {
+			const collab = [
+				{ label: 'International', value: dashCollab.international, color: '#3b6b9e' },
+				{ label: 'Domestique', value: dashCollab.domestic, color: '#e0e0e0' },
+			].filter(s => s.value > 0);
 			collabChart = new Chart(collabCanvas, {
 				type: 'doughnut',
 				data: {
-					labels: ['International', 'Domestique'],
+					labels: collab.map(s => s.label),
 					datasets: [{
-						data: [dashCollab.international, dashCollab.domestic],
-						backgroundColor: ['#3b6b9e', '#e0e0e0'],
+						data: collab.map(s => s.value),
+						backgroundColor: collab.map(s => s.color),
 					}]
 				},
 				options: {

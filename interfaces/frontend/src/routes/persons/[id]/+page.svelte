@@ -171,13 +171,20 @@
 		}
 
 		if (pieCanvas && dashOa.total > 0) {
+			// on masque les modalités à 0 cas
+			const oa = [
+				{ label: 'Open Access', value: dashOa.open_access, color: '#2a7d4f' },
+				{ label: 'Sous embargo', value: dashOa.embargoed, color: '#b08900' },
+				{ label: 'Closed', value: dashOa.closed, color: '#c0392b' },
+				{ label: 'Indéterminé', value: dashOa.unknown, color: '#ccc' },
+			].filter(s => s.value > 0);
 			pieChart = new Chart(pieCanvas, {
 				type: 'doughnut',
 				data: {
-					labels: ['Open Access', 'Sous embargo', 'Closed', 'Indéterminé'],
+					labels: oa.map(s => s.label),
 					datasets: [{
-						data: [dashOa.open_access, dashOa.embargoed, dashOa.closed, dashOa.unknown],
-						backgroundColor: ['#2a7d4f', '#b08900', '#c0392b', '#ccc'],
+						data: oa.map(s => s.value),
+						backgroundColor: oa.map(s => s.color),
 					}]
 				},
 				options: {
