@@ -9,7 +9,7 @@
 
 	let labs: Lab[] = $state([]);
 	let search = $state("");
-	let sortCol: "name" | "tutelles" = $state("name");
+	let sortCol: "acronym" | "name" | "tutelles" = $state("acronym");
 	let sortAsc = $state(true);
 
 	const filtered = $derived.by(() => {
@@ -25,7 +25,10 @@
 		}
 		result = [...result].sort((a, b) => {
 			let va: string, vb: string;
-			if (sortCol === "name") {
+			if (sortCol === "acronym") {
+				va = (a.acronym || "").toLowerCase();
+				vb = (b.acronym || "").toLowerCase();
+			} else if (sortCol === "name") {
 				va = (a.name || "").toLowerCase();
 				vb = (b.name || "").toLowerCase();
 			} else {
@@ -45,7 +48,7 @@
 		return result;
 	});
 
-	function toggleSort(col: "name" | "tutelles") {
+	function toggleSort(col: "acronym" | "name" | "tutelles") {
 		if (sortCol === col) {
 			sortAsc = !sortAsc;
 		} else {
@@ -78,15 +81,25 @@
 	<thead>
 		<tr>
 			<th
+				class:sorted={sortCol === "acronym"}
+				onclick={() => toggleSort("acronym")}
+			>
+				Acronyme
+				<span class="sort-arrow"
+					>{sortCol === "acronym" ? (sortAsc ? "▲" : "▼") : ""}</span
+				>
+			</th>
+			<th
 				class:sorted={sortCol === "name"}
 				onclick={() => toggleSort("name")}
 			>
-				Laboratoire
+				Nom
 				<span class="sort-arrow"
 					>{sortCol === "name" ? (sortAsc ? "▲" : "▼") : ""}</span
 				>
 			</th>
 			<th
+				class="tutelles-col"
 				class:sorted={sortCol === "tutelles"}
 				onclick={() => toggleSort("tutelles")}
 			>
@@ -106,15 +119,17 @@
 	<tbody>
 		{#each filtered as lab (lab.id)}
 			<tr>
-				<td>
+				<td class="acronym-cell">
 					<a href="{base}/laboratories/{lab.id}" class="lab-link">
-						<span class="lab-name">{lab.name}</span>
-						{#if lab.acronym}
-							<span class="lab-acronym">({lab.acronym})</span>
-						{/if}
+						<span class="lab-acronym">{lab.acronym}</span>
 					</a>
 				</td>
 				<td>
+					<a href="{base}/laboratories/{lab.id}" class="lab-link">
+						<span class="lab-name">{lab.name}</span>
+					</a>
+				</td>
+				<td class="tutelles-col">
 					<div class="tutelles">
 						{#each lab.tutelles || [] as t (t.id)}
 							<span class="tutelle-tag"
@@ -212,9 +227,12 @@
 		font-weight: 500;
 	}
 	.lab-acronym {
-		font-size: 0.85rem;
-		color: var(--muted);
-		margin-left: 6px;
+		font-weight: 600;
+		white-space: nowrap;
+	}
+	.tutelles-col {
+		width: 1%;
+		white-space: nowrap;
 	}
 	.tutelles {
 		display: flex;
