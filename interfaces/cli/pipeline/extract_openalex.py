@@ -14,7 +14,7 @@ logger = setup_logger("extract_openalex", os.path.join(os.path.dirname(__file__)
 def main() -> None:
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap).get("openalex", "https://api.openalex.org/works")
+        base_url = get_api_base_urls(bootstrap)["openalex"]
     conn = engine.connect()
     adapter = PgOpenalexExtractAdapter(base_url=base_url)
     OpenalexExtractor(conn, logger, adapter).run()
