@@ -1,11 +1,7 @@
 <script lang="ts">
   import { base } from "$app/paths";
-  import {
-    structLabel,
-    type StructInfo,
-    type ThesisAuthorship,
-    type ThesisMeta,
-  } from "./types";
+  import StructureTag from "./StructureTag.svelte";
+  import { type StructInfo, type ThesisAuthorship, type ThesisMeta } from "./types";
 
   const {
     thesesAuth,
@@ -100,9 +96,7 @@
           {/each}
         {/if}
         {#each thesisAuthorStructures as sid}
-          <a href="{base}/laboratories/{sid}?tab=theses" class="struct-tag"
-            >{structLabel(structures, sid)}</a
-          >
+          <StructureTag {structures} {sid} tab="theses" />
         {/each}
       </dd>
     {/if}
@@ -147,20 +141,5 @@
   }
   .thesis-dl a:hover {
     text-decoration: underline;
-  }
-  .struct-tag {
-    display: inline-block;
-    padding: 1px 6px;
-    background: var(--accent-light);
-    border-radius: 3px;
-    font-size: 0.8rem;
-    color: var(--accent);
-    font-weight: 500;
-    margin-right: 3px;
-    text-decoration: none;
-  }
-  a.struct-tag:hover {
-    background: #d0e3f4;
-    text-decoration: none;
   }
 </style>
