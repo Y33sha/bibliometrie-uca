@@ -1337,9 +1337,7 @@ def _run_extract_hal(
     source_log = setup_logger("hal", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        hal_url = get_api_base_urls(bootstrap).get(
-            "hal", "https://api.archives-ouvertes.fr/search/"
-        )
+        hal_url = get_api_base_urls(bootstrap)["hal"]
     conn = engine.connect()
     adapter = PgHalExtractAdapter(base_url=hal_url)
     try:
@@ -1366,7 +1364,7 @@ def _run_extract_openalex(
     source_log = setup_logger("openalex", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap).get("openalex", "https://api.openalex.org/works")
+        base_url = get_api_base_urls(bootstrap)["openalex"]
     conn = engine.connect()
     adapter = PgOpenalexExtractAdapter(base_url=base_url)
     try:
@@ -1391,7 +1389,7 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
     source_log = setup_logger("wos", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap).get("wos", "https://api.clarivate.com/api/wos")
+        base_url = get_api_base_urls(bootstrap)["wos"]
         api_key = get_wos_api_key(bootstrap)
     conn = engine.connect()
     adapter = PgWosExtractAdapter(base_url=base_url, api_key=api_key)
@@ -1420,10 +1418,7 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
     source_log = setup_logger("scanr", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap).get(
-            "scanr",
-            "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
-        )
+        base_url = get_api_base_urls(bootstrap)["scanr"]
         credentials = get_scanr_credentials_from_db(bootstrap)
     conn = engine.connect()
     adapter = PgScanrExtractAdapter(base_url=base_url, credentials=credentials)
@@ -1449,9 +1444,7 @@ def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> Phase
     source_log = setup_logger("theses", str(BASE / "logs"))
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap).get(
-            "theses", "https://theses.fr/api/v1/theses/recherche/"
-        )
+        base_url = get_api_base_urls(bootstrap)["theses"]
     conn = engine.connect()
     adapter = PgThesesExtractAdapter(base_url=base_url)
     try:

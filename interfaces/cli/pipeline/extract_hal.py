@@ -14,9 +14,7 @@ logger = setup_logger("extract_hal", os.path.join(os.path.dirname(__file__), "lo
 def main() -> None:
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        hal_url = get_api_base_urls(bootstrap).get(
-            "hal", "https://api.archives-ouvertes.fr/search/"
-        )
+        hal_url = get_api_base_urls(bootstrap)["hal"]
     conn = engine.connect()
     adapter = PgHalExtractAdapter(base_url=hal_url)
     HalExtractor(conn, logger, adapter).run()

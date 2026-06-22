@@ -14,9 +14,7 @@ logger = setup_logger("extract_theses", os.path.join(os.path.dirname(__file__), 
 def main() -> None:
     engine = get_sync_engine()
     with engine.connect() as bootstrap:
-        base_url = get_api_base_urls(bootstrap).get(
-            "theses", "https://theses.fr/api/v1/theses/recherche/"
-        )
+        base_url = get_api_base_urls(bootstrap)["theses"]
     conn = engine.connect()
     adapter = PgThesesExtractAdapter(base_url=base_url)
     ThesesExtractor(conn, logger, adapter).run()
