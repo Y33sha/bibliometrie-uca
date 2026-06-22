@@ -53,6 +53,7 @@
 * [ ] publications: indiquer si premier/dernier auteur
 ### Publications
 * [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
+* [ ] doc_types: répartir en deux niveaux?
 * [ ] colonne éditeur; filtres éditeur + revue?
 * [ ] définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
