@@ -7,8 +7,9 @@
 * [ ] à étudier: cross-import: seulement `in_perimeter`? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] analyser les diff de payload pour voir si on peut diminuer le nombre d'UPSERT en filtrant les champs importés (ScanR notamment)
 * [ ] scanR: paralléliser les années?
-* [ ] refetch_truncated: envisager un flag authors_truncated
+* [ ] refetch_truncated: envisager un flag `authors_truncated`
 * [ ] biorxiv, medrxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
+* [ ] chercher dans ScanR par hal-id?
 ### Suite du traitement
 * [ ] DOI versionnés: déplacer la correction (suppression de suffixes) depuis `clean_doi` vers `metadata_correction`. `clean_doi` devrait se borner au nettoyage simple.
 * [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
@@ -31,6 +32,7 @@
 ## Problèmes dans les sources
 * faux auteurs UCA créés par une erreur de parsing (toutes les signatures groupées ensemble pour chaque auteur) : ex. publi 77832
 * [ ] OpenAlex résout les noms d'équipes en listes de personnes (21105) => nettoyer les "for the ... study group"
+* [ ] publi 86878: Lorsque OpenAlex corrige le parsing des affiliations, certaines authorships sortent du périmètre; des auteurs UCA deviennent non-UCA mais restent polluer la base. Gérer la purge automatique.
 * [ ] publications avec beaucoup d'auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. En attendant une solution, le mode "conflit de sources" dans la déduplication manuelle des personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`) (chantier chiant, à enterrer le plus proprement possible)
 * [ ] DOI Crossref non trouvés sur Crossref: quel traitement ultérieur? (auditer; tenter corrections pour les cas simples (ponctuation parasite...); nuller les autres pour éviter que ça bloque une déduplication légitime)
 ## Explorer autres sources possibles
@@ -42,7 +44,6 @@
 * [ ] distinguer adresses correctes/incorrectes pour affichage %age par labo/personne; suppose: 1° de définir une typologie d'erreurs, et leur caractère bloquant ou non; 2° de grouper les signatures par publi pour interroger en pourcentage de publications, non en pourcentage de signatures; 3° de restreindre aux publications *stricto sensu* (ni preprint, ni dataset etc.: définir liste blanche de doc_types à prendre en compte); 4° question des publications sans signature en base (sources HAL/ScanR seulement): exclure du calcul?
 
 # UI
-* [ ] repenser entièrement la page stats; imaginer un va-et-vient entre pages listes et pages dashboard (générés à partir de listes filtrées)
 ## Admin
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer
 * [ ] repenser entièrement les pages `admin/duplicates` et `admin/person-duplicates`
@@ -58,20 +59,16 @@
 * [ ] colonne éditeur; filtres éditeur + revue?
 * [ ] définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
+* [ ] page détails: séparer l'affichage des relations selon le sens (publication parent: afficher dès le bloc titre; publications dépendantes: mettre liens dans la sidebar)
 ## Détails d'affichage
 * [ ] dashboard éditeur/revue: graphiques sur le modèle des dashboards labo/personne
 * [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques?
 * [ ] page revue: tableau publications, pas besoin de colonne revue
 * [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose
-* [ ] page détails thèse: seul endroit où le tag UCA est un lien (et surprise: http://localhost:5176/bibliometrie/laboratories/169 existe vraiment...)
-* [ ] détails publication: sidebar sticky: tenir compte du menu supérieur fixe
-* [ ] détails publication: séparer l'affichage des relations selon le sens (publication parent: afficher dès le bloc titre; publications dépendantes: mettre liens dans la sidebar)
 
 # Cas particuliers, bizarreries à élucider
-* [ ] 151499: source primaire HAL d'après Openalex mais pas de document HAL en base
 * [ ] 164107: pourquoi type autre?
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article)
-* [ ] 86878 Lorsque OpenAlex corrige le parsing des affiliations, certaines authorships sortent du périmètre; des auteurs UCA deviennent non-UCA. Gérer la purge automatique.
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier

@@ -1,5 +1,7 @@
 # Chantier — Identifiants partagés entre signatures (corruption source) : généraliser le `_dubious`
 
+Commencé et terminé le 2026-06-22
+
 ## Contexte
 
 Une personne « Frankenstein » découverte sur le stock : la personne 12913 (Acharya, Shreyasi, autrice ALICE/CERN) porte **921 formes de nom** — en majorité des **noms d'autres auteurs** (Adamová, Agnello, Das, Kim…) — et **2122 authorships couvrant 920 noms distincts**.
@@ -51,7 +53,7 @@ La séquence de remédiation doit donc être : **`null person_id corrompus` → 
 ### Phase 3 — Tests
 
 - [x] Le helper (valeur partagée / non partagée / idempotence).
-- [ ] Un cas par normalizer ; non-régression HAL.
+- [x] Un cas par normalizer (crossref, openalex, datacite) ; non-régression HAL (tests existants).
 
 ## Questions ouvertes
 
@@ -60,4 +62,4 @@ La séquence de remédiation doit donc être : **`null person_id corrompus` → 
 - **Tainter tous les ids d'une position, ou seulement le type partagé ?** HAL taint tous les ids (l'identité entière de la signature est douteuse, ils sont tous attachés au compte HAL). Pour crossref/openalex, la corruption est spécifiquement l'ORCID, et les autres ids (rares) pourraient être sains — mais tainter tout reste le choix conservateur. À trancher selon la fréquence de co-occurrence d'autres ids.
 - **Purge des `person_identifiers` orphelins.** Définir « plus appuyé par une authorship `in_perimeter` » : un identifiant de la table `person_identifiers` (statut/historique) dont plus aucune `source_authorship in_perimeter` ne porte la valeur. Attention aux identifiants `confirmed` manuellement (ne pas supprimer un verdict humain).
 - **Ampleur.** Quantifier sur le stock : combien d'ORCID partagés sur N noms distincts, combien de personnes « Frankenstein » en résultent. Dira si la remédiation touche une poignée d'auteurs physique des particules ou un volume plus large.
-- **Résidu épars single-carrier (hors scope de ce chantier).** Le garde par-publication (≥2 porteurs dans un même enregistrement) ne couvre pas la corruption **éparpillée** : un même ORCID erroné réparti sur des publications distinctes, un seul porteur (au mauvais nom) par publication. Constaté sur Acharya : 33 signatures « s das » portant l'ORCID d'Acharya, chacune seule porteuse dans sa publication → re-rattachées à Acharya au matching. Concentré sur les **dépôts DataCite de collaboration** (Zenodo/figshare/HEPData : `creator` libre, mauvais ORCID recopié de façon éparse, là où crossref le recopie en masse). Volume faible → traité en **action admin manuelle**. Pistes si le volume grossit : corroboration par le nom au matching (rejeter un match-identifiant dont le nom est incompatible avec la personne, via `names_compatible`) ou garde ciblé DataCite.
+- **Résidu épars single-carrier (hors scope de ce chantier).** Le garde par-publication (≥2 porteurs dans un même enregistrement) ne couvre pas la corruption **éparpillée** : un même ORCID erroné réparti sur des publications distinctes, un seul porteur (au mauvais nom) par publication. Constaté sur Acharya : 33 signatures « s das » portant l'ORCID d'Acharya, chacune seule porteuse dans sa publication → re-rattachées à Acharya au matching. Pistes si le volume grossit : corroboration par le nom au matching (rejeter un match-identifiant dont le nom est incompatible avec la personne, via `names_compatible`) ou garde ciblé DataCite. (autre exemple: adrien gosselin pali|crossref|{"orcid": "0000-0002-1918-0801"}|)
