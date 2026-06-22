@@ -34,9 +34,9 @@ Plusieurs leviers complémentaires :
 ### Dédoublonnage assisté — deux sources de signal
 
 1. **Formes de nom ambiguës** (≥2 personnes partageant une forme). Trois cas à distinguer algorithmiquement :
-   - **a) ambiguïté légitime** : vrai homonyme (« Pierre Bonnet »), homonymie de patronyme avec initiale identique ;
-   - **b) doublon** : les deux personnes sont en réalité la même → à fusionner ;
-   - **c) erreur** : une forme a été rattachée par erreur à une personne, via un identifiant mal placé sur une authorship → à détacher/corriger.
+   - **a. ambiguïté légitime** : vrai homonyme (« Pierre Bonnet »), homonymie de patronyme avec initiale identique ;
+   - **b. doublon** : les deux personnes sont en réalité la même → à fusionner ;
+   - **c. erreur** : une forme a été rattachée par erreur à une personne, via un identifiant mal placé sur une authorship → à détacher/corriger.
    Imaginer des algorithmes de classification (a/b/c) pour aider la fusion et la correction.
 2. **Conflits d'identifiants** : la phase persons peut produire des logs du type « impossible de rattacher l'identifiant x à la personne y : déjà attribué à z ». Ces conflits signent soit un **doublon réel**, soit une **erreur d'attribution** — à capturer et exploiter.
 
@@ -46,7 +46,7 @@ Plusieurs leviers complémentaires :
 
 - [ ] **Corroboration par le nom au matching identifiant** : rejeter un match identifiant dont le nom est incompatible avec la personne ciblée. Mesurer d'abord l'ampleur (combien de matchs identifiant à nom incompatible) et le risque de faux positifs.
 - [ ] **Config `confirmed`-only** : option restreignant le matching aux identifiants `confirmed` ; les `pending` deviennent no-op. Évaluer l'impact (volume d'orphelins, besoin d'un flux de confirmation).
-- [ ] **Vérification ORCID via API** : un appel par identifiant ORCID (pas par signature) pour récupérer le nom canonique — et affiliation / domaine de l'adresse mail si exposés — et confirmer ou rejeter le couple **identifiant ↔ personne**. Mesurer la couverture (combien de profils renseignent un nom exploitable) et le taux de corroboration.
+- [ ] **Vérification ORCID via API** : récupérer le nom canonique — et affiliation / domaine de l'adresse mail si exposés — et confirmer ou rejeter le couple **identifiant ↔ personne**. Mesurer la couverture (combien de profils renseignent un nom exploitable) et le taux de corroboration.
 
 ### Phase 2 — Signaux et classification
 

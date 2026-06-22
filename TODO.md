@@ -1,7 +1,7 @@
 # A régler avant transmission
 ## Pipeline de traitement
 * [ ] Faire un audit complet du logging (complétude, clarté, cohérence entre sources et entre phases)
-* [ ] Revoir la ModePolicy (modes full et weekly: à fusionner en un seul mode full avec une option "année de départ")
+* [ ] Revoir la ModePolicy (modes `full` et `weekly`: à fusionner en un seul mode `full` avec une option "année de début")
 ### Extraction
 * [ ] extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] à étudier: cross-import: seulement `in_perimeter`? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
