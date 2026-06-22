@@ -183,6 +183,28 @@ class TestGetCrossImportDois:
         assert "10.1234/primary" in result
         assert "10.9999/preprint" in result
 
+    def test_includes_arxiv_derived_datacite_doi(self, db):
+        """Un arxiv_id dans external_ids (source != cible) entre dans le pool sous la
+        forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules comme tout DOI staging."""
+        db.execute(
+            "INSERT INTO source_publications (source, source_id, title, external_ids) "
+            "VALUES (%s, %s, %s, %s)",
+            ("openalex", "W1", "T", '{"arxiv_id": "2605.02321"}'),
+        )
+        result = get_cross_import_dois(db.connection, "hal")
+        assert "10.48550/arxiv.2605.02321" in result
+
+    def test_arxiv_derived_doi_excluded_for_same_source(self, db):
+        """L'arxiv_id d'un record de la cible elle-même ne génère pas de candidat
+        (même logique `source != cible` que les autres branches du pool)."""
+        db.execute(
+            "INSERT INTO source_publications (source, source_id, title, external_ids) "
+            "VALUES (%s, %s, %s, %s)",
+            ("hal", "H1", "T", '{"arxiv_id": "2605.02321"}'),
+        )
+        result = get_cross_import_dois(db.connection, "hal")
+        assert "10.48550/arxiv.2605.02321" not in result
+
     def test_includes_relation_targets(self, db):
         """Les cibles des relations entre publications (`publication_relations.target_doi`)
         entrent dans le pool, pour rapatrier les œuvres liées absentes."""

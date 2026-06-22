@@ -232,10 +232,12 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
 
     Pool = `staging.doi` (DOI primaire) ∪ `source_publications.external_ids.related_dois`
     (DOI secondaires : preprint/dépôt/édition) ∪ `publication_relations.target_doi`
-    (cibles des relations entre publications : preprint/supplément/data paper… à rapatrier).
-    Les related_dois et les relations proviennent des runs précédents (source_publications
-    normalisés, phase `relations`) : ceux d'un record fraîchement ingéré sont rattrapés au
-    run suivant — bénin (le pipeline est convergent).
+    (cibles des relations entre publications : preprint/supplément/data paper… à rapatrier)
+    ∪ DOI DataCite déduits de `source_publications.external_ids.arxiv_id` (préfixe
+    `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite, modernes comme anciens
+    identifiants). Les related_dois, les relations et les arxiv_id proviennent des runs
+    précédents (source_publications normalisés, phase `relations`) : ceux d'un record
+    fraîchement ingéré sont rattrapés au run suivant — bénin (le pipeline est convergent).
 
     Comparaison directe sur `doi` : tous les DOIs sont stockés en minuscules
     (cf. `domain.publication._normalize_doi`), donc plus besoin d'un cas
@@ -263,7 +265,8 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
         "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
     # Pool de DOI candidats : primaires (staging.doi) + secondaires (related_dois
-    # des source_publications normalisés) + cibles des relations entre publications.
+    # des source_publications normalisés) + cibles des relations entre publications
+    # + DOI DataCite déduits des identifiants arXiv (préfixe `10.48550/arXiv.`).
     # Partagé par les deux branches.
     candidates_cte = """
         WITH candidates AS (
@@ -280,6 +283,11 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
             UNION
             SELECT pr.target_doi AS doi
             FROM publication_relations pr
+            UNION
+            SELECT '10.48550/arxiv.' || lower(sp.external_ids->>'arxiv_id') AS doi
+            FROM source_publications sp
+            WHERE sp.source != {t}
+              AND sp.external_ids->>'arxiv_id' IS NOT NULL
         )
     """
 
