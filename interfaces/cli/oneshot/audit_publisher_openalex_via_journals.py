@@ -46,7 +46,7 @@ def main() -> int:
     with engine.connect() as conn:
         api_key = get_openalex_api_key(conn)
         mailto = get_polite_pool_email(conn)
-        openalex_sources_api = get_api_base_urls(conn)["openalex_sources"]
+        openalex_sources_api = get_api_base_urls()["openalex_sources"]
 
         # 1. Charger le set des openalex_id déjà attribués à un publisher
         # (= contraintes de collision). On garde aussi le nom pour le report.

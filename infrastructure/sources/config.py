@@ -116,7 +116,7 @@ def get_openalex_api_key(conn: Connection) -> str | None:
     return None
 
 
-_API_BASE_URLS_DEFAULTS: dict[str, str] = {
+_API_BASE_URLS: dict[str, str] = {
     # Extracteurs principaux (un endpoint par source)
     "hal": "https://api.archives-ouvertes.fr/search/",
     "openalex": "https://api.openalex.org/works",
@@ -139,17 +139,17 @@ _API_BASE_URLS_DEFAULTS: dict[str, str] = {
 }
 
 
-def get_api_base_urls(conn: Connection) -> dict[str, str]:
+def get_api_base_urls() -> dict[str, str]:
     """Retourne les URLs de base des API (extracteurs + endpoints secondaires).
 
-    Les valeurs définies dans la table `config` écrasent les defaults ;
-    les clés non configurées retombent sur les defaults, pour qu'un
-    nouvel endpoint ajouté en code ne force pas à re-seeder la config.
+    Source unique : la constante `_API_BASE_URLS` du code. Ce sont des constantes
+    amont (mêmes endpoints en dev et en prod, qui ne changent quasiment jamais et
+    dont une évolution s'accompagne d'ordinaire d'un changement d'adapter), pas de
+    la config d'environnement — elles n'ont donc pas à vivre en base. Les valeurs
+    qui *varient* par déploiement (clés d'API, auth, email polite pool) restent
+    lues séparément depuis la table `config`.
     """
-    val = _get_from_db(conn, "api_base_urls")
-    if val and isinstance(val, dict):
-        return {**_API_BASE_URLS_DEFAULTS, **val}
-    return dict(_API_BASE_URLS_DEFAULTS)
+    return dict(_API_BASE_URLS)
 
 
 def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:

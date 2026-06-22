@@ -69,7 +69,7 @@ class WosFetchMissingDoiAdapter:
     headers: dict[str, str]
 
     def configure(self, conn: Connection) -> None:
-        self.base_url = get_api_base_urls(conn).get("wos", "https://api.clarivate.com/api/wos")
+        self.base_url = get_api_base_urls()["wos"]
         self.headers = {"X-ApiKey": get_wos_api_key(conn), "Accept": "application/json"}
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:

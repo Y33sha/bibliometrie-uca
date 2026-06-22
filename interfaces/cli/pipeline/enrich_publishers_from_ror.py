@@ -32,7 +32,7 @@ def main() -> None:
 
     conn = get_sync_engine().connect()
     try:
-        base_url = get_api_base_urls(conn)["ror"]
+        base_url = get_api_base_urls()["ror"]
         user_agent = build_ror_user_agent(get_polite_pool_email(conn))
         fetcher: RorFetcher = lambda ror: fetch_ror_record(  # noqa: E731
             ror, base_url=base_url, user_agent=user_agent, logger=logger

@@ -65,7 +65,7 @@ class OpenalexFetchMissingDoiAdapter:
 
     def configure(self, conn: Connection) -> None:
         init_auth(api_key=get_openalex_api_key(conn), email=get_polite_pool_email(conn))
-        self.base_url = get_api_base_urls(conn)["openalex"]
+        self.base_url = get_api_base_urls()["openalex"]
 
     async def fetch_async(self, client: httpx.AsyncClient, dois: list[str]) -> Iterable[dict]:
         doi = dois[0]

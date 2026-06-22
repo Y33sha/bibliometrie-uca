@@ -95,7 +95,7 @@ class DataciteFetchMissingDoiAdapter:
     headers: dict[str, str]
 
     def configure(self, conn: Connection) -> None:
-        self.base_url = get_api_base_urls(conn)["datacite"]
+        self.base_url = get_api_base_urls()["datacite"]
         email = get_polite_pool_email(conn)
         self.headers = {
             "User-Agent": _USER_AGENT_TEMPLATE.format(email=email),

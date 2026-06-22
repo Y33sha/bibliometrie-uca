@@ -254,7 +254,7 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         self._base_url: str = ""
 
     def configure(self, conn: Connection) -> None:
-        self._base_url = get_api_base_urls(conn)["hal"]
+        self._base_url = get_api_base_urls()["hal"]
 
     # ── Lookups SQL ────────────────────────────────────────────
 

@@ -41,7 +41,7 @@ def main() -> None:
             journal_repo=journal_repository(conn),
             api_key=get_openalex_api_key(conn),
             mailto=get_polite_pool_email(conn),
-            openalex_sources_api=get_api_base_urls(conn)["openalex_sources"],
+            openalex_sources_api=get_api_base_urls()["openalex_sources"],
             limit=args.limit,
             dry_run=args.dry_run,
             rate_delay=DOAJ_DELAY,

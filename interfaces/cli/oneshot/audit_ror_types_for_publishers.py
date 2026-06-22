@@ -51,7 +51,7 @@ def main() -> int:
     engine = get_sync_engine()
     with engine.connect() as conn:
         user_agent = build_ror_user_agent(get_polite_pool_email(conn))
-        ror_base_url = get_api_base_urls(conn)["ror"]
+        ror_base_url = get_api_base_urls()["ror"]
 
         sql = """
             SELECT id, name, ror
