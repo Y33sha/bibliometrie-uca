@@ -102,6 +102,23 @@ class TestGetPublicationDetail:
         detail = get_publication_detail(sa_sync_conn, pub)
         assert detail["thesis_meta"] is None
 
+    def test_doi_ra_resolved_from_doi_prefixes(self, sa_sync_conn):
+        """doi_ra = la RA du préfixe DOI (via doi_prefixes) — discrimine les DOI
+        DataCite (Zenodo/figshare/arXiv) pour le choix du lien d'accès."""
+        sa_sync_conn.execute(
+            text("INSERT INTO doi_prefixes (prefix, ra) VALUES ('10.5281', 'DataCite')")
+        )
+        pub = _create_pub(sa_sync_conn, doi="10.5281/zenodo.99")
+        detail = get_publication_detail(sa_sync_conn, pub)
+        assert detail is not None
+        assert detail["publication"]["doi_ra"] == "DataCite"
+
+    def test_doi_ra_none_when_prefix_unknown(self, sa_sync_conn):
+        pub = _create_pub(sa_sync_conn, doi="10.9999/unresolved")
+        detail = get_publication_detail(sa_sync_conn, pub)
+        assert detail is not None
+        assert detail["publication"]["doi_ra"] is None
+
     def test_multiple_source_publications_same_source(self, sa_sync_conn):
         """Plusieurs `source_publications` d'une même source pour une publi
         canonique (ex: deux Work IDs OpenAlex partageant un DOI) :

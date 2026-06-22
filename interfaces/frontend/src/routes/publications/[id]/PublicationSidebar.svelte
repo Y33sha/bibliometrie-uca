@@ -36,10 +36,13 @@
 
   // Lien d'accès, dérivé (pas de champ URL unique en base) :
   //   closed / embargoed → aucun lien ; green → dépôt HAL ; sinon → DOI.
+  // Exception green : un DOI DataCite (Zenodo, figshare, arXiv…) pointe vers le
+  // dépôt réel ; le dépôt HAL correspondant est souvent une coquille vide, donc
+  // on préfère le DOI dans ce cas.
   const accessUrl = $derived.by(() => {
     const oa = pub.oa_status;
     if (oa === "closed" || oa === "embargoed") return null;
-    if (oa === "green") {
+    if (oa === "green" && pub.doi_ra !== "DataCite") {
       const hal = sources.find((s) => s.source === "hal");
       if (hal) return sourceExternalUrl("hal", hal.source_id, oa);
     }
