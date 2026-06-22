@@ -1,9 +1,8 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import Tooltip from "$lib/components/Tooltip.svelte";
+  import StructureTag from "./StructureTag.svelte";
   import {
-    structIsLabo,
-    structLabel,
     structsTooltip,
     type PubResponse,
     type Source,
@@ -282,13 +281,7 @@
             <td>
               {#if a.structure_ids}
                 {#each a.structure_ids as sid}
-                  {#if structIsLabo(structures, sid)}
-                    <a href="{base}/laboratories/{sid}" class="struct-tag"
-                      >{structLabel(structures, sid)}</a
-                    >
-                  {:else}
-                    <span class="struct-tag">{structLabel(structures, sid)}</span>
-                  {/if}
+                  <StructureTag {structures} {sid} />
                 {/each}
               {/if}
               {#if a.raw_affiliation}
@@ -499,21 +492,6 @@
   }
   .author-link:hover {
     text-decoration: underline;
-  }
-  .struct-tag {
-    display: inline-block;
-    padding: 1px 6px;
-    background: var(--accent-light);
-    border-radius: 3px;
-    font-size: 0.8rem;
-    color: var(--accent);
-    font-weight: 500;
-    margin-right: 3px;
-    text-decoration: none;
-  }
-  a.struct-tag:hover {
-    background: #d0e3f4;
-    text-decoration: none;
   }
   .raw-affil {
     font-size: 0.8rem;
