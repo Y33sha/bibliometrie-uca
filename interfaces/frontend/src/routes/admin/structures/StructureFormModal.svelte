@@ -45,7 +45,7 @@
       <option value="site">Site</option>
       <option value="autre">Autre</option>
     </select></label>
-    <label>ROR ID <input placeholder="https://ror.org/0xxxxxxxxx" bind:value={ror} /></label>
+    <label>ROR ID <input placeholder="0xxxxxxxxx" bind:value={ror} /></label>
     <label>Collection HAL <input placeholder="ex: INSTITUT_PASCAL" bind:value={hal} /></label>
     <details class="api-ids-section">
       <summary>Identifiants API par source</summary>

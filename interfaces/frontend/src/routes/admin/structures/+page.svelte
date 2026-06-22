@@ -35,11 +35,13 @@
   }
 
   function normalizeRor(): boolean {
-    let ror = mRor.trim();
+    // Forme canonique stockée = ID court 9-char. On accepte une URL complète ou
+    // un ID nu en saisie, mais on envoie toujours l'ID court (le backend
+    // re-normalise de toute façon via le VO RorId).
+    const ror = mRor.trim().replace(/^https?:\/\/ror\.org\//, "");
     if (!ror) return true;
-    if (/^0[a-z0-9]{8}$/.test(ror)) ror = "https://ror.org/" + ror;
-    if (!/^https:\/\/ror\.org\/0[a-z0-9]{8}$/.test(ror)) {
-      toast("Format ROR invalide. Attendu : https://ror.org/0xxxxxxxxx", "error");
+    if (!/^0[a-z0-9]{8}$/.test(ror)) {
+      toast("Format ROR invalide. Attendu : 0xxxxxxxxx (ou https://ror.org/0xxxxxxxxx)", "error");
       return false;
     }
     mRor = ror;
