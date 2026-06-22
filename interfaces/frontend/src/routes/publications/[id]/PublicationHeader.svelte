@@ -9,8 +9,8 @@
 
 <div class="pub-header">
   <div class="pub-meta">
-    {#if pub.doc_type}<span>{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
-    {#if pub.pub_year}<span class="meta-sep">·</span><span>{pub.pub_year}</span>{/if}
+    {#if pub.doc_type}<span class="doc-type-tag">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+    {#if pub.pub_year}<span class="pub-year">{pub.pub_year}</span>{/if}
   </div>
   <h1 class="pub-title-main">{@html sanitizeTitle(pub.title)}</h1>
 
@@ -19,7 +19,7 @@
       {#if pub.journal_id}
         <a href="{base}/journals/{pub.journal_id}" class="journal-name">{pub.journal_title || pub.container_title}</a>
       {:else}
-        <span class="journal-name">{pub.journal_title || pub.container_title}</span>
+        <span class="journal-name" class:container={!pub.journal_title}>{pub.journal_title || pub.container_title}</span>
       {/if}
       {#if pub.publisher_name}
         <span class="publisher-sep">—</span>
@@ -50,15 +50,23 @@
   }
   .pub-meta {
     display: flex;
-    gap: 6px;
+    gap: 10px;
     align-items: center;
     flex-wrap: wrap;
     margin-bottom: 10px;
-    font-size: 0.9rem;
+    font-size: 1rem;
     color: var(--muted);
   }
-  .meta-sep {
-    color: var(--border);
+  .pub-year {
+    font-weight: 600;
+  }
+  .doc-type-tag {
+    background: #15616d;
+    color: #fff;
+    padding: 3px 9px;
+    border-radius: 3px;
+    font-size: 0.92rem;
+    font-weight: 500;
   }
 
   .pub-journal-line {
@@ -73,6 +81,10 @@
     font-weight: 500;
     color: var(--text);
     text-decoration: none;
+  }
+  .journal-name.container {
+    color: var(--muted);
+    font-weight: 400;
   }
   a.journal-name:hover {
     text-decoration: underline;
