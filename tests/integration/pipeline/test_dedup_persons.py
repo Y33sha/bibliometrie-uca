@@ -200,13 +200,34 @@ class TestCascadeRun:
         assert _get_person_id(sa_sync_conn, oa_as) == person_id
 
     def test_known_hal_person_id_links(self, sa_sync_conn):
-        """`hal_person_id` confirmé en base → matche la bonne personne, même nom
-        divergent (l'identifiant prime)."""
+        """`hal_person_id` confirmé en base + nom compatible → matche la bonne personne."""
         pub = _insert_publication(sa_sync_conn)
         person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
         _seed_identifier(sa_sync_conn, person_id, "hal_person_id", "123456", "confirmed")
 
         hal_sd = _insert_source_document(sa_sync_conn, "hal", "hal-200", pub)
+        hal_as = _insert_authorship(
+            sa_sync_conn,
+            "hal",
+            hal_sd,
+            "Jean Dupont",
+            identifiers={"hal_person_id": "123456"},
+        )
+
+        _run_cascade(sa_sync_conn)
+
+        assert _get_person_id(sa_sync_conn, hal_as) == person_id
+
+    def test_identifier_match_rejected_on_incompatible_name(self, sa_sync_conn):
+        """Corroboration par le nom : un identifiant confirmé pointant une personne
+        au nom incompatible avec la signature ne rattache pas (corruption éparse —
+        un identifiant recopié sur le mauvais co-auteur). La cascade retombe sur le
+        name_form (ici inconnu → création), pas sur la personne ciblée par l'identifiant."""
+        pub = _insert_publication(sa_sync_conn)
+        person_id = create_person("Dupont", "Jean", repo=person_repository(sa_sync_conn))
+        _seed_identifier(sa_sync_conn, person_id, "hal_person_id", "123456", "confirmed")
+
+        hal_sd = _insert_source_document(sa_sync_conn, "hal", "hal-201", pub)
         hal_as = _insert_authorship(
             sa_sync_conn,
             "hal",
@@ -217,7 +238,7 @@ class TestCascadeRun:
 
         _run_cascade(sa_sync_conn)
 
-        assert _get_person_id(sa_sync_conn, hal_as) == person_id
+        assert _get_person_id(sa_sync_conn, hal_as) != person_id
 
     def test_rejected_orcid_ignored(self, sa_sync_conn):
         """ORCID `rejected` en base → ignoré par le matching."""

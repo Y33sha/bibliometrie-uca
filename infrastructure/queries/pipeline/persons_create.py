@@ -209,43 +209,43 @@ def fetch_linked_authorships(conn: Connection) -> list[LinkedAuthorshipRow]:
     ]
 
 
-def fetch_idref_to_person_map(conn: Connection) -> dict[str, int]:
-    """`{idref: person_id}` pour les IdRef connus non rejetés."""
+def _fetch_identifier_to_person_map(
+    conn: Connection, id_type: str
+) -> dict[str, tuple[int, str, str]]:
+    """`{id_value: (person_id, last_name_normalized, first_name_normalized)}` pour les
+    identifiants `id_type` connus non rejetés.
+
+    Le nom normalisé de la personne ciblée accompagne le `person_id` : la cascade
+    corrobore le match identifiant par le nom (`decide_match_by_identifier`), refusant
+    un identifiant porté par une signature étrangère.
+    """
     rows = conn.execute(
         text("""
-            SELECT id_value, person_id
-            FROM person_identifiers
-            WHERE id_type = 'idref'
-              AND status != 'rejected'
-        """)
+            SELECT pi.id_value, pi.person_id,
+                   p.last_name_normalized AS ln, p.first_name_normalized AS fn
+            FROM person_identifiers pi
+            JOIN persons p ON p.id = pi.person_id
+            WHERE pi.id_type = :id_type
+              AND pi.status != 'rejected'
+        """),
+        {"id_type": id_type},
     ).all()
-    return {r.id_value: r.person_id for r in rows}
+    return {r.id_value: (r.person_id, r.ln or "", r.fn or "") for r in rows}
 
 
-def fetch_orcid_to_person_map(conn: Connection) -> dict[str, int]:
-    """`{orcid: person_id}` pour les ORCID connus non rejetés."""
-    rows = conn.execute(
-        text("""
-            SELECT id_value, person_id
-            FROM person_identifiers
-            WHERE id_type = 'orcid'
-              AND status != 'rejected'
-        """)
-    ).all()
-    return {r.id_value: r.person_id for r in rows}
+def fetch_idref_to_person_map(conn: Connection) -> dict[str, tuple[int, str, str]]:
+    """`{idref: (person_id, nom, prénom) normalisés}` pour les IdRef connus non rejetés."""
+    return _fetch_identifier_to_person_map(conn, "idref")
 
 
-def fetch_hal_account_to_person_map(conn: Connection) -> dict[str, int]:
-    """`{hal_person_id: person_id}` pour les comptes HAL connus non rejetés."""
-    rows = conn.execute(
-        text("""
-            SELECT id_value, person_id
-            FROM person_identifiers
-            WHERE id_type = 'hal_person_id'
-              AND status != 'rejected'
-        """)
-    ).all()
-    return {r.id_value: r.person_id for r in rows}
+def fetch_orcid_to_person_map(conn: Connection) -> dict[str, tuple[int, str, str]]:
+    """`{orcid: (person_id, nom, prénom) normalisés}` pour les ORCID connus non rejetés."""
+    return _fetch_identifier_to_person_map(conn, "orcid")
+
+
+def fetch_hal_account_to_person_map(conn: Connection) -> dict[str, tuple[int, str, str]]:
+    """`{hal_person_id: (person_id, nom, prénom) normalisés}` pour les comptes HAL connus non rejetés."""
+    return _fetch_identifier_to_person_map(conn, "hal_person_id")
 
 
 def fetch_name_form_map(conn: Connection) -> dict[str, list[int]]:
@@ -296,13 +296,13 @@ class PgPersonsCreateQueries(PersonsCreateQueries):
     def fetch_linked_authorships(self, conn: Connection) -> list[LinkedAuthorshipRow]:
         return fetch_linked_authorships(conn)
 
-    def fetch_idref_to_person_map(self, conn: Connection) -> dict[str, int]:
+    def fetch_idref_to_person_map(self, conn: Connection) -> dict[str, tuple[int, str, str]]:
         return fetch_idref_to_person_map(conn)
 
-    def fetch_orcid_to_person_map(self, conn: Connection) -> dict[str, int]:
+    def fetch_orcid_to_person_map(self, conn: Connection) -> dict[str, tuple[int, str, str]]:
         return fetch_orcid_to_person_map(conn)
 
-    def fetch_hal_account_to_person_map(self, conn: Connection) -> dict[str, int]:
+    def fetch_hal_account_to_person_map(self, conn: Connection) -> dict[str, tuple[int, str, str]]:
         return fetch_hal_account_to_person_map(conn)
 
     def fetch_name_form_map(self, conn: Connection) -> dict[str, list[int]]:

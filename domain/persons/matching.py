@@ -164,27 +164,51 @@ def decide_name_form_outcome(
     return NameFormDecision(action="skip", reason="ambiguous_name_form")
 
 
+@dataclass(frozen=True)
+class IdentifierMatch:
+    """Résultat de la résolution d'un identifiant vers une personne, corroborée par le nom.
+
+    - ``person_id`` : la personne si l'identifiant résout **et** que son nom est
+      compatible avec la signature ; ``None`` sinon.
+    - ``rejection`` : ``(person_id, target_name)`` quand l'identifiant résolvait vers
+      une personne mais que son nom est jugé incompatible avec la signature — le match
+      est refusé, et l'info sert à journaliser le rejet (identifiant + les deux formes).
+    """
+
+    person_id: int | None = None
+    rejection: tuple[int, str] | None = None
+
+
 def decide_match_by_identifier(
     value: str | None,
-    identifier_map: Mapping[str, int],
-) -> int | None:
-    """Résout un identifiant (IdRef, ORCID…) vers une ``person_id``.
+    identifier_map: Mapping[str, tuple[int, str, str]],
+    signature: str,
+) -> IdentifierMatch:
+    """Résout un identifiant (IdRef, ORCID…) vers une ``person_id``, corroboré par le nom.
 
-    Retourne le ``person_id`` si ``value`` est présent dans
-    ``identifier_map``, ``None`` sinon (y compris si ``value`` est
-    falsy).
+    ``identifier_map`` est typiquement
+    ``{idref: (person_id, last_name_normalized, first_name_normalized)}`` prefetché
+    via une query du type ``fetch_idref_to_person_map`` / ``fetch_orcid_to_person_map``,
+    déjà filtré sur les statuts non-``rejected``. La fonction est générique : elle
+    marche pour n'importe quel id_type indexé sur ``person_identifiers``.
 
-    ``identifier_map`` est typiquement ``{idref: person_id}`` ou
-    ``{orcid: person_id}`` prefetché via une query du type
-    ``fetch_idref_to_person_map`` / ``fetch_orcid_to_person_map``,
-    déjà filtré sur les statuts non-``rejected``. La fonction n'a
-    donc pas à reconnaître la nature de l'identifiant : elle est
-    générique et marche pour n'importe quel id_type indexé sur
-    ``person_identifiers``.
+    Corroboration : si la personne ciblée a un nom incompatible avec ``signature``
+    (comparaison ``names_compatible`` par tokens), le match est **refusé** — un
+    identifiant porté par une signature étrangère (corruption éparse : un ORCID recopié
+    sur le mauvais co-auteur) ne doit pas rattacher. Le refus est matérialisé dans
+    ``rejection`` pour journalisation. Une signature trop pauvre pour être comparée
+    (réduite au nom de famille) reste compatible (ses tokens sont un sous-ensemble) et
+    n'est donc pas refusée.
     """
     if not value:
-        return None
-    return identifier_map.get(value)
+        return IdentifierMatch()
+    target = identifier_map.get(value)
+    if target is None:
+        return IdentifierMatch()
+    person_id, target_ln, target_fn = target
+    if names_compatible(signature, "", target_ln, target_fn):
+        return IdentifierMatch(person_id=person_id)
+    return IdentifierMatch(rejection=(person_id, f"{target_fn} {target_ln}".strip()))
 
 
 @dataclass(frozen=True)
