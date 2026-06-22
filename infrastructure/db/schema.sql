@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0I6igjhgYINGDaHmM71AjDbmAd8CDlWpgBPUcPgJTwT9mG228EJXbH3xGYLg9uJ
+\restrict kZ778K8DdBfSH5h6fUrVfnfzm24Znof1Pp488rglJjJ8AqtWeaPqgrHNCBdEANu
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -868,7 +868,8 @@ CREATE TABLE public.person_name_forms (
     name_form text NOT NULL,
     person_id integer NOT NULL,
     sources text[] DEFAULT '{}'::text[] NOT NULL,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    status public.identifier_status DEFAULT 'pending'::public.identifier_status NOT NULL
 );
 
 
@@ -3187,5 +3188,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0I6igjhgYINGDaHmM71AjDbmAd8CDlWpgBPUcPgJTwT9mG228EJXbH3xGYLg9uJ
+\unrestrict kZ778K8DdBfSH5h6fUrVfnfzm24Znof1Pp488rglJjJ8AqtWeaPqgrHNCBdEANu
 

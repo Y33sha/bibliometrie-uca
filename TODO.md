@@ -1,3 +1,4 @@
+* lancer oneshot: python -m interfaces.cli.oneshot.remediate_identifier_name_incompatible
 # A régler avant transmission
 ## Pipeline de traitement
 * [ ] Faire un audit complet du logging (complétude, clarté, cohérence entre sources et entre phases)
