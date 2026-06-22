@@ -8,12 +8,19 @@ from __future__ import annotations
 import logging
 from unittest.mock import MagicMock
 
+import pytest
 import requests
 
 from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
 from infrastructure.sources.crossref import members
 
 LOGGER = logging.getLogger("test")
+
+
+@pytest.fixture(autouse=True)
+def _no_sleep(monkeypatch):
+    """Neutralise le backoff : les tests qui déclenchent un retry ne dorment pas."""
+    monkeypatch.setattr(members.time, "sleep", lambda *_a, **_k: None)
 
 
 def _mock_response(status_code: int = 200, json_data=None):
@@ -63,15 +70,37 @@ def test_fetch_crossref_member_network_error_returns_none(monkeypatch):
 # ── Coupe-circuit (budget Crossref) ──────────────────────────────
 
 
-def test_429_records_failure_and_returns_none(monkeypatch):
-    """Régression : un 429 compte un échec sur le breaker (au lieu d'être avalé)."""
-    monkeypatch.setattr(requests, "get", lambda *a, **kw: _mock_response(429))
+def test_429_persistant_records_failure_after_retries(monkeypatch):
+    """Un 429 qui persiste sur tous les essais compte UN échec définitif (après
+    épuisement du retry), pas un par tentative."""
+    calls = {"n": 0}
+
+    def _get(*a, **kw):
+        calls["n"] += 1
+        return _mock_response(429)
+
+    monkeypatch.setattr(requests, "get", _get)
     breaker = SourceCircuitBreaker("crossref", threshold=1)
 
     out = members.fetch_crossref_member(297, user_agent="ua", logger=LOGGER, breaker=breaker)
 
     assert out is None
-    assert breaker.tripped  # threshold=1 → tripé dès le premier 429
+    assert calls["n"] == members._MAX_RETRIES  # a bien retenté
+    assert breaker.tripped
+
+
+def test_429_transient_then_success(monkeypatch):
+    """Régression 429-en-rafale : un 429 ponctuel est rattrapé par le retry sans
+    perdre le member ni pénaliser le breaker."""
+    msg = {"id": 297, "location": "Berlin, Germany"}
+    responses = [_mock_response(429), _mock_response(200, {"message": msg})]
+    monkeypatch.setattr(requests, "get", lambda *a, **kw: responses.pop(0))
+    breaker = SourceCircuitBreaker("crossref", threshold=1)
+
+    out = members.fetch_crossref_member(297, user_agent="ua", logger=LOGGER, breaker=breaker)
+
+    assert out == msg
+    assert not breaker.tripped  # le succès au 2e essai n'incrémente pas le breaker
 
 
 def test_tripped_breaker_skips_api(monkeypatch):

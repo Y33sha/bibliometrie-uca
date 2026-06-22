@@ -19,9 +19,11 @@ sur les candidats (1162 / 1219). Les 4.6% de `no_match` sont des
 locations dégénérées (Crossref ne met pas le pays au bout, ou forme
 absente de `place_name_forms`).
 
-La latence Crossref (~4s/appel) domine, donc les fetches sont
-**parallélisés** (`ThreadPoolExecutor`) ; le traitement + l'écriture
-restent séquentiels (la connexion sync n'est pas thread-safe).
+Fetches **séquentiels** : un fan-out parallèle sur `api.crossref.org/members`
+burste au-dessus du quota polite pool et déclenche des 429 en rafale (Crossref
+répond vite, ~150ms/appel). Le séquentiel reste rapide et reste dans le quota,
+sur le même mode que `resolve_doi_prefixes` (l'autre appelant Crossref de la
+phase, qui ne 429 jamais). Le retry/backoff sur 429 vit dans le fetcher.
 
 Le fetcher concret vit dans `infrastructure/sources/crossref/members.py` ;
 il est injecté par la composition root pour respecter l'étanchéité DDD.
@@ -30,7 +32,6 @@ il est injecté par la composition root pour respecter l'étanchéité DDD.
 import logging
 from collections import Counter
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from sqlalchemy import Connection, text
@@ -47,7 +48,6 @@ type CrossrefMemberFetcher = Callable[[int], dict[str, Any] | None]
 """Signature : ``(member_id) → record `message` ou None (404 / erreur)``."""
 
 COMMIT_EVERY = 50
-MAX_WORKERS = 8
 
 
 def run_enrich_publishers_from_crossref_members(
@@ -59,7 +59,6 @@ def run_enrich_publishers_from_crossref_members(
     fetcher: CrossrefMemberFetcher,
     limit: int = 0,
     dry_run: bool = False,
-    max_workers: int = MAX_WORKERS,
 ) -> None:
     try:
         candidates = queries.fetch_publishers_needing_country_from_crossref(
@@ -87,14 +86,10 @@ def run_enrich_publishers_from_crossref_members(
         country_counter: Counter[str] = Counter()
         unmatched_raw: Counter[str] = Counter()
 
-        # Fetch concurrent : le goulot est la latence Crossref (~4s/appel).
-        with ThreadPoolExecutor(max_workers=max_workers) as ex:
-            members = list(ex.map(lambda pm: fetcher(pm[1]), candidates))
-
-        # Traitement + écriture séquentiels (connexion sync non thread-safe).
-        for i, ((publisher_id, _member_id), member) in enumerate(
-            zip(candidates, members, strict=True), 1
-        ):
+        # Fetch + traitement + écriture séquentiels : un fan-out parallèle sur
+        # /members burste au-dessus du quota polite pool (429 en rafale).
+        for i, (publisher_id, member_id) in enumerate(candidates, 1):
+            member = fetcher(member_id)
             if member is None:
                 no_record += 1
                 continue
