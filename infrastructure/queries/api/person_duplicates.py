@@ -2,7 +2,7 @@
 
 `PgPersonDuplicatesQueries` hérite explicitement du Protocol `application.ports.person_duplicates_queries.PersonDuplicatesQueries`.
 
-**Divergence assumée** avec `domain/names.py:names_compatible` (matching pipeline). Les 4 `PERSON_DUP_QUERIES` + `_tokens_match` ici sont plus larges : ils servent à présenter des candidats à la validation manuelle dans l'interface admin (recall important, faux positifs filtrés à l'œil par Laura). En particulier, `_tokens_match` gère « Jean Michel Dupont » vs « JM Dupont » (initiales jointes/séparées), cas rejeté par `names_compatible`. Ne pas tenter d'unifier : les deux contextes (pipeline strict vs admin lâche) ont des exigences opposées sur le compromis precision/recall.
+Le filtrage fin des paires candidates réutilise `names_compatible` du domaine (comparaison par tokens, indépendante de l'ordre et tolérante aux initiales) : pipeline et admin partagent désormais le même comparateur. Les 4 `PERSON_DUP_QUERIES` restent volontairement larges côté SQL (recall important) ; `names_compatible` resserre ensuite, les faux positifs résiduels étant filtrés à l'œil lors de la validation manuelle.
 """
 
 from typing import Any
@@ -19,28 +19,7 @@ from application.ports.api.person_duplicates_queries import (
     PersonDuplicatePair,
     PersonDuplicatesQueries,
 )
-
-
-def _person_name_tokens(ln_norm: str, fn_norm: str) -> set[str]:
-    """Tokens du nom complet normalisé (last + first), tirets éclatés en espaces."""
-    return set((ln_norm + " " + fn_norm).replace("-", " ").split()) - {""}
-
-
-def _tokens_match(t1: set[str], t2: set[str]) -> bool:
-    """Vérifie si les tokens matchent (initiales tolérées)."""
-    if not t1 or not t2:
-        return False
-    small, big = (t1, t2) if len(t1) <= len(t2) else (t2, t1)
-    for s in small:
-        if s in big:
-            continue
-        if len(s) == 1 and any(b.startswith(s) for b in big):
-            continue
-        if any(len(b) == 1 and s.startswith(b) for b in big):
-            continue
-        return False
-    return True
-
+from domain.persons.name_matching import names_compatible
 
 _DUP_NOT_EXISTS = """
     WHERE NOT EXISTS (
@@ -180,9 +159,7 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
         count = 0
         skipped = 0
         for row in result:
-            t1 = _person_name_tokens(row.ln1, row.fn1)
-            t2 = _person_name_tokens(row.ln2, row.fn2)
-            if not _tokens_match(t1, t2):
+            if not names_compatible(row.ln1, row.fn1, row.ln2, row.fn2):
                 continue
             count += 1
             if found is None:

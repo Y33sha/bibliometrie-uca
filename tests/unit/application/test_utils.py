@@ -3,8 +3,6 @@
 from domain.normalize import normalize_name
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.name_matching import (
-    first_names_compatible,
-    last_names_compatible,
     names_compatible,
     parse_raw_author_name,
 )
@@ -125,18 +123,30 @@ class TestNamesCompatible:
         assert names_compatible("dupont", "jean", "dupont", "pierre") is False
 
     def test_inverted(self):
-        # Inversion nom/prénom
+        # Inversion nom/prénom (les tokens sont mis en commun).
         assert names_compatible("jean", "dupont", "dupont", "jean") is True
 
-    def test_composite_last_name(self):
-        assert last_names_compatible("araujo da silva", "araujo da silva") is True
+    def test_composite_last_name_reordered(self):
+        # Ordre des composants du nom de famille indifférent : « Combes-Motel » ↔ « Motel Combes ».
+        assert names_compatible("combes motel", "pascale", "motel combes", "pascale") is True
 
     def test_first_name_prefix(self):
-        # "jean" compatible avec "jean luc"
-        assert first_names_compatible("jean", "jean luc") is True
+        # "jean" compatible avec "jean luc" (sous-ensemble de tokens).
+        assert names_compatible("dupont", "jean", "dupont", "jean luc") is True
 
-    def test_empty_first_name(self):
-        assert first_names_compatible("", "jean") is False
+    def test_joined_initials(self):
+        # « J-L Bailly » ↔ « Jean Luc Bailly » : initiales séparées tolérées.
+        assert names_compatible("bailly", "j l", "bailly", "jean luc") is True
+
+    def test_surname_only_is_compatible(self):
+        # Signature réduite au nom de famille : compatible avec un nom complet — le
+        # sous-ensemble de tokens matche. Évite de rejeter une signature trop pauvre
+        # pour être comparée sur le prénom.
+        assert names_compatible("dupont", "", "dupont", "jean") is True
+
+    def test_digits_ignored(self):
+        # Les chiffres (années de naissance type SUDOC) sont retirés avant comparaison.
+        assert names_compatible("chiari", "sophie 1977", "chiari lasserre", "sophie") is True
 
 
 # ── compute_person_name_forms ──

@@ -1,9 +1,14 @@
 """Fonctions de comparaison et de parsing des noms de personnes.
 
 Utilisées par le pipeline (matching cross-source dans
-`domain/persons/matching.py`, création de personnes dans
-`application/pipeline/persons/create.py`).
+`domain/persons/matching.py`) et par l'admin (présentation des doublons candidats
+dans `infrastructure/queries/api/person_duplicates.py`), qui partagent le même
+comparateur `names_compatible`.
 """
+
+import re
+
+from domain.normalize import normalize_name
 
 
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
@@ -25,55 +30,49 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
     return raw, ""
 
 
-def first_names_compatible(fn1: str, fn2: str) -> bool:
-    """Vérifie si deux prénoms normalisés sont compatibles.
+def _clean_name_tokens(*parts: str) -> set[str]:
+    """Ensemble de tokens normalisés d'un nom, sans les chiffres.
 
-    Compatible = identique, initiale de l'autre, ou préfixe (Jean vs Jean-Luc).
+    `normalize_name` (minuscules, sans accent ni ponctuation) puis retrait des
+    chiffres : les années de naissance collées aux signatures de type SUDOC
+    (« Chiari, Sophie 1977- ») parasiteraient sinon les tokens. Exception assumée à
+    la normalisation habituelle, qui conserve [a-z0-9] pour les identifiants.
     """
-    if not fn1 or not fn2:
-        return False
-    if fn1[0] != fn2[0]:
-        return False
-    if fn1 == fn2:
-        return True
-    # Initiale
-    if len(fn1) == 1 or len(fn2) == 1:
-        return True
-    # Préfixe (avec espace: "jean" vs "jean luc")
-    fn1s = fn1.replace("-", " ")
-    fn2s = fn2.replace("-", " ")
-    if fn1s.startswith(fn2s + " ") or fn2s.startswith(fn1s + " "):
-        return True
-    return False
+    text = re.sub(r"\d+", " ", normalize_name(" ".join(part for part in parts if part)))
+    return set(text.split())
 
 
-def last_names_compatible(ln1: str, ln2: str) -> bool:
-    """Vérifie si deux noms de famille normalisés sont compatibles.
+def _tokens_compatible(tokens1: set[str], tokens2: set[str]) -> bool:
+    """Vrai si chaque token du plus petit ensemble a un correspondant dans l'autre.
 
-    Compatible = identique, ou l'un est préfixe de l'autre (composé vs simple).
+    Correspondance = token identique, ou initiale (une lettre seule préfixe d'un
+    token de l'autre ensemble). Indépendant de l'ordre.
     """
-    if not ln1 or not ln2:
+    if not tokens1 or not tokens2:
         return False
-    if ln1 == ln2:
-        return True
-    ln1s = ln1.replace("-", " ")
-    ln2s = ln2.replace("-", " ")
-    if ln1s == ln2s:
-        return True
-    if ln2s.startswith(ln1s + " ") or ln1s.startswith(ln2s + " "):
-        return True
-    return False
+    small, big = (tokens1, tokens2) if len(tokens1) <= len(tokens2) else (tokens2, tokens1)
+    for token in small:
+        if token in big:
+            continue
+        if len(token) == 1 and any(other.startswith(token) for other in big):
+            continue
+        if any(len(other) == 1 and token.startswith(other) for other in big):
+            continue
+        return False
+    return True
 
 
 def names_compatible(ln1: str, fn1: str, ln2: str, fn2: str) -> bool:
-    """Vérifie si deux paires (nom, prénom) normalisées sont compatibles.
+    """Vrai si deux noms (nom, prénom) désignent vraisemblablement la même personne.
 
-    Gère aussi l'inversion nom/prénom.
+    Comparaison par ensemble de tokens : indépendante de l'ordre — gère l'inversion
+    nom/prénom et les noms composés réordonnés (« Combes-Motel » ↔ « Motel Combes »)
+    — et tolérante aux initiales (« J-L Bailly » ↔ « Jean Luc Bailly »). Chaque token
+    du nom le plus court doit correspondre à un token de l'autre.
+
+    Les entrées peuvent être brutes ou déjà normalisées (`_clean_name_tokens`
+    normalise dans tous les cas). Le découpage nom/prénom n'a pas d'importance — les
+    tokens sont mis en commun —, ce qui autorise à passer un nom entier en `ln` et
+    une chaîne vide en `fn`.
     """
-    # Ordre normal
-    if last_names_compatible(ln1, ln2) and first_names_compatible(fn1, fn2):
-        return True
-    # Inversion nom/prénom
-    if last_names_compatible(ln1, fn2) and first_names_compatible(fn1, ln2):
-        return True
-    return False
+    return _tokens_compatible(_clean_name_tokens(ln1, fn1), _clean_name_tokens(ln2, fn2))
