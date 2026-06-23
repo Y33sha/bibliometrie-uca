@@ -80,7 +80,7 @@ La fiche-atelier du drawer lève les gênes actuelles : **toutes** les formes de
 - [ ] **Liste maîtresse + facets** : liste person-centrée non filtrée, recherche, facets par catégorie et « formes pending » ; ajout manuel d'identifiant.
 - [ ] **Drawer-personne** déboîtable (panneau latéral deep-linkable + option pleine page) ; le clic-personne y mène, plus vers la page publique `persons/id`.
 - [ ] **Section formes de nom du drawer** : toutes les formes (dont `persons`-seules), badge de statut réutilisant le composant des identifiants, confirm / reject inline, dropdown des publications rattachées, pointeur « partagée avec N ».
-- [ ] **Endpoints confirm / reject de formes** + bascule de `detach_name_form` (aujourd'hui un DELETE, la forme revient au recompute suivant) en pose de statut `rejected` (bloque durablement le retour au matching par nom ; cf. verrou étape 2).
+- [x] **Endpoints confirm / reject de formes** + bascule de `detach_name_form` (9b1e7859) : `PATCH /api/persons/{id}/name-forms/status` (primitive `update_name_form_status`, audit `person_name_form.status_changed`) ; l'ancien détachement par DELETE est remplacé par un statut `rejected` durable (bloque le retour au matching par nom ; cf. verrou étape 2). La modale existante repointe sur l'endpoint.
 - [ ] **Onglets-files de triage** unifiés sous le hub (replier `admin/person-duplicates`), une file par détecteur, décision *evidence-forward*, action inline sur la ligne.
 - [ ] **Throughput** : navigation clavier (naviguer / confirmer / rejeter), undo, actions *bulk* sûres (sélection multiple de formes → confirmer en lot).
 - [ ] **Audit trail** : chaque confirm / reject / detach / merge émet un événement (`emit_event`).
@@ -96,8 +96,8 @@ Conservateurs, activables une fois le reste en place ; pas des prérequis.
 ## Items TODO liés (à intégrer quelque part ou à reporter à un autre chantier)
 * [ ] générer une liste de suggestions de fusions (conflit d'identifiants entre 2 `person_id`)
 * [ ] phase `persons`: ouvrir les étapes de matching par identifiant aux `source_authorships` hors périmètre? (La garde `in_perimeter = true` est nécessaire seulement pour le matching par nom et la création.)
-* faux auteurs UCA créés par une erreur de parsing (toutes les signatures groupées ensemble pour chaque auteur) : ex. publi 77832
-* [ ] OpenAlex résout les noms d'équipes en listes de personnes (21105) => nettoyer les "for the ... study group"
+* [ ] OpenAlex résout les noms d'équipes en listes de personnes, avec des scories (21105) => nettoyer les "for the ... study group"
+* [ ] faux auteurs UCA créés par une erreur de parsing (toutes les signatures groupées ensemble pour chaque auteur) : ex. publi 77832
 * [ ] publi 86878: Lorsque OpenAlex corrige le parsing des affiliations, certaines authorships sortent du périmètre; des auteurs UCA deviennent non-UCA mais restent polluer la base. Gérer la purge automatique.
 * [ ] publications avec beaucoup d'auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. En attendant une solution, le mode "conflit de sources" dans la déduplication manuelle des personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`) (chantier chiant, à enterrer le plus proprement possible)
 * [ ] repenser entièrement les pages `admin/duplicates` et `admin/person-duplicates`
