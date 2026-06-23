@@ -191,7 +191,7 @@ class TestNormalizeCrossrefIdempotence:
 
         rows = sa_sync_conn.execute(
             text("""
-                SELECT raw_author_name, person_identifiers, source_data
+                SELECT raw_author_name, person_identifiers
                 FROM source_authorships
                 WHERE source = 'crossref'
                 ORDER BY author_position
@@ -199,17 +199,14 @@ class TestNormalizeCrossrefIdempotence:
         ).all()
         assert len(rows) == 2
 
-        # Premier auteur : ORCID + sequence. L'affiliation n'est plus dans
-        # source_data (routée vers addresses), seul `sequence` y reste.
+        # Premier auteur : ORCID.
         assert rows[0].raw_author_name == "Alice Curie"
         assert rows[0].person_identifiers is not None
         assert rows[0].person_identifiers.get("orcid") == "0000-0002-1825-0097"
-        assert rows[0].source_data == {"sequence": "first"}
 
         # Deuxième auteur : pas d'ORCID.
         assert rows[1].raw_author_name == "Bob Pasteur"
         assert rows[1].person_identifiers is None
-        assert rows[1].source_data == {"sequence": "additional"}
 
         # Les affiliations sont routées vers addresses + source_authorship_addresses.
         addr_rows = sa_sync_conn.execute(

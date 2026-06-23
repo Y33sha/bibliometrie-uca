@@ -575,8 +575,6 @@ class TestBuildOpenalexAuthorRecords:
             ]
         }
         rec = build_openalex_author_records(work)[0]
-        # source_structures = openalex_id natifs des institutions.
-        assert rec.source_structures == ["I1", "I2"]
         assert [a.text for a in rec.addresses] == ["Inst One", "Inst Two"]
 
     def test_no_addr_when_no_affiliation(self):

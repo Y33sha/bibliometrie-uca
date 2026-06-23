@@ -20,8 +20,7 @@ class SourceAuthorshipBatchItem(TypedDict):
     """Ligne du batch upsert `source_authorships` (toutes sources).
 
     `author_name_normalized` est calculé en Python (`normalize_name_form`) par
-    le writer. `source_data` / `source_structures` / `person_identifiers` sont
-    nullables selon ce que la source fournit.
+    le writer. `person_identifiers` est nullable selon ce que la source fournit.
     """
 
     source: str
@@ -30,8 +29,6 @@ class SourceAuthorshipBatchItem(TypedDict):
     author_name_normalized: str
     is_corresponding: bool
     roles: list[str] | None
-    source_structures: list[str] | None
-    source_data: dict[str, JsonValue] | None
     raw_author_name: str
     person_identifiers: dict[str, JsonValue] | None
 

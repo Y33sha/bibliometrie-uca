@@ -53,8 +53,6 @@ class AuthorRecord:
     raw_name: str
     is_corresponding: bool = False
     roles: list[str] | None = None
-    source_structures: list[str] | None = None
-    source_data: dict[str, JsonValue] | None = None
     person_identifiers: dict[str, JsonValue] | None = None
     addresses: list[AddressRecord] = field(default_factory=list)
 
@@ -94,8 +92,6 @@ def write_source_authorships(
             "author_name_normalized": normalize_name_form(rec.raw_name),
             "is_corresponding": rec.is_corresponding,
             "roles": rec.roles,
-            "source_structures": rec.source_structures,
-            "source_data": rec.source_data,
             "raw_author_name": rec.raw_name,
             "person_identifiers": rec.person_identifiers,
         }

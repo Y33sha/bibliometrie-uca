@@ -51,8 +51,6 @@ def upsert_source_authorships_batch(
             "author_name_normalized": v["author_name_normalized"],
             "is_corresponding": v["is_corresponding"],
             "roles": v["roles"],
-            "source_structures": v["source_structures"],
-            "source_data": v["source_data"],
             "raw_author_name": v["raw_author_name"],
             "person_identifiers": v["person_identifiers"],
         }
@@ -66,14 +64,14 @@ def upsert_source_authorships_batch(
         INSERT INTO source_authorships
             (source, source_publication_id, author_position,
              author_name_normalized, is_corresponding, roles,
-             source_structures, source_data, raw_author_name, person_identifiers)
+             raw_author_name, person_identifiers)
         SELECT :source, :spid, t.author_position,
                t.author_name_normalized, t.is_corresponding, t.roles,
-               t.source_structures, t.source_data, t.raw_author_name, t.person_identifiers
+               t.raw_author_name, t.person_identifiers
         FROM jsonb_to_recordset(:payload) AS t(
             author_position smallint, author_name_normalized text,
-            is_corresponding boolean, roles text[], source_structures text[],
-            source_data jsonb, raw_author_name text, person_identifiers jsonb)
+            is_corresponding boolean, roles text[],
+            raw_author_name text, person_identifiers jsonb)
     """).bindparams(bindparam("payload", type_=JSONB))
     conn.execute(
         stmt,

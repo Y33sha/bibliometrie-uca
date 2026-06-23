@@ -255,7 +255,6 @@ def build_crossref_author_records(msg: dict) -> list[AuthorRecord]:
 
     - nom reconstruit via `_author_full_name` ;
     - ORCID (seul identifiant exploitable côté CrossRef) sur `person_identifiers` ;
-    - `sequence` (first/additional) conservé dans `source_data` ;
     - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase
       `affiliations` de poser `in_perimeter` sur les SA crossref ;
     - `roles=['author']` explicite (Crossref ne distingue pas les rôles ; on
@@ -287,15 +286,11 @@ def build_crossref_author_records(msg: dict) -> list[AuthorRecord]:
             continue
 
         ids = ids_by_position[position]
-        source_data: dict[str, JsonValue] | None = (
-            {"sequence": author["sequence"]} if author.get("sequence") else None
-        )
         records.append(
             AuthorRecord(
                 position=position,
                 raw_name=full_name,
                 roles=["author"],
-                source_data=source_data,
                 person_identifiers=ids if ids else None,
                 addresses=[AddressRecord(text=aff) for aff in _author_affiliation_strings(author)],
             )

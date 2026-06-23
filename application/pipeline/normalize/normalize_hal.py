@@ -10,13 +10,11 @@ Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_publications                     (lien staging ↔ publication, source='hal')
     source_authorships                      (lien document × auteur, source='hal',
-                                             avec `source_structures` TEXT[] = halId_s natifs
-                                             et `person_identifiers` JSONB)
+                                             avec `person_identifiers` JSONB)
 
 La résolution UCA (source_authorships.structure_ids, in_perimeter) se fait en
-post-traitement via populate_affiliations.py, pas ici. Ce script stocke les halId_s
-de structures extraits de authIdHasPrimaryStructure_fs dans
-`source_authorships.source_structures`.
+post-traitement via populate_affiliations.py, pas ici. Les structures affiliées
+(authIdHasPrimaryStructure_fs) sont résolues en noms et stockées comme adresses.
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
@@ -441,9 +439,9 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
 
     - Parse les champs alignés pour extraire hal_person_id, idhal et form_id
     - Parse authIdHasPrimaryStructure_fs pour les affiliations (clé = form_id)
-    - Produit pour chaque auteur les `source_structures` (TEXT[] des halId_s
-      natifs), `person_identifiers` (orcid/idref/idhal/hal_person_id quand
-      présents) et `addresses` (noms de structures).
+    - Produit pour chaque auteur les `person_identifiers`
+      (orcid/idref/idhal/hal_person_id quand présents) et `addresses` (noms de
+      structures).
 
     Un `hal_person_id` listé sur plusieurs auteurs du même dépôt (erreur de saisie
     HAL) rend toute l'identité de ces signatures douteuse : tous les identifiants
@@ -520,15 +518,13 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
 
         identifiers = ids_by_position[position]
 
-        # Structures affiliées à cet auteur sur ce document (par form_id).
-        # Stockées comme halId_s natifs (TEXT[]) sur la sa.
-        source_structures = None
+        # Noms des structures affiliées à cet auteur (par form_id), utilisés
+        # comme adresses brutes.
         addr_parts: list[str] = []
         if form_id and form_id in form_struct_map:
-            source_structures = sorted(form_struct_map[form_id])
             addr_parts = [
                 struct_name_by_hal_id[hid]
-                for hid in source_structures
+                for hid in sorted(form_struct_map[form_id])
                 if hid in struct_name_by_hal_id and struct_name_by_hal_id[hid].strip()
             ]
 
@@ -538,7 +534,6 @@ def build_hal_author_records(doc: dict) -> list[AuthorRecord]:
                 raw_name=name,
                 is_corresponding=is_corresponding,
                 roles=roles or None,
-                source_structures=source_structures,
                 person_identifiers=identifiers,
                 addresses=[AddressRecord(text=part) for part in addr_parts],
             )

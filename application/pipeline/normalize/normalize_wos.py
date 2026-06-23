@@ -10,8 +10,7 @@ Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_publications                     (lien staging ↔ publication, source='wos')
     source_authorships                      (lien document × auteur, source='wos',
-                                             avec `source_structures` TEXT[] = noms
-                                             d'institutions et `person_identifiers` JSONB)
+                                             avec `person_identifiers` JSONB)
 
 Format raw_data : structure WoS Expanded API (static_data, dynamic_data
 imbriqués). L'ancien format TSV (fichiers téléchargés, clés 2 lettres
@@ -470,9 +469,8 @@ def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRe
     Filtre les auteurs via `is_wos_author_exploitable` ; si aucun n'est
     exploitable alors que le record en porte, logge un warning (détecte une
     dérive éventuelle de l'API WoS — perte silencieuse de records sinon).
-    Chaque auteur porte `source_structures` (noms d'organisations WoS, seul
-    identifiant stable côté WoS), `person_identifiers` (orcid + researcher_id)
-    et ses adresses brutes. La dédup par position est faite par le writer.
+    Chaque auteur porte `person_identifiers` (orcid + researcher_id) et ses
+    adresses brutes. La dédup par position est faite par le writer.
     """
     raw_authors = rec.get("authors", [])
     authors_kept = [a for a in raw_authors if is_wos_author_exploitable(a)]
@@ -499,11 +497,6 @@ def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRe
 
     records: list[AuthorRecord] = []
     for idx, author in enumerate(authors_kept):
-        # Noms des institutions WoS comme identifiants natifs (pas d'ID stable
-        # côté WoS — le nom sert d'identifiant).
-        institution_names = [
-            org["name"] for org in author.get("organizations", []) if org.get("name")
-        ]
         ids = ids_by_position[idx]
         records.append(
             AuthorRecord(
@@ -511,7 +504,6 @@ def build_wos_author_records(rec: dict, logger: logging.Logger) -> list[AuthorRe
                 raw_name=author["full_name"],
                 is_corresponding=author["is_corresponding"],
                 roles=author.get("roles"),
-                source_structures=institution_names or None,
                 person_identifiers=ids if ids else None,
                 addresses=[AddressRecord(text=addr) for addr in (author.get("addresses") or [])],
             )
