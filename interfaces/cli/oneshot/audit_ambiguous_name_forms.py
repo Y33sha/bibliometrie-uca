@@ -76,7 +76,7 @@ def main():
             ]
             labels = ", ".join(
                 f"{names.get(pid, ('', '', f'#{pid}'))[2]}{'' if ok else ' [✗]'}"
-                for pid, ok in zip(r.pids, compat_flags)
+                for pid, ok in zip(r.pids, compat_flags, strict=True)
             )
             if not all(compat_flags):
                 n_with_error += 1
