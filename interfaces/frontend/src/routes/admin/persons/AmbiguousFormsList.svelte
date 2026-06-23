@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { untrack } from "svelte";
   import { api, persons as personsApi } from "$lib/api";
   import { titleCase } from "$lib/utils";
   import Pagination from "$lib/components/Pagination.svelte";
@@ -10,11 +10,14 @@
   let {
     onopenPerson,
     onchange,
+    reloadKey,
   }: {
     /** Ouvre le drawer d'une personne. */
     onopenPerson: (personId: number) => void;
     /** Notifie le parent après une mutation (rafraîchir le badge de l'onglet). */
     onchange: () => void;
+    /** Incrémenté par le parent après une action dans le drawer → recharge la file. */
+    reloadKey: number;
   } = $props();
 
   let page = $state(1);
@@ -45,7 +48,12 @@
     onchange();
   }
 
-  onMount(load);
+  // Charge au montage et à chaque incrément de `reloadKey` (action dans le drawer).
+  // `untrack` autour de `load()` pour ne pas dépendre de `page`/`data`.
+  $effect(() => {
+    void reloadKey;
+    untrack(load);
+  });
 </script>
 
 <p class="intro">

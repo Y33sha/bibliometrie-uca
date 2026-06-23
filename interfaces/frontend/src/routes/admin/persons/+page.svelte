@@ -34,6 +34,8 @@
   type TabKey = "all" | "ambiguous-forms";
   let tab = $state<TabKey>("all");
   let ambiguousCount = $state(0);
+  // Bumpé après chaque action du drawer pour recharger la file de triage active.
+  let reloadFiles = $state(0);
 
   type IdState = "all" | "yes" | "no";
 
@@ -439,6 +441,8 @@
     if (selectedPersonId !== null && !persons.some((p) => p.id === selectedPersonId)) {
       fetchedPerson = await api<Person>(`/api/admin/persons/${selectedPersonId}`);
     }
+    // Toute action du drawer passe ici → recharge les files de triage affichées.
+    reloadFiles++;
   }
 
   function closeDrawer() {
@@ -545,7 +549,11 @@
   <Pagination page={currentPage} pages={totalPages} onchange={handlePageChange} />
   {/if}
 {:else if tab === "ambiguous-forms"}
-  <AmbiguousFormsList onopenPerson={openDrawer} onchange={loadAmbiguousCount} />
+  <AmbiguousFormsList
+    onopenPerson={openDrawer}
+    onchange={loadAmbiguousCount}
+    reloadKey={reloadFiles}
+  />
 {/if}
 
 {#if selectedPerson}
