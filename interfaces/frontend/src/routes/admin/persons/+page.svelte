@@ -564,6 +564,7 @@
     onmergeClose={closeMergeSearch}
     onmerge={mergeInto}
     onabsorb={absorbPerson}
+    onopenPerson={openDrawer}
   />
 {/if}
 
