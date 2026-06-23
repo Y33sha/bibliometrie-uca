@@ -93,9 +93,7 @@ def first_non_null(sources: list[SourcePublication], attr: str) -> Any:
     return None
 
 
-def merge_lists_dedup_ci(
-    sources: list[SourcePublication], attr: str
-) -> list[Any] | None:
+def merge_lists_dedup_ci(sources: list[SourcePublication], attr: str) -> list[Any] | None:
     """Union dédupliquée des listes `source.<attr>`. Déduplication case-insensitive pour les strings, sinon par valeur. Préserve l'ordre d'apparition. None si toutes vides/null.
 
     `list[Any]` justifié : les listes consommées sont `list[str]` (`keywords`,
@@ -113,9 +111,7 @@ def merge_lists_dedup_ci(
     return result or None
 
 
-def shallow_merge_jsonb(
-    sources: list[SourcePublication], attr: str
-) -> dict[str, JsonValue] | None:
+def shallow_merge_jsonb(sources: list[SourcePublication], attr: str) -> dict[str, JsonValue] | None:
     """Fusion shallow par clé pour `meta` / `biblio`. La première source à fournir une clé l'emporte (cohérent avec « premier non-null ») ; les clés sont généralement orthogonales entre sources."""
     merged: dict[str, JsonValue] = {}
     for s in sources:

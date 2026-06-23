@@ -9,8 +9,7 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
-from application.addresses import countries as countries_service
-from application.addresses import structures as structures_service
+from application.addresses import countries as countries_service, structures as structures_service
 from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
     AddressesCountriesResponse,

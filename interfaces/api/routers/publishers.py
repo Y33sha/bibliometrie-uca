@@ -18,8 +18,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
-from application.publishers import merge_publishers
-from application.publishers import update_publisher as _update_publisher
+from application.publishers import merge_publishers, update_publisher as _update_publisher
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
     audit_repo_sync,

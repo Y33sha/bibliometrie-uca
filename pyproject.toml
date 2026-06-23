@@ -185,6 +185,11 @@ ignore = [
 # export_publications_csv (23 → <15). Prochaine cible : 10.
 max-complexity = 15
 
+[tool.ruff.lint.isort]
+# Regroupe les imports d'un même module en un seul bloc, alias inclus
+# (sinon chaque `from x import (a as b)` aliasé occupe son propre bloc).
+combine-as-imports = true
+
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E402"] # imports après setup de conftest
 "interfaces/cli/*" = ["E402", "C901"] # scripts one-shot, complexité tolérée
