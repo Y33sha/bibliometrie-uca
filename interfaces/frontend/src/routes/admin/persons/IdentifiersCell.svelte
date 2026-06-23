@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IdentifierLink from "$lib/components/IdentifierLink.svelte";
   import type { IdFormState, Person, PersonIdentifier } from "./types";
 
   let {
@@ -25,46 +26,43 @@
           : "en attente";
     return `${ident.id_type} (${ident.source}) — ${label}`;
   }
-
-  function identifierLabel(ident: PersonIdentifier): string {
-    const type =
-      ident.id_type === "orcid"
-        ? "ORCID"
-        : ident.id_type === "idhal"
-          ? "idHAL"
-          : ident.id_type;
-    return `${type}: ${ident.id_value}`;
-  }
 </script>
 
 {#if person.identifiers?.length}
   <div class="identifiers-row">
     {#each person.identifiers as ident}
       <div class="chip-row">
+        <span class="chip-controls">
+          <button
+            class="toggle-btn confirm"
+            class:active={ident.status === "confirmed"}
+            title={ident.status === "confirmed" ? "Retirer la confirmation" : "Confirmer"}
+            onclick={() =>
+              onsetStatus(ident.id, ident.status === "confirmed" ? "pending" : "confirmed")}
+            >&#x2713;</button
+          >
+          <button
+            class="toggle-btn reject"
+            class:active={ident.status === "rejected"}
+            title={ident.status === "rejected" ? "Retirer le rejet" : "Rejeter"}
+            onclick={() =>
+              onsetStatus(ident.id, ident.status === "rejected" ? "pending" : "rejected")}
+            >&#x2717;</button
+          >
+        </span>
+        <IdentifierLink
+          id_type={ident.id_type}
+          id_value={ident.id_value}
+          confirmed={ident.status === "confirmed"}
+        />
         <span
           class="status-chip identifier-chip"
           class:confirmed={ident.status === "confirmed"}
           class:rejected={ident.status === "rejected"}
           title={identifierTitle(ident)}
         >
-          {identifierLabel(ident)}
+          {ident.id_value}
         </span>
-        <button
-          class="status-btn confirm"
-          class:active={ident.status === "confirmed"}
-          title={ident.status === "confirmed" ? "Retirer la confirmation" : "Confirmer"}
-          onclick={() =>
-            onsetStatus(ident.id, ident.status === "confirmed" ? "pending" : "confirmed")}
-          >&#x2713;</button
-        >
-        <button
-          class="status-btn reject"
-          class:active={ident.status === "rejected"}
-          title={ident.status === "rejected" ? "Retirer le rejet" : "Rejeter"}
-          onclick={() =>
-            onsetStatus(ident.id, ident.status === "rejected" ? "pending" : "rejected")}
-          >&#x2717;</button
-        >
       </div>
     {/each}
   </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { base } from '$app/paths';
+	import IdentifierLink from './IdentifierLink.svelte';
 
 	type Identifier = { value: string; confirmed?: boolean };
 
@@ -17,16 +17,7 @@
 <span class="id-cell">
 	{#if orcids && orcids.length}
 		{#each orcids as id (id.value)}
-			<a
-				class="id-icon id-orcid"
-				class:id-confirmed={id.confirmed}
-				href="https://orcid.org/{id.value}"
-				target="_blank"
-				rel="noopener"
-				title="ORCID : {id.value}"
-			>
-				<img src="{base}/icons/orcid.ico" alt="ORCID" />
-			</a>
+			<IdentifierLink id_type="orcid" id_value={id.value} confirmed={id.confirmed ?? false} />
 		{/each}
 	{:else}
 		<span class="id-icon id-placeholder"></span>
@@ -34,16 +25,7 @@
 
 	{#if idhals && idhals.length}
 		{#each idhals as id (id.value)}
-			<a
-				class="id-icon id-hal"
-				class:id-confirmed={id.confirmed}
-				href="https://hal.science/search/index/?q=%2A&authIdHal_s={id.value}"
-				target="_blank"
-				rel="noopener"
-				title="idHAL : {id.value}"
-			>
-				<img src="{base}/icons/hal.ico" alt="idHAL" />
-			</a>
+			<IdentifierLink id_type="idhal" id_value={id.value} confirmed={id.confirmed ?? false} />
 		{/each}
 	{:else}
 		<span class="id-icon id-placeholder"></span>
@@ -51,16 +33,7 @@
 
 	{#if idrefs && idrefs.length}
 		{#each idrefs as id (id.value)}
-			<a
-				class="id-icon id-idref"
-				class:id-confirmed={id.confirmed}
-				href="https://www.idref.fr/{id.value}"
-				target="_blank"
-				rel="noopener"
-				title="IdRef : {id.value}"
-			>
-				<img src="{base}/icons/idref.png" alt="IdRef" />
-			</a>
+			<IdentifierLink id_type="idref" id_value={id.value} confirmed={id.confirmed ?? false} />
 		{/each}
 	{:else}
 		<span class="id-icon id-placeholder"></span>

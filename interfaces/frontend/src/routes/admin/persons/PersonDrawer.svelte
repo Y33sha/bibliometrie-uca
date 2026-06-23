@@ -12,7 +12,8 @@
     mergeActive,
     mergeSearch,
     onclose,
-    oneditName,
+    onrename,
+    onToggleReject,
     onaddIdentifier,
     ontoggleIdForm,
     onsetIdentifierStatus,
@@ -32,7 +33,9 @@
       setQuery: (q: string) => void;
     };
     onclose: () => void;
-    oneditName: (person: Person) => void;
+    /** Renvoie true si le renommage a réussi (sinon l'édition reste ouverte). */
+    onrename: (personId: number, lastName: string, firstName: string) => Promise<boolean>;
+    onToggleReject: (personId: number, rejected: boolean) => void | Promise<void>;
     onaddIdentifier: (personId: number) => void | Promise<void>;
     ontoggleIdForm: (personId: number) => void;
     onsetIdentifierStatus: (identId: number, status: string) => void | Promise<void>;
@@ -47,8 +50,37 @@
     onmerge: (targetId: number, sourceId: number) => void | Promise<void>;
   } = $props();
 
+  let editing = $state(false);
+  let lastName = $state("");
+  let firstName = $state("");
+
+  // Verrouille le scroll de fond tant que le drawer est ouvert : sans ça, la
+  // scrollbar de page chevauche le bord droit du panneau et masque ses boutons.
+  $effect(() => {
+    const body = document.body.style.overflow;
+    const html = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = body;
+      document.documentElement.style.overflow = html;
+    };
+  });
+
+  function startEdit() {
+    lastName = person.last_name;
+    firstName = person.first_name;
+    editing = true;
+  }
+
+  async function saveEdit() {
+    if (await onrename(person.id, lastName, firstName)) editing = false;
+  }
+
   function onkeydown(e: KeyboardEvent) {
-    if (e.key === "Escape") onclose();
+    if (e.key !== "Escape") return;
+    if (editing) editing = false;
+    else onclose();
   }
 </script>
 
@@ -58,23 +90,47 @@
 
 <aside class="drawer" class:rejected={person.rejected}>
   <header class="drawer-head">
-    <div class="drawer-title">
-      <a
-        class="drawer-name-link"
-        href="{base}/persons/{person.id}"
-        target="_blank"
-        rel="noopener"
-        title="Voir la fiche publique"
-      >
-        <span class="drawer-last">{titleCase(person.last_name)}</span>
-        {titleCase(person.first_name)}
-      </a>
-      {#if person.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
-    </div>
-    <div class="drawer-head-actions">
-      <button class="btn btn-sm" onclick={() => oneditName(person)}>Modifier le nom</button>
-      <button class="drawer-close" title="Fermer" aria-label="Fermer" onclick={onclose}>&times;</button>
-    </div>
+    {#if editing}
+      <form class="drawer-edit" onsubmit={(e) => { e.preventDefault(); saveEdit(); }}>
+        <input class="edit-input" bind:value={lastName} placeholder="Nom" aria-label="Nom" />
+        <input class="edit-input" bind:value={firstName} placeholder="Prénom" aria-label="Prénom" />
+        <button type="submit" class="btn btn-icon-sm btn-confirm-outline" title="Enregistrer"
+          >&#x2713;</button
+        >
+        <button type="button" class="btn btn-icon-sm" title="Annuler" onclick={() => (editing = false)}
+          >&#x2715;</button
+        >
+      </form>
+    {:else}
+      <div class="drawer-title">
+        <a
+          class="drawer-name-link"
+          href="{base}/persons/{person.id}"
+          target="_blank"
+          rel="noopener"
+          title="Voir la fiche publique"
+        >
+          <span class="drawer-last">{titleCase(person.last_name)}</span>
+          {titleCase(person.first_name)}
+        </a>
+        {#if person.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+      </div>
+      <div class="drawer-head-actions">
+        <button class="icon-btn" title="Modifier le nom" aria-label="Modifier le nom" onclick={startEdit}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+        </button>
+        <button
+          class="icon-btn"
+          class:rejected={person.rejected}
+          title={person.rejected ? "Restaurer la personne" : "Rejeter (fausse entité)"}
+          aria-label={person.rejected ? "Restaurer la personne" : "Rejeter la personne"}
+          onclick={() => onToggleReject(person.id, !person.rejected)}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+        </button>
+        <button class="drawer-close" title="Fermer" aria-label="Fermer" onclick={onclose}>&times;</button>
+      </div>
+    {/if}
   </header>
 
   <div class="drawer-body">
@@ -166,15 +222,44 @@
   .drawer-last {
     font-weight: 600;
   }
-  .rh-check {
-    color: var(--success, #2e7d32);
-    margin-left: 4px;
-  }
   .drawer-head-actions {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-shrink: 0;
+  }
+  .drawer-edit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .drawer-edit .btn {
+    flex-shrink: 0;
+  }
+  .edit-input {
+    width: 128px;
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  .icon-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 3px;
+    color: #888;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 4px;
+  }
+  .icon-btn:hover {
+    color: var(--accent, #1976d2);
+    background: #f0f0f0;
+  }
+  .icon-btn.rejected {
+    color: var(--danger, #c0392b);
   }
   .drawer-close {
     background: none;

@@ -9,13 +9,11 @@
     state = $bindable(),
     onclose,
     onconfirmDetach,
-    ondetachNameForm,
     onmerge,
   }: {
     state: DetachModalState;
     onclose: () => void;
     onconfirmDetach: () => void | Promise<void>;
-    ondetachNameForm: () => void | Promise<void>;
     onmerge: (sourceId: number) => void | Promise<void>;
   } = $props();
 
@@ -92,17 +90,9 @@
   {#snippet actions()}
     {#if !state.loading}
       <button class="btn" onclick={onclose}>Annuler</button>
-      {#if state.publications.length === 0}
-        <button class="btn btn-danger" onclick={ondetachNameForm}>Détacher cette forme</button>
-      {:else}
-        <button
-          class="btn btn-danger"
-          disabled={checkedCount === 0}
-          onclick={onconfirmDetach}
-        >
-          Détacher {checkedCount} publication{checkedCount > 1 ? "s" : ""}
-        </button>
-      {/if}
+      <button class="btn btn-danger" disabled={checkedCount === 0} onclick={onconfirmDetach}>
+        Détacher {checkedCount} publication{checkedCount > 1 ? "s" : ""}
+      </button>
     {/if}
   {/snippet}
 </Modal>
