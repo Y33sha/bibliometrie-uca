@@ -232,6 +232,7 @@ def persons_sharing_name_form(conn: Connection, person_id: int) -> list[dict[str
               ON pnf2.name_form = pnf1.name_form AND pnf2.person_id <> pnf1.person_id
             JOIN persons p2 ON p2.id = pnf2.person_id
             WHERE pnf1.person_id = :id AND p2.rejected = FALSE
+              AND pnf1.status <> 'rejected' AND pnf2.status <> 'rejected'
             GROUP BY p2.id, p2.first_name, p2.last_name
             ORDER BY p2.last_name, p2.first_name
         """),
