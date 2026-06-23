@@ -45,7 +45,8 @@ Progression du certain et borné vers l'ambigu et ouvert : chaque étape laisse 
 Le bout concret, parce que la cible est mesurée et bornée. Même logique de comparaison de noms des deux côtés : la corroboration empêche l'injection à venir, le détachement nettoie le stock déjà prouvé.
 
 - [x] **Corroboration par le nom au matching identifiant** (1b31d2df) : un match par ORCID / hal_person_id / idref dont le nom de la personne ciblée est incompatible avec la signature (`names_compatible`) est refusé, chaque rejet journalisé (identifiant + les deux formes). Ampleur mesurée par l'audit `interfaces/cli/oneshot/audit_identifier_name_corroboration.py`. Reste à statuer sur les faux rejets résiduels (changement de nom, translittération).
-- [ ] **Détachement du stock prouvé** : détacher les intrus repérés par le détecteur intrus-identifiant + porteur-légitime (~11,9k rattachements / 104 personnes, à 99 % via ORCID crossref + openalex). Détecteurs d'erreur connexes à brancher au passage : même `person_id` sur ≥2 `source_authorships` d'une même `source_publication` ; nom manifestement collectif sur la signature.
+- [x] **Détachement par identifiant** (991d7a12) : `remediate_identifier_name_incompatible` détache l'intrus tenu par un identifiant quand la même `source_publication` porte aussi une signature au nom compatible (l'ancre) — ~11,9k rattachements / 104 personnes, à 99 % via ORCID crossref + openalex.
+- [ ] **Généraliser au départage par statut de forme de nom** (audité par `audit_repeated_person_in_publication`) : dans un groupe `(source_publication, personne)` à ≥2 signatures, l'occurrence compatible avec une forme **`confirmed`** est l'ancre ; celle qui ne correspond qu'à une forme **`pending`** incompatible est un intrus étranger (un vrai intrus est porté par une forme pending — « i perez rafols » collé à Ravoux par une méga-publi à identifiant partagé). Détacher l'intrus ⇔ rejeter sa forme (verrou étape 2). Comparer au nom canonique seul est trop grossier (rejette à tort « Pm Llorca », initiales collées d'une forme confirmée, et « S. Porteboeuf », nom composé). Trois cas : **détachable** (ancre + intrus), **doublon de signature** (toutes les occurrences légitimes : duplication source / désalignement de positions des méga-papers, problème distinct), **sans ancre confirmée** (à examiner). Faux positif résiduel du bucket détachable : le **nom marié non encore confirmé** (« Sarah Julie Porteboeuf » pour une « Porteboeuf-Houssais ») — à lever par confirmation humaine, pas en aveugle. D'où une **résolution via l'UI de l'étape 4** (suspects + confirm/reject) avant tout détachement automatique.
 
 ### Étape 2 — Verrouiller le non-retour
 
@@ -64,7 +65,7 @@ Un seul moteur de dédoublonnage : des paires candidates `(A, B)` issues de plus
 
 ### Étape 4 — Outillage humain : refonte `admin/persons`
 
-Au service de l'étape 3. L'existant ne donne pas satisfaction : le générateur de paires candidates impose une navigation forcée d'une paire à l'autre, n'expose comme éléments de décision que les titres des publications, et `distinct_persons` ne sert qu'à ne plus re-suggérer une paire. Deux options ouvertes, à trancher :
+Probablement le **point d'entrée concret** de la résolution, avant l'automatisation : afficher les suspects (intrus détachables, doublons probables, conflits) avec des actions admin confirm/reject, puis dériver les actions automatiques une fois la frontière clarifiée par l'usage. L'existant ne donne pas satisfaction : le générateur de paires candidates impose une navigation forcée d'une paire à l'autre, n'expose comme éléments de décision que les titres des publications, et `distinct_persons` ne sert qu'à ne plus re-suggérer une paire. Deux options ouvertes, à trancher :
 
 - [ ] **Remplacer** par un autre outil ;
 - [ ] **Retravailler** l'existant pour le rendre utilisable : consultation de la **liste** des candidats doublons (au lieu de la navigation paire-par-paire imposée), et présentation des **éléments de décision chiffrés** (scores de recouvrement co-auteurs, sujets, revues, labos — pas seulement les titres de publications).
@@ -78,6 +79,16 @@ Conservateurs, activables une fois le reste en place ; pas des prérequis.
 - [ ] **Vérification ORCID via API** : récupérer le nom canonique — et affiliation / domaine de l'adresse mail si exposés — et confirmer ou rejeter le couple identifiant ↔ personne. Mesurer la couverture (combien de profils exposent un nom exploitable) et le taux de corroboration.
 - [ ] **API IdRef** ?
 
+## Items TODO liés (à intégrer quelque part ou à reporter à un autre chantier)
+* [ ] phase `persons`: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 `person_id`)
+* [ ] phase `persons`: ouvrir les étapes de matching par identifiant aux `source_authorships` hors périmètre. (La garde `in_perimeter = true` est nécessaire seulement pour le matching par nom et la création.)
+* faux auteurs UCA créés par une erreur de parsing (toutes les signatures groupées ensemble pour chaque auteur) : ex. publi 77832
+* [ ] OpenAlex résout les noms d'équipes en listes de personnes (21105) => nettoyer les "for the ... study group"
+* [ ] publi 86878: Lorsque OpenAlex corrige le parsing des affiliations, certaines authorships sortent du périmètre; des auteurs UCA deviennent non-UCA mais restent polluer la base. Gérer la purge automatique.
+* [ ] publications avec beaucoup d'auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. En attendant une solution, le mode "conflit de sources" dans la déduplication manuelle des personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`) (chantier chiant, à enterrer le plus proprement possible)
+* [ ] repenser entièrement les pages `admin/duplicates` et `admin/person-duplicates`
+* [ ] quoi faire des entités aberrantes (auteurs mal parsés)? *a minima*, s'assurer qu'elles n'apparaissent pas dans `admin/orphan-authorships`
+
 ## Questions ouvertes
 
 - **Agrégation des recouvrements en score.** Pondération et seuils pour combiner co-auteurs / labos / sujets / revues en un score homonymie vs doublon par paire. Un vrai homonyme a des réseaux disjoints ; un doublon les a communs — reste à calibrer la frontière.
@@ -85,3 +96,4 @@ Conservateurs, activables une fois le reste en place ; pas des prérequis.
 - **Corroboration par le nom : faux rejets résiduels.** La comparaison par tokens règle les initiales et les noms multi-mots ; restent les **changements de nom** (« Van Lander » → « Maneval », mariage / jeune fille) et les translittérations, où la signature et la personne n'ont aucun token en commun. À décider : rejeter quand même, ou conditionner le rejet à l'absence de tout autre signal concordant.
 - **Flux de confirmation des identifiants.** Si on active `confirmed`-only, comment confirmer à l'échelle : auto-confirmation sur faisceau d'indices, confirmation humaine ciblée, ou apport de la vérification ORCID.
 - **Vérification ORCID : modalités.** Contact polite-pool propre à l'API ORCID (distinct de celui d'OpenAlex), rate-limiting et cache, et destination des verdicts (transition `pending` → `confirmed` / `rejected` sur `person_identifiers`, ou table dédiée).
+- **Noms manifestement collectifs sur une signature** (« for the … study group », « consortium », « collaboration ») : à bloquer en amont, à la **création de personne**, plutôt qu'à détacher a posteriori. Problème distinct de la corruption éparse d'identifiant, et stock petit.
