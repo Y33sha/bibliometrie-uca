@@ -126,6 +126,9 @@ class PgPersonRepository:
     def find_publication_ids_for_source_authorships(self, sa_ids: list[int]) -> list[int]:
         return _authorships.find_publication_ids_for_source_authorships(self._conn, sa_ids)
 
+    def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
+        return _authorships.null_person_id_for_name_form(self._conn, person_id, name_form)
+
     def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None:
         _authorships.insert_authorship_if_missing(self._conn, publication_id, person_id)
 

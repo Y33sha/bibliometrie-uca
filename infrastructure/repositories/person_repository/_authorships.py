@@ -181,6 +181,19 @@ def find_publication_id_for_source_authorship(
     ).scalar_one_or_none()
 
 
+def null_person_id_for_name_form(conn: Connection, person_id: int, name_form: str) -> int:
+    """Détache (person_id → NULL) les source_authorships d'une personne portant une
+    forme de nom donnée. Sert au rejet d'une forme : ses signatures sont retirées de
+    la personne. Retourne le nombre de signatures détachées."""
+    return conn.execute(
+        text(
+            "UPDATE source_authorships SET person_id = NULL "
+            "WHERE person_id = :pid AND author_name_normalized = :nf"
+        ),
+        {"pid": person_id, "nf": name_form},
+    ).rowcount
+
+
 def find_publication_ids_for_source_authorships(conn: Connection, sa_ids: list[int]) -> list[int]:
     """Les `publication_id` distincts couverts par un lot de source_authorships."""
     if not sa_ids:
