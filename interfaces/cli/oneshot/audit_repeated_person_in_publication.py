@@ -40,7 +40,7 @@ Rien n'est écrit.
 """
 
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 from sqlalchemy import bindparam, text
 
@@ -58,6 +58,7 @@ _CANDIDATES_SQL = text("""
 _OCCURRENCES_SQL = text("""
     SELECT sa.source_publication_id AS spid,
            sa.person_id,
+           sa.source::text AS source,
            sa.raw_author_name AS name,
            sa.author_name_normalized AS norm
     FROM source_authorships sa
@@ -116,10 +117,12 @@ def main():
         n_detachable = n_dup = n_no_anchor = 0
         intrus_total = 0
         size_hist = defaultdict(int)
+        src_by_bucket = {"detachable": Counter(), "dup": Counter(), "no_anchor": Counter()}
         samples = {"detachable": [], "dup": [], "no_anchor": []}
 
         for (spid, pid), occs in groups.items():
             size_hist[len(occs)] += 1
+            src = occs[0].source  # une source_publication appartient à une seule source
             forms = confirmed.get(pid, [])
             legit = [is_legit(o.norm, forms) for o in occs]
             n_legit = sum(legit)
@@ -127,16 +130,19 @@ def main():
 
             if n_legit == 0:
                 n_no_anchor += 1
+                src_by_bucket["no_anchor"][src] += 1
                 if len(samples["no_anchor"]) < 25:
                     names = ", ".join(sorted({o.name for o in occs}))
                     samples["no_anchor"].append((spid, label, names))
             elif n_legit == len(occs):
                 n_dup += 1
+                src_by_bucket["dup"][src] += 1
                 if len(samples["dup"]) < 25:
                     names = ", ".join(sorted({o.name for o in occs}))
                     samples["dup"].append((spid, label, names))
             else:
                 n_detachable += 1
+                src_by_bucket["detachable"][src] += 1
                 intrus = [o for o, ok in zip(occs, legit, strict=True) if not ok]
                 intrus_total += len(intrus)
                 if len(samples["detachable"]) < 30:
@@ -153,6 +159,17 @@ def main():
         print("\n  taille des groupes (nb signatures → nb groupes) :")
         for size in sorted(size_hist):
             print(f"    {size:3d} → {size_hist[size]}")
+
+        sources = sorted(
+            {s for c in src_by_bucket.values() for s in c}, key=lambda s: -src_by_bucket["dup"][s]
+        )
+        print("\n  ventilation par source (groupes) :")
+        print(f"    {'source':10s} {'détach.':>8s} {'doublon':>8s} {'sans ancre':>11s}")
+        for s in sources:
+            print(
+                f"    {s:10s} {src_by_bucket['detachable'][s]:8d} "
+                f"{src_by_bucket['dup'][s]:8d} {src_by_bucket['no_anchor'][s]:11d}"
+            )
 
         print("\n--- échantillon DÉTACHABLE (spid | personne | ancre | intrus) ---")
         for spid, label, anchor, names in samples["detachable"]:
