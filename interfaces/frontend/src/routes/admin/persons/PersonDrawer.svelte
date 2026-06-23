@@ -1,10 +1,14 @@
 <script lang="ts">
   import { base } from "$app/paths";
+  import { api } from "$lib/api";
   import { titleCase } from "$lib/utils";
   import type { Person, IdFormState, PersonSearchResult } from "./types";
+  import type { components } from "$lib/api/schema";
   import IdentifiersCell from "./IdentifiersCell.svelte";
   import MergeSearchCell from "./MergeSearchCell.svelte";
   import NameFormsList from "./NameFormsList.svelte";
+
+  type SharingPerson = components["schemas"]["SharingPersonOut"];
 
   let {
     person,
@@ -22,6 +26,7 @@
     onmergeOpen,
     onmergeClose,
     onmerge,
+    onabsorb,
   }: {
     person: Person;
     idForm: IdFormState | null;
@@ -48,7 +53,26 @@
     onmergeOpen: (personId: number) => void;
     onmergeClose: () => void;
     onmerge: (targetId: number, sourceId: number) => void | Promise<void>;
+    /** Absorbe une autre personne dans celle du drawer (fusion vers `person`). */
+    onabsorb: (otherId: number) => Promise<void>;
   } = $props();
+
+  // Personnes partageant ≥1 forme de nom (candidates à l'absorption).
+  let sharing = $state<SharingPerson[]>([]);
+
+  async function loadSharing() {
+    sharing = await api<SharingPerson[]>(`/api/admin/persons/${person.id}/sharing-name-forms`);
+  }
+
+  $effect(() => {
+    void person.id; // re-fetch quand le drawer change de personne
+    loadSharing();
+  });
+
+  async function absorb(otherId: number) {
+    await onabsorb(otherId);
+    await loadSharing();
+  }
 
   let editing = $state(false);
   let lastName = $state("");
@@ -186,6 +210,31 @@
       <h3>Formes de nom</h3>
       <NameFormsList {person} onopenDetail={onopenDetach} onsetStatus={onsetFormStatus} />
     </section>
+
+    {#if sharing.length}
+      <section class="drawer-section">
+        <h3>Personnes partageant une forme de nom</h3>
+        <div class="sharing-list">
+          {#each sharing as sp (sp.id)}
+            <div class="sharing-row">
+              <button
+                class="btn btn-sm"
+                title="Fusionner cette personne dans celle-ci"
+                onclick={() => absorb(sp.id)}>Absorber</button
+              >
+              <span class="sharing-name">
+                <span class="person-last">{titleCase(sp.last_name)}</span>
+                {titleCase(sp.first_name)}
+              </span>
+              {#if sp.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+              <span class="sharing-forms" title={sp.shared_forms.join(", ")}>
+                {sp.shared_forms.length} forme{sp.shared_forms.length > 1 ? "s" : ""}
+              </span>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
 
     <section class="drawer-section">
       <h3>Fusion</h3>
@@ -339,6 +388,23 @@
     letter-spacing: 0.04em;
     color: #888;
     margin: 0 0 8px;
+  }
+  .sharing-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .sharing-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sharing-name {
+    font-size: 0.9rem;
+  }
+  .sharing-forms {
+    font-size: 0.72rem;
+    color: #888;
   }
   .tag {
     display: inline-block;

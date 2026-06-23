@@ -1443,6 +1443,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/persons/{person_id}/sharing-name-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Persons Sharing Name Form
+         * @description Personnes partageant ≥1 forme de nom avec celle-ci (candidates à l'absorption).
+         */
+        get: operations["persons_sharing_name_form_api_admin_persons__person_id__sharing_name_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/persons/{person_id}/detach-authorships": {
         parameters: {
             query?: never;
@@ -5281,6 +5301,22 @@ export interface components {
             countries?: string[] | null;
         };
         /**
+         * SharingPersonOut
+         * @description Personne partageant ≥1 forme de nom avec une autre (candidate à l'absorption).
+         */
+        SharingPersonOut: {
+            /** Id */
+            id: number;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Shared Forms */
+            shared_forms: string[];
+        };
+        /**
          * SourceAuthorshipOut
          * @description Authorship source (HAL / OpenAlex / WoS / ScanR).
          *
@@ -8168,6 +8204,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    persons_sharing_name_form_api_admin_persons__person_id__sharing_name_forms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharingPersonOut"][];
                 };
             };
             /** @description Validation Error */

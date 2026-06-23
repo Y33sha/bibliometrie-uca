@@ -25,6 +25,7 @@ from application.ports.api.persons_queries import (
     NameFormAuthorshipsResponse,
     PersonOut,
     PersonsQueries,
+    SharingPersonOut,
 )
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
@@ -275,6 +276,17 @@ def person_admin(
     if person is None:
         raise HTTPException(status_code=404, detail="Personne introuvable")
     return person
+
+
+@router.get(
+    "/api/admin/persons/{person_id}/sharing-name-forms", response_model=list[SharingPersonOut]
+)
+def persons_sharing_name_form(
+    person_id: int,
+    queries: PersonsQueries = Depends(persons_queries_sync),
+) -> list[SharingPersonOut]:
+    """Personnes partageant ≥1 forme de nom avec celle-ci (candidates à l'absorption)."""
+    return queries.persons_sharing_name_form(person_id)
 
 
 @router.post(

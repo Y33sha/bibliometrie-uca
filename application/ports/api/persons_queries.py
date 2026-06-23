@@ -328,6 +328,16 @@ class AmbiguousNameFormsResponse(BaseModel):
     forms: list[AmbiguousNameFormOut]
 
 
+class SharingPersonOut(BaseModel):
+    """Personne partageant ≥1 forme de nom avec une autre (candidate à l'absorption)."""
+
+    id: int
+    first_name: str
+    last_name: str
+    has_rh: bool
+    shared_forms: list[str]
+
+
 # ---------------------------------------------------------------------------
 # DTOs Admin : authorships orphelines
 # ---------------------------------------------------------------------------
@@ -413,3 +423,5 @@ class PersonsQueries(Protocol):
     def ambiguous_name_forms_count(self) -> int: ...
 
     def ambiguous_name_forms(self, *, page: int, per_page: int) -> AmbiguousNameFormsResponse: ...
+
+    def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]: ...
