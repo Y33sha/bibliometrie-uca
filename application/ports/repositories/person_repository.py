@@ -119,6 +119,11 @@ class PersonRepository(Protocol):
         `source_authorships`. Sert au pré-contrôle de rejet en batch."""
         ...
 
+    def null_person_id_for_name_form(self, person_id: int, name_form: str) -> int:
+        """Détache (person_id → NULL) les source_authorships d'une personne portant
+        une forme de nom donnée. Retourne le nombre de signatures détachées."""
+        ...
+
     def insert_authorship_if_missing(self, publication_id: int, person_id: int) -> None: ...
 
     def link_source_authorships_to_authorship(

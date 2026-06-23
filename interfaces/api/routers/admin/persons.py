@@ -319,13 +319,15 @@ def update_name_form_status(
     person_id: int,
     body: UpdateNameFormStatus,
     repo: PersonRepository = Depends(person_repo_sync),
+    auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> NameFormStatusResponse:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-    `rejected` détache durablement la forme du matching par nom (verrou de non-retour) ;
+    `rejected` pose le verrou de non-retour ET détache les signatures portant la forme
+    (null des source_authorships + suppression des authorships canoniques orphelines) ;
     `confirmed` valide le lien et corrobore les matchs par identifiant sans test de nom."""
     row = _update_name_form_status(
-        person_id, body.name_form, body.status, repo=repo, audit_repo=audit
+        person_id, body.name_form, body.status, repo=repo, authorship_repo=auth_repo, audit_repo=audit
     )
     return NameFormStatusResponse(**row)

@@ -727,6 +727,55 @@ class TestUpdateNameFormStatus:
         with pytest.raises(NotFoundError):
             update_name_form_status(person_id, "inexistante xyz", "rejected", repo=repo)
 
+    def test_reject_detaches_authorships(self, sa_sync_conn, repo, authorship_repo):
+        """Rejeter une forme détache ses signatures (source_authorships → NULL) et
+        supprime les authorships canoniques devenues sans source ; le verrou reste posé."""
+        pid = _insert_person(sa_sync_conn, "Foreign", "Form")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+                "VALUES ('intrus etranger', :pid, '{hal}', 'pending')"
+            ),
+            {"pid": pid},
+        )
+        pub = _insert_publication(sa_sync_conn)
+        spid = _insert_source_publication(sa_sync_conn, pub)
+        sa_id = _insert_source_authorship(
+            sa_sync_conn, spid, person_id=pid, author_name_normalized="intrus etranger"
+        )
+        sa_sync_conn.execute(
+            text("INSERT INTO authorships (publication_id, person_id) VALUES (:p, :pid)"),
+            {"p": pub, "pid": pid},
+        )
+
+        update_name_form_status(
+            pid, "intrus etranger", "rejected", repo=repo, authorship_repo=authorship_repo
+        )
+
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT person_id FROM source_authorships WHERE id = :id"), {"id": sa_id}
+            ).scalar_one()
+            is None
+        )
+        assert (
+            sa_sync_conn.execute(
+                text("SELECT 1 FROM authorships WHERE publication_id = :p AND person_id = :pid"),
+                {"p": pub, "pid": pid},
+            ).first()
+            is None
+        )
+        assert (
+            sa_sync_conn.execute(
+                text(
+                    "SELECT status::text FROM person_name_forms "
+                    "WHERE name_form = 'intrus etranger' AND person_id = :pid"
+                ),
+                {"pid": pid},
+            ).scalar_one()
+            == "rejected"
+        )
+
 
 # ── assign_orphan_authorship ───────────────────────────────────────
 

@@ -301,15 +301,24 @@ def update_name_form_status(
     status: str,
     *,
     repo: PersonRepository,
+    authorship_repo: AuthorshipRepository | None = None,
     audit_repo: AuditRepository | None = None,
 ) -> dict:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-    `rejected` est le détachement durable d'une forme (verrou de non-retour) ;
-    `confirmed` valide le lien. Retourne la ligne {person_id, name_form, status}.
-    Lève NotFoundError si le couple (name_form, person_id) n'existe pas.
+    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche
+    le **détachement** des signatures portant cette forme : leurs `source_authorships`
+    sont nullées et les `authorships` canoniques devenues sans source sont supprimées
+    (le verrou seul n'agirait qu'au matching futur, et la phase persons est incrémentale).
+
+    Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple
+    (name_form, person_id) n'existe pas.
     """
     row = repo.update_name_form_status(person_id, name_form, status)
+    if status == "rejected":
+        detached = repo.null_person_id_for_name_form(person_id, name_form)
+        if detached and authorship_repo is not None:
+            authorship_repo.delete_orphan_authorships_for_person(person_id)
     emit_event(
         audit_repo,
         "person_name_form.status_changed",
