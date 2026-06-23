@@ -7,7 +7,7 @@ type IdentifierReassignResponse = components['schemas']['IdentifierReassignRespo
 type MergeResponse = components['schemas']['MergeResponse'];
 type OkResponse = components['schemas']['OkResponse'];
 type RemovedResponse = components['schemas']['RemovedResponse'];
-type DetachedResponse = components['schemas']['DetachedResponse'];
+type NameFormStatusResponse = components['schemas']['NameFormStatusResponse'];
 type DetachAuthorshipsResponse = components['schemas']['DetachAuthorshipsResponse'];
 
 export function merge(targetId: number, sourceId: number): Promise<MergeResponse> {
@@ -36,11 +36,15 @@ export function detachAuthorships(
 	return post<DetachAuthorshipsResponse>(`/api/persons/${personId}/detach-authorships`, body);
 }
 
-export function detachNameForm(
+export function updateNameFormStatus(
 	personId: number,
-	body: Record<string, unknown>
-): Promise<DetachedResponse> {
-	return post<DetachedResponse>(`/api/persons/${personId}/detach-name-form`, body);
+	nameForm: string,
+	status: 'pending' | 'confirmed' | 'rejected'
+): Promise<NameFormStatusResponse> {
+	return patch<NameFormStatusResponse>(`/api/persons/${personId}/name-forms/status`, {
+		name_form: nameForm,
+		status
+	});
 }
 
 export function addIdentifier(

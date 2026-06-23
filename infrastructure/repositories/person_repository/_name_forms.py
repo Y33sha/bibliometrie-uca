@@ -12,6 +12,7 @@ DB).
 
 from sqlalchemy import Connection, text
 
+from domain.errors import NotFoundError
 from domain.normalize import normalize_name
 from domain.sources.registry import AUTHOR_SOURCES_SQL
 
@@ -60,16 +61,25 @@ def add_name_form(
     add_person_source(conn, name_form=norm, person_id=person_id, source=source)
 
 
-def detach_name_form(conn: Connection, person_id: int, name_form: str) -> None:
-    """Détache une personne d'une forme de nom (DELETE de la row).
+def update_name_form_status(conn: Connection, person_id: int, name_form: str, status: str) -> dict:
+    """Change le statut d'une forme de nom. Retourne {person_id, name_form, status}.
 
-    Avec la PK composite, la row porte exactement le couple — pas de
-    cas "supprimer la name_form si orpheline" : la row EST le lien.
+    `rejected` bloque durablement le retour de la forme au matching par nom (le
+    recompute préserve le verdict, `fetch_name_form_map` l'exclut) ; `confirmed`
+    corrobore les matchs par identifiant sans test de nom. Lève `NotFoundError` si
+    le couple `(name_form, person_id)` n'existe pas.
     """
-    conn.execute(
-        text("DELETE FROM person_name_forms WHERE name_form = :nf AND person_id = :pid"),
-        {"nf": name_form, "pid": person_id},
-    )
+    row = conn.execute(
+        text(
+            "UPDATE person_name_forms SET status = CAST(:st AS identifier_status) "
+            "WHERE name_form = :nf AND person_id = :pid "
+            "RETURNING person_id, name_form, CAST(status AS text) AS status"
+        ),
+        {"st": status, "nf": name_form, "pid": person_id},
+    ).first()
+    if not row:
+        raise NotFoundError(f"Forme de nom {name_form!r} introuvable pour la personne {person_id}")
+    return dict(row._mapping)
 
 
 def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int:

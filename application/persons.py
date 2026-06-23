@@ -33,7 +33,7 @@ __all__ = [
     "remove_identifier",
     "update_identifier_status",
     "reassign_identifier",
-    "detach_name_form",
+    "update_name_form_status",
     "detach_authorships",
     "mark_distinct",
 ]
@@ -295,10 +295,29 @@ def add_name_form(
     repo.add_name_form(person_id, full_name, source=source)
 
 
-def detach_name_form(person_id: int, name_form: str, *, repo: PersonRepository) -> None:
-    """Détache une personne d'une forme de nom. Supprime la forme si elle
-    n'est plus rattachée à aucune personne."""
-    repo.detach_name_form(person_id, name_form)
+def update_name_form_status(
+    person_id: int,
+    name_form: str,
+    status: str,
+    *,
+    repo: PersonRepository,
+    audit_repo: AuditRepository | None = None,
+) -> dict:
+    """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
+
+    `rejected` est le détachement durable d'une forme (verrou de non-retour) ;
+    `confirmed` valide le lien. Retourne la ligne {person_id, name_form, status}.
+    Lève NotFoundError si le couple (name_form, person_id) n'existe pas.
+    """
+    row = repo.update_name_form_status(person_id, name_form, status)
+    emit_event(
+        audit_repo,
+        "person_name_form.status_changed",
+        "person",
+        person_id,
+        {"name_form": name_form, "status": status},
+    )
+    return row
 
 
 def detach_authorships(

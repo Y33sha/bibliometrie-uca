@@ -1404,7 +1404,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/persons/{person_id}/detach-name-form": {
+    "/api/persons/{person_id}/name-forms/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -1413,15 +1413,18 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Detach Name Form
-         * @description Détache une forme de nom d'une personne (quand aucune authorship n'y est liée).
-         */
-        post: operations["detach_name_form_api_persons__person_id__detach_name_form_post"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Name Form Status
+         * @description Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
+         *
+         *     `rejected` détache durablement la forme du matching par nom (verrou de non-retour) ;
+         *     `confirmed` valide le lien et corrobore les matchs par identifiant sans test de nom.
+         */
+        patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;
     };
     "/api/authorships/{authorship_id}/exclude": {
@@ -2924,19 +2927,6 @@ export interface components {
             /** Cleaned Forms */
             cleaned_forms: number;
         };
-        /** DetachNameForm */
-        DetachNameForm: {
-            /** Name Form */
-            name_form: string;
-        };
-        /** DetachedResponse */
-        DetachedResponse: {
-            /**
-             * Detached
-             * @default true
-             */
-            detached: boolean;
-        };
         /**
          * DoiPrefixInfo
          * @description Préfixe DOI rattaché à un éditeur (lecture seule, vient de la table `doi_prefixes`).
@@ -3905,6 +3895,15 @@ export interface components {
             requires_context_of: number[] | null;
             /** Created At */
             created_at?: string | null;
+        };
+        /** NameFormStatusResponse */
+        NameFormStatusResponse: {
+            /** Person Id */
+            person_id: number;
+            /** Name Form */
+            name_form: string;
+            /** Status */
+            status: string;
         };
         /**
          * NameFormSummaryOut
@@ -5559,6 +5558,16 @@ export interface components {
         };
         /** UpdateIdentifierStatus */
         UpdateIdentifierStatus: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "rejected";
+        };
+        /** UpdateNameFormStatus */
+        UpdateNameFormStatus: {
+            /** Name Form */
+            name_form: string;
             /**
              * Status
              * @enum {string}
@@ -8017,7 +8026,7 @@ export interface operations {
             };
         };
     };
-    detach_name_form_api_persons__person_id__detach_name_form_post: {
+    update_name_form_status_api_persons__person_id__name_forms_status_patch: {
         parameters: {
             query?: never;
             header?: never;
@@ -8028,7 +8037,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DetachNameForm"];
+                "application/json": components["schemas"]["UpdateNameFormStatus"];
             };
         };
         responses: {
@@ -8038,7 +8047,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DetachedResponse"];
+                    "application/json": components["schemas"]["NameFormStatusResponse"];
                 };
             };
             /** @description Validation Error */

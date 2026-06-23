@@ -152,7 +152,9 @@ class PersonRepository(Protocol):
         source: str | None = None,
     ) -> None: ...
 
-    def detach_name_form(self, person_id: int, name_form: str) -> None: ...
+    def update_name_form_status(
+        self, person_id: int, name_form: str, status: str
+    ) -> dict[str, Any]: ...
 
     def delete_orphan_name_forms_for_person(self, person_id: int) -> int:
         """Supprime les formes de nom attestées par une source qui ne sont plus

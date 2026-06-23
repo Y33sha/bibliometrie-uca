@@ -51,9 +51,6 @@ from infrastructure.queries.api.persons.admin import (
     name_form_authorships as _name_form_authorships,
 )
 from infrastructure.queries.api.persons.admin import (
-    name_form_remaining_authorships as _name_form_remaining_authorships,
-)
-from infrastructure.queries.api.persons.admin import (
     orphan_authorships_count as _orphan_authorships_count,
 )
 from infrastructure.queries.api.persons.admin import (
@@ -185,9 +182,6 @@ class PgPersonsQueries(PersonsQueries):
         return NameFormAuthorshipsResponse.model_validate(
             _name_form_authorships(self._conn, person_id, name_form)
         )
-
-    def name_form_remaining_authorships(self, person_id: int, name_form: str) -> int:
-        return _name_form_remaining_authorships(self._conn, person_id, name_form)
 
 
 __all__ = ["PgPersonsQueries"]

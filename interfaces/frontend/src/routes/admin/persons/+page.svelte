@@ -336,7 +336,7 @@
 
   async function detachNameForm() {
     if (!detachModal) return;
-    await personsApi.detachNameForm(detachModal.personId, { name_form: detachModal.nameForm });
+    await personsApi.updateNameFormStatus(detachModal.personId, detachModal.nameForm, "rejected");
     detachModal = null;
     loadStats();
     loadTable();
