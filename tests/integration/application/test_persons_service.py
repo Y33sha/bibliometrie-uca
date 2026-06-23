@@ -2,7 +2,7 @@
 application/authorships/assign_orphans.py.
 
 Couvre link/unlink_authorship (branches source invalide), add_identifier,
-detach_name_form, assign_orphan_authorship (qui couvre la
+update_name_form_status, assign_orphan_authorship (qui couvre la
 re-synchronisation de l'authorship canonique depuis ses sources),
 merge_person, etc.
 """
@@ -21,7 +21,6 @@ from application.persons import (
     add_identifiers_from_authorships,
     create_person,
     detach_authorships,
-    detach_name_form,
     link_authorship,
     mark_distinct,
     merge_person,
@@ -31,6 +30,7 @@ from application.persons import (
     unlink_authorship,
     update_identifier_status,
     update_name,
+    update_name_form_status,
 )
 from domain.errors import NotFoundError, RejectedPairError, ValidationError
 from infrastructure.repositories import (
@@ -692,32 +692,40 @@ class TestAddIdentifiersFromAuthorships:
         assert id_types == ["idhal", "idref", "orcid"]
 
 
-# ── detach_name_form ───────────────────────────────────────────────
+# ── update_name_form_status ────────────────────────────────────────
 
 
-class TestDetachNameForm:
-    def test_removes_person_from_form(self, sa_sync_conn, repo):
-        p1 = create_person("Dupont", "Jean", repo=repo)
-        p2 = create_person("Dupont", "Jean", repo=repo)
-
-        detach_name_form(p1, "dupont jean", repo=repo)
-
-        rows = sa_sync_conn.execute(
-            text("SELECT person_id FROM person_name_forms WHERE name_form = 'dupont jean'")
-        ).all()
-        pids = {r.person_id for r in rows}
-        assert p1 not in pids
-        assert p2 in pids
-
-    def test_deletes_form_when_last_person_detached(self, sa_sync_conn, repo):
+class TestUpdateNameFormStatus:
+    def test_reject_keeps_row_and_sets_status(self, sa_sync_conn, repo):
+        """Rejeter une forme conserve la row (tombstone du verrou de non-retour),
+        contrairement à l'ancien détachement par DELETE."""
         person_id = create_person("Unique", "Name", repo=repo)
 
-        detach_name_form(person_id, "name unique", repo=repo)
+        row = update_name_form_status(person_id, "name unique", "rejected", repo=repo)
 
-        row = sa_sync_conn.execute(
-            text("SELECT 1 FROM person_name_forms WHERE name_form = 'name unique'")
-        ).first()
-        assert row is None
+        assert row["status"] == "rejected"
+        db = sa_sync_conn.execute(
+            text(
+                "SELECT status::text AS s FROM person_name_forms "
+                "WHERE name_form = 'name unique' AND person_id = :p"
+            ),
+            {"p": person_id},
+        ).one()
+        assert db.s == "rejected"
+
+    def test_confirm_overrides_previous_status(self, repo):
+        person_id = create_person("Alpha", "Beta", repo=repo)
+
+        update_name_form_status(person_id, "alpha beta", "rejected", repo=repo)
+        row = update_name_form_status(person_id, "alpha beta", "confirmed", repo=repo)
+
+        assert row["status"] == "confirmed"
+
+    def test_unknown_form_raises(self, repo):
+        person_id = create_person("Gamma", "Delta", repo=repo)
+
+        with pytest.raises(NotFoundError):
+            update_name_form_status(person_id, "inexistante xyz", "rejected", repo=repo)
 
 
 # ── assign_orphan_authorship ───────────────────────────────────────

@@ -16,9 +16,6 @@ from application.persons import (
     detach_authorships as _detach_authorships_service,
 )
 from application.persons import (
-    detach_name_form as _detach_name_form,
-)
-from application.persons import (
     merge_person as _merge_person,
 )
 from application.persons import (
@@ -35,6 +32,9 @@ from application.persons import (
 )
 from application.persons import (
     update_name as _update_name,
+)
+from application.persons import (
+    update_name_form_status as _update_name_form_status,
 )
 from application.ports.api.persons_queries import NameFormAuthorshipsResponse, PersonsQueries
 from application.ports.repositories.audit_repository import AuditRepository
@@ -53,17 +53,17 @@ from interfaces.api.models import (
     AddIdentifierResponse,
     DetachAuthorships,
     DetachAuthorshipsResponse,
-    DetachedResponse,
-    DetachNameForm,
     IdentifierReassignResponse,
     IdentifierStatusResponse,
     MergePersons,
     MergeResponse,
+    NameFormStatusResponse,
     OkResponse,
     ReassignIdentifier,
     RejectPerson,
     RemovedResponse,
     UpdateIdentifierStatus,
+    UpdateNameFormStatus,
     UpdatePersonName,
 )
 
@@ -279,16 +279,18 @@ def detach_authorships(
     )
 
 
-@router.post("/api/persons/{person_id}/detach-name-form", response_model=DetachedResponse)
-def detach_name_form(
+@router.patch("/api/persons/{person_id}/name-forms/status", response_model=NameFormStatusResponse)
+def update_name_form_status(
     person_id: int,
-    body: DetachNameForm,
-    queries: PersonsQueries = Depends(persons_queries_sync),
+    body: UpdateNameFormStatus,
     repo: PersonRepository = Depends(person_repo_sync),
-) -> DetachedResponse:
-    """Détache une forme de nom d'une personne (quand aucune authorship n'y est liée)."""
-    remaining = queries.name_form_remaining_authorships(person_id, body.name_form)
-    if remaining > 0:
-        raise HTTPException(status_code=400, detail="Cette forme a encore des authorships liées")
-    _detach_name_form(person_id, body.name_form, repo=repo)
-    return DetachedResponse()
+    audit: AuditRepository = Depends(audit_repo_sync),
+) -> NameFormStatusResponse:
+    """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
+
+    `rejected` détache durablement la forme du matching par nom (verrou de non-retour) ;
+    `confirmed` valide le lien et corrobore les matchs par identifiant sans test de nom."""
+    row = _update_name_form_status(
+        person_id, body.name_form, body.status, repo=repo, audit_repo=audit
+    )
+    return NameFormStatusResponse(**row)

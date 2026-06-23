@@ -50,8 +50,9 @@ class DetachAuthorships(BaseModel):
     authorships: list[SourceAuthorshipRef]
 
 
-class DetachNameForm(BaseModel):
+class UpdateNameFormStatus(BaseModel):
     name_form: str
+    status: Literal["pending", "confirmed", "rejected"]
 
 
 # ----- Réponses mutations (construites par le router) -----
@@ -75,6 +76,12 @@ class AddIdentifierResponse(BaseModel):
 
 class IdentifierStatusResponse(BaseModel):
     id: int
+    status: str
+
+
+class NameFormStatusResponse(BaseModel):
+    person_id: int
+    name_form: str
     status: str
 
 

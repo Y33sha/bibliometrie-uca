@@ -35,10 +35,6 @@ class OkResponse(BaseModel):
     ok: bool = True
 
 
-class DetachedResponse(BaseModel):
-    detached: bool = True
-
-
 class BatchUpdatedResponse(BaseModel):
     updated: int
 
@@ -91,7 +87,6 @@ __all__ = [
     "CreatedIdResponse",
     "DashboardOa",
     "DeletedResponse",
-    "DetachedResponse",
     "EnumOption",
     "FacetValueCount",
     "MergeRequest",

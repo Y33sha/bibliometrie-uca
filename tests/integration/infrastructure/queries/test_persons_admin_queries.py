@@ -5,7 +5,6 @@ from sqlalchemy import text
 from infrastructure.queries.api.persons.admin import (
     list_orphan_authorships,
     name_form_authorships,
-    name_form_remaining_authorships,
     orphan_authorships_count,
     person_exists,
 )
@@ -174,16 +173,6 @@ class TestNameFormAuthorships:
         assert len(res["authorships"]) >= 1
         other_ids = [p["id"] for p in res["other_persons"]]
         assert other in other_ids
-
-
-class TestNameFormRemainingAuthorships:
-    def test_counts_remaining(self, sa_sync_conn):
-        pid = _create_person(sa_sync_conn)
-        pub = _create_pub(sa_sync_conn)
-        sd = _create_sd(sa_sync_conn, pub)
-        _create_sa(sa_sync_conn, sd, person_id=pid, author_name_normalized="x")
-        assert name_form_remaining_authorships(sa_sync_conn, pid, "x") == 1
-        assert name_form_remaining_authorships(sa_sync_conn, pid, "autre") == 0
 
 
 # Tests pour `hal_duplicate_accounts` déplacés vers

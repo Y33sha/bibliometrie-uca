@@ -139,16 +139,3 @@ def name_form_authorships(conn: Connection, person_id: int, name_form: str) -> d
     ).all()
     other_persons = [dict(r._mapping) for r in other_rows]
     return {"authorships": authorships, "other_persons": other_persons}
-
-
-def name_form_remaining_authorships(conn: Connection, person_id: int, name_form: str) -> int:
-    """Compte les authorships qui restent liées à une personne pour un name_form."""
-    row = conn.execute(
-        text(f"""
-            SELECT COUNT(*) AS total FROM source_authorships sa
-            WHERE sa.person_id = :pid AND sa.author_name_normalized = :nf
-              AND sa.source IN {AUTHOR_SOURCES_SQL}
-        """),
-        {"pid": person_id, "nf": name_form},
-    ).one()
-    return int(row.total)

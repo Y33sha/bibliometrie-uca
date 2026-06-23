@@ -496,29 +496,30 @@ class TestDetachAuthorships:
         assert r.status_code == 200
 
 
-class TestDetachNameForm:
+class TestUpdateNameFormStatus:
     def test_requires_admin(self, client):
-        r = client.post("/api/persons/1/detach-name-form", json={"name_form": "X"})
+        r = client.patch(
+            "/api/persons/1/name-forms/status", json={"name_form": "X", "status": "rejected"}
+        )
         assert r.status_code == 401
 
-    def test_has_remaining_authorships_400(self, auth_client):
-        pid = _seed_person("DetachHas", "Rem")
-        nf = _uniq("DetachHas Rem")
+    def test_reject_sets_status(self, auth_client):
+        pid = _seed_person("RejectForm", "Nf")
+        nf = _uniq("RejectForm Nf")
         _seed_name_form(pid, nf)
-        sp = _seed_source_publication()
-        _seed_source_authorship(
-            source="hal",
-            source_pub_id=sp,
-            person_id=pid,
-            raw_author_name=nf,
+        r = auth_client.patch(
+            f"/api/persons/{pid}/name-forms/status", json={"name_form": nf, "status": "rejected"}
         )
-        r = auth_client.post(f"/api/persons/{pid}/detach-name-form", json={"name_form": nf})
-        assert r.status_code in (200, 400)
-
-    def test_ok_no_remaining(self, auth_client):
-        pid = _seed_person("DetachOk", "Norem")
-        nf = _uniq("DetachOk Norem")
-        _seed_name_form(pid, nf)
-        r = auth_client.post(f"/api/persons/{pid}/detach-name-form", json={"name_form": nf})
         assert r.status_code == 200
-        assert r.json()["detached"] is True
+        body = r.json()
+        assert body["person_id"] == pid
+        assert body["name_form"] == nf
+        assert body["status"] == "rejected"
+
+    def test_unknown_form_404(self, auth_client):
+        pid = _seed_person("UnknownForm", "Nf")
+        r = auth_client.patch(
+            f"/api/persons/{pid}/name-forms/status",
+            json={"name_form": "inexistante zzz", "status": "confirmed"},
+        )
+        assert r.status_code == 404
