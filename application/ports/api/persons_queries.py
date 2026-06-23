@@ -85,6 +85,8 @@ class NameFormSummaryOut(BaseModel):
     name_form: str
     sources: list[str]
     ambiguous: bool
+    status: Literal["pending", "confirmed", "rejected"]
+    shared_count: int
 
 
 # ---------------------------------------------------------------------------

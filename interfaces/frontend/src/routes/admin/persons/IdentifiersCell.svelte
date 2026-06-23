@@ -40,16 +40,17 @@
 {#if person.identifiers?.length}
   <div class="identifiers-row">
     {#each person.identifiers as ident}
-      <span
-        class="identifier-tag"
-        class:rejected={ident.status === "rejected"}
-        class:confirmed={ident.status === "confirmed"}
-      >
-        <span class="tag tag-id" title={identifierTitle(ident)}>
+      <div class="chip-row">
+        <span
+          class="status-chip identifier-chip"
+          class:confirmed={ident.status === "confirmed"}
+          class:rejected={ident.status === "rejected"}
+          title={identifierTitle(ident)}
+        >
           {identifierLabel(ident)}
         </span>
         <button
-          class="btn-status"
+          class="status-btn confirm"
           class:active={ident.status === "confirmed"}
           title={ident.status === "confirmed" ? "Retirer la confirmation" : "Confirmer"}
           onclick={() =>
@@ -57,14 +58,14 @@
           >&#x2713;</button
         >
         <button
-          class="btn-status btn-reject"
+          class="status-btn reject"
           class:active={ident.status === "rejected"}
           title={ident.status === "rejected" ? "Retirer le rejet" : "Rejeter"}
           onclick={() =>
             onsetStatus(ident.id, ident.status === "rejected" ? "pending" : "rejected")}
           >&#x2717;</button
         >
-      </span>
+      </div>
     {/each}
   </div>
 {/if}
@@ -104,74 +105,19 @@
 <style>
   .identifiers-row {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 4px;
-    margin-bottom: 4px;
+    align-items: flex-start;
+    margin-bottom: 6px;
   }
-  .identifier-tag {
+  .chip-row {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
   }
-  .identifier-tag.rejected {
-    opacity: 0.45;
-    text-decoration: line-through;
-  }
-  .identifier-tag.confirmed :global(.tag-id) {
-    background: var(--success-light);
-    color: var(--success);
-  }
-  .identifier-tag.rejected :global(.tag-id) {
-    background: var(--danger-light);
-    color: #721c24;
-  }
-  .tag {
-    display: inline-block;
-    font-size: 0.8rem;
-    padding: 1px 7px;
-    border-radius: 10px;
-    font-weight: 500;
-    margin: 1px 2px;
-  }
-  .tag-id {
-    background: var(--accent-light);
-    color: var(--accent);
+  .identifier-chip {
     font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 0.7rem;
-  }
-  .btn-status {
-    background: none;
-    border: 1px solid #ccc;
-    border-radius: 3px;
-    cursor: pointer;
-    font-size: 0.75rem;
-    padding: 0 3px;
-    line-height: 1.2;
-    color: #999;
-  }
-  .btn-status:hover {
-    background: #f0f0f0;
-  }
-  .btn-status.active {
-    color: var(--success);
-    border-color: var(--success);
-    font-weight: bold;
-  }
-  .btn-status.btn-reject.active {
-    color: var(--danger);
-    border-color: var(--danger);
-  }
-  .btn-reject {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 0.85rem;
-    padding: 0 2px;
-    color: var(--text-muted);
-    font-family: inherit;
-  }
-  .btn-reject:hover {
-    color: var(--danger);
+    font-size: 0.72rem;
   }
   .btn-add-id {
     padding: 2px 8px;

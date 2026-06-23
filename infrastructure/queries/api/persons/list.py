@@ -234,17 +234,22 @@ def list_persons(
 
     name_forms_map: dict[int, Any] = {}
     if person_ids:
-        # Filtre : on n'expose la forme que si elle a au moins une source
-        # autre que 'persons' (sinon elle est entièrement dérivée de la
-        # table persons et n'a aucune valeur d'audit cross-source).
-        # `ambiguous` : >1 person_id pour ce name_form (sous-select sur
-        # la PK composite, lookup index B-tree).
+        # Toutes les formes de la personne, y compris celles entièrement dérivées
+        # du nom canonique (source 'persons' seule) : le drawer admin les affiche
+        # pour la curation. `shared_count` / `ambiguous` : nombre de person_id
+        # portant ce name_form (sous-select sur la PK composite, lookup B-tree).
         nf_rows = conn.execute(
             text("""
                 SELECT pnf.person_id,
                        json_agg(json_build_object(
                            'name_form', pnf.name_form,
                            'sources', pnf.sources,
+                           'status', pnf.status::text,
+                           'shared_count', (
+                               SELECT COUNT(*)
+                               FROM person_name_forms p2
+                               WHERE p2.name_form = pnf.name_form
+                           ),
                            'ambiguous', (
                                SELECT COUNT(*) > 1
                                FROM person_name_forms p2
@@ -253,9 +258,6 @@ def list_persons(
                        ) ORDER BY pnf.name_form) AS name_forms
                 FROM person_name_forms pnf
                 WHERE pnf.person_id = ANY(:ids)
-                  AND EXISTS (
-                      SELECT 1 FROM unnest(pnf.sources) s WHERE s <> 'persons'
-                  )
                 GROUP BY pnf.person_id
             """),
             {"ids": person_ids},
