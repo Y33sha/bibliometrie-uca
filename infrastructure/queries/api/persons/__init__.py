@@ -44,6 +44,7 @@ from application.ports.api.persons_queries import (
     PersonsStatsResponse,
     PersonThesesResponse,
     RoleCount,
+    SharingPersonOut,
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from infrastructure.queries.api.persons.admin import (
@@ -53,6 +54,7 @@ from infrastructure.queries.api.persons.admin import (
     name_form_authorships as _name_form_authorships,
     orphan_authorships_count as _orphan_authorships_count,
     person_exists as _person_exists,
+    persons_sharing_name_form as _persons_sharing_name_form,
 )
 from infrastructure.queries.api.persons.detail import (
     person_addresses as _person_addresses,
@@ -175,6 +177,12 @@ class PgPersonsQueries(PersonsQueries):
         return AmbiguousNameFormsResponse.model_validate(
             _ambiguous_name_forms(self._conn, page=page, per_page=per_page)
         )
+
+    def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]:
+        return [
+            SharingPersonOut.model_validate(r)
+            for r in _persons_sharing_name_form(self._conn, person_id)
+        ]
 
 
 __all__ = ["PgPersonsQueries"]

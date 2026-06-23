@@ -396,6 +396,22 @@
     loadTable();
   }
 
+  // Absorbe une autre personne (sourceId) dans celle du drawer (la cible).
+  async function absorbPerson(otherId: number) {
+    if (selectedPersonId === null) return;
+    try {
+      await personsApi.merge(selectedPersonId, otherId);
+    } catch (e) {
+      const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
+      toast(detail || "Fusion impossible", "error");
+      return;
+    }
+    loadStats();
+    await loadTable();
+    await refreshSelected();
+    loadAmbiguousCount();
+  }
+
   async function mergeFromModal(sourceId: number) {
     if (!detachModal) return;
     const targetId = detachModal.personId;
@@ -547,6 +563,7 @@
     onmergeOpen={openMergeSearch}
     onmergeClose={closeMergeSearch}
     onmerge={mergeInto}
+    onabsorb={absorbPerson}
   />
 {/if}
 

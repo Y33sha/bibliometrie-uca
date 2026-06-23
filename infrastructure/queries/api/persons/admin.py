@@ -215,3 +215,26 @@ def ambiguous_name_forms(conn: Connection, *, page: int, per_page: int) -> dict[
         "pages": (total + per_page - 1) // per_page if per_page else 0,
         "forms": [{"name_form": f, "persons": persons_by_form[f]} for f in forms],
     }
+
+
+def persons_sharing_name_form(conn: Connection, person_id: int) -> list[dict[str, Any]]:
+    """Autres personnes (non rejetées) partageant ≥1 forme de nom avec `person_id`.
+
+    Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les
+    formes en commun — éléments de décision affichés dans le drawer."""
+    rows = conn.execute(
+        text("""
+            SELECT p2.id, p2.first_name, p2.last_name,
+                   EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p2.id) AS has_rh,
+                   array_agg(DISTINCT pnf1.name_form ORDER BY pnf1.name_form) AS shared_forms
+            FROM person_name_forms pnf1
+            JOIN person_name_forms pnf2
+              ON pnf2.name_form = pnf1.name_form AND pnf2.person_id <> pnf1.person_id
+            JOIN persons p2 ON p2.id = pnf2.person_id
+            WHERE pnf1.person_id = :id AND p2.rejected = FALSE
+            GROUP BY p2.id, p2.first_name, p2.last_name
+            ORDER BY p2.last_name, p2.first_name
+        """),
+        {"id": person_id},
+    ).all()
+    return [dict(r._mapping) for r in rows]
