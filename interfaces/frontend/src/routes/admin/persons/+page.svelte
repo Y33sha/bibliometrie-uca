@@ -23,11 +23,17 @@
   import PersonsToolbar from "./PersonsToolbar.svelte";
   import DetachNameFormModal from "./DetachNameFormModal.svelte";
   import PersonDrawer from "./PersonDrawer.svelte";
+  import AmbiguousFormsList from "./AmbiguousFormsList.svelte";
 
   /* ── State ── */
 
   let stats = $state<PersonStats | null>(null);
   let orphanCount = $state(0);
+
+  // Onglets du hub : liste maîtresse + files de triage.
+  type TabKey = "all" | "ambiguous-forms";
+  let tab = $state<TabKey>("all");
+  let ambiguousCount = $state(0);
 
   type IdState = "all" | "yes" | "no";
 
@@ -68,12 +74,18 @@
 
   let detachModal: DetachModalState | null = $state(null);
 
-  // Drawer-personne : ouvert quand `?person=:id` est dans l'URL. La personne
-  // affichée est dérivée de la liste chargée (clic depuis une ligne).
+  // Drawer-personne : ouvert quand `?person=:id` est dans l'URL. La personne vient
+  // de la liste chargée si elle y est, sinon d'un fetch dédié (ouverture depuis une
+  // file de triage, où la liste maîtresse n'est pas chargée).
   let selectedPersonId: number | null = $state(null);
-  const selectedPerson = $derived(
-    selectedPersonId === null ? null : (persons.find((p) => p.id === selectedPersonId) ?? null),
-  );
+  let fetchedPerson: Person | null = $state(null);
+  const selectedPerson = $derived.by(() => {
+    if (selectedPersonId === null) return null;
+    return (
+      persons.find((p) => p.id === selectedPersonId) ??
+      (fetchedPerson?.id === selectedPersonId ? fetchedPerson : null)
+    );
+  });
 
   let activeMergePersonId: number | null = $state(null);
   const mergeSearch = useDebouncedSearch<PersonSearchResult>({
@@ -180,6 +192,7 @@
       .join(",");
     setOrDel("id_filter", idFilter);
     setOrDel("person", selectedPersonId ? String(selectedPersonId) : "");
+    setOrDel("tab", tab !== "all" ? tab : "");
     replaceState(url, {});
   }
 
@@ -200,6 +213,7 @@
       idStates = states;
     }
     if (p.get("person")) selectedPersonId = parseInt(p.get("person")!, 10) || null;
+    if (p.get("tab") === "ambiguous-forms") tab = "ambiguous-forms";
   }
 
   /* ── Event handlers ── */
@@ -255,11 +269,13 @@
     delete next[personId];
     idForms = next;
     await loadTable();
+    await refreshSelected();
   }
 
   async function setIdentifierStatus(identId: number, status: string) {
     await personsApi.setIdentifierStatus(identId, status);
     await loadTable();
+    await refreshSelected();
   }
 
   /* ── Orphans ── */
@@ -267,6 +283,18 @@
   async function loadOrphanCount() {
     const data = await api<{ total: number }>("/api/admin/orphan-authorships/count");
     orphanCount = data.total;
+  }
+
+  /* ── Onglets / files de triage ── */
+
+  async function loadAmbiguousCount() {
+    const data = await api<{ total: number }>("/api/admin/ambiguous-name-forms/count");
+    ambiguousCount = data.total;
+  }
+
+  function selectTab(t: TabKey) {
+    tab = t;
+    updateUrl();
   }
 
   /* ── Edit name ── */
@@ -285,12 +313,14 @@
       return false;
     }
     await loadTable();
+    await refreshSelected();
     return true;
   }
 
   async function togglePersonReject(personId: number, rejected: boolean) {
     await personsApi.setRejected(personId, rejected);
     await loadTable();
+    await refreshSelected();
   }
 
   /* ── Detach modal ── */
@@ -344,6 +374,7 @@
       status as "pending" | "confirmed" | "rejected",
     );
     await loadTable();
+    await refreshSelected();
   }
 
   /* ── Merge ── */
@@ -376,24 +407,39 @@
 
   /* ── Drawer ── */
 
-  function openDrawer(personId: number) {
+  async function openDrawer(personId: number) {
     selectedPersonId = personId;
     updateUrl();
+    if (!persons.some((p) => p.id === personId)) {
+      fetchedPerson = await api<Person>(`/api/admin/persons/${personId}`);
+    }
+  }
+
+  // Rafraîchit la personne du drawer après une mutation, quand elle ne vient pas
+  // de la liste maîtresse (sinon `loadTable` s'en charge via le derived).
+  async function refreshSelected() {
+    if (selectedPersonId !== null && !persons.some((p) => p.id === selectedPersonId)) {
+      fetchedPerson = await api<Person>(`/api/admin/persons/${selectedPersonId}`);
+    }
   }
 
   function closeDrawer() {
     selectedPersonId = null;
+    fetchedPerson = null;
     closeMergeSearch();
     updateUrl();
   }
 
   /* ── Lifecycle ── */
 
-  onMount(() => {
+  onMount(async () => {
     readUrlFilters();
     loadFacets();
-    loadTable();
+    await loadTable();
     loadOrphanCount();
+    loadAmbiguousCount();
+    // Deep-link `?person=` vers une personne hors de la page courante.
+    await refreshSelected();
   });
 </script>
 
@@ -401,7 +447,22 @@
   <title>Admin - Personnes - Bibliom&eacute;trie UCA</title>
 </svelte:head>
 
-<PersonsToolbar
+<nav class="hub-tabs">
+  <button class="hub-tab" class:active={tab === "all"} onclick={() => selectTab("all")}>
+    Toutes les personnes
+  </button>
+  <button
+    class="hub-tab"
+    class:active={tab === "ambiguous-forms"}
+    onclick={() => selectTab("ambiguous-forms")}
+  >
+    Formes ambigu&euml;s
+    {#if ambiguousCount > 0}<span class="tab-badge">{ambiguousCount}</span>{/if}
+  </button>
+</nav>
+
+{#if tab === "all"}
+  <PersonsToolbar
   bind:search
   bind:selectedDepts
   bind:selectedRoles
@@ -464,6 +525,9 @@
   </table>
 
   <Pagination page={currentPage} pages={totalPages} onchange={handlePageChange} />
+  {/if}
+{:else if tab === "ambiguous-forms"}
+  <AmbiguousFormsList onopenPerson={openDrawer} onchange={loadAmbiguousCount} />
 {/if}
 
 {#if selectedPerson}
@@ -499,6 +563,40 @@
 
 
 <style>
+  .hub-tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border, #e0e0e0);
+    margin-bottom: 14px;
+  }
+  .hub-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 8px 14px;
+    cursor: pointer;
+    font: inherit;
+    color: #666;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .hub-tab:hover {
+    color: #222;
+  }
+  .hub-tab.active {
+    color: var(--accent, #1976d2);
+    border-bottom-color: var(--accent, #1976d2);
+    font-weight: 600;
+  }
+  .tab-badge {
+    background: var(--accent, #1976d2);
+    color: white;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    padding: 0 7px;
+    font-weight: 600;
+  }
   .data-table {
     overflow: visible;
   }

@@ -20,7 +20,12 @@ from application.persons import (
     update_name as _update_name,
     update_name_form_status as _update_name_form_status,
 )
-from application.ports.api.persons_queries import NameFormAuthorshipsResponse, PersonsQueries
+from application.ports.api.persons_queries import (
+    AmbiguousNameFormsResponse,
+    NameFormAuthorshipsResponse,
+    PersonOut,
+    PersonsQueries,
+)
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -46,6 +51,7 @@ from interfaces.api.models import (
     ReassignIdentifier,
     RejectPerson,
     RemovedResponse,
+    TotalCountResponse,
     UpdateIdentifierStatus,
     UpdateNameFormStatus,
     UpdatePersonName,
@@ -236,6 +242,39 @@ def name_form_authorships(
 ) -> NameFormAuthorshipsResponse:
     """Authorships sources + autres personnes partageant une forme de nom."""
     return queries.name_form_authorships(person_id, name_form)
+
+
+# ── File de triage : formes de nom ambiguës ──────────────────────
+
+
+@router.get("/api/admin/ambiguous-name-forms/count", response_model=TotalCountResponse)
+def ambiguous_name_forms_count(
+    queries: PersonsQueries = Depends(persons_queries_sync),
+) -> TotalCountResponse:
+    """Compteur de l'onglet « Formes ambiguës » (badge)."""
+    return TotalCountResponse(total=queries.ambiguous_name_forms_count())
+
+
+@router.get("/api/admin/ambiguous-name-forms", response_model=AmbiguousNameFormsResponse)
+def ambiguous_name_forms(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    queries: PersonsQueries = Depends(persons_queries_sync),
+) -> AmbiguousNameFormsResponse:
+    """Formes de nom portées par ≥2 personnes avec ≥1 lien pending, paginées."""
+    return queries.ambiguous_name_forms(page=page, per_page=per_page)
+
+
+@router.get("/api/admin/persons/{person_id}", response_model=PersonOut)
+def person_admin(
+    person_id: int,
+    queries: PersonsQueries = Depends(persons_queries_sync),
+) -> PersonOut:
+    """Une personne (projection liste admin) par id — alimente le drawer ouvert hors liste."""
+    person = queries.person_admin(person_id)
+    if person is None:
+        raise HTTPException(status_code=404, detail="Personne introuvable")
+    return person
 
 
 @router.post(

@@ -300,6 +300,35 @@ class NameFormAuthorshipsResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# DTOs Triage : formes de nom ambiguës
+# ---------------------------------------------------------------------------
+
+
+class AmbiguousFormPersonOut(BaseModel):
+    person_id: int
+    first_name: str
+    last_name: str
+    status: Literal["pending", "confirmed", "rejected"]
+    has_rh: bool
+    # Nom canonique compatible (par tokens) avec la forme : homonyme/doublon si
+    # vrai, erreur d'attribution probable si faux.
+    compatible: bool
+
+
+class AmbiguousNameFormOut(BaseModel):
+    name_form: str
+    persons: list[AmbiguousFormPersonOut]
+
+
+class AmbiguousNameFormsResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    forms: list[AmbiguousNameFormOut]
+
+
+# ---------------------------------------------------------------------------
 # DTOs Admin : authorships orphelines
 # ---------------------------------------------------------------------------
 
@@ -341,6 +370,8 @@ class PersonsQueries(Protocol):
         self, *, filters: ListFilters, page: int, per_page: int, sort: str
     ) -> PersonListResponse: ...
 
+    def person_admin(self, person_id: int) -> PersonOut | None: ...
+
     # ── Facettes / listes de référence / stats ─────────────────────
 
     def persons_facets(self, *, filters: FacetFilters) -> PersonsFacetsResponse: ...
@@ -378,3 +409,7 @@ class PersonsQueries(Protocol):
     def name_form_authorships(
         self, person_id: int, name_form: str
     ) -> NameFormAuthorshipsResponse: ...
+
+    def ambiguous_name_forms_count(self) -> int: ...
+
+    def ambiguous_name_forms(self, *, page: int, per_page: int) -> AmbiguousNameFormsResponse: ...

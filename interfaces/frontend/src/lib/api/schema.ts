@@ -1383,6 +1383,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/ambiguous-name-forms/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ambiguous Name Forms Count
+         * @description Compteur de l'onglet « Formes ambiguës » (badge).
+         */
+        get: operations["ambiguous_name_forms_count_api_admin_ambiguous_name_forms_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/ambiguous-name-forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ambiguous Name Forms
+         * @description Formes de nom portées par ≥2 personnes avec ≥1 lien pending, paginées.
+         */
+        get: operations["ambiguous_name_forms_api_admin_ambiguous_name_forms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/persons/{person_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Person Admin
+         * @description Une personne (projection liste admin) par id — alimente le drawer ouvert hors liste.
+         */
+        get: operations["person_admin_api_admin_persons__person_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/persons/{person_id}/detach-authorships": {
         parameters: {
             query?: never;
@@ -2692,6 +2752,44 @@ export interface components {
             suggestion_facets?: components["schemas"]["CountrySuggestion"][] | null;
             /** Country Facets */
             country_facets: components["schemas"]["CountrySuggestion"][];
+        };
+        /** AmbiguousFormPersonOut */
+        AmbiguousFormPersonOut: {
+            /** Person Id */
+            person_id: number;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "rejected";
+            /** Has Rh */
+            has_rh: boolean;
+            /** Compatible */
+            compatible: boolean;
+        };
+        /** AmbiguousNameFormOut */
+        AmbiguousNameFormOut: {
+            /** Name Form */
+            name_form: string;
+            /** Persons */
+            persons: components["schemas"]["AmbiguousFormPersonOut"][];
+        };
+        /** AmbiguousNameFormsResponse */
+        AmbiguousNameFormsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Forms */
+            forms: components["schemas"]["AmbiguousNameFormOut"][];
         };
         /** ApcFacet */
         ApcFacet: {
@@ -7987,6 +8085,89 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NameFormAuthorshipsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ambiguous_name_forms_count_api_admin_ambiguous_name_forms_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    ambiguous_name_forms_api_admin_ambiguous_name_forms_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AmbiguousNameFormsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    person_admin_api_admin_persons__person_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonOut"];
                 };
             };
             /** @description Validation Error */
