@@ -1,11 +1,7 @@
-* lancer oneshot: python -m interfaces.cli.oneshot.remediate_identifier_name_incompatible
-* audit: python -m interfaces.cli.oneshot.audit_identifier_linked_person_pairs
-python -m interfaces.cli.oneshot.audit_ambiguous_name_forms
-
 # A régler avant transmission
+## Schéma
+* [ ] décomposer la table source_authorships en plusieurs tables? (table identités auteurs distinctes (name_forms, identifiers) + table de liaison auteurs-publis-adresses): select count(*) from (select distinct person_id, author_name_normalized, person_identifiers from source_authorships) => 750k, vs 19M de rows actuellement dans source_authorships
 ## Pipeline de traitement
-* [ ] Faire un audit complet du logging (complétude, clarté, cohérence entre sources et entre phases)
-* [ ] Revoir la ModePolicy (modes `full` et `weekly`: à fusionner en un seul mode `full` avec une option "année de début")
 ### Extraction
 * [ ] extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] à étudier: cross-import: seulement `in_perimeter`? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
@@ -20,11 +16,8 @@ python -m interfaces.cli.oneshot.audit_ambiguous_name_forms
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
 * [ ] `metadata_correction`: ajouter correction via `doi_prefix` du journal (contrôle de cohérence entre `doi` et `journal_id`, avant les corrections `journal_type` => `doc_type`)
 * [ ] conflation de doc_types différents ou titres différents sous un même DOI => soit DOI erroné, soit métadonnées erronées. Auditer et définir règles de correction
-* [ ] phase `persons`: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 `person_id`)
-* [ ] phase `persons`: ouvrir les étapes de matching par identifiant aux `source_authorships` hors périmètre. (La garde `in_perimeter = true` est nécessaire seulement pour le matching par nom et la création.)
 ## Code
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture beaucoup trop de publis + problème de perf
-* [ ] chantier observabilité pipeline: quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de snapshot; c'est un problème. => faire des snapshots par phase, pas par pipeline
 * [ ] Unit of Work: pertinent? voir transactions multi-repos
 * [ ] Audit complet "nommage des variables". S'assurer que le code est structure-agnostique. Eviter abréviations (publication > publi > pub...). Revoir certains noms trop restrictifs (publication->document? journal->container?)
 ## Doc
@@ -34,10 +27,6 @@ python -m interfaces.cli.oneshot.audit_ambiguous_name_forms
 # Chantiers qui peuvent continuer en prod (Qualité des données)
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 ## Problèmes dans les sources
-* faux auteurs UCA créés par une erreur de parsing (toutes les signatures groupées ensemble pour chaque auteur) : ex. publi 77832
-* [ ] OpenAlex résout les noms d'équipes en listes de personnes (21105) => nettoyer les "for the ... study group"
-* [ ] publi 86878: Lorsque OpenAlex corrige le parsing des affiliations, certaines authorships sortent du périmètre; des auteurs UCA deviennent non-UCA mais restent polluer la base. Gérer la purge automatique.
-* [ ] publications avec beaucoup d'auteurs: désalignement des positions entre HAL/OpenAlex/WoS → faux conflits en cascade. En attendant une solution, le mode "conflit de sources" dans la déduplication manuelle des personnes exclut les publis > 50 auteurs (constante `MAX_AUTHORS_CONFLICT`) (chantier chiant, à enterrer le plus proprement possible)
 * [ ] DOI Crossref non trouvés sur Crossref: quel traitement ultérieur? (auditer; tenter corrections pour les cas simples (ponctuation parasite...); nuller les autres pour éviter que ça bloque une déduplication légitime)
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
@@ -51,10 +40,7 @@ python -m interfaces.cli.oneshot.audit_ambiguous_name_forms
 * [ ] mettre en place des slugs pour les URL?
 ## Admin
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer
-* [ ] repenser entièrement les pages `admin/duplicates` et `admin/person-duplicates`
 * [ ] comportement capricieux de l'UI sur la page `admin/countries` (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: "loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine."
-### Personnes (admin)
-* [ ] quoi faire des entités aberrantes (auteurs mal parsés)? *a minima*, s'assurer qu'elles n'apparaissent pas dans `admin/orphan-authorships`
 ## Publique
 ### Personnes (public)
 * [ ] publications: indiquer si premier/dernier auteur
@@ -74,6 +60,7 @@ python -m interfaces.cli.oneshot.audit_ambiguous_name_forms
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article)
+* [ ] 30172 un recueil de proceedings fusionné avec tous ses chapitres
 
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
