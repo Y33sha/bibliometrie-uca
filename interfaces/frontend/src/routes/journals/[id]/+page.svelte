@@ -7,6 +7,9 @@
 	import { docTypeSingular } from '$lib/labels';
 	import TabNav from '$lib/components/TabNav.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
+	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
+	import { oaStatusColor } from '$lib/components/charts/oaColors';
+	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
 	import type { components } from '$lib/api/schema';
 
 	type JournalDetail = components['schemas']['JournalDetailResponse'];
@@ -26,6 +29,26 @@
 	let dashboard = $state<JournalDashboard | null>(null);
 	let subjects = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
+
+	// Distributions en segments pour les doughnuts ; `expected=false` (valeur
+	// inattendue pour le type de revue / modèle OA) est signalé visuellement
+	// par le composant (couleur d'alerte + ⚠ en légende), sans énumérer les
+	// valeurs attendues.
+	const docTypeSegments = $derived(
+		(dashboard?.doc_types ?? []).map((d) => ({
+			label: d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)',
+			value: d.count,
+			expected: d.expected
+		}))
+	);
+	const oaStatusSegments = $derived(
+		(dashboard?.oa_statuses ?? []).map((o) => ({
+			label: o.oa_status ? (oaLabelsMap[o.oa_status] ?? o.oa_status) : '(non renseigné)',
+			value: o.count,
+			color: oaStatusColor(o.oa_status),
+			expected: o.expected
+		}))
+	);
 
 	let showRawDoaj = $state(false);
 
@@ -180,71 +203,30 @@
 				<div class="loading">Chargement…</div>
 			{:else}
 				<div class="dash-grid">
-					<div class="dash-card">
-						<h3>Types de documents ({dashboard.total_publications})</h3>
-						{#if dashboard.expected_doc_types.length > 0}
-							<div class="expected-row">
-								<span class="expected-label">Attendus&nbsp;:</span>
-								{#each dashboard.expected_doc_types as t (t)}
-									<span class="expected-tag">{docTypeSingular[t] ?? t}</span>
-								{/each}
-							</div>
-						{/if}
-						{#if dashboard.doc_types.length === 0}
-							<p class="muted">Aucune publication rattachée.</p>
-						{:else}
-							<table class="count-table">
-								<tbody>
-									{#each dashboard.doc_types as d (d.doc_type ?? '∅')}
-										<tr class:warning={!d.expected}>
-											<td>{d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)'}</td>
-											<td class="num">{d.count}</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						{/if}
-					</div>
-
-					<div class="dash-card">
-						<h3>Statuts Open Access</h3>
-						{#if dashboard.expected_oa_statuses.length > 0}
-							<div class="expected-row">
-								<span class="expected-label">Attendus&nbsp;:</span>
-								{#each dashboard.expected_oa_statuses as s (s)}
-									<span class="expected-tag">{oaLabelsMap[s] ?? s}</span>
-								{/each}
-							</div>
-						{/if}
-						{#if dashboard.oa_statuses.length === 0}
-							<p class="muted">Aucune publication rattachée.</p>
-						{:else}
-							<table class="count-table">
-								<tbody>
-									{#each dashboard.oa_statuses as o (o.oa_status ?? '∅')}
-										<tr class:warning={!o.expected}>
-											<td>{o.oa_status ? (oaLabelsMap[o.oa_status] ?? o.oa_status) : '(non renseigné)'}</td>
-											<td class="num">{o.count}</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						{/if}
-					</div>
-
 					<div class="dash-card dash-card-wide">
 						<h3>Sujets dominants</h3>
 						{#if subjects.length === 0}
 							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
 						{:else}
-							<ul class="subjects-list">
-								{#each subjects as s (s.id)}
-									<li>
-										<a href="{base}/subjects/{s.id}">{s.label}</a>
-										<span class="count-pill">{s.count}</span>
-									</li>
-								{/each}
-							</ul>
+							<SubjectsCloud {subjects} />
+						{/if}
+					</div>
+
+					<div class="dash-card">
+						<h3>Types de documents ({dashboard.total_publications})</h3>
+						{#if dashboard.doc_types.length === 0}
+							<p class="muted">Aucune publication rattachée.</p>
+						{:else}
+							<DoughnutChart segments={docTypeSegments} flagAnomalies />
+						{/if}
+					</div>
+
+					<div class="dash-card">
+						<h3>Statuts Open Access</h3>
+						{#if dashboard.oa_statuses.length === 0}
+							<p class="muted">Aucune publication rattachée.</p>
+						{:else}
+							<DoughnutChart segments={oaStatusSegments} flagAnomalies />
 						{/if}
 					</div>
 
@@ -349,39 +331,6 @@
 	}
 	.muted { color: var(--muted); }
 	.small { font-size: 0.8rem; font-weight: 400; }
-
-	.count-table { width: 100%; border-collapse: collapse; }
-	.count-table td { padding: 6px 8px; font-size: 0.95rem; border-bottom: 1px solid var(--border-subtle); }
-	.count-table tr:last-child td { border-bottom: none; }
-	.count-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
-	.count-table tr.warning td { background: #fef3e0; color: #8a4a00; }
-	.count-table tr.warning td.num { color: #8a4a00; }
-
-	.expected-row {
-		display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
-		margin-bottom: 10px; font-size: 0.85rem;
-	}
-	.expected-label { color: var(--muted); font-weight: 600; margin-right: 4px; }
-	.expected-tag {
-		background: var(--success-light); color: var(--success);
-		padding: 1px 8px; border-radius: 10px; font-size: 0.8rem;
-	}
-
-	.subjects-list {
-		list-style: none; padding: 0; margin: 0;
-		display: flex; flex-wrap: wrap; gap: 8px;
-	}
-	.subjects-list li {
-		display: inline-flex; align-items: center; gap: 6px;
-		background: var(--surface); padding: 4px 10px; border-radius: 12px;
-		font-size: 0.9rem;
-	}
-	.subjects-list a { color: var(--accent); text-decoration: none; }
-	.subjects-list a:hover { text-decoration: underline; }
-	.count-pill {
-		background: #fff; padding: 0 6px; border-radius: 8px;
-		font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums;
-	}
 
 	.doaj-fields {
 		display: grid; grid-template-columns: max-content 1fr;

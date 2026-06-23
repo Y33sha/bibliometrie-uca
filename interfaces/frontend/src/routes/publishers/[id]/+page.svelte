@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { base } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api } from '$lib/api';
 	import { oaLabelsMap } from '$lib/labels';
@@ -8,6 +7,9 @@
 	import TabNav from '$lib/components/TabNav.svelte';
 	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
 	import JournalsListView from '$lib/components/JournalsListView.svelte';
+	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
+	import { oaStatusColor } from '$lib/components/charts/oaColors';
+	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
 	import type { components } from '$lib/api/schema';
 
 	type PublisherDetail = components['schemas']['PublisherDetailResponse'];
@@ -33,11 +35,24 @@
 	let subjects = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
 
-	// Labels FR des publisher_type / journal_type — alimentent les colonnes
-	// du dashboard. Le tableau de l'onglet Revues utilise JournalsListView
-	// qui fetch ses propres labels via /api/journal-types.
+	// Label FR du publisher_type, affiché dans l'en-tête de la page.
 	let publisherTypeLabels: Record<string, string> = $state({});
-	let journalTypeLabels: Record<string, string> = $state({});
+
+	// Distributions en segments pour les doughnuts (palette neutre ; pas de
+	// notion d'« attendu » au niveau éditeur, agrégat multi-revues).
+	const docTypeSegments = $derived(
+		(dashboard?.doc_types ?? []).map((d) => ({
+			label: d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)',
+			value: d.count
+		}))
+	);
+	const oaStatusSegments = $derived(
+		(dashboard?.oa_statuses ?? []).map((o) => ({
+			label: o.oa_status ? (oaLabelsMap[o.oa_status] ?? o.oa_status) : '(non renseigné)',
+			value: o.count,
+			color: oaStatusColor(o.oa_status)
+		}))
+	);
 
 	async function loadPublisher() {
 		try {
@@ -48,12 +63,8 @@
 	}
 
 	async function loadTypeLabels() {
-		const [pubOpts, jOpts] = await Promise.all([
-			api<EnumOption[]>('/api/publisher-types'),
-			api<EnumOption[]>('/api/journal-types')
-		]);
+		const pubOpts = await api<EnumOption[]>('/api/publisher-types');
 		publisherTypeLabels = Object.fromEntries(pubOpts.map((o) => [o.value, o.label_fr]));
-		journalTypeLabels = Object.fromEntries(jOpts.map((o) => [o.value, o.label_fr]));
 	}
 
 	async function loadDashboard() {
@@ -151,21 +162,12 @@
 				<div class="loading">Chargement…</div>
 			{:else}
 				<div class="dash-grid">
-					<div class="dash-card">
-						<h3>Types de revues ({publisher.journal_count})</h3>
-						{#if dashboard.journal_types.length === 0}
-							<p class="muted">Aucune revue rattachée.</p>
+					<div class="dash-card dash-card-wide">
+						<h3>Sujets dominants</h3>
+						{#if subjects.length === 0}
+							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
 						{:else}
-							<table class="count-table">
-								<tbody>
-									{#each dashboard.journal_types as j (j.journal_type ?? '∅')}
-										<tr>
-											<td>{j.journal_type ? (journalTypeLabels[j.journal_type] ?? j.journal_type) : '(non renseigné)'}</td>
-											<td class="num">{j.count}</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
+							<SubjectsCloud {subjects} />
 						{/if}
 					</div>
 
@@ -174,16 +176,7 @@
 						{#if dashboard.doc_types.length === 0}
 							<p class="muted">Aucune publication rattachée.</p>
 						{:else}
-							<table class="count-table">
-								<tbody>
-									{#each dashboard.doc_types as d (d.doc_type ?? '∅')}
-										<tr>
-											<td>{d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)'}</td>
-											<td class="num">{d.count}</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
+							<DoughnutChart segments={docTypeSegments} />
 						{/if}
 					</div>
 
@@ -192,32 +185,7 @@
 						{#if dashboard.oa_statuses.length === 0}
 							<p class="muted">Aucune publication rattachée.</p>
 						{:else}
-							<table class="count-table">
-								<tbody>
-									{#each dashboard.oa_statuses as o (o.oa_status ?? '∅')}
-										<tr>
-											<td>{o.oa_status ? (oaLabelsMap[o.oa_status] ?? o.oa_status) : '(non renseigné)'}</td>
-											<td class="num">{o.count}</td>
-										</tr>
-									{/each}
-								</tbody>
-							</table>
-						{/if}
-					</div>
-
-					<div class="dash-card dash-card-wide">
-						<h3>Sujets dominants</h3>
-						{#if subjects.length === 0}
-							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
-						{:else}
-							<ul class="subjects-list">
-								{#each subjects as s (s.id)}
-									<li>
-										<a href="{base}/subjects/{s.id}">{s.label}</a>
-										<span class="count-pill">{s.count}</span>
-									</li>
-								{/each}
-							</ul>
+							<DoughnutChart segments={oaStatusSegments} />
 						{/if}
 					</div>
 				</div>
@@ -284,7 +252,7 @@
 	.loading, .no-results { padding: 20px; color: var(--muted); }
 
 	.dash-grid {
-		display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;
+		display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
 	}
 	@media (max-width: 900px) {
 		.dash-grid { grid-template-columns: 1fr; }
@@ -298,25 +266,4 @@
 		font-size: 0.95rem; font-weight: 600; margin: 0 0 12px;
 	}
 	.muted { color: var(--muted); }
-
-	.count-table { width: 100%; border-collapse: collapse; }
-	.count-table td { padding: 6px 8px; font-size: 0.95rem; border-bottom: 1px solid var(--border-subtle); }
-	.count-table tr:last-child td { border-bottom: none; }
-	.count-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
-
-	.subjects-list {
-		list-style: none; padding: 0; margin: 0;
-		display: flex; flex-wrap: wrap; gap: 8px;
-	}
-	.subjects-list li {
-		display: inline-flex; align-items: center; gap: 6px;
-		background: var(--surface); padding: 4px 10px; border-radius: 12px;
-		font-size: 0.9rem;
-	}
-	.subjects-list a { color: var(--accent); text-decoration: none; }
-	.subjects-list a:hover { text-decoration: underline; }
-	.count-pill {
-		background: #fff; padding: 0 6px; border-radius: 8px;
-		font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums;
-	}
 </style>
