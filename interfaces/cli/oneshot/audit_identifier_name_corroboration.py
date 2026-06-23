@@ -152,7 +152,7 @@ def audit_double_occurrence(conn, maps):
     by_type = defaultdict(int)
     by_source = defaultdict(int)
     by_type_source = defaultdict(int)
-    for spid, pid, t, val, name, source in confirmed:
+    for _spid, _pid, t, _val, _name, source in confirmed:
         by_type[t] += 1
         by_source[source] += 1
         by_type_source[(t, source)] += 1
