@@ -1,4 +1,7 @@
 * lancer oneshot: python -m interfaces.cli.oneshot.remediate_identifier_name_incompatible
+* audit: python -m interfaces.cli.oneshot.audit_identifier_linked_person_pairs
+python -m interfaces.cli.oneshot.audit_ambiguous_name_forms
+
 # A régler avant transmission
 ## Pipeline de traitement
 * [ ] Faire un audit complet du logging (complétude, clarté, cohérence entre sources et entre phases)
@@ -38,13 +41,14 @@
 * [ ] DOI Crossref non trouvés sur Crossref: quel traitement ultérieur? (auditer; tenter corrections pour les cas simples (ponctuation parasite...); nuller les autres pour éviter que ça bloque une déduplication légitime)
 ## Explorer autres sources possibles
 * [ ] pour les publis: ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
-* [ ] divers: ORCID, IdRef, DOAJ
+* [ ] divers: ORCID, IdRef
 * [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 ## Chantier des signatures institutionnelles
 * [ ] Onglet adresses des pages personnes/id et laboratoire/id: afficher nombre de publications liées à chaque adresse; créer possibilité de consulter la liste?; normaliser adresses pour diminuer le nombre de variantes liées à des différences de ponctuation?
 * [ ] distinguer adresses correctes/incorrectes pour affichage %age par labo/personne; suppose: 1° de définir une typologie d'erreurs, et leur caractère bloquant ou non; 2° de grouper les signatures par publi pour interroger en pourcentage de publications, non en pourcentage de signatures; 3° de restreindre aux publications *stricto sensu* (ni preprint, ni dataset etc.: définir liste blanche de doc_types à prendre en compte); 4° question des publications sans signature en base (sources HAL/ScanR seulement): exclure du calcul?
 
 # UI
+* [ ] mettre en place des slugs pour les URL?
 ## Admin
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer
 * [ ] repenser entièrement les pages `admin/duplicates` et `admin/person-duplicates`
