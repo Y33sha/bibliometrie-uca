@@ -81,19 +81,6 @@
   let lastName = $state("");
   let firstName = $state("");
 
-  // Verrouille le scroll de fond tant que le drawer est ouvert : sans ça, la
-  // scrollbar de page chevauche le bord droit du panneau et masque ses boutons.
-  $effect(() => {
-    const body = document.body.style.overflow;
-    const html = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = body;
-      document.documentElement.style.overflow = html;
-    };
-  });
-
   function startEdit() {
     lastName = person.last_name;
     firstName = person.first_name;
