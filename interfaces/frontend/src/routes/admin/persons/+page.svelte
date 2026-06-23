@@ -24,8 +24,7 @@
   import PersonsToolbar from "./PersonsToolbar.svelte";
   import EditNameModal from "./EditNameModal.svelte";
   import DetachNameFormModal from "./DetachNameFormModal.svelte";
-  import IdentifiersCell from "./IdentifiersCell.svelte";
-  import MergeSearchCell from "./MergeSearchCell.svelte";
+  import PersonDrawer from "./PersonDrawer.svelte";
 
   /* ── State ── */
 
@@ -71,6 +70,13 @@
 
   let editNameModal: EditNameState | null = $state(null);
   let detachModal: DetachModalState | null = $state(null);
+
+  // Drawer-personne : ouvert quand `?person=:id` est dans l'URL. La personne
+  // affichée est dérivée de la liste chargée (clic depuis une ligne).
+  let selectedPersonId: number | null = $state(null);
+  const selectedPerson = $derived(
+    selectedPersonId === null ? null : (persons.find((p) => p.id === selectedPersonId) ?? null),
+  );
 
   let activeMergePersonId: number | null = $state(null);
   const mergeSearch = useDebouncedSearch<PersonSearchResult>({
@@ -176,6 +182,7 @@
       .map(([k, v]) => `${k}_${v}`)
       .join(",");
     setOrDel("id_filter", idFilter);
+    setOrDel("person", selectedPersonId ? String(selectedPersonId) : "");
     replaceState(url, {});
   }
 
@@ -195,6 +202,7 @@
       }
       idStates = states;
     }
+    if (p.get("person")) selectedPersonId = parseInt(p.get("person")!, 10) || null;
   }
 
   /* ── Event handlers ── */
@@ -370,6 +378,28 @@
     loadTable();
   }
 
+  /* ── Drawer ── */
+
+  function openDrawer(personId: number) {
+    selectedPersonId = personId;
+    updateUrl();
+  }
+
+  function closeDrawer() {
+    selectedPersonId = null;
+    closeMergeSearch();
+    updateUrl();
+  }
+
+  function editNameFromDrawer(p: Person) {
+    editNameModal = {
+      personId: p.id,
+      lastName: p.last_name,
+      firstName: p.first_name,
+      rejected: p.rejected ?? false,
+    };
+  }
+
   /* ── Lifecycle ── */
 
   onMount(() => {
@@ -422,9 +452,6 @@
         <th class="sortable" onclick={() => toggleSort("uca_pubs")}
           >UCA{sortIndicator("uca_pubs")}</th
         >
-        <th>Identifiants</th>
-        <th>Formes de noms</th>
-        <th>Actions</th>
       </tr>
     </thead>
     <tbody>
@@ -456,56 +483,43 @@
                 /></svg
               ></button
             >
-            <a href="{base}/persons/{p.id}" class="person-name">
+            <button
+              type="button"
+              class="person-name"
+              class:active={selectedPersonId === p.id}
+              onclick={() => openDrawer(p.id)}
+            >
               <span class="person-last">{titleCase(p.last_name)}</span>
               {titleCase(p.first_name)}
-            </a>
+            </button>
             {#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
           </td>
           <td>{p.pub_count ?? 0}</td>
           <td>{p.uca_pub_count ?? 0}</td>
-          <td>
-            <IdentifiersCell
-              person={p}
-              form={idForms[p.id] ?? null}
-              onadd={addIdentifier}
-              ontoggleForm={toggleIdForm}
-              onsetStatus={setIdentifierStatus}
-            />
-          </td>
-          <td>
-            {#if p.name_forms?.length}
-              <div class="name-forms-list">
-                {#each p.name_forms as nf}
-                  <button
-                    class="name-form-tag"
-                    class:ambiguous={nf.ambiguous}
-                    onclick={() => openDetachModal(p.id, nf.name_form)}
-                  >
-                    {nf.name_form}
-                  </button>
-                {/each}
-              </div>
-            {:else}
-              <span class="tag tag-unlinked">aucune</span>
-            {/if}
-          </td>
-          <td>
-            <MergeSearchCell
-              targetPersonId={p.id}
-              active={activeMergePersonId === p.id}
-              {mergeSearch}
-              onopen={openMergeSearch}
-              onclose={closeMergeSearch}
-              onmerge={mergeInto}
-            />
-          </td>
         </tr>
       {/each}
     </tbody>
   </table>
 
   <Pagination page={currentPage} pages={totalPages} onchange={handlePageChange} />
+{/if}
+
+{#if selectedPerson}
+  <PersonDrawer
+    person={selectedPerson}
+    idForm={idForms[selectedPerson.id] ?? null}
+    mergeActive={activeMergePersonId === selectedPerson.id}
+    {mergeSearch}
+    onclose={closeDrawer}
+    oneditName={editNameFromDrawer}
+    onaddIdentifier={addIdentifier}
+    ontoggleIdForm={toggleIdForm}
+    onsetIdentifierStatus={setIdentifierStatus}
+    onopenDetach={openDetachModal}
+    onmergeOpen={openMergeSearch}
+    onmergeClose={closeMergeSearch}
+    onmerge={mergeInto}
+  />
 {/if}
 
 {#if detachModal}
@@ -535,19 +549,6 @@
   .data-table {
     overflow: visible;
   }
-  /* ── Tags ── */
-  .tag {
-    display: inline-block;
-    font-size: 0.8rem;
-    padding: 1px 7px;
-    border-radius: 10px;
-    font-weight: 500;
-    margin: 1px 2px;
-  }
-  .tag-unlinked {
-    background: var(--warning-light);
-    color: #8a6d10;
-  }
   .sortable:hover {
     color: #2563eb;
   }
@@ -562,46 +563,22 @@
     font-weight: 500;
     color: inherit;
     text-decoration: none;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
   }
   .person-name:hover {
     color: #2563eb;
     text-decoration: underline;
   }
+  .person-name.active {
+    color: #2563eb;
+  }
   .person-last {
     font-weight: 600;
-  }
-  /* ── Name forms ── */
-  .name-forms-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    align-items: flex-start;
-  }
-  .name-form-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    background: #f0f4f8;
-    border: 1px solid #d0d8e0;
-    border-radius: 3px;
-    padding: 1px 6px;
-    font-size: 0.78rem;
-    cursor: pointer;
-    transition: background 0.15s;
-    text-align: left;
-  }
-  .name-form-tag:hover {
-    background: #e0e8f0;
-    border-color: #a0b0c0;
-  }
-  .name-form-tag.ambiguous {
-    background: #fff3e0;
-    border-color: #e0c080;
-    color: #8a6d3b;
-  }
-  .name-form-tag.ambiguous:hover {
-    background: #ffe8cc;
-    border-color: #d0a050;
   }
   /* ── Edit name trigger ── */
   .btn-edit-name {
