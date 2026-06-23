@@ -393,7 +393,9 @@
     await personsApi.merge(targetId, sourceId);
     closeMergeSearch();
     loadStats();
-    loadTable();
+    await loadTable();
+    await refreshSelected();
+    loadAmbiguousCount();
   }
 
   // Absorbe une autre personne (sourceId) dans celle du drawer (la cible).
