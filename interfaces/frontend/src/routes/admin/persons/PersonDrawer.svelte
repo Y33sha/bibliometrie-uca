@@ -27,6 +27,7 @@
     onmergeClose,
     onmerge,
     onabsorb,
+    onopenPerson,
   }: {
     person: Person;
     idForm: IdFormState | null;
@@ -55,6 +56,8 @@
     onmerge: (targetId: number, sourceId: number) => void | Promise<void>;
     /** Absorbe une autre personne dans celle du drawer (fusion vers `person`). */
     onabsorb: (otherId: number) => Promise<void>;
+    /** Ouvre le drawer d'une autre personne (depuis la liste des partages). */
+    onopenPerson: (personId: number) => void;
   } = $props();
 
   // Personnes partageant ≥1 forme de nom (candidates à l'absorption).
@@ -222,10 +225,10 @@
                 title="Fusionner cette personne dans celle-ci"
                 onclick={() => absorb(sp.id)}>Absorber</button
               >
-              <span class="sharing-name">
+              <button class="sharing-name" onclick={() => onopenPerson(sp.id)}>
                 <span class="person-last">{titleCase(sp.last_name)}</span>
                 {titleCase(sp.first_name)}
-              </span>
+              </button>
               {#if sp.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
               <span class="sharing-forms" title={sp.shared_forms.join(", ")}>
                 {sp.shared_forms.length} forme{sp.shared_forms.length > 1 ? "s" : ""}
@@ -401,6 +404,17 @@
   }
   .sharing-name {
     font-size: 0.9rem;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+    color: inherit;
+    text-align: left;
+  }
+  .sharing-name:hover {
+    color: #2563eb;
+    text-decoration: underline;
   }
   .sharing-forms {
     font-size: 0.72rem;
