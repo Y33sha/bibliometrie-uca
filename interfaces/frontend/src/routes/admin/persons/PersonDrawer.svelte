@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { base } from "$app/paths";
   import { titleCase } from "$lib/utils";
   import type { Person, IdFormState, PersonSearchResult } from "./types";
   import IdentifiersCell from "./IdentifiersCell.svelte";
@@ -51,8 +52,16 @@
 <aside class="drawer" class:rejected={person.rejected}>
   <header class="drawer-head">
     <div class="drawer-title">
-      <span class="drawer-last">{titleCase(person.last_name)}</span>
-      {titleCase(person.first_name)}
+      <a
+        class="drawer-name-link"
+        href="{base}/persons/{person.id}"
+        target="_blank"
+        rel="noopener"
+        title="Voir la fiche publique"
+      >
+        <span class="drawer-last">{titleCase(person.last_name)}</span>
+        {titleCase(person.first_name)}
+      </a>
       {#if person.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
     </div>
     <div class="drawer-head-actions">
@@ -149,6 +158,14 @@
   }
   .drawer-title {
     font-size: 1.1rem;
+  }
+  .drawer-name-link {
+    color: inherit;
+    text-decoration: none;
+  }
+  .drawer-name-link:hover {
+    color: #2563eb;
+    text-decoration: underline;
   }
   .drawer-last {
     font-weight: 600;
