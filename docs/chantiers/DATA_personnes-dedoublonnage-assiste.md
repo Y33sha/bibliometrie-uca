@@ -55,9 +55,12 @@ Le bout concret, parce que la cible est mesurée et bornée. Même logique de co
 
 Le gros morceau flou, itératif et human-in-the-loop, attaqué sur une base déjà assainie par les étapes 1-2.
 
-- [ ] **Signaux de paire (homonymies vs doublons)** : valeur d'identifiant brut partagée entre `person_id` distincts ; recouvrements chiffrés (co-auteurs, labos, sujets, revues) pour trancher homonymie légitime (réseaux disjoints) vs doublon (réseaux communs). Définir l'agrégation en score.
-- [ ] **Capture des conflits d'identifiants** : matérialiser (table/vue) les divergences de signaux identifiants détectées par la cascade de la phase persons, avec le type de conflit présumé (doublon vs erreur d'attribution).
-- [ ] **Forme de l'outillage à trancher** : scripts de maintenance, phase dédiée du pipeline, ou assistance human-in-the-loop dans l'UI admin. Probablement un mélange : correction automatique des erreurs nettes à haute confiance, suggestions pour les doublons probables, signalement non-intrusif des homonymies légitimes à laisser tranquilles.
+Un seul moteur de dédoublonnage : des paires candidates `(A, B)` issues de plusieurs sources, une classification homonymie / doublon / erreur, trois actions.
+
+- [ ] **Sources de paires candidates** : (i) **formes de nom ambiguës** — une forme portée par ≥2 `person_id` ; (ii) **liens par identifiant** — même valeur d'identifiant brut portée par des `source_authorships` rattachées à des `person_id` distincts, ou identifiants divergents sur une même signature (l'ORCID résout vers A, l'idref vers B). Les conflits d'identifiants ne sont pas une machinerie à part : c'est une source de paires de plus, à fort signal.
+- [ ] **Classification homonymie / doublon / erreur** : pour chaque paire, recouvrements chiffrés (co-auteurs, labos, sujets, revues) — réseaux disjoints → homonymie légitime, communs → doublon ; un lien par identifiant sans recouvrement → erreur d'attribution. Définir l'agrégation en score, à partir de cas réels (méthode empirique, pas de typologie a priori).
+- [ ] **Verdicts sur les formes de nom ambiguës à ≥1 lien `pending`** : matérialiser la classification en statut `person_name_forms` — homonymie → `confirmed` sur chaque personne (les deux gardent la forme) ; doublon → fusion puis `confirmed` ; erreur → `rejected` (bloque le retour, cf. verrou de l'étape 2). Audit de classification d'abord, action UI ensuite (étape 4).
+- [ ] **Forme de l'outillage à trancher** : empirique d'abord (audits bottom-up), puis assistance human-in-the-loop dans l'UI. Probablement un mélange : correction automatique des erreurs nettes à haute confiance, suggestions pour les doublons probables, signalement non-intrusif des homonymies légitimes à laisser tranquilles.
 
 ### Étape 4 — Outillage humain : refonte `admin/persons`
 
