@@ -87,6 +87,7 @@ class NameFormSummaryOut(BaseModel):
     ambiguous: bool
     status: Literal["pending", "confirmed", "rejected"]
     shared_count: int
+    pub_count: int
 
 
 # ---------------------------------------------------------------------------

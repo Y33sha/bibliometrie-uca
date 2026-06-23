@@ -3923,6 +3923,8 @@ export interface components {
             status: "pending" | "confirmed" | "rejected";
             /** Shared Count */
             shared_count: number;
+            /** Pub Count */
+            pub_count: number;
         };
         /** NameFormUpdate */
         NameFormUpdate: {

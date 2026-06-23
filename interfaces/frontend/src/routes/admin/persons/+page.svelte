@@ -11,7 +11,6 @@
   import type {
     DetachModalState,
     DetachPublication,
-    EditNameState,
     IdFormState,
     OtherPerson,
     Person,
@@ -22,7 +21,6 @@
   import type { components } from "$lib/api/schema";
   type NameFormAuthorshipRef = components["schemas"]["NameFormAuthorshipRef"];
   import PersonsToolbar from "./PersonsToolbar.svelte";
-  import EditNameModal from "./EditNameModal.svelte";
   import DetachNameFormModal from "./DetachNameFormModal.svelte";
   import PersonDrawer from "./PersonDrawer.svelte";
 
@@ -68,7 +66,6 @@
 
   let idForms: Record<number, IdFormState> = $state({});
 
-  let editNameModal: EditNameState | null = $state(null);
   let detachModal: DetachModalState | null = $state(null);
 
   // Drawer-personne : ouvert quand `?person=:id` est dans l'URL. La personne
@@ -274,28 +271,26 @@
 
   /* ── Edit name ── */
 
-  async function savePersonName() {
-    if (!editNameModal) return;
+  async function renamePerson(
+    personId: number,
+    lastName: string,
+    firstName: string,
+  ): Promise<boolean> {
     try {
-      await personsApi.rename(
-        editNameModal.personId,
-        editNameModal.lastName,
-        editNameModal.firstName,
-      );
+      await personsApi.rename(personId, lastName, firstName);
     } catch (e) {
       const status = e instanceof ApiError ? e.status : "?";
       const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
       toast(detail || `Erreur ${status}`, "error");
-      return;
+      return false;
     }
-    editNameModal = null;
-    loadTable();
+    await loadTable();
+    return true;
   }
 
-  async function toggleRejectPerson(personId: number, rejected: boolean) {
+  async function togglePersonReject(personId: number, rejected: boolean) {
     await personsApi.setRejected(personId, rejected);
-    editNameModal = null;
-    loadTable();
+    await loadTable();
   }
 
   /* ── Detach modal ── */
@@ -337,14 +332,6 @@
     await personsApi.detachAuthorships(detachModal.personId, {
       authorships: toDetach.map((p) => p.sources[0]),
     });
-    detachModal = null;
-    loadStats();
-    loadTable();
-  }
-
-  async function detachNameForm() {
-    if (!detachModal) return;
-    await personsApi.updateNameFormStatus(detachModal.personId, detachModal.nameForm, "rejected");
     detachModal = null;
     loadStats();
     loadTable();
@@ -398,15 +385,6 @@
     selectedPersonId = null;
     closeMergeSearch();
     updateUrl();
-  }
-
-  function editNameFromDrawer(p: Person) {
-    editNameModal = {
-      personId: p.id,
-      lastName: p.last_name,
-      firstName: p.first_name,
-      rejected: p.rejected ?? false,
-    };
   }
 
   /* ── Lifecycle ── */
@@ -468,31 +446,6 @@
         <tr class:rejected={p.rejected}>
           <td class="td-name">
             <button
-              class="btn-edit-name"
-              title="Modifier le nom"
-              onclick={() => {
-                editNameModal = {
-                  personId: p.id,
-                  lastName: p.last_name,
-                  firstName: p.first_name,
-                  rejected: p.rejected ?? false,
-                };
-              }}
-              ><svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path
-                  d="m15 5 4 4"
-                /></svg
-              ></button
-            >
-            <button
               type="button"
               class="person-name"
               class:active={selectedPersonId === p.id}
@@ -520,7 +473,8 @@
     mergeActive={activeMergePersonId === selectedPerson.id}
     {mergeSearch}
     onclose={closeDrawer}
-    oneditName={editNameFromDrawer}
+    onrename={renamePerson}
+    onToggleReject={togglePersonReject}
     onaddIdentifier={addIdentifier}
     ontoggleIdForm={toggleIdForm}
     onsetIdentifierStatus={setIdentifierStatus}
@@ -539,21 +493,10 @@
       detachModal = null;
     }}
     onconfirmDetach={confirmDetach}
-    ondetachNameForm={detachNameForm}
     onmerge={mergeFromModal}
   />
 {/if}
 
-{#if editNameModal}
-  <EditNameModal
-    bind:state={editNameModal}
-    onsave={savePersonName}
-    ontoggleReject={toggleRejectPerson}
-    onclose={() => {
-      editNameModal = null;
-    }}
-  />
-{/if}
 
 <style>
   .data-table {
@@ -567,7 +510,6 @@
   }
   .td-name {
     position: relative;
-    padding-left: 30px !important;
   }
   .person-name {
     font-weight: 500;
@@ -589,25 +531,6 @@
   }
   .person-last {
     font-weight: 600;
-  }
-  /* ── Edit name trigger ── */
-  .btn-edit-name {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 2px;
-    color: #bbb;
-    opacity: 0.4;
-    transition:
-      opacity 0.15s,
-      color 0.15s;
-    position: absolute;
-    left: 8px;
-    top: 8px;
-  }
-  .btn-edit-name:hover {
-    color: var(--accent, #1976d2);
-    opacity: 1;
   }
   /* ── Rejected persons ── */
   tr.rejected {

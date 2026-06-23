@@ -33,13 +33,6 @@ export interface DetachPublication {
 }
 
 // ── États UI locaux ──
-export interface EditNameState {
-  personId: number;
-  lastName: string;
-  firstName: string;
-  rejected: boolean;
-}
-
 export interface DetachModalState {
   personId: number;
   nameForm: string;
