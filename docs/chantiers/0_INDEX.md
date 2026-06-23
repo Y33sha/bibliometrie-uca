@@ -16,6 +16,8 @@
 
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
 - [Visualisations dynamiques (pivot listes ↔ tableaux de bord)](METIER_visualisations-pivot.md)
+- [Signatures institutionnelles (qualité et outillage)](METIER_signatures-institutionnelles.md)
+- [Scinder `source_authorships` (identité ⊥ liaison)](DATA_scinder-source-authorship.md)
 
 ## Chantiers archivés
 

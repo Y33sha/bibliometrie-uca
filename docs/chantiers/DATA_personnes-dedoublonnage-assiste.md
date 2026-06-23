@@ -91,7 +91,7 @@ Conservateurs, activables une fois le reste en place ; pas des prérequis.
 
 - [ ] **Option de config `confirmed`-only** (défaut `false`) : restreint le matching aux identifiants `confirmed` ; les `pending` deviennent no-op. Évaluer l'impact (volume d'orphelins, besoin d'un flux de confirmation) avant d'envisager de l'activer sur une base curée.
 - [ ] **Vérification ORCID via API** : récupérer le nom canonique — et affiliation / domaine de l'adresse mail si exposés — et confirmer ou rejeter le couple identifiant ↔ personne. Mesurer la couverture (combien de profils exposent un nom exploitable) et le taux de corroboration.
-- [ ] **API IdRef** ?
+- [ ] **API IdRef** : explorer les données disponibles, voir si on peut l'exploiter pour valider automatiquement les IdRef et compléter les identifiants manquants (idhal et ORCID liés).
 
 ## Items TODO liés (à intégrer quelque part ou à reporter à un autre chantier)
 * [ ] générer une liste de suggestions de fusions (conflit d'identifiants entre 2 `person_id`)

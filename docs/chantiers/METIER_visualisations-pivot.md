@@ -78,6 +78,9 @@ Ces décisions sont des orientations proposées, à confirmer ou amender ; seul 
 
 - [ ] Persistance et partage de configurations de pivot, pour les rapports récurrents et les sélections volumineuses.
 
+## Items TODO liés (à intégrer quelque part)
+* [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques
+
 ## Questions ouvertes
 
 - **Dimensions et mesures de départ** : quel jeu rendre groupable et mesurable d'emblée (année, voie d'accès, type, source, éditeur, revue, laboratoire ; nombre de publications, % d'accès ouvert, frais de publication) ? C'est ce choix qui dimensionne le registre et le premier moteur.
