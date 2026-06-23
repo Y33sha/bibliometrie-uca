@@ -77,6 +77,17 @@
     if (await onrename(person.id, lastName, firstName)) editing = false;
   }
 
+  function formatDate(d: string | null): string {
+    return d ? new Date(d).toLocaleDateString("fr-FR") : "";
+  }
+
+  function dateRange(start: string | null, end: string | null): string {
+    if (start && end) return `${formatDate(start)} – ${formatDate(end)}`;
+    if (start) return `depuis le ${formatDate(start)}`;
+    if (end) return `jusqu'au ${formatDate(end)}`;
+    return "";
+  }
+
   function onkeydown(e: KeyboardEvent) {
     if (e.key !== "Escape") return;
     if (editing) editing = false;
@@ -139,6 +150,26 @@
       <span>{person.uca_pub_count ?? 0} UCA</span>
       {#if person.rejected}<span class="tag tag-rejected">rejetée</span>{/if}
     </div>
+
+    {#if person.has_rh}
+      <section class="drawer-section">
+        <h3>Fiche RH</h3>
+        <dl class="rh-info">
+          {#if person.role_title}
+            <dt>Rôle</dt>
+            <dd>{person.role_title}</dd>
+          {/if}
+          {#if person.department_name}
+            <dt>Département</dt>
+            <dd>{person.department_name}</dd>
+          {/if}
+          {#if person.start_date || person.end_date}
+            <dt>Dates</dt>
+            <dd>{dateRange(person.start_date, person.end_date)}</dd>
+          {/if}
+        </dl>
+      </section>
+    {/if}
 
     <section class="drawer-section">
       <h3>Identifiants</h3>
@@ -288,6 +319,19 @@
   }
   .drawer-section {
     margin-bottom: 22px;
+  }
+  .rh-info {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 3px 12px;
+    margin: 0;
+    font-size: 0.85rem;
+  }
+  .rh-info dt {
+    color: #888;
+  }
+  .rh-info dd {
+    margin: 0;
   }
   .drawer-section h3 {
     font-size: 0.78rem;

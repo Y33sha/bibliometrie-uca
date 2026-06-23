@@ -50,11 +50,6 @@
             >&#x2717;</button
           >
         </span>
-        <IdentifierLink
-          id_type={ident.id_type}
-          id_value={ident.id_value}
-          confirmed={ident.status === "confirmed"}
-        />
         <span
           class="status-chip identifier-chip"
           class:confirmed={ident.status === "confirmed"}
@@ -63,6 +58,11 @@
         >
           {ident.id_value}
         </span>
+        <IdentifierLink
+          id_type={ident.id_type}
+          id_value={ident.id_value}
+          confirmed={ident.status === "confirmed"}
+        />
       </div>
     {/each}
   </div>
