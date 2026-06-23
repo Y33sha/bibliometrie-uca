@@ -4,9 +4,8 @@
 	import { onMount } from 'svelte';
 	import { api, auth, authorships } from '$lib/api';
 	import { titleCase, formatDate } from '$lib/utils';
-	import { Chart, registerables } from 'chart.js';
-	import ChartDataLabels from 'chartjs-plugin-datalabels';
-	Chart.register(...registerables, ChartDataLabels);
+	import BarChart from '$lib/components/charts/BarChart.svelte';
+	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
 	import IdentifiersCell from '$lib/components/IdentifiersCell.svelte';
 	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
 	import TabNav from '$lib/components/TabNav.svelte';
@@ -62,10 +61,13 @@
 	let dashPubsByYear: { year: number; count: number }[] = $state([]);
 	let dashOa = $state({ open_access: 0, embargoed: 0, closed: 0, unknown: 0, total: 0 });
 	let dashSubjects: SubjectFrequency[] = $state([]);
-	let barCanvas = $state<HTMLCanvasElement | undefined>();
-	let pieCanvas = $state<HTMLCanvasElement | undefined>();
-	let barChart: Chart | null = null;
-	let pieChart: Chart | null = null;
+
+	const oaSegments = $derived([
+		{ label: 'Open Access', value: dashOa.open_access, color: '#2a7d4f' },
+		{ label: 'Sous embargo', value: dashOa.embargoed, color: '#b08900' },
+		{ label: 'Closed', value: dashOa.closed, color: '#c0392b' },
+		{ label: 'Indéterminé', value: dashOa.unknown, color: '#ccc' }
+	]);
 
 	const displayName = $derived(
 		profile
@@ -138,75 +140,6 @@
 		// il se déclenche quand le canvas est (re)monté.
 	}
 
-	function renderDashCharts() {
-		if (barChart) barChart.destroy();
-		if (pieChart) pieChart.destroy();
-		const cs = getComputedStyle(document.documentElement);
-
-		if (barCanvas) {
-			barChart = new Chart(barCanvas, {
-				type: 'bar',
-				data: {
-					labels: dashPubsByYear.map(d => String(d.year)),
-					datasets: [{
-						label: 'Publications',
-						data: dashPubsByYear.map(d => d.count),
-						backgroundColor: cs.getPropertyValue('--accent')?.trim() || '#3b6b9e',
-						borderRadius: 3,
-					}]
-				},
-				options: {
-					responsive: true,
-					maintainAspectRatio: false,
-					plugins: {
-						legend: { display: false },
-						datalabels: { color: '#fff', font: { weight: 'bold', size: 12 } }
-					},
-					scales: {
-						y: { beginAtZero: true, ticks: { precision: 0 } },
-						x: { grid: { display: false } }
-					}
-				}
-			});
-		}
-
-		if (pieCanvas && dashOa.total > 0) {
-			// on masque les modalités à 0 cas
-			const oa = [
-				{ label: 'Open Access', value: dashOa.open_access, color: '#2a7d4f' },
-				{ label: 'Sous embargo', value: dashOa.embargoed, color: '#b08900' },
-				{ label: 'Closed', value: dashOa.closed, color: '#c0392b' },
-				{ label: 'Indéterminé', value: dashOa.unknown, color: '#ccc' },
-			].filter(s => s.value > 0);
-			pieChart = new Chart(pieCanvas, {
-				type: 'doughnut',
-				data: {
-					labels: oa.map(s => s.label),
-					datasets: [{
-						data: oa.map(s => s.value),
-						backgroundColor: oa.map(s => s.color),
-					}]
-				},
-				options: {
-					responsive: true,
-					maintainAspectRatio: false,
-					plugins: {
-						legend: { position: 'bottom' },
-						datalabels: {
-							color: '#fff',
-							font: { weight: 'bold', size: 13 },
-							formatter: (value: number, ctx: any) => {
-								const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
-								const pct = total > 0 ? Math.round(value / total * 100) : 0;
-								return pct > 3 ? `${pct}%` : '';
-							}
-						}
-					}
-				}
-			});
-		}
-	}
-
 	async function excludeAuthorship(authorshipId: number) {
 		if (!(await confirmDialog({ message: 'Exclure ce lien auteur–publication ? Il ne sera pas recréé automatiquement.', danger: true }))) {
 			return false;
@@ -260,14 +193,6 @@
 		if (personId) loadProfile(personId);
 	});
 
-	// (Re)render des charts dès que le canvas est monté avec data dispo.
-	// Couvre à la fois le 1er affichage et les retours sur l'onglet après
-	// que le {#if} ait détruit/remonté le canvas.
-	$effect(() => {
-		if (activeTab === 'dashboard' && dashboardLoaded && barCanvas && pieCanvas) {
-			renderDashCharts();
-		}
-	});
 </script>
 
 <svelte:head>
@@ -342,15 +267,15 @@
 					</div>
 					<div class="dash-card">
 						<h3>Publications par année</h3>
-						<div class="chart-wrap">
-							<canvas bind:this={barCanvas}></canvas>
-						</div>
+						<BarChart
+							labels={dashPubsByYear.map((d) => String(d.year))}
+							values={dashPubsByYear.map((d) => d.count)}
+							datasetLabel="Publications"
+						/>
 					</div>
 					<div class="dash-card">
 						<h3>Open Access</h3>
-						<div class="chart-wrap">
-							<canvas bind:this={pieCanvas}></canvas>
-						</div>
+						<DoughnutChart segments={oaSegments} />
 						{#if dashOa.total > 0}
 							<div class="oa-summary">
 								{Math.round(dashOa.open_access / dashOa.total * 100)} % Open Access
@@ -479,7 +404,6 @@
 		min-width: 0; /* autorise la cellule grid à rétrécir sous la largeur du canvas */
 	}
 	.dash-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 12px; }
-	.chart-wrap { position: relative; height: 280px; }
 	.oa-summary { text-align: center; font-size: 0.9rem; color: var(--muted); margin-top: 8px; }
 
 	.thesis-role-heading {

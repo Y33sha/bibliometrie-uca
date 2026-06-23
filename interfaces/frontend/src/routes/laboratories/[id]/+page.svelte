@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
-	import { onMount, tick } from 'svelte';
+	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import { rorShortId, rorFullUrl } from '$lib/utils';
-	import { Chart, registerables } from 'chart.js';
-	import ChartDataLabels from 'chartjs-plugin-datalabels';
-	Chart.register(...registerables, ChartDataLabels);
+	import BarChart from '$lib/components/charts/BarChart.svelte';
+	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
 	import PersonsListView from '$lib/components/PersonsListView.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import TabNav from '$lib/components/TabNav.svelte';
@@ -55,14 +54,17 @@
 	let dashTopCountries: { code: string; name: string; count: number }[] = $state([]);
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	let dashSubjects: SubjectFrequency[] = $state([]);
-	let barCanvas: HTMLCanvasElement | undefined = $state();
-	let pieCanvas: HTMLCanvasElement | undefined = $state();
-	let collabCanvas: HTMLCanvasElement | undefined = $state();
-	let countriesCanvas: HTMLCanvasElement | undefined = $state();
-	let barChart: Chart | null = null;
-	let pieChart: Chart | null = null;
-	let collabChart: Chart | null = null;
-	let countriesChart: Chart | null = null;
+
+	const oaSegments = $derived([
+		{ label: 'Open Access', value: dashOa.open_access, color: '#2a7d4f' },
+		{ label: 'Sous embargo', value: dashOa.embargoed, color: '#b08900' },
+		{ label: 'Closed', value: dashOa.closed, color: '#c0392b' },
+		{ label: 'Indéterminé', value: dashOa.unknown, color: '#ccc' }
+	]);
+	const collabSegments = $derived([
+		{ label: 'International', value: dashCollab.international, color: '#3b6b9e' },
+		{ label: 'Domestique', value: dashCollab.domestic, color: '#e0e0e0' }
+	]);
 
 	const tutelles = $derived(parents.filter((p) => p.relation_type === 'est_tutelle_de'));
 	const partenaires = $derived(parents.filter((p) => p.relation_type === 'est_partenaire_de'));
@@ -118,144 +120,6 @@
 		dashTopCountries = data.top_countries;
 		dashSubjects = subjects;
 		dashboardLoaded = true;
-		await tick();
-		renderDashCharts();
-	}
-
-	function renderDashCharts() {
-		if (barChart) barChart.destroy();
-		if (pieChart) pieChart.destroy();
-		if (collabChart) collabChart.destroy();
-		if (countriesChart) countriesChart.destroy();
-
-		const cs = getComputedStyle(document.documentElement);
-
-		// Bar chart: publications par an
-		if (barCanvas) {
-			barChart = new Chart(barCanvas, {
-				type: 'bar',
-				data: {
-					labels: dashPubsByYear.map(d => String(d.year)),
-					datasets: [{
-						label: 'Publications',
-						data: dashPubsByYear.map(d => d.count),
-						backgroundColor: cs.getPropertyValue('--accent')?.trim() || '#3b6b9e',
-						borderRadius: 3,
-					}]
-				},
-				options: {
-					responsive: true,
-					maintainAspectRatio: false,
-					plugins: {
-						legend: { display: false },
-						datalabels: { color: '#fff', font: { weight: 'bold', size: 12 } }
-					},
-					scales: {
-						y: { beginAtZero: true, ticks: { precision: 0 } },
-						x: { grid: { display: false } }
-					}
-				}
-			});
-		}
-
-		// Pie chart: OA (on masque les modalités à 0 cas)
-		if (pieCanvas && dashOa.total > 0) {
-			const oa = [
-				{ label: 'Open Access', value: dashOa.open_access, color: '#2a7d4f' },
-				{ label: 'Sous embargo', value: dashOa.embargoed, color: '#b08900' },
-				{ label: 'Closed', value: dashOa.closed, color: '#c0392b' },
-				{ label: 'Indéterminé', value: dashOa.unknown, color: '#ccc' },
-			].filter(s => s.value > 0);
-			pieChart = new Chart(pieCanvas, {
-				type: 'doughnut',
-				data: {
-					labels: oa.map(s => s.label),
-					datasets: [{
-						data: oa.map(s => s.value),
-						backgroundColor: oa.map(s => s.color),
-					}]
-				},
-				options: {
-					responsive: true,
-					maintainAspectRatio: false,
-					plugins: {
-						legend: { position: 'bottom' },
-						datalabels: {
-							color: '#fff',
-							font: { weight: 'bold', size: 13 },
-							formatter: (value: number, ctx: any) => {
-								const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
-								const pct = total > 0 ? Math.round(value / total * 100) : 0;
-								return pct > 3 ? `${pct}%` : '';
-							}
-						}
-					}
-				}
-			});
-		}
-
-		// Doughnut: collaborations internationales (articles) — on masque les modalités à 0 cas
-		if (collabCanvas && dashCollab.total_articles > 0) {
-			const collab = [
-				{ label: 'International', value: dashCollab.international, color: '#3b6b9e' },
-				{ label: 'Domestique', value: dashCollab.domestic, color: '#e0e0e0' },
-			].filter(s => s.value > 0);
-			collabChart = new Chart(collabCanvas, {
-				type: 'doughnut',
-				data: {
-					labels: collab.map(s => s.label),
-					datasets: [{
-						data: collab.map(s => s.value),
-						backgroundColor: collab.map(s => s.color),
-					}]
-				},
-				options: {
-					responsive: true,
-					maintainAspectRatio: false,
-					plugins: {
-						legend: { position: 'bottom' },
-						datalabels: {
-							color: '#fff',
-							font: { weight: 'bold', size: 13 },
-							formatter: (value: number, ctx: any) => {
-								const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
-								const pct = total > 0 ? Math.round(value / total * 100) : 0;
-								return pct > 3 ? `${pct}%` : '';
-							}
-						}
-					}
-				}
-			});
-		}
-
-		// Bar: top 5 pays (hors FR)
-		if (countriesCanvas && dashTopCountries.length > 0) {
-			countriesChart = new Chart(countriesCanvas, {
-				type: 'bar',
-				data: {
-					labels: dashTopCountries.map(c => `${c.name}`),
-					datasets: [{
-						label: 'Articles',
-						data: dashTopCountries.map(c => c.count),
-						backgroundColor: '#e8a838',
-						borderRadius: 3,
-					}]
-				},
-				options: {
-					indexAxis: 'y',
-					responsive: true,
-					maintainAspectRatio: false,
-					plugins: {
-						legend: { display: false },
-						datalabels: { color: '#fff', font: { weight: 'bold', size: 12 } }
-					},
-					scales: {
-						x: { beginAtZero: true, ticks: { precision: 0 } },
-						y: { grid: { display: false } }
-					}
-				}
-			});
-		}
 	}
 
 	function onTabSwitch(tab: string) {
@@ -385,15 +249,15 @@
 					</div>
 					<div class="dash-card">
 						<h3>Publications par année</h3>
-						<div class="chart-wrap">
-							<canvas bind:this={barCanvas}></canvas>
-						</div>
+						<BarChart
+							labels={dashPubsByYear.map((d) => String(d.year))}
+							values={dashPubsByYear.map((d) => d.count)}
+							datasetLabel="Publications"
+						/>
 					</div>
 					<div class="dash-card">
 						<h3>Open Access</h3>
-						<div class="chart-wrap">
-							<canvas bind:this={pieCanvas}></canvas>
-						</div>
+						<DoughnutChart segments={oaSegments} />
 						{#if dashOa.total > 0}
 							<div class="oa-summary">
 								{Math.round(dashOa.open_access / dashOa.total * 100)} % Open Access
@@ -403,9 +267,7 @@
 					</div>
 					<div class="dash-card">
 						<h3>Collaborations internationales (articles)</h3>
-						<div class="chart-wrap">
-							<canvas bind:this={collabCanvas}></canvas>
-						</div>
+						<DoughnutChart segments={collabSegments} />
 						{#if dashCollab.total_articles > 0}
 							<div class="oa-summary">
 								{Math.round(dashCollab.international / dashCollab.total_articles * 100)} % international
@@ -415,9 +277,13 @@
 					</div>
 					<div class="dash-card">
 						<h3>Top 5 pays partenaires (articles)</h3>
-						<div class="chart-wrap">
-							<canvas bind:this={countriesCanvas}></canvas>
-						</div>
+						<BarChart
+							labels={dashTopCountries.map((c) => c.name)}
+							values={dashTopCountries.map((c) => c.count)}
+							datasetLabel="Articles"
+							color="#e8a838"
+							horizontal
+						/>
 					</div>
 				</div>
 			{/if}
@@ -533,7 +399,6 @@
 		min-width: 0; /* autorise la cellule grid à rétrécir sous la largeur du canvas */
 	}
 	.dash-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 12px; }
-	.chart-wrap { position: relative; height: 280px; }
 	.oa-summary { text-align: center; font-size: 0.9rem; color: var(--muted); margin-top: 8px; }
 
 	/* Shared table styles */
