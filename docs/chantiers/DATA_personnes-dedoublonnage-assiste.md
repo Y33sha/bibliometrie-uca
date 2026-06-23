@@ -63,13 +63,27 @@ Un seul moteur de dédoublonnage : des paires candidates `(A, B)` issues de plus
 - [ ] **Verdicts sur les formes de nom ambiguës à ≥1 lien `pending`** : matérialiser la classification en statut `person_name_forms` — homonymie → `confirmed` sur chaque personne (les deux gardent la forme) ; doublon → fusion puis `confirmed` ; erreur → `rejected` (bloque le retour, cf. verrou de l'étape 2). Audit de classification d'abord, action UI ensuite (étape 4).
 - [ ] **Forme de l'outillage à trancher** : empirique d'abord (audits bottom-up), puis assistance human-in-the-loop dans l'UI. Probablement un mélange : correction automatique des erreurs nettes à haute confiance, suggestions pour les doublons probables, signalement non-intrusif des homonymies légitimes à laisser tranquilles.
 
-### Étape 4 — Outillage humain : refonte `admin/persons`
+### Étape 4 — Outillage humain : hub `admin/persons`
 
-Probablement le **point d'entrée concret** de la résolution, avant l'automatisation : afficher les suspects (intrus détachables, doublons probables, conflits) avec des actions admin confirm/reject, puis dériver les actions automatiques une fois la frontière clarifiée par l'usage. L'existant ne donne pas satisfaction : le générateur de paires candidates impose une navigation forcée d'une paire à l'autre, n'expose comme éléments de décision que les titres des publications, et `distinct_persons` ne sert qu'à ne plus re-suggérer une paire. Deux options ouvertes, à trancher :
+Le **point d'entrée concret** de la résolution, avant l'automatisation : un hub unique d'administration des personnes, d'où l'on traite les suspects *et* l'on retrouve / édite n'importe quelle personne hors problème (ajouter un identifiant à la main, par exemple). L'automatisation des erreurs nettes se dérivera une fois la frontière clarifiée par l'usage. L'existant ne satisfait pas : le générateur de paires impose une navigation forcée paire-par-paire, n'expose comme décision que les titres de publications, et `distinct_persons` ne sert qu'à ne plus re-suggérer une paire.
 
-- [ ] **Remplacer** par un autre outil ;
-- [ ] **Retravailler** l'existant pour le rendre utilisable : consultation de la **liste** des candidats doublons (au lieu de la navigation paire-par-paire imposée), et présentation des **éléments de décision chiffrés** (scores de recouvrement co-auteurs, sujets, revues, labos — pas seulement les titres de publications).
-- [ ] **Endpoints et UI de validation des formes de nom** (action humaine du verrou de l'étape 2, dont le socle backend est en place) : confirmer / rejeter un lien `(name_form, person_id)`. Un rejet bloque le retour de la forme au matching par nom ; une confirmation corrobore les matchs par identifiant sans test de nom. Inclut la bascule de `detach_name_form` (aujourd'hui un DELETE, donc la forme revient au recompute suivant) en pose de statut `rejected` (qui bloque durablement).
+Trois briques, articulées par une règle simple — **l'unité de la ligne** :
+
+- **Liste maîtresse** (1 ligne = 1 personne) : non filtrée par défaut, recherche, point d'ancrage jamais masqué. Tout ce qui se filtre *par personne* y est un **facet** (RH / co-tutelle / partie / suspecte, « a des formes pending »).
+- **Files de triage** (1 ligne = une paire / une forme / un conflit — *pas* une personne, donc des listes sœurs de forme propre, pas des filtres de la maîtresse) : une file par détecteur (doublons probables, intrus détachables, formes ambiguës, conflits d'identifiants), chacune *evidence-forward* (éléments de décision chiffrés sous les yeux : recouvrements co-auteurs / labos / sujets / revues, ou ancre + intrus + publi), avec **action inline sur la ligne** pour les cas évidents (rejeter une forme sans même ouvrir le drawer).
+- **Drawer-personne** commun à toutes les vues : ouvert au clic depuis n'importe quelle liste, *deep-linkable* (`/admin/persons/:id`, pas la page publique), en panneau latéral (option pleine page).
+
+Navigation par **onglets à compteur** (« Toutes », « Doublons (n) », « Intrus (n) »…), pas un dropdown : le backlog reste visible en permanence.
+
+La fiche-atelier du drawer lève les gênes actuelles : **toutes** les formes de nom y figurent, y compris celles de source `persons` seule (aujourd'hui invisibles faute d'authorship) ; chaque forme porte son **statut** confirmed / pending / rejected (même composant visuel que les identifiants) avec confirm / reject inline ; une forme partagée entre `person_id` n'est qu'un **pointeur discret** « aussi portée par N personnes » (lien vers la comparaison), pas une colonne — l'ambiguïté se résout dans la file de triage, pas dans la vue principale.
+
+- [ ] **Liste maîtresse + facets** : liste person-centrée non filtrée, recherche, facets par catégorie et « formes pending » ; ajout manuel d'identifiant.
+- [ ] **Drawer-personne** déboîtable (panneau latéral deep-linkable + option pleine page) ; le clic-personne y mène, plus vers la page publique `persons/id`.
+- [ ] **Section formes de nom du drawer** : toutes les formes (dont `persons`-seules), badge de statut réutilisant le composant des identifiants, confirm / reject inline, dropdown des publications rattachées, pointeur « partagée avec N ».
+- [ ] **Endpoints confirm / reject de formes** + bascule de `detach_name_form` (aujourd'hui un DELETE, la forme revient au recompute suivant) en pose de statut `rejected` (bloque durablement le retour au matching par nom ; cf. verrou étape 2).
+- [ ] **Onglets-files de triage** unifiés sous le hub (replier `admin/person-duplicates`), une file par détecteur, décision *evidence-forward*, action inline sur la ligne.
+- [ ] **Throughput** : navigation clavier (naviguer / confirmer / rejeter), undo, actions *bulk* sûres (sélection multiple de formes → confirmer en lot).
+- [ ] **Audit trail** : chaque confirm / reject / detach / merge émet un événement (`emit_event`).
 
 ### Renforts optionnels (hors chemin critique)
 
@@ -80,8 +94,8 @@ Conservateurs, activables une fois le reste en place ; pas des prérequis.
 - [ ] **API IdRef** ?
 
 ## Items TODO liés (à intégrer quelque part ou à reporter à un autre chantier)
-* [ ] phase `persons`: générer une liste de suggestions de fusions (conflit d'identifiants entre 2 `person_id`)
-* [ ] phase `persons`: ouvrir les étapes de matching par identifiant aux `source_authorships` hors périmètre. (La garde `in_perimeter = true` est nécessaire seulement pour le matching par nom et la création.)
+* [ ] générer une liste de suggestions de fusions (conflit d'identifiants entre 2 `person_id`)
+* [ ] phase `persons`: ouvrir les étapes de matching par identifiant aux `source_authorships` hors périmètre? (La garde `in_perimeter = true` est nécessaire seulement pour le matching par nom et la création.)
 * faux auteurs UCA créés par une erreur de parsing (toutes les signatures groupées ensemble pour chaque auteur) : ex. publi 77832
 * [ ] OpenAlex résout les noms d'équipes en listes de personnes (21105) => nettoyer les "for the ... study group"
 * [ ] publi 86878: Lorsque OpenAlex corrige le parsing des affiliations, certaines authorships sortent du périmètre; des auteurs UCA deviennent non-UCA mais restent polluer la base. Gérer la purge automatique.
