@@ -33,8 +33,11 @@ class TestExtractLocationsDataHalIds:
 
 
 from domain.publications.identifiers import extract_hal_id_from_url
-from domain.source_publications.doc_types import _SOURCE_MAPS, map_doc_type
-from domain.source_publications.doc_types import DOC_TYPES_SET as VALID_DOC_TYPES_SET
+from domain.source_publications.doc_types import (
+    _SOURCE_MAPS,
+    DOC_TYPES_SET as VALID_DOC_TYPES_SET,
+    map_doc_type,
+)
 
 
 class TestOAExtractShortId:

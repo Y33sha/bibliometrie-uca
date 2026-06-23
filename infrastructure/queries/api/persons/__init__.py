@@ -46,50 +46,26 @@ from application.ports.api.persons_queries import (
 from application.ports.api.subjects_queries import SubjectFrequency
 from infrastructure.queries.api.persons.admin import (
     list_orphan_authorships as _list_orphan_authorships,
-)
-from infrastructure.queries.api.persons.admin import (
     name_form_authorships as _name_form_authorships,
-)
-from infrastructure.queries.api.persons.admin import (
     orphan_authorships_count as _orphan_authorships_count,
-)
-from infrastructure.queries.api.persons.admin import (
     person_exists as _person_exists,
 )
 from infrastructure.queries.api.persons.detail import (
     person_addresses as _person_addresses,
-)
-from infrastructure.queries.api.persons.detail import (
     person_dashboard as _person_dashboard,
-)
-from infrastructure.queries.api.persons.detail import (
     person_profile as _person_profile,
-)
-from infrastructure.queries.api.persons.detail import (
     person_subjects as _person_subjects,
-)
-from infrastructure.queries.api.persons.detail import (
     person_theses as _person_theses,
 )
 from infrastructure.queries.api.persons.facets import (
     list_departments as _list_departments,
-)
-from infrastructure.queries.api.persons.facets import (
     list_roles as _list_roles,
-)
-from infrastructure.queries.api.persons.facets import (
     persons_facets as _persons_facets,
-)
-from infrastructure.queries.api.persons.facets import (
     persons_stats as _persons_stats,
 )
 from infrastructure.queries.api.persons.list import (
     list_persons as _list_persons,
-)
-from infrastructure.queries.api.persons.list import (
     persons_directory as _persons_directory,
-)
-from infrastructure.queries.api.persons.list import (
     search_persons as _search_persons,
 )
 

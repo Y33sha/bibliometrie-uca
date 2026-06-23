@@ -11,29 +11,13 @@ from sqlalchemy import Connection, text
 
 from application.persons import (
     add_identifier as _add_identifier,
-)
-from application.persons import (
     detach_authorships as _detach_authorships_service,
-)
-from application.persons import (
     merge_person as _merge_person,
-)
-from application.persons import (
     reassign_identifier as _reassign_identifier,
-)
-from application.persons import (
     remove_identifier as _remove_identifier,
-)
-from application.persons import (
     set_rejected as _set_rejected,
-)
-from application.persons import (
     update_identifier_status as _update_identifier_status,
-)
-from application.persons import (
     update_name as _update_name,
-)
-from application.persons import (
     update_name_form_status as _update_name_form_status,
 )
 from application.ports.api.persons_queries import NameFormAuthorshipsResponse, PersonsQueries

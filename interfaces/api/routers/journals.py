@@ -8,8 +8,8 @@ from sqlalchemy import Connection
 from application.journals import (
     merge_journals,
     requalify_publications_for_journal,
+    update_journal as _update_journal,
 )
-from application.journals import update_journal as _update_journal
 from application.ports.api.journals_queries import (
     JournalDashboardResponse,
     JournalDetailResponse,

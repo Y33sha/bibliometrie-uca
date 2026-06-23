@@ -61,12 +61,8 @@ from sqlalchemy import Connection
 
 from application.persons import (
     add_identifiers_from_authorships as add_identifiers,
-)
-from application.persons import (
     add_name_form,
     create_person,
-)
-from application.persons import (
     link_authorships as link_to_person,
 )
 from application.ports.pipeline.persons_create import (

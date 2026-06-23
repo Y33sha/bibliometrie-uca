@@ -10,8 +10,6 @@ from application.ports.repositories.publication_repository import PubByDoi, Publ
 from domain.errors import DistinctDoiError, NotFoundError
 from domain.publications.aggregation import (
     first_non_null,
-)
-from domain.publications.aggregation import (
     refresh_from_sources as _refresh_aggregate,
 )
 from domain.publications.identifiers import DOI

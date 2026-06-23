@@ -10,8 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from application.authorships.assign_orphans import (
     assign_orphan_authorship as _assign_orphan,
-)
-from application.authorships.assign_orphans import (
     batch_assign_orphan_authorships as _batch_assign_orphan,
 )
 from application.authorships.core import (

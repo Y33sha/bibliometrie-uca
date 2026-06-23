@@ -60,31 +60,17 @@ from interfaces.api.routers import (  # noqa: E402
     stats,
     subjects,
 )
-from interfaces.api.routers.admin import addresses as admin_addresses  # noqa: E402
-from interfaces.api.routers.admin import (  # noqa: E402
+from interfaces.api.routers.admin import (  # noqa: E402  # noqa: E402  # noqa: E402  # noqa: E402  # noqa: E402  # noqa: E402  # noqa: E402  # noqa: E402
+    addresses as admin_addresses,  # noqa: E402
     authorships as admin_authorships,
-)
-from interfaces.api.routers.admin import feedback as admin_feedback  # noqa: E402
-from interfaces.api.routers.admin import (  # noqa: E402
+    feedback as admin_feedback,  # noqa: E402
     perimeters as admin_perimeters,
-)
-from interfaces.api.routers.admin import (  # noqa: E402
     person_duplicates as admin_person_duplicates,
-)
-from interfaces.api.routers.admin import persons as admin_persons  # noqa: E402
-from interfaces.api.routers.admin import (  # noqa: E402
+    persons as admin_persons,  # noqa: E402
     pipeline_config as admin_pipeline_config,
-)
-from interfaces.api.routers.admin import (  # noqa: E402
     pipeline_logs as admin_pipeline_logs,
-)
-from interfaces.api.routers.admin import (  # noqa: E402
     pipeline_runs as admin_pipeline_runs,
-)
-from interfaces.api.routers.admin import (  # noqa: E402
     publication_duplicates as admin_publication_duplicates,
-)
-from interfaces.api.routers.admin import (  # noqa: E402
     structures as admin_structures,
 )
 

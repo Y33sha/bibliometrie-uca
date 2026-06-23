@@ -37,11 +37,7 @@ from infrastructure.queries.api.publications.facets import (
 )
 from infrastructure.queries.api.publications.list import (
     export_publications_csv as _export_publications_csv,
-)
-from infrastructure.queries.api.publications.list import (
     export_theses_csv as _export_theses_csv,
-)
-from infrastructure.queries.api.publications.list import (
     list_publications as _list_publications,
 )
 

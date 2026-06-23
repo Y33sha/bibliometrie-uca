@@ -15,8 +15,6 @@ import pytest
 
 from application.pipeline.publishers_journals import (
     enrich_journals_from_openalex as journals_mod,
-)
-from application.pipeline.publishers_journals import (
     enrich_publishers_from_openalex as publishers_mod,
 )
 

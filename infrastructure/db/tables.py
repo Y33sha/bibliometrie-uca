@@ -36,8 +36,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, REAL
-from sqlalchemy.dialects.postgresql import ENUM as PgEnum
+from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum, JSONB, REAL
 
 metadata = MetaData()
 

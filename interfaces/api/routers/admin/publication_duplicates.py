@@ -11,8 +11,11 @@ from application.ports.api.publication_duplicates_queries import (
 )
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.publications import mark_distinct as _mark_pubs_distinct
-from application.publications import merge_publications, refresh_from_sources
+from application.publications import (
+    mark_distinct as _mark_pubs_distinct,
+    merge_publications,
+    refresh_from_sources,
+)
 from interfaces.api.deps import (
     audit_repo_sync,
     db_conn_sync,
