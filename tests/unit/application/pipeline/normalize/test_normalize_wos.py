@@ -4,7 +4,7 @@ Couvre :
 - Helpers purs (`_safe_list`, `_get_api_title`, `_parse_api_authors`, `_get_api_doi`, `_get_api_issn`).
 - `extract_from_api` : extraction depuis la structure WoS Expanded API (static_data/dynamic_data imbriqués) avec ses nombreuses branches (dict vs list, doctypes, biblio, abstract, keywords, topics, citations).
 - `extract_pub_metadata`, `upsert_publisher`, `upsert_journal`, `insert_wos_document` : wiring + propagation des champs.
-- `build_wos_author_records` : filtre `is_wos_author_exploitable`, construction des `AuthorRecord` (organisations → source_structures, orcid+researcher_id, adresses), warning si tout rejeté. L'écriture (clear + batch) passe par le writer partagé, testée séparément.
+- `build_wos_author_records` : filtre `is_wos_author_exploitable`, construction des `AuthorRecord` (orcid+researcher_id, adresses), warning si tout rejeté. L'écriture (clear + batch) passe par le writer partagé, testée séparément.
 - `process_record` : orchestration (cascade publisher → journal → document → authorships), staging mark_done.
 - `WosNormalizer.preload_caches` / `process_work` : wiring de la classe.
 
@@ -878,8 +878,6 @@ class TestBuildWosAuthorRecords:
         assert rec0.raw_name == "Jane Doe"
         assert rec0.is_corresponding is True
         assert rec0.roles == ["author"]
-        # Noms d'organisations WoS → source_structures (seul identifiant côté WoS).
-        assert rec0.source_structures == ["ICCF", "UCA"]
         assert rec0.person_identifiers  # orcid + researcher_id, dict non vide
         assert [a.text for a in rec0.addresses] == ["addr-X"]
 
@@ -898,7 +896,6 @@ class TestBuildWosAuthorRecords:
             ],
         }
         rec0 = build_wos_author_records(rec, logger)[0]
-        assert rec0.source_structures is None
         assert rec0.addresses == []
 
 

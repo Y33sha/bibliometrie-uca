@@ -598,7 +598,6 @@ source_authorships = Table(
     Column("source_publication_id", Integer, nullable=False),
     Column("author_position", SmallInteger),
     Column("in_perimeter", Boolean, server_default="false"),
-    Column("source_structures", ARRAY(Text)),
     Column("countries", ARRAY(Text)),
     # Refresh pays incrémental : True = `countries` à (re)calculer depuis les
     # adresses. Posé par normalize (nouveaux sa) et detect/institution (adresse
@@ -608,7 +607,6 @@ source_authorships = Table(
     Column("author_name_normalized", Text),
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),
-    Column("source_data", JSONB),
     Column("authorship_id", Integer),
     Column("raw_author_name", Text),
     # Identifiants observés sur cette signature (orcid, idhal, idref,

@@ -375,14 +375,11 @@ class TestBuildCrossrefAuthorRecords:
         # roles posé explicitement (reproduit l'ancien défaut DB ARRAY['author']).
         assert rec.roles == ["author"]
         assert rec.person_identifiers == {"orcid": "0000-0001-2345-6789"}
-        # `sequence` conservé en source_data.
-        assert rec.source_data == {"sequence": "first"}
         assert [a.text for a in rec.addresses] == ["UCA"]
         assert rec.addresses[0].countries is None
 
-    def test_no_sequence_no_source_data(self):
+    def test_bare_author_no_identifiers(self):
         rec = build_crossref_author_records({"author": [{"family": "Dupont"}]})[0]
-        assert rec.source_data is None
         assert rec.person_identifiers is None
 
     def test_shared_orcid_marked_dubious(self):

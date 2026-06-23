@@ -10,8 +10,7 @@ Tables peuplées :
     publishers, journals, publications      (tables de vérité — partagées)
     source_publications                     (lien staging ↔ publication, source='openalex')
     source_authorships                      (lien document × auteur, source='openalex',
-                                             avec `source_structures` TEXT[] = openalex_ids natifs
-                                             des institutions et `person_identifiers` JSONB)
+                                             avec `person_identifiers` JSONB)
 
 Idempotent : peut être relancé sans risque (ON CONFLICT + flag processed).
 """
@@ -397,7 +396,6 @@ def build_openalex_author_records(work: dict) -> list[AuthorRecord]:
 
     - nom brut (`raw_author_name`, fiable contrairement à `author.display_name`) ;
     - ORCID déposé (`raw_orcid`) sur `person_identifiers` ;
-    - `openalex_id` natifs des institutions sur `source_structures` ;
     - `country_code` OpenAlex (rattaché à la structure désambiguïsée,
       algorithmique et faillible) en `suggested_countries` (à valider), jamais
       en `countries` (autorité) ;
@@ -420,9 +418,6 @@ def build_openalex_author_records(work: dict) -> list[AuthorRecord]:
             continue
 
         institutions = authorship.get("institutions") or []
-        source_structures = [
-            extract_short_id(inst["id"]) for inst in institutions if inst.get("id")
-        ]
         suggested_countries = sorted(
             {inst["country_code"].lower() for inst in institutions if inst.get("country_code")}
         )
@@ -440,7 +435,6 @@ def build_openalex_author_records(work: dict) -> list[AuthorRecord]:
                 raw_name=raw_author_name,
                 is_corresponding=authorship.get("is_corresponding", False),
                 roles=["author"],
-                source_structures=source_structures or None,
                 person_identifiers=ids if ids else None,
                 addresses=[
                     AddressRecord(text=part, suggested_countries=suggested_countries or None)

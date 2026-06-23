@@ -558,7 +558,6 @@ class TestBuildHalAuthorRecords:
             ],
         }
         record = build_hal_author_records(doc)[0]
-        assert record.source_structures == ["300012"]
         assert [a.text for a in record.addresses] == ["LIMOS"]
 
     def test_quality_maps_to_roles(self):
