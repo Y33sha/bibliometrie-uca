@@ -3916,6 +3916,13 @@ export interface components {
             sources: string[];
             /** Ambiguous */
             ambiguous: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "confirmed" | "rejected";
+            /** Shared Count */
+            shared_count: number;
         };
         /** NameFormUpdate */
         NameFormUpdate: {

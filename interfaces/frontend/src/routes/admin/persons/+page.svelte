@@ -350,6 +350,15 @@
     loadTable();
   }
 
+  async function setNameFormStatus(personId: number, nameForm: string, status: string) {
+    await personsApi.updateNameFormStatus(
+      personId,
+      nameForm,
+      status as "pending" | "confirmed" | "rejected",
+    );
+    await loadTable();
+  }
+
   /* ── Merge ── */
 
   function openMergeSearch(personId: number) {
@@ -516,6 +525,7 @@
     ontoggleIdForm={toggleIdForm}
     onsetIdentifierStatus={setIdentifierStatus}
     onopenDetach={openDetachModal}
+    onsetFormStatus={setNameFormStatus}
     onmergeOpen={openMergeSearch}
     onmergeClose={closeMergeSearch}
     onmerge={mergeInto}

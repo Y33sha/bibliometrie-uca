@@ -4,6 +4,7 @@
   import type { Person, IdFormState, PersonSearchResult } from "./types";
   import IdentifiersCell from "./IdentifiersCell.svelte";
   import MergeSearchCell from "./MergeSearchCell.svelte";
+  import NameFormsList from "./NameFormsList.svelte";
 
   let {
     person,
@@ -16,6 +17,7 @@
     ontoggleIdForm,
     onsetIdentifierStatus,
     onopenDetach,
+    onsetFormStatus,
     onmergeOpen,
     onmergeClose,
     onmerge,
@@ -35,6 +37,11 @@
     ontoggleIdForm: (personId: number) => void;
     onsetIdentifierStatus: (identId: number, status: string) => void | Promise<void>;
     onopenDetach: (personId: number, nameForm: string) => void | Promise<void>;
+    onsetFormStatus: (
+      personId: number,
+      nameForm: string,
+      status: string,
+    ) => void | Promise<void>;
     onmergeOpen: (personId: number) => void;
     onmergeClose: () => void;
     onmerge: (targetId: number, sourceId: number) => void | Promise<void>;
@@ -90,21 +97,7 @@
 
     <section class="drawer-section">
       <h3>Formes de nom</h3>
-      {#if person.name_forms?.length}
-        <div class="name-forms-list">
-          {#each person.name_forms as nf}
-            <button
-              class="name-form-tag"
-              class:ambiguous={nf.ambiguous}
-              onclick={() => onopenDetach(person.id, nf.name_form)}
-            >
-              {nf.name_form}
-            </button>
-          {/each}
-        </div>
-      {:else}
-        <span class="tag tag-unlinked">aucune</span>
-      {/if}
+      <NameFormsList {person} onopenDetail={onopenDetach} onsetStatus={onsetFormStatus} />
     </section>
 
     <section class="drawer-section">
@@ -124,7 +117,10 @@
 <style>
   .drawer-backdrop {
     position: fixed;
-    inset: 0;
+    top: var(--header-height, 46px);
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: rgba(0, 0, 0, 0.25);
     border: none;
     padding: 0;
@@ -133,9 +129,9 @@
   }
   .drawer {
     position: fixed;
-    top: 0;
+    top: var(--header-height, 46px);
     right: 0;
-    height: 100vh;
+    height: calc(100vh - var(--header-height, 46px));
     width: min(480px, 92vw);
     background: #fff;
     box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
@@ -215,48 +211,12 @@
     color: #888;
     margin: 0 0 8px;
   }
-  .name-forms-list {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    align-items: flex-start;
-  }
-  .name-form-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    background: #f0f4f8;
-    border: 1px solid #d0d8e0;
-    border-radius: 3px;
-    padding: 2px 7px;
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background 0.15s;
-    text-align: left;
-  }
-  .name-form-tag:hover {
-    background: #e0e8f0;
-    border-color: #a0b0c0;
-  }
-  .name-form-tag.ambiguous {
-    background: #fff3e0;
-    border-color: #e0c080;
-    color: #8a6d3b;
-  }
-  .name-form-tag.ambiguous:hover {
-    background: #ffe8cc;
-    border-color: #d0a050;
-  }
   .tag {
     display: inline-block;
     font-size: 0.8rem;
     padding: 1px 7px;
     border-radius: 10px;
     font-weight: 500;
-  }
-  .tag-unlinked {
-    background: var(--warning-light, #fff3e0);
-    color: #8a6d10;
   }
   .tag-rejected {
     background: #fdecea;
