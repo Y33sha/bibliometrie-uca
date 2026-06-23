@@ -3,9 +3,9 @@ name-form authorships."""
 
 from typing import Any
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection, bindparam, text
 
-from domain.persons.name_matching import parse_raw_author_name
+from domain.persons.name_matching import names_compatible, parse_raw_author_name
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from domain.sources.registry import AUTHOR_SOURCES_SQL
 
@@ -139,3 +139,79 @@ def name_form_authorships(conn: Connection, person_id: int, name_form: str) -> d
     ).all()
     other_persons = [dict(r._mapping) for r in other_rows]
     return {"authorships": authorships, "other_persons": other_persons}
+
+
+# ── File de triage : formes de nom ambiguës ──────────────────────
+
+# Une forme portée par ≥2 personnes, avec au moins un lien encore `pending`
+# (les liens déjà tranchés confirmed/rejected sortent du travail à faire).
+_AMBIGUOUS_FORMS_HAVING = "HAVING count(*) >= 2 AND bool_or(status = 'pending')"
+
+
+def ambiguous_name_forms_count(conn: Connection) -> int:
+    """Nombre de formes de nom ambiguës restant à trancher (badge de l'onglet)."""
+    row = conn.execute(
+        text(f"""
+            SELECT count(*) AS total FROM (
+                SELECT name_form FROM person_name_forms
+                GROUP BY name_form {_AMBIGUOUS_FORMS_HAVING}
+            ) t
+        """)
+    ).one()
+    return int(row.total)
+
+
+def ambiguous_name_forms(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
+    """Formes de nom ambiguës paginées, avec les personnes qui les portent.
+
+    Chaque personne porte son statut (pending/confirmed/rejected) pour cette forme
+    et un drapeau `compatible` (nom canonique compatible avec la forme, par tokens) —
+    discriminant homonyme/doublon (compatible) vs erreur (incompatible).
+    """
+    total = ambiguous_name_forms_count(conn)
+    offset = (page - 1) * per_page
+    form_rows = conn.execute(
+        text(f"""
+            SELECT name_form FROM person_name_forms
+            GROUP BY name_form {_AMBIGUOUS_FORMS_HAVING}
+            ORDER BY name_form
+            LIMIT :lim OFFSET :off
+        """),
+        {"lim": per_page, "off": offset},
+    ).all()
+    forms = [r.name_form for r in form_rows]
+
+    persons_by_form: dict[str, list[dict[str, Any]]] = {f: [] for f in forms}
+    if forms:
+        rows = conn.execute(
+            text("""
+                SELECT pnf.name_form, pnf.person_id, pnf.status::text AS status,
+                       p.first_name, p.last_name,
+                       p.last_name_normalized AS ln, p.first_name_normalized AS fn,
+                       EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh
+                FROM person_name_forms pnf
+                JOIN persons p ON p.id = pnf.person_id
+                WHERE pnf.name_form = ANY(:forms)
+                ORDER BY pnf.name_form, p.last_name, p.first_name
+            """).bindparams(bindparam("forms")),
+            {"forms": forms},
+        ).all()
+        for r in rows:
+            persons_by_form[r.name_form].append(
+                {
+                    "person_id": r.person_id,
+                    "first_name": r.first_name,
+                    "last_name": r.last_name,
+                    "status": r.status,
+                    "has_rh": r.has_rh,
+                    "compatible": names_compatible(r.name_form, "", r.ln or "", r.fn or ""),
+                }
+            )
+
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page if per_page else 0,
+        "forms": [{"name_form": f, "persons": persons_by_form[f]} for f in forms],
+    }

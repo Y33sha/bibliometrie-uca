@@ -24,6 +24,7 @@ from __future__ import annotations
 from sqlalchemy import Connection
 
 from application.ports.api.persons_queries import (
+    AmbiguousNameFormsResponse,
     DepartmentCount,
     DirectoryFilters,
     FacetFilters,
@@ -35,6 +36,7 @@ from application.ports.api.persons_queries import (
     PersonDashboardResponse,
     PersonDirectoryResponse,
     PersonListResponse,
+    PersonOut,
     PersonProfileResponse,
     PersonSearchResult,
     PersonsFacetsResponse,
@@ -45,6 +47,8 @@ from application.ports.api.persons_queries import (
 )
 from application.ports.api.subjects_queries import SubjectFrequency
 from infrastructure.queries.api.persons.admin import (
+    ambiguous_name_forms as _ambiguous_name_forms,
+    ambiguous_name_forms_count as _ambiguous_name_forms_count,
     list_orphan_authorships as _list_orphan_authorships,
     name_form_authorships as _name_form_authorships,
     orphan_authorships_count as _orphan_authorships_count,
@@ -65,6 +69,7 @@ from infrastructure.queries.api.persons.facets import (
 )
 from infrastructure.queries.api.persons.list import (
     list_persons as _list_persons,
+    person_admin as _person_admin,
     persons_directory as _persons_directory,
     search_persons as _search_persons,
 )
@@ -97,6 +102,10 @@ class PgPersonsQueries(PersonsQueries):
         return PersonListResponse.model_validate(
             _list_persons(self._conn, filters=filters, page=page, per_page=per_page, sort=sort)
         )
+
+    def person_admin(self, person_id: int) -> PersonOut | None:
+        row = _person_admin(self._conn, person_id)
+        return PersonOut.model_validate(row) if row is not None else None
 
     # ── Facettes / listes de référence / stats ─────────────────────
 
@@ -157,6 +166,14 @@ class PgPersonsQueries(PersonsQueries):
     def name_form_authorships(self, person_id: int, name_form: str) -> NameFormAuthorshipsResponse:
         return NameFormAuthorshipsResponse.model_validate(
             _name_form_authorships(self._conn, person_id, name_form)
+        )
+
+    def ambiguous_name_forms_count(self) -> int:
+        return _ambiguous_name_forms_count(self._conn)
+
+    def ambiguous_name_forms(self, *, page: int, per_page: int) -> AmbiguousNameFormsResponse:
+        return AmbiguousNameFormsResponse.model_validate(
+            _ambiguous_name_forms(self._conn, page=page, per_page=per_page)
         )
 
 
