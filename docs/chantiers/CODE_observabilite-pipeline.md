@@ -136,6 +136,12 @@ Logs ambigus relevés à l'usage, à élucider et harmoniser entre sources.
   - **Préfixe source dans les logs** : chaque helper `_run_extract_*` de `run_pipeline.py` crée un logger nommé (`setup_logger("hal", ...)`, etc.) au lieu du logger global `pipeline`. Le `record.name` apparaît dans le format JSON (`"logger": "hal"`) et texte (`%(name)s`) — distingue les logs entrelacés en parallèle.
   - **Bilans finaux harmonisés** : les 5 extracteurs utilisent désormais le `log_summary` par défaut de `SourceExtractor` (`=== Terminé : as_summary ===` où `as_summary()` produit `N new, M updated, …`). Les surcharges custom de ScanR/theses.fr/WoS/HAL ont été retirées.
 
+## Items TODO liés: à intégrer ou à reporter à un chantier ultérieur
+
+* [ ] Faire un audit complet du logging (complétude, clarté, cohérence entre sources et entre phases)
+* [ ] Revoir la ModePolicy (modes `full` et `weekly`: à fusionner en un seul mode `full` avec une option "année de début")
+* [ ] chantier observabilité pipeline: quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de snapshot; c'est un problème. => faire des snapshots par phase, pas par pipeline
+
 ## Questions ouvertes
 
 - **Page admin vs Grafana DSI** : si la DSI met en place sa propre
