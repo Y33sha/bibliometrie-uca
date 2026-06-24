@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { autofocus } from '$lib/actions/focus';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
 	import { sanitizeTitle, halDocUrl, scanrPubUrl } from '$lib/utils';
@@ -428,7 +429,7 @@
 {/if}
 
 <div class="toolbar toolbar-card toolbar-sticky">
-	<input type="text" placeholder="Rechercher par titre..." bind:value={search} oninput={onSearchInput} />
+	<input type="search" placeholder="Rechercher par titre..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
 	{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
 	{#if !hasFixedLab && col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
@@ -627,7 +628,7 @@
 		color: #2c3e50;
 	}
 	.filter-banner a { color: var(--accent); }
-	.toolbar input[type='text'] { width: 280px; }
+	.toolbar input[type='search'] { width: 280px; }
 	.pub-table {
 		width: 100%;
 		min-width: 760px;

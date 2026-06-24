@@ -168,6 +168,28 @@
   :global(*, *::before, *::after) {
     box-sizing: border-box;
   }
+  /* Socle uniforme des champs `type="search"` (sémantique correcte, et évite que
+     les gestionnaires de mots de passe les prennent pour des champs de connexion).
+     On retire l'apparence native du navigateur — forme « pilule », bouton
+     d'effacement — et on reproduit le champ texte standard de l'application.
+     `:where()` donne une spécificité nulle : ce socle s'applique aux barres de
+     recherche nues sans écraser les champs volontairement stylés (inputs de
+     fusion thémés, recherche du composant Picker). */
+  :global(:where(input[type="search"])) {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: white;
+    font-family: inherit;
+    font-size: 0.95rem;
+    color: inherit;
+  }
+  :global(input[type="search"]::-webkit-search-cancel-button) {
+    -webkit-appearance: none;
+    appearance: none;
+  }
   .site-brand {
     display: flex;
     align-items: center;

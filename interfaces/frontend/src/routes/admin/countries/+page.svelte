@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { autofocus } from '$lib/actions/focus';
 	import { base } from '$app/paths';
 	import { replaceState } from '$app/navigation';
 	import { addresses as addressesApi, api } from '$lib/api';
@@ -227,7 +228,7 @@
 <h1>Attribution des pays aux adresses</h1>
 
 <div class="toolbar">
-	<input type="text" placeholder="Rechercher dans les adresses..." bind:value={search} oninput={onSearchInput} />
+	<input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	<button class="btn btn-suggest" class:active={suggestMode} onclick={toggleSuggest}>
 		{suggestMode ? 'Suggestions actives' : 'Activer suggestions'}
 	</button>
@@ -312,7 +313,7 @@
 
 <style>
 	h1 { font-size: 1.3rem; margin-bottom: 12px; }
-	.toolbar input[type="text"] { width: 300px; }
+	.toolbar input[type="search"] { width: 300px; }
 	.batch-bar {
 		display: flex; align-items: center; gap: 8px;
 		padding: 8px 12px; margin-bottom: 10px;

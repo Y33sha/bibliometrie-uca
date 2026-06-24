@@ -2,6 +2,7 @@
   import { base } from "$app/paths";
   import { api } from "$lib/api";
   import { titleCase } from "$lib/utils";
+  import { autofocus } from "$lib/actions/focus";
   import type { Person, IdFormState, PersonSearchResult } from "./types";
   import type { components } from "$lib/api/schema";
   import IdentifiersCell from "./IdentifiersCell.svelte";
@@ -117,7 +118,7 @@
   <header class="drawer-head">
     {#if editing}
       <form class="drawer-edit" onsubmit={(e) => { e.preventDefault(); saveEdit(); }}>
-        <input class="edit-input" bind:value={lastName} placeholder="Nom" aria-label="Nom" />
+        <input class="edit-input" bind:value={lastName} placeholder="Nom" aria-label="Nom" use:autofocus={{ select: true }} />
         <input class="edit-input" bind:value={firstName} placeholder="Prénom" aria-label="Prénom" />
         <button type="submit" class="btn btn-icon-sm btn-confirm-outline" title="Enregistrer"
           >&#x2713;</button

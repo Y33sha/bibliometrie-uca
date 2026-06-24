@@ -23,9 +23,15 @@
 
 	let dialog: HTMLDivElement | undefined = $state();
 
-	// Focus à l'ouverture (l'utilisateur démarre dans la modale ; échap ferme).
+	// Focus le premier champ de saisie à l'ouverture, pour démarrer la frappe
+	// sans cliquer ; à défaut (modale sans champ) le conteneur, qui capte échap.
 	// Trap complet de Tab non implémenté — usage admin, quick-win a11y.
-	onMount(() => dialog?.focus());
+	onMount(() => {
+		const field = dialog?.querySelector<HTMLElement>(
+			'input:not([type="hidden"]):not(:disabled), textarea:not(:disabled), select:not(:disabled)'
+		);
+		(field ?? dialog)?.focus();
+	});
 
 	function onkeydown(e: KeyboardEvent): void {
 		if (e.key === 'Escape') {

@@ -5,6 +5,7 @@
 	import { api, ApiError, orphanAuthorships } from '$lib/api';
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import { titleCase } from '$lib/utils';
+	import { autofocus } from '$lib/actions/focus';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import type { components } from '$lib/api/schema';
@@ -216,14 +217,16 @@
 </div>
 
 <div class="toolbar">
-	<input type="text" placeholder="Filtrer par nom…" bind:value={search}
+	<input type="search" placeholder="Filtrer par nom…" bind:value={search}
+		use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput} autocomplete="off" />
 </div>
 
 {#if selectedIds.size > 0}
 	<div class="batch-bar">
 		<span>{selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}</span>
-		<input type="text" placeholder="Attribuer à une personne existante…" value={batchSearch.query}
+		<input type="search" placeholder="Attribuer à une personne existante…" value={batchSearch.query}
+			onkeydown={(e) => { if (e.key === 'Escape') { batchSearch.setQuery(''); } }}
 			oninput={(e) => batchSearch.setQuery((e.target as HTMLInputElement).value)} autocomplete="off" />
 		<button class="btn btn-sm btn-create" onclick={openCreateModal}>Créer une personne</button>
 		{#if batchSearch.loading}
@@ -270,7 +273,8 @@
 						{#if activeAssignIdx === i}
 							<div class="assign-panel">
 								<div class="assign-row">
-									<input type="text" placeholder="Nom de la personne…" value={assignSearch.query}
+									<input type="search" placeholder="Nom de la personne…" value={assignSearch.query}
+											use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
 										oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
 									<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
 								</div>

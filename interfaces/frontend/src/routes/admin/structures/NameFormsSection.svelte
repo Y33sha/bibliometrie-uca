@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Picker from "$lib/components/Picker.svelte";
   import type { NameForm, Structure } from "./types";
 
   let {
@@ -23,6 +24,7 @@
     onpickCtx,
     onpickCtxShortcutTutelles,
     onpickCtxClear,
+    oncloseCtxPicker,
   }: {
     structureId: number;
     forms: NameForm[];
@@ -45,6 +47,7 @@
     onpickCtx: (item: number | string) => void | Promise<void>;
     onpickCtxShortcutTutelles: () => void;
     onpickCtxClear: () => void | Promise<void>;
+    oncloseCtxPicker: () => void;
   } = $props();
 </script>
 
@@ -175,7 +178,19 @@
 
 <!-- Add form row -->
 <div class="add-row">
-  <input placeholder="Nouvelle forme..." bind:value={addFormText} />
+  <input
+    placeholder="Nouvelle forme..."
+    bind:value={addFormText}
+    onkeydown={(e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        onaddForm(structureId);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        addFormText = "";
+      }
+    }}
+  />
   <label class="checkbox-label">
     <input
       type="checkbox"
@@ -211,38 +226,25 @@
 
 <!-- Context picker -->
 {#if ctxPickerOpen}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="picker-container ctx-picker"
-    bind:this={ctxPickerEl}
-    onclick={(e) => e.stopPropagation()}
+  <Picker
+    results={ctxPickerResults}
+    bind:search={ctxPickerSearch}
+    bind:element={ctxPickerEl}
+    onpick={(cs) => onpickCtx(cs.id)}
+    onclose={oncloseCtxPicker}
+    placeholder="Rechercher une structure…"
   >
-    <div class="ctx-picker-shortcuts">
-      <button class="btn btn-sm" onclick={onpickCtxShortcutTutelles}> tutelles </button>
-      <button class="btn btn-sm" onclick={onpickCtxClear}> &#x2715; suffisant </button>
-    </div>
-    <input
-      type="text"
-      placeholder="Rechercher une structure..."
-      bind:value={ctxPickerSearch}
-      autocomplete="off"
-    />
-    <div class="picker-results">
-      {#if ctxPickerResults.length === 0}
-        <div class="picker-item disabled">Aucun résultat</div>
-      {:else}
-        {#each ctxPickerResults as cs (cs.id)}
-          <button class="picker-item" onclick={() => onpickCtx(cs.id)}>
-            <span class="type-badge type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">
-              {cs.type}
-            </span>
-            {cs.acronym ? cs.acronym + " \u2014 " : ""}{cs.name}
-          </button>
-        {/each}
-      {/if}
-    </div>
-  </div>
+    {#snippet header()}
+      <div class="ctx-picker-shortcuts">
+        <button class="btn btn-sm" onclick={onpickCtxShortcutTutelles}> tutelles </button>
+        <button class="btn btn-sm" onclick={onpickCtxClear}> &#x2715; suffisant </button>
+      </div>
+    {/snippet}
+    {#snippet item(cs)}
+      <span class="type-badge type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">{cs.type}</span>
+      {cs.acronym ? cs.acronym + " — " : ""}{cs.name}
+    {/snippet}
+  </Picker>
 {/if}
 
 <style>
@@ -444,54 +446,6 @@
     color: var(--text-muted);
     font-size: 0.8rem;
     margin-left: 4px;
-  }
-  .picker-container {
-    position: relative;
-    margin: 8px 0;
-    background: white;
-    border: 1px solid var(--accent);
-    border-radius: 5px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-    max-width: 380px;
-    z-index: 50;
-  }
-  .picker-container input {
-    width: 100%;
-    padding: 7px 10px;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    border-radius: 5px 5px 0 0;
-    font-size: 0.95rem;
-    outline: none;
-    font-family: inherit;
-  }
-  .picker-results {
-    max-height: 200px;
-    overflow-y: auto;
-  }
-  .picker-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    padding: 6px 10px;
-    font-size: 0.95rem;
-    cursor: pointer;
-    background: none;
-    border: none;
-    text-align: left;
-    font-family: inherit;
-    color: inherit;
-  }
-  .picker-item:hover {
-    background: var(--accent-light);
-  }
-  .picker-item.disabled {
-    color: var(--text-muted);
-    cursor: default;
-  }
-  .ctx-picker {
-    max-width: 380px;
   }
   .ctx-picker-shortcuts {
     padding: 6px 10px;

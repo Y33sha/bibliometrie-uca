@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { autofocus } from "$lib/actions/focus";
   import { base } from "$app/paths";
   import { goto } from "$app/navigation";
   import { api, ApiError, structures as structuresApi } from "$lib/api";
@@ -104,19 +105,6 @@
   onMount(loadList);
 </script>
 
-<svelte:window
-  onkeydown={(e) => {
-    if (e.key === "Escape" && createModalOpen) {
-      createModalOpen = false;
-      e.preventDefault();
-    }
-    if (e.key === "Enter" && !e.shiftKey && createModalOpen) {
-      e.preventDefault();
-      submitCreate();
-    }
-  }}
-/>
-
 <svelte:head>
   <title>Admin - Structures - Bibliométrie UCA</title>
 </svelte:head>
@@ -124,7 +112,7 @@
 <h2>Structures</h2>
 
 <div class="toolbar">
-  <input type="text" placeholder="Rechercher..." bind:value={search} oninput={handleSearch} />
+  <input type="search" placeholder="Rechercher..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; loadList(); } }} oninput={handleSearch} />
   <select bind:value={typeFilter} onchange={loadList}>
     <option value="">Tous types</option>
     <option value="labo">Laboratoires</option>
