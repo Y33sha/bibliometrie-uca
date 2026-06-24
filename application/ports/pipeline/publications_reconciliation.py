@@ -44,6 +44,16 @@ class PublicationsReconciliationQueries(Protocol):
         avec l'une d'elles — matérialisées ou orphelines. Univers sur lequel tourne `connected_components`."""
         ...
 
+    def fetch_publication_ids_by_doi(self, conn: Connection) -> dict[str, int]:
+        """Map `lower(doi) → id` des publications existantes portant un DOI.
+
+        Permet à `plan_reconciliation` d'ancrer un groupe sur la publication qui porte
+        déjà son DOI même quand **aucune** SP du voisinage n'y est rattachée — publication
+        devenue orpheline après un TRUNCATE + réimport des sources, ou dérive du
+        `publications.doi` vis-à-vis de ses sources. Sans cela, le groupe créerait une
+        publication neuve qui heurterait la contrainte unique sur le DOI."""
+        ...
+
     def repoint_source_publications(
         self, conn: Connection, source_publication_ids: list[int], publication_id: int
     ) -> None:

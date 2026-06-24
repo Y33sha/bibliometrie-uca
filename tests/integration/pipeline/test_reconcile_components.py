@@ -8,7 +8,7 @@ import logging
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.pipeline.publications.reconcile_components import run
+from application.pipeline.publications.reconcile_components import reconcile, run
 from domain.source_publications.keys import project_confirmation_keys
 from infrastructure.queries.pipeline.publications_reconciliation import (
     PgPublicationsReconciliationQueries,
@@ -506,3 +506,38 @@ class TestUniverseMatchesPythonTokens:
             assert sql_neighbors == py_neighbors, (
                 f"divergence SP {i} : SQL={sql_neighbors} Python={py_neighbors}"
             )
+
+
+class TestExternalDoiCarrier:
+    """Régression : une publication orpheline (sans SP) portant un DOI — état typique après un
+    TRUNCATE + réimport des sources — ne doit pas faire planter la réconciliation. Les SP fraîches
+    portant ce DOI s'y rattachent au lieu de créer une pub neuve (qui violerait l'unicité du DOI)."""
+
+    def test_orphan_publication_with_doi_is_reused_not_duplicated(self, sa_sync_conn):
+        conn = sa_sync_conn
+        orphan_pub = _seed_pub(conn, doi="10.70675/abc")  # porte le DOI, aucune SP
+        sp1 = _seed_sp(
+            conn, source_id="t1", doi="10.70675/abc", title_normalized="t", keys_dirty=True
+        )
+        sp2 = _seed_sp(conn, source_id="t2", doi="10.70675/abc", keys_dirty=True)
+        # in_perimeter → sans le correctif, ce groupe d'orphelins serait une CRÉATION et
+        # planterait sur publications_doi_lower_key ; avec, il s'ancre sur la pub existante.
+        conn.execute(
+            text(
+                "INSERT INTO source_authorships (source, source_publication_id, in_perimeter) "
+                "VALUES ('openalex', :sp, true)"
+            ),
+            {"sp": sp1},
+        )
+
+        reconcile(
+            conn, PgPublicationsReconciliationQueries(), pub_repo=publication_repository(conn)
+        )
+
+        assert _pub_exists(conn, orphan_pub)
+        assert _sp_state(conn, sp1)[0] == orphan_pub
+        assert _sp_state(conn, sp2)[0] == orphan_pub
+        n = conn.execute(
+            text("SELECT count(*) FROM publications WHERE lower(doi) = '10.70675/abc'")
+        ).scalar_one()
+        assert n == 1
