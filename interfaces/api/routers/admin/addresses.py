@@ -1,15 +1,16 @@
 """Router /api/addresses/* et /api/countries.
 
-Lectures : port `AddressesQueries`. Mutations : services applicatifs
-- `application.addresses_structures` pour les liens adresse↔structure
-- `application.addresses_countries` pour l'attribution et propagation des pays.
+Lectures : port `AddressesQueries`. Écritures : command handlers de
+`application.addresses.commands` (frontière transactionnelle : ils committent
+avant que le routeur ne rende la main).
 """
 
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from sqlalchemy import Connection
 
-from application.addresses import countries as countries_service, structures as structures_service
+from application.addresses import commands as address_commands
 from application.ports.api.addresses_queries import (
     AddressCountriesFilters,
     AddressesCountriesResponse,
@@ -28,6 +29,7 @@ from interfaces.api.deps import (
     addresses_queries_sync,
     bg_propagate_countries_sync,
     bg_propagate_in_perimeter_sync,
+    db_conn_sync,
     require_admin,
 )
 from interfaces.api.models import (
@@ -137,11 +139,13 @@ def review_address(
     addr_id: int,
     action: ReviewAction,
     bg: BackgroundTasks,
+    conn: Connection = Depends(db_conn_sync),
     queries: AddressesQueries = Depends(addresses_queries_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
 ) -> AddressReviewResponse:
     """Confirme, rejette ou reset le lien adresse ↔ structure."""
-    changed = structures_service.review_structure_link(
+    changed = address_commands.review_structure_link(
+        conn,
         addr_id,
         action.structure_id,
         action.is_confirmed,
@@ -163,10 +167,12 @@ def review_address(
 def batch_review(
     data: BatchReviewAction,
     bg: BackgroundTasks,
+    conn: Connection = Depends(db_conn_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
 ) -> BatchUpdatedResponse:
     """Confirme/rejette/reset en batch."""
-    updated, changed = structures_service.batch_review_structure_link(
+    updated, changed = address_commands.batch_review_structure_link(
+        conn,
         data.address_ids,
         data.structure_id,
         data.is_confirmed,
@@ -222,6 +228,7 @@ def set_address_country(
     addr_id: int,
     body: SetCountry,
     bg: BackgroundTasks,
+    conn: Connection = Depends(db_conn_sync),
     queries: AddressesQueries = Depends(addresses_queries_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
     _: None = Depends(require_admin),
@@ -233,7 +240,7 @@ def set_address_country(
         if not queries.country_exists(c):
             raise HTTPException(status_code=400, detail=f"Code pays inconnu: {c}")
 
-    affected = countries_service.set_country(addr_id, body.countries, repo=addr_repo)
+    affected = address_commands.set_country(conn, addr_id, body.countries, repo=addr_repo)
     bg.add_task(bg_propagate_countries_sync, affected)
     return OkResponse()
 
@@ -242,6 +249,7 @@ def set_address_country(
 def batch_set_country(
     body: BatchSetCountry,
     bg: BackgroundTasks,
+    conn: Connection = Depends(db_conn_sync),
     queries: AddressesQueries = Depends(addresses_queries_sync),
     addr_repo: AddressRepository = Depends(address_repo_sync),
     _: None = Depends(require_admin),
@@ -254,26 +262,16 @@ def batch_set_country(
     if not queries.country_exists(country_code):
         raise HTTPException(status_code=400, detail=f"Code pays inconnu: {country_code}")
 
-    if body.address_ids:
-        modified_ids = countries_service.batch_set_country_by_ids(
-            country_code, body.address_ids, repo=addr_repo
-        )
-    else:
-        modified_ids = countries_service.batch_set_country_by_filter(
-            country_code,
-            search=body.search,
-            has_country=body.has_country,
-            country_code_filter=body.country_code_filter,
-            suggested_country=body.suggested_country,
-            repo=addr_repo,
-        )
-    updated = len(modified_ids)
-
-    propagated_ids = countries_service.propagate_countries_to_similar(
-        modified_ids=modified_ids, repo=addr_repo
+    updated, propagated, all_ids = address_commands.batch_set_country(
+        conn,
+        country_code,
+        address_ids=body.address_ids,
+        search=body.search,
+        has_country=body.has_country,
+        country_code_filter=body.country_code_filter,
+        suggested_country=body.suggested_country,
+        repo=addr_repo,
     )
-    propagated = len(propagated_ids)
-    all_ids = modified_ids + propagated_ids
 
     bg.add_task(bg_propagate_countries_sync, all_ids)
     return BatchCountryResponse(updated=updated, propagated=propagated)

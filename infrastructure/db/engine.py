@@ -16,6 +16,7 @@ import os
 import psycopg  # noqa: F401 — driver chargé par SA via la URL postgresql+psycopg://
 from sqlalchemy import URL, Engine, create_engine
 
+from infrastructure.db.dml_guard import install_dml_guard
 from infrastructure.settings import settings
 
 _sync_engine: Engine | None = None
@@ -52,12 +53,14 @@ def build_sync_engine() -> Engine:
             f"build_sync_engine refusé sous pytest sur DB '{settings.db_name}' "
             f"(suffixe '_test' requis). Vérifier le monkey-patch dans le conftest."
         )
-    return create_engine(
+    engine = create_engine(
         _db_url(),
         pool_size=settings.db_pool_min,
         max_overflow=settings.db_pool_max - settings.db_pool_min,
         pool_pre_ping=True,
     )
+    install_dml_guard(engine)
+    return engine
 
 
 def set_sync_engine(engine: Engine | None) -> None:
