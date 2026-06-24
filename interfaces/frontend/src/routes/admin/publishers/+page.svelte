@@ -11,8 +11,10 @@
 	import type { components } from '$lib/api/schema';
 	type Publisher = components['schemas']['PublisherListItem'];
 	type EnumOption = components['schemas']['EnumOption'];
+	type Country = components['schemas']['CountryOut'];
 
 	let publisherTypes: EnumOption[] = $state([]);
+	let countries: Country[] = $state([]);
 
 	// Clé d'API utilisée pour forcer le reload de PublishersListView après
 	// une édition ou fusion (incrément invalide le cache).
@@ -120,6 +122,7 @@
 
 	onMount(async () => {
 		publisherTypes = await api<EnumOption[]>('/api/publisher-types');
+		countries = await api<Country[]>('/api/countries');
 	});
 </script>
 
@@ -201,7 +204,12 @@
 {#if editModal}
 <Modal title="Modifier l'éditeur" maxWidth="460px" onclose={() => editModal = null} onsubmit={saveEdit}>
 		<label>Nom <input bind:value={editModal.name} /></label>
-		<label>Pays <input bind:value={editModal.country} placeholder="ex: FR, US" /></label>
+		<label>Pays <select bind:value={editModal.country}>
+			<option value="">— Aucun —</option>
+			{#each countries as c (c.code)}
+				<option value={c.code.toUpperCase()}>{c.name} ({c.code.toUpperCase()})</option>
+			{/each}
+		</select></label>
 		<label>Type <select bind:value={editModal.publisher_type}>
 			{#each publisherTypes as opt (opt.value)}
 				<option value={opt.value}>{opt.label_fr}</option>
