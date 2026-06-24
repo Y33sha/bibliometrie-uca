@@ -123,7 +123,10 @@ def reconcile(
         )
     rows = queries.fetch_reconciliation_universe(conn)
     rows_by_sp = {row.id: row for row in rows}
-    plan = plan_reconciliation(_member(row) for row in rows)
+    existing_pub_by_doi = queries.fetch_publication_ids_by_doi(conn)
+    plan = plan_reconciliation(
+        (_member(row) for row in rows), existing_pub_by_doi=existing_pub_by_doi
+    )
     if logger:
         logger.info(
             "  univers de %d SP → %d publications cibles, %d doublons à fusionner ; application…",
@@ -199,7 +202,8 @@ def run(
             logger.info("Réconciliation (dry-run) : %d source_publications dirty", len(dirty_ids))
             if dirty_ids:
                 plan = plan_reconciliation(
-                    _member(row) for row in queries.fetch_reconciliation_universe(conn)
+                    (_member(row) for row in queries.fetch_reconciliation_universe(conn)),
+                    existing_pub_by_doi=queries.fetch_publication_ids_by_doi(conn),
                 )
                 created = sum(1 for g in plan.groups if g.target_publication_id is None)
                 logger.info(

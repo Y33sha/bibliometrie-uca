@@ -96,7 +96,7 @@ def _partitions(members: list[ReconcileMember]) -> list[list[ReconcileMember]]:
 type _Claim = tuple[int | None, bool, int, tuple[int, ...]]
 
 
-def _claim(part: list[ReconcileMember]) -> _Claim | None:
+def _claim(part: list[ReconcileMember], existing_pub_by_doi: dict[str, int]) -> _Claim | None:
     """Revendication d'ancre d'une partition, ou `None` si **skip** (orphelins hors-périmètre).
 
     - Partition contenant ≥1 SP matérialisée → revendique un pub existant : porteur du DOI
@@ -105,12 +105,19 @@ def _claim(part: list[ReconcileMember]) -> _Claim | None:
     - Partition d'orphelins (aucune SP matérialisée) → `preferred = None` (**create**) si ≥1 membre
       in-périmètre **et** ≥1 membre matérialisable (titre + année — gate `has_minimal_publication_metadata`,
       sinon `pub_year NOT NULL` ferait échouer la création) ; sinon `None` (**skip**, les SP restent orphelines).
+
+    Porteur du DOI **hors voisinage** (`existing_pub_by_doi`) : une publication existante porte
+    déjà le DOI de la partition sans qu'aucune SP du voisinage n'y soit rattachée (orpheline après
+    un TRUNCATE + réimport, ou dérive du `publications.doi`). Elle reste l'ancre — sinon la création
+    d'une pub neuve au même DOI heurterait la contrainte unique. Honore la doctrine « ancre = porteur
+    du DOI » pour les porteurs qu'aucun membre ne représente.
     """
     sp_ids = tuple(sorted(m.source_publication_id for m in part))
     min_sp = min(m.source_publication_id for m in part)
+    doi = next((m.effective_doi for m in part if m.effective_doi), None)
+    external_carrier = existing_pub_by_doi.get(doi) if doi else None
     materialized = [m for m in part if m.publication_id is not None]
     if materialized:
-        doi = next((m.effective_doi for m in part if m.effective_doi), None)
         carriers = sorted(
             {
                 pid
@@ -120,15 +127,21 @@ def _claim(part: list[ReconcileMember]) -> _Claim | None:
         )
         if carriers:
             return carriers[0], True, min_sp, sp_ids
+        if external_carrier is not None:
+            return external_carrier, True, min_sp, sp_ids
         anchor_pub = min(materialized, key=lambda m: m.source_publication_id).publication_id
         return anchor_pub, False, min_sp, sp_ids
+    if external_carrier is not None:
+        return external_carrier, True, min_sp, sp_ids
     creatable = any(m.title_normalized and m.pub_year for m in part)
     if creatable and any(m.in_perimeter for m in part):
         return None, False, min_sp, sp_ids  # create
     return None  # skip
 
 
-def plan_reconciliation(members: Iterable[ReconcileMember]) -> ReconcilePlan:
+def plan_reconciliation(
+    members: Iterable[ReconcileMember], *, existing_pub_by_doi: dict[str, int] | None = None
+) -> ReconcilePlan:
     """Calcule les assignations SP → publication sur le voisinage `members` (pur, sans I/O).
 
     Pour chaque partition, une revendication (`_claim`) : pub existant (match/merge), création
@@ -137,9 +150,14 @@ def plan_reconciliation(members: Iterable[ReconcileMember]) -> ReconcilePlan:
     que d'**une** partition — la revendication forte (porteur du DOI) l'emporte, puis le plus petit
     `source_publication_id` ; les perdantes prennent un nouveau pub. Les pubs vidées de toutes leurs
     SP sont listées dans `dissolved` avec leur successeur.
+
+    `existing_pub_by_doi` (map `lower(doi) → id`) sert d'ancre de repli pour une partition dont le
+    DOI est porté par une publication existante qu'aucun membre du voisinage ne représente (pub
+    orpheline, ou dérive). Vide par défaut (aucun porteur hors voisinage connu).
     """
     members = list(members)
-    claims = [c for part in _partitions(members) if (c := _claim(part)) is not None]
+    by_doi = existing_pub_by_doi or {}
+    claims = [c for part in _partitions(members) if (c := _claim(part, by_doi)) is not None]
 
     # Attribution gloutonne : revendications de pub existant d'abord (forte, puis min_sp), puis
     # les créations (`preferred=None`). La première à revendiquer un pub le garde ; les suivantes,

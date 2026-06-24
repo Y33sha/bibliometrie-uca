@@ -199,6 +199,41 @@ class TestAssignmentOfOrphans:
         assert plan.dissolved == ()
 
 
+class TestExternalDoiCarrier:
+    """Porteur du DOI hors voisinage : une publication existante porte le DOI sans qu'aucune SP
+    du voisinage n'y soit rattachée (orpheline après TRUNCATE+réimport, ou dérive). Le groupe s'y
+    ancre au lieu de créer une pub neuve qui heurterait la contrainte unique sur le DOI."""
+
+    def test_orphan_partition_anchors_to_external_carrier(self):
+        plan = plan_reconciliation(
+            [
+                _m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")], in_perimeter=True),
+                _m(2, None, doi="10.1/x", tokens=[("doi", "10.1/x")]),
+            ],
+            existing_pub_by_doi={"10.1/x": 132},
+        )
+        assert _groups(plan) == {132: (1, 2)}
+        assert plan.dissolved == ()
+
+    def test_no_external_carrier_still_creates(self):
+        """Sans porteur connu, comportement inchangé : création (target=None)."""
+        plan = plan_reconciliation(
+            [_m(1, None, doi="10.1/x", tokens=[("doi", "10.1/x")], in_perimeter=True)],
+            existing_pub_by_doi={},
+        )
+        assert _groups(plan) == {None: (1,)}
+
+    def test_materialized_without_carrier_prefers_external_carrier(self):
+        """SP matérialisée sur une pub qui ne porte pas le DOI (dérive) → ancre = porteur externe,
+        la pub dérivée est dissoute vers lui."""
+        plan = plan_reconciliation(
+            [_m(1, 50, doi="10.1/x", tokens=[("doi", "10.1/x")])],  # pub 50 ne porte pas X
+            existing_pub_by_doi={"10.1/x": 90},
+        )
+        assert _groups(plan) == {90: (1,)}
+        assert plan.dissolved == (DissolvedPublication(50, 90),)
+
+
 class TestWorkGroupShape:
     def test_group_sp_ids_sorted(self):
         plan = plan_reconciliation(

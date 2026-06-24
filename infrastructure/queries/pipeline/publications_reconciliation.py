@@ -103,6 +103,16 @@ def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
     ]
 
 
+def fetch_publication_ids_by_doi(conn: Connection) -> dict[str, int]:
+    # Map `lower(doi) → id` des publications portant un DOI. Clé sur `lower(doi)` :
+    # l'index unique `publications_doi_lower_key` garantit l'unicité, et le DOI de
+    # partition (`effective_doi`, via `clean_doi`) est déjà en minuscule.
+    rows = conn.execute(
+        text("SELECT id, lower(doi) AS doi FROM publications WHERE doi IS NOT NULL")
+    ).all()
+    return {row.doi: row.id for row in rows}
+
+
 def repoint_source_publications(
     conn: Connection, source_publication_ids: list[int], publication_id: int
 ) -> None:
@@ -178,6 +188,9 @@ class PgPublicationsReconciliationQueries(PublicationsReconciliationQueries):
 
     def fetch_reconciliation_universe(self, conn: Connection) -> list[ReconcileRow]:
         return fetch_reconciliation_universe(conn)
+
+    def fetch_publication_ids_by_doi(self, conn: Connection) -> dict[str, int]:
+        return fetch_publication_ids_by_doi(conn)
 
     def repoint_source_publications(
         self, conn: Connection, source_publication_ids: list[int], publication_id: int
