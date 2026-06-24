@@ -41,8 +41,9 @@ Rien n'est écrit.
 
 import sys
 from collections import Counter, defaultdict
+from typing import Any
 
-from sqlalchemy import bindparam, text
+from sqlalchemy import Connection, bindparam, text
 
 from domain.persons.name_matching import names_compatible
 from infrastructure.db.engine import get_sync_engine
@@ -68,15 +69,15 @@ _OCCURRENCES_SQL = text("""
 """).bindparams(bindparam("spids"))
 
 
-def load_person_labels(conn):
+def load_person_labels(conn: Connection) -> dict[Any, str]:
     """{person_id: "Prénom Nom"}."""
     rows = conn.execute(text("SELECT id, first_name, last_name FROM persons")).all()
     return {r.id: f"{r.first_name} {r.last_name}".strip() for r in rows}
 
 
-def load_confirmed_forms(conn):
+def load_confirmed_forms(conn: Connection) -> dict[Any, list[Any]]:
     """{person_id: [forme confirmée, …]} — la base du départage (verrou de l'étape 2)."""
-    forms = defaultdict(list)
+    forms: dict[Any, list[Any]] = defaultdict(list)
     rows = conn.execute(
         text("SELECT person_id, name_form FROM person_name_forms WHERE status = 'confirmed'")
     ).all()
@@ -85,13 +86,13 @@ def load_confirmed_forms(conn):
     return forms
 
 
-def is_legit(norm, confirmed):
+def is_legit(norm: str, confirmed: list[Any]) -> bool:
     """L'occurrence est-elle compatible avec une forme confirmée de la personne ?"""
     return any(names_compatible(norm, "", f, "") for f in confirmed)
 
 
-def main():
-    sys.stdout.reconfigure(encoding="utf-8")
+def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     conn = get_sync_engine().connect()
     try:
         labels = load_person_labels(conn)
@@ -116,9 +117,13 @@ def main():
 
         n_detachable = n_dup = n_no_anchor = 0
         intrus_total = 0
-        size_hist = defaultdict(int)
-        src_by_bucket = {"detachable": Counter(), "dup": Counter(), "no_anchor": Counter()}
-        samples = {"detachable": [], "dup": [], "no_anchor": []}
+        size_hist: dict[int, int] = defaultdict(int)
+        src_by_bucket: dict[str, Counter[str]] = {
+            "detachable": Counter(),
+            "dup": Counter(),
+            "no_anchor": Counter(),
+        }
+        samples: dict[str, list[Any]] = {"detachable": [], "dup": [], "no_anchor": []}
 
         for (spid, pid), occs in groups.items():
             size_hist[len(occs)] += 1

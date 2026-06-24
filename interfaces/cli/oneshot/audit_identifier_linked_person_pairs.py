@@ -21,9 +21,11 @@ Rien n'est écrit.
 
 import sys
 from collections import defaultdict
+from collections.abc import Iterable
 from itertools import combinations
+from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from domain.persons.matching import ORCID_MATCH_SOURCES
 from domain.persons.name_matching import names_compatible
@@ -32,7 +34,7 @@ from infrastructure.db.engine import get_sync_engine
 ID_TYPES = ("orcid", "idref", "hal_person_id")
 
 
-def load_person_names(conn):
+def load_person_names(conn: Connection) -> dict[Any, tuple[str, str, str]]:
     """{person_id: (last_name_normalized, first_name_normalized, "Prénom Nom")}."""
     rows = conn.execute(
         text("""
@@ -44,14 +46,14 @@ def load_person_names(conn):
     return {r.id: (r.ln or "", r.fn or "", f"{r.first_name} {r.last_name}".strip()) for r in rows}
 
 
-def cluster_compatible(person_ids, names):
+def cluster_compatible(person_ids: Iterable[Any], names: dict[Any, tuple[str, str, str]]) -> bool:
     """Vrai si toutes les paires du cluster ont des noms compatibles."""
     forms = [names.get(pid, ("", "", "")) for pid in person_ids]
     return all(names_compatible(a[0], a[1], b[0], b[1]) for a, b in combinations(forms, 2))
 
 
-def main():
-    sys.stdout.reconfigure(encoding="utf-8")
+def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     conn = get_sync_engine().connect()
     try:
         names = load_person_names(conn)
@@ -87,10 +89,10 @@ def main():
         print(f"  {n} authorships à identifiant scannées\n")
 
         # Clusters multi-personnes.
-        stats = {t: defaultdict(int) for t in ID_TYPES}
-        compatible_samples = []
-        mixed_samples = []
-        size_hist = defaultdict(int)
+        stats: dict[str, dict[str, int]] = {t: defaultdict(int) for t in ID_TYPES}
+        compatible_samples: list[tuple[str, str, str]] = []
+        mixed_samples: list[tuple[str, str, str]] = []
+        size_hist: dict[int, int] = defaultdict(int)
         for (t, val), persons in id_to_persons.items():
             if len(persons) < 2:
                 continue

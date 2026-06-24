@@ -322,7 +322,12 @@ exclude = [
 #   paramètres (records DB hydratés) — délégués à Phase 8 (`CODE_rich-domain-model`).
 # - `infrastructure.repositories.*` et `infrastructure.queries.*` :
 #   couche SQL — Row, records DB, batchs hétérogènes. Phase 8.
-# - `interfaces.cli.{imports,maintenance}.*` : scripts one-shot, hors scope.
+# - `application.publishers_enrichment.*` : orchestrateurs d'enrichissement
+#   consommant des payloads d'API externes (`dict[str, Any]`, fetchers typés
+#   `Callable[..., dict[str, Any]]`) — comme `infrastructure.sources.*`.
+# - `interfaces.cli.{imports,maintenance,oneshot}.*` : scripts touchant des
+#   records DB / payloads JSONB — `Any` délibéré, comme les couches SQL. Ils
+#   restent annotés et leurs corps vérifiés (≠ exclusion : cf. `exclude` plus haut).
 # - `interfaces.api.models.*` : nombreux fields `Any` (payloads JSONB libres
 #   côté API, body dicts hétérogènes). Hors scope du chantier typage strict
 #   tant que `JsonValue` ne couvre pas tous les cas.
@@ -339,6 +344,7 @@ module = [
     "application.pipeline.oa_status.*",
     "application.pipeline.publishers_journals.*",
     "application.pipeline.subjects._common",
+    "application.publishers_enrichment.*",
     "application.ports.api.*",
     "application.ports.pipeline.extract.*",
     "application.ports.pipeline.staging",

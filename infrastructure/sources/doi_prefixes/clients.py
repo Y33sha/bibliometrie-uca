@@ -82,17 +82,17 @@ def fetch_crossref_prefix(prefix: str, *, user_agent: str) -> tuple[str, int | N
     ou si `name` est absent. `member_id` peut être `None` si l'API ne le
     renvoie pas pour ce préfixe.
     """
-    prefix = clean_doi_prefix(prefix)
-    if not prefix:
+    cleaned = clean_doi_prefix(prefix)
+    if not cleaned:
         return None
-    url = f"{CROSSREF_PREFIX_BASE_URL}/{prefix}"
+    url = f"{CROSSREF_PREFIX_BASE_URL}/{cleaned}"
     headers = {"User-Agent": user_agent, "Accept": "application/json"}
     try:
         data = http_request_with_retry(
-            "GET", url, headers=headers, timeout=15, max_retries=3, label=f"prefix {prefix}"
+            "GET", url, headers=headers, timeout=15, max_retries=3, label=f"prefix {cleaned}"
         )
     except Exception as exc:
-        logger.warning(f"api.crossref.org/prefixes/{prefix} : {exc!r}")
+        logger.warning(f"api.crossref.org/prefixes/{cleaned} : {exc!r}")
         return None
     msg = data.get("message") if isinstance(data, dict) else None
     if not isinstance(msg, dict):
@@ -110,10 +110,10 @@ def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, st
 
     Hiérarchie DataCite : `provider → client → prefix → DOI`. Un préfixe est alloué à un seul client (validé Phase 0 sur 105/105 prefixes UCA). Le `client_symbol` (ex. `cern.zenodo`, `inist.inra`) est l'identifiant stable assigné par DataCite, distinct du nom et persistant au-delà des renommages.
     """
-    prefix = clean_doi_prefix(prefix)
-    if not prefix:
+    cleaned = clean_doi_prefix(prefix)
+    if not cleaned:
         return None
-    url = f"{DATACITE_PREFIX_BASE_URL}/{prefix}"
+    url = f"{DATACITE_PREFIX_BASE_URL}/{cleaned}"
     headers = {"User-Agent": user_agent, "Accept": "application/vnd.api+json"}
     try:
         data = http_request_with_retry(
@@ -123,10 +123,10 @@ def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, st
             headers=headers,
             timeout=15,
             max_retries=3,
-            label=f"datacite prefix {prefix}",
+            label=f"datacite prefix {cleaned}",
         )
     except Exception as exc:
-        logger.warning(f"api.datacite.org/prefixes/{prefix} : {exc!r}")
+        logger.warning(f"api.datacite.org/prefixes/{cleaned} : {exc!r}")
         return None
     return _parse_datacite_prefix_payload(data)
 
