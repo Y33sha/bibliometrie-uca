@@ -14,6 +14,7 @@ import logging
 
 import httpx
 
+from domain.publications.identifiers import clean_doi
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
 # Mapping Unpaywall oa_status → notre enum oa_type
@@ -35,7 +36,12 @@ async def fetch_oa_status(
     logger: logging.Logger,
 ) -> str | None:
     """Interroge Unpaywall pour un DOI. Retourne le statut OA mappé ou None (DOI inconnu / erreur)."""
-    url = f"{base_url}/{doi}"
+    # Re-nettoyage avant l'appel HTTP par DOI (idempotent) : la colonne source du
+    # DOI peut porter du legacy non normalisé. Un DOI inexploitable → pas d'appel.
+    cleaned = clean_doi(doi)
+    if not cleaned:
+        return None
+    url = f"{base_url}/{cleaned}"
     try:
         data = await http_request_with_retry_async(
             client,
