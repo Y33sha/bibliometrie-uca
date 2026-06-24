@@ -420,22 +420,29 @@ class TestUniverseMatchesPythonTokens:
             _seed_sp(
                 conn,
                 source_id="hal1",
-                external_ids={"hal_id": ["hal-1", "hal-2"]},
+                external_ids={"hal_id": ["hal-00000001", "hal-00000002"]},
                 keys_dirty=False,
             ),
             _seed_sp(
                 conn,
                 source_id="hal2",
-                external_ids={"hal_id": ["hal-2", "hal-3"]},
+                external_ids={"hal_id": ["hal-00000002", "hal-00000003"]},
                 keys_dirty=False,
             ),
             # Préfixe de collection institutionnelle : le VO HALId doit l'accepter comme token
             # (sinon le SQL les rapproche mais le clustering Python non → divergence + non-fusion).
+            # Le numéro fait 8 chiffres (docid CCSD), exigence du VO.
             _seed_sp(
-                conn, source_id="emse1", external_ids={"hal_id": ["emse-99"]}, keys_dirty=False
+                conn,
+                source_id="emse1",
+                external_ids={"hal_id": ["emse-04836977"]},
+                keys_dirty=False,
             ),
             _seed_sp(
-                conn, source_id="emse2", external_ids={"hal_id": ["emse-99"]}, keys_dirty=False
+                conn,
+                source_id="emse2",
+                external_ids={"hal_id": ["emse-04836977"]},
+                keys_dirty=False,
             ),
             _seed_sp(conn, source_id="nnt1", external_ids={"nnt": "2024UCA01"}, keys_dirty=False),
             _seed_sp(conn, source_id="nnt2", external_ids={"nnt": "2024UCA01"}, keys_dirty=False),

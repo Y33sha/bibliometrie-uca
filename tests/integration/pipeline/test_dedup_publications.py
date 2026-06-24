@@ -151,15 +151,15 @@ class TestRefreshFromSources:
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "fr"
 
-    def test_source_priority_scanr_over_hal(self, sa_sync_conn):
-        """Pour les non-thèses, ScanR est prioritaire sur HAL."""
-        id1 = _insert_pub(sa_sync_conn, doi="10.1234/scanr-prio", pub_year=2024, doc_type="article")
+    def test_source_priority_hal_over_scanr(self, sa_sync_conn):
+        """Pour les non-thèses, HAL est prioritaire sur ScanR (cf. SOURCE_PRIORITY)."""
+        id1 = _insert_pub(sa_sync_conn, doi="10.1234/hal-prio", pub_year=2024, doc_type="article")
         self._insert_sd(sa_sync_conn, id1, "hal", language="en", doc_type="article")
         self._insert_sd(sa_sync_conn, id1, "scanr", language="fr", doc_type="article")
         refresh_from_sources(id1, repo=publication_repository(sa_sync_conn))
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
-        assert lang == "fr"
+        assert lang == "en"
 
     def test_ongoing_thesis_to_thesis(self, sa_sync_conn):
         """Un ongoing_thesis passe à thesis quand theses.fr le dit."""

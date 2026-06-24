@@ -167,7 +167,7 @@ class TestCreateStructure:
                 "name": "Nouvelle",
                 "type": "labo",
                 "acronym": "NOV",
-                "ror_id": "ror123",
+                "ror_id": "02scfj030",
                 "rnsr_id": None,
                 "hal_collection": "COLL",
                 "api_ids": {"openalex": "I1"},
