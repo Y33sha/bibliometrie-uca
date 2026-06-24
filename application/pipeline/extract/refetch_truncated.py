@@ -43,23 +43,18 @@ async def refetch(
     *,
     dry_run: bool = False,
     limit: int | None = None,
-    full: bool = False,
 ) -> PhaseMetrics:
-    """Re-fetch les works OpenAlex avec exactement 100 authorships.
+    """Re-fetch les works OpenAlex marqués `staging.authors_truncated`.
 
     Phase importable depuis `run_pipeline.py` ; ne ferme pas la
     connexion (responsabilité du caller). `updated` compte les works
     ré-écrits ; `already_complete` (extras) ceux qui avaient pile 100
-    auteurs ; `errors` les fetchs échoués.
-
-    `full=True` (CLI hors-ligne) cible les works déjà normalisés via
-    `source_publications` au lieu des seules lignes staging `processed=FALSE` —
-    utile pour rattraper les tronqués figés par des runs antérieurs.
+    auteurs (genuine, flag effacé) ; `errors` les fetchs échoués.
     """
     adapter.configure(conn)
 
-    truncated = adapter.find_truncated(conn, limit=limit, full=full)
-    log.info(f"{len(truncated)} works avec 100 auteurs détectés (potentiellement tronqués)")
+    truncated = adapter.find_truncated(conn, limit=limit)
+    log.info(f"{len(truncated)} works marqués tronqués (à vérifier/compléter)")
 
     metrics = PhaseMetrics(total=len(truncated))
     if not truncated or dry_run:
@@ -78,8 +73,14 @@ async def refetch(
                 work = await adapter.fetch_work(client, ref.openalex_id)
 
             if not work:
+                # Fetch échoué : on garde le flag → retry au prochain run (robuste à
+                # une indisponibilité OpenAlex / un 429).
                 metrics.add(errors=1)
             elif len(work.get("authorships", [])) <= 100:
+                # Genuine 100 (ou moins) : pas tronqué → on efface juste le flag,
+                # sans réécrire raw_data ni forcer une re-normalisation.
+                async with db_lock:
+                    await asyncio.to_thread(adapter.clear_truncated, conn, ref.staging_id)
                 metrics.add(already_complete=1)
             else:
                 async with db_lock:

@@ -91,7 +91,7 @@ def _seed_refetched(conn, *, source_id, full_work, bulk_payload, processed):
 def _get_staging(conn, source_id):
     return conn.execute(
         text(
-            "SELECT raw_data, raw_hash, processed FROM staging "
+            "SELECT raw_data, raw_hash, processed, authors_truncated FROM staging "
             "WHERE source = 'openalex' AND source_id = :sid"
         ),
         {"sid": source_id},
@@ -188,7 +188,31 @@ class TestRefetchPreservation:
         assert row.raw_data["title"] == "Updated"
         assert row.raw_data["cited_by_count"] == 42
         assert len(row.raw_data["authorships"]) == 100
-        # processed remis à FALSE → normalize re-passera, et refetch dans
-        # le même run pipeline re-pickera (count=100, processed=FALSE)
+        # processed remis à FALSE + flag re-posé (bulk re-tronqué à 100) → normalize
+        # re-passera et refetch re-pickera la ligne.
         assert row.processed is False
+        assert row.authors_truncated is True
         assert counts.new == 0 and counts.updated == 1
+
+
+class TestAuthorsTruncatedFlag:
+    def test_bulk_100_authors_flags_truncated(self, sa_sync_conn):
+        """Bulk à 100 auteurs (plafond OpenAlex) → authors_truncated = TRUE."""
+        insert_batch(sa_sync_conn, [_make_work("W200", 100)])
+        assert _get_staging(sa_sync_conn, "W200").authors_truncated is True
+
+    def test_bulk_under_100_not_flagged(self, sa_sync_conn):
+        """Bulk sous le plafond → flag FALSE."""
+        insert_batch(sa_sync_conn, [_make_work("W201", 50)])
+        assert _get_staging(sa_sync_conn, "W201").authors_truncated is False
+
+    def test_unchanged_bulk_preserves_cleared_flag(self, sa_sync_conn):
+        """Ligne refetchée (flag effacé) re-vue à l'identique → le flag reste FALSE
+        (ne re-déclenche pas un refetch sur un work déjà complété)."""
+        bulk = _make_work("W202", 100, title="Stable")
+        full = _make_work("W202", 150, title="Stable")
+        _seed_refetched(
+            sa_sync_conn, source_id="W202", full_work=full, bulk_payload=bulk, processed=True
+        )
+        insert_batch(sa_sync_conn, [bulk])  # hash identique → flag préservé (FALSE)
+        assert _get_staging(sa_sync_conn, "W202").authors_truncated is False

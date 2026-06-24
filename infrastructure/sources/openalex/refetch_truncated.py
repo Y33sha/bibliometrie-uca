@@ -1,7 +1,7 @@
 """Adapter OpenAlex pour `application.pipeline.extract.refetch_truncated`.
 
-HTTP (un appel par work) + SELECT (works avec 100 auteurs) +
-UPDATE staging.raw_data (sans recalcul de raw_hash).
+HTTP (un appel par work) + SELECT (works marqués `staging.authors_truncated`) +
+UPDATE staging.raw_data (efface le flag, sans recalcul de raw_hash).
 
 L'orchestration (boucle async, sémaphore, commits intermédiaires) vit
 côté `application.pipeline.extract.refetch_truncated`.
@@ -34,40 +34,28 @@ MAX_CONCURRENT = 3
 # préservation (cf. orchestrateur). Tant que le bulk renvoie le même
 # payload tronqué, son hash matchera celui en base et l'UPSERT bulk ne
 # touchera pas `raw_data` (qui contient pourtant les auteurs complets).
+# Efface `authors_truncated` (le work est désormais complet et vérifié) et
+# repasse `processed = FALSE` pour que normalize ré-écrive les authorships complètes.
 _UPDATE_SQL = text(
     """
     UPDATE staging
-    SET raw_data = :raw_data, processed = FALSE, last_seen_at = now()
+    SET raw_data = :raw_data, processed = FALSE, authors_truncated = FALSE, last_seen_at = now()
     WHERE id = :id
     """
 ).bindparams(bindparam("raw_data", type_=JSONB))
 
+# Genuine 100 auteurs : pas tronqué, on lève juste le drapeau (pas de réécriture).
+_CLEAR_TRUNCATED_SQL = text("UPDATE staging SET authors_truncated = FALSE WHERE id = :id")
+
+# Détection par le marqueur explicite posé à l'extraction : indépendant de l'ordre
+# des phases (survit à normalize, qui purge `raw_data`) et de la source des auteurs.
+# `source_id` (l'ID OpenAlex) reste sur la ligne staging même après purge du brut.
 _SELECT_TRUNCATED_SQL = text(
     """
     SELECT id, source_id
     FROM staging
-    WHERE source = 'openalex'
-      AND processed = FALSE
-      AND jsonb_array_length(raw_data->'authorships') = 100
+    WHERE source = 'openalex' AND authors_truncated
     ORDER BY id
-    """
-)
-
-# Mode `full` : les works déjà normalisés ont leur `staging.raw_data` vidé, donc
-# le comptage des auteurs se fait sur `source_authorships`. On remonte le
-# `staging_id` (la ligne staging existe toujours, seul `raw_data` a été purgé)
-# pour que `update_raw_data` re-pose le payload complet et repasse `processed`
-# à FALSE — un normalize ultérieur ré-écrira alors les authorships complètes.
-_SELECT_TRUNCATED_FULL_SQL = text(
-    """
-    SELECT sp.staging_id AS id, sp.source_id
-    FROM source_publications sp
-    JOIN source_authorships sa ON sa.source_publication_id = sp.id
-    WHERE sp.source = 'openalex'
-      AND sp.staging_id IS NOT NULL
-    GROUP BY sp.id, sp.staging_id, sp.source_id
-    HAVING count(*) = 100
-    ORDER BY sp.staging_id
     """
 )
 
@@ -89,10 +77,8 @@ class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
         init_auth(api_key=get_openalex_api_key(conn), email=get_polite_pool_email(conn))
         self._base_url = get_api_base_urls()["openalex"]
 
-    def find_truncated(
-        self, conn: Connection, *, limit: int | None = None, full: bool = False
-    ) -> list[TruncatedWork]:
-        rows = conn.execute(_SELECT_TRUNCATED_FULL_SQL if full else _SELECT_TRUNCATED_SQL).all()
+    def find_truncated(self, conn: Connection, *, limit: int | None = None) -> list[TruncatedWork]:
+        rows = conn.execute(_SELECT_TRUNCATED_SQL).all()
         if limit:
             rows = rows[:limit]
         return [TruncatedWork(staging_id=row.id, openalex_id=row.source_id) for row in rows]
@@ -121,3 +107,6 @@ class PgOpenalexRefetchAdapter(OpenalexRefetchAdapter):
 
     def update_raw_data(self, conn: Connection, staging_id: int, work: dict[str, Any]) -> None:
         conn.execute(_UPDATE_SQL, {"raw_data": work, "id": staging_id})
+
+    def clear_truncated(self, conn: Connection, staging_id: int) -> None:
+        conn.execute(_CLEAR_TRUNCATED_SQL, {"id": staging_id})

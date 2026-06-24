@@ -143,12 +143,17 @@ class PgOpenalexExtractAdapter(OpenalexExtractAdapter):
         updated_count = 0
         unchanged_count = 0
         for work in works:
+            # 100 authorships = plafond bulk OpenAlex → tronqué probable (`refetch_truncated`
+            # vérifiera et complétera). Posé seulement quand le hash change (cf. upsert_staging).
+            authorships = work.get("authorships")
+            authors_truncated = isinstance(authorships, list) and len(authorships) == 100
             inserted, changed = upsert_staging(
                 conn,
                 source="openalex",
                 source_id=extract_openalex_id(work),
                 doi=extract_doi(work),
                 raw_data=work,
+                authors_truncated=authors_truncated,
             )
             if inserted:
                 new_count += 1
