@@ -23,8 +23,9 @@ Sans argument : lance les deux. Rien n'est écrit.
 import argparse
 import sys
 from collections import defaultdict
+from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from domain.persons.name_matching import names_compatible
 from infrastructure.db.engine import get_sync_engine
@@ -33,7 +34,7 @@ ORCID_MATCH_SOURCES = frozenset({"crossref", "openalex", "hal"})
 ID_TYPES = ("orcid", "idref", "hal_person_id")
 
 
-def load_target_map(conn, id_type):
+def load_target_map(conn: Connection, id_type: str) -> dict[str, tuple[int, str, str]]:
     """{id_value: (person_id, last_name_normalized, first_name_normalized)} pour
     les identifiants connus non rejetés (mêmes maps que la cascade de matching)."""
     rows = conn.execute(
@@ -49,12 +50,12 @@ def load_target_map(conn, id_type):
     return {r.id_value: (r.person_id, r.ln or "", r.fn or "") for r in rows}
 
 
-def audit_rates(conn, maps):
+def audit_rates(conn: Connection, maps: dict[str, dict[str, tuple[int, str, str]]]) -> None:
     """Ventilation compatible / incompatible par type d'identifiant.
 
     `names_compatible` comparant par tokens (ordre indifférent), on passe la
     signature brute entière en premier argument et une chaîne vide en second."""
-    stats = {t: defaultdict(int) for t in ID_TYPES}
+    stats: dict[str, dict[str, int]] = {t: defaultdict(int) for t in ID_TYPES}
     result = conn.execution_options(stream_results=True).execute(
         text("""
             SELECT sa.source::text AS source,
@@ -100,7 +101,9 @@ def audit_rates(conn, maps):
         print()
 
 
-def audit_double_occurrence(conn, maps):
+def audit_double_occurrence(
+    conn: Connection, maps: dict[str, dict[str, tuple[int, str, str]]]
+) -> None:
     """Intrus identifiant + occurrence légitime de la même personne sur la même publi.
 
     Un seul passage : on accumule les présences légitimes
@@ -108,8 +111,12 @@ def audit_double_occurrence(conn, maps):
     personne) et les intrus (authorship au nom incompatible avec sa personne, mais
     portant un identifiant qui résout vers cette même personne). On croise ensuite.
     """
-    legit_example = {}  # (spid, person_id) -> nom compatible (une occurrence)
-    intruders = []  # (spid, person_id, id_type, id_value, name, source)
+    legit_example: dict[
+        tuple[Any, Any], str
+    ] = {}  # (spid, person_id) -> nom compatible (une occurrence)
+    intruders: list[
+        tuple[Any, Any, str, str, str, str]
+    ] = []  # (spid, person_id, id_type, id_value, name, source)
 
     result = conn.execution_options(stream_results=True).execute(
         text("""
@@ -149,9 +156,9 @@ def audit_double_occurrence(conn, maps):
                 break
 
     confirmed = [i for i in intruders if (i[0], i[1]) in legit_example]
-    by_type = defaultdict(int)
-    by_source = defaultdict(int)
-    by_type_source = defaultdict(int)
+    by_type: dict[str, int] = defaultdict(int)
+    by_source: dict[str, int] = defaultdict(int)
+    by_type_source: dict[tuple[str, str], int] = defaultdict(int)
     for _spid, _pid, t, _val, _name, source in confirmed:
         by_type[t] += 1
         by_source[source] += 1
@@ -179,8 +186,8 @@ def audit_double_occurrence(conn, maps):
     print()
 
 
-def main():
-    sys.stdout.reconfigure(encoding="utf-8")
+def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rates", action="store_true", help="Ventilation compatible/incompatible")
     parser.add_argument(

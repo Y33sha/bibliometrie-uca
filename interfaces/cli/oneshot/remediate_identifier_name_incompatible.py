@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from typing import Any
 
 from sqlalchemy import Connection, text
 
@@ -97,7 +98,7 @@ def _load_id_map(conn: Connection, id_type: str) -> dict[str, int]:
     return {r.id_value: r.person_id for r in rows}
 
 
-def _id_resolves_to_linked_person(maps, row) -> bool:
+def _id_resolves_to_linked_person(maps: dict[str, dict[str, int]], row: Any) -> bool:
     """Un identifiant porté par la signature résout-il vers la personne déjà rattachée ?
 
     C'est ce qui signe que le rattachement est tenu par l'identifiant (le nom ne pouvait pas
@@ -116,7 +117,9 @@ def _id_resolves_to_linked_person(maps, row) -> bool:
     return False
 
 
-def _detach(conn: Connection, maps, window: int, dry_run: bool):
+def _detach(
+    conn: Connection, maps: dict[str, dict[str, int]], window: int, dry_run: bool
+) -> tuple[int, list[tuple[str, str]]]:
     max_pub = conn.execute(_MAX_PUB_SQL).scalar() or 0
     total = 0
     samples: list[tuple[str, str]] = []

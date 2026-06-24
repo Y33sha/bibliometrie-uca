@@ -20,14 +20,15 @@ Rien n'est écrit.
 
 import sys
 from collections import defaultdict
+from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import Connection, text
 
 from domain.persons.name_matching import names_compatible
 from infrastructure.db.engine import get_sync_engine
 
 
-def load_person_names(conn):
+def load_person_names(conn: Connection) -> dict[Any, tuple[str, str, str]]:
     """{person_id: (last_name_normalized, first_name_normalized, "Prénom Nom")}."""
     rows = conn.execute(
         text("""
@@ -39,8 +40,8 @@ def load_person_names(conn):
     return {r.id: (r.ln or "", r.fn or "", f"{r.first_name} {r.last_name}".strip()) for r in rows}
 
 
-def main():
-    sys.stdout.reconfigure(encoding="utf-8")
+def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
     conn = get_sync_engine().connect()
     try:
         names = load_person_names(conn)
@@ -57,9 +58,9 @@ def main():
         ).all()
         print(f"  {len(rows)} formes ambiguës (≥2 personnes, ≥1 lien pending)\n")
 
-        size_hist = defaultdict(int)
-        with_error = []  # forme intruse sur ≥1 personne
-        all_compatible = []  # homonymie / doublon
+        size_hist: dict[int, int] = defaultdict(int)
+        with_error: list[tuple[str, str]] = []  # forme intruse sur ≥1 personne
+        all_compatible: list[tuple[str, str]] = []  # homonymie / doublon
         n_with_error = 0
         n_all_compat = 0
 
