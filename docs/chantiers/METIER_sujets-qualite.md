@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Quatre problèmes connexes sur `subjects` / `publication_subjects` repérés à l'usage :
+Problèmes connexes sur `subjects` / `publication_subjects` repérés à l'usage :
 
 1. **Sujets OpenAlex hors-sujet** : les sujets OpenAlex (`publication_subjects.source = 'openalex'`) sont fréquemment aberrants à l'inspection — bruit de l'algo OA sur les revues généralistes / pluridisciplinaires, ou attribution thématique retenue sans filtrage. Le champ `score` existe, aucun seuil n'est appliqué.
 
