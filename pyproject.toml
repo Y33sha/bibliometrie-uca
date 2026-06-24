@@ -197,6 +197,7 @@ combine-as-imports = true
     "C901",
 ] # normalisation par source, nombreuses branches métier
 "infrastructure/sources/*" = ["C901"] # idem pour les extracteurs
+"application/publishers_enrichment/*" = ["C901"] # orchestrateurs d'API (retry, circuit-breaker, gating)
 "interfaces/api/routers/*" = ["E402"] # imports tardifs fréquents
 
 # ----------------------------------------------------------------------

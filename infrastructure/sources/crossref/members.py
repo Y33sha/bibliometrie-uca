@@ -1,8 +1,8 @@
 """Client API Crossref Members — `GET /members/{id}`.
 
-Consommé par le sub-step pipeline `enrich_publishers_from_crossref_members`
-(fallback `country` quand OpenAlex Publishers n'a pas eu de match) et
-par l'audit `audit_crossref_member_countries`.
+Consommé par `application.publishers_enrichment.from_crossref_members`
+(fallback `country` quand OpenAlex Publishers n'a pas de match) et par
+l'audit `audit_crossref_member_countries`.
 
 Polite pool via header `User-Agent` (mailto), cohérent avec les autres
 clients Crossref du projet (`doi_prefixes/clients.py`,

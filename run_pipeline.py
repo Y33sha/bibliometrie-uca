@@ -355,34 +355,25 @@ def phase_publishers_journals(mode: Any = "full", **kw: Any) -> PhaseMetrics:
        dump CSV DOAJ (téléchargé au plus tous les ~30 jours dans `data/doaj/`) →
        `doaj_payload` + `is_in_doaj` pour tout le catalogue. DOAJ fait autorité et
        est seul à poser `is_in_doaj` (reset global puis re-pose des TRUE).
-    4. `enrich_publishers_from_openalex` (gated par `run_journal_enrichment`) :
-       OpenAlex Publishers → country + ror.
-    5. `enrich_publishers_from_crossref_members` (gated par `run_journal_enrichment`) :
-       fallback `country` via Crossref Members pour les publishers sans
-       country posé en 4 mais avec `doi_prefixes.crossref_member_id`.
-    6. `enrich_publishers_from_ror` (gated par `run_journal_enrichment`) :
-       ROR types → publisher_type. Consomme `publishers.ror` posé en 4.
+
+    L'enrichissement des **éditeurs** (pays, ROR, type) est purement cosmétique :
+    hors pipeline, lancé à la demande via
+    `interfaces/cli/maintenance/enrich_publishers.py`.
 
     Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les `publishers`/`journals` qu'on veut enrichir.
 
     Idempotente : `resolve_doi_prefixes` ne traite que les préfixes absents
-    de `doi_prefixes` ; l'enrichissement journaux OpenAlex ne traite que
-    les revues sans APC renseigné (sauf `--reset`) ; le fetch DOAJ ne
-    cible que les revues dont le dernier `doaj_imported_at` est null ou
-    plus vieux que la fenêtre de stale (30 j par défaut) ;
-    l'enrichissement publishers ne traite que ceux à qui il manque
-    `country` ou `ror` ; le typage ROR ne touche que ceux à
-    `publisher_type='unknown'`.
+    de `doi_prefixes` ; l'enrichissement journaux OpenAlex ne traite que les
+    revues à `journal_type='unknown'` (converge à zéro, OpenAlex typant ses
+    sources) ; le fetch DOAJ ne se déclenche que si le dernier
+    `doaj_imported_at` est null ou plus vieux que la fenêtre de stale (30 j).
     """
     metrics = _run_resolve_doi_prefixes()
     if MODES[mode].run_journal_enrichment:
         _run_enrich_journals_from_openalex()
         _run_enrich_journals_from_doaj()
-        _run_enrich_publishers_from_openalex()
-        _run_enrich_publishers_from_crossref_members()
-        _run_enrich_publishers_from_ror()
     else:
-        log.info("Enrichissement journaux/publishers ignoré en mode %s", mode)
+        log.info("Enrichissement journaux ignoré en mode %s", mode)
     return metrics
 
 
@@ -1118,109 +1109,6 @@ def _run_enrich_journals_from_doaj() -> None:
     finally:
         conn.close()
     log.info("✓ enrich_journals_from_doaj terminé en %.1fs", time.time() - t0)
-
-
-def _run_enrich_publishers_from_openalex() -> None:
-    from application.pipeline.publishers_journals.enrich_publishers_from_openalex import (
-        run_enrich_publishers_from_openalex,
-    )
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
-    from infrastructure.repositories import publisher_repository
-    from infrastructure.sources.api_limits import DOAJ_DELAY
-    from infrastructure.sources.config import (
-        get_api_base_urls,
-        get_openalex_api_key,
-        get_polite_pool_email,
-    )
-
-    log.info("▶ enrich_publishers_from_openalex")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        run_enrich_publishers_from_openalex(
-            conn,
-            PgEnrichQueries(),
-            log,
-            publisher_repo=publisher_repository(conn),
-            api_key=get_openalex_api_key(conn),
-            mailto=get_polite_pool_email(conn),
-            openalex_publishers_api=get_api_base_urls()["openalex_publishers"],
-            rate_delay=DOAJ_DELAY,
-        )
-    finally:
-        conn.close()
-    log.info("✓ enrich_publishers_from_openalex terminé en %.1fs", time.time() - t0)
-
-
-def _run_enrich_publishers_from_crossref_members() -> None:
-    from application.pipeline.publishers_journals.enrich_publishers_from_crossref_members import (
-        CrossrefMemberFetcher,
-        run_enrich_publishers_from_crossref_members,
-    )
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
-    from infrastructure.repositories import publisher_repository
-    from infrastructure.sources.circuit_breaker import SourceCircuitBreaker
-    from infrastructure.sources.config import get_polite_pool_email
-    from infrastructure.sources.crossref.members import fetch_crossref_member
-    from infrastructure.sources.doi_prefixes.clients import build_user_agent
-
-    log.info("▶ enrich_publishers_from_crossref_members")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        user_agent = build_user_agent(get_polite_pool_email(conn))
-        # Coupe-circuit Crossref (budget API) : partagé entre les fetches parallèles ;
-        # une fois tripé, les appels restants sautent l'API (cf. fetch_crossref_member).
-        breaker = SourceCircuitBreaker("crossref")
-        fetcher: CrossrefMemberFetcher = lambda member_id: fetch_crossref_member(  # noqa: E731
-            member_id, user_agent=user_agent, logger=log, breaker=breaker
-        )
-
-        run_enrich_publishers_from_crossref_members(
-            conn,
-            PgEnrichQueries(),
-            log,
-            publisher_repo=publisher_repository(conn),
-            fetcher=fetcher,
-        )
-    finally:
-        conn.close()
-    log.info("✓ enrich_publishers_from_crossref_members terminé en %.1fs", time.time() - t0)
-
-
-def _run_enrich_publishers_from_ror() -> None:
-    from application.pipeline.publishers_journals.enrich_publishers_from_ror import (
-        RorFetcher,
-        run_enrich_publishers_from_ror,
-    )
-    from infrastructure.db.engine import get_sync_engine
-    from infrastructure.queries.pipeline.enrich import PgEnrichQueries
-    from infrastructure.repositories import publisher_repository
-    from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
-    from infrastructure.sources.ror import build_ror_user_agent, fetch_ror_record
-
-    log.info("▶ enrich_publishers_from_ror")
-    t0 = time.time()
-    conn = get_sync_engine().connect()
-    try:
-        base_url = get_api_base_urls()["ror"]
-        user_agent = build_ror_user_agent(get_polite_pool_email(conn))
-        fetcher: RorFetcher = lambda ror: fetch_ror_record(  # noqa: E731
-            ror, base_url=base_url, user_agent=user_agent, logger=log
-        )
-
-        run_enrich_publishers_from_ror(
-            conn,
-            PgEnrichQueries(),
-            log,
-            publisher_repo=publisher_repository(conn),
-            fetcher=fetcher,
-        )
-    finally:
-        conn.close()
-    log.info("✓ enrich_publishers_from_ror terminé en %.1fs", time.time() - t0)
 
 
 def _run_resolve_addresses() -> None:

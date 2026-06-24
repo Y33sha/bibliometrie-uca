@@ -32,18 +32,6 @@ class EnrichQueries(Protocol):
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]: ...
 
-    def fetch_publishers_needing_enrichment(
-        self, conn: Connection, *, limit: int | None = None
-    ) -> list[tuple[int, str]]: ...
-
-    def fetch_publishers_needing_publisher_type_from_ror(
-        self, conn: Connection, *, limit: int | None = None
-    ) -> list[tuple[int, str]]: ...
-
-    def fetch_publishers_needing_country_from_crossref(
-        self, conn: Connection, *, limit: int | None = None
-    ) -> list[tuple[int, int]]: ...
-
     def fetch_journal_issn_index(self, conn: Connection) -> list[JournalIssnRow]:
         """`JournalIssnRow` de tous les journaux ayant au moins un ISSN — pour
         indexer ISSN → journal_id à l'import du dump DOAJ."""

@@ -1,7 +1,7 @@
 """
-Sub-step de la phase pipeline `publishers_journals` — fallback
-`publishers.country` via l'API Crossref Members pour les éditeurs sans
-country (= manqués par OpenAlex Publishers en Phase 2).
+Orchestrateur d'enrichissement éditeurs (maintenance, hors pipeline) —
+fallback `publishers.country` via l'API Crossref Members pour les éditeurs
+sans country (= manqués par OpenAlex Publishers, étape précédente).
 
 Pour chaque publisher avec `country IS NULL` + au moins un
 `doi_prefixes.crossref_member_id` :
@@ -21,9 +21,8 @@ absente de `place_name_forms`).
 
 Fetches **séquentiels** : un fan-out parallèle sur `api.crossref.org/members`
 burste au-dessus du quota polite pool et déclenche des 429 en rafale (Crossref
-répond vite, ~150ms/appel). Le séquentiel reste rapide et reste dans le quota,
-sur le même mode que `resolve_doi_prefixes` (l'autre appelant Crossref de la
-phase, qui ne 429 jamais). Le retry/backoff sur 429 vit dans le fetcher.
+répond vite, ~150ms/appel). Le séquentiel reste rapide et reste dans le quota.
+Le retry/backoff sur 429 vit dans le fetcher.
 
 Le fetcher concret vit dans `infrastructure/sources/crossref/members.py` ;
 il est injecté par la composition root pour respecter l'étanchéité DDD.
@@ -36,7 +35,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.enrich import EnrichQueries
+from application.ports.publishers_enrichment import PublisherEnrichmentQueries
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdateFields,
@@ -52,7 +51,7 @@ COMMIT_EVERY = 50
 
 def run_enrich_publishers_from_crossref_members(
     conn: Connection,
-    queries: EnrichQueries,
+    queries: PublisherEnrichmentQueries,
     logger: logging.Logger,
     *,
     publisher_repo: PublisherRepository,
@@ -141,7 +140,7 @@ def run_enrich_publishers_from_crossref_members(
     except KeyboardInterrupt:
         # Ctrl+C peut frapper en plein execute (transaction avortée → `commit()`
         # lèverait `PendingRollbackError`) : on rollback le batch en cours et on
-        # re-raise pour laisser `run_pipeline` arrêter proprement le pipeline.
+        # re-raise pour laisser l'appelant (CLI maintenance) s'arrêter proprement.
         conn.rollback()
         logger.warning("Interruption — batches déjà committés conservés.")
         raise

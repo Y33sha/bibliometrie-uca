@@ -4,12 +4,12 @@ Audit (pure lecture) : pour les publishers locaux qui ont un `ror`
 non-NULL, fetcher leur enregistrement ROR et reporter la distribution
 des combinaisons de `types` (ROR v2 expose `types` comme une LISTE,
 ex. `['company', 'funder']`), en y appliquant le mapping figé dans
-`domain.publishers.publisher.map_ror_types` pour visualiser ce que le
-sub-step `enrich_publishers_from_ror` écrirait.
+`domain.publishers.publisher.map_ror_types` pour visualiser ce que
+`application.publishers_enrichment.from_ror` écrirait.
 
-Mapping initialement écrit ici pour permettre l'arbitrage à l'audit ;
-puis stabilisé côté domain et consommé par le sub-step pipeline. Ce
-script reste utile en oneshot pour re-vérifier la distribution si on
+Le mapping vit dans `domain.publishers.publisher` et est consommé par
+`application.publishers_enrichment.from_ror`. Ce script reste utile en
+oneshot pour re-vérifier la distribution si on
 veut éventuellement re-arbitrer le mapping (ex. `nonprofit` qui mélange
 sociétés savantes et éditeurs nonprofit).
 
