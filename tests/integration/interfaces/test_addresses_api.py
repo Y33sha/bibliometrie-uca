@@ -322,6 +322,19 @@ class TestSetAddressCountry:
         r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["FR"]})
         assert r.status_code == 200
 
+    def test_set_country_visible_immediately(self, auth_client):
+        # Régression (chantier commit-avant-réponse) : la donnée écrite par le POST
+        # est lisible dès le GET suivant. Garde-fou de la dépendance commit-as-you-go
+        # et du futur passage du teardown en rollback — un handler d'écriture sans
+        # `commit()` ferait alors échouer ce test.
+        addr = _seed_address("Readback marker QWXZ")
+        r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["FR"]})
+        assert r.status_code == 200
+        r2 = auth_client.get("/api/addresses/countries", params={"search": "QWXZ"})
+        assert r2.status_code == 200
+        rows = [a for a in r2.json()["addresses"] if a["id"] == addr]
+        assert rows and rows[0]["countries"] == ["fr"]
+
 
 # ── POST /api/addresses/batch-country ────────────────────────────
 
