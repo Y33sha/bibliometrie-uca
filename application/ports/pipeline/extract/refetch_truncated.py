@@ -33,16 +33,12 @@ class OpenalexRefetchAdapter(Protocol):
     def configure(self, conn: Connection) -> None:
         """Lit la config (URL, auth) depuis la base avant la boucle."""
 
-    def find_truncated(
-        self, conn: Connection, *, limit: int | None = None, full: bool = False
-    ) -> list[TruncatedWork]:
-        """SELECT des works OpenAlex avec exactement 100 authorships.
+    def find_truncated(self, conn: Connection, *, limit: int | None = None) -> list[TruncatedWork]:
+        """SELECT des works staging OpenAlex marqués `authors_truncated`.
 
-        `full=False` (passe pipeline) : works staging encore `processed=FALSE`,
-        comptés sur `staging.raw_data`. `full=True` (repli hors-ligne) : works déjà
-        normalisés, comptés sur `source_publications` / `source_authorships` —
-        `staging.raw_data` étant vidé après normalisation, c'est l'unique source
-        de comptage pour eux.
+        Le marqueur est posé à l'extraction (payload bulk à 100 auteurs) et survit à
+        la normalisation (qui purge `raw_data`), donc la détection ne dépend ni de
+        l'ordre des phases ni du comptage des auteurs.
         """
 
     async def fetch_work(
@@ -51,8 +47,11 @@ class OpenalexRefetchAdapter(Protocol):
         """Fetch un work individuel via l'API OpenAlex (auteurs complets)."""
 
     def update_raw_data(self, conn: Connection, staging_id: int, work: dict[str, Any]) -> None:
-        """UPDATE staging.raw_data = nouveau work, processed = FALSE.
+        """UPDATE staging.raw_data = nouveau work, processed = FALSE, authors_truncated = FALSE.
 
         Ne recalcule **pas** `raw_hash` (dissymétrie volontaire du
         mécanisme de préservation — cf. docstring de l'orchestrateur).
         """
+
+    def clear_truncated(self, conn: Connection, staging_id: int) -> None:
+        """Efface `authors_truncated` sans toucher au reste (work vérifié non tronqué)."""

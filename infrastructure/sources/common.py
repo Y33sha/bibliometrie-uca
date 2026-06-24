@@ -39,8 +39,8 @@ _UPSERT_STAGING_SQL = text(
         SELECT raw_hash AS old_hash FROM staging
         WHERE source = :source AND source_id = :source_id
     )
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-    VALUES (:source, :source_id, :doi, :raw_data, :raw_hash)
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, authors_truncated)
+    VALUES (:source, :source_id, :doi, :raw_data, :raw_hash, :authors_truncated)
     ON CONFLICT (source, source_id) DO UPDATE SET
         raw_data = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
@@ -52,6 +52,14 @@ _UPSERT_STAGING_SQL = text(
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                 THEN FALSE
             ELSE staging.processed
+        END,
+        -- Suit `raw_hash` comme `processed` : un payload bulk inchangé n'écrase pas
+        -- le flag (préserve l'effacement posé par refetch_truncated) ; un payload
+        -- modifié le recalcule depuis le nouveau contenu.
+        authors_truncated = CASE
+            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
+                THEN EXCLUDED.authors_truncated
+            ELSE staging.authors_truncated
         END,
         last_seen_at = now()
     RETURNING (xmax = 0) AS inserted,
@@ -67,6 +75,7 @@ def upsert_staging(
     source_id: str,
     doi: str | None,
     raw_data: dict[str, Any],
+    authors_truncated: bool = False,
 ) -> tuple[bool, bool]:
     """UPSERT canonique d'une ligne `staging`, partagé par toutes les sources bulk.
 
@@ -74,6 +83,11 @@ def upsert_staging(
     réécrit `raw_data` (et repasse `processed=FALSE`) seulement si le hash a changé,
     bumpe toujours `last_seen_at`. Un `raw_hash=null` en base force le re-import
     (`NULL IS DISTINCT FROM <hash>`). Le hash est calculé ici via `compute_hash`.
+
+    `authors_truncated` (OpenAlex : payload bulk plafonné à 100 auteurs) suit la même
+    logique que `processed` — (re)posé seulement quand le hash change, sinon préservé
+    (n'écrase pas l'effacement de `refetch_truncated`). Les sources non plafonnées
+    laissent le défaut `False`.
 
     Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`),
     `changed` = contenu réécrit (hash distinct de l'ancien). Le commit est à la
@@ -87,6 +101,7 @@ def upsert_staging(
             "doi": clean_doi(doi),
             "raw_data": raw_data,
             "raw_hash": compute_hash(raw_data),
+            "authors_truncated": authors_truncated,
         },
     ).one()
     return (bool(row.inserted), bool(row.changed))
