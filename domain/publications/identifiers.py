@@ -17,7 +17,7 @@ HAL) ou un identifiant brut.
 
 import re
 from dataclasses import dataclass
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from domain.errors import ValidationError
 
@@ -36,15 +36,27 @@ _DOI_URL_PREFIXES = (
     "https://dx.doi.org/",
     "http://dx.doi.org/",
 )
+# Tirets typographiques Unicode (hyphen, non-breaking, figure, en/em dash, minus,
+# variantes small/fullwidth) ramenés sur le `-` ASCII : un DOI saisi/copié avec un
+# de ces caractères ne s'apparierait pas à sa forme ASCII (faux doublon).
+_DASH_TRANSLATION = {ord(c): "-" for c in "‐‑‒–—―−﹘﹣－"}
 
 
 def _normalize_doi(raw: str | None) -> str | None:
-    """Normalise un DOI brut (préfixe URL, espaces, suffixe de version, casse).
+    """Normalise un DOI brut (préfixe URL, encodage, casse, ponctuation, suffixes).
 
     Lowercase systématique : la spec DOI Handbook précise que le préfixe
     `10.xxxx` est insensible à la casse, et CrossRef (registre officiel)
     traite l'ensemble du DOI en case-insensitive. Stocker tout en minuscules
     évite les faux doublons lors des comparaisons cross-sources.
+
+    Décode l'encodage pourcent (`%2f` → `/`), ramène les tirets typographiques
+    Unicode sur le `-` ASCII, retire une éventuelle query string (`?utm_…`),
+    ne garde que le premier DOI d'une liste concaténée au point-virgule, et
+    retire la ponctuation/markup parasite de fin (`. , ; : < >`, parenthèse non
+    appariée) — autant d'artefacts de copier-coller, de fragment HTML scrapé ou
+    de parsing d'URL qui produiraient des faux doublons ou des DOI irrésolubles.
+    Idempotent.
     """
     if not raw:
         return None
@@ -56,16 +68,33 @@ def _normalize_doi(raw: str | None) -> str | None:
     s = s.strip()
     if not s:
         return None
+    # Décodage pourcent (DOI tiré d'une URL : `%2f` = `/`, `%28` = `(`…). En boucle
+    # jusqu'à stabilité pour rester idempotent même sur un double encodage (`%252f`).
+    while "%" in s:
+        decoded = unquote(s)
+        if decoded == s:
+            break
+        s = decoded
+    # Tirets typographiques Unicode → `-` ASCII.
+    s = s.translate(_DASH_TRANSLATION)
+    # Query string parasite (paramètres de tracking accolés à un DOI tiré d'une URL).
+    s = s.split("?", 1)[0]
+    # Liste de DOI concaténés au point-virgule : on garde le premier (l'œuvre ; les
+    # suivants sont des formes liées — versions, rapports de relecture — qui ont leur
+    # propre DOI et vivent ailleurs).
+    s = s.split(";", 1)[0].strip()
     # Slash final parasite (artefact d'URL) : `10.x/abc/` ≠ `10.x/abc` sinon, faux doublon.
     # Strippé avant les suffixes ci-dessous, qui sont ancrés en fin (`v2/`, `/pdf/` matchent alors).
     s = s.rstrip("/")
-    # Ponctuation finale parasite (copier-coller, parsing d'URL) : un DOI ne se termine pas par
-    # `.,;:` ; une parenthèse fermante finale n'est retirée que si elle est non appariée — les DOI
-    # type `10.1007/jhep07(2020)108` portent des parenthèses légitimes.
+    # Ponctuation/markup final parasite (copier-coller, fragment HTML, parsing d'URL) : un DOI ne
+    # se termine pas par `. , ; : < >` ; une parenthèse finale n'est retirée que si elle est non
+    # appariée — les DOI type `10.1007/jhep07(2020)108` portent des parenthèses légitimes.
     while True:
         before = s
-        s = s.rstrip(".,;:")
+        s = s.rstrip(".,;:<>")
         if s.endswith(")") and s.count(")") > s.count("("):
+            s = s[:-1]
+        if s.endswith("(") and s.count("(") > s.count(")"):
             s = s[:-1]
         if s == before:
             break

@@ -52,6 +52,19 @@ class TestDOIConstruction:
             ("10.1038/Nature", "10.1038/nature"),
             ("10.1038/NATURE", "10.1038/nature"),
             ("https://doi.org/10.1038/NATURE", "10.1038/nature"),
+            # Encodage pourcent (DOI tiré d'une URL) : `%2f` = `/`.
+            ("10.1140/epjc%2fs10052-021-09192-8", "10.1140/epjc/s10052-021-09192-8"),
+            ("10.1140/epjc%252fs10052-021-09192-8", "10.1140/epjc/s10052-021-09192-8"),  # double
+            # Tiret typographique Unicode → `-` ASCII.
+            ("10.1002/1878‐0261.12651", "10.1002/1878-0261.12651"),
+            # Markup / fragment HTML scrapé en fin.
+            ("10.1002/casp.2572>)", "10.1002/casp.2572"),
+            ("10.1016/j.chemgeo.2023.121326>.", "10.1016/j.chemgeo.2023.121326"),
+            ("10.1016/j.caeai.2022.100093.(", "10.1016/j.caeai.2022.100093"),  # parenthèse ouvrante
+            # Query string parasite.
+            ("10.1108/raf-05-2017-0101?utm_campaign=repec", "10.1108/raf-05-2017-0101"),
+            # Liste de DOI au point-virgule : garder le premier.
+            ("10.1017/qpb.2025.10030; 10.1017/qpb.2025.10030.pr1", "10.1017/qpb.2025.10030"),
         ],
     )
     def test_normalizes(self, raw, expected):

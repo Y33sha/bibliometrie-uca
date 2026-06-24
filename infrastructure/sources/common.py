@@ -237,9 +237,10 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     précédents (source_publications normalisés, phase `relations`) : ceux d'un record
     fraîchement ingéré sont rattrapés au run suivant — bénin (le pipeline est convergent).
 
-    Comparaison directe sur `doi` : tous les DOIs sont stockés en minuscules
-    (cf. `domain.publication._normalize_doi`), donc plus besoin d'un cas
-    spécial par source. Préserve l'utilisation de l'index btree `idx_staging_doi`.
+    Le SQL compare les `doi` par égalité directe, pour s'appuyer sur l'index
+    btree `idx_staging_doi`. Les candidats retenus sont normalisés via `clean_doi`
+    et dédoublonnés avant d'être renvoyés : les appels HTTP par DOI en aval
+    reçoivent une forme canonique, quelle que soit la propreté de la valeur source.
 
     Exclut les DOI en backoff dans `doi_lookups` (miss cross-import récent
     sur la cible dont `next_retry` n'est pas encore atteint). Le pool est
