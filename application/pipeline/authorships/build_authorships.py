@@ -56,12 +56,14 @@ def build(
     pruned = queries.prune_orphan_authorships(conn)
     logger.info(f"  {pruned} authorships orphelines supprimées")
 
-    # ANALYZE après l'INSERT massif : sinon les stats Postgres restent à zéro sur
-    # les colonnes fraîchement insérées et l'UPDATE de l'étape 3 part en Nested Loop
-    # catastrophique (estimate `rows=1` au lieu de `rows=100_000+`).
-    if rebuild_full:
-        logger.info("  ANALYZE authorships (stats fraîches pour le planner)")
-        queries.analyze_authorships(conn)
+    # ANALYZE après l'insertion : sans stats fraîches sur les lignes qui viennent
+    # d'être insérées (cas d'un run suivant un réimport massif, où l'étape 1 insère
+    # un gros paquet), l'UPDATE de l'étape 3 estime `rows=1` au lieu de
+    # `rows=100_000+` et part en Nested Loop catastrophique. Inconditionnel : le
+    # déclencheur est le volume inséré, pas le mode `rebuild_full` ; le coût sur la
+    # table est sub-seconde.
+    logger.info("  ANALYZE authorships (stats fraîches pour le planner)")
+    queries.analyze_authorships(conn)
 
     logger.info("Étape 2 : peuplement des FK (source_authorships → authorships)...")
     linked = queries.link_source_authorships_to_authorships(conn)
