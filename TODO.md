@@ -1,30 +1,31 @@
-# A régler avant transmission
-## Pipeline de traitement
-### Extraction
-#### Couverture
+* [ ] oneshot sur prod: python interfaces/cli/oneshot/backfill_clean_dois.py
+* [ ] régler le problème de CI (vulnerability scan: pydantic-settings 2.13.1  GHSA-4xgf-cpjx-pc3j 2.14.2)
+# Pipeline
+## Extraction
+### Couverture
 * [ ] extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] biorxiv, medrxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
-#### Performance
-* [ ] à étudier: cross-import: seulement `in_perimeter`? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
+### Performance
+* [ ] à étudier: cross-import: seulement `in_perimeter`? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations / suppose d'abord de faire un audit de l'existant (ajouter colonnes temporaires pour stocker les critères de requête ayant permis de trouver un document)
 * [ ] analyser les diff de payload pour voir si on peut diminuer le nombre d'UPSERT en filtrant les champs importés
 * [ ] scanR: paralléliser les années?
 * [ ] refetch_truncated: envisager un flag `authors_truncated`
-### Suite du traitement
-* [ ] au réimport: possibilité d'UPSERT les source_authorships? (avec PK source_publication_id,author_position)
-* [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
+## Suite du traitement
+### Correction
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
-* [ ] `metadata_correction`: ajouter correction via `doi_prefix` du journal (contrôle de cohérence entre `doi` et `journal_id`, avant les corrections `journal_type` => `doc_type`)
+* [ ] `metadata_correction`: ajouter correction via `doi_prefix` du journal (contrôle de cohérence entre `doi` et `journal_id`, avant les corrections `journal_type` => `doc_type`) / + détecter incohérences `doi_prefix`/`publisher_id`
+* [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
 * [ ] conflation de doc_types différents ou titres différents sous un même DOI => soit DOI erroné, soit métadonnées erronées. Auditer et définir règles de correction
+### Autres
 * [ ] phase `publishers_journals` à simplifier (pas très lisible) + ajouter système de staleness pour éviter de multiplier les appels http
 
-# Chantiers qui peuvent continuer en prod (Qualité des données)
+# Données
 ## Problèmes dans les sources
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
-* [ ] DOI Crossref non trouvés sur Crossref: quel traitement ultérieur? (auditer; tenter corrections pour les cas simples (ponctuation parasite...); nuller les autres pour éviter que ça bloque une déduplication légitime)
 * [ ] noms de containers OpenAlex aberrants ("SPIRE - Sciences Po Institutional REpository") => faire quelque chose
 ## Explorer autres sources possibles
-* [ ] ArXiv, Pubmed, Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
+* [ ] ArXiv, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
 * [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 
 # UI
@@ -37,7 +38,6 @@
 * [ ] premier/dernier auteur (sur l'onglet publications de la page personne)
 * [ ] doc_types: répartir en deux niveaux?
 * [ ] colonne éditeur; filtres éditeur + revue?
-* [ ] définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
 * [ ] page détails: séparer l'affichage des relations selon le sens (publication parent: afficher dès le bloc titre; publications dépendantes: mettre liens dans la sidebar)
 
@@ -49,10 +49,11 @@
 # Trucs pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier
 * collaborations nationales et internationales: identification des structures partenaires?
+* [ ] définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
 * audit trail: uniformiser les types d'action qui génèrent un log ou pas + interface pour les consulter
 * règles de correction de métadonnées et règles de déduplication de publications: actuellement logées dans le code; possibilité de les stocker en base et de les rendre configurables via l'UI?
 * rendre les extracteurs interruptibles avec ctrl+C sous Windows
-* [ ] mettre en place des slugs pour les URL?
+* mettre en place des slugs pour les URL?
 
 # Pas nécessaire de le régler, du moment qu'on le documente quelque part
 * [ ] re-tester le circuit des imports RH => pas urgent, pas d'imports csv à terme en prod
