@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict TGb0ApaxEvMh02NbTAKCGoMLQYhmu6comSzaoJM5wtY0zQEGZf9FZVA3eWGBOi2
+\restrict 36KuJkQ8WcrPb3qtyE31eoNItV9wmMoDiVcii5ddreVIXaKSfEneNpbKgKE1iEX
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1306,6 +1306,8 @@ CREATE TABLE public.staging (
     not_found_at timestamp with time zone,
     disappeared_at timestamp with time zone,
     authors_truncated boolean DEFAULT false NOT NULL,
+    entry_mode text DEFAULT 'bulk'::text NOT NULL,
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'cross_import_doi'::text, 'cross_import_hal'::text]))),
     CONSTRAINT staging_not_found_at_implies_processed CHECK (((not_found_at IS NULL) OR processed))
 );
 
@@ -3187,5 +3189,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict TGb0ApaxEvMh02NbTAKCGoMLQYhmu6comSzaoJM5wtY0zQEGZf9FZVA3eWGBOi2
+\unrestrict 36KuJkQ8WcrPb3qtyE31eoNItV9wmMoDiVcii5ddreVIXaKSfEneNpbKgKE1iEX
 
