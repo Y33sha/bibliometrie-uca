@@ -56,18 +56,26 @@ def build(
     pruned = queries.prune_orphan_authorships(conn)
     logger.info(f"  {pruned} authorships orphelines supprimées")
 
-    # ANALYZE après l'insertion : sans stats fraîches sur les lignes qui viennent
-    # d'être insérées (cas d'un run suivant un réimport massif, où l'étape 1 insère
-    # un gros paquet), l'UPDATE de l'étape 3 estime `rows=1` au lieu de
-    # `rows=100_000+` et part en Nested Loop catastrophique. Inconditionnel : le
-    # déclencheur est le volume inséré, pas le mode `rebuild_full` ; le coût sur la
-    # table est sub-seconde.
-    logger.info("  ANALYZE authorships (stats fraîches pour le planner)")
-    queries.analyze_authorships(conn)
+    # En rebuild_full, authorships est purgée puis réinsérée depuis zéro : ANALYZE
+    # pour que les étapes suivantes voient la table reconstruite au lieu de stats
+    # périmées (sinon Nested Loop sur estimate rows=1). En nominal, la table garde
+    # ses lignes et ses stats ; c'est source_authorships, massivement écrite à
+    # l'étape 2, qui exige le ANALYZE ci-dessous.
+    if rebuild_full:
+        logger.info("  ANALYZE authorships (stats fraîches pour le planner)")
+        queries.analyze_authorships(conn)
 
     logger.info("Étape 2 : peuplement des FK (source_authorships → authorships)...")
     linked = queries.link_source_authorships_to_authorships(conn)
     logger.info(f"  {linked} liens posés")
+
+    # ANALYZE après le lien : l'étape 2 vient de poser authorship_id sur des
+    # centaines de milliers de lignes (non committé). En état committé la colonne est
+    # quasi 100% NULL, donc sans ce ANALYZE le planner de l'étape 3 estime que
+    # `authorship_id IS NOT NULL` ne ramène rien (rows=1) et part en Nested Loop.
+    # Inconditionnel : le lien a lieu dans tous les modes. Coût sub-seconde.
+    logger.info("  ANALYZE source_authorships (stats fraîches pour le planner)")
+    queries.analyze_source_authorships(conn)
 
     logger.info(
         "Étape 3 : recomposition des attributs "
