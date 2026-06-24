@@ -9,9 +9,7 @@ from typing import Any
 from sqlalchemy import Connection, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from domain.publications.identifiers import (
-    clean_doi,  # noqa: F401 — réexporté pour les scripts d'extraction
-)
+from domain.publications.identifiers import clean_doi  # utilisé ici + réexporté pour l'extraction
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 from infrastructure.observability.log import (
     setup_logger,  # noqa: F401 — réexporté pour les scripts d'extraction
@@ -86,7 +84,7 @@ def upsert_staging(
         {
             "source": source,
             "source_id": source_id,
-            "doi": doi,
+            "doi": clean_doi(doi),
             "raw_data": raw_data,
             "raw_hash": compute_hash(raw_data),
         },
@@ -310,7 +308,12 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
         params: dict[str, str] = {"target": target}
         if target_ra:
             params["target_ra"] = target_ra
-        return list(conn.execute(text(query), params).scalars())
+        rows = conn.execute(text(query), params).scalars()
+        # Re-nettoyage des candidats avant tout appel HTTP par DOI : la colonne
+        # `staging.doi` peut porter du legacy non normalisé (le `clean_doi` à
+        # l'écriture est récent). Idempotent ; `dict.fromkeys` dédoublonne les
+        # collisions induites par la normalisation en préservant l'ordre.
+        return list(dict.fromkeys(c for d in rows if (c := clean_doi(d))))
 
     pg_prefix_filter = " AND (dp.ra = %(target_ra)s OR dp.ra IS NULL)" if target_ra else ""
     query_pg = f"""
@@ -330,7 +333,8 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     pg_params = {"target": target, "target_ra": target_ra} if target_ra else {"target": target}
     with conn.cursor() as cur:
         cur.execute(query_pg, pg_params)
-        return [row["doi"] for row in cur.fetchall()]
+        # Cf. branche SA : re-nettoyage idempotent + dédoublonnage avant le lookup HTTP.
+        return list(dict.fromkeys(c for row in cur.fetchall() if (c := clean_doi(row["doi"]))))
 
 
 def get_existing_ids(conn: Connection, source: str) -> set:

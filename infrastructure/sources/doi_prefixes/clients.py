@@ -16,6 +16,7 @@ import re
 import urllib.parse
 from typing import Any
 
+from domain.publications.identifiers import clean_doi, clean_doi_prefix
 from infrastructure.sources.http_retry import http_request_with_retry
 
 logger = logging.getLogger(__name__)
@@ -54,7 +55,10 @@ def resolve_ra(doi: str, *, user_agent: str) -> str | None:
     pour un préfixe enregistré chez une RA hors du set principal — c'est
     distinct de la non-résolution (qui renvoie ici `None`).
     """
-    url = f"{DOI_RA_BASE_URL}/{urllib.parse.quote(doi, safe='')}"
+    cleaned = clean_doi(doi)
+    if not cleaned:
+        return None
+    url = f"{DOI_RA_BASE_URL}/{urllib.parse.quote(cleaned, safe='')}"
     headers = {"User-Agent": user_agent, "Accept": "application/json"}
     try:
         data = http_request_with_retry(
@@ -78,6 +82,9 @@ def fetch_crossref_prefix(prefix: str, *, user_agent: str) -> tuple[str, int | N
     ou si `name` est absent. `member_id` peut être `None` si l'API ne le
     renvoie pas pour ce préfixe.
     """
+    prefix = clean_doi_prefix(prefix)
+    if not prefix:
+        return None
     url = f"{CROSSREF_PREFIX_BASE_URL}/{prefix}"
     headers = {"User-Agent": user_agent, "Accept": "application/json"}
     try:
@@ -103,6 +110,9 @@ def fetch_datacite_prefix(prefix: str, *, user_agent: str) -> tuple[str, str, st
 
     Hiérarchie DataCite : `provider → client → prefix → DOI`. Un préfixe est alloué à un seul client (validé Phase 0 sur 105/105 prefixes UCA). Le `client_symbol` (ex. `cern.zenodo`, `inist.inra`) est l'identifiant stable assigné par DataCite, distinct du nom et persistant au-delà des renommages.
     """
+    prefix = clean_doi_prefix(prefix)
+    if not prefix:
+        return None
     url = f"{DATACITE_PREFIX_BASE_URL}/{prefix}"
     headers = {"User-Agent": user_agent, "Accept": "application/vnd.api+json"}
     try:

@@ -69,8 +69,8 @@ def _normalize_doi(raw: str | None) -> str | None:
             s = s[:-1]
         if s == before:
             break
-    s = _DOI_VERSION_SUFFIX.sub("", s)
     s = _DOI_PDF_SUFFIX.sub("", s)
+    s = _DOI_VERSION_SUFFIX.sub("", s)
     return s or None
 
 
@@ -365,6 +365,23 @@ def clean_doi(doi: str | None) -> str | None:
     Retourne le DOI canonique, ou None si l'entrée est vide/inutilisable.
     """
     return _normalize_doi(doi)
+
+
+_DOI_PREFIX_RE = re.compile(r"(10\.\d+)")
+
+
+def clean_doi_prefix(prefix: str | None) -> str | None:
+    """Isole le préfixe DOI canonique (`10.<chiffres>`) d'une chaîne brute.
+
+    Le préfixe est la partie registrant d'un DOI, avant le premier `/`. Tolère
+    une entrée bruitée (espaces, casse, DOI complet, ponctuation parasite) en
+    extrayant le motif `10.<chiffres>` en tête. Retourne `None` si aucun préfixe
+    valide n'est présent. À appliquer avant d'interroger les endpoints préfixe
+    (`api.crossref.org/prefixes`, `api.datacite.org/prefixes`)."""
+    if not prefix:
+        return None
+    match = _DOI_PREFIX_RE.match(prefix.strip())
+    return match.group(1) if match else None
 
 
 def normalize_nnt(nnt: str | None) -> str | None:

@@ -13,6 +13,7 @@ from domain.publications.identifiers import (
     PMID,
     ArxivId,
     HALId,
+    clean_doi_prefix,
     extract_doi_from_url,
     normalize_arxiv_id,
     normalize_pmcid,
@@ -274,3 +275,25 @@ class TestPubMedArxivVOs:
         assert ArxivId.try_parse(None) is None
         with pytest.raises(ValidationError):
             ArxivId("garbage")
+
+
+# ── clean_doi_prefix ───────────────────────────────────────────────
+
+
+class TestCleanDoiPrefix:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("10.1016", "10.1016"),  # préfixe nu
+            ("  10.1016  ", "10.1016"),  # whitespace
+            ("10.1016/j.foo.2020.01", "10.1016"),  # DOI complet → préfixe
+            ("10.1016>", "10.1016"),  # ponctuation parasite en queue
+            ("10.5194/acp-21-1", "10.5194"),  # préfixe Copernicus
+            (None, None),
+            ("", None),
+            ("pas-un-prefixe", None),  # ne commence pas par 10.<chiffres>
+            ("https://doi.org/10.1016/x", None),  # URL : pas un préfixe en tête
+        ],
+    )
+    def test_clean_doi_prefix(self, raw, expected):
+        assert clean_doi_prefix(raw) == expected

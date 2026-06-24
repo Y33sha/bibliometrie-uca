@@ -34,6 +34,7 @@ from application.ports.pipeline.extract.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
+from domain.publications.identifiers import clean_doi
 from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
@@ -42,14 +43,15 @@ _USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
 
 
 def _record_doi(record: dict) -> str | None:
-    """DOI canonique (lowercase) d'un nœud JSON:API `data` : `attributes.doi`,
-    sinon `id` (les deux portent le DOI). `None` si aucun des deux n'est présent."""
+    """DOI canonique d'un nœud JSON:API `data` : `attributes.doi`, sinon `id`
+    (les deux portent le DOI). Passé par `clean_doi` (normalisation partagée).
+    `None` si aucun des deux n'est présent ou exploitable."""
     attributes = record.get("attributes")
     doi_raw = ""
     if isinstance(attributes, dict):
         doi_raw = attributes.get("doi") or ""
     doi_raw = doi_raw or record.get("id") or ""
-    return doi_raw.lower() or None
+    return clean_doi(doi_raw)
 
 
 _INSERT_NOT_FOUND_SQL = text(
@@ -136,7 +138,7 @@ class DataciteFetchMissingDoiAdapter:
                 if doi:
                     found[doi] = rec
         out: list[dict] = list(found.values())
-        out.extend(not_found_marker(d) for d in dois if d.lower() not in found)
+        out.extend(not_found_marker(d) for d in dois if clean_doi(d) not in found)
         return out
 
     def insert(self, conn: Connection, record: dict) -> bool:

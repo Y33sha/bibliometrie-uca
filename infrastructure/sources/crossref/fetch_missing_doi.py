@@ -28,6 +28,7 @@ from application.ports.pipeline.extract.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
+from domain.publications.identifiers import clean_doi
 from infrastructure.sources.common import compute_hash
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
@@ -113,12 +114,12 @@ class CrossrefFetchMissingDoiAdapter:
             conn.commit()
             return False
 
-        # DOI = identifiant CrossRef. On normalise en lowercase pour
-        # rester cohérent avec les autres sources qui font de même.
-        doi_raw = record.get("DOI", "")
-        if not doi_raw:
+        # DOI = identifiant CrossRef. On le passe par `clean_doi` (normalisation
+        # canonique partagée : lowercase, strip URL/ponctuation/suffixes) pour
+        # rester cohérent avec les autres sources et la colonne `doi`.
+        doi = clean_doi(record.get("DOI"))
+        if not doi:
             return False
-        doi = doi_raw.lower()
 
         result = conn.execute(
             _INSERT_CROSSREF_SQL,
