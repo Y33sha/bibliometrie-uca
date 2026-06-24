@@ -234,6 +234,10 @@ class PgAuthorshipsBuildQueries(AuthorshipsBuildQueries):
     def link_source_authorships_to_authorships(self, conn: Connection) -> int:
         return link_source_authorships_to_authorships(conn)
 
+    def analyze_source_authorships(self, conn: Connection) -> None:
+        # Après l'étape 2, `source_authorships.authorship_id` vient d'être posé sur des centaines de milliers de lignes (non committé). Sans ce ANALYZE, le planner garde le null_frac committé (≈ 1, colonne quasi 100% NULL) et estime que le filtre `authorship_id IS NOT NULL` de l'étape 3 ne ramène rien → Nested Loop au lieu de Hash Aggregate. L'ANALYZE intra-transaction voit les mises à jour non committées de la transaction courante ; coût sub-seconde (échantillon fixe, indépendant des 9 M lignes).
+        conn.execute(text("ANALYZE source_authorships"))
+
     def propagate_authorship_attributes(self, conn: Connection) -> int:
         return propagate_authorship_attributes(conn)
 
