@@ -13,10 +13,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.pipeline.publishers_journals import (
-    enrich_journals_from_openalex as journals_mod,
-    enrich_publishers_from_openalex as publishers_mod,
-)
+from application.pipeline.publishers_journals import enrich_journals_from_openalex as journals_mod
+from application.publishers_enrichment import from_openalex as publishers_mod
 
 
 @pytest.fixture(autouse=True)

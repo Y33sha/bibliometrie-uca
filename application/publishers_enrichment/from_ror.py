@@ -1,15 +1,14 @@
 """
-Sub-step de la phase pipeline `publishers_journals` — types
-`publisher_type` dérivés des records ROR.
+Orchestrateur d'enrichissement éditeurs (maintenance, hors pipeline) —
+types `publisher_type` dérivés des records ROR.
 
 Pour chaque publisher avec `ror IS NOT NULL AND publisher_type='unknown'`,
 fetche l'API ROR v2 (via le `RorFetcher` injecté par la composition
 root) et mappe `types` (liste) vers notre enum via
 `domain.publishers.publisher.map_ror_types`. Politique d'écrasement
-« unknown only » : ne touche pas les valeurs admin explicites (cf.
-décision 7 du chantier).
+« unknown only » : ne touche pas les valeurs admin explicites.
 
-Mapping figé à l'audit Phase 3 (cf. roadmap) :
+Mapping ROR → `publisher_type` :
 - ROR `education` → `academic_institution`
 - ROR `archive` → `repository`
 - ROR `company` → `commercial`
@@ -35,7 +34,7 @@ from typing import Any
 
 from sqlalchemy import Connection
 
-from application.ports.pipeline.enrich import EnrichQueries
+from application.ports.publishers_enrichment import PublisherEnrichmentQueries
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdateFields,
@@ -51,7 +50,7 @@ MAX_WORKERS = 8
 
 def run_enrich_publishers_from_ror(
     conn: Connection,
-    queries: EnrichQueries,
+    queries: PublisherEnrichmentQueries,
     logger: logging.Logger,
     *,
     publisher_repo: PublisherRepository,
@@ -123,7 +122,7 @@ def run_enrich_publishers_from_ror(
     except KeyboardInterrupt:
         # Ctrl+C peut frapper en plein execute (transaction avortée → `commit()`
         # lèverait `PendingRollbackError`) : on rollback le batch en cours et on
-        # re-raise pour laisser `run_pipeline` arrêter proprement le pipeline.
+        # re-raise pour laisser l'appelant (CLI maintenance) s'arrêter proprement.
         conn.rollback()
         logger.warning("Interruption — batches déjà committés conservés.")
         raise

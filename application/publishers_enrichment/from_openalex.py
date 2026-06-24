@@ -1,18 +1,17 @@
 """
-Sub-step de la phase pipeline `publishers_journals` — enrichit les
-éditeurs à partir de l'API OpenAlex Publishers.
+Orchestrateur d'enrichissement éditeurs (maintenance, hors pipeline) à
+partir de l'API OpenAlex Publishers.
 
-Champs mis à jour (si NULL côté DB, politique d'écrasement « ne pas
-écraser un signal admin » — cf. décision 7 de
-docs/chantiers/METIER_pipeline-publishers-journals.md) :
+Champs mis à jour (si NULL côté DB seulement — ne jamais écraser un signal
+admin) :
 - `country` (depuis `country_codes[0]` ; un éditeur peut opérer dans
   plusieurs pays côté OpenAlex, on prend le premier qui correspond
   généralement au siège social)
 - `ror` (depuis `ids.ror`, stocké en short form `02scfj030` sans le
   préfixe `https://ror.org/`)
 
-Le `ror` posé ici sera consommé par le futur sub-step Phase 3 pour
-dériver `publisher_type` via les types ROR.
+Le `ror` posé ici est consommé par `from_ror` pour dériver `publisher_type`
+via les types ROR.
 
 L'API Publishers utilise un filtre différent de Sources :
 `ids.openalex:P1|P2|...` (et non `openalex:`).
@@ -25,7 +24,7 @@ from collections import Counter
 import requests
 from sqlalchemy import Connection
 
-from application.ports.pipeline.enrich import EnrichQueries
+from application.ports.publishers_enrichment import PublisherEnrichmentQueries
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdateFields,
@@ -128,7 +127,7 @@ def extract_country_ror(source: dict) -> tuple[str | None, str | None]:
 
 def run_enrich_publishers_from_openalex(
     conn: Connection,
-    queries: EnrichQueries,
+    queries: PublisherEnrichmentQueries,
     logger: logging.Logger,
     *,
     publisher_repo: PublisherRepository,
@@ -245,7 +244,7 @@ def run_enrich_publishers_from_openalex(
     except KeyboardInterrupt:
         # Ctrl+C peut frapper en plein execute (transaction avortée → `commit()`
         # lèverait `PendingRollbackError`) : on rollback le batch en cours et on
-        # re-raise pour laisser `run_pipeline` arrêter proprement le pipeline.
+        # re-raise pour laisser l'appelant (CLI maintenance) s'arrêter proprement.
         conn.rollback()
         logger.warning("Interruption — batches déjà committés conservés.")
         raise

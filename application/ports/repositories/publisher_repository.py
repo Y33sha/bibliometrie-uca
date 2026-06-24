@@ -25,8 +25,7 @@ class PublisherUpdateFields(TypedDict, total=False):
     """Partial update sur la table `publishers`.
 
     `name_normalized` est calculé par le service quand `name` est fourni.
-    `ror` est posé par le sub-step `enrich_publishers_from_openalex` (cf.
-    Phase 2 du chantier pipeline-publishers-journals).
+    `ror` est posé par `application.publishers_enrichment.from_openalex`.
     """
 
     name: str

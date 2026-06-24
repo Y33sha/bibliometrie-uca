@@ -1,17 +1,28 @@
 # Enrichissement des référentiels publishers et journals
 
-Phase `publishers_journals` : enrichit les **référentiels** `journals` (revues) et `publishers` (éditeurs) à partir de sources externes, après leur création initiale en phase [normalize](03-normalize.md).
+Phase `publishers_journals` : enrichit le référentiel `journals` (revues) à partir de sources externes, après sa création initiale en phase [normalize](03-normalize.md).
 
-Six sous-étapes enchaînées. La première (`resolve_doi_prefixes`) s'exécute à chaque lancement du pipeline ; les cinq autres ne tournent que lorsque l'enrichissement des référentiels est activé pour le mode courant (drapeau de politique `run_journal_enrichment`, vrai en mode `full`).
+Trois sous-étapes. `resolve_doi_prefixes` s'exécute à chaque lancement du pipeline ; les deux enrichissements journaux ne tournent que lorsque l'enrichissement des référentiels est activé pour le mode courant (drapeau de politique `run_journal_enrichment`, vrai en mode `full`).
 
 | Sous-étape | Source externe | Ce qu'elle renseigne | Quand |
 |---|---|---|---|
 | `resolve_doi_prefixes` | Crossref `/prefixes/{prefix}` + DataCite `/dois?prefix=` | `doi_prefixes` : pour chaque préfixe DOI, son agence d'enregistrement et l'éditeur (Crossref) ou l'entrepôt (DataCite) qui le détient | toujours |
 | `enrich_journals_from_openalex` | [OpenAlex Sources](../sources/03-openalex.md) | `journals` : type de revue, montant et devise des frais de publication (APC) | mode `full` |
 | `enrich_journals_from_doaj` | export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj) | `journals` : fiche DOAJ complète (`doaj_payload`) et appartenance au DOAJ (`is_in_doaj`) | mode `full` |
-| `enrich_publishers_from_openalex` | [OpenAlex Publishers](../sources/03-openalex.md) | `publishers` : pays (ISO-2) et identifiant ROR | mode `full` |
-| `enrich_publishers_from_crossref_members` | [Crossref Members](../sources/06-crossref.md) | `publishers` : pays (rattrapage des éditeurs sans pays après OpenAlex) | mode `full` |
-| `enrich_publishers_from_ror` | [ROR](../sources/09-sources-supplementaires.md#ror) | `publishers` : type d'éditeur (`commercial`, `academic_institution`, `learned_society`, `repository`) | mode `full` |
+
+Le `journal_type` posé ici nourrit la correction `journal_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
+
+## Enrichissement des éditeurs : hors pipeline
+
+Les champs d'éditeur enrichis depuis des sources externes — `country` (pays), `ror`, `publisher_type` — sont **purement cosmétiques** (affichage) : aucune phase du pipeline ne les consomme. Ils sont donc enrichis **à la demande**, par le script de maintenance `interfaces/cli/maintenance/enrich_publishers.py`, qui enchaîne trois sources sur une même connexion :
+
+| Étape | Source externe | Ce qu'elle renseigne |
+|---|---|---|
+| OpenAlex Publishers | [OpenAlex](../sources/03-openalex.md) | `country` (ISO-2) + `ror` |
+| Crossref Members | [Crossref](../sources/06-crossref.md) | `country` (rattrapage des éditeurs sans pays après OpenAlex, reliés à un membre Crossref via `doi_prefixes`) |
+| ROR | [ROR](../sources/09-sources-supplementaires.md#ror) | `publisher_type` (`commercial`, `academic_institution`, `learned_society`, `repository`), dérivé du `ror` posé par OpenAlex |
+
+Lancement : `python -m interfaces.cli.maintenance.enrich_publishers [--limit N] [--dry-run]`. Politique « NULL/unknown only » : ne touche jamais une valeur saisie par un administrateur.
 
 ## DOAJ : import par export complet
 
@@ -23,14 +34,11 @@ Pour `is_in_doaj`, le DOAJ fait autorité : le drapeau est remis à `false` part
 
 Chaque sous-étape est incrémentale — filtres d'éligibilité :
 
-- `resolve_doi_prefixes` : préfixes encore absents de `doi_prefixes`.
-- `enrich_journals_from_openalex` : revues ayant un `openalex_id` et un type encore inconnu (`journal_type = 'unknown'`).
+- `resolve_doi_prefixes` : préfixes encore absents de `doi_prefixes` (un préfixe non résoluble est mémorisé avec une agence sentinelle `'unknown'` pour ne plus être retenté).
+- `enrich_journals_from_openalex` : revues ayant un `openalex_id` et un type encore inconnu (`journal_type = 'unknown'`). Converge à zéro : OpenAlex type ses sources, une revue typée sort de la file.
 - `enrich_journals_from_doaj` : déclenché par l'âge du dernier import (voir ci-dessus), et non par un filtre revue par revue.
-- `enrich_publishers_from_openalex` : éditeurs ayant un `openalex_id` mais à qui il manque le pays ou le ROR.
-- `enrich_publishers_from_crossref_members` : éditeurs sans pays, reliés à un identifiant de membre Crossref via `doi_prefixes`.
-- `enrich_publishers_from_ror` : éditeurs ayant un ROR et un type encore inconnu (`publisher_type = 'unknown'`).
 
-Politique d'écrasement : une valeur n'est posée que si la cible est vide. Les valeurs saisies à la main par un administrateur sont donc préservées.
+Le script de maintenance des éditeurs est lui aussi incrémental (éditeurs au champ encore manquant). Politique d'écrasement, partout : une valeur n'est posée que si la cible est vide. Les valeurs saisies à la main par un administrateur sont donc préservées.
 
 ## Import manuel d'un export DOAJ
 
