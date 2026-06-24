@@ -21,43 +21,18 @@ import urllib.parse
 from collections.abc import Iterable
 
 import httpx
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.common import compute_hash
+from infrastructure.sources.common import upsert_not_found_stub, upsert_staging
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
 _USER_AGENT_TEMPLATE = "BibliometrieUCA-pipeline/1.0 (mailto:{email})"
-
-_INSERT_NOT_FOUND_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, not_found_at, processed)
-    VALUES ('crossref', :doi, :doi, '{}'::jsonb, now(), TRUE)
-    ON CONFLICT (source, source_id) DO NOTHING
-    """
-)
-
-_INSERT_CROSSREF_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
-    VALUES ('crossref', :doi, :doi, :raw_data, :raw_hash, FALSE)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN EXCLUDED.raw_data ELSE staging.raw_data END,
-        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        processed = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN FALSE ELSE staging.processed END,
-        last_seen_at = now()
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 class CrossrefFetchMissingDoiAdapter:
@@ -110,7 +85,14 @@ class CrossrefFetchMissingDoiAdapter:
 
     def insert(self, conn: Connection, record: dict) -> bool:
         if is_not_found_marker(record):
-            conn.execute(_INSERT_NOT_FOUND_SQL, {"doi": record["_doi"]})
+            # Source native du DOI : un 404 est définitif → stub `staging`, pas de re-arm.
+            upsert_not_found_stub(
+                conn,
+                source="crossref",
+                source_id=record["_doi"],
+                doi=record["_doi"],
+                entry_mode="cross_import_doi",
+            )
             conn.commit()
             return False
 
@@ -120,10 +102,13 @@ class CrossrefFetchMissingDoiAdapter:
         doi = clean_doi(record.get("DOI"))
         if not doi:
             return False
-
-        result = conn.execute(
-            _INSERT_CROSSREF_SQL,
-            {"doi": doi, "raw_data": record, "raw_hash": compute_hash(record)},
+        inserted, _ = upsert_staging(
+            conn,
+            source="crossref",
+            source_id=doi,
+            doi=doi,
+            raw_data=record,
+            entry_mode="cross_import_doi",
         )
         conn.commit()
-        return result.rowcount > 0
+        return inserted

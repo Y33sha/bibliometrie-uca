@@ -1,17 +1,18 @@
-"""Intégration : UPSERT staging de `HalFetchMissingDoiAdapter` (`_INSERT_HAL_SQL`).
+"""Intégration : back-fill du `doi` sur conflit, via `upsert_staging`.
 
 Régression : sur conflit `(source, source_id)`, le `DO UPDATE` doit renseigner
-`doi` quand la ligne HAL existait sans (doc moissonné avant que HAL ne porte le
-`doiId_s`). Sinon le DOI trouvé par le cross-import n'atterrit jamais et le même
-lot est re-cherché à chaque run.
+`doi` quand la ligne existait sans (doc moissonné avant que la source ne porte le
+DOI). Sinon le DOI trouvé par le cross-import n'atterrit jamais et le même lot est
+re-cherché à chaque run. Comportement mutualisé dans `upsert_staging` (utilisé par
+l'extraction bulk et tous les cross-imports).
 
-Teste le SQL directement (pas `adapter.insert`, qui committe et casserait
-l'isolation transactionnelle du fixture).
+Appelle `upsert_staging` directement (ne committe pas, l'isolation du fixture est
+préservée).
 """
 
 from sqlalchemy import text
 
-from infrastructure.sources.hal.fetch_missing_doi import _INSERT_HAL_SQL
+from infrastructure.sources.common import upsert_staging
 
 
 def _insert_existing(conn, source_id, doi):
@@ -32,14 +33,13 @@ def _staging_doi(conn, source_id):
 
 
 def _upsert(conn, source_id, doi):
-    conn.execute(
-        _INSERT_HAL_SQL,
-        {
-            "source_id": source_id,
-            "doi": doi,
-            "raw_data": {"halId_s": source_id, "doiId_s": doi},
-            "raw_hash": "newhash",
-        },
+    upsert_staging(
+        conn,
+        source="hal",
+        source_id=source_id,
+        doi=doi,
+        raw_data={"halId_s": source_id, "doiId_s": doi},
+        entry_mode="cross_import_doi",
     )
 
 

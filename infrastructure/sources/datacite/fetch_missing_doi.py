@@ -27,15 +27,14 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 import httpx
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
 from domain.publications.identifiers import clean_doi
-from infrastructure.sources.common import compute_hash
+from infrastructure.sources.common import upsert_not_found_stub, upsert_staging
 from infrastructure.sources.config import get_api_base_urls, get_polite_pool_email
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
@@ -52,31 +51,6 @@ def _record_doi(record: dict) -> str | None:
         doi_raw = attributes.get("doi") or ""
     doi_raw = doi_raw or record.get("id") or ""
     return clean_doi(doi_raw)
-
-
-_INSERT_NOT_FOUND_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, not_found_at, processed)
-    VALUES ('datacite', :doi, :doi, '{}'::jsonb, now(), TRUE)
-    ON CONFLICT (source, source_id) DO NOTHING
-    """
-)
-
-_INSERT_DATACITE_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, processed)
-    VALUES ('datacite', :doi, :doi, :raw_data, :raw_hash, FALSE)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN EXCLUDED.raw_data ELSE staging.raw_data END,
-        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        processed = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN FALSE ELSE staging.processed END,
-        last_seen_at = now()
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 class DataciteFetchMissingDoiAdapter:
@@ -143,7 +117,14 @@ class DataciteFetchMissingDoiAdapter:
 
     def insert(self, conn: Connection, record: dict) -> bool:
         if is_not_found_marker(record):
-            conn.execute(_INSERT_NOT_FOUND_SQL, {"doi": record["_doi"]})
+            # Source native du DOI pour ses préfixes : miss définitif → stub, pas de re-arm.
+            upsert_not_found_stub(
+                conn,
+                source="datacite",
+                source_id=record["_doi"],
+                doi=record["_doi"],
+                entry_mode="cross_import_doi",
+            )
             conn.commit()
             return False
 
@@ -152,10 +133,13 @@ class DataciteFetchMissingDoiAdapter:
         doi = _record_doi(record)
         if not doi:
             return False
-
-        result = conn.execute(
-            _INSERT_DATACITE_SQL,
-            {"doi": doi, "raw_data": record, "raw_hash": compute_hash(record)},
+        inserted, _ = upsert_staging(
+            conn,
+            source="datacite",
+            source_id=doi,
+            doi=doi,
+            raw_data=record,
+            entry_mode="cross_import_doi",
         )
         conn.commit()
-        return result.rowcount > 0
+        return inserted
