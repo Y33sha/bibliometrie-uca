@@ -2,15 +2,27 @@
 
 ## Approche de développement
 
+### Code
+
 - Privilégier les solutions architecturalement propres même si elles impliquent plus de fichiers modifiés. Ne jamais appliquer de fix local sans vérifier si le problème est structurel. Demander confirmation avant de choisir une approche quick-fix.
-- Ne pas proposer de pauses ou demander si l'utilisatrice veut continuer — elle le dira d'elle-même.
 - Avant toute proposition de modification du schéma de données: consulter le schéma existant.
-- Ne jamais écrire de commentaires faisant référence à des fichiers transitoires (todo, roadmap) ou à un état passé du code.
-- Si des tests échouent sans être liés au chantier en cours: au prochain commit, interrompre le chantier et s'occuper du problème.
-- Ne jamais proposer de faire une pause.
+- Si des tests échouent ou si des problèmes sont détectés en passant, sans être liés au chantier en cours: au prochain commit, interrompre le chantier et s'occuper du problème. S'il est trop gros pour être traité en passant, le signaler comme futur chantier.
+
+### Documentation et commentaires
+
+- Respecter l'accentuation du français.
+- Toujours utiliser le présent intemporel pour la documentation et les commentaires: ne jamais supposer connu l'état passé du code.
+- Ecrire la documentation et les commentaires d'une manière intelligible pour quelqu'un qui n'a pas le contexte des conversations: éviter le jargon interne au projet.
+- Eviter les sauts de ligne non sémantiques.
+
+### Savoir-vivre
+
+- En fin de message, proposer des pistes pour la suite. Ne pas proposer de pauses ou demander si l'utilisatrice veut continuer.
+- Pour les décisions structurantes (impact sur le schéma de données, la logique du pipeline, l'UI), toujours attendre la décision de l'utilisatrice avant de commencer à coder.
 
 ## Conventions du projet
 
+- Chantiers en cours: `/docs/chantiers/`; chantiers archivés dans `/docs/chantiers/archived`.
 - Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (orchestrateurs métier, incluant `application/pipeline/`), `infrastructure/` (adapters SQL, APIs sources, settings), `interfaces/` (adapters entrants : `interfaces/api/` pour FastAPI, `interfaces/frontend/` pour SvelteKit, `interfaces/cli/` pour les scripts one-shot). Entry points CLI : `run_pipeline.py` à la racine.
 - Frontend : SvelteKit (Svelte 5), routes dans `interfaces/frontend/src/routes/`
 - Pipeline : phases dans `application/pipeline/`, extracteurs dans `infrastructure/sources/`, orchestrateur `run_pipeline.py` à la racine
