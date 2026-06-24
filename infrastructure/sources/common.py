@@ -39,8 +39,8 @@ _UPSERT_STAGING_SQL = text(
         SELECT raw_hash AS old_hash FROM staging
         WHERE source = :source AND source_id = :source_id
     )
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, authors_truncated)
-    VALUES (:source, :source_id, :doi, :raw_data, :raw_hash, :authors_truncated)
+    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash, authors_truncated, entry_mode)
+    VALUES (:source, :source_id, :doi, :raw_data, :raw_hash, :authors_truncated, :entry_mode)
     ON CONFLICT (source, source_id) DO UPDATE SET
         raw_data = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
@@ -48,6 +48,9 @@ _UPSERT_STAGING_SQL = text(
             ELSE staging.raw_data
         END,
         raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
+        -- Renseigne le DOI quand la ligne existait sans (doc moissonné avant que la
+        -- source ne porte le DOI) ; ne clobbe jamais un DOI déjà posé.
+        doi = COALESCE(staging.doi, EXCLUDED.doi),
         processed = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                 THEN FALSE
@@ -61,6 +64,7 @@ _UPSERT_STAGING_SQL = text(
                 THEN EXCLUDED.authors_truncated
             ELSE staging.authors_truncated
         END,
+        -- `entry_mode` n'est PAS réécrit : il garde la provenance de première création.
         last_seen_at = now()
     RETURNING (xmax = 0) AS inserted,
               ((SELECT old_hash FROM old) IS DISTINCT FROM :raw_hash) AS changed
@@ -76,18 +80,25 @@ def upsert_staging(
     doi: str | None,
     raw_data: dict[str, Any],
     authors_truncated: bool = False,
+    entry_mode: str = "bulk",
 ) -> tuple[bool, bool]:
-    """UPSERT canonique d'une ligne `staging`, partagé par toutes les sources bulk.
+    """UPSERT canonique d'une ligne `staging`, partagé par toutes les voies d'entrée
+    (extraction bulk **et** cross-import — un seul endroit pour la logique d'UPSERT).
 
     `INSERT … ON CONFLICT (source, source_id) DO UPDATE` piloté par `raw_hash` :
     réécrit `raw_data` (et repasse `processed=FALSE`) seulement si le hash a changé,
-    bumpe toujours `last_seen_at`. Un `raw_hash=null` en base force le re-import
-    (`NULL IS DISTINCT FROM <hash>`). Le hash est calculé ici via `compute_hash`.
+    bumpe toujours `last_seen_at`, et renseigne `doi` s'il manquait (jamais d'écrasement).
+    Un `raw_hash=null` en base force le re-import (`NULL IS DISTINCT FROM <hash>`).
+    Le hash est calculé ici via `compute_hash`.
 
     `authors_truncated` (OpenAlex : payload bulk plafonné à 100 auteurs) suit la même
     logique que `processed` — (re)posé seulement quand le hash change, sinon préservé
     (n'écrase pas l'effacement de `refetch_truncated`). Les sources non plafonnées
     laissent le défaut `False`.
+
+    `entry_mode` enregistre comment la ligne est **entrée** (`bulk` à l'extraction,
+    `cross_import_doi` / `cross_import_hal` au cross-import) ; posé à la création,
+    jamais réécrit (provenance d'origine).
 
     Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`),
     `changed` = contenu réécrit (hash distinct de l'ancien). Le commit est à la
@@ -102,9 +113,42 @@ def upsert_staging(
             "raw_data": raw_data,
             "raw_hash": compute_hash(raw_data),
             "authors_truncated": authors_truncated,
+            "entry_mode": entry_mode,
         },
     ).one()
     return (bool(row.inserted), bool(row.changed))
+
+
+_NOT_FOUND_STUB_TEMPLATE = """
+    INSERT INTO staging (source, source_id, doi, raw_data, not_found_at, processed, entry_mode)
+    VALUES (:source, :source_id, :doi, '{}'::jsonb, now(), TRUE, :entry_mode)
+    ON CONFLICT (source, source_id) DO __ON_CONFLICT__
+"""
+_NOT_FOUND_STUB_DO_NOTHING = text(_NOT_FOUND_STUB_TEMPLATE.replace("__ON_CONFLICT__", "NOTHING"))
+_NOT_FOUND_STUB_REARM = text(
+    _NOT_FOUND_STUB_TEMPLATE.replace("__ON_CONFLICT__", "UPDATE SET not_found_at = now()")
+)
+
+
+def upsert_not_found_stub(
+    conn: Connection,
+    *,
+    source: str,
+    source_id: str,
+    doi: str | None = None,
+    entry_mode: str,
+    rearm: bool = False,
+) -> None:
+    """Pose un stub `staging` « introuvable » (raw_data vide, `not_found_at`, `processed`).
+
+    Partagé par les cross-imports (crossref/datacite par DOI, HAL par hal-id/NNT).
+    `rearm=True` : ré-arme `not_found_at` sur conflit (miss retriable, HAL) ; sinon
+    `DO NOTHING` (miss définitif d'une source native du DOI). Ne commit pas.
+    """
+    sql = _NOT_FOUND_STUB_REARM if rearm else _NOT_FOUND_STUB_DO_NOTHING
+    conn.execute(
+        sql, {"source": source, "source_id": source_id, "doi": doi, "entry_mode": entry_mode}
+    )
 
 
 # Mapping `target source → RA attendue côté doi_prefixes`. Pour ces sources,

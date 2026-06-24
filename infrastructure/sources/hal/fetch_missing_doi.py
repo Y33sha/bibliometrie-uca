@@ -11,41 +11,16 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 import httpx
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
-from infrastructure.sources.common import compute_hash, record_doi_not_found
+from infrastructure.sources.common import record_doi_not_found, upsert_staging
 from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
-
-_INSERT_HAL_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, processed, raw_hash)
-    VALUES ('hal', :source_id, :doi, :raw_data, FALSE, :raw_hash)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN EXCLUDED.raw_data
-            ELSE staging.raw_data
-        END,
-        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        processed = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN FALSE
-            ELSE staging.processed
-        END,
-        -- Renseigne le DOI trouvé quand la ligne HAL existait sans (doc moissonné
-        -- avant que HAL ne porte le doiId_s) : sinon le DOI ne serait jamais posé
-        -- et le cross-import le re-chercherait à chaque run. Ne clobbe pas un DOI déjà présent.
-        doi = COALESCE(staging.doi, EXCLUDED.doi),
-        last_seen_at = now()
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 class HalFetchMissingDoiAdapter:
@@ -102,14 +77,13 @@ class HalFetchMissingDoiAdapter:
         if isinstance(doi, list):
             doi = doi[0] if doi else None
 
-        result = conn.execute(
-            _INSERT_HAL_SQL,
-            {
-                "source_id": hal_id,
-                "doi": doi,
-                "raw_data": record,
-                "raw_hash": compute_hash(record),
-            },
+        inserted, _ = upsert_staging(
+            conn,
+            source="hal",
+            source_id=hal_id,
+            doi=doi,
+            raw_data=record,
+            entry_mode="cross_import_doi",
         )
         conn.commit()
-        return result.rowcount > 0
+        return inserted

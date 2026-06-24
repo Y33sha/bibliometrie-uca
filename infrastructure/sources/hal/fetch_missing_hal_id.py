@@ -13,8 +13,7 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection, text
 
 from application.ports.pipeline.extract.fetch_missing_hal_id import (
     HalFetchMissingAdapter,
@@ -23,7 +22,7 @@ from application.ports.pipeline.extract.fetch_missing_hal_id import (
 )
 from domain.publications.identifiers import extract_hal_id_from_url
 from infrastructure.sources.api_limits import HAL_DELAY
-from infrastructure.sources.common import compute_hash
+from infrastructure.sources.common import upsert_not_found_stub, upsert_staging
 from infrastructure.sources.config import get_api_base_urls
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
@@ -32,35 +31,6 @@ from infrastructure.sources.http_retry_async import http_request_with_retry_asyn
 # + délai par worker (HAL_DELAY = 0.5 s) → ~6-7 req/s sustained (5× le débit
 # de la variante sync précédente), sans burst.
 HAL_MAX_CONCURRENT = 5
-
-
-_UPSERT_HAL_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, processed, raw_hash)
-    VALUES ('hal', :source_id, :doi, :raw_data, FALSE, :raw_hash)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN EXCLUDED.raw_data
-            ELSE staging.raw_data
-        END,
-        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        processed = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-                THEN FALSE
-            ELSE staging.processed
-        END,
-        last_seen_at = now()
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
-
-_INSERT_NOT_FOUND_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, raw_data, not_found_at, processed)
-    VALUES ('hal', :source_id, '{}', now(), TRUE)
-    ON CONFLICT (source, source_id) DO UPDATE SET not_found_at = now()
-    """
-)
 
 
 def find_hal_ids_from_openalex(conn: Connection) -> list[dict[str, Any]]:
@@ -226,14 +196,13 @@ def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict
     Si le document existe et a changé (hash différent), met à jour et
     remet `processed = FALSE`.
     """
-    conn.execute(
-        _UPSERT_HAL_SQL,
-        {
-            "source_id": hal_id,
-            "doi": doi,
-            "raw_data": doc,
-            "raw_hash": compute_hash(doc),
-        },
+    upsert_staging(
+        conn,
+        source="hal",
+        source_id=hal_id,
+        doi=doi,
+        raw_data=doc,
+        entry_mode="cross_import_hal",
     )
 
 
@@ -328,7 +297,9 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         if doc:
             insert_staging_hal(conn, hal_id, _extract_doi_str(doc), doc)
             return True
-        conn.execute(_INSERT_NOT_FOUND_SQL, {"source_id": hal_id})
+        upsert_not_found_stub(
+            conn, source="hal", source_id=hal_id, entry_mode="cross_import_hal", rearm=True
+        )
         return False
 
     def insert_nnt_result(

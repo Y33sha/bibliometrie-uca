@@ -20,36 +20,19 @@ import logging
 from collections.abc import Iterable
 
 import httpx
-from sqlalchemy import Connection, bindparam, text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Connection
 
 from application.ports.pipeline.extract.fetch_missing_doi import (
     is_not_found_marker,
     not_found_marker,
 )
 from infrastructure.sources.api_limits import WOS_DELAY, WOS_PER_PAGE
-from infrastructure.sources.common import compute_hash, record_doi_not_found
+from infrastructure.sources.common import record_doi_not_found, upsert_staging
 from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 from infrastructure.sources.wos.parsing import clean_doi_for_wos, extract_doi, extract_ut
 
 log = logging.getLogger(__name__)
-
-_INSERT_WOS_SQL = text(
-    """
-    INSERT INTO staging (source, source_id, doi, raw_data, raw_hash)
-    VALUES ('wos', :source_id, :doi, :raw_data, :raw_hash)
-    ON CONFLICT (source, source_id) DO UPDATE SET
-        raw_data = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-            THEN EXCLUDED.raw_data ELSE staging.raw_data END,
-        raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        processed = CASE
-            WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
-            THEN FALSE ELSE staging.processed END,
-        last_seen_at = now()
-    """
-).bindparams(bindparam("raw_data", type_=JSONB))
 
 
 class WosFetchMissingDoiAdapter:
@@ -161,14 +144,13 @@ class WosFetchMissingDoiAdapter:
             conn.commit()
             return False
 
-        result = conn.execute(
-            _INSERT_WOS_SQL,
-            {
-                "source_id": extract_ut(record),
-                "doi": extract_doi(record),
-                "raw_data": record,
-                "raw_hash": compute_hash(record),
-            },
+        inserted, _ = upsert_staging(
+            conn,
+            source="wos",
+            source_id=extract_ut(record),
+            doi=extract_doi(record),
+            raw_data=record,
+            entry_mode="cross_import_doi",
         )
         conn.commit()
-        return result.rowcount > 0
+        return inserted
