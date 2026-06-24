@@ -139,8 +139,7 @@ Logs ambigus relevés à l'usage, à élucider et harmoniser entre sources.
 ## Items TODO liés: à intégrer ou à reporter à un chantier ultérieur
 
 * [ ] Faire un audit complet du logging (complétude, clarté, cohérence entre sources et entre phases)
-* [ ] Revoir la ModePolicy (modes `full` et `weekly`: à fusionner en un seul mode `full` avec une option "année de début")
-* [ ] chantier observabilité pipeline: quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de snapshot; c'est un problème. => faire des snapshots par phase, pas par pipeline
+* [ ] Quid des runs partiels? (phases séparées: extract, puis traitement) => ne génère pas de snapshot; c'est un problème. => faire des snapshots par phase, pas par pipeline
 
 ## Questions ouvertes
 
