@@ -16,7 +16,7 @@ flowchart LR
 ## Moissonnage initial {#extract}
 
 **Critères de requête**:
-- **années** de publication ([configurables](../guide-utilisateur/03-workflow-admin.md#years) dans `admin/config` : *weekly* couvre une fenêtre récente glissante (offset `pipeline_years_weekly`, par défaut n et n-1), *full* re-moissonne tout l'historique depuis une année d'ancre fixe (`pipeline_start_year_full`, 2017 = fusion UCA) → rétention cumulative, pas de fenêtre glissante);
+- **années** de publication : de l'année de début à l'année courante. L'année de début est l'argument `--start-year`, à défaut la valeur [configurable](../guide-utilisateur/03-workflow-admin.md#years) dans `admin/config` (par défaut 2017, année de la fusion UCA) ;
 - **affiliation** des publications ([périmètre configurable](../guide-utilisateur/03-workflow-admin.md#perimeters) dans `admin/config`). Il s'agit des affiliations *telles qu'elles sont renseignées dans chaque source*. Elles peuvent varier d'une source à l'autre et être incomplètes ou erronées. Ce point est géré dans les étapes ultérieures.
 
 **Gestion des changements**:

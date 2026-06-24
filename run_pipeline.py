@@ -9,8 +9,9 @@ Usage:
     python run_pipeline.py --list             # Lister les phases
     python run_pipeline.py --dry-run          # Afficher sans exécuter
     python run_pipeline.py --mode daily       # Import quotidien (HAL depuis dernier run)
-    python run_pipeline.py --mode weekly      # Import années n et n-1 (WoS exclu)
-    python run_pipeline.py --mode full        # Repasse complète + cross-imports + enrichissements
+    python run_pipeline.py --mode full        # Repasse complète (toutes sources sauf WoS)
+    python run_pipeline.py --start-year 2024  # Repasse sur [2024 … année courante]
+    python run_pipeline.py --include-wos      # Inclure WoS (opt-in, crédit API limité)
     python run_pipeline.py --sources hal,openalex  # Extraction HAL + OA seulement
     python run_pipeline.py --only extract --sources scanr --year 2023  # ScanR 2023 seul
 
@@ -31,8 +32,8 @@ Phases (dans l'ordre d'execution):
                         staging apres traitement + VACUUM.
     affiliations        Résolution adresses → structures, puis propagation in_perimeter
                         sur source_authorships
-    publishers_journals Enrichissement des référentiels publishers/journals (préfixes DOI,
-                        APC, DOAJ, pays/ROR, type d'éditeur)
+    publishers_journals Enrichissement du référentiel journals (préfixes DOI, APC, DOAJ,
+                        journal_type). L'enrichissement éditeurs est hors pipeline (maintenance).
     metadata_correction Corrections de métadonnées sur source_publications (par enregistrement,
                         et par grappe de DOI : concept DataCite, ouvrage/chapitre)
     publications        Création/rattachement des publications + fusions/scissions, en une passe
@@ -89,13 +90,19 @@ atexit.register(clear_status)
 
 
 def phase_extract(
-    mode: Any = "full", sources: Any = None, year: Any = None, **kw: Any
+    mode: Any = "full",
+    sources: Any = None,
+    year: Any = None,
+    start_year: Any = None,
+    include_wos: bool = False,
+    **kw: Any,
 ) -> PhaseMetrics:
     """Phase 1 : Extraction des sources vers staging.
 
-    La politique du mode (sources à interroger, plage d'années) vit dans
-    `application/pipeline/modes.py`. Les scripts d'extraction lisent la config DB
-    pour les plages d'années (`pipeline_years_full/weekly`).
+    La policy du mode (sources, stratégie d'années) vit dans
+    `application/pipeline/modes.py`. Le mode `full` extrait la plage
+    `[start_year … courante]` (défaut config `pipeline_start_year_full`) ; le mode
+    `daily` extrait HAL en incrémental par date. WoS est opt-in (`--include-wos`).
 
     Le refetch des works OpenAlex tronqués est une phase distincte
     (`refetch_truncated`), placée après `refresh_stale` et avant `normalize` : il
@@ -103,14 +110,14 @@ def phase_extract(
     que normalize ne les consomme.
     """
     policy = MODES[mode]
-    effective = (set(sources) if sources else set(policy.extract_sources)) & policy.extract_sources
+    allowed = set(policy.extract_sources) | ({"wos"} if include_wos else set())
+    effective = (set(sources) if sources else allowed) & allowed
     metrics = PhaseMetrics()
 
     if policy.year_selection == "since_last":
         # HAL uniquement, depuis le dernier rapport de pipeline (à 00:00).
         # OpenAlex n'a pas d'équivalent (filtre `from_updated_date` payant ;
-        # changefiles non filtrables par institution) et est rattrapé par
-        # le mode weekly.
+        # changefiles non filtrables par institution).
         from infrastructure.observability.pipeline_report import get_last_report_date
 
         last = get_last_report_date()
@@ -121,22 +128,21 @@ def phase_extract(
             since = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
             log.info("Mode quotidien : HAL depuis %s (fallback, aucun rapport)", since)
         if "hal" in effective:
-            metrics.merge(_run_extract_hal(mode="full", since=since))
+            metrics.merge(_run_extract_hal(since=since))
     else:
-        sub_mode = policy.year_selection  # "weekly" ou "full"
-        if mode == "weekly":
-            log.info("Mode hebdomadaire (WoS exclu)")
         tasks: list[tuple[str, Callable[[], PhaseMetrics]]] = []
         if "openalex" in effective:
-            tasks.append(("openalex", partial(_run_extract_openalex, mode=sub_mode, year=year)))
+            tasks.append(
+                ("openalex", partial(_run_extract_openalex, start_year=start_year, year=year))
+            )
         if "hal" in effective:
-            tasks.append(("hal", partial(_run_extract_hal, mode=sub_mode, year=year)))
+            tasks.append(("hal", partial(_run_extract_hal, start_year=start_year, year=year)))
         if "wos" in effective:
-            tasks.append(("wos", partial(_run_extract_wos, mode=sub_mode, year=year)))
+            tasks.append(("wos", partial(_run_extract_wos, start_year=start_year, year=year)))
         if "scanr" in effective:
-            tasks.append(("scanr", partial(_run_extract_scanr, mode=sub_mode, year=year)))
+            tasks.append(("scanr", partial(_run_extract_scanr, start_year=start_year, year=year)))
         if "theses" in effective:
-            tasks.append(("theses", partial(_run_extract_theses, mode=sub_mode, year=year)))
+            tasks.append(("theses", partial(_run_extract_theses, year=year)))
         if tasks:
             # Les helpers `_run_extract_*` ouvrent chacun leur propre connexion DB
             # et écrivent dans des tables `staging.*` distinctes : aucun état
@@ -154,7 +160,9 @@ def phase_extract(
     return metrics
 
 
-def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> PhaseMetrics:
+def phase_cross_imports(
+    mode: Any = "full", sources: Any = None, include_wos: bool = False, **kw: Any
+) -> PhaseMetrics:
     """Rattrapage des documents repérés dans une source mais absents d'une autre.
 
     Deux mécanismes complémentaires, exécutés dans cet ordre :
@@ -169,10 +177,11 @@ def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> P
     2. **Cross-import par DOI** (`fetch_missing_doi`).
        Pour chaque source cible, on cherche les DOI vus dans les autres
        sources mais absents de la sienne, et on tente de les fetcher.
-       Sources cibles depuis la policy du mode (`application/pipeline/modes.py`).
-       Auto-bornée : les DOI absents d'une source non native reçoivent un
-       backoff dans `doi_lookups` (re-tenté après `DOI_LOOKUP_RETRY_DAYS`),
-       ceux absents de Crossref (source native) un stub `staging` définitif.
+       WoS est opt-in (`--include-wos`) : source en fin de vie, crédit API
+       limité, exclue par défaut. Auto-bornée : les DOI absents d'une source non
+       native reçoivent un backoff dans `doi_lookups` (re-tenté après
+       `DOI_LOOKUP_RETRY_DAYS`), ceux absents de Crossref (source native) un stub
+       `staging` définitif.
     """
     metrics = PhaseMetrics()
 
@@ -180,11 +189,11 @@ def phase_cross_imports(mode: Any = "full", sources: Any = None, **kw: Any) -> P
     if not sources or "hal" in sources:
         metrics.merge(_run_fetch_missing_hal_id(mode=mode))
 
-    # Étape 2 : par DOI, sources selon la policy
-    policy = MODES[mode]
-    effective = (
-        set(sources) if sources else set(policy.fetch_missing_doi_sources)
-    ) & policy.fetch_missing_doi_sources
+    # Étape 2 : par DOI. WoS opt-in (cf. docstring).
+    targets = set(DOI_SEARCHABLE_SOURCES)
+    if not include_wos:
+        targets -= {"wos"}
+    effective = (set(sources) if sources else set(targets)) & targets
 
     doi_targets = [t for t in DOI_SEARCHABLE_SOURCES if t in effective]
     if doi_targets:
@@ -256,10 +265,10 @@ def phase_refetch_truncated(**kw: Any) -> PhaseMetrics:
     lignes à `processed=TRUE`, après quoi elles sont invisibles à la détection).
     """
     sources = kw.get("sources", set(ALL_SOURCES_SET))
-    mode = kw.get("mode", "full")
-    policy = MODES[mode]
     metrics = PhaseMetrics()
-    if policy.refetch_truncated_oa and "openalex" in sources:
+    # Toujours actif (incrémental : ne repère que les lignes openalex processed=FALSE
+    # à 100 auteurs) ; ne dépend que de la présence d'openalex dans les sources.
+    if "openalex" in sources:
         metrics.merge(_run_refetch_truncated())
     return metrics
 
@@ -341,39 +350,33 @@ def _vacuum_staging(full: bool = False) -> Any:
         conn.execute(text(sql))
 
 
-def phase_publishers_journals(mode: Any = "full", **kw: Any) -> PhaseMetrics:
-    """Enrichissement des référentiels `publishers` et `journals`.
+def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
+    """Enrichissement du référentiel `journals`, positionné entre `affiliations`
+    et `metadata_correction`. Trois sous-étapes, toutes incrémentales :
 
-    Phase consolidée (cf. `docs/chantiers/METIER_pipeline-publishers-journals.md`),
-    positionnée entre `affiliations` et `metadata_correction`. Sub-steps :
-
-    1. `resolve_doi_prefixes` (toujours actif) : préfixe DOI → Registration
-       Agency + éditeur Crossref / repository DataCite.
-    2. `enrich_journals_from_openalex` (gated par `run_journal_enrichment`) :
-       OpenAlex Sources → APC + journal_type.
-    3. `enrich_journals_from_doaj` (gated par `run_journal_enrichment`) :
-       dump CSV DOAJ (téléchargé au plus tous les ~30 jours dans `data/doaj/`) →
-       `doaj_payload` + `is_in_doaj` pour tout le catalogue. DOAJ fait autorité et
-       est seul à poser `is_in_doaj` (reset global puis re-pose des TRUE).
+    1. `resolve_doi_prefixes` : préfixe DOI → Registration Agency + éditeur
+       Crossref / repository DataCite. Ne traite que les préfixes absents de
+       `doi_prefixes` (préfixe non résoluble → sentinelle `'unknown'`).
+    2. `enrich_journals_from_openalex` : OpenAlex Sources → APC + journal_type.
+       Ne traite que les revues à `journal_type='unknown'` (converge à zéro,
+       OpenAlex typant ses sources).
+    3. `enrich_journals_from_doaj` : dump CSV DOAJ (téléchargé au plus tous les
+       ~30 jours dans `data/doaj/`) → `doaj_payload` + `is_in_doaj`. DOAJ fait
+       autorité et est seul à poser `is_in_doaj` (reset global puis re-pose des
+       TRUE). Ne se déclenche que si le dernier `doaj_imported_at` est null ou
+       plus vieux que la fenêtre de stale.
 
     L'enrichissement des **éditeurs** (pays, ROR, type) est purement cosmétique :
     hors pipeline, lancé à la demande via
     `interfaces/cli/maintenance/enrich_publishers.py`.
 
-    Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les `publishers`/`journals` qu'on veut enrichir.
-
-    Idempotente : `resolve_doi_prefixes` ne traite que les préfixes absents
-    de `doi_prefixes` ; l'enrichissement journaux OpenAlex ne traite que les
-    revues à `journal_type='unknown'` (converge à zéro, OpenAlex typant ses
-    sources) ; le fetch DOAJ ne se déclenche que si le dernier
-    `doaj_imported_at` est null ou plus vieux que la fenêtre de stale (30 j).
+    Placée **après normalize** : (a) `cross_imports` (en amont) peut introduire de
+    nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les
+    `publishers`/`journals` qu'on veut enrichir.
     """
     metrics = _run_resolve_doi_prefixes()
-    if MODES[mode].run_journal_enrichment:
-        _run_enrich_journals_from_openalex()
-        _run_enrich_journals_from_doaj()
-    else:
-        log.info("Enrichissement journaux ignoré en mode %s", mode)
+    _run_enrich_journals_from_openalex()
+    _run_enrich_journals_from_doaj()
     return metrics
 
 
@@ -1180,14 +1183,15 @@ def _run_cooccurrences() -> None:
 
 
 def _extractor_args(
-    *, mode: str = "full", year: int | None = None, since: str | None = None
+    *, start_year: int | None = None, year: int | None = None, since: str | None = None
 ) -> argparse.Namespace:
     """Construit le Namespace `args` consommé par `SourceExtractor.run_as_phase`.
 
-    Tous les extracteurs s'attendent à `dry_run, mode, year, since`. HAL est
-    le seul qui exploite `since` ; les autres l'ignorent silencieusement.
+    Les extracteurs lisent `dry_run, start_year, year, since`. HAL et OpenAlex
+    exploitent `since` (incrémental) ; theses ignore `start_year` (ramène tout
+    l'historique des PPN).
     """
-    return argparse.Namespace(dry_run=False, mode=mode, year=year, since=since)
+    return argparse.Namespace(dry_run=False, start_year=start_year, year=year, since=since)
 
 
 def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
@@ -1213,7 +1217,7 @@ def _run_extractor(extractor: Any, args: Any) -> PhaseMetrics:
 
 
 def _run_extract_hal(
-    *, mode: str = "full", year: int | None = None, since: str | None = None
+    *, start_year: int | None = None, year: int | None = None, since: str | None = None
 ) -> PhaseMetrics:
     from application.pipeline.extract.extract_hal import HalExtractor
     from infrastructure.db.engine import get_sync_engine
@@ -1230,7 +1234,7 @@ def _run_extract_hal(
     try:
         metrics = _run_extractor(
             HalExtractor(conn, source_log, adapter),
-            _extractor_args(mode=mode, year=year, since=since),
+            _extractor_args(start_year=start_year, year=year, since=since),
         )
     finally:
         conn.close()
@@ -1239,7 +1243,7 @@ def _run_extract_hal(
 
 
 def _run_extract_openalex(
-    *, mode: str = "full", year: int | None = None, since: str | None = None
+    *, start_year: int | None = None, year: int | None = None, since: str | None = None
 ) -> PhaseMetrics:
     from application.pipeline.extract.extract_openalex import OpenalexExtractor
     from infrastructure.db.engine import get_sync_engine
@@ -1256,7 +1260,7 @@ def _run_extract_openalex(
     try:
         metrics = _run_extractor(
             OpenalexExtractor(conn, source_log, adapter),
-            _extractor_args(mode=mode, year=year, since=since),
+            _extractor_args(start_year=start_year, year=year, since=since),
         )
     finally:
         conn.close()
@@ -1264,7 +1268,7 @@ def _run_extract_openalex(
     return metrics
 
 
-def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
+def _run_extract_wos(*, start_year: int | None = None, year: int | None = None) -> PhaseMetrics:
     from application.pipeline.extract.extract_wos import WosExtractor
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
@@ -1282,7 +1286,7 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
     try:
         metrics = _run_extractor(
             WosExtractor(conn, source_log, adapter),
-            _extractor_args(mode=mode, year=year),
+            _extractor_args(start_year=start_year, year=year),
         )
     finally:
         conn.close()
@@ -1290,7 +1294,7 @@ def _run_extract_wos(*, mode: str = "full", year: int | None = None) -> PhaseMet
     return metrics
 
 
-def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
+def _run_extract_scanr(*, start_year: int | None = None, year: int | None = None) -> PhaseMetrics:
     from application.pipeline.extract.extract_scanr import ScanrExtractor
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.config import get_api_base_urls
@@ -1311,7 +1315,7 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
     try:
         metrics = _run_extractor(
             ScanrExtractor(conn, source_log, adapter),
-            _extractor_args(mode=mode, year=year),
+            _extractor_args(start_year=start_year, year=year),
         )
     finally:
         conn.close()
@@ -1319,7 +1323,7 @@ def _run_extract_scanr(*, mode: str = "full", year: int | None = None) -> PhaseM
     return metrics
 
 
-def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> PhaseMetrics:
+def _run_extract_theses(*, year: int | None = None) -> PhaseMetrics:
     from application.pipeline.extract.extract_theses import ThesesExtractor
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.sources.config import get_api_base_urls
@@ -1335,7 +1339,7 @@ def _run_extract_theses(*, mode: str = "full", year: int | None = None) -> Phase
     try:
         metrics = _run_extractor(
             ThesesExtractor(conn, source_log, adapter),
-            _extractor_args(mode=mode, year=year),
+            _extractor_args(year=year),
         )
     finally:
         conn.close()
@@ -1572,19 +1576,13 @@ def _run_suggest_address_countries(*, retry_empty: bool = False) -> PhaseMetrics
     return metrics
 
 
-def phase_oa_status(mode: Any = "full", **kw: Any) -> Any:
-    """Enrichissement `publications.oa_status` via Unpaywall.
+def phase_oa_status(**kw: Any) -> Any:
+    """Enrichissement `publications.oa_status` via Unpaywall (per-publication).
 
-    Renommée depuis `enrich` le 2026-05-26 : `enrich` était devenu un
-    misnomer une fois countries/subjects/publishers_journals enrichis
-    par ailleurs. Cette phase ne fait plus que l'Unpaywall (per-publication).
-
-    Gouverné par `ModePolicy.run_oa_status` (cf. `application/pipeline/modes.py`).
+    Incrémentale et auto-bornée (staleness + cap `MAX_PER_RUN`) : le backlog des
+    jamais-vérifiées s'écoule run après run. Tourne dans tous les modes.
     """
-    if MODES[mode].run_oa_status:
-        _run_enrich_oa_status()
-    else:
-        log.info("Phase oa_status ignorée en mode %s", mode)
+    _run_enrich_oa_status()
 
 
 # Registre des phases, dans l'ordre
@@ -1662,6 +1660,18 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
     )
     parser.add_argument(
         "--year", type=int, help="Surcharger l'année d'extraction (une seule année)"
+    )
+    parser.add_argument(
+        "--start-year",
+        type=int,
+        help="Année de début du range d'extraction (mode full ; défaut: config "
+        "pipeline_start_year_full)",
+    )
+    parser.add_argument(
+        "--include-wos",
+        action="store_true",
+        help="Inclure WoS dans l'extraction et le cross-import (opt-in : source en fin de vie, "
+        "crédit API limité ; exclue par défaut).",
     )
     parser.add_argument(
         "--force",
@@ -1752,6 +1762,8 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
                 mode=args.mode,
                 sources=sources,
                 year=args.year,
+                start_year=args.start_year,
+                include_wos=args.include_wos,
                 rebuild_publications=args.rebuild_publications,
             )
         except KeyboardInterrupt:

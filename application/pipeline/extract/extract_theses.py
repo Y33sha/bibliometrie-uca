@@ -108,12 +108,6 @@ class ThesesExtractor(SourceExtractor[ThesesExtractConfig]):
             type=int,
             help="Filtre post-fetch par année (NNT préfixé YYYY ; ne ramène que les soutenues)",
         )
-        parser.add_argument(
-            "--mode",
-            choices=["full", "weekly"],
-            default="full",
-            help="Accepté pour cohérence CLI ; sans effet (theses.fr a un volume bas)",
-        )
 
     def load_config(self, conn: Connection) -> ThesesExtractConfig:
         config = self._adapter.load_config(conn)
