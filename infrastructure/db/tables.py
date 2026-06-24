@@ -715,6 +715,7 @@ person_name_forms = Table(
     Column("name_form", Text, nullable=False),
     Column("person_id", Integer, nullable=False),
     Column("sources", ARRAY(Text), nullable=False, server_default="{}"),
+    Column("status", identifier_status_enum, nullable=False, server_default="pending"),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     PrimaryKeyConstraint("name_form", "person_id", name="person_name_forms_pkey"),
     Index("idx_pnf_person_id", "person_id"),
@@ -856,6 +857,7 @@ source_publications = Table(
     Column("cited_by_count", Integer),
     Column("journal_id", Integer),
     Column("oa_status", Text),
+    Column("embargo_until", Date),
     Column("language", Text),
     Column("container_title", Text),
     Column("is_retracted", Boolean),
@@ -1045,6 +1047,9 @@ staging = Table(
     Column("last_seen_at", DateTime(timezone=True), server_default=func.now()),
     Column("not_found_at", DateTime(timezone=True)),
     Column("disappeared_at", DateTime(timezone=True)),
+    # OpenAlex : payload bulk plafonné à 100 auteurs → work probablement tronqué.
+    # Posé à l'extraction, consommé puis effacé par `refetch_truncated`.
+    Column("authors_truncated", Boolean, nullable=False, server_default="false"),
     UniqueConstraint("source", "source_id", name="staging_source_source_id_key"),
     CheckConstraint(
         "not_found_at IS NULL OR processed",
