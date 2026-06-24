@@ -162,18 +162,29 @@ def require_admin(session: str | None = Cookie(None, alias="session")) -> None:
 
 
 def db_conn_sync() -> Iterator[Connection]:
-    """Connection SA sync ouverte en transaction, pour les routers `def`.
+    """Connection SA sync ouverte pour les routers `def`, via `Depends(db_conn_sync)`.
 
-    À utiliser via `Depends(db_conn_sync)`. Ouvre `engine.begin()` :
-    commit auto en sortie sans exception, rollback sinon — équivalent
-    sync de `db_conn` côté async (`interfaces/api/async_deps.py`).
+    Style « commit as you go » : un handler d'écriture appelle `conn.commit()`
+    lui-même, avant de retourner. C'est nécessaire pour que la donnée soit
+    persistée *avant* l'envoi de la réponse — FastAPI exécute le teardown des
+    dépendances `yield` après l'envoi, donc un commit fait ici en sortie
+    arriverait trop tard (un GET ou une tâche de fond déclenchés juste après
+    liraient l'état pré-commit).
 
-    Toute dépendance qui en dérive (`*_repo` sync, query adapters
-    sync) doit partager la même connexion → même transaction.
+    En sortie, un commit de fin persiste ce qu'un handler n'aurait pas commité
+    (garde-fou pendant la migration des handlers d'écriture). Sur exception, la
+    transaction est annulée. Toute dépendance qui en dérive (`*_repo` sync,
+    query adapters sync) partage la même connexion.
     """
     engine = get_sync_engine()
-    with engine.begin() as conn:
-        yield conn
+    with engine.connect() as conn:
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+        if conn.in_transaction():
+            conn.commit()
 
 
 def subjects_admin_queries(
@@ -320,8 +331,12 @@ def metadata_correction_queries_sync() -> MetadataCorrectionQueries:
 # Contrat (cf. chantier CODE_background-jobs, phase hygiène) : une BG task ouvre
 # TOUJOURS sa propre connexion via `with engine.begin()` (commit/rollback + close
 # en sortie, même sur exception) et enveloppe son corps dans un `try/except` qui
-# logue — jamais réutiliser la connexion de la requête (déjà fermée quand la BG
-# task tourne) et jamais laisser une transaction ouverte (idle in transaction).
+# logue — jamais réutiliser la connexion de la requête (elle appartient à un autre
+# contexte et tourne en parallèle) et jamais laisser une transaction ouverte (idle
+# in transaction). Note : une BG task s'exécute pendant l'envoi de la réponse, donc
+# AVANT le commit de fin de la requête (cf. chantier CODE_commit-avant-reponse) ;
+# elle ne voit les écritures de la requête que si le handler les a commitées avant
+# de retourner.
 
 
 def bg_propagate_countries_sync(address_ids: list[int]) -> None:
