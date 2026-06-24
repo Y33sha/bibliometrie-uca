@@ -21,7 +21,9 @@ DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
 
 def _build_test_sync_engine() -> Engine:
-    """Engine SA sync sur bibliometrie_test."""
+    """Engine SA sync sur bibliometrie_test, garde-fou DML installé comme le vrai."""
+    from infrastructure.db.dml_guard import install_dml_guard
+
     url = URL.create(
         drivername="postgresql+psycopg",
         username=DB_USER,
@@ -30,7 +32,9 @@ def _build_test_sync_engine() -> Engine:
         port=DB_PORT,
         database="bibliometrie_test",
     )
-    return create_engine(url, pool_size=1, max_overflow=2, pool_pre_ping=True)
+    engine = create_engine(url, pool_size=1, max_overflow=2, pool_pre_ping=True)
+    install_dml_guard(engine)
+    return engine
 
 
 # Patcher AVANT import de l'app
