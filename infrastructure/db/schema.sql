@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict eUGE0Hf4MBfZ3bwh3d8sxsQxQYY3rGRPmEBhz2z8V3Dg3QXtQLdekOgFVg9m04e
+\restrict TGb0ApaxEvMh02NbTAKCGoMLQYhmu6comSzaoJM5wtY0zQEGZf9FZVA3eWGBOi2
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1305,6 +1305,7 @@ CREATE TABLE public.staging (
     last_seen_at timestamp with time zone DEFAULT now(),
     not_found_at timestamp with time zone,
     disappeared_at timestamp with time zone,
+    authors_truncated boolean DEFAULT false NOT NULL,
     CONSTRAINT staging_not_found_at_implies_processed CHECK (((not_found_at IS NULL) OR processed))
 );
 
@@ -2589,7 +2590,7 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
 
 
 --
@@ -3186,5 +3187,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eUGE0Hf4MBfZ3bwh3d8sxsQxQYY3rGRPmEBhz2z8V3Dg3QXtQLdekOgFVg9m04e
+\unrestrict TGb0ApaxEvMh02NbTAKCGoMLQYhmu6comSzaoJM5wtY0zQEGZf9FZVA3eWGBOi2
 

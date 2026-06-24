@@ -19,6 +19,7 @@
 
 - En fin de message, proposer des pistes pour la suite. Ne pas proposer de pauses ou demander si l'utilisatrice veut continuer.
 - Pour les décisions structurantes (impact sur le schéma de données, la logique du pipeline, l'UI), toujours attendre la décision de l'utilisatrice avant de commencer à coder.
+- Ne pas faire tourner la suite pytest plusieurs fois juste pour récupérer le résumé. Si c'est vert la première fois, c'est bon. Si tu veux le résumé, débrouille-toi pour le récupérer du premier coup, au lieu de tronquer l'output sans nécessité.
 
 ## Conventions du projet
 

@@ -1,5 +1,5 @@
 * [ ] oneshot sur prod: python interfaces/cli/oneshot/backfill_clean_dois.py
-* [ ] régler le problème de CI (mypy)
+* [ ] régler le problème de CI (4 tests d'intégration)
 # Pipeline
 ## Extraction
 ### Couverture
@@ -10,7 +10,6 @@
 * [ ] à étudier: cross-import: seulement `in_perimeter`? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations / suppose d'abord de faire un audit de l'existant (ajouter colonnes temporaires pour stocker les critères de requête ayant permis de trouver un document)
 * [ ] analyser les diff de payload pour voir si on peut diminuer le nombre d'UPSERT en filtrant les champs importés
 * [ ] scanR: paralléliser les années?
-* [ ] refetch_truncated: envisager un flag `authors_truncated`
 ## Suite du traitement
 ### Correction
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
