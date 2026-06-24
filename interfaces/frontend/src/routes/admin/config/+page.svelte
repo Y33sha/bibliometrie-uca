@@ -4,6 +4,7 @@
   import { api, ApiError, config as configApi, perimeters as perimetersApi } from "$lib/api";
   import { confirmDialog, toast } from '$lib/dialogs.svelte';
   import Modal from '$lib/components/Modal.svelte';
+  import { autofocus } from "$lib/actions/focus";
   import type { components } from "$lib/api/schema";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
@@ -142,6 +143,21 @@
     }
   }
 
+  function cancelEdit() {
+    editingKey = null;
+  }
+
+  /** Entrée valide, Échap annule — sur tous les éditeurs inline de config. */
+  function editKeydown(e: KeyboardEvent, key: string) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      save(key);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+    }
+  }
+
   async function save(key: string) {
     saving = true;
     try {
@@ -168,6 +184,21 @@
 <h2>Configuration du pipeline</h2>
 <p class="subtitle">Les modifications prennent effet au prochain lancement du pipeline.</p>
 
+<!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires :
+     focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
+{#snippet inlineEdit(key: string)}
+  <input
+    class="config-editor-inline"
+    bind:value={editValue}
+    use:autofocus={{ select: true }}
+    onkeydown={(e) => editKeydown(e, key)}
+  />
+  <span class="config-actions-inline">
+    <button class="btn btn-sm btn-primary" onclick={() => save(key)} disabled={saving}>OK</button>
+    <button class="btn btn-sm" onclick={cancelEdit}>Annuler</button>
+  </span>
+{/snippet}
+
 <!-- ═══ API ═══ -->
 <h3 class="section-title">API</h3>
 <div class="config-grid">
@@ -189,26 +220,7 @@
                     : key}</span
         >
         {#if editingKey === key}
-          <input
-            class="config-editor-inline"
-            style="width: 300px;"
-            bind:value={editValue}
-            onkeydown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                save(key);
-              }
-            }}
-          />
-          <span class="config-actions-inline">
-            <button class="btn btn-sm btn-primary" onclick={() => save(key)} disabled={saving}>OK</button>
-            <button
-              class="btn btn-sm"
-              onclick={() => {
-                editingKey = null;
-              }}>Annuler</button
-            >
-          </span>
+          {@render inlineEdit(key)}
         {:else}
           <span class="config-value-inline">{isSecret ? "••••••••" : configByKey(key)?.value || "(non défini)"}</span>
           <button class="btn btn-sm" onclick={() => startEdit(key)}>Modifier</button>
@@ -227,23 +239,7 @@
       <div class="config-row">
         <span class="config-label">Année de début</span>
         {#if editingKey === key}
-          <input
-            class="config-editor-inline"
-            bind:value={editValue}
-            onkeydown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                save(key);
-              }
-            }}
-          />
-          <button class="btn btn-sm btn-primary" onclick={() => save(key)} disabled={saving}>OK</button>
-          <button
-            class="btn btn-sm"
-            onclick={() => {
-              editingKey = null;
-            }}>Annuler</button
-          >
+          {@render inlineEdit(key)}
         {:else}
           <span class="config-value-inline"
             >{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span
@@ -320,25 +316,7 @@
       <div class="config-row">
         <span class="config-label">{field.label}</span>
         {#if editingKey === field.key}
-          <input
-            class="config-editor-inline"
-            bind:value={editValue}
-            onkeydown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                save(field.key);
-              }
-            }}
-          />
-          <span class="config-actions-inline">
-            <button class="btn btn-sm btn-primary" onclick={() => save(field.key)} disabled={saving}>OK</button>
-            <button
-              class="btn btn-sm"
-              onclick={() => {
-                editingKey = null;
-              }}>Annuler</button
-            >
-          </span>
+          {@render inlineEdit(field.key)}
         {:else}
           <span class="config-value-inline">{Array.isArray(item.value) && item.value.length ? item.value.join(", ") : "(aucune)"}</span>
           <button class="btn btn-sm" onclick={() => startEdit(field.key)}>Modifier</button>
@@ -378,7 +356,7 @@
           </span>
         {/each}
       </div>
-      <input id="perim-struct-search" type="text" placeholder="Rechercher une structure..." bind:value={perimModal.structSearch} oninput={perimSearchStructures} autocomplete="off" />
+      <input id="perim-struct-search" type="search" placeholder="Rechercher une structure..." bind:value={perimModal.structSearch} oninput={perimSearchStructures} autocomplete="off" />
       {#if perimModal.structResults.length > 0}
         <div class="perim-search-results">
           {#each perimModal.structResults.slice(0, 8) as s (s.id)}

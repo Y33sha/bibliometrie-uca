@@ -1,5 +1,6 @@
 <script lang="ts">
   import IdentifierLink from "$lib/components/IdentifierLink.svelte";
+  import { autofocus } from "$lib/actions/focus";
   import type { IdFormState, Person, PersonIdentifier } from "./types";
 
   let {
@@ -82,8 +83,16 @@
           ? "identifiant-hal"
           : "identifiant idref"}
       bind:value={form.id_value}
+      use:autofocus={{ select: true }}
       onkeydown={(e) => {
-        if (e.key === "Enter") onadd(person.id);
+        if (e.key === "Enter") {
+          e.preventDefault();
+          onadd(person.id);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          ontoggleForm(person.id);
+        }
       }}
     />
     <button class="btn btn-link" onclick={() => onadd(person.id)}>OK</button>

@@ -6,6 +6,7 @@
   import { esc, deriveStructDetectionStatus } from "$lib/utils";
   import { structDetectionClasses, structDetectionLabels } from "$lib/labels";
   import Pagination from "$lib/components/Pagination.svelte";
+  import { autofocus } from "$lib/actions/focus";
   import { confirmDialog, toast } from '$lib/dialogs.svelte';
 
   // ---------- Types ----------
@@ -337,7 +338,7 @@
       <button class="tab-btn" class:active={currentTab === "fn"} onclick={() => switchTab("fn")}> Faux négatifs </button>
       <button class="tab-btn" class:active={currentTab === "fp"} onclick={() => switchTab("fp")}> Faux positifs </button>
     </div>
-    <input type="text" placeholder="Rechercher dans les adresses..." bind:value={search} oninput={onSearchInput} />
+    <input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
     <span class="count">{total} adresses</span>
   </div>
 
@@ -405,11 +406,11 @@
 
   <!-- Context picker -->
   {#if ctxPicker}
-    <div class="ctx-picker-inline" id="form-ctx-picker" style="top:{ctxPicker.y}px;left:{ctxPicker.x}px" onclick={(e) => e.stopPropagation()} onkeydown={() => {}} role="dialog">
+    <div class="ctx-picker-inline" id="form-ctx-picker" style="top:{ctxPicker.y}px;left:{ctxPicker.x}px" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeCtxPicker(); } }} role="dialog">
       <div class="picker-shortcuts">
         <button onclick={() => addCtxToForm("tutelles")}>{"\uD83D\uDD17"} tutelles</button>
       </div>
-      <input type="text" placeholder="Rechercher une structure..." bind:value={ctxSearch} />
+      <input type="text" placeholder="Rechercher une structure..." bind:value={ctxSearch} use:autofocus />
       <div class="picker-results">
         {#each ctxFilteredStructures as s (s.id)}
           <button class="picker-item" onclick={() => addCtxToForm(s.id)}>
@@ -556,9 +557,8 @@
     border-color: var(--accent);
   }
 
-  .toolbar input[type="text"] {
+  .toolbar input[type="search"] {
     width: 250px;
-    background: white;
   }
 
   /* Table */
@@ -683,8 +683,10 @@
     text-align: left;
     font-family: inherit;
   }
-  .picker-item:hover {
+  .picker-item:hover,
+  .picker-item:focus-visible {
     background: var(--accent-light);
+    outline: none;
   }
   .picker-type {
     font-size: 0.65rem;

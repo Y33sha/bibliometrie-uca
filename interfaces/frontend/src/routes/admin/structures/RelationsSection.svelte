@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Picker from "$lib/components/Picker.svelte";
   import type { RelatedStructure, Structure } from "./types";
 
   let {
@@ -14,6 +15,7 @@
     ondeleteRelation,
     onopenPicker,
     onpickStructure,
+    onclosePicker,
   }: {
     structureId: number;
     tutelles: RelatedStructure[];
@@ -27,6 +29,7 @@
     ondeleteRelation: (relId: number) => void | Promise<void>;
     onopenPicker: (relType: string, direction: string, structId: number) => void;
     onpickStructure: (otherId: number) => void | Promise<void>;
+    onclosePicker: () => void;
   } = $props();
 </script>
 
@@ -106,30 +109,19 @@
 
 <!-- Relation picker -->
 {#if relationPickerOpen}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="picker-container" bind:this={relationPickerEl} onclick={(e) => e.stopPropagation()}>
-    <input
-      type="text"
-      placeholder="Rechercher une structure..."
-      bind:value={relationPickerSearch}
-      autocomplete="off"
-    />
-    <div class="picker-results">
-      {#if relationPickerResults.length === 0}
-        <div class="picker-item disabled">Aucun résultat</div>
-      {:else}
-        {#each relationPickerResults as rs (rs.id)}
-          <button class="picker-item" onclick={() => onpickStructure(rs.id)}>
-            <span class="type-badge type-{rs.type}" style="font-size: 0.65rem;padding:0 5px">
-              {rs.type}
-            </span>
-            {rs.acronym ? rs.acronym + " \u2014 " : ""}{rs.name}
-          </button>
-        {/each}
-      {/if}
-    </div>
-  </div>
+  <Picker
+    results={relationPickerResults}
+    bind:search={relationPickerSearch}
+    bind:element={relationPickerEl}
+    onpick={(rs) => onpickStructure(rs.id)}
+    onclose={onclosePicker}
+    placeholder="Rechercher une structure…"
+  >
+    {#snippet item(rs)}
+      <span class="type-badge type-{rs.type}" style="font-size: 0.65rem;padding:0 5px">{rs.type}</span>
+      {rs.acronym ? rs.acronym + " — " : ""}{rs.name}
+    {/snippet}
+  </Picker>
 {/if}
 
 <style>
@@ -210,51 +202,6 @@
     background: var(--accent);
     color: white;
     border-color: var(--accent);
-  }
-  .picker-container {
-    position: relative;
-    margin: 8px 0;
-    background: white;
-    border: 1px solid var(--accent);
-    border-radius: 5px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-    max-width: 380px;
-    z-index: 50;
-  }
-  .picker-container input {
-    width: 100%;
-    padding: 7px 10px;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    border-radius: 5px 5px 0 0;
-    font-size: 0.95rem;
-    outline: none;
-    font-family: inherit;
-  }
-  .picker-results {
-    max-height: 200px;
-    overflow-y: auto;
-  }
-  .picker-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: 100%;
-    padding: 6px 10px;
-    font-size: 0.95rem;
-    cursor: pointer;
-    background: none;
-    border: none;
-    text-align: left;
-    font-family: inherit;
-    color: inherit;
-  }
-  .picker-item:hover {
-    background: var(--accent-light);
-  }
-  .picker-item.disabled {
-    color: var(--text-muted);
-    cursor: default;
   }
   h3 {
     margin: 12px 0 6px;

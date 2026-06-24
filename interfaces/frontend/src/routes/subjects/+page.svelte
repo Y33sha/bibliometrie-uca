@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { autofocus } from "$lib/actions/focus";
   import { base } from "$app/paths";
   import { api } from "$lib/api";
   import Pagination from "$lib/components/Pagination.svelte";
@@ -92,9 +93,11 @@
 
   <div class="filters">
     <input
-      type="text"
+      type="search"
       placeholder="Rechercher dans les libellés…"
       bind:value={search}
+      use:autofocus
+      onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
       oninput={onSearchInput}
     />
     <label>
@@ -157,10 +160,7 @@
     align-items: center;
     margin-bottom: 12px;
   }
-  .filters input[type="text"] {
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+  .filters input[type="search"] {
     min-width: 320px;
   }
   .filters input[type="number"] {

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autofocus } from '$lib/actions/focus';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
@@ -174,13 +175,18 @@
 
 <div class="toolbar toolbar-card toolbar-sticky">
 	<input
-		type="text"
+		type="search"
 		placeholder="Rechercher par titre..."
 		bind:value={search}
+		use:autofocus
 		oninput={onSearchInput}
 		onkeydown={(e: KeyboardEvent) => {
 			if (e.key === 'Enter') {
 				e.preventDefault();
+				onFilterChange();
+			} else if (e.key === 'Escape') {
+				e.preventDefault();
+				search = '';
 				onFilterChange();
 			}
 		}}
@@ -219,7 +225,7 @@
 />
 
 <style>
-	.toolbar input[type='text'] {
+	.toolbar input[type='search'] {
 		width: 280px;
 	}
 </style>

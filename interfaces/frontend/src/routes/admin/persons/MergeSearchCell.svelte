@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { autofocus } from "$lib/actions/focus";
   import type { PersonSearchResult } from "./types";
 
   let {
@@ -26,12 +27,23 @@
 </script>
 
 {#if active}
-  <div class="merge-search">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="merge-search"
+    onkeydown={(e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onclose();
+      }
+    }}
+  >
     <div class="merge-input-row">
       <input
-        type="text"
+        type="search"
         placeholder="Nom à absorber…"
         value={mergeSearch.query}
+        use:autofocus
         oninput={(e) => mergeSearch.setQuery((e.target as HTMLInputElement).value)}
       />
       <button class="btn" onclick={onclose}>&times;</button>
@@ -118,8 +130,10 @@
     font-size: 0.85rem;
     font-family: inherit;
   }
-  .merge-result:hover {
-    background: var(--warning-light);
+  .merge-result:hover,
+  .merge-result:focus-visible {
+    background: var(--accent-light);
+    outline: none;
   }
   .merge-dept {
     font-size: 0.8rem;

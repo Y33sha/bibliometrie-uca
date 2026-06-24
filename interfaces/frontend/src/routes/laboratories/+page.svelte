@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from "svelte";
+	import { autofocus } from "$lib/actions/focus";
 	import { base } from "$app/paths";
 	import { api } from "$lib/api";
 	import { rorShortId, rorFullUrl } from "$lib/utils";
@@ -68,9 +69,11 @@
 
 <div class="toolbar toolbar-card">
 	<input
-		type="text"
+		type="search"
 		placeholder="Rechercher un laboratoire..."
 		bind:value={search}
+		use:autofocus
+		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; } }}
 	/>
 	<span class="count"
 		>{filtered.length} laboratoire{filtered.length > 1 ? "s" : ""}</span
@@ -168,7 +171,7 @@
 </table>
 
 <style>
-	.toolbar input[type="text"] {
+	.toolbar input[type="search"] {
 		width: 260px;
 	}
 	table {

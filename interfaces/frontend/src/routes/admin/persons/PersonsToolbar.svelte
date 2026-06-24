@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { autofocus } from "$lib/actions/focus";
   import FacetDropdown from "$lib/components/FacetDropdown.svelte";
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
   import PresenceFilterToggle from "$lib/components/PresenceFilterToggle.svelte";
@@ -37,9 +38,11 @@
 
 <div class="toolbar">
   <input
-    type="text"
+    type="search"
     placeholder="Rechercher (nom, email)…"
     bind:value={search}
+    use:autofocus
+    onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onsearch(); } }}
     oninput={onsearch}
   />
   <FacetDropdown

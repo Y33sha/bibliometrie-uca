@@ -7,6 +7,7 @@
 	import { esc, sanitizeTitle } from '$lib/utils';
 	import { toast } from '$lib/dialogs.svelte';
 	import Pagination from '$lib/components/Pagination.svelte';
+	import { autofocus } from '$lib/actions/focus';
 
 	// ---- Type definitions ----
 
@@ -522,11 +523,13 @@
 					<option value="not_contains">ne contient pas</option>
 				</select>
 				<input
-					type="text"
+					type="search"
 					class="pred-text"
 					placeholder="texte recherché…"
 					autocomplete="off"
 					value={tp.term}
+					use:autofocus
+					onkeydown={(e) => { if (e.key === 'Escape') { onTextTermInput(i, ''); } }}
 					oninput={(e) => onTextTermInput(i, (e.target as HTMLInputElement).value)}
 				/>
 				<button class="pred-remove" title="Retirer ce filtre" onclick={() => removeTextPredicate(i)}>&#x2717;</button>
@@ -783,8 +786,7 @@
 		flex-direction: column;
 		gap: 6px;
 	}
-	.filters-zone select,
-	.filters-zone input[type='text'] {
+	.filters-zone select {
 		padding: 6px 10px;
 		border: 1px solid var(--border);
 		border-radius: 4px;

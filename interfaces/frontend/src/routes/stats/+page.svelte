@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
+	import { autofocus } from '$lib/actions/focus';
 	import { base } from '$app/paths';
 	import { api } from '$lib/api';
 	import { Chart, registerables } from 'chart.js';
@@ -503,7 +504,7 @@
 	<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
 	<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
 	{#if tab === 'publishers' || tab === 'journals'}
-		<input type="text" placeholder="Rechercher..." bind:value={search} oninput={onSearchInput} />
+		<input type="search" placeholder="Rechercher..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	{/if}
 	{#if tab !== 'oa'}
 		<span class="count">
@@ -667,7 +668,7 @@
 	.pub-link:hover { opacity: 0.9; }
 
 	.toolbar { margin-bottom: 16px; }
-	.toolbar input[type='text'] { width: 220px; background: white; }
+	.toolbar input[type='search'] { width: 220px; }
 	.tab-group { display: flex; gap: 0; margin-right: 12px; }
 	.tab-btn {
 		padding: 6px 14px;

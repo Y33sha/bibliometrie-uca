@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { autofocus } from '$lib/actions/focus';
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
@@ -159,9 +160,11 @@
 
 <div class="toolbar toolbar-card toolbar-sticky">
 	<input
-		type="text"
+		type="search"
 		placeholder="Rechercher dans les noms…"
 		bind:value={search}
+		use:autofocus
+		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput}
 	/>
 	<FacetDropdown

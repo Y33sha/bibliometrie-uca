@@ -5,6 +5,7 @@
 	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
 	import PublishersListView from '$lib/components/PublishersListView.svelte';
 	import Modal from '$lib/components/Modal.svelte';
+	import { autofocus } from '$lib/actions/focus';
 	import { toast } from '$lib/dialogs.svelte';
 
 	import type { components } from '$lib/api/schema';
@@ -172,7 +173,7 @@
 	{#snippet actionCell(pub: Publisher)}
 		{#if mergeTargetId === pub.id}
 			<div class="merge-search">
-				<input type="text" placeholder="Fusionner avec…" value={mergeSearch.query}
+				<input type="search" placeholder="Fusionner avec…" value={mergeSearch.query} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeMerge(); } }}
 					oninput={(e) => mergeSearch.setQuery((e.target as HTMLInputElement).value)}
 					class="merge-input" />
 				<button class="btn btn-sm" onclick={closeMerge}>Annuler</button>
@@ -226,7 +227,7 @@
 	.merge-input { width: 160px; padding: 3px 6px; font-size: 0.85rem; border: 1px solid var(--accent); border-radius: 3px; font-family: inherit; }
 	.merge-results { position: absolute; right: 0; top: 100%; z-index: 10; border: 1px solid var(--border); border-radius: 4px; margin-top: 2px; max-height: 200px; overflow-y: auto; background: white; min-width: 350px; max-width: 600px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
 	.merge-result { display: block; width: 100%; padding: 5px 8px; font-size: 0.85rem; cursor: pointer; background: none; border: none; text-align: left; font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-	.merge-result:hover { background: var(--warning-light, #fff3e0); }
+	.merge-result:hover, .merge-result:focus-visible { background: var(--accent-light); outline: none; }
 	.muted { color: var(--muted); }
 
 	.blocking-panel {

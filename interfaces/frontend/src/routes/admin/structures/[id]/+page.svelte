@@ -432,29 +432,6 @@
   });
 </script>
 
-<svelte:window
-  onkeydown={(e) => {
-    if (e.key === "Escape") {
-      if (editFormModal) {
-        editFormModal = null;
-        e.preventDefault();
-      } else if (editModalOpen) {
-        editModalOpen = false;
-        e.preventDefault();
-      }
-    }
-    if (e.key === "Enter" && !e.shiftKey) {
-      if (editFormModal) {
-        e.preventDefault();
-        saveEditForm();
-      } else if (editModalOpen) {
-        e.preventDefault();
-        submitEdit();
-      }
-    }
-  }}
-/>
-
 <svelte:head>
   <title>Admin - Structure - Bibliométrie UCA</title>
 </svelte:head>
@@ -528,6 +505,7 @@
       ondeleteRelation={deleteRelation}
       onopenPicker={openPicker}
       onpickStructure={pickStructure}
+      onclosePicker={() => (relationPickerOpen = false)}
     />
 
     <NameFormsSection
@@ -552,6 +530,7 @@
       onpickCtx={pickCtx}
       onpickCtxShortcutTutelles={pickCtxShortcutTutelles}
       onpickCtxClear={pickCtxClear}
+      oncloseCtxPicker={() => (ctxPickerOpen = false)}
     />
   </div>
 {/if}
