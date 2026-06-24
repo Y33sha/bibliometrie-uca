@@ -328,6 +328,11 @@ def update_name_form_status(
     (null des source_authorships + suppression des authorships canoniques orphelines) ;
     `confirmed` valide le lien et corrobore les matchs par identifiant sans test de nom."""
     row = _update_name_form_status(
-        person_id, body.name_form, body.status, repo=repo, authorship_repo=auth_repo, audit_repo=audit
+        person_id,
+        body.name_form,
+        body.status,
+        repo=repo,
+        authorship_repo=auth_repo,
+        audit_repo=audit,
     )
     return NameFormStatusResponse(**row)
