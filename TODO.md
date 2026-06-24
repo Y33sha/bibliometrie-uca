@@ -13,12 +13,12 @@
 * [ ] refetch_truncated: envisager un flag `authors_truncated`
 ## Suite du traitement
 ### Correction
-* [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
-* [ ] `metadata_correction`: ajouter correction via `doi_prefix` du journal (contrôle de cohérence entre `doi` et `journal_id`, avant les corrections `journal_type` => `doc_type`) / + détecter incohérences `doi_prefix`/`publisher_id`
-* [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
 * [ ] conflation de doc_types différents ou titres différents sous un même DOI => soit DOI erroné, soit métadonnées erronées. Auditer et définir règles de correction
+* [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
+* [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
+* [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
 ### Autres
-* [ ] phase `publishers_journals` à simplifier (pas très lisible) + ajouter système de staleness pour éviter de multiplier les appels http
+* [ ] phase `publishers_journals` à simplifier (pas très lisible): 1° ajouter système de staleness pour éviter de multiplier les appels http; 2° vu que les pays et publisher_types sont purement cosmétiques, remplacer phase pipeline par un script cli/maintenance
 
 # Données
 ## Problèmes dans les sources
