@@ -1,5 +1,4 @@
 * [ ] oneshot sur prod: python interfaces/cli/oneshot/backfill_clean_dois.py
-* [ ] régler le problème de CI (4 tests d'intégration)
 # Pipeline
 ## Extraction
 ### Couverture
@@ -9,7 +8,6 @@
 ### Performance
 * [ ] à étudier: cross-import: seulement `in_perimeter`? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations / suppose d'abord de faire un audit de l'existant (ajouter colonnes temporaires pour stocker les critères de requête ayant permis de trouver un document)
 * [ ] analyser les diff de payload pour voir si on peut diminuer le nombre d'UPSERT en filtrant les champs importés
-* [ ] scanR: paralléliser les années?
 ## Suite du traitement
 ### Correction
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
@@ -25,11 +23,10 @@
 * [ ] OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 
 # UI
-* [ ] Audit complet des champs de formulaires: focus automatique, Entrée/Esc pour valider/annuler
 ## Admin
-* [ ] Clarifier le rôle des périmètres (grouper affiliation/publications; séparer persons + UI)
+* [ ] Clarifier la section "périmètres" (grouper affiliation/publications; séparer persons + UI)
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer
-* [ ] comportement capricieux de l'UI sur la page `admin/countries` (filtres qui sautent, mise à jour de l'UI à retardement): pistes de Claude: "loadAddresses() est appelé sans await après le POST, donc l'ordre des promesses n'est pas garanti; Race condition FastAPI : dans le pattern engine.begin() via Depends(yield), le commit DB a lieu après que la response soit envoyée au client (doc FastAPI explicite). Donc un GET déclenché immédiatement après le POST peut voir l'état pre-commit. La parade propre serait de commit dans le handler avant return, ou de changer le pattern dep. Investigation pas anodine."
+* [ ] signaler visuellement les structures qui ne font partie d'aucun périmètre (pages liste et détail), ajouter filtre périmètre dans la page liste
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
