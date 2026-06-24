@@ -42,25 +42,16 @@ def _config_int(conn: Connection, key: str) -> int | None:
     return None
 
 
-def get_years(conn: Connection, mode: str = "full") -> list[int]:
-    """Retourne la liste des années à extraire selon le mode.
+def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
+    """Retourne les années à extraire : `[start_year … année courante]`.
 
-    - `weekly` : `pipeline_years_weekly` est un **offset** N → fenêtre récente
-      glissante `[année courante - N, année courante]`.
-    - `full` : `pipeline_start_year_full` est une **année absolue** (ancre
-      fixe) → rétention cumulative `[ancre, année courante]`.
-
-    Fallback `[année courante]` si la config est absente ou invalide.
+    `start_year` est l'ancre absolue du range. Si `None`, on lit la config
+    `pipeline_start_year_full`. Rétention cumulative. Fallback `[année courante]`
+    si l'ancre est absente, invalide ou dans le futur.
     """
     current_year = datetime.date.today().year
-
-    if mode == "weekly":
-        offset = _config_int(conn, "pipeline_years_weekly")
-        if offset is not None:
-            return list(range(current_year - offset, current_year + 1))
-        return [current_year]
-
-    start_year = _config_int(conn, "pipeline_start_year_full")
+    if start_year is None:
+        start_year = _config_int(conn, "pipeline_start_year_full")
     if start_year is not None and start_year <= current_year:
         return list(range(start_year, current_year + 1))
     return [current_year]

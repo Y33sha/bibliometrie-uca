@@ -128,9 +128,13 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
         self._adapter = adapter
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
         parser.add_argument(
-            "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
+            "--year", type=int, help="Année spécifique (sinon le range depuis l'ancre)"
+        )
+        parser.add_argument(
+            "--start-year",
+            type=int,
+            help="Année de début du range (défaut: config pipeline_start_year_full)",
         )
 
     def load_config(self, conn: Connection) -> WosExtractConfig:
@@ -153,7 +157,7 @@ class WosExtractor(SourceExtractor[WosExtractConfig]):
             self.logger.info(f"Quota annuel restant : {remaining} records")
 
     def extract_all(self, args: argparse.Namespace, config: WosExtractConfig) -> PhaseMetrics:
-        config_years = self._adapter.get_years(self.conn, mode=args.mode)
+        config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
         years = [args.year] if args.year else config_years
         self.logger.info(f"Années : {years}")
 

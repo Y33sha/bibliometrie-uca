@@ -174,7 +174,8 @@ python run_pipeline.py --from persons     # Reprise depuis une phase
 python run_pipeline.py --only authorships # Une seule phase
 python run_pipeline.py --list             # Liste des phases
 python run_pipeline.py --dry-run          # Sans exécuter
-python run_pipeline.py --mode weekly      # Import hebdomadaire (WoS exclu)
+python run_pipeline.py --mode daily       # Import quotidien (HAL seul, depuis le dernier run)
+python run_pipeline.py --start-year 2024  # Extraction depuis une année de début
 python run_pipeline.py --sources hal,openalex  # Sources spécifiques
 ```
 

@@ -96,7 +96,9 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
         parser.add_argument("--year", type=int, help="Année unique")
         parser.add_argument(
-            "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
+            "--start-year",
+            type=int,
+            help="Année de début du range (défaut: config pipeline_start_year_full)",
         )
 
     def load_config(self, conn: Connection) -> ScanrExtractConfig:
@@ -112,7 +114,7 @@ class ScanrExtractor(SourceExtractor[ScanrExtractConfig]):
         self.logger.info(f"=== Extraction ScanR : {len(config.affiliation_ids)} structures ===")
 
     def extract_all(self, args: argparse.Namespace, config: ScanrExtractConfig) -> PhaseMetrics:
-        config_years = self._adapter.get_years(self.conn, mode=args.mode)
+        config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
         years = [args.year] if args.year else config_years
         self.logger.info(f"Années : {years}")
         stats = PhaseMetrics()

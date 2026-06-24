@@ -42,11 +42,11 @@ Certaines sources requièrent une clé API ([WoS](../sources/04-wos.md)) ou un c
 
 #### Années {#years}
 
-Le pipeline a [trois modes](../pipeline/01-vue-d-ensemble.md): *daily*, *weekly*, *full*.
+Le pipeline a [deux modes](../pipeline/01-vue-d-ensemble.md): *daily* et *full*.
 
-Par défaut le mode *weekly* interroge les sources depuis l'année *n*-1 (le critère est l'année de publication, donc c'est une année civile complète: pas de possibilité d'année glissante). Le mode *full* interroge depuis l'année *n*-6.
+Le mode *full* interroge les sources depuis une année de début jusqu'à l'année courante (le critère est l'année de publication, donc des années civiles complètes). Le mode *daily* ne réinterroge que les nouveaux dépôts HAL depuis le dernier lancement.
 
-On peut modifier cette plage temporelle dans `admin/config`.
+L'année de début est l'argument `--start-year` ; à défaut, la valeur configurée dans `admin/config` (par défaut 2017).
 
 #### Périmètres {#perimeters}
 

@@ -76,8 +76,8 @@ class PgWosExtractAdapter(WosExtractAdapter):
             affiliations=affiliations,
         )
 
-    def get_years(self, conn: Connection, *, mode: str) -> list[int]:
-        return get_years(conn, mode=mode)
+    def get_years(self, conn: Connection, *, start_year: int | None = None) -> list[int]:
+        return get_years(conn, start_year=start_year)
 
     # ── Parsing & requête (pur, sans I/O) ──────────────────────
 

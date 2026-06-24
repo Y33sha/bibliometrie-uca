@@ -144,9 +144,13 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
         self._adapter = adapter
 
     def add_cli_args(self, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--year", type=int, help="Année spécifique (sinon toutes)")
         parser.add_argument(
-            "--mode", choices=["full", "weekly"], default="full", help="Mode (défaut: full)"
+            "--year", type=int, help="Année spécifique (sinon le range depuis l'ancre)"
+        )
+        parser.add_argument(
+            "--start-year",
+            type=int,
+            help="Année de début du range (défaut: config pipeline_start_year_full)",
         )
         parser.add_argument(
             "--since",
@@ -187,7 +191,7 @@ class HalExtractor(SourceExtractor[HalExtractConfig]):
                 breaker_tripped=self._breaker_tripped,
             )
 
-        config_years = self._adapter.get_years(self.conn, mode=args.mode)
+        config_years = self._adapter.get_years(self.conn, start_year=args.start_year)
         years = [args.year] if args.year else config_years
 
         metrics = PhaseMetrics()
