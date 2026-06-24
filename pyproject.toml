@@ -18,7 +18,7 @@ dependencies = [
     "bcrypt==5.0.0",
     "python-dotenv==1.2.2",      # requis par pydantic-settings pour env_file ; CVE-2026-28684 fixed
     "pydantic==2.12.5",          # requis par pydantic-settings et utilisé directement
-    "pydantic-settings==2.13.1",
+    "pydantic-settings==2.14.2",  # ≥2.14.2 corrige GHSA-4xgf-cpjx-pc3j
     "openpyxl==3.1.5",           # utilisé par interfaces/cli/import_persons.py
     "pyahocorasick==2.2.0",      # automate Aho-Corasick : matching multi-formes des adresses (phase affiliations)
 ]
