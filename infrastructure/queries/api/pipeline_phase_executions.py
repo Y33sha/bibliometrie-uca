@@ -15,6 +15,7 @@ from sqlalchemy import Connection, text
 
 from application.observability.read import compute_yield, duration_ratio, median_duration
 from application.ports.api.pipeline_phase_executions_queries import (
+    PhaseBrief,
     PhaseExecutionDetail,
     PhaseExecutionsQueries,
     RunDetail,
@@ -49,12 +50,16 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
                            CASE WHEN bool_or(status = 'error') THEN 'error'
                                 WHEN bool_or(status = 'warning') THEN 'warning'
                                 ELSE 'ok' END AS status,
-                           sum((metrics ->> 'duration_s')::float) AS total_duration_s
+                           sum((metrics ->> 'duration_s')::float) AS total_duration_s,
+                           jsonb_agg(
+                               jsonb_build_object('phase', phase, 'status', status)
+                               ORDER BY id
+                           ) AS phases
                     FROM pipeline_phase_executions
                     GROUP BY run_id
                 )
                 SELECT a.run_id, a.started_at, a.ended_at, a.phase_count, a.status,
-                       a.total_duration_s, r.mode, r.sources
+                       a.total_duration_s, a.phases, r.mode, r.sources
                 FROM agg a
                 JOIN LATERAL (
                     SELECT mode, sources FROM pipeline_phase_executions p
@@ -76,6 +81,7 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
                 status=cast(PhaseStatus, r.status),
                 phase_count=r.phase_count,
                 total_duration_s=r.total_duration_s,
+                phases=[PhaseBrief(phase=p["phase"], status=p["status"]) for p in r.phases],
             )
             for r in rows
         ]

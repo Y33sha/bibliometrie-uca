@@ -74,9 +74,9 @@ Les dépendances input → output sont statiques et connues. La colonne vertébr
 
 ### Phase E — Interface en ruban
 
-- [ ] Refonte de `/admin/pipeline` : liste anté-chronologique de runs, ruban de phases coloré par statut, drill-down par phase. Suppression du système d'onglets et du composant monolithique ; découpage en sous-composants.
-- [ ] Mise en évidence visuelle des phases anormalement lentes.
-- [ ] Statut live (run en cours) reconduit dans la nouvelle structure ; lien vers les logs en consultation secondaire.
+- [x] Refonte de `/admin/pipeline` : liste anté-chronologique de runs (chaque run portant son ruban), ruban de phases coloré par statut (vert/ambre/rouge, gris pour les phases non jouées), drill-down par phase (métriques, observables d'entrée/sortie, rendement, durée vs médian, signaux). Onglets et composant monolithique supprimés ; découpage en `PhaseRibbon`, `RunList`, `RunDetail` + helpers. L'ordre des phases du ruban vient d'un endpoint `/api/admin/pipeline/phases` (graphe) ; les statuts par phase sont portés par la liste des runs.
+- [x] Mise en évidence visuelle des phases anormalement lentes (durée ≥ 1,5× le médian historique, repère calculé à l'affichage).
+- [x] Statut live (run en cours) reconduit ; logs (`cron.log`) en consultation secondaire via un volet dépliable.
 
 ### Phase F — Clôture
 
