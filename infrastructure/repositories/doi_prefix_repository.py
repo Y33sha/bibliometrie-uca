@@ -65,6 +65,23 @@ class PgDoiPrefixRepository:
         )
         return result.rowcount > 0
 
+    def count_dois_by_registration_agency(self) -> dict[str, int]:
+        """DOI candidats distincts par RA de leur préfixe. Le préfixe est extrait comme
+        à l'insertion (`split_part(doi, '/', 1)`) pour joindre `doi_prefixes` ; un préfixe
+        absent (non encore résolu) compte comme `unknown`."""
+        result = self._conn.execute(
+            text(
+                """
+                SELECT COALESCE(dp.ra, 'unknown') AS ra, count(DISTINCT c.doi) AS n
+                FROM candidate_dois c
+                LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)
+                WHERE c.doi <> ''
+                GROUP BY COALESCE(dp.ra, 'unknown')
+                """
+            )
+        )
+        return {row.ra: int(row.n) for row in result}
+
     def get_prefixes_pending_publisher(self) -> list[PendingPublisherPrefix]:
         """Rows `publisher_id IS NULL`, `publisher_checked_at IS NULL`, RA gérée. Ordre par prefix ASC."""
         result = self._conn.execute(

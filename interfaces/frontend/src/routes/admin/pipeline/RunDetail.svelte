@@ -25,6 +25,7 @@
   type Details = {
     tables?: Record<string, { before: number; after: number }>;
     by_source?: Record<string, SourceRow>;
+    distributions?: Record<string, Record<string, number>>;
   };
 
   let { detail, allPhases }: { detail: RunDetail; allPhases: string[] } = $props();
@@ -48,6 +49,17 @@
   }
   function tableEntries(d: unknown): [string, { before: number; after: number }][] {
     return Object.entries(asDetails(d).tables ?? {});
+  }
+  function distributions(d: unknown): [string, Record<string, number>][] {
+    return Object.entries(asDetails(d).distributions ?? {});
+  }
+  function pctRows(counts: Record<string, number>): { label: string; count: number; pct: string }[] {
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    return Object.entries(counts).map(([label, count]) => ({
+      label,
+      count,
+      pct: total ? `${((count / total) * 100).toFixed(1)} %` : "—",
+    }));
   }
   function fmtDelta(n: number): string {
     return n >= 0 ? `+${n}` : `${n}`;
@@ -158,6 +170,17 @@
                   </tbody>
                 </table>
               {/if}
+              {#each distributions(p.details) as [title, counts] (title)}
+                <div class="dist">
+                  <div class="dist-title">{title}</div>
+                  {#each pctRows(counts) as row (row.label)}
+                    <div class="dist-row">
+                      <span>{row.label}</span>
+                      <span class="num">{row.count} ({row.pct})</span>
+                    </div>
+                  {/each}
+                </div>
+              {/each}
               {#each tableEntries(p.details) as [t, v] (t)}
                 <div class="expand-line">
                   <span class="k">{t}</span>
@@ -304,6 +327,23 @@
   .src-table td {
     padding: 3px 8px;
     border-bottom: 1px solid var(--border);
+  }
+  .dist {
+    font-size: 0.82rem;
+  }
+  .dist-title {
+    color: var(--muted);
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    letter-spacing: 0.05em;
+    font-family: "JetBrains Mono", monospace;
+    margin-bottom: 2px;
+  }
+  .dist-row {
+    display: flex;
+    justify-content: space-between;
+    max-width: 320px;
+    padding: 1px 0;
   }
   .expand-line {
     display: grid;

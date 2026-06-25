@@ -32,6 +32,10 @@ class DoiPrefixRepository(Protocol):
         """Insère un préfixe avec sa RA seule (`publisher_*` NULL, `publisher_checked_at` NULL). `ra='unknown'` si doi.org/ra n'a pas su classer. Retourne True si inséré, False si déjà présent (`ON CONFLICT (prefix) DO NOTHING`)."""
         ...
 
+    def count_dois_by_registration_agency(self) -> dict[str, int]:
+        """Nombre de DOI candidats distincts (pool `candidate_dois`) par Registration Agency de leur préfixe (`Crossref` / `DataCite` / `unknown`). Un DOI dont le préfixe n'est pas encore résolu compte comme `unknown`. Sert l'observabilité de la phase `resolve_ra`."""
+        ...
+
     def get_prefixes_pending_publisher(self) -> list[PendingPublisherPrefix]:
         """Rows à traiter par le volet publisher : `publisher_id IS NULL`, `publisher_checked_at IS NULL`, et `ra` gérée (`Crossref`/`DataCite`/`unknown` — les autres RAs n'ont pas d'endpoint `/prefixes` exploitable). Ordre par `prefix` ASC pour des logs reproductibles."""
         ...

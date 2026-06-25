@@ -37,6 +37,7 @@ class FakeDoiPrefixRepo:
 
     unresolved: list[tuple[str, list[str]]] = field(default_factory=list)
     rows: dict[str, _Row] = field(default_factory=dict)
+    ra_counts: dict[str, int] = field(default_factory=dict)
 
     def get_unresolved_prefixes_with_samples(
         self, *, n_samples_per_prefix: int
@@ -48,6 +49,9 @@ class FakeDoiPrefixRepo:
             return False
         self.rows[prefix] = _Row(prefix=prefix, ra=ra)
         return True
+
+    def count_dois_by_registration_agency(self) -> dict[str, int]:
+        return dict(self.ra_counts)
 
     def get_prefixes_pending_publisher(self) -> list[PendingPublisherPrefix]:
         return [
@@ -171,6 +175,22 @@ def test_resolve_ra_inserts_ra_only():
     assert repo.rows["10.1038"].publisher_id is None  # aucun publisher en resolve_ra
     assert metrics.new == 1
     assert metrics.extras.get("resolved") == 1
+
+
+def test_resolve_ra_expose_la_repartition_par_ra():
+    repo = FakeDoiPrefixRepo(
+        unresolved=[("10.1038", ["10.1038/a"])],
+        ra_counts={"Crossref": 80, "DataCite": 15, "unknown": 5},
+    )
+    ra = StubResolveRa(answers={"10.1038/a": "Crossref"})
+
+    metrics = _run_ra(repo, ra)
+
+    assert metrics.details["distributions"]["Registration Agency"] == {
+        "Crossref": 80,
+        "DataCite": 15,
+        "unknown": 5,
+    }
 
 
 def test_resolve_ra_unknown_when_all_samples_fail():
