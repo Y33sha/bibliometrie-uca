@@ -168,20 +168,18 @@ def require_admin(session: str | None = Cookie(None, alias="session")) -> None:
 def db_conn_sync(request: Request) -> Iterator[Connection]:
     """Connection SA sync ouverte pour les routers `def`, via `Depends(db_conn_sync)`.
 
-    Style « commit as you go » : un handler d'écriture (command handler de la
-    couche application) appelle `conn.commit()` lui-même, avant de retourner.
-    C'est nécessaire pour que la donnée soit persistée *avant* l'envoi de la
-    réponse — FastAPI exécute le teardown des dépendances `yield` après l'envoi,
-    donc un commit fait ici en sortie arriverait trop tard (un GET ou une tâche
-    de fond déclenchés juste après liraient l'état pré-commit).
+    La persistance est la prérogative du use case : un command handler de la
+    couche application appelle `conn.commit()` lui-même, avant de retourner. C'est
+    nécessaire pour que la donnée soit persistée *avant* l'envoi de la réponse —
+    FastAPI exécute le teardown des dépendances `yield` après l'envoi, donc un
+    commit fait ici en sortie arriverait trop tard (un GET ou une tâche de fond
+    déclenchés juste après liraient l'état pré-commit).
 
-    En sortie, un commit de fin persiste ce qu'un handler n'aurait pas commité
-    (garde-fou pendant la migration des handlers d'écriture). Quand ce commit de
-    fin rattrape du DML non committé (endpoint non migré, ou écriture parasite
-    dans un routeur), il émet un warning : la bascule finale (commit de fin →
-    rollback, qui retire le filet) est pilotée par l'extinction de ce warning sur
-    tout le trafic, pas par la croyance que tout est migré. Sur exception, la
-    transaction est annulée. Toute dépendance qui en dérive (`*_repo` sync, query
+    En sortie, la transaction est **annulée** (`rollback`) : une session sans
+    écriture (GET) ou dont le command handler a déjà committé n'a rien à
+    persister. Si du DML atteint cette sortie sans avoir été committé, c'est un
+    bug (écriture qui ne passe pas par un command handler) : le rollback le perd
+    et un warning le signale. Toute dépendance qui en dérive (`*_repo` sync, query
     adapters sync) partage la même connexion.
     """
     engine = get_sync_engine()
@@ -193,14 +191,12 @@ def db_conn_sync(request: Request) -> Iterator[Connection]:
             conn.rollback()
             raise
         if conn.in_transaction():
-            # Lu avant le commit garde-fou : ce commit réarmerait le flag.
             escaped_dml = has_uncommitted_dml(conn)
-            conn.commit()
+            conn.rollback()
             if escaped_dml:
                 logger.warning(
-                    "Écriture non committée rattrapée par le commit de fin de db_conn_sync : "
-                    "%s %s a émis du DML hors command handler (endpoint non migré ou écriture "
-                    "parasite ; cf. docs/chantiers/CODE_commit-avant-reponse.md).",
+                    "DML annulé : %s %s a émis une écriture qui n'est pas passée par un "
+                    "command handler committant ; le rollback de fin de db_conn_sync l'a perdue.",
                     request.method,
                     request.url.path,
                 )

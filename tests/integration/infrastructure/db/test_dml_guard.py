@@ -1,4 +1,4 @@
-"""Garde-fou DML (chantier commit-avant-réponse).
+"""Garde-fou DML : détecte une écriture qui n'est pas passée par un command handler.
 
 Deux niveaux :
 
@@ -7,9 +7,9 @@ Deux niveaux :
   DML enveloppé dans un CTE (`WITH … UPDATE`), et reste muet sur les lectures (le cas
   du DELETE-404 : une méthode d'écriture qui ne fait que valider puis renvoyer 404).
   Un commit ou un rollback réarme le flag.
-- `TestDbConnSyncTeardown` : `db_conn_sync` émet un warning quand son commit de fin
-  rattrape du DML échappé à un command handler, et reste silencieux quand le handler
-  a commité ou quand la requête n'a fait que lire.
+- `TestDbConnSyncTeardown` : `db_conn_sync` émet un warning quand son rollback de fin
+  annule du DML échappé à un command handler (donc perdu), et reste silencieux quand
+  le handler a commité ou quand la requête n'a fait que lire.
 """
 
 import os
@@ -156,14 +156,14 @@ class TestDbConnSyncTeardown:
             body(conn)
         finally:
             with pytest.raises(StopIteration):
-                next(gen)  # épuise le générateur → teardown (commit garde-fou + warning éventuel)
+                next(gen)  # épuise le générateur → teardown (rollback de fin + warning éventuel)
         return warnings
 
     def test_warns_on_uncommitted_dml(self, monkeypatch, guarded_engine):
         warnings = self._run(
             monkeypatch, guarded_engine, lambda conn: conn.execute(text(_NOOP_DML))
         )
-        assert warnings  # le commit de fin rattrape du DML échappé → warning
+        assert warnings  # le rollback de fin annule du DML échappé → warning
 
     def test_silent_when_handler_committed(self, monkeypatch, guarded_engine):
         def body(conn):
