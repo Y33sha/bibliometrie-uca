@@ -1071,7 +1071,7 @@ def _run_normalize_datacite() -> None:
     log.info("✓ normalize_datacite terminé en %.1fs", time.time() - t0)
 
 
-def _run_enrich_oa_status() -> None:
+def _run_enrich_oa_status() -> PhaseMetrics:
     import asyncio
 
     import httpx
@@ -1093,7 +1093,7 @@ def _run_enrich_oa_status() -> None:
         async def fetcher(client: httpx.AsyncClient, doi: str) -> str | None:
             return await fetch_oa_status(client, doi, base_url=base_url, email=email, logger=log)
 
-        asyncio.run(
+        metrics = asyncio.run(
             run_enrich_oa_status(
                 conn,
                 PgEnrichQueries(),
@@ -1105,6 +1105,7 @@ def _run_enrich_oa_status() -> None:
     finally:
         conn.close()
     log.info("✓ enrich_oa_status terminé en %.1fs", time.time() - t0)
+    return metrics
 
 
 def _run_enrich_journals_from_openalex() -> None:
@@ -1665,13 +1666,13 @@ def _run_suggest_address_countries(*, retry_empty: bool = False) -> PhaseMetrics
     return metrics
 
 
-def phase_oa_status(**kw: Any) -> Any:
+def phase_oa_status(**kw: Any) -> PhaseMetrics:
     """Enrichissement `publications.oa_status` via Unpaywall (per-publication).
 
     Incrémentale et auto-bornée (staleness + cap `MAX_PER_RUN`) : le backlog des
     jamais-vérifiées s'écoule run après run. Tourne dans tous les modes.
     """
-    _run_enrich_oa_status()
+    return _run_enrich_oa_status()
 
 
 # Registre des phases : l'implémentation de chacune. L'ordre d'exécution vient du

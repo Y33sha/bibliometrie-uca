@@ -28,6 +28,14 @@ class EnrichQueries(Protocol):
         self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
     ) -> list[tuple[int, str, str | None]]: ...
 
+    def count_stale_publications(self, conn: Connection, *, staleness_days: int = 30) -> int:
+        """Nombre de publications avec DOI à (re)vérifier (même prédicat que `fetch_publications_with_doi`, sans cap) — le backlog de staleness OA, avant plafonnement du run."""
+        ...
+
+    def count_publications_by_oa_status(self, conn: Connection) -> dict[str, int]:
+        """Répartition des publications par statut OA (`oa_status` → nombre)."""
+        ...
+
     def fetch_journals_of_unknown_type(
         self, conn: Connection, *, limit: int | None = None
     ) -> list[tuple[int, str]]: ...

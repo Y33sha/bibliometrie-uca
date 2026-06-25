@@ -55,11 +55,25 @@ def _route(doi: str, *, status: str | None = None, http_status: int = 200):
 
 
 class _FakeQueries:
-    def __init__(self, pubs: list[tuple[int, str, str | None]]) -> None:
+    def __init__(
+        self,
+        pubs: list[tuple[int, str, str | None]],
+        *,
+        stale_total: int | None = None,
+        oa_distribution: dict[str, int] | None = None,
+    ) -> None:
         self._pubs = pubs
+        self._stale_total = stale_total if stale_total is not None else len(pubs)
+        self._oa_distribution = oa_distribution or {}
 
     def fetch_publications_with_doi(self, conn, *, limit=None, staleness_days=30):  # noqa: ARG002
         return self._pubs[:limit] if limit else self._pubs
+
+    def count_stale_publications(self, conn, *, staleness_days=30) -> int:  # noqa: ARG002
+        return self._stale_total
+
+    def count_publications_by_oa_status(self, conn) -> dict[str, int]:  # noqa: ARG002
+        return dict(self._oa_distribution)
 
 
 class _FakeRepo:
@@ -90,9 +104,9 @@ async def test_happy_path_updates_each_pub(logger):
     _route("10.1/c", status="bronze")
 
     repo = _FakeRepo()
-    await module.run_enrich_oa_status(
+    metrics = await module.run_enrich_oa_status(
         MagicMock(),
-        _FakeQueries(pubs),
+        _FakeQueries(pubs, stale_total=42, oa_distribution={"gold": 7, "closed": 3}),
         logger,
         pub_repo=repo,
         fetcher=_make_fetcher(logger),
@@ -100,6 +114,13 @@ async def test_happy_path_updates_each_pub(logger):
 
     # pub 3 inchangée (bronze→bronze), 1 et 2 mises à jour
     assert sorted(repo.updates) == [(1, "gold"), (2, "green")]
+    # Indicateurs remontés : compteurs du run, backlog stale, répartition par statut.
+    assert metrics.total == 3
+    assert metrics.updated == 2
+    assert metrics.unchanged == 1
+    assert metrics.extras["not_found"] == 0
+    assert metrics.extras["stale"] == 42
+    assert metrics.details["distributions"]["Statut OA"] == {"gold": 7, "closed": 3}
 
 
 @pytest.mark.asyncio

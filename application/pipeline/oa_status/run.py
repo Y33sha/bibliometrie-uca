@@ -31,6 +31,7 @@ from collections.abc import Awaitable, Callable
 import httpx
 from sqlalchemy import Connection
 
+from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.publication_repository import PublicationRepository
 
@@ -59,24 +60,41 @@ async def run_enrich_oa_status(
     limit: int = 0,
     dry_run: bool = False,
     max_concurrent: int = MAX_CONCURRENT,
-) -> None:
+) -> PhaseMetrics:
+    metrics = PhaseMetrics()
     pubs = queries.fetch_publications_with_doi(
         conn, limit=limit or MAX_PER_RUN, staleness_days=STALENESS_DAYS
     )
     total = len(pubs)
+    stale_total = queries.count_stale_publications(conn, staleness_days=STALENESS_DAYS)
     logger.info(
         f"{total} publications à (re)vérifier sur Unpaywall "
-        f"(cap {limit or MAX_PER_RUN}, staleness {STALENESS_DAYS}j)"
+        f"(cap {limit or MAX_PER_RUN}, staleness {STALENESS_DAYS}j) — {stale_total} stale au total"
     )
 
+    progress = {"processed": 0, "updated": 0, "skipped": 0, "not_found": 0}
+
+    def _result() -> PhaseMetrics:
+        # Indicateurs : compteurs du run + backlog stale + répartition par statut OA.
+        metrics.add(
+            total=total,
+            updated=progress["updated"],
+            unchanged=progress["skipped"],
+            not_found=progress["not_found"],
+            stale=stale_total,
+        )
+        metrics.details["distributions"] = {
+            "Statut OA": queries.count_publications_by_oa_status(conn)
+        }
+        return metrics
+
     if not total:
-        return
+        return _result()
 
     sem = asyncio.Semaphore(max_concurrent)
     # La `Connection` SA sync n'est pas thread-safe ; tous les writes
     # (update, commit) passent par `to_thread` sous ce lock.
     db_lock = asyncio.Lock()
-    progress = {"processed": 0, "updated": 0, "skipped": 0, "not_found": 0}
 
     async with httpx.AsyncClient() as client:
 
@@ -130,3 +148,5 @@ async def run_enrich_oa_status(
         f"Terminé : {progress['updated']} mis à jour, {progress['skipped']} inchangés, "
         f"{progress['not_found']} non trouvés sur Unpaywall"
     )
+
+    return _result()

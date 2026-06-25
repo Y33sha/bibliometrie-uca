@@ -67,6 +67,7 @@
 
   function metricsSummary(m: PhaseExecutionDetail["metrics"]): string {
     const parts: string[] = [];
+    if (m.total) parts.push(`${m.total} traités`);
     if (m.new) parts.push(`${m.new} new`);
     if (m.updated) parts.push(`${m.updated} updated`);
     if (m.unchanged) parts.push(`${m.unchanged} unchanged`);
