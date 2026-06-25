@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 36KuJkQ8WcrPb3qtyE31eoNItV9wmMoDiVcii5ddreVIXaKSfEneNpbKgKE1iEX
+\restrict lYNinY1vokkoj0BHsZPJdUfMpCGVRw2GkTmF6yosjkfCN46Q3LfwR6vMSq7KnRB
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -617,6 +617,116 @@ ALTER SEQUENCE public.authorships_id_seq OWNED BY public.authorships.id;
 
 
 --
+-- Name: publication_relations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.publication_relations (
+    from_publication_id integer NOT NULL,
+    relation_type public.relation_type NOT NULL,
+    target_doi text NOT NULL,
+    target_publication_id integer,
+    source text NOT NULL
+);
+
+
+--
+-- Name: source_publications; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.source_publications (
+    id integer NOT NULL,
+    source public.source_type NOT NULL,
+    source_id text NOT NULL,
+    doi text,
+    title text NOT NULL,
+    pub_year smallint,
+    doc_type text,
+    publication_id integer,
+    staging_id integer,
+    created_at timestamp with time zone DEFAULT now(),
+    countries text[],
+    hal_collections text[],
+    external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
+    urls text[],
+    cited_by_count integer,
+    journal_id integer,
+    oa_status text,
+    language text,
+    container_title text,
+    is_retracted boolean,
+    abstract text,
+    keywords text[],
+    topics jsonb,
+    biblio jsonb,
+    meta jsonb,
+    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    title_normalized text,
+    keys_dirty boolean DEFAULT true NOT NULL,
+    embargo_until date,
+    CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
+    CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
+);
+
+
+--
+-- Name: staging; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staging (
+    id integer NOT NULL,
+    source public.source_type NOT NULL,
+    source_id text NOT NULL,
+    doi text,
+    raw_data jsonb NOT NULL,
+    processed boolean DEFAULT false,
+    imported_at timestamp with time zone DEFAULT now(),
+    raw_hash text,
+    last_seen_at timestamp with time zone DEFAULT now(),
+    not_found_at timestamp with time zone,
+    disappeared_at timestamp with time zone,
+    authors_truncated boolean DEFAULT false NOT NULL,
+    entry_mode text DEFAULT 'bulk'::text NOT NULL,
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'cross_import_doi'::text, 'cross_import_hal'::text]))),
+    CONSTRAINT staging_not_found_at_implies_processed CHECK (((not_found_at IS NULL) OR processed))
+);
+
+
+--
+-- Name: COLUMN staging.raw_hash; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 du payload tel qu''extrait de la source bulk. Sert de clé de détection de changement à l''UPSERT (et d''empreinte d''intégrité pour le chantier DATA_raw-data-store). Cas particulier OpenAlex : `refetch_truncated` n''écrit PAS `raw_hash` quand il complète les authorships d''une publication tronquée à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant ne déclenche pas de réécriture inutile. L''invariant `raw_hash = md5(raw_data)` est donc volontairement rompu sur les lignes OpenAlex refetchées.';
+
+
+--
+-- Name: candidate_dois; Type: VIEW; Schema: public; Owner: -
+--
+
+CREATE VIEW public.candidate_dois AS
+ SELECT s.doi,
+    s.source
+   FROM public.staging s
+  WHERE (s.doi IS NOT NULL)
+UNION
+ SELECT d.value AS doi,
+    sp.source
+   FROM (public.source_publications sp
+     CROSS JOIN LATERAL jsonb_array_elements_text((sp.external_ids -> 'related_dois'::text)) d(value))
+  WHERE (jsonb_typeof((sp.external_ids -> 'related_dois'::text)) = 'array'::text)
+UNION
+ SELECT pr.target_doi AS doi,
+    NULL::public.source_type AS source
+   FROM public.publication_relations pr
+  WHERE (pr.target_doi IS NOT NULL)
+UNION
+ SELECT ('10.48550/arxiv.'::text || lower((sp.external_ids ->> 'arxiv_id'::text))) AS doi,
+    sp.source
+   FROM public.source_publications sp
+  WHERE ((sp.external_ids ->> 'arxiv_id'::text) IS NOT NULL);
+
+
+--
 -- Name: countries; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -718,7 +828,8 @@ CREATE TABLE public.doi_prefixes (
     fetched_at timestamp with time zone DEFAULT now() NOT NULL,
     client_name_raw text,
     client_name_normalized text,
-    datacite_client_symbol text
+    datacite_client_symbol text,
+    publisher_checked_at timestamp with time zone
 );
 
 
@@ -1011,19 +1122,6 @@ ALTER SEQUENCE public.place_name_forms_id_seq OWNED BY public.place_name_forms.i
 
 
 --
--- Name: publication_relations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.publication_relations (
-    from_publication_id integer NOT NULL,
-    relation_type public.relation_type NOT NULL,
-    target_doi text NOT NULL,
-    target_publication_id integer,
-    source text NOT NULL
-);
-
-
---
 -- Name: publication_structures; Type: MATERIALIZED VIEW; Schema: public; Owner: -
 --
 
@@ -1230,46 +1328,6 @@ ALTER SEQUENCE public.source_authorships_id_seq OWNED BY public.source_authorshi
 
 
 --
--- Name: source_publications; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.source_publications (
-    id integer NOT NULL,
-    source public.source_type NOT NULL,
-    source_id text NOT NULL,
-    doi text,
-    title text NOT NULL,
-    pub_year smallint,
-    doc_type text,
-    publication_id integer,
-    staging_id integer,
-    created_at timestamp with time zone DEFAULT now(),
-    countries text[],
-    hal_collections text[],
-    external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
-    urls text[],
-    cited_by_count integer,
-    journal_id integer,
-    oa_status text,
-    language text,
-    container_title text,
-    is_retracted boolean,
-    abstract text,
-    keywords text[],
-    topics jsonb,
-    biblio jsonb,
-    meta jsonb,
-    updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
-    raw_metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    title_normalized text,
-    keys_dirty boolean DEFAULT true NOT NULL,
-    embargo_until date,
-    CONSTRAINT source_publications_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
-    CONSTRAINT source_publications_raw_metadata_is_object CHECK ((jsonb_typeof(raw_metadata) = 'object'::text))
-);
-
-
---
 -- Name: source_publications_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
@@ -1287,36 +1345,6 @@ CREATE SEQUENCE public.source_publications_id_seq
 --
 
 ALTER SEQUENCE public.source_publications_id_seq OWNED BY public.source_publications.id;
-
-
---
--- Name: staging; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.staging (
-    id integer NOT NULL,
-    source public.source_type NOT NULL,
-    source_id text NOT NULL,
-    doi text,
-    raw_data jsonb NOT NULL,
-    processed boolean DEFAULT false,
-    imported_at timestamp with time zone DEFAULT now(),
-    raw_hash text,
-    last_seen_at timestamp with time zone DEFAULT now(),
-    not_found_at timestamp with time zone,
-    disappeared_at timestamp with time zone,
-    authors_truncated boolean DEFAULT false NOT NULL,
-    entry_mode text DEFAULT 'bulk'::text NOT NULL,
-    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'cross_import_doi'::text, 'cross_import_hal'::text]))),
-    CONSTRAINT staging_not_found_at_implies_processed CHECK (((not_found_at IS NULL) OR processed))
-);
-
-
---
--- Name: COLUMN staging.raw_hash; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.staging.raw_hash IS 'Empreinte md5 du payload tel qu''extrait de la source bulk. Sert de clé de détection de changement à l''UPSERT (et d''empreinte d''intégrité pour le chantier DATA_raw-data-store). Cas particulier OpenAlex : `refetch_truncated` n''écrit PAS `raw_hash` quand il complète les authorships d''une publication tronquée à 100 — la ligne garde le hash du payload bulk pour que le bulk suivant ne déclenche pas de réécriture inutile. L''invariant `raw_hash = md5(raw_data)` est donc volontairement rompu sur les lignes OpenAlex refetchées.';
 
 
 --
@@ -2344,6 +2372,13 @@ CREATE INDEX idx_doi_prefixes_publisher_name_normalized ON public.doi_prefixes U
 
 
 --
+-- Name: idx_doi_prefixes_publisher_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_doi_prefixes_publisher_pending ON public.doi_prefixes USING btree (prefix) WHERE ((publisher_id IS NULL) AND (publisher_checked_at IS NULL));
+
+
+--
 -- Name: idx_doi_prefixes_ra; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2592,7 +2627,7 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
 
 
 --
@@ -3189,5 +3224,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 36KuJkQ8WcrPb3qtyE31eoNItV9wmMoDiVcii5ddreVIXaKSfEneNpbKgKE1iEX
+\unrestrict lYNinY1vokkoj0BHsZPJdUfMpCGVRw2GkTmF6yosjkfCN46Q3LfwR6vMSq7KnRB
 

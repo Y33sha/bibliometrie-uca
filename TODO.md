@@ -1,6 +1,5 @@
 # Pipeline
 ## Extraction
-* [ ] voir si on peut mettre `resolve_doi_prefixes` avant `cross_imports`, pour éviter de multiplier les appels DataCite infructueux. (+ paralléliser Crossref/Datacite? et/ou supprimer de la pile DataCite les préfixes trouvés sur Crossref et vice-versa.)
 ### Couverture
 * [ ] extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
 * [ ] bioRxiv, medRxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
@@ -9,6 +8,8 @@
 * [ ] à étudier: cross-import: seulement `in_perimeter`? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
 * [ ] analyser les diff de payload pour voir si on peut diminuer le nombre d'UPSERT en filtrant les champs importés
 ## Suite du traitement
+* [ ] `publishers_journals`: paralléliser crossref/datacite
+* [ ] vérifier qu'il ne manque pas des `ANALYZE` en cours de pipeline pour éviter un *seq scan* sur des millions de lignes lors d'un premier run depuis une base vide.
 ### Correction
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
 * [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
@@ -29,6 +30,7 @@
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer
 * [ ] signaler visuellement les structures qui ne font partie d'aucun périmètre (pages liste et détail), ajouter filtre périmètre dans la page liste
 * [ ] page persons: le nombre de publications liées à une forme de nom ne se met pas à jour dans le drawer quand on les détache de l'auteur
+* [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de nouvelles personnes)
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
@@ -37,6 +39,7 @@
 * [ ] colonne éditeur; filtres éditeur + revue?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
 * [ ] page détails: séparer l'affichage des relations selon le sens (publication parent: afficher dès le bloc titre; publications dépendantes: mettre liens dans la sidebar)
+* [ ] affichage des relations: styler correctement le titre (balises mml)
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
