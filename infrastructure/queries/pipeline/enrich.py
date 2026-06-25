@@ -44,6 +44,35 @@ def fetch_publications_with_doi(
     return [(r.id, r.doi, r.oa_status) for r in rows]
 
 
+def count_stale_publications(conn: Connection, *, staleness_days: int = 30) -> int:
+    """Nombre de publications avec DOI à (re)vérifier — même prédicat que
+    `fetch_publications_with_doi`, sans cap. C'est le backlog de staleness OA."""
+    return conn.execute(
+        text(f"""
+            SELECT count(*)
+            FROM publications
+            WHERE doi IS NOT NULL
+              AND (
+                  unpaywall_checked_at IS NULL
+                  OR (oa_status::text NOT IN {STABLE_OA_STATUSES_SQL}
+                      AND unpaywall_checked_at < now() - make_interval(days => :stale))
+              )
+        """),
+        {"stale": staleness_days},
+    ).scalar_one()
+
+
+def count_publications_by_oa_status(conn: Connection) -> dict[str, int]:
+    """Répartition des publications par statut OA (`oa_status` → nombre)."""
+    rows = conn.execute(
+        text(
+            "SELECT COALESCE(oa_status::text, 'unknown') AS status, count(*) AS n "
+            "FROM publications GROUP BY COALESCE(oa_status::text, 'unknown')"
+        )
+    ).all()
+    return {r.status: int(r.n) for r in rows}
+
+
 def fetch_journals_of_unknown_type(
     conn: Connection, *, limit: int | None = None
 ) -> list[tuple[int, str]]:
@@ -117,6 +146,12 @@ class PgEnrichQueries(EnrichQueries):
         self, conn: Connection, *, limit: int | None = None, staleness_days: int = 30
     ) -> list[tuple[int, str, str | None]]:
         return fetch_publications_with_doi(conn, limit=limit, staleness_days=staleness_days)
+
+    def count_stale_publications(self, conn: Connection, *, staleness_days: int = 30) -> int:
+        return count_stale_publications(conn, staleness_days=staleness_days)
+
+    def count_publications_by_oa_status(self, conn: Connection) -> dict[str, int]:
+        return count_publications_by_oa_status(conn)
 
     def fetch_journals_of_unknown_type(
         self, conn: Connection, *, limit: int | None = None
