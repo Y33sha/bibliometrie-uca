@@ -1,9 +1,9 @@
-* [ ] oneshot sur prod: python interfaces/cli/oneshot/backfill_clean_dois.py
 # Pipeline
 ## Extraction
+* [ ] voir si on peut mettre `resolve_doi_prefixes` avant `cross_imports`, pour éviter de multiplier les appels DataCite infructueux. (+ paralléliser Crossref/Datacite? et/ou supprimer de la pile DataCite les préfixes trouvés sur Crossref et vice-versa.)
 ### Couverture
 * [ ] extraction par ORCID: vérifier pertinence (tester différentes sources, auditer le gain)
-* [ ] biorxiv, medrxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
+* [ ] bioRxiv, medRxiv: identifiants différents de arxiv? cf publi 2757 (voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
 ### Performance
 * [ ] à étudier: cross-import: seulement `in_perimeter`? (ie seulement au run n+1) => éviter de cross-importer des trucs rejetés pendant la phase affiliations
@@ -12,6 +12,7 @@
 ### Correction
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks)
 * [ ] `metadata_correction`: en cas de corrections de champs multiples sur un même doc, les règles s'appliquent indépendamment à partir du brut; étudier les scénarios de corrections multiples où l'output d'une règle pourrait intersecter l'input des suivantes, voir s'il est pertinent de les chaîner ensemble
+* [ ] `persons`: voir si on peut généraliser le matching par identifiants forts aux authorships hors périmètre (à réserver aux identifiants `confirmed`)
 
 # Données
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
@@ -27,6 +28,7 @@
 * [ ] Clarifier la section "périmètres" (grouper affiliation/publications; séparer persons + UI)
 * [ ] fusion / dé-fusion manuelle de publications: circuit à créer
 * [ ] signaler visuellement les structures qui ne font partie d'aucun périmètre (pages liste et détail), ajouter filtre périmètre dans la page liste
+* [ ] page persons: le nombre de publications liées à une forme de nom ne se met pas à jour dans le drawer quand on les détache de l'auteur
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: langue; `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); licence
