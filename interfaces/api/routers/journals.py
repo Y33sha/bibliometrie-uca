@@ -5,11 +5,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.journals import (
-    merge_journals,
-    requalify_publications_for_journal,
-    update_journal as _update_journal,
-)
+from application import journals_commands as journal_commands
+from application.journals import requalify_publications_for_journal
 from application.ports.api.journals_queries import (
     JournalDashboardResponse,
     JournalDetailResponse,
@@ -244,24 +241,15 @@ def update_journal(
     Si `journal_type` change effectivement de valeur, déclenche la requalification synchrone du `doc_type` des publications rattachées dans la même transaction — cf. `requalify_publications_for_journal` côté application. Le caller frontal aura typiquement appelé le preview (`type-change-impact`) en amont pour afficher l'ampleur à l'admin.
     """
     fields = body.model_dump(exclude_unset=True)
-    new_type = fields.get("journal_type")
-
-    type_changed_to: str | None = None
-    if isinstance(new_type, str):
-        existing = repo.find_by_id(journal_id)
-        if existing is not None and existing.journal_type != new_type:
-            type_changed_to = new_type
-
-    _update_journal(journal_id, fields=fields, repo=repo)
-
-    if type_changed_to is not None:
-        requalify_publications_for_journal(
-            journal_id,
-            conn=conn,
-            correction_queries=correction_queries,
-            pub_repo=pub_repo,
-            audit_repo=audit,
-        )
+    journal_commands.update_journal(
+        conn,
+        journal_id,
+        fields=fields,
+        repo=repo,
+        pub_repo=pub_repo,
+        audit_repo=audit,
+        correction_queries=correction_queries,
+    )
     return OkResponse()
 
 
@@ -289,10 +277,10 @@ def merge(
     if body.source_id not in found:
         raise HTTPException(status_code=404, detail="Revue source introuvable")
 
-    merge_journals(
+    journal_commands.merge_journals(
+        conn,
         journal_id,
         body.source_id,
-        conn=conn,
         correction_queries=correction_queries,
         repo=repo,
         pub_repo=pub_repo,
