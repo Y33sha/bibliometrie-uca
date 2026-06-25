@@ -5,6 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
+from application import publishers_commands as publisher_commands
 from application.ports.api.publishers_queries import (
     PublisherDashboardResponse,
     PublisherDetailResponse,
@@ -18,7 +19,6 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
-from application.publishers import merge_publishers, update_publisher as _update_publisher
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
     audit_repo_sync,
@@ -170,6 +170,7 @@ def get_publisher_subjects(
 def update_publisher(
     publisher_id: int,
     body: PublisherUpdate,
+    conn: Connection = Depends(db_conn_sync),
     repo: PublisherRepository = Depends(publisher_repo_sync),
 ) -> OkResponse:
     """Met à jour un éditeur (modification sélective des champs fournis).
@@ -178,7 +179,7 @@ def update_publisher(
     (`exclude_unset=True`). Lève 404 si l'éditeur n'existe pas.
     """
     fields = body.model_dump(exclude_unset=True)
-    _update_publisher(publisher_id, fields=fields, repo=repo)
+    publisher_commands.update_publisher(conn, publisher_id, fields=fields, repo=repo)
     return OkResponse()
 
 
@@ -207,10 +208,10 @@ def merge(
     if body.source_id not in found:
         raise HTTPException(status_code=404, detail="Éditeur source introuvable")
 
-    merge_publishers(
+    publisher_commands.merge_publishers(
+        conn,
         publisher_id,
         body.source_id,
-        conn=conn,
         correction_queries=correction_queries,
         publisher_repo=pub_repo,
         journal_repo=j_repo,

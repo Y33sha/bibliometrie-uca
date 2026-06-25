@@ -12,7 +12,6 @@ Deux niveaux :
   a commité ou quand la requête n'a fait que lire.
 """
 
-import logging
 import os
 from types import SimpleNamespace
 
@@ -106,6 +105,30 @@ class TestDmlFlag:
         probe_conn.execute(text("INSERT INTO _dml_probe VALUES (6)"))
         assert has_uncommitted_dml(probe_conn)
 
+    def test_savepoint_rollback_undoes_dirty(self, probe_conn):
+        # Preview (cas get_type_change_impact) : rien de dirty avant, on écrit dans un
+        # savepoint puis on le rollback → le flag retombe, pas de faux warning au teardown.
+        sp = probe_conn.begin_nested()
+        probe_conn.execute(text("INSERT INTO _dml_probe VALUES (7)"))
+        assert has_uncommitted_dml(probe_conn)
+        sp.rollback()
+        assert not has_uncommitted_dml(probe_conn)
+
+    def test_savepoint_rollback_preserves_prior_dml(self, probe_conn):
+        # Un DML hors savepoint reste dirty même si un savepoint ultérieur est rollbacké.
+        probe_conn.execute(text("INSERT INTO _dml_probe VALUES (8)"))
+        sp = probe_conn.begin_nested()
+        probe_conn.execute(text("INSERT INTO _dml_probe VALUES (9)"))
+        sp.rollback()
+        assert has_uncommitted_dml(probe_conn)
+
+    def test_savepoint_release_keeps_dirty(self, probe_conn):
+        # Savepoint relâché (commit) : ses écritures sont conservées → reste dirty.
+        sp = probe_conn.begin_nested()
+        probe_conn.execute(text("INSERT INTO _dml_probe VALUES (10)"))
+        sp.commit()
+        assert has_uncommitted_dml(probe_conn)
+
 
 # DML no-op (zéro ligne) : arme le flag sans modifier de donnée réelle.
 _NOOP_DML = "DELETE FROM countries WHERE code = '__dml_guard_probe__'"
@@ -113,12 +136,19 @@ _NOOP_DML = "DELETE FROM countries WHERE code = '__dml_guard_probe__'"
 
 class TestDbConnSyncTeardown:
     """Pilote le générateur `db_conn_sync` à la main (sans FastAPI) avec une fausse
-    Request, l'engine de test substitué à `get_sync_engine`."""
+    Request, l'engine de test substitué à `get_sync_engine`.
 
-    def _run(self, monkeypatch, guarded_engine, body) -> None:
+    Le warning est observé par un spy sur `deps.logger.warning`, pas via les handlers
+    de logging : sous la suite complète, pytest relève les niveaux et pose
+    `logging.disable`, ce qui empêcherait le record d'être émis. Le spy capture
+    l'appel directement, indépendamment de l'état du logging."""
+
+    def _run(self, monkeypatch, guarded_engine, body) -> list:
         from interfaces.api import deps
 
         monkeypatch.setattr(deps, "get_sync_engine", lambda: guarded_engine)
+        warnings: list = []
+        monkeypatch.setattr(deps.logger, "warning", lambda *args, **kwargs: warnings.append(args))
         request = SimpleNamespace(method="POST", url=SimpleNamespace(path="/api/_probe"))
         gen = deps.db_conn_sync(request)
         conn = next(gen)
@@ -126,23 +156,24 @@ class TestDbConnSyncTeardown:
             body(conn)
         finally:
             with pytest.raises(StopIteration):
-                next(gen)  # épuise le générateur → teardown (commit garde-fou + warning)
+                next(gen)  # épuise le générateur → teardown (commit garde-fou + warning éventuel)
+        return warnings
 
-    def test_warns_on_uncommitted_dml(self, monkeypatch, guarded_engine, caplog):
-        with caplog.at_level(logging.WARNING, logger="interfaces.api.deps"):
-            self._run(monkeypatch, guarded_engine, lambda conn: conn.execute(text(_NOOP_DML)))
-        assert "non committée" in caplog.text
+    def test_warns_on_uncommitted_dml(self, monkeypatch, guarded_engine):
+        warnings = self._run(
+            monkeypatch, guarded_engine, lambda conn: conn.execute(text(_NOOP_DML))
+        )
+        assert warnings  # le commit de fin rattrape du DML échappé → warning
 
-    def test_silent_when_handler_committed(self, monkeypatch, guarded_engine, caplog):
+    def test_silent_when_handler_committed(self, monkeypatch, guarded_engine):
         def body(conn):
             conn.execute(text(_NOOP_DML))
             conn.commit()  # le command handler commit lui-même
 
-        with caplog.at_level(logging.WARNING, logger="interfaces.api.deps"):
-            self._run(monkeypatch, guarded_engine, body)
-        assert "non committée" not in caplog.text
+        assert self._run(monkeypatch, guarded_engine, body) == []
 
-    def test_silent_on_read_only(self, monkeypatch, guarded_engine, caplog):
-        with caplog.at_level(logging.WARNING, logger="interfaces.api.deps"):
-            self._run(monkeypatch, guarded_engine, lambda conn: conn.execute(text("SELECT 1")))
-        assert "non committée" not in caplog.text
+    def test_silent_on_read_only(self, monkeypatch, guarded_engine):
+        warnings = self._run(
+            monkeypatch, guarded_engine, lambda conn: conn.execute(text("SELECT 1"))
+        )
+        assert warnings == []
