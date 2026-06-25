@@ -64,5 +64,7 @@ class PhaseExecution:
     status: PhaseStatus
     metrics: PhaseMetricsPayload
     signals: list[Signal] = field(default_factory=list)
-    input: ObservableVolumes | None = None
-    output: ObservableVolumes | None = None
+    # Indicateurs sur-mesure de la phase. `details["tables"]` = volumes avant/après
+    # des tables consommées/produites (auto) ; les phases enrichissent librement
+    # (ex. `details["by_source"]`).
+    details: dict[str, object] = field(default_factory=dict)

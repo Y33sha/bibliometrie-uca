@@ -14,6 +14,19 @@
   type RunDetail = components["schemas"]["RunDetail"];
   type PhaseExecutionDetail = components["schemas"]["PhaseExecutionDetail"];
 
+  type SourceRow = {
+    found: number;
+    new: number;
+    updated: number;
+    unchanged: number;
+    errors: number;
+    duration_s: number;
+  };
+  type Details = {
+    tables?: Record<string, { before: number; after: number }>;
+    by_source?: Record<string, SourceRow>;
+  };
+
   let { detail, allPhases }: { detail: RunDetail; allPhases: string[] } = $props();
 
   let expanded = $state<string | null>(null);
@@ -27,6 +40,19 @@
     return map;
   });
 
+  function asDetails(d: unknown): Details {
+    return (d ?? {}) as Details;
+  }
+  function bySource(d: unknown): [string, SourceRow][] {
+    return Object.entries(asDetails(d).by_source ?? {});
+  }
+  function tableEntries(d: unknown): [string, { before: number; after: number }][] {
+    return Object.entries(asDetails(d).tables ?? {});
+  }
+  function fmtDelta(n: number): string {
+    return n >= 0 ? `+${n}` : `${n}`;
+  }
+
   function metricsSummary(m: PhaseExecutionDetail["metrics"]): string {
     const parts: string[] = [];
     if (m.new) parts.push(`${m.new} new`);
@@ -35,10 +61,6 @@
     if (m.errors) parts.push(`${m.errors} errors`);
     for (const [k, v] of Object.entries(m.extras ?? {})) if (v) parts.push(`${v} ${k}`);
     return parts.join(", ") || "—";
-  }
-
-  function volumes(v: { [key: string]: number } | null): [string, number][] {
-    return v ? Object.entries(v) : [];
   }
 </script>
 
@@ -97,7 +119,12 @@
             ? `médian ${fmtDuration(p.historical_median_duration_s)}`
             : "pas d'historique"}
         >
-          {fmtDuration(p.duration_s)}{#if isSlow(p.duration_ratio)}<span class="slow-flag" title="nettement plus lent que le médian"> ⚠</span>{/if}
+          {fmtDuration(p.duration_s)}{#if isSlow(p.duration_ratio)}<span
+              class="slow-flag"
+              title="nettement plus lent que le médian"
+            >
+              ⚠</span
+            >{/if}
         </td>
         <td class="num">{p.signals.length || "—"}</td>
       </tr>
@@ -105,31 +132,59 @@
         <tr class="expand-row">
           <td colspan="4">
             <div class="expand">
-              <div class="expand-line"><span class="k">Métriques</span><span>{metricsSummary(p.metrics)}</span></div>
+              {#if bySource(p.details).length}
+                <table class="src-table">
+                  <thead>
+                    <tr>
+                      <th>Source</th>
+                      <th class="num">Trouvés</th>
+                      <th class="num">Nouveaux</th>
+                      <th class="num">Màj</th>
+                      <th class="num">Inchangés</th>
+                      <th class="num">Durée</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each bySource(p.details) as [src, m] (src)}
+                      <tr>
+                        <td>{src}</td>
+                        <td class="num">{m.found}</td>
+                        <td class="num">{m.new}</td>
+                        <td class="num">{m.updated}</td>
+                        <td class="num">{m.unchanged}</td>
+                        <td class="num">{fmtDuration(m.duration_s)}</td>
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              {/if}
+              {#each tableEntries(p.details) as [t, v] (t)}
+                <div class="expand-line">
+                  <span class="k">{t}</span>
+                  <span>{v.before} ⇒ {v.after} ({fmtDelta(v.after - v.before)})</span>
+                </div>
+              {/each}
+              <div class="expand-line">
+                <span class="k">Métriques</span><span>{metricsSummary(p.metrics)}</span>
+              </div>
               {#if p.historical_median_duration_s !== null}
                 <div class="expand-line">
                   <span class="k">Durée vs médian</span>
-                  <span>{fmtDuration(p.duration_s)} / {fmtDuration(p.historical_median_duration_s)} (×{fmtRatio(p.duration_ratio)})</span>
-                </div>
-              {/if}
-              {#if volumes(p.input).length}
-                <div class="expand-line">
-                  <span class="k">Entrée</span>
-                  <span>{#each volumes(p.input) as [t, n], i}{i > 0 ? " · " : ""}{t} {n}{/each}</span>
-                </div>
-              {/if}
-              {#if volumes(p.output).length}
-                <div class="expand-line">
-                  <span class="k">Sortie</span>
-                  <span>{#each volumes(p.output) as [t, n], i}{i > 0 ? " · " : ""}{t} {n}{/each}</span>
+                  <span
+                    >{fmtDuration(p.duration_s)} / {fmtDuration(
+                      p.historical_median_duration_s,
+                    )} (×{fmtRatio(p.duration_ratio)})</span
+                  >
                 </div>
               {/if}
               {#if p.signals.length}
                 <div class="expand-line">
                   <span class="k">Signaux</span>
                   <span class="signals">
-                    {#each p.signals as s}
-                      <span class="signal" style="border-color:{CELL_COLOR[s.level as Status]}">{s.message}</span>
+                    {#each p.signals as s, i (i)}
+                      <span class="signal" style="border-color:{CELL_COLOR[s.level as Status]}"
+                        >{s.message}</span
+                      >
                     {/each}
                   </span>
                 </div>
@@ -198,9 +253,7 @@
     padding: 5px 8px;
     border-bottom: 1px solid var(--border);
   }
-  .phase-row:hover td {
-    background: var(--hover);
-  }
+  .phase-row:hover td,
   .phase-row.open td {
     background: var(--hover);
   }
@@ -229,7 +282,28 @@
     background: var(--bg);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
+  }
+  .src-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-bottom: 4px;
+  }
+  .src-table th {
+    padding: 3px 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    text-align: left;
+  }
+  .src-table th.num {
+    text-align: right;
+  }
+  .src-table td {
+    padding: 3px 8px;
+    border-bottom: 1px solid var(--border);
   }
   .expand-line {
     display: grid;
@@ -242,6 +316,7 @@
     text-transform: uppercase;
     font-size: 0.72rem;
     letter-spacing: 0.05em;
+    font-family: "JetBrains Mono", monospace;
   }
   .signals {
     display: flex;

@@ -20,13 +20,13 @@ Besoin primaire : **savoir d'un coup d'œil si un run s'est bien passé**, phase
 
 ### Observables et durée : affichés, non jugés
 
-Chaque phase relève le volume des tables qu'elle touche au début et à la fin de son exécution (avant / après) ; le drill-down les montre tels quels. Pour une phase de transformation, c'est l'entrée consommée et la sortie produite (`normalize` : staging → source_publications) ; pour une phase qui enrichit ou accumule en place, c'est l'avant / après d'une même table (`resolve_ra` : doi_prefixes au début et à la fin, dont le delta donne les nouveaux préfixes). On n'en dérive **pas** de ratio de rendement : un tel ratio (sortie / entrée) n'est pas comparable d'une phase à l'autre — facteur de dédup pour `publications`, quasi-1 pour les enrichissements en place — et serait plus trompeur qu'utile. Ce qui parle, ce sont les volumes avant / après, les compteurs `PhaseMetrics` (new / updated…) et l'écart de durée.
+Chaque phase relève le volume des tables qu'elle touche au début et à la fin de son exécution (avant / après) ; le drill-down les montre tels quels. Pour une phase de transformation, c'est l'entrée consommée et la sortie produite (`normalize` : staging → source_publications) ; pour une phase qui enrichit ou accumule en place, c'est l'avant / après d'une même table (`resolve_ra` : doi_prefixes au début et à la fin, dont le delta donne les nouveaux préfixes). On n'en dérive **pas** de ratio de rendement : un tel ratio (sortie / entrée) n'est pas comparable d'une phase à l'autre — facteur de dédup pour `publications`, quasi-1 pour les enrichissements en place — et serait plus trompeur qu'utile. Ce qui parle, ce sont les volumes avant / après, les compteurs `PhaseMetrics` (new / updated…) et l'écart de durée. Le rendu du drill-down est **sur-mesure par phase** : chaque phase remonte ses indicateurs propres dans un `details` libre, et l'interface les affiche selon leur forme — les phases multi-sources (`extract`…) présentent une table par source (trouvés / nouveaux / màj / inchangés / durée), les autres l'avant / après de leurs tables.
 
 **Aucune détection automatique de dérive.** La durée d'une phase est **affichée** à côté de son médian historique (même phase) ; une phase nettement plus lente (≈ 1,5× le médian) est mise en évidence visuellement, l'écart étant calculé à la lecture, sans seuil stocké ni drapeau. L'œil juge. Poser un critère objectif de dérive sur un corpus de quelques milliers de publications, aux runs hétérogènes (daily mono-source vs full multi-sources), produirait surtout du bruit.
 
 ### Une seule surface : l'interface graphique
 
-La page `/admin/pipeline` est l'unique surface d'observabilité. Les rapports markdown (`generate_report`) sont retirés : ils font double emploi avec les enregistrements consultables. Les logs restent accessibles en lien secondaire par run.
+La page `/admin/pipeline` est l'unique surface d'observabilité. Les rapports markdown (`generate_report`) sont retirés : ils font double emploi avec les enregistrements consultables. La page ne surface pas les logs (le `cron.log` n'apportait rien) ; une consultation des logs par phase, si elle est mise en place, sera un mécanisme distinct.
 
 **Présentation en ruban de phases.** La page liste les runs en ordre anté-chronologique. Chaque run porte son verdict global, sa date, sa durée et un **ruban** : les phases dans l'ordre du graphe (gauche → droite), en cases de largeur fixe dont la **couleur** porte le statut. Le ruban n'est pas proportionnel au temps — les durées de phase sont trop hétérogènes (secondes à heures) pour un axe-temps lisible. Le graphe de dépendances ne sert qu'à ordonner les phases et à marquer l'éventail post-`normalize` d'un séparateur ; aucune arête n'est dessinée. Le drill-down sur une phase affiche les volumes d'entrée/sortie (avant / après), les métriques, la durée et son médian historique, et les signaux.
 
@@ -53,13 +53,14 @@ Les dépendances input → output sont statiques et connues. La colonne vertébr
 ### Phase A — Modèle de données et graphe des phases
 
 - [x] Graphe des phases en code (`application/pipeline/graph.py`) : pour chaque phase, ses tables consommées et produites (définition des observables d'entrée et de sortie), dans l'ordre d'exécution. Source de vérité unique, consommée par la capture et par l'interface.
-- [x] Migration Alembic (`c4e9a1b7f2d8`) : création de la table des exécutions de phase (`run_id`, phase, `started_at`, `ended_at`, mode, sources, `status`, `signals jsonb`, `metrics jsonb`, `input jsonb`, `output jsonb`) + séquence `pipeline_run_id_seq` + index par phase, par `run_id`, par date. Le drop de `pipeline_run_snapshots` est reporté en Phase F.
-- [x] Value objects de payload (`application/ports/pipeline/phase_executions.py`) : métriques, observables, signaux, statut ; sérialisation JSON.
+- [x] Migration Alembic (`c4e9a1b7f2d8`) : création de la table des exécutions de phase (`run_id`, phase, `started_at`, `ended_at`, mode, sources, `status`, `signals jsonb`, `metrics jsonb`, `details jsonb`) + séquence `pipeline_run_id_seq` + index par phase, par `run_id`, par date. La table a d'abord porté `input`/`output`, consolidés en une colonne libre `details` par la migration `d7f2a4c9e1b6`. Le drop de `pipeline_run_snapshots` est reporté en Phase F.
+- [x] Value objects de payload (`application/ports/pipeline/phase_executions.py`) : métriques, signaux, statut, `details` (indicateurs sur-mesure) ; sérialisation JSON.
 
 ### Phase B — Capture par phase dans `run_pipeline.py`
 
-- [x] `run_id` (séquence) généré au lancement ; chaque phase relève son observable d'entrée à son début et persiste à sa fin observable de sortie, métriques et statut (`infrastructure/observability/phase_executions.py`). Statut `error` sur exception ou interruption, avec un signal portant le message ; `warning` et les signaux métier viennent au point suivant. Capture best-effort : une défaillance d'observabilité (migration non appliquée, etc.) est loggée sans interrompre le run. Fonctionne pour `--only` et `--from`. L'orchestrateur fait dériver son ordre d'exécution de `PHASE_ORDER` (graphe), supprimant la duplication de l'ordre.
-- [ ] Remontée structurée des signaux par les phases (source indisponible, série de 429, conflits d'identité), `extract` et `persons` en priorité.
+- [x] `run_id` (séquence) généré au lancement ; chaque phase relève les volumes avant/après de ses tables (`details["tables"]`) et persiste métriques, statut, signaux et indicateurs sur-mesure (`infrastructure/observability/phase_executions.py`). Statut `error` sur exception, `warning` sur interruption utilisateur (action contrôlée) ou si la phase remonte des signaux. Capture best-effort : une défaillance d'observabilité (migration non appliquée, etc.) est loggée sans interrompre le run. Fonctionne pour `--only` et `--from`. L'orchestrateur fait dériver son ordre d'exécution de `PHASE_ORDER` (graphe), supprimant la duplication de l'ordre.
+- [x] Indicateurs sur-mesure : `PhaseMetrics` gagne `details` et `signals` ; `extract` remonte `by_source` (trouvés / nouveaux / màj / inchangés / durée par source).
+- [ ] Émission des signaux dans les phases : le canal est en place (remontés via `PhaseMetrics.signals`, affichés en ambre) ; reste à détecter et remonter les cas dans `extract` (source indisponible, série de 429) et `persons` (`CannotAttributeConflict`).
 - [x] Récapitulatif par phase (durées) en fin d'invocation, en plus du résumé par phase existant ; pas d'email.
 
 ### Phase C — Lecture : écart de durée
@@ -69,14 +70,14 @@ Les dépendances input → output sont statiques et connues. La colonne vertébr
 
 ### Phase D — API
 
-- [x] Endpoints de lecture (`/api/admin/pipeline/runs`, `/api/admin/pipeline/runs/{run_id}`) : liste des runs (agrégation par `run_id`, statut global) ; détail d'un run = ses exécutions de phase, chacune portant métriques, observables (avant / après), durée, médian historique et écart, signaux (recalculés à la lecture). Le détail d'une exécution de phase est embarqué dans le détail du run, pas d'endpoint séparé.
+- [x] Endpoints de lecture (`/api/admin/pipeline/runs`, `/api/admin/pipeline/runs/{run_id}`) : liste des runs (agrégation par `run_id`, statut global) ; détail d'un run = ses exécutions de phase, chacune portant métriques, `details` (avant / après + indicateurs par source), durée, médian historique et écart, signaux (recalculés à la lecture). Le détail d'une exécution de phase est embarqué dans le détail du run, pas d'endpoint séparé.
 - [x] Port typé (`application/ports/api/pipeline_phase_executions_queries.py`) et adapter queries (`infrastructure/queries/api/pipeline_phase_executions.py`).
 
 ### Phase E — Interface en ruban
 
-- [x] Refonte de `/admin/pipeline` : liste anté-chronologique de runs (chaque run portant son ruban), ruban de phases coloré par statut (vert/ambre/rouge, gris pour les phases non jouées), drill-down par phase (métriques, observables d'entrée/sortie, rendement, durée vs médian, signaux). Onglets et composant monolithique supprimés ; découpage en `PhaseRibbon`, `RunList`, `RunDetail` + helpers. L'ordre des phases du ruban vient d'un endpoint `/api/admin/pipeline/phases` (graphe) ; les statuts par phase sont portés par la liste des runs.
+- [x] Refonte de `/admin/pipeline` : liste anté-chronologique de runs (chaque run portant son ruban), ruban de phases coloré par statut (vert/ambre/rouge, gris pour les phases non jouées), drill-down par phase au rendu sur-mesure (table par source quand la phase fournit `by_source`, avant/après des tables sinon, plus métriques, durée vs médian, signaux). Onglets et composant monolithique supprimés ; découpage en `PhaseRibbon`, `RunList`, `RunDetail` + helpers. L'ordre des phases du ruban vient d'un endpoint `/api/admin/pipeline/phases` (graphe) ; les statuts par phase sont portés par la liste des runs.
 - [x] Mise en évidence visuelle des phases anormalement lentes (durée ≥ 1,5× le médian historique, repère calculé à l'affichage).
-- [x] Statut live (run en cours) reconduit ; logs (`cron.log`) en consultation secondaire via un volet dépliable.
+- [x] Statut live (run en cours) reconduit. La page ne surface pas les logs (le `cron.log` était toujours vide) ; une consultation des logs par phase, si elle est mise en place, sera un mécanisme distinct.
 
 ### Phase F — Clôture
 

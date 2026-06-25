@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from application.ports.pipeline.phase_executions import Signal
+
 
 @dataclass
 class PhaseMetrics:
@@ -21,6 +23,11 @@ class PhaseMetrics:
     les compteurs spécifiques à une phase quand ils ne rentrent pas dans le
     cadre générique : `already_complete` pour `refetch_truncated`, `tagged`
     pour `extract_hal`, `not_found` pour les fetchers HAL, etc.
+
+    `details` porte les indicateurs sur-mesure d'observabilité (structure libre
+    propre à la phase, ex. `{"by_source": {...}}`) et `signals` les faits notables
+    à signaler (source indisponible, conflit d'identité…) : tous deux remontés à
+    l'orchestrateur pour la capture par phase, sans rôle dans les compteurs.
     """
 
     new: int = 0
@@ -29,6 +36,8 @@ class PhaseMetrics:
     total: int = 0
     errors: int = 0
     extras: dict[str, int] = field(default_factory=dict)
+    details: dict[str, object] = field(default_factory=dict)
+    signals: list[Signal] = field(default_factory=list)
 
     def add(
         self,
@@ -62,6 +71,8 @@ class PhaseMetrics:
         self.errors += other.errors
         for k, v in other.extras.items():
             self.extras[k] = self.extras.get(k, 0) + v
+        self.details.update(other.details)
+        self.signals.extend(other.signals)
 
     def as_summary(self) -> str:
         """Une-ligne lisible pour les logs ('10 new, 5 updated' / '...')."""

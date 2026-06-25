@@ -2,8 +2,8 @@
 
 Couvre :
 - GET /api/admin/pipeline/runs (liste agrégée par run, statut global, ordre)
-- GET /api/admin/pipeline/runs/{run_id} (phases ordonnées, rendement, médian de
-  durée historique, écart de durée ; statut warning ; 404)
+- GET /api/admin/pipeline/runs/{run_id} (phases ordonnées, details avant/après et
+  by_source, médian de durée historique, écart de durée ; statut warning ; 404)
 """
 
 from __future__ import annotations
@@ -61,8 +61,7 @@ def _seed_phase(
     *,
     status: str,
     duration_s: float,
-    input_volumes: dict | None = None,
-    output_volumes: dict | None = None,
+    details: dict | None = None,
     signals: list | None = None,
 ) -> None:
     with _pool() as cur:
@@ -70,10 +69,9 @@ def _seed_phase(
             """
             INSERT INTO pipeline_phase_executions
                 (run_id, phase, started_at, ended_at, mode, sources, status,
-                 signals, metrics, input, output)
+                 signals, metrics, details)
             VALUES
-                (%s, %s, now(), now(), %s, %s, %s,
-                 %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb)
+                (%s, %s, now(), now(), %s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb)
             """,
             (
                 run_id,
@@ -83,8 +81,7 @@ def _seed_phase(
                 status,
                 json.dumps(signals or []),
                 json.dumps(_metrics(duration_s)),
-                json.dumps(input_volumes) if input_volumes is not None else None,
-                json.dumps(output_volumes) if output_volumes is not None else None,
+                json.dumps(details or {}),
             ),
         )
 
@@ -92,27 +89,32 @@ def _seed_phase(
 @pytest.fixture(scope="module")
 def seeded_runs() -> dict[str, int]:
     """Deux runs : A tout vert, B avec une phase en warning et publications plus lente."""
+    publications_details = {"tables": {"source_publications": {"before": 1000, "after": 800}}}
+
     run_a = _next_run_id()
     _seed_phase(run_a, "normalize", status="ok", duration_s=5.0)
-    _seed_phase(
-        run_a,
-        "publications",
-        status="ok",
-        duration_s=10.0,
-        input_volumes={"source_publications": 1000},
-        output_volumes={"publications": 800},
-    )
+    _seed_phase(run_a, "publications", status="ok", duration_s=10.0, details=publications_details)
 
     run_b = _next_run_id()
-    _seed_phase(run_b, "normalize", status="ok", duration_s=6.0)
     _seed_phase(
         run_b,
-        "publications",
+        "normalize",
         status="ok",
-        duration_s=20.0,
-        input_volumes={"source_publications": 1000},
-        output_volumes={"publications": 800},
+        duration_s=6.0,
+        details={
+            "by_source": {
+                "openalex": {
+                    "found": 7658,
+                    "new": 457,
+                    "updated": 10,
+                    "unchanged": 7191,
+                    "errors": 0,
+                    "duration_s": 42.0,
+                }
+            }
+        },
     )
+    _seed_phase(run_b, "publications", status="ok", duration_s=20.0, details=publications_details)
     _seed_phase(
         run_b,
         "persons",
@@ -161,12 +163,18 @@ def test_get_run_detail(client, seeded_runs):
     assert [p["phase"] for p in detail["phases"]] == ["normalize", "publications", "persons"]
 
     publications = next(p for p in detail["phases"] if p["phase"] == "publications")
-    # Volumes avant/après conservés tels quels (pas de ratio de rendement).
-    assert publications["input"] == {"source_publications": 1000}
-    assert publications["output"] == {"publications": 800}
+    # Volumes avant/après conservés tels quels dans details (pas de ratio de rendement).
+    assert publications["details"]["tables"]["source_publications"] == {
+        "before": 1000,
+        "after": 800,
+    }
     # Médian historique = durée de publications dans run A (10), run courant exclu.
     assert publications["historical_median_duration_s"] == 10.0
     assert publications["duration_ratio"] == 2.0
+
+    # Indicateur sur-mesure par source remonté tel quel.
+    normalize = next(p for p in detail["phases"] if p["phase"] == "normalize")
+    assert normalize["details"]["by_source"]["openalex"]["found"] == 7658
 
     persons = next(p for p in detail["phases"] if p["phase"] == "persons")
     assert persons["status"] == "warning"
