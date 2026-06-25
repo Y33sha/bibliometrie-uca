@@ -40,7 +40,7 @@ Légende des cases : vert = ok, rouge = exception (run interrompu là), ambre = 
 
 ### Modèle de dépendances des phases
 
-Les dépendances input → output sont statiques et connues. La colonne vertébrale est `extract → resolve_ra → cross_imports → refresh_stale → refetch_truncated → normalize` (`cross_imports` dépend aussi de `resolve_ra` pour les agences d'enregistrement). En aval, `normalize` alimente `affiliations`, `metadata_correction` et `publishers_journals` (← `resolve_ra` également) ; `metadata_correction` alimente `publications` ; `publications` alimente `relations` (← normalize aussi), `subjects`, `oa_status` et `countries` (← affiliations aussi) ; `affiliations` alimente `persons` ; `publications` et `persons` alimentent `authorships`. Ce graphe est codé une fois dans `application/pipeline/graph.py` (chaque phase y déclare ses amonts, ses tables consommées et ses tables produites) ; il sert à ordonner le ruban et à définir, pour chaque phase, ses observables d'entrée et de sortie. Ce qui varie d'un run à l'autre, c'est quelles phases tournent et quand, pas le graphe.
+Les dépendances input → output sont statiques et connues. La colonne vertébrale est `extract → resolve_ra → cross_imports → refresh_stale → refetch_truncated → normalize` (`cross_imports` dépend aussi de `resolve_ra` pour les agences d'enregistrement). En aval, `normalize` alimente `affiliations`, `metadata_correction` et `publishers_journals` (← `resolve_ra` également) ; `metadata_correction` alimente `publications` ; `publications` alimente `relations` (← normalize aussi), `subjects`, `oa_status` et `countries` (← affiliations aussi) ; `affiliations` alimente `persons` ; `publications` et `persons` alimentent `authorships`. Ce flux est documenté ici à titre informatif ; ce que le code déclare (`application/pipeline/graph.py`), phase par phase, ce sont ses tables consommées et produites — la définition de ses observables d'entrée et de sortie. Les liaisons amont ne sont pas matérialisées : le rendement se mesure localement sur chaque phase, sans lignage inféré. L'ordre de déclaration est l'ordre d'exécution, qui ordonne le ruban. Ce qui varie d'un run à l'autre, c'est quelles phases tournent et quand, pas le flux.
 
 ### Existant : réutilisé, remplacé, retiré
 
@@ -52,7 +52,7 @@ Les dépendances input → output sont statiques et connues. La colonne vertébr
 
 ### Phase A — Modèle de données et graphe des phases
 
-- [x] Graphe des phases en code (`application/pipeline/graph.py`) : pour chaque phase, ses phases amont et ses tables consommées/produites (définition des observables d'entrée et de sortie). Source de vérité unique, consommée par la capture et par l'interface.
+- [x] Graphe des phases en code (`application/pipeline/graph.py`) : pour chaque phase, ses tables consommées et produites (définition des observables d'entrée et de sortie), dans l'ordre d'exécution. Source de vérité unique, consommée par la capture et par l'interface.
 - [x] Migration Alembic (`c4e9a1b7f2d8`) : création de la table des exécutions de phase (`run_id`, phase, `started_at`, `ended_at`, mode, sources, `status`, `signals jsonb`, `metrics jsonb`, `input jsonb`, `output jsonb`) + séquence `pipeline_run_id_seq` + index par phase, par `run_id`, par date. Le drop de `pipeline_run_snapshots` est reporté en Phase F.
 - [x] Value objects de payload (`application/ports/pipeline/phase_executions.py`) : métriques, observables, signaux, statut ; sérialisation JSON.
 
