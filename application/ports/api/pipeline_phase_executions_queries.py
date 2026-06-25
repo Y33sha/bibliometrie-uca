@@ -21,6 +21,13 @@ from application.ports.pipeline.phase_executions import (
 )
 
 
+class PhaseBrief(BaseModel):
+    """Statut d'une phase au sein d'un run, pour le ruban de la liste."""
+
+    phase: str
+    status: PhaseStatus
+
+
 class RunSummary(BaseModel):
     """Une ligne dans la liste des runs (agrégat des exécutions d'un même `run_id`)."""
 
@@ -32,6 +39,7 @@ class RunSummary(BaseModel):
     status: PhaseStatus
     phase_count: int
     total_duration_s: float
+    phases: list[PhaseBrief]
 
 
 class PhaseExecutionDetail(BaseModel):

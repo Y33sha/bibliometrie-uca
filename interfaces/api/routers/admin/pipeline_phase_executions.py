@@ -9,6 +9,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from application.pipeline.graph import PHASE_ORDER
 from application.ports.api.pipeline_phase_executions_queries import (
     PhaseExecutionsQueries,
     RunDetail,
@@ -18,6 +19,12 @@ from interfaces.api.deps import pipeline_phase_executions_queries_sync
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+@router.get("/api/admin/pipeline/phases", response_model=list[str])
+def list_phases() -> list[str]:
+    """Ordre canonique des phases du pipeline (graphe), pour la trame du ruban."""
+    return list(PHASE_ORDER)
 
 
 @router.get("/api/admin/pipeline/runs", response_model=list[RunSummary])

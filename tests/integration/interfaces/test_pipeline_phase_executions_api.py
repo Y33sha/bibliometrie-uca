@@ -138,10 +138,21 @@ def test_list_runs_aggrege_et_ordonne(client, seeded_runs):
     run_b = by_id[seeded_runs["b"]]
     assert run_b["status"] == "warning"
     assert run_b["phase_count"] == 3
+    # Ruban : statut par phase, dans l'ordre d'exécution.
+    assert [p["phase"] for p in run_b["phases"]] == ["normalize", "publications", "persons"]
+    assert run_b["phases"][2] == {"phase": "persons", "status": "warning"}
 
     # Plus récent (run_id plus grand) en premier.
     ids = [r["run_id"] for r in runs]
     assert ids.index(seeded_runs["b"]) < ids.index(seeded_runs["a"])
+
+
+def test_list_phases(client):
+    phases = client.get("/api/admin/pipeline/phases").json()
+    assert phases[0] == "extract"
+    assert "normalize" in phases
+    assert phases[-1] == "oa_status"
+    assert len(phases) == 16
 
 
 def test_get_run_detail(client, seeded_runs):
