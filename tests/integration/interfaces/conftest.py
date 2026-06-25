@@ -9,6 +9,7 @@ bibliometrie_test par monkey-patch de `build_sync_engine` avant l'import
 de l'app.
 """
 
+import logging
 import os
 
 import pytest
@@ -51,6 +52,40 @@ from interfaces.api.app import app  # noqa: E402
 _app_module.build_sync_engine = _build_test_sync_engine
 
 from infrastructure.settings import settings as _settings  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fail_on_escaped_dml():
+    """Échoue si une écriture API échappe à un command handler.
+
+    `db_conn_sync` émet un warning quand son commit de fin rattrape du DML non
+    committé (écriture qui ne passe pas par un command handler committant). On le
+    transforme en échec de test pour verrouiller l'invariant « toute écriture API
+    commit avant la réponse », y compris pour les futurs endpoints — c'est ce qui
+    rend sûre la lecture seule de `db_conn_sync` (commit de fin retiré).
+    """
+    captured: list[str] = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            message = record.getMessage()
+            if "command handler" in message:
+                captured.append(message)
+
+    handler = _Capture()
+    deps_logger = logging.getLogger("interfaces.api.deps")
+    # `setup_logger` (dictConfig) désactive les loggers existants ; on le réactive
+    # le temps du test, sinon `logger.warning` du garde-fou est un no-op et un
+    # éventuel DML échappé passerait inaperçu.
+    was_disabled = deps_logger.disabled
+    deps_logger.disabled = False
+    deps_logger.addHandler(handler)
+    try:
+        yield
+    finally:
+        deps_logger.removeHandler(handler)
+        deps_logger.disabled = was_disabled
+    assert not captured, "Écriture(s) hors command handler détectée(s) : " + " | ".join(captured)
 
 
 @pytest.fixture(scope="module")

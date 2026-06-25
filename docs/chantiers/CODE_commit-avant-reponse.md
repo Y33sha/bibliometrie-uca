@@ -65,7 +65,12 @@ Surface : ~36 endpoints d'écriture (POST/PUT/PATCH/DELETE) sur 11 routers (publ
 
 ### Phase finale — `db_conn_sync` en lecture seule
 
-- [ ] **Quand le warning du garde-fou s'est tu sur tout le trafic** (tests + prod, `auth` compris) — donc plus aucune écriture ne passe hors command handler : remplacer le commit de fin de `db_conn_sync` par un rollback. Petit changement en un point ; la complétude est alors vérifiée par la donnée, pas crue.
+- [x] **Bascule faite, validée par les tests (pas par l'attente d'un silence prod).** Le commit de fin de `db_conn_sync` est remplacé par un `rollback`. La complétude est vérifiée par la donnée : avec le filet retiré, une écriture qui n'aurait pas committé via un command handler est annulée → son test de persistance échoue. Un fixture autouse (`tests/integration/interfaces/conftest.py`) transforme en outre le warning du garde-fou en échec de test, verrouillant l'invariant « toute écriture API commit avant la réponse » pour les endpoints exercés (y compris futurs). Suite complète verte après bascule (2782).
+
+  Ajustements vs le plan initial :
+  - **`auth`** ne prend aucune connexion DB (login = vérif mot de passe + cookie, logout = cookie) → aucun DML, hors sujet pour la bascule.
+  - **Le garde-fou DML est conservé** (et non retiré) : une fois le commit de fin devenu rollback, il cesse d'être une instrumentation de migration pour devenir un **détecteur permanent de perte de données** (DML atteignant le teardown sans commit = bug → annulé + signalé). Le fixture de test s'appuie dessus ; le retirer aurait supprimé ce filet alors que tous les endpoints n'ont pas un test de readback.
+  - Découverte au passage : `setup_logger` (`dictConfig`) **désactive** les loggers existants, donc le warning prod du garde-fou était de fait muselé — raison de plus de s'appuyer sur la validation par les tests plutôt que sur l'observation des logs prod. Le fixture réactive le logger le temps du test.
 
 ## Questions ouvertes
 
