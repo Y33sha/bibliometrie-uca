@@ -22,12 +22,18 @@
 - Pour les décisions structurantes (impact sur le schéma de données ou la logique du pipeline), toujours attendre la décision de l'utilisatrice avant de commencer à coder.
 - Ne pas faire tourner la suite pytest plusieurs fois juste pour récupérer le résumé. Si c'est vert la première fois, c'est bon. Si tu veux le résumé, débrouille-toi pour le récupérer du premier coup, au lieu de tronquer l'output sans nécessité.
 
+### Workflow
+
+- Gérer les commits git. Faire un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase)
+- Utiliser des commandes qui génèrent le moins possible de demandes d'autorisation: éviter si possible les commandes chaînées, les commandes multiples enchaînées avec `&&`, les commandes superflues (`cd ... &&` lorsque tu te trouves déjà dans le bon répertoire), l'usage du PowerShell sous Windows...
+
 ## Conventions du projet
 
+- Nom de la base: `bibliometrie`
 - Dépendances et contrats d'import: `pyproject.toml`
 - Pre-commit hooks: `.pre-commit-config.yaml`
 - Documentation du projet: `/docs/`
-- Chantiers en cours: `/docs/chantiers/`; chantiers archivés dans `/docs/chantiers/archived`.
+- Chantiers en cours: `/docs/chantiers/`; chantiers archivés dans `/docs/chantiers/archived`. Structure: Contexte / Décisions / Phasage / Questions ouvertes. Phasage = sous-titres par phase et listes d'items à cocher.
 - Architecture en couches DDD : `domain/` (règles et value objects, zéro I/O), `application/` (orchestrateurs métier, incluant `application/pipeline/`), `infrastructure/` (adapters SQL, APIs sources, settings), `interfaces/` (adapters entrants : `interfaces/api/` pour FastAPI, `interfaces/frontend/` pour SvelteKit, `interfaces/cli/` pour les scripts). Entry points CLI : `run_pipeline.py` à la racine.
 - Frontend : SvelteKit (Svelte 5), routes dans `interfaces/frontend/src/routes/`
 - Pipeline : phases dans `application/pipeline/`, extracteurs dans `infrastructure/sources/`, orchestrateur `run_pipeline.py` à la racine

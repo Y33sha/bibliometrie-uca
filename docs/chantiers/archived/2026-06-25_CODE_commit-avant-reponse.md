@@ -1,6 +1,6 @@
 # Chantier — Écritures API : frontière transactionnelle (commit avant réponse)
 
-Commencé le 2026-06-24
+Commencé le 2026-06-24 - Terminé le 2026-06-25
 
 ## Contexte
 
@@ -74,6 +74,4 @@ Surface : ~36 endpoints d'écriture (POST/PUT/PATCH/DELETE) sur 11 routers (publ
 
 ## Questions ouvertes
 
-- **Placement de la validation HTTP** (404/400 : ressource inexistante, code pays inconnu). Reste-t-elle dans le routeur (garde-fou transport) ou descend-elle dans le command handler via des erreurs domaine mappées en HTTP ? Le minimum est que le **commit** descende ; la validation peut rester au routeur — sûr grâce à l'atomicité du statement d'écriture (Décision 6), pas à une absence de TOCTOU.
-- **Découpage transaction vs tâche de fond pour les autres écritures** que la propagation des pays (tranchée : BG). À décider au cas par cas en migrant chaque router.
 - **Quand réifier le UoW en objet** (Décision 2) : au premier besoin de **composition transactionnelle** (un command handler qui en compose un autre, ou deux intentions en une transaction), pas sur un critère de verbosité du câblage.
