@@ -5,7 +5,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application import publishers_commands as publisher_commands
 from application.ports.api.publishers_queries import (
     PublisherDashboardResponse,
     PublisherDetailResponse,
@@ -19,6 +18,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
+from application.publishers import commands as publisher_commands
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
     audit_repo_sync,

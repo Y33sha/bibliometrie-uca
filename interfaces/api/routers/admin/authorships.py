@@ -7,15 +7,9 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import Connection
 
-from application.authorships.assign_orphans import (
-    assign_orphan_authorship as _assign_orphan,
-    batch_assign_orphan_authorships as _batch_assign_orphan,
-)
-from application.authorships.core import (
-    exclude_authorship,
-)
-from application.persons import create_person as _create_person
+from application.authorships import commands as authorship_commands
 from application.ports.api.persons_queries import (
     OrphanAuthorshipsResponse,
     OrphanCountResponse,
@@ -28,6 +22,7 @@ from domain.sources.registry import ALL_SOURCES_SET
 from interfaces.api.deps import (
     audit_repo_sync,
     authorship_repo_sync,
+    db_conn_sync,
     person_repo_sync,
     persons_queries_sync,
 )
@@ -49,6 +44,7 @@ logger = logging.getLogger(__name__)
 @router.patch("/api/authorships/{authorship_id}/exclude", response_model=AuthorshipExcludeResponse)
 def exclude_authorship_endpoint(
     authorship_id: int,
+    conn: Connection = Depends(db_conn_sync),
     repo: AuthorshipRepository = Depends(authorship_repo_sync),
     person_repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
@@ -59,7 +55,9 @@ def exclude_authorship_endpoint(
     détache les sources et supprime la row consolidée ; le rebuild ne la
     recrée pas. Action à sens unique.
     """
-    exclude_authorship(authorship_id, repo=repo, person_repo=person_repo, audit_repo=audit)
+    authorship_commands.exclude_authorship(
+        conn, authorship_id, repo=repo, person_repo=person_repo, audit_repo=audit
+    )
     return AuthorshipExcludeResponse(ok=True)
 
 
@@ -88,6 +86,7 @@ def list_orphan_authorships(
 @router.post("/api/admin/orphan-authorships/assign", response_model=OrphanAssignResponse)
 def assign_orphan_authorship_endpoint(
     body: AssignOrphanAuthorship,
+    conn: Connection = Depends(db_conn_sync),
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     authorship_repo: AuthorshipRepository = Depends(authorship_repo_sync),
@@ -101,21 +100,24 @@ def assign_orphan_authorship_endpoint(
     if body.source not in ALL_SOURCES_SET:
         raise HTTPException(status_code=400, detail=f"Source inconnue: {body.source}")
 
-    person_id = body.person_id
+    new_person: tuple[str, str] | None = None
     if body.create_person:
         ln = body.create_person.last_name.strip()
         fn = body.create_person.first_name.strip()
         if not ln:
             raise HTTPException(status_code=400, detail="Nom requis")
-        person_id = _create_person(ln, fn, repo=repo)
-    elif not person_id:
+        new_person = (ln, fn)
+    elif not body.person_id:
         raise HTTPException(status_code=400, detail="person_id ou create_person requis")
-    if not queries.person_exists(person_id):
+    elif not queries.person_exists(body.person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
-    _assign_orphan(
-        person_id,
+
+    person_id = authorship_commands.assign_orphan_authorship(
+        conn,
         body.source,
         body.authorship_id,
+        person_id=body.person_id,
+        new_person=new_person,
         repo=repo,
         authorship_repo=authorship_repo,
         audit_repo=audit,
@@ -127,6 +129,7 @@ def assign_orphan_authorship_endpoint(
 @router.post("/api/admin/orphan-authorships/batch-assign", response_model=OrphanBatchAssignResponse)
 def batch_assign_orphan_authorships(
     body: BatchAssignOrphanAuthorships,
+    conn: Connection = Depends(db_conn_sync),
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     authorship_repo: AuthorshipRepository = Depends(authorship_repo_sync),
@@ -144,7 +147,8 @@ def batch_assign_orphan_authorships(
 
     if not queries.person_exists(person_id):
         raise HTTPException(status_code=404, detail="Personne introuvable")
-    assigned = _batch_assign_orphan(
+    assigned = authorship_commands.batch_assign_orphan_authorships(
+        conn,
         person_id,
         sa_ids,
         repo=repo,

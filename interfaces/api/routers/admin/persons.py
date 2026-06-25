@@ -9,17 +9,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection, text
 
-from application.persons import (
-    add_identifier as _add_identifier,
-    detach_authorships as _detach_authorships_service,
-    merge_person as _merge_person,
-    reassign_identifier as _reassign_identifier,
-    remove_identifier as _remove_identifier,
-    set_rejected as _set_rejected,
-    update_identifier_status as _update_identifier_status,
-    update_name as _update_name,
-    update_name_form_status as _update_name_form_status,
-)
+from application.persons import commands as person_commands
 from application.ports.api.persons_queries import (
     AmbiguousNameFormsResponse,
     NameFormAuthorshipsResponse,
@@ -118,7 +108,9 @@ def add_person_identifier(
             )
         was_reassigned = True
 
-    _add_identifier(person_id, data.id_type, id_value, source="manual", repo=repo)
+    person_commands.add_identifier(
+        conn, person_id, data.id_type, id_value, source="manual", repo=repo
+    )
     return AddIdentifierResponse(
         added=True,
         id_type=data.id_type,
@@ -135,11 +127,14 @@ def remove_person_identifier(
     person_id: int,
     id_type: str,
     id_value: str,
+    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> RemovedResponse:
     """Supprime un identifiant d'une personne."""
-    _remove_identifier(person_id, id_type, id_value, repo=repo, audit_repo=audit)
+    person_commands.remove_identifier(
+        conn, person_id, id_type, id_value, repo=repo, audit_repo=audit
+    )
     return RemovedResponse()
 
 
@@ -147,11 +142,14 @@ def remove_person_identifier(
 def update_identifier_status(
     ident_id: int,
     body: UpdateIdentifierStatus,
+    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> IdentifierStatusResponse:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected)."""
-    row = _update_identifier_status(ident_id, body.status, repo=repo, audit_repo=audit)
+    row = person_commands.update_identifier_status(
+        conn, ident_id, body.status, repo=repo, audit_repo=audit
+    )
     return IdentifierStatusResponse(id=row["id"], status=row["status"])
 
 
@@ -161,6 +159,7 @@ def update_identifier_status(
 def reassign_identifier(
     ident_id: int,
     body: ReassignIdentifier,
+    conn: Connection = Depends(db_conn_sync),
     queries: PersonsQueries = Depends(persons_queries_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
@@ -168,7 +167,7 @@ def reassign_identifier(
     """Réattribue un identifiant rejeté à une autre personne (status → pending)."""
     if not queries.person_exists(body.person_id):
         raise HTTPException(status_code=404, detail="Personne cible introuvable")
-    _reassign_identifier(ident_id, body.person_id, repo=repo, audit_repo=audit)
+    person_commands.reassign_identifier(conn, ident_id, body.person_id, repo=repo, audit_repo=audit)
     return IdentifierReassignResponse(id=ident_id, person_id=body.person_id, status="pending")
 
 
@@ -179,11 +178,12 @@ def reassign_identifier(
 def reject_person(
     person_id: int,
     body: RejectPerson,
+    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> OkResponse:
     """Marque/démarque une personne comme rejetée."""
-    _set_rejected(person_id, body.rejected, repo=repo, audit_repo=audit)
+    person_commands.set_rejected(conn, person_id, body.rejected, repo=repo, audit_repo=audit)
     return OkResponse()
 
 
@@ -191,6 +191,7 @@ def reject_person(
 def update_person_name(
     person_id: int,
     body: UpdatePersonName,
+    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
 ) -> OkResponse:
     """Modifie le nom/prénom d'une personne."""
@@ -198,7 +199,7 @@ def update_person_name(
     first_name = body.first_name.strip()
     if not last_name:
         raise HTTPException(status_code=400, detail="Le nom est requis")
-    _update_name(person_id, last_name, first_name, repo=repo)
+    person_commands.update_name(conn, person_id, last_name, first_name, repo=repo)
     return OkResponse()
 
 
@@ -225,7 +226,7 @@ def merge_persons(
     if source_id not in found:
         raise HTTPException(status_code=404, detail="Personne source introuvable")
 
-    _merge_person(person_id, source_id, repo=repo, audit_repo=audit)
+    person_commands.merge_person(conn, person_id, source_id, repo=repo, audit_repo=audit)
     return MergeResponse(merged=True, source_id=source_id, target_id=person_id)
 
 
@@ -295,6 +296,7 @@ def persons_sharing_name_form(
 def detach_authorships(
     person_id: int,
     body: DetachAuthorships,
+    conn: Connection = Depends(db_conn_sync),
     person_repo_: PersonRepository = Depends(person_repo_sync),
     auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
@@ -302,11 +304,10 @@ def detach_authorships(
     """Rejette durablement les paires (publication, personne) des authorships
     sources sélectionnées et nettoie les formes de noms."""
     return DetachAuthorshipsResponse.model_validate(
-        _detach_authorships_service(
+        person_commands.detach_authorships(
+            conn,
             person_id,
-            authorships=[
-                {"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships
-            ],
+            [{"source": a.source, "authorship_id": a.authorship_id} for a in body.authorships],
             repo=person_repo_,
             authorship_repo=auth_repo,
             audit_repo=audit,
@@ -318,6 +319,7 @@ def detach_authorships(
 def update_name_form_status(
     person_id: int,
     body: UpdateNameFormStatus,
+    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     auth_repo: AuthorshipRepository = Depends(authorship_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
@@ -327,7 +329,8 @@ def update_name_form_status(
     `rejected` pose le verrou de non-retour ET détache les signatures portant la forme
     (null des source_authorships + suppression des authorships canoniques orphelines) ;
     `confirmed` valide le lien et corrobore les matchs par identifiant sans test de nom."""
-    row = _update_name_form_status(
+    row = person_commands.update_name_form_status(
+        conn,
         person_id,
         body.name_form,
         body.status,

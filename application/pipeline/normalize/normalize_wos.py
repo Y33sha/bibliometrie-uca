@@ -24,7 +24,7 @@ from collections.abc import Callable
 
 from sqlalchemy import Connection
 
-from application.journals import find_or_create_journal
+from application.journals.core import find_or_create_journal
 from application.pipeline.normalize._authorships_batch import (
     AddressRecord,
     AuthorRecord,
@@ -37,7 +37,7 @@ from application.ports.pipeline.staging import StagingQueries, StagingRow
 from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publication_repository import PublicationRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
-from application.publishers import find_or_create_publisher
+from application.publishers.core import find_or_create_publisher
 from domain.persons.identifiers import (
     compact_identifiers,
     mark_shared_identifiers_dubious,

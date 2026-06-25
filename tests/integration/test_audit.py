@@ -126,7 +126,7 @@ class TestEndToEndServiceIntegration:
         ).scalar_one()
 
     def test_set_rejected_emits_event(self, sa_sync_conn):
-        from application.persons import set_rejected
+        from application.persons.core import set_rejected
         from infrastructure.repositories import person_repository
 
         person_id = self._create_person(sa_sync_conn)
@@ -155,7 +155,7 @@ class TestEndToEndServiceIntegration:
     def test_set_rejected_without_context_no_event(self, sa_sync_conn):
         """Confirme que hors contexte (pipeline, script), rien n'est audité
         même quand un service destructif est appelé."""
-        from application.persons import set_rejected
+        from application.persons.core import set_rejected
         from infrastructure.repositories import person_repository
 
         person_id = self._create_person(sa_sync_conn)
@@ -172,7 +172,7 @@ class TestEndToEndServiceIntegration:
     def test_mark_distinct_emits_only_on_actual_insert(self, sa_sync_conn):
         """mark_distinct est idempotent : un appel sur une paire déjà
         marquée ne doit pas générer d'événement supplémentaire."""
-        from application.persons import mark_distinct
+        from application.persons.core import mark_distinct
         from infrastructure.repositories import person_repository
 
         def _mk(last):

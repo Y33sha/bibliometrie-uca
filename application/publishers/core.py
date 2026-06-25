@@ -1,7 +1,7 @@
 """
 Service Éditeurs — accès exclusif en écriture à la table `publishers`.
 
-Séparé de `application/journals.py` (principe SRP) : publishers et journals sont deux agrégats distincts, servis par deux ports distincts (`PublisherRepository`, `JournalRepository`). Un caller qui ne touche qu'aux éditeurs (ex. `update_publisher` d'un router admin) n'a pas à charger la surface journaux.
+Séparé de `application/journals/core.py` (principe SRP) : publishers et journals sont deux agrégats distincts, servis par deux ports distincts (`PublisherRepository`, `JournalRepository`). Un caller qui ne touche qu'aux éditeurs (ex. `update_publisher` d'un router admin) n'a pas à charger la surface journaux.
 
 La fusion d'éditeurs (`merge_publishers`) reste ici parce que sémantiquement c'est une opération sur l'agrégat Publisher ; elle a besoin du port `JournalRepository` en complément pour détecter les journaux à conflit entre les deux éditeurs à fusionner avant de déléguer les transferts SQL.
 """
@@ -12,7 +12,7 @@ from typing import cast
 from sqlalchemy import Connection
 
 from application.audit import emit_event
-from application.journals import merge_journals
+from application.journals.core import merge_journals
 from application.ports.pipeline.metadata_correction import MetadataCorrectionQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository

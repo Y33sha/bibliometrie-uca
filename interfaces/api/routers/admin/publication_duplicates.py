@@ -11,11 +11,7 @@ from application.ports.api.publication_duplicates_queries import (
 )
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.publications import (
-    mark_distinct as _mark_pubs_distinct,
-    merge_publications,
-    refresh_from_sources,
-)
+from application.publications import commands as publication_commands
 from interfaces.api.deps import (
     audit_repo_sync,
     db_conn_sync,
@@ -68,9 +64,10 @@ def merge_duplicate_publications(
     un run du pipeline.
 
     Authorships, sources, adresses et métadonnées sont transférés vers la cible ;
-    la source est supprimée. Encadrée par un SAVEPOINT : un échec rollback la
-    fusion sans impacter la transaction englobante. 400 si les ids sont égaux,
-    404 si une des publications est introuvable.
+    la source est supprimée. Fusion + refresh forment une unité transactionnelle
+    (command handler) : un échec est mappé en 500 et la transaction est annulée
+    sans état partiel. 400 si les ids sont égaux, 404 si une des publications est
+    introuvable.
     """
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
@@ -81,13 +78,13 @@ def merge_duplicate_publications(
 
     target_id, source_id = sorted((body.pub_id_a, body.pub_id_b))
 
-    savepoint = conn.begin_nested()
     try:
-        merge_publications(target_id, source_id, repo=repo, audit_repo=audit)
-        refresh_from_sources(target_id, repo=repo, audit_repo=audit)
-        savepoint.commit()
+        publication_commands.merge_publications(
+            conn, target_id, source_id, repo=repo, audit_repo=audit
+        )
     except Exception as e:
-        savepoint.rollback()
+        # Le command handler n'a pas committé ; db_conn_sync rollback sur l'exception
+        # propagée. On mappe en 500 sans exposer un état partiel.
         raise HTTPException(status_code=500, detail=f"Échec de la fusion : {e}") from e
 
     return PubMergeResponse(ok=True, target_id=target_id, source_id=source_id)
@@ -96,6 +93,7 @@ def merge_duplicate_publications(
 @router.post("/api/admin/duplicates/mark-distinct", response_model=OkResponse)
 def mark_publications_distinct(
     body: MarkDistinctPublications,
+    conn: Connection = Depends(db_conn_sync),
     repo: PublicationRepository = Depends(publication_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> OkResponse:
@@ -107,5 +105,7 @@ def mark_publications_distinct(
     """
     if body.pub_id_a == body.pub_id_b:
         raise HTTPException(status_code=400, detail="pub_id_a et pub_id_b doivent être différents")
-    _mark_pubs_distinct(body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit)
+    publication_commands.mark_distinct(
+        conn, body.pub_id_a, body.pub_id_b, repo=repo, audit_repo=audit
+    )
     return OkResponse()

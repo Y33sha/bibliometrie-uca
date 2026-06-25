@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour services/publications.py.
+"""Tests de caractérisation pour application/publications/core.py.
 
 Couvre `find_by_doi` (guards + happy path) et merge_publications.
 """
@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from application.publications import (
+from application.publications.core import (
     find_by_doi,
     mark_distinct,
     merge_publications,

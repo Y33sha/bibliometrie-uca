@@ -22,7 +22,7 @@ from collections import Counter
 import requests
 from sqlalchemy import Connection
 
-from application.journals import update_journal_apc
+from application.journals.core import update_journal_apc
 from application.ports.pipeline.enrich import EnrichQueries
 from application.ports.repositories.journal_repository import (
     JournalRepository,

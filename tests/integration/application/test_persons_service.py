@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour application/persons.py et
+"""Tests de caractérisation pour application/persons/core.py et
 application/authorships/assign_orphans.py.
 
 Couvre link/unlink_authorship (branches source invalide), add_identifier,
@@ -16,7 +16,7 @@ from application.authorships.assign_orphans import (
     assign_orphan_authorship,
     batch_assign_orphan_authorships,
 )
-from application.persons import (
+from application.persons.core import (
     add_identifier,
     add_identifiers_from_authorships,
     create_person,

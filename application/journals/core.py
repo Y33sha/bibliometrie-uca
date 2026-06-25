@@ -1,7 +1,7 @@
 """
 Service Journaux — accès exclusif en écriture à la table `journals`.
 
-Les opérations sur l'agrégat Publisher vivent dans `application/publishers.py` (principe SRP). Les deux agrégats restent liés par `journals.publisher_id` (FK) mais sont manipulés par des services distincts, chacun sur son propre port.
+Les opérations sur l'agrégat Publisher vivent dans `application/publishers/core.py` (principe SRP). Les deux agrégats restent liés par `journals.publisher_id` (FK) mais sont manipulés par des services distincts, chacun sur son propre port.
 
 Les routers FastAPI utilisent les mêmes repos que le pipeline (routes `def` exécutées dans le threadpool Starlette).
 """
@@ -16,7 +16,7 @@ from application.ports.pipeline.metadata_correction import MetadataCorrectionQue
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.journal_repository import JournalRepository, JournalUpdateFields
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.publications import refresh_from_sources
+from application.publications.core import refresh_from_sources
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.types import JsonValue

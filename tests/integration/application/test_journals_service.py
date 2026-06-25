@@ -1,5 +1,5 @@
-"""Tests de caractérisation pour application/journals.py et
-application/publishers.py.
+"""Tests de caractérisation pour application/journals/core.py et
+application/publishers/core.py.
 
 Couvre les fonctions sync (find_or_create_*, update_journal_apc — utilisées
 par le pipeline) et les fonctions async (update_journal, update_publisher,
@@ -9,14 +9,14 @@ merge_*).
 import pytest
 from sqlalchemy import text
 
-from application.journals import (
+from application.journals.core import (
     find_or_create_journal,
     merge_journals,
     requalify_publications_for_journal,
     update_journal,
     update_journal_apc,
 )
-from application.publishers import (
+from application.publishers.core import (
     find_or_create_publisher,
     merge_publishers,
     update_publisher,
