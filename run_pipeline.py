@@ -217,7 +217,7 @@ def phase_cross_imports(
     return metrics
 
 
-def phase_refresh_stale(sources: Any = None, **kw: Any) -> PhaseMetrics:
+def phase_refresh_stale(sources: Any = None, include_wos: bool = False, **kw: Any) -> PhaseMetrics:
     """Rafraîchit les rows à `last_seen_at` ancien et marque les disparues.
 
     Tourne à **chaque run** : le seuil `STALE_REFRESH_AFTER_DAYS` étale la
@@ -227,7 +227,8 @@ def phase_refresh_stale(sources: Any = None, **kw: Any) -> PhaseMetrics:
     refetch des DOI stale → trouvé : bump `last_seen_at` + refresh `raw_data` ;
     404 confirmé : `disappeared_at`. Puis marque disparues les rows stale
     **sans DOI** (non refetchables, mais re-moissonnées par le bulk → rester
-    stale signifie disparu).
+    stale signifie disparu). WoS est opt-in (`--include-wos`) : exclu par
+    défaut, comme `extract` et `cross_imports`.
 
     Conservateur : on **marque seulement** (`disappeared_at`), aucun effet
     aval. Placée après `cross_imports` (qui a fini de peupler `staging` et
@@ -237,7 +238,11 @@ def phase_refresh_stale(sources: Any = None, **kw: Any) -> PhaseMetrics:
     from infrastructure.sources.common import mark_undiscoverable_stale_disappeared
 
     metrics = PhaseMetrics()
-    targets = [t for t in DOI_SEARCHABLE_SOURCES if not sources or t in sources]
+    allowed = set(DOI_SEARCHABLE_SOURCES)
+    if not include_wos:
+        allowed -= {"wos"}
+    effective = (set(sources) if sources else allowed) & allowed
+    targets = [t for t in DOI_SEARCHABLE_SOURCES if t in effective]
     for target in targets:
         metrics.merge(_run_refresh_stale_doi(target))
 
@@ -1467,6 +1472,11 @@ def _run_refresh_stale_doi(target: str) -> PhaseMetrics:
     """Refetch des DOI stale d'une source : trouvé → bump, 404 → disappeared_at."""
     from application.pipeline.extract.fetch_missing_doi import run_async
     from infrastructure.db.engine import get_sync_engine
+    from infrastructure.sources.circuit_breaker import (
+        SourceCircuitBreaker,
+        reset_current_breaker,
+        set_current_breaker,
+    )
     from infrastructure.sources.common import get_stale_dois, set_disappeared_by_doi
 
     adapter = _make_fetch_missing_doi_adapter(target)
@@ -1478,6 +1488,12 @@ def _run_refresh_stale_doi(target: str) -> PhaseMetrics:
     log.info("▶ refresh_stale --target %s", target)
     t0 = time.time()
     conn = get_sync_engine().connect()
+    # Circuit-breaker par source (cf. `_run_fetch_missing_doi`) : coupe le refetch
+    # d'une source à bout de budget (429 répétés) au lieu de la marteler. La
+    # ContextVar est posée ici, le helper HTTP infra la lit, run_async ne consulte
+    # que `breaker.tripped`.
+    breaker = SourceCircuitBreaker(target)
+    token = set_current_breaker(breaker)
     try:
         metrics = asyncio.run(
             run_async(
@@ -1486,9 +1502,11 @@ def _run_refresh_stale_doi(target: str) -> PhaseMetrics:
                 log,
                 cross_import_dois_reader=get_stale_dois,
                 marker_handler=_mark_disappeared,
+                breaker=breaker,
             )
         )
     finally:
+        reset_current_breaker(token)
         conn.close()
     log.info(
         "✓ refresh_stale (%s) terminé en %.1fs — %s",
