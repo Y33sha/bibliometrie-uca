@@ -64,8 +64,8 @@ Les dépendances input → output sont statiques et connues. La colonne vertébr
 
 ### Phase C — Lecture : rendement et durée
 
-- [ ] Calcul à la lecture du rendement (sortie / entrée) et de l'écart de durée au médian historique de la même phase. Affichage seul, sans seuil ni drapeau.
-- [ ] Tests unit sur le calcul du rendement et du médian (sans base).
+- [x] Calcul à la lecture du rendement (sortie / entrée) et de l'écart de durée au médian historique de la même phase (`application/observability/read.py`). Affichage seul, sans seuil ni drapeau. Le rendement rapporte la table principale produite à la table principale consommée (premières entrées `produces`/`consumes` du graphe).
+- [x] Tests unit sur le calcul du rendement et du médian (sans base).
 
 ### Phase D — API
 
