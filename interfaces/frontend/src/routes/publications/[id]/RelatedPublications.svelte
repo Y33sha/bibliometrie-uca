@@ -2,6 +2,7 @@
   import { base } from "$app/paths";
   import SectionLabel from "./SectionLabel.svelte";
   import { docTypeSingular, relationTypeLabel } from "$lib/labels";
+  import { sanitizeTitle } from "$lib/utils";
   import type { RelatedPublication } from "./types";
 
   let { relations }: { relations: RelatedPublication[] } = $props();
@@ -35,7 +36,7 @@
           {#each items as r (r.relation_type + r.doi)}
             <li>
               {#if r.publication_id}
-                <a href="{base}/publications/{r.publication_id}">{r.title ?? r.doi}</a>
+                <a href="{base}/publications/{r.publication_id}">{@html sanitizeTitle(r.title ?? r.doi)}</a>
                 <span class="meta">
                   {#if r.pub_year}{r.pub_year}{/if}{#if r.pub_year && r.doc_type} · {/if}{docTypeLabel(r.doc_type)}
                 </span>
