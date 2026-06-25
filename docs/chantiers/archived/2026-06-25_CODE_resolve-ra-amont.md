@@ -1,6 +1,6 @@
 # Chantier — Résolution de la RA en amont de cross_imports
 
-Commencé le 2026-06-25.
+Commencé et terminé le 2026-06-25.
 
 ## Contexte
 
@@ -36,7 +36,7 @@ Deux causes structurelles :
 ### Phase 2 — Scission `resolve_ra` / volet publisher
 
 - [x] Migration Alembic `f2d9b6a4c1e8` : colonne `doi_prefixes.publisher_checked_at` (marqueur « `/prefixes` déjà tenté »), backfill `= fetched_at` sur le backlog (337 rows terminales → le volet les ignore). Colonne + index `idx_doi_prefixes_publisher_pending` ajoutés à `infrastructure/db/tables.py`.
-- [ ] Régénérer le snapshot `infrastructure/db/schema.sql` (après `alembic upgrade head`).
+- [x] Régénérer le snapshot `infrastructure/db/schema.sql` (après `alembic upgrade head`).
 - [x] `run_resolve_ra` : résout la RA des préfixes non résolus du pool (`doi.org/ra`) et `insert_ra(prefix, ra)` (`unknown` si non classé). Sous circuit-breaker (s'arrête sur `breaker.tripped`).
 - [x] `run_resolve_publishers` : rows `publisher_id IS NULL ∧ publisher_checked_at IS NULL ∧ ra gérée` → `/prefixes` routé par RA (`unknown` → les deux + correction RA) → match/crée/attache, `mark_publisher_checked` quoi qu'il arrive (garde anti-réinterrogation). Sous circuit-breaker.
 - [x] Repo : `insert_ra`, `get_prefixes_pending_publisher`, `set_prefix_publisher_metadata`, `mark_publisher_checked` (remplacent `insert_doi_prefix` / `get_unmatched_prefixes`). Test unitaire réécrit (Fakes + passes séparées).
