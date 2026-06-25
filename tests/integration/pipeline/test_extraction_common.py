@@ -390,3 +390,40 @@ class TestDisappearedMarking:
             .all()
         )
         assert gone == ["W1"]
+
+
+class TestGetUnresolvedPrefixes:
+    """Régression : resolve tire ses préfixes de la vue `candidate_dois`, le même
+    pool que cross-import — donc aussi les cibles de relations et les arXiv-dérivés,
+    pas seulement staging + related_dois. L'ancienne requête ratait ces préfixes,
+    laissant leur RA jamais résolue et cross-import en best-effort sur les deux RA."""
+
+    def test_pool_covers_relation_and_arxiv_prefixes(self, sa_sync_conn):
+        from infrastructure.repositories.doi_prefix_repository import PgDoiPrefixRepository
+
+        # Préfixe vu UNIQUEMENT via publication_relations.target_doi.
+        sa_sync_conn.execute(
+            text("INSERT INTO publications (id, title, pub_year) VALUES (1, 'P', 2020)")
+        )
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO publication_relations "
+                "(from_publication_id, relation_type, target_doi, source) "
+                "VALUES (1, 'is_preprint_of', '10.77777/rel', 'crossref')"
+            )
+        )
+        # Préfixe vu UNIQUEMENT via un arxiv_id (DOI DataCite dérivé).
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO source_publications (source, source_id, title, external_ids) "
+                "VALUES ('openalex', 'W1', 'T', '{\"arxiv_id\": \"2605.02321\"}')"
+            )
+        )
+
+        prefixes = dict(
+            PgDoiPrefixRepository(sa_sync_conn).get_unresolved_prefixes_with_samples(
+                n_samples_per_prefix=3
+            )
+        )
+        assert "10.77777" in prefixes  # cible de relation
+        assert "10.48550" in prefixes  # arxiv-dérivé

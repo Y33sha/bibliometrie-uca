@@ -17,18 +17,12 @@ class PgDoiPrefixRepository:
     def get_unresolved_prefixes_with_samples(
         self, *, n_samples_per_prefix: int
     ) -> list[tuple[str, list[str]]]:
-        """Renvoie `[(prefix, [doi1, doi2, ...]), ...]` pour chaque préfixe DOI absent de `doi_prefixes`. Les DOI proviennent de `staging.doi` (primaire) **et** de `source_publications.external_ids.related_dois` (DOI secondaires : preprint, dépôt, édition). Au plus `n_samples_per_prefix` DOIs par préfixe, ordonnés par longueur croissante pour minimiser la complexité d'encodage URL côté client doi.org/ra."""
+        """Renvoie `[(prefix, [doi1, doi2, ...]), ...]` pour chaque préfixe DOI absent de `doi_prefixes`. Les DOI proviennent de la vue `candidate_dois` — le même pool que le cross-import par DOI (staging, related_dois, cibles de relations, arXiv-dérivés), pour que tout préfixe interrogé par cross-import soit résolu ici. Au plus `n_samples_per_prefix` DOIs par préfixe, ordonnés par longueur croissante pour minimiser la complexité d'encodage URL côté client doi.org/ra."""
         result = self._conn.execute(
             text(
                 """
                 WITH all_dois AS (
-                    SELECT doi FROM staging WHERE doi IS NOT NULL AND doi <> ''
-                    UNION
-                    SELECT d AS doi
-                    FROM source_publications
-                    CROSS JOIN LATERAL
-                        jsonb_array_elements_text(external_ids->'related_dois') AS d
-                    WHERE jsonb_typeof(external_ids->'related_dois') = 'array'
+                    SELECT doi FROM candidate_dois WHERE doi <> ''
                 ),
                 new_prefixes AS (
                     SELECT DISTINCT split_part(ad.doi, '/', 1) AS prefix
