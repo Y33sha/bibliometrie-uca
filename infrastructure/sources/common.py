@@ -322,41 +322,20 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
     join_clause = (
         "LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
-    # Pool de DOI candidats : primaires (staging.doi) + secondaires (related_dois
-    # des source_publications normalisés) + cibles des relations entre publications
-    # + DOI DataCite déduits des identifiants arXiv (préfixe `10.48550/arXiv.`).
-    # Partagé par les deux branches.
-    candidates_cte = """
-        WITH candidates AS (
-            SELECT s.doi
-            FROM staging s
-            WHERE s.source != {t} AND s.doi IS NOT NULL
-            UNION
-            SELECT d AS doi
-            FROM source_publications sp
-            CROSS JOIN LATERAL
-                jsonb_array_elements_text(sp.external_ids->'related_dois') AS d
-            WHERE sp.source != {t}
-              AND jsonb_typeof(sp.external_ids->'related_dois') = 'array'
-            UNION
-            SELECT pr.target_doi AS doi
-            FROM publication_relations pr
-            UNION
-            SELECT '10.48550/arxiv.' || lower(sp.external_ids->>'arxiv_id') AS doi
-            FROM source_publications sp
-            WHERE sp.source != {t}
-              AND sp.external_ids->>'arxiv_id' IS NOT NULL
-        )
-    """
-
+    # Pool de DOI candidats centralisé dans la vue `candidate_dois` : staging +
+    # related_dois + cibles de relations (source NULL) + arXiv-dérivés. La même
+    # vue alimente la résolution de RA des préfixes — tout DOI interrogé ici a donc
+    # son préfixe résolu en amont. L'exclusion du target se fait via
+    # `source IS DISTINCT FROM` (les relations à source NULL restent candidates
+    # pour toutes les cibles) et le `NOT IN (staging du target)` final.
     if isinstance(conn, Connection):
         prefix_filter = " AND (dp.ra = :target_ra OR dp.ra IS NULL)" if target_ra else ""
         query = f"""
-            {candidates_cte.format(t=":target")}
             SELECT DISTINCT c.doi
-            FROM candidates c
+            FROM candidate_dois c
             {join_clause}
-            WHERE c.doi NOT IN (
+            WHERE c.source IS DISTINCT FROM :target
+              AND c.doi NOT IN (
                       SELECT doi FROM staging WHERE source = :target AND doi IS NOT NULL
                   ){prefix_filter}
               AND NOT EXISTS (
@@ -377,11 +356,11 @@ def get_cross_import_dois(conn: Connection, target: str) -> list[str]:
 
     pg_prefix_filter = " AND (dp.ra = %(target_ra)s OR dp.ra IS NULL)" if target_ra else ""
     query_pg = f"""
-        {candidates_cte.format(t="%(target)s")}
         SELECT DISTINCT c.doi
-        FROM candidates c
+        FROM candidate_dois c
         {join_clause}
-        WHERE c.doi NOT IN (
+        WHERE c.source IS DISTINCT FROM %(target)s
+          AND c.doi NOT IN (
                   SELECT doi FROM staging WHERE source = %(target)s AND doi IS NOT NULL
               ){pg_prefix_filter}
           AND NOT EXISTS (
