@@ -37,7 +37,7 @@ class FakeDoiPrefixRepo:
 
     unresolved: list[tuple[str, list[str]]] = field(default_factory=list)
     rows: dict[str, _Row] = field(default_factory=dict)
-    ra_counts: dict[str, int] = field(default_factory=dict)
+    ra_breakdown: list[tuple[str, int, int]] = field(default_factory=list)
 
     def get_unresolved_prefixes_with_samples(
         self, *, n_samples_per_prefix: int
@@ -50,8 +50,8 @@ class FakeDoiPrefixRepo:
         self.rows[prefix] = _Row(prefix=prefix, ra=ra)
         return True
 
-    def count_dois_by_registration_agency(self) -> dict[str, int]:
-        return dict(self.ra_counts)
+    def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
+        return list(self.ra_breakdown)
 
     def get_prefixes_pending_publisher(self) -> list[PendingPublisherPrefix]:
         return [
@@ -180,17 +180,17 @@ def test_resolve_ra_inserts_ra_only():
 def test_resolve_ra_expose_la_repartition_par_ra():
     repo = FakeDoiPrefixRepo(
         unresolved=[("10.1038", ["10.1038/a"])],
-        ra_counts={"Crossref": 80, "DataCite": 15, "unknown": 5},
+        ra_breakdown=[("Crossref", 80, 12), ("DataCite", 15, 4), ("unknown", 5, 2)],
     )
     ra = StubResolveRa(answers={"10.1038/a": "Crossref"})
 
     metrics = _run_ra(repo, ra)
 
-    assert metrics.details["distributions"]["Registration Agency"] == {
-        "Crossref": 80,
-        "DataCite": 15,
-        "unknown": 5,
-    }
+    rows = metrics.details["ra_table"]["rows"]
+    # Le run a inséré le préfixe Crossref → +1 sur la ligne Crossref.
+    assert rows[0] == {"ra": "Crossref", "dois": 80, "prefixes": 12, "new": 1}
+    assert {r["ra"] for r in rows} == {"Crossref", "DataCite", "unknown"}
+    assert rows[1]["new"] == 0  # DataCite non touché ce run
 
 
 def test_resolve_ra_unknown_when_all_samples_fail():

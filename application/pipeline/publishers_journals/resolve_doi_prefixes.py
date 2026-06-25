@@ -61,6 +61,7 @@ def run_resolve_ra(
         metrics.add(total=len(prefixes))
         return metrics
 
+    new_by_ra: dict[str, int] = {}
     for prefix, samples in prefixes:
         if breaker is not None and breaker.tripped:
             log.warning("resolve_ra : circuit-breaker tripé, arrêt (doi.org indisponible)")
@@ -74,14 +75,19 @@ def run_resolve_ra(
             metrics.add(resolved=1)
         if repo.insert_ra(prefix=prefix, ra=ra):
             metrics.add(new=1)
+            new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
         log.info("  %s → %s", prefix, ra)
 
-    # Indicateur sur-mesure : répartition des DOI candidats par Registration Agency
-    # (Crossref / DataCite / unknown) après résolution. La part `unknown` inclut les
-    # préfixes que doi.org/ra ne classe pas et les préfixes malformés (DOI à scheme
-    # « doi: » non nettoyé), ce qui la rend lisible comme signal de qualité.
-    metrics.details["distributions"] = {
-        "Registration Agency": repo.count_dois_by_registration_agency()
+    # Indicateur sur-mesure : par Registration Agency (Crossref / DataCite / unknown),
+    # le nombre de DOI candidats et de préfixes (avec ce que le run vient d'ajouter).
+    # La part `unknown` inclut les préfixes que doi.org/ra ne classe pas et les préfixes
+    # malformés (DOI à scheme « doi: » non nettoyé), ce qui la rend lisible comme signal
+    # de qualité.
+    metrics.details["ra_table"] = {
+        "rows": [
+            {"ra": ra, "dois": dois, "prefixes": n_prefixes, "new": new_by_ra.get(ra, 0)}
+            for ra, dois, n_prefixes in repo.breakdown_by_registration_agency()
+        ]
     }
     return metrics
 

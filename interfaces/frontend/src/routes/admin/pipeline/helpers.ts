@@ -38,13 +38,3 @@ export function fmtDuration(s: number): string {
   return `${h} h ${m - h * 60} min`;
 }
 
-export function fmtRatio(v: number | null): string {
-  return v === null ? "—" : v.toFixed(2);
-}
-
-// Repère visuel : une phase nettement plus lente que son médian historique.
-export const SLOW_RATIO = 1.5;
-
-export function isSlow(ratio: number | null): boolean {
-  return ratio !== null && ratio >= SLOW_RATIO;
-}
