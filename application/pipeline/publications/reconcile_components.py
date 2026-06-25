@@ -25,7 +25,7 @@ from application.ports.pipeline.publications_reconciliation import (
 )
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.publication_repository import PublicationRepository
-from application.publications import refresh_from_sources
+from application.publications.core import refresh_from_sources
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.reconciliation import ReconcileMember, WorkGroup, plan_reconciliation
 from domain.source_publications.keys import project_confirmation_keys

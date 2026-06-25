@@ -13,7 +13,7 @@ import os
 
 from sqlalchemy import text
 
-from application.publications import refresh_from_sources
+from application.publications.core import refresh_from_sources
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import audit_repository, publication_repository

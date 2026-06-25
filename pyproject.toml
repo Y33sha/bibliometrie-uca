@@ -318,8 +318,9 @@ exclude = [
 #   `domain.sources.*`).
 # - `application.pipeline.subjects._common` : `_PushedOntology` interne au
 #   cache (dict mutable avec sets, difficile à typer).
-# - Services racine `application.{persons,structures}` : `list` / `dict` sans
-#   paramètres (records DB hydratés) — délégués à Phase 8 (`CODE_rich-domain-model`).
+# - Packages `application.{persons,structures}.*` (core + commands) : `list` /
+#   `dict` sans paramètres (records DB hydratés, propagés par les command
+#   handlers) — délégués à Phase 8 (`CODE_rich-domain-model`).
 # - `infrastructure.repositories.*` et `infrastructure.queries.*` :
 #   couche SQL — Row, records DB, batchs hétérogènes. Phase 8.
 # - `application.publishers_enrichment.*` : orchestrateurs d'enrichissement
@@ -337,8 +338,8 @@ exclude = [
 #   d'options hétérogènes — hors scope du chantier typage.
 [[tool.mypy.overrides]]
 module = [
-    "application.persons",
-    "application.structures",
+    "application.persons.*",
+    "application.structures.*",
     "application.pipeline.extract.*",
     "application.pipeline.normalize.*",
     "application.pipeline.oa_status.*",

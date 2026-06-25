@@ -178,6 +178,21 @@ class TestCreateStructure:
         assert body["code"] == code
         assert body["type"] == "labo"
 
+    def test_create_visible_immediately(self, auth_client):
+        # Régression (chantier commit-avant-réponse) : la structure écrite par le POST
+        # est commitée avant l'envoi de la réponse, donc lisible depuis une connexion
+        # indépendante. Garde-fou du passage final du teardown de db_conn_sync en
+        # rollback — un command handler sans `commit()` ferait alors échouer ce test.
+        code = _uniq("READBACK")
+        r = auth_client.post(
+            "/api/structures",
+            json={"code": code, "name": "Readback", "type": "labo"},
+        )
+        assert r.status_code == 200
+        with _pool() as cur:
+            cur.execute("SELECT id FROM structures WHERE code = %s", (code,))
+            assert cur.fetchone() is not None
+
 
 class TestUpdateStructure:
     def test_requires_admin(self, client):

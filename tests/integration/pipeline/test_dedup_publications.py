@@ -13,7 +13,7 @@ la vraie passe pipeline (`tests/integration/pipeline/test_reprocessing.py`).
 
 from sqlalchemy import text
 
-from application.publications import refresh_from_sources
+from application.publications.core import refresh_from_sources
 from domain.normalize import normalize_text
 from infrastructure.repositories import publication_repository
 

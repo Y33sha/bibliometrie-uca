@@ -59,7 +59,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection
 
-from application.persons import (
+from application.persons.core import (
     add_identifiers_from_authorships as add_identifiers,
     add_name_form,
     create_person,

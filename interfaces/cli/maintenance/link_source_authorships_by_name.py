@@ -49,7 +49,7 @@ import os
 
 from sqlalchemy import text
 
-from application.persons import add_identifiers_from_authorships
+from application.persons.core import add_identifiers_from_authorships
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import person_repository

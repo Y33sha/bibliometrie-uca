@@ -22,7 +22,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.persons import refresh_person_name_forms
+from application.persons.core import refresh_person_name_forms
 from domain.normalize import normalize_name
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.repositories import person_repository

@@ -6,8 +6,9 @@ Un `perimeter` (table `perimeters`) nomme un ensemble de structures racines (col
 import logging
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import Connection
 
-from application import config as config_service
+from application.perimeters import commands as perimeter_commands
 from application.ports.api.perimeters_queries import PerimeterOut, PerimetersAdminQueries
 from application.ports.config import ConfigStore
 from application.ports.repositories.audit_repository import AuditRepository
@@ -15,6 +16,7 @@ from application.ports.repositories.perimeter_repository import PerimeterReposit
 from interfaces.api.deps import (
     audit_repo_sync,
     config_store_sync,
+    db_conn_sync,
     perimeter_repo_sync,
     perimeters_admin_queries_sync,
 )
@@ -45,13 +47,15 @@ def list_perimeters(
 @router.post("/api/perimeters", response_model=CreatedIdResponse)
 def create_perimeter(
     body: PerimeterCreate,
+    conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> CreatedIdResponse:
     """Crée un nouveau périmètre."""
     code = body.code.strip()
     name = body.name.strip()
     description = (body.description or "").strip() or None
-    pid = config_service.create_perimeter(
+    pid = perimeter_commands.create_perimeter(
+        conn,
         code=code,
         name=name,
         description=description,
@@ -64,6 +68,7 @@ def create_perimeter(
 def update_perimeter(
     perimeter_id: int,
     body: PerimeterUpdate,
+    conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> OkResponse:
     """Met à jour un périmètre (nom, description, structures)."""
@@ -73,19 +78,22 @@ def update_perimeter(
         fields["name"] = fields["name"].strip()
     if "description" in fields and isinstance(fields["description"], str):
         fields["description"] = fields["description"].strip() or None
-    config_service.update_perimeter(perimeter_id, fields=fields, repo=repo)
+    perimeter_commands.update_perimeter(conn, perimeter_id, fields=fields, repo=repo)
     return OkResponse()
 
 
 @router.delete("/api/perimeters/{perimeter_id}", response_model=OkResponse)
 def delete_perimeter(
     perimeter_id: int,
+    conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
     config_repo: ConfigStore = Depends(config_store_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> OkResponse:
     """Supprime un périmètre (interdit si utilisé dans la config pipeline)."""
-    config_service.delete_perimeter(perimeter_id, repo=repo, config=config_repo, audit_repo=audit)
+    perimeter_commands.delete_perimeter(
+        conn, perimeter_id, repo=repo, config=config_repo, audit_repo=audit
+    )
     return OkResponse()
 
 
@@ -93,13 +101,16 @@ def delete_perimeter(
 def add_perimeter_structure(
     perimeter_id: int,
     body: AddPerimeterStructure,
+    conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> StatusResponse:
     """Ajoute une structure racine au périmètre.
 
     Renvoie `{"status": "added"}` ou `"already_present"` si la structure était déjà racine.
     """
-    status = config_service.add_perimeter_structure(perimeter_id, body.structure_id, repo=repo)
+    status = perimeter_commands.add_perimeter_structure(
+        conn, perimeter_id, body.structure_id, repo=repo
+    )
     return StatusResponse(status=status)
 
 
@@ -109,8 +120,9 @@ def add_perimeter_structure(
 def remove_perimeter_structure(
     perimeter_id: int,
     structure_id: int,
+    conn: Connection = Depends(db_conn_sync),
     repo: PerimeterRepository = Depends(perimeter_repo_sync),
 ) -> StatusResponse:
     """Retire une structure racine du périmètre. N'affecte pas ses sous-structures tant qu'elles sont rattachées à d'autres racines."""
-    config_service.remove_perimeter_structure(perimeter_id, structure_id, repo=repo)
+    perimeter_commands.remove_perimeter_structure(conn, perimeter_id, structure_id, repo=repo)
     return StatusResponse(status="removed")

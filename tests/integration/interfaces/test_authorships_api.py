@@ -270,6 +270,22 @@ class TestAssignOrphanAuthorship:
         assert r.status_code == 200
         assert r.json()["person_id"] == pid
 
+    def test_assign_visible_immediately(self, auth_client):
+        # Régression (chantier commit-avant-réponse) : le command handler commit
+        # avant l'envoi de la réponse, donc le rattachement est lisible depuis une
+        # connexion indépendante. Garde-fou du passage final du teardown de
+        # db_conn_sync en rollback — un handler sans `commit()` ferait échouer ce test.
+        pid = _seed_person()
+        sa = _seed_source_authorship(source="hal")
+        r = auth_client.post(
+            "/api/admin/orphan-authorships/assign",
+            json={"source": "hal", "authorship_id": sa, "person_id": pid},
+        )
+        assert r.status_code == 200
+        with _pool() as cur:
+            cur.execute("SELECT person_id FROM source_authorships WHERE id = %s", (sa,))
+            assert cur.fetchone()["person_id"] == pid
+
     def test_ok_with_create_person(self, auth_client):
         sa = _seed_source_authorship(source="hal")
         r = auth_client.post(

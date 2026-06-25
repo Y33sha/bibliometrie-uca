@@ -3,8 +3,9 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import Connection
 
-from application.persons import mark_distinct as _mark_persons_distinct
+from application.persons import commands as person_commands
 from application.ports.api.person_duplicates_queries import (
     PersonDuplicatesQueries,
     parse_skip_pairs,
@@ -13,6 +14,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.person_repository import PersonRepository
 from interfaces.api.deps import (
     audit_repo_sync,
+    db_conn_sync,
     person_duplicates_queries_sync,
     person_repo_sync,
 )
@@ -56,6 +58,7 @@ def next_person_duplicate(
 @router.post("/api/admin/person-duplicates/mark-distinct", response_model=OkResponse)
 def mark_persons_distinct(
     body: MarkPersonsDistinct,
+    conn: Connection = Depends(db_conn_sync),
     repo: PersonRepository = Depends(person_repo_sync),
     audit: AuditRepository = Depends(audit_repo_sync),
 ) -> OkResponse:
@@ -64,7 +67,9 @@ def mark_persons_distinct(
         raise HTTPException(
             status_code=400, detail="person_id_a et person_id_b doivent être différents"
         )
-    _mark_persons_distinct(body.person_id_a, body.person_id_b, repo=repo, audit_repo=audit)
+    person_commands.mark_distinct(
+        conn, body.person_id_a, body.person_id_b, repo=repo, audit_repo=audit
+    )
     return OkResponse()
 
 

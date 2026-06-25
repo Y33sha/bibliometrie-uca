@@ -18,7 +18,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.publications import merge_publications
+from application.publications.core import merge_publications
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import publication_repository
