@@ -4705,14 +4705,10 @@ export interface components {
             /** Duration S */
             duration_s: number;
             metrics: components["schemas"]["application__ports__pipeline__phase_executions__PhaseMetricsPayload"];
-            /** Input */
-            input: {
-                [key: string]: number;
-            } | null;
-            /** Output */
-            output: {
-                [key: string]: number;
-            } | null;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
             /** Historical Median Duration S */
             historical_median_duration_s: number | null;
             /** Duration Ratio */

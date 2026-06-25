@@ -22,7 +22,6 @@ from application.ports.api.pipeline_phase_executions_queries import (
     RunSummary,
 )
 from application.ports.pipeline.phase_executions import (
-    ObservableVolumes,
     PhaseMetricsPayload,
     PhaseStatus,
     Signal,
@@ -92,7 +91,7 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
             text(
                 """
                 SELECT phase, started_at, ended_at, mode, sources, status,
-                       signals, metrics, input, output
+                       signals, metrics, details
                 FROM pipeline_phase_executions
                 WHERE run_id = :run_id
                 ORDER BY id
@@ -117,8 +116,7 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
                     status=cast(PhaseStatus, r.status),
                     duration_s=duration_s,
                     metrics=metrics,
-                    input=cast("ObservableVolumes | None", r.input),
-                    output=cast("ObservableVolumes | None", r.output),
+                    details=r.details,
                     historical_median_duration_s=median,
                     duration_ratio=duration_ratio(duration_s, median),
                     signals=cast("list[Signal]", r.signals),

@@ -114,6 +114,21 @@ def phase_extract(
     allowed = set(policy.extract_sources) | ({"wos"} if include_wos else set())
     effective = (set(sources) if sources else allowed) & allowed
     metrics = PhaseMetrics()
+    by_source: dict[str, dict[str, float]] = {}
+
+    def _summary(source_metrics: PhaseMetrics, duration_s: float) -> dict[str, float]:
+        return {
+            "found": source_metrics.total,
+            "new": source_metrics.new,
+            "updated": source_metrics.updated,
+            "unchanged": source_metrics.unchanged,
+            "errors": source_metrics.errors,
+            "duration_s": round(duration_s, 1),
+        }
+
+    def _timed(fn: Callable[[], PhaseMetrics]) -> tuple[PhaseMetrics, float]:
+        started = time.time()
+        return fn(), time.time() - started
 
     if policy.year_selection == "since_last":
         # HAL uniquement, depuis le dernier rapport de pipeline (à 00:00).
@@ -129,7 +144,9 @@ def phase_extract(
             since = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
             log.info("Mode quotidien : HAL depuis %s (fallback, aucun rapport)", since)
         if "hal" in effective:
-            metrics.merge(_run_extract_hal(since=since))
+            hal_metrics, hal_duration = _timed(partial(_run_extract_hal, since=since))
+            metrics.merge(hal_metrics)
+            by_source["hal"] = _summary(hal_metrics, hal_duration)
     else:
         tasks: list[tuple[str, Callable[[], PhaseMetrics]]] = []
         if "openalex" in effective:
@@ -154,10 +171,14 @@ def phase_extract(
                 "▶ extracteurs en parallèle (%d) : %s", len(tasks), ", ".join(n for n, _ in tasks)
             )
             with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
-                futures = {pool.submit(fn): name for name, fn in tasks}
+                futures = {pool.submit(_timed, fn): name for name, fn in tasks}
                 for future in as_completed(futures):
-                    metrics.merge(future.result())
+                    source_metrics, duration = future.result()
+                    metrics.merge(source_metrics)
+                    by_source[futures[future]] = _summary(source_metrics, duration)
 
+    if by_source:
+        metrics.details["by_source"] = by_source
     return metrics
 
 
@@ -1846,7 +1867,7 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
 
         log_offsets = capture_log_offsets()
         phase_started_at = datetime.datetime.now(datetime.UTC)
-        input_volumes = recorder.input_volumes(name)
+        before_volumes = recorder.before_volumes(name)
         t0_phase = time.time()
         try:
             result = fn(
@@ -1872,7 +1893,8 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
                         "message": "Interrompu par l'utilisateur (action contrôlée)",
                     }
                 ],
-                input_volumes=input_volumes,
+                details={},
+                before_volumes=before_volumes,
             )
             phase_logs = read_new_logs(log_offsets)
             phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase, phase_logs))
@@ -1889,7 +1911,8 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
                 status="error",
                 metrics=metrics_to_payload(PhaseMetrics(), time.time() - t0_phase),
                 signals=[{"level": "error", "code": "exception", "message": str(e)}],
-                input_volumes=input_volumes,
+                details={},
+                before_volumes=before_volumes,
             )
             phase_logs = read_new_logs(log_offsets)
             phase_results.append((name + " (ERREUR)", time.time() - t0_phase, phase_logs))
@@ -1908,10 +1931,11 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         recorder.record(
             phase=name,
             started_at=phase_started_at,
-            status="ok",
+            status="warning" if metrics.signals else "ok",
             metrics=metrics_to_payload(metrics, duration),
-            signals=[],
-            input_volumes=input_volumes,
+            signals=metrics.signals,
+            details=metrics.details,
+            before_volumes=before_volumes,
         )
 
     elapsed_total = time.time() - t0_total

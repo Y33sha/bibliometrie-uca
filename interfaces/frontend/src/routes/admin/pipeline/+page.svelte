@@ -18,9 +18,6 @@
   let runDetail = $state<RunDetailT | null>(null);
   let runLoading = $state(false);
 
-  let logsLoaded = $state(false);
-  let logsContent = $state("");
-
   async function pollStatus() {
     try {
       pipelineStatus = await api<PipelineStatus | null>("/api/admin/pipeline/status");
@@ -43,15 +40,6 @@
       runDetail = await api<RunDetailT>(`/api/admin/pipeline/runs/${runId}`);
     } finally {
       runLoading = false;
-    }
-  }
-
-  async function onLogsToggle(event: Event) {
-    const el = event.currentTarget as HTMLDetailsElement;
-    if (el.open && !logsLoaded) {
-      logsLoaded = true;
-      const r = await api<{ content: string }>("/api/admin/pipeline/logs?lines=200");
-      logsContent = r.content;
     }
   }
 
@@ -105,15 +93,6 @@
   </div>
 </div>
 
-<details class="logs" ontoggle={onLogsToggle}>
-  <summary>Logs (cron.log)</summary>
-  {#if logsContent}
-    <pre class="log-block">{logsContent}</pre>
-  {:else}
-    <p class="empty">Aucun log.</p>
-  {/if}
-</details>
-
 <style>
   .page-header h2 {
     margin: 0 0 16px;
@@ -157,32 +136,6 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--card);
-  }
-  .logs {
-    margin-top: 20px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-  }
-  .logs summary {
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--muted);
-  }
-  .log-block {
-    margin: 0;
-    padding: 10px 12px;
-    border-top: 1px solid var(--border);
-    background: var(--bg);
-    font-family: "JetBrains Mono", monospace;
-    font-size: 0.75rem;
-    line-height: 1.5;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-height: 400px;
-    overflow-y: auto;
   }
   .empty {
     color: var(--muted);

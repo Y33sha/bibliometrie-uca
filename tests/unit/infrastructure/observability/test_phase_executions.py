@@ -28,13 +28,14 @@ def test_recorder_desactive_est_noop():
     """Un recorder sans connexion ne relève rien et ne lève jamais."""
     recorder = PhaseExecutionRecorder(None, None, mode="full", sources=["hal"])
     assert recorder.run_id is None
-    assert recorder.input_volumes("normalize") is None
+    assert recorder.before_volumes("normalize") is None
     recorder.record(
         phase="normalize",
         started_at=datetime.datetime.now(datetime.UTC),
         status="ok",
         metrics=metrics_to_payload(PhaseMetrics(), 1.0),
         signals=[],
-        input_volumes=None,
+        details={},
+        before_volumes=None,
     )
     recorder.close()

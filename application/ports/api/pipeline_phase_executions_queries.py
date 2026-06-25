@@ -14,7 +14,6 @@ from typing import Protocol
 from pydantic import BaseModel
 
 from application.ports.pipeline.phase_executions import (
-    ObservableVolumes,
     PhaseMetricsPayload,
     PhaseStatus,
     Signal,
@@ -51,8 +50,7 @@ class PhaseExecutionDetail(BaseModel):
     status: PhaseStatus
     duration_s: float
     metrics: PhaseMetricsPayload
-    input: ObservableVolumes | None
-    output: ObservableVolumes | None
+    details: dict[str, object]
     historical_median_duration_s: float | None
     duration_ratio: float | None
     signals: list[Signal]
