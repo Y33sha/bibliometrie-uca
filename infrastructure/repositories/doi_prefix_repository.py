@@ -5,7 +5,7 @@ Implémente `DoiPrefixRepository`. Sert la phase pipeline `resolve_doi_prefixes`
 
 from sqlalchemy import Connection, text
 
-from application.ports.repositories.doi_prefix_repository import UnmatchedPrefix
+from application.ports.repositories.doi_prefix_repository import PendingPublisherPrefix
 
 
 class PgDoiPrefixRepository:
@@ -54,44 +54,71 @@ class PgDoiPrefixRepository:
         )
         return [(row.prefix, list(row.dois)) for row in result]
 
-    def insert_doi_prefix(
+    def insert_ra(self, *, prefix: str, ra: str) -> bool:
+        """Insère `(prefix, ra)` seul (publisher non déterminé). Retourne True si inséré, False si déjà présent."""
+        result = self._conn.execute(
+            text(
+                "INSERT INTO doi_prefixes (prefix, ra) VALUES (:prefix, :ra) "
+                "ON CONFLICT (prefix) DO NOTHING"
+            ),
+            {"prefix": prefix, "ra": ra},
+        )
+        return result.rowcount > 0
+
+    def get_prefixes_pending_publisher(self) -> list[PendingPublisherPrefix]:
+        """Rows `publisher_id IS NULL`, `publisher_checked_at IS NULL`, RA gérée. Ordre par prefix ASC."""
+        result = self._conn.execute(
+            text(
+                """
+                SELECT prefix, ra, publisher_name_raw, publisher_name_normalized
+                FROM doi_prefixes
+                WHERE publisher_id IS NULL
+                  AND publisher_checked_at IS NULL
+                  AND ra IN ('Crossref', 'DataCite', 'unknown')
+                ORDER BY prefix
+                """
+            )
+        )
+        return [
+            PendingPublisherPrefix(
+                prefix=r.prefix,
+                ra=r.ra,
+                publisher_name_raw=r.publisher_name_raw,
+                publisher_name_normalized=r.publisher_name_normalized,
+            )
+            for r in result
+        ]
+
+    def set_prefix_publisher_metadata(
         self,
         *,
         prefix: str,
         ra: str,
-        publisher_id: int | None,
         publisher_name_raw: str | None,
         publisher_name_normalized: str | None,
         crossref_member_id: int | None,
         client_name_raw: str | None,
         client_name_normalized: str | None,
         datacite_client_symbol: str | None,
-    ) -> bool:
-        """Insère un préfixe résolu. Retourne True si inséré, False si déjà présent (conflit sur la PK)."""
-        result = self._conn.execute(
+    ) -> None:
+        """Renseigne les métadonnées publisher (et corrige `ra`) après fetch `/prefixes`."""
+        self._conn.execute(
             text(
                 """
-                INSERT INTO doi_prefixes (
-                    prefix, ra, publisher_id,
-                    publisher_name_raw, publisher_name_normalized,
-                    crossref_member_id,
-                    client_name_raw, client_name_normalized,
-                    datacite_client_symbol
-                )
-                VALUES (
-                    :prefix, :ra, :publisher_id,
-                    :publisher_name_raw, :publisher_name_normalized,
-                    :crossref_member_id,
-                    :client_name_raw, :client_name_normalized,
-                    :datacite_client_symbol
-                )
-                ON CONFLICT (prefix) DO NOTHING
+                UPDATE doi_prefixes SET
+                    ra = :ra,
+                    publisher_name_raw = :publisher_name_raw,
+                    publisher_name_normalized = :publisher_name_normalized,
+                    crossref_member_id = :crossref_member_id,
+                    client_name_raw = :client_name_raw,
+                    client_name_normalized = :client_name_normalized,
+                    datacite_client_symbol = :datacite_client_symbol
+                WHERE prefix = :prefix
                 """
             ),
             {
                 "prefix": prefix,
                 "ra": ra,
-                "publisher_id": publisher_id,
                 "publisher_name_raw": publisher_name_raw,
                 "publisher_name_normalized": publisher_name_normalized,
                 "crossref_member_id": crossref_member_id,
@@ -100,33 +127,17 @@ class PgDoiPrefixRepository:
                 "datacite_client_symbol": datacite_client_symbol,
             },
         )
-        return result.rowcount > 0
-
-    def get_unmatched_prefixes(self) -> list[UnmatchedPrefix]:
-        """Rows avec `publisher_name_normalized` rempli mais `publisher_id IS NULL`. Couvre Crossref et DataCite indifféremment. Ordre par prefix ASC."""
-        result = self._conn.execute(
-            text(
-                """
-                SELECT prefix, publisher_name_raw, publisher_name_normalized
-                FROM doi_prefixes
-                WHERE publisher_id IS NULL
-                  AND publisher_name_normalized IS NOT NULL
-                ORDER BY prefix
-                """
-            )
-        )
-        return [
-            UnmatchedPrefix(
-                prefix=r.prefix,
-                publisher_name_raw=r.publisher_name_raw,
-                publisher_name_normalized=r.publisher_name_normalized,
-            )
-            for r in result
-        ]
 
     def update_publisher_id(self, prefix: str, publisher_id: int) -> None:
-        """Rattache un préfixe existant à un publisher (passe de rattrapage)."""
+        """Attache un publisher à un préfixe."""
         self._conn.execute(
             text("UPDATE doi_prefixes SET publisher_id = :pid WHERE prefix = :prefix"),
             {"pid": publisher_id, "prefix": prefix},
+        )
+
+    def mark_publisher_checked(self, prefix: str) -> None:
+        """Pose `publisher_checked_at = now()` (tentative `/prefixes` effectuée)."""
+        self._conn.execute(
+            text("UPDATE doi_prefixes SET publisher_checked_at = now() WHERE prefix = :prefix"),
+            {"prefix": prefix},
         )
