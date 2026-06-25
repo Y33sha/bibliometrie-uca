@@ -23,7 +23,7 @@ class PhaseNode:
 
 PIPELINE_GRAPH: tuple[PhaseNode, ...] = (
     PhaseNode("extract", (), ("staging",)),
-    PhaseNode("resolve_ra", ("staging",), ("doi_prefixes",)),
+    PhaseNode("resolve_ra", ("doi_prefixes",), ("doi_prefixes",)),
     PhaseNode("cross_imports", ("staging",), ("staging",)),
     PhaseNode("refresh_stale", ("staging",), ("staging",)),
     PhaseNode("refetch_truncated", ("staging",), ("staging",)),

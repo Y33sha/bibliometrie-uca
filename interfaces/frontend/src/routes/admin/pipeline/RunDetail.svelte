@@ -75,7 +75,6 @@
       <th>Phase</th>
       <th>Statut</th>
       <th class="num">Durée</th>
-      <th class="num">Rendement</th>
       <th class="num">Signaux</th>
     </tr>
   </thead>
@@ -100,12 +99,11 @@
         >
           {fmtDuration(p.duration_s)}{#if isSlow(p.duration_ratio)}<span class="slow-flag" title="nettement plus lent que le médian"> ⚠</span>{/if}
         </td>
-        <td class="num">{fmtRatio(p.yield_ratio)}</td>
         <td class="num">{p.signals.length || "—"}</td>
       </tr>
       {#if expanded === p.phase}
         <tr class="expand-row">
-          <td colspan="5">
+          <td colspan="4">
             <div class="expand">
               <div class="expand-line"><span class="k">Métriques</span><span>{metricsSummary(p.metrics)}</span></div>
               {#if p.historical_median_duration_s !== null}

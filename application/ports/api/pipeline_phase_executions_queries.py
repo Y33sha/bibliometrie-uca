@@ -53,7 +53,6 @@ class PhaseExecutionDetail(BaseModel):
     metrics: PhaseMetricsPayload
     input: ObservableVolumes | None
     output: ObservableVolumes | None
-    yield_ratio: float | None
     historical_median_duration_s: float | None
     duration_ratio: float | None
     signals: list[Signal]

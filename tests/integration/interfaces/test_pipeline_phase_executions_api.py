@@ -161,7 +161,9 @@ def test_get_run_detail(client, seeded_runs):
     assert [p["phase"] for p in detail["phases"]] == ["normalize", "publications", "persons"]
 
     publications = next(p for p in detail["phases"] if p["phase"] == "publications")
-    assert publications["yield_ratio"] == 0.8
+    # Volumes avant/après conservés tels quels (pas de ratio de rendement).
+    assert publications["input"] == {"source_publications": 1000}
+    assert publications["output"] == {"publications": 800}
     # Médian historique = durée de publications dans run A (10), run courant exclu.
     assert publications["historical_median_duration_s"] == 10.0
     assert publications["duration_ratio"] == 2.0
@@ -169,7 +171,6 @@ def test_get_run_detail(client, seeded_runs):
     persons = next(p for p in detail["phases"] if p["phase"] == "persons")
     assert persons["status"] == "warning"
     assert persons["signals"][0]["code"] == "identity_conflict"
-    assert persons["yield_ratio"] is None  # persons : produces[0]=persons absent de l'output
 
 
 def test_get_run_404(client):

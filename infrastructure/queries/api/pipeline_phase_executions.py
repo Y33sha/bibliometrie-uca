@@ -13,7 +13,7 @@ from typing import cast
 
 from sqlalchemy import Connection, text
 
-from application.observability.read import compute_yield, duration_ratio, median_duration
+from application.observability.read import duration_ratio, median_duration
 from application.ports.api.pipeline_phase_executions_queries import (
     PhaseBrief,
     PhaseExecutionDetail,
@@ -23,7 +23,6 @@ from application.ports.api.pipeline_phase_executions_queries import (
 )
 from application.ports.pipeline.phase_executions import (
     ObservableVolumes,
-    PhaseExecution,
     PhaseMetricsPayload,
     PhaseStatus,
     Signal,
@@ -108,19 +107,6 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
         phases: list[PhaseExecutionDetail] = []
         for r in rows:
             metrics = cast(PhaseMetricsPayload, r.metrics)
-            execution = PhaseExecution(
-                run_id=run_id,
-                phase=r.phase,
-                started_at=r.started_at,
-                ended_at=r.ended_at,
-                mode=r.mode,
-                sources=list(r.sources),
-                status=cast(PhaseStatus, r.status),
-                metrics=metrics,
-                signals=cast("list[Signal]", r.signals),
-                input=cast("ObservableVolumes | None", r.input),
-                output=cast("ObservableVolumes | None", r.output),
-            )
             duration_s = float(metrics["duration_s"])
             median = median_duration(history.get(r.phase, []))
             phases.append(
@@ -128,15 +114,14 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
                     phase=r.phase,
                     started_at=r.started_at,
                     ended_at=r.ended_at,
-                    status=execution.status,
+                    status=cast(PhaseStatus, r.status),
                     duration_s=duration_s,
                     metrics=metrics,
-                    input=execution.input,
-                    output=execution.output,
-                    yield_ratio=compute_yield(execution),
+                    input=cast("ObservableVolumes | None", r.input),
+                    output=cast("ObservableVolumes | None", r.output),
                     historical_median_duration_s=median,
                     duration_ratio=duration_ratio(duration_s, median),
-                    signals=execution.signals,
+                    signals=cast("list[Signal]", r.signals),
                 )
             )
 
