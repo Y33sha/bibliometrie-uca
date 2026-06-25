@@ -6,10 +6,28 @@ concrète). Toute autre implémentation respectant cette interface
 (fake en mémoire pour tests, autre SGBD, etc.) est également acceptable.
 """
 
-from typing import Any, Protocol
+from typing import Any, Protocol, TypedDict
 
 from domain.persons.person import Person
 from domain.persons.person_identifier import PersonIdentifier
+
+
+class IdentifierStatusRow(TypedDict):
+    """Ligne renvoyée par `update_identifier_status` (changement de statut d'un
+    identifiant ; `person_id` sert à l'audit)."""
+
+    id: int
+    status: str
+    person_id: int
+
+
+class NameFormStatusRow(TypedDict):
+    """Ligne renvoyée par `update_name_form_status` (changement de statut d'une
+    forme de nom). Alimente le DTO `NameFormStatusResponse`."""
+
+    person_id: int
+    name_form: str
+    status: str
 
 
 class PersonRepository(Protocol):
@@ -51,7 +69,7 @@ class PersonRepository(Protocol):
 
     def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None: ...
 
-    def update_identifier_status(self, ident_id: int, status: str) -> dict[str, Any]: ...
+    def update_identifier_status(self, ident_id: int, status: str) -> IdentifierStatusRow: ...
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None: ...
 
@@ -159,7 +177,7 @@ class PersonRepository(Protocol):
 
     def update_name_form_status(
         self, person_id: int, name_form: str, status: str
-    ) -> dict[str, Any]: ...
+    ) -> NameFormStatusRow: ...
 
     def delete_orphan_name_forms_for_person(self, person_id: int) -> int:
         """Supprime les formes de nom attestées par une source qui ne sont plus

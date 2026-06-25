@@ -15,9 +15,14 @@ Couvre les tables de l'agrégat : `persons`, `person_identifiers`,
 from sqlalchemy import Connection
 
 from application.persons import core as persons_service
+from application.persons.core import AuthorshipRef, DetachResult
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
-from application.ports.repositories.person_repository import PersonRepository
+from application.ports.repositories.person_repository import (
+    IdentifierStatusRow,
+    NameFormStatusRow,
+    PersonRepository,
+)
 
 # ── Identifiants ──────────────────────────────────────────────────
 
@@ -59,8 +64,8 @@ def update_identifier_status(
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository,
-) -> dict:
-    """Met à jour le statut d'un identifiant. Retourne la ligne {id, status}."""
+) -> IdentifierStatusRow:
+    """Met à jour le statut d'un identifiant. Retourne la ligne {id, status, person_id}."""
     row = persons_service.update_identifier_status(
         ident_id, status, repo=repo, audit_repo=audit_repo
     )
@@ -144,12 +149,12 @@ def mark_distinct(
 def detach_authorships(
     conn: Connection,
     person_id: int,
-    authorships: list[dict],
+    authorships: list[AuthorshipRef],
     *,
     repo: PersonRepository,
     authorship_repo: AuthorshipRepository,
     audit_repo: AuditRepository,
-) -> dict:
+) -> DetachResult:
     """Rejette durablement les paires (publication, personne) des authorships
     sélectionnées et nettoie les formes de noms orphelines.
 
@@ -174,7 +179,7 @@ def update_name_form_status(
     repo: PersonRepository,
     authorship_repo: AuthorshipRepository,
     audit_repo: AuditRepository,
-) -> dict:
+) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom. `rejected` détache aussi les
     signatures portant la forme. Retourne la ligne {person_id, name_form, status}."""
     row = persons_service.update_name_form_status(

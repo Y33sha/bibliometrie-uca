@@ -1,13 +1,19 @@
 """Adapter PostgreSQL sync pour les 3 tables du concept Structure."""
 
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, cast
 
 from pydantic import ValidationError as PydanticValidationError
-from sqlalchemy import Connection, Text, bindparam, cast, delete, select, text, update
+from sqlalchemy import Connection, Text, bindparam, cast as sql_cast, delete, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from application.ports.repositories.structure_repository import (
+    StructureDeletedRow,
+    StructureNameFormDeletedRow,
+    StructureNameFormRow,
     StructureNameFormUpdateFields,
+    StructureRelationDeletedRow,
+    StructureRelationRow,
+    StructureRow,
     StructureUpdateFields,
 )
 from domain.errors import ValidationError
@@ -105,7 +111,7 @@ def _structure_returning_columns() -> list:
         structures.c.code,
         structures.c.name,
         structures.c.acronym,
-        cast(structures.c.structure_type, Text).label("type"),
+        sql_cast(structures.c.structure_type, Text).label("type"),
         structures.c.ror_id,
         structures.c.rnsr_id,
         structures.c.hal_collection,
@@ -128,7 +134,7 @@ class PgStructureRepository:
                 structures.c.code,
                 structures.c.name,
                 structures.c.acronym,
-                cast(structures.c.structure_type, Text).label("structure_type"),
+                sql_cast(structures.c.structure_type, Text).label("structure_type"),
                 structures.c.ror_id,
                 structures.c.hal_collection,
                 structures.c.api_ids,
@@ -166,7 +172,7 @@ class PgStructureRepository:
         rnsr_id: str | None,
         hal_collection: str | None,
         api_ids: dict | None,
-    ) -> dict:
+    ) -> StructureRow:
         stmt = (
             structures.insert()
             .values(
@@ -182,9 +188,11 @@ class PgStructureRepository:
             .returning(*_structure_returning_columns())
         )
         result = self._conn.execute(stmt)
-        return dict(result.one()._mapping)
+        return cast(StructureRow, dict(result.one()._mapping))
 
-    def update_structure_fields(self, structure_id: int, fields: StructureUpdateFields) -> dict:
+    def update_structure_fields(
+        self, structure_id: int, fields: StructureUpdateFields
+    ) -> StructureRow:
         if "api_ids" in fields:
             fields = {**fields, "api_ids": _normalize_api_ids(fields["api_ids"])}
         stmt = (
@@ -194,9 +202,9 @@ class PgStructureRepository:
             .returning(*_structure_returning_columns())
         )
         result = self._conn.execute(stmt)
-        return dict(result.one()._mapping)
+        return cast(StructureRow, dict(result.one()._mapping))
 
-    def delete_structure(self, structure_id: int) -> dict | None:
+    def delete_structure(self, structure_id: int) -> StructureDeletedRow | None:
         stmt = (
             delete(structures)
             .where(structures.c.id == structure_id)
@@ -204,7 +212,7 @@ class PgStructureRepository:
         )
         result = self._conn.execute(stmt)
         row = result.first()
-        return dict(row._mapping) if row else None
+        return cast(StructureDeletedRow, dict(row._mapping)) if row else None
 
     # ── structure_relations ────────────────────────────────────────
 
@@ -233,7 +241,7 @@ class PgStructureRepository:
         parent_id: int,
         child_id: int,
         relation_type: str,
-    ) -> dict | None:
+    ) -> StructureRelationRow | None:
         stmt = (
             pg_insert(structure_relations)
             .values(parent_id=parent_id, child_id=child_id, relation_type=relation_type)
@@ -247,9 +255,9 @@ class PgStructureRepository:
         )
         result = self._conn.execute(stmt)
         row = result.first()
-        return dict(row._mapping) if row else None
+        return cast(StructureRelationRow, dict(row._mapping)) if row else None
 
-    def delete_relation(self, relation_id: int) -> dict | None:
+    def delete_relation(self, relation_id: int) -> StructureRelationDeletedRow | None:
         stmt = (
             delete(structure_relations)
             .where(structure_relations.c.id == relation_id)
@@ -261,7 +269,7 @@ class PgStructureRepository:
         )
         result = self._conn.execute(stmt)
         row = result.first()
-        return dict(row._mapping) if row else None
+        return cast(StructureRelationDeletedRow, dict(row._mapping)) if row else None
 
     # ── structure_name_forms ───────────────────────────────────────
 
@@ -279,7 +287,7 @@ class PgStructureRepository:
         is_word_boundary: bool,
         is_excluding: bool,
         requires_context_of: list | None,
-    ) -> dict:
+    ) -> StructureNameFormRow:
         stmt = (
             structure_name_forms.insert()
             .values(
@@ -300,9 +308,11 @@ class PgStructureRepository:
             )
         )
         result = self._conn.execute(stmt)
-        return dict(result.one()._mapping)
+        return cast(StructureNameFormRow, dict(result.one()._mapping))
 
-    def update_name_form_fields(self, form_id: int, fields: StructureNameFormUpdateFields) -> dict:
+    def update_name_form_fields(
+        self, form_id: int, fields: StructureNameFormUpdateFields
+    ) -> StructureNameFormRow:
         stmt = (
             update(structure_name_forms)
             .where(structure_name_forms.c.id == form_id)
@@ -318,9 +328,9 @@ class PgStructureRepository:
             )
         )
         result = self._conn.execute(stmt)
-        return dict(result.one()._mapping)
+        return cast(StructureNameFormRow, dict(result.one()._mapping))
 
-    def delete_name_form(self, form_id: int) -> dict | None:
+    def delete_name_form(self, form_id: int) -> StructureNameFormDeletedRow | None:
         stmt = (
             delete(structure_name_forms)
             .where(structure_name_forms.c.id == form_id)
@@ -331,4 +341,4 @@ class PgStructureRepository:
         )
         result = self._conn.execute(stmt)
         row = result.first()
-        return dict(row._mapping) if row else None
+        return cast(StructureNameFormDeletedRow, dict(row._mapping)) if row else None

@@ -4,19 +4,41 @@ Gère aussi le rattachement/détachement des authorships sources (`source_author
 """
 
 import logging
+from typing import TypedDict, cast
 
 from application.audit import emit_event
 from application.authorships.core import reject_pair
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.authorship_repository import AuthorshipRepository
-from application.ports.repositories.person_repository import PersonRepository
+from application.ports.repositories.person_repository import (
+    IdentifierStatusRow,
+    NameFormStatusRow,
+    PersonRepository,
+)
 from domain.errors import CannotAttributeConflict, NotFoundError
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
 from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person_identifier import PersonIdentifier
 from domain.sources.registry import ALL_SOURCES_SET
+from domain.types import JsonValue
 
 logger = logging.getLogger(__name__)
+
+
+class AuthorshipRef(TypedDict):
+    """Référence d'une signature source (entrée de `detach_authorships`)."""
+
+    source: str
+    authorship_id: int
+
+
+class DetachResult(TypedDict):
+    """Résultat de `detach_authorships` : compteurs de l'opération."""
+
+    detached: int
+    deleted_authorships: int
+    cleaned_forms: int
+
 
 __all__ = [
     "create_person",
@@ -95,7 +117,9 @@ def link_authorship(
     repo.link_authorship(person_id, source, authorship_id)
 
 
-def link_authorships(person_id: int, authorships: list[dict], *, repo: PersonRepository) -> None:
+def link_authorships(
+    person_id: int, authorships: list[dict[str, JsonValue]], *, repo: PersonRepository
+) -> None:
     """Rattache un groupe d'authorships à une personne (pipeline).
 
     Chaque dict doit avoir 'source' et 'authorship_id'.
@@ -103,8 +127,8 @@ def link_authorships(person_id: int, authorships: list[dict], *, repo: PersonRep
     for a in authorships:
         link_authorship(
             person_id,
-            a["source"],
-            a["authorship_id"],
+            cast(str, a["source"]),
+            cast(int, a["authorship_id"]),
             repo=repo,
         )
 
@@ -198,10 +222,10 @@ def update_identifier_status(
     *,
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
-) -> dict:
+) -> IdentifierStatusRow:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
-    Retourne la ligne {id, status} mise à jour.
+    Retourne la ligne {id, status, person_id} mise à jour.
     Lève NotFoundError si l'identifiant n'existe pas.
     """
     row = repo.update_identifier_status(ident_id, status)
@@ -212,7 +236,7 @@ def update_identifier_status(
         row["person_id"],
         {"ident_id": ident_id, "status": status},
     )
-    return {"id": row["id"], "status": row["status"]}
+    return row
 
 
 def reassign_identifier(
@@ -237,7 +261,7 @@ def reassign_identifier(
 
 
 def add_identifiers_from_authorships(
-    person_id: int, authorships: list[dict], *, repo: PersonRepository
+    person_id: int, authorships: list[dict[str, JsonValue]], *, repo: PersonRepository
 ) -> None:
     """Promotion canonique en batch : pour chaque authorship source, extrait les identifiants observés (orcid/idhal/idref/hal_person_id) et délègue à `add_identifier` qui dispatche selon l'état existant en base.
 
@@ -255,8 +279,9 @@ def add_identifiers_from_authorships(
             raw = a.get(id_type)
             if not raw:
                 continue
-            # int en source côté hal_person_id, str en cible person_identifiers
-            value = str(raw) if id_type == "hal_person_id" else raw
+            # Cible `person_identifiers` = text ; `hal_person_id` arrive en int,
+            # les autres en str — `str()` couvre les deux.
+            value = str(raw)
             if (id_type, value) in seen:
                 continue
             seen.add((id_type, value))
@@ -303,7 +328,7 @@ def update_name_form_status(
     repo: PersonRepository,
     authorship_repo: AuthorshipRepository | None = None,
     audit_repo: AuditRepository | None = None,
-) -> dict:
+) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
     `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche
@@ -331,12 +356,12 @@ def update_name_form_status(
 
 def detach_authorships(
     person_id: int,
-    authorships: list[dict],
+    authorships: list[AuthorshipRef],
     *,
     repo: PersonRepository,
     authorship_repo: AuthorshipRepository,
     audit_repo: AuditRepository | None = None,
-) -> dict:
+) -> DetachResult:
     """Rejette durablement les paires (publication, personne) couvertes par un
     lot d'authorships sources sélectionnées.
 
