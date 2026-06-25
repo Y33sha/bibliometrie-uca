@@ -1809,7 +1809,9 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         return
 
     sources = set(s.strip() for s in args.sources.split(",") if s.strip())
-    log.info("Sources : %s", ", ".join(sorted(sources)))
+    # Sources effectivement interrogées : wos est opt-in (`--include-wos`).
+    effective_sources = sorted(sources - {"wos"}) if not args.include_wos else sorted(sources)
+    log.info("Sources : %s", ", ".join(effective_sources))
 
     # Métriques pipeline
     from infrastructure.observability.phase_executions import metrics_to_payload, start_run
@@ -1823,7 +1825,7 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
     phase_metrics: dict[str, PhaseMetrics] = {}  # collecté pour Volet B (dashboard)
 
     # Observabilité par phase : run_id de séquence, capture entrée/sortie + statut.
-    recorder = start_run(mode=args.mode, sources=sorted(sources))
+    recorder = start_run(mode=args.mode, sources=effective_sources)
     if recorder.run_id is not None:
         log.info("Run pipeline #%d", recorder.run_id)
 
@@ -1861,13 +1863,13 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
             recorder.record(
                 phase=name,
                 started_at=phase_started_at,
-                status="error",
+                status="warning",
                 metrics=metrics_to_payload(PhaseMetrics(), time.time() - t0_phase),
                 signals=[
                     {
-                        "level": "error",
+                        "level": "warning",
                         "code": "interrupted",
-                        "message": "Interrompu par l'utilisateur",
+                        "message": "Interrompu par l'utilisateur (action contrôlée)",
                     }
                 ],
                 input_volumes=input_volumes,

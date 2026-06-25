@@ -6,7 +6,7 @@ Commencé le 2026-05-16.
 
 Le pipeline se lance rarement d'un bloc : extraction sur une plage d'années custom, `cross_imports` interrompu s'il est trop long, reprise en `--from normalize`. L'observabilité doit suivre cet usage. Le système en place ne produit un instantané que pour un **run complet** (gardé par `not args.only and not args.from_phase` dans `run_pipeline.py`), agrégeant l'état global de la base et les métriques de toutes les phases dans un seul payload `pipeline_run_snapshots`. Les runs partiels — le cas courant — ne produisent rien. La page admin associée (onglets Snapshots / Rapports, composant monolithique) est inadaptée à cet usage.
 
-Besoin primaire : **savoir d'un coup d'œil si un run s'est bien passé**, phase par phase, y compris pour un run partiel ou automatisé — vert quand il n'y a rien à regarder, rouge quand une phase est interrompue par une exception, ambre quand une anomalie est signalée (source indisponible, arrêt après une série de 429, conflits d'identité). Avoir aussi une idée du temps pris et repérer une phase anormalement lente. Besoin secondaire : suivre l'évolution des volumes et des rendements dans la durée.
+Besoin primaire : **savoir d'un coup d'œil si un run s'est bien passé**, phase par phase, y compris pour un run partiel ou automatisé — vert quand il n'y a rien à regarder, rouge quand une phase échoue sur exception, ambre quand quelque chose est à signaler (interruption contrôlée par l'utilisateur, source indisponible, arrêt après une série de 429, conflit d'identité). Avoir aussi une idée du temps pris et repérer une phase anormalement lente. Besoin secondaire : suivre l'évolution des volumes dans la durée.
 
 ## Décisions
 
@@ -16,19 +16,19 @@ Besoin primaire : **savoir d'un coup d'œil si un run s'est bien passé**, phase
 
 **Pas de table de runs.** Un `run_id` (entier de séquence, généré au lancement) est une colonne de la table des exécutions de phase. Tout ce qui est « par run » est dérivable par agrégation (`début = min`, `fin = max`, mode et sources communs, statut global = le pire des statuts de phase) ; une table parente ne répèterait que du dérivable.
 
-**Statut et signaux.** `status = error` est décidé par l'orchestrateur lorsqu'une phase remonte une exception. `status = warning` et les signaux (source indisponible, arrêt après une série de 429, `CannotAttributeConflict` pendant `persons`…) sont **remontés par la phase elle-même** : ils enrichissent sa valeur de retour, là où ils ne partent aujourd'hui qu'en log et sont perdus. C'est la part de plumbing la plus lourde du chantier, concentrée dans `extract` et `persons`.
+**Statut et signaux.** `status = error` est décidé par l'orchestrateur lorsqu'une phase remonte une exception. Une interruption par l'utilisateur est un `status = warning` (action contrôlée — écourter un import n'est pas un échec), pas une erreur. `status = warning` et les signaux (source indisponible, arrêt après une série de 429, `CannotAttributeConflict` pendant `persons`…) sont aussi **remontés par la phase elle-même** : ils enrichissent sa valeur de retour, là où ils ne partent aujourd'hui qu'en log et sont perdus. C'est la part de plumbing la plus lourde du chantier, concentrée dans `extract` et `persons`.
 
-### Rendement : métrique locale, affichée et non jugée
+### Observables et durée : affichés, non jugés
 
-**Le rendement d'une phase = sa sortie rapportée à son entrée**, toutes deux mesurées sur la phase elle-même : l'entrée est l'observable capturé à son début, la sortie l'observable capturé à sa fin. Pas de lignage inféré entre phases — une phase connaît ce qu'elle consomme et ce qu'elle produit. Le rendement est invariant à l'échelle : doubler les années extraites double les volumes aval sans changer le rendement, donc pas de faux signal sur un simple changement de périmètre. Une dérive du rendement (une phase qui sort soudain moitié moins par unité d'entrée) reste, elle, visible.
+Chaque phase relève le volume des tables qu'elle touche au début et à la fin de son exécution (avant / après) ; le drill-down les montre tels quels. Pour une phase de transformation, c'est l'entrée consommée et la sortie produite (`normalize` : staging → source_publications) ; pour une phase qui enrichit ou accumule en place, c'est l'avant / après d'une même table (`resolve_ra` : doi_prefixes au début et à la fin, dont le delta donne les nouveaux préfixes). On n'en dérive **pas** de ratio de rendement : un tel ratio (sortie / entrée) n'est pas comparable d'une phase à l'autre — facteur de dédup pour `publications`, quasi-1 pour les enrichissements en place — et serait plus trompeur qu'utile. Ce qui parle, ce sont les volumes avant / après, les compteurs `PhaseMetrics` (new / updated…) et l'écart de durée.
 
-**Aucune détection automatique de dérive.** Le rendement et la durée d'une phase sont **affichés** à côté de leur médian historique pour la même phase ; l'œil juge. Une phase anormalement lente est mise en évidence visuellement, l'écart au médian étant calculé à la lecture, sans seuil stocké ni drapeau. Poser un critère objectif de dérive sur un corpus de quelques milliers de publications, aux runs hétérogènes (daily mono-source vs full multi-sources), produirait surtout du bruit.
+**Aucune détection automatique de dérive.** La durée d'une phase est **affichée** à côté de son médian historique (même phase) ; une phase nettement plus lente (≈ 1,5× le médian) est mise en évidence visuellement, l'écart étant calculé à la lecture, sans seuil stocké ni drapeau. L'œil juge. Poser un critère objectif de dérive sur un corpus de quelques milliers de publications, aux runs hétérogènes (daily mono-source vs full multi-sources), produirait surtout du bruit.
 
 ### Une seule surface : l'interface graphique
 
 La page `/admin/pipeline` est l'unique surface d'observabilité. Les rapports markdown (`generate_report`) sont retirés : ils font double emploi avec les enregistrements consultables. Les logs restent accessibles en lien secondaire par run.
 
-**Présentation en ruban de phases.** La page liste les runs en ordre anté-chronologique. Chaque run porte son verdict global, sa date, sa durée et un **ruban** : les phases dans l'ordre du graphe (gauche → droite), en cases de largeur fixe dont la **couleur** porte le statut. Le ruban n'est pas proportionnel au temps — les durées de phase sont trop hétérogènes (secondes à heures) pour un axe-temps lisible. Le graphe de dépendances ne sert qu'à ordonner les phases et à marquer l'éventail post-`normalize` d'un séparateur ; aucune arête n'est dessinée. Le drill-down sur une phase affiche entrée, sortie, métriques, rendement et durée (chacun avec son médian historique) et les signaux.
+**Présentation en ruban de phases.** La page liste les runs en ordre anté-chronologique. Chaque run porte son verdict global, sa date, sa durée et un **ruban** : les phases dans l'ordre du graphe (gauche → droite), en cases de largeur fixe dont la **couleur** porte le statut. Le ruban n'est pas proportionnel au temps — les durées de phase sont trop hétérogènes (secondes à heures) pour un axe-temps lisible. Le graphe de dépendances ne sert qu'à ordonner les phases et à marquer l'éventail post-`normalize` d'un séparateur ; aucune arête n'est dessinée. Le drill-down sur une phase affiche les volumes d'entrée/sortie (avant / après), les métriques, la durée et son médian historique, et les signaux.
 
 ```
 ● 142   25/06 14:30   full · 5 sources    18 min 04s   ✓
@@ -40,7 +40,7 @@ Légende des cases : vert = ok, rouge = exception (run interrompu là), ambre = 
 
 ### Modèle de dépendances des phases
 
-Les dépendances input → output sont statiques et connues. La colonne vertébrale est `extract → resolve_ra → cross_imports → refresh_stale → refetch_truncated → normalize` (`cross_imports` dépend aussi de `resolve_ra` pour les agences d'enregistrement). En aval, `normalize` alimente `affiliations`, `metadata_correction` et `publishers_journals` (← `resolve_ra` également) ; `metadata_correction` alimente `publications` ; `publications` alimente `relations` (← normalize aussi), `subjects`, `oa_status` et `countries` (← affiliations aussi) ; `affiliations` alimente `persons` ; `publications` et `persons` alimentent `authorships`. Ce flux est documenté ici à titre informatif ; ce que le code déclare (`application/pipeline/graph.py`), phase par phase, ce sont ses tables consommées et produites — la définition de ses observables d'entrée et de sortie. Les liaisons amont ne sont pas matérialisées : le rendement se mesure localement sur chaque phase, sans lignage inféré. L'ordre de déclaration est l'ordre d'exécution, qui ordonne le ruban. Ce qui varie d'un run à l'autre, c'est quelles phases tournent et quand, pas le flux.
+Les dépendances input → output sont statiques et connues. La colonne vertébrale est `extract → resolve_ra → cross_imports → refresh_stale → refetch_truncated → normalize` (`cross_imports` dépend aussi de `resolve_ra` pour les agences d'enregistrement). En aval, `normalize` alimente `affiliations`, `metadata_correction` et `publishers_journals` (← `resolve_ra` également) ; `metadata_correction` alimente `publications` ; `publications` alimente `relations` (← normalize aussi), `subjects`, `oa_status` et `countries` (← affiliations aussi) ; `affiliations` alimente `persons` ; `publications` et `persons` alimentent `authorships`. Ce flux est documenté ici à titre informatif ; ce que le code déclare (`application/pipeline/graph.py`), phase par phase, ce sont ses tables consommées et produites — relevées au début et à la fin pour donner les volumes avant / après. Les liaisons amont ne sont pas matérialisées. L'ordre de déclaration est l'ordre d'exécution, qui ordonne le ruban. Ce qui varie d'un run à l'autre, c'est quelles phases tournent et quand, pas le flux.
 
 ### Existant : réutilisé, remplacé, retiré
 
@@ -62,14 +62,14 @@ Les dépendances input → output sont statiques et connues. La colonne vertébr
 - [ ] Remontée structurée des signaux par les phases (source indisponible, série de 429, conflits d'identité), `extract` et `persons` en priorité.
 - [x] Récapitulatif par phase (durées) en fin d'invocation, en plus du résumé par phase existant ; pas d'email.
 
-### Phase C — Lecture : rendement et durée
+### Phase C — Lecture : écart de durée
 
-- [x] Calcul à la lecture du rendement (sortie / entrée) et de l'écart de durée au médian historique de la même phase (`application/observability/read.py`). Affichage seul, sans seuil ni drapeau. Le rendement rapporte la table principale produite à la table principale consommée (premières entrées `produces`/`consumes` du graphe).
-- [x] Tests unit sur le calcul du rendement et du médian (sans base).
+- [x] Calcul à la lecture de l'écart de durée au médian historique de la même phase (`application/observability/read.py`). Affichage seul, sans seuil ni drapeau. Pas de ratio de rendement (peu comparable d'une phase à l'autre) : les volumes avant / après et les métriques suffisent.
+- [x] Tests unit sur le médian et l'écart de durée (sans base).
 
 ### Phase D — API
 
-- [x] Endpoints de lecture (`/api/admin/pipeline/runs`, `/api/admin/pipeline/runs/{run_id}`) : liste des runs (agrégation par `run_id`, statut global) ; détail d'un run = ses exécutions de phase, chacune portant métriques, observables, rendement, durée, médian historique et écart, signaux (recalculés à la lecture). Le détail d'une exécution de phase est embarqué dans le détail du run, pas d'endpoint séparé.
+- [x] Endpoints de lecture (`/api/admin/pipeline/runs`, `/api/admin/pipeline/runs/{run_id}`) : liste des runs (agrégation par `run_id`, statut global) ; détail d'un run = ses exécutions de phase, chacune portant métriques, observables (avant / après), durée, médian historique et écart, signaux (recalculés à la lecture). Le détail d'une exécution de phase est embarqué dans le détail du run, pas d'endpoint séparé.
 - [x] Port typé (`application/ports/api/pipeline_phase_executions_queries.py`) et adapter queries (`infrastructure/queries/api/pipeline_phase_executions.py`).
 
 ### Phase E — Interface en ruban

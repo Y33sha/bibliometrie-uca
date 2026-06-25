@@ -4713,8 +4713,6 @@ export interface components {
             output: {
                 [key: string]: number;
             } | null;
-            /** Yield Ratio */
-            yield_ratio: number | null;
             /** Historical Median Duration S */
             historical_median_duration_s: number | null;
             /** Duration Ratio */
