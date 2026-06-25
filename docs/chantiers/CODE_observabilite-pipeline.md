@@ -69,8 +69,8 @@ Les dépendances input → output sont statiques et connues. La colonne vertébr
 
 ### Phase D — API
 
-- [ ] Endpoints de lecture : liste des runs (agrégation `GROUP BY run_id`, statut global), détail d'un run (ses phases), détail d'une exécution de phase (métriques, observables, rendement, durée et médians recalculés à la lecture, signaux).
-- [ ] Ports typés et adapters queries.
+- [x] Endpoints de lecture (`/api/admin/pipeline/runs`, `/api/admin/pipeline/runs/{run_id}`) : liste des runs (agrégation par `run_id`, statut global) ; détail d'un run = ses exécutions de phase, chacune portant métriques, observables, rendement, durée, médian historique et écart, signaux (recalculés à la lecture). Le détail d'une exécution de phase est embarqué dans le détail du run, pas d'endpoint séparé.
+- [x] Port typé (`application/ports/api/pipeline_phase_executions_queries.py`) et adapter queries (`infrastructure/queries/api/pipeline_phase_executions.py`).
 
 ### Phase E — Interface en ruban
 
