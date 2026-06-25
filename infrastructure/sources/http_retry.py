@@ -46,7 +46,8 @@ def http_request_with_retry(
 
     Stratégie :
       - status 429 → pause `initial_backoff * 2^attempt` puis retry
-      - RequestException → pause puis retry (sauf au dernier essai, où on raise)
+      - 4xx (≠ 429) → échec immédiat (déterministe : retenter ne changerait rien)
+      - 5xx / erreur réseau → pause puis retry (sauf au dernier essai, où on raise)
       - body vide (si retry_on_empty_body) → pause puis retry
       - succès → retourne response.json()
 
@@ -106,7 +107,12 @@ def http_request_with_retry(
             time.sleep(wait)
         except requests.RequestException as e:
             last_error = e
-            if attempt == max_retries - 1:
+            # 4xx déterministe (≠ 429, déjà géré plus haut) : retenter ne changera
+            # rien (préfixe inconnu, requête malformée…) → échec immédiat. On ne
+            # retente que les 5xx et les erreurs réseau.
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            client_error = status is not None and 400 <= status < 500
+            if client_error or attempt == max_retries - 1:
                 # HTTPError (4xx/5xx) ⊂ RequestException : seuls 5xx/réseau comptent.
                 if breaker is not None and _counts_as_source_failure(e):
                     breaker.record_failure()
