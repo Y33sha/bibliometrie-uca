@@ -160,6 +160,17 @@ def phase_extract(
     return metrics
 
 
+def phase_resolve_ra(**kw: Any) -> PhaseMetrics:
+    """Résout la Registration Agency des préfixes DOI (`doi.org/ra`) avant cross_imports.
+
+    Permet à `cross_imports` de router les fetches par RA (Crossref vs DataCite) dès le
+    run courant, au lieu de tenter chaque DOI contre les deux APIs (ensembles disjoints).
+    Le volet publisher (phase `publishers_journals`) complète ensuite les rows via les
+    API `/prefixes`.
+    """
+    return _run_resolve_ra()
+
+
 def phase_cross_imports(
     mode: Any = "full", sources: Any = None, include_wos: bool = False, **kw: Any
 ) -> PhaseMetrics:
@@ -379,51 +390,89 @@ def phase_publishers_journals(**kw: Any) -> PhaseMetrics:
     nouveaux DOIs via `fetch_missing_hal_id`, (b) `normalize` crée les
     `publishers`/`journals` qu'on veut enrichir.
     """
-    metrics = _run_resolve_doi_prefixes()
+    metrics = _run_resolve_publishers()
     _run_enrich_journals_from_openalex()
     _run_enrich_journals_from_doaj()
     return metrics
 
 
-def _run_resolve_doi_prefixes() -> PhaseMetrics:
+def _run_resolve_ra() -> PhaseMetrics:
+    from application.pipeline.publishers_journals.resolve_doi_prefixes import run_resolve_ra
+    from infrastructure.db.engine import get_sync_engine
+    from infrastructure.repositories import doi_prefix_repository
+    from infrastructure.sources.circuit_breaker import (
+        SourceCircuitBreaker,
+        reset_current_breaker,
+        set_current_breaker,
+    )
+    from infrastructure.sources.config import get_polite_pool_email
+    from infrastructure.sources.doi_prefixes.clients import build_user_agent, resolve_ra
+
+    log.info("▶ resolve_ra")
+    t0 = time.time()
+    conn = get_sync_engine().connect()
+    # Circuit-breaker sur doi.org/ra : la ContextVar est lue par le helper HTTP,
+    # `run_resolve_ra` consulte `breaker.tripped` pour s'arrêter proprement.
+    breaker = SourceCircuitBreaker("doi.org/ra")
+    token = set_current_breaker(breaker)
+    try:
+        user_agent = build_user_agent(get_polite_pool_email(conn))
+        metrics = run_resolve_ra(
+            log,
+            repo=doi_prefix_repository(conn),
+            resolve_ra_fn=lambda doi: resolve_ra(doi, user_agent=user_agent),
+            breaker=breaker,
+        )
+        conn.commit()
+    finally:
+        reset_current_breaker(token)
+        conn.close()
+    log.info("✓ resolve_ra terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
+    return metrics
+
+
+def _run_resolve_publishers() -> PhaseMetrics:
     from application.pipeline.publishers_journals.resolve_doi_prefixes import (
-        run_resolve_doi_prefixes,
+        run_resolve_publishers,
     )
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.repositories import doi_prefix_repository, publisher_repository
+    from infrastructure.sources.circuit_breaker import (
+        SourceCircuitBreaker,
+        reset_current_breaker,
+        set_current_breaker,
+    )
     from infrastructure.sources.config import get_polite_pool_email
     from infrastructure.sources.doi_prefixes.clients import (
         build_user_agent,
         fetch_crossref_prefix,
         fetch_datacite_prefix,
-        resolve_ra,
     )
 
-    log.info("▶ resolve_doi_prefixes")
+    log.info("▶ resolve_publishers")
     t0 = time.time()
     conn = get_sync_engine().connect()
+    breaker = SourceCircuitBreaker("crossref/datacite prefixes")
+    token = set_current_breaker(breaker)
     try:
         user_agent = build_user_agent(get_polite_pool_email(conn))
-        metrics = run_resolve_doi_prefixes(
+        metrics = run_resolve_publishers(
             log,
             repo=doi_prefix_repository(conn),
             publisher_repo=publisher_repository(conn),
-            resolve_ra_fn=lambda doi: resolve_ra(doi, user_agent=user_agent),
             fetch_crossref_prefix_fn=lambda prefix: fetch_crossref_prefix(
                 prefix, user_agent=user_agent
             ),
             fetch_datacite_prefix_fn=lambda prefix: fetch_datacite_prefix(
                 prefix, user_agent=user_agent
             ),
+            breaker=breaker,
         )
         conn.commit()
     finally:
+        reset_current_breaker(token)
         conn.close()
-    log.info(
-        "✓ resolve_doi_prefixes terminé en %.1fs — %s",
-        time.time() - t0,
-        metrics.as_summary(),
-    )
+    log.info("✓ resolve_publishers terminé en %.1fs — %s", time.time() - t0, metrics.as_summary())
     return metrics
 
 
@@ -1606,6 +1655,7 @@ def phase_oa_status(**kw: Any) -> Any:
 # Registre des phases, dans l'ordre
 PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
     ("extract", phase_extract),
+    ("resolve_ra", phase_resolve_ra),
     ("cross_imports", phase_cross_imports),
     ("refresh_stale", phase_refresh_stale),
     ("refetch_truncated", phase_refetch_truncated),

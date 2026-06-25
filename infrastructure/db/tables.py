@@ -351,7 +351,13 @@ doi_prefixes = Table(
     Column("client_name_normalized", Text),
     Column("datacite_client_symbol", Text),
     Column("fetched_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    Column("publisher_checked_at", DateTime(timezone=True)),
     Index("idx_doi_prefixes_ra", "ra"),
+    Index(
+        "idx_doi_prefixes_publisher_pending",
+        "prefix",
+        postgresql_where=text("publisher_id IS NULL AND publisher_checked_at IS NULL"),
+    ),
     Index(
         "idx_doi_prefixes_publisher",
         "publisher_id",

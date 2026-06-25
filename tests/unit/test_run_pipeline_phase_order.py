@@ -31,3 +31,10 @@ def test_recompute_addresses_runs_in_publications_not_normalize():
 
         run_pipeline.phase_publications()
         assert recompute.call_count == 1, "recompute_pub_count doit tourner en publications"
+
+
+def test_resolve_ra_runs_after_extract_before_cross_imports():
+    """La RA doit être résolue avant le cross-import par DOI : sinon cross_imports
+    route en best-effort (RA NULL) et tente chaque DOI contre Crossref ET DataCite."""
+    names = [n for n, _ in run_pipeline.PHASES]
+    assert names.index("extract") < names.index("resolve_ra") < names.index("cross_imports")

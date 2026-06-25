@@ -28,18 +28,21 @@ Deux causes structurelles :
 ### Phase 1 — Vue `candidate_dois` + branchement des deux requêtes
 
 - [x] Migration Alembic `e1c7a4f9b3d6` : `CREATE VIEW candidate_dois(doi, source)` (union staging + related_dois + publication_relations[source NULL] + arXiv-dérivés). `source` exposée en enum `source_type` pour que les comparaisons `source = <param>` restent enum=enum côté appelants.
-- [ ] Régénérer le snapshot `infrastructure/db/schema.sql` (après `alembic upgrade head`).
+- [x] Régénérer le snapshot `infrastructure/db/schema.sql` (après `alembic upgrade head`).
 - [x] `get_cross_import_dois` : `FROM candidate_dois` + filtres existants (exclusion du target via `source IS DISTINCT FROM`, RA, backoff). Équivalence couverte par `TestGetCrossImportDois`.
 - [x] Sélection des préfixes à résoudre (`get_unresolved_prefixes_with_samples`) : `FROM candidate_dois` (tous, sans exclusion de source) → préfixes distincts non encore résolus.
 - [x] Test de couverture : préfixes vus seulement via relations / arXiv désormais résolus (`TestGetUnresolvedPrefixes`).
 
 ### Phase 2 — Scission `resolve_ra` / volet publisher
 
-- [ ] `resolve_ra` : résout la RA des préfixes non résolus du pool (`doi.org/ra`) et insère `doi_prefixes(prefix, ra)`. Sous circuit-breaker.
-- [ ] Volet publisher dans `publishers_journals` : pour les rows `ra` connue ∧ publisher non déterminé, `/prefixes` Crossref/DataCite selon la RA → nom → match/crée/attache le publisher. Sous circuit-breaker.
-- [ ] Scinder le(s) script(s) CLI standalone correspondant(s).
+- [x] Migration Alembic `f2d9b6a4c1e8` : colonne `doi_prefixes.publisher_checked_at` (marqueur « `/prefixes` déjà tenté »), backfill `= fetched_at` sur le backlog (337 rows terminales → le volet les ignore). Colonne + index `idx_doi_prefixes_publisher_pending` ajoutés à `infrastructure/db/tables.py`.
+- [ ] Régénérer le snapshot `infrastructure/db/schema.sql` (après `alembic upgrade head`).
+- [x] `run_resolve_ra` : résout la RA des préfixes non résolus du pool (`doi.org/ra`) et `insert_ra(prefix, ra)` (`unknown` si non classé). Sous circuit-breaker (s'arrête sur `breaker.tripped`).
+- [x] `run_resolve_publishers` : rows `publisher_id IS NULL ∧ publisher_checked_at IS NULL ∧ ra gérée` → `/prefixes` routé par RA (`unknown` → les deux + correction RA) → match/crée/attache, `mark_publisher_checked` quoi qu'il arrive (garde anti-réinterrogation). Sous circuit-breaker.
+- [x] Repo : `insert_ra`, `get_prefixes_pending_publisher`, `set_prefix_publisher_metadata`, `mark_publisher_checked` (remplacent `insert_doi_prefix` / `get_unmatched_prefixes`). Test unitaire réécrit (Fakes + passes séparées).
+- [x] CLI `interfaces/cli/pipeline/resolve_doi_prefixes.py` : enchaîne les deux passes.
 
 ### Phase 3 — Câblage pipeline
 
-- [ ] `run_pipeline.py` : insérer `resolve_ra` dans `PHASES` entre `extract` et `cross_imports` ; helper `_run_resolve_ra` → `PhaseMetrics`. Le helper resolve de `publishers_journals` se réduit au volet publisher.
-- [ ] Tests : RA effective dès le 1er run (DataCite ne reçoit aucun DOI Crossref) ; ordre `resolve_ra` avant `cross_imports` ; le volet publisher attache toujours correctement.
+- [x] `run_pipeline.py` : phase `resolve_ra` insérée dans `PHASES` entre `extract` et `cross_imports` (helper `_run_resolve_ra`) ; `publishers_journals` appelle `_run_resolve_publishers`. Circuit-breaker posé dans chaque helper (`set_current_breaker`).
+- [x] Tests : ordre `resolve_ra` avant `cross_imports` (`test_resolve_ra_runs_after_extract_before_cross_imports`) ; routage par RA couvert par `test_crossref_target_filters_non_crossref_prefixes` ; volet publisher (match/crée/attache, garde `checked`) couvert par les tests unitaires.
