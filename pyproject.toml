@@ -302,12 +302,11 @@ exclude = [
 # - `application.ports.api.*` : DTOs Pydantic co-localisés — `BaseModel`
 #   propage `Any` via ses stubs (`__init__: **data: Any`), ce qui déclenche
 #   `explicit-any` à chaque héritage `class X(BaseModel)`. Le `Any` côté
-#   projet est strict (Phase 4 du chantier `CODE_typage-projections-strict`)
-#   mais l'override couvre Pydantic. Idem pour `infrastructure.settings` qui
-#   hérite de `BaseSettings`.
-# - `application.ports.repositories.*` (sauf audit, déjà strict) : records DB
-#   hydratés et partial updates — délégués au chantier `CODE_rich-domain-model`
-#   Phase 8.
+#   projet reste par ailleurs strict ; l'override ne couvre que la surface
+#   Pydantic. Idem pour `infrastructure.settings` qui hérite de `BaseSettings`.
+# - `application.ports.repositories.*` (sauf audit + les projections déjà
+#   typées des ports structures/persons) : records DB hydratés et partial
+#   updates encore exposés en `dict[str, Any]`.
 # - `application.ports.pipeline.{staging,subjects}` : `raw_data: dict[str, Any]`
 #   JSONB sur `StagingRow`, `list[Any]` sur
 #   `select_source_publications_with_subjects`.
@@ -318,11 +317,8 @@ exclude = [
 #   `domain.sources.*`).
 # - `application.pipeline.subjects._common` : `_PushedOntology` interne au
 #   cache (dict mutable avec sets, difficile à typer).
-# - Packages `application.{persons,structures}.*` (core + commands) : `list` /
-#   `dict` sans paramètres (records DB hydratés, propagés par les command
-#   handlers) — délégués à Phase 8 (`CODE_rich-domain-model`).
 # - `infrastructure.repositories.*` et `infrastructure.queries.*` :
-#   couche SQL — Row, records DB, batchs hétérogènes. Phase 8.
+#   couche SQL — Row, records DB, batchs hétérogènes.
 # - `application.publishers_enrichment.*` : orchestrateurs d'enrichissement
 #   consommant des payloads d'API externes (`dict[str, Any]`, fetchers typés
 #   `Callable[..., dict[str, Any]]`) — comme `infrastructure.sources.*`.
@@ -330,16 +326,14 @@ exclude = [
 #   records DB / payloads JSONB — `Any` délibéré, comme les couches SQL. Ils
 #   restent annotés et leurs corps vérifiés (≠ exclusion : cf. `exclude` plus haut).
 # - `interfaces.api.models.*` : nombreux fields `Any` (payloads JSONB libres
-#   côté API, body dicts hétérogènes). Hors scope du chantier typage strict
-#   tant que `JsonValue` ne couvre pas tous les cas.
+#   côté API, body dicts hétérogènes), tant que `JsonValue` ne couvre pas
+#   tous les cas.
 # - `interfaces.cli.dev.generate_seed.TABLES` : schéma de seed,
 #   `list[dict[str, Any]]` délibéré.
 # - `run_pipeline` : entry-point CLI qui orchestre des subprocess + dict
-#   d'options hétérogènes — hors scope du chantier typage.
+#   d'options hétérogènes (`Any` délibéré).
 [[tool.mypy.overrides]]
 module = [
-    "application.persons.*",
-    "application.structures.*",
     "application.pipeline.extract.*",
     "application.pipeline.normalize.*",
     "application.pipeline.oa_status.*",

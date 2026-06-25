@@ -14,8 +14,14 @@ Couvre les trois tables du domaine : `structures`, `structure_relations`,
 from sqlalchemy import Connection
 
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.structure_repository import StructureRepository
+from application.ports.repositories.structure_repository import (
+    StructureNameFormRow,
+    StructureRelationRow,
+    StructureRepository,
+    StructureRow,
+)
 from application.structures import core as structures_service
+from domain.types import JsonValue
 
 # ── structures ────────────────────────────────────────────────────
 
@@ -33,7 +39,7 @@ def create_structure(
     api_ids: dict[str, str | list[str]] | None,
     repo: StructureRepository,
     audit_repo: AuditRepository,
-) -> dict:
+) -> StructureRow:
     """Crée une structure. Retourne la ligne insérée."""
     row = structures_service.create_structure(
         code=code,
@@ -55,9 +61,9 @@ def update_structure(
     conn: Connection,
     structure_id: int,
     *,
-    fields: dict,
+    fields: dict[str, JsonValue],
     repo: StructureRepository,
-) -> dict:
+) -> StructureRow:
     """Met à jour une structure (champs sélectifs). Retourne la ligne modifiée."""
     row = structures_service.update_structure(structure_id, fields=fields, repo=repo)
     conn.commit()
@@ -86,7 +92,7 @@ def create_relation(
     child_id: int,
     relation_type: str,
     repo: StructureRepository,
-) -> dict | None:
+) -> StructureRelationRow | None:
     """Crée une relation parent-enfant. Retourne la ligne insérée, ou None si
     elle existait déjà."""
     row = structures_service.create_relation(
@@ -121,9 +127,9 @@ def create_name_form(
     form_text: str,
     is_word_boundary: bool,
     is_excluding: bool,
-    requires_context_of: list | None,
+    requires_context_of: list[int] | None,
     repo: StructureRepository,
-) -> dict:
+) -> StructureNameFormRow:
     """Crée une forme de nom. Retourne la ligne insérée."""
     row = structures_service.create_name_form(
         structure_id=structure_id,
@@ -141,9 +147,9 @@ def update_name_form(
     conn: Connection,
     form_id: int,
     *,
-    fields: dict,
+    fields: dict[str, JsonValue],
     repo: StructureRepository,
-) -> dict:
+) -> StructureNameFormRow:
     """Met à jour une forme de nom (champs sélectifs). Retourne la ligne modifiée."""
     row = structures_service.update_name_form(form_id, fields=fields, repo=repo)
     conn.commit()

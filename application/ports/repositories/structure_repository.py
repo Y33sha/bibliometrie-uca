@@ -1,6 +1,7 @@
 """Port StructureRepository — contrat d'accès à l'agrégat Structure."""
 
-from typing import Any, Protocol, TypedDict
+from datetime import datetime
+from typing import Protocol, TypedDict
 
 from domain.structures.structure import Structure
 
@@ -32,12 +33,68 @@ class StructureNameFormUpdateFields(TypedDict, total=False):
     requires_context_of: list[int] | None
 
 
+class StructureRow(TypedDict):
+    """Ligne `structures` renvoyée par create / update (colonne `structure_type`
+    exposée sous l'alias `type`). Alimente le DTO `StructureOut`."""
+
+    id: int
+    code: str
+    name: str
+    acronym: str | None
+    type: str
+    ror_id: str | None
+    rnsr_id: str | None
+    hal_collection: str | None
+    api_ids: dict[str, list[str]] | None
+
+
+class StructureDeletedRow(TypedDict):
+    """Sous-ensemble renvoyé par delete (identification pour l'audit)."""
+
+    code: str
+    name: str
+
+
+class StructureRelationRow(TypedDict):
+    """Ligne `structure_relations` renvoyée par create."""
+
+    id: int
+    parent_id: int
+    child_id: int
+    relation_type: str
+
+
+class StructureRelationDeletedRow(TypedDict):
+    """Sous-ensemble renvoyé par delete (les ids pour l'audit)."""
+
+    parent_id: int
+    child_id: int
+    relation_type: str
+
+
+class StructureNameFormRow(TypedDict):
+    """Ligne `structure_name_forms` renvoyée par create / update.
+    Alimente le DTO `NameFormOut`."""
+
+    id: int
+    structure_id: int
+    form_text: str
+    created_at: datetime | None
+    is_word_boundary: bool
+    requires_context_of: list[int] | None
+    is_excluding: bool
+
+
+class StructureNameFormDeletedRow(TypedDict):
+    """Sous-ensemble renvoyé par delete (structure + texte pour l'audit)."""
+
+    structure_id: int
+    form_text: str
+
+
 class StructureRepository(Protocol):
     """Contrat d'accès aux 3 tables du concept Structure
-    (structures, structure_relations, structure_name_forms).
-
-    Les retours `dict[str, Any]` sont des records DB (colonnes hétérogènes par table) ; ces `Any` sont des frontières DB intrinsèques, traités par les phases ultérieures du chantier `CODE_typage-projections-strict`.
-    """
+    (structures, structure_relations, structure_name_forms)."""
 
     # ── Chargement de l'aggregate ──────────────────────────────────
 
@@ -67,15 +124,15 @@ class StructureRepository(Protocol):
         # via `StructureApiIds`. Le post-coercion (DB / aggregate) est
         # `dict[str, list[str]]`.
         api_ids: dict[str, str | list[str]] | None,
-    ) -> dict[str, Any]: ...
+    ) -> StructureRow: ...
 
     def update_structure_fields(
         self,
         structure_id: int,
         fields: StructureUpdateFields,
-    ) -> dict[str, Any]: ...
+    ) -> StructureRow: ...
 
-    def delete_structure(self, structure_id: int) -> dict[str, Any] | None: ...
+    def delete_structure(self, structure_id: int) -> StructureDeletedRow | None: ...
 
     # ── structure_relations ────────────────────────────────────────
 
@@ -92,9 +149,9 @@ class StructureRepository(Protocol):
         parent_id: int,
         child_id: int,
         relation_type: str,
-    ) -> dict[str, Any] | None: ...
+    ) -> StructureRelationRow | None: ...
 
-    def delete_relation(self, relation_id: int) -> dict[str, Any] | None: ...
+    def delete_relation(self, relation_id: int) -> StructureRelationDeletedRow | None: ...
 
     # ── structure_name_forms ───────────────────────────────────────
 
@@ -108,12 +165,12 @@ class StructureRepository(Protocol):
         is_word_boundary: bool,
         is_excluding: bool,
         requires_context_of: list[int] | None,
-    ) -> dict[str, Any]: ...
+    ) -> StructureNameFormRow: ...
 
     def update_name_form_fields(
         self,
         form_id: int,
         fields: StructureNameFormUpdateFields,
-    ) -> dict[str, Any]: ...
+    ) -> StructureNameFormRow: ...
 
-    def delete_name_form(self, form_id: int) -> dict[str, Any] | None: ...
+    def delete_name_form(self, form_id: int) -> StructureNameFormDeletedRow | None: ...

@@ -6,17 +6,23 @@ Le SQL vit dans `infrastructure/repositories/structure_repository.py`. La valida
 Les routers passent par ces fonctions pour toute écriture. Les lectures restent autorisées dans les routers (convention du projet).
 """
 
+from typing import cast
+
 from application.audit import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.structure_repository import (
+    StructureNameFormRow,
     StructureNameFormUpdateFields,
+    StructureRelationRow,
     StructureRepository,
+    StructureRow,
     StructureUpdateFields,
 )
 from domain.errors import NotFoundError, ValidationError
 from domain.normalize import normalize_text
 from domain.structures.identifiers import RorId
 from domain.structures.relations import check_can_create_relation
+from domain.types import JsonValue
 
 # ── Mapping des champs UI → colonnes SQL pour la table structures ──
 _STRUCTURE_FIELD_MAP = {
@@ -59,8 +65,8 @@ def create_structure(
     api_ids: dict[str, str | list[str]] | None = None,
     repo: StructureRepository,
     audit_repo: AuditRepository | None = None,
-) -> dict:
-    """Crée une structure. Retourne la ligne insérée (dict)."""
+) -> StructureRow:
+    """Crée une structure. Retourne la ligne insérée."""
     row = repo.create_structure(
         code=code,
         name=name,
@@ -81,7 +87,9 @@ def create_structure(
     return row
 
 
-def update_structure(structure_id: int, *, fields: dict, repo: StructureRepository) -> dict:
+def update_structure(
+    structure_id: int, *, fields: dict[str, JsonValue], repo: StructureRepository
+) -> StructureRow:
     """Met à jour une structure. Retourne la ligne modifiée.
 
     Lève NotFoundError si la structure n'existe pas.
@@ -99,10 +107,11 @@ def update_structure(structure_id: int, *, fields: dict, repo: StructureReposito
     if "ror_id" in update_fields:
         update_fields["ror_id"] = _normalize_ror_id(update_fields["ror_id"])
 
-    if "api_ids" in fields and fields["api_ids"] is not None:
+    api_ids = fields.get("api_ids")
+    if isinstance(api_ids, dict):
         # SA sérialise auto en JSONB depuis un dict Python ; pas de Json() wrap.
         # Validation appliquée côté repo.
-        update_fields["api_ids"] = fields["api_ids"]
+        update_fields["api_ids"] = cast("dict[str, str | list[str]]", api_ids)
 
     if not update_fields:
         raise ValidationError("Aucun champ à mettre à jour")
@@ -144,7 +153,7 @@ def create_relation(
     child_id: int,
     relation_type: str,
     repo: StructureRepository,
-) -> dict | None:
+) -> StructureRelationRow | None:
     """Crée une relation. Retourne la ligne insérée, ou None si elle existait déjà.
 
     Lève `ValidationError` si la relation viole l'invariant de graphe
@@ -197,9 +206,9 @@ def create_name_form(
     form_text: str,
     is_word_boundary: bool = False,
     is_excluding: bool = False,
-    requires_context_of: list | None = None,
+    requires_context_of: list[int] | None = None,
     repo: StructureRepository,
-) -> dict:
+) -> StructureNameFormRow:
     """Crée une forme de nom. Retourne la ligne insérée."""
     return repo.create_name_form(
         structure_id=structure_id,
@@ -210,7 +219,9 @@ def create_name_form(
     )
 
 
-def update_name_form(form_id: int, *, fields: dict, repo: StructureRepository) -> dict:
+def update_name_form(
+    form_id: int, *, fields: dict[str, JsonValue], repo: StructureRepository
+) -> StructureNameFormRow:
     """Met à jour une forme de nom. Retourne la ligne modifiée.
 
     Lève NotFoundError si la forme n'existe pas.
@@ -221,14 +232,18 @@ def update_name_form(form_id: int, *, fields: dict, repo: StructureRepository) -
 
     update_fields: StructureNameFormUpdateFields = {}
 
-    if fields.get("form_text") is not None:
-        update_fields["form_text"] = normalize_text(fields["form_text"])
-    if fields.get("is_word_boundary") is not None:
-        update_fields["is_word_boundary"] = fields["is_word_boundary"]
-    if fields.get("is_excluding") is not None:
-        update_fields["is_excluding"] = fields["is_excluding"]
-    if fields.get("requires_context_of") is not None:
-        update_fields["requires_context_of"] = fields["requires_context_of"] or None
+    form_text = fields.get("form_text")
+    if isinstance(form_text, str):
+        update_fields["form_text"] = normalize_text(form_text)
+    is_word_boundary = fields.get("is_word_boundary")
+    if isinstance(is_word_boundary, bool):
+        update_fields["is_word_boundary"] = is_word_boundary
+    is_excluding = fields.get("is_excluding")
+    if isinstance(is_excluding, bool):
+        update_fields["is_excluding"] = is_excluding
+    requires_context_of = fields.get("requires_context_of")
+    if isinstance(requires_context_of, list):
+        update_fields["requires_context_of"] = cast("list[int]", requires_context_of) or None
 
     if not update_fields:
         raise ValidationError("Aucun champ à mettre à jour")

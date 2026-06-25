@@ -1,7 +1,10 @@
 """SQL pour `person_identifiers` (ORCID, idHAL, IdRef...)."""
 
+from typing import cast
+
 from sqlalchemy import Connection, text
 
+from application.ports.repositories.person_repository import IdentifierStatusRow
 from domain.errors import NotFoundError
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person_identifier import PersonIdentifier
@@ -91,7 +94,7 @@ def remove_identifier(conn: Connection, person_id: int, id_type: str, id_value: 
         raise NotFoundError("Identifiant introuvable")
 
 
-def update_identifier_status(conn: Connection, ident_id: int, status: str) -> dict:
+def update_identifier_status(conn: Connection, ident_id: int, status: str) -> IdentifierStatusRow:
     """Change le statut d'un identifiant. Retourne {id, status, person_id}."""
     row = conn.execute(
         text(
@@ -102,7 +105,7 @@ def update_identifier_status(conn: Connection, ident_id: int, status: str) -> di
     ).first()
     if not row:
         raise NotFoundError(f"Identifiant {ident_id} introuvable")
-    return dict(row._mapping)
+    return cast(IdentifierStatusRow, dict(row._mapping))
 
 
 def reassign_identifier(conn: Connection, ident_id: int, target_person_id: int) -> None:

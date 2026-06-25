@@ -10,8 +10,11 @@ auparavant — leur sémantique métier survit, leur implémentation est
 DB).
 """
 
+from typing import cast
+
 from sqlalchemy import Connection, text
 
+from application.ports.repositories.person_repository import NameFormStatusRow
 from domain.errors import NotFoundError
 from domain.normalize import normalize_name
 from domain.sources.registry import AUTHOR_SOURCES_SQL
@@ -61,7 +64,9 @@ def add_name_form(
     add_person_source(conn, name_form=norm, person_id=person_id, source=source)
 
 
-def update_name_form_status(conn: Connection, person_id: int, name_form: str, status: str) -> dict:
+def update_name_form_status(
+    conn: Connection, person_id: int, name_form: str, status: str
+) -> NameFormStatusRow:
     """Change le statut d'une forme de nom. Retourne {person_id, name_form, status}.
 
     `rejected` bloque durablement le retour de la forme au matching par nom (le
@@ -79,7 +84,7 @@ def update_name_form_status(conn: Connection, person_id: int, name_form: str, st
     ).first()
     if not row:
         raise NotFoundError(f"Forme de nom {name_form!r} introuvable pour la personne {person_id}")
-    return dict(row._mapping)
+    return cast(NameFormStatusRow, dict(row._mapping))
 
 
 def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int:

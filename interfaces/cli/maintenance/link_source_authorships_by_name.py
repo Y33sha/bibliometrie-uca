@@ -50,6 +50,7 @@ import os
 from sqlalchemy import text
 
 from application.persons.core import add_identifiers_from_authorships
+from domain.types import JsonValue
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 from infrastructure.repositories import person_repository
@@ -131,7 +132,7 @@ _UPDATE_SQL = (
 )
 
 
-def _identifier_dict(orphan_identifiers: dict | None) -> dict[str, object]:
+def _identifier_dict(orphan_identifiers: dict | None) -> dict[str, JsonValue]:
     """Adapte le jsonb `source_authorships.person_identifiers` au format
     dict attendu par `add_identifiers_from_authorships` (clé `id_type` =
     valeur)."""

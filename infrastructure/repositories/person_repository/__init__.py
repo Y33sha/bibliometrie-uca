@@ -22,6 +22,10 @@ from infrastructure.repositories.person_repository import (
 )
 
 if TYPE_CHECKING:
+    from application.ports.repositories.person_repository import (
+        IdentifierStatusRow,
+        NameFormStatusRow,
+    )
     from domain.persons.person import Person
     from domain.persons.person_identifier import PersonIdentifier
 
@@ -73,7 +77,7 @@ class PgPersonRepository:
     def remove_identifier(self, person_id: int, id_type: str, id_value: str) -> None:
         _identifiers.remove_identifier(self._conn, person_id, id_type, id_value)
 
-    def update_identifier_status(self, ident_id: int, status: str) -> dict:
+    def update_identifier_status(self, ident_id: int, status: str) -> "IdentifierStatusRow":
         return _identifiers.update_identifier_status(self._conn, ident_id, status)
 
     def reassign_identifier(self, ident_id: int, target_person_id: int) -> None:
@@ -166,7 +170,9 @@ class PgPersonRepository:
     def add_name_form(self, person_id: int, full_name: str, source: str | None = None) -> None:
         _name_forms.add_name_form(self._conn, person_id, full_name, source)
 
-    def update_name_form_status(self, person_id: int, name_form: str, status: str) -> dict:
+    def update_name_form_status(
+        self, person_id: int, name_form: str, status: str
+    ) -> "NameFormStatusRow":
         return _name_forms.update_name_form_status(self._conn, person_id, name_form, status)
 
     def delete_orphan_name_forms_for_person(self, person_id: int) -> int:
