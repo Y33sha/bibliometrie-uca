@@ -39,12 +39,13 @@
 * [ ] colonne éditeur; filtres éditeur + revue?
 * [ ] thèses d'autres établissements liés à nos labos: enlever de la page thèses (ajouter filtre implicite sur "établissement de soutenance" / ou le faire en amont dès le pipeline?)
 * [ ] page détails: séparer l'affichage des relations selon le sens (publication parent: afficher dès le bloc titre; publications dépendantes: mettre liens dans la sidebar)
-* [ ] affichage des relations: styler correctement le titre (balises mml)
+* [ ] onglet thèses: noms d'auteur bruts (en capitales)
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 164107: pourquoi type autre?
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article)
 * [ ] 30172 un recueil de proceedings fusionné avec tous ses chapitres
+* [ ] 182637 et 182636: vérifier si DataCite indique relation
 
 # Idées pour plus tard, éventuellement
 * stats en compte fractionnaire vs compte entier

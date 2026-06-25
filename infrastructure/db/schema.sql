@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict lYNinY1vokkoj0BHsZPJdUfMpCGVRw2GkTmF6yosjkfCN46Q3LfwR6vMSq7KnRB
+\restrict 8DmC96gcefd0ibpq0tGb5GGPirVIl6YtHeM6DDkCAJzfQwNQXkbK5bF95cu07uO
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg22.04+1)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1056,6 +1056,52 @@ ALTER SEQUENCE public.persons_rh_id_seq OWNED BY public.persons_rh.id;
 
 
 --
+-- Name: pipeline_phase_executions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pipeline_phase_executions (
+    id bigint NOT NULL,
+    run_id bigint NOT NULL,
+    phase text NOT NULL,
+    started_at timestamp with time zone NOT NULL,
+    ended_at timestamp with time zone NOT NULL,
+    mode text NOT NULL,
+    sources text[] DEFAULT '{}'::text[] NOT NULL,
+    status text NOT NULL,
+    signals jsonb DEFAULT '[]'::jsonb NOT NULL,
+    metrics jsonb DEFAULT '{}'::jsonb NOT NULL,
+    details jsonb DEFAULT '{}'::jsonb NOT NULL,
+    CONSTRAINT pipeline_phase_executions_status_check CHECK ((status = ANY (ARRAY['ok'::text, 'warning'::text, 'error'::text])))
+);
+
+
+--
+-- Name: pipeline_phase_executions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.pipeline_phase_executions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.pipeline_phase_executions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: pipeline_run_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.pipeline_run_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
 -- Name: pipeline_run_snapshots; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1939,6 +1985,14 @@ ALTER TABLE ONLY public.pipeline_run_snapshots
 
 
 --
+-- Name: pipeline_phase_executions pipeline_phase_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pipeline_phase_executions
+    ADD CONSTRAINT pipeline_phase_executions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: place_name_forms place_name_forms_form_normalized_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2470,6 +2524,27 @@ CREATE INDEX idx_persons_rh_person_id ON public.persons_rh USING btree (person_i
 
 
 --
+-- Name: idx_phase_exec_phase; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_phase_exec_phase ON public.pipeline_phase_executions USING btree (phase);
+
+
+--
+-- Name: idx_phase_exec_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_phase_exec_run_id ON public.pipeline_phase_executions USING btree (run_id);
+
+
+--
+-- Name: idx_phase_exec_started_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_phase_exec_started_at ON public.pipeline_phase_executions USING btree (started_at DESC);
+
+
+--
 -- Name: idx_pipeline_run_snapshots_mode_ran_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2627,7 +2702,7 @@ CREATE INDEX idx_sa_authorship ON public.source_authorships USING btree (authors
 -- Name: idx_sa_countries_dirty; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source_publication_id) WHERE countries_dirty;
+CREATE INDEX idx_sa_countries_dirty ON public.source_authorships USING btree (source) WHERE countries_dirty;
 
 
 --
@@ -3224,5 +3299,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lYNinY1vokkoj0BHsZPJdUfMpCGVRw2GkTmF6yosjkfCN46Q3LfwR6vMSq7KnRB
+\unrestrict 8DmC96gcefd0ibpq0tGb5GGPirVIl6YtHeM6DDkCAJzfQwNQXkbK5bF95cu07uO
 
