@@ -63,6 +63,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
 
+from application.pipeline.graph import PHASE_ORDER
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from domain.sources.registry import ALL_SOURCES_SET, DOI_SEARCHABLE_SOURCES
@@ -1652,27 +1653,39 @@ def phase_oa_status(**kw: Any) -> Any:
     _run_enrich_oa_status()
 
 
-# Registre des phases, dans l'ordre
+# Registre des phases : l'implémentation de chacune. L'ordre d'exécution vient du
+# graphe des phases (`PHASE_ORDER`), source de vérité unique ; ce registre ne fournit
+# que les fonctions, validées comme couvrant exactement le graphe.
+_PHASE_FUNCTIONS: dict[str, Callable[..., PhaseMetrics]] = {
+    "extract": phase_extract,
+    "resolve_ra": phase_resolve_ra,
+    "cross_imports": phase_cross_imports,
+    "refresh_stale": phase_refresh_stale,
+    "refetch_truncated": phase_refetch_truncated,
+    "normalize": phase_normalize,
+    "affiliations": phase_affiliations,
+    "publishers_journals": phase_publishers_journals,
+    "metadata_correction": phase_metadata_correction,
+    "publications": phase_publications,
+    "relations": phase_relations,
+    "persons": phase_persons,
+    "authorships": phase_authorships,
+    "countries": phase_countries,
+    "subjects": phase_subjects,
+    "oa_status": phase_oa_status,
+}
+
+if set(_PHASE_FUNCTIONS) != set(PHASE_ORDER):
+    raise RuntimeError(
+        "Le registre des phases de l'orchestrateur et le graphe des phases divergent : "
+        f"{set(_PHASE_FUNCTIONS) ^ set(PHASE_ORDER)}"
+    )
+
 PHASES: list[tuple[str, Callable[..., PhaseMetrics]]] = [
-    ("extract", phase_extract),
-    ("resolve_ra", phase_resolve_ra),
-    ("cross_imports", phase_cross_imports),
-    ("refresh_stale", phase_refresh_stale),
-    ("refetch_truncated", phase_refetch_truncated),
-    ("normalize", phase_normalize),
-    ("affiliations", phase_affiliations),
-    ("publishers_journals", phase_publishers_journals),
-    ("metadata_correction", phase_metadata_correction),
-    ("publications", phase_publications),
-    ("relations", phase_relations),
-    ("persons", phase_persons),
-    ("authorships", phase_authorships),
-    ("countries", phase_countries),
-    ("subjects", phase_subjects),
-    ("oa_status", phase_oa_status),
+    (name, _PHASE_FUNCTIONS[name]) for name in PHASE_ORDER
 ]
 
-PHASE_NAMES = [name for name, _ in PHASES]
+PHASE_NAMES = list(PHASE_ORDER)
 
 
 # ---------------------------------------------------------------------------
@@ -1799,6 +1812,7 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
     log.info("Sources : %s", ", ".join(sorted(sources)))
 
     # Métriques pipeline
+    from infrastructure.observability.phase_executions import metrics_to_payload, start_run
     from infrastructure.observability.pipeline_report import (
         capture_log_offsets,
         generate_report,
@@ -1807,6 +1821,11 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
 
     phase_results = []  # [(name, duration, logs)]
     phase_metrics: dict[str, PhaseMetrics] = {}  # collecté pour Volet B (dashboard)
+
+    # Observabilité par phase : run_id de séquence, capture entrée/sortie + statut.
+    recorder = start_run(mode=args.mode, sources=sorted(sources))
+    if recorder.run_id is not None:
+        log.info("Run pipeline #%d", recorder.run_id)
 
     t0_total = time.time()
     pipeline_started_at = datetime.datetime.now().isoformat(timespec="seconds")
@@ -1824,6 +1843,8 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         )
 
         log_offsets = capture_log_offsets()
+        phase_started_at = datetime.datetime.now(datetime.UTC)
+        input_volumes = recorder.input_volumes(name)
         t0_phase = time.time()
         try:
             result = fn(
@@ -1837,6 +1858,20 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         except KeyboardInterrupt:
             log.warning("Pipeline interrompu par l'utilisateur à la phase '%s'", name)
             log.info("Pour reprendre : python run_pipeline.py --from %s", name)
+            recorder.record(
+                phase=name,
+                started_at=phase_started_at,
+                status="error",
+                metrics=metrics_to_payload(PhaseMetrics(), time.time() - t0_phase),
+                signals=[
+                    {
+                        "level": "error",
+                        "code": "interrupted",
+                        "message": "Interrompu par l'utilisateur",
+                    }
+                ],
+                input_volumes=input_volumes,
+            )
             phase_logs = read_new_logs(log_offsets)
             phase_results.append((name + " (INTERROMPU)", time.time() - t0_phase, phase_logs))
             report_path = generate_report(args.mode, sources, phase_results, time.time() - t0_total)
@@ -1846,6 +1881,14 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         except RuntimeError as e:
             log.error("Pipeline interrompu à la phase '%s' : %s", name, e)
             log.error("Pour reprendre : python run_pipeline.py --from %s", name)
+            recorder.record(
+                phase=name,
+                started_at=phase_started_at,
+                status="error",
+                metrics=metrics_to_payload(PhaseMetrics(), time.time() - t0_phase),
+                signals=[{"level": "error", "code": "exception", "message": str(e)}],
+                input_volumes=input_volumes,
+            )
             phase_logs = read_new_logs(log_offsets)
             phase_results.append((name + " (ERREUR)", time.time() - t0_phase, phase_logs))
             report_path = generate_report(args.mode, sources, phase_results, time.time() - t0_total)
@@ -1856,9 +1899,18 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         duration = time.time() - t0_phase
         phase_logs = read_new_logs(log_offsets)
         phase_results.append((name, duration, phase_logs))
+        metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
         if isinstance(result, PhaseMetrics):
             phase_metrics[name] = result
             log.info("Total phase %s : %s", name, result.as_summary())
+        recorder.record(
+            phase=name,
+            started_at=phase_started_at,
+            status="ok",
+            metrics=metrics_to_payload(metrics, duration),
+            signals=[],
+            input_volumes=input_volumes,
+        )
 
     elapsed_total = time.time() - t0_total
 
@@ -1913,9 +1965,15 @@ def main() -> None:  # noqa: C901 — orchestrateur CLI : refactor en helpers s�
         except Exception as e:
             log.warning("Échec du snapshot post-pipeline : %s", e)
 
+    recorder.close()
+
     clear_status()
     log.info("=" * 60)
     log.info("PIPELINE TERMINÉ en %.0fs (%.1f min)", elapsed_total, elapsed_total / 60)
+    if recorder.run_id is not None:
+        log.info("Run #%d — récapitulatif par phase :", recorder.run_id)
+        for phase_name, phase_duration, _ in phase_results:
+            log.info("  %-22s %7.1fs", phase_name, phase_duration)
     log.info("=" * 60)
 
 

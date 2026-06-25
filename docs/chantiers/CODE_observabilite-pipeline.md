@@ -58,9 +58,9 @@ Les dépendances input → output sont statiques et connues. La colonne vertébr
 
 ### Phase B — Capture par phase dans `run_pipeline.py`
 
-- [ ] `run_id` généré au lancement ; chaque phase capture son observable d'entrée à son début et persiste à sa fin observable de sortie, métriques, statut et signaux. Fonctionne pour `--only` et `--from`.
+- [x] `run_id` (séquence) généré au lancement ; chaque phase relève son observable d'entrée à son début et persiste à sa fin observable de sortie, métriques et statut (`infrastructure/observability/phase_executions.py`). Statut `error` sur exception ou interruption, avec un signal portant le message ; `warning` et les signaux métier viennent au point suivant. Capture best-effort : une défaillance d'observabilité (migration non appliquée, etc.) est loggée sans interrompre le run. Fonctionne pour `--only` et `--from`. L'orchestrateur fait dériver son ordre d'exécution de `PHASE_ORDER` (graphe), supprimant la duplication de l'ordre.
 - [ ] Remontée structurée des signaux par les phases (source indisponible, série de 429, conflits d'identité), `extract` et `persons` en priorité.
-- [ ] Résumé console par phase et récap de run en fin d'invocation ; pas d'email.
+- [x] Récapitulatif par phase (durées) en fin d'invocation, en plus du résumé par phase existant ; pas d'email.
 
 ### Phase C — Lecture : rendement et durée
 
