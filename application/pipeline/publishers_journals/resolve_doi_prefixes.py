@@ -76,6 +76,13 @@ def run_resolve_ra(
             metrics.add(new=1)
         log.info("  %s → %s", prefix, ra)
 
+    # Indicateur sur-mesure : répartition des DOI candidats par Registration Agency
+    # (Crossref / DataCite / unknown) après résolution. La part `unknown` inclut les
+    # préfixes que doi.org/ra ne classe pas et les préfixes malformés (DOI à scheme
+    # « doi: » non nettoyé), ce qui la rend lisible comme signal de qualité.
+    metrics.details["distributions"] = {
+        "Registration Agency": repo.count_dois_by_registration_agency()
+    }
     return metrics
 
 
