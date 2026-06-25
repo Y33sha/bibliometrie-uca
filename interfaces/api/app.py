@@ -69,6 +69,7 @@ from interfaces.api.routers.admin import (  # noqa: E402  # noqa: E402  # noqa: 
     persons as admin_persons,  # noqa: E402
     pipeline_config as admin_pipeline_config,
     pipeline_logs as admin_pipeline_logs,
+    pipeline_phase_executions as admin_pipeline_phase_executions,
     pipeline_runs as admin_pipeline_runs,
     publication_duplicates as admin_publication_duplicates,
     structures as admin_structures,
@@ -352,6 +353,7 @@ app.include_router(publishers.router)
 app.include_router(journals.router)
 app.include_router(admin_pipeline_logs.router)
 app.include_router(admin_pipeline_runs.router)
+app.include_router(admin_pipeline_phase_executions.router)
 app.include_router(subjects.router)
 
 
