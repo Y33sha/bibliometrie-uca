@@ -78,14 +78,17 @@ def run_resolve_ra(
             new_by_ra[ra] = new_by_ra.get(ra, 0) + 1
         log.info("  %s → %s", prefix, ra)
 
-    # Indicateur sur-mesure : par Registration Agency (Crossref / DataCite / unknown),
-    # le nombre de DOI candidats et de préfixes (avec ce que le run vient d'ajouter).
-    # La part `unknown` inclut les préfixes que doi.org/ra ne classe pas et les préfixes
-    # malformés (DOI à scheme « doi: » non nettoyé), ce qui la rend lisible comme signal
-    # de qualité.
-    metrics.details["ra_table"] = {
+    # Indicateurs sur-mesure : synthèse du run + tableau par Registration Agency
+    # (Crossref / DataCite / unknown) avec DOI candidats et préfixes. La part `unknown`
+    # inclut les préfixes que doi.org/ra ne classe pas et les préfixes malformés (DOI à
+    # scheme « doi: » non nettoyé), ce qui la rend lisible comme signal de qualité.
+    metrics.details["summary"] = {
+        "new_prefixes": metrics.new,
+        "resolved": metrics.extras.get("resolved", 0),
+    }
+    metrics.details["table"] = {
         "rows": [
-            {"ra": ra, "dois": dois, "prefixes": n_prefixes, "new": new_by_ra.get(ra, 0)}
+            {"key": ra, "dois": dois, "prefixes": n_prefixes, "new": new_by_ra.get(ra, 0)}
             for ra, dois, n_prefixes in repo.breakdown_by_registration_agency()
         ]
     }

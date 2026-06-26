@@ -114,13 +114,18 @@ async def test_happy_path_updates_each_pub(logger):
 
     # pub 3 inchangée (bronze→bronze), 1 et 2 mises à jour
     assert sorted(repo.updates) == [(1, "gold"), (2, "green")]
-    # Indicateurs remontés : compteurs du run, backlog stale, répartition par statut.
+    # Indicateurs remontés : compteurs du run, backlog stale, ventilation + table OA.
     assert metrics.total == 3
     assert metrics.updated == 2
     assert metrics.unchanged == 1
     assert metrics.extras["not_found"] == 0
     assert metrics.extras["stale"] == 42
-    assert metrics.details["distributions"]["Statut OA"] == {"gold": 7, "closed": 3}
+    summary = metrics.details["summary"]
+    assert summary["stale"] == 42
+    assert summary["checked"] == 3
+    assert summary["updated"] == 2
+    # before == after (fake renvoie la même distribution) → delta nul, trié par count.
+    assert metrics.details["table"]["rows"][0] == {"key": "gold", "count": 7, "delta": 0}
 
 
 @pytest.mark.asyncio

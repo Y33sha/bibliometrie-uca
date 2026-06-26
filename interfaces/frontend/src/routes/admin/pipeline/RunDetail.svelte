@@ -2,6 +2,7 @@
   import type { components } from "$lib/api/schema";
   import PhaseRibbon from "./PhaseRibbon.svelte";
   import { CELL_COLOR, fmtDate, fmtDuration, STATUS_LABEL, type Status } from "./helpers";
+  import { PHASE_VIEWS, type TableColumn } from "./phase-views";
 
   type RunDetail = components["schemas"]["RunDetail"];
   type PhaseExecutionDetail = components["schemas"]["PhaseExecutionDetail"];
@@ -14,12 +15,11 @@
     errors: number;
     duration_s: number;
   };
-  type RaRow = { ra: string; dois: number; prefixes: number; new: number };
   type Details = {
     tables?: Record<string, { before: number; after: number }>;
     by_source?: Record<string, SourceRow>;
-    distributions?: Record<string, Record<string, number>>;
-    ra_table?: { rows: RaRow[] };
+    summary?: Record<string, number>;
+    table?: { rows: Record<string, string | number>[] };
   };
 
   let { detail, allPhases }: { detail: RunDetail; allPhases: string[] } = $props();
@@ -41,39 +41,43 @@
   function bySource(d: unknown): [string, SourceRow][] {
     return Object.entries(asDetails(d).by_source ?? {});
   }
-  function tableEntries(d: unknown): [string, { before: number; after: number }][] {
+  function detailSummary(d: unknown): Record<string, number> {
+    return asDetails(d).summary ?? {};
+  }
+  function tableRows(d: unknown): Record<string, string | number>[] {
+    return asDetails(d).table?.rows ?? [];
+  }
+  function changedTables(d: unknown): [string, { before: number; after: number }][] {
     // Seules les tables dont le volume change : un « 59841 ⇒ 59841 (+0) » pour une
     // phase d'enrichissement en place n'apprend rien.
     return Object.entries(asDetails(d).tables ?? {}).filter(([, v]) => v.before !== v.after);
   }
-  function distributions(d: unknown): [string, Record<string, number>][] {
-    return Object.entries(asDetails(d).distributions ?? {});
-  }
-  function pctRows(counts: Record<string, number>): { label: string; count: number; pct: string }[] {
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([label, count]) => ({ label, count, pct: fmtPct(count, total) }));
-  }
-  function raRows(d: unknown): RaRow[] {
-    return asDetails(d).ra_table?.rows ?? [];
-  }
-  function raTotals(rows: RaRow[]): { dois: number; prefixes: number; new: number } {
-    return rows.reduce(
-      (a, r) => ({ dois: a.dois + r.dois, prefixes: a.prefixes + r.prefixes, new: a.new + r.new }),
-      { dois: 0, prefixes: 0, new: 0 },
-    );
+
+  function colTotal(rows: Record<string, string | number>[], key: string): number {
+    return rows.reduce((a, r) => a + (Number(r[key]) || 0), 0);
   }
   function fmtPct(n: number, total: number): string {
     return total ? `${((n / total) * 100).toFixed(1)} %` : "—";
   }
-  function fmtPerItem(durationS: number, total: number): string {
-    if (!total) return "";
-    const per = durationS / total;
-    return per >= 1 ? `${per.toFixed(2)} s/élément` : `${(per * 1000).toFixed(0)} ms/élément`;
+  function fmtSigned(n: number): string {
+    return n > 0 ? `+${n}` : n < 0 ? `${n}` : "—";
   }
-  function extra(m: PhaseExecutionDetail["metrics"], key: string): number {
-    return m.extras[key] ?? 0;
+  function fmtCell(value: string | number, col: TableColumn, total: number): string {
+    const n = Number(value) || 0;
+    if (col.sign) return fmtSigned(n);
+    if (col.pct) return `${n} (${fmtPct(n, total)})`;
+    return `${n}`;
+  }
+  function fmtTotalCell(sum: number, col: TableColumn): string {
+    return col.sign ? fmtSigned(sum) : `${sum}`;
+  }
+
+  function fmtDurationLabel(p: PhaseExecutionDetail): string {
+    const base = fmtDuration(p.duration_s);
+    if (!p.metrics.total) return base; // pas de division par zéro sur un no-op
+    const per = p.duration_s / p.metrics.total;
+    const rate = per >= 1 ? `${per.toFixed(2)} s/élément` : `${(per * 1000).toFixed(0)} ms/élément`;
+    return `${base} (${rate})`;
   }
 
   function metricsSummary(m: PhaseExecutionDetail["metrics"]): string {
@@ -136,95 +140,92 @@
         <td class="num">{p.signals.length || "—"}</td>
       </tr>
       {#if expanded === p.phase}
+        {@const view = PHASE_VIEWS[p.phase]}
+        {@const dsummary = detailSummary(p.details)}
+        {@const drows = tableRows(p.details)}
+        {@const sources = bySource(p.details)}
         <tr class="expand-row">
           <td colspan="4">
             <div class="expand">
-              {#if raRows(p.details).length}
-                {@const rows = raRows(p.details)}
-                {@const tot = raTotals(rows)}
+              {#if view?.summary}
+                {#each view.summary as item (item.key)}
+                  {#if item.key in dsummary}
+                    <div class="expand-line">
+                      <span class="k">{item.label}</span><span class="num">{dsummary[item.key]}</span>
+                    </div>
+                  {/if}
+                {/each}
+              {:else if metricsSummary(p.metrics)}
                 <div class="expand-line">
-                  <span class="k">Run</span>
-                  <span>{p.metrics.new} nouveaux préfixes · {extra(p.metrics, "resolved")} résolus</span>
+                  <span class="k">Métriques</span><span>{metricsSummary(p.metrics)}</span>
                 </div>
+              {/if}
+
+              {#if sources.length}
                 <table class="src-table">
                   <thead>
                     <tr>
-                      <th>Registration Agency</th>
-                      <th class="num">DOI</th>
-                      <th class="num">Préfixes DOI</th>
-                      <th class="num">Run</th>
+                      <th>Source</th>
+                      <th class="num">Trouvés</th>
+                      <th class="num">Nouveaux</th>
+                      <th class="num">Màj</th>
+                      <th class="num">Inchangés</th>
+                      <th class="num">Durée</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {#each rows as r (r.ra)}
+                    {#each sources as [src, m] (src)}
                       <tr>
-                        <td>{r.ra}</td>
-                        <td class="num">{r.dois} ({fmtPct(r.dois, tot.dois)})</td>
-                        <td class="num">{r.prefixes} ({fmtPct(r.prefixes, tot.prefixes)})</td>
-                        <td class="num">{r.new ? `+${r.new}` : "—"}</td>
+                        <td>{src}</td>
+                        <td class="num">{m.found}</td>
+                        <td class="num">{m.new}</td>
+                        <td class="num">{m.updated}</td>
+                        <td class="num">{m.unchanged}</td>
+                        <td class="num">{fmtDuration(m.duration_s)}</td>
                       </tr>
                     {/each}
-                    <tr class="total-row">
-                      <td>TOTAL</td>
-                      <td class="num">{tot.dois}</td>
-                      <td class="num">{tot.prefixes}</td>
-                      <td class="num">{tot.new ? `+${tot.new}` : "—"}</td>
+                  </tbody>
+                </table>
+              {/if}
+
+              {#if view?.table && drows.length}
+                <table class="src-table">
+                  <thead>
+                    <tr>
+                      <th>{view.table.firstColumnLabel}</th>
+                      {#each view.table.columns as c (c.key)}<th class="num">{c.label}</th>{/each}
                     </tr>
+                  </thead>
+                  <tbody>
+                    {#each drows as r (r.key)}
+                      <tr>
+                        <td>{r.key}</td>
+                        {#each view.table.columns as c (c.key)}
+                          <td class="num">{fmtCell(r[c.key], c, colTotal(drows, c.key))}</td>
+                        {/each}
+                      </tr>
+                    {/each}
+                    {#if view.table.total}
+                      <tr class="total-row">
+                        <td>TOTAL</td>
+                        {#each view.table.columns as c (c.key)}
+                          <td class="num">{fmtTotalCell(colTotal(drows, c.key), c)}</td>
+                        {/each}
+                      </tr>
+                    {/if}
                   </tbody>
                 </table>
               {:else}
-                {#if bySource(p.details).length}
-                  <table class="src-table">
-                    <thead>
-                      <tr>
-                        <th>Source</th>
-                        <th class="num">Trouvés</th>
-                        <th class="num">Nouveaux</th>
-                        <th class="num">Màj</th>
-                        <th class="num">Inchangés</th>
-                        <th class="num">Durée</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {#each bySource(p.details) as [src, m] (src)}
-                        <tr>
-                          <td>{src}</td>
-                          <td class="num">{m.found}</td>
-                          <td class="num">{m.new}</td>
-                          <td class="num">{m.updated}</td>
-                          <td class="num">{m.unchanged}</td>
-                          <td class="num">{fmtDuration(m.duration_s)}</td>
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                {/if}
-                {#each distributions(p.details) as [title, counts] (title)}
-                  <div class="dist">
-                    <div class="dist-title">{title}</div>
-                    {#each pctRows(counts) as row (row.label)}
-                      <div class="dist-row">
-                        <span>{row.label}</span>
-                        <span class="num">{row.count} ({row.pct})</span>
-                      </div>
-                    {/each}
-                  </div>
-                {/each}
-                {#each tableEntries(p.details) as [t, v] (t)}
+                {#each changedTables(p.details) as [t, v] (t)}
                   <div class="expand-line">
                     <span class="k">{t}</span>
-                    <span>{v.before} ⇒ {v.after} ({v.after - v.before >= 0 ? "+" : ""}{v.after - v.before})</span>
+                    <span>{v.before} ⇒ {v.after} ({fmtSigned(v.after - v.before)})</span>
                   </div>
                 {/each}
-                {#if metricsSummary(p.metrics)}
-                  <div class="expand-line">
-                    <span class="k">Métriques</span><span>{metricsSummary(p.metrics)}</span>
-                  </div>
-                {/if}
               {/if}
+
               <div class="expand-line">
-                <span class="k">Durée</span>
-                <span>{fmtDuration(p.duration_s)}{#if p.metrics.total} ({fmtPerItem(p.duration_s, p.metrics.total)}){/if}</span>
+                <span class="k">Durée</span><span>{fmtDurationLabel(p)}</span>
               </div>
               {#if p.signals.length}
                 <div class="expand-line">
@@ -352,26 +353,9 @@
     border-bottom: none;
     font-weight: 600;
   }
-  .dist {
-    font-size: 0.82rem;
-  }
-  .dist-title {
-    color: var(--muted);
-    text-transform: uppercase;
-    font-size: 0.72rem;
-    letter-spacing: 0.05em;
-    font-family: "JetBrains Mono", monospace;
-    margin-bottom: 2px;
-  }
-  .dist-row {
-    display: flex;
-    justify-content: space-between;
-    max-width: 320px;
-    padding: 1px 0;
-  }
   .expand-line {
     display: grid;
-    grid-template-columns: 140px 1fr;
+    grid-template-columns: 160px 1fr;
     gap: 12px;
     font-size: 0.82rem;
   }
