@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from application.pipeline.normalize.base import SourceNormalizer
+from application.pipeline.normalize.base import NormalizeStats, SourceNormalizer
 from application.ports.pipeline.staging import StagingRow
 
 
@@ -158,10 +158,11 @@ class TestRunHappyPath:
         staging.pending_rows = [_row("ok"), _row("skip"), _row("err")]
         norm = _Norm(staging, results=[True, None, False])
         with caplog.at_level(logging.INFO):
-            norm.run(argv=[])
+            stats = norm.run(argv=[])
         assert "Traités avec succès : 1" in caplog.text
         assert "Ignorés : 1" in caplog.text
         assert "Erreurs : 1" in caplog.text
+        assert stats == NormalizeStats(processed=1, skipped=1, errors=1)
 
     def test_batch_commit_logs_progress(self, caplog):
         """Avec DEFAULT_BATCH_SIZE=2, un commit + log au 2e traité."""
