@@ -7,10 +7,13 @@
   type RunDetail = components["schemas"]["RunDetail"];
   type PhaseExecutionDetail = components["schemas"]["PhaseExecutionDetail"];
 
+  type TableBlock = { rows?: Record<string, string | number>[] };
   type Details = {
+    // Volumes avant/après relevés par le recorder (clé réservée).
     tables?: Record<string, { before: number; after: number }>;
     summary?: Record<string, number>;
-    table?: { rows: Record<string, string | number>[] };
+    // Tableaux sur-mesure, chacun sous sa propre clé (cf. `TableView.source`).
+    [source: string]: unknown;
   };
 
   let { detail, allPhases }: { detail: RunDetail; allPhases: string[] } = $props();
@@ -32,7 +35,7 @@
   function detailSummary(d: unknown): Record<string, number> {
     return asDetails(d).summary ?? {};
   }
-  function summaryPairs(
+  function summaryLines(
     view: PhaseView | undefined,
     dsummary: Record<string, number>,
   ): [string, number][] {
@@ -41,13 +44,9 @@
       .filter((item) => item.key in dsummary)
       .map((item): [string, number] => [item.label, dsummary[item.key]]);
   }
-  function chunkPairs(pairs: [string, number][]): [string, number][][] {
-    const rows: [string, number][][] = [];
-    for (let i = 0; i < pairs.length; i += 2) rows.push(pairs.slice(i, i + 2));
-    return rows;
-  }
-  function tableRows(d: unknown): Record<string, string | number>[] {
-    return asDetails(d).table?.rows ?? [];
+  function tableRows(d: unknown, source: string): Record<string, string | number>[] {
+    const block = asDetails(d)[source] as TableBlock | undefined;
+    return block?.rows ?? [];
   }
   function changedTables(d: unknown): [string, { before: number; after: number }][] {
     // Seules les tables dont le volume change : un « 59841 ⇒ 59841 (+0) » pour une
@@ -145,21 +144,15 @@
       </tr>
       {#if expanded === p.phase}
         {@const view = PHASE_VIEWS[p.phase]}
-        {@const dsummary = detailSummary(p.details)}
-        {@const drows = tableRows(p.details)}
-        {@const pairs = summaryPairs(view, dsummary)}
+        {@const lines = summaryLines(view, detailSummary(p.details))}
         <tr class="expand-row">
           <td colspan="4">
             <div class="expand">
-              {#if pairs.length}
+              {#if lines.length}
                 <div class="summary">
-                  {#each chunkPairs(pairs) as row, i (i)}
-                    <div class="summary-row">
-                      {#each row as [label, value] (label)}
-                        <div class="summary-cell">
-                          <span class="sk">{label}</span><span class="sv">{value}</span>
-                        </div>
-                      {/each}
+                  {#each lines as [label, value] (label)}
+                    <div class="summary-line">
+                      <span class="sk">{label}</span><span class="sv">{value}</span>
                     </div>
                   {/each}
                 </div>
@@ -169,37 +162,42 @@
                 </div>
               {/if}
 
-              {#if view?.table && drows.length}
-                <table class="src-table">
-                  <thead>
-                    <tr>
-                      <th>{view.table.firstColumnLabel}</th>
-                      {#each view.table.columns as c (c.key)}<th class="num">{c.label}</th>{/each}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each drows as r (r.key)}
-                      <tr>
-                        <td>{r.key}</td>
-                        {#each view.table.columns as c (c.key)}
-                          <td class="num">{fmtCell(r[c.key], c, colTotal(drows, c.key))}</td>
+              {#if view?.tables?.length}
+                {#each view.tables as t (t.source)}
+                  {@const drows = tableRows(p.details, t.source)}
+                  {#if drows.length}
+                    <table class="src-table">
+                      <thead>
+                        <tr>
+                          <th>{t.firstColumnLabel}</th>
+                          {#each t.columns as c (c.key)}<th class="num">{c.label}</th>{/each}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {#each drows as r (r.key)}
+                          <tr>
+                            <td>{r.key}</td>
+                            {#each t.columns as c (c.key)}
+                              <td class="num">{fmtCell(r[c.key], c, colTotal(drows, c.key))}</td>
+                            {/each}
+                          </tr>
                         {/each}
-                      </tr>
-                    {/each}
-                    {#if view.table.total}
-                      <tr class="total-row">
-                        <td>TOTAL</td>
-                        {#each view.table.columns as c (c.key)}
-                          <td class="num">{fmtTotalCell(colTotal(drows, c.key), c)}</td>
-                        {/each}
-                      </tr>
-                    {/if}
-                  </tbody>
-                </table>
+                        {#if t.total}
+                          <tr class="total-row">
+                            <td>TOTAL</td>
+                            {#each t.columns as c (c.key)}
+                              <td class="num">{fmtTotalCell(colTotal(drows, c.key), c)}</td>
+                            {/each}
+                          </tr>
+                        {/if}
+                      </tbody>
+                    </table>
+                  {/if}
+                {/each}
               {:else}
-                {#each changedTables(p.details) as [t, v] (t)}
+                {#each changedTables(p.details) as [tbl, v] (tbl)}
                   <div class="expand-line">
-                    <span class="k">{t}</span>
+                    <span class="k">{tbl}</span>
                     <span>{v.before} ⇒ {v.after} ({fmtSigned(v.after - v.before)})</span>
                   </div>
                 {/each}
@@ -309,10 +307,9 @@
     gap: 6px;
   }
   .src-table {
-    width: 100%;
     border-collapse: collapse;
     font-size: 0.82rem;
-    margin-bottom: 4px;
+    margin-bottom: 10px;
   }
   .src-table th {
     padding: 3px 8px;
@@ -338,29 +335,23 @@
     display: flex;
     flex-direction: column;
     font-size: 0.82rem;
+    max-width: 420px;
+    margin-bottom: 6px;
   }
-  .summary-row {
-    display: flex;
-    border-bottom: 1px solid var(--border);
-  }
-  .summary-row:first-child {
-    border-top: 1px solid var(--border);
-  }
-  .summary-cell {
-    flex: 1;
+  .summary-line {
     display: flex;
     justify-content: space-between;
-    gap: 12px;
+    gap: 24px;
     padding: 4px 12px;
-    min-width: 0;
+    border-bottom: 1px solid var(--border);
   }
-  .summary-cell:not(:last-child) {
-    border-right: 1px solid var(--border);
+  .summary-line:first-child {
+    border-top: 1px solid var(--border);
   }
-  .summary-cell .sk {
+  .summary-line .sk {
     color: var(--muted);
   }
-  .summary-cell .sv {
+  .summary-line .sv {
     font-family: "JetBrains Mono", monospace;
   }
   .expand-line {
