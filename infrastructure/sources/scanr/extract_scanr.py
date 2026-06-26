@@ -30,6 +30,14 @@ from infrastructure.sources.config import (
 from infrastructure.sources.http_retry import http_request_with_retry
 
 
+def extract_doi(doc: dict[str, Any]) -> str | None:
+    """Extrait le premier DOI nettoyé depuis `externalIds` d'un document ScanR."""
+    for ext in doc.get("externalIds") or []:
+        if ext.get("type") == "doi":
+            return clean_doi(ext.get("id"))
+    return None
+
+
 class PgScanrExtractAdapter(ScanrExtractAdapter):
     """Adapter PostgreSQL + HTTP pour `ScanrExtractAdapter`.
 
@@ -130,10 +138,7 @@ class PgScanrExtractAdapter(ScanrExtractAdapter):
 
     def extract_doi(self, doc: dict[str, Any]) -> str | None:
         """Extrait le premier DOI nettoyé depuis `externalIds`."""
-        for ext in doc.get("externalIds") or []:
-            if ext.get("type") == "doi":
-                return clean_doi(ext.get("id"))
-        return None
+        return extract_doi(doc)
 
     # ── HTTP ───────────────────────────────────────────────────
 
