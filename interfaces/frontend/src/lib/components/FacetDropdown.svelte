@@ -282,11 +282,11 @@
 		font-size: 0.85rem;
 	}
 	.facet-group-label {
-		padding: 7px 12px 2px;
-		font-size: 0.72rem;
-		font-weight: 700;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
+		margin-top: 4px;
+		padding: 7px 12px 3px;
+		border-top: 1px solid var(--border);
+		font-size: 0.8rem;
+		font-weight: 600;
 		color: var(--muted);
 	}
 	.facet-options label {
