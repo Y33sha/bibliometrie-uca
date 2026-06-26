@@ -208,10 +208,14 @@ def record_doi_not_found(conn: Connection, source: str, doi: str) -> None:
     wos, scanr) quand un DOI cherché est absent de la source. Le miss est
     temporaire : `next_retry` repousse la prochaine tentative de
     `DOI_LOOKUP_RETRY_DAYS` jours. Ne commit pas — l'appelant s'en charge.
+
+    Le DOI est normalisé par `clean_doi` avant écriture : `doi_lookups.doi`
+    sert de clé d'exclusion comparée à des DOI déjà normalisés (cf.
+    `get_cross_import_dois`) — toute forme non canonique manquerait le backoff.
     """
     conn.execute(
         _RECORD_DOI_NOT_FOUND_SQL,
-        {"source": source, "doi": doi, "days": DOI_LOOKUP_RETRY_DAYS},
+        {"source": source, "doi": clean_doi(doi), "days": DOI_LOOKUP_RETRY_DAYS},
     )
 
 

@@ -228,14 +228,14 @@ def extract_related_dois(attributes: dict[str, Any], self_doi: str) -> list[str]
     (pool cross-import). La liste typée complète vit dans
     `meta.related_identifiers`.
     """
-    self_doi_lc = self_doi.strip().lower()
+    self_doi_clean = clean_doi(self_doi)
     out: list[str] = []
     seen: set[str] = set()
     for item in _doi_related_identifiers(attributes):
         if item["relation_type"] not in _CORPUS_RELATION_TYPES:
             continue
         doi = item["doi"]
-        if doi == self_doi_lc or doi in seen:
+        if doi == self_doi_clean or doi in seen:
             continue
         seen.add(doi)
         out.append(doi)
