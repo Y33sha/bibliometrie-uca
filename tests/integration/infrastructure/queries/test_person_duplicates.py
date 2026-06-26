@@ -1,5 +1,7 @@
 """Tests d'intégration pour `infrastructure.queries.api.person_duplicates`."""
 
+import json
+
 from sqlalchemy import text
 
 from application.ports.api.person_duplicates_queries import parse_skip_pairs
@@ -129,3 +131,65 @@ class TestNextPersonConflict:
         # Pas de données → pas de conflit
         res = _q(sa_sync_conn).next_person_conflict(skip_pairs=set(), offset=0)
         assert res is None
+
+
+def _sa_with_identifiers(conn, sd, position, person_id, identifiers):
+    conn.execute(
+        text("""
+            INSERT INTO source_authorships
+                (source, source_publication_id, author_position, person_id, person_identifiers)
+            VALUES ('hal', :sd, :pos, :pid, CAST(:ids AS jsonb))
+        """),
+        {"sd": sd, "pos": position, "pid": person_id, "ids": json.dumps(identifiers)},
+    )
+
+
+def _staging_pub(conn):
+    return conn.execute(
+        text(
+            "INSERT INTO source_publications (source, source_id, title) "
+            "VALUES ('hal', 'h-id-conflict', 'X') RETURNING id"
+        )
+    ).scalar_one()
+
+
+class TestIdentifierConflicts:
+    def test_pair_sharing_orcid_detected(self, sa_sync_conn):
+        p1 = _create_person(sa_sync_conn, last="Smith", first="John")
+        p2 = _create_person(sa_sync_conn, last="Smith", first="J")
+        sd = _staging_pub(sa_sync_conn)
+        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0001-2345-6789"})
+        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0001-2345-6789"})
+
+        assert _q(sa_sync_conn).count_person_identifier_conflicts() == 1
+        res = _q(sa_sync_conn).next_person_identifier_conflict(skip_pairs=set(), offset=0)
+        assert res is not None
+        assert {res.person_a.id, res.person_b.id} == {p1, p2}
+        assert [(s.id_type, s.id_value) for s in res.shared_identifiers] == [
+            ("orcid", "0000-0001-2345-6789")
+        ]
+
+    def test_dubious_identifier_excluded(self, sa_sync_conn):
+        p1 = _create_person(sa_sync_conn, last="Brown", first="Anne")
+        p2 = _create_person(sa_sync_conn, last="Brown", first="A")
+        sd = _staging_pub(sa_sync_conn)
+        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0009-9999-9999_dubious"})
+        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0009-9999-9999_dubious"})
+
+        assert _q(sa_sync_conn).count_person_identifier_conflicts() == 0
+
+    def test_distinct_pair_excluded(self, sa_sync_conn):
+        p1 = _create_person(sa_sync_conn, last="Green", first="Paul")
+        p2 = _create_person(sa_sync_conn, last="Green", first="P")
+        sd = _staging_pub(sa_sync_conn)
+        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"idref": "111222333"})
+        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"idref": "111222333"})
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO distinct_persons (person_id_a, person_id_b) "
+                "VALUES (LEAST(:a, :b), GREATEST(:a, :b))"
+            ),
+            {"a": p1, "b": p2},
+        )
+
+        assert _q(sa_sync_conn).count_person_identifier_conflicts() == 0
