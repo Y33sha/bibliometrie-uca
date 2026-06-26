@@ -2,8 +2,7 @@
 
 La liste agrège les exécutions par `run_id` (statut global = le pire des statuts de
 phase). Le détail d'un run renvoie ses phases dans l'ordre d'exécution, chacune avec
-son rendement et son écart de durée au médian historique, recalculés à la lecture
-(cf. `application.observability.read`).
+son écart de durée au médian historique, recalculé à la lecture par l'adapter.
 """
 
 from __future__ import annotations
