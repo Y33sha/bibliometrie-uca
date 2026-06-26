@@ -67,6 +67,7 @@ async def run_enrich_oa_status(
     )
     total = len(pubs)
     stale_total = queries.count_stale_publications(conn, staleness_days=STALENESS_DAYS)
+    before_dist = queries.count_publications_by_oa_status(conn)
     logger.info(
         f"{total} publications à (re)vérifier sur Unpaywall "
         f"(cap {limit or MAX_PER_RUN}, staleness {STALENESS_DAYS}j) — {stale_total} stale au total"
@@ -75,7 +76,8 @@ async def run_enrich_oa_status(
     progress = {"processed": 0, "updated": 0, "skipped": 0, "not_found": 0}
 
     def _result() -> PhaseMetrics:
-        # Indicateurs : compteurs du run + backlog stale + répartition par statut OA.
+        # Indicateurs : synthèse du run (backlog, vérifiées, ventilation) puis répartition
+        # des publications par statut OA avec le delta du run (avant → après).
         metrics.add(
             total=total,
             updated=progress["updated"],
@@ -83,8 +85,28 @@ async def run_enrich_oa_status(
             not_found=progress["not_found"],
             stale=stale_total,
         )
-        metrics.details["distributions"] = {
-            "Statut OA": queries.count_publications_by_oa_status(conn)
+        after_dist = queries.count_publications_by_oa_status(conn)
+        statuses = sorted(
+            set(before_dist) | set(after_dist),
+            key=lambda s: after_dist.get(s, 0),
+            reverse=True,
+        )
+        metrics.details["summary"] = {
+            "stale": stale_total,
+            "checked": total,
+            "updated": progress["updated"],
+            "unchanged": progress["skipped"],
+            "not_found": progress["not_found"],
+        }
+        metrics.details["table"] = {
+            "rows": [
+                {
+                    "key": s,
+                    "count": after_dist.get(s, 0),
+                    "delta": after_dist.get(s, 0) - before_dist.get(s, 0),
+                }
+                for s in statuses
+            ]
         }
         return metrics
 

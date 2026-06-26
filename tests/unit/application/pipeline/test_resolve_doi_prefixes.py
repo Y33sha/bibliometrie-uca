@@ -186,10 +186,11 @@ def test_resolve_ra_expose_la_repartition_par_ra():
 
     metrics = _run_ra(repo, ra)
 
-    rows = metrics.details["ra_table"]["rows"]
+    assert metrics.details["summary"] == {"new_prefixes": 1, "resolved": 1}
+    rows = metrics.details["table"]["rows"]
     # Le run a inséré le préfixe Crossref → +1 sur la ligne Crossref.
-    assert rows[0] == {"ra": "Crossref", "dois": 80, "prefixes": 12, "new": 1}
-    assert {r["ra"] for r in rows} == {"Crossref", "DataCite", "unknown"}
+    assert rows[0] == {"key": "Crossref", "dois": 80, "prefixes": 12, "new": 1}
+    assert {r["key"] for r in rows} == {"Crossref", "DataCite", "unknown"}
     assert rows[1]["new"] == 0  # DataCite non touché ce run
 
 
