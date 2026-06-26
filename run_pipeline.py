@@ -544,7 +544,7 @@ def phase_metadata_correction(**kw: Any) -> PhaseMetrics:
     return metrics
 
 
-def phase_publications(**kw: Any) -> Any:
+def phase_publications(**kw: Any) -> PhaseMetrics:
     """Assignation des `source_publications` aux publications, en une seule passe.
 
     `reconcile_components` clusterise le voisinage des SP dirty par composante
@@ -567,11 +567,12 @@ def phase_publications(**kw: Any) -> Any:
     """
     if kw.get("rebuild_publications"):
         _run_redirty_all_publications()
-    _run_reconcile_components()
+    metrics = _run_reconcile_components()
     # `addresses.pub_count` compte les publications par adresse : recalcul ici,
     # une fois les publications créées et fusionnées — il n'y a rien à compter
     # au stade `normalize`. Un run `--only publications` suffit à le tenir à jour.
     _run_recompute_address_pub_count()
+    return metrics
 
 
 def phase_relations(**kw: Any) -> Any:
@@ -715,7 +716,7 @@ def _run_redirty_all_publications() -> None:
     log.info("✓ %d source_publications marquées keys_dirty (rebuild complet)", n)
 
 
-def _run_reconcile_components() -> None:
+def _run_reconcile_components() -> PhaseMetrics:
     from application.pipeline.publications.reconcile_components import run
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.publications_reconciliation import (
@@ -725,18 +726,34 @@ def _run_reconcile_components() -> None:
 
     log.info("▶ reconcile_components")
     t0 = time.time()
+    queries = PgPublicationsReconciliationQueries()
     conn = get_sync_engine().connect()
     try:
-        run(
+        stats = run(
             conn,
-            PgPublicationsReconciliationQueries(),
+            queries,
             log,
             pub_repo=publication_repository(conn),
             audit_repo=audit_repository(conn),
         )
+        sp_in_perimeter, publications = queries.count_dedup_inputs(conn)
     finally:
         conn.close()
     log.info("✓ reconcile_components terminé en %.1fs", time.time() - t0)
+
+    metrics = PhaseMetrics()
+    metrics.add(total=stats.processed if stats else 0, new=stats.created if stats else 0)
+    metrics.details["summary"] = {
+        "sp_in_perimeter": sp_in_perimeter,
+        "publications": publications,
+        "dedup_factor": round(sp_in_perimeter / publications, 3) if publications else 0,
+        "processed": stats.processed if stats else 0,
+        "created": stats.created if stats else 0,
+        "splits": stats.splits if stats else 0,
+        "existing": stats.existing if stats else 0,
+        "merges": stats.merges if stats else 0,
+    }
+    return metrics
 
 
 def _run_populate_relations() -> None:
