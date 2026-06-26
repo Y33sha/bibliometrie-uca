@@ -1424,6 +1424,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/identifier-conflicts/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Identifier Conflicts Count
+         * @description Compteur de l'onglet « Conflits d'identifiant » (badge).
+         */
+        get: operations["identifier_conflicts_count_api_admin_identifier_conflicts_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/identifier-conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Identifier Conflicts
+         * @description Paires de personnes au même identifiant brut (ORCID / IdRef / hal_person_id / idHAL),
+         *     paginées : doublons probables ou erreurs d'attribution, à trancher à l'œil.
+         */
+        get: operations["identifier_conflicts_api_admin_identifier_conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/persons/{person_id}": {
         parameters: {
             query?: never;
@@ -3486,6 +3527,48 @@ export interface components {
             /** Hal Docs */
             hal_docs: components["schemas"]["HalDocSummary"][];
         };
+        /**
+         * IdentifierConflictPairOut
+         * @description Deux personnes distinctes portant la même valeur brute d'identifiant (ORCID / IdRef /
+         *     hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution.
+         */
+        IdentifierConflictPairOut: {
+            person_a: components["schemas"]["IdentifierConflictPersonOut"];
+            person_b: components["schemas"]["IdentifierConflictPersonOut"];
+            /** Shared Identifiers */
+            shared_identifiers: components["schemas"]["SharedIdentifierOut"][];
+        };
+        /**
+         * IdentifierConflictPersonOut
+         * @description Personne d'une paire en conflit d'identifiant, vue allégée (le détail complet est dans le drawer).
+         */
+        IdentifierConflictPersonOut: {
+            /** Person Id */
+            person_id: number;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Has Rh */
+            has_rh: boolean;
+            /** Pub Count */
+            pub_count: number;
+            /** Labs */
+            labs: string[];
+        };
+        /** IdentifierConflictsResponse */
+        IdentifierConflictsResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Pairs */
+            pairs: components["schemas"]["IdentifierConflictPairOut"][];
+        };
         /** IdentifierReassignResponse */
         IdentifierReassignResponse: {
             /** Id */
@@ -5450,6 +5533,13 @@ export interface components {
         SetCountry: {
             /** Countries */
             countries?: string[] | null;
+        };
+        /** SharedIdentifierOut */
+        SharedIdentifierOut: {
+            /** Id Type */
+            id_type: string;
+            /** Id Value */
+            id_value: string;
         };
         /**
          * SharingPersonOut
@@ -8390,6 +8480,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AmbiguousNameFormsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    identifier_conflicts_count_api_admin_identifier_conflicts_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    identifier_conflicts_api_admin_identifier_conflicts_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentifierConflictsResponse"];
                 };
             };
             /** @description Validation Error */

@@ -12,6 +12,7 @@ from sqlalchemy import Connection, text
 from application.persons import commands as person_commands
 from application.ports.api.persons_queries import (
     AmbiguousNameFormsResponse,
+    IdentifierConflictsResponse,
     NameFormAuthorshipsResponse,
     PersonOut,
     PersonsQueries,
@@ -265,6 +266,25 @@ def ambiguous_name_forms(
 ) -> AmbiguousNameFormsResponse:
     """Formes de nom portées par ≥2 personnes avec ≥1 lien pending, paginées."""
     return queries.ambiguous_name_forms(page=page, per_page=per_page)
+
+
+@router.get("/api/admin/identifier-conflicts/count", response_model=TotalCountResponse)
+def identifier_conflicts_count(
+    queries: PersonsQueries = Depends(persons_queries_sync),
+) -> TotalCountResponse:
+    """Compteur de l'onglet « Conflits d'identifiant » (badge)."""
+    return TotalCountResponse(total=queries.identifier_conflicts_count())
+
+
+@router.get("/api/admin/identifier-conflicts", response_model=IdentifierConflictsResponse)
+def identifier_conflicts(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    queries: PersonsQueries = Depends(persons_queries_sync),
+) -> IdentifierConflictsResponse:
+    """Paires de personnes au même identifiant brut (ORCID / IdRef / hal_person_id / idHAL),
+    paginées : doublons probables ou erreurs d'attribution, à trancher à l'œil."""
+    return queries.identifier_conflicts(page=page, per_page=per_page)
 
 
 @router.get("/api/admin/persons/{person_id}", response_model=PersonOut)

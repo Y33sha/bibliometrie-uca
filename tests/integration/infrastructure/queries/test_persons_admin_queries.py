@@ -1,8 +1,12 @@
 """Tests d'intégration pour `infrastructure.queries.api.persons.admin`."""
 
+import json
+
 from sqlalchemy import text
 
 from infrastructure.queries.api.persons.admin import (
+    identifier_conflicts,
+    identifier_conflicts_count,
     list_orphan_authorships,
     name_form_authorships,
     orphan_authorships_count,
@@ -178,3 +182,47 @@ class TestNameFormAuthorships:
 # Tests pour `hal_duplicate_accounts` déplacés vers
 # `tests/integration/infrastructure/queries/test_hal_problems.py` —
 # la query est maintenant exposée par PgHalProblemsQueries.
+
+
+def _sa_with_identifiers(conn, sd, position, person_id, identifiers):
+    conn.execute(
+        text("""
+            INSERT INTO source_authorships
+                (source, source_publication_id, author_position, person_id,
+                 raw_author_name, person_identifiers)
+            VALUES ('hal', :sd, :pos, :pid, 'X', CAST(:ids AS jsonb))
+        """),
+        {"sd": sd, "pos": position, "pid": person_id, "ids": json.dumps(identifiers)},
+    )
+
+
+class TestIdentifierConflicts:
+    """La détection lit la matview `person_identifier_keys` : on la rafraîchit (non concurrent,
+    donc transactionnel) après le seed, dans la transaction rollbackée du fixture."""
+
+    def test_pair_sharing_orcid(self, sa_sync_conn):
+        p1 = _create_person(sa_sync_conn, last="Smith", first="John")
+        p2 = _create_person(sa_sync_conn, last="Smith", first="J")
+        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0001-2345-6789"})
+        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0001-2345-6789"})
+        sa_sync_conn.execute(text("REFRESH MATERIALIZED VIEW person_identifier_keys"))
+
+        assert identifier_conflicts_count(sa_sync_conn) == 1
+        res = identifier_conflicts(sa_sync_conn, page=1, per_page=50)
+        assert res["total"] == 1
+        pair = res["pairs"][0]
+        assert {pair["person_a"]["person_id"], pair["person_b"]["person_id"]} == {p1, p2}
+        assert pair["shared_identifiers"] == [
+            {"id_type": "orcid", "id_value": "0000-0001-2345-6789"}
+        ]
+
+    def test_dubious_excluded(self, sa_sync_conn):
+        p1 = _create_person(sa_sync_conn, last="Brown", first="Anne")
+        p2 = _create_person(sa_sync_conn, last="Brown", first="A")
+        sd = _create_sd(sa_sync_conn, _create_pub(sa_sync_conn))
+        _sa_with_identifiers(sa_sync_conn, sd, 0, p1, {"orcid": "0000-0009-9999-9999_dubious"})
+        _sa_with_identifiers(sa_sync_conn, sd, 1, p2, {"orcid": "0000-0009-9999-9999_dubious"})
+        sa_sync_conn.execute(text("REFRESH MATERIALIZED VIEW person_identifier_keys"))
+
+        assert identifier_conflicts_count(sa_sync_conn) == 0
