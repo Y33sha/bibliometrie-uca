@@ -18,6 +18,8 @@ from application.ports.api.person_duplicates_queries import (
     PersonDedupPublication,
     PersonDuplicatePair,
     PersonDuplicatesQueries,
+    PersonIdentifierConflictPair,
+    PersonSharedIdentifier,
 )
 from domain.persons.name_matching import names_compatible
 
@@ -138,6 +140,40 @@ WHERE NOT EXISTS (
 )
 GROUP BY LEAST(a1.person_id, a2.person_id), GREATEST(a1.person_id, a2.person_id)
 ORDER BY COUNT(*) DESC, LEAST(a1.person_id, a2.person_id)
+"""
+
+
+# Paires de personnes distinctes portant la même valeur d'identifiant brut (sur leurs
+# `source_authorships`). On exclut les identifiants neutralisés `_dubious` (corruption dense déjà
+# traitée) et les paires déjà marquées distinctes. L'identifiant partagé sert d'évidence ; le tri
+# doublon / erreur d'attribution est laissé à l'œil (noms + labos + publications de la fiche).
+_IDENTIFIER_KEYS = ("orcid", "idref", "hal_person_id", "idhal")
+
+IDENTIFIER_CONFLICT_PAIRS_SQL = f"""
+WITH ident AS (
+    SELECT sa.person_id, k AS id_type, sa.person_identifiers->>k AS id_value
+    FROM source_authorships sa
+    CROSS JOIN unnest(ARRAY{list(_IDENTIFIER_KEYS)}) AS k
+    WHERE sa.person_id IS NOT NULL
+      AND sa.person_identifiers ? k
+      AND sa.person_identifiers->>k NOT LIKE '%%_dubious'
+),
+pairs AS (
+    SELECT i1.id_type, i1.id_value,
+           i1.person_id AS id_a, i2.person_id AS id_b
+    FROM ident i1
+    JOIN ident i2
+      ON i1.id_type = i2.id_type AND i1.id_value = i2.id_value AND i1.person_id < i2.person_id
+)
+SELECT id_a, id_b,
+       json_agg(DISTINCT jsonb_build_object('id_type', id_type, 'id_value', id_value)) AS shared
+FROM pairs
+WHERE NOT EXISTS (
+    SELECT 1 FROM distinct_persons dp
+    WHERE dp.person_id_a = id_a AND dp.person_id_b = id_b
+)
+GROUP BY id_a, id_b
+ORDER BY id_a, id_b
 """
 
 
@@ -331,6 +367,39 @@ class PgPersonDuplicatesQueries(PersonDuplicatesQueries):
                 continue
             return PersonConflictPair(
                 person_a=person_a, person_b=person_b, conflict_pubs=conflict_pubs
+            )
+
+        return None
+
+    def count_person_identifier_conflicts(self) -> int:
+        row = self._conn.execute(
+            text(f"SELECT COUNT(*) AS total FROM ({IDENTIFIER_CONFLICT_PAIRS_SQL}) sub")
+        ).one()
+        return row.total
+
+    def next_person_identifier_conflict(
+        self, *, skip_pairs: set[tuple[int, int]], offset: int
+    ) -> PersonIdentifierConflictPair | None:
+        rows = self._conn.execute(text(IDENTIFIER_CONFLICT_PAIRS_SQL)).all()
+        skipped = 0
+        for row in rows:
+            pair = (row.id_a, row.id_b)
+            if pair in skip_pairs or (pair[1], pair[0]) in skip_pairs:
+                continue
+            if skipped < offset:
+                skipped += 1
+                continue
+
+            person_a = self._get_person_dedup_detail(row.id_a)
+            person_b = self._get_person_dedup_detail(row.id_b)
+            if person_a is None or person_b is None:
+                continue
+            shared = [
+                PersonSharedIdentifier(id_type=s["id_type"], id_value=s["id_value"])
+                for s in row.shared
+            ]
+            return PersonIdentifierConflictPair(
+                person_a=person_a, person_b=person_b, shared_identifiers=shared
             )
 
         return None

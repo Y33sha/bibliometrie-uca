@@ -23,6 +23,7 @@ from interfaces.api.models import (
     OkResponse,
     PersonConflictPairResponse,
     PersonDuplicatePairResponse,
+    PersonIdentifierConflictPairResponse,
     TotalCountResponse,
 )
 
@@ -103,3 +104,37 @@ def next_person_conflict(
     skip_pairs = parse_skip_pairs(skip) if skip else set()
     pair = queries.next_person_conflict(skip_pairs=skip_pairs, offset=offset)
     return PersonConflictPairResponse(pair=pair)
+
+
+@router.get(
+    "/api/admin/person-duplicates/identifier-conflicts/count", response_model=TotalCountResponse
+)
+def count_person_identifier_conflicts(
+    queries: PersonDuplicatesQueries = Depends(person_duplicates_queries_sync),
+) -> TotalCountResponse:
+    """Nombre de paires de personnes portant la même valeur d'identifiant brut.
+
+    Deux `person_id` distincts dont des `source_authorships` portent le même
+    ORCID / IdRef / hal_person_id / idHAL (hors `_dubious`) : doublon probable,
+    ou erreur d'attribution si les personnes sont en réalité distinctes.
+    """
+    return TotalCountResponse(total=queries.count_person_identifier_conflicts())
+
+
+@router.get(
+    "/api/admin/person-duplicates/identifier-conflicts/next",
+    response_model=PersonIdentifierConflictPairResponse,
+)
+def next_person_identifier_conflict(
+    skip: str = Query("", alias="skip"),
+    offset: int = Query(0, ge=0),
+    queries: PersonDuplicatesQueries = Depends(person_duplicates_queries_sync),
+) -> PersonIdentifierConflictPairResponse:
+    """Renvoie la paire personnes-au-même-identifiant à l'offset donné.
+
+    Même protocole que `/person-duplicates/next` (paire + skip + offset).
+    L'identifiant partagé est porté par `shared_identifiers`.
+    """
+    skip_pairs = parse_skip_pairs(skip) if skip else set()
+    pair = queries.next_person_identifier_conflict(skip_pairs=skip_pairs, offset=offset)
+    return PersonIdentifierConflictPairResponse(pair=pair)
