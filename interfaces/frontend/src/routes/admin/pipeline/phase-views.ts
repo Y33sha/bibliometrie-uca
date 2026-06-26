@@ -35,6 +35,19 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       total: true,
     },
   },
+  metadata_correction: {
+    summary: [
+      { key: "unary_examined", label: "SP examinées (unaire)" },
+      { key: "unary_corrected", label: "Corrigées (unaire)" },
+      { key: "cluster_examined", label: "SP examinées (cluster)" },
+      { key: "cluster_corrected", label: "DOI corrigés (cluster)" },
+    ],
+    table: {
+      firstColumnLabel: "Règle de correction",
+      columns: [{ key: "count", label: "Nombre", pct: true }],
+      total: true,
+    },
+  },
   oa_status: {
     summary: [
       { key: "stale", label: "Publications à vérifier" },

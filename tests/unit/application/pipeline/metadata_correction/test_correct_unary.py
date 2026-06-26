@@ -1,7 +1,50 @@
 """Tests purs de `compute_update` : mapping source→canonique puis correction unaire idempotente."""
 
-from application.pipeline.metadata_correction.correct_unary import compute_update
+from application.pipeline.metadata_correction.correct_unary import (
+    DOC_TYPE_MAP_MARKER,
+    compute_update,
+    tally_corrections,
+)
+from application.ports.pipeline.metadata_correction import CorrectionUpdate
 from domain.source_publications.correction import SourcePublicationForCorrection
+from domain.source_publications.raw_metadata import stash_entry
+
+
+def test_tally_corrections_exclut_le_mapping_doc_type():
+    updates = [
+        # mapping de vocabulaire seul → pas une correction
+        CorrectionUpdate(
+            1, "article", None, None, {}, {"doc_type": stash_entry("ART", DOC_TYPE_MAP_MARKER)}
+        ),
+        # règle réelle sur doc_type
+        CorrectionUpdate(
+            2,
+            "thesis",
+            None,
+            None,
+            {},
+            {"doc_type": stash_entry("article", "THESIS_WITH_JOURNAL_TO_ARTICLE")},
+        ),
+        # deux champs corrigés sur une même SP → 1 SP, 2 déclenchements
+        CorrectionUpdate(
+            3,
+            None,
+            5,
+            "green",
+            {},
+            {
+                "journal_id": stash_entry(None, "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
+                "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
+            },
+        ),
+    ]
+    corrected, rule_counts = tally_corrections(updates)
+    assert corrected == 2  # SP 1 = mapping seul (exclue) ; SP 2 et 3 corrigées
+    assert rule_counts == {
+        "THESIS_WITH_JOURNAL_TO_ARTICLE": 1,
+        "JOURNAL_TYPE_MEDIA_TO_MEDIA": 1,
+        "EMBARGO_EXPIRED_TO_GREEN": 1,
+    }
 
 
 def _sp(**overrides: object) -> SourcePublicationForCorrection:

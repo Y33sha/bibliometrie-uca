@@ -1,7 +1,10 @@
 """Tests purs : corrections de DOI par cluster (convergence même-œuvre, ouvrage/chapitre,
 chapitre/chapitre) + `compute_updates`."""
 
-from application.pipeline.metadata_correction.correct_by_cluster import compute_updates
+from application.pipeline.metadata_correction.correct_by_cluster import (
+    compute_updates,
+    tally_doi_corrections,
+)
 from application.ports.pipeline.metadata_correction import DoiClusterRow, DoiCorrectionUpdate
 from domain.source_publications.correction import (
     DoiClusterCase,
@@ -9,6 +12,23 @@ from domain.source_publications.correction import (
     DoiClusterMember,
     resolve_cluster_doi_corrections,
 )
+from domain.source_publications.raw_metadata import stash_entry
+
+
+def test_tally_doi_corrections_par_cas():
+    updates = [
+        DoiCorrectionUpdate(
+            1, "10.x/c", {"doi": stash_entry("10.x/v1", "DATACITE_VERSION_TO_CONCEPT")}
+        ),
+        DoiCorrectionUpdate(
+            2, "10.x/d", {"doi": stash_entry("10.x/v2", "DATACITE_VERSION_TO_CONCEPT")}
+        ),
+        DoiCorrectionUpdate(3, None, {"doi": stash_entry("10.y/book", "OUVRAGE_VS_CHAPITRE")}),
+    ]
+    assert tally_doi_corrections(updates) == {
+        "DATACITE_VERSION_TO_CONCEPT": 2,
+        "OUVRAGE_VS_CHAPITRE": 1,
+    }
 
 
 def _row(
