@@ -11,10 +11,11 @@ Trois signaux peuplent la table :
 - **Signal #2 — clés de confirmation partagées** : deux publications distinctes (DOI distincts)
   qui partagent une clé (hal_id, arXiv, PMID, NNT) sans avoir fusionné sont apparentées ; le type
   se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
-- **Signal #3 — rapprochement erratum par titre** : un erratum sans relation déclarée ni clé
-  partagée est relié à l'œuvre qu'il corrige quand son titre en reproduit le titre verbatim (le
-  `title_normalized` du parent est un suffixe), sous garde d'ambiguïté (un seul parent substantiel
-  au même titre). Type `is_correction_of`. La sélection (avec sa garde) vit dans le SQL du port.
+- **Signal #3 — rapprochement par titre** : une publication dépendante sans relation déclarée ni
+  clé partagée est reliée à l'œuvre dont elle dépend par le titre — un erratum à l'article qu'il
+  corrige (`is_correction_of`, titre parent en suffixe après « Erratum: »…), un preprint à sa
+  version publiée (`is_preprint_of`, titre identique). Sous garde d'ambiguïté (un seul parent
+  substantiel au même titre). La sélection (avec sa garde) vit dans le SQL du port.
 
 Les relations même-œuvre (versions, formes variantes, pièces de package) sont absentes des trois
 signaux : elles sont traitées en déduplication à la phase `metadata_correction`, en amont.
@@ -29,10 +30,10 @@ from sqlalchemy import Connection
 
 from application.ports.pipeline.relations import (
     DeclaredRelationSource,
-    ErratumTitleMatch,
     PublicationRelationsQueries,
     RelationEdge,
     SharedKeyPair,
+    TitleMatch,
 )
 from domain.publications.identifiers import clean_doi
 from domain.publications.relations import (
@@ -87,19 +88,22 @@ def _build_shared_key_edges(
     return edges
 
 
-def _build_title_match_edges(matches: list[ErratumTitleMatch]) -> list[RelationEdge]:
-    """Une arête `erratum is_correction_of parent` par rapprochement de titre. La cible est le DOI
-    du parent (résolu en `publication_id` à l'insertion). Un DOI parent malformé est écarté."""
-    edges: list[RelationEdge] = []
-    for match in matches:
-        cleaned = clean_doi(match.parent_doi)
-        if cleaned:
-            edges.append(
-                RelationEdge(
-                    match.erratum_id, RelationType.IS_CORRECTION_OF.value, cleaned, "title_match"
-                )
-            )
-    return edges
+def _build_title_match_edges(
+    matches: list[TitleMatch], relation_type: RelationType
+) -> list[RelationEdge]:
+    """Une arête `enfant relation_type parent` par rapprochement de titre. La cible est désignée par
+    le `publication_id` du parent (au corpus), avec son DOI quand il en a un — l'unicité dédoublonne
+    alors contre une éventuelle relation déjà posée vers ce même parent par un autre signal."""
+    return [
+        RelationEdge(
+            match.child_id,
+            relation_type.value,
+            clean_doi(match.parent_doi) if match.parent_doi else None,
+            "title_match",
+            target_publication_id=match.parent_id,
+        )
+        for match in matches
+    ]
 
 
 def run(conn: Connection, queries: PublicationRelationsQueries, logger: logging.Logger) -> None:
@@ -112,19 +116,23 @@ def run(conn: Connection, queries: PublicationRelationsQueries, logger: logging.
     shared_edges = _build_shared_key_edges(pairs, declared_pairs)
     written_shared = queries.replace_shared_key_relations(conn, shared_edges)
 
-    matches = queries.fetch_erratum_title_matches(conn)
-    title_edges = _build_title_match_edges(matches)
+    erratum_matches = queries.fetch_erratum_title_matches(conn)
+    preprint_matches = queries.fetch_preprint_title_matches(conn)
+    title_edges = _build_title_match_edges(
+        erratum_matches, RelationType.IS_CORRECTION_OF
+    ) + _build_title_match_edges(preprint_matches, RelationType.IS_PREPRINT_OF)
     written_title = queries.replace_title_match_relations(conn, title_edges)
 
     conn.commit()
     logger.info(
         "✓ relations : déclarées %d (%d arêtes / %d source_publications) ; "
-        "clés partagées %d (%d paires) ; erratums par titre %d (%d rapprochements)",
+        "clés partagées %d (%d paires) ; par titre %d (%d erratums, %d preprints)",
         written_declared,
         len(declared_edges),
         len(sources),
         written_shared,
         len(pairs),
         written_title,
-        len(matches),
+        len(erratum_matches),
+        len(preprint_matches),
     )

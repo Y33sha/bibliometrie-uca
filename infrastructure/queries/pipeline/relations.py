@@ -9,10 +9,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.relations import (
     DeclaredRelationSource,
-    ErratumTitleMatch,
     PublicationRelationsQueries,
     RelationEdge,
     SharedKeyPair,
+    TitleMatch,
 )
 
 
@@ -88,64 +88,107 @@ def fetch_declared_related_pairs(conn: Connection) -> set[frozenset[int]]:
     return {frozenset((r.a, r.b)) for r in rows}
 
 
-# Signal #3 — rapprochement erratum → œuvre corrigée par le titre. Le titre d'un erratum reproduit
-# celui du parent après un préfixe (« Erratum: », « Corrigendum to »…), donc `title_normalized` du
-# parent est un **suffixe** de celui de l'erratum (égalité exacte de la portion-parent, pas du flou).
-# Garde de longueur > 30 (titres génériques écartés) et fenêtre d'année [année − 2 … année] (le
-# parent précède l'erratum). Garde d'ambiguïté : un seul candidat « substantiel » (hors `preprint` /
-# `dataset`, simples formes de la même œuvre) doit porter ce titre, sinon collision → abstention.
+# Signal #3 — rapprochement d'une publication dépendante (erratum, preprint) de l'œuvre dont elle
+# dépend, par le titre. Deux variantes selon la forme du titre :
+#  - erratum : le titre reproduit celui du parent après un préfixe (« Erratum: », « Corrigendum
+#    to »…), donc `title_normalized` du parent est un **suffixe** de celui de l'erratum ;
+#  - preprint : le preprint et sa version publiée portent un titre **identique**.
+# Garde commune : longueur de titre > 30 (génériques écartés) et garde d'ambiguïté — un seul
+# candidat « substantiel » (hors formes de la même œuvre) doit porter ce titre, sinon collision →
+# abstention. Le parent est au corpus : on renvoie son `publication_id` (et son DOI s'il en a un).
 _ERRATUM_TITLE_MATCHES_SQL = text("""
-    WITH erratum AS (
+    WITH child AS (
         SELECT id, title_normalized AS t, pub_year AS y
         FROM publications
         WHERE doc_type = 'erratum' AND title_normalized IS NOT NULL AND pub_year IS NOT NULL
     ),
     candidate AS (
-        SELECT e.id AS erratum_id, p.doi AS parent_doi,
+        SELECT c.id AS child_id, p.id AS parent_id, p.doi AS parent_doi,
                (p.doc_type::text NOT IN ('preprint', 'dataset')) AS substantive
-        FROM erratum e
+        FROM child c
         JOIN publications p
-          ON p.id <> e.id
+          ON p.id <> c.id
          AND p.doc_type <> 'erratum'
-         AND p.doi IS NOT NULL
          AND length(p.title_normalized) > 30
-         AND p.pub_year BETWEEN e.y - 2 AND e.y
-         AND right(e.t, length(p.title_normalized)) = p.title_normalized
+         AND p.pub_year BETWEEN c.y - 2 AND c.y
+         AND right(c.t, length(p.title_normalized)) = p.title_normalized
     ),
     substantive_count AS (
-        SELECT erratum_id, count(*) FILTER (WHERE substantive) AS n
-        FROM candidate GROUP BY erratum_id
+        SELECT child_id, count(*) FILTER (WHERE substantive) AS n
+        FROM candidate GROUP BY child_id
     )
-    SELECT c.erratum_id, c.parent_doi
+    SELECT c.child_id, c.parent_id, c.parent_doi
     FROM candidate c
-    JOIN substantive_count s ON s.erratum_id = c.erratum_id
+    JOIN substantive_count s ON s.child_id = c.child_id
+    WHERE s.n = 1 AND c.substantive
+""")
+
+# Preprint → version publiée : titre identique (le preprint ne préfixe pas), parent publié dans la
+# fenêtre [année … année + 2] (la version publiée suit le preprint). Garde d'ambiguïté : un seul
+# candidat substantiel (hors `dataset`) au même titre.
+_PREPRINT_TITLE_MATCHES_SQL = text("""
+    WITH child AS (
+        SELECT id, title_normalized AS t, pub_year AS y
+        FROM publications
+        WHERE doc_type = 'preprint' AND title_normalized IS NOT NULL
+          AND length(title_normalized) > 30 AND pub_year IS NOT NULL
+    ),
+    candidate AS (
+        SELECT c.id AS child_id, p.id AS parent_id, p.doi AS parent_doi,
+               (p.doc_type::text <> 'dataset') AS substantive
+        FROM child c
+        JOIN publications p
+          ON p.doc_type <> 'preprint'
+         AND p.title_normalized = c.t
+         AND length(p.title_normalized) > 30
+         AND p.pub_year BETWEEN c.y AND c.y + 2
+    ),
+    substantive_count AS (
+        SELECT child_id, count(*) FILTER (WHERE substantive) AS n
+        FROM candidate GROUP BY child_id
+    )
+    SELECT c.child_id, c.parent_id, c.parent_doi
+    FROM candidate c
+    JOIN substantive_count s ON s.child_id = c.child_id
     WHERE s.n = 1 AND c.substantive
 """)
 
 
-def fetch_erratum_title_matches(conn: Connection) -> list[ErratumTitleMatch]:
+def fetch_erratum_title_matches(conn: Connection) -> list[TitleMatch]:
     rows = conn.execute(_ERRATUM_TITLE_MATCHES_SQL).all()
-    return [ErratumTitleMatch(r.erratum_id, r.parent_doi) for r in rows]
+    return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
+
+
+def fetch_preprint_title_matches(conn: Connection) -> list[TitleMatch]:
+    rows = conn.execute(_PREPRINT_TITLE_MATCHES_SQL).all()
+    return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
 
 def _insert_relation_edges(conn: Connection, edges: list[RelationEdge]) -> int:
-    """Insère `edges` en résolvant la cible (`target_publication_id` par LEFT JOIN sur le DOI),
-    en écartant les auto-relations et en dédoublonnant par la PK. Un seul aller-retour bulk via
-    `jsonb_to_recordset`. Retourne le nombre de lignes insérées."""
+    """Insère `edges` en désignant la cible soit directement par `target_publication_id` (cible au
+    corpus connue, ex. rapprochement par titre), soit en la résolvant par LEFT JOIN sur le DOI
+    (relations déclarées). Écarte les auto-relations et dédoublonne par la contrainte d'unicité. Un
+    seul aller-retour bulk via `jsonb_to_recordset`. Retourne le nombre de lignes insérées."""
     if not edges:
         return 0
     payload = [
-        {"f": e.from_publication_id, "t": e.relation_type, "d": e.target_doi, "s": e.source}
+        {
+            "f": e.from_publication_id,
+            "t": e.relation_type,
+            "d": e.target_doi,
+            "p": e.target_publication_id,
+            "s": e.source,
+        }
         for e in edges
     ]
     stmt = text("""
         INSERT INTO publication_relations
             (from_publication_id, relation_type, target_doi, target_publication_id, source)
-        SELECT e.f, e.t::relation_type, e.d, p.id, e.s
-        FROM jsonb_to_recordset(:payload) AS e(f int, t text, d text, s text)
-        LEFT JOIN publications p ON lower(p.doi) = e.d
-        WHERE p.id IS NULL OR p.id <> e.f
-        ON CONFLICT (from_publication_id, relation_type, target_doi) DO NOTHING
+        SELECT e.f, e.t::relation_type, e.d, COALESCE(e.p, p.id), e.s
+        FROM jsonb_to_recordset(:payload) AS e(f int, t text, d text, p int, s text)
+        LEFT JOIN publications p ON e.p IS NULL AND e.d IS NOT NULL AND lower(p.doi) = e.d
+        WHERE COALESCE(e.p, p.id) IS NULL OR COALESCE(e.p, p.id) <> e.f
+        ON CONFLICT ON CONSTRAINT publication_relations_uq DO NOTHING
     """).bindparams(bindparam("payload", type_=JSONB))
     return conn.execute(stmt, {"payload": payload}).rowcount
 
@@ -189,8 +232,11 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
     def replace_shared_key_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
         return replace_shared_key_relations(conn, edges)
 
-    def fetch_erratum_title_matches(self, conn: Connection) -> list[ErratumTitleMatch]:
+    def fetch_erratum_title_matches(self, conn: Connection) -> list[TitleMatch]:
         return fetch_erratum_title_matches(conn)
+
+    def fetch_preprint_title_matches(self, conn: Connection) -> list[TitleMatch]:
+        return fetch_preprint_title_matches(conn)
 
     def replace_title_match_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
         return replace_title_match_relations(conn, edges)

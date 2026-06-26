@@ -1,10 +1,11 @@
-"""Tests de l'assemblage des arêtes des signaux #2 (clés partagées) et #3 (erratum par titre)."""
+"""Tests de l'assemblage des arêtes des signaux #2 (clés partagées) et #3 (rapprochement par titre)."""
 
 from application.pipeline.relations.populate_relations import (
     _build_shared_key_edges,
     _build_title_match_edges,
 )
-from application.ports.pipeline.relations import ErratumTitleMatch, SharedKeyPair
+from application.ports.pipeline.relations import SharedKeyPair, TitleMatch
+from domain.publications.relations import RelationType
 
 
 def _pair(a_id, a_dt, b_id, b_dt):
@@ -48,14 +49,27 @@ class TestBuildSharedKeyEdges:
 
 
 class TestBuildTitleMatchEdges:
-    def test_builds_is_correction_of_edge(self):
-        edges = _build_title_match_edges([ErratumTitleMatch(5, "10.1234/parent")])
+    def test_directed_edge_targets_parent_publication(self):
+        edges = _build_title_match_edges(
+            [TitleMatch(child_id=5, parent_id=9, parent_doi="10.1234/parent")],
+            RelationType.IS_CORRECTION_OF,
+        )
         assert len(edges) == 1
         e = edges[0]
         assert e.from_publication_id == 5
         assert e.relation_type == "is_correction_of"
+        assert e.target_publication_id == 9
         assert e.target_doi == "10.1234/parent"
         assert e.source == "title_match"
 
-    def test_drops_malformed_doi(self):
-        assert _build_title_match_edges([ErratumTitleMatch(5, "")]) == []
+    def test_preprint_type_and_doiless_parent(self):
+        # Parent au corpus sans DOI : la cible est désignée par publication_id, target_doi reste None.
+        edges = _build_title_match_edges(
+            [TitleMatch(child_id=7, parent_id=3, parent_doi=None)],
+            RelationType.IS_PREPRINT_OF,
+        )
+        assert len(edges) == 1
+        e = edges[0]
+        assert e.relation_type == "is_preprint_of"
+        assert e.target_publication_id == 3
+        assert e.target_doi is None

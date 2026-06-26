@@ -5292,13 +5292,14 @@ export interface components {
          *
          *     `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes
          *     sont inversées). `publication_id`/`title`/`pub_year`/`doc_type` sont renseignés quand la cible
-         *     est au corpus ; sinon seul `doi` l'est (cible hors corpus, lien externe).
+         *     est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie
+         *     par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`.
          */
         RelatedPublicationOut: {
             /** Relation Type */
             relation_type: string;
             /** Doi */
-            doi: string;
+            doi?: string | null;
             /** Publication Id */
             publication_id?: number | null;
             /** Title */
