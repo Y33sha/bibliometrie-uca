@@ -6,8 +6,14 @@
  * mise en forme vivent ici, ce qui les rend modifiables sans relancer le pipeline
  * (et donc rétroactifs sur les anciens runs).
  *
- * Une phase sans entrée ici retombe sur l'affichage générique (résumé des compteurs
- * `PhaseMetrics` + tables avant/après).
+ * Deux conventions d'affichage, combinables sur une même phase :
+ * - `summary` : une liste verticale de métriques indépendantes (`details.summary`).
+ * - `tables` : un ou plusieurs tableaux, chacun alimenté par `details[source].rows`
+ *   (chaque ligne porte une `key`, premier en-tête de colonne). Un tableau s'ajuste
+ *   à son contenu plutôt que d'occuper toute la largeur.
+ *
+ * Une phase sans entrée ici retombe sur l'affichage générique (compteurs
+ * `PhaseMetrics` + volumes avant/après des tables produites).
  */
 
 export type SummaryItem = { key: string; label: string };
@@ -18,73 +24,95 @@ export type TableColumn = {
   sign?: boolean;
   duration?: boolean;
 };
+export type TableView = {
+  // Clé dans `details` portant `{ rows: [...] }`.
+  source: string;
+  // En-tête de la première colonne (les `key` des lignes). Vide pour une matrice
+  // dont les lignes sont elles-mêmes des en-têtes.
+  firstColumnLabel: string;
+  columns: TableColumn[];
+  total?: boolean;
+};
 export type PhaseView = {
-  // Lignes de synthèse : pour chaque clé de `details.summary`, son libellé, dans l'ordre.
   summary?: SummaryItem[];
-  // Tableau alimenté par `details.table.rows` (chaque ligne porte une `key` métier).
-  table?: { firstColumnLabel: string; columns: TableColumn[]; total?: boolean };
+  tables?: TableView[];
 };
 
 export const PHASE_VIEWS: Record<string, PhaseView> = {
   extract: {
-    table: {
-      firstColumnLabel: "Source",
-      columns: [
-        { key: "found", label: "Trouvés" },
-        { key: "new", label: "Nouveaux" },
-        { key: "updated", label: "Màj" },
-        { key: "unchanged", label: "Inchangés" },
-        { key: "duration_s", label: "Durée", duration: true },
-      ],
-      total: true,
-    },
+    tables: [
+      {
+        source: "table",
+        firstColumnLabel: "Source",
+        columns: [
+          { key: "found", label: "Trouvés" },
+          { key: "new", label: "Nouveaux" },
+          { key: "updated", label: "Màj" },
+          { key: "unchanged", label: "Inchangés" },
+          { key: "duration_s", label: "Durée", duration: true },
+        ],
+        total: true,
+      },
+    ],
   },
   cross_imports: {
-    table: {
-      firstColumnLabel: "Canal",
-      columns: [
-        { key: "interrogated", label: "Interrogés" },
-        { key: "new", label: "Nouveaux" },
-        { key: "not_found", label: "Introuvables" },
-        { key: "duration_s", label: "Durée", duration: true },
-      ],
-      total: true,
-    },
+    tables: [
+      {
+        source: "table",
+        firstColumnLabel: "Canal",
+        columns: [
+          { key: "interrogated", label: "Interrogés" },
+          { key: "new", label: "Nouveaux" },
+          { key: "not_found", label: "Introuvables" },
+          { key: "duration_s", label: "Durée", duration: true },
+        ],
+        total: true,
+      },
+    ],
   },
   refresh_stale: {
-    table: {
-      firstColumnLabel: "Source",
-      columns: [
-        { key: "interrogated", label: "Interrogés" },
-        { key: "refreshed", label: "Rafraîchis" },
-        { key: "disappeared", label: "Disparus" },
-        { key: "duration_s", label: "Durée", duration: true },
-      ],
-      total: true,
-    },
+    tables: [
+      {
+        source: "table",
+        firstColumnLabel: "Source",
+        columns: [
+          { key: "interrogated", label: "Interrogés" },
+          { key: "refreshed", label: "Rafraîchis" },
+          { key: "disappeared", label: "Disparus" },
+          { key: "duration_s", label: "Durée", duration: true },
+        ],
+        total: true,
+      },
+    ],
   },
   normalize: {
-    table: {
-      firstColumnLabel: "Source",
-      columns: [
-        { key: "processed", label: "Traités" },
-        { key: "skipped", label: "Ignorés" },
-        { key: "errors", label: "Erreurs" },
-        { key: "duration_s", label: "Durée", duration: true },
-      ],
-      total: true,
-    },
+    tables: [
+      {
+        source: "table",
+        firstColumnLabel: "Source",
+        columns: [
+          { key: "processed", label: "Traités" },
+          { key: "skipped", label: "Ignorés" },
+          { key: "errors", label: "Erreurs" },
+          { key: "duration_s", label: "Durée", duration: true },
+        ],
+        total: true,
+      },
+    ],
   },
   affiliations: {
-    table: {
-      firstColumnLabel: "Source",
-      columns: [
-        { key: "total", label: "source_authorships" },
-        { key: "in_perimeter", label: "Dans le périmètre" },
-        { key: "with_structs", label: "Avec structures" },
-      ],
-      total: true,
-    },
+    tables: [
+      {
+        source: "table",
+        firstColumnLabel: "Source",
+        columns: [
+          { key: "total", label: "source_authorships" },
+          { key: "in_perimeter", label: "Dans le périmètre" },
+          { key: "with_structs", label: "Avec structures" },
+        ],
+        total: true,
+      },
+    ],
   },
   publications: {
     summary: [
@@ -103,28 +131,36 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "new_prefixes", label: "Nouveaux préfixes" },
       { key: "resolved", label: "Résolus" },
     ],
-    table: {
-      firstColumnLabel: "Registration Agency",
-      columns: [
-        { key: "dois", label: "DOI", pct: true },
-        { key: "prefixes", label: "Préfixes DOI", pct: true },
-        { key: "new", label: "Run", sign: true },
-      ],
-      total: true,
-    },
+    tables: [
+      {
+        source: "table",
+        firstColumnLabel: "Registration Agency",
+        columns: [
+          { key: "dois", label: "DOI", pct: true },
+          { key: "prefixes", label: "Préfixes DOI", pct: true },
+          { key: "new", label: "Run", sign: true },
+        ],
+        total: true,
+      },
+    ],
   },
   metadata_correction: {
-    summary: [
-      { key: "unary_examined", label: "SP examinées (unaire)" },
-      { key: "unary_corrected", label: "Corrigées (unaire)" },
-      { key: "cluster_examined", label: "SP examinées (cluster)" },
-      { key: "cluster_corrected", label: "DOI corrigés (cluster)" },
+    tables: [
+      {
+        source: "synthesis",
+        firstColumnLabel: "",
+        columns: [
+          { key: "examined", label: "source_publications examinées" },
+          { key: "corrected", label: "corrigées" },
+        ],
+      },
+      {
+        source: "by_rule",
+        firstColumnLabel: "Règle de correction",
+        columns: [{ key: "count", label: "Nombre", pct: true }],
+        total: true,
+      },
     ],
-    table: {
-      firstColumnLabel: "Règle de correction",
-      columns: [{ key: "count", label: "Nombre", pct: true }],
-      total: true,
-    },
   },
   countries: {
     summary: [
@@ -143,13 +179,16 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       { key: "unchanged", label: "Inchangées" },
       { key: "not_found", label: "Non trouvées" },
     ],
-    table: {
-      firstColumnLabel: "Statut OA",
-      columns: [
-        { key: "count", label: "Nombre", pct: true },
-        { key: "delta", label: "Δ", sign: true },
-      ],
-      total: true,
-    },
+    tables: [
+      {
+        source: "table",
+        firstColumnLabel: "Statut OA",
+        columns: [
+          { key: "count", label: "Nombre", pct: true },
+          { key: "delta", label: "Δ", sign: true },
+        ],
+        total: true,
+      },
+    ],
   },
 };
