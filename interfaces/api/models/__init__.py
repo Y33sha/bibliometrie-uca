@@ -50,7 +50,6 @@ from interfaces.api.models.admin.perimeters import (
 from interfaces.api.models.admin.person_duplicates import (
     PersonConflictPairResponse,
     PersonDuplicatePairResponse,
-    PersonIdentifierConflictPairResponse,
 )
 from interfaces.api.models.admin.persons import (
     AddIdentifier,
@@ -141,7 +140,6 @@ __all__ = [
     "PerimeterUpdate",
     "PersonConflictPairResponse",
     "PersonDuplicatePairResponse",
-    "PersonIdentifierConflictPairResponse",
     "PipelineLogsResponse",
     "PipelineReportContent",
     "PipelineReportItem",

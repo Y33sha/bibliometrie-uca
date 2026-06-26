@@ -94,7 +94,7 @@ Conservateurs, activables une fois le reste en place ; pas des prérequis.
 - [ ] **API IdRef** : explorer les données disponibles, voir si on peut l'exploiter pour valider automatiquement les IdRef et compléter les identifiants manquants (idhal et ORCID liés).
 
 ## Items TODO liés (à intégrer quelque part ou à reporter à un autre chantier)
-* [x] générer une liste de suggestions de fusions (conflit d'identifiants entre 2 `person_id`) — mode « Par identifiant partagé » dans la page de déduplication des personnes : paires de `person_id` distincts portant la même valeur brute d'ORCID / IdRef / hal_person_id / idHAL (hors `_dubious`), évidence = l'identifiant partagé, fusion / marquage distinct via le pair-card existant. ~89 paires au stock. Audit : `_dubious` + corroboration ont déjà absorbé le bruit des méga-papers (aucun identifiant éclaté sur >4 personnes) ; reste à départager doublon (mêmes nom/réseau) vs erreur d'attribution (personnes distinctes) à l'œil — l'affinage par recouvrement labos/co-auteurs viendra si l'usage le réclame.
+* [ ] générer une liste de suggestions de fusions (conflit d'identifiants entre 2 `person_id`)
 * [ ] phase `persons`: ouvrir les étapes de matching par identifiant aux `source_authorships` hors périmètre? (La garde `in_perimeter = true` est nécessaire seulement pour le matching par nom et la création.)
 * [ ] OpenAlex résout les noms d'équipes en listes de personnes, avec des scories (21105) => nettoyer les "for the ... study group"
 * [ ] faux auteurs UCA créés par une erreur de parsing (toutes les signatures groupées ensemble pour chaque auteur) : ex. publi 77832

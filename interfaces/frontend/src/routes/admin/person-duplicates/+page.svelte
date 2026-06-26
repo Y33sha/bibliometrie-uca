@@ -11,26 +11,20 @@
 	import type { components } from '$lib/api/schema';
 	type PersonDetail = components['schemas']['PersonDedupDetail'];
 	type ConflictPub = components['schemas']['PersonConflictPub'];
-	type SharedIdentifier = components['schemas']['PersonSharedIdentifier'];
-	// Réponse partagée pour /next, /conflicts/next et /identifier-conflicts/next : `conflict_pubs`
-	// (mode conflit co-auteurs) et `shared_identifiers` (mode identifiant) sont présents selon le mode.
-	type DedupPair = {
-		person_a: PersonDetail;
-		person_b: PersonDetail;
-		conflict_pubs?: ConflictPub[];
-		shared_identifiers?: SharedIdentifier[];
+	// Réponse partagée pour /next et /conflicts/next : conflict_pubs présent
+	// uniquement sur l'endpoint conflict (PersonConflictPair vs PersonDuplicatePair).
+	type NextResponse = {
+		pair: { person_a: PersonDetail; person_b: PersonDetail; conflict_pubs?: ConflictPub[] } | null;
 	};
-	type NextResponse = { pair: DedupPair | null };
 
-	type Mode = 'name' | 'conflict' | 'identifier';
+	type Mode = 'name' | 'conflict';
 
 	// Restore state from URL
 	const urlParams = new URLSearchParams($page.url.search);
-	const mode0 = urlParams.get('mode');
-	let mode: Mode = $state(mode0 === 'conflict' || mode0 === 'identifier' ? mode0 : 'name');
+	let mode: Mode = $state((urlParams.get('mode') === 'conflict' ? 'conflict' : 'name') as Mode);
 	let total = $state<number | null>(null);
 	let offset = $state(parseInt(urlParams.get('offset') ?? '0') || 0);
-	let pair = $state<DedupPair | null>(null);
+	let pair = $state<{ person_a: PersonDetail; person_b: PersonDetail; conflict_pubs?: ConflictPub[] } | null>(null);
 	let loading = $state(false);
 	let acting = $state(false);
 	let mergedCount = $state(0);
@@ -45,16 +39,12 @@
 		replaceState(`${base}/admin/person-duplicates${qs ? '?' + qs : ''}`, {});
 	}
 
-	function endpointBase(): string {
-		const root = '/api/admin/person-duplicates';
-		if (mode === 'conflict') return `${root}/conflicts`;
-		if (mode === 'identifier') return `${root}/identifier-conflicts`;
-		return root;
-	}
-
 	async function loadTotal() {
 		try {
-			const data = await api<{ total: number }>(`${endpointBase()}/count`);
+			const endpoint = mode === 'conflict'
+				? '/api/admin/person-duplicates/conflicts/count'
+				: '/api/admin/person-duplicates/count';
+			const data = await api<{ total: number }>(endpoint);
 			total = data.total;
 		} catch {}
 	}
@@ -63,7 +53,9 @@
 		loading = true;
 		error = '';
 		try {
-			const endpoint = `${endpointBase()}/next`;
+			const endpoint = mode === 'conflict'
+				? '/api/admin/person-duplicates/conflicts/next'
+				: '/api/admin/person-duplicates/next';
 			const data = await api<NextResponse>(`${endpoint}?offset=${pos}`);
 			pair = data.pair;
 			offset = pos;
@@ -140,7 +132,6 @@
 	<div class="mode-toggle">
 		<button class="mode-btn" class:active={mode === 'name'} onclick={() => switchMode('name')}>Par nom</button>
 		<button class="mode-btn" class:active={mode === 'conflict'} onclick={() => switchMode('conflict')}>Par conflit de sources</button>
-		<button class="mode-btn" class:active={mode === 'identifier'} onclick={() => switchMode('identifier')}>Par identifiant partagé</button>
 	</div>
 
 	<div class="stats-bar">
@@ -200,20 +191,6 @@
 				</button>
 			</div>
 
-
-			{#if pair.shared_identifiers?.length}
-				<div class="shared-idents">
-					<h4>Identifiant partagé</h4>
-					<div class="shared-idents-list">
-						{#each pair.shared_identifiers as si}
-							<span class="ident-tag id-pending">
-								<span class="ident-type">{si.id_type}</span>
-								<span class="ident-value">{si.id_value}</span>
-							</span>
-						{/each}
-					</div>
-				</div>
-			{/if}
 
 			{#if pair.conflict_pubs?.length}
 				<div class="conflict-pubs">
@@ -328,23 +305,6 @@
 		font-weight: 600;
 	}
 
-	.shared-idents {
-		background: #eef4f5;
-		border: 1px solid #cfe0e3;
-		border-radius: 6px;
-		padding: 10px 14px;
-		margin-bottom: 12px;
-	}
-	.shared-idents h4 {
-		font-size: 0.9rem;
-		margin: 0 0 6px;
-		color: #15616d;
-	}
-	.shared-idents-list {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
-	}
 	.conflict-pubs {
 		background: #fff8f0;
 		border: 1px solid #f0dcc0;
