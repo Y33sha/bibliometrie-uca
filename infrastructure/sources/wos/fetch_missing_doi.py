@@ -30,7 +30,7 @@ from infrastructure.sources.api_limits import WOS_DELAY, WOS_PER_PAGE
 from infrastructure.sources.common import record_doi_not_found, upsert_staging
 from infrastructure.sources.config import get_api_base_urls, get_wos_api_key
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
-from infrastructure.sources.wos.parsing import clean_doi_for_wos, extract_doi, extract_ut
+from infrastructure.sources.wos.parsing import extract_doi, extract_ut, filter_doi_for_wos
 
 log = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class WosFetchMissingDoiAdapter:
         # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI
         # preprints filtrés (c=None) ne sont pas interrogeables, donc jamais
         # enregistrés comme not-found (le filtre client les écarte gratuitement).
-        queried = [(d, clean_doi_for_wos(d)) for d in dois]
+        queried = [(d, filter_doi_for_wos(d)) for d in dois]
         clean = [c for _, c in queried if c]
 
         records: list[dict] = []
@@ -132,10 +132,10 @@ class WosFetchMissingDoiAdapter:
         if not complete:
             return records
         # Lot complet : tout DOI interrogé sans record correspondant est
-        # confirmé absent de WoS. On enregistre le backoff sur le DOI d'origine
-        # (clé doi_lookups = doi staging lowercase).
-        found = {d.lower() for r in records if (d := extract_doi(r))}
-        missed = [not_found_marker(orig) for orig, c in queried if c and c.lower() not in found]
+        # confirmé absent de WoS. `extract_doi` et les candidats sont tous deux
+        # normalisés par `clean_doi`, donc comparables directement.
+        found = {d for r in records if (d := extract_doi(r))}
+        missed = [not_found_marker(orig) for orig, c in queried if c and c not in found]
         return records + missed
 
     def insert(self, conn: Connection, record: dict) -> bool:

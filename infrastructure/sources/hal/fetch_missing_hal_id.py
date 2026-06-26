@@ -24,6 +24,7 @@ from domain.publications.identifiers import extract_hal_id_from_url
 from infrastructure.sources.api_limits import HAL_DELAY
 from infrastructure.sources.common import upsert_not_found_stub, upsert_staging
 from infrastructure.sources.config import get_api_base_urls
+from infrastructure.sources.hal.extract_hal import extract_doi
 from infrastructure.sources.hal.fields import HAL_FIELDS_STR
 from infrastructure.sources.http_retry_async import http_request_with_retry_async
 
@@ -206,13 +207,6 @@ def insert_staging_hal(conn: Connection, hal_id: str, doi: str | None, doc: dict
     )
 
 
-def _extract_doi_str(doc: dict[str, Any]) -> str | None:
-    doi = doc.get("doiId_s")
-    if isinstance(doi, list):
-        return doi[0] if doi else None
-    return doi
-
-
 class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
     """Adapter PostgreSQL + HTTP pour `HalFetchMissingAdapter`."""
 
@@ -295,7 +289,7 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         self, conn: Connection, hal_id: str, doc: dict[str, Any] | None
     ) -> bool:
         if doc:
-            insert_staging_hal(conn, hal_id, _extract_doi_str(doc), doc)
+            insert_staging_hal(conn, hal_id, extract_doi(doc), doc)
             return True
         upsert_not_found_stub(
             conn, source="hal", source_id=hal_id, entry_mode="cross_import_hal", rearm=True
@@ -316,5 +310,5 @@ class PgHalFetchMissingAdapter(HalFetchMissingAdapter):
         ).first()
         if exists:
             return (True, False)
-        insert_staging_hal(conn, hal_id, _extract_doi_str(doc), doc)
+        insert_staging_hal(conn, hal_id, extract_doi(doc), doc)
         return (True, True)

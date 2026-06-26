@@ -6,9 +6,9 @@ import pytest
 
 from infrastructure.sources.wos.parsing import (
     build_query,
-    clean_doi_for_wos,
     extract_doi,
     extract_ut,
+    filter_doi_for_wos,
     get_records,
     get_records_found,
 )
@@ -69,11 +69,15 @@ class TestExtractDoi:
         }
         assert extract_doi(rec) == "10.1000/abc"
 
-    def test_strips_whitespace_from_value(self):
+    def test_normalizes_value_via_clean_doi(self):
+        # Le DOI extrait passe par `clean_doi` : préfixe URL, casse et espaces
+        # sont normalisés à la source (forme canonique unique).
         rec = {
             "dynamic_data": {
                 "cluster_related": {
-                    "identifiers": {"identifier": [{"type": "doi", "value": "  10.1000/abc  "}]}
+                    "identifiers": {
+                        "identifier": [{"type": "doi", "value": "  https://doi.org/10.1000/ABC  "}]
+                    }
                 }
             }
         }
@@ -133,38 +137,30 @@ class TestGetRecordsFound:
         assert get_records_found({"QueryResult": {}}) == 0
 
 
-class TestCleanDoiForWos:
-    def test_passes_through_clean_doi(self):
-        assert clean_doi_for_wos("10.1000/abc") == "10.1000/abc"
+class TestFilterDoiForWos:
+    # `filter_doi_for_wos` reçoit un DOI déjà normalisé par `clean_doi` (forme
+    # canonique minuscule) et ne fait que le filtrage propre à WoS : la
+    # normalisation (préfixe URL, casse, espaces) est testée pour `clean_doi`.
 
-    def test_strips_url_params(self):
-        # DOI tronqué après `?` ou `&` (paramètres résiduels d'URL).
-        assert clean_doi_for_wos("10.1000/abc?foo=1") == "10.1000/abc"
-        assert clean_doi_for_wos("10.1000/abc&bar=2") == "10.1000/abc"
-
-    def test_strips_whitespace(self):
-        assert clean_doi_for_wos("  10.1000/abc  ") == "10.1000/abc"
+    def test_passes_through_indexed_doi(self):
+        assert filter_doi_for_wos("10.1000/abc") == "10.1000/abc"
 
     def test_filters_zenodo(self):
         # Préfixes WoS-unindexed → None pour éviter l'appel inutile.
-        assert clean_doi_for_wos("10.5281/zenodo.123") is None
+        assert filter_doi_for_wos("10.5281/zenodo.123") is None
 
     def test_filters_arxiv(self):
-        assert clean_doi_for_wos("10.48550/arXiv.2401.12345") is None
+        assert filter_doi_for_wos("10.48550/arxiv.2401.12345") is None
 
     def test_filters_ssrn(self):
-        assert clean_doi_for_wos("10.2139/ssrn.4567890") is None
+        assert filter_doi_for_wos("10.2139/ssrn.4567890") is None
 
     def test_filters_research_square(self):
-        assert clean_doi_for_wos("10.21203/rs.3.rs-12345") is None
-
-    def test_filter_is_case_insensitive(self):
-        # Le prefix matching utilise `.lower()` : un DOI en majuscule reste filtré.
-        assert clean_doi_for_wos("10.5281/Zenodo.123") is None
+        assert filter_doi_for_wos("10.21203/rs.3.rs-12345") is None
 
     def test_filters_doi_with_double_quote(self):
         # `"` casserait la requête WoS `DO=("...")` côté backend.
-        assert clean_doi_for_wos('10.1000/abc"def') is None
+        assert filter_doi_for_wos('10.1000/abc"def') is None
 
     def test_filters_doi_with_newline(self):
-        assert clean_doi_for_wos("10.1000/abc\ndef") is None
+        assert filter_doi_for_wos("10.1000/abc\ndef") is None
