@@ -72,3 +72,7 @@ class PublicationsReconciliationQueries(Protocol):
     def clear_keys_dirty(self, conn: Connection, source_publication_ids: list[int]) -> int:
         """Efface `keys_dirty` sur les SP réconciliées. Retourne le nombre de lignes touchées."""
         ...
+
+    def count_dedup_inputs(self, conn: Connection) -> tuple[int, int]:
+        """`(source_publications in-périmètre, publications)` pour le facteur de dédup global. Une SP est in-périmètre si elle a au moins une authorship in-périmètre (même définition que l'univers de réconciliation). Les publications hors périmètre n'existent pas — la réconciliation gate leur création sur le périmètre."""
+        ...

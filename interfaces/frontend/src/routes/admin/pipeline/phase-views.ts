@@ -20,6 +20,18 @@ export type PhaseView = {
 };
 
 export const PHASE_VIEWS: Record<string, PhaseView> = {
+  publications: {
+    summary: [
+      { key: "sp_in_perimeter", label: "source_publications (in-périmètre)" },
+      { key: "publications", label: "Publications" },
+      { key: "dedup_factor", label: "Facteur de dédup (SP/pub)" },
+      { key: "processed", label: "SP traitées (ce run)" },
+      { key: "created", label: "Publications créées" },
+      { key: "splits", label: "dont par scission" },
+      { key: "existing", label: "Existantes conservées" },
+      { key: "merges", label: "Doublons fusionnés" },
+    ],
+  },
   resolve_ra: {
     summary: [
       { key: "new_prefixes", label: "Nouveaux préfixes" },

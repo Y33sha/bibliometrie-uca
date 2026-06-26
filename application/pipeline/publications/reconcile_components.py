@@ -195,7 +195,7 @@ def run(
     pub_repo: PublicationRepository,
     audit_repo: AuditRepository | None = None,
     dry_run: bool = False,
-) -> None:
+) -> ReconcileStats | None:
     try:
         if dry_run:
             dirty_ids = queries.fetch_dirty_source_publication_ids(conn)
@@ -213,12 +213,12 @@ def run(
                     len(plan.dissolved),
                 )
             conn.rollback()
-            return
+            return None
 
         stats = reconcile(conn, queries, pub_repo=pub_repo, audit_repo=audit_repo, logger=logger)
         if stats is None:
             logger.info("Réconciliation : aucune source_publication dirty")
-            return
+            return None
         conn.commit()
         logger.info("✓ %d source_publications traitées", stats.processed)
         logger.info(
@@ -229,6 +229,7 @@ def run(
             stats.existing,
         )
         logger.info("  → %d doublons fusionnés", stats.merges)
+        return stats
     except Exception:
         conn.rollback()
         logger.exception("Erreur")

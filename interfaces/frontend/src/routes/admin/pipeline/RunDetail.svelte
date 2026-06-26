@@ -2,7 +2,7 @@
   import type { components } from "$lib/api/schema";
   import PhaseRibbon from "./PhaseRibbon.svelte";
   import { CELL_COLOR, fmtDate, fmtDuration, STATUS_LABEL, type Status } from "./helpers";
-  import { PHASE_VIEWS, type TableColumn } from "./phase-views";
+  import { PHASE_VIEWS, type PhaseView, type TableColumn } from "./phase-views";
 
   type RunDetail = components["schemas"]["RunDetail"];
   type PhaseExecutionDetail = components["schemas"]["PhaseExecutionDetail"];
@@ -43,6 +43,20 @@
   }
   function detailSummary(d: unknown): Record<string, number> {
     return asDetails(d).summary ?? {};
+  }
+  function summaryPairs(
+    view: PhaseView | undefined,
+    dsummary: Record<string, number>,
+  ): [string, number][] {
+    if (!view?.summary) return [];
+    return view.summary
+      .filter((item) => item.key in dsummary)
+      .map((item): [string, number] => [item.label, dsummary[item.key]]);
+  }
+  function chunkPairs(pairs: [string, number][]): [string, number][][] {
+    const rows: [string, number][][] = [];
+    for (let i = 0; i < pairs.length; i += 2) rows.push(pairs.slice(i, i + 2));
+    return rows;
   }
   function tableRows(d: unknown): Record<string, string | number>[] {
     return asDetails(d).table?.rows ?? [];
@@ -144,17 +158,22 @@
         {@const dsummary = detailSummary(p.details)}
         {@const drows = tableRows(p.details)}
         {@const sources = bySource(p.details)}
+        {@const pairs = summaryPairs(view, dsummary)}
         <tr class="expand-row">
           <td colspan="4">
             <div class="expand">
-              {#if view?.summary}
-                {#each view.summary as item (item.key)}
-                  {#if item.key in dsummary}
-                    <div class="expand-line">
-                      <span class="k">{item.label}</span><span class="num">{dsummary[item.key]}</span>
+              {#if pairs.length}
+                <div class="summary">
+                  {#each chunkPairs(pairs) as row, i (i)}
+                    <div class="summary-row">
+                      {#each row as [label, value] (label)}
+                        <div class="summary-cell">
+                          <span class="sk">{label}</span><span class="sv">{value}</span>
+                        </div>
+                      {/each}
                     </div>
-                  {/if}
-                {/each}
+                  {/each}
+                </div>
               {:else if metricsSummary(p.metrics)}
                 <div class="expand-line">
                   <span class="k">Métriques</span><span>{metricsSummary(p.metrics)}</span>
@@ -352,6 +371,35 @@
     border-top: 2px solid var(--border);
     border-bottom: none;
     font-weight: 600;
+  }
+  .summary {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.82rem;
+  }
+  .summary-row {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+  }
+  .summary-row:first-child {
+    border-top: 1px solid var(--border);
+  }
+  .summary-cell {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 12px;
+    min-width: 0;
+  }
+  .summary-cell:not(:last-child) {
+    border-right: 1px solid var(--border);
+  }
+  .summary-cell .sk {
+    color: var(--muted);
+  }
+  .summary-cell .sv {
+    font-family: "JetBrains Mono", monospace;
   }
   .expand-line {
     display: grid;
