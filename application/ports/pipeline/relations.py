@@ -41,6 +41,16 @@ class SharedKeyPair(NamedTuple):
     b_doi: str
 
 
+class ErratumTitleMatch(NamedTuple):
+    """Un erratum rapproché de l'œuvre qu'il corrige par le titre (signal #3). Le titre d'un erratum
+    reproduit verbatim celui du parent après un préfixe (« Erratum: », « Corrigendum to »…), donc le
+    `title_normalized` du parent est un suffixe de celui de l'erratum — rapprochement exact, pas
+    flou. La cible est désignée par son DOI (parent au corpus, donc résoluble en `publication_id`)."""
+
+    erratum_id: int
+    parent_doi: str
+
+
 class PublicationRelationsQueries(Protocol):
     """Opérations SQL de la phase `relations`."""
 
@@ -67,4 +77,19 @@ class PublicationRelationsQueries(Protocol):
     def replace_shared_key_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
         """Remplace les relations issues des clés partagées (`source` shared_key) par `edges`,
         avec la même résolution/dédup que `replace_declared_relations`."""
+        ...
+
+    def fetch_erratum_title_matches(self, conn: Connection) -> list[ErratumTitleMatch]:
+        """Les erratums rapprochés par titre de l'œuvre qu'ils corrigent (signal #3).
+
+        Pour chaque erratum, candidats = publications non-erratum, au corpus (DOI présent), titre
+        assez long, publiées dans la fenêtre `[année − 2 … année]`, dont le `title_normalized` est un
+        suffixe de celui de l'erratum. Garde d'ambiguïté : on ne rapproche que si **exactement un**
+        candidat « substantiel » (hors `preprint` et `dataset`, qui ne sont que des formes de la même
+        œuvre) porte ce titre — deux articles distincts au même titre = collision, on s'abstient."""
+        ...
+
+    def replace_title_match_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
+        """Remplace les relations rapprochées par titre (`source` title_match) par `edges`, avec la
+        même résolution/dédup que `replace_declared_relations`."""
         ...

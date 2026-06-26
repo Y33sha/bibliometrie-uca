@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from application.ports.pipeline.relations import (
     DeclaredRelationSource,
+    ErratumTitleMatch,
     PublicationRelationsQueries,
     RelationEdge,
     SharedKeyPair,
@@ -87,6 +88,46 @@ def fetch_declared_related_pairs(conn: Connection) -> set[frozenset[int]]:
     return {frozenset((r.a, r.b)) for r in rows}
 
 
+# Signal #3 — rapprochement erratum → œuvre corrigée par le titre. Le titre d'un erratum reproduit
+# celui du parent après un préfixe (« Erratum: », « Corrigendum to »…), donc `title_normalized` du
+# parent est un **suffixe** de celui de l'erratum (égalité exacte de la portion-parent, pas du flou).
+# Garde de longueur > 30 (titres génériques écartés) et fenêtre d'année [année − 2 … année] (le
+# parent précède l'erratum). Garde d'ambiguïté : un seul candidat « substantiel » (hors `preprint` /
+# `dataset`, simples formes de la même œuvre) doit porter ce titre, sinon collision → abstention.
+_ERRATUM_TITLE_MATCHES_SQL = text("""
+    WITH erratum AS (
+        SELECT id, title_normalized AS t, pub_year AS y
+        FROM publications
+        WHERE doc_type = 'erratum' AND title_normalized IS NOT NULL AND pub_year IS NOT NULL
+    ),
+    candidate AS (
+        SELECT e.id AS erratum_id, p.doi AS parent_doi,
+               (p.doc_type::text NOT IN ('preprint', 'dataset')) AS substantive
+        FROM erratum e
+        JOIN publications p
+          ON p.id <> e.id
+         AND p.doc_type <> 'erratum'
+         AND p.doi IS NOT NULL
+         AND length(p.title_normalized) > 30
+         AND p.pub_year BETWEEN e.y - 2 AND e.y
+         AND right(e.t, length(p.title_normalized)) = p.title_normalized
+    ),
+    substantive_count AS (
+        SELECT erratum_id, count(*) FILTER (WHERE substantive) AS n
+        FROM candidate GROUP BY erratum_id
+    )
+    SELECT c.erratum_id, c.parent_doi
+    FROM candidate c
+    JOIN substantive_count s ON s.erratum_id = c.erratum_id
+    WHERE s.n = 1 AND c.substantive
+""")
+
+
+def fetch_erratum_title_matches(conn: Connection) -> list[ErratumTitleMatch]:
+    rows = conn.execute(_ERRATUM_TITLE_MATCHES_SQL).all()
+    return [ErratumTitleMatch(r.erratum_id, r.parent_doi) for r in rows]
+
+
 def _insert_relation_edges(conn: Connection, edges: list[RelationEdge]) -> int:
     """Insère `edges` en résolvant la cible (`target_publication_id` par LEFT JOIN sur le DOI),
     en écartant les auto-relations et en dédoublonnant par la PK. Un seul aller-retour bulk via
@@ -123,6 +164,13 @@ def replace_shared_key_relations(conn: Connection, edges: list[RelationEdge]) ->
     return _insert_relation_edges(conn, edges)
 
 
+def replace_title_match_relations(conn: Connection, edges: list[RelationEdge]) -> int:
+    """Remplace les relations rapprochées par titre : purge la `source` title_match, puis insère
+    `edges`."""
+    conn.execute(text("DELETE FROM publication_relations WHERE source = 'title_match'"))
+    return _insert_relation_edges(conn, edges)
+
+
 class PgPublicationRelationsQueries(PublicationRelationsQueries):
     """Adapter PostgreSQL pour `application.ports.pipeline.relations.PublicationRelationsQueries`."""
 
@@ -140,3 +188,9 @@ class PgPublicationRelationsQueries(PublicationRelationsQueries):
 
     def replace_shared_key_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
         return replace_shared_key_relations(conn, edges)
+
+    def fetch_erratum_title_matches(self, conn: Connection) -> list[ErratumTitleMatch]:
+        return fetch_erratum_title_matches(conn)
+
+    def replace_title_match_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:
+        return replace_title_match_relations(conn, edges)
