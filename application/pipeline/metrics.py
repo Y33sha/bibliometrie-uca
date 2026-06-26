@@ -24,8 +24,8 @@ class PhaseMetrics:
     cadre générique : `already_complete` pour `refetch_truncated`, `tagged`
     pour `extract_hal`, `not_found` pour les fetchers HAL, etc.
 
-    `details` porte les indicateurs sur-mesure d'observabilité (structure libre
-    propre à la phase, ex. `{"by_source": {...}}`) et `signals` les faits notables
+    `details` porte les indicateurs sur-mesure d'observabilité (conventions
+    `summary`, `table`, lues par l'interface) et `signals` les faits notables
     à signaler (source indisponible, conflit d'identité…) : tous deux remontés à
     l'orchestrateur pour la capture par phase, sans rôle dans les compteurs.
     """

@@ -2,7 +2,7 @@
 
 Source de vérité unique de la structure du pipeline, consommée par la capture d'observabilité (orchestrateur) et par sa lecture (API, interface). Pour chaque phase : les tables qu'elle consomme en entrée et celles qu'elle produit en sortie. Module pur, sans I/O.
 
-Les tables consommées définissent l'observable d'entrée (volume capturé au début de la phase), les tables produites l'observable de sortie (volume capturé à la fin) ; leur rapport donne le rendement de la phase. Les phases d'extraction et de récupération (`extract`, `resolve_ra`, `cross_imports`, `refresh_stale`, `refetch_truncated`) ont une entrée essentiellement externe (API sources) : leur rendement local est secondaire, c'est l'absolu produit qui parle.
+Les tables consommées définissent l'observable d'entrée (volume capturé au début de la phase), les tables produites l'observable de sortie (volume capturé à la fin) ; leur comparaison avant / après donne le mouvement de volume de la phase. Une phase qui enrichit une table en place (même volume avant / après) ne s'observe pas par ce mouvement : elle remonte ses propres indicateurs sur-mesure.
 
 L'ordre de déclaration est l'ordre d'exécution du pipeline ; la validation à l'import vérifie l'unicité des noms.
 """

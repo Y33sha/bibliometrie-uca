@@ -9,9 +9,9 @@ non appliquée) laisse le run tourner sans le tracer.
 
 La colonne `details` rassemble les indicateurs : `details["tables"]` porte le
 volume avant / après des tables consommées et produites (relevé ici), et les
-phases y ajoutent leurs indicateurs sur-mesure (ex. `by_source`) via leur
-`PhaseMetrics`. La connexion est utilisée en autocommit : chaque relevé voit les
-données committées par les phases précédentes, chaque écriture est immédiate.
+phases y ajoutent leurs indicateurs sur-mesure (conventions `summary`, `table`)
+via leur `PhaseMetrics`. La connexion est utilisée en autocommit : chaque relevé
+voit les données committées par les phases précédentes, chaque écriture est immédiate.
 """
 
 from __future__ import annotations
