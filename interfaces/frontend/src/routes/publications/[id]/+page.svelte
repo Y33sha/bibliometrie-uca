@@ -110,19 +110,27 @@
 
   const hasSourceConflict = $derived(sourceRows.some((r) => r.conflict));
 
-  async function loadData() {
-    data = await api<PubResponse>(`/api/publications/${pubId}`);
+  async function loadData(id: string) {
+    data = await api<PubResponse>(`/api/publications/${id}`);
   }
+
+  // Recharge à chaque changement d'`id`. La navigation d'une publication à une autre réutilise la
+  // même route `[id]`, donc le composant n'est pas remonté : `onMount` ne suffit pas, il faut un
+  // effet réactif sur `pubId` (sinon l'URL change mais le contenu reste).
+  $effect(() => {
+    const id = pubId;
+    if (!id) return;
+    data = null;
+    error = false;
+    loadData(id).catch(() => {
+      error = true;
+    });
+  });
 
   onMount(async () => {
     canGoBack =
       (window as any).navigation?.canGoBack ??
       document.referrer.startsWith(window.location.origin);
-    try {
-      await loadData();
-    } catch {
-      error = true;
-    }
     try {
       isAdmin = (await auth.check()).authenticated;
     } catch {
