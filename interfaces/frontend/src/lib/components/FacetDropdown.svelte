@@ -14,10 +14,13 @@
 		selected?: string[];
 		allLabel?: string;
 		tooltip?: string;
+		/** Regroupe les options sous des en-têtes (ex. familles de doc_types). Les options hors
+		 *  groupe sont rendues sans en-tête à la fin. La logique de sélection est inchangée. */
+		groups?: { label: string; values: string[] }[];
 		onchange?: (selected: string[]) => void;
 	}
 
-	let { label, options, searchable = false, selected = $bindable([]), allLabel = 'Tous', tooltip, onchange }: Props = $props();
+	let { label, options, searchable = false, selected = $bindable([]), allLabel = 'Tous', tooltip, groups, onchange }: Props = $props();
 	let showTooltip = $state(false);
 	let tooltipTimer: ReturnType<typeof setTimeout>;
 
@@ -99,6 +102,13 @@
 
 <svelte:window onclick={handleClickOutside} />
 
+{#snippet optionRow(opt: FacetOption)}
+	<label>
+		<input type="checkbox" checked={isChecked(opt.value)} onchange={() => toggle(opt.value)} />
+		{opt.text}{#if opt.count != null}<span class="facet-count">{opt.count}</span>{/if}
+	</label>
+{/snippet}
+
 <div class="facet">
 	<button
 		type="button"
@@ -148,16 +158,21 @@
 					<input type="checkbox" checked={isAllSelected} onchange={toggleAll} />
 					<span style="font-weight:500">{allLabel}</span>
 				</label>
-				{#each filteredOptions as opt (opt.value)}
-					<label>
-						<input
-							type="checkbox"
-							checked={isChecked(opt.value)}
-							onchange={() => toggle(opt.value)}
-						/>
-						{opt.text}{#if opt.count != null}<span class="facet-count">{opt.count}</span>{/if}
-					</label>
-				{/each}
+				{#if groups}
+					{#each groups as g (g.label)}
+						{@const opts = filteredOptions.filter((o) => g.values.includes(o.value))}
+						{#if opts.length}
+							<div class="facet-group-label">{g.label}</div>
+							{#each opts as opt (opt.value)}{@render optionRow(opt)}{/each}
+						{/if}
+					{/each}
+					{@const ungrouped = filteredOptions.filter(
+						(o) => !groups.some((g) => g.values.includes(o.value)),
+					)}
+					{#each ungrouped as opt (opt.value)}{@render optionRow(opt)}{/each}
+				{:else}
+					{#each filteredOptions as opt (opt.value)}{@render optionRow(opt)}{/each}
+				{/if}
 			</div>
 		</div>
 	{/if}
@@ -265,6 +280,14 @@
 		border: 1px solid var(--border);
 		border-radius: 4px;
 		font-size: 0.85rem;
+	}
+	.facet-group-label {
+		padding: 7px 12px 2px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--muted);
 	}
 	.facet-options label {
 		display: flex;
