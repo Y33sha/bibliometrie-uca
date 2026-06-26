@@ -83,23 +83,8 @@ class PersonConflictPair(BaseModel):
     conflict_pubs: list[PersonConflictPub]
 
 
-class PersonSharedIdentifier(BaseModel):
-    id_type: str
-    id_value: str
-
-
-class PersonIdentifierConflictPair(BaseModel):
-    """Deux personnes distinctes portant la **même valeur d'identifiant brut** (ORCID, IdRef,
-    hal_person_id, idHAL) : un doublon (mêmes nom/réseau) ou une erreur d'attribution (personnes
-    distinctes, identifiant désaligné). L'évidence est l'identifiant partagé."""
-
-    person_a: PersonDedupDetail
-    person_b: PersonDedupDetail
-    shared_identifiers: list[PersonSharedIdentifier]
-
-
 class PersonDuplicatesQueries(Protocol):
-    """Lectures sur les doublons personnes (candidats par nom, conflits co-auteurs, conflits d'identifiant)."""
+    """Lectures sur les doublons personnes (candidats + conflits co-auteurs)."""
 
     def count_person_duplicates(self) -> int: ...
 
@@ -112,9 +97,3 @@ class PersonDuplicatesQueries(Protocol):
     def next_person_conflict(
         self, *, skip_pairs: set[tuple[int, int]], offset: int
     ) -> PersonConflictPair | None: ...
-
-    def count_person_identifier_conflicts(self) -> int: ...
-
-    def next_person_identifier_conflict(
-        self, *, skip_pairs: set[tuple[int, int]], offset: int
-    ) -> PersonIdentifierConflictPair | None: ...

@@ -1731,53 +1731,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/person-duplicates/identifier-conflicts/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Count Person Identifier Conflicts
-         * @description Nombre de paires de personnes portant la même valeur d'identifiant brut.
-         *
-         *     Deux `person_id` distincts dont des `source_authorships` portent le même
-         *     ORCID / IdRef / hal_person_id / idHAL (hors `_dubious`) : doublon probable,
-         *     ou erreur d'attribution si les personnes sont en réalité distinctes.
-         */
-        get: operations["count_person_identifier_conflicts_api_admin_person_duplicates_identifier_conflicts_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/identifier-conflicts/next": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Next Person Identifier Conflict
-         * @description Renvoie la paire personnes-au-même-identifiant à l'offset donné.
-         *
-         *     Même protocole que `/person-duplicates/next` (paire + skip + offset).
-         *     L'identifiant partagé est porté par `shared_identifiers`.
-         */
-        get: operations["next_person_identifier_conflict_api_admin_person_duplicates_identifier_conflicts_next_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/hal-problems/duplicate-accounts": {
         parameters: {
             query?: never;
@@ -4517,22 +4470,6 @@ export interface components {
             pair: components["schemas"]["PersonDuplicatePair"] | null;
         };
         /**
-         * PersonIdentifierConflictPair
-         * @description Deux personnes distinctes portant la **même valeur d'identifiant brut** (ORCID, IdRef,
-         *     hal_person_id, idHAL) : un doublon (mêmes nom/réseau) ou une erreur d'attribution (personnes
-         *     distinctes, identifiant désaligné). L'évidence est l'identifiant partagé.
-         */
-        PersonIdentifierConflictPair: {
-            person_a: components["schemas"]["PersonDedupDetail"];
-            person_b: components["schemas"]["PersonDedupDetail"];
-            /** Shared Identifiers */
-            shared_identifiers: components["schemas"]["PersonSharedIdentifier"][];
-        };
-        /** PersonIdentifierConflictPairResponse */
-        PersonIdentifierConflictPairResponse: {
-            pair: components["schemas"]["PersonIdentifierConflictPair"] | null;
-        };
-        /**
          * PersonIdentifierOut
          * @description Identifiant (ORCID, idHAL, idRef) attaché à une personne.
          */
@@ -4667,13 +4604,6 @@ export interface components {
             department_name: string | null;
             /** Has Rh */
             has_rh: boolean;
-        };
-        /** PersonSharedIdentifier */
-        PersonSharedIdentifier: {
-            /** Id Type */
-            id_type: string;
-            /** Id Value */
-            id_value: string;
         };
         /** PersonThesesResponse */
         PersonThesesResponse: {
@@ -8879,58 +8809,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonConflictPairResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    count_person_identifier_conflicts_api_admin_person_duplicates_identifier_conflicts_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TotalCountResponse"];
-                };
-            };
-        };
-    };
-    next_person_identifier_conflict_api_admin_person_duplicates_identifier_conflicts_next_get: {
-        parameters: {
-            query?: {
-                skip?: string;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonIdentifierConflictPairResponse"];
                 };
             };
             /** @description Validation Error */

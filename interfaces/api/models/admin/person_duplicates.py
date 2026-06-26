@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from application.ports.api.person_duplicates_queries import (
     PersonConflictPair,
     PersonDuplicatePair,
-    PersonIdentifierConflictPair,
 )
 
 
@@ -18,7 +17,3 @@ class PersonDuplicatePairResponse(BaseModel):
 
 class PersonConflictPairResponse(BaseModel):
     pair: PersonConflictPair | None
-
-
-class PersonIdentifierConflictPairResponse(BaseModel):
-    pair: PersonIdentifierConflictPair | None
