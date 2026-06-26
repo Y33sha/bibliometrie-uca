@@ -23,8 +23,9 @@ Deux modes :
   `authors_truncated`) reprennent leur défaut et se recalculent au prochain
   extract bulk réel.
 
-Ne lance PAS la normalisation : une fois réhydraté, relancer
-    python run_pipeline.py --only normalize --sources <sources>
+Ne lance PAS la normalisation : une fois réhydraté, relancer le pipeline
+depuis la normalisation (qui réenchaîne toutes les phases aval) :
+    python run_pipeline.py --from normalize --sources <sources>
 
 Usage :
     python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
@@ -193,7 +194,8 @@ def main() -> None:
                 )
 
     log.info(
-        "Terminé. Relancer la normalisation : python run_pipeline.py --only normalize --sources %s",
+        "Terminé. Relancer le pipeline depuis la normalisation : "
+        "python run_pipeline.py --from normalize --sources %s",
         ",".join(sources),
     )
 
