@@ -1,6 +1,7 @@
 """Query services admin sync pour les personnes : orphan authorships,
 name-form authorships."""
 
+from collections import defaultdict
 from typing import Any
 
 from sqlalchemy import Connection, bindparam, text
@@ -313,6 +314,150 @@ def identifier_conflicts(conn: Connection, *, page: int, per_page: int) -> dict[
         "per_page": per_page,
         "pages": (total + per_page - 1) // per_page if per_page else 0,
         "pairs": pairs,
+    }
+
+
+# ── Intrus détachables (file de triage du hub) ───────────────────
+
+# Une même personne rattachée à ≥2 signatures d'une même `source_publication` : impossible (on ne
+# signe pas deux positions d'un même enregistrement), donc l'une des signatures est mal rattachée.
+# L'index partiel `idx_sa_pub_person` sert ce groupement en index-only scan ordonné.
+_REPEATED_CANDIDATES_SQL = text("""
+    SELECT source_publication_id AS spid, person_id
+    FROM source_authorships
+    WHERE person_id IS NOT NULL
+    GROUP BY source_publication_id, person_id
+    HAVING count(*) >= 2
+""")
+
+# Occurrences des seules paires candidates (pas tous les auteurs des méga-publications) : `unnest`
+# zippe les deux tableaux parallèles en couples exacts `(source_publication, personne)`.
+_REPEATED_OCCURRENCES_SQL = text("""
+    SELECT sa.source_publication_id AS spid, sa.person_id,
+           sa.source::text AS source, sa.raw_author_name AS name,
+           sa.author_name_normalized AS norm, sa.person_identifiers AS identifiers
+    FROM source_authorships sa
+    WHERE (sa.source_publication_id, sa.person_id) IN (
+        SELECT spid, pid FROM unnest(CAST(:spids AS bigint[]), CAST(:pids AS bigint[])) AS t(spid, pid)
+    )
+      AND sa.author_name_normalized IS NOT NULL
+""").bindparams(bindparam("spids"), bindparam("pids"))
+
+_CONFIRMED_FORMS_SQL = text("""
+    SELECT person_id, name_form FROM person_name_forms
+    WHERE status = 'confirmed' AND person_id = ANY(:pids)
+""").bindparams(bindparam("pids"))
+
+_IDENTIFIER_KEYS = ("orcid", "idref", "hal_person_id", "idhal")
+
+
+def _occurrence_identifiers(raw: Any) -> list[dict[str, str]]:
+    """Identifiants bruts portés par une signature (hors valeurs neutralisées `_dubious`) —
+    élément de décision : c'est souvent l'identifiant fautif qui a rattaché l'intrus."""
+    if not raw:
+        return []
+    return [
+        {"id_type": k, "id_value": str(raw[k])}
+        for k in _IDENTIFIER_KEYS
+        if raw.get(k) and not str(raw[k]).endswith("_dubious")
+    ]
+
+
+def _detachable_groups(conn: Connection) -> list[tuple[int, int, list[Any], list[Any]]]:
+    """Groupes `(source_publication, personne)` à ≥2 signatures dont au moins une est légitime
+    (compatible avec une forme `confirmed`) et au moins une est intruse (incompatible).
+
+    Reprend le départage de l'audit `audit_repeated_person_in_publication` : seules les formes
+    `confirmed` servent d'ancre ; une occurrence sans aucune forme confirmée compatible est intruse.
+    Retourne `(spid, person_id, ancres, intrus)`."""
+    candidates = conn.execute(_REPEATED_CANDIDATES_SQL).all()
+    if not candidates:
+        return []
+    spids = [r.spid for r in candidates]
+    pids = [r.person_id for r in candidates]
+
+    confirmed: dict[int, list[str]] = defaultdict(list)
+    for r in conn.execute(_CONFIRMED_FORMS_SQL, {"pids": sorted(set(pids))}):
+        confirmed[r.person_id].append(r.name_form)
+
+    occurrences: dict[tuple[int, int], list[Any]] = defaultdict(list)
+    for r in conn.execute(_REPEATED_OCCURRENCES_SQL, {"spids": spids, "pids": pids}):
+        occurrences[(r.spid, r.person_id)].append(r)
+
+    groups: list[tuple[int, int, list[Any], list[Any]]] = []
+    for (spid, pid), occs in occurrences.items():
+        forms = confirmed.get(pid, [])
+        legit = [any(names_compatible(o.norm, "", f, "") for f in forms) for o in occs]
+        if any(legit) and not all(legit):
+            anchors = [o for o, ok in zip(occs, legit, strict=True) if ok]
+            intruders = [o for o, ok in zip(occs, legit, strict=True) if not ok]
+            groups.append((spid, pid, anchors, intruders))
+    groups.sort(key=lambda g: (g[0], g[1]))
+    return groups
+
+
+def detachable_intruders_count(conn: Connection) -> int:
+    """Nombre de groupes détachables (badge de l'onglet)."""
+    return len(_detachable_groups(conn))
+
+
+def _publications_for_spids(conn: Connection, spids: list[int]) -> dict[int, dict[str, Any]]:
+    if not spids:
+        return {}
+    rows = conn.execute(
+        text("""
+            SELECT sd.id AS spid, sd.publication_id, sd.title, sd.pub_year
+            FROM source_publications sd WHERE sd.id = ANY(:spids)
+        """).bindparams(bindparam("spids")),
+        {"spids": spids},
+    ).all()
+    return {
+        r.spid: {"publication_id": r.publication_id, "title": r.title, "pub_year": r.pub_year}
+        for r in rows
+    }
+
+
+def detachable_intruders(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
+    """Groupes détachables paginés : la personne, son occurrence-ancre, son occurrence-intrus (avec
+    la forme de nom à rejeter et l'identifiant fautif) et la publication où les deux coexistent.
+
+    L'action de résolution est le rejet de la forme de nom de l'intrus (`name_form`), qui détache
+    les signatures et pose le verrou de non-retour."""
+    groups = _detachable_groups(conn)
+    total = len(groups)
+    offset = (page - 1) * per_page
+    page_groups = groups[offset : offset + per_page]
+
+    persons = _light_persons(conn, sorted({pid for _, pid, _, _ in page_groups}))
+    pubs = _publications_for_spids(conn, sorted({spid for spid, _, _, _ in page_groups}))
+
+    items = [
+        {
+            "source_publication_id": spid,
+            "publication_id": pubs.get(spid, {}).get("publication_id"),
+            "pub_title": pubs.get(spid, {}).get("title"),
+            "pub_year": pubs.get(spid, {}).get("pub_year"),
+            "person": persons[pid],
+            "anchors": [{"source": o.source, "raw_author_name": o.name} for o in anchors],
+            "intruders": [
+                {
+                    "source": o.source,
+                    "raw_author_name": o.name,
+                    "name_form": o.norm,
+                    "identifiers": _occurrence_identifiers(o.identifiers),
+                }
+                for o in intruders
+            ],
+        }
+        for spid, pid, anchors, intruders in page_groups
+        if pid in persons
+    ]
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page if per_page else 0,
+        "groups": items,
     }
 
 

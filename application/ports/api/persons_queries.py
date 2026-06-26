@@ -361,6 +361,43 @@ class IdentifierConflictsResponse(BaseModel):
     pairs: list[IdentifierConflictPairOut]
 
 
+class AnchorOccurrenceOut(BaseModel):
+    """Signature légitime (nom compatible avec une forme confirmée) de la personne."""
+
+    source: str
+    raw_author_name: str
+
+
+class IntruderOccurrenceOut(BaseModel):
+    """Signature intruse : nom incompatible avec les formes confirmées de la personne. `name_form`
+    est la forme à rejeter pour détacher la signature ; `identifiers` expose l'identifiant fautif."""
+
+    source: str
+    raw_author_name: str
+    name_form: str
+    identifiers: list[SharedIdentifierOut]
+
+
+class DetachableIntruderGroupOut(BaseModel):
+    """Une personne rattachée à ≥2 signatures d'une même publication, avec ancre(s) et intrus."""
+
+    source_publication_id: int
+    publication_id: int | None
+    pub_title: str | None
+    pub_year: int | None
+    person: IdentifierConflictPersonOut
+    anchors: list[AnchorOccurrenceOut]
+    intruders: list[IntruderOccurrenceOut]
+
+
+class DetachableIntrudersResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    groups: list[DetachableIntruderGroupOut]
+
+
 class SharingPersonOut(BaseModel):
     """Personne partageant ≥1 forme de nom avec une autre (candidate à l'absorption)."""
 
@@ -460,5 +497,9 @@ class PersonsQueries(Protocol):
     def identifier_conflicts_count(self) -> int: ...
 
     def identifier_conflicts(self, *, page: int, per_page: int) -> IdentifierConflictsResponse: ...
+
+    def detachable_intruders_count(self) -> int: ...
+
+    def detachable_intruders(self, *, page: int, per_page: int) -> DetachableIntrudersResponse: ...
 
     def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]: ...

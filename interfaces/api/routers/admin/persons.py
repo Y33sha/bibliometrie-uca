@@ -12,6 +12,7 @@ from sqlalchemy import Connection, text
 from application.persons import commands as person_commands
 from application.ports.api.persons_queries import (
     AmbiguousNameFormsResponse,
+    DetachableIntrudersResponse,
     IdentifierConflictsResponse,
     NameFormAuthorshipsResponse,
     PersonOut,
@@ -285,6 +286,28 @@ def identifier_conflicts(
     """Paires de personnes au même identifiant brut (ORCID / IdRef / hal_person_id / idHAL),
     paginées : doublons probables ou erreurs d'attribution, à trancher à l'œil."""
     return queries.identifier_conflicts(page=page, per_page=per_page)
+
+
+# ── File de triage : intrus détachables ──────────────────────────
+
+
+@router.get("/api/admin/detachable-intruders/count", response_model=TotalCountResponse)
+def detachable_intruders_count(
+    queries: PersonsQueries = Depends(persons_queries_sync),
+) -> TotalCountResponse:
+    """Compteur de l'onglet « Intrus détachables » (badge)."""
+    return TotalCountResponse(total=queries.detachable_intruders_count())
+
+
+@router.get("/api/admin/detachable-intruders", response_model=DetachableIntrudersResponse)
+def detachable_intruders(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    queries: PersonsQueries = Depends(persons_queries_sync),
+) -> DetachableIntrudersResponse:
+    """Personnes rattachées à ≥2 signatures d'une même publication, avec ancre et intrus, paginées :
+    l'intrus se détache en rejetant sa forme de nom (`PATCH /api/persons/{id}/name-forms/status`)."""
+    return queries.detachable_intruders(page=page, per_page=per_page)
 
 
 @router.get("/api/admin/persons/{person_id}", response_model=PersonOut)

@@ -26,6 +26,7 @@ from sqlalchemy import Connection
 from application.ports.api.persons_queries import (
     AmbiguousNameFormsResponse,
     DepartmentCount,
+    DetachableIntrudersResponse,
     DirectoryFilters,
     FacetFilters,
     IdentifierConflictsResponse,
@@ -51,6 +52,8 @@ from application.ports.api.subjects_queries import SubjectFrequency
 from infrastructure.queries.api.persons.admin import (
     ambiguous_name_forms as _ambiguous_name_forms,
     ambiguous_name_forms_count as _ambiguous_name_forms_count,
+    detachable_intruders as _detachable_intruders,
+    detachable_intruders_count as _detachable_intruders_count,
     identifier_conflicts as _identifier_conflicts,
     identifier_conflicts_count as _identifier_conflicts_count,
     list_orphan_authorships as _list_orphan_authorships,
@@ -187,6 +190,14 @@ class PgPersonsQueries(PersonsQueries):
     def identifier_conflicts(self, *, page: int, per_page: int) -> IdentifierConflictsResponse:
         return IdentifierConflictsResponse.model_validate(
             _identifier_conflicts(self._conn, page=page, per_page=per_page)
+        )
+
+    def detachable_intruders_count(self) -> int:
+        return _detachable_intruders_count(self._conn)
+
+    def detachable_intruders(self, *, page: int, per_page: int) -> DetachableIntrudersResponse:
+        return DetachableIntrudersResponse.model_validate(
+            _detachable_intruders(self._conn, page=page, per_page=per_page)
         )
 
     def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]:
