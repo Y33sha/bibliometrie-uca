@@ -25,6 +25,7 @@
   import PersonDrawer from "./PersonDrawer.svelte";
   import AmbiguousFormsList from "./AmbiguousFormsList.svelte";
   import IdentifierConflictsList from "./IdentifierConflictsList.svelte";
+  import DetachableIntrudersList from "./DetachableIntrudersList.svelte";
 
   /* ── State ── */
 
@@ -32,10 +33,11 @@
   let orphanCount = $state(0);
 
   // Onglets du hub : liste maîtresse + files de triage.
-  type TabKey = "all" | "ambiguous-forms" | "identifier-conflicts";
+  type TabKey = "all" | "ambiguous-forms" | "identifier-conflicts" | "detachable-intruders";
   let tab = $state<TabKey>("all");
   let ambiguousCount = $state(0);
   let identifierConflictCount = $state(0);
+  let detachableCount = $state(0);
   // Bumpé après chaque action du drawer pour recharger la file de triage active.
   let reloadFiles = $state(0);
 
@@ -218,7 +220,8 @@
     }
     if (p.get("person")) selectedPersonId = parseInt(p.get("person")!, 10) || null;
     const t = p.get("tab");
-    if (t === "ambiguous-forms" || t === "identifier-conflicts") tab = t;
+    if (t === "ambiguous-forms" || t === "identifier-conflicts" || t === "detachable-intruders")
+      tab = t;
   }
 
   /* ── Event handlers ── */
@@ -300,6 +303,11 @@
   async function loadIdentifierConflictCount() {
     const data = await api<{ total: number }>("/api/admin/identifier-conflicts/count");
     identifierConflictCount = data.total;
+  }
+
+  async function loadDetachableCount() {
+    const data = await api<{ total: number }>("/api/admin/detachable-intruders/count");
+    detachableCount = data.total;
   }
 
   function selectTab(t: TabKey) {
@@ -407,6 +415,7 @@
     await refreshSelected();
     loadAmbiguousCount();
     loadIdentifierConflictCount();
+    loadDetachableCount();
   }
 
   // Absorbe une autre personne (sourceId) dans celle du drawer (la cible).
@@ -424,6 +433,7 @@
     await refreshSelected();
     loadAmbiguousCount();
     loadIdentifierConflictCount();
+    loadDetachableCount();
   }
 
   async function mergeFromModal(sourceId: number) {
@@ -471,6 +481,7 @@
     loadOrphanCount();
     loadAmbiguousCount();
     loadIdentifierConflictCount();
+    loadDetachableCount();
     // Deep-link `?person=` vers une personne hors de la page courante.
     await refreshSelected();
   });
@@ -499,6 +510,14 @@
   >
     Conflits d'identifiant
     {#if identifierConflictCount > 0}<span class="tab-badge">{identifierConflictCount}</span>{/if}
+  </button>
+  <button
+    class="hub-tab"
+    class:active={tab === "detachable-intruders"}
+    onclick={() => selectTab("detachable-intruders")}
+  >
+    Intrus d&eacute;tachables
+    {#if detachableCount > 0}<span class="tab-badge">{detachableCount}</span>{/if}
   </button>
 </nav>
 
@@ -577,6 +596,12 @@
   <IdentifierConflictsList
     onopenPerson={openDrawer}
     onchange={loadIdentifierConflictCount}
+    reloadKey={reloadFiles}
+  />
+{:else if tab === "detachable-intruders"}
+  <DetachableIntrudersList
+    onopenPerson={openDrawer}
+    onchange={loadDetachableCount}
     reloadKey={reloadFiles}
   />
 {/if}
