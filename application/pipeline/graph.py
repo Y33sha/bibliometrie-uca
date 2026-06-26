@@ -78,6 +78,13 @@ def node(name: str) -> PhaseNode:
     return _BY_NAME[name]
 
 
+def watched_tables(name: str) -> tuple[str, ...]:
+    """Tables dont on relève le volume avant / après une phase : consommées ∪ produites,
+    dédupliquées en préservant l'ordre."""
+    graph_node = node(name)
+    return tuple(dict.fromkeys(graph_node.consumes + graph_node.produces))
+
+
 def _validate() -> None:
     """Vérifie que les noms de phase sont uniques."""
     if len(_BY_NAME) != len(PIPELINE_GRAPH):

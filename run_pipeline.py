@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
     from infrastructure.queries.pipeline.countries import AddressCountryStatus
 
-from application.pipeline.graph import PHASE_ORDER
+from application.pipeline.graph import PHASE_ORDER, watched_tables
 from application.pipeline.metadata_correction.correct_by_cluster import ClusterCorrectionStats
 from application.pipeline.metadata_correction.correct_unary import UnaryCorrectionStats
 from application.pipeline.metrics import PhaseMetrics
@@ -1996,7 +1996,7 @@ def main() -> None:  # noqa: C901 â€” orchestrateur CLI : refactor en helpers sÃ
     log.info("Sources : %s", ", ".join(effective_sources))
 
     # MÃ©triques pipeline
-    from infrastructure.observability.phase_executions import metrics_to_payload, start_run
+    from infrastructure.observability.phase_executions import start_run
     from infrastructure.observability.pipeline_report import (
         capture_log_offsets,
         generate_report,
@@ -2028,7 +2028,7 @@ def main() -> None:  # noqa: C901 â€” orchestrateur CLI : refactor en helpers sÃ
 
         log_offsets = capture_log_offsets()
         phase_started_at = datetime.datetime.now(datetime.UTC)
-        before_volumes = recorder.before_volumes(name)
+        before_volumes = recorder.before_volumes(watched_tables(name))
         t0_phase = time.time()
         try:
             result = fn(
@@ -2046,7 +2046,7 @@ def main() -> None:  # noqa: C901 â€” orchestrateur CLI : refactor en helpers sÃ
                 phase=name,
                 started_at=phase_started_at,
                 status="warning",
-                metrics=metrics_to_payload(PhaseMetrics(), time.time() - t0_phase),
+                metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
                 signals=[
                     {
                         "level": "warning",
@@ -2070,7 +2070,7 @@ def main() -> None:  # noqa: C901 â€” orchestrateur CLI : refactor en helpers sÃ
                 phase=name,
                 started_at=phase_started_at,
                 status="error",
-                metrics=metrics_to_payload(PhaseMetrics(), time.time() - t0_phase),
+                metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
                 signals=[{"level": "error", "code": "exception", "message": str(e)}],
                 details={},
                 before_volumes=before_volumes,
@@ -2093,7 +2093,7 @@ def main() -> None:  # noqa: C901 â€” orchestrateur CLI : refactor en helpers sÃ
             phase=name,
             started_at=phase_started_at,
             status="warning" if metrics.signals else "ok",
-            metrics=metrics_to_payload(metrics, duration),
+            metrics=metrics.to_payload(duration),
             signals=metrics.signals,
             details=metrics.details,
             before_volumes=before_volumes,

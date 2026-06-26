@@ -1,19 +1,19 @@
 """Query service pour les exécutions de phase (table `pipeline_phase_executions`).
 
-Adapter SA pour le port `PhaseExecutionsQueries`. Le rendement et l'écart de durée
-sont recalculés à la lecture via `application.observability.read` ; le médian
-historique de durée se calcule sur les exécutions réussies de la même phase, hors
-run courant.
+Adapter SA pour le port `PhaseExecutionsQueries`. L'écart de durée est recalculé à
+la lecture : le médian historique d'une phase se calcule sur ses exécutions réussies
+hors run courant, et le rapport de la durée courante à ce médian est exposé tel quel
+(aucun seuil ; l'œil juge une phase anormalement lente).
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
+from statistics import median as _statistics_median
 from typing import cast
 
 from sqlalchemy import Connection, text
 
-from application.observability.read import duration_ratio, median_duration
 from application.ports.api.pipeline_phase_executions_queries import (
     PhaseBrief,
     PhaseExecutionDetail,
@@ -26,6 +26,19 @@ from application.ports.pipeline.phase_executions import (
     PhaseStatus,
     Signal,
 )
+
+
+def _median_duration(durations: list[float]) -> float | None:
+    """Médian des durées historiques d'une phase, ou `None` si l'historique est vide."""
+    return float(_statistics_median(durations)) if durations else None
+
+
+def _duration_ratio(duration_s: float, historical_median_s: float | None) -> float | None:
+    """Rapport de la durée courante au médian historique (> 1 = plus lent que d'habitude),
+    `None` sans historique exploitable."""
+    if historical_median_s is None or historical_median_s == 0:
+        return None
+    return duration_s / historical_median_s
 
 
 class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
@@ -107,7 +120,7 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
         for r in rows:
             metrics = cast(PhaseMetricsPayload, r.metrics)
             duration_s = float(metrics["duration_s"])
-            median = median_duration(history.get(r.phase, []))
+            median = _median_duration(history.get(r.phase, []))
             phases.append(
                 PhaseExecutionDetail(
                     phase=r.phase,
@@ -118,7 +131,7 @@ class PgPhaseExecutionsQueries(PhaseExecutionsQueries):
                     metrics=metrics,
                     details=r.details,
                     historical_median_duration_s=median,
-                    duration_ratio=duration_ratio(duration_s, median),
+                    duration_ratio=_duration_ratio(duration_s, median),
                     signals=cast("list[Signal]", r.signals),
                 )
             )

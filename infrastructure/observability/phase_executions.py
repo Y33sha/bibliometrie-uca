@@ -22,8 +22,6 @@ import logging
 
 from sqlalchemy import Connection, text
 
-from application.pipeline.graph import node
-from application.pipeline.metrics import PhaseMetrics
 from application.ports.pipeline.phase_executions import (
     ObservableVolumes,
     PhaseExecution,
@@ -50,19 +48,6 @@ def snapshot_volumes(conn: Connection, tables: tuple[str, ...]) -> ObservableVol
         count = conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()  # noqa: S608
         volumes[table] = int(count) if count is not None else 0
     return volumes
-
-
-def metrics_to_payload(metrics: PhaseMetrics, duration_s: float) -> PhaseMetricsPayload:
-    """Sérialise les compteurs d'un `PhaseMetrics` et sa durée d'exécution."""
-    return {
-        "new": metrics.new,
-        "updated": metrics.updated,
-        "unchanged": metrics.unchanged,
-        "total": metrics.total,
-        "errors": metrics.errors,
-        "extras": dict(metrics.extras),
-        "duration_s": duration_s,
-    }
 
 
 def persist_phase_execution(conn: Connection, execution: PhaseExecution) -> None:
@@ -93,12 +78,6 @@ def persist_phase_execution(conn: Connection, execution: PhaseExecution) -> None
     )
 
 
-def _watched_tables(phase: str) -> tuple[str, ...]:
-    """Tables dont on relève le volume avant/après : consommées ∪ produites."""
-    graph_node = node(phase)
-    return tuple(dict.fromkeys(graph_node.consumes + graph_node.produces))
-
-
 class PhaseExecutionRecorder:
     """Capture par phase, best-effort. Désactivé quand `conn` est `None`."""
 
@@ -119,14 +98,15 @@ class PhaseExecutionRecorder:
     def run_id(self) -> int | None:
         return self._run_id
 
-    def before_volumes(self, phase: str) -> ObservableVolumes | None:
-        """Volume des tables touchées par la phase, relevé avant son exécution."""
+    def before_volumes(self, tables: tuple[str, ...]) -> ObservableVolumes | None:
+        """Volume des `tables` touchées par la phase, relevé avant son exécution. Les tables
+        proviennent du graphe des phases, fourni par l'orchestrateur (couche application)."""
         if self._conn is None:
             return None
         try:
-            return snapshot_volumes(self._conn, _watched_tables(phase))
+            return snapshot_volumes(self._conn, tables)
         except Exception as exc:
-            log.warning("Relevé d'avant-phase %s échoué : %s", phase, exc)
+            log.warning("Relevé d'avant-phase échoué : %s", exc)
             return None
 
     def record(
@@ -151,7 +131,7 @@ class PhaseExecutionRecorder:
             full_details: dict[str, object] = dict(details)
             if before_volumes is not None:
                 try:
-                    after = snapshot_volumes(self._conn, _watched_tables(phase))
+                    after = snapshot_volumes(self._conn, tuple(before_volumes))
                     full_details["tables"] = {
                         table: {
                             "before": before_volumes.get(table, 0),

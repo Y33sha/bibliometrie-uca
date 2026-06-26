@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from application.ports.pipeline.phase_executions import Signal
+from application.ports.pipeline.phase_executions import PhaseMetricsPayload, Signal
 
 
 @dataclass
@@ -73,6 +73,19 @@ class PhaseMetrics:
             self.extras[k] = self.extras.get(k, 0) + v
         self.details.update(other.details)
         self.signals.extend(other.signals)
+
+    def to_payload(self, duration_s: float) -> PhaseMetricsPayload:
+        """Sérialise les compteurs et la durée d'exécution vers le payload de transport
+        (`application.ports.pipeline.phase_executions`), persisté par l'observabilité."""
+        return {
+            "new": self.new,
+            "updated": self.updated,
+            "unchanged": self.unchanged,
+            "total": self.total,
+            "errors": self.errors,
+            "extras": dict(self.extras),
+            "duration_s": duration_s,
+        }
 
     def as_summary(self) -> str:
         """Une-ligne lisible pour les logs ('10 new, 5 updated' / '...')."""
