@@ -32,6 +32,19 @@ def _build_url(base_url: str) -> str:
     return f"{base_url}/"
 
 
+def extract_doi(doc: dict[str, Any]) -> str | None:
+    """Extrait le DOI nettoyé d'un document HAL (champ `doiId_s`).
+
+    `doiId_s` arrive en scalaire depuis l'extraction bulk Solr, mais en liste
+    depuis l'API de recherche par hal-id (cross-import) : les deux formes sont
+    gérées avant nettoyage.
+    """
+    doi = doc.get("doiId_s")
+    if isinstance(doi, list):
+        doi = doi[0] if doi else None
+    return clean_doi(doi)
+
+
 class PgHalExtractAdapter(HalExtractAdapter):
     """Adapter PostgreSQL + HTTP pour `HalExtractAdapter`.
 
@@ -114,7 +127,7 @@ class PgHalExtractAdapter(HalExtractAdapter):
 
     def extract_doi(self, doc: dict[str, Any]) -> str | None:
         """Extrait le DOI nettoyé depuis un document HAL (champ `doiId_s`)."""
-        return clean_doi(doc.get("doiId_s"))
+        return extract_doi(doc)
 
     def build_collections_fq(self, collection_codes: list[str]) -> str:
         """Filtre Solr `collCode_s:("C1" OR "C2" …)` couvrant toutes les collections

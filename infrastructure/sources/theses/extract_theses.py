@@ -24,6 +24,14 @@ from infrastructure.sources.config import get_extraction_api_ids
 from infrastructure.sources.http_retry import http_request_with_retry
 
 
+def extract_doi(these: dict[str, Any]) -> str | None:
+    """Extrait le DOI d'une thèse s'il est présent et non vide, sinon `None`."""
+    doi = these.get("doi")
+    if doi and isinstance(doi, str) and doi.strip():
+        return doi.strip()
+    return None
+
+
 class PgThesesExtractAdapter(ThesesExtractAdapter):
     """Adapter PostgreSQL + HTTP pour `ThesesExtractAdapter`.
 
@@ -78,10 +86,7 @@ class PgThesesExtractAdapter(ThesesExtractAdapter):
 
     def extract_doi(self, these: dict[str, Any]) -> str | None:
         """Extrait le DOI s'il est présent et non vide, sinon `None`."""
-        doi = these.get("doi")
-        if doi and isinstance(doi, str) and doi.strip():
-            return doi.strip()
-        return None
+        return extract_doi(these)
 
     # ── HTTP ───────────────────────────────────────────────────
 
