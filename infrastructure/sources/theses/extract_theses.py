@@ -18,6 +18,7 @@ from application.ports.pipeline.extract.theses import (
     ThesesExtractAdapter,
     ThesesExtractConfig,
 )
+from domain.publications.identifiers import clean_doi
 from infrastructure.sources.api_limits import THESES_DELAY, THESES_PER_PAGE
 from infrastructure.sources.common import upsert_staging
 from infrastructure.sources.config import get_extraction_api_ids
@@ -25,11 +26,9 @@ from infrastructure.sources.http_retry import http_request_with_retry
 
 
 def extract_doi(these: dict[str, Any]) -> str | None:
-    """Extrait le DOI d'une thèse s'il est présent et non vide, sinon `None`."""
+    """Extrait le DOI nettoyé d'une thèse (champ `doi`), ou `None`."""
     doi = these.get("doi")
-    if doi and isinstance(doi, str) and doi.strip():
-        return doi.strip()
-    return None
+    return clean_doi(doi) if isinstance(doi, str) else None
 
 
 class PgThesesExtractAdapter(ThesesExtractAdapter):

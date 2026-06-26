@@ -8,8 +8,9 @@ non indexés par WoS. Ne dépend que du format de l'API WoS.
 
 from __future__ import annotations
 
-import re
 from typing import Any
+
+from domain.publications.identifiers import clean_doi
 
 # ── Requête WoS Advanced Search ───────────────────────────────────
 
@@ -82,7 +83,7 @@ def extract_doi(rec: dict[str, Any]) -> str | None:
         for ident in identifiers:
             if isinstance(ident, dict) and ident.get("type") == "doi":
                 val = ident.get("value")
-                return str(val).strip() if val is not None else None
+                return clean_doi(str(val)) if val is not None else None
     except (KeyError, TypeError, AttributeError):
         pass
     return None
@@ -94,22 +95,20 @@ def extract_doi(rec: dict[str, Any]) -> str | None:
 _WOS_UNINDEXED_DOI_PREFIXES = ("10.48550/", "10.2139/", "10.21203/", "10.5281/zenodo")
 
 
-def clean_doi_for_wos(doi: str) -> str | None:
-    """Filtre / nettoie un DOI avant interrogation de WoS.
+def filter_doi_for_wos(doi: str) -> str | None:
+    """Écarte un DOI (déjà normalisé par `clean_doi`) non interrogeable sur WoS.
 
-    Retourne `None` si le DOI ne peut pas être envoyé à WoS :
+    Retourne `None` si :
 
-    - DOI tronqué après un `?` ou `&` (paramètres d'URL résiduels).
-    - DOI dans `_WOS_UNINDEXED_DOI_PREFIXES` (preprints Zenodo, arXiv,
-      SSRN, Research Square) — WoS ne les indexe pas.
-    - DOI contenant `"` ou newline (casserait la requête WoS).
+    - le DOI est dans `_WOS_UNINDEXED_DOI_PREFIXES` (preprints Zenodo, arXiv,
+      SSRN, Research Square) — WoS ne les indexe pas ;
+    - le DOI contient `"` ou newline (casserait la requête WoS).
 
-    Sinon, retourne le DOI nettoyé (préfixes URL retirés en amont via
-    `domain.publications.identifiers.clean_doi` ; cette fonction se
-    concentre sur les filtres spécifiques à WoS).
+    Sinon retourne le DOI inchangé. La normalisation (préfixe URL, casse,
+    encodage, suffixes) est faite en amont par `clean_doi` : ici, uniquement
+    le filtrage propre à WoS.
     """
-    doi = re.split(r"[&?]", doi.strip())[0]
-    if any(doi.lower().startswith(p) for p in _WOS_UNINDEXED_DOI_PREFIXES):
+    if any(doi.startswith(p) for p in _WOS_UNINDEXED_DOI_PREFIXES):
         return None
     if '"' in doi or "\n" in doi:
         return None
