@@ -33,10 +33,10 @@
       <div class="relation-group">
         <div class="detail-sublabel">{label(rtype)}</div>
         <ul class="relations-list">
-          {#each items as r (r.relation_type + r.doi)}
+          {#each items as r (r.relation_type + (r.publication_id ?? r.doi))}
             <li>
               {#if r.publication_id}
-                <a href="{base}/publications/{r.publication_id}">{@html sanitizeTitle(r.title ?? r.doi)}</a>
+                <a href="{base}/publications/{r.publication_id}">{@html sanitizeTitle(r.title ?? r.doi ?? "")}</a>
                 <span class="meta">
                   {#if r.pub_year}{r.pub_year}{/if}{#if r.pub_year && r.doc_type} · {/if}{docTypeLabel(r.doc_type)}
                 </span>

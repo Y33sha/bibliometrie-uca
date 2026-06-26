@@ -20,12 +20,18 @@ class DeclaredRelationSource(NamedTuple):
 
 
 class RelationEdge(NamedTuple):
-    """Une arête de relation à persister : publication déclarante → DOI cible, typée."""
+    """Une arête de relation à persister : publication déclarante → cible, typée.
+
+    La cible est désignée par `target_doi` (relations issues des sources, qui pointent
+    toujours un DOI — résolu en `target_publication_id` à l'insertion) **ou** directement
+    par `target_publication_id` (relations dérivées en interne vers une publication au
+    corpus, qui peut ne pas avoir de DOI). Au moins l'un des deux est présent."""
 
     from_publication_id: int
     relation_type: str
-    target_doi: str
+    target_doi: str | None
     source: str
+    target_publication_id: int | None = None
 
 
 class SharedKeyPair(NamedTuple):
@@ -41,14 +47,15 @@ class SharedKeyPair(NamedTuple):
     b_doi: str
 
 
-class ErratumTitleMatch(NamedTuple):
-    """Un erratum rapproché de l'œuvre qu'il corrige par le titre (signal #3). Le titre d'un erratum
-    reproduit verbatim celui du parent après un préfixe (« Erratum: », « Corrigendum to »…), donc le
-    `title_normalized` du parent est un suffixe de celui de l'erratum — rapprochement exact, pas
-    flou. La cible est désignée par son DOI (parent au corpus, donc résoluble en `publication_id`)."""
+class TitleMatch(NamedTuple):
+    """Une publication rapprochée par titre de l'œuvre dont elle dépend (signal #3) : un erratum de
+    l'article qu'il corrige, un preprint de sa version publiée. Le parent est au corpus, désigné par
+    son `publication_id` (et son DOI quand il en a un). `child` porte la relation dirigée vers
+    `parent` (`is_correction_of`, `is_preprint_of`)."""
 
-    erratum_id: int
-    parent_doi: str
+    child_id: int
+    parent_id: int
+    parent_doi: str | None
 
 
 class PublicationRelationsQueries(Protocol):
@@ -79,14 +86,23 @@ class PublicationRelationsQueries(Protocol):
         avec la même résolution/dédup que `replace_declared_relations`."""
         ...
 
-    def fetch_erratum_title_matches(self, conn: Connection) -> list[ErratumTitleMatch]:
+    def fetch_erratum_title_matches(self, conn: Connection) -> list[TitleMatch]:
         """Les erratums rapprochés par titre de l'œuvre qu'ils corrigent (signal #3).
 
-        Pour chaque erratum, candidats = publications non-erratum, au corpus (DOI présent), titre
-        assez long, publiées dans la fenêtre `[année − 2 … année]`, dont le `title_normalized` est un
-        suffixe de celui de l'erratum. Garde d'ambiguïté : on ne rapproche que si **exactement un**
-        candidat « substantiel » (hors `preprint` et `dataset`, qui ne sont que des formes de la même
-        œuvre) porte ce titre — deux articles distincts au même titre = collision, on s'abstient."""
+        Pour chaque erratum, candidats = publications non-erratum, titre assez long, publiées dans la
+        fenêtre `[année − 2 … année]`, dont le `title_normalized` est un suffixe de celui de
+        l'erratum (le titre parent est reproduit verbatim après un préfixe « Erratum: »). Garde
+        d'ambiguïté : on ne rapproche que si **exactement un** candidat « substantiel » (hors
+        `preprint` et `dataset`, simples formes de la même œuvre) porte ce titre."""
+        ...
+
+    def fetch_preprint_title_matches(self, conn: Connection) -> list[TitleMatch]:
+        """Les preprints rapprochés par titre de leur version publiée (signal #3).
+
+        Pour chaque preprint, candidats = publications non-preprint au `title_normalized`
+        **identique** (le preprint et sa version publiée portent le même titre), titre assez long,
+        publiées dans la fenêtre `[année … année + 2]`. Même garde d'ambiguïté : un seul candidat
+        substantiel (hors `dataset`) au même titre."""
         ...
 
     def replace_title_match_relations(self, conn: Connection, edges: list[RelationEdge]) -> int:

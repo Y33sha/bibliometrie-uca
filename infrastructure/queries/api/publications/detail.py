@@ -43,7 +43,11 @@ def get_publication_relations(conn: Connection, pub_id: int) -> list[dict[str, A
         relation_type = r.rtype
         if r.incoming:
             relation_type = inverse_relation(RelationType(relation_type)).value
-        key = (relation_type, r.other_doi)
+        # Identité de la cible : son `publication_id` si au corpus, sinon son DOI (cible hors
+        # corpus, qui n'a pas de ligne `publications`). Le DOI peut être absent d'une cible au
+        # corpus, d'où la bascule sur l'id.
+        target_key = f"id:{r.other_id}" if r.other_id is not None else f"doi:{r.other_doi}"
+        key = (relation_type, target_key)
         if key in seen:
             continue
         seen.add(key)
