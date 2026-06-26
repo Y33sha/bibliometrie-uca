@@ -64,6 +64,8 @@ if TYPE_CHECKING:
     from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
 
 from application.pipeline.graph import PHASE_ORDER
+from application.pipeline.metadata_correction.correct_by_cluster import ClusterCorrectionStats
+from application.pipeline.metadata_correction.correct_unary import UnaryCorrectionStats
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
 from domain.sources.registry import ALL_SOURCES_SET, DOI_SEARCHABLE_SOURCES
@@ -514,7 +516,7 @@ def phase_affiliations(**kw: Any) -> Any:
     _run_populate_affiliations()
 
 
-def phase_metadata_correction(**kw: Any) -> Any:
+def phase_metadata_correction(**kw: Any) -> PhaseMetrics:
     """Persistance des corrections de métadonnées sur les source_publications.
 
     Tourne après `publishers_journals` (journaux typés, donc les règles
@@ -523,8 +525,23 @@ def phase_metadata_correction(**kw: Any) -> Any:
     (per-record : mapping + règles de correction), puis cluster (group-by-DOI :
     substitution version→concept DataCite, nullage des DOI erronés ouvrage/chapitre).
     """
-    _run_correct_metadata_unary()
-    _run_correct_by_cluster()
+    unary = _run_correct_metadata_unary()
+    cluster = _run_correct_by_cluster()
+    metrics = PhaseMetrics()
+    metrics.add(
+        total=unary.examined + cluster.examined,
+        updated=unary.corrected + cluster.corrected,
+    )
+    metrics.details["summary"] = {
+        "unary_examined": unary.examined,
+        "unary_corrected": unary.corrected,
+        "cluster_examined": cluster.examined,
+        "cluster_corrected": cluster.corrected,
+    }
+    counts = list(unary.rule_counts.items()) + list(cluster.case_counts.items())
+    counts.sort(key=lambda kc: kc[1], reverse=True)
+    metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
+    return metrics
 
 
 def phase_publications(**kw: Any) -> Any:
@@ -652,7 +669,7 @@ def phase_subjects(**kw: Any) -> Any:
     _run_cooccurrences()
 
 
-def _run_correct_metadata_unary() -> None:
+def _run_correct_metadata_unary() -> UnaryCorrectionStats:
     from application.pipeline.metadata_correction.correct_unary import run
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
@@ -661,13 +678,14 @@ def _run_correct_metadata_unary() -> None:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        run(conn, PgMetadataCorrectionQueries(), log)
+        stats = run(conn, PgMetadataCorrectionQueries(), log)
     finally:
         conn.close()
     log.info("✓ metadata_correction (unaire) terminé en %.1fs", time.time() - t0)
+    return stats
 
 
-def _run_correct_by_cluster() -> None:
+def _run_correct_by_cluster() -> ClusterCorrectionStats:
     from application.pipeline.metadata_correction.correct_by_cluster import run
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.metadata_correction import PgMetadataCorrectionQueries
@@ -676,10 +694,11 @@ def _run_correct_by_cluster() -> None:
     t0 = time.time()
     conn = get_sync_engine().connect()
     try:
-        run(conn, PgMetadataCorrectionQueries(), log)
+        stats = run(conn, PgMetadataCorrectionQueries(), log)
     finally:
         conn.close()
     log.info("✓ metadata_correction (cluster) terminé en %.1fs", time.time() - t0)
+    return stats
 
 
 def _run_redirty_all_publications() -> None:

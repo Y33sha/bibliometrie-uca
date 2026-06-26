@@ -16,6 +16,7 @@ dont la relation/le conflit a disparu récupère son DOI source au run suivant.
 
 import logging
 from collections import defaultdict
+from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
@@ -29,7 +30,7 @@ from domain.source_publications.correction import (
     DoiClusterMember,
     resolve_cluster_doi_corrections,
 )
-from domain.source_publications.raw_metadata import raw_value, stash_entry
+from domain.source_publications.raw_metadata import CORRECTED_BY, raw_value, stash_entry
 
 _PERSIST_BATCH = 5000
 
@@ -85,7 +86,31 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
     return updates
 
 
-def run(conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Logger) -> None:
+@dataclass
+class ClusterCorrectionStats:
+    """Bilan de la passe cluster : SP examinées, DOI corrigés, et nombre de corrections
+    par cas (`DoiClusterCase` : version → concept, variante → primaire, fichier → dépôt,
+    ouvrage/chapitre, chapitres distincts)."""
+
+    examined: int
+    corrected: int
+    case_counts: dict[str, int]
+
+
+def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
+    """Nombre de corrections de DOI par cas, à partir du `corrected_by` stashé sur `doi`."""
+    case_counts: dict[str, int] = {}
+    for update in updates:
+        entry = update.raw_metadata.get("doi")
+        case = entry.get(CORRECTED_BY) if isinstance(entry, dict) else None
+        if isinstance(case, str):
+            case_counts[case] = case_counts.get(case, 0) + 1
+    return case_counts
+
+
+def run(
+    conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Logger
+) -> ClusterCorrectionStats:
     """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre canonique
     (version → concept, variante → version publiée, fichier → dépôt parent) et nulle le DOI
     des chapitres portant le DOI de l'ouvrage."""
@@ -94,9 +119,11 @@ def run(conn: Connection, queries: MetadataCorrectionQueries, logger: logging.Lo
 
     updates = compute_updates(rows)
     logger.info("  %d corrections de DOI à appliquer", len(updates))
+    case_counts = tally_doi_corrections(updates)
 
     total = 0
     for start in range(0, len(updates), _PERSIST_BATCH):
         total += queries.persist_doi_corrections(conn, updates[start : start + _PERSIST_BATCH])
         conn.commit()
     logger.info("✓ %d DOI corrigés (cluster)", total)
+    return ClusterCorrectionStats(len(rows), len(updates), case_counts)
