@@ -1,14 +1,23 @@
 <script lang="ts">
   import { base } from "$app/paths";
   import { sanitizeTitle } from "$lib/utils";
-  import { docTypeSingular, relationTypeLabel } from "$lib/labels";
+  import { docTypeSingular, relationTypeLabel, relationTier, relationTierRank } from "$lib/labels";
   import type { PubDetail, RelatedPublication } from "./types";
 
-  const { pub, parentRelations = [] }: { pub: PubDetail; parentRelations?: RelatedPublication[] } =
-    $props();
+  const { pub, relations = [] }: { pub: PubDetail; relations?: RelatedPublication[] } = $props();
 
-  // Lien vers l'œuvre principale : interne si elle est au corpus, sinon vers doi.org.
-  function parentHref(r: RelatedPublication): string {
+  // Trié par niveau de gravité (rétractation, erratum, rattachement, secondaire) ; l'ordre d'origine
+  // est conservé à l'intérieur d'un niveau (le tri JS est stable).
+  const sortedRelations = $derived(
+    [...relations].sort(
+      (a, b) =>
+        relationTierRank[relationTier[a.relation_type] ?? "secondary"] -
+        relationTierRank[relationTier[b.relation_type] ?? "secondary"],
+    ),
+  );
+
+  // Lien vers l'œuvre liée : interne si elle est au corpus, sinon vers doi.org.
+  function relHref(r: RelatedPublication): string {
     return r.publication_id ? `${base}/publications/${r.publication_id}` : `https://doi.org/${r.doi}`;
   }
 </script>
@@ -38,20 +47,29 @@
     </div>
   {/if}
 
-  {#if parentRelations.length}
-    <div class="parent-relations">
-      {#each parentRelations as r (r.relation_type + (r.publication_id ?? r.doi))}
+  {#if sortedRelations.length}
+    <div class="rel-banner">
+      {#each sortedRelations as r (r.relation_type + (r.publication_id ?? r.doi))}
+        {@const tier = relationTier[r.relation_type] ?? "secondary"}
         <a
-          class="parent-rel"
-          href={parentHref(r)}
+          class="rel-item tier-{tier}"
+          href={relHref(r)}
           target={r.publication_id ? undefined : "_blank"}
           rel={r.publication_id ? undefined : "noopener"}
         >
-          <svg class="parent-rel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />
-          </svg>
-          <span class="parent-rel-kind">{relationTypeLabel[r.relation_type] ?? r.relation_type}</span>
-          <span class="parent-rel-title">{@html sanitizeTitle(r.title ?? r.doi ?? "")}</span>
+          {#if tier === "danger" || tier === "warning"}
+            <svg class="rel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          {:else}
+            <svg class="rel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 17H7A5 5 0 0 1 7 7h2M15 7h2a5 5 0 0 1 0 10h-2M8 12h8" />
+            </svg>
+          {/if}
+          <span class="rel-kind">{relationTypeLabel[r.relation_type] ?? r.relation_type}</span>
+          <span class="rel-title">{@html sanitizeTitle(r.title ?? r.doi ?? "")}</span>
         </a>
       {/each}
     </div>
@@ -94,50 +112,90 @@
     font-weight: 500;
   }
 
-  /* Bandeau « cette publi est une pièce rattachée à une œuvre principale » : volontairement
-     voyant (fond teinté + filet d'accent épais) pour qu'on le saisisse au premier coup d'œil. */
-  .parent-relations {
+  /* Bandeau des relations, en pied de header : volontairement voyant (fond teinté + filet d'accent
+     épais), hiérarchisé par niveau de gravité (couleur + ordre) pour qu'on saisisse au premier coup
+     d'œil qu'une publi est rattachée, corrigée ou rétractée. */
+  .rel-banner {
     display: flex;
     flex-direction: column;
     gap: 6px;
     margin: 0 0 12px;
   }
-  .parent-rel {
+  .rel-item {
     display: flex;
     align-items: baseline;
     gap: 10px;
     padding: 10px 14px;
-    background: #eef4f5;
-    border-left: 4px solid #15616d;
+    border-left: 4px solid;
     border-radius: 4px;
     text-decoration: none;
   }
-  .parent-rel:hover {
-    background: #e1edef;
-  }
-  .parent-rel-icon {
+  .rel-icon {
     width: 16px;
     height: 16px;
-    color: #15616d;
     flex: none;
     align-self: center;
   }
-  .parent-rel-kind {
+  .rel-kind {
     text-transform: uppercase;
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.05em;
-    color: #15616d;
     white-space: nowrap;
   }
-  .parent-rel-title {
+  .rel-title {
     font-size: 1rem;
     font-weight: 600;
     color: var(--text);
     min-width: 0;
   }
-  .parent-rel:hover .parent-rel-title {
+  .rel-item:hover .rel-title {
     text-decoration: underline;
+  }
+  /* Niveaux : la couleur porte sur le filet, l'icône et le libellé ; le titre reste lisible. */
+  .tier-danger {
+    background: #fef3f2;
+    border-left-color: #d92d20;
+  }
+  .tier-danger .rel-icon,
+  .tier-danger .rel-kind {
+    color: #b42318;
+  }
+  .tier-danger:hover {
+    background: #fee4e2;
+  }
+  .tier-warning {
+    background: #fffaeb;
+    border-left-color: #f79009;
+  }
+  .tier-warning .rel-icon,
+  .tier-warning .rel-kind {
+    color: #b54708;
+  }
+  .tier-warning:hover {
+    background: #fef0c7;
+  }
+  .tier-parent {
+    background: #eef4f5;
+    border-left-color: #15616d;
+  }
+  .tier-parent .rel-icon,
+  .tier-parent .rel-kind {
+    color: #15616d;
+  }
+  .tier-parent:hover {
+    background: #e1edef;
+  }
+  .tier-secondary {
+    background: #f5f6f7;
+    border-left-color: #98a2b3;
+  }
+  .tier-secondary .rel-icon,
+  .tier-secondary .rel-kind {
+    color: #667085;
+  }
+  .tier-secondary:hover {
+    background: #eceef0;
   }
 
   .pub-journal-line {

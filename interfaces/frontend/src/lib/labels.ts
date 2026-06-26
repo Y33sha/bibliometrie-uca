@@ -82,19 +82,41 @@ export const relationTypeLabel: Record<string, string> = {
 	is_related_to: 'Apparenté à'
 };
 
-/** Relations « vers le parent » : la publication courante est une pièce dépendante (erratum,
- * préprint, supplément, partie…) rattachée à une œuvre principale. Mises en avant dans le header
- * (et non au centre) pour qu'on voie d'emblée que la publi est rattachée à une autre. Exclut les
- * relations latérales (`is_related_to`, `is_described_by`) et toutes les `has_*` (sens inverse). */
-export const PARENT_RELATION_TYPES: ReadonlySet<string> = new Set([
-	'is_correction_of',
-	'is_preprint_of',
-	'is_supplement_to',
-	'is_part_of',
-	'is_translation_of',
-	'is_concern_about',
-	'is_retraction_of'
-]);
+/** Niveau de signalement d'une relation, vu depuis la publication courante : décide sa couleur et
+ * son ordre dans le bandeau du header (le plus critique en premier).
+ *  - `danger`    : rétractation — l'œuvre est invalidée (rouge) ;
+ *  - `warning`   : correction/erratum, avis de préoccupation — à lire avec réserve (ambre) ;
+ *  - `parent`    : la publi est une pièce rattachée à une œuvre principale (préprint, supplément,
+ *                  partie, traduction…) — teal ;
+ *  - `secondary` : pièces dépendantes (la publi a un préprint, des données…) et apparentées — gris.
+ * Les types absents tombent en `secondary`. */
+export type RelationTier = 'danger' | 'warning' | 'parent' | 'secondary';
+export const relationTier: Record<string, RelationTier> = {
+	is_retraction_of: 'danger',
+	has_retraction: 'danger',
+	is_correction_of: 'warning',
+	has_correction: 'warning',
+	is_concern_about: 'warning',
+	has_concern: 'warning',
+	is_preprint_of: 'parent',
+	is_supplement_to: 'parent',
+	is_part_of: 'parent',
+	is_translation_of: 'parent',
+	is_described_by: 'parent',
+	has_preprint: 'secondary',
+	has_supplement: 'secondary',
+	has_part: 'secondary',
+	has_translation: 'secondary',
+	describes: 'secondary',
+	is_related_to: 'secondary'
+};
+/** Ordre d'affichage des niveaux dans le bandeau : le plus critique d'abord. */
+export const relationTierRank: Record<RelationTier, number> = {
+	danger: 0,
+	warning: 1,
+	parent: 2,
+	secondary: 3
+};
 
 /** Accès générique pour la fiche détail, sans le jargon OA (gold/green/diamond/…) : on ne dit que
  * « ouvert / fermé / sous embargo ». Retourne `null` si indéterminé (rien à afficher). Le cas

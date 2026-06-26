@@ -3,7 +3,6 @@
   import { onMount } from "svelte";
   import { api, auth } from "$lib/api";
   import { sanitizeTitle } from "$lib/utils";
-  import { PARENT_RELATION_TYPES } from "$lib/labels";
   import type { PubResponse, SourceAuthorship, SourceRow } from "./types";
   import PublicationHeader from "./PublicationHeader.svelte";
   import PublicationSidebar from "./PublicationSidebar.svelte";
@@ -12,7 +11,6 @@
   import PersonsBlock from "./PersonsBlock.svelte";
   import SourceComparison from "./SourceComparison.svelte";
   import SubjectsBlock from "./SubjectsBlock.svelte";
-  import RelatedPublications from "./RelatedPublications.svelte";
 
   const pubId = $derived($page.params.id);
   let canGoBack = $state(false);
@@ -40,15 +38,6 @@
   const thesisMeta = $derived(data?.thesis_meta);
   const thesisAuthorStructures = $derived(
     data?.authorships.find((a) => a.in_perimeter)?.structure_ids ?? [],
-  );
-
-  // Relations « vers le parent » (la publi est une pièce dépendante) mises en avant dans le header ;
-  // les autres (dépendantes de la publi, latérales) restent dans le bloc central.
-  const parentRelations = $derived(
-    (data?.relations ?? []).filter((r) => PARENT_RELATION_TYPES.has(r.relation_type)),
-  );
-  const otherRelations = $derived(
-    (data?.relations ?? []).filter((r) => !PARENT_RELATION_TYPES.has(r.relation_type)),
   );
 
   const halSource = $derived(data?.sources.find((s) => s.source === "hal"));
@@ -160,7 +149,7 @@
 {:else if !pub}
   <div class="pub-header"><div class="loading">Chargement…</div></div>
 {:else}
-  <PublicationHeader {pub} {parentRelations} />
+  <PublicationHeader {pub} relations={data!.relations} />
 
   <div class="detail-layout">
     <div class="detail-main">
@@ -179,8 +168,6 @@
         {/if}
 
         <StructuresBlock {structureIds} structures={data!.structures} />
-
-        <RelatedPublications relations={otherRelations} />
 
         <SubjectsBlock subjects={data!.subjects} />
 
