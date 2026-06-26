@@ -6,8 +6,11 @@
  * mise en forme vivent ici, ce qui les rend modifiables sans relancer le pipeline
  * (et donc rétroactifs sur les anciens runs).
  *
- * Deux conventions d'affichage, combinables sur une même phase :
+ * Conventions d'affichage, combinables sur une même phase :
  * - `summary` : une liste verticale de métriques indépendantes (`details.summary`).
+ * - `matrix` : un croisé qui arrange des chiffres plats de `details.summary` en
+ *   lignes × colonnes (chaque cellule = `summary[`${row.key}_${col.key}`]`). Pur
+ *   agencement de présentation : la donnée en base reste les chiffres plats.
  * - `tables` : un ou plusieurs tableaux, chacun alimenté par `details[source].rows`
  *   (chaque ligne porte une `key`, premier en-tête de colonne). Un tableau s'ajuste
  *   à son contenu plutôt que d'occuper toute la largeur.
@@ -33,8 +36,14 @@ export type TableView = {
   columns: TableColumn[];
   total?: boolean;
 };
+export type MatrixView = {
+  // Cellule = `summary[`${row.key}_${col.key}`]`.
+  columns: { key: string; label: string }[];
+  rows: { key: string; label: string }[];
+};
 export type PhaseView = {
   summary?: SummaryItem[];
+  matrix?: MatrixView;
   tables?: TableView[];
 };
 
@@ -145,17 +154,19 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   metadata_correction: {
+    matrix: {
+      columns: [
+        { key: "examined", label: "source_publications examinées" },
+        { key: "corrected", label: "corrigées" },
+      ],
+      rows: [
+        { key: "unary", label: "Corrections à l'unité" },
+        { key: "cluster", label: "Corrections par grappe" },
+      ],
+    },
     tables: [
       {
-        source: "synthesis",
-        firstColumnLabel: "",
-        columns: [
-          { key: "examined", label: "source_publications examinées" },
-          { key: "corrected", label: "corrigées" },
-        ],
-      },
-      {
-        source: "by_rule",
+        source: "table",
         firstColumnLabel: "Règle de correction",
         columns: [{ key: "count", label: "Nombre", pct: true }],
         total: true,

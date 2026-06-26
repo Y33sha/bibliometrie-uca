@@ -589,24 +589,17 @@ def phase_metadata_correction(**kw: Any) -> PhaseMetrics:
         total=unary.examined + cluster.examined,
         updated=unary.corrected + cluster.corrected,
     )
-    # Synthèse en matrice : une ligne par mode de correction, examinées / corrigées.
-    metrics.details["synthesis"] = {
-        "rows": [
-            {
-                "key": "Corrections à l'unité",
-                "examined": unary.examined,
-                "corrected": unary.corrected,
-            },
-            {
-                "key": "Corrections par grappe",
-                "examined": cluster.examined,
-                "corrected": cluster.corrected,
-            },
-        ]
+    # Chiffres plats : `{mode}_{examined,corrected}`. Le frontend les arrange en
+    # matrice (mode × examinées/corrigées) — pur agencement de présentation.
+    metrics.details["summary"] = {
+        "unary_examined": unary.examined,
+        "unary_corrected": unary.corrected,
+        "cluster_examined": cluster.examined,
+        "cluster_corrected": cluster.corrected,
     }
     counts = list(unary.rule_counts.items()) + list(cluster.case_counts.items())
     counts.sort(key=lambda kc: kc[1], reverse=True)
-    metrics.details["by_rule"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
+    metrics.details["table"] = {"rows": [{"key": key, "count": count} for key, count in counts]}
     return metrics
 
 

@@ -156,10 +156,32 @@
                     </div>
                   {/each}
                 </div>
-              {:else if metricsSummary(p.metrics)}
+              {:else if !view?.matrix && metricsSummary(p.metrics)}
                 <div class="expand-line">
                   <span class="k">Métriques</span><span>{metricsSummary(p.metrics)}</span>
                 </div>
+              {/if}
+
+              {#if view?.matrix}
+                {@const dsummary = detailSummary(p.details)}
+                <table class="src-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      {#each view.matrix.columns as c (c.key)}<th class="num">{c.label}</th>{/each}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each view.matrix.rows as row (row.key)}
+                      <tr>
+                        <td>{row.label}</td>
+                        {#each view.matrix.columns as c (c.key)}
+                          <td class="num">{dsummary[`${row.key}_${c.key}`] ?? "—"}</td>
+                        {/each}
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
               {/if}
 
               {#if view?.tables?.length}
