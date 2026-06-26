@@ -39,6 +39,30 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       total: true,
     },
   },
+  cross_imports: {
+    table: {
+      firstColumnLabel: "Canal",
+      columns: [
+        { key: "interrogated", label: "Interrogés" },
+        { key: "new", label: "Nouveaux" },
+        { key: "not_found", label: "Introuvables" },
+        { key: "duration_s", label: "Durée", duration: true },
+      ],
+      total: true,
+    },
+  },
+  refresh_stale: {
+    table: {
+      firstColumnLabel: "Source",
+      columns: [
+        { key: "interrogated", label: "Interrogés" },
+        { key: "refreshed", label: "Rafraîchis" },
+        { key: "disappeared", label: "Disparus" },
+        { key: "duration_s", label: "Durée", duration: true },
+      ],
+      total: true,
+    },
+  },
   normalize: {
     table: {
       firstColumnLabel: "Source",
@@ -47,6 +71,17 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         { key: "skipped", label: "Ignorés" },
         { key: "errors", label: "Erreurs" },
         { key: "duration_s", label: "Durée", duration: true },
+      ],
+      total: true,
+    },
+  },
+  affiliations: {
+    table: {
+      firstColumnLabel: "Source",
+      columns: [
+        { key: "total", label: "source_authorships" },
+        { key: "in_perimeter", label: "Dans le périmètre" },
+        { key: "with_structs", label: "Avec structures" },
       ],
       total: true,
     },
@@ -90,6 +125,15 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       columns: [{ key: "count", label: "Nombre", pct: true }],
       total: true,
     },
+  },
+  countries: {
+    summary: [
+      { key: "addresses_total", label: "Adresses (pub_count > 0)" },
+      { key: "with_country_before", label: "Avec pays (avant)" },
+      { key: "with_country_after", label: "Avec pays (après)" },
+      { key: "with_suggestion", label: "Avec suggestion" },
+      { key: "without_country", label: "Sans pays ni suggestion" },
+    ],
   },
   oa_status: {
     summary: [

@@ -62,6 +62,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
+    from infrastructure.queries.pipeline.countries import AddressCountryStatus
 
 from application.pipeline.graph import PHASE_ORDER
 from application.pipeline.metadata_correction.correct_by_cluster import ClusterCorrectionStats
@@ -91,6 +92,18 @@ atexit.register(clear_status)
 # ---------------------------------------------------------------------------
 # Définition des phases
 # ---------------------------------------------------------------------------
+
+
+def _timed_metrics(fn: Callable[[], PhaseMetrics]) -> tuple[PhaseMetrics, float]:
+    """Exécute `fn` et renvoie ses métriques avec sa durée d'exécution (s).
+
+    Partagé par les phases qui ventilent leurs indicateurs par source / canal
+    (`extract`, `cross_imports`, `refresh_stale`) et ont besoin d'une durée par
+    sous-tâche, distincte de la durée totale de la phase.
+    """
+    started = time.time()
+    result = fn()
+    return result, time.time() - started
 
 
 def phase_extract(
@@ -129,10 +142,6 @@ def phase_extract(
             "duration_s": round(duration_s, 1),
         }
 
-    def _timed(fn: Callable[[], PhaseMetrics]) -> tuple[PhaseMetrics, float]:
-        started = time.time()
-        return fn(), time.time() - started
-
     if policy.year_selection == "since_last":
         # HAL uniquement, depuis le dernier rapport de pipeline (à 00:00).
         # OpenAlex n'a pas d'équivalent (filtre `from_updated_date` payant ;
@@ -147,7 +156,7 @@ def phase_extract(
             since = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
             log.info("Mode quotidien : HAL depuis %s (fallback, aucun rapport)", since)
         if "hal" in effective:
-            hal_metrics, hal_duration = _timed(partial(_run_extract_hal, since=since))
+            hal_metrics, hal_duration = _timed_metrics(partial(_run_extract_hal, since=since))
             metrics.merge(hal_metrics)
             by_source["hal"] = _summary(hal_metrics, hal_duration)
     else:
@@ -174,7 +183,7 @@ def phase_extract(
                 "▶ extracteurs en parallèle (%d) : %s", len(tasks), ", ".join(n for n, _ in tasks)
             )
             with ThreadPoolExecutor(max_workers=len(tasks)) as pool:
-                futures = {pool.submit(_timed, fn): name for name, fn in tasks}
+                futures = {pool.submit(_timed_metrics, fn): name for name, fn in tasks}
                 for future in as_completed(futures):
                     source_metrics, duration = future.result()
                     metrics.merge(source_metrics)
@@ -222,10 +231,21 @@ def phase_cross_imports(
        `staging` définitif.
     """
     metrics = PhaseMetrics()
+    by_channel: dict[str, dict[str, float]] = {}
+
+    def _summary(channel_metrics: PhaseMetrics, duration_s: float) -> dict[str, float]:
+        return {
+            "interrogated": channel_metrics.total,
+            "new": channel_metrics.new,
+            "not_found": channel_metrics.extras.get("not_found", 0),
+            "duration_s": round(duration_s, 1),
+        }
 
     # Étape 1 : par hal-id / NNT
     if not sources or "hal" in sources:
-        metrics.merge(_run_fetch_missing_hal_id(mode=mode))
+        hal_metrics, hal_duration = _timed_metrics(partial(_run_fetch_missing_hal_id, mode=mode))
+        metrics.merge(hal_metrics)
+        by_channel["hal-id / NNT"] = _summary(hal_metrics, hal_duration)
 
     # Étape 2 : par DOI. WoS opt-in (cf. docstring).
     targets = set(DOI_SEARCHABLE_SOURCES)
@@ -248,10 +268,19 @@ def phase_cross_imports(
             ", ".join(doi_targets),
         )
         with ThreadPoolExecutor(max_workers=len(doi_targets)) as pool:
-            futures = {pool.submit(_run_fetch_missing_doi, t): t for t in doi_targets}
+            futures = {
+                pool.submit(_timed_metrics, partial(_run_fetch_missing_doi, t)): t
+                for t in doi_targets
+            }
             for future in as_completed(futures):
-                metrics.merge(future.result())
+                channel_metrics, duration = future.result()
+                metrics.merge(channel_metrics)
+                by_channel[futures[future]] = _summary(channel_metrics, duration)
 
+    if by_channel:
+        metrics.details["table"] = {
+            "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]
+        }
     return metrics
 
 
@@ -276,13 +305,22 @@ def phase_refresh_stale(sources: Any = None, include_wos: bool = False, **kw: An
     from infrastructure.sources.common import mark_undiscoverable_stale_disappeared
 
     metrics = PhaseMetrics()
+    by_source: dict[str, dict[str, float]] = {}
     allowed = set(DOI_SEARCHABLE_SOURCES)
     if not include_wos:
         allowed -= {"wos"}
     effective = (set(sources) if sources else allowed) & allowed
     targets = [t for t in DOI_SEARCHABLE_SOURCES if t in effective]
     for target in targets:
-        metrics.merge(_run_refresh_stale_doi(target))
+        source_metrics, duration = _timed_metrics(partial(_run_refresh_stale_doi, target))
+        metrics.merge(source_metrics)
+        by_source[target] = {
+            "interrogated": source_metrics.total,
+            "refreshed": source_metrics.new,
+            # 404 confirmé sur un DOI stale → `disappeared_at` (via marker_handler).
+            "disappeared": source_metrics.extras.get("not_found", 0),
+            "duration_s": round(duration, 1),
+        }
 
     conn = get_sync_engine().connect()
     try:
@@ -292,7 +330,20 @@ def phase_refresh_stale(sources: Any = None, include_wos: bool = False, **kw: An
         conn.close()
     if n_undiscoverable:
         log.info("✓ refresh_stale : %d rows sans DOI marquées disparues", n_undiscoverable)
+        # Rows stale sans DOI (non refetchables) marquées disparues : un canal
+        # distinct des refetchs par source, agrégé toutes sources confondues.
+        by_source["sans DOI"] = {
+            "interrogated": 0,
+            "refreshed": 0,
+            "disappeared": n_undiscoverable,
+            "duration_s": 0,
+        }
     metrics.add(disappeared=n_undiscoverable)
+
+    if by_source:
+        metrics.details["table"] = {
+            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
+        }
     return metrics
 
 
@@ -506,7 +557,7 @@ def _run_resolve_publishers() -> PhaseMetrics:
     return metrics
 
 
-def phase_affiliations(**kw: Any) -> Any:
+def phase_affiliations(**kw: Any) -> PhaseMetrics:
     """Résolution des affiliations UCA sur les source_authorships.
 
     1. refresh_perimeter_structures : rematérialise le périmètre (clôture des tutelles)
@@ -519,7 +570,7 @@ def phase_affiliations(**kw: Any) -> Any:
     """
     _run_refresh_perimeter_structures()
     _run_resolve_addresses()
-    _run_populate_affiliations()
+    return _run_populate_affiliations()
 
 
 def phase_metadata_correction(**kw: Any) -> PhaseMetrics:
@@ -636,14 +687,21 @@ def phase_authorships(**kw: Any) -> Any:
 def phase_countries(mode: Any = "full", **kw: Any) -> PhaseMetrics:
     """Detection des pays des adresses et recalcul sur les publications."""
     metrics = PhaseMetrics()
-    _log_countries_summary("Bilan initial")
+    initial = _log_countries_summary("Bilan initial")
     metrics.merge(_run_detect_address_countries())
     metrics.merge(_run_detect_place_countries())
     metrics.merge(
         _run_suggest_address_countries(retry_empty=MODES[mode].retry_empty_country_suggestions)
     )
     _run_refresh_publication_countries()
-    _log_countries_summary("Bilan final")
+    final = _log_countries_summary("Bilan final")
+    metrics.details["summary"] = {
+        "addresses_total": final.total,
+        "with_country_before": initial.with_country,
+        "with_country_after": final.with_country,
+        "with_suggestion": final.with_suggestion,
+        "without_country": final.none,
+    }
     return metrics
 
 
@@ -890,7 +948,7 @@ def _run_refresh_perimeter_structures() -> None:
     log.info("✓ perimeter_structures : %d liens en %.1fs", n, time.time() - t0)
 
 
-def _run_populate_affiliations() -> None:
+def _run_populate_affiliations() -> PhaseMetrics:
     from application.pipeline.affiliations.populate_affiliations import run_populate
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.perimeter import get_persons_structure_ids
@@ -898,14 +956,30 @@ def _run_populate_affiliations() -> None:
 
     log.info("▶ populate_affiliations")
     t0 = time.time()
+    queries = PgAffiliationsQueries()
     conn = get_sync_engine().connect()
+    rows: list[dict[str, object]] = []
     try:
         perimeter_ids = get_persons_structure_ids(conn)
-        run_populate(conn, PgAffiliationsQueries(), log, perimeter_ids)
+        run_populate(conn, queries, log, perimeter_ids)
         conn.commit()
+        # Bilan in_perimeter par source, une fois la propagation committée.
+        for source in ("hal", "openalex", "wos", "scanr", "theses"):
+            total, in_perimeter, with_structs = queries.count_source_authorships_stats(conn, source)
+            rows.append(
+                {
+                    "key": source,
+                    "total": total,
+                    "in_perimeter": in_perimeter,
+                    "with_structs": with_structs,
+                }
+            )
     finally:
         conn.close()
     log.info("✓ populate_affiliations terminé en %.1fs", time.time() - t0)
+    metrics = PhaseMetrics()
+    metrics.details["table"] = {"rows": rows}
+    return metrics
 
 
 def _run_populate_person_name_forms() -> None:
@@ -1675,7 +1749,7 @@ def _run_detect_address_countries() -> PhaseMetrics:
     return metrics
 
 
-def _log_countries_summary(label: str) -> None:
+def _log_countries_summary(label: str) -> "AddressCountryStatus":
     """Bilan global de l'état pays des adresses, en début et fin de phase countries."""
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.countries import count_address_country_status
@@ -1693,6 +1767,7 @@ def _log_countries_summary(label: str) -> None:
         s.with_suggestion,
         s.none,
     )
+    return s
 
 
 def _run_detect_place_countries() -> PhaseMetrics:
