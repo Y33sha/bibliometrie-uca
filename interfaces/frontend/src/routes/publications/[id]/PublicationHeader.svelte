@@ -20,6 +20,24 @@
   </div>
   <h1 class="pub-title-main">{@html sanitizeTitle(pub.title)}</h1>
 
+  {#if pub.journal_title || pub.container_title}
+    <div class="pub-journal-line">
+      {#if pub.journal_id}
+        <a href="{base}/journals/{pub.journal_id}" class="journal-name">{pub.journal_title || pub.container_title}</a>
+      {:else}
+        <span class="journal-name" class:container={!pub.journal_title}>{pub.journal_title || pub.container_title}</span>
+      {/if}
+      {#if pub.publisher_name}
+        <span class="publisher-sep">—</span>
+        {#if pub.publisher_id}
+          <a href="{base}/publishers/{pub.publisher_id}" class="publisher-name">{pub.publisher_name}</a>
+        {:else}
+          <span class="publisher-name">{pub.publisher_name}</span>
+        {/if}
+      {/if}
+    </div>
+  {/if}
+
   {#if parentRelations.length}
     <div class="parent-relations">
       {#each parentRelations as r (r.relation_type + (r.publication_id ?? r.doi))}
@@ -36,24 +54,6 @@
           <span class="parent-rel-title">{@html sanitizeTitle(r.title ?? r.doi ?? "")}</span>
         </a>
       {/each}
-    </div>
-  {/if}
-
-  {#if pub.journal_title || pub.container_title}
-    <div class="pub-journal-line">
-      {#if pub.journal_id}
-        <a href="{base}/journals/{pub.journal_id}" class="journal-name">{pub.journal_title || pub.container_title}</a>
-      {:else}
-        <span class="journal-name" class:container={!pub.journal_title}>{pub.journal_title || pub.container_title}</span>
-      {/if}
-      {#if pub.publisher_name}
-        <span class="publisher-sep">—</span>
-        {#if pub.publisher_id}
-          <a href="{base}/publishers/{pub.publisher_id}" class="publisher-name">{pub.publisher_name}</a>
-        {:else}
-          <span class="publisher-name">{pub.publisher_name}</span>
-        {/if}
-      {/if}
     </div>
   {/if}
 
