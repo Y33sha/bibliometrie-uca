@@ -82,6 +82,20 @@ export const relationTypeLabel: Record<string, string> = {
 	is_related_to: 'Apparenté à'
 };
 
+/** Relations « vers le parent » : la publication courante est une pièce dépendante (erratum,
+ * préprint, supplément, partie…) rattachée à une œuvre principale. Mises en avant dans le header
+ * (et non au centre) pour qu'on voie d'emblée que la publi est rattachée à une autre. Exclut les
+ * relations latérales (`is_related_to`, `is_described_by`) et toutes les `has_*` (sens inverse). */
+export const PARENT_RELATION_TYPES: ReadonlySet<string> = new Set([
+	'is_correction_of',
+	'is_preprint_of',
+	'is_supplement_to',
+	'is_part_of',
+	'is_translation_of',
+	'is_concern_about',
+	'is_retraction_of'
+]);
+
 /** Accès générique pour la fiche détail, sans le jargon OA (gold/green/diamond/…) : on ne dit que
  * « ouvert / fermé / sous embargo ». Retourne `null` si indéterminé (rien à afficher). Le cas
  * « thèse en cours » est porté par le `doc_type`, pas ici. `cls` = classe de pastille colorée. */

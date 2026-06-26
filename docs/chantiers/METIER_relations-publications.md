@@ -83,7 +83,8 @@ La détection vraiment **heuristique** (rapprochement par titre pour les orpheli
 ### Phase 3 — UI
 
 - [x] Afficher les publications liées sur la fiche détail (`RelatedPublications.svelte`, sous le header, avant les sujets). Relations des deux sens, le type entrant inversé pour se lire depuis la publication courante (`inverse_relation`), groupées par type ; cible au corpus → lien interne, cible hors corpus → lien `doi.org`. Exposées par `get_publication_relations` dans la réponse détail.
-- [ ] ITEM TODO : page détails: séparer l'affichage des relations selon le sens (publication parent: afficher dès le bloc titre; publications dépendantes: mettre liens dans la sidebar)
+- [x] Page détail — relations **vers le parent** (la publi est une pièce dépendante : erratum, préprint, supplément, partie…) mises en avant dans le header : bandeau voyant (fond teinté + filet d'accent) sous le titre, « Correction de / Préprint de / Supplément à … » + titre cliquable de l'œuvre principale. Le tri vit dans `PARENT_RELATION_TYPES` (`$lib/labels`).
+- [ ] Page détail — relations **dépendantes** (`has_*`) et **latérales** (`is_related_to`, data paper ↔ dataset) : à déplacer du bloc central vers la sidebar (à tester d'abord — risque d'enlaidir avec un titre coupé/wrappé).
 - [ ] Réfléchir aux pages listes: publications "dépendantes" exclues par défaut? option de les inclure? distinguer vue tabulaire (totale) vs vue liste (avec groupement des publications liées)?
 
 ### Phase 4 — Exploitations en aval
@@ -99,7 +100,7 @@ Le retypage à partir des relations **déclarées (signal #1)** se fait en règl
   - **erratums** → `is_correction_of` : le titre reproduit celui du parent après un préfixe (« Erratum: », « Corrigendum to »…), donc le `title_normalized` du parent en est un **suffixe**. Fenêtre [n−2 … n]. ~68 orphelins rattachables.
   - **preprints** → `is_preprint_of` : le preprint et sa version publiée portent un titre **identique**. Fenêtre [n … n+2]. ~240 liens nets. Précision validée contre la vérité-terrain (relations déjà établies) : 423/429 = 98,6 % désignent le même parent → **pas de garde auteurs nécessaire**.
 - [x] **`target_doi` nullable** (migration `c1a8e4f7b2d9`) : une relation peut cibler une œuvre **au corpus sans DOI** (désignée par `target_publication_id`). La PK passe sur un `id` de substitution, l'unicité sur `(from_publication_id, relation_type, target_publication_id, target_doi)` `NULLS NOT DISTINCT`. Le `CHECK` garantit qu'une cible existe (publication ou DOI).
-- [ ] Rapprochement par titre — **rétractations** : même mécanisme à étendre (préfixe « Retraction: », ~7 orphelins).
+- [x] Rapprochement par titre — **rétractations** : audité, **abandonné**. Les 9 notices au stock préfixent bien (« Retraction notice to «…» », « Retraction Note: … »), mais **aucune** n'a son article rétracté au corpus (0 parent, même en sous-chaîne — l'œuvre rétractée n'est pas une publication UCA). Rien à relier par titre ; relèvera de l'interface admin (ou d'un rapatriement par DOI si un signal déclaré le portait).
 
 ## Questions ouvertes
 
