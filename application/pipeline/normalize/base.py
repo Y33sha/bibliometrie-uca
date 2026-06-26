@@ -19,12 +19,21 @@ import argparse
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from typing import ClassVar
+from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
 
 from application.pipeline._savepoint import savepoint
 from application.ports.pipeline.staging import StagingQueries, StagingRow
+
+
+class NormalizeStats(NamedTuple):
+    """Bilan d'une normalisation de source : works normalisés, ignorés (rien à
+    écrire / non pertinents), en erreur."""
+
+    processed: int
+    skipped: int
+    errors: int
 
 
 class SourceNormalizer(ABC):
@@ -130,7 +139,7 @@ class SourceNormalizer(ABC):
             self.on_error()
             raise
 
-    def run(self, argv: list[str] | None = None) -> None:
+    def run(self, argv: list[str] | None = None) -> NormalizeStats:
         """Entry point : parse args, drive the normalization loop."""
         args = self.parse_args(argv)
         self.conn.rollback()
@@ -140,13 +149,13 @@ class SourceNormalizer(ABC):
                 count = self._reset(self.conn)
                 self.conn.commit()
                 self.logger.info(f"Reset : {count} works remis à processed=FALSE")
-                return
+                return NormalizeStats(0, 0, 0)
 
             total = self._count_pending(self.conn)
             self.logger.info(f"=== Normalisation {self.SOURCE} : {total} works à traiter ===")
             if total == 0:
                 self.logger.info("Rien à faire.")
-                return
+                return NormalizeStats(0, 0, 0)
 
             limit = min(args.limit or total, total)
             self.logger.info(f"Traitement de {limit} works (batch size: {args.batch_size})")
@@ -194,6 +203,8 @@ class SourceNormalizer(ABC):
             self.logger.info(f"Erreurs : {errors}")
             for line in self.summary_stats(self.conn):
                 self.logger.info(line)
+
+            return NormalizeStats(processed, skipped, errors)
 
         except KeyboardInterrupt:
             # Ctrl+C frappe souvent en plein `conn.execute()` : la transaction est

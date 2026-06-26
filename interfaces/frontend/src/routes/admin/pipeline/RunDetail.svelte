@@ -7,17 +7,8 @@
   type RunDetail = components["schemas"]["RunDetail"];
   type PhaseExecutionDetail = components["schemas"]["PhaseExecutionDetail"];
 
-  type SourceRow = {
-    found: number;
-    new: number;
-    updated: number;
-    unchanged: number;
-    errors: number;
-    duration_s: number;
-  };
   type Details = {
     tables?: Record<string, { before: number; after: number }>;
-    by_source?: Record<string, SourceRow>;
     summary?: Record<string, number>;
     table?: { rows: Record<string, string | number>[] };
   };
@@ -37,9 +28,6 @@
 
   function asDetails(d: unknown): Details {
     return (d ?? {}) as Details;
-  }
-  function bySource(d: unknown): [string, SourceRow][] {
-    return Object.entries(asDetails(d).by_source ?? {});
   }
   function detailSummary(d: unknown): Record<string, number> {
     return asDetails(d).summary ?? {};
@@ -78,11 +66,13 @@
   }
   function fmtCell(value: string | number, col: TableColumn, total: number): string {
     const n = Number(value) || 0;
+    if (col.duration) return fmtDuration(n);
     if (col.sign) return fmtSigned(n);
     if (col.pct) return `${n} (${fmtPct(n, total)})`;
     return `${n}`;
   }
   function fmtTotalCell(sum: number, col: TableColumn): string {
+    if (col.duration) return "";
     return col.sign ? fmtSigned(sum) : `${sum}`;
   }
 
@@ -157,7 +147,6 @@
         {@const view = PHASE_VIEWS[p.phase]}
         {@const dsummary = detailSummary(p.details)}
         {@const drows = tableRows(p.details)}
-        {@const sources = bySource(p.details)}
         {@const pairs = summaryPairs(view, dsummary)}
         <tr class="expand-row">
           <td colspan="4">
@@ -178,33 +167,6 @@
                 <div class="expand-line">
                   <span class="k">Métriques</span><span>{metricsSummary(p.metrics)}</span>
                 </div>
-              {/if}
-
-              {#if sources.length}
-                <table class="src-table">
-                  <thead>
-                    <tr>
-                      <th>Source</th>
-                      <th class="num">Trouvés</th>
-                      <th class="num">Nouveaux</th>
-                      <th class="num">Màj</th>
-                      <th class="num">Inchangés</th>
-                      <th class="num">Durée</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {#each sources as [src, m] (src)}
-                      <tr>
-                        <td>{src}</td>
-                        <td class="num">{m.found}</td>
-                        <td class="num">{m.new}</td>
-                        <td class="num">{m.updated}</td>
-                        <td class="num">{m.unchanged}</td>
-                        <td class="num">{fmtDuration(m.duration_s)}</td>
-                      </tr>
-                    {/each}
-                  </tbody>
-                </table>
               {/if}
 
               {#if view?.table && drows.length}

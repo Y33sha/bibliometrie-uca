@@ -58,7 +58,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from application.ports.pipeline.extract.fetch_missing_doi import AsyncFetchMissingDoiAdapter
@@ -68,6 +68,7 @@ from application.pipeline.metadata_correction.correct_by_cluster import ClusterC
 from application.pipeline.metadata_correction.correct_unary import UnaryCorrectionStats
 from application.pipeline.metrics import PhaseMetrics
 from application.pipeline.modes import MODE_NAMES, MODES
+from application.pipeline.normalize.base import NormalizeStats
 from domain.sources.registry import ALL_SOURCES_SET, DOI_SEARCHABLE_SOURCES
 from infrastructure.observability.log import setup_logger
 from infrastructure.observability.pipeline_status import clear_status, read_status, write_status
@@ -180,7 +181,9 @@ def phase_extract(
                     by_source[futures[future]] = _summary(source_metrics, duration)
 
     if by_source:
-        metrics.details["by_source"] = by_source
+        metrics.details["table"] = {
+            "rows": [{"key": source, **summary} for source, summary in by_source.items()]
+        }
     return metrics
 
 
@@ -313,7 +316,7 @@ def phase_refetch_truncated(**kw: Any) -> PhaseMetrics:
     return metrics
 
 
-def phase_normalize(**kw: Any) -> Any:
+def phase_normalize(**kw: Any) -> PhaseMetrics:
     """Normalisation staging -> tables sources.
 
     Écrit les `source_publications` avec `publication_id = NULL` (aucun
@@ -326,25 +329,25 @@ def phase_normalize(**kw: Any) -> Any:
     sources = kw.get("sources", set(ALL_SOURCES_SET))
     mode = kw.get("mode", "full")
     policy = MODES[mode]
-    metrics = PhaseMetrics()
     # Ordre d'exécution : source la plus autoritative en premier
     # (cf. SOURCE_PRIORITY dans domain/sources.py). Les sources suivantes
     # n'écrasent pas les métadonnées déjà posées par les précédentes
     # lors de `refresh_from_sources`.
+    rows: list[dict[str, object]] = []
     if "theses" in sources:
-        _run_normalize_theses()
+        rows.append(_run_normalize_theses())
     if "crossref" in sources:
-        _run_normalize_crossref()
+        rows.append(_run_normalize_crossref())
     if "datacite" in sources:
-        _run_normalize_datacite()
+        rows.append(_run_normalize_datacite())
     if "scanr" in sources:
-        _run_normalize_scanr()
+        rows.append(_run_normalize_scanr())
     if "hal" in sources:
-        _run_normalize_hal()
+        rows.append(_run_normalize_hal())
     if "openalex" in sources:
-        _run_normalize_openalex()
+        rows.append(_run_normalize_openalex())
     if "wos" in sources:
-        _run_normalize_wos()
+        rows.append(_run_normalize_wos())
     # Libérer l'espace TOAST du staging (raw_data vidé après normalisation)
     if policy.vacuum_full:
         log.info("VACUUM FULL staging...")
@@ -352,6 +355,9 @@ def phase_normalize(**kw: Any) -> Any:
     else:
         log.info("VACUUM staging...")
         _vacuum_staging(full=False)
+    metrics = PhaseMetrics()
+    metrics.add(total=sum(cast("int", r["processed"]) for r in rows))
+    metrics.details["table"] = {"rows": rows}
     return metrics
 
 
@@ -917,7 +923,18 @@ def _run_populate_person_name_forms() -> None:
     log.info("✓ populate_person_name_forms terminé en %.1fs", time.time() - t0)
 
 
-def _run_normalize_hal() -> None:
+def _normalize_row(source: str, stats: NormalizeStats, duration_s: float) -> dict[str, object]:
+    """Ligne « par source » de la table d'observabilité de la phase normalize."""
+    return {
+        "key": source,
+        "processed": stats.processed,
+        "skipped": stats.skipped,
+        "errors": stats.errors,
+        "duration_s": round(duration_s, 1),
+    }
+
+
+def _run_normalize_hal() -> dict[str, object]:
     from application.pipeline.normalize.normalize_hal import HalNormalizer
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
@@ -932,7 +949,7 @@ def _run_normalize_hal() -> None:
     log.info("▶ normalize_hal")
     t0 = time.time()
     conn = get_sync_engine().connect()
-    HalNormalizer(
+    stats = HalNormalizer(
         conn,
         log,
         PgStagingQueries(),
@@ -942,10 +959,12 @@ def _run_normalize_hal() -> None:
         pub_repo_factory=publication_repository,
         authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
-    log.info("✓ normalize_hal terminé en %.1fs", time.time() - t0)
+    duration = time.time() - t0
+    log.info("✓ normalize_hal terminé en %.1fs", duration)
+    return _normalize_row("hal", stats, duration)
 
 
-def _run_normalize_wos() -> None:
+def _run_normalize_wos() -> dict[str, object]:
     from application.pipeline.normalize.normalize_wos import WosNormalizer
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
@@ -960,7 +979,7 @@ def _run_normalize_wos() -> None:
     log.info("▶ normalize_wos")
     t0 = time.time()
     conn = get_sync_engine().connect()
-    WosNormalizer(
+    stats = WosNormalizer(
         conn,
         log,
         PgStagingQueries(),
@@ -970,10 +989,12 @@ def _run_normalize_wos() -> None:
         pub_repo_factory=publication_repository,
         authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
-    log.info("✓ normalize_wos terminé en %.1fs", time.time() - t0)
+    duration = time.time() - t0
+    log.info("✓ normalize_wos terminé en %.1fs", duration)
+    return _normalize_row("wos", stats, duration)
 
 
-def _run_normalize_openalex() -> None:
+def _run_normalize_openalex() -> dict[str, object]:
     from application.pipeline.normalize.normalize_openalex import OpenalexNormalizer
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
@@ -988,7 +1009,7 @@ def _run_normalize_openalex() -> None:
     log.info("▶ normalize_openalex")
     t0 = time.time()
     conn = get_sync_engine().connect()
-    OpenalexNormalizer(
+    stats = OpenalexNormalizer(
         conn,
         log,
         PgStagingQueries(),
@@ -998,10 +1019,12 @@ def _run_normalize_openalex() -> None:
         pub_repo_factory=publication_repository,
         authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
-    log.info("✓ normalize_openalex terminé en %.1fs", time.time() - t0)
+    duration = time.time() - t0
+    log.info("✓ normalize_openalex terminé en %.1fs", duration)
+    return _normalize_row("openalex", stats, duration)
 
 
-def _run_normalize_scanr() -> None:
+def _run_normalize_scanr() -> dict[str, object]:
     from application.pipeline.normalize.normalize_scanr import ScanrNormalizer
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
@@ -1016,7 +1039,7 @@ def _run_normalize_scanr() -> None:
     log.info("▶ normalize_scanr")
     t0 = time.time()
     conn = get_sync_engine().connect()
-    ScanrNormalizer(
+    stats = ScanrNormalizer(
         conn,
         log,
         PgStagingQueries(),
@@ -1026,10 +1049,12 @@ def _run_normalize_scanr() -> None:
         pub_repo_factory=publication_repository,
         authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
-    log.info("✓ normalize_scanr terminé en %.1fs", time.time() - t0)
+    duration = time.time() - t0
+    log.info("✓ normalize_scanr terminé en %.1fs", duration)
+    return _normalize_row("scanr", stats, duration)
 
 
-def _run_normalize_theses() -> None:
+def _run_normalize_theses() -> dict[str, object]:
     from application.pipeline.normalize.normalize_theses import ThesesNormalizer
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.normalize.theses import PgThesesNormalizeQueries
@@ -1040,7 +1065,7 @@ def _run_normalize_theses() -> None:
     log.info("▶ normalize_theses")
     t0 = time.time()
     conn = get_sync_engine().connect()
-    ThesesNormalizer(
+    stats = ThesesNormalizer(
         conn,
         log,
         PgStagingQueries(),
@@ -1048,10 +1073,12 @@ def _run_normalize_theses() -> None:
         pub_repo_factory=publication_repository,
         address_linker=PgAddressLinker(),
     ).run([])
-    log.info("✓ normalize_theses terminé en %.1fs", time.time() - t0)
+    duration = time.time() - t0
+    log.info("✓ normalize_theses terminé en %.1fs", duration)
+    return _normalize_row("theses", stats, duration)
 
 
-def _run_normalize_crossref() -> None:
+def _run_normalize_crossref() -> dict[str, object]:
     from application.pipeline.normalize.normalize_crossref import CrossrefNormalizer
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
@@ -1066,7 +1093,7 @@ def _run_normalize_crossref() -> None:
     log.info("▶ normalize_crossref")
     t0 = time.time()
     conn = get_sync_engine().connect()
-    CrossrefNormalizer(
+    stats = CrossrefNormalizer(
         conn,
         log,
         PgStagingQueries(),
@@ -1076,10 +1103,12 @@ def _run_normalize_crossref() -> None:
         pub_repo_factory=publication_repository,
         authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
-    log.info("✓ normalize_crossref terminé en %.1fs", time.time() - t0)
+    duration = time.time() - t0
+    log.info("✓ normalize_crossref terminé en %.1fs", duration)
+    return _normalize_row("crossref", stats, duration)
 
 
-def _run_normalize_datacite() -> None:
+def _run_normalize_datacite() -> dict[str, object]:
     from application.pipeline.normalize.normalize_datacite import DataciteNormalizer
     from infrastructure.db.engine import get_sync_engine
     from infrastructure.queries.pipeline.normalize.authorships import PgAuthorshipsBatchQueries
@@ -1094,7 +1123,7 @@ def _run_normalize_datacite() -> None:
     log.info("▶ normalize_datacite")
     t0 = time.time()
     conn = get_sync_engine().connect()
-    DataciteNormalizer(
+    stats = DataciteNormalizer(
         conn,
         log,
         PgStagingQueries(),
@@ -1104,7 +1133,9 @@ def _run_normalize_datacite() -> None:
         pub_repo_factory=publication_repository,
         authorship_queries=PgAuthorshipsBatchQueries(),
     ).run([])
-    log.info("✓ normalize_datacite terminé en %.1fs", time.time() - t0)
+    duration = time.time() - t0
+    log.info("✓ normalize_datacite terminé en %.1fs", duration)
+    return _normalize_row("datacite", stats, duration)
 
 
 def _run_enrich_oa_status() -> PhaseMetrics:

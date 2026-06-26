@@ -11,7 +11,13 @@
  */
 
 export type SummaryItem = { key: string; label: string };
-export type TableColumn = { key: string; label: string; pct?: boolean; sign?: boolean };
+export type TableColumn = {
+  key: string;
+  label: string;
+  pct?: boolean;
+  sign?: boolean;
+  duration?: boolean;
+};
 export type PhaseView = {
   // Lignes de synthèse : pour chaque clé de `details.summary`, son libellé, dans l'ordre.
   summary?: SummaryItem[];
@@ -20,6 +26,31 @@ export type PhaseView = {
 };
 
 export const PHASE_VIEWS: Record<string, PhaseView> = {
+  extract: {
+    table: {
+      firstColumnLabel: "Source",
+      columns: [
+        { key: "found", label: "Trouvés" },
+        { key: "new", label: "Nouveaux" },
+        { key: "updated", label: "Màj" },
+        { key: "unchanged", label: "Inchangés" },
+        { key: "duration_s", label: "Durée", duration: true },
+      ],
+      total: true,
+    },
+  },
+  normalize: {
+    table: {
+      firstColumnLabel: "Source",
+      columns: [
+        { key: "processed", label: "Traités" },
+        { key: "skipped", label: "Ignorés" },
+        { key: "errors", label: "Erreurs" },
+        { key: "duration_s", label: "Durée", duration: true },
+      ],
+      total: true,
+    },
+  },
   publications: {
     summary: [
       { key: "sp_in_perimeter", label: "source_publications (in-périmètre)" },
