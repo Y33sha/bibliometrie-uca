@@ -217,6 +217,105 @@ def ambiguous_name_forms(conn: Connection, *, page: int, per_page: int) -> dict[
     }
 
 
+# ── Conflits d'identifiant (file de triage du hub) ───────────────
+
+# Paires de personnes distinctes portant la même valeur brute d'identifiant, lues sur la matview
+# `person_identifier_keys` (déjà au grain identité, hors `_dubious`). Le self-join sur
+# (id_type, id_value) est instantané, contrairement au scan de `source_authorships`. Exclut les
+# paires déjà marquées distinctes.
+_IDENTIFIER_CONFLICT_PAIRS = """
+    WITH pairs AS (
+        SELECT k1.id_type, k1.id_value, k1.person_id AS id_a, k2.person_id AS id_b
+        FROM person_identifier_keys k1
+        JOIN person_identifier_keys k2
+          ON k1.id_type = k2.id_type AND k1.id_value = k2.id_value AND k1.person_id < k2.person_id
+    )
+    SELECT id_a, id_b,
+           json_agg(DISTINCT jsonb_build_object('id_type', id_type, 'id_value', id_value)) AS shared
+    FROM pairs
+    WHERE NOT EXISTS (
+        SELECT 1 FROM distinct_persons dp
+        WHERE dp.person_id_a = id_a AND dp.person_id_b = id_b
+    )
+    GROUP BY id_a, id_b
+"""
+
+
+def identifier_conflicts_count(conn: Connection) -> int:
+    """Nombre de paires de personnes au même identifiant brut (badge de l'onglet)."""
+    row = conn.execute(
+        text(f"SELECT count(*) AS total FROM ({_IDENTIFIER_CONFLICT_PAIRS}) sub")
+    ).one()
+    return int(row.total)
+
+
+def _light_persons(conn: Connection, ids: list[int]) -> dict[int, dict[str, Any]]:
+    """Vue allégée par personne (nom, RH, nb publications, labos) pour la file de triage."""
+    if not ids:
+        return {}
+    rows = conn.execute(
+        text("""
+            SELECT p.id, p.first_name, p.last_name,
+                   EXISTS(SELECT 1 FROM persons_rh rh WHERE rh.person_id = p.id) AS has_rh,
+                   (SELECT count(*) FROM authorships a WHERE a.person_id = p.id) AS pub_count,
+                   COALESCE((
+                       SELECT array_agg(DISTINCT COALESCE(s.acronym, s.name)
+                                        ORDER BY COALESCE(s.acronym, s.name))
+                       FROM structures s
+                       WHERE s.structure_type = 'labo' AND s.id IN (
+                           SELECT sas.structure_id FROM source_authorship_structures sas
+                           JOIN source_authorships sa ON sa.id = sas.source_authorship_id
+                           WHERE sa.person_id = p.id
+                       )
+                   ), ARRAY[]::text[]) AS labs
+            FROM persons p WHERE p.id = ANY(:ids)
+        """).bindparams(bindparam("ids")),
+        {"ids": ids},
+    ).all()
+    return {
+        r.id: {
+            "person_id": r.id,
+            "first_name": r.first_name,
+            "last_name": r.last_name,
+            "has_rh": r.has_rh,
+            "pub_count": r.pub_count,
+            "labs": list(r.labs or []),
+        }
+        for r in rows
+    }
+
+
+def identifier_conflicts(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
+    """Paires de personnes au même identifiant brut, paginées, avec vue allégée des deux personnes
+    et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
+    total = identifier_conflicts_count(conn)
+    offset = (page - 1) * per_page
+    rows = conn.execute(
+        text(f"{_IDENTIFIER_CONFLICT_PAIRS} ORDER BY id_a, id_b LIMIT :lim OFFSET :off"),
+        {"lim": per_page, "off": offset},
+    ).all()
+    ids = sorted({r.id_a for r in rows} | {r.id_b for r in rows})
+    persons = _light_persons(conn, ids)
+    pairs = [
+        {
+            "person_a": persons[r.id_a],
+            "person_b": persons[r.id_b],
+            "shared_identifiers": [
+                {"id_type": s["id_type"], "id_value": s["id_value"]} for s in r.shared
+            ],
+        }
+        for r in rows
+        if r.id_a in persons and r.id_b in persons
+    ]
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page if per_page else 0,
+        "pairs": pairs,
+    }
+
+
 def persons_sharing_name_form(conn: Connection, person_id: int) -> list[dict[str, Any]]:
     """Autres personnes (non rejetées) partageant ≥1 forme de nom avec `person_id`.
 

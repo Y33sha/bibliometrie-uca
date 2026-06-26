@@ -24,6 +24,7 @@
   import DetachNameFormModal from "./DetachNameFormModal.svelte";
   import PersonDrawer from "./PersonDrawer.svelte";
   import AmbiguousFormsList from "./AmbiguousFormsList.svelte";
+  import IdentifierConflictsList from "./IdentifierConflictsList.svelte";
 
   /* ── State ── */
 
@@ -31,9 +32,10 @@
   let orphanCount = $state(0);
 
   // Onglets du hub : liste maîtresse + files de triage.
-  type TabKey = "all" | "ambiguous-forms";
+  type TabKey = "all" | "ambiguous-forms" | "identifier-conflicts";
   let tab = $state<TabKey>("all");
   let ambiguousCount = $state(0);
+  let identifierConflictCount = $state(0);
   // Bumpé après chaque action du drawer pour recharger la file de triage active.
   let reloadFiles = $state(0);
 
@@ -215,7 +217,8 @@
       idStates = states;
     }
     if (p.get("person")) selectedPersonId = parseInt(p.get("person")!, 10) || null;
-    if (p.get("tab") === "ambiguous-forms") tab = "ambiguous-forms";
+    const t = p.get("tab");
+    if (t === "ambiguous-forms" || t === "identifier-conflicts") tab = t;
   }
 
   /* ── Event handlers ── */
@@ -292,6 +295,11 @@
   async function loadAmbiguousCount() {
     const data = await api<{ total: number }>("/api/admin/ambiguous-name-forms/count");
     ambiguousCount = data.total;
+  }
+
+  async function loadIdentifierConflictCount() {
+    const data = await api<{ total: number }>("/api/admin/identifier-conflicts/count");
+    identifierConflictCount = data.total;
   }
 
   function selectTab(t: TabKey) {
@@ -398,6 +406,7 @@
     await loadTable();
     await refreshSelected();
     loadAmbiguousCount();
+    loadIdentifierConflictCount();
   }
 
   // Absorbe une autre personne (sourceId) dans celle du drawer (la cible).
@@ -414,6 +423,7 @@
     await loadTable();
     await refreshSelected();
     loadAmbiguousCount();
+    loadIdentifierConflictCount();
   }
 
   async function mergeFromModal(sourceId: number) {
@@ -460,6 +470,7 @@
     await loadTable();
     loadOrphanCount();
     loadAmbiguousCount();
+    loadIdentifierConflictCount();
     // Deep-link `?person=` vers une personne hors de la page courante.
     await refreshSelected();
   });
@@ -480,6 +491,14 @@
   >
     Formes ambigu&euml;s
     {#if ambiguousCount > 0}<span class="tab-badge">{ambiguousCount}</span>{/if}
+  </button>
+  <button
+    class="hub-tab"
+    class:active={tab === "identifier-conflicts"}
+    onclick={() => selectTab("identifier-conflicts")}
+  >
+    Conflits d'identifiant
+    {#if identifierConflictCount > 0}<span class="tab-badge">{identifierConflictCount}</span>{/if}
   </button>
 </nav>
 
@@ -552,6 +571,12 @@
   <AmbiguousFormsList
     onopenPerson={openDrawer}
     onchange={loadAmbiguousCount}
+    reloadKey={reloadFiles}
+  />
+{:else if tab === "identifier-conflicts"}
+  <IdentifierConflictsList
+    onopenPerson={openDrawer}
+    onchange={loadIdentifierConflictCount}
     reloadKey={reloadFiles}
   />
 {/if}

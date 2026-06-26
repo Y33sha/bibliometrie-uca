@@ -328,6 +328,39 @@ class AmbiguousNameFormsResponse(BaseModel):
     forms: list[AmbiguousNameFormOut]
 
 
+class IdentifierConflictPersonOut(BaseModel):
+    """Personne d'une paire en conflit d'identifiant, vue allégée (le détail complet est dans le drawer)."""
+
+    person_id: int
+    first_name: str
+    last_name: str
+    has_rh: bool
+    pub_count: int
+    labs: list[str]
+
+
+class SharedIdentifierOut(BaseModel):
+    id_type: str
+    id_value: str
+
+
+class IdentifierConflictPairOut(BaseModel):
+    """Deux personnes distinctes portant la même valeur brute d'identifiant (ORCID / IdRef /
+    hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution."""
+
+    person_a: IdentifierConflictPersonOut
+    person_b: IdentifierConflictPersonOut
+    shared_identifiers: list[SharedIdentifierOut]
+
+
+class IdentifierConflictsResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    pairs: list[IdentifierConflictPairOut]
+
+
 class SharingPersonOut(BaseModel):
     """Personne partageant ≥1 forme de nom avec une autre (candidate à l'absorption)."""
 
@@ -423,5 +456,9 @@ class PersonsQueries(Protocol):
     def ambiguous_name_forms_count(self) -> int: ...
 
     def ambiguous_name_forms(self, *, page: int, per_page: int) -> AmbiguousNameFormsResponse: ...
+
+    def identifier_conflicts_count(self) -> int: ...
+
+    def identifier_conflicts(self, *, page: int, per_page: int) -> IdentifierConflictsResponse: ...
 
     def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]: ...

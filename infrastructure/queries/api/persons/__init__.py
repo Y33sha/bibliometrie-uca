@@ -28,6 +28,7 @@ from application.ports.api.persons_queries import (
     DepartmentCount,
     DirectoryFilters,
     FacetFilters,
+    IdentifierConflictsResponse,
     ListFilters,
     NameFormAuthorshipsResponse,
     OrphanAuthorshipsResponse,
@@ -50,6 +51,8 @@ from application.ports.api.subjects_queries import SubjectFrequency
 from infrastructure.queries.api.persons.admin import (
     ambiguous_name_forms as _ambiguous_name_forms,
     ambiguous_name_forms_count as _ambiguous_name_forms_count,
+    identifier_conflicts as _identifier_conflicts,
+    identifier_conflicts_count as _identifier_conflicts_count,
     list_orphan_authorships as _list_orphan_authorships,
     name_form_authorships as _name_form_authorships,
     orphan_authorships_count as _orphan_authorships_count,
@@ -176,6 +179,14 @@ class PgPersonsQueries(PersonsQueries):
     def ambiguous_name_forms(self, *, page: int, per_page: int) -> AmbiguousNameFormsResponse:
         return AmbiguousNameFormsResponse.model_validate(
             _ambiguous_name_forms(self._conn, page=page, per_page=per_page)
+        )
+
+    def identifier_conflicts_count(self) -> int:
+        return _identifier_conflicts_count(self._conn)
+
+    def identifier_conflicts(self, *, page: int, per_page: int) -> IdentifierConflictsResponse:
+        return IdentifierConflictsResponse.model_validate(
+            _identifier_conflicts(self._conn, page=page, per_page=per_page)
         )
 
     def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]:
