@@ -1,7 +1,10 @@
-"""Tests de l'assemblage des arêtes du signal #2 (clés de confirmation partagées)."""
+"""Tests de l'assemblage des arêtes des signaux #2 (clés partagées) et #3 (erratum par titre)."""
 
-from application.pipeline.relations.populate_relations import _build_shared_key_edges
-from application.ports.pipeline.relations import SharedKeyPair
+from application.pipeline.relations.populate_relations import (
+    _build_shared_key_edges,
+    _build_title_match_edges,
+)
+from application.ports.pipeline.relations import ErratumTitleMatch, SharedKeyPair
 
 
 def _pair(a_id, a_dt, b_id, b_dt):
@@ -42,3 +45,17 @@ class TestBuildSharedKeyEdges:
             [_pair(50, "peer_review", 60, "article")], declared_pairs=set()
         )
         assert edges == []
+
+
+class TestBuildTitleMatchEdges:
+    def test_builds_is_correction_of_edge(self):
+        edges = _build_title_match_edges([ErratumTitleMatch(5, "10.1234/parent")])
+        assert len(edges) == 1
+        e = edges[0]
+        assert e.from_publication_id == 5
+        assert e.relation_type == "is_correction_of"
+        assert e.target_doi == "10.1234/parent"
+        assert e.source == "title_match"
+
+    def test_drops_malformed_doi(self):
+        assert _build_title_match_edges([ErratumTitleMatch(5, "")]) == []
