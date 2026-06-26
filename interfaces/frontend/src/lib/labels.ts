@@ -60,6 +60,43 @@ export const docTypePlural: Record<string, string> = {
 	media: 'Interventions média'
 };
 
+/** Familles de doc_types : un niveau grossier au-dessus du `doc_type` fin, pour grouper et filtrer
+ * les listes (distinguer les publications au sens strict des autres objets). Couvre exhaustivement
+ * l'enum `doc_type` ; l'ordre est celui d'affichage. Découpage de première intention, ajustable.
+ * Mémoires exclus des listes par ailleurs et thèses en cours invisibles → la famille académique
+ * s'intitule « Thèses » (ses membres visibles sont thèses + HDR). */
+export const docTypeFamilies: { key: string; label: string; types: string[] }[] = [
+	{
+		key: 'publications',
+		label: 'Publications',
+		types: ['article', 'conference_paper', 'book', 'book_chapter', 'review', 'data_paper']
+	},
+	{ key: 'preprints', label: 'Prépublications', types: ['preprint'] },
+	{ key: 'theses', label: 'Thèses', types: ['thesis', 'ongoing_thesis', 'hdr', 'memoir'] },
+	{ key: 'data', label: 'Données & logiciels', types: ['dataset', 'software', 'patent'] },
+	{
+		key: 'misc',
+		label: 'Annexes & divers',
+		types: [
+			'other',
+			'media',
+			'poster',
+			'report',
+			'erratum',
+			'retraction',
+			'peer_review',
+			'editorial',
+			'letter',
+			'book_review',
+			'proceedings'
+		]
+	}
+];
+/** Famille (clé) d'un `doc_type`, dérivée de `docTypeFamilies`. */
+export const docTypeFamilyOf: Record<string, string> = Object.fromEntries(
+	docTypeFamilies.flatMap((f) => f.types.map((t) => [t, f.key]))
+);
+
 /** Libellés FR des types de relation entre publications, lus depuis la publication courante
  * (sujet). Miroir de l'enum PG `relation_type` / `RelationType` du domain backend. */
 export const relationTypeLabel: Record<string, string> = {

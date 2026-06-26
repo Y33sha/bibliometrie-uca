@@ -9,7 +9,7 @@
 	import { SOURCE_ITEMS } from '$lib/filterItems';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import { oaLabelsMap } from '$lib/labels';
-	import { docTypeSingular, docTypePlural } from '$lib/labels';
+	import { docTypeSingular, docTypePlural, docTypeFamilies } from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
@@ -61,6 +61,7 @@
 		showAdminExclude = false,
 		apcMode = 'uca' as ApcMode,
 		perPage = 100,
+		restrictToPublications = false,
 		onExcludeAuthorship,
 	}: {
 		apiKey?: string;
@@ -88,6 +89,10 @@
 		apcMode?: ApcMode;
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
 		perPage?: number;
+		/** Par défaut, restreint la liste à la famille « Publications » (au sens strict) tant
+		 *  qu'aucun type n'est coché. Réservé à la liste générale ; les listes embarquées (journal,
+		 *  éditeur, personne…) restent permissives. L'utilisatrice élargit via la facet « Types ». */
+		restrictToPublications?: boolean;
 		onExcludeAuthorship?: (authorshipId: number, pubId: number) => void | boolean | Promise<void | boolean>;
 	} = $props();
 
@@ -400,6 +405,14 @@
 			if (restored.filterJournalName) filterJournalName = restored.filterJournalName as string;
 		}
 
+		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans
+		// l'URL, on pré-sélectionne la famille Publications. La sélection est réelle (et non un
+		// filtre caché), donc la facet « Types » la reflète ; cocher d'autres types ou « Tous »
+		// l'élargit.
+		if (restrictToPublications && selectedDocTypes.length === 0) {
+			selectedDocTypes = [...(docTypeFamilies.find((f) => f.key === 'publications')?.types ?? [])];
+		}
+
 		// Forcer l'affichage des colonnes liées aux filtres actifs
 		const needed: string[] = [];
 		if (selectedOa.length || selectedAccess.length) needed.push('oa', 'oa_status');
@@ -430,7 +443,7 @@
 
 <div class="toolbar toolbar-card toolbar-sticky">
 	<input type="search" placeholder="Rechercher par titre..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-	{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
+	{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
 	{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
 	{#if !hasFixedLab && col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
 	{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}

@@ -6,4 +6,4 @@
 	<title>Publications — Bibliométrie UCA</title>
 </svelte:head>
 
-<PublicationsListView />
+<PublicationsListView restrictToPublications />
