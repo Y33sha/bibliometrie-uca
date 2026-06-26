@@ -270,8 +270,4 @@
     padding: 20px;
     color: #888;
   }
-  .rh-check {
-    color: var(--success, #34a853);
-    margin-left: 4px;
-  }
 </style>
