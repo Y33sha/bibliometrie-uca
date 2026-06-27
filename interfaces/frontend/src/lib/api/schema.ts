@@ -3222,6 +3222,13 @@ export interface components {
             /** Groups */
             groups: components["schemas"]["DetachableIntruderGroupOut"][];
         };
+        /** DocTypeFacet */
+        DocTypeFacet: {
+            /** Value */
+            value: string;
+            /** Count */
+            count: number;
+        };
         /**
          * DoiPrefixInfo
          * @description Préfixe DOI rattaché à un éditeur (lecture seule, vient de la table `doi_prefixes`).
@@ -5716,6 +5723,8 @@ export interface components {
             oa_statuses: components["schemas"]["OaFacet"][];
             /** Apc */
             apc: components["schemas"]["ApcFacet"][];
+            /** Doc Types */
+            doc_types: components["schemas"]["DocTypeFacet"][];
         };
         /**
          * StatsSummary
@@ -6376,6 +6385,7 @@ export interface operations {
                 year?: string;
                 oa_status?: string;
                 has_apc?: string;
+                doc_type?: string;
                 page?: number;
                 per_page?: number;
                 search?: string;
@@ -6415,6 +6425,7 @@ export interface operations {
                 publisher_id?: number | null;
                 oa_status?: string;
                 has_apc?: string;
+                doc_type?: string;
                 page?: number;
                 per_page?: number;
                 search?: string;
@@ -6455,6 +6466,7 @@ export interface operations {
                 journal_id?: number | null;
                 oa_status?: string;
                 has_apc?: string;
+                doc_type?: string;
             };
             header?: never;
             path?: never;
@@ -6491,6 +6503,7 @@ export interface operations {
                 journal_id?: number | null;
                 oa_status?: string;
                 has_apc?: string;
+                doc_type?: string;
             };
             header?: never;
             path?: never;
@@ -6527,6 +6540,7 @@ export interface operations {
                 journal_id?: number | null;
                 oa_status?: string;
                 has_apc?: string;
+                doc_type?: string;
                 page?: number;
                 per_page?: number;
                 sort?: string;
@@ -6586,6 +6600,7 @@ export interface operations {
                 journal_id?: number | null;
                 oa_status?: string;
                 has_apc?: string;
+                doc_type?: string;
             };
             header?: never;
             path?: never;

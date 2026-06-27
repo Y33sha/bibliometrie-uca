@@ -7,7 +7,7 @@
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import { oaLabelsMap } from '$lib/labels';
+	import { oaLabelsMap, docTypePlural, docTypeFamilies } from '$lib/labels';
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
@@ -33,6 +33,7 @@
 	let selectedLabs: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
+	let selectedDocTypes: string[] = $state([]); // défaut = famille « Publications » (cf. onMount)
 	let search = $state('');
 	let publisherId: number | null = $state(null);
 	let publisherName = $state('');
@@ -130,6 +131,7 @@
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
+		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		if (publisherId) p.set('publisher_id', String(publisherId));
 		if (journalId) p.set('journal_id', String(journalId));
 		return p;
@@ -175,7 +177,7 @@
 	});
 
 	// --- Composable: facets ---
-	const facets = useFacets<'years' | 'labs' | 'oa' | 'apc'>({
+	const facets = useFacets<'years' | 'labs' | 'oa' | 'apc' | 'docTypes'>({
 		endpoint: '/api/stats/facets',
 		apiKey: 'stats-facets',
 		buildParams: chartParams,
@@ -184,6 +186,7 @@
 			labs: { type: 'labeled', apiKey: 'labs' },
 			oa: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
 			apc: { type: 'passthrough', apiKey: 'apc' },
+			docTypes: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
 		},
 	});
 
@@ -197,6 +200,7 @@
 			selectedLabs: { type: 'string_array', urlKey: 'lab_id' },
 			selectedOa: { type: 'string_array', urlKey: 'oa_status' },
 			selectedApc: { type: 'string_array', urlKey: 'has_apc' },
+			selectedDocTypes: { type: 'string_array', urlKey: 'doc_type' },
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 				journalId: { type: 'single', urlKey: 'journal_id' },
 				search: { type: 'single', urlKey: 'search' },
@@ -214,6 +218,7 @@
 			selectedLabs,
 			selectedOa,
 			selectedApc,
+			selectedDocTypes,
 			publisherId: publisherId ? String(publisherId) : '',
 			journalId: journalId ? String(journalId) : '',
 			search,
@@ -232,7 +237,7 @@
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (publisherId) { p.set('publisher_id', String(publisherId)); }
 		if (journalId) { p.set('journal_id', String(journalId)); }
-		p.set('doc_type', 'article,review');
+		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		return base + '/publications?' + p.toString();
 	});
 
@@ -310,10 +315,9 @@
 
 	async function loadChart() {
 		const p = chartParams();
-		p.set('measure', 'pub_count');
+		p.set('measure', measure);
 		p.set('group', 'year');
 		if (groupBy) p.set('group2', groupBy);
-		p.set('doc_type', 'article,review');
 		const res = await api<{ rows: Record<string, unknown>[] }>('/api/stats/pivot?' + p);
 		await tick();
 		if (yearChart) yearChart.destroy();
@@ -460,6 +464,7 @@
 		if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
 		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
+		if (restored.selectedDocTypes) selectedDocTypes = restored.selectedDocTypes as string[];
 		if (restored.publisherId) {
 			publisherId = parseInt(restored.publisherId as string);
 			try {
@@ -484,6 +489,12 @@
 		try {
 			pivotSchema = await api<components['schemas']['PivotSchemaResponse']>('/api/stats/pivot/schema');
 		} catch { pivotSchema = null; }
+
+		// Défaut du type de document : la famille « Publications » (même base que la liste des
+		// publications), sauf si l'URL en a restauré une sélection.
+		if (selectedDocTypes.length === 0) {
+			selectedDocTypes = [...(docTypeFamilies.find((f) => f.key === 'publications')?.types ?? [])];
+		}
 
 		// Load facets first, then apply default years if needed, then full refresh
 		await facets.load();
@@ -584,6 +595,9 @@
 	{/if}
 	{#if tab !== 'oa' || facetKeys.has('oa_voie')}
 		<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
+	{/if}
+	{#if tab !== 'oa' || facetKeys.has('doc_type')}
+		<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 	{/if}
 	{#if tab !== 'oa' || facetKeys.has('apc')}
 		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />

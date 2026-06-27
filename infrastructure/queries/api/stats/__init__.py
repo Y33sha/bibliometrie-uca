@@ -14,6 +14,7 @@ from sqlalchemy import Connection
 
 from application.ports.api.stats_queries import (
     ApcFacet,
+    DocTypeFacet,
     JournalStatsResponse,
     JournalStatsRow,
     LabFacet,
@@ -59,6 +60,7 @@ class PgStatsQueries(StatsQueries):
         years: list[int],
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
         search: str,
         page: int,
         per_page: int,
@@ -71,6 +73,7 @@ class PgStatsQueries(StatsQueries):
             years=years,
             oa_status=oa_status,
             has_apc=has_apc,
+            doc_types=doc_types,
             search=search,
             page=page,
             per_page=per_page,
@@ -93,6 +96,7 @@ class PgStatsQueries(StatsQueries):
         publisher_id: int | None,
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
         search: str,
         page: int,
         per_page: int,
@@ -106,6 +110,7 @@ class PgStatsQueries(StatsQueries):
             publisher_id=publisher_id,
             oa_status=oa_status,
             has_apc=has_apc,
+            doc_types=doc_types,
             search=search,
             page=page,
             per_page=per_page,
@@ -129,6 +134,7 @@ class PgStatsQueries(StatsQueries):
         journal_id: int | None,
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
         page: int,
         per_page: int,
         sort: str,
@@ -142,6 +148,7 @@ class PgStatsQueries(StatsQueries):
             journal_id=journal_id,
             oa_status=oa_status,
             has_apc=has_apc,
+            doc_types=doc_types,
             page=page,
             per_page=per_page,
             sort=sort,
@@ -164,6 +171,7 @@ class PgStatsQueries(StatsQueries):
         journal_id: int | None,
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
     ) -> list[YearStatsRow]:
         rows = _stats_by_year(
             self._conn,
@@ -174,6 +182,7 @@ class PgStatsQueries(StatsQueries):
             journal_id=journal_id,
             oa_status=oa_status,
             has_apc=has_apc,
+            doc_types=doc_types,
         )
         return [YearStatsRow(**r) for r in rows]
 
@@ -187,6 +196,7 @@ class PgStatsQueries(StatsQueries):
         journal_id: int | None,
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
     ) -> StatsSummary:
         return StatsSummary(
             **_stats_summary(
@@ -198,6 +208,7 @@ class PgStatsQueries(StatsQueries):
                 journal_id=journal_id,
                 oa_status=oa_status,
                 has_apc=has_apc,
+                doc_types=doc_types,
             )
         )
 
@@ -265,6 +276,7 @@ class PgStatsQueries(StatsQueries):
         journal_id: int | None,
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
     ) -> StatsFacetsResponse:
         data = _stats_facets(
             self._conn,
@@ -275,12 +287,14 @@ class PgStatsQueries(StatsQueries):
             journal_id=journal_id,
             oa_status=oa_status,
             has_apc=has_apc,
+            doc_types=doc_types,
         )
         return StatsFacetsResponse(
             years=[YearFacet(**y) for y in data["years"]],
             labs=[LabFacet(**lab) for lab in data["labs"]],
             oa_statuses=[OaFacet(**o) for o in data["oa_statuses"]],
             apc=[ApcFacet(**a) for a in data["apc"]],
+            doc_types=[DocTypeFacet(**d) for d in data["doc_types"]],
         )
 
 

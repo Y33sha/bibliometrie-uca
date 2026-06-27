@@ -31,6 +31,7 @@ def publisher_stats(
     year: str = Query(""),
     oa_status: str = Query(""),
     has_apc: str = Query(""),
+    doc_type: str = Query(""),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
@@ -47,6 +48,7 @@ def publisher_stats(
         years=parse_int_csv(year),
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=parse_str_csv(doc_type),
         search=search,
         page=page,
         per_page=per_page,
@@ -61,6 +63,7 @@ def journal_stats(
     publisher_id: int | None = Query(None),
     oa_status: str = Query(""),
     has_apc: str = Query(""),
+    doc_type: str = Query(""),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     search: str = Query(""),
@@ -75,6 +78,7 @@ def journal_stats(
         publisher_id=publisher_id,
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=parse_str_csv(doc_type),
         search=search,
         page=page,
         per_page=per_page,
@@ -90,6 +94,7 @@ def stats_by_year(
     journal_id: int | None = Query(None),
     oa_status: str = Query(""),
     has_apc: str = Query(""),
+    doc_type: str = Query(""),
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> list[YearStatsRow]:
     """Ventilation par année (pour les graphiques)."""
@@ -101,6 +106,7 @@ def stats_by_year(
         journal_id=journal_id,
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=parse_str_csv(doc_type),
     )
 
 
@@ -112,6 +118,7 @@ def stats_summary(
     journal_id: int | None = Query(None),
     oa_status: str = Query(""),
     has_apc: str = Query(""),
+    doc_type: str = Query(""),
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> StatsSummary:
     """Agrégats globaux (total, taux OA, total APC, etc.) pour le jeu de filtres."""
@@ -123,6 +130,7 @@ def stats_summary(
         journal_id=journal_id,
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=parse_str_csv(doc_type),
     )
 
 
@@ -134,6 +142,7 @@ def stats_labs(
     journal_id: int | None = Query(None),
     oa_status: str = Query(""),
     has_apc: str = Query(""),
+    doc_type: str = Query(""),
     page: int = Query(1, ge=1),
     per_page: int = Query(50, ge=10, le=200),
     sort: str = Query("-pubs"),
@@ -148,6 +157,7 @@ def stats_labs(
         journal_id=journal_id,
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=parse_str_csv(doc_type),
         page=page,
         per_page=per_page,
         sort=sort,
@@ -170,6 +180,7 @@ def stats_facets(
     journal_id: int | None = Query(None),
     oa_status: str = Query(""),
     has_apc: str = Query(""),
+    doc_type: str = Query(""),
     queries: StatsQueries = Depends(stats_queries_sync),
 ) -> StatsFacetsResponse:
     """Facettes dynamiques : années, labos, oa_status, apc."""
@@ -181,6 +192,7 @@ def stats_facets(
         journal_id=journal_id,
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=parse_str_csv(doc_type),
     )
 
 
