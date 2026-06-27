@@ -53,6 +53,16 @@ class TestPivotEngine:
         by_year = {r["year"]: float(r["value"]) for r in res["rows"]}
         assert by_year == {2024: 50.0, 2023: 100.0}
 
+    def test_doc_type_family_grouping(self, sa_sync_conn):
+        # Le découpage par type se fait au grain « famille » (lisible), pas par type fin.
+        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="article")  # publications
+        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="book")  # publications
+        _pub(sa_sync_conn, oa_status="closed", sources="{hal}", doc_type="thesis")  # theses
+
+        res = _piv(sa_sync_conn, "pub_count", ["doc_type_family"], doc_types=())
+        by_family = {r["doc_type_family"]: r["value"] for r in res["rows"]}
+        assert by_family == {"publications": 2, "theses": 1}
+
     def test_zero_groups_returns_single_total(self, sa_sync_conn):
         _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
         _pub(sa_sync_conn, oa_status="closed", sources="{hal}")
