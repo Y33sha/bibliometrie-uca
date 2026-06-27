@@ -62,11 +62,13 @@
 	let pivotSchema = $state<components['schemas']['PivotSchemaResponse'] | null>(null);
 	let groupBy = $state('oa_access'); // dimension de découpage (série empilée)
 	let legendItems: { label: string; color: string }[] = $state([]);
-	let measure = $state('pub_count'); // mesure courante
-	const isRatio = $derived(
-		pivotSchema?.measures.find((m) => m.key === measure)?.is_ratio ?? false
-	);
-	// Dimensions effondrées par la mesure-ratio courante (retirées des groupements et des facettes).
+	// Le graphe par année est toujours le simple compte. La mesure-ratio « % d'accès ouvert » est
+	// réservée aux classements d'entités (labo / revue / éditeur les plus ouverts), pas au graphe
+	// par année (où le % figure déjà dans les barres empilées) — donc pas de sélecteur de mesure ici.
+	const measure = 'pub_count';
+	const isRatio = false; // le graphe par année est toujours en barres (compte) ; la mesure-ratio
+	// % accès ouvert reste dans le moteur pour les futurs classements d'entités (labo/revue).
+	// Dimensions effondrées par une mesure-ratio (inerte tant que la mesure est le simple compte).
 	const collapsed = $derived(
 		new Set(pivotSchema?.measures.find((m) => m.key === measure)?.collapses ?? [])
 	);
@@ -146,15 +148,6 @@
 		syncUrl();
 		if (cleared) refresh();
 		else loadChart();
-	}
-
-	function onMeasureChange() {
-		// Une mesure-ratio effondre sa dimension : on ne peut plus la grouper ni la filtrer.
-		const coll = pivotSchema?.measures.find((m) => m.key === measure)?.collapses ?? [];
-		if (groupBy && coll.includes(groupBy)) groupBy = '';
-		if (coll.includes('oa_voie') && selectedOa.length) selectedOa = [];
-		syncUrl();
-		refresh();
 	}
 
 	// --- Filter params (shared by all loaders) ---
@@ -237,7 +230,6 @@
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 				journalId: { type: 'single', urlKey: 'journal_id' },
 				search: { type: 'single', urlKey: 'search' },
-			measure: { type: 'single', urlKey: 'measure', defaultValue: 'pub_count' },
 			groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'oa_access' },
 			page: { type: 'page', urlKey: 'page' },
 			labPage: { type: 'page', urlKey: 'lab_page' },
@@ -256,7 +248,6 @@
 			publisherId: publisherId ? String(publisherId) : '',
 			journalId: journalId ? String(journalId) : '',
 			search,
-			measure,
 			groupBy,
 			page: pubFetch.page,
 			labPage: labFetch.page,
@@ -362,30 +353,22 @@
 		const years = [...new Set(rows.map((r) => Number(r.year)))].sort((a, b) => a - b);
 		const cs = getComputedStyle(document.documentElement);
 		const values = groupBy ? orderedValues(rows) : ['__all__'];
-		const measureLabel = pivotSchema?.measures.find((m) => m.key === measure)?.label ?? '';
-		const datasets = values.map((v, i) => {
-			const color = groupBy ? dimColor(v, i, cs) : cs.getPropertyValue('--accent').trim();
-			return {
-				label: groupBy ? dimLabel(v) : measureLabel,
-				data: years.map((y) => {
-					const row = rows.find(
-						(r) => Number(r.year) === y && (!groupBy || String(r[groupBy]) === v)
-					);
-					const val = row && row.value != null ? Number(row.value) : null;
-					return isRatio ? val : (val ?? 0);
-				}),
-				backgroundColor: color,
-				borderColor: color,
-				fill: false,
-				tension: 0.3,
-				barPercentage: 0.5,
-				categoryPercentage: 0.7
-			};
-		});
+		const datasets = values.map((v, i) => ({
+			label: groupBy ? dimLabel(v) : 'Publications',
+			data: years.map((y) => {
+				const row = rows.find(
+					(r) => Number(r.year) === y && (!groupBy || String(r[groupBy]) === v)
+				);
+				return row ? Number(row.value) : 0;
+			}),
+			backgroundColor: groupBy ? dimColor(v, i, cs) : cs.getPropertyValue('--accent').trim(),
+			barPercentage: 0.5,
+			categoryPercentage: 0.7
+		}));
 		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
 
 		yearChart = new Chart(chartCanvas, {
-			type: isRatio ? 'line' : 'bar',
+			type: 'bar',
 			plugins: [whiteBgPlugin],
 			data: {
 				labels: years,
@@ -529,7 +512,6 @@
 			} catch { journalName = `#${journalId}`; }
 		}
 		if (restored.search) search = restored.search as string;
-		if (restored.measure !== undefined) measure = restored.measure as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.page) pubFetch.page = restored.page as number;
 		if (restored.labPage) labFetch.page = restored.labPage as number;
@@ -653,14 +635,6 @@
 		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
 	{/if}
 	{#if tab === 'oa' && pivotSchema}
-		<label class="groupby">
-			Mesure&nbsp;:
-			<select bind:value={measure} onchange={onMeasureChange}>
-				{#each pivotSchema.measures as m (m.key)}
-					<option value={m.key}>{m.label}</option>
-				{/each}
-			</select>
-		</label>
 		<label class="groupby">
 			Découpage&nbsp;:
 			<select bind:value={groupBy} onchange={onGroupByChange}>
