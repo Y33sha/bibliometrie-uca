@@ -107,9 +107,9 @@ DIMENSIONS: dict[str, Dimension] = {
         "high",
         ordinal=False,
         multiplies=True,
-        groupable=False,
+        groupable=True,
         filterable=True,
-    ),
+    ),  # forte cardinalité : axe de comparaison (top N + « Autres »), pas de groupement primaire
     "apc": Dimension(
         "apc", "APC", "low", ordinal=False, multiplies=False, groupable=False, filterable=True
     ),

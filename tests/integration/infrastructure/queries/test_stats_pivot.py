@@ -54,6 +54,15 @@ class TestPivotEngine:
         by_family = {r["doc_type_family"]: r["value"] for r in res["rows"]}
         assert by_family == {"publications": 2, "theses": 1}
 
+    def test_group_by_lab_executes(self, sa_sync_conn):
+        # Le groupement par laboratoire compose une requête valide (jointures de rattachement).
+        # Smoke test : on vérifie que la requête s'exécute et renvoie la forme attendue, sans
+        # dépendre des matviews de rattachement peuplées.
+        _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
+        res = _piv(sa_sync_conn, "pub_count", ["lab"])
+        assert "rows" in res
+        assert res["groups"] == ["lab"]
+
     def test_zero_groups_returns_single_total(self, sa_sync_conn):
         _pub(sa_sync_conn, oa_status="gold", sources="{hal}")
         _pub(sa_sync_conn, oa_status="closed", sources="{hal}")
