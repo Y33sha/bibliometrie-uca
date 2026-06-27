@@ -501,16 +501,6 @@ def _overlap_sets(conn: Connection, sql: str, ids: list[int]) -> dict[int, set[i
     return out
 
 
-def _pair_tier(overlaps: dict[str, int]) -> str:
-    """Force du rapprochement : un réseau de collaboration commun (co-auteurs ou publication
-    co-signée) prouve le doublon ; labo/revue seuls corroborent faiblement ; rien → homonyme."""
-    if overlaps["coauthors"] > 0 or overlaps["shared_pubs"] > 0:
-        return "network"
-    if overlaps["labs"] > 0 or overlaps["journals"] > 0:
-        return "weak"
-    return "homonym"
-
-
 def _name_duplicate_candidates(conn: Connection) -> list[tuple[int, int]]:
     """Paires de personnes aux noms compatibles (union des requêtes larges, resserrée par tokens).
     Étape la moins chère : sert le badge sans charger les recouvrements de réseau."""
@@ -573,7 +563,6 @@ def name_duplicates(conn: Connection, *, page: int, per_page: int) -> dict[str, 
             "person_a": persons[id_a],
             "person_b": persons[id_b],
             "overlaps": overlaps,
-            "tier": _pair_tier(overlaps),
         }
         for id_a, id_b, overlaps in page_pairs
         if id_a in persons and id_b in persons

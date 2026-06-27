@@ -416,14 +416,12 @@ class OverlapCountsOut(BaseModel):
 
 
 class NameDuplicatePairOut(BaseModel):
-    """Deux personnes aux noms compatibles, avec leurs recouvrements et la force du rapprochement
-    (`network` = réseau de collaboration commun → doublon probable ; `weak` = labo/revue seuls ;
-    `homonym` = réseaux disjoints → homonyme probable)."""
+    """Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun
+    (co-auteurs, publications co-signées) signe un doublon ; des réseaux disjoints, un homonyme."""
 
     person_a: IdentifierConflictPersonOut
     person_b: IdentifierConflictPersonOut
     overlaps: OverlapCountsOut
-    tier: Literal["network", "weak", "homonym"]
 
 
 class NameDuplicatesResponse(BaseModel):
