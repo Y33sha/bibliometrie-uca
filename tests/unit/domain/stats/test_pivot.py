@@ -3,7 +3,7 @@
 import pytest
 
 from domain.errors import ValidationError
-from domain.stats.pivot import DIMENSIONS, MEASURES, grain_multiplies, validate_pivot
+from domain.stats.pivot import DIMENSIONS, MEASURES, Dimension, grain_multiplies, validate_pivot
 
 
 def test_validate_returns_measure_and_dimensions():
@@ -34,6 +34,8 @@ def test_validate_rejects_repeated_group():
 
 
 def test_grain_multiplies_only_for_multiplying_dimensions():
-    assert grain_multiplies([DIMENSIONS["source"]]) is True
+    # Aucune dimension du registre actuel ne démultiplie ; on en construit une (cas labo/sujet à venir).
+    multiplying = Dimension("lab", "Laboratoire", "high", ordinal=False, multiplies=True)
     assert grain_multiplies([DIMENSIONS["year"], DIMENSIONS["oa_access"]]) is False
-    assert grain_multiplies([DIMENSIONS["year"], DIMENSIONS["source"]]) is True
+    assert grain_multiplies([multiplying]) is True
+    assert grain_multiplies([DIMENSIONS["year"], multiplying]) is True

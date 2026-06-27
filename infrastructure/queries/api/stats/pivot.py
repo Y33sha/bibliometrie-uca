@@ -38,11 +38,9 @@ _DIM_EXPR: dict[str, str] = {
     ),
     "oa_voie": "p.oa_status::text",
     "doc_type": "p.doc_type::text",
-    "source": "src.source::text",
 }
-_DIM_JOIN: dict[str, str] = {
-    "source": "CROSS JOIN unnest(p.sources) AS src(source)",
-}
+# Jointures supplémentaires par dimension (vide tant qu'aucune dimension ne sort de `publications`).
+_DIM_JOIN: dict[str, str] = {}
 _MEASURE_AGG: dict[str, str] = {
     "pub_count": "COUNT(DISTINCT p.id)",
     "pct_open": (

@@ -44,16 +44,6 @@ class TestPivotEngine:
         by_access = {r["oa_access"]: r["value"] for r in res["rows"]}
         assert by_access == {"ouvert": 2, "ferme": 1}
 
-    def test_source_dimension_multiplies_without_overcount(self, sa_sync_conn):
-        # 3 publications, mais une signe deux sources : chaque source compte la publi une fois.
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal,openalex}")
-        _pub(sa_sync_conn, oa_status="closed", sources="{hal}")
-        _pub(sa_sync_conn, oa_status="gold", sources="{openalex}")
-
-        res = _piv(sa_sync_conn, "pub_count", ["source"])
-        by_source = {r["source"]: r["value"] for r in res["rows"]}
-        assert by_source == {"hal": 2, "openalex": 2}
-
     def test_pct_open_ratio(self, sa_sync_conn):
         _pub(sa_sync_conn, oa_status="gold", sources="{hal}", year=2024)
         _pub(sa_sync_conn, oa_status="closed", sources="{hal}", year=2024)
