@@ -157,9 +157,6 @@ class PivotDimensionOut(BaseModel):
 class PivotMeasureOut(BaseModel):
     key: str
     label: str
-    is_ratio: bool
-    # Dimensions qu'une mesure-ratio rend contradictoires (retirées des groupements et facettes).
-    collapses: list[str]
 
 
 class PivotSchemaResponse(BaseModel):

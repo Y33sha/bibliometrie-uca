@@ -4962,10 +4962,6 @@ export interface components {
             key: string;
             /** Label */
             label: string;
-            /** Is Ratio */
-            is_ratio: boolean;
-            /** Collapses */
-            collapses: string[];
         };
         /**
          * PivotResponse

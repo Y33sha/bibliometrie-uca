@@ -44,15 +44,6 @@ class TestPivotEngine:
         by_access = {r["oa_access"]: r["value"] for r in res["rows"]}
         assert by_access == {"ouvert": 2, "ferme": 1}
 
-    def test_pct_open_ratio(self, sa_sync_conn):
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", year=2024)
-        _pub(sa_sync_conn, oa_status="closed", sources="{hal}", year=2024)
-        _pub(sa_sync_conn, oa_status="gold", sources="{hal}", year=2023)
-
-        res = _piv(sa_sync_conn, "pct_open", ["year"])
-        by_year = {r["year"]: float(r["value"]) for r in res["rows"]}
-        assert by_year == {2024: 50.0, 2023: 100.0}
-
     def test_doc_type_family_grouping(self, sa_sync_conn):
         # Le découpage par type se fait au grain « famille » (lisible), pas par type fin.
         _pub(sa_sync_conn, oa_status="gold", sources="{hal}", doc_type="article")  # publications
