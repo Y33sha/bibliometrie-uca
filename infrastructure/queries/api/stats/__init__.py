@@ -20,6 +20,10 @@ from application.ports.api.stats_queries import (
     LabStatsResponse,
     LabStatsRow,
     OaFacet,
+    PivotDimensionOut,
+    PivotMeasureOut,
+    PivotResponse,
+    PivotSchemaResponse,
     PublisherStatsResponse,
     PublisherStatsRow,
     StatsFacetsResponse,
@@ -28,8 +32,10 @@ from application.ports.api.stats_queries import (
     YearFacet,
     YearStatsRow,
 )
+from domain.stats.pivot import DIMENSIONS, MEASURES
 from infrastructure.queries.api.stats.journals import journal_stats as _journal_stats
 from infrastructure.queries.api.stats.labs import stats_labs as _stats_labs
+from infrastructure.queries.api.stats.pivot import run_pivot as _run_pivot
 from infrastructure.queries.api.stats.publishers import publisher_stats as _publisher_stats
 from infrastructure.queries.api.stats.summary import (
     available_years as _available_years,
@@ -197,6 +203,50 @@ class PgStatsQueries(StatsQueries):
 
     def available_years(self) -> list[int]:
         return _available_years(self._conn)
+
+    def pivot_schema(self) -> PivotSchemaResponse:
+        return PivotSchemaResponse(
+            dimensions=[
+                PivotDimensionOut(
+                    key=d.key, label=d.label, cardinality=d.cardinality, ordinal=d.ordinal
+                )
+                for d in DIMENSIONS.values()
+            ],
+            measures=[
+                PivotMeasureOut(key=m.key, label=m.label, is_ratio=m.is_ratio)
+                for m in MEASURES.values()
+            ],
+        )
+
+    def pivot(
+        self,
+        *,
+        measure: str,
+        groups: list[str],
+        apc_structure_ids: list[int],
+        lab_ids: list[int],
+        years: list[int],
+        publisher_id: int | None,
+        journal_id: int | None,
+        oa_status: str,
+        has_apc: str,
+        doc_types: list[str],
+    ) -> PivotResponse:
+        return PivotResponse.model_validate(
+            _run_pivot(
+                self._conn,
+                measure=measure,
+                groups=groups,
+                apc_structure_ids=apc_structure_ids,
+                lab_ids=lab_ids,
+                years=years,
+                publisher_id=publisher_id,
+                journal_id=journal_id,
+                oa_status=oa_status,
+                has_apc=has_apc,
+                doc_types=doc_types,
+            )
+        )
 
     def stats_facets(
         self,

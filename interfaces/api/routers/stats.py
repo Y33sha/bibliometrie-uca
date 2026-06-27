@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, Query
 from application.ports.api.stats_queries import (
     JournalStatsResponse,
     LabStatsResponse,
+    PivotResponse,
+    PivotSchemaResponse,
     PublisherStatsResponse,
     StatsFacetsResponse,
     StatsQueries,
@@ -17,7 +19,7 @@ from interfaces.api.deps import (
     get_apc_structure_ids_sync,
     stats_queries_sync,
 )
-from interfaces.api.filters import parse_int_csv
+from interfaces.api.filters import parse_int_csv, parse_str_csv
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -179,4 +181,43 @@ def stats_facets(
         journal_id=journal_id,
         oa_status=oa_status,
         has_apc=has_apc,
+    )
+
+
+@router.get("/api/stats/pivot/schema", response_model=PivotSchemaResponse)
+def pivot_schema(
+    queries: StatsQueries = Depends(stats_queries_sync),
+) -> PivotSchemaResponse:
+    """Vocabulaire du pivot (dimensions groupables, mesures) dont l'interface tire ses sélecteurs."""
+    return queries.pivot_schema()
+
+
+@router.get("/api/stats/pivot", response_model=PivotResponse)
+def pivot(
+    measure: str = Query("pub_count"),
+    group: str = Query(""),
+    group2: str = Query(""),
+    lab_id: str = Query(""),
+    year: str = Query(""),
+    publisher_id: int | None = Query(None),
+    journal_id: int | None = Query(None),
+    oa_status: str = Query(""),
+    has_apc: str = Query(""),
+    doc_type: str = Query(""),
+    queries: StatsQueries = Depends(stats_queries_sync),
+) -> PivotResponse:
+    """Agrégation générique : `measure` ventilée selon `group` (primaire) et `group2` (secondaire),
+    sous les filtres. Clés validées contre le registre (400 si inconnues)."""
+    groups = [g for g in (group, group2) if g]
+    return queries.pivot(
+        measure=measure,
+        groups=groups,
+        apc_structure_ids=get_apc_structure_ids_sync(),
+        lab_ids=parse_int_csv(lab_id),
+        years=parse_int_csv(year),
+        publisher_id=publisher_id,
+        journal_id=journal_id,
+        oa_status=oa_status,
+        has_apc=has_apc,
+        doc_types=parse_str_csv(doc_type),
     )

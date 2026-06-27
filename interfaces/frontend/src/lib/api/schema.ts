@@ -259,6 +259,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/pivot/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pivot Schema
+         * @description Vocabulaire du pivot (dimensions groupables, mesures) dont l'interface tire ses sélecteurs.
+         */
+        get: operations["pivot_schema_api_stats_pivot_schema_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stats/pivot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pivot
+         * @description Agrégation générique : `measure` ventilée selon `group` (primaire) et `group2` (secondaire),
+         *     sous les filtres. Clés validées contre le registre (400 si inconnues).
+         */
+        get: operations["pivot_api_stats_pivot_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publications/facets": {
         parameters: {
             query?: never;
@@ -4887,6 +4928,57 @@ export interface components {
             phases_total: number;
         };
         /**
+         * PivotDimensionOut
+         * @description Métadonnée d'une dimension groupable, lue par les sélecteurs de l'interface.
+         */
+        PivotDimensionOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Cardinality
+             * @enum {string}
+             */
+            cardinality: "low" | "high";
+            /** Ordinal */
+            ordinal: boolean;
+        };
+        /** PivotMeasureOut */
+        PivotMeasureOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Is Ratio */
+            is_ratio: boolean;
+        };
+        /**
+         * PivotResponse
+         * @description Résultat d'une agrégation. Chaque ligne porte la valeur de chaque groupement (clés =
+         *     `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul).
+         */
+        PivotResponse: {
+            /** Measure */
+            measure: string;
+            /** Groups */
+            groups: string[];
+            /** Rows */
+            rows: {
+                [key: string]: string | number | null;
+            }[];
+        };
+        /**
+         * PivotSchemaResponse
+         * @description Vocabulaire du pivot exposé à l'interface (sans liaison SQL).
+         */
+        PivotSchemaResponse: {
+            /** Dimensions */
+            dimensions: components["schemas"]["PivotDimensionOut"][];
+            /** Measures */
+            measures: components["schemas"]["PivotMeasureOut"][];
+        };
+        /**
          * PubApcPayment
          * @description Détail d'un paiement APC (une ligne d'`apc` dans la liste).
          */
@@ -6501,6 +6593,66 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StatsFacetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pivot_schema_api_stats_pivot_schema_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PivotSchemaResponse"];
+                };
+            };
+        };
+    };
+    pivot_api_stats_pivot_get: {
+        parameters: {
+            query?: {
+                measure?: string;
+                group?: string;
+                group2?: string;
+                lab_id?: string;
+                year?: string;
+                publisher_id?: number | null;
+                journal_id?: number | null;
+                oa_status?: string;
+                has_apc?: string;
+                doc_type?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PivotResponse"];
                 };
             };
             /** @description Validation Error */
