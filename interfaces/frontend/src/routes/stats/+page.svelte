@@ -57,6 +57,9 @@
 	let primaryBy = $state('oa_access'); // groupement primaire (abscisse) : une catégorie, jamais l'année
 	let groupBy = $state('year'); // comparaison : série secondaire empilée (facultative), p. ex. l'année
 	let chartMode = $state<'absolu' | 'part'>('absolu'); // part = empilement aplati à 100 %
+	let chartPage = $state(1); // page de l'axe de comparaison à forte cardinalité (laboratoires)
+	let chartCatTotal = $state(0); // total des valeurs sur cet axe (0 si faible cardinalité)
+	const CHART_PAGE_SIZE = 15;
 	let legendItems: { label: string; color: string }[] = $state([]);
 	// Le graphe par année est toujours le simple compte de publications (barres empilées). Le taux
 	// d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
@@ -141,6 +144,7 @@
 		onAxisChange(groupBy);
 	}
 	function onAxisChange(dim: string) {
+		chartPage = 1; // changer d'axe repart de la première page
 		// Comparer/grouper par une dimension filtrable efface son filtre actif (sinon il resterait, caché).
 		let cleared = false;
 		if (dim === 'oa_voie' && selectedOa.length > 0) { selectedOa = []; cleared = true; }
@@ -233,6 +237,7 @@
 			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'oa_access' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
+				chartPage: { type: 'page', urlKey: 'chart_page' },
 			page: { type: 'page', urlKey: 'page' },
 			labPage: { type: 'page', urlKey: 'lab_page' },
 		},
@@ -253,6 +258,7 @@
 			primaryBy,
 			groupBy,
 			chartMode,
+			chartPage,
 			page: pubFetch.page,
 			labPage: labFetch.page,
 		}));
@@ -358,14 +364,16 @@
 		const stackDim = comparison ? primaryBy : '';
 		const cs = getComputedStyle(document.documentElement);
 
-		// Abscisse : à forte cardinalité (laboratoire), on ne garde que les N premières valeurs (par
-		// total décroissant) et on regroupe le reste dans « Autres » — sinon l'axe est illisible.
-		const HIGH_CARD_TOP_N = 15;
+		// Abscisse : à forte cardinalité (laboratoire), on pagine les valeurs (triées par total
+		// décroissant) au lieu de les tronquer — l'axe reste lisible, le détail reste atteignable.
 		const highCard = dimCard(xDim) === 'high';
 		const allCats = orderedValues(xDim, rows);
-		const cats = highCard ? allCats.slice(0, HIGH_CARD_TOP_N) : allCats;
-		const autres = highCard ? allCats.slice(HIGH_CARD_TOP_N) : [];
-		const labels = [...cats.map((c) => dimLabel(xDim, c)), ...(autres.length ? ['Autres'] : [])];
+		chartCatTotal = highCard ? allCats.length : 0;
+		if (highCard && (chartPage - 1) * CHART_PAGE_SIZE >= allCats.length) chartPage = 1;
+		const cats = highCard
+			? allCats.slice((chartPage - 1) * CHART_PAGE_SIZE, chartPage * CHART_PAGE_SIZE)
+			: allCats;
+		const labels = cats.map((c) => dimLabel(xDim, c));
 
 		const cell = (cv: string, sv: string) => {
 			const row = rows.find((r) => String(r[xDim]) === cv && (!stackDim || String(r[stackDim]) === sv));
@@ -374,13 +382,10 @@
 		const series = stackDim ? orderedValues(stackDim, rows) : ['__all__'];
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : 'Publications',
-			data: [
-				...cats.map((cv) => cell(cv, sv)),
-				...(autres.length ? [autres.reduce((s, cv) => s + cell(cv, sv), 0)] : [])
-			],
+			data: cats.map((cv) => cell(cv, sv)),
 			backgroundColor: stackDim ? dimColor(stackDim, sv, i, cs) : cs.getPropertyValue('--accent').trim(),
-			barPercentage: 0.5,
-			categoryPercentage: 0.7
+			barPercentage: 0.9,
+			categoryPercentage: 0.8
 		}));
 		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
 
@@ -539,6 +544,7 @@
 		if (restored.primaryBy !== undefined) primaryBy = restored.primaryBy as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
+		if (restored.chartPage) chartPage = restored.chartPage as number;
 		if (restored.page) pubFetch.page = restored.page as number;
 		if (restored.labPage) labFetch.page = restored.labPage as number;
 
@@ -693,6 +699,13 @@
 		<canvas bind:this={chartCanvas}></canvas>
 		<button type="button" class="chart-export" onclick={exportChartPng}>Export PNG</button>
 	</div>
+	{#if chartCatTotal > CHART_PAGE_SIZE}
+		<Pagination
+			page={chartPage}
+			pages={Math.ceil(chartCatTotal / CHART_PAGE_SIZE)}
+			onchange={(p) => { chartPage = p; syncUrl(); loadChart(); }}
+		/>
+	{/if}
 {/if}
 
 <!-- Tab: Publishers -->
