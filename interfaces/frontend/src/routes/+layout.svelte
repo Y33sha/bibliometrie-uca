@@ -77,10 +77,8 @@
           <a href="{base}/admin/countries" class:active={isActive("/admin/countries")}>Pays</a>
         </div>
       </div>
-      <a
-        href="{base}/admin/duplicates"
-        class="nav-link"
-        class:active={isDuplicates}>Doublons publications</a
+      <a href="{base}/admin/duplicates" class="nav-link" class:active={isDuplicates}
+        >Dédoublonnage</a
       >
       <a href="{base}/stats" class="nav-link nav-switch-link">Public</a>
       <button class="nav-link nav-switch-link" onclick={logout}>Déconnexion</button>
