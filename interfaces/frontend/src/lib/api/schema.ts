@@ -179,26 +179,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stats Summary
-         * @description Agrégats globaux (total, taux OA, total APC, etc.) pour le jeu de filtres.
-         */
-        get: operations["stats_summary_api_stats_summary_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/stats/labs": {
         parameters: {
             query?: never;
@@ -5723,34 +5703,6 @@ export interface components {
             doc_types: components["schemas"]["DocTypeFacet"][];
         };
         /**
-         * StatsSummary
-         * @description Totaux globaux pour la page stats.
-         *
-         *     Pas de champ `diamond` — le résumé remonte gold/hybrid/green/bronze/closed/unknown uniquement (diamond non distingué côté summary SQL).
-         */
-        StatsSummary: {
-            /** Total Pubs */
-            total_pubs: number;
-            /** Gold */
-            gold: number;
-            /** Hybrid */
-            hybrid: number;
-            /** Green */
-            green: number;
-            /** Bronze */
-            bronze: number;
-            /** Embargoed */
-            embargoed: number;
-            /** Closed */
-            closed: number;
-            /** Unknown */
-            unknown: number;
-            /** Publisher Count */
-            publisher_count: number;
-            /** Journal Count */
-            journal_count: number;
-        };
-        /**
          * StatusResponse
          * @description Réponse générique : `{status: str}` (mutations sans corps utile).
          */
@@ -6477,43 +6429,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["YearStatsRow"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    stats_summary_api_stats_summary_get: {
-        parameters: {
-            query?: {
-                lab_id?: string;
-                year?: string;
-                publisher_id?: number | null;
-                journal_id?: number | null;
-                oa_status?: string;
-                has_apc?: string;
-                doc_type?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatsSummary"];
                 };
             };
             /** @description Validation Error */
