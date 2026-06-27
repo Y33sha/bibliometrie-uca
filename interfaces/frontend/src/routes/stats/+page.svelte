@@ -62,40 +62,28 @@
 	let pivotSchema = $state<components['schemas']['PivotSchemaResponse'] | null>(null);
 	let groupBy = $state('oa_access'); // dimension de découpage (série empilée)
 	let legendItems: { label: string; color: string }[] = $state([]);
-	// Le graphe par année est toujours le simple compte. La mesure-ratio « % d'accès ouvert » est
-	// réservée aux classements d'entités (labo / revue / éditeur les plus ouverts), pas au graphe
-	// par année (où le % figure déjà dans les barres empilées) — donc pas de sélecteur de mesure ici.
+	// Le graphe par année est toujours le simple compte de publications (barres empilées). Le taux
+	// d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
 	const measure = 'pub_count';
-	const isRatio = false; // le graphe par année est toujours en barres (compte) ; la mesure-ratio
-	// % accès ouvert reste dans le moteur pour les futurs classements d'entités (labo/revue).
-	// Dimensions effondrées par une mesure-ratio (inerte tant que la mesure est le simple compte).
-	const collapsed = $derived(
-		new Set(pivotSchema?.measures.find((m) => m.key === measure)?.collapses ?? [])
-	);
 
 	// Dimensions graphables proposées au sélecteur « Découpage » (groupables, faible cardinalité,
-	// hors année, et non effondrées par la mesure courante).
+	// hors année).
 	const pivotDims = $derived(
 		pivotSchema
 			? pivotSchema.dimensions.filter(
-					(d) =>
-						d.groupable &&
-						d.cardinality === 'low' &&
-						d.key !== 'year' &&
-						!collapsed.has(d.key)
+					(d) => d.groupable && d.cardinality === 'low' && d.key !== 'year'
 				)
 			: []
 	);
 
 	// Barre de facettes dérivée du registre (cf. domain `applicable_facets`) : ensemble des dimensions
-	// filtrables, moins celles effondrées par une mesure-ratio et moins un groupement catégoriel
-	// (l'année, ordinale, reste filtrable). Mirroir TS des règles G/M.
+	// filtrables, moins un groupement catégoriel (l'année, ordinale, reste filtrable). Miroir TS de la règle G.
 	const facetKeys = $derived.by(() => {
 		if (!pivotSchema) return new Set(['year', 'lab', 'oa_voie', 'apc']);
 		const grouped = new Set(['year', groupBy].filter(Boolean));
 		const out = new Set<string>();
 		for (const d of pivotSchema.dimensions) {
-			if (!d.filterable || collapsed.has(d.key)) continue;
+			if (!d.filterable) continue;
 			if (grouped.has(d.key) && !d.ordinal) continue;
 			out.add(d.key);
 		}
@@ -381,9 +369,7 @@
 					legend: { display: false },
 					tooltip: {
 						bodyFont: { size: 14 },
-						callbacks: isRatio
-							? { label: (ctx) => `${ctx.dataset.label} : ${ctx.raw ?? '—'} %` }
-							: {
+						callbacks: {
 									label: (ctx) => {
 										const val = ctx.raw as number;
 										const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
@@ -396,9 +382,7 @@
 									}
 								}
 					},
-					datalabels: isRatio
-						? { display: false }
-						: {
+					datalabels: {
 								color: '#fff',
 								font: { size: 13, weight: 'bold' },
 								formatter: (val: number, ctx) => {
@@ -420,10 +404,8 @@
 					intersect: true
 				},
 				scales: {
-					x: { stacked: !isRatio, grid: { display: false }, ticks: { font: { size: 14 } } },
-					y: isRatio
-						? { stacked: false, beginAtZero: true, suggestedMax: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
-						: { stacked: true, beginAtZero: true, ticks: { font: { size: 13 }, precision: 0 } }
+					x: { stacked: true, grid: { display: false }, ticks: { font: { size: 14 } } },
+					y: { stacked: true, beginAtZero: true, ticks: { font: { size: 13 }, precision: 0 } }
 				}
 			}
 		});

@@ -44,10 +44,6 @@ _DIM_EXPR: dict[str, str] = {
 _DIM_JOIN: dict[str, str] = {}
 _MEASURE_AGG: dict[str, str] = {
     "pub_count": "COUNT(DISTINCT p.id)",
-    "pct_open": (
-        f"ROUND(COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status::text IN {OA_OPEN_SQL}) "
-        "* 100.0 / NULLIF(COUNT(DISTINCT p.id), 0), 1)"
-    ),
 }
 
 # Garde-fou d'extensibilité : toute dimension *groupable* a sa liaison SQL de groupement, et

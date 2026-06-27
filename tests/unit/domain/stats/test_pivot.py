@@ -49,7 +49,7 @@ def test_validate_rejects_non_groupable_dimension():
 
 class TestApplicableFacets:
     def test_universal_set_minus_nothing(self):
-        # Sans groupement catégoriel ni mesure-ratio : toutes les dimensions filtrables.
+        # Sans groupement catégoriel : toutes les dimensions filtrables.
         facets = applicable_facets("pub_count", ["year"])
         assert set(facets) == {"year", "oa_voie", "doc_type", "lab", "apc"}
 
@@ -58,12 +58,6 @@ class TestApplicableFacets:
         facets = applicable_facets("pub_count", ["year", "oa_voie"])
         assert "oa_voie" not in facets
         assert "year" in facets
-
-    def test_rule_m_ratio_measure_collapses_its_dimension(self):
-        # Mesurer le % d'accès ouvert retire toute facette OA.
-        facets = applicable_facets("pct_open", ["year"])
-        assert "oa_voie" not in facets
-        assert set(facets) == {"year", "doc_type", "lab", "apc"}
 
     def test_non_filterable_dimension_never_a_facet(self):
         # `oa_access` est groupable mais pas filtrable : jamais dans la barre.
