@@ -4,7 +4,7 @@ Le package est organisé par thème d'agrégat :
 - `publishers` : `publisher_stats`
 - `journals` : `journal_stats`
 - `labs` : `stats_labs`
-- `summary` : `stats_by_year`, `stats_summary`, `available_years`, `stats_facets`
+- `summary` : `stats_by_year`, `available_years`, `stats_facets`
 - `_shared` : filtre APC + pagination partagés par tous les agrégats.
 
 `PgStatsQueries` agrège les 7 fonctions sous le port `application.ports.stats_queries.StatsQueries`. Les fonctions libres retournent des dicts conformes au shape des DTOs ; la conversion vers Pydantic est faite ici à la sortie, pour garder les fonctions libres réutilisables hors API.
@@ -29,7 +29,6 @@ from application.ports.api.stats_queries import (
     PublisherStatsRow,
     StatsFacetsResponse,
     StatsQueries,
-    StatsSummary,
     YearFacet,
     YearStatsRow,
 )
@@ -42,7 +41,6 @@ from infrastructure.queries.api.stats.summary import (
     available_years as _available_years,
     stats_by_year as _stats_by_year,
     stats_facets as _stats_facets,
-    stats_summary as _stats_summary,
 )
 
 
@@ -186,31 +184,6 @@ class PgStatsQueries(StatsQueries):
         )
         return [YearStatsRow(**r) for r in rows]
 
-    def stats_summary(
-        self,
-        *,
-        apc_structure_ids: list[int],
-        lab_ids: list[int],
-        years: list[int],
-        publisher_id: int | None,
-        journal_id: int | None,
-        oa_status: str,
-        has_apc: str,
-        doc_types: list[str],
-    ) -> StatsSummary:
-        return StatsSummary(
-            **_stats_summary(
-                self._conn,
-                apc_structure_ids=apc_structure_ids,
-                lab_ids=lab_ids,
-                years=years,
-                publisher_id=publisher_id,
-                journal_id=journal_id,
-                oa_status=oa_status,
-                has_apc=has_apc,
-                doc_types=doc_types,
-            )
-        )
 
     def available_years(self) -> list[int]:
         return _available_years(self._conn)

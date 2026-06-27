@@ -5,19 +5,6 @@ dynamiques).
 """
 
 
-class TestStatsSummary:
-    def test_summary(self, client):
-        r = client.get("/api/stats/summary")
-        assert r.status_code == 200
-
-    def test_summary_with_filters(self, client):
-        r = client.get(
-            "/api/stats/summary",
-            params={"year": "2024", "lab_id": "1"},
-        )
-        assert r.status_code == 200
-
-
 class TestStatsByYear:
     def test_basic(self, client):
         r = client.get("/api/stats/by-year")

@@ -89,24 +89,6 @@ class YearStatsRow(BaseModel):
     unknown: int
 
 
-class StatsSummary(BaseModel):
-    """Totaux globaux pour la page stats.
-
-    Pas de champ `diamond` — le résumé remonte gold/hybrid/green/bronze/closed/unknown uniquement (diamond non distingué côté summary SQL).
-    """
-
-    total_pubs: int
-    gold: int
-    hybrid: int
-    green: int
-    bronze: int
-    embargoed: int
-    closed: int
-    unknown: int
-    publisher_count: int
-    journal_count: int
-
-
 class YearFacet(BaseModel):
     value: int
     count: int
@@ -254,19 +236,6 @@ class StatsQueries(Protocol):
         has_apc: str,
         doc_types: list[str],
     ) -> list[YearStatsRow]: ...
-
-    def stats_summary(
-        self,
-        *,
-        apc_structure_ids: list[int],
-        lab_ids: list[int],
-        years: list[int],
-        publisher_id: int | None,
-        journal_id: int | None,
-        oa_status: str,
-        has_apc: str,
-        doc_types: list[str],
-    ) -> StatsSummary: ...
 
     def available_years(self) -> list[int]: ...
 

@@ -12,7 +12,6 @@ from application.ports.api.stats_queries import (
     PublisherStatsResponse,
     StatsFacetsResponse,
     StatsQueries,
-    StatsSummary,
     YearStatsRow,
 )
 from interfaces.api.deps import (
@@ -99,30 +98,6 @@ def stats_by_year(
 ) -> list[YearStatsRow]:
     """Ventilation par année (pour les graphiques)."""
     return queries.stats_by_year(
-        apc_structure_ids=get_apc_structure_ids_sync(),
-        lab_ids=parse_int_csv(lab_id),
-        years=parse_int_csv(year),
-        publisher_id=publisher_id,
-        journal_id=journal_id,
-        oa_status=oa_status,
-        has_apc=has_apc,
-        doc_types=parse_str_csv(doc_type),
-    )
-
-
-@router.get("/api/stats/summary", response_model=StatsSummary)
-def stats_summary(
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    publisher_id: int | None = Query(None),
-    journal_id: int | None = Query(None),
-    oa_status: str = Query(""),
-    has_apc: str = Query(""),
-    doc_type: str = Query(""),
-    queries: StatsQueries = Depends(stats_queries_sync),
-) -> StatsSummary:
-    """Agrégats globaux (total, taux OA, total APC, etc.) pour le jeu de filtres."""
-    return queries.stats_summary(
         apc_structure_ids=get_apc_structure_ids_sync(),
         lab_ids=parse_int_csv(lab_id),
         years=parse_int_csv(year),
