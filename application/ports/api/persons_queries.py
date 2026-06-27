@@ -49,6 +49,9 @@ class ListFilters:
     has_idhal: str = ""
     has_idref: str = ""
     has_rh: str = ""
+    # « À confirmer » : personnes portant ≥1 forme de nom / identifiant `pending`.
+    has_pending_forms: str = ""
+    has_pending_identifiers: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +63,9 @@ class FacetFilters:
     has_idhal: str = ""
     has_idref: str = ""
     has_rh: str = ""
+    # « À confirmer » : personnes portant ≥1 forme de nom / identifiant `pending`.
+    has_pending_forms: str = ""
+    has_pending_identifiers: str = ""
     # Scope facultatif à un laboratoire (onglet personnes de la fiche labo).
     lab_id: int | None = None
 
@@ -170,6 +176,8 @@ class PersonsFacetsResponse(BaseModel):
     idhal: YesNoCount
     idref: YesNoCount
     rh: YesNoCount
+    pending_forms: YesNoCount
+    pending_identifiers: YesNoCount
 
 
 class DepartmentCount(BaseModel):

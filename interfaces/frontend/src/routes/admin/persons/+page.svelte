@@ -61,10 +61,22 @@
     idref: { yes: 0, no: 0 },
   });
 
+  // Facette « À confirmer » : formes de nom / identifiants au statut pending.
+  let pendingStates = $state<Record<string, IdState>>({});
+  let pendingCounts: Record<string, { yes: number; no: number }> = $state({
+    pending_forms: { yes: 0, no: 0 },
+    pending_identifiers: { yes: 0, no: 0 },
+  });
+
   const idQueryKey: Record<string, string> = {
     orcid: "has_orcid",
     idhal: "has_idhal",
     idref: "has_idref",
+  };
+
+  const pendingQueryKey: Record<string, string> = {
+    pending_forms: "has_pending_forms",
+    pending_identifiers: "has_pending_identifiers",
   };
 
   let currentPage = $state(1);
@@ -116,6 +128,10 @@
       const v = idStates[key];
       if (v === "yes" || v === "no") params.set(qk, v);
     }
+    for (const [key, qk] of Object.entries(pendingQueryKey)) {
+      const v = pendingStates[key];
+      if (v === "yes" || v === "no") params.set(qk, v);
+    }
     if (selectedRh.length === 1) params.set("has_rh", selectedRh[0]);
     return params;
   }
@@ -129,6 +145,8 @@
       idhal: { yes: number; no: number };
       idref: { yes: number; no: number };
       rh: { yes: number; no: number };
+      pending_forms: { yes: number; no: number };
+      pending_identifiers: { yes: number; no: number };
     }>("/api/persons/facets?" + params, { key: "persons-facets" });
     deptOptions = data.departments.map((d) => ({ value: d.value, text: d.value, count: d.count }));
     roleOptions = data.roles.map((r) => ({ value: r.value, text: r.value, count: r.count }));
@@ -141,6 +159,13 @@
       idhal: { yes: data.idhal.yes, no: data.idhal.no },
       idref: { yes: data.idref.yes, no: data.idref.no },
     };
+    pendingCounts = {
+      pending_forms: { yes: data.pending_forms.yes, no: data.pending_forms.no },
+      pending_identifiers: {
+        yes: data.pending_identifiers.yes,
+        no: data.pending_identifiers.no,
+      },
+    };
   }
 
   async function loadTable() {
@@ -151,6 +176,10 @@
     if (selectedRoles.length === 1) params.set("role", selectedRoles[0]);
     for (const [key, qk] of Object.entries(idQueryKey)) {
       const v = idStates[key];
+      if (v === "yes" || v === "no") params.set(qk, v);
+    }
+    for (const [key, qk] of Object.entries(pendingQueryKey)) {
+      const v = pendingStates[key];
       if (v === "yes" || v === "no") params.set(qk, v);
     }
     if (selectedRh.length === 1) params.set("has_rh", selectedRh[0]);
@@ -197,6 +226,11 @@
       .map(([k, v]) => `${k}_${v}`)
       .join(",");
     setOrDel("id_filter", idFilter);
+    const pendingFilter = Object.entries(pendingStates)
+      .filter(([, v]) => v === "yes" || v === "no")
+      .map(([k, v]) => `${k}_${v}`)
+      .join(",");
+    setOrDel("pending_filter", pendingFilter);
     setOrDel("person", selectedPersonId ? String(selectedPersonId) : "");
     setOrDel("tab", tab !== "all" ? tab : "");
     replaceState(url, {});
@@ -217,6 +251,15 @@
         if (m) states[m[1]] = m[2] as IdState;
       }
       idStates = states;
+    }
+    const pendingFilter = p.get("pending_filter");
+    if (pendingFilter) {
+      const states: Record<string, IdState> = {};
+      for (const part of pendingFilter.split(",")) {
+        const m = part.match(/^(pending_forms|pending_identifiers)_(yes|no)$/);
+        if (m) states[m[1]] = m[2] as IdState;
+      }
+      pendingStates = states;
     }
     if (p.get("person")) selectedPersonId = parseInt(p.get("person")!, 10) || null;
     const t = p.get("tab");
@@ -528,10 +571,12 @@
   bind:selectedRoles
   bind:selectedRh
   bind:idStates
+  bind:pendingStates
   {deptOptions}
   {roleOptions}
   {rhOptions}
   {idCounts}
+  {pendingCounts}
   {totalCount}
   onsearch={handleSearch}
   onfilterchange={handleFilterChange}

@@ -86,6 +86,8 @@ def list_persons(
     has_idhal: str = Query(""),
     has_idref: str = Query(""),
     has_rh: str = Query(""),
+    has_pending_forms: str = Query(""),
+    has_pending_identifiers: str = Query(""),
     sort: str = Query("name"),
     queries: PersonsQueries = Depends(persons_queries_sync),
 ) -> PersonListResponse:
@@ -98,6 +100,8 @@ def list_persons(
         has_idhal=has_idhal,
         has_idref=has_idref,
         has_rh=has_rh,
+        has_pending_forms=has_pending_forms,
+        has_pending_identifiers=has_pending_identifiers,
     )
     return queries.list_persons(filters=filters, page=page, per_page=per_page, sort=sort)
 
@@ -110,6 +114,8 @@ def persons_facets(
     has_idhal: str = Query(""),
     has_idref: str = Query(""),
     has_rh: str = Query(""),
+    has_pending_forms: str = Query(""),
+    has_pending_identifiers: str = Query(""),
     lab_id: int | None = Query(None),
     search: str = Query(""),
     queries: PersonsQueries = Depends(persons_queries_sync),
@@ -123,6 +129,8 @@ def persons_facets(
         has_idhal=has_idhal,
         has_idref=has_idref,
         has_rh=has_rh,
+        has_pending_forms=has_pending_forms,
+        has_pending_identifiers=has_pending_identifiers,
         lab_id=lab_id,
     )
     return queries.persons_facets(filters=filters)

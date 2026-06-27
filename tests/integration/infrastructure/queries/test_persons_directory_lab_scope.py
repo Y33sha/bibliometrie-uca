@@ -8,7 +8,7 @@ personnes ayant un authorship (rôle author) rattaché au labo via
 
 from sqlalchemy import text
 
-from application.ports.api.persons_queries import DirectoryFilters, FacetFilters
+from application.ports.api.persons_queries import DirectoryFilters, FacetFilters, ListFilters
 from infrastructure.queries.api.persons import PgPersonsQueries
 from tests.integration.helpers.structures import add_authorship_structure
 
@@ -122,3 +122,60 @@ class TestDirectoryLabScope:
         q = PgPersonsQueries(sa_sync_conn)
         res = q.persons_facets(filters=FacetFilters(lab_id=lab))
         assert res.rh.yes + res.rh.no == 1
+
+
+class TestPendingFacets:
+    """Facette « À confirmer » : formes de nom / identifiants au statut `pending`."""
+
+    def test_pending_name_forms_filter(self, sa_sync_conn):
+        p_pending = _person(sa_sync_conn, "Pendingform")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+                "VALUES ('pf', :pid, ARRAY['hal'], 'pending')"
+            ),
+            {"pid": p_pending},
+        )
+        p_clean = _person(sa_sync_conn, "Cleanform")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+                "VALUES ('cf', :pid, ARRAY['hal'], 'confirmed')"
+            ),
+            {"pid": p_clean},
+        )
+
+        q = PgPersonsQueries(sa_sync_conn)
+        res = q.list_persons(
+            filters=ListFilters(has_pending_forms="yes"), page=1, per_page=50, sort="name"
+        )
+        ids = {p.id for p in res.persons}
+        assert p_pending in ids
+        assert p_clean not in ids
+        assert q.persons_facets(filters=FacetFilters()).pending_forms.yes >= 1
+
+    def test_pending_identifiers_filter(self, sa_sync_conn):
+        p_pending = _person(sa_sync_conn, "Pendingid")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+                "VALUES (:pid, 'orcid', '0000-0000-0000-0001', 'auto', 'pending')"
+            ),
+            {"pid": p_pending},
+        )
+        p_clean = _person(sa_sync_conn, "Cleanid")
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
+                "VALUES (:pid, 'orcid', '0000-0000-0000-0002', 'auto', 'confirmed')"
+            ),
+            {"pid": p_clean},
+        )
+
+        q = PgPersonsQueries(sa_sync_conn)
+        res = q.list_persons(
+            filters=ListFilters(has_pending_identifiers="yes"), page=1, per_page=50, sort="name"
+        )
+        ids = {p.id for p in res.persons}
+        assert p_pending in ids
+        assert p_clean not in ids

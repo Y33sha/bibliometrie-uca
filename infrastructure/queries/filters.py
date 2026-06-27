@@ -466,6 +466,37 @@ def person_has_identifier_clause(id_type: str, value: str) -> WhereClause | None
     )
 
 
+def person_has_pending_name_forms_clause(value: str) -> WhereClause | None:
+    """Personnes ayant ≥1 forme de nom au statut `pending` (à confirmer). `value` = yes/no.
+
+    Les formes dérivées du nom canonique (source `'persons'`) sont confirmées d'office :
+    `status = 'pending'` ne capte donc que les formes bibliographiques non encore tranchées."""
+    if value not in ("yes", "no"):
+        return None
+    negate = "NOT " if value == "no" else ""
+    return WhereClause(
+        f"""{negate}EXISTS (
+            SELECT 1 FROM person_name_forms pnf
+            WHERE pnf.person_id = p.id AND pnf.status = 'pending'
+        )""",
+        {},
+    )
+
+
+def person_has_pending_identifiers_clause(value: str) -> WhereClause | None:
+    """Personnes ayant ≥1 identifiant au statut `pending` (à confirmer). `value` = yes/no."""
+    if value not in ("yes", "no"):
+        return None
+    negate = "NOT " if value == "no" else ""
+    return WhereClause(
+        f"""{negate}EXISTS (
+            SELECT 1 FROM person_identifiers pi
+            WHERE pi.person_id = p.id AND pi.status = 'pending'
+        )""",
+        {},
+    )
+
+
 def person_has_rh_clause(value: str) -> WhereClause | None:
     if value == "yes":
         return WhereClause("prh.id IS NOT NULL", {})
