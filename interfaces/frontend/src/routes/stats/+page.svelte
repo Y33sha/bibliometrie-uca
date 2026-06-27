@@ -346,35 +346,40 @@
 		const p = chartParams();
 		p.set('measure', measure);
 		p.set('group', primaryBy);
-		const secondary = groupBy && groupBy !== primaryBy ? groupBy : '';
-		if (secondary) p.set('group2', secondary);
+		const comparison = groupBy && groupBy !== primaryBy ? groupBy : '';
+		if (comparison) p.set('group2', comparison);
 		const res = await api<{ rows: Record<string, unknown>[] }>('/api/stats/pivot?' + p);
 		await tick();
 		if (yearChart) yearChart.destroy();
 		const rows = res.rows;
 		if (!rows.length || !chartCanvas) { yearChart = null; legendItems = []; return; }
 
+		// La comparaison occupe l'abscisse (on compare le long de l'axe des x ; l'année y va
+		// naturellement) ; le groupement est l'empilement (la catégorie lue dans chaque barre). Sans
+		// comparaison, le groupement passe en abscisse, en barres simples.
+		const xDim = comparison || primaryBy;
+		const stackDim = comparison ? primaryBy : '';
 		const cs = getComputedStyle(document.documentElement);
-		const cats = orderedValues(primaryBy, rows); // valeurs de l'axe primaire (abscisse)
-		const labels = cats.map((c) => dimLabel(primaryBy, c));
-		const series = secondary ? orderedValues(secondary, rows) : ['__all__'];
+		const cats = orderedValues(xDim, rows); // valeurs en abscisse
+		const labels = cats.map((c) => dimLabel(xDim, c));
+		const series = stackDim ? orderedValues(stackDim, rows) : ['__all__'];
 		const datasets = series.map((sv, i) => ({
-			label: secondary ? dimLabel(secondary, sv) : 'Publications',
+			label: stackDim ? dimLabel(stackDim, sv) : 'Publications',
 			data: cats.map((cv) => {
 				const row = rows.find(
-					(r) => String(r[primaryBy]) === cv && (!secondary || String(r[secondary]) === sv)
+					(r) => String(r[xDim]) === cv && (!stackDim || String(r[stackDim]) === sv)
 				);
 				return row ? Number(row.value) : 0;
 			}),
-			backgroundColor: secondary ? dimColor(secondary, sv, i, cs) : cs.getPropertyValue('--accent').trim(),
+			backgroundColor: stackDim ? dimColor(stackDim, sv, i, cs) : cs.getPropertyValue('--accent').trim(),
 			barPercentage: 0.5,
 			categoryPercentage: 0.7
 		}));
 		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
 
-		// Mode « part » : aplatir chaque colonne de l'axe primaire à 100 % en remplaçant les comptes
-		// par leur proportion. N'a de sens qu'avec une comparaison ; sans elle, on reste en absolu.
-		const part = chartMode === 'part' && !!secondary;
+		// Mode « part » : aplatir chaque colonne (abscisse) à 100 % en remplaçant les comptes par leur
+		// proportion. N'a de sens qu'avec un empilement ; sans comparaison, on reste en absolu.
+		const part = chartMode === 'part' && !!stackDim;
 		if (part) {
 			const totals = cats.map((_, ci) => datasets.reduce((s, d) => s + ((d.data[ci] as number) || 0), 0));
 			for (const d of datasets) d.data = d.data.map((c, ci) => (totals[ci] ? ((c as number) / totals[ci]) * 100 : 0));
