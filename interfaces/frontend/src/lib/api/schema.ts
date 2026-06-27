@@ -1506,6 +1506,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/name-duplicates/count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Name Duplicates Count
+         * @description Compteur de l'onglet « Doublons par nom » (badge).
+         */
+        get: operations["name_duplicates_count_api_admin_name_duplicates_count_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/name-duplicates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Name Duplicates
+         * @description Paires de personnes aux noms compatibles, triées par force de réseau (co-auteurs / publis
+         *     co-signées / labos / revues communs), paginées : doublons probables en tête, homonymes en fin.
+         */
+        get: operations["name_duplicates_api_admin_name_duplicates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/persons/{person_id}": {
         parameters: {
             query?: never;
@@ -4196,6 +4237,35 @@ export interface components {
             /** Target Id */
             target_id: number;
         };
+        /**
+         * NameDuplicatePairOut
+         * @description Deux personnes aux noms compatibles, avec leurs recouvrements et la force du rapprochement
+         *     (`network` = réseau de collaboration commun → doublon probable ; `weak` = labo/revue seuls ;
+         *     `homonym` = réseaux disjoints → homonyme probable).
+         */
+        NameDuplicatePairOut: {
+            person_a: components["schemas"]["IdentifierConflictPersonOut"];
+            person_b: components["schemas"]["IdentifierConflictPersonOut"];
+            overlaps: components["schemas"]["OverlapCountsOut"];
+            /**
+             * Tier
+             * @enum {string}
+             */
+            tier: "network" | "weak" | "homonym";
+        };
+        /** NameDuplicatesResponse */
+        NameDuplicatesResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Pages */
+            pages: number;
+            /** Pairs */
+            pairs: components["schemas"]["NameDuplicatePairOut"][];
+        };
         /** NameFormAuthorshipRef */
         NameFormAuthorshipRef: {
             /** Source */
@@ -4410,6 +4480,20 @@ export interface components {
             department_name: string | null;
             /** Has Rh */
             has_rh: boolean;
+        };
+        /**
+         * OverlapCountsOut
+         * @description Recouvrements de réseau entre deux personnes d'une paire candidate par nom.
+         */
+        OverlapCountsOut: {
+            /** Coauthors */
+            coauthors: number;
+            /** Shared Pubs */
+            shared_pubs: number;
+            /** Labs */
+            labs: number;
+            /** Journals */
+            journals: number;
         };
         /**
          * PartenaireThese
@@ -8688,6 +8772,58 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DetachableIntrudersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    name_duplicates_count_api_admin_name_duplicates_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    name_duplicates_api_admin_name_duplicates_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NameDuplicatesResponse"];
                 };
             };
             /** @description Validation Error */

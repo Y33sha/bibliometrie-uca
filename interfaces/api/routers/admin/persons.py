@@ -14,6 +14,7 @@ from application.ports.api.persons_queries import (
     AmbiguousNameFormsResponse,
     DetachableIntrudersResponse,
     IdentifierConflictsResponse,
+    NameDuplicatesResponse,
     NameFormAuthorshipsResponse,
     PersonOut,
     PersonsQueries,
@@ -308,6 +309,28 @@ def detachable_intruders(
     """Personnes rattachées à ≥2 signatures d'une même publication, avec ancre et intrus, paginées :
     l'intrus se détache en rejetant sa forme de nom (`PATCH /api/persons/{id}/name-forms/status`)."""
     return queries.detachable_intruders(page=page, per_page=per_page)
+
+
+# ── File de triage : doublons par nom ────────────────────────────
+
+
+@router.get("/api/admin/name-duplicates/count", response_model=TotalCountResponse)
+def name_duplicates_count(
+    queries: PersonsQueries = Depends(persons_queries_sync),
+) -> TotalCountResponse:
+    """Compteur de l'onglet « Doublons par nom » (badge)."""
+    return TotalCountResponse(total=queries.name_duplicates_count())
+
+
+@router.get("/api/admin/name-duplicates", response_model=NameDuplicatesResponse)
+def name_duplicates(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    queries: PersonsQueries = Depends(persons_queries_sync),
+) -> NameDuplicatesResponse:
+    """Paires de personnes aux noms compatibles, triées par force de réseau (co-auteurs / publis
+    co-signées / labos / revues communs), paginées : doublons probables en tête, homonymes en fin."""
+    return queries.name_duplicates(page=page, per_page=per_page)
 
 
 @router.get("/api/admin/persons/{person_id}", response_model=PersonOut)

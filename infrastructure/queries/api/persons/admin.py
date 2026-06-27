@@ -9,6 +9,7 @@ from sqlalchemy import Connection, bindparam, text
 from domain.persons.name_matching import names_compatible, parse_raw_author_name
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from domain.sources.registry import AUTHOR_SOURCES_SQL
+from infrastructure.queries.api.person_duplicates import PERSON_DUP_QUERIES
 
 # ── Orphan authorships ───────────────────────────────────────────
 
@@ -458,6 +459,131 @@ def detachable_intruders(conn: Connection, *, page: int, per_page: int) -> dict[
         "per_page": per_page,
         "pages": (total + per_page - 1) // per_page if per_page else 0,
         "groups": items,
+    }
+
+
+# ── Doublons par nom (file de triage du hub) ─────────────────────
+
+# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur), au
+# grain `authorships`. Réseaux disjoints → homonyme légitime ; réseaux communs → doublon. Les sujets
+# sont écartés (trop larges pour discriminer : même domaine ≠ même personne).
+_OVERLAP_DIMENSIONS: dict[str, str] = {
+    "coauthors": """
+        SELECT a1.person_id AS person, a2.person_id AS val
+        FROM authorships a1
+        JOIN authorships a2 ON a2.publication_id = a1.publication_id AND a2.person_id <> a1.person_id
+        WHERE a1.person_id = ANY(:ids) AND a2.person_id IS NOT NULL
+    """,
+    "shared_pubs": """
+        SELECT a.person_id AS person, a.publication_id AS val
+        FROM authorships a WHERE a.person_id = ANY(:ids)
+    """,
+    "labs": """
+        SELECT a.person_id AS person, aus.structure_id AS val
+        FROM authorships a
+        JOIN authorship_structures aus ON aus.authorship_id = a.id
+        JOIN structures s ON s.id = aus.structure_id AND s.structure_type = 'labo'
+        WHERE a.person_id = ANY(:ids)
+    """,
+    "journals": """
+        SELECT a.person_id AS person, p.journal_id AS val
+        FROM authorships a
+        JOIN publications p ON p.id = a.publication_id
+        WHERE a.person_id = ANY(:ids) AND p.journal_id IS NOT NULL
+    """,
+}
+
+
+def _overlap_sets(conn: Connection, sql: str, ids: list[int]) -> dict[int, set[int]]:
+    out: dict[int, set[int]] = defaultdict(set)
+    for r in conn.execute(text(sql).bindparams(bindparam("ids")), {"ids": ids}):
+        out[r.person].add(r.val)
+    return out
+
+
+def _pair_tier(overlaps: dict[str, int]) -> str:
+    """Force du rapprochement : un réseau de collaboration commun (co-auteurs ou publication
+    co-signée) prouve le doublon ; labo/revue seuls corroborent faiblement ; rien → homonyme."""
+    if overlaps["coauthors"] > 0 or overlaps["shared_pubs"] > 0:
+        return "network"
+    if overlaps["labs"] > 0 or overlaps["journals"] > 0:
+        return "weak"
+    return "homonym"
+
+
+def _name_duplicate_candidates(conn: Connection) -> list[tuple[int, int]]:
+    """Paires de personnes aux noms compatibles (union des requêtes larges, resserrée par tokens).
+    Étape la moins chère : sert le badge sans charger les recouvrements de réseau."""
+    seen: set[tuple[int, int]] = set()
+    candidates: list[tuple[int, int]] = []
+    for sql in PERSON_DUP_QUERIES:
+        for r in conn.execute(text(sql)):
+            key = (r.id_a, r.id_b)
+            if key in seen:
+                continue
+            seen.add(key)
+            if names_compatible(r.ln1 or "", r.fn1 or "", r.ln2 or "", r.fn2 or ""):
+                candidates.append((r.id_a, r.id_b))
+    return candidates
+
+
+def _name_duplicate_pairs(conn: Connection) -> list[tuple[int, int, dict[str, int]]]:
+    """Paires candidates enrichies de leurs recouvrements de réseau, triées par force décroissante
+    (doublons évidents d'abord, homonymes en fin de file)."""
+    candidates = _name_duplicate_candidates(conn)
+    if not candidates:
+        return []
+
+    ids = sorted({pid for pair in candidates for pid in pair})
+    sets = {dim: _overlap_sets(conn, sql, ids) for dim, sql in _OVERLAP_DIMENSIONS.items()}
+
+    pairs: list[tuple[int, int, dict[str, int]]] = []
+    for id_a, id_b in candidates:
+        overlaps = {
+            dim: len(sets[dim].get(id_a, set()) & sets[dim].get(id_b, set()))
+            for dim in _OVERLAP_DIMENSIONS
+        }
+        pairs.append((id_a, id_b, overlaps))
+
+    pairs.sort(
+        key=lambda t: (t[2]["coauthors"] + t[2]["shared_pubs"], t[2]["labs"], t[2]["journals"]),
+        reverse=True,
+    )
+    return pairs
+
+
+def name_duplicates_count(conn: Connection) -> int:
+    """Nombre de paires candidates par nom (badge de l'onglet)."""
+    return len(_name_duplicate_candidates(conn))
+
+
+def name_duplicates(conn: Connection, *, page: int, per_page: int) -> dict[str, Any]:
+    """Paires candidates par nom, paginées, avec vue allégée des deux personnes, recouvrements de
+    réseau chiffrés et pastille de force. Fusion / marquage distinct laissés à l'œil."""
+    pairs = _name_duplicate_pairs(conn)
+    total = len(pairs)
+    offset = (page - 1) * per_page
+    page_pairs = pairs[offset : offset + per_page]
+
+    persons = _light_persons(
+        conn, sorted({pid for id_a, id_b, _ in page_pairs for pid in (id_a, id_b)})
+    )
+    items = [
+        {
+            "person_a": persons[id_a],
+            "person_b": persons[id_b],
+            "overlaps": overlaps,
+            "tier": _pair_tier(overlaps),
+        }
+        for id_a, id_b, overlaps in page_pairs
+        if id_a in persons and id_b in persons
+    ]
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "pages": (total + per_page - 1) // per_page if per_page else 0,
+        "pairs": items,
     }
 
 
