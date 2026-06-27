@@ -58,30 +58,29 @@
 	let yearChart: Chart | null = null;
 	let initialYearsApplied = false;
 
-	// --- Pivot: ventilation secondaire de l'histogramme par année ---
+	// --- Pivot : axes de l'histogramme. Groupement primaire (abscisse) + comparaison empilée (facultative). ---
 	let pivotSchema = $state<components['schemas']['PivotSchemaResponse'] | null>(null);
-	let groupBy = $state('oa_access'); // dimension de découpage (série empilée)
+	let primaryBy = $state('year'); // groupement primaire (abscisse)
+	let groupBy = $state('oa_access'); // comparaison : série secondaire empilée (facultative)
 	let chartMode = $state<'absolu' | 'part'>('absolu'); // part = empilement aplati à 100 %
 	let legendItems: { label: string; color: string }[] = $state([]);
 	// Le graphe par année est toujours le simple compte de publications (barres empilées). Le taux
 	// d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
 	const measure = 'pub_count';
 
-	// Dimensions graphables proposées au sélecteur « Découpage » (groupables, faible cardinalité,
-	// hors année).
-	const pivotDims = $derived(
-		pivotSchema
-			? pivotSchema.dimensions.filter(
-					(d) => d.groupable && d.cardinality === 'low' && d.key !== 'year'
-				)
-			: []
+	// Dimensions graphables (groupables, faible cardinalité) proposées aux sélecteurs de groupement
+	// et de comparaison. L'année y figure : c'est un axe parmi d'autres, plus un primaire figé.
+	const graphableDims = $derived(
+		pivotSchema ? pivotSchema.dimensions.filter((d) => d.groupable && d.cardinality === 'low') : []
 	);
+	// Comparaison : les mêmes dimensions, moins celle déjà prise comme groupement primaire.
+	const comparableDims = $derived(graphableDims.filter((d) => d.key !== primaryBy));
 
 	// Barre de facettes dérivée du registre (cf. domain `applicable_facets`) : ensemble des dimensions
 	// filtrables, moins un groupement catégoriel (l'année, ordinale, reste filtrable). Miroir TS de la règle G.
 	const facetKeys = $derived.by(() => {
 		if (!pivotSchema) return new Set(['year', 'lab', 'oa_voie', 'apc']);
-		const grouped = new Set(['year', groupBy].filter(Boolean));
+		const grouped = new Set([primaryBy, groupBy].filter(Boolean));
 		const out = new Set<string>();
 		for (const d of pivotSchema.dimensions) {
 			if (!d.filterable) continue;
@@ -103,36 +102,45 @@
 	};
 	const PALETTE = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#b07aa1', '#76b7b2', '#ff9da7', '#9c755f', '#bab0ac', '#edc948'];
 
-	function dimLabel(value: string): string {
-		if (groupBy === 'oa_access') return OA_ACCESS_LABELS[value] ?? value;
-		if (groupBy === 'oa_voie') return oaLabelsMap[value] ?? value;
-		if (groupBy === 'doc_type_family')
+	function dimLabel(dim: string, value: string): string {
+		if (dim === 'oa_access') return OA_ACCESS_LABELS[value] ?? value;
+		if (dim === 'oa_voie') return oaLabelsMap[value] ?? value;
+		if (dim === 'doc_type_family')
 			return docTypeFamilies.find((f) => f.key === value)?.label ?? value;
 		return value;
 	}
-	function dimColor(value: string, idx: number, cs: CSSStyleDeclaration): string {
-		if (groupBy === 'oa_voie') return cs.getPropertyValue('--' + value).trim() || PALETTE[idx % PALETTE.length];
-		if (groupBy === 'oa_access') return cs.getPropertyValue(OA_ACCESS_VAR[value] ?? '').trim() || PALETTE[idx % PALETTE.length];
+	function dimColor(dim: string, value: string, idx: number, cs: CSSStyleDeclaration): string {
+		if (dim === 'oa_voie') return cs.getPropertyValue('--' + value).trim() || PALETTE[idx % PALETTE.length];
+		if (dim === 'oa_access') return cs.getPropertyValue(OA_ACCESS_VAR[value] ?? '').trim() || PALETTE[idx % PALETTE.length];
 		return PALETTE[idx % PALETTE.length];
 	}
-	function orderedValues(rows: Record<string, unknown>[]): string[] {
-		const present = rows.map((r) => String(r[groupBy]));
-		if (groupBy === 'oa_access') return OA_ACCESS_ORDER.filter((v) => present.includes(v));
-		if (groupBy === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.includes(v));
-		if (groupBy === 'doc_type_family')
+	function orderedValues(dim: string, rows: Record<string, unknown>[]): string[] {
+		const present = rows.map((r) => String(r[dim]));
+		if (dim === 'year') return [...new Set(present)].sort((a, b) => Number(a) - Number(b));
+		if (dim === 'oa_access') return OA_ACCESS_ORDER.filter((v) => present.includes(v));
+		if (dim === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.includes(v));
+		if (dim === 'doc_type_family')
 			return docTypeFamilies.map((f) => f.key).filter((k) => present.includes(k));
 		// Sinon : valeurs distinctes triées par total décroissant.
 		const totals = new Map<string, number>();
 		for (const r of rows) {
-			const v = String(r[groupBy]);
+			const v = String(r[dim]);
 			totals.set(v, (totals.get(v) ?? 0) + Number(r.value ?? 0));
 		}
 		return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v);
 	}
 
+	function onPrimaryChange() {
+		// Le groupement primaire ne peut pas être aussi la comparaison.
+		if (groupBy === primaryBy) groupBy = '';
+		onAxisChange(primaryBy);
+	}
 	function onGroupByChange() {
+		onAxisChange(groupBy);
+	}
+	function onAxisChange(dim: string) {
 		// Grouper par une dimension filtrable efface son filtre actif (sinon il resterait, caché).
-		const cleared = groupBy === 'oa_voie' && selectedOa.length > 0;
+		const cleared = dim === 'oa_voie' && selectedOa.length > 0;
 		if (cleared) selectedOa = [];
 		syncUrl();
 		if (cleared) refresh();
@@ -219,7 +227,8 @@
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 				journalId: { type: 'single', urlKey: 'journal_id' },
 				search: { type: 'single', urlKey: 'search' },
-			groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'oa_access' },
+			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'year' },
+				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'oa_access' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
 			page: { type: 'page', urlKey: 'page' },
 			labPage: { type: 'page', urlKey: 'lab_page' },
@@ -238,6 +247,7 @@
 			publisherId: publisherId ? String(publisherId) : '',
 			journalId: journalId ? String(journalId) : '',
 			search,
+			primaryBy,
 			groupBy,
 			chartMode,
 			page: pubFetch.page,
@@ -333,44 +343,46 @@
 	async function loadChart() {
 		const p = chartParams();
 		p.set('measure', measure);
-		p.set('group', 'year');
-		if (groupBy) p.set('group2', groupBy);
+		p.set('group', primaryBy);
+		const secondary = groupBy && groupBy !== primaryBy ? groupBy : '';
+		if (secondary) p.set('group2', secondary);
 		const res = await api<{ rows: Record<string, unknown>[] }>('/api/stats/pivot?' + p);
 		await tick();
 		if (yearChart) yearChart.destroy();
 		const rows = res.rows;
 		if (!rows.length || !chartCanvas) { yearChart = null; legendItems = []; return; }
 
-		const years = [...new Set(rows.map((r) => Number(r.year)))].sort((a, b) => a - b);
 		const cs = getComputedStyle(document.documentElement);
-		const values = groupBy ? orderedValues(rows) : ['__all__'];
-		const datasets = values.map((v, i) => ({
-			label: groupBy ? dimLabel(v) : 'Publications',
-			data: years.map((y) => {
+		const cats = orderedValues(primaryBy, rows); // valeurs de l'axe primaire (abscisse)
+		const labels = cats.map((c) => dimLabel(primaryBy, c));
+		const series = secondary ? orderedValues(secondary, rows) : ['__all__'];
+		const datasets = series.map((sv, i) => ({
+			label: secondary ? dimLabel(secondary, sv) : 'Publications',
+			data: cats.map((cv) => {
 				const row = rows.find(
-					(r) => Number(r.year) === y && (!groupBy || String(r[groupBy]) === v)
+					(r) => String(r[primaryBy]) === cv && (!secondary || String(r[secondary]) === sv)
 				);
 				return row ? Number(row.value) : 0;
 			}),
-			backgroundColor: groupBy ? dimColor(v, i, cs) : cs.getPropertyValue('--accent').trim(),
+			backgroundColor: secondary ? dimColor(secondary, sv, i, cs) : cs.getPropertyValue('--accent').trim(),
 			barPercentage: 0.5,
 			categoryPercentage: 0.7
 		}));
 		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
 
-		// Mode « part » : aplatir chaque colonne (année) à 100 % en remplaçant les comptes par leur
-		// proportion. N'a de sens qu'avec une comparaison (série empilée) ; sans découpage, on reste en absolu.
-		const part = chartMode === 'part' && !!groupBy;
+		// Mode « part » : aplatir chaque colonne de l'axe primaire à 100 % en remplaçant les comptes
+		// par leur proportion. N'a de sens qu'avec une comparaison ; sans elle, on reste en absolu.
+		const part = chartMode === 'part' && !!secondary;
 		if (part) {
-			const totals = years.map((_, yi) => datasets.reduce((s, d) => s + ((d.data[yi] as number) || 0), 0));
-			for (const d of datasets) d.data = d.data.map((c, yi) => (totals[yi] ? ((c as number) / totals[yi]) * 100 : 0));
+			const totals = cats.map((_, ci) => datasets.reduce((s, d) => s + ((d.data[ci] as number) || 0), 0));
+			for (const d of datasets) d.data = d.data.map((c, ci) => (totals[ci] ? ((c as number) / totals[ci]) * 100 : 0));
 		}
 
 		yearChart = new Chart(chartCanvas, {
 			type: 'bar',
 			plugins: [whiteBgPlugin],
 			data: {
-				labels: years,
+				labels,
 				datasets
 			},
 			options: {
@@ -509,6 +521,7 @@
 			} catch { journalName = `#${journalId}`; }
 		}
 		if (restored.search) search = restored.search as string;
+		if (restored.primaryBy !== undefined) primaryBy = restored.primaryBy as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
 		if (restored.page) pubFetch.page = restored.page as number;
@@ -634,16 +647,24 @@
 	{/if}
 	{#if tab === 'oa' && pivotSchema}
 		<label class="groupby">
-			Découpage&nbsp;:
+			Grouper par&nbsp;:
+			<select bind:value={primaryBy} onchange={onPrimaryChange}>
+				{#each graphableDims as d (d.key)}
+					<option value={d.key}>{d.label}</option>
+				{/each}
+			</select>
+		</label>
+		<label class="groupby">
+			Comparer par&nbsp;:
 			<select bind:value={groupBy} onchange={onGroupByChange}>
 				<option value="">Aucun</option>
-				{#each pivotDims as d (d.key)}
+				{#each comparableDims as d (d.key)}
 					<option value={d.key}>{d.label}</option>
 				{/each}
 			</select>
 		</label>
 	{/if}
-	{#if tab === 'oa' && groupBy}
+	{#if tab === 'oa' && groupBy && groupBy !== primaryBy}
 		<label class="groupby">
 			<input type="checkbox" checked={chartMode === 'part'} onchange={(e) => { chartMode = e.currentTarget.checked ? 'part' : 'absolu'; syncUrl(); loadChart(); }} />
 			Part&nbsp;(%)
