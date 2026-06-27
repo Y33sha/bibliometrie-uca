@@ -62,15 +62,18 @@
 	// d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
 	const measure = 'pub_count';
 
-	// Dimensions graphables (groupables, faible cardinalité). Le groupement primaire est une catégorie
-	// à analyser (accès, voie, type) ; un axe ordinal comme l'année ne se groupe pas, il se compare —
-	// l'année est donc exclue du groupement et réservée à la comparaison.
-	const graphableDims = $derived(
-		pivotSchema ? pivotSchema.dimensions.filter((d) => d.groupable && d.cardinality === 'low') : []
+	// Groupement primaire : catégories à analyser, faible cardinalité, non ordinales (accès, voie,
+	// type). L'année ne se groupe pas (elle se compare) ; le laboratoire non plus (forte cardinalité).
+	const groupingDims = $derived(
+		pivotSchema
+			? pivotSchema.dimensions.filter((d) => d.groupable && d.cardinality === 'low' && !d.ordinal)
+			: []
 	);
-	const groupingDims = $derived(graphableDims.filter((d) => !d.ordinal));
-	// Comparaison : toute dimension graphable (l'année comprise), moins celle prise comme primaire.
-	const comparableDims = $derived(graphableDims.filter((d) => d.key !== primaryBy));
+	// Comparaison : toute dimension groupable (l'année, les catégories, le laboratoire à forte
+	// cardinalité), moins celle déjà prise comme groupement primaire.
+	const comparableDims = $derived(
+		pivotSchema ? pivotSchema.dimensions.filter((d) => d.groupable && d.key !== primaryBy) : []
+	);
 
 	// Barre de facettes dérivée du registre (cf. domain `applicable_facets`) : ensemble des dimensions
 	// filtrables, moins un groupement catégoriel (l'année, ordinale, reste filtrable). Miroir TS de la règle G.
@@ -98,6 +101,9 @@
 	};
 	const PALETTE = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#b07aa1', '#76b7b2', '#ff9da7', '#9c755f', '#bab0ac', '#edc948'];
 
+	function dimCard(dim: string): string {
+		return pivotSchema?.dimensions.find((d) => d.key === dim)?.cardinality ?? 'low';
+	}
 	function dimLabel(dim: string, value: string): string {
 		if (dim === 'oa_access') return OA_ACCESS_LABELS[value] ?? value;
 		if (dim === 'oa_voie') return oaLabelsMap[value] ?? value;
@@ -135,9 +141,10 @@
 		onAxisChange(groupBy);
 	}
 	function onAxisChange(dim: string) {
-		// Grouper par une dimension filtrable efface son filtre actif (sinon il resterait, caché).
-		const cleared = dim === 'oa_voie' && selectedOa.length > 0;
-		if (cleared) selectedOa = [];
+		// Comparer/grouper par une dimension filtrable efface son filtre actif (sinon il resterait, caché).
+		let cleared = false;
+		if (dim === 'oa_voie' && selectedOa.length > 0) { selectedOa = []; cleared = true; }
+		if (dim === 'lab' && selectedLabs.length > 0) { selectedLabs = []; cleared = true; }
 		syncUrl();
 		if (cleared) refresh();
 		else loadChart();
@@ -350,17 +357,27 @@
 		const xDim = comparison || primaryBy;
 		const stackDim = comparison ? primaryBy : '';
 		const cs = getComputedStyle(document.documentElement);
-		const cats = orderedValues(xDim, rows); // valeurs en abscisse
-		const labels = cats.map((c) => dimLabel(xDim, c));
+
+		// Abscisse : à forte cardinalité (laboratoire), on ne garde que les N premières valeurs (par
+		// total décroissant) et on regroupe le reste dans « Autres » — sinon l'axe est illisible.
+		const HIGH_CARD_TOP_N = 15;
+		const highCard = dimCard(xDim) === 'high';
+		const allCats = orderedValues(xDim, rows);
+		const cats = highCard ? allCats.slice(0, HIGH_CARD_TOP_N) : allCats;
+		const autres = highCard ? allCats.slice(HIGH_CARD_TOP_N) : [];
+		const labels = [...cats.map((c) => dimLabel(xDim, c)), ...(autres.length ? ['Autres'] : [])];
+
+		const cell = (cv: string, sv: string) => {
+			const row = rows.find((r) => String(r[xDim]) === cv && (!stackDim || String(r[stackDim]) === sv));
+			return row ? Number(row.value) : 0;
+		};
 		const series = stackDim ? orderedValues(stackDim, rows) : ['__all__'];
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : 'Publications',
-			data: cats.map((cv) => {
-				const row = rows.find(
-					(r) => String(r[xDim]) === cv && (!stackDim || String(r[stackDim]) === sv)
-				);
-				return row ? Number(row.value) : 0;
-			}),
+			data: [
+				...cats.map((cv) => cell(cv, sv)),
+				...(autres.length ? [autres.reduce((s, cv) => s + cell(cv, sv), 0)] : [])
+			],
 			backgroundColor: stackDim ? dimColor(stackDim, sv, i, cs) : cs.getPropertyValue('--accent').trim(),
 			barPercentage: 0.5,
 			categoryPercentage: 0.7
@@ -371,7 +388,7 @@
 		// proportion. N'a de sens qu'avec un empilement ; sans comparaison, on reste en absolu.
 		const part = chartMode === 'part' && !!stackDim;
 		if (part) {
-			const totals = cats.map((_, ci) => datasets.reduce((s, d) => s + ((d.data[ci] as number) || 0), 0));
+			const totals = labels.map((_, ci) => datasets.reduce((s, d) => s + ((d.data[ci] as number) || 0), 0));
 			for (const d of datasets) d.data = d.data.map((c, ci) => (totals[ci] ? ((c as number) / totals[ci]) * 100 : 0));
 		}
 
@@ -385,6 +402,7 @@
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
+					indexAxis: highCard ? 'y' : 'x',
 				plugins: {
 					legend: { display: false },
 					tooltip: {
@@ -426,8 +444,8 @@
 					intersect: true
 				},
 				scales: {
-					x: { stacked: true, grid: { display: false }, ticks: { font: { size: 14 } } },
-					y: part
+					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 } } },
+					[highCard ? 'x' : 'y']: part
 						? { stacked: true, min: 0, max: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
 						: { stacked: true, beginAtZero: true, ticks: { font: { size: 13 }, precision: 0 } }
 				}
