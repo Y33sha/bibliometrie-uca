@@ -13,8 +13,8 @@ Propriétés portées par le registre :
 - **ordinal** — axe ordonné (l'année) vs catégoriel (la voie d'accès), qui change le tri
   et l'éligibilité au filtrage par plage.
 - **`multiplies`** (grain) — grouper par cette dimension démultiplie-t-il une publication ?
-  (une publication a plusieurs sources : grouper par `source` la compte dans chacune). Dès
-  qu'un groupement démultiplie, la mesure doit compter les publications de façon distincte.
+  (une publication rattachée à plusieurs laboratoires compte dans chacun). Dès qu'un groupement
+  démultiplie, la mesure doit compter les publications de façon distincte.
 - **`is_ratio`** (mesure) — mesure-ratio (un numérateur sur un dénominateur, p. ex. le taux
   d'accès ouvert : une courbe) vs agrégat additif (empilable).
 
@@ -56,7 +56,6 @@ DIMENSIONS: dict[str, Dimension] = {
     "oa_access": Dimension("oa_access", "Accès", "low", ordinal=False, multiplies=False),
     "oa_voie": Dimension("oa_voie", "Voie d'accès ouvert", "low", ordinal=False, multiplies=False),
     "doc_type": Dimension("doc_type", "Type de document", "low", ordinal=False, multiplies=False),
-    "source": Dimension("source", "Source", "low", ordinal=False, multiplies=True),
 }
 
 MEASURES: dict[str, Measure] = {
