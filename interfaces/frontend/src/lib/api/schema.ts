@@ -179,26 +179,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/labs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stats Labs
-         * @description Stats d'articles par laboratoire.
-         */
-        get: operations["stats_labs_api_stats_labs_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/stats/years": {
         parameters: {
             query?: never;
@@ -3979,48 +3959,6 @@ export interface components {
             /** Relation Type */
             relation_type: string;
         };
-        /** LabStatsResponse */
-        LabStatsResponse: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Pages */
-            pages: number;
-            /** Labs */
-            labs: components["schemas"]["LabStatsRow"][];
-        };
-        /** LabStatsRow */
-        LabStatsRow: {
-            /** Pub Count */
-            pub_count: number;
-            /** Apc Uca */
-            apc_uca: number;
-            /** Gold */
-            gold: number;
-            /** Diamond */
-            diamond: number;
-            /** Hybrid */
-            hybrid: number;
-            /** Bronze */
-            bronze: number;
-            /** Green */
-            green: number;
-            /** Embargoed */
-            embargoed: number;
-            /** Closed */
-            closed: number;
-            /** Unknown */
-            unknown: number;
-            /** Lab Id */
-            lab_id: number;
-            /** Lab Acronym */
-            lab_acronym: string | null;
-            /** Lab Name */
-            lab_name: string;
-        };
         /**
          * LabStructureCore
          * @description Métadonnées du labo (bloc `structure` du détail).
@@ -6429,46 +6367,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["YearStatsRow"][];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    stats_labs_api_stats_labs_get: {
-        parameters: {
-            query?: {
-                lab_id?: string;
-                year?: string;
-                publisher_id?: number | null;
-                journal_id?: number | null;
-                oa_status?: string;
-                has_apc?: string;
-                doc_type?: string;
-                page?: number;
-                per_page?: number;
-                sort?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LabStatsResponse"];
                 };
             };
             /** @description Validation Error */
