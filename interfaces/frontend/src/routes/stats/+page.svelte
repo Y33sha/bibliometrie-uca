@@ -58,10 +58,35 @@
 	let initialYearsApplied = false;
 
 	// --- Pivot: ventilation secondaire de l'histogramme par année ---
-	type PivotDim = components['schemas']['PivotDimensionOut'];
-	let pivotDims: PivotDim[] = $state([]); // dimensions graphables (hors année), lues du schéma
+	let pivotSchema = $state<components['schemas']['PivotSchemaResponse'] | null>(null);
 	let groupBy = $state('oa_access'); // dimension de découpage (série empilée)
 	let legendItems: { label: string; color: string }[] = $state([]);
+	const measure = 'pub_count'; // mesure courante (sélecteur de mesure : étape suivante)
+
+	// Dimensions graphables proposées au sélecteur « Découpage » (groupables, faible cardinalité, hors année).
+	const pivotDims = $derived(
+		pivotSchema
+			? pivotSchema.dimensions.filter(
+					(d) => d.groupable && d.cardinality === 'low' && d.key !== 'year'
+				)
+			: []
+	);
+
+	// Barre de facettes dérivée du registre (cf. domain `applicable_facets`) : ensemble des dimensions
+	// filtrables, moins celles effondrées par une mesure-ratio et moins un groupement catégoriel
+	// (l'année, ordinale, reste filtrable). Mirroir TS des règles G/M.
+	const facetKeys = $derived.by(() => {
+		if (!pivotSchema) return new Set(['year', 'lab', 'oa_voie', 'apc']);
+		const collapsed = new Set(pivotSchema.measures.find((m) => m.key === measure)?.collapses ?? []);
+		const grouped = new Set(['year', groupBy].filter(Boolean));
+		const out = new Set<string>();
+		for (const d of pivotSchema.dimensions) {
+			if (!d.filterable || collapsed.has(d.key)) continue;
+			if (grouped.has(d.key) && !d.ordinal) continue;
+			out.add(d.key);
+		}
+		return out;
+	});
 
 	// Couleurs / libellés / ordre par dimension de découpage. Les valeurs OA réutilisent les
 	// variables CSS existantes ; les autres dimensions piochent dans une palette catégorielle.
@@ -457,11 +482,8 @@
 		// Vocabulaire du pivot : dimensions graphables (faible cardinalité, hors l'axe année)
 		// proposées au sélecteur de découpage. Ajouter une dimension au registre l'y fait apparaître.
 		try {
-			const schema = await api<components['schemas']['PivotSchemaResponse']>('/api/stats/pivot/schema');
-			pivotDims = schema.dimensions.filter(
-				(d) => d.groupable && d.cardinality === 'low' && d.key !== 'year'
-			);
-		} catch { pivotDims = []; }
+			pivotSchema = await api<components['schemas']['PivotSchemaResponse']>('/api/stats/pivot/schema');
+		} catch { pivotSchema = null; }
 
 		// Load facets first, then apply default years if needed, then full refresh
 		await facets.load();
@@ -552,10 +574,20 @@
 		{/if}
 		<button class="tab-btn" class:active={tab === 'labs'} onclick={() => switchTab('labs')}>Laboratoires</button>
 	</div>
-	<FacetDropdown label="Années" allLabel="Toutes" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
-	<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
-	<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
-	<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
+	<!-- Barre de facettes : dérivée du registre sur l'onglet OA (piloté par le pivot) ; inchangée
+	     sur les onglets-tables tant qu'ils ne sont pas migrés au pivot. -->
+	{#if tab !== 'oa' || facetKeys.has('year')}
+		<FacetDropdown label="Années" allLabel="Toutes" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
+	{/if}
+	{#if tab !== 'oa' || facetKeys.has('lab')}
+		<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
+	{/if}
+	{#if tab !== 'oa' || facetKeys.has('oa_voie')}
+		<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
+	{/if}
+	{#if tab !== 'oa' || facetKeys.has('apc')}
+		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
+	{/if}
 	{#if tab === 'oa'}
 		<label class="groupby">
 			Découpage&nbsp;:
