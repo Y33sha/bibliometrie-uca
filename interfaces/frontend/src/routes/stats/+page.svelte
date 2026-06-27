@@ -59,7 +59,7 @@
 	let chartMode = $state<'absolu' | 'part'>('absolu'); // part = empilement aplati à 100 %
 	let chartPage = $state(1); // page de l'axe de comparaison à forte cardinalité (laboratoires)
 	let chartCatTotal = $state(0); // total des valeurs sur cet axe (0 si faible cardinalité)
-	const CHART_PAGE_SIZE = 15;
+	const CHART_PAGE_SIZE = 10;
 	let legendItems: { label: string; color: string }[] = $state([]);
 	// Le graphe par année est toujours le simple compte de publications (barres empilées). Le taux
 	// d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
@@ -384,8 +384,8 @@
 			label: stackDim ? dimLabel(stackDim, sv) : 'Publications',
 			data: cats.map((cv) => cell(cv, sv)),
 			backgroundColor: stackDim ? dimColor(stackDim, sv, i, cs) : cs.getPropertyValue('--accent').trim(),
-			barPercentage: 0.9,
-			categoryPercentage: 0.8
+			barPercentage: 0.85,
+			categoryPercentage: 0.7
 		}));
 		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
 
