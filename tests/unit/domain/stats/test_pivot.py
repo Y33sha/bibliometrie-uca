@@ -47,6 +47,13 @@ def test_validate_rejects_non_groupable_dimension():
         validate_pivot("pub_count", ["apc"])
 
 
+def test_validate_allows_lab_grouping():
+    # Le laboratoire (forte cardinalité) est groupable : il sert d'axe de comparaison.
+    assert DIMENSIONS["lab"].cardinality == "high"
+    _, dims = validate_pivot("pub_count", ["lab"])
+    assert [d.key for d in dims] == ["lab"]
+
+
 class TestApplicableFacets:
     def test_universal_set_minus_nothing(self):
         # Sans groupement catégoriel : toutes les dimensions filtrables.
