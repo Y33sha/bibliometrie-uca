@@ -335,12 +335,10 @@ class TestNameDuplicates:
         assert name_duplicates_count(sa_sync_conn) >= 1
         pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
         assert pair["overlaps"]["coauthors"] == 1
-        assert pair["tier"] == "network"
 
-    def test_disjoint_pair_is_homonym(self, sa_sync_conn):
+    def test_disjoint_pair_has_no_overlap(self, sa_sync_conn):
         a = _create_person(sa_sync_conn, last="Bernard", first="M")
         b = _create_person(sa_sync_conn, last="Bernard", first="Marie")
 
         pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
-        assert pair["tier"] == "homonym"
         assert pair["overlaps"] == {"coauthors": 0, "shared_pubs": 0, "labs": 0, "journals": 0}

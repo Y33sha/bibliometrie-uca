@@ -4239,19 +4239,13 @@ export interface components {
         };
         /**
          * NameDuplicatePairOut
-         * @description Deux personnes aux noms compatibles, avec leurs recouvrements et la force du rapprochement
-         *     (`network` = réseau de collaboration commun → doublon probable ; `weak` = labo/revue seuls ;
-         *     `homonym` = réseaux disjoints → homonyme probable).
+         * @description Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun
+         *     (co-auteurs, publications co-signées) signe un doublon ; des réseaux disjoints, un homonyme.
          */
         NameDuplicatePairOut: {
             person_a: components["schemas"]["IdentifierConflictPersonOut"];
             person_b: components["schemas"]["IdentifierConflictPersonOut"];
             overlaps: components["schemas"]["OverlapCountsOut"];
-            /**
-             * Tier
-             * @enum {string}
-             */
-            tier: "network" | "weak" | "homonym";
         };
         /** NameDuplicatesResponse */
         NameDuplicatesResponse: {

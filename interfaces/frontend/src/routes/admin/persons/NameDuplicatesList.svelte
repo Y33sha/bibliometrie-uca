@@ -29,12 +29,6 @@
   let acting = $state(false);
   let error = $state("");
 
-  const TIERS: Record<string, { label: string; cls: string }> = {
-    network: { label: "Réseau commun", cls: "tier-network" },
-    weak: { label: "À vérifier", cls: "tier-weak" },
-    homonym: { label: "Homonyme probable", cls: "tier-homonym" },
-  };
-
   const OVERLAPS: [keyof Pair["overlaps"], string][] = [
     ["coauthors", "co-auteurs"],
     ["shared_pubs", "publis communes"],
@@ -101,17 +95,13 @@
 {:else if data}
   <div class="pairs">
     {#each data.pairs as pair, i (i)}
-      {@const tier = TIERS[pair.tier]}
       <div class="pair-block">
-        <div class="pair-header">
-          <span class="tier {tier.cls}">{tier.label}</span>
-          <div class="overlaps">
-            {#each OVERLAPS as [key, label] (key)}
-              <span class="ov" class:zero={pair.overlaps[key] === 0}>
-                <span class="ov-n">{pair.overlaps[key]}</span>{label}
-              </span>
-            {/each}
-          </div>
+        <div class="overlaps">
+          {#each OVERLAPS as [key, label] (key)}
+            <span class="ov" class:zero={pair.overlaps[key] === 0}>
+              <span class="ov-n">{pair.overlaps[key]}</span>{label}
+            </span>
+          {/each}
         </div>
         <div class="pair-body">
           {@render personCol(pair.person_a)}
@@ -180,37 +170,12 @@
     border-radius: 6px;
     padding: 10px 12px;
   }
-  .pair-header {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-  }
-  .tier {
-    font-size: 0.72rem;
-    font-weight: 600;
-    border-radius: 10px;
-    padding: 1px 9px;
-    white-space: nowrap;
-  }
-  .tier-network {
-    background: #e6f4ea;
-    color: #1e7e44;
-  }
-  .tier-weak {
-    background: #fff3cd;
-    color: #8a6d1b;
-  }
-  .tier-homonym {
-    background: #eee;
-    color: #777;
-  }
   .overlaps {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     font-size: 0.8rem;
+    margin-bottom: 8px;
   }
   .ov {
     color: #444;
