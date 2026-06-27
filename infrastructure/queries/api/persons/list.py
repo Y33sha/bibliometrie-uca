@@ -11,6 +11,8 @@ from infrastructure.queries.filters import (
     WhereClause,
     assemble_where,
     person_has_identifier_clause,
+    person_has_pending_identifiers_clause,
+    person_has_pending_name_forms_clause,
     person_has_rh_clause,
     person_in_lab_clause,
     person_search_clause,
@@ -182,6 +184,8 @@ def list_persons(
     clauses.append(person_has_identifier_clause("idhal", filters.has_idhal))
     clauses.append(person_has_identifier_clause("idref", filters.has_idref))
     clauses.append(person_has_rh_clause(filters.has_rh))
+    clauses.append(person_has_pending_name_forms_clause(filters.has_pending_forms))
+    clauses.append(person_has_pending_identifiers_clause(filters.has_pending_identifiers))
 
     where_sql, binds = assemble_where(clauses)
     order = _LIST_SORT_MAP.get(sort, _LIST_SORT_MAP["name"])

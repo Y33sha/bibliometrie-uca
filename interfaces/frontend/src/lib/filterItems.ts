@@ -10,3 +10,8 @@ export const IDENTIFIER_ITEMS = [
 	{ key: 'idhal', label: 'idHAL' },
 	{ key: 'idref', label: 'IdRef' },
 ];
+
+export const PENDING_ITEMS = [
+	{ key: 'pending_forms', label: 'Formes de nom' },
+	{ key: 'pending_identifiers', label: 'Identifiants' },
+];

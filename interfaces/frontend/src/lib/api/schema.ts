@@ -4836,6 +4836,8 @@ export interface components {
             idhal: components["schemas"]["YesNoCount"];
             idref: components["schemas"]["YesNoCount"];
             rh: components["schemas"]["YesNoCount"];
+            pending_forms: components["schemas"]["YesNoCount"];
+            pending_identifiers: components["schemas"]["YesNoCount"];
         };
         /** PersonsStatsResponse */
         PersonsStatsResponse: {
@@ -7977,6 +7979,8 @@ export interface operations {
                 has_idhal?: string;
                 has_idref?: string;
                 has_rh?: string;
+                has_pending_forms?: string;
+                has_pending_identifiers?: string;
                 sort?: string;
             };
             header?: never;
@@ -8014,6 +8018,8 @@ export interface operations {
                 has_idhal?: string;
                 has_idref?: string;
                 has_rh?: string;
+                has_pending_forms?: string;
+                has_pending_identifiers?: string;
                 lab_id?: number | null;
                 search?: string;
             };

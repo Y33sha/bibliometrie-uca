@@ -3,7 +3,7 @@
   import FacetDropdown from "$lib/components/FacetDropdown.svelte";
   import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
   import PresenceFilterToggle from "$lib/components/PresenceFilterToggle.svelte";
-  import { IDENTIFIER_ITEMS } from "$lib/filterItems";
+  import { IDENTIFIER_ITEMS, PENDING_ITEMS } from "$lib/filterItems";
 
   type IdState = "all" | "yes" | "no";
 
@@ -13,10 +13,12 @@
     selectedRoles = $bindable(),
     selectedRh = $bindable(),
     idStates = $bindable(),
+    pendingStates = $bindable(),
     deptOptions,
     roleOptions,
     rhOptions,
     idCounts,
+    pendingCounts,
     totalCount,
     onsearch,
     onfilterchange,
@@ -26,10 +28,12 @@
     selectedRoles: string[];
     selectedRh: string[];
     idStates: Record<string, IdState>;
+    pendingStates: Record<string, IdState>;
     deptOptions: FacetOption[];
     roleOptions: FacetOption[];
     rhOptions: FacetOption[];
     idCounts: Record<string, { yes: number; no: number }>;
+    pendingCounts: Record<string, { yes: number; no: number }>;
     totalCount: number;
     onsearch: () => void;
     onfilterchange: () => void;
@@ -70,6 +74,13 @@
     items={IDENTIFIER_ITEMS}
     bind:states={idStates}
     counts={idCounts}
+    onchange={onfilterchange}
+  />
+  <PresenceFilterToggle
+    label="À confirmer"
+    items={PENDING_ITEMS}
+    bind:states={pendingStates}
+    counts={pendingCounts}
     onchange={onfilterchange}
   />
   <span class="count">{totalCount} personnes</span>

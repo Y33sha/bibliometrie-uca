@@ -9,6 +9,8 @@ from infrastructure.queries.filters import (
     WhereClause,
     assemble_where,
     person_has_identifier_clause,
+    person_has_pending_identifiers_clause,
+    person_has_pending_name_forms_clause,
     person_has_rh_clause,
     person_in_lab_clause,
     person_search_clause,
@@ -45,6 +47,10 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
             out.append(person_has_identifier_clause("idref", filters.has_idref))
         if skip != "has_rh":
             out.append(person_has_rh_clause(filters.has_rh))
+        if skip != "pending_forms":
+            out.append(person_has_pending_name_forms_clause(filters.has_pending_forms))
+        if skip != "pending_identifiers":
+            out.append(person_has_pending_identifiers_clause(filters.has_pending_identifiers))
         return out
 
     # DÉPARTEMENTS
@@ -139,6 +145,42 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
         binds,
     ).one()
 
+    # FORMES DE NOM À CONFIRMER (≥1 forme `pending`)
+    where_sql, binds = assemble_where(base_clauses(skip="pending_forms"))
+    pending_forms = conn.execute(
+        text(f"""
+            SELECT
+                COUNT(*) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM person_name_forms pnf
+                    WHERE pnf.person_id = p.id AND pnf.status = 'pending'
+                )) AS yes,
+                COUNT(*) FILTER (WHERE NOT EXISTS (
+                    SELECT 1 FROM person_name_forms pnf
+                    WHERE pnf.person_id = p.id AND pnf.status = 'pending'
+                )) AS no
+            FROM {_BASE_FROM} WHERE {where_sql}
+        """),
+        binds,
+    ).one()
+
+    # IDENTIFIANTS À CONFIRMER (≥1 identifiant `pending`)
+    where_sql, binds = assemble_where(base_clauses(skip="pending_identifiers"))
+    pending_identifiers = conn.execute(
+        text(f"""
+            SELECT
+                COUNT(*) FILTER (WHERE EXISTS (
+                    SELECT 1 FROM person_identifiers pi
+                    WHERE pi.person_id = p.id AND pi.status = 'pending'
+                )) AS yes,
+                COUNT(*) FILTER (WHERE NOT EXISTS (
+                    SELECT 1 FROM person_identifiers pi
+                    WHERE pi.person_id = p.id AND pi.status = 'pending'
+                )) AS no
+            FROM {_BASE_FROM} WHERE {where_sql}
+        """),
+        binds,
+    ).one()
+
     return {
         "departments": dept_facets,
         "roles": role_facets,
@@ -146,6 +188,8 @@ def persons_facets(conn: Connection, *, filters: FacetFilters) -> dict[str, Any]
         "idhal": {"yes": idhal.yes, "no": idhal.no},
         "idref": {"yes": idref.yes, "no": idref.no},
         "rh": {"yes": rh.yes, "no": rh.no},
+        "pending_forms": {"yes": pending_forms.yes, "no": pending_forms.no},
+        "pending_identifiers": {"yes": pending_identifiers.yes, "no": pending_identifiers.no},
     }
 
 
