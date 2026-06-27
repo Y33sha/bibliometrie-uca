@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8DmC96gcefd0ibpq0tGb5GGPirVIl6YtHeM6DDkCAJzfQwNQXkbK5bF95cu07uO
+\restrict WiVReXdQuwPJEGSSSPxbClZlkEkTlMY4NDSUOmWOF4hw433xAswHXO94J3mtxxa
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -623,9 +623,11 @@ ALTER SEQUENCE public.authorships_id_seq OWNED BY public.authorships.id;
 CREATE TABLE public.publication_relations (
     from_publication_id integer NOT NULL,
     relation_type public.relation_type NOT NULL,
-    target_doi text NOT NULL,
+    target_doi text,
     target_publication_id integer,
-    source text NOT NULL
+    source text NOT NULL,
+    id bigint NOT NULL,
+    CONSTRAINT publication_relations_target_present CHECK (((target_publication_id IS NOT NULL) OR (target_doi IS NOT NULL)))
 );
 
 
@@ -935,6 +937,20 @@ ALTER SEQUENCE public.perimeters_id_seq OWNED BY public.perimeters.id;
 
 
 --
+-- Name: person_identifier_keys; Type: MATERIALIZED VIEW; Schema: public; Owner: -
+--
+
+CREATE MATERIALIZED VIEW public.person_identifier_keys AS
+ SELECT DISTINCT sa.person_id,
+    k.k AS id_type,
+    (sa.person_identifiers ->> k.k) AS id_value
+   FROM (public.source_authorships sa
+     CROSS JOIN unnest(ARRAY['orcid'::text, 'idref'::text, 'hal_person_id'::text, 'idhal'::text]) k(k))
+  WHERE ((sa.person_id IS NOT NULL) AND (sa.person_identifiers ? k.k) AND ((sa.person_identifiers ->> k.k) !~~ '%_dubious'::text))
+  WITH NO DATA;
+
+
+--
 -- Name: person_identifiers; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1165,6 +1181,20 @@ CREATE SEQUENCE public.place_name_forms_id_seq
 --
 
 ALTER SEQUENCE public.place_name_forms_id_seq OWNED BY public.place_name_forms.id;
+
+
+--
+-- Name: publication_relations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.publication_relations ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.publication_relations_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
 
 
 --
@@ -2013,7 +2043,15 @@ ALTER TABLE ONLY public.place_name_forms
 --
 
 ALTER TABLE ONLY public.publication_relations
-    ADD CONSTRAINT publication_relations_pkey PRIMARY KEY (from_publication_id, relation_type, target_doi);
+    ADD CONSTRAINT publication_relations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: publication_relations publication_relations_uq; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.publication_relations
+    ADD CONSTRAINT publication_relations_uq UNIQUE NULLS NOT DISTINCT (from_publication_id, relation_type, target_publication_id, target_doi);
 
 
 --
@@ -2489,6 +2527,20 @@ CREATE INDEX idx_journals_titlenorm ON public.journals USING btree (title_normal
 
 
 --
+-- Name: idx_person_identifier_keys_uq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_person_identifier_keys_uq ON public.person_identifier_keys USING btree (person_id, id_type, id_value);
+
+
+--
+-- Name: idx_person_identifier_keys_value; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_person_identifier_keys_value ON public.person_identifier_keys USING btree (id_type, id_value);
+
+
+--
 -- Name: idx_person_ids_lookup; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2717,6 +2769,13 @@ CREATE INDEX idx_sa_in_perimeter ON public.source_authorships USING btree (sourc
 --
 
 CREATE INDEX idx_sa_person ON public.source_authorships USING btree (person_id) WHERE (person_id IS NOT NULL);
+
+
+--
+-- Name: idx_sa_pub_person; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sa_pub_person ON public.source_authorships USING btree (source_publication_id, person_id) WHERE (person_id IS NOT NULL);
 
 
 --
@@ -3299,5 +3358,5 @@ ALTER TABLE ONLY public.structure_relations
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8DmC96gcefd0ibpq0tGb5GGPirVIl6YtHeM6DDkCAJzfQwNQXkbK5bF95cu07uO
+\unrestrict WiVReXdQuwPJEGSSSPxbClZlkEkTlMY4NDSUOmWOF4hw433xAswHXO94J3mtxxa
 

@@ -25,7 +25,6 @@
 ### Workflow
 
 - Gérer les commits git. Faire un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase)
-- Utiliser des commandes qui génèrent le moins possible de demandes d'autorisation: éviter si possible les commandes chaînées, les commandes multiples enchaînées avec `&&`, les commandes superflues (`cd ... &&` lorsque tu te trouves déjà dans le bon répertoire), l'usage du PowerShell sous Windows...
 
 ## Conventions du projet
 
@@ -41,6 +40,4 @@
 - Tests backend : `python -m pytest tests/ -v` (nécessite `export DB_PASSWORD=...`)
 - Tests frontend : `cd interfaces/frontend && npm run check` (svelte-check, échoue sur les erreurs de types)
 - Lancement dev : `bash start.sh` (uvicorn port 8003 + vite port 5176)
-- Endpoints POST/PUT/PATCH : toujours un modèle Pydantic dans `interfaces/api/models.py`, jamais `body: dict`
-- Requêtes SQL : toujours des requêtes paramétrées (`%s`), jamais d'interpolation f-string pour les valeurs
 - Logging : utiliser `setup_logger` de `infrastructure/log.py`

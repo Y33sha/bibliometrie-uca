@@ -1,5 +1,9 @@
 # Chantier — Déduplication des publications sans identifiant fiable (arête pairwise-gated)
 
+Archivé le 2026-06-26
+
+**Résultat de l'audit et décision.** Sur 289 613 source_publications, le token Tier 1 (`metadata_block`) est étanche (un seul bloc même-`doc_type` non fusionné au stock) ; le résidu sans conflit de DOI se limite à 246 blocs « même titre long + année » (~0,08 % du stock), dont 128 couples preprint/publié (versions = relations, pas des fusions) et ~117 incohérences de typage cross-source, détectables seulement par le bloc titre+année lui-même. On s'arrête donc à Tier 1 : construire une garde pairwise auteurs (matching robuste de listes de noms + réordonnancement vis-à-vis de `persons`) est disproportionné pour ce volume. Le résidu part dans des canaux plus adaptés — versions sans DOI distinctif vers [relations](METIER_relations-publications.md), incohérences de typage vers un futur **outillage admin de fusion manuelle des publications** (cet audit rejoué dans l'UI pour remonter des listes à arbitrer, quelques centaines sur dix ans, gérables à la main), thèse mistypée (thèse + DOI éditeur, signal par enregistrement) vers `metadata_correction`. Une garde pairwise dédiée est de l'over-engineering au regard du besoin réel.
+
 ## Contexte
 
 Issu de [DATA_publications-match-or-create](DATA_publications-match-or-create.md) (Phase 3, item 3.2b, renvoyé ici). La déduplication repose sur des **tokens de confirmation par égalité** — DOI, NNT, hal_id, pmid, composite thèse `(title_normalized, pub_year)` — qui entrent dans `connected_components` (`domain/entity_resolution.py`) : deux `source_publications` partageant un token sont reliées, la composante est l'œuvre. Couvre les œuvres à **identifiant fiable**.
