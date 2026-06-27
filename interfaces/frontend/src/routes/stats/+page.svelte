@@ -477,12 +477,8 @@
 	<title>Statistiques — Bibliométrie UCA</title>
 </svelte:head>
 
-<!-- En-têtes et cellules de ventilation OA, partagés par les onglets éditeurs/revues/labos. -->
-{#snippet oaHeaderCols()}
-	<th class="num">Dia.</th><th class="num">Gold</th><th class="num">Hybrid</th><th class="num">Bronze</th>
-	<th class="num">Green</th><th class="num">Emb.</th><th class="num">Closed</th><th class="num">Ind.</th>
-{/snippet}
-
+<!-- Cellule de ventilation OA (barre de répartition), partagée par les onglets éditeurs/revues/labos.
+     Le détail chiffré par voie relève du pivot (onglet Open Access) / du drill-down, pas des tables. -->
 {#snippet oaBreakdownCells(r: OaRow)}
 	<td>
 		<div class="oa-bar">
@@ -495,14 +491,6 @@
 			<span class="unknown" style="width:{oaPercent(r.unknown, r.pub_count)}"></span>
 		</div>
 	</td>
-	<td class="num num-small">{r.diamond}</td>
-	<td class="num num-small">{r.gold}</td>
-	<td class="num num-small">{r.hybrid}</td>
-	<td class="num num-small">{r.bronze}</td>
-	<td class="num num-small">{r.green}</td>
-	<td class="num num-small">{r.embargoed}</td>
-	<td class="num num-small">{r.closed}</td>
-	<td class="num num-small">{r.unknown}</td>
 {/snippet}
 
 <!-- Summary row -->
@@ -615,7 +603,6 @@
 				<th class="num sortable" class:active={pubSort === 'pubs' || pubSort === '-pubs'} onclick={() => { pubSort = toggleSort(pubSort, 'pubs'); pubFetch.page = 1; pubFetch.load(); }}>Articles {pubSort === 'pubs' ? '▲' : pubSort === '-pubs' ? '▼' : ''}</th>
 				<th class="num sortable" class:active={pubSort === 'apc' || pubSort === '-apc'} onclick={() => { pubSort = toggleSort(pubSort, 'apc'); pubFetch.page = 1; pubFetch.load(); }}>APC UCA {pubSort === 'apc' ? '▲' : pubSort === '-apc' ? '▼' : ''}</th>
 				<th style="min-width:100px">OA</th>
-				{@render oaHeaderCols()}
 			</tr>
 		</thead>
 		<tbody>
@@ -646,7 +633,6 @@
 				<th class="num sortable" class:active={journalSort === 'pubs' || journalSort === '-pubs'} onclick={() => { journalSort = toggleSort(journalSort, 'pubs'); journalFetch.page = 1; journalFetch.load(); }}>Articles {journalSort === 'pubs' ? '▲' : journalSort === '-pubs' ? '▼' : ''}</th>
 				<th class="num sortable" class:active={journalSort === 'apc' || journalSort === '-apc'} onclick={() => { journalSort = toggleSort(journalSort, 'apc'); journalFetch.page = 1; journalFetch.load(); }}>APC UCA {journalSort === 'apc' ? '▲' : journalSort === '-apc' ? '▼' : ''}</th>
 				<th style="min-width:100px">OA</th>
-				{@render oaHeaderCols()}
 			</tr>
 		</thead>
 		<tbody>
@@ -679,7 +665,6 @@
 					<th class="num sortable" class:active={labSort === 'pubs' || labSort === '-pubs'} onclick={() => { labSort = toggleSort(labSort, 'pubs'); labFetch.page = 1; labFetch.load(); }}>Articles {labSort === 'pubs' ? '▲' : labSort === '-pubs' ? '▼' : ''}</th>
 					<th class="num sortable" class:active={labSort === 'apc' || labSort === '-apc'} onclick={() => { labSort = toggleSort(labSort, 'apc'); labFetch.page = 1; labFetch.load(); }}>APC UCA {labSort === 'apc' ? '▲' : labSort === '-apc' ? '▼' : ''}</th>
 					<th style="min-width:100px">OA</th>
-					{@render oaHeaderCols()}
 				</tr>
 			</thead>
 			<tbody>
