@@ -60,20 +60,22 @@
 
 	// --- Pivot : axes de l'histogramme. Groupement primaire (abscisse) + comparaison empilée (facultative). ---
 	let pivotSchema = $state<components['schemas']['PivotSchemaResponse'] | null>(null);
-	let primaryBy = $state('year'); // groupement primaire (abscisse)
-	let groupBy = $state('oa_access'); // comparaison : série secondaire empilée (facultative)
+	let primaryBy = $state('oa_access'); // groupement primaire (abscisse) : une catégorie, jamais l'année
+	let groupBy = $state('year'); // comparaison : série secondaire empilée (facultative), p. ex. l'année
 	let chartMode = $state<'absolu' | 'part'>('absolu'); // part = empilement aplati à 100 %
 	let legendItems: { label: string; color: string }[] = $state([]);
 	// Le graphe par année est toujours le simple compte de publications (barres empilées). Le taux
 	// d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
 	const measure = 'pub_count';
 
-	// Dimensions graphables (groupables, faible cardinalité) proposées aux sélecteurs de groupement
-	// et de comparaison. L'année y figure : c'est un axe parmi d'autres, plus un primaire figé.
+	// Dimensions graphables (groupables, faible cardinalité). Le groupement primaire est une catégorie
+	// à analyser (accès, voie, type) ; un axe ordinal comme l'année ne se groupe pas, il se compare —
+	// l'année est donc exclue du groupement et réservée à la comparaison.
 	const graphableDims = $derived(
 		pivotSchema ? pivotSchema.dimensions.filter((d) => d.groupable && d.cardinality === 'low') : []
 	);
-	// Comparaison : les mêmes dimensions, moins celle déjà prise comme groupement primaire.
+	const groupingDims = $derived(graphableDims.filter((d) => !d.ordinal));
+	// Comparaison : toute dimension graphable (l'année comprise), moins celle prise comme primaire.
 	const comparableDims = $derived(graphableDims.filter((d) => d.key !== primaryBy));
 
 	// Barre de facettes dérivée du registre (cf. domain `applicable_facets`) : ensemble des dimensions
@@ -227,8 +229,8 @@
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 				journalId: { type: 'single', urlKey: 'journal_id' },
 				search: { type: 'single', urlKey: 'search' },
-			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'year' },
-				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'oa_access' },
+			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'oa_access' },
+				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
 			page: { type: 'page', urlKey: 'page' },
 			labPage: { type: 'page', urlKey: 'lab_page' },
@@ -649,7 +651,7 @@
 		<label class="groupby">
 			Grouper par&nbsp;:
 			<select bind:value={primaryBy} onchange={onPrimaryChange}>
-				{#each graphableDims as d (d.key)}
+				{#each groupingDims as d (d.key)}
 					<option value={d.key}>{d.label}</option>
 				{/each}
 			</select>
