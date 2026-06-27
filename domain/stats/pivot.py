@@ -15,11 +15,15 @@ Propriétés portées par le registre :
 - **`multiplies`** (grain) — grouper par cette dimension démultiplie-t-il une publication ?
   (une publication rattachée à plusieurs laboratoires compte dans chacun). Dès qu'un groupement
   démultiplie, la mesure doit compter les publications de façon distincte.
-- **`is_ratio`** (mesure) — mesure-ratio (un numérateur sur un dénominateur, p. ex. le taux
-  d'accès ouvert : une courbe) vs agrégat additif (empilable).
+- **`groupable` / `filterable`** — rôles d'une dimension : axe de ventilation et/ou facette. La
+  barre de facettes se *dérive* de l'ensemble des dimensions filtrables (`applicable_facets`), sans
+  table de combinaisons (mesure, groupement).
+- **`is_ratio`** / **`collapses`** (mesure) — mesure-ratio (un numérateur sur un dénominateur, p. ex.
+  le taux d'accès ouvert : une courbe) vs agrégat additif (empilable) ; `collapses` liste les
+  dimensions qu'une mesure-ratio rend contradictoires (retirées des groupements et facettes).
 
 Pur, sans I/O. Ajouter une dimension ou une mesure = ajouter une entrée ici (et sa liaison
-SQL côté infrastructure).
+SQL côté infrastructure si elle est groupable).
 """
 
 from collections.abc import Sequence
@@ -33,34 +37,81 @@ Cardinality = Literal["low", "high"]
 
 @dataclass(frozen=True, slots=True)
 class Dimension:
-    """Un axe de groupement / ventilation."""
+    """Un attribut d'une publication. `groupable` : peut servir d'axe de ventilation ;
+    `filterable` : peut servir de facette. La plupart sont les deux ; certaines sont filtrables
+    seules (APC : utile à filtrer, sans intérêt comme axe)."""
 
     key: str
     label: str
     cardinality: Cardinality
     ordinal: bool
     multiplies: bool
+    groupable: bool
+    filterable: bool
 
 
 @dataclass(frozen=True, slots=True)
 class Measure:
-    """Une grandeur agrégée."""
+    """Une grandeur agrégée. `collapses` : les dimensions qu'une mesure-ratio rend contradictoires
+    (mesurer le % d'accès ouvert en filtrant/groupant par accès n'a pas de sens) — elles quittent
+    alors groupements et facettes."""
 
     key: str
     label: str
     is_ratio: bool
+    collapses: tuple[str, ...] = ()
 
 
 DIMENSIONS: dict[str, Dimension] = {
-    "year": Dimension("year", "Année", "low", ordinal=True, multiplies=False),
-    "oa_access": Dimension("oa_access", "Accès", "low", ordinal=False, multiplies=False),
-    "oa_voie": Dimension("oa_voie", "Voie d'accès ouvert", "low", ordinal=False, multiplies=False),
-    "doc_type": Dimension("doc_type", "Type de document", "low", ordinal=False, multiplies=False),
+    "year": Dimension(
+        "year", "Année", "low", ordinal=True, multiplies=False, groupable=True, filterable=True
+    ),
+    "oa_access": Dimension(
+        "oa_access",
+        "Accès",
+        "low",
+        ordinal=False,
+        multiplies=False,
+        groupable=True,
+        filterable=False,
+    ),
+    "oa_voie": Dimension(
+        "oa_voie",
+        "Voie d'accès ouvert",
+        "low",
+        ordinal=False,
+        multiplies=False,
+        groupable=True,
+        filterable=True,
+    ),
+    "doc_type": Dimension(
+        "doc_type",
+        "Type de document",
+        "low",
+        ordinal=False,
+        multiplies=False,
+        groupable=True,
+        filterable=True,
+    ),
+    "lab": Dimension(
+        "lab",
+        "Laboratoire",
+        "high",
+        ordinal=False,
+        multiplies=True,
+        groupable=False,
+        filterable=True,
+    ),
+    "apc": Dimension(
+        "apc", "APC", "low", ordinal=False, multiplies=False, groupable=False, filterable=True
+    ),
 }
 
 MEASURES: dict[str, Measure] = {
     "pub_count": Measure("pub_count", "Nombre de publications", is_ratio=False),
-    "pct_open": Measure("pct_open", "% d'accès ouvert", is_ratio=True),
+    "pct_open": Measure(
+        "pct_open", "% d'accès ouvert", is_ratio=True, collapses=("oa_access", "oa_voie")
+    ),
 }
 
 
@@ -78,11 +129,37 @@ def validate_pivot(measure: str, groups: Sequence[str]) -> tuple[Measure, list[D
     for key in groups:
         if key not in DIMENSIONS:
             raise ValidationError(f"Dimension inconnue : {key!r}")
+        if not DIMENSIONS[key].groupable:
+            raise ValidationError(f"Dimension non groupable : {key!r}")
         if key in seen:
             raise ValidationError(f"Groupement répété : {key!r}")
         seen.add(key)
         dims.append(DIMENSIONS[key])
     return MEASURES[measure], dims
+
+
+def applicable_facets(measure_key: str, group_keys: Sequence[str]) -> list[str]:
+    """Facettes applicables à une vue, par soustraction d'un ensemble universel (cf. registre).
+
+    Part de toutes les dimensions `filterable`, puis retire :
+    - **règle M** — les dimensions effondrées par une mesure-ratio (`Measure.collapses`) ;
+    - **règle G** — un groupement *catégoriel* (un axe de ventilation déjà visible ; un groupement
+      *ordinal* comme l'année reste filtrable en plage).
+
+    Aucune table de combinaisons : un ensemble unique moins ce que mesure et groupements consomment.
+    """
+    if measure_key not in MEASURES:
+        raise ValidationError(f"Mesure inconnue : {measure_key!r}")
+    collapsed = set(MEASURES[measure_key].collapses)
+    grouped = set(group_keys)
+    out: list[str] = []
+    for dim in DIMENSIONS.values():
+        if not dim.filterable or dim.key in collapsed:
+            continue
+        if dim.key in grouped and not dim.ordinal:
+            continue
+        out.append(dim.key)
+    return out
 
 
 def grain_multiplies(dims: Sequence[Dimension]) -> bool:

@@ -208,12 +208,19 @@ class PgStatsQueries(StatsQueries):
         return PivotSchemaResponse(
             dimensions=[
                 PivotDimensionOut(
-                    key=d.key, label=d.label, cardinality=d.cardinality, ordinal=d.ordinal
+                    key=d.key,
+                    label=d.label,
+                    cardinality=d.cardinality,
+                    ordinal=d.ordinal,
+                    groupable=d.groupable,
+                    filterable=d.filterable,
                 )
                 for d in DIMENSIONS.values()
             ],
             measures=[
-                PivotMeasureOut(key=m.key, label=m.label, is_ratio=m.is_ratio)
+                PivotMeasureOut(
+                    key=m.key, label=m.label, is_ratio=m.is_ratio, collapses=list(m.collapses)
+                )
                 for m in MEASURES.values()
             ],
         )

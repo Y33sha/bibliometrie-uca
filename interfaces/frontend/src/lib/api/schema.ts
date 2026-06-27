@@ -4929,7 +4929,8 @@ export interface components {
         };
         /**
          * PivotDimensionOut
-         * @description Métadonnée d'une dimension groupable, lue par les sélecteurs de l'interface.
+         * @description Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le
+         *     choix de ventilation, `filterable` la barre de facettes (dérivée par soustraction).
          */
         PivotDimensionOut: {
             /** Key */
@@ -4943,6 +4944,10 @@ export interface components {
             cardinality: "low" | "high";
             /** Ordinal */
             ordinal: boolean;
+            /** Groupable */
+            groupable: boolean;
+            /** Filterable */
+            filterable: boolean;
         };
         /** PivotMeasureOut */
         PivotMeasureOut: {
@@ -4952,6 +4957,8 @@ export interface components {
             label: string;
             /** Is Ratio */
             is_ratio: boolean;
+            /** Collapses */
+            collapses: string[];
         };
         /**
          * PivotResponse

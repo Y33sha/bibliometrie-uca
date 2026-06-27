@@ -137,18 +137,23 @@ class StatsFacetsResponse(BaseModel):
 
 
 class PivotDimensionOut(BaseModel):
-    """Métadonnée d'une dimension groupable, lue par les sélecteurs de l'interface."""
+    """Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le
+    choix de ventilation, `filterable` la barre de facettes (dérivée par soustraction)."""
 
     key: str
     label: str
     cardinality: Literal["low", "high"]
     ordinal: bool
+    groupable: bool
+    filterable: bool
 
 
 class PivotMeasureOut(BaseModel):
     key: str
     label: str
     is_ratio: bool
+    # Dimensions qu'une mesure-ratio rend contradictoires (retirées des groupements et facettes).
+    collapses: list[str]
 
 
 class PivotSchemaResponse(BaseModel):

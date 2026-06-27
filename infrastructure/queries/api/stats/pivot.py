@@ -49,8 +49,11 @@ _MEASURE_AGG: dict[str, str] = {
     ),
 }
 
-# Garde-fou d'extensibilité : toute clé du registre domaine a sa liaison SQL, et réciproquement.
-assert set(_DIM_EXPR) == set(DIMENSIONS), "liaison SQL des dimensions désynchronisée du registre"
+# Garde-fou d'extensibilité : toute dimension *groupable* a sa liaison SQL de groupement, et
+# réciproquement ; idem pour les mesures. Les dimensions filtrables-seules (APC, labo) n'ont pas
+# d'expression de groupement — leur SQL de filtrage vit dans les clauses de `filters.py`.
+_GROUPABLE = {key for key, dim in DIMENSIONS.items() if dim.groupable}
+assert set(_DIM_EXPR) == _GROUPABLE, "liaison SQL des dimensions désynchronisée du registre"
 assert set(_MEASURE_AGG) == set(MEASURES), "liaison SQL des mesures désynchronisée du registre"
 
 # Périmètre du moteur : corpus in-perimeter, hors revues-dépôts (serveurs de preprint). Le type de
