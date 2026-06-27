@@ -65,7 +65,6 @@ from interfaces.api.routers.admin import (  # noqa: E402  # noqa: E402  # noqa: 
     authorships as admin_authorships,
     feedback as admin_feedback,  # noqa: E402
     perimeters as admin_perimeters,
-    person_duplicates as admin_person_duplicates,
     persons as admin_persons,  # noqa: E402
     pipeline_config as admin_pipeline_config,
     pipeline_logs as admin_pipeline_logs,
@@ -345,7 +344,6 @@ app.include_router(admin_structures.router)
 app.include_router(persons.router)
 app.include_router(admin_persons.router)
 app.include_router(admin_authorships.router)
-app.include_router(admin_person_duplicates.router)
 app.include_router(hal_problems.router)
 app.include_router(admin_pipeline_config.router)
 app.include_router(admin_perimeters.router)

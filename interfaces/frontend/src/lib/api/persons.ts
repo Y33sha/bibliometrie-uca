@@ -81,7 +81,7 @@ export function markDistinct(
 	personIdA: number,
 	personIdB: number
 ): Promise<unknown> {
-	return post('/api/admin/person-duplicates/mark-distinct', {
+	return post('/api/admin/persons/mark-distinct', {
 		person_id_a: personIdA,
 		person_id_b: personIdB
 	});

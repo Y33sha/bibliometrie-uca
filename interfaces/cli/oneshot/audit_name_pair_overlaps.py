@@ -8,8 +8,8 @@ recouvrements sur les paires candidates réelles, pour voir lesquels discriminen
 frontière.
 
 Les paires candidates réutilisent la génération existante (`PERSON_DUP_QUERIES`, 4 requêtes larges)
-resserrée par `names_compatible` (comparaison par tokens) — la source de paires du mode « par nom »
-de `admin/person-duplicates`. Pour chaque paire, on compte l'intersection de cinq dimensions :
+resserrée par `names_compatible` (comparaison par tokens) — la source de paires de la file
+« Doublons par nom » du hub `admin/persons`. Pour chaque paire, on compte l'intersection de cinq dimensions :
 co-auteurs, laboratoires, revues, sujets, et publications directement co-signées.
 
 Rien n'est écrit.
@@ -23,7 +23,7 @@ from sqlalchemy import Connection, bindparam, text
 
 from domain.persons.name_matching import names_compatible
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.queries.api.person_duplicates import PERSON_DUP_QUERIES
+from infrastructure.queries.api.persons.admin import PERSON_DUP_QUERIES
 
 # Une dimension = (étiquette, SQL renvoyant (person_id, valeur) pour les personnes ciblées).
 # Toutes au grain `authorships` (paires consolidées, rôle quelconque).

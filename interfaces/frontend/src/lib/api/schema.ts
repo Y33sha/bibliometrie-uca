@@ -1364,6 +1364,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/persons/mark-distinct": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Persons Distinct
+         * @description Marque deux personnes comme distinctes (non-doublon) : la paire ne sera plus proposée par les
+         *     files de triage par nom / identifiant.
+         */
+        post: operations["mark_persons_distinct_api_admin_persons_mark_distinct_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/persons/{person_id}/name-form-authorships": {
         parameters: {
             query?: never;
@@ -1736,118 +1757,6 @@ export interface paths {
          *     et que `force` est faux ; avec `force`, les rejets sont d'abord levés.
          */
         post: operations["batch_assign_orphan_authorships_api_admin_orphan_authorships_batch_assign_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Count Person Duplicates
-         * @description Comptage des paires candidates doublons-personnes.
-         */
-        get: operations["count_person_duplicates_api_admin_person_duplicates_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/next": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Next Person Duplicate
-         * @description Renvoie la paire personne-candidate au dédoublonnage à l'offset donné.
-         *
-         *     `skip` : liste CSV de paires `idA-idB` à ignorer pour cette
-         *     session (défilement côté front sans revoir les mêmes candidats).
-         *     Renvoie `{"pair": null}` si aucune paire restante.
-         */
-        get: operations["next_person_duplicate_api_admin_person_duplicates_next_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/mark-distinct": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Mark Persons Distinct
-         * @description Marque deux personnes comme distinctes (non-doublon).
-         */
-        post: operations["mark_persons_distinct_api_admin_person_duplicates_mark_distinct_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/conflicts/count": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Count Person Conflict Pairs
-         * @description Nombre de paires de personnes co-auteurs d'une même publication.
-         *
-         *     Un conflit = deux `person_id` distincts rattachés à la même
-         *     `publication_id` alors que leur forme de nom est compatible →
-         *     suggère un doublon que la déduplication classique n'a pas vu.
-         */
-        get: operations["count_person_conflict_pairs_api_admin_person_duplicates_conflicts_count_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/person-duplicates/conflicts/next": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Next Person Conflict
-         * @description Renvoie la paire personnes-en-conflit à l'offset donné.
-         *
-         *     Même protocole que `/person-duplicates/next` (paire + skip +
-         *     offset) mais pour les conflits co-auteurs plutôt que les
-         *     candidats de similarité de nom.
-         */
-        get: operations["next_person_conflict_api_admin_person_duplicates_conflicts_next_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4583,102 +4492,11 @@ export interface components {
             /** Addresses */
             addresses: components["schemas"]["PersonAddressOut"][];
         };
-        /** PersonConflictPair */
-        PersonConflictPair: {
-            person_a: components["schemas"]["PersonDedupDetail"];
-            person_b: components["schemas"]["PersonDedupDetail"];
-            /** Conflict Pubs */
-            conflict_pubs: components["schemas"]["PersonConflictPub"][];
-        };
-        /** PersonConflictPairResponse */
-        PersonConflictPairResponse: {
-            pair: components["schemas"]["PersonConflictPair"] | null;
-        };
-        /** PersonConflictPub */
-        PersonConflictPub: {
-            /** Id */
-            id: number;
-            /** Title */
-            title: string;
-            /** Pub Year */
-            pub_year: number | null;
-            /** Doc Type */
-            doc_type: string;
-            /** Position */
-            position: number;
-        };
         /** PersonDashboardResponse */
         PersonDashboardResponse: {
             /** Pubs By Year */
             pubs_by_year: components["schemas"]["PubYearCount"][];
             oa: components["schemas"]["DashboardOa"];
-        };
-        /**
-         * PersonDedupDetail
-         * @description Profil d'une personne pour la page de déduplication.
-         */
-        PersonDedupDetail: {
-            /** Id */
-            id: number;
-            /** Last Name */
-            last_name: string;
-            /** First Name */
-            first_name: string;
-            /** Last Name Normalized */
-            last_name_normalized: string;
-            /** First Name Normalized */
-            first_name_normalized: string;
-            /** Has Rh */
-            has_rh: boolean;
-            /** Role Title */
-            role_title: string | null;
-            /** Department Name */
-            department_name: string | null;
-            /** Identifiers */
-            identifiers: components["schemas"]["PersonDedupIdentifier"][];
-            /** Publications */
-            publications: components["schemas"]["PersonDedupPublication"][];
-            /** Pub Count */
-            pub_count: number;
-            /** Labs */
-            labs: components["schemas"]["PersonDedupLab"][];
-        };
-        /** PersonDedupIdentifier */
-        PersonDedupIdentifier: {
-            /** Id */
-            id: number;
-            /** Id Type */
-            id_type: string;
-            /** Id Value */
-            id_value: string;
-            /** Source */
-            source: string;
-            /** Status */
-            status: string;
-        };
-        /** PersonDedupLab */
-        PersonDedupLab: {
-            /** Id */
-            id: number;
-            /** Acronym */
-            acronym: string | null;
-            /** Name */
-            name: string;
-        };
-        /** PersonDedupPublication */
-        PersonDedupPublication: {
-            /** Id */
-            id: number;
-            /** Title */
-            title: string;
-            /** Pub Year */
-            pub_year: number | null;
-            /** Doi */
-            doi: string | null;
-            /** Doc Type */
-            doc_type: string;
-            /** Sources */
-            sources: string[];
         };
         /**
          * PersonDirectoryEntry
@@ -4718,15 +4536,6 @@ export interface components {
             pages: number;
             /** Persons */
             persons: components["schemas"]["PersonDirectoryEntry"][];
-        };
-        /** PersonDuplicatePair */
-        PersonDuplicatePair: {
-            person_a: components["schemas"]["PersonDedupDetail"];
-            person_b: components["schemas"]["PersonDedupDetail"];
-        };
-        /** PersonDuplicatePairResponse */
-        PersonDuplicatePairResponse: {
-            pair: components["schemas"]["PersonDuplicatePair"] | null;
         };
         /**
          * PersonIdentifierOut
@@ -8590,6 +8399,39 @@ export interface operations {
             };
         };
     };
+    mark_persons_distinct_api_admin_persons_mark_distinct_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarkPersonsDistinct"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     name_form_authorships_api_persons__person_id__name_form_authorships_get: {
         parameters: {
             query: {
@@ -9100,143 +8942,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrphanBatchAssignResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    count_person_duplicates_api_admin_person_duplicates_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TotalCountResponse"];
-                };
-            };
-        };
-    };
-    next_person_duplicate_api_admin_person_duplicates_next_get: {
-        parameters: {
-            query?: {
-                skip?: string;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonDuplicatePairResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    mark_persons_distinct_api_admin_person_duplicates_mark_distinct_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MarkPersonsDistinct"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    count_person_conflict_pairs_api_admin_person_duplicates_conflicts_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TotalCountResponse"];
-                };
-            };
-        };
-    };
-    next_person_conflict_api_admin_person_duplicates_conflicts_next_get: {
-        parameters: {
-            query?: {
-                skip?: string;
-                offset?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonConflictPairResponse"];
                 };
             };
             /** @description Validation Error */

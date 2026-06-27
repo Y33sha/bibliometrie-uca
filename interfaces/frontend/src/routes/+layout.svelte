@@ -19,7 +19,7 @@
       isActive("/admin/publishers") ||
       isActive("/admin/journals"),
   );
-  const isDuplicates = $derived($page.url.pathname === base + "/admin/duplicates" || $page.url.pathname === base + "/admin/person-duplicates");
+  const isDuplicates = $derived($page.url.pathname === base + "/admin/duplicates");
   const isHalProblems = $derived($page.url.pathname.startsWith(base + "/hal-problems"));
   const isPublicReferentiels = $derived(
     isActive("/publishers") || isActive("/journals") || isActive("/subjects"),
@@ -77,13 +77,11 @@
           <a href="{base}/admin/countries" class:active={isActive("/admin/countries")}>Pays</a>
         </div>
       </div>
-      <div class="nav-dropdown" role="navigation" class:active={isDuplicates}>
-        <button class="nav-link" class:active={isDuplicates}>Dédoublonnage &#x25BE;</button>
-        <div class="nav-dropdown-menu">
-          <a href="{base}/admin/duplicates" class:active={isActive("/admin/duplicates")}>Publications</a>
-          <a href="{base}/admin/person-duplicates" class:active={isActive("/admin/person-duplicates")}>Personnes</a>
-        </div>
-      </div>
+      <a
+        href="{base}/admin/duplicates"
+        class="nav-link"
+        class:active={isDuplicates}>Doublons publications</a
+      >
       <a href="{base}/stats" class="nav-link nav-switch-link">Public</a>
       <button class="nav-link nav-switch-link" onclick={logout}>Déconnexion</button>
     </nav>
