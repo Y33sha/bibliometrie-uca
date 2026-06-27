@@ -129,11 +129,17 @@ class ApcFacet(BaseModel):
     count: int
 
 
+class DocTypeFacet(BaseModel):
+    value: str
+    count: int
+
+
 class StatsFacetsResponse(BaseModel):
     years: list[YearFacet]
     labs: list[LabFacet]
     oa_statuses: list[OaFacet]
     apc: list[ApcFacet]
+    doc_types: list[DocTypeFacet]
 
 
 class PivotDimensionOut(BaseModel):
@@ -200,6 +206,7 @@ class StatsQueries(Protocol):
         years: list[int],
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
         search: str,
         page: int,
         per_page: int,
@@ -215,6 +222,7 @@ class StatsQueries(Protocol):
         publisher_id: int | None,
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
         search: str,
         page: int,
         per_page: int,
@@ -231,6 +239,7 @@ class StatsQueries(Protocol):
         journal_id: int | None,
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
         page: int,
         per_page: int,
         sort: str,
@@ -246,6 +255,7 @@ class StatsQueries(Protocol):
         journal_id: int | None,
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
     ) -> list[YearStatsRow]: ...
 
     def stats_summary(
@@ -258,6 +268,7 @@ class StatsQueries(Protocol):
         journal_id: int | None,
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
     ) -> StatsSummary: ...
 
     def available_years(self) -> list[int]: ...
@@ -272,4 +283,5 @@ class StatsQueries(Protocol):
         journal_id: int | None,
         oa_status: str,
         has_apc: str,
+        doc_types: list[str],
     ) -> StatsFacetsResponse: ...

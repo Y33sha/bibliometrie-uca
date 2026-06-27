@@ -11,15 +11,17 @@ from infrastructure.queries.filters import (
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     assemble_where,
+    doc_type_clause,
     lab_clause,
     oa_clause,
     year_clause,
 )
 
+# Périmètre : corpus in-perimeter, hors revues-dépôts. Le type de document n'est PAS figé ici —
+# c'est un filtre comme un autre (facette « Type de document »), porté par `doc_type_clause`.
 _BASE_CLAUSES = " AND ".join(
     [
         PUBLICATION_IS_IN_PERIMETER,
-        "p.doc_type IN ('article', 'review')",
         "(j.oa_model IS DISTINCT FROM 'repository')",
     ]
 )
@@ -47,12 +49,13 @@ def _common_clauses(
     journal_id: int | None,
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
     skip: str = "",
 ) -> list[WhereClause | None]:
     """Construit les filtres communs aux endpoints stats summary / facets.
 
     `skip` permet d'omettre un filtre pour les facettes croisées ("year",
-    "lab", "oa", "apc"). Les filtres publisher/journal sont toujours
+    "lab", "oa", "apc", "doc_type"). Les filtres publisher/journal sont toujours
     appliqués (jamais facettés).
     """
     out: list[WhereClause | None] = []
@@ -65,6 +68,8 @@ def _common_clauses(
         out.append(oa_clause(oa_status))
     if skip != "apc":
         out.append(stats_apc_clause(has_apc, apc_structure_ids))
+    if skip != "doc_type":
+        out.append(doc_type_clause(doc_types))
     return out
 
 
@@ -77,6 +82,7 @@ def _by_year_sql(
     journal_id: int | None,
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
 ) -> tuple[str, dict[str, Any]]:
     dyn_where, binds = assemble_where(
         _common_clauses(
@@ -87,6 +93,7 @@ def _by_year_sql(
             journal_id=journal_id,
             oa_status=oa_status,
             has_apc=has_apc,
+            doc_types=doc_types,
         )
     )
     sql = f"""
@@ -113,6 +120,7 @@ def stats_by_year(
     journal_id: int | None,
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
 ) -> list[dict[str, Any]]:
     """Ventilation par année."""
     conn.execute(text("SET LOCAL jit = off"))
@@ -124,6 +132,7 @@ def stats_by_year(
         journal_id=journal_id,
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=doc_types,
     )
     rows = conn.execute(text(sql), binds).all()
     return [dict(r._mapping) for r in rows]
@@ -138,6 +147,7 @@ def _summary_sql(
     journal_id: int | None,
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
 ) -> tuple[str, dict[str, Any]]:
     dyn_where, binds = assemble_where(
         _common_clauses(
@@ -148,6 +158,7 @@ def _summary_sql(
             journal_id=journal_id,
             oa_status=oa_status,
             has_apc=has_apc,
+            doc_types=doc_types,
         )
     )
     sql = f"""
@@ -179,6 +190,7 @@ def stats_summary(
     journal_id: int | None,
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
 ) -> dict[str, Any]:
     """Totaux globaux pour la page stats."""
     conn.execute(text("SET LOCAL jit = off"))
@@ -190,6 +202,7 @@ def stats_summary(
         journal_id=journal_id,
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=doc_types,
     )
     row = conn.execute(text(sql), binds).one()
     return dict(row._mapping)
@@ -218,6 +231,7 @@ def _facets_sqls(
     journal_id: int | None,
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
 ) -> dict[str, tuple[str, dict[str, Any]]]:
     """Retourne {facet_name: (sql, binds)} pour les 4 sous-requêtes facettes."""
 
@@ -230,6 +244,7 @@ def _facets_sqls(
             journal_id=journal_id,
             oa_status=oa_status,
             has_apc=has_apc,
+            doc_types=doc_types,
             skip=skip,
         )
 
@@ -293,11 +308,22 @@ def _facets_sqls(
         WHERE {_BASE_CLAUSES} AND {apc_where}
     """
 
+    dt_where, dt_binds = assemble_where(_clauses("doc_type"))
+    doc_type_sql = f"""
+        SELECT p.doc_type::text AS value, COUNT(DISTINCT p.id) AS count
+        FROM publications p
+        LEFT JOIN journals j ON j.id = p.journal_id
+        WHERE {_BASE_CLAUSES} AND {dt_where}
+        GROUP BY p.doc_type
+        ORDER BY count DESC
+    """
+
     return {
         "year": (year_sql, year_binds),
         "lab": (lab_sql, lab_binds),
         "oa": (oa_sql, oa_binds),
         "apc": (apc_sql, {**apc_binds, "apc_root_ids": apc_structure_ids}),
+        "doc_type": (doc_type_sql, dt_binds),
     }
 
 
@@ -311,6 +337,7 @@ def stats_facets(
     journal_id: int | None,
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
 ) -> dict[str, list[dict[str, Any]]]:
     """Facettes dynamiques."""
     conn.execute(text("SET LOCAL jit = off"))
@@ -322,14 +349,16 @@ def stats_facets(
         journal_id=journal_id,
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=doc_types,
     )
 
     year_rows = conn.execute(text(sqls["year"][0]), sqls["year"][1]).all()
     lab_rows = conn.execute(text(sqls["lab"][0]), sqls["lab"][1]).all()
     oa_rows = conn.execute(text(sqls["oa"][0]), sqls["oa"][1]).all()
     apc_row = conn.execute(text(sqls["apc"][0]), sqls["apc"][1]).one()
+    doc_type_rows = conn.execute(text(sqls["doc_type"][0]), sqls["doc_type"][1]).all()
 
-    return _build_facets_result(year_rows, lab_rows, oa_rows, apc_row)
+    return _build_facets_result(year_rows, lab_rows, oa_rows, apc_row, doc_type_rows)
 
 
 def _build_facets_result(
@@ -337,11 +366,13 @@ def _build_facets_result(
     lab_rows: Sequence[Row[Any]],
     oa_rows: Sequence[Row[Any]],
     apc_row: Row[Any],
+    doc_type_rows: Sequence[Row[Any]],
 ) -> dict[str, list[dict[str, Any]]]:
     return {
         "years": [{"value": r.pub_year, "count": r.count} for r in year_rows],
         "labs": [{"value": r.id, "label": r.label, "count": r.count} for r in lab_rows],
         "oa_statuses": [{"value": r.value, "count": r.count} for r in oa_rows],
+        "doc_types": [{"value": r.value, "count": r.count} for r in doc_type_rows],
         "apc": [
             {"value": "uca", "text": "APC UCA", "count": apc_row.apc_uca},
             {"value": "non_uca", "text": "APC hors UCA", "count": apc_row.apc_non_uca},

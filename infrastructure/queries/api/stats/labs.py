@@ -12,6 +12,7 @@ from infrastructure.queries.filters import (
     OA_BREAKDOWN_COLS_SQL,
     WhereClause,
     assemble_where,
+    doc_type_clause,
     oa_clause,
     year_clause,
 )
@@ -44,17 +45,13 @@ def _build_stats_labs_sql(
     journal_id: int | None,
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
     page: int,
     per_page: int,
     sort: str,
 ) -> tuple[str, str, dict[str, Any]]:
     offset = (page - 1) * per_page
-    static_clauses = " AND ".join(
-        [
-            "p.doc_type IN ('article', 'review')",
-            "(j.oa_model IS DISTINCT FROM 'repository')",
-        ]
-    )
+    static_clauses = "(j.oa_model IS DISTINCT FROM 'repository')"
     # Spécificité de cet endpoint : lab filter passe par la CTE `pub_structs` (utilisée aussi pour le GROUP BY structure plus bas), donc `lab_clause` générique ferait un EXISTS séparé sur `authorships`/`authorship_structures` — on factorise via la CTE déjà en place.
     lab_struct_clause = (
         WhereClause(
@@ -73,6 +70,7 @@ def _build_stats_labs_sql(
         year_clause(years),
         oa_clause(oa_status),
         stats_apc_clause(has_apc, apc_structure_ids),
+        doc_type_clause(doc_types),
     ]
     if publisher_id:
         extra_clauses.append(
@@ -131,6 +129,7 @@ def stats_labs(
     journal_id: int | None,
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
     page: int,
     per_page: int,
     sort: str,
@@ -145,6 +144,7 @@ def stats_labs(
         journal_id=journal_id,
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=doc_types,
         page=page,
         per_page=per_page,
         sort=sort,

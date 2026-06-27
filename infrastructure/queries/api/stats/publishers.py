@@ -13,6 +13,7 @@ from infrastructure.queries.filters import (
     OA_BREAKDOWN_COLS_SQL,
     PUBLICATION_IS_IN_PERIMETER,
     assemble_where,
+    doc_type_clause,
     lab_clause,
     oa_clause,
     year_clause,
@@ -35,6 +36,7 @@ def _build_publisher_stats_sql(
     years: list[int],
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
     search: str,
     page: int,
     per_page: int,
@@ -45,7 +47,6 @@ def _build_publisher_stats_sql(
     static_clauses = " AND ".join(
         [
             PUBLICATION_IS_IN_PERIMETER,
-            "p.doc_type IN ('article', 'review')",
             "j.oa_model IS DISTINCT FROM 'repository'",
         ]
     )
@@ -55,6 +56,7 @@ def _build_publisher_stats_sql(
             year_clause(years),
             oa_clause(oa_status),
             stats_apc_clause(has_apc, apc_structure_ids),
+            doc_type_clause(doc_types),
         ]
     )
     where = f"{static_clauses} AND {dyn_where}"
@@ -103,6 +105,7 @@ def publisher_stats(
     years: list[int],
     oa_status: str,
     has_apc: str,
+    doc_types: list[str],
     search: str,
     page: int,
     per_page: int,
@@ -116,6 +119,7 @@ def publisher_stats(
         years=years,
         oa_status=oa_status,
         has_apc=has_apc,
+        doc_types=doc_types,
         search=search,
         page=page,
         per_page=per_page,
