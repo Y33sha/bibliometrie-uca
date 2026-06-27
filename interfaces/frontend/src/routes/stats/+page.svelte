@@ -16,7 +16,6 @@
 
 	// --- Types ---
 	import type { components } from '$lib/api/schema';
-	type Summary = components['schemas']['StatsSummary'];
 	type PublisherRow = components['schemas']['PublisherStatsRow'];
 	type JournalRow = components['schemas']['JournalStatsRow'];
 	type LabRow = components['schemas']['LabStatsRow'];
@@ -48,11 +47,6 @@
 		if (current === '-' + field) return field;
 		return field;
 	}
-
-	let summary: Summary = $state({
-		total_pubs: 0, gold: 0, hybrid: 0, green: 0, bronze: 0, embargoed: 0, closed: 0, unknown: 0,
-		publisher_count: 0, journal_count: 0,
-	});
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
@@ -322,11 +316,7 @@
 
 	// --- Data loading ---
 	async function refresh() {
-		await Promise.all([loadSummary(), loadTabContent(), facets.load()]);
-	}
-
-	async function loadSummary() {
-		summary = await api<Summary>('/api/stats/summary?' + chartParams());
+		await Promise.all([loadTabContent(), facets.load()]);
 	}
 
 	async function loadTabContent() {
@@ -578,27 +568,6 @@
 	</td>
 {/snippet}
 
-<!-- Summary row -->
-<div class="summary-row">
-	<div class="summary-card">
-		<div class="value">{summary.total_pubs}</div>
-		<div class="label">Articles</div>
-	</div>
-	{#if !journalId}
-		{#if !publisherId}
-			<div class="summary-card">
-				<div class="value">{summary.publisher_count}</div>
-				<div class="label">Éditeurs</div>
-			</div>
-		{/if}
-		<div class="summary-card">
-			<div class="value">{summary.journal_count}</div>
-			<div class="label">Revues</div>
-		</div>
-	{/if}
-	<a class="pub-link" href={pubsUrl}>Voir les publications &rarr;</a>
-</div>
-
 <!-- Breadcrumb for detail views -->
 {#if view !== 'top'}
 	<div class="breadcrumb">
@@ -623,35 +592,8 @@
 	</div>
 {/if}
 
-<!-- Toolbar: tabs + filters -->
-<div class="toolbar">
-	<div class="tab-group">
-		<button class="tab-btn" class:active={tab === 'oa'} onclick={() => switchTab('oa')}>Open Access</button>
-		{#if view === 'top'}
-			<button class="tab-btn" class:active={tab === 'publishers'} onclick={() => switchTab('publishers')}>Éditeurs</button>
-		{/if}
-		{#if view === 'top' || view === 'publisher_detail'}
-			<button class="tab-btn" class:active={tab === 'journals'} onclick={() => switchTab('journals')}>Revues</button>
-		{/if}
-		<button class="tab-btn" class:active={tab === 'labs'} onclick={() => switchTab('labs')}>Laboratoires</button>
-	</div>
-	<!-- Barre de facettes : dérivée du registre sur l'onglet OA (piloté par le pivot) ; inchangée
-	     sur les onglets-tables tant qu'ils ne sont pas migrés au pivot. -->
-	{#if tab !== 'oa' || facetKeys.has('year')}
-		<FacetDropdown label="Années" allLabel="Toutes" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
-	{/if}
-	{#if tab !== 'oa' || facetKeys.has('lab')}
-		<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
-	{/if}
-	{#if tab !== 'oa' || facetKeys.has('oa_voie')}
-		<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
-	{/if}
-	{#if tab !== 'oa' || facetKeys.has('doc_type')}
-		<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
-	{/if}
-	{#if tab !== 'oa' || facetKeys.has('apc')}
-		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
-	{/if}
+<!-- Ligne 1 : contrôles du pivot + onglets -->
+<div class="toolbar controls-row">
 	{#if tab === 'oa' && pivotSchema}
 		<label class="groupby">
 			Grouper par&nbsp;:
@@ -677,6 +619,16 @@
 			Part&nbsp;(%)
 		</label>
 	{/if}
+	<div class="tab-group">
+		<button class="tab-btn" class:active={tab === 'oa'} onclick={() => switchTab('oa')}>Open Access</button>
+		{#if view === 'top'}
+			<button class="tab-btn" class:active={tab === 'publishers'} onclick={() => switchTab('publishers')}>Éditeurs</button>
+		{/if}
+		{#if view === 'top' || view === 'publisher_detail'}
+			<button class="tab-btn" class:active={tab === 'journals'} onclick={() => switchTab('journals')}>Revues</button>
+		{/if}
+		<button class="tab-btn" class:active={tab === 'labs'} onclick={() => switchTab('labs')}>Laboratoires</button>
+	</div>
 	{#if tab === 'publishers' || tab === 'journals'}
 		<input type="search" placeholder="Rechercher..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	{/if}
@@ -687,6 +639,26 @@
 			{:else if tab === 'labs'}{labFetch.total} laboratoire{labFetch.total > 1 ? 's' : ''}
 			{/if}
 		</span>
+	{/if}
+	<a class="pub-link" href={pubsUrl}>Voir les publications &rarr;</a>
+</div>
+<!-- Ligne 2 : filtres à facettes (dérivés du registre sur l'onglet OA ; inchangés sur les
+     onglets-tables tant qu'ils ne sont pas migrés au pivot) -->
+<div class="toolbar facets-row">
+	{#if tab !== 'oa' || facetKeys.has('year')}
+		<FacetDropdown label="Années" allLabel="Toutes" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
+	{/if}
+	{#if tab !== 'oa' || facetKeys.has('lab')}
+		<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
+	{/if}
+	{#if tab !== 'oa' || facetKeys.has('oa_voie')}
+		<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
+	{/if}
+	{#if tab !== 'oa' || facetKeys.has('doc_type')}
+		<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
+	{/if}
+	{#if tab !== 'oa' || facetKeys.has('apc')}
+		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
 	{/if}
 </div>
 
@@ -799,27 +771,6 @@
 {/if}
 
 <style>
-	.summary-row {
-		display: flex;
-		gap: 10px;
-		margin-bottom: 16px;
-		align-items: center;
-		flex-wrap: wrap;
-	}
-	.summary-card {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 10px 16px;
-		text-align: center;
-	}
-	.summary-card .value { font-size: 1.45rem; font-weight: 700; line-height: 1.2; }
-	.summary-card .label {
-		font-size: 0.8rem;
-		color: var(--muted);
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
 	.pub-link {
 		margin-left: auto;
 		display: inline-flex;
@@ -835,7 +786,14 @@
 	}
 	.pub-link:hover { opacity: 0.9; }
 
-	.toolbar { margin-bottom: 16px; }
+	.toolbar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 10px;
+		margin-bottom: 12px;
+	}
+	.facets-row { margin-bottom: 16px; }
 	.toolbar input[type='search'] { width: 220px; }
 	.groupby {
 		font-size: 0.9rem;
@@ -850,7 +808,7 @@
 		border-radius: 4px;
 		background: white;
 	}
-	.tab-group { display: flex; gap: 0; margin-right: 12px; }
+	.tab-group { display: flex; gap: 0; }
 	.tab-btn {
 		padding: 6px 14px;
 		border: 1px solid var(--border);
