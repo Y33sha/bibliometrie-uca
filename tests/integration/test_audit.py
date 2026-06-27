@@ -125,6 +125,22 @@ class TestEndToEndServiceIntegration:
             {"l": last, "f": first},
         ).scalar_one()
 
+    def _create_publication(self, conn):
+        return conn.execute(
+            text(
+                "INSERT INTO publications (title, title_normalized, pub_year, doc_type) "
+                "VALUES ('X', 'x', 2024, CAST('article' AS doc_type)) RETURNING id"
+            )
+        ).scalar_one()
+
+    def _last_event(self, conn):
+        return conn.execute(
+            text(
+                "SELECT event_type, aggregate_type, aggregate_id, payload, user_id "
+                "FROM audit_log ORDER BY id DESC LIMIT 1"
+            )
+        ).one()
+
     def test_set_rejected_emits_event(self, sa_sync_conn):
         from application.persons.core import set_rejected
         from infrastructure.repositories import person_repository
@@ -201,3 +217,108 @@ class TestEndToEndServiceIntegration:
             text("SELECT COUNT(*) AS n FROM audit_log WHERE event_type = 'person.marked_distinct'")
         ).scalar_one()
         assert n == 1
+
+    def test_merge_person_emits_event(self, sa_sync_conn):
+        from application.persons.core import merge_person
+        from infrastructure.repositories import person_repository
+
+        target = self._create_person(sa_sync_conn, last="A")
+        source = self._create_person(sa_sync_conn, last="B")
+        token = set_current_user("admin")
+        try:
+            merge_person(
+                target,
+                source,
+                repo=person_repository(sa_sync_conn),
+                audit_repo=audit_repository(sa_sync_conn),
+            )
+        finally:
+            reset_current_user(token)
+
+        row = self._last_event(sa_sync_conn)
+        assert row.event_type == "person.merged"
+        assert row.aggregate_id == target
+        assert row.payload == {"source_id": source}
+        assert row.user_id == "admin"
+
+    def test_name_form_confirm_emits_event(self, sa_sync_conn):
+        from application.persons.core import update_name_form_status
+        from infrastructure.repositories import person_repository
+
+        person_id = self._create_person(sa_sync_conn)
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+                "VALUES ('x x', :pid, ARRAY['hal'], 'pending')"
+            ),
+            {"pid": person_id},
+        )
+        token = set_current_user("admin")
+        try:
+            update_name_form_status(
+                person_id,
+                "x x",
+                "confirmed",
+                repo=person_repository(sa_sync_conn),
+                audit_repo=audit_repository(sa_sync_conn),
+            )
+        finally:
+            reset_current_user(token)
+
+        row = self._last_event(sa_sync_conn)
+        assert row.event_type == "person_name_form.status_changed"
+        assert row.aggregate_id == person_id
+        assert row.payload == {"name_form": "x x", "status": "confirmed"}
+
+    def test_name_form_reject_emits_event(self, sa_sync_conn):
+        """Le rejet d'une forme (action « détacher l'intrus ») émet l'événement."""
+        from application.persons.core import update_name_form_status
+        from infrastructure.repositories import person_repository
+
+        person_id = self._create_person(sa_sync_conn)
+        sa_sync_conn.execute(
+            text(
+                "INSERT INTO person_name_forms (name_form, person_id, sources, status) "
+                "VALUES ('x x', :pid, ARRAY['hal'], 'pending')"
+            ),
+            {"pid": person_id},
+        )
+        token = set_current_user("admin")
+        try:
+            update_name_form_status(
+                person_id,
+                "x x",
+                "rejected",
+                repo=person_repository(sa_sync_conn),
+                audit_repo=audit_repository(sa_sync_conn),
+            )
+        finally:
+            reset_current_user(token)
+
+        row = self._last_event(sa_sync_conn)
+        assert row.event_type == "person_name_form.status_changed"
+        assert row.payload == {"name_form": "x x", "status": "rejected"}
+
+    def test_reject_pair_emits_event(self, sa_sync_conn):
+        """Le détachement d'une paire (publication, personne) émet l'événement."""
+        from application.authorships.core import reject_pair
+        from infrastructure.repositories import authorship_repository
+
+        person_id = self._create_person(sa_sync_conn)
+        pub_id = self._create_publication(sa_sync_conn)
+        token = set_current_user("admin")
+        try:
+            reject_pair(
+                pub_id,
+                person_id,
+                repo=authorship_repository(sa_sync_conn),
+                audit_repo=audit_repository(sa_sync_conn),
+            )
+        finally:
+            reset_current_user(token)
+
+        row = self._last_event(sa_sync_conn)
+        assert row.event_type == "authorship.rejected"
+        assert row.aggregate_type == "publication"
+        assert row.aggregate_id == pub_id
+        assert row.payload == {"person_id": person_id}
