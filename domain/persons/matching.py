@@ -42,12 +42,7 @@ MAX_AUTHORS_CROSS_SOURCE = 50
 cross-source est désactivé. Sur les méga-papers (consortiums avec
 plusieurs dizaines à plusieurs centaines d'auteurs), les positions
 divergent fréquemment entre HAL/OpenAlex/WoS — on récolterait
-surtout des faux conflits ou des faux matchings.
-
-À garder cohérent avec ``MAX_AUTHORS_CONFLICT`` côté admin
-(``infrastructure/queries/person_duplicates.py``) qui filtre les
-mêmes méga-papers à l'autre bout du flux (présentation des paires
-en conflit pour validation manuelle)."""
+surtout des faux conflits ou des faux matchings."""
 
 
 def decide_cross_source_match(

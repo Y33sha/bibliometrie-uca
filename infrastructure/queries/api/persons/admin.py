@@ -9,7 +9,6 @@ from sqlalchemy import Connection, bindparam, text
 from domain.persons.name_matching import names_compatible, parse_raw_author_name
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES_SQL
 from domain.sources.registry import AUTHOR_SOURCES_SQL
-from infrastructure.queries.api.person_duplicates import PERSON_DUP_QUERIES
 
 # ── Orphan authorships ───────────────────────────────────────────
 
@@ -463,6 +462,91 @@ def detachable_intruders(conn: Connection, *, page: int, per_page: int) -> dict[
 
 
 # ── Doublons par nom (file de triage du hub) ─────────────────────
+
+# Génération des paires candidates : 4 requêtes volontairement larges (recall important), resserrées
+# ensuite par `names_compatible` (comparaison par tokens), les faux positifs résiduels étant filtrés
+# à l'œil. Exclut les paires déjà marquées distinctes et celles dont les deux membres ont une fiche
+# RH (deux titulaires distincts ne se fusionnent pas).
+_DUP_NOT_EXISTS = """
+    WHERE NOT EXISTS (
+        SELECT 1 FROM distinct_persons dp
+        WHERE dp.person_id_a = LEAST(p1.id, p2.id) AND dp.person_id_b = GREATEST(p1.id, p2.id)
+    )
+    AND NOT (
+        EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p1.id)
+        AND EXISTS (SELECT 1 FROM persons_rh WHERE person_id = p2.id)
+    )
+"""
+
+PERSON_DUP_QUERIES = [
+    f"""SELECT p1.id AS id_a, p2.id AS id_b,
+               p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
+               p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
+        FROM persons p1
+        JOIN persons p2 ON p1.id < p2.id
+          AND p1.last_name_normalized = p2.last_name_normalized
+          AND p1.last_name_normalized <> ''
+          AND LEFT(p1.first_name_normalized, 1) = LEFT(p2.first_name_normalized, 1)
+          AND (LENGTH(p1.first_name_normalized) = 1 OR LENGTH(p2.first_name_normalized) = 1)
+          AND LENGTH(p1.first_name_normalized) >= 1
+          AND LENGTH(p2.first_name_normalized) >= 1
+        {_DUP_NOT_EXISTS}
+        ORDER BY p1.id, p2.id""",
+    f"""SELECT p1.id AS id_a, p2.id AS id_b,
+               p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
+               p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
+        FROM persons p1
+        JOIN persons p2 ON p1.id < p2.id
+          AND REPLACE(p1.last_name_normalized, '-', ' ') <> REPLACE(p2.last_name_normalized, '-', ' ')
+          AND p1.last_name_normalized <> ''
+          AND p2.last_name_normalized <> ''
+          AND (
+              REPLACE(p2.last_name_normalized, '-', ' ') LIKE REPLACE(p1.last_name_normalized, '-', ' ') || ' %%'
+              OR REPLACE(p1.last_name_normalized, '-', ' ') LIKE REPLACE(p2.last_name_normalized, '-', ' ') || ' %%'
+          )
+          AND LENGTH(p1.first_name_normalized) >= 1
+          AND LENGTH(p2.first_name_normalized) >= 1
+          AND LEFT(p1.first_name_normalized, 1) = LEFT(p2.first_name_normalized, 1)
+          AND (
+              p1.first_name_normalized = p2.first_name_normalized
+              OR LENGTH(p1.first_name_normalized) = 1
+              OR LENGTH(p2.first_name_normalized) = 1
+              OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
+              OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
+          )
+        {_DUP_NOT_EXISTS}
+        ORDER BY p1.id, p2.id""",
+    f"""SELECT p1.id AS id_a, p2.id AS id_b,
+               p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
+               p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
+        FROM persons p1
+        JOIN persons p2 ON p1.id < p2.id
+          AND p1.last_name_normalized = p2.first_name_normalized
+          AND p1.first_name_normalized = p2.last_name_normalized
+          AND p1.last_name_normalized <> ''
+          AND p1.first_name_normalized <> ''
+          AND p1.last_name_normalized <> p1.first_name_normalized
+        {_DUP_NOT_EXISTS}
+        ORDER BY p1.id, p2.id""",
+    f"""SELECT p1.id AS id_a, p2.id AS id_b,
+               p1.last_name_normalized AS ln1, p1.first_name_normalized AS fn1,
+               p2.last_name_normalized AS ln2, p2.first_name_normalized AS fn2
+        FROM persons p1
+        JOIN persons p2 ON p1.id < p2.id
+          AND p1.last_name_normalized = p2.last_name_normalized
+          AND p1.last_name_normalized <> ''
+          AND LENGTH(p1.first_name_normalized) > 1
+          AND LENGTH(p2.first_name_normalized) > 1
+          AND LEFT(p1.first_name_normalized, 1) = LEFT(p2.first_name_normalized, 1)
+          AND (
+              p1.first_name_normalized = p2.first_name_normalized
+              OR p1.first_name_normalized LIKE p2.first_name_normalized || ' %%'
+              OR p2.first_name_normalized LIKE p1.first_name_normalized || ' %%'
+          )
+        {_DUP_NOT_EXISTS}
+        ORDER BY p1.id, p2.id""",
+]
+
 
 # Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur), au
 # grain `authorships`. Réseaux disjoints → homonyme légitime ; réseaux communs → doublon. Les sujets

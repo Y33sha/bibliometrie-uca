@@ -1,9 +1,9 @@
 """Fonctions de comparaison et de parsing des noms de personnes.
 
 Utilisées par le pipeline (matching cross-source dans
-`domain/persons/matching.py`) et par l'admin (présentation des doublons candidats
-dans `infrastructure/queries/api/person_duplicates.py`), qui partagent le même
-comparateur `names_compatible`.
+`domain/persons/matching.py`) et par l'admin (rapprochement des doublons candidats
+dans les files de triage du hub personnes), qui partagent le même comparateur
+`names_compatible`.
 """
 
 import re

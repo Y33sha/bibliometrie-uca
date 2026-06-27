@@ -38,6 +38,7 @@ from interfaces.api.models import (
     DetachAuthorshipsResponse,
     IdentifierReassignResponse,
     IdentifierStatusResponse,
+    MarkPersonsDistinct,
     MergePersons,
     MergeResponse,
     NameFormStatusResponse,
@@ -231,6 +232,25 @@ def merge_persons(
 
     person_commands.merge_person(conn, person_id, source_id, repo=repo, audit_repo=audit)
     return MergeResponse(merged=True, source_id=source_id, target_id=person_id)
+
+
+@router.post("/api/admin/persons/mark-distinct", response_model=OkResponse)
+def mark_persons_distinct(
+    body: MarkPersonsDistinct,
+    conn: Connection = Depends(db_conn_sync),
+    repo: PersonRepository = Depends(person_repo_sync),
+    audit: AuditRepository = Depends(audit_repo_sync),
+) -> OkResponse:
+    """Marque deux personnes comme distinctes (non-doublon) : la paire ne sera plus proposée par les
+    files de triage par nom / identifiant."""
+    if body.person_id_a == body.person_id_b:
+        raise HTTPException(
+            status_code=400, detail="person_id_a et person_id_b doivent être différents"
+        )
+    person_commands.mark_distinct(
+        conn, body.person_id_a, body.person_id_b, repo=repo, audit_repo=audit
+    )
+    return OkResponse()
 
 
 # ── Formes de noms / détachement authorships ─────────────────────

@@ -184,9 +184,6 @@ def _max_authors_per_pub(
     la source — il faut bien retenir un chiffre pour comparer au
     seuil. On prend le plus élevé par défensivité : si HAL dit 48 et
     OpenAlex 52, on est dans le régime méga-paper.
-
-    Cohérent avec `MAX_AUTHORS_CONFLICT = 50` côté admin
-    (`infrastructure/queries/person_duplicates.py`).
     """
     counts: dict[int, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for a in all_authorships:

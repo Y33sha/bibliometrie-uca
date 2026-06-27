@@ -47,10 +47,6 @@ from interfaces.api.models.admin.perimeters import (
     PerimeterCreate,
     PerimeterUpdate,
 )
-from interfaces.api.models.admin.person_duplicates import (
-    PersonConflictPairResponse,
-    PersonDuplicatePairResponse,
-)
 from interfaces.api.models.admin.persons import (
     AddIdentifier,
     AddIdentifierResponse,
@@ -138,8 +134,6 @@ __all__ = [
     "OrphanBatchAssignResponse",
     "PerimeterCreate",
     "PerimeterUpdate",
-    "PersonConflictPairResponse",
-    "PersonDuplicatePairResponse",
     "PipelineLogsResponse",
     "PipelineReportContent",
     "PipelineReportItem",

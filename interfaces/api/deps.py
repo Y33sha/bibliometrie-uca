@@ -27,7 +27,6 @@ from application.ports.api.hal_problems_queries import HalProblemsQueries
 from application.ports.api.journals_queries import JournalQueries
 from application.ports.api.laboratories_queries import LaboratoriesQueries
 from application.ports.api.perimeters_queries import PerimetersAdminQueries
-from application.ports.api.person_duplicates_queries import PersonDuplicatesQueries
 from application.ports.api.persons_queries import PersonsQueries
 from application.ports.api.pipeline_phase_executions_queries import PhaseExecutionsQueries
 from application.ports.api.pipeline_runs_queries import PipelineRunsQueries
@@ -56,7 +55,6 @@ from infrastructure.queries.api.admin_feedback import PgAdminFeedbackQueries
 from infrastructure.queries.api.hal_problems import PgHalProblemsQueries
 from infrastructure.queries.api.journals import PgJournalQueries
 from infrastructure.queries.api.laboratories import PgLaboratoriesQueries
-from infrastructure.queries.api.person_duplicates import PgPersonDuplicatesQueries
 from infrastructure.queries.api.persons import PgPersonsQueries
 from infrastructure.queries.api.pipeline_phase_executions import PgPhaseExecutionsQueries
 from infrastructure.queries.api.pipeline_runs import PgPipelineRunsQueries
@@ -240,12 +238,6 @@ def publication_duplicates_queries_sync(
 
 def person_repo_sync(conn: Connection = Depends(db_conn_sync)) -> PersonRepository:
     return person_repository(conn)
-
-
-def person_duplicates_queries_sync(
-    conn: Connection = Depends(db_conn_sync),
-) -> PersonDuplicatesQueries:
-    return PgPersonDuplicatesQueries(conn)
 
 
 def journal_queries_sync(conn: Connection = Depends(db_conn_sync)) -> JournalQueries:

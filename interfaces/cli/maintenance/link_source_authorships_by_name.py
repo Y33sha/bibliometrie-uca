@@ -33,8 +33,7 @@ Effets de bord, alignés sur la cascade `decide_person_match` action
 Cas pathologique : si pour un même (publication, position, nom
 normalisé) plusieurs `person_id` canoniques distincts sont candidats,
 on skip cette SA et on log les person_ids concernés -- signal fort de
-doublon de person dans la base, à investiguer via l'admin
-`/admin/person-duplicates`.
+doublon de person dans la base, à investiguer via le hub `/admin/persons`.
 
 Idempotent : un re-run ne retraite que les nouvelles SA orphelines.
 
@@ -162,7 +161,7 @@ def main() -> int:
             log.warning(
                 "%d cas ambigus (plusieurs person_id distincts pour un même"
                 " (publication, position, nom normalisé)) -- doublons person"
-                " probables, à investiguer dans /admin/person-duplicates :",
+                " probables, à investiguer dans /admin/persons :",
                 len(ambiguous),
             )
             for a in ambiguous:
