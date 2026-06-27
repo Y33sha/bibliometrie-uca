@@ -458,7 +458,9 @@
 		// proposées au sélecteur de découpage. Ajouter une dimension au registre l'y fait apparaître.
 		try {
 			const schema = await api<components['schemas']['PivotSchemaResponse']>('/api/stats/pivot/schema');
-			pivotDims = schema.dimensions.filter((d) => d.cardinality === 'low' && d.key !== 'year');
+			pivotDims = schema.dimensions.filter(
+				(d) => d.groupable && d.cardinality === 'low' && d.key !== 'year'
+			);
 		} catch { pivotDims = []; }
 
 		// Load facets first, then apply default years if needed, then full refresh
