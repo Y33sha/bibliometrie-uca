@@ -3,6 +3,7 @@
   import { ApiError, api, persons as personsApi } from "$lib/api";
   import { titleCase } from "$lib/utils";
   import Pagination from "$lib/components/Pagination.svelte";
+  import { confirmMerge } from "./confirmMerge";
   import type { components } from "$lib/api/schema";
 
   type Resp = components["schemas"]["IdentifierConflictsResponse"];
@@ -41,6 +42,7 @@
   }
 
   async function merge(targetId: number, sourceId: number) {
+    if (!(await confirmMerge(sourceId))) return;
     acting = true;
     error = "";
     try {

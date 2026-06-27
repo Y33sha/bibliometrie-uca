@@ -26,6 +26,7 @@
   import AmbiguousFormsList from "./AmbiguousFormsList.svelte";
   import IdentifierConflictsList from "./IdentifierConflictsList.svelte";
   import DetachableIntrudersList from "./DetachableIntrudersList.svelte";
+  import { confirmMerge } from "./confirmMerge";
 
   /* ── State ── */
 
@@ -451,6 +452,7 @@
   }
 
   async function mergeInto(targetId: number, sourceId: number) {
+    if (!(await confirmMerge(sourceId))) return;
     await personsApi.merge(targetId, sourceId);
     closeMergeSearch();
     loadStats();
@@ -464,6 +466,7 @@
   // Absorbe une autre personne (sourceId) dans celle du drawer (la cible).
   async function absorbPerson(otherId: number) {
     if (selectedPersonId === null) return;
+    if (!(await confirmMerge(otherId))) return;
     try {
       await personsApi.merge(selectedPersonId, otherId);
     } catch (e) {
@@ -481,6 +484,7 @@
 
   async function mergeFromModal(sourceId: number) {
     if (!detachModal) return;
+    if (!(await confirmMerge(sourceId))) return;
     const targetId = detachModal.personId;
     await personsApi.merge(targetId, sourceId);
     detachModal = null;
