@@ -62,13 +62,25 @@
 	let pivotSchema = $state<components['schemas']['PivotSchemaResponse'] | null>(null);
 	let groupBy = $state('oa_access'); // dimension de découpage (série empilée)
 	let legendItems: { label: string; color: string }[] = $state([]);
-	const measure = 'pub_count'; // mesure courante (sélecteur de mesure : étape suivante)
+	let measure = $state('pub_count'); // mesure courante
+	const isRatio = $derived(
+		pivotSchema?.measures.find((m) => m.key === measure)?.is_ratio ?? false
+	);
+	// Dimensions effondrées par la mesure-ratio courante (retirées des groupements et des facettes).
+	const collapsed = $derived(
+		new Set(pivotSchema?.measures.find((m) => m.key === measure)?.collapses ?? [])
+	);
 
-	// Dimensions graphables proposées au sélecteur « Découpage » (groupables, faible cardinalité, hors année).
+	// Dimensions graphables proposées au sélecteur « Découpage » (groupables, faible cardinalité,
+	// hors année, et non effondrées par la mesure courante).
 	const pivotDims = $derived(
 		pivotSchema
 			? pivotSchema.dimensions.filter(
-					(d) => d.groupable && d.cardinality === 'low' && d.key !== 'year'
+					(d) =>
+						d.groupable &&
+						d.cardinality === 'low' &&
+						d.key !== 'year' &&
+						!collapsed.has(d.key)
 				)
 			: []
 	);
@@ -78,7 +90,6 @@
 	// (l'année, ordinale, reste filtrable). Mirroir TS des règles G/M.
 	const facetKeys = $derived.by(() => {
 		if (!pivotSchema) return new Set(['year', 'lab', 'oa_voie', 'apc']);
-		const collapsed = new Set(pivotSchema.measures.find((m) => m.key === measure)?.collapses ?? []);
 		const grouped = new Set(['year', groupBy].filter(Boolean));
 		const out = new Set<string>();
 		for (const d of pivotSchema.dimensions) {
@@ -104,6 +115,8 @@
 	function dimLabel(value: string): string {
 		if (groupBy === 'oa_access') return OA_ACCESS_LABELS[value] ?? value;
 		if (groupBy === 'oa_voie') return oaLabelsMap[value] ?? value;
+		if (groupBy === 'doc_type_family')
+			return docTypeFamilies.find((f) => f.key === value)?.label ?? value;
 		return value;
 	}
 	function dimColor(value: string, idx: number, cs: CSSStyleDeclaration): string {
@@ -115,6 +128,8 @@
 		const present = rows.map((r) => String(r[groupBy]));
 		if (groupBy === 'oa_access') return OA_ACCESS_ORDER.filter((v) => present.includes(v));
 		if (groupBy === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.includes(v));
+		if (groupBy === 'doc_type_family')
+			return docTypeFamilies.map((f) => f.key).filter((k) => present.includes(k));
 		// Sinon : valeurs distinctes triées par total décroissant.
 		const totals = new Map<string, number>();
 		for (const r of rows) {
@@ -122,6 +137,24 @@
 			totals.set(v, (totals.get(v) ?? 0) + Number(r.value ?? 0));
 		}
 		return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v);
+	}
+
+	function onGroupByChange() {
+		// Grouper par une dimension filtrable efface son filtre actif (sinon il resterait, caché).
+		const cleared = groupBy === 'oa_voie' && selectedOa.length > 0;
+		if (cleared) selectedOa = [];
+		syncUrl();
+		if (cleared) refresh();
+		else loadChart();
+	}
+
+	function onMeasureChange() {
+		// Une mesure-ratio effondre sa dimension : on ne peut plus la grouper ni la filtrer.
+		const coll = pivotSchema?.measures.find((m) => m.key === measure)?.collapses ?? [];
+		if (groupBy && coll.includes(groupBy)) groupBy = '';
+		if (coll.includes('oa_voie') && selectedOa.length) selectedOa = [];
+		syncUrl();
+		refresh();
 	}
 
 	// --- Filter params (shared by all loaders) ---
@@ -204,6 +237,7 @@
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 				journalId: { type: 'single', urlKey: 'journal_id' },
 				search: { type: 'single', urlKey: 'search' },
+			measure: { type: 'single', urlKey: 'measure', defaultValue: 'pub_count' },
 			groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'oa_access' },
 			page: { type: 'page', urlKey: 'page' },
 			labPage: { type: 'page', urlKey: 'lab_page' },
@@ -222,6 +256,7 @@
 			publisherId: publisherId ? String(publisherId) : '',
 			journalId: journalId ? String(journalId) : '',
 			search,
+			measure,
 			groupBy,
 			page: pubFetch.page,
 			labPage: labFetch.page,
@@ -327,22 +362,30 @@
 		const years = [...new Set(rows.map((r) => Number(r.year)))].sort((a, b) => a - b);
 		const cs = getComputedStyle(document.documentElement);
 		const values = groupBy ? orderedValues(rows) : ['__all__'];
-		const datasets = values.map((v, i) => ({
-			label: groupBy ? dimLabel(v) : 'Publications',
-			data: years.map((y) => {
-				const row = rows.find(
-					(r) => Number(r.year) === y && (!groupBy || String(r[groupBy]) === v)
-				);
-				return row ? Number(row.value) : 0;
-			}),
-			backgroundColor: groupBy ? dimColor(v, i, cs) : cs.getPropertyValue('--accent').trim(),
-			barPercentage: 0.5,
-			categoryPercentage: 0.7
-		}));
+		const measureLabel = pivotSchema?.measures.find((m) => m.key === measure)?.label ?? '';
+		const datasets = values.map((v, i) => {
+			const color = groupBy ? dimColor(v, i, cs) : cs.getPropertyValue('--accent').trim();
+			return {
+				label: groupBy ? dimLabel(v) : measureLabel,
+				data: years.map((y) => {
+					const row = rows.find(
+						(r) => Number(r.year) === y && (!groupBy || String(r[groupBy]) === v)
+					);
+					const val = row && row.value != null ? Number(row.value) : null;
+					return isRatio ? val : (val ?? 0);
+				}),
+				backgroundColor: color,
+				borderColor: color,
+				fill: false,
+				tension: 0.3,
+				barPercentage: 0.5,
+				categoryPercentage: 0.7
+			};
+		});
 		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
 
 		yearChart = new Chart(chartCanvas, {
-			type: 'bar',
+			type: isRatio ? 'line' : 'bar',
 			plugins: [whiteBgPlugin],
 			data: {
 				labels: years,
@@ -355,31 +398,35 @@
 					legend: { display: false },
 					tooltip: {
 						bodyFont: { size: 14 },
-						callbacks: {
-							label: (ctx) => {
-								const val = ctx.raw as number;
-								const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
-								const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
-								return `${ctx.dataset.label} : ${val} (${pct}%)`;
-							},
-							afterBody: (items) => {
-								const total = items[0].chart.data.datasets.reduce((s, ds) => s + ((ds.data[items[0].dataIndex] as number) || 0), 0);
-								return `Total : ${total}`;
-							}
-						}
+						callbacks: isRatio
+							? { label: (ctx) => `${ctx.dataset.label} : ${ctx.raw ?? '—'} %` }
+							: {
+									label: (ctx) => {
+										const val = ctx.raw as number;
+										const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
+										const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
+										return `${ctx.dataset.label} : ${val} (${pct}%)`;
+									},
+									afterBody: (items) => {
+										const total = items[0].chart.data.datasets.reduce((s, ds) => s + ((ds.data[items[0].dataIndex] as number) || 0), 0);
+										return `Total : ${total}`;
+									}
+								}
 					},
-					datalabels: {
-						color: '#fff',
-						font: { size: 13, weight: 'bold' },
-						formatter: (val: number, ctx) => {
-							const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
-							const pct = total ? (val / total) * 100 : 0;
-							return pct >= 10 ? Math.round(pct) + '%' : '';
-						},
-						anchor: 'center' as const,
-						align: 'center' as const,
-						listeners: {}
-					}
+					datalabels: isRatio
+						? { display: false }
+						: {
+								color: '#fff',
+								font: { size: 13, weight: 'bold' },
+								formatter: (val: number, ctx) => {
+									const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
+									const pct = total ? (val / total) * 100 : 0;
+									return pct >= 10 ? Math.round(pct) + '%' : '';
+								},
+								anchor: 'center' as const,
+								align: 'center' as const,
+								listeners: {}
+							}
 				},
 				interaction: {
 					mode: 'point' as const,
@@ -390,8 +437,10 @@
 					intersect: true
 				},
 				scales: {
-					x: { stacked: true, grid: { display: false }, ticks: { font: { size: 14 } } },
-					y: { stacked: true, beginAtZero: true, ticks: { font: { size: 13 }, precision: 0 } }
+					x: { stacked: !isRatio, grid: { display: false }, ticks: { font: { size: 14 } } },
+					y: isRatio
+						? { stacked: false, beginAtZero: true, suggestedMax: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
+						: { stacked: true, beginAtZero: true, ticks: { font: { size: 13 }, precision: 0 } }
 				}
 			}
 		});
@@ -480,6 +529,7 @@
 			} catch { journalName = `#${journalId}`; }
 		}
 		if (restored.search) search = restored.search as string;
+		if (restored.measure !== undefined) measure = restored.measure as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.page) pubFetch.page = restored.page as number;
 		if (restored.labPage) labFetch.page = restored.labPage as number;
@@ -602,10 +652,18 @@
 	{#if tab !== 'oa' || facetKeys.has('apc')}
 		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
 	{/if}
-	{#if tab === 'oa'}
+	{#if tab === 'oa' && pivotSchema}
+		<label class="groupby">
+			Mesure&nbsp;:
+			<select bind:value={measure} onchange={onMeasureChange}>
+				{#each pivotSchema.measures as m (m.key)}
+					<option value={m.key}>{m.label}</option>
+				{/each}
+			</select>
+		</label>
 		<label class="groupby">
 			Découpage&nbsp;:
-			<select bind:value={groupBy} onchange={() => { syncUrl(); loadChart(); }}>
+			<select bind:value={groupBy} onchange={onGroupByChange}>
 				<option value="">Aucun</option>
 				{#each pivotDims as d (d.key)}
 					<option value={d.key}>{d.label}</option>
