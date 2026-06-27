@@ -17,7 +17,6 @@
 	// --- Types ---
 	import type { components } from '$lib/api/schema';
 	type Summary = components['schemas']['StatsSummary'];
-	type YearData = components['schemas']['YearStatsRow'];
 	type PublisherRow = components['schemas']['PublisherStatsRow'];
 	type JournalRow = components['schemas']['JournalStatsRow'];
 	type LabRow = components['schemas']['LabStatsRow'];
@@ -57,6 +56,47 @@
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
 	let initialYearsApplied = false;
+
+	// --- Pivot: ventilation secondaire de l'histogramme par année ---
+	type PivotDim = components['schemas']['PivotDimensionOut'];
+	let pivotDims: PivotDim[] = $state([]); // dimensions graphables (hors année), lues du schéma
+	let groupBy = $state('oa_access'); // dimension de découpage (série empilée)
+	let legendItems: { label: string; color: string }[] = $state([]);
+
+	// Couleurs / libellés / ordre par dimension de découpage. Les valeurs OA réutilisent les
+	// variables CSS existantes ; les autres dimensions piochent dans une palette catégorielle.
+	const OA_VOIE_ORDER = ['diamond', 'gold', 'hybrid', 'bronze', 'green', 'embargoed', 'closed', 'unknown'];
+	const OA_ACCESS_ORDER = ['ouvert', 'embargo', 'ferme', 'indetermine'];
+	const OA_ACCESS_LABELS: Record<string, string> = {
+		ouvert: 'Ouvert', embargo: 'Sous embargo', ferme: 'Fermé', indetermine: 'Indéterminé',
+	};
+	const OA_ACCESS_VAR: Record<string, string> = {
+		ouvert: '--green', embargo: '--embargoed', ferme: '--closed', indetermine: '--unknown',
+	};
+	const PALETTE = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#b07aa1', '#76b7b2', '#ff9da7', '#9c755f', '#bab0ac', '#edc948'];
+
+	function dimLabel(value: string): string {
+		if (groupBy === 'oa_access') return OA_ACCESS_LABELS[value] ?? value;
+		if (groupBy === 'oa_voie') return oaLabelsMap[value] ?? value;
+		return value;
+	}
+	function dimColor(value: string, idx: number, cs: CSSStyleDeclaration): string {
+		if (groupBy === 'oa_voie') return cs.getPropertyValue('--' + value).trim() || PALETTE[idx % PALETTE.length];
+		if (groupBy === 'oa_access') return cs.getPropertyValue(OA_ACCESS_VAR[value] ?? '').trim() || PALETTE[idx % PALETTE.length];
+		return PALETTE[idx % PALETTE.length];
+	}
+	function orderedValues(rows: Record<string, unknown>[]): string[] {
+		const present = rows.map((r) => String(r[groupBy]));
+		if (groupBy === 'oa_access') return OA_ACCESS_ORDER.filter((v) => present.includes(v));
+		if (groupBy === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.includes(v));
+		// Sinon : valeurs distinctes triées par total décroissant.
+		const totals = new Map<string, number>();
+		for (const r of rows) {
+			const v = String(r[groupBy]);
+			totals.set(v, (totals.get(v) ?? 0) + Number(r.value ?? 0));
+		}
+		return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v);
+	}
 
 	// --- Filter params (shared by all loaders) ---
 	function chartParams(): URLSearchParams {
@@ -135,6 +175,7 @@
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 				journalId: { type: 'single', urlKey: 'journal_id' },
 				search: { type: 'single', urlKey: 'search' },
+			groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'oa_access' },
 			page: { type: 'page', urlKey: 'page' },
 			labPage: { type: 'page', urlKey: 'lab_page' },
 		},
@@ -151,6 +192,7 @@
 			publisherId: publisherId ? String(publisherId) : '',
 			journalId: journalId ? String(journalId) : '',
 			search,
+			groupBy,
 			page: pubFetch.page,
 			labPage: labFetch.page,
 		}));
@@ -242,27 +284,40 @@
 	}
 
 	async function loadChart() {
-		const data = await api<YearData[]>('/api/stats/by-year?' + chartParams());
+		const p = chartParams();
+		p.set('measure', 'pub_count');
+		p.set('group', 'year');
+		if (groupBy) p.set('group2', groupBy);
+		p.set('doc_type', 'article,review');
+		const res = await api<{ rows: Record<string, unknown>[] }>('/api/stats/pivot?' + p);
 		await tick();
 		if (yearChart) yearChart.destroy();
-		if (!data.length || !chartCanvas) { yearChart = null; return; }
+		const rows = res.rows;
+		if (!rows.length || !chartCanvas) { yearChart = null; legendItems = []; return; }
 
+		const years = [...new Set(rows.map((r) => Number(r.year)))].sort((a, b) => a - b);
 		const cs = getComputedStyle(document.documentElement);
+		const values = groupBy ? orderedValues(rows) : ['__all__'];
+		const datasets = values.map((v, i) => ({
+			label: groupBy ? dimLabel(v) : 'Publications',
+			data: years.map((y) => {
+				const row = rows.find(
+					(r) => Number(r.year) === y && (!groupBy || String(r[groupBy]) === v)
+				);
+				return row ? Number(row.value) : 0;
+			}),
+			backgroundColor: groupBy ? dimColor(v, i, cs) : cs.getPropertyValue('--accent').trim(),
+			barPercentage: 0.5,
+			categoryPercentage: 0.7
+		}));
+		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
+
 		yearChart = new Chart(chartCanvas, {
 			type: 'bar',
 			plugins: [whiteBgPlugin],
 			data: {
-				labels: data.map((d) => d.pub_year),
-				datasets: [
-					{ label: 'Diamond', data: data.map((d) => d.diamond), backgroundColor: cs.getPropertyValue('--diamond').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
-					{ label: 'Gold', data: data.map((d) => d.gold), backgroundColor: cs.getPropertyValue('--gold').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
-					{ label: 'Hybrid', data: data.map((d) => d.hybrid), backgroundColor: cs.getPropertyValue('--hybrid').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
-					{ label: 'Bronze', data: data.map((d) => d.bronze), backgroundColor: cs.getPropertyValue('--bronze').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
-					{ label: 'Green', data: data.map((d) => d.green), backgroundColor: cs.getPropertyValue('--green').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
-					{ label: 'Embargo', data: data.map((d) => d.embargoed), backgroundColor: cs.getPropertyValue('--embargoed').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
-					{ label: 'Closed', data: data.map((d) => d.closed), backgroundColor: cs.getPropertyValue('--closed').trim(), barPercentage: 0.5, categoryPercentage: 0.7 },
-					{ label: 'Indéterminé', data: data.map((d) => d.unknown), backgroundColor: cs.getPropertyValue('--unknown').trim(), barPercentage: 0.5, categoryPercentage: 0.7 }
-				]
+				labels: years,
+				datasets
 			},
 			options: {
 				responsive: true,
@@ -395,8 +450,16 @@
 			} catch { journalName = `#${journalId}`; }
 		}
 		if (restored.search) search = restored.search as string;
+		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.page) pubFetch.page = restored.page as number;
 		if (restored.labPage) labFetch.page = restored.labPage as number;
+
+		// Vocabulaire du pivot : dimensions graphables (faible cardinalité, hors l'axe année)
+		// proposées au sélecteur de découpage. Ajouter une dimension au registre l'y fait apparaître.
+		try {
+			const schema = await api<components['schemas']['PivotSchemaResponse']>('/api/stats/pivot/schema');
+			pivotDims = schema.dimensions.filter((d) => d.cardinality === 'low' && d.key !== 'year');
+		} catch { pivotDims = []; }
 
 		// Load facets first, then apply default years if needed, then full refresh
 		await facets.load();
@@ -503,6 +566,17 @@
 	<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
 	<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
 	<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
+	{#if tab === 'oa'}
+		<label class="groupby">
+			Découpage&nbsp;:
+			<select bind:value={groupBy} onchange={() => { syncUrl(); loadChart(); }}>
+				<option value="">Aucun</option>
+				{#each pivotDims as d (d.key)}
+					<option value={d.key}>{d.label}</option>
+				{/each}
+			</select>
+		</label>
+	{/if}
 	{#if tab === 'publishers' || tab === 'journals'}
 		<input type="search" placeholder="Rechercher..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	{/if}
@@ -518,16 +592,13 @@
 
 <!-- Tab: Open Access (chart) -->
 {#if tab === 'oa'}
-	<div class="legend">
-		<span><span class="legend-dot" style="background:var(--diamond)"></span>Diamond</span>
-		<span><span class="legend-dot" style="background:var(--gold)"></span>Gold</span>
-		<span><span class="legend-dot" style="background:var(--hybrid)"></span>Hybrid</span>
-		<span><span class="legend-dot" style="background:var(--bronze)"></span>Bronze</span>
-		<span><span class="legend-dot" style="background:var(--green)"></span>Green</span>
-		<span><span class="legend-dot" style="background:var(--embargoed)"></span>Embargo</span>
-		<span><span class="legend-dot" style="background:var(--closed)"></span>Closed</span>
-		<span><span class="legend-dot" style="background:var(--unknown)"></span>Indéterminé</span>
-	</div>
+	{#if legendItems.length > 1}
+		<div class="legend">
+			{#each legendItems as item (item.label)}
+				<span><span class="legend-dot" style="background:{item.color}"></span>{item.label}</span>
+			{/each}
+		</div>
+	{/if}
 	<div class="chart-area">
 		<canvas bind:this={chartCanvas}></canvas>
 		<button type="button" class="chart-export" onclick={exportChartPng}>Export PNG</button>
@@ -669,6 +740,19 @@
 
 	.toolbar { margin-bottom: 16px; }
 	.toolbar input[type='search'] { width: 220px; }
+	.groupby {
+		font-size: 0.9rem;
+		color: var(--muted);
+		white-space: nowrap;
+	}
+	.groupby select {
+		font-family: inherit;
+		font-size: 0.9rem;
+		padding: 5px 8px;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		background: white;
+	}
 	.tab-group { display: flex; gap: 0; margin-right: 12px; }
 	.tab-btn {
 		padding: 6px 14px;
