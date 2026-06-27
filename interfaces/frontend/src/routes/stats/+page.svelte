@@ -61,6 +61,7 @@
 	// --- Pivot: ventilation secondaire de l'histogramme par année ---
 	let pivotSchema = $state<components['schemas']['PivotSchemaResponse'] | null>(null);
 	let groupBy = $state('oa_access'); // dimension de découpage (série empilée)
+	let chartMode = $state<'absolu' | 'part'>('absolu'); // part = empilement aplati à 100 %
 	let legendItems: { label: string; color: string }[] = $state([]);
 	// Le graphe par année est toujours le simple compte de publications (barres empilées). Le taux
 	// d'accès ouvert n'est pas une mesure : il se lit via le découpage par accès. Pas de sélecteur de mesure.
@@ -219,6 +220,7 @@
 				journalId: { type: 'single', urlKey: 'journal_id' },
 				search: { type: 'single', urlKey: 'search' },
 			groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'oa_access' },
+				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
 			page: { type: 'page', urlKey: 'page' },
 			labPage: { type: 'page', urlKey: 'lab_page' },
 		},
@@ -237,6 +239,7 @@
 			journalId: journalId ? String(journalId) : '',
 			search,
 			groupBy,
+			chartMode,
 			page: pubFetch.page,
 			labPage: labFetch.page,
 		}));
@@ -355,6 +358,14 @@
 		}));
 		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
 
+		// Mode « part » : aplatir chaque colonne (année) à 100 % en remplaçant les comptes par leur
+		// proportion. N'a de sens qu'avec une comparaison (série empilée) ; sans découpage, on reste en absolu.
+		const part = chartMode === 'part' && !!groupBy;
+		if (part) {
+			const totals = years.map((_, yi) => datasets.reduce((s, d) => s + ((d.data[yi] as number) || 0), 0));
+			for (const d of datasets) d.data = d.data.map((c, yi) => (totals[yi] ? ((c as number) / totals[yi]) * 100 : 0));
+		}
+
 		yearChart = new Chart(chartCanvas, {
 			type: 'bar',
 			plugins: [whiteBgPlugin],
@@ -374,11 +385,13 @@
 										const val = ctx.raw as number;
 										const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
 										const pct = total ? ((val / total) * 100).toFixed(1) : '0.0';
-										return `${ctx.dataset.label} : ${val} (${pct}%)`;
+										return part
+											? `${ctx.dataset.label} : ${pct}%`
+											: `${ctx.dataset.label} : ${val} (${pct}%)`;
 									},
 									afterBody: (items) => {
 										const total = items[0].chart.data.datasets.reduce((s, ds) => s + ((ds.data[items[0].dataIndex] as number) || 0), 0);
-										return `Total : ${total}`;
+										return part ? [] : `Total : ${total}`;
 									}
 								}
 					},
@@ -405,7 +418,9 @@
 				},
 				scales: {
 					x: { stacked: true, grid: { display: false }, ticks: { font: { size: 14 } } },
-					y: { stacked: true, beginAtZero: true, ticks: { font: { size: 13 }, precision: 0 } }
+					y: part
+						? { stacked: true, min: 0, max: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
+						: { stacked: true, beginAtZero: true, ticks: { font: { size: 13 }, precision: 0 } }
 				}
 			}
 		});
@@ -495,6 +510,7 @@
 		}
 		if (restored.search) search = restored.search as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
+		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
 		if (restored.page) pubFetch.page = restored.page as number;
 		if (restored.labPage) labFetch.page = restored.labPage as number;
 
@@ -625,6 +641,12 @@
 					<option value={d.key}>{d.label}</option>
 				{/each}
 			</select>
+		</label>
+	{/if}
+	{#if tab === 'oa' && groupBy}
+		<label class="groupby">
+			<input type="checkbox" checked={chartMode === 'part'} onchange={(e) => { chartMode = e.currentTarget.checked ? 'part' : 'absolu'; syncUrl(); loadChart(); }} />
+			Part&nbsp;(%)
 		</label>
 	{/if}
 	{#if tab === 'publishers' || tab === 'journals'}
