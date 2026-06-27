@@ -18,13 +18,12 @@
 	import type { components } from '$lib/api/schema';
 	type PublisherRow = components['schemas']['PublisherStatsRow'];
 	type JournalRow = components['schemas']['JournalStatsRow'];
-	type LabRow = components['schemas']['LabStatsRow'];
-	// Ligne partagée par les 3 onglets pour la ventilation OA (mêmes champs OaCounts).
-	type OaRow = PublisherRow | JournalRow | LabRow;
+	// Ligne partagée par les onglets éditeurs/revues pour la ventilation OA (mêmes champs OaCounts).
+	type OaRow = PublisherRow | JournalRow;
 
 	// --- State ---
 	type View = 'top' | 'publisher_detail' | 'journal_detail';
-	type Tab = 'oa' | 'publishers' | 'journals' | 'labs';
+	type Tab = 'oa' | 'publishers' | 'journals';
 
 	let view: View = $state('top');
 	let tab: Tab = $state('oa');
@@ -40,7 +39,6 @@
 	let journalName = $state('');
 	let pubSort = $state('-pubs');
 	let journalSort = $state('-pubs');
-	let labSort = $state('-pubs');
 
 	function toggleSort(current: string, field: string): string {
 		if (current === field) return '-' + field;
@@ -194,18 +192,6 @@
 		},
 	});
 
-	const labFetch = usePaginatedFetch<LabRow>({
-		endpoint: '/api/stats/labs',
-		itemsKey: 'labs',
-		perPage: 50,
-		apiKey: 'stats-labs',
-		buildParams: () => {
-			const p = chartParams();
-			p.set('sort', labSort);
-			return p;
-		},
-	});
-
 	// --- Composable: facets ---
 	const facets = useFacets<'years' | 'labs' | 'oa' | 'apc' | 'docTypes'>({
 		endpoint: '/api/stats/facets',
@@ -239,7 +225,6 @@
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
 				chartPage: { type: 'page', urlKey: 'chart_page' },
 			page: { type: 'page', urlKey: 'page' },
-			labPage: { type: 'page', urlKey: 'lab_page' },
 		},
 	});
 
@@ -260,7 +245,6 @@
 			chartMode,
 			chartPage,
 			page: pubFetch.page,
-			labPage: labFetch.page,
 		}));
 	}
 
@@ -283,7 +267,7 @@
 		if (yearChart) { yearChart.destroy(); yearChart = null; }
 		view = newView;
 		tab = 'oa';
-		pubFetch.page = 1; labFetch.page = 1;
+		pubFetch.page = 1;
 		search = '';
 		if (newView === 'top') {
 			publisherId = null; publisherName = '';
@@ -309,7 +293,7 @@
 		tab = defaultTab;
 		publisherId = null; publisherName = '';
 		journalId = null; journalName = '';
-		pubFetch.page = 1; labFetch.page = 1;
+		pubFetch.page = 1;
 		search = '';
 		syncUrl();
 		refresh();
@@ -321,7 +305,7 @@
 			yearChart = null;
 		}
 		tab = newTab;
-		pubFetch.page = 1; labFetch.page = 1;
+		pubFetch.page = 1;
 		search = '';
 		syncUrl();
 		await loadTabContent();
@@ -340,8 +324,6 @@
 			await pubFetch.load();
 		} else if (tab === 'journals') {
 			await journalFetch.load();
-		} else if (tab === 'labs') {
-			await labFetch.load();
 		}
 	}
 
@@ -487,7 +469,7 @@
 	};
 
 	function onFilterChange() {
-		pubFetch.page = 1; labFetch.page = 1;
+		pubFetch.page = 1;
 		syncUrl();
 		refresh();
 	}
@@ -502,13 +484,6 @@
 		return total ? (val / total * 100).toFixed(1) + '%' : '0%';
 	}
 
-	function labDisplayName(row: LabRow): string {
-		if (row.lab_acronym && row.lab_acronym !== row.lab_name) {
-			return row.lab_acronym + ' — ' + row.lab_name;
-		}
-		return row.lab_acronym || row.lab_name;
-	}
-
 	onMount(async () => {
 		// Restore state from URL params
 		const u = new URLSearchParams(window.location.search);
@@ -519,7 +494,7 @@
 		}
 		if (restored.tab) {
 			const t = restored.tab as string;
-			if (t === 'oa' || t === 'publishers' || t === 'journals' || t === 'labs') tab = t;
+			if (t === 'oa' || t === 'publishers' || t === 'journals') tab = t;
 		}
 		if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
 		if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
@@ -546,7 +521,6 @@
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
 		if (restored.chartPage) chartPage = restored.chartPage as number;
 		if (restored.page) pubFetch.page = restored.page as number;
-		if (restored.labPage) labFetch.page = restored.labPage as number;
 
 		// Vocabulaire du pivot : dimensions graphables (faible cardinalité, hors l'axe année)
 		// proposées au sélecteur de découpage. Ajouter une dimension au registre l'y fait apparaître.
@@ -651,7 +625,6 @@
 		{#if view === 'top' || view === 'publisher_detail'}
 			<button class="tab-btn" class:active={tab === 'journals'} onclick={() => switchTab('journals')}>Revues</button>
 		{/if}
-		<button class="tab-btn" class:active={tab === 'labs'} onclick={() => switchTab('labs')}>Laboratoires</button>
 	</div>
 	{#if tab === 'publishers' || tab === 'journals'}
 		<input type="search" placeholder="Rechercher..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
@@ -660,7 +633,6 @@
 		<span class="count">
 			{#if tab === 'publishers'}{pubFetch.total} éditeur{pubFetch.total > 1 ? 's' : ''}
 			{:else if tab === 'journals'}{journalFetch.total} revue{journalFetch.total > 1 ? 's' : ''}
-			{:else if tab === 'labs'}{labFetch.total} laboratoire{labFetch.total > 1 ? 's' : ''}
 			{/if}
 		</span>
 	{/if}
@@ -770,36 +742,6 @@
 	<Pagination page={journalFetch.page} pages={journalFetch.pages} onchange={(p) => { journalFetch.goToPage(p); syncUrl(); }} />
 {/if}
 
-<!-- Tab: Labs -->
-{#if tab === 'labs'}
-	{#if labFetch.items.length > 0}
-		<table class="data-table">
-			<thead>
-				<tr>
-					<th class="sortable" class:active={labSort === 'name' || labSort === '-name'} onclick={() => { labSort = toggleSort(labSort, 'name'); labFetch.page = 1; labFetch.load(); }}>Laboratoire {labSort === 'name' ? '▲' : labSort === '-name' ? '▼' : ''}</th>
-					<th class="num sortable" class:active={labSort === 'pubs' || labSort === '-pubs'} onclick={() => { labSort = toggleSort(labSort, 'pubs'); labFetch.page = 1; labFetch.load(); }}>Articles {labSort === 'pubs' ? '▲' : labSort === '-pubs' ? '▼' : ''}</th>
-					<th class="num sortable" class:active={labSort === 'apc' || labSort === '-apc'} onclick={() => { labSort = toggleSort(labSort, 'apc'); labFetch.page = 1; labFetch.load(); }}>APC UCA {labSort === 'apc' ? '▲' : labSort === '-apc' ? '▼' : ''}</th>
-					<th style="min-width:100px">OA</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each labFetch.items as r (r.lab_id)}
-					<tr>
-						<td class="name-cell" title={r.lab_name}>
-							<a href="{base}/laboratories/{r.lab_id}">{labDisplayName(r)}</a>
-						</td>
-						<td class="num">{r.pub_count}</td>
-						<td class="num apc-cell">{r.apc_uca > 0 ? Math.round(r.apc_uca).toLocaleString('fr-FR') + ' €' : ''}</td>
-						{@render oaBreakdownCells(r)}
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-		<Pagination page={labFetch.page} pages={labFetch.pages} onchange={(p) => { labFetch.goToPage(p); syncUrl(); }} />
-	{:else}
-		<div class="empty">Aucun laboratoire associé</div>
-	{/if}
-{/if}
 
 <style>
 	.pub-link {

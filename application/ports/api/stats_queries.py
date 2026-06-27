@@ -44,12 +44,6 @@ class JournalStatsRow(OaCounts):
     apc_amount: float | None
 
 
-class LabStatsRow(OaCounts):
-    lab_id: int
-    lab_acronym: str | None
-    lab_name: str
-
-
 class PublisherStatsResponse(BaseModel):
     total: int
     page: int
@@ -64,14 +58,6 @@ class JournalStatsResponse(BaseModel):
     per_page: int
     pages: int
     journals: list[JournalStatsRow]
-
-
-class LabStatsResponse(BaseModel):
-    total: int
-    page: int
-    per_page: int
-    pages: int
-    labs: list[LabStatsRow]
 
 
 class YearStatsRow(BaseModel):
@@ -207,22 +193,6 @@ class StatsQueries(Protocol):
         per_page: int,
         sort: str,
     ) -> JournalStatsResponse: ...
-
-    def stats_labs(
-        self,
-        *,
-        apc_structure_ids: list[int],
-        lab_ids: list[int],
-        years: list[int],
-        publisher_id: int | None,
-        journal_id: int | None,
-        oa_status: str,
-        has_apc: str,
-        doc_types: list[str],
-        page: int,
-        per_page: int,
-        sort: str,
-    ) -> LabStatsResponse: ...
 
     def stats_by_year(
         self,

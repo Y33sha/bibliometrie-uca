@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, Query
 
 from application.ports.api.stats_queries import (
     JournalStatsResponse,
-    LabStatsResponse,
     PivotResponse,
     PivotSchemaResponse,
     PublisherStatsResponse,
@@ -106,36 +105,6 @@ def stats_by_year(
         oa_status=oa_status,
         has_apc=has_apc,
         doc_types=parse_str_csv(doc_type),
-    )
-
-
-@router.get("/api/stats/labs", response_model=LabStatsResponse)
-def stats_labs(
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    publisher_id: int | None = Query(None),
-    journal_id: int | None = Query(None),
-    oa_status: str = Query(""),
-    has_apc: str = Query(""),
-    doc_type: str = Query(""),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
-    sort: str = Query("-pubs"),
-    queries: StatsQueries = Depends(stats_queries_sync),
-) -> LabStatsResponse:
-    """Stats d'articles par laboratoire."""
-    return queries.stats_labs(
-        apc_structure_ids=get_apc_structure_ids_sync(),
-        lab_ids=parse_int_csv(lab_id),
-        years=parse_int_csv(year),
-        publisher_id=publisher_id,
-        journal_id=journal_id,
-        oa_status=oa_status,
-        has_apc=has_apc,
-        doc_types=parse_str_csv(doc_type),
-        page=page,
-        per_page=per_page,
-        sort=sort,
     )
 
 
