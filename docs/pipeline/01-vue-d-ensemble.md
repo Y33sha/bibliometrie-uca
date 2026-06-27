@@ -7,6 +7,7 @@ Le peuplement de la base s'effectue via un *pipeline* composé des étapes suiva
 ## Moissonnage
 
 - [Moissonnage initial](02-extract.md) : récupère les données brutes depuis les API et les stocke en JSONB dans la table de *staging*.
+- [Résolution des Registration Agencies](02-extract.md#resolve-ra) : résout la Registration Agency (Crossref ou DataCite) des préfixes DOI, pour que l'import croisé par DOI route chaque DOI vers la bonne API plutôt que de l'interroger contre les deux.
 - [Imports croisés](02-extract.md#cross-imports) : deux mécanismes de rattrapage cross-source enchaînés — (1) docs HAL manquants repérés par hal-id ou NNT dans d'autres sources, (2) recherche par DOI des records absents d'une source mais présents dans une autre.
 - [Refresh & disparitions](02-extract.md#refresh-stale) : refetch des documents à `last_seen_at` ancien (> 90 j) — rafraîchit les métadonnées vieillissantes et marque (`disappeared_at`) ceux qui ont disparu de leur source.
 - [Works OpenAlex tronqués](02-extract.md#refetch-truncated) : re-télécharge les works OpenAlex dont la liste d'auteurs dépasse le plafond de 100 de l'API.

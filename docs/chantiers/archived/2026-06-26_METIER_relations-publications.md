@@ -1,6 +1,6 @@
 # Chantier — Relations entre publications
 
-Commencé le 2026-06-21
+Commencé le 2026-06-21 - Terminé le 2026-06-26
 
 Modéliser les relations sémantiques entre publications **distinctes** (qui ne sont pas des doublons) : supplément ↔ article, actes/ouvrage ↔ communication/chapitre, preprint ↔ version publiée, article ↔ erratum/rétractation, data paper ↔ jeu de données décrit.
 

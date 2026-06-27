@@ -2,11 +2,11 @@
 
 Phase `publishers_journals` : enrichit le référentiel `journals` (revues) à partir de sources externes, après sa création initiale en phase [normalize](03-normalize.md).
 
-Trois sous-étapes. `resolve_doi_prefixes` s'exécute à chaque lancement du pipeline ; les deux enrichissements journaux ne tournent que lorsque l'enrichissement des référentiels est activé pour le mode courant (drapeau de politique `run_journal_enrichment`, vrai en mode `full`).
+Trois sous-étapes. `resolve_publishers` s'exécute à chaque lancement du pipeline ; les deux enrichissements journaux ne tournent que lorsque l'enrichissement des référentiels est activé pour le mode courant (drapeau de politique `run_journal_enrichment`, vrai en mode `full`).
 
 | Sous-étape | Source externe | Ce qu'elle renseigne | Quand |
 |---|---|---|---|
-| `resolve_doi_prefixes` | Crossref `/prefixes/{prefix}` + DataCite `/dois?prefix=` | `doi_prefixes` : pour chaque préfixe DOI, son agence d'enregistrement et l'éditeur (Crossref) ou l'entrepôt (DataCite) qui le détient | toujours |
+| `resolve_publishers` | Crossref `/prefixes/{prefix}` + DataCite `/dois?prefix=` | `doi_prefixes` : pour chaque préfixe DOI déjà routé vers sa Registration Agency par la phase [resolve_ra](02-extract.md#resolve-ra), l'éditeur (Crossref) ou l'entrepôt (DataCite) qui le détient, et le `publisher_id` rattaché | toujours |
 | `enrich_journals_from_openalex` | [OpenAlex Sources](../sources/03-openalex.md) | `journals` : type de revue, montant et devise des frais de publication (APC) | mode `full` |
 | `enrich_journals_from_doaj` | export CSV du [DOAJ](../sources/09-sources-supplementaires.md#doaj) | `journals` : fiche DOAJ complète (`doaj_payload`) et appartenance au DOAJ (`is_in_doaj`) | mode `full` |
 
@@ -34,7 +34,7 @@ Pour `is_in_doaj`, le DOAJ fait autorité : le drapeau est remis à `false` part
 
 Chaque sous-étape est incrémentale — filtres d'éligibilité :
 
-- `resolve_doi_prefixes` : préfixes encore absents de `doi_prefixes` (un préfixe non résoluble est mémorisé avec une agence sentinelle `'unknown'` pour ne plus être retenté).
+- `resolve_publishers` : préfixes dont la Registration Agency est résolue mais dont l'éditeur n'a pas encore été interrogé (`publisher_id` et `publisher_checked_at` nuls). Chaque préfixe est marqué « interrogé » quoi qu'il advienne, pour ne pas être retenté indéfiniment quand l'API ne renseigne aucun éditeur.
 - `enrich_journals_from_openalex` : revues ayant un `openalex_id` et un type encore inconnu (`journal_type = 'unknown'`). Converge à zéro : OpenAlex type ses sources, une revue typée sort de la file.
 - `enrich_journals_from_doaj` : déclenché par l'âge du dernier import (voir ci-dessus), et non par un filtre revue par revue.
 

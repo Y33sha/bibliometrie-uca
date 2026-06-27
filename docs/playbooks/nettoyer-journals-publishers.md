@@ -54,7 +54,7 @@ Choisir comme cible la row avec le titre le plus canonique (nom long, métadonn�
 
 ## Cas 2 — Doublons de publishers (sources vs Crossref)
 
-**Symptôme** : `journals.publisher_id` (créé par les normalizers HAL/OA/WoS à partir du nom brut) ≠ `doi_prefixes.publisher_id` (créé par `resolve_doi_prefixes` à partir de l'API Crossref). Ex. *Nature Portfolio* (id source) vs *Springer Science and Business Media LLC* (id Crossref) pour le préfixe `10.1038`.
+**Symptôme** : `journals.publisher_id` (créé par les normalizers HAL/OA/WoS à partir du nom brut) ≠ `doi_prefixes.publisher_id` (créé par `resolve_publishers` à partir de l'API Crossref). Ex. *Nature Portfolio* (id source) vs *Springer Science and Business Media LLC* (id Crossref) pour le préfixe `10.1038`.
 
 ### Diagnostic
 

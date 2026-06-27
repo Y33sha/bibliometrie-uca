@@ -18,54 +18,70 @@ Un va-et-vient entre listes et tableaux de bord, ces derniers étant compris com
 
 L'architecture frontend supporte une grande part de cet objectif sans que ce soit nommé. `PublicationsListView` est une lentille « liste » réutilisable, embarquée dans six contextes (la page publications, et l'onglet `tab=publications` des pages laboratoire, personne, revue, éditeur, sujet), chacun avec des filtres externes et une synchronisation d'URL. La page de statistiques est une lentille « tableau de bord » sur un état de filtre partagé (années, laboratoires, accès ouvert, frais de publication, éditeur, revue), avec un enchaînement éditeur → revues → détail et un fil d'Ariane. Les deux lentilles s'appuient sur les mêmes briques (`useUrlFilters`, `useFacets`, `usePaginatedFetch`, `FacetDropdown`) et **portent tout leur état dans l'URL**.
 
-### Le modèle conceptuel établi : le pivot
+### Le modèle conceptuel : quatre axes
 
-Toute vue du système est une requête à trois rôles : une **mesure** (ce qu'on agrège — aujourd'hui toujours le nombre de publications), un **groupement** (les axes de ventilation — codés en dur par onglet : année croisée avec `oa_status`, ou éditeur, ou revue, ou laboratoire), et des **filtres** (les contraintes du corpus — les facettes du haut de page). Les quatre onglets de la page de statistiques ne sont donc pas quatre pages, mais quatre **préréglages de groupement** d'un même pivot.
+Toute vue du système est une requête à quatre axes orthogonaux :
 
-De ce cadrage découlent plusieurs propriétés qui unifient les intuitions du chantier. La **liste est le cas du pivot à zéro groupement** (la mesure, ce sont les lignes elles-mêmes) ; le drill-down du graphique vers la liste devient alors une opération algébrique propre : cliquer un agrégat **pèle une dimension de groupement et la convertit en filtre**, jusqu'à ce qu'il ne reste plus de groupement — c'est-à-dire la liste filtrée. La **cardinalité d'une dimension contraint la faisabilité** d'un rendu : les dimensions à faible cardinalité (année, voie d'accès, type, source) conviennent à des axes de graphique, les dimensions à forte cardinalité (éditeur, revue, sujet, personne — des milliers de valeurs) appellent une table classée ou un graphique tronqué aux N premières valeurs. Le rapport **absolu / taux est un axe de normalisation** indépendant du groupement. Le **rendu graphique / table est un choix par vue**, souvent dicté par le besoin d'export.
+1. **Le corpus interrogé** — *ce qu'on compte*. « Nombre de X » : X est le corpus, par défaut les publications, éventuellement les revues ou les éditeurs distincts. Changer de corpus, c'est changer ce que dénombre le `COUNT(DISTINCT …)`. Le compte du corpus *est* la grandeur affichée ; il n'y a pas de « mesure » comme axe séparé.
+2. **Les filtres** — les contraintes qui restreignent le corpus (les facettes du haut de page).
+3. **Le groupement** — l'axe de ventilation, une *catégorie à analyser* : « nombre de X *par Y* » (par voie d'accès, par type de document, par éditeur…). Un axe ordinal comme l'année n'en est pas : on ne groupe pas par année.
+4. **La comparaison** — un second axe, facultatif, *ce que l'on compare* : « nombre de X par Y, *d'un Z à l'autre* » (d'une année à l'autre, d'un laboratoire à l'autre). C'est l'axe naturel de l'année et des entités ; il se déploie en abscisse, le groupement formant l'empilement de chaque barre.
+
+Les quatre onglets de la page de statistiques ne sont donc pas quatre pages, mais quatre **préréglages** d'un même pivot. De ce cadrage découlent les intuitions du chantier. La **liste est le pivot à zéro groupement** (la mesure, ce sont les lignes elles-mêmes) ; le drill-down du graphique vers la liste **pèle un groupement et le convertit en filtre**, jusqu'à ce qu'il ne reste plus de groupement — la liste filtrée. La **cardinalité contraint le rendu** : faible cardinalité (année, accès, type) → axe de graphique ; forte cardinalité (laboratoire, revue, éditeur — des milliers de valeurs) → top N et « Autres », ou table classée, ou simple renvoi vers la liste existante. La **part (empilement à 100 %) est un mode de présentation** indépendant des axes, pas une mesure : « % d'accès ouvert » se lit en comparant par accès puis en aplatissant à 100 %.
 
 ## Décisions
 
 Ces décisions sont des orientations proposées, à confirmer ou amender ; seul le contexte ci-dessus est factuel.
 
-1. **Modèle pivot à axes orthogonaux**, tous portés par l'URL : mesure, mode (absolu ou part), groupement primaire et secondaire, rendu (graphique ou table), filtres. Les préréglages actuels (par année et voie d'accès, top éditeurs, etc.) deviennent des points de départ sur ce moteur, non des branches de code séparées.
+1. **Quatre axes orthogonaux, portés par l'URL** : corpus, filtres, groupement, comparaison. S'y ajoutent deux modes de présentation (absolu / part, graphique / table) et un tri (« classer par »), qui ne sont pas des axes. Les préréglages actuels (par année et voie d'accès, top éditeurs, etc.) deviennent des points de départ sur ce moteur, non des branches de code séparées.
 
-2. **Backend = moteur d'agrégation générique**, conçu comme un constructeur de requête sur un **registre fermé** : chaque dimension et chaque mesure map vers une expression connue, la composition `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` se fait sur liste blanche. Ce n'est pas du SQL libre — aucune injection possible — mais un assembleur sur vocabulaire borné. Le moteur consolide au passage la clause de filtres, aujourd'hui dupliquée entre les endpoints `by-year`, `publishers`, `journals`, `labs`, `summary`. L'absence d'enjeu temporel fait préférer ce moteur générique à un jeu d'endpoints figés : il n'y a qu'une source de vérité, et l'ajout d'une dimension se fait dans le registre.
+2. **Le corpus est l'axe « ce qu'on compte »**, pas une « mesure » distincte. La grandeur affichée est toujours un `COUNT(DISTINCT <corpus>.id)` sur l'ensemble filtré ; il n'y a donc pas de sélecteur de mesure. Le corpus vaut les publications par défaut ; les revues et les éditeurs distincts viennent ensuite (« nombre de revues par éditeur » = corpus *revues*, groupé par éditeur). Une grandeur sort de ce cadre du « compte » : la **somme des frais de publication** (en euros). On l'ignore tant qu'aucun besoin ne l'exige ; le jour venu, elle prendra la forme d'un **mode « somme »** s'ajoutant au compte, et non d'un corpus.
 
-3. **Le registre de dimensions est l'artefact central**, partagé entre le constructeur SQL et les sélecteurs de l'interface. Pour chaque dimension : son expression, sa jointure éventuelle, son **grain** (une publication rattachée à deux laboratoires compte dans les deux : grouper par une dimension qui démultiplie impose `count(distinct publication_id)`), sa cardinalité, son caractère ordinal. Un petit registre de mesures l'accompagne. La gestion du grain est la vraie difficulté du backend, et elle existe quelle que soit l'approche.
+3. **Backend = moteur d'agrégation générique**, conçu comme un constructeur de requête sur un **registre fermé** : chaque dimension et chaque corpus map vers une expression connue, la composition `SELECT <dimensions>, COUNT(DISTINCT <corpus>) … GROUP BY <dimensions>` se fait sur liste blanche. Ce n'est pas du SQL libre — aucune injection possible — mais un assembleur sur vocabulaire borné. Le moteur consolide au passage la clause de filtres, aujourd'hui dupliquée entre les endpoints `by-year`, `publishers`, `journals`, `labs`, `summary`. L'absence d'enjeu temporel fait préférer ce moteur générique à un jeu d'endpoints figés : il n'y a qu'une source de vérité, et l'ajout d'une dimension se fait dans le registre.
 
-4. **Liste = pivot à zéro groupement**, drill-down = conversion d'un groupement en filtre. Le « bouton Publications » ad hoc disparaît au profit d'un changement de lentille qui porte le filtre **complet** (sans `doc_type` forcé).
+4. **Le registre de dimensions est l'artefact central**, partagé entre le constructeur SQL et les sélecteurs de l'interface. Pour chaque dimension : son expression, sa jointure éventuelle, son **grain** (une publication rattachée à deux laboratoires compte dans les deux : grouper par une dimension qui démultiplie impose `count(distinct publication_id)`), sa cardinalité, son caractère ordinal. La gestion du grain est la vraie difficulté du backend, et elle existe quelle que soit l'approche.
 
-5. **Accès ouvert reformulé.** Par défaut, le vocabulaire générique « ouvert / fermé / sous embargo » (le même que la fiche détail d'une publication) et un taux phare ; les voies détaillées (gold, green, etc.) restent accessibles à la demande, par changement de mesure ou par groupement secondaire. « % d'accès ouvert » devient une **mesure nommée de plein droit**, car c'est l'indicateur phare et qu'on le veut souvent sans avoir à grouper par voie puis sommer les voies ouvertes. Les colonnes numériques par valeur de `oa_status` sont retirées des tables (la barre de répartition suffit ; le détail relève du drill-down).
+5. **Liste = pivot à zéro groupement**, drill-down = conversion d'un groupement en filtre. Le « bouton Publications » ad hoc disparaît au profit d'un changement de lentille qui porte le filtre **complet** (sans `doc_type` forcé).
 
-6. **Graphique / table : un commutateur par vue.** La cardinalité ne dicte pas le rendu, elle contraint le faisable : forte cardinalité → table classée, ou graphique tronqué aux N premières valeurs (avec un tri par la mesure et éventuellement une barre « Autres »). Dans le faisable, le choix est libre et sert l'export : table → CSV (valeurs exactes), graphique → PNG (l'histoire visuelle).
+6. **Le tableau de bord renvoie vers les listes, il ne les recrée pas.** Le va-et-vient est l'objectif : du graphique vers la liste filtrée, et retour. Une table dans le tableau de bord ne se justifie que pour ce qu'une liste de publications ne sait pas rendre — typiquement un **classement d'entités par agrégat** (les laboratoires les plus ouverts). Pour le détail, le lien renvoie vers la liste existante en transmettant les filtres, plutôt que de réimplémenter cette liste dans le tableau de bord.
 
-7. **Deux sens de « taux » à distinguer.** D'une part la **normalisation d'une ventilation** (empilement à 100 %) : quand un groupement secondaire partage un tout, basculer de l'absolu à la part donne la proportion de chaque valeur — simple bascule de présentation, valable pour tout secondaire catégoriel. D'autre part la **mesure-ratio** (« % d'accès ouvert » = publications ouvertes sur total) qui effondre une dimension catégorielle en un numérateur sur un dénominateur et donne une courbe plutôt qu'un empilement. L'interface offre les deux : la bascule absolu / part sur toute ventilation, et les mesures-ratios nommées.
+7. **Accès ouvert : une part, pas une mesure.** Vocabulaire générique « ouvert / fermé / sous embargo » par défaut (le même que la fiche détail d'une publication) ; les huit voies (gold, green, etc.) à la demande, par comparaison. Le « % d'accès ouvert » n'est pas une mesure-axe : c'est la **comparaison par accès aplatie à 100 %** sur un graphique, ou une **colonne triable** dans un classement d'entités. Les colonnes numériques par valeur de `oa_status` sont retirées des tables (la barre de répartition suffit ; le détail relève du drill-down).
 
-8. **L'URL reste le siège de l'état**, avec omission des valeurs par défaut et clés courtes pour rester compact. Les vues nommées (configuration persistée côté serveur, référencée par identifiant) sont différées : elles répondront au seul cas réellement volumineux (multi-sélections de dizaines d'identifiants) et au besoin de rapports récurrents.
+8. **Rendu : modes de présentation et garde-fous de cardinalité.** Groupement simple → barres (absolu) ou camembert (part). Comparaison → histogramme empilé, dont l'orientation suit la lisibilité des libellés (les années en abscisse, les entités à libellé long en ordonnée). La bascule absolu / part est une case à cocher qui aplatit l'empilement à 100 %. Un bouton « classer par » trie la ventilation. La cardinalité ne dicte pas le rendu mais contraint le faisable : forte cardinalité → top N et barre « Autres », table seulement si c'est le seul rendu possible, sinon renvoi vers la liste. L'export suit le rendu : table → CSV (valeurs exactes), graphique → PNG (l'histoire visuelle).
+
+9. **L'URL reste le siège de l'état**, avec omission des valeurs par défaut et clés courtes pour rester compact. Les vues nommées (configuration persistée côté serveur, référencée par identifiant) sont différées : elles répondront au seul cas réellement volumineux (multi-sélections de dizaines d'identifiants) et au besoin de rapports récurrents.
 
 ## Phasage
 
 ### Phase 0 — Registre des dimensions et des mesures
 
-- [ ] Recenser les dimensions groupables et filtrables, et pour chacune : expression, jointure, grain (démultiplication ou non), cardinalité, caractère ordinal.
-- [ ] Recenser les mesures : agrégats (nombre de publications, somme des frais de publication, nombre de revues distinctes…) et mesures-ratios nommées (% d'accès ouvert, et ultérieurement % avec frais de publication, % déposé en archive ouverte…).
+- [x] Recenser les dimensions groupables et filtrables, et pour chacune : expression, jointure, grain (démultiplication ou non), cardinalité, caractère ordinal. → registre pur `domain/stats/pivot.py` : année · accès · voie OA · type · laboratoire · APC, chaque entrée portant cardinalité, ordinal, grain (`multiplies`) et rôles `groupable`/`filterable` ; liaison SQL côté infrastructure (5b741330, 9aaa73fb).
+- [x] Recenser les mesures. → le registre ne porte qu'un compte : `nombre de publications` (`COUNT(DISTINCT)`). Le taux d'accès ouvert n'est pas une mesure (il se lit comme part à 100 % ou colonne de classement) ; un éventuel mode « somme » (frais de publication) viendra plus tard. Compter d'autres corpus (revues, éditeurs) reste une question ouverte (36eba95c).
 
 ### Phase 1 — Moteur d'agrégation générique (backend)
 
-- [ ] Endpoint unique d'agrégation paramétré par mesure, groupements et filtres, composé sur le registre.
-- [ ] Gestion du grain : `count(distinct publication_id)` dès qu'un groupement démultiplie.
-- [ ] Consolidation de la clause de filtres aujourd'hui dupliquée entre les endpoints de statistiques.
+- [x] Endpoint unique d'agrégation paramétré par mesure, groupements et filtres, composé sur le registre. → `GET /api/stats/pivot` + `/api/stats/pivot/schema`, composition sur liste blanche, 400 sur clé inconnue (5b741330).
+- [x] Gestion du grain : `count(distinct publication_id)` dès qu'un groupement démultiplie. → mesures `COUNT(DISTINCT p.id)` (5b741330).
+- [ ] Consolidation de la clause de filtres aujourd'hui dupliquée entre les endpoints de statistiques. → le pivot réutilise les clauses de `filters.py` ; reste à y rallier `summary`/`publishers`/`journals`/`labs`, encore dupliquées (rejoint le dé-hardcode `doc_type`, Phase 3).
 
 ### Phase 2 — Reformulation de l'accès ouvert
 
-- [ ] Mesure nommée « % d'accès ouvert » ; vocabulaire générique ouvert / fermé / sous embargo par défaut.
-- [ ] Retrait des colonnes par valeur de `oa_status` des tables ; voies détaillées à la demande.
+- [x] Taux d'accès ouvert lu comme part (et non comme mesure) ; vocabulaire générique ouvert / fermé / sous embargo par défaut. → vocabulaire `oa_access` (ouvert / embargo / fermé / indéterminé) = découpage par défaut de l'histogramme, les 8 voies à la demande via `oa_voie` ; le taux se lit via la bascule absolu / part (5b741330, 24b8158f, 36eba95c).
+- [x] Retrait des colonnes par valeur de `oa_status` des tables ; voies détaillées à la demande. → fait (2b6beb46) ; la barre de répartition suffit, le détail chiffré relève du pivot.
 
 ### Phase 3 — Interface du pivot
 
 - [ ] Sélecteurs de mesure, de mode (absolu / part), de groupement (primaire et secondaire), de rendu (graphique / table).
-- [ ] Bascule d'une dimension entre filtre et groupement (un groupement catégoriel sort des facettes ; un groupement ordinal comme l'année reste filtrable en plage).
+  - [x] **groupement** : sélecteurs « Grouper par » (la catégorie à analyser — accès, voie, type — empilée dans chaque barre ; un axe ordinal comme l'année en est exclu) et « Comparer par » (l'axe déployé en abscisse, où figure l'année, facultatif, excluant la dimension prise comme groupement). Défaut : groupé par accès, comparé par année — barres par année, empilées par accès. Sans comparaison, le groupement passe en abscisse. Options lues du schéma du registre (24b8158f, 02cb8180, fc3ec564, e2da7875).
+  - [x] **comparaison à forte cardinalité** : le laboratoire devient une dimension de pivot groupable (jointures de rattachement, grain `COUNT(DISTINCT)`) offerte en « Comparer par ». L'abscisse est **paginée** (10 par page, triées par total décroissant ; page portée par l'URL) plutôt que tronquée, et passe en **barres horizontales** pour les libellés longs. Le libellé est l'acronyme ou le nom du laboratoire (bd5f8f3e, 96541a98, 64e64de7). Revue et éditeur en comparaison restent à brancher de la même façon.
+  - [x] **corpus / mesure** : le graphe est toujours le compte de publications (barres empilées) ; pas de sélecteur de mesure. La mesure-ratio « % d'accès ouvert » est retirée du registre — le taux se lit via la bascule absolu / part, le découpage par accès portant déjà l'information (32d26a4c, 36eba95c).
+  - [x] **mode** absolu / part : case à cocher « Part (%) » qui aplatit l'empilement à 100 % ; portée par l'URL (clé `mode`), visible seulement avec une comparaison (71394885).
+  - [ ] **rendu** graphique / table.
+- [x] Bascule d'une dimension entre filtre et groupement (un groupement catégoriel sort des facettes ; un groupement ordinal comme l'année reste filtrable en plage).
+  - [x] **cadre posé** : rôles `groupable`/`filterable` au registre + `applicable_facets` (règle G : un groupement catégoriel sort des facettes, l'ordinal reste), testé (9aaa73fb, 36eba95c).
+  - [x] **dériver la barre de facettes** côté UI (montrer / masquer un dropdown selon le groupement courant) sur les facettes existantes (année / labo / OA / APC) — miroir TS de la règle G sur l'onglet OA ; grouper par voie OA retire la facette « Voies OA » (9fb2a2ac).
+  - [x] **facette « Type de document »** : comptes dans `/api/stats/facets` + dropdown groupé par familles (même base que la liste des publications), défaut famille « Publications » (08487681).
+  - [x] **dé-hardcoder `doc_type`** dans `summary`/`publishers`/`journals`/`labs` : passé en filtre, plus aucun hardcode `article,review` côté stats ; le lien « Voir les publications » porte la sélection de types (08487681).
 - [ ] Préréglages (par année et voie d'accès, top éditeurs…) comme points de départ.
 
 ### Phase 4 — Va-et-vient liste ↔ tableau de bord
@@ -79,11 +95,13 @@ Ces décisions sont des orientations proposées, à confirmer ou amender ; seul 
 - [ ] Persistance et partage de configurations de pivot, pour les rapports récurrents et les sélections volumineuses.
 
 ## Items TODO liés (à intégrer quelque part)
-* [ ] ajouter facettes sur dashboards pour générer dynamiquement les graphiques
+* [x] ajouter facettes sur dashboards pour générer dynamiquement les graphiques → l'histogramme OA est piloté par le pivot, sa ventilation est un choix (24b8158f) ; la dérivation de la barre de facettes elle-même est en cours (Phase 3).
+* [x] permettre des ventilations par labo (taux d'open access) → « Comparer par → Laboratoire » donne les laboratoires en abscisse paginée, empilés par le groupement (accès…) ; en mode part, le taux d'ouverture par laboratoire. Cela a permis de supprimer l'onglet Laboratoires et sa chaîne backend `/api/stats/labs` (e8af81ba).
 
 ## Questions ouvertes
 
-- **Dimensions et mesures de départ** : quel jeu rendre groupable et mesurable d'emblée (année, voie d'accès, type, source, éditeur, revue, laboratoire ; nombre de publications, % d'accès ouvert, frais de publication) ? C'est ce choix qui dimensionne le registre et le premier moteur.
+- **Dimensions de départ** : quel jeu rendre groupable et filtrable d'emblée (année, voie d'accès, type, éditeur, revue, laboratoire) ? C'est ce choix qui dimensionne le registre et le premier moteur.
+- **Corpus au-delà des publications** : faut-il compter d'autres corpus (revues, éditeurs distincts) sur le tableau de bord, et pour quels besoins ?
 - **Page unifiée à lentilles ou deux pages pontées** : viser d'emblée une page unique avec commutateur de lentille, ou converger par étapes (d'abord rendre le pont bidirectionnel et filtre-complet, puis embarquer la visualisation dans la liste) ?
 - **Périmètre des types de documents** : le taux d'accès ouvert n'a de sens que pour certains types ; rendre le filtre `doc_type` explicite (visible) plutôt que caché en dur.
 - **Politique d'URL** : seuil de multi-sélection au-delà duquel basculer sur les vues nommées.

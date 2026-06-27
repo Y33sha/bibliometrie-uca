@@ -18,7 +18,7 @@ Le pipeline interroge DataCite pour les DOI déjà découverts par les autres so
 - Pas de quota contractuel. L'adapter reste conservateur (`max_concurrent=3`, `request_delay_s=0.2`) pour ne pas se faire limiter
 - Les 404 sont matérialisés dans `staging` avec `not_found=TRUE` + `processed=TRUE` pour ne pas être réinterrogés à chaque run
 
-**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identification du *provider* et du *client* (l'entrepôt) rattachés à un préfixe DOI. Consommée par le sub-step `resolve_doi_prefixes` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui peuple la table `doi_prefixes` (préfixe → entrepôt + provider).
+**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identification du *provider* et du *client* (l'entrepôt) rattachés à un préfixe DOI. Consommée par le sub-step `resolve_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → entrepôt + provider) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/02-extract.md#resolve-ra).
 
 ## Données récupérées
 
@@ -104,7 +104,7 @@ DataCite est intégré en **DOI-driven uniquement** : on l'interroge pour enrich
 **En place** :
 - Ingestion DOI-driven (`fetch_missing_doi` + `normalize_datacite`)
 - Résolution concept/version via `relatedIdentifiers` (phase `metadata_correction`)
-- Résolution des préfixes DOI vers leur entrepôt (`resolve_doi_prefixes`)
+- Résolution des préfixes DOI : Registration Agency (`resolve_ra`) puis entrepôt (`resolve_publishers`)
 
 **Hors périmètre actuel** (chantiers ultérieurs) :
 - *Discovery* par affiliation : trouver de nouvelles publications via la requête affiliation DataCite (`creators.affiliation.name`). Piste réelle (recall mesuré encourageant), mais ouvre ses propres questions (volumétrie, balance précision/recall) — distincte de l'usage DOI-driven actuel.
