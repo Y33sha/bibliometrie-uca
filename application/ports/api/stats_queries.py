@@ -136,8 +136,56 @@ class StatsFacetsResponse(BaseModel):
     apc: list[ApcFacet]
 
 
+class PivotDimensionOut(BaseModel):
+    """Métadonnée d'une dimension groupable, lue par les sélecteurs de l'interface."""
+
+    key: str
+    label: str
+    cardinality: Literal["low", "high"]
+    ordinal: bool
+
+
+class PivotMeasureOut(BaseModel):
+    key: str
+    label: str
+    is_ratio: bool
+
+
+class PivotSchemaResponse(BaseModel):
+    """Vocabulaire du pivot exposé à l'interface (sans liaison SQL)."""
+
+    dimensions: list[PivotDimensionOut]
+    measures: list[PivotMeasureOut]
+
+
+class PivotResponse(BaseModel):
+    """Résultat d'une agrégation. Chaque ligne porte la valeur de chaque groupement (clés =
+    `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul)."""
+
+    measure: str
+    groups: list[str]
+    rows: list[dict[str, str | int | float | None]]
+
+
 class StatsQueries(Protocol):
     """Lectures pour /api/stats/*."""
+
+    def pivot_schema(self) -> PivotSchemaResponse: ...
+
+    def pivot(
+        self,
+        *,
+        measure: str,
+        groups: list[str],
+        apc_structure_ids: list[int],
+        lab_ids: list[int],
+        years: list[int],
+        publisher_id: int | None,
+        journal_id: int | None,
+        oa_status: str,
+        has_apc: str,
+        doc_types: list[str],
+    ) -> PivotResponse: ...
 
     def publisher_stats(
         self,
