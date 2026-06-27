@@ -10,10 +10,22 @@ from infrastructure.queries.api.persons.admin import (
     identifier_conflicts,
     identifier_conflicts_count,
     list_orphan_authorships,
+    name_duplicates,
+    name_duplicates_count,
     name_form_authorships,
     orphan_authorships_count,
     person_exists,
 )
+
+
+def _create_authorship(conn, pub_id, person_id):
+    conn.execute(
+        text(
+            "INSERT INTO authorships (publication_id, person_id, roles) "
+            "VALUES (:p, :pe, ARRAY['author']::text[])"
+        ),
+        {"p": pub_id, "pe": person_id},
+    )
 
 
 def _create_person(conn, last="A", first="Z", rejected=False):
@@ -298,3 +310,37 @@ class TestDetachableIntruders:
         )
 
         assert detachable_intruders_count(sa_sync_conn) == 0
+
+
+class TestNameDuplicates:
+    """Paires aux noms compatibles, classées par recouvrement de réseau."""
+
+    def _pair(self, res, a, b):
+        return next(
+            p
+            for p in res["pairs"]
+            if {p["person_a"]["person_id"], p["person_b"]["person_id"]} == {a, b}
+        )
+
+    def test_shared_coauthor_is_network_tier(self, sa_sync_conn):
+        a = _create_person(sa_sync_conn, last="Dupont", first="J")
+        b = _create_person(sa_sync_conn, last="Dupont", first="Jean")
+        coauthor = _create_person(sa_sync_conn, last="Martin", first="Paul")
+        pub1, pub2 = _create_pub(sa_sync_conn), _create_pub(sa_sync_conn)
+        _create_authorship(sa_sync_conn, pub1, a)
+        _create_authorship(sa_sync_conn, pub1, coauthor)
+        _create_authorship(sa_sync_conn, pub2, b)
+        _create_authorship(sa_sync_conn, pub2, coauthor)
+
+        assert name_duplicates_count(sa_sync_conn) >= 1
+        pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
+        assert pair["overlaps"]["coauthors"] == 1
+        assert pair["tier"] == "network"
+
+    def test_disjoint_pair_is_homonym(self, sa_sync_conn):
+        a = _create_person(sa_sync_conn, last="Bernard", first="M")
+        b = _create_person(sa_sync_conn, last="Bernard", first="Marie")
+
+        pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
+        assert pair["tier"] == "homonym"
+        assert pair["overlaps"] == {"coauthors": 0, "shared_pubs": 0, "labs": 0, "journals": 0}

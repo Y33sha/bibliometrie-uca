@@ -31,6 +31,7 @@ from application.ports.api.persons_queries import (
     FacetFilters,
     IdentifierConflictsResponse,
     ListFilters,
+    NameDuplicatesResponse,
     NameFormAuthorshipsResponse,
     OrphanAuthorshipsResponse,
     OrphanCountResponse,
@@ -57,6 +58,8 @@ from infrastructure.queries.api.persons.admin import (
     identifier_conflicts as _identifier_conflicts,
     identifier_conflicts_count as _identifier_conflicts_count,
     list_orphan_authorships as _list_orphan_authorships,
+    name_duplicates as _name_duplicates,
+    name_duplicates_count as _name_duplicates_count,
     name_form_authorships as _name_form_authorships,
     orphan_authorships_count as _orphan_authorships_count,
     person_exists as _person_exists,
@@ -198,6 +201,14 @@ class PgPersonsQueries(PersonsQueries):
     def detachable_intruders(self, *, page: int, per_page: int) -> DetachableIntrudersResponse:
         return DetachableIntrudersResponse.model_validate(
             _detachable_intruders(self._conn, page=page, per_page=per_page)
+        )
+
+    def name_duplicates_count(self) -> int:
+        return _name_duplicates_count(self._conn)
+
+    def name_duplicates(self, *, page: int, per_page: int) -> NameDuplicatesResponse:
+        return NameDuplicatesResponse.model_validate(
+            _name_duplicates(self._conn, page=page, per_page=per_page)
         )
 
     def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]:

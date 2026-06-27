@@ -26,6 +26,7 @@
   import AmbiguousFormsList from "./AmbiguousFormsList.svelte";
   import IdentifierConflictsList from "./IdentifierConflictsList.svelte";
   import DetachableIntrudersList from "./DetachableIntrudersList.svelte";
+  import NameDuplicatesList from "./NameDuplicatesList.svelte";
   import { confirmMerge } from "./confirmMerge";
 
   /* ── State ── */
@@ -34,11 +35,17 @@
   let orphanCount = $state(0);
 
   // Onglets du hub : liste maîtresse + files de triage.
-  type TabKey = "all" | "ambiguous-forms" | "identifier-conflicts" | "detachable-intruders";
+  type TabKey =
+    | "all"
+    | "ambiguous-forms"
+    | "identifier-conflicts"
+    | "detachable-intruders"
+    | "name-duplicates";
   let tab = $state<TabKey>("all");
   let ambiguousCount = $state(0);
   let identifierConflictCount = $state(0);
   let detachableCount = $state(0);
+  let nameDuplicateCount = $state(0);
   // Bumpé après chaque action du drawer pour recharger la file de triage active.
   let reloadFiles = $state(0);
 
@@ -264,7 +271,12 @@
     }
     if (p.get("person")) selectedPersonId = parseInt(p.get("person")!, 10) || null;
     const t = p.get("tab");
-    if (t === "ambiguous-forms" || t === "identifier-conflicts" || t === "detachable-intruders")
+    if (
+      t === "ambiguous-forms" ||
+      t === "identifier-conflicts" ||
+      t === "detachable-intruders" ||
+      t === "name-duplicates"
+    )
       tab = t;
   }
 
@@ -354,8 +366,16 @@
     detachableCount = data.total;
   }
 
+  async function loadNameDuplicateCount() {
+    const data = await api<{ total: number }>("/api/admin/name-duplicates/count");
+    nameDuplicateCount = data.total;
+  }
+
   function selectTab(t: TabKey) {
     tab = t;
+    // Compteur « Doublons par nom » paresseux : sa détection (4 self-joins sur les personnes)
+    // coûte ~3 s, on ne la paie qu'à l'ouverture de l'onglet, pas au montage du hub.
+    if (t === "name-duplicates") loadNameDuplicateCount();
     updateUrl();
   }
 
@@ -529,6 +549,9 @@
     loadAmbiguousCount();
     loadIdentifierConflictCount();
     loadDetachableCount();
+    // Compteur « Doublons par nom » : seulement si l'onglet est l'onglet courant (restauré
+    // depuis l'URL) — sinon il se charge à l'ouverture de l'onglet (cf. `selectTab`).
+    if (tab === "name-duplicates") loadNameDuplicateCount();
     // Deep-link `?person=` vers une personne hors de la page courante.
     await refreshSelected();
   });
@@ -565,6 +588,14 @@
   >
     Intrus d&eacute;tachables
     {#if detachableCount > 0}<span class="tab-badge">{detachableCount}</span>{/if}
+  </button>
+  <button
+    class="hub-tab"
+    class:active={tab === "name-duplicates"}
+    onclick={() => selectTab("name-duplicates")}
+  >
+    Doublons par nom
+    {#if nameDuplicateCount > 0}<span class="tab-badge">{nameDuplicateCount}</span>{/if}
   </button>
 </nav>
 
@@ -651,6 +682,12 @@
   <DetachableIntrudersList
     onopenPerson={openDrawer}
     onchange={loadDetachableCount}
+    reloadKey={reloadFiles}
+  />
+{:else if tab === "name-duplicates"}
+  <NameDuplicatesList
+    onopenPerson={openDrawer}
+    onchange={loadNameDuplicateCount}
     reloadKey={reloadFiles}
   />
 {/if}

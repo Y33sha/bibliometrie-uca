@@ -406,6 +406,34 @@ class DetachableIntrudersResponse(BaseModel):
     groups: list[DetachableIntruderGroupOut]
 
 
+class OverlapCountsOut(BaseModel):
+    """Recouvrements de réseau entre deux personnes d'une paire candidate par nom."""
+
+    coauthors: int
+    shared_pubs: int
+    labs: int
+    journals: int
+
+
+class NameDuplicatePairOut(BaseModel):
+    """Deux personnes aux noms compatibles, avec leurs recouvrements et la force du rapprochement
+    (`network` = réseau de collaboration commun → doublon probable ; `weak` = labo/revue seuls ;
+    `homonym` = réseaux disjoints → homonyme probable)."""
+
+    person_a: IdentifierConflictPersonOut
+    person_b: IdentifierConflictPersonOut
+    overlaps: OverlapCountsOut
+    tier: Literal["network", "weak", "homonym"]
+
+
+class NameDuplicatesResponse(BaseModel):
+    total: int
+    page: int
+    per_page: int
+    pages: int
+    pairs: list[NameDuplicatePairOut]
+
+
 class SharingPersonOut(BaseModel):
     """Personne partageant ≥1 forme de nom avec une autre (candidate à l'absorption)."""
 
@@ -509,5 +537,9 @@ class PersonsQueries(Protocol):
     def detachable_intruders_count(self) -> int: ...
 
     def detachable_intruders(self, *, page: int, per_page: int) -> DetachableIntrudersResponse: ...
+
+    def name_duplicates_count(self) -> int: ...
+
+    def name_duplicates(self, *, page: int, per_page: int) -> NameDuplicatesResponse: ...
 
     def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]: ...
