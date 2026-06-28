@@ -38,7 +38,9 @@ def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
     laboratoire à l'autre), le grossier ailleurs. Couvre exhaustivement l'enum ; les types non listés
     tombent dans `misc` (filet)."""
     expanded = DOC_TYPE_FAMILIES["publications"]
-    whens = [f"WHEN {column}::text IN ({', '.join(f'{t!r}' for t in expanded)}) THEN {column}::text"]
+    whens = [
+        f"WHEN {column}::text IN ({', '.join(f'{t!r}' for t in expanded)}) THEN {column}::text"
+    ]
     whens += [
         f"WHEN {column}::text IN ({', '.join(f'{t!r}' for t in types)}) THEN {family!r}"
         for family, types in DOC_TYPE_FAMILIES.items()

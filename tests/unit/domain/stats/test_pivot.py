@@ -75,8 +75,14 @@ class TestApplicableFacets:
 def test_grain_multiplies_only_for_multiplying_dimensions():
     # Aucune dimension groupable du registre ne démultiplie ; on en construit une (cas labo/sujet).
     multiplying = Dimension(
-        "lab2", "Labo", "high",
-        ordinal=False, multiplies=True, groupable=True, comparable=True, filterable=True,
+        "lab2",
+        "Labo",
+        "high",
+        ordinal=False,
+        multiplies=True,
+        groupable=True,
+        comparable=True,
+        filterable=True,
     )
     assert grain_multiplies([DIMENSIONS["year"], DIMENSIONS["oa_access"]]) is False
     assert grain_multiplies([multiplying]) is True
