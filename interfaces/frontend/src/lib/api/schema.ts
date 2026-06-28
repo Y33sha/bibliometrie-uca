@@ -178,6 +178,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/facets/entity-label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stats Entity Label
+         * @description Libellé d'une entité (revue/éditeur) par id, pour réafficher une pastille de facette restaurée
+         *     depuis l'URL (qui ne porte que l'id, état canonique de la sélection).
+         */
+        get: operations["stats_entity_label_api_stats_facets_entity_label_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stats/pivot/schema": {
         parameters: {
             query?: never;
@@ -253,6 +274,27 @@ export interface paths {
          *     `search` reste le filtre titre/sujet des publications.
          */
         get: operations["publications_entity_facet_api_publications_facets_entities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/facets/entity-label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Publications Entity Label
+         * @description Libellé d'une entité (revue/éditeur) par id, pour réafficher une pastille de facette restaurée
+         *     depuis l'URL (qui ne porte que l'id, état canonique de la sélection).
+         */
+        get: operations["publications_entity_label_api_publications_facets_entity_label_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3212,6 +3254,15 @@ export interface components {
         EntityFacetResponse: {
             /** Entities */
             entities: components["schemas"]["EntityFacetItem"][];
+        };
+        /**
+         * EntityLabelResponse
+         * @description Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de
+         *     facette restaurée depuis l'URL, où seul l'id — l'état canonique — est transporté.
+         */
+        EntityLabelResponse: {
+            /** Label */
+            label: string | null;
         };
         /**
          * EnumOption
@@ -6242,6 +6293,38 @@ export interface operations {
             };
         };
     };
+    stats_entity_label_api_stats_facets_entity_label_get: {
+        parameters: {
+            query: {
+                kind: "publisher" | "journal";
+                entity_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityLabelResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     pivot_schema_api_stats_pivot_schema_get: {
         parameters: {
             query?: never;
@@ -6385,6 +6468,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EntityFacetResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publications_entity_label_api_publications_facets_entity_label_get: {
+        parameters: {
+            query: {
+                kind: "publisher" | "journal";
+                entity_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EntityLabelResponse"];
                 };
             };
             /** @description Validation Error */

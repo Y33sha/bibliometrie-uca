@@ -15,7 +15,7 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict
 
 from application.ports.api._common import YesNoCount
-from application.ports.api.entity_facet import EntityFacetResponse
+from application.ports.api.entity_facet import EntityFacetResponse, EntityLabelResponse
 from application.ports.api.subjects_queries import SubjectOut
 
 
@@ -362,6 +362,8 @@ class PublicationsQueries(Protocol):
     def publications_entity_facet(
         self, *, kind: str, search: str, filters: FacetFilters, apc_structure_ids: list[int]
     ) -> EntityFacetResponse: ...
+
+    def resolve_entity_label(self, *, kind: str, entity_id: int) -> EntityLabelResponse: ...
 
     def export_publications_csv(
         self,

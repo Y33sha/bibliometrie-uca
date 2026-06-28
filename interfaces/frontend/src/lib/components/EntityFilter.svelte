@@ -3,28 +3,30 @@
 	import { api } from '$lib/api';
 
 	/** Facette d'entité à forte cardinalité (éditeur, revue) : recherche serveur **contextuelle**.
-	 *  Le parent fournit `buildParams` (les filtres actifs du contexte) ; le composant y ajoute le
-	 *  `kind` et le terme de recherche, appelle l'endpoint de facette, et n'affiche que les N
-	 *  premières entités sous ces filtres, avec leur décompte. Ne retient que l'entité choisie. */
-	export interface Entity {
-		value: string; // identifiant
-		text: string; // libellé
-	}
-
+	 *  Le parent fournit `buildParams` (les filtres actifs) ; le composant y ajoute le `kind` et le
+	 *  terme de recherche pour lister les N premières entités sous ces filtres, avec décompte.
+	 *
+	 *  L'état canonique côté parent est le seul **id** sélectionné. Le libellé de la pastille est de la
+	 *  donnée dérivée, gérée ici : connu d'emblée quand l'utilisateur choisit une option, sinon résolu
+	 *  via l'endpoint `entity-label` quand un id est restauré depuis l'URL sans son nom. */
 	interface Props {
 		label: string;
-		/** Endpoint de facette-entité (ex. /api/stats/facets/entities). */
+		/** Base des endpoints (ex. /api/stats/facets) : `${endpoint}/entities` pour la recherche
+		 *  contextuelle, `${endpoint}/entity-label` pour résoudre un id en libellé. */
 		endpoint: string;
 		kind: 'publisher' | 'journal';
 		/** Filtres actifs du contexte (l'endpoint saute de lui-même celui de `kind`). */
 		buildParams: () => URLSearchParams;
-		selected?: Entity | null;
-		onchange?: (selected: Entity | null) => void;
+		/** Id de l'entité sélectionnée (état canonique), ou null. */
+		selectedId?: string | null;
+		onchange?: (id: string | null) => void;
 	}
 
-	let { label, endpoint, kind, buildParams, selected = null, onchange }: Props = $props();
+	let { label, endpoint, kind, buildParams, selectedId = null, onchange }: Props = $props();
 
-	interface Result extends Entity {
+	interface Result {
+		value: string;
+		text: string;
 		count: number;
 	}
 
@@ -32,8 +34,29 @@
 	let query = $state('');
 	let results = $state<Result[]>([]);
 	let loading = $state(false);
+	let selectedLabel = $state<string | null>(null);
+	let resolvedId: string | null = null; // id pour lequel `selectedLabel` est à jour
 	let debounce: ReturnType<typeof setTimeout>;
 	const instanceId = Symbol();
+
+	// Résolution du libellé de la pastille. Quand un id est présélectionné (restauré de l'URL) dont on
+	// ne connaît pas encore le nom, on le demande à l'endpoint. Idempotent (mémoïsé par `resolvedId`),
+	// et tolérant aux changements rapides (on n'applique la réponse que si l'id n'a pas changé entre-temps).
+	$effect(() => {
+		if (!selectedId) {
+			selectedLabel = null;
+			resolvedId = null;
+			return;
+		}
+		if (selectedId === resolvedId) return;
+		resolvedId = selectedId;
+		const id = selectedId;
+		api<{ label: string | null }>(`${endpoint}/entity-label?kind=${kind}&entity_id=${id}`)
+			.then((d) => {
+				if (resolvedId === id) selectedLabel = d.label;
+			})
+			.catch(() => {});
+	});
 
 	async function search() {
 		loading = true;
@@ -42,7 +65,7 @@
 		if (query.trim().length >= 2) p.set('entity_search', query.trim());
 		try {
 			const data = await api<{ entities: { id: number; label: string; count: number }[] }>(
-				endpoint + '?' + p,
+				`${endpoint}/entities?` + p,
 			);
 			results = data.entities.map((e) => ({ value: String(e.id), text: e.label, count: e.count }));
 		} catch {
@@ -56,8 +79,11 @@
 		debounce = setTimeout(search, 250);
 	}
 
-	function pick(e: Entity | null) {
-		onchange?.(e);
+	function pick(r: Result | null) {
+		// Le libellé de l'option choisie est déjà connu : on l'adopte sans relecture.
+		selectedLabel = r?.text ?? null;
+		resolvedId = r?.value ?? null;
+		onchange?.(r?.value ?? null);
 		open = false;
 	}
 
@@ -81,14 +107,14 @@
 	<button
 		type="button"
 		class="facet-btn"
-		class:has-selection={!!selected}
+		class:has-selection={!!selectedId}
 		onclick={(e) => {
 			e.stopPropagation();
 			if (open) open = false;
 			else openPanel();
 		}}
 	>
-		<span class="facet-label">{selected ? selected.text : label}</span>
+		<span class="facet-label">{selectedLabel ?? label}</span>
 		<span class="facet-arrow">&#9662;</span>
 	</button>
 
@@ -98,15 +124,18 @@
 			<input type="text" class="facet-search" placeholder="Rechercher..." bind:value={query} oninput={onInput} />
 			<div class="facet-options">
 				<label>
-					<input type="radio" checked={!selected} onchange={() => pick(null)} />
+					<input type="radio" checked={!selectedId} onchange={() => pick(null)} />
 					<span style="font-weight:500">Tous</span>
 				</label>
-				{#if selected && !results.some((r) => r.value === selected!.value)}
-					<label><input type="radio" checked onchange={() => pick(selected)} />{selected.text}</label>
+				{#if selectedId && !results.some((r) => r.value === selectedId)}
+					<label>
+						<input type="radio" checked onchange={() => (open = false)} />
+						<span class="facet-name">{selectedLabel ?? selectedId}</span>
+					</label>
 				{/if}
 				{#each results as e (e.value)}
 					<label>
-						<input type="radio" checked={selected?.value === e.value} onchange={() => pick(e)} />
+						<input type="radio" checked={selectedId === e.value} onchange={() => pick(e)} />
 						<span class="facet-name">{e.text}</span><span class="facet-count">{e.count}</span>
 					</label>
 				{/each}

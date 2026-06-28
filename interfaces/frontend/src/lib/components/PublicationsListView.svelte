@@ -158,37 +158,24 @@
 	let selectedCorr: string[] = $state([]);
 	let selectedPerimeter: string[] = $state([]);
 
-	// External filters (from stats page)
+	// Facettes éditeur / revue (recherche serveur) : seul l'id sélectionné est conservé — état
+	// canonique. Le libellé de la pastille est résolu par le composant EntityFilter.
 	let filterPublisherId: string | null = $state(null);
 	let filterJournalId: string | null = $state(null);
-	let filterPublisherName: string | null = $state(null);
-	let filterJournalName: string | null = $state(null);
 
-	// Éditeur et revue sont des facettes (recherche serveur) ; leur sélection libre vit dans
-	// `filterPublisherId`/`filterJournalId` (+ libellés). Le bandeau ne signale plus que le sujet,
-	// contexte fixé par la route (sans facette propre ici).
+	// Le bandeau ne signale que le sujet, contexte fixé par la route (sans facette propre ici).
 	const subjectBannerText = $derived(
 		externalFilters?.subjectId
 			? 'sujet = ' + (externalFilters.subjectLabel ?? `#${externalFilters.subjectId}`)
 			: '',
 	);
 
-	// Sélection courante des facettes éditeur / revue (id + libellé restaurés de l'URL).
-	const publisherSelection = $derived(
-		filterPublisherId ? { value: filterPublisherId, text: filterPublisherName ?? filterPublisherId } : null,
-	);
-	const journalSelection = $derived(
-		filterJournalId ? { value: filterJournalId, text: filterJournalName ?? filterJournalId } : null,
-	);
-
-	function onPublisherFilter(e: { value: string; text: string } | null) {
-		filterPublisherId = e?.value ?? null;
-		filterPublisherName = e?.text ?? null;
+	function onPublisherFilter(id: string | null) {
+		filterPublisherId = id;
 		onFilterChange();
 	}
-	function onJournalFilter(e: { value: string; text: string } | null) {
-		filterJournalId = e?.value ?? null;
-		filterJournalName = e?.text ?? null;
+	function onJournalFilter(id: string | null) {
+		filterJournalId = id;
 		onFilterChange();
 	}
 
@@ -211,15 +198,9 @@
 		if (labId) p.set('lab_id', labId);
 		// Éditeur / revue : id + libellé, pour restaurer la facette du tableau de bord sans relecture.
 		const publisherId = externalFilters?.publisherId != null ? String(externalFilters.publisherId) : filterPublisherId;
-		if (publisherId) {
-			p.set('publisher_id', publisherId);
-			if (filterPublisherName) p.set('publisher_name', filterPublisherName);
-		}
+		if (publisherId) p.set('publisher_id', publisherId);
 		const journalId = externalFilters?.journalId != null ? String(externalFilters.journalId) : filterJournalId;
-		if (journalId) {
-			p.set('journal_id', journalId);
-			if (filterJournalName) p.set('journal_name', filterJournalName);
-		}
+		if (journalId) p.set('journal_id', journalId);
 		return base + '/stats?' + p.toString();
 	});
 
@@ -341,8 +322,6 @@
 			currentPage:       { type: 'page',          urlKey: 'page' },
 			filterPublisherId: { type: 'single',        urlKey: 'publisher_id' },
 			filterJournalId:   { type: 'single',        urlKey: 'journal_id' },
-			filterPublisherName: { type: 'single',      urlKey: 'publisher_name' },
-			filterJournalName:   { type: 'single',      urlKey: 'journal_name' },
 		},
 	});
 
@@ -355,7 +334,7 @@
 			selectedHalStatus, selectedCorr, selectedPerimeter,
 			search, currentSort,
 			currentPage: pubs.page,
-			filterPublisherId, filterJournalId, filterPublisherName, filterJournalName,
+			filterPublisherId, filterJournalId,
 		}));
 	}
 
@@ -435,8 +414,6 @@
 			if (restored.currentPage) pubs.page = restored.currentPage as number;
 			if (restored.filterPublisherId) filterPublisherId = restored.filterPublisherId as string;
 			if (restored.filterJournalId) filterJournalId = restored.filterJournalId as string;
-			if (restored.filterPublisherName) filterPublisherName = restored.filterPublisherName as string;
-			if (restored.filterJournalName) filterJournalName = restored.filterJournalName as string;
 		}
 
 		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans
@@ -477,8 +454,8 @@
 		<span class="facets-label">Filtrer par&nbsp;:</span>
 		{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
 		{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
-		{#if !externalFilters?.journalId}<EntityFilter label="Revue" endpoint="/api/publications/facets/entities" kind="journal" buildParams={buildFilterParams} selected={journalSelection} onchange={onJournalFilter} />{/if}
-		{#if !externalFilters?.publisherId}<EntityFilter label="Éditeur" endpoint="/api/publications/facets/entities" kind="publisher" buildParams={buildFilterParams} selected={publisherSelection} onchange={onPublisherFilter} />{/if}
+		{#if !externalFilters?.journalId}<EntityFilter label="Revue" endpoint="/api/publications/facets" kind="journal" buildParams={buildFilterParams} selectedId={filterJournalId} onchange={onJournalFilter} />{/if}
+		{#if !externalFilters?.publisherId}<EntityFilter label="Éditeur" endpoint="/api/publications/facets" kind="publisher" buildParams={buildFilterParams} selectedId={filterPublisherId} onchange={onPublisherFilter} />{/if}
 		{#if !hasFixedLab && col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
 		{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
 		{#if col('oa_status')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}

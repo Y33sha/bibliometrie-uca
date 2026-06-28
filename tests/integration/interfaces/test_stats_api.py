@@ -17,6 +17,12 @@ class TestStatsEntityFacet:
         )
         assert r.status_code == 200
 
+    def test_entity_label_unknown_id(self, client):
+        # Résolution id → libellé : id absent sur base vide → label null, pas d'erreur.
+        r = client.get("/api/stats/facets/entity-label", params={"kind": "journal", "entity_id": 1})
+        assert r.status_code == 200
+        assert r.json() == {"label": None}
+
 
 class TestStatsFacets:
     def test_facets(self, client):

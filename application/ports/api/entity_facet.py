@@ -16,3 +16,10 @@ class EntityFacetItem(BaseModel):
 
 class EntityFacetResponse(BaseModel):
     entities: list[EntityFacetItem]
+
+
+class EntityLabelResponse(BaseModel):
+    """Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de
+    facette restaurée depuis l'URL, où seul l'id — l'état canonique — est transporté."""
+
+    label: str | None
