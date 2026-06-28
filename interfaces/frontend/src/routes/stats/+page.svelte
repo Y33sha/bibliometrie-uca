@@ -543,15 +543,19 @@
 				{/each}
 			</select>
 		</label>
-		<label class="groupby">
-			Comparer par&nbsp;:
-			<select bind:value={groupBy} onchange={onGroupByChange}>
-				<option value="">Aucun</option>
-				{#each comparableDims as d (d.key)}
-					<option value={d.key}>{d.label}</option>
-				{/each}
-			</select>
-		</label>
+		<!-- {#key primaryBy} : recrée le select quand le groupement change, pour que sa valeur
+		     affichée reste synchronisée avec `groupBy` malgré le recalcul des options. -->
+		{#key primaryBy}
+			<label class="groupby">
+				Comparer par&nbsp;:
+				<select bind:value={groupBy} onchange={onGroupByChange}>
+					<option value="">Aucun</option>
+					{#each comparableDims as d (d.key)}
+						<option value={d.key}>{d.label}</option>
+					{/each}
+				</select>
+			</label>
+		{/key}
 	{/if}
 	{#if tab === 'oa' && groupBy && groupBy !== primaryBy}
 		<label class="groupby">
