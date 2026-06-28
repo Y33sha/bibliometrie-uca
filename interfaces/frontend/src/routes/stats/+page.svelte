@@ -322,7 +322,7 @@
 					intersect: true
 				},
 				scales: {
-					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 } } },
+					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 }, callback: (_v: string | number, i: number) => { const l = labels[i] ?? ''; return l.length > 30 ? l.slice(0, 30) + '…' : l; } } },
 					[highCard ? 'x' : 'y']: part
 						? { stacked: true, min: 0, max: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
 						: { stacked: true, beginAtZero: true, ticks: { font: { size: 13 }, precision: 0 } }
@@ -455,6 +455,7 @@
 </div>
 <!-- Ligne 2 : filtres à facettes, dérivés du registre (cf. domain `applicable_facets`, règle G). -->
 <div class="toolbar facets-row">
+	<span class="facets-label">Filtrer par&nbsp;:</span>
 	{#if facetKeys.has('year')}
 		<FacetDropdown label="Années" allLabel="Toutes" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
 	{/if}
@@ -523,6 +524,7 @@
 		margin-bottom: 12px;
 	}
 	.facets-row { margin-bottom: 16px; }
+	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
 	.groupby {
 		font-size: 0.9rem;
 		color: var(--muted);
