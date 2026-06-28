@@ -1,6 +1,6 @@
 # Chantier — Visualisations dynamiques (pivot listes ↔ tableaux de bord)
 
-Commencé le 2026-06-22
+Commencé le 2026-06-22 - Archivé le 2026-06-28 (quelques points non traités, à voir au fil des besoins réels)
 
 Repenser la page de statistiques et, plus largement, unifier la navigation entre les vues « liste » (les publications une à une) et les vues « tableau de bord » (les agrégats), de sorte que chaque graphique mène au détail des entités qu'il agrège, et que chaque liste filtrée donne accès à des visualisations qui conservent ses facettes.
 
@@ -62,7 +62,7 @@ Ces décisions sont des orientations proposées, à confirmer ou amender ; seul 
 
 - [x] Endpoint unique d'agrégation paramétré par mesure, groupements et filtres, composé sur le registre. → `GET /api/stats/pivot` + `/api/stats/pivot/schema`, composition sur liste blanche, 400 sur clé inconnue (5b741330).
 - [x] Gestion du grain : `count(distinct publication_id)` dès qu'un groupement démultiplie. → mesures `COUNT(DISTINCT p.id)` (5b741330).
-- [ ] Consolidation de la clause de filtres aujourd'hui dupliquée entre les endpoints de statistiques. → le pivot réutilise les clauses de `filters.py` ; reste à y rallier `summary`/`publishers`/`journals`/`labs`, encore dupliquées (rejoint le dé-hardcode `doc_type`, Phase 3).
+- [x] Consolidation de la clause de filtres autrefois dupliquée entre les endpoints de statistiques. → le pivot réutilise les clauses de `filters.py` ; les endpoints `summary`/`by-year`/`publishers`/`journals`/`labs` qui les dupliquaient ont été retirés avec les onglets-tables (e8af81ba, aac64eb4, 9a73841a) — le pivot est la source unique.
 
 ### Phase 2 — Reformulation de l'accès ouvert
 
@@ -72,10 +72,11 @@ Ces décisions sont des orientations proposées, à confirmer ou amender ; seul 
 ### Phase 3 — Interface du pivot
 
 - [ ] Sélecteurs de mesure, de mode (absolu / part), de groupement (primaire et secondaire), de rendu (graphique / table).
-  - [x] **groupement** : sélecteurs « Grouper par » (la catégorie à analyser — accès, voie, type — empilée dans chaque barre ; un axe ordinal comme l'année en est exclu) et « Comparer par » (l'axe déployé en abscisse, où figure l'année, facultatif, excluant la dimension prise comme groupement). Défaut : groupé par accès, comparé par année — barres par année, empilées par accès. Sans comparaison, le groupement passe en abscisse. Options lues du schéma du registre (24b8158f, 02cb8180, fc3ec564, e2da7875).
-  - [x] **comparaison à forte cardinalité** : le laboratoire devient une dimension de pivot groupable (jointures de rattachement, grain `COUNT(DISTINCT)`) offerte en « Comparer par ». L'abscisse est **paginée** (10 par page, triées par total décroissant ; page portée par l'URL) plutôt que tronquée, et passe en **barres horizontales** pour les libellés longs. Le libellé est l'acronyme ou le nom du laboratoire (bd5f8f3e, 96541a98, 64e64de7). Revue et éditeur en comparaison restent à brancher de la même façon.
+  - [x] **groupement** : deux rôles distincts au registre. « Indicateur » liste les dimensions `groupable` à analyser (Productions, accès, voie) empilées dans chaque barre ; « Comparer par » liste les dimensions `comparable` déployées en abscisse (année et les entités à forte cardinalité — labo, éditeur, revue), excluant celle prise comme groupement. L'accès, la voie et le type sont groupables mais non comparables (ils se ventilent ou s'empilent, ne se comparent pas) ; un axe ordinal comme l'année n'est pas un groupement. L'indicateur « Productions » est le type de document, la famille « publications » éclatée en types fins (article, communication, chapitre…) et les autres familles agrégées ; c'est l'indicateur par défaut, comparé par année. Sans comparaison, le groupement passe en abscisse. Options lues du schéma du registre (24b8158f, 02cb8180, fc3ec564, e2da7875, 96603477, 1c181dfc, 84167570, 5c49db3d).
+  - [x] **comparaison à forte cardinalité** : le laboratoire devient une dimension de pivot groupable (jointures de rattachement, grain `COUNT(DISTINCT)`) offerte en « Comparer par ». L'abscisse est **paginée** (10 par page, triées par total décroissant ; page portée par l'URL) plutôt que tronquée, et passe en **barres horizontales** pour les libellés longs. Le libellé est l'acronyme ou le nom du laboratoire (bd5f8f3e, 96541a98, 64e64de7). **Éditeur** et **revue** sont branchés de la même façon (nombre de publications par éditeur / par revue ; jointures internes excluant les publications sans éditeur / sans revue) (38c72e1b).
+  - [x] **onglets-tables → comparaison** : chaque onglet-table (laboratoires, éditeurs, revues) est devenu une comparaison du pivot, puis l'onglet et sa chaîne backend ont été retirés — Laboratoires (e8af81ba), Éditeurs (aac64eb4), Revues (9a73841a). Avec le dernier, toute la mécanique d'onglets (état `view`/`tab`, fil d'Ariane, navigation, recherche) disparaît : la page se réduit au tableau de bord pivot. La « vue détails » d'une entité (graphe filtré par éditeur/revue), qui équivaut à une facette, est rebranchée comme telle : éditeur et revue deviennent `filterable` au registre, avec une facette à recherche serveur (composant `EntityFilter`), sans chargement exhaustif. Cette facette figure sur le tableau de bord et dans les `PublicationsListView` (où le bandeau « filtre actif » ad hoc disparaît au profit d'une facette restaurable depuis l'URL), et une colonne « Éditeur » (masquée par défaut) s'ajoute à la liste. « Voir les publications » transmet l'éditeur/la revue sélectionnés (c3951445, 7cbec843, 6a0efb37, 8a719f3b, 020e37ad). La facette est **contextuelle** : un endpoint par contexte (`/api/stats/facets/entities`, `/api/publications/facets/entities`) renvoie les N premières entités sous les filtres actifs, en sautant le sien — d'où des **décomptes** et une **corrélation** (une revue sélectionnée ne propose plus que son éditeur). Sans matérialiser `publisher_id` : la revue sort de `publications.journal_id`, l'éditeur via une jointure un-à-un indexée (d9fb2690, 6b3d5a8).
   - [x] **corpus / mesure** : le graphe est toujours le compte de publications (barres empilées) ; pas de sélecteur de mesure. La mesure-ratio « % d'accès ouvert » est retirée du registre — le taux se lit via la bascule absolu / part, le découpage par accès portant déjà l'information (32d26a4c, 36eba95c).
-  - [x] **mode** absolu / part : case à cocher « Part (%) » qui aplatit l'empilement à 100 % ; portée par l'URL (clé `mode`), visible seulement avec une comparaison (71394885).
+  - [x] **mode** absolu / part : case à cocher « Part (%) » toujours disponible — avec comparaison, elle aplatit l'empilement à 100 % ; sans comparaison, elle rend un **camembert** des parts du groupement primaire. Portée par l'URL (clé `mode`) (71394885, 26a54708).
   - [ ] **rendu** graphique / table.
 - [x] Bascule d'une dimension entre filtre et groupement (un groupement catégoriel sort des facettes ; un groupement ordinal comme l'année reste filtrable en plage).
   - [x] **cadre posé** : rôles `groupable`/`filterable` au registre + `applicable_facets` (règle G : un groupement catégoriel sort des facettes, l'ordinal reste), testé (9aaa73fb, 36eba95c).
@@ -87,7 +88,7 @@ Ces décisions sont des orientations proposées, à confirmer ou amender ; seul 
 ### Phase 4 — Va-et-vient liste ↔ tableau de bord
 
 - [ ] Drill-down du graphique vers la liste : un clic pèle un groupement en filtre.
-- [ ] Changement de lentille de la liste vers le tableau de bord, à filtre constant.
+- [x] Changement de lentille de la liste vers le tableau de bord, à filtre constant. → bouton « Statistiques → » sur la liste, pendant inverse de « Voir les publications », transmettant les filtres représentables côté tableau de bord — année, type, voie OA, APC, labo, éditeur, revue (147f9e40).
 - [ ] Convergence vers une page unifiée à lentilles plutôt que deux pages pontées.
 
 ### Phase 5 (ultérieure) — Vues nommées
@@ -111,4 +112,4 @@ Ces décisions sont des orientations proposées, à confirmer ou amender ; seul 
 - Page de statistiques actuelle : `interfaces/frontend/src/routes/stats/+page.svelte`.
 - Lentille liste réutilisable : `interfaces/frontend/src/lib/components/PublicationsListView.svelte`.
 - Composables d'état partagé : `interfaces/frontend/src/lib/composables/useUrlFilters.svelte.ts`, `useFacets.svelte.ts`, `usePaginatedFetch.svelte.ts`.
-- Endpoints de statistiques actuels : `/api/stats/summary`, `/by-year`, `/publishers`, `/journals`, `/labs`, `/facets`.
+- Endpoints de statistiques : `/api/stats/pivot` (+ `/pivot/schema`), `/facets`, `/facets/entities`, `/facets/entity-label`, `/years`. Le moteur pivot remplace les anciens endpoints par agrégat (`summary`, `by-year`, `publishers`, `journals`, `labs`), retirés.
