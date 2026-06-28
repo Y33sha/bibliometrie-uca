@@ -6,6 +6,7 @@
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
+	import EntityFilter from '$lib/components/EntityFilter.svelte';
 	import { oaLabelsMap, docTypePlural, docTypeFamilies } from '$lib/labels';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
@@ -20,6 +21,9 @@
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
 	let selectedDocTypes: string[] = $state([]); // défaut = famille « Publications » (cf. onMount)
+	// Facettes à forte cardinalité (recherche serveur) : une entité sélectionnée (id + libellé).
+	let selectedJournal = $state<{ value: string; text: string } | null>(null);
+	let selectedPublisher = $state<{ value: string; text: string } | null>(null);
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
@@ -123,6 +127,8 @@
 		let cleared = false;
 		if (dim === 'oa_voie' && selectedOa.length > 0) { selectedOa = []; cleared = true; }
 		if (dim === 'lab' && selectedLabs.length > 0) { selectedLabs = []; cleared = true; }
+		if (dim === 'publisher' && selectedPublisher) { selectedPublisher = null; cleared = true; }
+		if (dim === 'journal' && selectedJournal) { selectedJournal = null; cleared = true; }
 		syncUrl();
 		if (cleared) refresh();
 		else loadChart();
@@ -136,6 +142,8 @@
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
+		if (selectedPublisher) p.set('publisher_id', selectedPublisher.value);
+		if (selectedJournal) p.set('journal_id', selectedJournal.value);
 		return p;
 	}
 
@@ -162,6 +170,10 @@
 			selectedOa: { type: 'string_array', urlKey: 'oa_status' },
 			selectedApc: { type: 'string_array', urlKey: 'has_apc' },
 			selectedDocTypes: { type: 'string_array', urlKey: 'doc_type' },
+			publisherId: { type: 'single', urlKey: 'publisher_id' },
+			publisherName: { type: 'single', urlKey: 'publisher_name' },
+			journalId: { type: 'single', urlKey: 'journal_id' },
+			journalName: { type: 'single', urlKey: 'journal_name' },
 			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'oa_access' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
@@ -176,6 +188,10 @@
 			selectedOa,
 			selectedApc,
 			selectedDocTypes,
+			publisherId: selectedPublisher?.value ?? '',
+			publisherName: selectedPublisher?.text ?? '',
+			journalId: selectedJournal?.value ?? '',
+			journalName: selectedJournal?.text ?? '',
 			primaryBy,
 			groupBy,
 			chartMode,
@@ -191,6 +207,9 @@
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
+		// On transmet id ET libellé pour que la facette de la liste se restaure sans relecture.
+		if (selectedPublisher) { p.set('publisher_id', selectedPublisher.value); p.set('publisher_name', selectedPublisher.text); }
+		if (selectedJournal) { p.set('journal_id', selectedJournal.value); p.set('journal_name', selectedJournal.text); }
 		return base + '/publications?' + p.toString();
 	});
 
@@ -344,6 +363,14 @@
 		syncUrl();
 		refresh();
 	}
+	function onPublisherFilter(e: { value: string; text: string } | null) {
+		selectedPublisher = e;
+		onFilterChange();
+	}
+	function onJournalFilter(e: { value: string; text: string } | null) {
+		selectedJournal = e;
+		onFilterChange();
+	}
 
 	onMount(async () => {
 		// Restore state from URL params
@@ -354,6 +381,12 @@
 		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
 		if (restored.selectedDocTypes) selectedDocTypes = restored.selectedDocTypes as string[];
+		if (restored.publisherId) {
+			selectedPublisher = { value: restored.publisherId as string, text: (restored.publisherName as string) || (restored.publisherId as string) };
+		}
+		if (restored.journalId) {
+			selectedJournal = { value: restored.journalId as string, text: (restored.journalName as string) || (restored.journalId as string) };
+		}
 		if (restored.primaryBy !== undefined) primaryBy = restored.primaryBy as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
@@ -433,6 +466,12 @@
 	{/if}
 	{#if facetKeys.has('doc_type')}
 		<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
+	{/if}
+	{#if facetKeys.has('journal')}
+		<EntityFilter label="Revue" endpoint="/api/journals" itemsKey="journals" labelField="title" selected={selectedJournal} onchange={onJournalFilter} />
+	{/if}
+	{#if facetKeys.has('publisher')}
+		<EntityFilter label="Éditeur" endpoint="/api/publishers" itemsKey="publishers" labelField="name" selected={selectedPublisher} onchange={onPublisherFilter} />
 	{/if}
 	{#if facetKeys.has('apc')}
 		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
