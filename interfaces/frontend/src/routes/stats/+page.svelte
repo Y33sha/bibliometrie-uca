@@ -31,7 +31,7 @@
 
 	// --- Pivot : axes de l'histogramme. Groupement primaire (abscisse) + comparaison empilée (facultative). ---
 	let pivotSchema = $state<components['schemas']['PivotSchemaResponse'] | null>(null);
-	let primaryBy = $state('oa_access'); // groupement primaire (abscisse) : une catégorie, jamais l'année
+	let primaryBy = $state('doc_type_grouped'); // groupement primaire (abscisse) : une catégorie, jamais l'année
 	let groupBy = $state('year'); // comparaison : série secondaire empilée (facultative), p. ex. l'année
 	let chartMode = $state<'absolu' | 'part'>('absolu'); // part = empilement aplati à 100 %
 	let chartPage = $state(1); // page de l'axe de comparaison à forte cardinalité (laboratoires)
@@ -54,9 +54,9 @@
 					)
 			: []
 	);
-	// Comparaison : les dimensions déclarées `comparable` (année, type, et les entités à forte
-	// cardinalité — labo, éditeur, revue ; pas l'accès ni la voie, qui s'empilent), moins celle déjà
-	// prise comme groupement primaire.
+	// Comparaison : les dimensions déclarées `comparable` (année et les entités à forte cardinalité
+	// — labo, éditeur, revue ; pas l'accès ni la voie, qui s'empilent), moins celle déjà prise comme
+	// groupement primaire.
 	const comparableDims = $derived(
 		pivotSchema ? pivotSchema.dimensions.filter((d) => d.comparable && d.key !== primaryBy) : []
 	);
@@ -182,7 +182,7 @@
 			publisherName: { type: 'single', urlKey: 'publisher_name' },
 			journalId: { type: 'single', urlKey: 'journal_id' },
 			journalName: { type: 'single', urlKey: 'journal_name' },
-			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'oa_access' },
+			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'doc_type_grouped' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
 				chartPage: { type: 'page', urlKey: 'chart_page' },
