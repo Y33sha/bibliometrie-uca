@@ -77,8 +77,8 @@ def _filter_clauses(
     apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
-    publisher_id: int | None,
-    journal_id: int | None,
+    publisher_ids: list[int],
+    journal_ids: list[int],
     oa_status: str,
     has_apc: str,
     doc_types: list[str],
@@ -90,12 +90,12 @@ def _filter_clauses(
         stats_apc_clause(has_apc, apc_structure_ids),
         doc_type_clause(doc_types),
     ]
-    if publisher_id:
+    if publisher_ids:
         out.append(
-            WhereClause("j.publisher_id = :flt_publisher_id", {"flt_publisher_id": publisher_id})
+            WhereClause("j.publisher_id = ANY(:flt_publisher_ids)", {"flt_publisher_ids": publisher_ids})
         )
-    if journal_id:
-        out.append(WhereClause("p.journal_id = :flt_journal_id", {"flt_journal_id": journal_id}))
+    if journal_ids:
+        out.append(WhereClause("p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": journal_ids}))
     return out
 
 
@@ -114,8 +114,8 @@ def run_pivot(
     apc_structure_ids: list[int],
     lab_ids: list[int],
     years: list[int],
-    publisher_id: int | None,
-    journal_id: int | None,
+    publisher_ids: list[int],
+    journal_ids: list[int],
     oa_status: str,
     has_apc: str,
     doc_types: list[str],
@@ -128,8 +128,8 @@ def run_pivot(
             apc_structure_ids=apc_structure_ids,
             lab_ids=lab_ids,
             years=years,
-            publisher_id=publisher_id,
-            journal_id=journal_id,
+            publisher_ids=publisher_ids,
+            journal_ids=journal_ids,
             oa_status=oa_status,
             has_apc=has_apc,
             doc_types=doc_types,

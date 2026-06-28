@@ -58,7 +58,7 @@ class TestApplicableFacets:
     def test_universal_set_minus_nothing(self):
         # Sans groupement catégoriel : toutes les dimensions filtrables.
         facets = applicable_facets("pub_count", ["year"])
-        assert set(facets) == {"year", "oa_voie", "doc_type", "lab", "apc"}
+        assert set(facets) == {"year", "oa_voie", "doc_type", "lab", "apc", "publisher", "journal"}
 
     def test_rule_g_categorical_grouping_leaves(self):
         # Grouper par voie OA la retire des facettes ; l'année ordinale, elle, reste.

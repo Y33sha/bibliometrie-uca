@@ -6112,8 +6112,8 @@ export interface operations {
             query?: {
                 lab_id?: string;
                 year?: string;
-                publisher_id?: number | null;
-                journal_id?: number | null;
+                publisher_id?: string;
+                journal_id?: string;
                 oa_status?: string;
                 has_apc?: string;
                 doc_type?: string;
@@ -6172,8 +6172,8 @@ export interface operations {
                 group2?: string;
                 lab_id?: string;
                 year?: string;
-                publisher_id?: number | null;
-                journal_id?: number | null;
+                publisher_id?: string;
+                journal_id?: string;
                 oa_status?: string;
                 has_apc?: string;
                 doc_type?: string;
