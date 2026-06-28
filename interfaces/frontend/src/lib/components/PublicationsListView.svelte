@@ -437,6 +437,7 @@
 
 <div class="toolbar toolbar-card toolbar-sticky">
 	<input type="search" placeholder="Rechercher par titre..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+	<span class="facets-label">Filtrer par&nbsp;:</span>
 	{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
 	{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
 	{#if !externalFilters?.journalId}<EntityFilter label="Revue" endpoint="/api/publications/facets/entities" kind="journal" buildParams={buildFilterParams} selected={journalSelection} onchange={onJournalFilter} />{/if}
@@ -645,6 +646,7 @@
 		color: #2c3e50;
 	}
 	.toolbar input[type='search'] { width: 280px; }
+	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
 	.pub-table {
 		width: 100%;
 		min-width: 760px;
