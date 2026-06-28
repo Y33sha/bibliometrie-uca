@@ -63,10 +63,13 @@ OPEN_ARCHIVE_SOURCES: frozenset[str] = frozenset({"hal"})
 
 class _OaSignalSource(Protocol):
     """Forme minimale lue par `has_open_archive_deposit` : la provenance et le statut OA d'une
-    `source_publication`."""
+    `source_publication`. Membres en lecture seule (propriétés) pour accepter aussi bien un dataclass
+    mutable qu'un `frozen` (comme `SourcePublication`)."""
 
-    source: str
-    oa_status: str | None
+    @property
+    def source(self) -> str: ...
+    @property
+    def oa_status(self) -> str | None: ...
 
 
 def has_open_archive_deposit(sources: Iterable[_OaSignalSource]) -> bool:
