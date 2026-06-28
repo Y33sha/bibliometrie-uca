@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { autofocus } from '$lib/actions/focus';
 	import { base } from '$app/paths';
 	import { api } from '$lib/api';
 	import { Chart, registerables } from 'chart.js';
@@ -8,7 +7,6 @@
 	import Pagination from '$lib/components/Pagination.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import { oaLabelsMap, docTypePlural, docTypeFamilies } from '$lib/labels';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
 
@@ -16,31 +14,12 @@
 
 	// --- Types ---
 	import type { components } from '$lib/api/schema';
-	type JournalRow = components['schemas']['JournalStatsRow'];
-	// Ligne de la table des revues pour la ventilation OA (champs OaCounts).
-	type OaRow = JournalRow;
-
 	// --- State ---
-	type View = 'top' | 'journal_detail';
-	type Tab = 'oa' | 'journals';
-
-	let view: View = $state('top');
-	let tab: Tab = $state('oa');
 	let selectedYears: string[] = $state([]);
 	let selectedLabs: string[] = $state([]);
 	let selectedOa: string[] = $state([]);
 	let selectedApc: string[] = $state([]);
 	let selectedDocTypes: string[] = $state([]); // défaut = famille « Publications » (cf. onMount)
-	let search = $state('');
-	let journalId: number | null = $state(null);
-	let journalName = $state('');
-	let journalSort = $state('-pubs');
-
-	function toggleSort(current: string, field: string): string {
-		if (current === field) return '-' + field;
-		if (current === '-' + field) return field;
-		return field;
-	}
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
@@ -148,7 +127,7 @@
 		else loadChart();
 	}
 
-	// --- Filter params (shared by all loaders) ---
+	// --- Filter params (partagés par le graphe et les facettes) ---
 	function chartParams(): URLSearchParams {
 		const p = new URLSearchParams();
 		if (selectedLabs.length) p.set('lab_id', selectedLabs.join(','));
@@ -156,23 +135,8 @@
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
-		if (journalId) p.set('journal_id', String(journalId));
 		return p;
 	}
-
-	// --- Composables: paginated tables ---
-	const journalFetch = usePaginatedFetch<JournalRow>({
-		endpoint: '/api/stats/journals',
-		itemsKey: 'journals',
-		perPage: 50,
-		apiKey: 'stats-journals',
-		buildParams: () => {
-			const p = chartParams();
-			if (search.trim()) p.set('search', search.trim());
-			p.set('sort', journalSort);
-			return p;
-		},
-	});
 
 	// --- Composable: facets ---
 	const facets = useFacets<'years' | 'labs' | 'oa' | 'apc' | 'docTypes'>({
@@ -192,15 +156,11 @@
 	const urlFilters = useUrlFilters({
 		basePath: '/stats',
 		filters: {
-			view: { type: 'single', urlKey: 'view', defaultValue: 'top' },
-			tab: { type: 'single', urlKey: 'tab', defaultValue: 'oa' },
 			selectedYears: { type: 'string_array', urlKey: 'year' },
 			selectedLabs: { type: 'string_array', urlKey: 'lab_id' },
 			selectedOa: { type: 'string_array', urlKey: 'oa_status' },
 			selectedApc: { type: 'string_array', urlKey: 'has_apc' },
 			selectedDocTypes: { type: 'string_array', urlKey: 'doc_type' },
-				journalId: { type: 'single', urlKey: 'journal_id' },
-				search: { type: 'single', urlKey: 'search' },
 			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'oa_access' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
@@ -210,15 +170,11 @@
 
 	function syncUrl() {
 		urlFilters.syncUrl(() => ({
-			view,
-			tab,
 			selectedYears,
 			selectedLabs,
 			selectedOa,
 			selectedApc,
 			selectedDocTypes,
-			journalId: journalId ? String(journalId) : '',
-			search,
 			primaryBy,
 			groupBy,
 			chartMode,
@@ -233,60 +189,13 @@
 		if (selectedYears.length) p.set('year', selectedYears.join(','));
 		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
-		if (journalId) { p.set('journal_id', String(journalId)); }
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		return base + '/publications?' + p.toString();
 	});
 
-	// --- Navigation ---
-	function goTo(newView: View, opts?: { id?: number; name?: string }) {
-		if (yearChart) { yearChart.destroy(); yearChart = null; }
-		view = newView;
-		tab = 'oa';
-		search = '';
-		if (newView === 'top') {
-			journalId = null; journalName = '';
-		} else if (newView === 'journal_detail') {
-			journalId = opts?.id ?? null;
-			journalName = opts?.name ?? '';
-		}
-		syncUrl();
-		refresh();
-	}
-
-	function goToTop(defaultTab: Tab) {
-		if (yearChart) { yearChart.destroy(); yearChart = null; }
-		view = 'top';
-		tab = defaultTab;
-		journalId = null; journalName = '';
-		search = '';
-		syncUrl();
-		refresh();
-	}
-
-	async function switchTab(newTab: Tab) {
-		if (tab === 'oa' && yearChart) {
-			yearChart.destroy();
-			yearChart = null;
-		}
-		tab = newTab;
-		search = '';
-		syncUrl();
-		await loadTabContent();
-	}
-
 	// --- Data loading ---
 	async function refresh() {
-		await Promise.all([loadTabContent(), facets.load()]);
-	}
-
-	async function loadTabContent() {
-		if (tab === 'oa') {
-			await tick();
-			await loadChart();
-		} else if (tab === 'journals') {
-			await journalFetch.load();
-		}
+		await Promise.all([loadChart(), facets.load()]);
 	}
 
 	async function loadChart() {
@@ -431,46 +340,19 @@
 	};
 
 	function onFilterChange() {
-		journalFetch.page = 1;
 		syncUrl();
 		refresh();
-	}
-
-	const onSearchInput = urlFilters.debouncedSearch(() => {
-		journalFetch.page = 1;
-		syncUrl();
-		loadTabContent();
-	});
-
-	function oaPercent(val: number, total: number): string {
-		return total ? (val / total * 100).toFixed(1) + '%' : '0%';
 	}
 
 	onMount(async () => {
 		// Restore state from URL params
 		const u = new URLSearchParams(window.location.search);
 		const restored = urlFilters.restoreFromUrl(u);
-		if (restored.view) {
-			const v = restored.view as string;
-			if (v === 'journal_detail') view = v;
-		}
-		if (restored.tab) {
-			const t = restored.tab as string;
-			if (t === 'oa' || t === 'journals') tab = t;
-		}
 		if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
 		if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
 		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
 		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
 		if (restored.selectedDocTypes) selectedDocTypes = restored.selectedDocTypes as string[];
-		if (restored.journalId) {
-			journalId = parseInt(restored.journalId as string);
-			try {
-				const j = await api<{id: number, title: string}>(`/api/journals/${journalId}`);
-				journalName = j.title;
-			} catch { journalName = `#${journalId}`; }
-		}
-		if (restored.search) search = restored.search as string;
 		if (restored.primaryBy !== undefined) primaryBy = restored.primaryBy as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
@@ -504,37 +386,9 @@
 	<title>Statistiques — Bibliométrie UCA</title>
 </svelte:head>
 
-<!-- Cellule de ventilation OA (barre de répartition), partagée par les onglets éditeurs/revues/labos.
-     Le détail chiffré par voie relève du pivot (onglet Open Access) / du drill-down, pas des tables. -->
-{#snippet oaBreakdownCells(r: OaRow)}
-	<td>
-		<div class="oa-bar">
-			<span class="diamond" style="width:{oaPercent(r.diamond, r.pub_count)}"></span>
-			<span class="gold" style="width:{oaPercent(r.gold, r.pub_count)}"></span>
-			<span class="hybrid" style="width:{oaPercent(r.hybrid, r.pub_count)}"></span>
-			<span class="bronze" style="width:{oaPercent(r.bronze, r.pub_count)}"></span>
-			<span class="green" style="width:{oaPercent(r.green, r.pub_count)}"></span>
-			<span class="embargoed" style="width:{oaPercent(r.embargoed, r.pub_count)}"></span><span class="closed" style="width:{oaPercent(r.closed, r.pub_count)}"></span>
-			<span class="unknown" style="width:{oaPercent(r.unknown, r.pub_count)}"></span>
-		</div>
-	</td>
-{/snippet}
-
-<!-- Breadcrumb for detail views -->
-{#if view !== 'top'}
-	<div class="breadcrumb">
-		{#if journalId}
-			<!-- svelte-ignore a11y_missing_attribute -->
-			<a onclick={() => goToTop('journals')}>Revues</a>
-			<span class="sep">›</span>
-			{journalName}
-		{/if}
-	</div>
-{/if}
-
 <!-- Ligne 1 : contrôles du pivot + onglets -->
 <div class="toolbar controls-row">
-	{#if tab === 'oa' && pivotSchema}
+	{#if pivotSchema}
 		<label class="groupby">
 			Grouper par&nbsp;:
 			<select bind:value={primaryBy} onchange={onPrimaryChange}>
@@ -557,96 +411,51 @@
 			</label>
 		{/key}
 	{/if}
-	{#if tab === 'oa' && groupBy && groupBy !== primaryBy}
+	{#if groupBy && groupBy !== primaryBy}
 		<label class="groupby">
 			<input type="checkbox" checked={chartMode === 'part'} onchange={(e) => { chartMode = e.currentTarget.checked ? 'part' : 'absolu'; syncUrl(); loadChart(); }} />
 			Part&nbsp;(%)
 		</label>
 	{/if}
-	<div class="tab-group">
-		<button class="tab-btn" class:active={tab === 'oa'} onclick={() => switchTab('oa')}>Open Access</button>
-		{#if view === 'top'}
-			<button class="tab-btn" class:active={tab === 'journals'} onclick={() => switchTab('journals')}>Revues</button>
-		{/if}
-	</div>
-	{#if tab === 'journals'}
-		<input type="search" placeholder="Rechercher..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-	{/if}
-	{#if tab !== 'oa'}
-		<span class="count">{journalFetch.total} revue{journalFetch.total > 1 ? 's' : ''}</span>
-	{/if}
 	<a class="pub-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
-<!-- Ligne 2 : filtres à facettes (dérivés du registre sur l'onglet OA ; inchangés sur les
-     onglets-tables tant qu'ils ne sont pas migrés au pivot) -->
+<!-- Ligne 2 : filtres à facettes, dérivés du registre (cf. domain `applicable_facets`, règle G). -->
 <div class="toolbar facets-row">
-	{#if tab !== 'oa' || facetKeys.has('year')}
+	{#if facetKeys.has('year')}
 		<FacetDropdown label="Années" allLabel="Toutes" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
 	{/if}
-	{#if tab !== 'oa' || facetKeys.has('lab')}
+	{#if facetKeys.has('lab')}
 		<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
 	{/if}
-	{#if tab !== 'oa' || facetKeys.has('oa_voie')}
+	{#if facetKeys.has('oa_voie')}
 		<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
 	{/if}
-	{#if tab !== 'oa' || facetKeys.has('doc_type')}
+	{#if facetKeys.has('doc_type')}
 		<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 	{/if}
-	{#if tab !== 'oa' || facetKeys.has('apc')}
+	{#if facetKeys.has('apc')}
 		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip="Pas d'info après 2024<br>Sans APC = ou APC non documentés" />
 	{/if}
 </div>
 
-<!-- Tab: Open Access (chart) -->
-{#if tab === 'oa'}
-	{#if legendItems.length > 1}
-		<div class="legend">
-			{#each legendItems as item (item.label)}
-				<span><span class="legend-dot" style="background:{item.color}"></span>{item.label}</span>
-			{/each}
-		</div>
-	{/if}
-	<div class="chart-area">
-		<canvas bind:this={chartCanvas}></canvas>
-		<button type="button" class="chart-export" onclick={exportChartPng}>Export PNG</button>
+<!-- Histogramme du pivot -->
+{#if legendItems.length > 1}
+	<div class="legend">
+		{#each legendItems as item (item.label)}
+			<span><span class="legend-dot" style="background:{item.color}"></span>{item.label}</span>
+		{/each}
 	</div>
-	{#if chartCatTotal > CHART_PAGE_SIZE}
-		<Pagination
-			page={chartPage}
-			pages={Math.ceil(chartCatTotal / CHART_PAGE_SIZE)}
-			onchange={(p) => { chartPage = p; syncUrl(); loadChart(); }}
-		/>
-	{/if}
 {/if}
-
-<!-- Tab: Journals -->
-{#if tab === 'journals'}
-	<table class="data-table">
-		<thead>
-			<tr>
-				<th class="sortable" class:active={journalSort === 'name' || journalSort === '-name'} onclick={() => { journalSort = toggleSort(journalSort, 'name'); journalFetch.page = 1; journalFetch.load(); }}>Revue {journalSort === 'name' ? '▲' : journalSort === '-name' ? '▼' : ''}</th>
-				<th>Éditeur</th>
-				<th class="num sortable" class:active={journalSort === 'pubs' || journalSort === '-pubs'} onclick={() => { journalSort = toggleSort(journalSort, 'pubs'); journalFetch.page = 1; journalFetch.load(); }}>Articles {journalSort === 'pubs' ? '▲' : journalSort === '-pubs' ? '▼' : ''}</th>
-				<th class="num sortable" class:active={journalSort === 'apc' || journalSort === '-apc'} onclick={() => { journalSort = toggleSort(journalSort, 'apc'); journalFetch.page = 1; journalFetch.load(); }}>APC UCA {journalSort === 'apc' ? '▲' : journalSort === '-apc' ? '▼' : ''}</th>
-				<th style="min-width:100px">OA</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each journalFetch.items as r (r.journal_id)}
-				<tr>
-					<td class="name-cell">
-						<!-- svelte-ignore a11y_missing_attribute -->
-						<a onclick={() => goTo('journal_detail', { id: r.journal_id, name: r.journal_title })}>{r.journal_title}</a>
-					</td>
-					<td class="name-cell num-small">{r.publisher_name || ''}</td>
-					<td class="num">{r.pub_count}</td>
-					<td class="num apc-cell">{r.apc_uca > 0 ? Math.round(r.apc_uca).toLocaleString('fr-FR') + ' €' : ''}</td>
-					{@render oaBreakdownCells(r)}
-				</tr>
-			{/each}
-		</tbody>
-	</table>
-	<Pagination page={journalFetch.page} pages={journalFetch.pages} onchange={(p) => { journalFetch.goToPage(p); syncUrl(); }} />
+<div class="chart-area">
+	<canvas bind:this={chartCanvas}></canvas>
+	<button type="button" class="chart-export" onclick={exportChartPng}>Export PNG</button>
+</div>
+{#if chartCatTotal > CHART_PAGE_SIZE}
+	<Pagination
+		page={chartPage}
+		pages={Math.ceil(chartCatTotal / CHART_PAGE_SIZE)}
+		onchange={(p) => { chartPage = p; syncUrl(); loadChart(); }}
+	/>
 {/if}
 
 
@@ -674,7 +483,6 @@
 		margin-bottom: 12px;
 	}
 	.facets-row { margin-bottom: 16px; }
-	.toolbar input[type='search'] { width: 220px; }
 	.groupby {
 		font-size: 0.9rem;
 		color: var(--muted);
@@ -688,25 +496,6 @@
 		border-radius: 4px;
 		background: white;
 	}
-	.tab-group { display: flex; gap: 0; }
-	.tab-btn {
-		padding: 6px 14px;
-		border: 1px solid var(--border);
-		background: white;
-		font-size: 0.95rem;
-		cursor: pointer;
-		font-family: inherit;
-	}
-	.tab-btn:first-child { border-radius: 4px 0 0 4px; }
-	.tab-btn:last-child { border-radius: 0 4px 4px 0; }
-	.tab-btn:not(:first-child) { border-left: none; }
-	.tab-btn.active { background: var(--accent); color: white; border-color: var(--accent); }
-
-	.breadcrumb { font-size: 0.95rem; color: var(--muted); margin-bottom: 12px; }
-	.breadcrumb a { color: var(--accent); text-decoration: none; cursor: pointer; }
-	.breadcrumb a:hover { text-decoration: underline; }
-	.breadcrumb .sep { margin: 0 6px; color: #ccc; }
-
 	.legend {
 		display: flex;
 		gap: 12px;
@@ -755,36 +544,5 @@
 		border-color: var(--accent);
 		color: var(--accent);
 	}
-
-	.data-table { margin-bottom: 4px; }
-	th.sortable { cursor: pointer; user-select: none; }
-	th.sortable:hover { color: var(--accent); }
-	th.sortable.active { color: var(--accent); }
-
-	.name-cell {
-		font-size: 0.9em;
-		word-break: break-word;
-	}
-	.name-cell a { color: var(--accent); text-decoration: none; cursor: pointer; }
-	.name-cell a:hover { text-decoration: underline; }
-	.num-small { font-size: 0.85rem; color: var(--muted); }
-	.apc-cell { font-size: 0.85rem; color: var(--success); white-space: nowrap; }
-
-	.oa-bar {
-		display: flex;
-		height: 6px;
-		border-radius: 3px;
-		overflow: hidden;
-		min-width: 80px;
-	}
-	.oa-bar span { height: 100%; }
-	.oa-bar .diamond { background: var(--diamond); }
-	.oa-bar .gold { background: var(--gold); }
-	.oa-bar .hybrid { background: var(--hybrid); }
-	.oa-bar .bronze { background: var(--bronze); }
-	.oa-bar .green { background: var(--green); }
-	.oa-bar .embargoed { background: var(--embargoed); }
-	.oa-bar .closed { background: var(--closed); }
-	.oa-bar .unknown { background: var(--unknown); }
 
 </style>

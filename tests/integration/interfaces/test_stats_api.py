@@ -19,19 +19,6 @@ class TestStatsByYear:
         assert r.status_code == 200
 
 
-class TestStatsJournals:
-    def test_basic(self, client):
-        r = client.get("/api/stats/journals")
-        assert r.status_code == 200
-
-    def test_with_filters(self, client):
-        r = client.get(
-            "/api/stats/journals",
-            params={"year": "2024", "oa_status": "oa"},
-        )
-        assert r.status_code == 200
-
-
 class TestStatsFacets:
     def test_facets(self, client):
         r = client.get("/api/stats/facets")

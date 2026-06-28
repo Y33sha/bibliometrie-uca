@@ -117,26 +117,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/journals": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Journal Stats
-         * @description Stats d'articles par revue.
-         */
-        get: operations["journal_stats_api_stats_journals_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/stats/by-year": {
         parameters: {
             query?: never;
@@ -3761,56 +3741,6 @@ export interface components {
             /** Doaj Url */
             doaj_url: string | null;
         };
-        /** JournalStatsResponse */
-        JournalStatsResponse: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Pages */
-            pages: number;
-            /** Journals */
-            journals: components["schemas"]["JournalStatsRow"][];
-        };
-        /** JournalStatsRow */
-        JournalStatsRow: {
-            /** Pub Count */
-            pub_count: number;
-            /** Apc Uca */
-            apc_uca: number;
-            /** Gold */
-            gold: number;
-            /** Diamond */
-            diamond: number;
-            /** Hybrid */
-            hybrid: number;
-            /** Bronze */
-            bronze: number;
-            /** Green */
-            green: number;
-            /** Embargoed */
-            embargoed: number;
-            /** Closed */
-            closed: number;
-            /** Unknown */
-            unknown: number;
-            /** Journal Id */
-            journal_id: number;
-            /** Journal Title */
-            journal_title: string;
-            /** Issn */
-            issn: string | null;
-            /** Eissn */
-            eissn: string | null;
-            /** Publisher Name */
-            publisher_name: string | null;
-            /** Is Predatory */
-            is_predatory: boolean;
-            /** Apc Amount */
-            apc_amount: number | null;
-        };
         /**
          * JournalTypeChangeImpact
          * @description Compte des publications dont le `doc_type` canonique changerait si le `journal_type` passait à la valeur prévue. Renvoyé par le preview de la modale admin avant confirmation de l'édition.
@@ -6196,46 +6126,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-        };
-    };
-    journal_stats_api_stats_journals_get: {
-        parameters: {
-            query?: {
-                lab_id?: string;
-                year?: string;
-                publisher_id?: number | null;
-                oa_status?: string;
-                has_apc?: string;
-                doc_type?: string;
-                page?: number;
-                per_page?: number;
-                search?: string;
-                sort?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JournalStatsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

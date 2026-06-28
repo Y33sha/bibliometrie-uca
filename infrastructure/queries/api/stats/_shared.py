@@ -1,4 +1,4 @@
-"""Helpers partagés : filtre APC et pagination pour les endpoints stats."""
+"""Helper partagé : filtre APC pour les endpoints stats."""
 
 from typing import Any
 
@@ -6,12 +6,6 @@ from infrastructure.queries.filters import WhereClause
 
 # Fragments APC — définis ici car spécifiques aux agrégations stats
 # (distincts de `apc_clause` de filters.py qui filtre sur l'existence).
-APC_SUM_SA = """COALESCE((SELECT SUM(ap.amount_eur_ht)
-     FROM apc_payments ap
-     WHERE ap.publication_id = p.id
-       AND ap.budget_structure_id = ANY(CAST(:apc_root_ids AS int[]))
-    ), 0)"""
-
 _APC_EXISTS_SA = (
     "EXISTS (SELECT 1 FROM apc_payments ap "
     "WHERE ap.publication_id = p.id "
@@ -57,13 +51,3 @@ def stats_apc_clause(has_apc: str, apc_structure_ids: list[int]) -> WhereClause 
     if len(parts) == 1:
         return WhereClause(parts[0], binds)
     return WhereClause("(" + " OR ".join(parts) + ")", binds)
-
-
-def paginated(total: int, page: int, per_page: int, key: str, rows: list) -> dict[str, Any]:
-    return {
-        "total": total,
-        "page": page,
-        "per_page": per_page,
-        "pages": (total + per_page - 1) // per_page,
-        key: rows,
-    }

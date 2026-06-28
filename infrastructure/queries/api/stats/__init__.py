@@ -1,10 +1,9 @@
 """Query services pour /api/stats/* (router stats).
 
 Le package est organisé par thème d'agrégat :
-- `journals` : `journal_stats`
 - `pivot` : `run_pivot` (agrégation générique) et le schéma du registre
 - `summary` : `stats_by_year`, `available_years`, `stats_facets`
-- `_shared` : filtre APC + pagination partagés par tous les agrégats.
+- `_shared` : filtre APC partagé par les agrégats.
 
 `PgStatsQueries` agrège ces fonctions sous le port `application.ports.stats_queries.StatsQueries`. Les fonctions libres retournent des dicts conformes au shape des DTOs ; la conversion vers Pydantic est faite ici à la sortie, pour garder les fonctions libres réutilisables hors API.
 """
@@ -14,8 +13,6 @@ from sqlalchemy import Connection
 from application.ports.api.stats_queries import (
     ApcFacet,
     DocTypeFacet,
-    JournalStatsResponse,
-    JournalStatsRow,
     LabFacet,
     OaFacet,
     PivotDimensionOut,
@@ -28,7 +25,6 @@ from application.ports.api.stats_queries import (
     YearStatsRow,
 )
 from domain.stats.pivot import DIMENSIONS, MEASURES
-from infrastructure.queries.api.stats.journals import journal_stats as _journal_stats
 from infrastructure.queries.api.stats.pivot import run_pivot as _run_pivot
 from infrastructure.queries.api.stats.summary import (
     available_years as _available_years,
@@ -42,44 +38,6 @@ class PgStatsQueries(StatsQueries):
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
-
-    def journal_stats(
-        self,
-        *,
-        apc_structure_ids: list[int],
-        lab_ids: list[int],
-        years: list[int],
-        publisher_id: int | None,
-        oa_status: str,
-        has_apc: str,
-        doc_types: list[str],
-        search: str,
-        page: int,
-        per_page: int,
-        sort: str,
-    ) -> JournalStatsResponse:
-        data = _journal_stats(
-            self._conn,
-            apc_structure_ids=apc_structure_ids,
-            lab_ids=lab_ids,
-            years=years,
-            publisher_id=publisher_id,
-            oa_status=oa_status,
-            has_apc=has_apc,
-            doc_types=doc_types,
-            search=search,
-            page=page,
-            per_page=per_page,
-            sort=sort,
-        )
-        return JournalStatsResponse(
-            total=data["total"],
-            page=data["page"],
-            per_page=data["per_page"],
-            pages=data["pages"],
-            journals=[JournalStatsRow(**r) for r in data["journals"]],
-        )
-
 
     def stats_by_year(
         self,
