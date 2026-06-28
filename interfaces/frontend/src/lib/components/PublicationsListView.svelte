@@ -439,8 +439,8 @@
 	<input type="search" placeholder="Rechercher par titre..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	{#if col('type')}<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />{/if}
 	{#if col('year')}<FacetDropdown label="Années" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />{/if}
-	{#if !externalFilters?.journalId}<EntityFilter label="Revue" endpoint="/api/journals" itemsKey="journals" labelField="title" selected={journalSelection} onchange={onJournalFilter} />{/if}
-	{#if !externalFilters?.publisherId}<EntityFilter label="Éditeur" endpoint="/api/publishers" itemsKey="publishers" labelField="name" selected={publisherSelection} onchange={onPublisherFilter} />{/if}
+	{#if !externalFilters?.journalId}<EntityFilter label="Revue" endpoint="/api/publications/facets/entities" kind="journal" buildParams={buildFilterParams} selected={journalSelection} onchange={onJournalFilter} />{/if}
+	{#if !externalFilters?.publisherId}<EntityFilter label="Éditeur" endpoint="/api/publications/facets/entities" kind="publisher" buildParams={buildFilterParams} selected={publisherSelection} onchange={onPublisherFilter} />{/if}
 	{#if !hasFixedLab && col('labs')}<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onLabChange} />{/if}
 	{#if col('oa')}<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={onFilterChange} />{/if}
 	{#if col('oa_status')}<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />{/if}
