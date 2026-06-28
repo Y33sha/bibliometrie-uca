@@ -14,7 +14,7 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from domain.publications.doc_type_families import doc_type_family_sql
+from domain.publications.doc_type_families import doc_type_grouped_sql
 from domain.stats.pivot import DIMENSIONS, MEASURES, Dimension, validate_pivot
 from infrastructure.queries.api.stats._shared import stats_apc_clause
 from infrastructure.queries.filters import (
@@ -38,7 +38,7 @@ _DIM_EXPR: dict[str, str] = {
         "ELSE 'indetermine' END"
     ),
     "oa_voie": "p.oa_status::text",
-    "doc_type_family": doc_type_family_sql("p.doc_type"),
+    "doc_type_grouped": doc_type_grouped_sql("p.doc_type"),
     "lab": "COALESCE(ls.acronym, ls.name)",
     "publisher": "pub.name",
     "journal": "jt.title",
