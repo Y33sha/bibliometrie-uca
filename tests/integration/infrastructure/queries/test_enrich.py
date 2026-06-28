@@ -46,27 +46,28 @@ def _create_journal(conn, openalex_id=None, apc_amount=None):
 
 class TestFetchPublicationsWithDoi:
     def test_returns_tuples(self, sa_sync_conn):
-        """La fonction retourne des tuples conformes au type hint, pour que
-        les callers puissent unpacker `(pub_id, doi, status)`."""
+        """La fonction retourne des `PublicationOaCheck`, pour que les callers puissent unpacker
+        `(pub_id, doi, oa_status, has_open_deposit)`."""
         _create_pub(sa_sync_conn, doi="10.1/a", oa_status="gold")
         rows = fetch_publications_with_doi(sa_sync_conn)
         assert rows
         assert all(isinstance(r, tuple) for r in rows)
-        # Forme du tuple : (id, doi, oa_status)
-        for pub_id, doi, oa_status in rows:
+        # Forme du tuple : (id, doi, oa_status, has_open_deposit)
+        for pub_id, doi, oa_status, has_open_deposit in rows:
             assert isinstance(pub_id, int)
             assert isinstance(doi, str)
             assert oa_status is None or isinstance(oa_status, str)
+            assert isinstance(has_open_deposit, bool)
 
     def test_returns_only_pubs_with_doi(self, sa_sync_conn):
         with_doi = _create_pub(sa_sync_conn, doi="10.1/a")
         _create_pub(sa_sync_conn, doi=None)
 
         rows = fetch_publications_with_doi(sa_sync_conn)
-        ids = [pid for pid, _doi, _oa in rows]
+        ids = [r.id for r in rows]
         assert with_doi in ids
         # Pas de pub sans DOI
-        assert all(doi is not None for _pid, doi, _oa in rows)
+        assert all(r.doi is not None for r in rows)
 
     def test_sorts_never_checked_first(self, sa_sync_conn):
         # Tri `unpaywall_checked_at NULLS FIRST` : les jamais-vérifiés d'abord.
@@ -74,7 +75,7 @@ class TestFetchPublicationsWithDoi:
         _set_checked(sa_sync_conn, checked, days_ago=1)
         never = _create_pub(sa_sync_conn, doi="10.1/b", oa_status="closed")
         rows = fetch_publications_with_doi(sa_sync_conn)
-        ordered = [pid for pid, _, _ in rows if pid in (checked, never)]
+        ordered = [r.id for r in rows if r.id in (checked, never)]
         assert ordered[0] == never
 
     def test_staleness_excludes_stable_and_fresh(self, sa_sync_conn):
@@ -90,7 +91,7 @@ class TestFetchPublicationsWithDoi:
         closed_stale = _create_pub(sa_sync_conn, doi="10.1/cs", oa_status="closed")
         _set_checked(sa_sync_conn, closed_stale, days_ago=999)
 
-        ids = {pid for pid, _, _ in fetch_publications_with_doi(sa_sync_conn, staleness_days=30)}
+        ids = {r.id for r in fetch_publications_with_doi(sa_sync_conn, staleness_days=30)}
         assert never_gold in ids
         assert gold_checked not in ids
         assert closed_fresh not in ids
@@ -111,7 +112,7 @@ class TestFetchPublicationsWithDoi:
     def test_returns_oa_status(self, sa_sync_conn):
         _create_pub(sa_sync_conn, doi="10.1/a", oa_status="gold")
         rows = fetch_publications_with_doi(sa_sync_conn)
-        assert any(oa == "gold" for _pid, _doi, oa in rows)
+        assert any(r.oa_status == "gold" for r in rows)
 
 
 class TestFetchJournalsOfUnknownType:

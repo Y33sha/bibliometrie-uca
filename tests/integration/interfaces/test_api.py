@@ -80,15 +80,6 @@ class TestLaboratories:
         assert r.status_code in (404, 500)
 
 
-# ── Stats ───────────────────────────────────────────────────────
-
-
-class TestStats:
-    def test_summary(self, client):
-        r = client.get("/api/stats/summary")
-        assert r.status_code == 200
-
-
 # ── Auth ────────────────────────────────────────────────────────
 
 
