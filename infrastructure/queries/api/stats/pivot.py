@@ -92,10 +92,14 @@ def _filter_clauses(
     ]
     if publisher_ids:
         out.append(
-            WhereClause("j.publisher_id = ANY(:flt_publisher_ids)", {"flt_publisher_ids": publisher_ids})
+            WhereClause(
+                "j.publisher_id = ANY(:flt_publisher_ids)", {"flt_publisher_ids": publisher_ids}
+            )
         )
     if journal_ids:
-        out.append(WhereClause("p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": journal_ids}))
+        out.append(
+            WhereClause("p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": journal_ids})
+        )
     return out
 
 
