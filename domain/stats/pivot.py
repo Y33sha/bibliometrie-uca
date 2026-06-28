@@ -86,7 +86,7 @@ DIMENSIONS: dict[str, Dimension] = {
         ordinal=False, multiplies=False, groupable=False, comparable=False, filterable=True,
     ),
     "doc_type_grouped": Dimension(
-        "doc_type_grouped", "Type de document", "low",
+        "doc_type_grouped", "Productions", "low",
         ordinal=False, multiplies=False, groupable=True, comparable=True, filterable=False,
     ),
     "lab": Dimension(
