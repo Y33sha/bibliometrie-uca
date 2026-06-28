@@ -74,11 +74,11 @@ DIMENSIONS: dict[str, Dimension] = {
         ordinal=True, multiplies=False, groupable=True, comparable=True, filterable=True,
     ),
     "oa_access": Dimension(
-        "oa_access", "Accès", "low",
+        "oa_access", "Open access", "low",
         ordinal=False, multiplies=False, groupable=True, comparable=False, filterable=False,
     ),
     "oa_voie": Dimension(
-        "oa_voie", "Voie d'accès ouvert", "low",
+        "oa_voie", "Modèle OA", "low",
         ordinal=False, multiplies=False, groupable=True, comparable=False, filterable=True,
     ),
     "doc_type": Dimension(
